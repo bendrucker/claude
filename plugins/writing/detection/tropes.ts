@@ -1273,18 +1273,34 @@ export function scan(text: string, filePath?: string, context?: ScanContext): Pa
   return scanIntroduced(text, "", filePath, context);
 }
 
+// The batch analyze surface audits every pattern, skillOnly included. The hook
+// path through scan() skips them.
+export function scanAudit(text: string): PatternMatch[] {
+  return collectMatches(text, "", undefined, undefined, true);
+}
+
 export function scanIntroduced(
   newText: string,
   oldText: string,
   filePath?: string,
   context?: ScanContext,
 ): PatternMatch[] {
+  return collectMatches(newText, oldText, filePath, context, false);
+}
+
+function collectMatches(
+  newText: string,
+  oldText: string,
+  filePath: string | undefined,
+  context: ScanContext | undefined,
+  includeSkillOnly: boolean,
+): PatternMatch[] {
   const newStripped = stripCode(newText);
   const oldStripped = stripCode(oldText);
   const matches: PatternMatch[] = [];
 
   for (const def of PATTERNS) {
-    if (def.skillOnly) continue;
+    if (def.skillOnly && !includeSkillOnly) continue;
     if (def.fileOnly && filePath != null && filePath !== "" && !isProseFile(filePath)) continue;
     if (def.sideEffectOnly && context === "file") continue;
 

@@ -1,8 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { fightinWords, rank, stemTerm, tokenizeCorpus } from "./fightin-words";
+import type { VoiceDocument } from "./voice-corpus";
 
 function counts(entries: Record<string, number>): Map<string, number> {
   return new Map(Object.entries(entries));
+}
+
+// One sentence per document unless a test needs the spread to differ.
+function docs(...bodies: string[]): VoiceDocument[] {
+  return bodies.map((body, index) => ({ source: `doc-${index}`, meta: "", body }));
 }
 
 describe("fightinWords", () => {
@@ -101,34 +107,29 @@ describe("fightinWords", () => {
 });
 
 describe("tokenizeCorpus", () => {
-  // Monroe's alpha sums to alpha-0 only when the corpus size is the count of
-  // the feature being analyzed. A corpus holds one fewer bigram per sentence
-  // than it holds tokens.
-  test("counts each n-gram size separately from the token count", () => {
-    const corpus = tokenizeCorpus("one two three. four five.", [1, 2, 3]);
-    expect(corpus.tokens).toBe(5);
-    expect(corpus.totals.get(1)).toBe(5);
-    expect(corpus.totals.get(2)).toBe(3);
-    expect(corpus.totals.get(3)).toBe(1);
-  });
-
-  test("a size longer than every sentence contributes no features", () => {
-    expect(tokenizeCorpus("one two.", [5]).totals.get(5)).toBe(0);
-  });
-
-  test("counts unigrams and bigrams and keeps the shortest example", () => {
+  test("counts each n-gram size and keeps the shortest example", () => {
     const corpus = tokenizeCorpus(
-      "The load bearing part. This is the load bearing part again.",
+      docs("The load bearing part. This is the load bearing part again."),
       [1, 2],
     );
+    expect(corpus.tokens).toBe(11);
     expect(corpus.ngrams.get(1)?.get("load")).toBe(2);
     expect(corpus.ngrams.get(2)?.get("load bearing")).toBe(2);
     expect(corpus.examples.get("load bearing")).toBe("The load bearing part");
   });
 
+  test("counts the documents a term appears in, not its occurrences", () => {
+    const corpus = tokenizeCorpus(
+      docs("Worth noting. Worth noting again.", "Worth noting here."),
+      [2],
+    );
+    expect(corpus.ngrams.get(2)?.get("worth noting")).toBe(3);
+    expect(corpus.spread.get("worth noting")).toBe(2);
+  });
+
   test("strips code, paths, and identifiers before counting", () => {
     const corpus = tokenizeCorpus(
-      "Consider `someCall()` on src/lib/thing.ts with --dry-run and snake_case names.",
+      docs("Consider `someCall()` on src/lib/thing.ts with --dry-run and snake_case names."),
       [1],
     );
     const unigrams = corpus.ngrams.get(1) ?? new Map();
@@ -139,53 +140,74 @@ describe("tokenizeCorpus", () => {
   });
 
   test("sentences do not bleed n-grams across boundaries", () => {
-    const corpus = tokenizeCorpus("First alpha. Beta second.", [2]);
-    expect(corpus.ngrams.get(2)?.has("alpha beta")).toBe(false);
+    expect(
+      tokenizeCorpus(docs("First alpha. Beta second."), [2]).ngrams.get(2)?.has("alpha beta"),
+    ).toBe(false);
+  });
+
+  test("documents do not bleed n-grams into each other", () => {
+    expect(
+      tokenizeCorpus(docs("First alpha", "Beta second"), [2]).ngrams.get(2)?.has("alpha beta"),
+    ).toBe(false);
+  });
+
+  test.each([0, -1, 1.5])("an n-gram size of %p is rejected", (size) => {
+    expect(() => tokenizeCorpus(docs("one two three."), [size])).toThrow(/positive integer/);
   });
 });
 
 describe("rank", () => {
   const a = tokenizeCorpus(
-    "Worth noting the tradeoff. Worth noting the risk. Worth noting.",
+    docs("Worth noting the tradeoff.", "Worth noting the risk.", "Worth noting."),
     [1, 2],
   );
-  const b = tokenizeCorpus("The tradeoff is fine. The risk is fine. Fine either way.", [1, 2]);
+  const b = tokenizeCorpus(
+    docs("The tradeoff is fine.", "The risk is fine.", "Fine either way."),
+    [1, 2],
+  );
+  const options = { sizes: [1, 2], prior: 100, minCount: 1, minDocs: 1 };
 
   test("drops terms below the minimum count in A", () => {
-    const kept = rank(a, b, { sizes: [1, 2], prior: 100, minCount: 3 });
+    const kept = rank(a, b, { ...options, minCount: 3 });
     expect(kept.every((row) => row.countA >= 3)).toBe(true);
     expect(kept.some((row) => row.term === "worth noting")).toBe(true);
   });
 
+  // A term confined to one document is that document's quirk, not a habit.
+  test("drops terms confined to fewer documents than the minimum", () => {
+    const kept = rank(a, b, { ...options, minDocs: 3 });
+    expect(kept.every((row) => row.docs >= 3)).toBe(true);
+    expect(kept.some((row) => row.term === "tradeoff")).toBe(false);
+    expect(kept.some((row) => row.term === "worth noting")).toBe(true);
+  });
+
   test("interleaves n-gram sizes into one ordering by z", () => {
-    const ranked = rank(a, b, { sizes: [1, 2], prior: 100, minCount: 1 });
+    const ranked = rank(a, b, options);
     const zs = ranked.map((row) => row.z);
     expect(zs).toEqual(zs.toSorted((left, right) => right - left));
     expect(new Set(ranked.map((row) => row.n))).toEqual(new Set([1, 2]));
   });
 
-  test("scores each size against its own feature total", () => {
-    const text = "alpha beta. alpha beta. alpha beta.";
-    const corpus = tokenizeCorpus(text, [2]);
-    const [row] = rank(corpus, tokenizeCorpus("gamma delta.", [2]), {
-      sizes: [2],
-      prior: 100,
-      minCount: 1,
-    });
+  // Monroe's alpha sums to alpha-0 only against the count of the feature being
+  // analyzed, and a corpus holds fewer bigrams than tokens.
+  test("scores each size against its own feature total, not the token count", () => {
+    const study = tokenizeCorpus(docs("alpha beta.", "alpha beta.", "alpha beta."), [2]);
+    const reference = tokenizeCorpus(docs("gamma delta."), [2]);
+    const [row] = rank(study, reference, { sizes: [2], prior: 100, minCount: 1, minDocs: 1 });
     const direct = fightinWords({
-      a: corpus.ngrams.get(2) ?? new Map(),
-      b: tokenizeCorpus("gamma delta.", [2]).ngrams.get(2) ?? new Map(),
-      totalA: corpus.totals.get(2) ?? 0,
+      a: study.ngrams.get(2) ?? new Map(),
+      b: reference.ngrams.get(2) ?? new Map(),
+      totalA: 3,
       totalB: 1,
       prior: 100,
     })[0];
+    expect(study.tokens).toBe(6);
     expect(row?.z).toBeCloseTo(direct?.z ?? 0, 12);
   });
 
   test("carries an example sentence for each ranked term", () => {
-    const ranked = rank(a, b, { sizes: [2], prior: 100, minCount: 3 });
-    const noting = ranked.find((row) => row.term === "worth noting");
-    expect(noting?.example).toContain("Worth noting");
+    const ranked = rank(a, b, { ...options, sizes: [2], minCount: 3 });
+    expect(ranked.find((row) => row.term === "worth noting")?.example).toContain("Worth noting");
   });
 });
 

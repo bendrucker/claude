@@ -6,18 +6,29 @@ import {
   curatedEntries,
   type MeasuredTerm,
   recallOfCuratedEntries,
+  renderReport,
   splitHalves,
   summarize,
 } from "./wordlist-overlap";
 
 function makeTerm(overrides: Partial<RankedTerm> = {}): RankedTerm {
-  return { term: "term", countA: 10, countB: 1, delta: 1, z: 2, n: 1, example: "", ...overrides };
+  return {
+    term: "term",
+    countA: 10,
+    countB: 1,
+    delta: 1,
+    z: 2,
+    n: 1,
+    docs: 4,
+    example: "",
+    ...overrides,
+  };
 }
 
 function makeMeasured(coverage: Partial<MeasuredTerm["coverage"]> = {}): MeasuredTerm {
   return {
     row: makeTerm(),
-    coverage: { wordlist: false, lexical: false, sentence: false, categories: [], ...coverage },
+    coverage: { wordlist: false, lexical: false, categories: [], ...coverage },
   };
 }
 
@@ -26,23 +37,39 @@ function makeDoc(source: string): VoiceDocument {
 }
 
 describe("curatedEntries", () => {
-  test("skips comments and blank lines", () => {
-    expect(curatedEntries(["# a comment\n\ndelve\n  tapestry  \n"])).toEqual(["delve", "tapestry"]);
-  });
-
-  test("strips the trailing weight from a weighted list", () => {
-    expect(curatedEntries(["empower 2.5\ncleanly 1.5\n"])).toEqual(["empower", "cleanly"]);
-  });
-
-  test("keeps a multi-word phrase whole", () => {
-    expect(curatedEntries(["source of truth\nescape hatch\n"])).toEqual([
-      "source of truth",
-      "escape hatch",
-    ]);
-  });
-
-  test("concatenates every source list", () => {
-    expect(curatedEntries(["delve\n", "empower 2.5\n"])).toEqual(["delve", "empower"]);
+  test.each<{ name: string; plain: string[]; weighted: string[]; expected: string[] }>([
+    {
+      name: "skips comments and blank lines",
+      plain: ["# a comment\n\ndelve\n  tapestry  \n"],
+      weighted: [],
+      expected: ["delve", "tapestry"],
+    },
+    {
+      name: "strips the trailing weight from a weighted list",
+      plain: [],
+      weighted: ["empower 2.5\ncleanly 1.5\n"],
+      expected: ["empower", "cleanly"],
+    },
+    {
+      name: "keeps a trailing number in a plain list",
+      plain: ["web 3\n"],
+      weighted: [],
+      expected: ["web 3"],
+    },
+    {
+      name: "keeps a multi-word phrase whole",
+      plain: ["source of truth\nescape hatch\n"],
+      weighted: [],
+      expected: ["source of truth", "escape hatch"],
+    },
+    {
+      name: "concatenates every source list",
+      plain: ["delve\n"],
+      weighted: ["empower 2.5\n"],
+      expected: ["delve", "empower"],
+    },
+  ])("$name", ({ plain, weighted, expected }) => {
+    expect(curatedEntries(plain, weighted)).toEqual(expected);
   });
 });
 
@@ -62,25 +89,31 @@ describe("coverageOf", () => {
   });
 
   test("a sentence tripping a detector reports its category", () => {
-    const coverage = coverageOf("dig", "Let me dig into the failing test.");
-    expect(coverage.sentence).toBe(true);
-    expect(coverage.categories).toContain("dig into");
+    expect(coverageOf("dig", "Let me dig into the failing test.").categories).toContain("dig into");
+  });
+
+  // The hook skips skillOnly patterns; this batch surface exists to audit them.
+  test("a skill-only detector still counts as coverage", () => {
+    expect(coverageOf("rides", "The retry path rides on the same socket.").categories).toContain(
+      "rides on",
+    );
   });
 
   test("an empty example cannot trip a sentence-level detector", () => {
-    expect(coverageOf("the", "").sentence).toBe(false);
+    expect(coverageOf("the", "").categories).toEqual([]);
   });
 });
 
 describe("summarize", () => {
   test("counts each coverage kind independently", () => {
-    const summary = summarize([
-      makeMeasured({ wordlist: true, lexical: true, sentence: true }),
-      makeMeasured({ lexical: true, sentence: true }),
-      makeMeasured({ sentence: true }),
-      makeMeasured(),
-    ]);
-    expect(summary).toEqual({ considered: 4, wordlist: 1, lexical: 2, sentence: 3 });
+    expect(
+      summarize([
+        makeMeasured({ wordlist: true, lexical: true, categories: ["a"] }),
+        makeMeasured({ lexical: true, categories: ["a"] }),
+        makeMeasured({ categories: ["a"] }),
+        makeMeasured(),
+      ]),
+    ).toEqual({ considered: 4, wordlist: 1, lexical: 2, sentence: 3 });
   });
 
   test("an empty measurement is all zeroes", () => {
@@ -96,18 +129,27 @@ describe("recallOfCuratedEntries", () => {
   ];
 
   test("finds a curated entry through its stem", () => {
-    const [found] = recallOfCuratedEntries(["delve"], ranked, 3);
-    expect(found).toEqual({ entry: "delve", rankIndex: 0, z: 5 });
+    expect(recallOfCuratedEntries(["delve"], ranked, 3)[0]).toEqual({
+      entry: "delve",
+      rankIndex: 0,
+      z: 5,
+    });
   });
 
   test("reports an entry outside the cutoff as unplaced but keeps its score", () => {
-    const [found] = recallOfCuratedEntries(["robust"], ranked, 1);
-    expect(found).toEqual({ entry: "robust", rankIndex: null, z: 3 });
+    expect(recallOfCuratedEntries(["robust"], ranked, 1)[0]).toEqual({
+      entry: "robust",
+      rankIndex: null,
+      z: 3,
+    });
   });
 
   test("an entry absent from the ranking carries no score", () => {
-    const [found] = recallOfCuratedEntries(["tapestry"], ranked, 3);
-    expect(found).toEqual({ entry: "tapestry", rankIndex: null, z: null });
+    expect(recallOfCuratedEntries(["tapestry"], ranked, 3)[0]).toEqual({
+      entry: "tapestry",
+      rankIndex: null,
+      z: null,
+    });
   });
 
   test("keeps the highest-ranked occurrence when a stem repeats", () => {
@@ -134,11 +176,68 @@ describe("splitHalves", () => {
       body: "The parser reads the file and returns the tree.",
     }));
     const [left, right] = splitHalves(docs);
-    const ranked = rank(
-      tokenizeCorpus(left.map((doc) => doc.body).join("\n\n"), [1]),
-      tokenizeCorpus(right.map((doc) => doc.body).join("\n\n"), [1]),
-      { sizes: [1], prior: 500, minCount: 1 },
-    );
+    const ranked = rank(tokenizeCorpus(left, [1]), tokenizeCorpus(right, [1]), {
+      sizes: [1],
+      prior: 500,
+      minCount: 1,
+      minDocs: 1,
+    });
     expect(Math.abs(ranked[0]?.z ?? 0)).toBeLessThan(0.5);
+  });
+});
+
+describe("renderReport", () => {
+  test("formats the whole measurement", () => {
+    expect(
+      renderReport({
+        studyPath: "/data/contrast-baseline/claude-deliverables.txt",
+        studyDocs: 22,
+        studyTokens: 1234,
+        baselineNames: ["github-prs.txt"],
+        baselineDocs: 342,
+        baselineTokens: 5678,
+        prior: 500,
+        sizes: [1, 2],
+        minCount: 5,
+        minDocs: 3,
+        summary: { considered: 2, wordlist: 0, lexical: 1, sentence: 1 },
+        nullTop: [makeTerm({ term: "noise", z: 4.29 })],
+        recall: [
+          { entry: "delve", rankIndex: 12, z: 3.5 },
+          { entry: "tapestry", rankIndex: null, z: null },
+        ],
+        curatedPool: 140_000,
+        measured: [
+          {
+            row: makeTerm({ term: "worth noting", z: 12.3, countA: 40, countB: 2, docs: 18 }),
+            coverage: { wordlist: false, lexical: true, categories: ["hedging"] },
+          },
+          {
+            row: makeTerm({ term: "the", z: 1.1 }),
+            coverage: { wordlist: false, lexical: false, categories: [] },
+          },
+        ],
+        show: 2,
+      }),
+    ).toMatchInlineSnapshot(`
+      "corpus A  22 docs, 1,234 tokens  /data/contrast-baseline/claude-deliverables.txt
+      corpus B  342 docs, 5,678 tokens  github-prs.txt
+      prior 500  sizes 1,2  min-count 5  min-docs 3
+
+      top 2 discovered terms
+        matched by a curated wordlist entry     0 (0.0%)
+        matched by any vocabulary-layer rule    1 (50.0%)
+        example sentence trips any rule at all  1 (50.0%)
+
+      null control (corpus A split in half): max z=4.29, top terms noise
+
+      curated entries, ranked over 140,000 terms at min-count 1
+        delve                #13  z=3.50
+        tapestry             absent from corpus A
+
+      top 2 by z
+        1. -LS  z=  12.3  40/2 in 18 docs  worth noting
+        2. ---  z=   1.1  10/1 in 4 docs  the"
+    `);
   });
 });

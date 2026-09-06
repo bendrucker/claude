@@ -4,7 +4,8 @@
 // Identifying the Content of Political Conflict", section 3.5.
 
 import { stemmer } from "stemmer";
-import { addNgrams, cleanText, type NGramCounts, splitSentences, tokenizeSentence } from "./ngram";
+import { type NGramCounts, processRows } from "./ngram";
+import type { VoiceDocument } from "./voice-corpus";
 
 export interface FightinWordsInput {
   /** Term counts for the corpus under study. */
@@ -67,42 +68,39 @@ export function fightinWords({
 export interface TokenizedCorpus {
   tokens: number;
   ngrams: Map<number, NGramCounts>;
-  /** Feature count per n-gram size. A corpus holds fewer bigrams than tokens. */
-  totals: Map<number, number>;
+  /** Documents each term appears in. A term confined to one is an artifact. */
+  spread: Map<string, number>;
   /** Shortest sentence each term was seen in, for eyeballing what a term means. */
   examples: Map<string, string>;
 }
 
-// cleanText drops code, paths, and identifiers, which otherwise dominate any
-// contrast drawn over engineering prose.
-export function tokenizeCorpus(text: string, sizes: number[]): TokenizedCorpus {
-  const corpus: TokenizedCorpus = {
-    tokens: 0,
-    ngrams: new Map(sizes.map((n) => [n, new Map<string, number>()])),
-    totals: new Map(sizes.map((n) => [n, 0])),
-    examples: new Map(),
-  };
-
-  for (const sentence of splitSentences(cleanText(text))) {
-    const tokens = tokenizeSentence(sentence);
-    if (tokens.length === 0) continue;
-    corpus.tokens += tokens.length;
-    for (const n of sizes) {
-      const counts = corpus.ngrams.get(n);
-      if (!counts) continue;
-      addNgrams(counts, tokens, n);
-      corpus.totals.set(n, (corpus.totals.get(n) ?? 0) + Math.max(0, tokens.length - n + 1));
-      for (let i = 0; i <= tokens.length - n; i++) {
-        const key = tokens.slice(i, i + n).join(" ");
-        const seen = corpus.examples.get(key);
-        if (seen === undefined || sentence.length < seen.length) {
-          corpus.examples.set(key, sentence);
-        }
-      }
+function assertSizes(sizes: number[]): void {
+  for (const n of sizes) {
+    if (!Number.isInteger(n) || n < 1) {
+      throw new Error(`n-gram size must be a positive integer, got ${n}`);
     }
   }
+}
 
-  return corpus;
+// Counting per document rather than over one joined string keeps the spread,
+// which is what separates a habit from one document's quirk.
+export function tokenizeCorpus(docs: VoiceDocument[], sizes: number[]): TokenizedCorpus {
+  assertSizes(sizes);
+  const examples = new Map<string, string>();
+  const { stats, sessionSpread } = processRows(
+    docs.map((doc) => ({ session_id: doc.source, text: doc.body })),
+    sizes,
+    { examples },
+  );
+  return { tokens: stats.tokens, ngrams: stats.ngrams, spread: sessionSpread, examples };
+}
+
+// Monroe's alpha sums to alpha-0 only against the count of the feature being
+// analyzed, and a corpus holds fewer bigrams than tokens.
+function featureTotal(counts: NGramCounts | undefined): number {
+  let total = 0;
+  for (const count of counts?.values() ?? []) total += count;
+  return total;
 }
 
 // Stem as the detection wordlists do, so "delves" and "delve" are one entry.
@@ -119,10 +117,13 @@ export interface RankOptions {
   prior: number;
   /** Drop terms seen fewer times than this in A. Guards against hapax noise. */
   minCount: number;
+  /** Drop terms confined to fewer than this many documents of A. */
+  minDocs: number;
 }
 
 export interface RankedTerm extends FightinWordsRow {
   n: number;
+  docs: number;
   example: string;
 }
 
@@ -132,13 +133,15 @@ export function rank(a: TokenizedCorpus, b: TokenizedCorpus, options: RankOption
     const rows = fightinWords({
       a: a.ngrams.get(n) ?? new Map(),
       b: b.ngrams.get(n) ?? new Map(),
-      totalA: a.totals.get(n) ?? 0,
-      totalB: b.totals.get(n) ?? 0,
+      totalA: featureTotal(a.ngrams.get(n)),
+      totalB: featureTotal(b.ngrams.get(n)),
       prior: options.prior,
     });
     for (const row of rows) {
       if (row.countA < options.minCount) continue;
-      ranked.push({ ...row, n, example: a.examples.get(row.term) ?? "" });
+      const docs = a.spread.get(row.term) ?? 0;
+      if (docs < options.minDocs) continue;
+      ranked.push({ ...row, n, docs, example: a.examples.get(row.term) ?? "" });
     }
   }
   ranked.sort((left, right) => right.z - left.z);

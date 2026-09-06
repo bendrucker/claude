@@ -169,13 +169,10 @@ async function writeCacheFile(path: string, value: unknown): Promise<void> {
   try {
     await Bun.write(path, JSON.stringify(value));
   } catch {
-    // Rendering the line takes priority over remembering what was rendered.
   }
 }
 
-// The session title Claude Code has settled on, or null before it names one.
-// Read on every status line render, so an unchanged transcript costs a stat and
-// a changed one a bounded read of the tail. The file is never read end to end.
+// The session title Claude Code has settled on, or null before it names one. Read on every status line render, so an unchanged transcript costs a stat and a changed one a bounded read of the tail.
 export async function readSessionTitle(
   transcriptPath: string,
   sessionId: string,
@@ -255,8 +252,6 @@ export async function reportPaneMetadata(
   const paneId = process.env.HERDR_PANE_ID;
   if (paneId == null || paneId === "") return;
 
-  // The dedup cache and the transcript are unrelated files, so the render waits
-  // on one round trip rather than two.
   const path = cachePath(sessionId);
   const [cached, title] = await Promise.all([
     readCacheFile(path, CachedReport),

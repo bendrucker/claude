@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ContextToken } from "./pane-metadata";
+import { cachePath, type ContextToken, titleCachePath } from "./pane-metadata";
 import {
   buildStatusLine,
   contextDial,
@@ -389,5 +389,98 @@ describe("emitRateLimits", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// The dial and the title only mean something once they reach herdr, and the
+// chain that carries them (stdin schema, transcript scan, detached child,
+// argv) has no seam a unit test can reach.
+describe("pane metadata report", () => {
+  const sessionId = "9f0b1c2d-3e4f-5061-7283-94a5b6c7d8e9";
+
+  // Derived rather than inlined: a private-use glyph pasted into an assertion is
+  // one bad paste away from asserting some other icon.
+  const dial = contextDial({ context_window: { used_percentage: 30 } });
+  const dialToken = `${dial?.token}=${dial?.value}`;
+
+  const paneList = JSON.stringify({
+    result: {
+      type: "pane_list",
+      panes: [{ pane_id: "w2:p2", agent_session: { agent: "claude", value: sessionId } }],
+    },
+  });
+
+  async function recordedArgs(transcript: string): Promise<string[]> {
+    const dir = mkdtempSync(join(tmpdir(), "statusline-herdr-"));
+    const bin = join(dir, "bin");
+    const log = join(dir, "argv");
+    const transcriptPath = join(dir, "transcript.jsonl");
+
+    try {
+      mkdirSync(bin);
+      const herdr = join(bin, "herdr");
+      await Bun.write(
+        herdr,
+        [
+          "#!/bin/sh",
+          `if [ "$2" = list ]; then printf '%s' '${paneList}'; exit 0; fi`,
+          `for arg in "$@"; do printf '%s\\n' "$arg" >> ${log}; done`,
+          "",
+        ].join("\n"),
+      );
+      Bun.spawnSync(["chmod", "+x", herdr]);
+      await Bun.write(transcriptPath, transcript);
+
+      const child = Bun.spawn([process.execPath, join(import.meta.dir, "statusline.ts")], {
+        env: { ...process.env, HERDR_PANE_ID: "w2:p2", PATH: `${bin}:${process.env.PATH ?? ""}` },
+        stdin: Buffer.from(
+          JSON.stringify({
+            session_id: sessionId,
+            transcript_path: transcriptPath,
+            context_window: { used_percentage: 30 },
+          }),
+        ),
+        stdout: "ignore",
+        stderr: "ignore",
+      });
+      await child.exited;
+
+      // The reporting child is detached so the line renders at its own speed,
+      // which lands the stub's log after the status line has already exited.
+      // oxlint-disable no-await-in-loop -- polling for another process's write is sequential by nature.
+      const deadline = Date.now() + 10_000;
+      while (Date.now() < deadline) {
+        const text = await Bun.file(log)
+          .text()
+          .catch(() => "");
+        if (text.includes("report-metadata")) return text.trimEnd().split("\n");
+        await Bun.sleep(25);
+      }
+      // oxlint-enable no-await-in-loop
+      return [];
+    } finally {
+      await Promise.all([
+        rm(dir, { recursive: true, force: true }),
+        rm(cachePath(sessionId), { force: true }),
+        rm(titleCachePath(sessionId), { force: true }),
+      ]);
+    }
+  }
+
+  test("carries the title token and the dial to herdr", async () => {
+    const args = await recordedArgs(
+      `${JSON.stringify({ type: "ai-title", aiTitle: "Herdr sidebar redesign", sessionId })}\n`,
+    );
+    const tokens = args.filter((_arg, i) => args[i - 1] === "--token");
+    expect(tokens).toEqual(["title=Herdr sidebar redesign", dialToken]);
+  });
+
+  test("clears the title before the session is named", async () => {
+    const args = await recordedArgs(
+      `${JSON.stringify({ type: "user", message: { role: "user", content: "hi" } })}\n`,
+    );
+    const tokens = args.filter((_arg, i) => args[i - 1] === "--token");
+    expect(tokens).toEqual([dialToken]);
+    expect(args.filter((_arg, i) => args[i - 1] === "--clear-token")).toContain("title");
   });
 });

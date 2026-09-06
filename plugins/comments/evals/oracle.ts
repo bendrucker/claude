@@ -171,7 +171,17 @@ export function anthropicCommentJudge(options: AnthropicJudgeOptions): CommentJu
     if (!block) {
       throw new Error(`Judge response contained no text block (stop: ${response.stop_reason})`);
     }
-    return parseBatchVerdicts(block.text, inputs.length);
+    try {
+      return parseBatchVerdicts(block.text, inputs.length);
+    } catch (error) {
+      // Structured output constrains the grammar, so malformed JSON means a cut
+      // short response. Report what the API said about why, since a stop reason
+      // other than max_tokens points somewhere other than the token budget.
+      throw new Error(
+        `${error instanceof Error ? error.message : String(error)} (stop: ${response.stop_reason}, batch of ${inputs.length}, output ${response.usage.output_tokens} of ${MAX_TOKENS} tokens, text ends: ${JSON.stringify(block.text.slice(-160))})`,
+        { cause: error },
+      );
+    }
   };
 }
 

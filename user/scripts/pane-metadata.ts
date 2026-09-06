@@ -24,17 +24,23 @@ const CachedReport = z.object({
 });
 type CachedReport = z.infer<typeof CachedReport>;
 
-// The byte offset the transcript had been read to, and the title standing at
-// that point. Resuming from the offset is what keeps a transcript that grows
-// through the turn from being reread on every render.
+// The size the transcript had when the title beside it was read. An unchanged
+// size means nothing has been appended, so the next render needs no read at all.
 const CachedTitle = z.object({
-  offset: z.number(),
+  size: z.number(),
   title: z.string().nullable(),
 });
 type CachedTitle = z.infer<typeof CachedTitle>;
 
 // The name the herdr sidebar config binds to as `$title`.
 const TITLE_TOKEN = "title";
+
+// Claude Code rewrites the title record as a session goes, so the live title
+// sits near the end of the transcript rather than wherever it was first named.
+// Across 376 named transcripts the last record was within 53 KB of the end, so
+// this window carries several times that and keeps the read a fixed cost a
+// transcript running to megabytes cannot grow.
+const TITLE_TAIL_BYTES = 262_144;
 
 const SOURCE = "claude-statusline";
 const TTL_MS = 86_400_000;
@@ -130,25 +136,21 @@ function recordTitle(line: string): string | null {
   return null;
 }
 
-// Reads the complete lines in a chunk of transcript, carrying `previous` forward
-// when the chunk names no title, and reports how many bytes it consumed so the
-// next chunk resumes on a line boundary. A trailing partial line is left for the
-// render that sees it finished.
-export function scanTitles(
-  chunk: string,
-  previous: string | null,
-): { title: string | null; consumed: number } {
-  const end = chunk.lastIndexOf("\n") + 1;
-  const complete = chunk.slice(0, end);
+// The last title a chunk of transcript names, or null when it names none. A
+// chunk taken from mid-file opens on a partial line, which is dropped rather
+// than parsed. A half-written record at the end fails to parse and is ignored.
+export function latestTitle(chunk: string, partialFirstLine: boolean): string | null {
+  const lines = chunk.split("\n");
+  if (partialFirstLine) lines.shift();
 
-  let title = previous;
-  for (const line of complete.split("\n")) {
+  let title: string | null = null;
+  for (const line of lines) {
     // herdr strips control bytes out of token values, which would glue the words
     // of a multi-line title together, so flatten whitespace here instead.
     const found = recordTitle(line)?.replaceAll(/\s+/gu, " ").trim();
     if (found != null && found !== "") title = found;
   }
-  return { title, consumed: Buffer.byteLength(complete) };
+  return title;
 }
 
 async function readCacheFile<T>(path: string, schema: z.ZodType<T>): Promise<T | null> {
@@ -171,9 +173,8 @@ async function writeCacheFile(path: string, value: unknown): Promise<void> {
 }
 
 // The session title Claude Code has settled on, or null before it names one.
-// Read on every status line render, so only the bytes appended since the last
-// one are scanned. A transcript shorter than the cached offset was replaced
-// rather than appended to, and is read from the start.
+// Read on every status line render, so an unchanged transcript costs a stat and
+// a changed one a bounded read of the tail. The file is never read end to end.
 export async function readSessionTitle(
   transcriptPath: string,
   sessionId: string,
@@ -183,14 +184,14 @@ export async function readSessionTitle(
   try {
     const file = Bun.file(transcriptPath);
     const size = file.size;
-    const resume = cached != null && cached.offset <= size ? cached : { offset: 0, title: null };
-    if (resume.offset === size) return resume.title;
+    if (cached?.size === size) return cached.title;
 
-    const { title, consumed } = scanTitles(
-      await file.slice(resume.offset, size).text(),
-      resume.title,
-    );
-    await writeCacheFile(path, { offset: resume.offset + consumed, title });
+    const start = Math.max(0, size - TITLE_TAIL_BYTES);
+    // Standing by the cached title is what carries a name across a stretch of
+    // transcript long enough to push every title record out of the window.
+    const title =
+      latestTitle(await file.slice(start, size).text(), start > 0) ?? cached?.title ?? null;
+    await writeCacheFile(path, { size, title });
     return title;
   } catch {
     return cached?.title ?? null;

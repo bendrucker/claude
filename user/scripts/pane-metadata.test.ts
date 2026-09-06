@@ -12,7 +12,7 @@ import {
   readSessionTitle,
   reportArgs,
   reportSignature,
-  scanTitles,
+  latestTitle,
   shouldReport,
   titleCachePath,
 } from "./pane-metadata";
@@ -187,38 +187,27 @@ const customTitle = (title: string) =>
 const turn = (text: string) =>
   `${JSON.stringify({ type: "user", message: { role: "user", content: text } })}\n`;
 
-describe("scanTitles", () => {
+describe("latestTitle", () => {
   test.each([
     ["names the session", aiTitle("Herdr sidebar redesign"), "Herdr sidebar redesign"],
     ["takes a /title rename", customTitle("screens"), "screens"],
     ["takes the latest of either kind", aiTitle("First") + customTitle("Second"), "Second"],
     ["takes the latest rename", customTitle("Second") + aiTitle("Third"), "Third"],
     ["flattens a multi-line title", aiTitle("Two\nlines"), "Two lines"],
+    ["reads a multi-byte title", aiTitle("Café ☕"), "Café ☕"],
     ["ignores a turn quoting the record", turn(JSON.stringify({ type: "ai-title" })), null],
     ["ignores a record with no title", `${JSON.stringify({ type: "ai-title" })}\n`, null],
     ["ignores a malformed line", '{"type":"ai-title",\n', null],
     ["ignores a blank title", aiTitle("   "), null],
+    ["ignores a record still being written", aiTitle("Named").slice(0, 30), null],
   ])("%s", (_name, chunk, expected) => {
-    expect(scanTitles(chunk, null).title).toBe(expected);
+    expect(latestTitle(chunk, false)).toBe(expected);
   });
 
-  test("carries the standing title through a chunk that names none", () => {
-    expect(scanTitles(turn("hello"), "Standing").title).toBe("Standing");
-  });
-
-  test("leaves a half-written record for the render that sees it finished", () => {
-    const chunk = `${turn("hello")}${aiTitle("Named").trimEnd()}`;
-    const scan = scanTitles(chunk, null);
-    expect(scan.title).toBeNull();
-    expect(scan.consumed).toBe(Buffer.byteLength(turn("hello")));
-  });
-
-  test("resumes on a line boundary through a multi-byte title", () => {
-    const chunk = aiTitle("Café ☕");
-    expect(scanTitles(chunk, null)).toEqual({
-      title: "Café ☕",
-      consumed: Buffer.byteLength(chunk),
-    });
+  test("drops the truncated line a mid-file window opens on", () => {
+    const chunk = `Title"}\n${aiTitle("Named")}`;
+    expect(latestTitle(chunk, true)).toBe("Named");
+    expect(latestTitle(aiTitle("Cut off"), true)).toBeNull();
   });
 });
 
@@ -266,18 +255,30 @@ describe("readSessionTitle", () => {
     });
   });
 
-  test("scans only the bytes appended since the last render", async () => {
+  test("caches against the size that produced it", async () => {
     await withTranscript(async (path, sessionId) => {
       await Bun.write(path, aiTitle("Named"));
       expect(await readSessionTitle(path, sessionId)).toBe("Named");
       expect(await Bun.file(titleCachePath(sessionId)).json()).toEqual({
-        offset: Bun.file(path).size,
+        size: Bun.file(path).size,
         title: "Named",
       });
+    });
+  });
 
-      // A record already behind the cached offset is never reread, so a
-      // transcript that grows without naming a new title costs one short read.
-      await Bun.write(path, aiTitle("Rewritten") + turn("hello"));
+  test("reads a title a transcript longer than the tail window ends with", async () => {
+    await withTranscript(async (path, sessionId) => {
+      await Bun.write(path, turn("x".repeat(400_000)) + aiTitle("Named"));
+      expect(await readSessionTitle(path, sessionId)).toBe("Named");
+    });
+  });
+
+  test("stands by the cached title once the tail window slides past it", async () => {
+    await withTranscript(async (path, sessionId) => {
+      await Bun.write(path, aiTitle("Named"));
+      expect(await readSessionTitle(path, sessionId)).toBe("Named");
+
+      await Bun.write(path, aiTitle("Named") + turn("x".repeat(400_000)));
       expect(await readSessionTitle(path, sessionId)).toBe("Named");
     });
   });

@@ -50,7 +50,7 @@ describe("parseRemote", () => {
 });
 
 describe("forgeKind", () => {
-  const cases: Array<[string, string | null, "github" | "gitlab" | null]> = [
+  const cases: [string, string | null, "github" | "gitlab" | null][] = [
     ["github.com", null, "github"],
     ["gitlab.com", null, "gitlab"],
     ["gitlab.internal.example", null, "gitlab"],

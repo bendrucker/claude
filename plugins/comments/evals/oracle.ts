@@ -10,7 +10,7 @@ import { batchVerdictSchema, type Verdict } from "../judge/schema";
 /**
  * The calibration oracle: the Anthropic SDK judge used only under `evals/`. It
  * renders an indexed batch, scores it in one Messages call, and validates the
- * response. It is a cross-check on the rubric; `eval.ts build` and `eval.ts
+ * response. It is a cross-check on the rubric. `eval.ts build` and `eval.ts
  * score` gate the rubric through the production Workflow judge.
  */
 

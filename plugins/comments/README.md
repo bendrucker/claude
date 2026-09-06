@@ -45,13 +45,13 @@ The ship gate scores the fixture corpus through the judge that ships. `build` sh
 
 ```bash
 bun run plugins/comments/evals/eval.ts build
-# Workflow({ scriptPath: <scriptPath>, args: <parsed job-args.json> })
+# Workflow({ scriptPath: <scriptPath>, args: <the parsed contents of argsPath> })
 bun run plugins/comments/evals/eval.ts score --job <jobDir> --gate
 ```
 
 The gate holds the must-keep comments at `keep` (canonical-API docstrings, genuine why-comments, regression-test rationale). Trimming or rewriting one of those is the destructive error the gate guards against.
 
-The SDK oracle scores the same corpus in one batched Messages call, as a cross-check on the rubric rather than the gate. It needs `ANTHROPIC_API_KEY`, and models after Opus 4.6 reject `temperature`, so it pins `effort` instead and repeated runs can differ:
+The SDK oracle cross-checks the rubric over the same corpus, scoring it in batched Messages calls. It needs `ANTHROPIC_API_KEY`, and it samples, so repeated runs can differ:
 
 ```bash
 bun run plugins/comments/evals/eval.ts --gate

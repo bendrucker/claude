@@ -75,8 +75,8 @@ function toShardComment(comment: ShardComment): ShardComment {
  * wins judge and stream first, and pin the prompt. The Bun side shards once. The
  * sandboxed Workflow cannot re-shard, so one shard maps 1:1 to one agent.
  *
- * Takes the shard fields alone, so the audit passes `CollectedComment`s and the
- * eval passes fixtures, and both reach the agents through the same writer.
+ * Reads only the shard fields off each comment, so a caller may pass a wider
+ * type and the extra fields stay out of the shard files.
  */
 export async function buildJob(
   comments: ShardComment[],

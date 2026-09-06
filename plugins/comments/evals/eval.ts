@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Glob } from "bun";
@@ -262,19 +263,39 @@ export function alignVerdicts(fixtures: Fixture[], verdicts: Map<string, Verdict
     if (verdict) aligned.push(verdict);
     else unjudged.push(fixture.id);
   }
-  if (unjudged.length > 0) {
-    throw new Error(`No verdict for ${unjudged.length} fixture(s): ${unjudged.join(", ")}`);
-  }
   const ids = new Set(fixtures.map((fixture) => fixture.id));
   const foreign = [...verdicts.keys()].filter((id) => !ids.has(id));
-  if (foreign.length > 0) {
-    throw new Error(`Verdicts name ${foreign.length} unknown comment(s): ${foreign.join(", ")}`);
+  const problems: string[] = [];
+  if (unjudged.length > 0) {
+    problems.push(`No verdict for ${unjudged.length} fixture(s): ${unjudged.join(", ")}`);
   }
+  if (foreign.length > 0) {
+    problems.push(`Verdicts name ${foreign.length} unknown comment(s): ${foreign.join(", ")}`);
+  }
+  if (problems.length > 0) throw new Error(problems.join(". "));
   return aligned;
 }
 
 /** Where `build` materializes a job, kept apart from the audit's own job dirs. */
 const EVAL_JOB_BASE = join(tmpdir(), "comments-eval");
+
+/** Every verdict file in a job's verdicts dir, by absolute path. */
+async function verdictFiles(verdictsDir: string): Promise<string[]> {
+  const paths: string[] = [];
+  for await (const file of new Glob("verdict-*.json").scan(verdictsDir)) {
+    paths.push(join(verdictsDir, file));
+  }
+  return paths;
+}
+
+/**
+ * A job dir is keyed on the corpus and the rubric, so a re-run of an unchanged
+ * gate reuses the dir the last one wrote. Clearing it leaves a failed judging
+ * run with no verdicts for `score` to read, rather than the previous run's.
+ */
+export async function clearVerdicts(verdictsDir: string): Promise<void> {
+  await Promise.all((await verdictFiles(verdictsDir)).map((path) => rm(path)));
+}
 
 /**
  * Shard the corpus through the production job writer and emit the `<preflight>`
@@ -289,6 +310,7 @@ async function build(jobBase: string): Promise<number> {
   }
   const descriptor = await buildJob(fixtures.map(fixtureToShardComment), { fix: false });
   const written = await writeJob(descriptor, jobBase);
+  await clearVerdicts(written.verdictsDir);
   console.error(
     `${written.count} fixtures / ${written.shardCount} shards (prompt ${descriptor.promptSha.slice(0, 12)})`,
   );
@@ -305,13 +327,14 @@ async function readJobVerdicts(jobDir: string): Promise<Map<string, Verdict>> {
     throw new Error(`No job at ${jobDir}. Pass the job dir printed by build.`);
   }
   const verdictsDir = join(jobDir, "verdicts");
-  const glob = new Glob("verdict-*.json");
-  const contents: unknown[] = [];
-  for await (const file of glob.scan(verdictsDir)) {
-    contents.push(JSON.parse(await Bun.file(join(verdictsDir, file)).text()));
-  }
-  if (contents.length === 0) {
+  const files = await verdictFiles(verdictsDir);
+  if (files.length === 0) {
     throw new Error(`No verdict files in ${verdictsDir}. Run the judge workflow first.`);
+  }
+  const texts = await Promise.all(files.map((path) => Bun.file(path).text()));
+  const contents: unknown[] = [];
+  for (const text of texts) {
+    contents.push(JSON.parse(text));
   }
   return collectVerdicts(contents);
 }
@@ -353,9 +376,10 @@ const GATE_FLAG = {
 } as const;
 
 if (import.meta.main) {
-  // cleye dispatches synchronously, so each handler parks its work here for the
-  // top-level await below. `--help` parks nothing and exits 0.
-  const tasks: Promise<number>[] = [];
+  // cleye runs one handler synchronously, either a command's or the root's, so
+  // the handler parks its work here for the top-level await below. `--help`
+  // parks nothing and exits 0.
+  let task: Promise<number> | undefined;
 
   const buildCmd = command(
     {
@@ -365,7 +389,7 @@ if (import.meta.main) {
       },
     },
     (parsed) => {
-      tasks.push(build(parsed.flags.jobBase));
+      task = build(parsed.flags.jobBase);
     },
   );
 
@@ -378,7 +402,7 @@ if (import.meta.main) {
       },
     },
     (parsed) => {
-      tasks.push(score(parsed.flags.job, parsed.flags.gate));
+      task = score(parsed.flags.job, parsed.flags.gate);
     },
   );
 
@@ -392,17 +416,14 @@ if (import.meta.main) {
       commands: [buildCmd, scoreCmd],
     },
     (parsed) => {
-      tasks.push(oracle(parsed.flags.model, parsed.flags.gate));
+      task = oracle(parsed.flags.model, parsed.flags.gate);
     },
   );
 
-  const codes = await Promise.all(
-    tasks.map((task) =>
-      task.catch((error: unknown) => {
-        console.error(error instanceof Error ? error.message : String(error));
-        return 1;
-      }),
-    ),
+  process.exit(
+    await (task?.catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      return 1;
+    }) ?? 0),
   );
-  process.exit(codes.find((code) => code !== 0) ?? 0);
 }

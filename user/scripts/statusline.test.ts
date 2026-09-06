@@ -392,7 +392,9 @@ describe("emitRateLimits", () => {
   });
 });
 
-// The dial and the title only mean something once they reach herdr, and the chain that carries them (stdin schema, transcript scan, detached child, argv) has no seam a unit test can reach.
+// The dial and the title only mean something once they reach herdr, and the
+// chain that carries them (stdin schema, transcript scan, detached child,
+// argv) has no seam a unit test can reach.
 describe("pane metadata report", () => {
   const sessionId = "9f0b1c2d-3e4f-5061-7283-94a5b6c7d8e9";
 

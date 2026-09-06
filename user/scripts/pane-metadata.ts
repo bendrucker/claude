@@ -166,13 +166,12 @@ async function readCacheFile<T>(path: string, schema: z.ZodType<T>): Promise<T |
 // rescan or a repeated report, so a failure here must not reach the value the
 // caller went to the trouble of computing.
 async function writeCacheFile(path: string, value: unknown): Promise<void> {
-  try {
-    await Bun.write(path, JSON.stringify(value));
-  } catch {
-  }
+  await Bun.write(path, JSON.stringify(value)).catch(() => undefined);
 }
 
-// The session title Claude Code has settled on, or null before it names one. Read on every status line render, so an unchanged transcript costs a stat and a changed one a bounded read of the tail.
+// The session title Claude Code has settled on, or null before it names one.
+// Read on every status line render, so an unchanged transcript costs a stat and
+// a changed one a bounded read of the tail.
 export async function readSessionTitle(
   transcriptPath: string,
   sessionId: string,

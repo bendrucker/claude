@@ -85,6 +85,8 @@ describe("reportArgs", () => {
         "86400000",
         "--display-agent",
         "<brand>",
+        "--clear-token",
+        "title",
         "--token",
         "ctx_high=󰪢",
         "--clear-token",
@@ -109,6 +111,8 @@ describe("reportArgs", () => {
       "86400000",
       "--display-agent",
       brandGlyph,
+      "--clear-token",
+      "title",
     ]);
   });
 
@@ -125,6 +129,7 @@ describe("reportArgs", () => {
       "--token",
       "title=Herdr sidebar redesign",
     ]);
+    expect(args).not.toContain("--clear-token");
   });
 
   test("carries the title alongside the dial", () => {
@@ -133,16 +138,32 @@ describe("reportArgs", () => {
     expect(tokens).toEqual(["title=Named", "ctx_mid=x"]);
   });
 
-  test("leaves the title standing when the session has no name yet", () => {
+  test("clears the title when the session has no name yet", () => {
+    // A pane carries the previous session's title until something replaces it,
+    // so a new session drops it rather than wearing it as its own.
     const args = reportArgs("w2:p2", { token: "ctx_mid", value: "x" }, null);
-    expect(args).not.toContain("title");
-    expect(args.filter((_arg, i) => args[i - 1] === "--clear-token")).not.toContain("title");
+    expect(args.filter((_arg, i) => args[i - 1] === "--clear-token")).toContain("title");
+    expect(args.filter((_arg, i) => args[i - 1] === "--token")).toEqual(["ctx_mid=x"]);
+  });
+
+  test("clears the title an empty argv placeholder stands for", () => {
+    const args = reportArgs("w2:p2", null, "");
+    expect(args.filter((_arg, i) => args[i - 1] === "--clear-token")).toEqual(["title"]);
+  });
+
+  test("sets or clears the title, never both", () => {
+    for (const title of [null, "", "Named"]) {
+      const args = reportArgs("w2:p2", null, title);
+      const set = args.filter((_arg, i) => args[i - 1] === "--token");
+      const cleared = args.filter((_arg, i) => args[i - 1] === "--clear-token");
+      expect(set.length + cleared.length).toBe(1);
+    }
   });
 
   const levels = CONTEXT_TOKENS.map((token) => [token] as const);
 
   test.each(levels)("%s clears every other level", (token) => {
-    const args = reportArgs("w2:p2", { token, value: "\u{f0a9e}" }, null);
+    const args = reportArgs("w2:p2", { token, value: "\u{f0a9e}" }, "Named");
     const cleared = args.filter((_arg, i) => args[i - 1] === "--clear-token");
     expect(cleared).toEqual(CONTEXT_TOKENS.filter((other) => other !== token));
   });

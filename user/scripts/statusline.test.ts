@@ -476,11 +476,12 @@ describe("pane metadata report", () => {
     expect(tokens).toEqual(["title=Herdr sidebar redesign", dialToken]);
   });
 
-  test("reports the dial alone before the session is named", async () => {
+  test("clears the title before the session is named", async () => {
     const args = await recordedArgs(
       `${JSON.stringify({ type: "user", message: { role: "user", content: "hi" } })}\n`,
     );
     const tokens = args.filter((_arg, i) => args[i - 1] === "--token");
     expect(tokens).toEqual([dialToken]);
+    expect(args.filter((_arg, i) => args[i - 1] === "--clear-token")).toContain("title");
   });
 });

@@ -82,9 +82,9 @@ export function reportSignature(report: DialReport | null, title: string | null)
 // `context_window` is absent until a turn has closed, and the pane should be
 // branded before then.
 //
-// The title rides along the same way, and is only ever set: a session that has
-// not been named yet keeps whatever herdr already shows, where clearing would
-// blank the sidebar row that renders it.
+// The title rides along the same way. A session that has not been named yet
+// clears the token instead of leaving it, so a pane reused by a new session
+// drops the last one's title rather than showing it as this session's.
 export function reportArgs(
   paneId: string,
   report: DialReport | null,
@@ -102,6 +102,7 @@ export function reportArgs(
     brandGlyph,
   ];
   if (title != null && title !== "") args.push("--token", `${TITLE_TOKEN}=${title}`);
+  else args.push("--clear-token", TITLE_TOKEN);
   if (!report) return args;
 
   args.push("--token", `${report.token}=${report.value}`);

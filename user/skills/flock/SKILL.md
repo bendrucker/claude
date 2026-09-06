@@ -76,7 +76,7 @@ Below the bar, the row is a report. Name the failing job, the reviewer's finding
 
 Check the rendered rows against the deferred keys first. A deferred row is held unless the state block re-raised it as stale.
 
-**Clean up.** Merged with nothing left in the tree. Confirm the pane is still empty with `herdr agent get` immediately before removing anything, because an agent can take the pane between the board and the user's answer, and removal takes the tree out from under it. Then remove the worktree, close its workspace and panes, prune the branch. Read `open_workspace_id` out of `herdr worktree list --json` before removing the path, because herdr loses the mapping once the worktree is gone.
+**Clean up.** Merged with nothing left in the tree. Confirm the pane is still empty with `herdr agent get` first, because an agent can take it between the board and the user's answer, and the removal would take the tree out from under it. Remove the worktree, close its workspace and panes, prune the branch. Read `open_workspace_id` out of `herdr worktree list --json` before removing the path, because herdr loses the mapping once the worktree is gone.
 
 **Merge.** Checks green, merge state clean, your repo. Re-read the bar immediately before merging, because both the board and your first lookup predate the user's answer. `gh pr merge --squash --delete-branch`, and stop there. The worktree becomes a cleanup row on a later sweep, once a fresh board shows it carrying nothing.
 

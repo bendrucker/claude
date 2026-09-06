@@ -52,7 +52,7 @@ This @-mention is the only place a bot is named. Thread replies never name or th
 
 A repo can be configured to review only on request, which changes an absent summary from pending to nothing-to-do. Greptile offers three levers, none of them visible in `.greptile/config.json` alone:
 
-- **Filters → `Labels / Include`** skips every PR without one of the named labels. This is the opt-in: `pull-request:create --label <name>` requests the review at creation, and adding the label later requests it after the fact.
+- **Filters → `Labels / Include`** skips every PR without one of the named labels. `pull-request:create` applies the label on a diff that clears its gate, `--label <name>` requests the review outright, and adding the label later requests it after the fact.
 - **`triggerOnUpdates`** off stops the automatic re-review on each push. A pushed fix then needs an explicit re-trigger (see [The Autonomous Loop](SKILL.md#the-autonomous-loop)).
 - **`triggerOnDrafts`** off skips drafts entirely.
 

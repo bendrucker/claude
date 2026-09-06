@@ -85,9 +85,12 @@ See the "Meaning-Layer Judge" section of [references/methodology.md](references/
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts
 bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts --baseline github-issues.txt --sizes 1 --sizes 2
+bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts --kind docs
 ```
 
 Corpora A and B must match register. Contrasting mismatched genres raises the split-half null floor far above any real term and makes the ranking uninterpretable. Every run prints that floor, which is the z a finding has to clear.
+
+Corpus A holds several genres, sorted by source path into the kinds `--kind` selects: `chat`, `plan`, `memory`, `scratch`, `docs`, and `other`. Only `docs`, the markdown committed to a repository for another reader, has a counterpart in a baseline of PR and issue text. Every run also splits each kind against itself, so the per-kind floors show what a pairing costs: unrestricted, the floor sits at 10.4 against a top score of 16.4, and `--kind docs` drops it to 4.3 against 13.9.
 
 `--json` omits the example sentences the human-readable report already withholds, so no corpus prose reaches a file.
 

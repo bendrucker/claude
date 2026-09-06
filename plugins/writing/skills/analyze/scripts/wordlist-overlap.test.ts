@@ -5,6 +5,7 @@ import {
   coverageOf,
   curatedEntries,
   type MeasuredTerm,
+  nullFloorByKind,
   recallOfCuratedEntries,
   renderReport,
   splitHalves,
@@ -186,6 +187,34 @@ describe("splitHalves", () => {
   });
 });
 
+describe("nullFloorByKind", () => {
+  const options = { sizes: [1], prior: 500, minCount: 1, minDocs: 1 };
+
+  // One body across every document, so any score the split produces is noise.
+  function sameBody(source: string): VoiceDocument {
+    return { source, meta: "", body: "The parser reads the file and returns the tree." };
+  }
+
+  test("scores each kind present against itself, in kind order", () => {
+    const docs = [
+      ...Array.from({ length: 6 }, (_, index) => sameBody(`session-${index}`)),
+      ...Array.from({ length: 4 }, (_, index) => sameBody(`/repo/doc-${index}.md`)),
+    ];
+    const floors = nullFloorByKind(docs, options);
+    expect(floors.map((floor) => [floor.kind, floor.docs])).toEqual([
+      ["chat", 6],
+      ["docs", 4],
+    ]);
+    for (const floor of floors) expect(Math.abs(floor.maxZ ?? 0)).toBeLessThan(0.5);
+  });
+
+  test("a kind holding one document has no split to score", () => {
+    expect(nullFloorByKind([makeDoc("/repo/only.md")], options)).toEqual([
+      { kind: "docs", docs: 1, maxZ: null },
+    ]);
+  });
+});
+
 describe("renderReport", () => {
   test("formats the whole measurement", () => {
     expect(
@@ -193,6 +222,11 @@ describe("renderReport", () => {
         studyPath: "/data/contrast-baseline/claude-deliverables.txt",
         studyDocs: 22,
         studyTokens: 1234,
+        kinds: ["docs", "other"],
+        kindFloors: [
+          { kind: "docs", docs: 18, maxZ: 6.31 },
+          { kind: "other", docs: 4, maxZ: null },
+        ],
         baselineNames: ["github-prs.txt"],
         baselineDocs: 342,
         baselineTokens: 5678,
@@ -220,7 +254,7 @@ describe("renderReport", () => {
         show: 2,
       }),
     ).toMatchInlineSnapshot(`
-      "corpus A  22 docs, 1,234 tokens  /data/contrast-baseline/claude-deliverables.txt
+      "corpus A  22 docs, 1,234 tokens  kinds docs,other  /data/contrast-baseline/claude-deliverables.txt
       corpus B  342 docs, 5,678 tokens  github-prs.txt
       prior 500  sizes 1,2  min-count 5  min-docs 3
 
@@ -230,6 +264,10 @@ describe("renderReport", () => {
         example sentence trips any rule at all  1 (50.0%)
 
       null control (corpus A split in half): max z=4.29, top terms noise
+
+      null floor by kind (each kind split against itself)
+        docs        18 docs  max z=6.31
+        other        4 docs  max z=n/a
 
       curated entries, ranked over 140,000 terms at min-count 1
         delve                #13  z=3.50

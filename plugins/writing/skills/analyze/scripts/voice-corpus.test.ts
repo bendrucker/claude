@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import * as fc from "fast-check";
-import { mergeDocuments, parseCorpus, serializeCorpus, type VoiceDocument } from "./voice-corpus";
+import {
+  documentKind,
+  groupByKind,
+  isDocumentKind,
+  mergeDocuments,
+  parseCorpus,
+  serializeCorpus,
+  type VoiceDocument,
+} from "./voice-corpus";
 
 // A document that survives serialize/parse: the source is a single non-empty
 // token (the delimiter captures \S+), meta carries no ")" or newline (it sits
@@ -58,6 +66,49 @@ describe("serializeCorpus", () => {
         expect(project(reparsed)).toEqual(project(docs));
       }),
     );
+  });
+});
+
+describe("documentKind", () => {
+  test.each([
+    ["a3f9c1d2-7b44-4e10-9c8a-1f2e3d4b5a60#7", "chat"],
+    ["/Users/ben/.claude/plans/2026-08-31-corpus.md#0", "plan"],
+    ["/Users/ben/.claude/projects/-Users-ben-src/memory/project_voice.md#1", "memory"],
+    ["/tmp/claude-501/scratchpad/notes.md#2", "scratch"],
+    ["tmp/pr-body-writing.md#0", "scratch"],
+    ["/Users/ben/src/bendrucker/claude/README.md#0", "docs"],
+    ["/Users/ben/src/bendrucker/claude/.worktrees/x/docs/settings.md#4", "docs"],
+    ["/Users/ben/src/bendrucker/claude/plugins/writing/detection/tropes.ts#0", "other"],
+  ])("%s is %s", (source, kind) => {
+    expect(documentKind(source)).toBe(kind);
+  });
+
+  // The occurrence index sits past the extension, so stripping it is what lets
+  // the markdown check see the real suffix.
+  test("classifies by extension despite the occurrence index", () => {
+    expect(documentKind("/repo/NOTES.md#118")).toBe("docs");
+  });
+});
+
+describe("groupByKind", () => {
+  test("groups only the kinds present, keeping document order", () => {
+    const docs: VoiceDocument[] = [
+      { source: "/repo/a.md#0", meta: "", body: "first" },
+      { source: "session-id#0", meta: "", body: "chatter" },
+      { source: "/repo/b.md#0", meta: "", body: "second" },
+    ];
+    const groups = groupByKind(docs);
+    expect([...groups.keys()].toSorted()).toEqual(["chat", "docs"]);
+    expect(groups.get("docs")?.map((doc) => doc.body)).toEqual(["first", "second"]);
+  });
+});
+
+describe("isDocumentKind", () => {
+  test.each([
+    ["docs", true],
+    ["prose", false],
+  ])("%s is a kind: %p", (value, expected) => {
+    expect(isDocumentKind(value)).toBe(expected);
   });
 });
 

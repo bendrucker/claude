@@ -43,7 +43,9 @@ async function readAllFeedback(): Promise<Record<string, unknown>> {
       .map(async (n) => {
         try {
           out[n.replace(/\.json$/, "")] = await Bun.file(join(argv.flags.feedback, n)).json();
-        } catch {}
+        } catch {
+          // best-effort: skip a feedback file that fails to parse rather than blocking the rest
+        }
       }),
   );
   return out;

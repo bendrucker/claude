@@ -50,7 +50,9 @@ export const Spec = z
   });
 export type Spec = z.infer<typeof Spec>;
 
-class SpecError extends Error {}
+class SpecError extends Error {
+  override readonly name = "SpecError";
+}
 
 function fail(path: string, message: string): never {
   throw new SpecError(`${path}: ${message}`);

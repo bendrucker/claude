@@ -26,8 +26,8 @@ export async function fetchUrls(command: string): Promise<FetchResult> {
   try {
     const entries = Queue.parse(JSON.parse(stdoutText));
     return { ok: true, urls: entries.map((entry) => entry.url) };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     return { ok: false, reason: `JSON parse failed: ${message}` };
   }
 }

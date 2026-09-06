@@ -66,9 +66,9 @@ export async function loadQueryHeaders(dir: string = QUERIES_DIR): Promise<Query
         const header = parseQueryHeader(await Bun.file(path.join(dir, file)).text());
         if (header.name !== name) throw new Error(`header names "${header.name}"`);
         return header;
-      } catch (err) {
-        throw new Error(`${file}: ${err instanceof Error ? err.message : String(err)}`, {
-          cause: err,
+      } catch (error) {
+        throw new Error(`${file}: ${error instanceof Error ? error.message : String(error)}`, {
+          cause: error,
         });
       }
     }),

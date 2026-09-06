@@ -12,6 +12,10 @@
     "eqeqeq": ["error", "always", { "null": "ignore" }],
     "max-depth": "error",
     "no-await-in-loop": "error",
+    // An empty block silently swallows whatever it should have handled, hiding bugs.
+    "no-empty": "error",
+    // Nesting an if inside an else block obscures control flow that else if states directly.
+    "no-lonely-if": "error",
     "no-template-curly-in-string": "warn",
     "no-underscore-dangle": ["error", { "allow": ["__typename", "__dirname"] }],
     "no-unsafe-optional-chaining": "off",
@@ -37,6 +41,10 @@
     // A `new Promise` executor that only wraps an existing async API duplicates
     // logic the platform already exposes, and drops its built-in error handling.
     "promise/avoid-new": "error",
+    // A catch binding named anything but "error" reads as an unrelated value at the call site.
+    "unicorn/catch-error-name": "error",
+    // A custom Error subclass that never sets name prints as "Error", losing which error it is.
+    "unicorn/custom-error-definition": "error",
     // An implicit length check reads as a numeric truthiness test rather
     // than a stated "has items" or "is empty" comparison, and looks the
     // same whether the intent is >0, !==0, or something else entirely.
@@ -70,15 +78,19 @@
     "vitest/no-commented-out-tests": "off",
     // This repo tests with bun:test, not vitest. The vitest plugin matches
     // on the Jest-style API shape rather than the import, so it still
-    // applies correctly here.
-    "vitest/prefer-each": "error"
+    // applies correctly here. Like no-commented-out-tests, it only means
+    // something in test files: repo-wide it flags any loop whose body it
+    // reads as a repeated case, such as render.ts drawing one text line
+    // per iteration. Off here, on under **/*.test.ts below.
+    "vitest/prefer-each": "off"
   },
   "overrides": [
     {
       "files": ["**/*.test.ts"],
       "rules": {
         "unicorn/consistent-function-scoping": "off",
-        "vitest/no-commented-out-tests": "error"
+        "vitest/no-commented-out-tests": "error",
+        "vitest/prefer-each": "error"
       }
     }
   ]

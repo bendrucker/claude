@@ -54,9 +54,9 @@ async function cleanupStrayDatabases(): Promise<void> {
       // oxlint-disable-next-line no-await-in-loop -- two known stray directories; concurrency buys nothing.
       await rm(dir, { recursive: true, force: true });
       console.error(`refresh: removed stale index at ${dir}`);
-    } catch (err) {
+    } catch (error) {
       console.error(
-        `refresh: could not remove stale index at ${dir}: ${err instanceof Error ? err.message : String(err)}`,
+        `refresh: could not remove stale index at ${dir}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
   }
@@ -76,11 +76,11 @@ async function openWithRetry(): Promise<Database | null> {
     try {
       // oxlint-disable-next-line no-await-in-loop -- retry loop: an attempt runs only because the previous one hit the write lock.
       return await getDb(dataDir);
-    } catch (err) {
-      if (!/lock/i.test(String(err)) || attempt >= 3) {
+    } catch (error) {
+      if (!/lock/i.test(String(error)) || attempt >= 3) {
         // oxlint-disable-next-line no-await-in-loop -- retry loop: an attempt runs only because the previous one hit the write lock.
-        if ((await Bun.file(dbPath).exists()) && /lock/i.test(String(err))) return null;
-        throw err;
+        if ((await Bun.file(dbPath).exists()) && /lock/i.test(String(error))) return null;
+        throw error;
       }
     }
     // oxlint-disable-next-line no-await-in-loop -- backoff between lock retries.

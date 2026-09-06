@@ -266,7 +266,9 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
           candidates.add(filePath);
         }
       }
-    } catch {}
+    } catch {
+      // must never break the hook: skip a transcript line that fails to decode
+    }
   }
 
   const checks = [...candidates].map(async (path) => ({
@@ -583,7 +585,9 @@ async function recordBlocks(sessionId: string, blocks: number): Promise<boolean>
 async function clearBlocks(sessionId: string): Promise<void> {
   try {
     await rm(blockCountPath(sessionId), { force: true });
-  } catch {}
+  } catch {
+    // best-effort: a stale block-count file gets overwritten on the next write anyway
+  }
 }
 
 export async function processStop(input: StopInput): Promise<SyncHookJSONOutput | null> {

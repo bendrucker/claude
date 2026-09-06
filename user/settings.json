@@ -515,6 +515,7 @@
       "allowWrite": [
         "/tmp",
         "~/.tmux",
+        "~/.herdr/worktrees",
         "~/.terraform.d/plugin-cache",
         "~/.cache",
         "~/Library/Caches/go-build",
@@ -529,6 +530,7 @@
         "~/.npm",
         "~/.local/share/uv",
         "~/.local/share/graphite",
+        "~/.local/share/plannotator",
         "~/.local/share/atuin",
         "~/.greptile",
         "~/.coderabbit",

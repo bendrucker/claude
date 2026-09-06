@@ -151,11 +151,22 @@ export function scanTitles(
   return { title, consumed: Buffer.byteLength(complete) };
 }
 
-async function readTitleCache(path: string): Promise<CachedTitle | null> {
+async function readCacheFile<T>(path: string, schema: z.ZodType<T>): Promise<T | null> {
   try {
-    return CachedTitle.parse(await Bun.file(path).json());
+    return schema.parse(await Bun.file(path).json());
   } catch {
     return null;
+  }
+}
+
+// Caching is best effort. A render that cannot write costs the next one a
+// rescan or a repeated report, so a failure here must not reach the value the
+// caller went to the trouble of computing.
+async function writeCacheFile(path: string, value: unknown): Promise<void> {
+  try {
+    await Bun.write(path, JSON.stringify(value));
+  } catch {
+    // Rendering the line takes priority over remembering what was rendered.
   }
 }
 
@@ -168,7 +179,7 @@ export async function readSessionTitle(
   sessionId: string,
 ): Promise<string | null> {
   const path = titleCachePath(sessionId);
-  const cached = await readTitleCache(path);
+  const cached = await readCacheFile(path, CachedTitle);
   try {
     const file = Bun.file(transcriptPath);
     const size = file.size;
@@ -179,7 +190,7 @@ export async function readSessionTitle(
       await file.slice(resume.offset, size).text(),
       resume.title,
     );
-    await Bun.write(path, JSON.stringify({ offset: resume.offset + consumed, title }));
+    await writeCacheFile(path, { offset: resume.offset + consumed, title });
     return title;
   } catch {
     return cached?.title ?? null;
@@ -219,14 +230,6 @@ export function findPane(paneList: string, sessionId: string): string | null {
   return pane?.pane_id ?? null;
 }
 
-async function readCache(path: string): Promise<CachedReport | null> {
-  try {
-    return CachedReport.parse(await Bun.file(path).json());
-  } catch {
-    return null;
-  }
-}
-
 // The dial and the title are each optional and the child reads them by
 // position, so an absent one is passed as an empty placeholder rather than
 // shifting the argument after it.
@@ -250,18 +253,22 @@ export async function reportPaneMetadata(
   const paneId = process.env.HERDR_PANE_ID;
   if (paneId == null || paneId === "") return;
 
-  const title =
+  // The dedup cache and the transcript are unrelated files, so the render waits
+  // on one round trip rather than two.
+  const path = cachePath(sessionId);
+  const [cached, title] = await Promise.all([
+    readCacheFile(path, CachedReport),
     transcriptPath != null && transcriptPath !== ""
-      ? await readSessionTitle(transcriptPath, sessionId)
-      : null;
+      ? readSessionTitle(transcriptPath, sessionId)
+      : null,
+  ]);
 
   const sig = reportSignature(report, title);
-  const path = cachePath(sessionId);
-  if (!shouldReport(await readCache(path), sig, Date.now())) return;
+  if (!shouldReport(cached, sig, Date.now())) return;
 
   // The cache records the attempt rather than the outcome. A herdr that is down
   // would otherwise turn every later render back into a spawn.
-  await Bun.write(path, JSON.stringify({ sig, at: Date.now() }));
+  await writeCacheFile(path, { sig, at: Date.now() });
 
   Bun.spawn([process.execPath, import.meta.path, ...childArgs(sessionId, report, title)], {
     stdio: ["ignore", "ignore", "ignore"],

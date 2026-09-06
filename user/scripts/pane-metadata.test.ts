@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -248,7 +248,7 @@ describe("readSessionTitle", () => {
     } finally {
       await Promise.all([
         rm(dir, { recursive: true, force: true }),
-        rm(titleCachePath(sessionId), { force: true }),
+        rm(titleCachePath(sessionId), { recursive: true, force: true }),
       ]);
     }
   }
@@ -289,6 +289,16 @@ describe("readSessionTitle", () => {
 
       await Bun.write(path, aiTitle("Fresh"));
       expect(await readSessionTitle(path, sessionId)).toBe("Fresh");
+    });
+  });
+
+  test("stands by a scanned title the cache could not be written for", async () => {
+    await withTranscript(async (path, sessionId) => {
+      // A directory where the cache file goes fails the write and nothing else,
+      // so the scan still has the title the transcript names.
+      mkdirSync(titleCachePath(sessionId), { recursive: true });
+      await Bun.write(path, aiTitle("Named"));
+      expect(await readSessionTitle(path, sessionId)).toBe("Named");
     });
   });
 

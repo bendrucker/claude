@@ -76,6 +76,7 @@ describe("processInput", () => {
 
   it("allows git worktree add under an unexpanded $TMPDIR", () => {
     expect(processInput(bashInput("git worktree add $TMPDIR/verify"))).toBeNull();
+    // oxlint-disable-next-line no-template-curly-in-string -- the unexpanded form is what this case asserts the hook accepts.
     expect(processInput(bashInput("git worktree add ${TMPDIR}/verify"))).toBeNull();
   });
 
@@ -225,6 +226,7 @@ describe("isThrowawayAdd", () => {
 
   it("matches an unexpanded $TMPDIR target", () => {
     expect(isThrowawayAdd("git worktree add $TMPDIR/x")).toBe(true);
+    // oxlint-disable-next-line no-template-curly-in-string -- the unexpanded form is what this case asserts the matcher accepts.
     expect(isThrowawayAdd("git worktree add ${TMPDIR}/x")).toBe(true);
   });
 

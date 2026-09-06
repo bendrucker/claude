@@ -2129,6 +2129,7 @@ describe("stop-hook-noop-detector query", () => {
   }
 
   it("surfaces a hook that fires and writes nothing to the attachment channel", async () => {
+    // oxlint-disable-next-line no-template-curly-in-string -- the fixture records the hook command unexpanded, so the key must match it.
     const silent = (await detect()).get("bun ${CLAUDE_PLUGIN_ROOT}/hooks/silent-stop.ts");
     expect(silent).toBeDefined();
     expect(Number(silent?.fires)).toBe(2);
@@ -2159,6 +2160,7 @@ describe("stop-hook-noop-detector query", () => {
     // Both rostered hooks share the blocked Stop's toolUseID. `silent-stop` also fires at
     // an ungated Stop, so a silent hook that may be the gate is distinguishable from one
     // that never ran at a blocked Stop.
+    // oxlint-disable-next-line no-template-curly-in-string -- the fixture records the hook command unexpanded, so the key must match it.
     expect(Number(rows.get("bun ${CLAUDE_PLUGIN_ROOT}/hooks/silent-stop.ts")?.gated_stops)).toBe(1);
     expect(Number(rows.get("make test-unit")?.gated_stops)).toBe(1);
   });

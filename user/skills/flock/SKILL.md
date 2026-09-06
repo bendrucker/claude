@@ -46,7 +46,7 @@ FLAGS reads `clean` or a comma-joined list, forge state first. `failing:lint,bui
 
 The checkout flags follow. Only `merged` clears a row for cleanup, and every other flag holds it. Three are not self-evident: `carries:N` counts gitignored files a recursive removal would take, `reused` means the `merged#N` beside it belongs to different work under a recycled branch name, and `unreadable` or `unpushed:?` mean git would not report the state at all, which raises the row rather than parking it.
 
-The AGENT column reads `<agent>/<status>`. A `blocked` status is an agent stopped on a prompt, which puts its row in `needs you` whatever else the row carries.
+The AGENT column reads `<agent>/<status>`. A `blocked` status is an agent stopped on a prompt, which puts its row in `needs you` whatever else the row carries. Any other status still means the pane is occupied, and an occupied pane holds its row out of `clean up`. The two resting statuses, `idle` and `done`, differ only in whether the tab has been seen, so an agent between the turns of a running workflow reads idle.
 
 An `incomplete:` line names what the board could not resolve. Retry it: `gh pr list --head <branch>` for the branches it names, `gh pr list` for a `?` PR column. Dispose of nothing the retry also leaves unresolved.
 
@@ -76,7 +76,7 @@ Below the bar, the row is a report. Name the failing job, the reviewer's finding
 
 Check the rendered rows against the deferred keys first. A deferred row is held unless the state block re-raised it as stale.
 
-**Clean up.** Merged with nothing left in the tree. Remove the worktree, close its workspace and panes, prune the branch. Read `open_workspace_id` out of `herdr worktree list --json` before removing the path, because herdr loses the mapping once the worktree is gone.
+**Clean up.** Merged with nothing left in the tree. Confirm the pane is still empty with `herdr agent get` first, because an agent can take it between the board and the user's answer, and the removal would take the tree out from under it. Remove the worktree, close its workspace and panes, prune the branch. Read `open_workspace_id` out of `herdr worktree list --json` before removing the path, because herdr loses the mapping once the worktree is gone.
 
 **Merge.** Checks green, merge state clean, your repo. Re-read the bar immediately before merging, because both the board and your first lookup predate the user's answer. `gh pr merge --squash --delete-branch`, and stop there. The worktree becomes a cleanup row on a later sweep, once a fresh board shows it carrying nothing.
 

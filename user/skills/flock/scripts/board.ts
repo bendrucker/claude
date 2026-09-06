@@ -84,6 +84,17 @@ export function branchLabel(row: Pick<BoardRow, "branch" | "detached" | "kind">)
   return "(detached)";
 }
 
+/**
+ * herdr rests an agent in `idle` or `done`, one state split by whether the tab
+ * has been seen, so neither reports the work over: an agent between the turns
+ * of a running workflow reads idle. The pane is occupied until the agent
+ * leaves it. A shell is a person's prompt rather than an agent, and holds
+ * nothing.
+ */
+export function heldByAgent(agent: string | null): boolean {
+  return agent !== null && !agent.startsWith("shell/");
+}
+
 export function rowCells(row: BoardRow): string[] {
   return [
     row.pane ?? "-",

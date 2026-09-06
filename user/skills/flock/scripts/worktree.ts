@@ -207,6 +207,20 @@ export function ageInDays(commit: number | null, now: number): number | null {
 }
 
 /**
+ * `git cherry` marks a commit `-` once the default branch carries an equivalent
+ * patch, so a branch whose every commit reads `-` went in however it was
+ * squashed or rebased. Ancestry cannot stand in for this: a branch is an
+ * ancestor of the default branch from the moment it is created, which reads
+ * the same as one whose work landed, and a branch with no commits of its own
+ * has nothing that could have been merged.
+ */
+export function isMergedBranch(cherry: CommandResult): boolean {
+  if (!cherry.ok) return false;
+  const commits = cherry.stdout.split("\n").filter((line) => line.trim() !== "");
+  return commits.length > 0 && commits.every((line) => line.startsWith("-"));
+}
+
+/**
  * `headRefName` is historical text that survives the branch's deletion, so a
  * new branch created under a recycled name joins to the old merged pull
  * request and inherits its disposition.

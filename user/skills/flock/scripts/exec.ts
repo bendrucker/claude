@@ -60,7 +60,9 @@ export function limiter(limit: number): <T>(task: () => Promise<T>) => Promise<T
 
   return async <T>(task: () => Promise<T>): Promise<T> => {
     if (active >= limit) {
-      await new Promise<void>((resolve) => waiting.push(resolve));
+      const turn = Promise.withResolvers<void>();
+      waiting.push(turn.resolve);
+      await turn.promise;
     }
     active += 1;
     try {

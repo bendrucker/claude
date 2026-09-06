@@ -16,7 +16,7 @@ Rules that follow from this, all of them load-bearing:
 - **`--profile Default`**, the real Chrome profile. A dedicated profile directory fails intermittently. The mechanism is unexplained. It is worked around empirically, not understood.
 - **Headless never works.** Headed only.
 - **Chain `open`, a sleep, and `read` in one Bash call.** Splitting them across calls invites the daemon to reset between them.
-- Allow 12 to 14 seconds after `open`. Results render late, and a page that returns the site shell with no itineraries usually needs more time rather than a different approach.
+- Allow 12 to 14 seconds after `open`. Results render late, and a page that returns the site shell with no itineraries usually needs more time rather than a different approach. An award search is the exception: signed out it never finishes, however long it is given ([Award Results](#award-results)).
 
 Even on the working combination the error recurs, including mid-session after a run of successful loads. It is a rate of use the site tolerates, not a configuration that fixes anything. Space the queries out, keep united.com to the shortlist, and when the error appears twice in a row, stop and report rather than continuing to retry. Results already collected stay valid.
 
@@ -149,6 +149,8 @@ The consent banner overlays the bottom of the viewport and silently intercepts c
 Click `Accept cookies` once per profile before anything else. The error message names the covering element, so this failure is at least self-describing when it recurs.
 
 ## Award Results
+
+`at=1` needs an authenticated session. Signed out it sits at `Loading results…` with the sign-in dialog behind it. An award search that never finishes means a missing login, so look for the dialog before granting more time. Cash (`at=0`) has no such requirement and returns signed out, so a run can complete the cash side and still lose the award side.
 
 `at=1`, then parse the page text:
 

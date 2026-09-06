@@ -1,6 +1,6 @@
 {
   "name": "review",
-  "description": "Code review workflows for peer and self review",
+  "description": "Code review workflows for pull requests and the working diff",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

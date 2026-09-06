@@ -20,7 +20,7 @@ allowed-tools:
   - mcp__github
   - WebFetch
   - Skill(review:code)
-  - Skill(review:tuicr)
+  - "Bash(bun ${CLAUDE_SKILL_DIR}/scripts/:*)"
 ---
 
 # Peer Review
@@ -64,11 +64,15 @@ When `--triage` is set, stay read-only and assess the PR for sequencing. Gather 
    - **high**: large refactors, multi-module, public API or schema changes, ~500–2000 lines
    - **xhigh**: security-sensitive (auth, payments, data access), breaking changes, migrations, or a change with extreme blast radius
 5. **Think** - Evaluate along two axes. Requirement fulfillment: does the change deliver what was asked (see [requirements.md](requirements.md))? Code quality: evaluate against priorities (see [priorities.md](priorities.md)) and smells (see [smells.md](smells.md)), incorporating `review:code` findings. Keep the axes separate so a clean diff does not mask a missed requirement.
-6. **Stage** - Open the PR diff in tuicr via `review:tuicr` (`tuicr pr <N>` for GitHub, `tuicr mr <N>` for GitLab) and seed proposed comments with `tuicr review add` (pass `--username` so they read as agent comments). Capture the PR head SHA (and base/start SHAs for GitLab, from the MR `diff_refs`) for mapping. Skip staging when approving with no comments.
-7. **Revise** - I curate in the tuicr pane: delete comments I reject, reword, and add my own at any line. The surviving set gets posted.
-8. **Submit a GitHub PR yourself from the TUI** - For a GitHub PR you curated in the tuicr pane, the fastest path is tuicr's own `:submit` (Comment / Approve / Request changes / Draft), which posts a real PR review via `gh`. When that fits, skip the map-and-post steps below. Claude maps and posts only for GitLab (tuicr cannot post to GitLab at all) or when the review runs headless with no TUI.
-9. **Map** - When Claude posts, read back the final set (`tuicr review comments --repo <repo> --session <slug>`) and map each comment to a platform position with `review:tuicr`'s mapping CLI (`mapping.ts map --platform <github|gitlab> --comments ... --diff ... --commit <sha>`). It runs the in-diff pre-check and returns `{ payloads, dropped }`. Off-diff anchors land in `dropped` (GitHub rejects them with `422 "Line could not be resolved"`), so surface those to me rather than losing them.
-10. **Post** - Show me the mapped set, then on my go post as one batch and choose Approve / Comment / Request Changes based on severity. GitHub: a pending review submitted as a batch. GitLab: draft notes published together.
+6. **Map** - Write the proposed comments to a JSON file (`id`, `path`, `start_line`, `end_line`, `side`, `comment_type`, `content` per comment), then map each to a platform position:
+
+   ```bash
+   bun ${CLAUDE_SKILL_DIR}/scripts/mapping.ts map --platform <github|gitlab> \
+     --comments <path> --diff <path> --commit <head-sha>
+   ```
+
+   GitLab also needs `--base` and `--start` from the MR `diff_refs`. The CLI runs the in-diff pre-check and returns `{ payloads, dropped }`. An anchor outside a diff hunk lands in `dropped` (GitHub rejects it with `422 "Line could not be resolved"`), so surface those to me and re-anchor rather than losing them. Skip this step when approving with no comments.
+7. **Post** - Show me the mapped set, then on my go post as one batch and choose Approve / Comment / Request Changes based on severity. GitHub: a pending review submitted as a batch. GitLab: draft notes published together.
 
 See [tone.md](tone.md) for comment style guidelines.
 
@@ -76,4 +80,4 @@ See [tone.md](tone.md) for comment style guidelines.
 
 This skill assumes GitHub. For GitLab merge requests, load `gitlab:merge-request` for the submission workflow; use `draft-note.ts submit` to publish draft notes with an optional summary and review decision.
 
-When tuicr is not running or I prefer to skip it, stage nothing and post directly through the programmatic path (`mcp__github` / `gh` / `glab`). On follow-up, resolve addressed threads natively on the platform (`review-threads.ts` for GitHub, the resolve flow in `gitlab:merge-request` for GitLab), never in tuicr.
+Comments post through the programmatic path (`mcp__github` / `gh` / `glab`). On follow-up, resolve addressed threads natively on the platform: `review-threads.ts` for GitHub, the resolve flow in `gitlab:merge-request` for GitLab.

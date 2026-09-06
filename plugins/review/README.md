@@ -6,10 +6,8 @@ Code review workflows for Claude Code.
 
 ### Skills
 
-- **`tuicr`**: Core layer for reviewing changes through a live [tuicr](https://github.com/agavra/tuicr) session in tmux. Discovers and drives the session, seeds and reads back inline comments, and ships the watcher, line-mapping, and resolution-ledger helpers. `self` and `peer` delegate to it. Also the model-invocable path to pick up comments already left in a running session and apply them.
 - **`code`**: Review the working diff for correctness bugs and reuse/simplification/efficiency cleanups at a chosen effort level. A model-invocable port of Claude Code's built-in `/code-review`, which is user-invocable only.
-- **`peer`**: Review PRs when requested by a peer (GitHub or GitLab). Stages comments in tuicr for local revision, then maps and posts them as a batch.
-- **`self`**: Self-review your own changes in a live tuicr session before committing. Your inline comments come back to Claude as edits to apply.
+- **`peer`**: Review PRs when requested by a peer (GitHub or GitLab). Maps proposed comments to platform positions with an in-diff pre-check, then posts them as a batch.
 - **`follow-up`**: Follow up on a PR/MR you reviewed: check if your comments were addressed, find silent resolves, decide whether to re-approve
 - **`inbox`**: Dispatch inbound PR/MR reviews as background sessions that collect in `claude agents` (GitHub and GitLab)
 

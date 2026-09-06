@@ -1,25 +1,23 @@
 import { describe, expect, test } from "bun:test";
-import { decodeComments, deriveAnchor, type TuicrComment } from "./comment";
+import { decodeComments, deriveAnchor, type ReviewComment } from "./comment";
 
-function comment(overrides: Partial<TuicrComment>): TuicrComment {
+function comment(overrides: Partial<ReviewComment>): ReviewComment {
   return {
     id: "c1",
-    location: "user/settings.json:150",
     path: "user/settings.json",
     start_line: null,
     end_line: null,
     side: null,
     comment_type: "issue",
-    lifecycle_state: "local_draft",
     content: "comment",
     ...overrides,
   };
 }
 
 describe("deriveAnchor", () => {
-  test.each<[string, Partial<TuicrComment>, ReturnType<typeof deriveAnchor>]>([
+  test.each<[string, Partial<ReviewComment>, ReturnType<typeof deriveAnchor>]>([
     [
-      "uses the new side when tuicr stamps it",
+      "uses the new side when the comment stamps it",
       { start_line: 150, end_line: 150, side: "new" },
       { side: "new", line: 150, path: "user/settings.json" },
     ],

@@ -1,5 +1,5 @@
 import { cli, command } from "cleye";
-import { decodeComments, type TuicrComment } from "./comment";
+import { decodeComments, type ReviewComment } from "./comment";
 import { parseDiff } from "./diff";
 import { toGitHubComment, toGitLabPosition, validateInDiff } from "./platform";
 
@@ -31,7 +31,7 @@ const mapCmd = command(
       process.exit(1);
     }
 
-    let commentList: TuicrComment[];
+    let commentList: ReviewComment[];
     let diffText: string;
     try {
       commentList = decodeComments(await Bun.file(comments).text());

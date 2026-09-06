@@ -80,10 +80,6 @@
       "Edit(.git/config.lock)",
       "Edit(.worktrees/**)",
       "Read(~/.claude/plugins/**)",
-      "Bash(tmux display-message:*)",
-      "Bash(tmux list-panes:*)",
-      "Bash(tmux list-windows:*)",
-      "Bash(tmux capture-pane:*)",
       "Bash(gh run view:*)",
       "Bash(gh run list:*)",
       "Bash(gh pr checks:*)",
@@ -506,7 +502,6 @@
       "allowMachLookup": ["com.apple.trustd.agent"],
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
-        "~/.tmux",
         "~/.config/herdr/herdr.sock",
         "/tmp/claude"
       ]
@@ -514,7 +509,6 @@
     "filesystem": {
       "allowWrite": [
         "/tmp",
-        "~/.tmux",
         "~/.herdr/worktrees",
         "~/.terraform.d/plugin-cache",
         "~/.cache",

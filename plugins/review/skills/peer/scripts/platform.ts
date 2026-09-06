@@ -1,14 +1,14 @@
-import { deriveAnchor, type TuicrComment } from "./comment";
+import { deriveAnchor, type ReviewComment } from "./comment";
 import type { ParsedDiff } from "./diff";
 
 export type ValidationResult = { ok: true } | { ok: false; reason: string };
 
 /**
  * Pre-check that a comment's anchor lands on a line the platform will accept.
- * tuicr allows anchoring on unchanged context lines outside the diff, which
- * GitHub rejects with 422 "Line could not be resolved".
+ * An anchor on an unchanged context line outside the diff reads fine locally but
+ * GitHub rejects it with 422 "Line could not be resolved".
  */
-export function validateInDiff(comment: TuicrComment, parsed: ParsedDiff): ValidationResult {
+export function validateInDiff(comment: ReviewComment, parsed: ParsedDiff): ValidationResult {
   const anchor = deriveAnchor(comment);
   const fileDiff = parsed.get(anchor.path);
   if (!fileDiff) {
@@ -35,7 +35,7 @@ export interface GitHubComment {
 }
 
 /** Map a comment to a GitHub review-comment payload. new-side -> RIGHT, old-side -> LEFT. */
-export function toGitHubComment(comment: TuicrComment, opts: { commitId: string }): GitHubComment {
+export function toGitHubComment(comment: ReviewComment, opts: { commitId: string }): GitHubComment {
   const anchor = deriveAnchor(comment);
   return {
     path: anchor.path,
@@ -69,7 +69,7 @@ export interface GitLabPosition {
  * the file is not a rename.
  */
 export function toGitLabPosition(
-  comment: TuicrComment,
+  comment: ReviewComment,
   refs: GitLabRefs,
   opts: { newPath: string; oldPath?: string },
 ): GitLabPosition {

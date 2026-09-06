@@ -45,7 +45,7 @@
     },
     {
       "name": "review",
-      "description": "Code review workflows for peer and self review",
+      "description": "Code review workflows for pull requests and the working diff",
       "source": "./plugins/review"
     },
     {
@@ -158,11 +158,6 @@
       "name": "herdr",
       "description": "Drive the herdr terminal workspace manager: panes, tabs, workspaces, and sibling coding agents",
       "source": "./plugins/herdr"
-    },
-    {
-      "name": "tmux",
-      "description": "Tmux session awareness and pane interaction",
-      "source": "./plugins/tmux"
     },
     {
       "name": "comments",

@@ -26,7 +26,6 @@ The `claude-code:hook` skill covers `async` and `asyncRewake`. Read it before ma
 
 Only the vibe-island bridge and the herdr state export in `user/settings.json` qualify. Everything else gates a call or emits `hookSpecificOutput`, including every hook in `plugins/*/hooks/hooks.json`. Three bridge entries stay synchronous: `Stop` and `StopFailure`, whose backgrounded processes are killed before they finish, and `PermissionRequest`, which blocks to return a remote `permissionDecision`.
 
-Never background `plugins/tmux/hooks/notification.ts`. Its three hooks do a read-modify-write on shared tmux options and must complete in event order.
 
 ## MCP Matchers
 

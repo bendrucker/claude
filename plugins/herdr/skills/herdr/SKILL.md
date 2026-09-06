@@ -40,7 +40,7 @@ allowed-tools:
 
 herdr manages the terminal workspace this session runs in, including every pane, tab, and sibling coding agent.
 
-Under `HERDR_ENV=1`, a request naming a pane, tab, workspace, or split is about this session's herdr layout. Use tmux only when the user says tmux.
+Under `HERDR_ENV=1`, a request naming a pane, tab, workspace, or split is about this session's herdr layout.
 
 ## Command Surface
 

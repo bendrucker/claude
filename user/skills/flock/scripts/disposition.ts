@@ -88,16 +88,17 @@ export function classify(row: BoardRow): Disposition {
   if (row.state.blocked) return "needs-you";
   if (row.kind === "pane") return "panes";
 
-  // An agent mid-turn owns the working tree, so nothing that touches the tree
-  // is the user's to decide yet. A merge happens on the forge instead, and
-  // holding it back would hide the one row the sweep exists to raise.
   const disposition = verdict(row);
-  if (row.state.working) return disposition === "merge" ? disposition : "working";
-  // A resting agent owns the tree too, and cleanup is the one disposition that
-  // destroys it. Merge keeps its own path: an agent that finished the work
-  // rests in the pane it finished in, so holding merges on an occupied pane
-  // would empty the disposition rather than guard anything.
-  return disposition === "cleanup" && heldByAgent(row) ? "working" : disposition;
+  // A merge happens on the forge rather than in the tree, and the agent that
+  // finished the work is still resting in the pane it finished in, so gating
+  // merges on an occupied pane would empty the disposition rather than guard
+  // anything.
+  if (disposition === "merge") return disposition;
+  // An agent mid-turn owns the tree, so nothing that touches it is the user's
+  // to decide yet. A resting agent owns it too, and cleanup is the one
+  // remaining disposition that destroys it.
+  if (row.state.working) return "working";
+  return disposition === "cleanup" && heldByAgent(row.agent) ? "working" : disposition;
 }
 
 const FAILING_SHOWN = 3;

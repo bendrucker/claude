@@ -91,8 +91,8 @@ export function branchLabel(row: Pick<BoardRow, "branch" | "detached" | "kind">)
  * leaves it. A shell is a person's prompt rather than an agent, and holds
  * nothing.
  */
-export function heldByAgent(row: Pick<BoardRow, "agent">): boolean {
-  return row.agent !== null && !row.agent.startsWith("shell/");
+export function heldByAgent(agent: string | null): boolean {
+  return agent !== null && !agent.startsWith("shell/");
 }
 
 export function rowCells(row: BoardRow): string[] {

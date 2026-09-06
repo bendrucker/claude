@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   branchLabel,
   fit,
+  heldByAgent,
   jsonRow,
   renderTable,
   rowCells,
@@ -194,5 +195,19 @@ test("a json row carries the fields the table truncates or omits", () => {
       mergedBranch: false,
       reused: false,
     },
+  });
+});
+
+describe("heldByAgent", () => {
+  test.each([
+    ["a working agent", "claude/working", true],
+    ["an agent resting between turns", "claude/idle", true],
+    ["an agent whose tab has been seen", "claude/done", true],
+    ["an agent stopped on a prompt", "claude/blocked", true],
+    ["a status herdr would not report", "claude/?", true],
+    ["a person's own shell", "shell/idle", false],
+    ["no pane", null, false],
+  ] as const)("%s", (_name, agent, expected) => {
+    expect(heldByAgent(agent)).toBe(expected);
   });
 });

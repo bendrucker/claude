@@ -5,7 +5,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { decodeJson } from "../../../../packages/decode/index";
-import { jsonRow, sortWorktreeRows, type BoardRow } from "./board";
+import { heldByAgent, jsonRow, sortWorktreeRows, type BoardRow } from "./board";
 import { classify, pullFlags, renderBoard } from "./disposition";
 import { daysBefore, deferredPath, readDeferrals, staleKeys } from "./deferred";
 import { spawnRun, throttle, type Run } from "./exec";
@@ -487,6 +487,22 @@ function readPanes(snapshot: z.infer<typeof Snapshot>): {
   return { panes, repoRoots, flockWorkspace };
 }
 
+/**
+ * A worktree can hold several panes, and the row carries one. An agent's pane
+ * is the one whose state the sweep turns on, so a plain shell sharing the
+ * directory must not stand in for it and report the tree unoccupied.
+ */
+function occupant(panes: readonly Pane[], worktree: string, self: string): Pane | undefined {
+  const inside = panes.filter(
+    (candidate) => candidate.cwd === worktree || candidate.cwd.startsWith(`${worktree}/`),
+  );
+  return (
+    inside.find((candidate) => candidate.id === self) ??
+    inside.find((candidate) => heldByAgent(candidate.agent)) ??
+    inside[0]
+  );
+}
+
 function attachPanes(
   rows: readonly BoardRow[],
   panes: readonly Pane[],
@@ -496,9 +512,7 @@ function attachPanes(
   const attached = rows.map((row) => {
     const worktree = row.worktree;
     if (worktree === null) return row;
-    const pane = panes.find(
-      (candidate) => candidate.cwd === worktree || candidate.cwd.startsWith(`${worktree}/`),
-    );
+    const pane = occupant(panes, worktree, self);
     if (pane === undefined) return row;
     claimed.add(pane.id);
     const state = {
@@ -522,7 +536,7 @@ function idlePaneRows(
   self: string,
 ): BoardRow[] {
   return panes
-    .filter((pane) => !pane.agent.startsWith("shell/") && pane.id !== self && !claimed.has(pane.id))
+    .filter((pane) => heldByAgent(pane.agent) && pane.id !== self && !claimed.has(pane.id))
     .map((pane) => ({
       kind: "pane" as const,
       pane: pane.id,

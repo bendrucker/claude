@@ -36,6 +36,9 @@ export function fightinWords({
   totalB,
   prior,
 }: FightinWordsInput): FightinWordsRow[] {
+  if (!Number.isFinite(prior) || prior <= 0) {
+    throw new Error(`prior must be a positive number, got ${prior}`);
+  }
   const background = totalA + totalB;
   if (background === 0) return [];
 
@@ -64,6 +67,8 @@ export function fightinWords({
 export interface TokenizedCorpus {
   tokens: number;
   ngrams: Map<number, NGramCounts>;
+  /** Feature count per n-gram size. A corpus holds fewer bigrams than tokens. */
+  totals: Map<number, number>;
   /** Shortest sentence each term was seen in, for eyeballing what a term means. */
   examples: Map<string, string>;
 }
@@ -74,6 +79,7 @@ export function tokenizeCorpus(text: string, sizes: number[]): TokenizedCorpus {
   const corpus: TokenizedCorpus = {
     tokens: 0,
     ngrams: new Map(sizes.map((n) => [n, new Map<string, number>()])),
+    totals: new Map(sizes.map((n) => [n, 0])),
     examples: new Map(),
   };
 
@@ -85,6 +91,7 @@ export function tokenizeCorpus(text: string, sizes: number[]): TokenizedCorpus {
       const counts = corpus.ngrams.get(n);
       if (!counts) continue;
       addNgrams(counts, tokens, n);
+      corpus.totals.set(n, (corpus.totals.get(n) ?? 0) + Math.max(0, tokens.length - n + 1));
       for (let i = 0; i <= tokens.length - n; i++) {
         const key = tokens.slice(i, i + n).join(" ");
         const seen = corpus.examples.get(key);
@@ -125,8 +132,8 @@ export function rank(a: TokenizedCorpus, b: TokenizedCorpus, options: RankOption
     const rows = fightinWords({
       a: a.ngrams.get(n) ?? new Map(),
       b: b.ngrams.get(n) ?? new Map(),
-      totalA: a.tokens,
-      totalB: b.tokens,
+      totalA: a.totals.get(n) ?? 0,
+      totalB: b.totals.get(n) ?? 0,
       prior: options.prior,
     });
     for (const row of rows) {

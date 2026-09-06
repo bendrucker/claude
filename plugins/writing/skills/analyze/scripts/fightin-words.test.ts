@@ -69,6 +69,12 @@ describe("fightinWords", () => {
     expect(rows.map((row) => row.term)).toEqual(["present"]);
   });
 
+  test.each([0, -1, Number.NaN])("a prior of %p is rejected", (prior) => {
+    expect(() =>
+      fightinWords({ a: counts({ x: 1 }), b: counts({}), totalA: 10, totalB: 10, prior }),
+    ).toThrow(/positive/);
+  });
+
   test("empty corpora yield no rows", () => {
     expect(
       fightinWords({ a: counts({}), b: counts({}), totalA: 0, totalB: 0, prior: 500 }),
@@ -95,6 +101,21 @@ describe("fightinWords", () => {
 });
 
 describe("tokenizeCorpus", () => {
+  // Monroe's alpha sums to alpha-0 only when the corpus size is the count of
+  // the feature being analyzed. A corpus holds one fewer bigram per sentence
+  // than it holds tokens.
+  test("counts each n-gram size separately from the token count", () => {
+    const corpus = tokenizeCorpus("one two three. four five.", [1, 2, 3]);
+    expect(corpus.tokens).toBe(5);
+    expect(corpus.totals.get(1)).toBe(5);
+    expect(corpus.totals.get(2)).toBe(3);
+    expect(corpus.totals.get(3)).toBe(1);
+  });
+
+  test("a size longer than every sentence contributes no features", () => {
+    expect(tokenizeCorpus("one two.", [5]).totals.get(5)).toBe(0);
+  });
+
   test("counts unigrams and bigrams and keeps the shortest example", () => {
     const corpus = tokenizeCorpus(
       "The load bearing part. This is the load bearing part again.",
@@ -141,6 +162,24 @@ describe("rank", () => {
     const zs = ranked.map((row) => row.z);
     expect(zs).toEqual(zs.toSorted((left, right) => right - left));
     expect(new Set(ranked.map((row) => row.n))).toEqual(new Set([1, 2]));
+  });
+
+  test("scores each size against its own feature total", () => {
+    const text = "alpha beta. alpha beta. alpha beta.";
+    const corpus = tokenizeCorpus(text, [2]);
+    const [row] = rank(corpus, tokenizeCorpus("gamma delta.", [2]), {
+      sizes: [2],
+      prior: 100,
+      minCount: 1,
+    });
+    const direct = fightinWords({
+      a: corpus.ngrams.get(2) ?? new Map(),
+      b: tokenizeCorpus("gamma delta.", [2]).ngrams.get(2) ?? new Map(),
+      totalA: corpus.totals.get(2) ?? 0,
+      totalB: 1,
+      prior: 100,
+    })[0];
+    expect(row?.z).toBeCloseTo(direct?.z ?? 0, 12);
   });
 
   test("carries an example sentence for each ranked term", () => {

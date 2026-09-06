@@ -34,7 +34,7 @@ Extension titles should be nouns ("Emoji Search" not "Search Emoji"). Command ti
 - Fixed pagination for large result sets
 ```
 
-Use `{PR_MERGE_DATE}` instead of a hardcoded date — the Raycast Store replaces it with the actual merge date when the PR lands, avoiding stale dates when review takes longer than expected. Title must be in square brackets, separated from the date by ` - `.
+Use `{PR_MERGE_DATE}` instead of a hardcoded date. The Raycast Store replaces it with the merge date when the PR lands, so a slow review does not leave a stale date behind. Title must be in square brackets, separated from the date by ` - `.
 
 **README.md** (required if setup is needed):
 - Place at extension root
@@ -54,11 +54,7 @@ Use `{PR_MERGE_DATE}` instead of a hardcoded date — the Raycast Store replaces
 
 ## Publishing
 
-```bash
-npm run publish
-```
-
-This opens the Store submission flow in Raycast.
+Push the branch to your fork and open the pull request against `raycast/extensions`. `npm run publish` authenticates with GitHub and opens that pull request itself, which skips the local review the branch is waiting on.
 
 ## Categories
 

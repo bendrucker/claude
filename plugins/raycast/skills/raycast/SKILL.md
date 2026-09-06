@@ -2,7 +2,6 @@
 name: raycast
 description: Raycast extension development. Use when working with @raycast/api imports, Raycast commands/tools, or building extensions.
 user-invocable: true
-disable-model-invocation: true
 ---
 
 # Raycast
@@ -43,6 +42,6 @@ Bootstrap with `npx create-raycast-extension`. Install dependencies with `npm in
 
 ## Store
 
-Extensions require Apple Style Title Case for names. Icons must be 512x512 PNG. Screenshots should be 2000x1250 PNG. Include a `CHANGELOG.md`. Add a `README.md` if setup is required. Run `npm run publish` to submit.
+Extensions require Apple Style Title Case for names. Icons must be 512x512 PNG. Screenshots should be 2000x1250 PNG. Include a `CHANGELOG.md`. Add a `README.md` if setup is required. Submit by pushing the branch to your fork and opening the pull request against `raycast/extensions`. The `raycast:publish` skill covers the preflight.
 
 See [references/store.md](references/store.md)

@@ -119,6 +119,19 @@ async function entryNames(dir: string): Promise<string[]> {
 }
 
 /**
+ * Worktrunk wrote worktrees into a repository-local `.worktrees` before it
+ * moved to the central path, and checkouts under the old layout are still
+ * live, so both are seeded.
+ */
+async function repoLocalWorktreeDirs(home: string): Promise<string[]> {
+  const owners = await directories(join(home, "src"));
+  const repos = (await Promise.all(owners.map(directories))).flat();
+  const dirs = repos.map((repo) => join(repo, ".worktrees"));
+  const present = await Promise.all(dirs.map(async (dir) => (await entryNames(dir)).length > 0));
+  return dirs.filter((_, index) => present[index]);
+}
+
+/**
  * A worktree with no pane is where work that merged remotely but stayed open
  * locally hides, so the seeds reach past what herdr has actually opened. One
  * checkout resolves a whole repository, so each layout contributes one path
@@ -129,6 +142,7 @@ async function seededCheckouts(home: string): Promise<string[]> {
   const repoDirs = [
     ...(await Promise.all(owners.map(directories))).flat(),
     ...(await directories(join(home, ".herdr", "worktrees"))),
+    ...(await repoLocalWorktreeDirs(home)),
   ];
 
   const seeds = await Promise.all(

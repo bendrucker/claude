@@ -279,7 +279,7 @@ const EVAL_JOB_BASE = join(tmpdir(), "comments-eval");
 /**
  * Shard the corpus through the production job writer and emit the `<preflight>`
  * block for the Workflow tool, so the gate judges fixtures on the path that
- * ships rather than through the SDK oracle.
+ * ships.
  */
 async function build(jobBase: string): Promise<number> {
   const fixtures = await loadFixtures();

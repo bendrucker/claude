@@ -17,8 +17,7 @@ const job = typeof args === "string" ? JSON.parse(args) : args;
 
 // The eval gate judges the labeled fixture corpus through this workflow
 // (evals/eval.ts build, then score --gate), so the rubric is cleared on the
-// model pinned here rather than on whatever the session runs. Re-clear the gate
-// on a cheaper model before lowering this.
+// model pinned here. Re-clear the gate on a cheaper model before lowering this.
 const JUDGE_MODEL = "sonnet";
 
 const SUMMARY_SCHEMA = {

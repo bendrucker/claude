@@ -10,14 +10,14 @@ import { batchVerdictSchema, type Verdict } from "../judge/schema";
 /**
  * The calibration oracle: the Anthropic SDK judge used only under `evals/`. It
  * renders an indexed batch, scores it in one Messages call, and validates the
- * response. It is a cross-check on the rubric, not the ship gate: `eval.ts build`
- * and `eval.ts score` gate the rubric through the production Workflow judge.
+ * response. It is a cross-check on the rubric; `eval.ts build` and `eval.ts
+ * score` gate the rubric through the production Workflow judge.
  */
 
 /**
  * Pinned to the generation `judge.workflow.js` runs on, so the oracle scores the
  * rubric on the model that ships. Models after Opus 4.6 reject `temperature`, so
- * the batch pins `effort` instead of sampling, and repeated runs can differ.
+ * the batch pins `effort`, and repeated runs can differ.
  */
 export const JUDGE_MODEL = "claude-sonnet-5";
 

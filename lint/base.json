@@ -78,15 +78,19 @@
     "vitest/no-commented-out-tests": "off",
     // This repo tests with bun:test, not vitest. The vitest plugin matches
     // on the Jest-style API shape rather than the import, so it still
-    // applies correctly here.
-    "vitest/prefer-each": "error"
+    // applies correctly here. Like no-commented-out-tests, it only means
+    // something in test files: repo-wide it flags any loop whose body it
+    // reads as a repeated case, such as render.ts drawing one text line
+    // per iteration. Off here, on under **/*.test.ts below.
+    "vitest/prefer-each": "off"
   },
   "overrides": [
     {
       "files": ["**/*.test.ts"],
       "rules": {
         "unicorn/consistent-function-scoping": "off",
-        "vitest/no-commented-out-tests": "error"
+        "vitest/no-commented-out-tests": "error",
+        "vitest/prefer-each": "error"
       }
     }
   ]

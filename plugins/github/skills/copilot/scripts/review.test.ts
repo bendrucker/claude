@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   AGENTIC_TOOL_ARGS,
   ALL_CLASSES,
+  type Angle,
   ANGLES,
   buildPrompt,
   copilotArgs,
@@ -11,7 +12,9 @@ import {
   exceedsEntitlement,
   type Meter,
   resolveTier,
+  runCopilot,
   type Snapshot,
+  type Spawn,
   splitPaths,
   type Tier,
 } from "./review";
@@ -156,7 +159,7 @@ describe("angles", () => {
 
 describe("copilotArgs", () => {
   const args = (agentic: boolean) =>
-    copilotArgs("review this", { model: "gpt-5.6-terra", cap: 30, cwd: ".", agentic });
+    copilotArgs({ model: "gpt-5.6-terra", cap: 30, cwd: ".", agentic });
 
   // The cap is the only per-session ceiling, and the preflight guard reserves exactly this
   // number before the spawn. A shape that omits it can bill past what was reserved.
@@ -194,8 +197,62 @@ describe("copilotArgs", () => {
     }
   });
 
-  test("the prompt is the last argument", () => {
-    const argv = args(true);
-    expect(argv.slice(-2)).toEqual(["-p", "review this"]);
+  // -p is what puts the prompt in argv. Omitting it is what makes Copilot read stdin, so its
+  // presence would silently put the prompt back under ARG_MAX.
+  test.each([
+    ["one-shot", false],
+    ["agentic", true],
+  ])("%s passes no -p, so Copilot reads the prompt from stdin", (_name, agentic) => {
+    expect(args(agentic)).not.toContain("-p");
+    expect(args(agentic)).not.toContain("--prompt");
+  });
+});
+
+describe("runCopilot", () => {
+  const angle: Angle = { id: "all", title: "All defect classes", focus: "FOCUS" };
+  const options = { model: "gpt-5.6-terra", cap: 30, cwd: "/", agentic: false };
+
+  const record = (output: string, exitCode = 0) => {
+    const seen: { args: string[]; stdin: string } = { args: [], stdin: "" };
+    const spawn: Spawn = (args, stdin) => {
+      seen.args = args;
+      seen.stdin = new TextDecoder().decode(stdin);
+      return {
+        stdout: new Blob([output]).stream(),
+        stderr: new Blob([]).stream(),
+        exited: Promise.resolve(exitCode),
+      };
+    };
+    return { seen, spawn };
+  };
+
+  // A stacked review assembles hundreds of KB. Every byte has to arrive on stdin, which has
+  // no size limit, and none of it in argv, which does.
+  test("hands a prompt far past ARG_MAX to stdin intact", async () => {
+    const prompt = `HEAD ${"lorem ipsum ".repeat(42_000)}TAIL`;
+    expect(Buffer.byteLength(prompt, "utf8")).toBeGreaterThan(500_000);
+    const { seen, spawn } = record("no defects");
+
+    await runCopilot(prompt, angle, options, spawn);
+
+    expect(seen.stdin).toBe(prompt);
+    expect(seen.args.some((arg) => arg.includes("HEAD") || arg.includes("TAIL"))).toBe(false);
+  });
+
+  // The spend this reports is what lands in the transcript, and a footer it cannot parse
+  // reports a review as free.
+  test.each<[string, string, number | null]>([
+    ["a billed run", "findings\n\nAI Credits    7.58\nDuration   35s", 7.58],
+    ["a run that reported none", "findings\n\nDuration   35s", null],
+  ])("reads the credits off %s", async (_name, output, credits) => {
+    const { spawn } = record(output);
+
+    expect((await runCopilot("p", angle, options, spawn)).credits).toBe(credits);
+  });
+
+  test("carries the child's failure back so a broken run is not read as a clean review", async () => {
+    const { spawn } = record("boom", 1);
+
+    expect((await runCopilot("p", angle, options, spawn)).exitCode).toBe(1);
   });
 });

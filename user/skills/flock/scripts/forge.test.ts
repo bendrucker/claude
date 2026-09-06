@@ -10,6 +10,12 @@ import {
   parseRemote,
   pullRequestRef,
   slugParts,
+  gitlabChecks,
+  gitlabMergeState,
+  mergeState,
+  reviewState,
+  rollUpChecks,
+  SETTLED_STATE,
   type PullRequest,
 } from "./forge";
 
@@ -30,7 +36,7 @@ function pull(
   state: PullRequest["state"],
   mergedAt: number | null = null,
 ): PullRequest {
-  return { branch, number, state, mergedAt };
+  return { branch, number, state, mergedAt, ...SETTLED_STATE };
 }
 
 describe("parseRemote", () => {
@@ -145,18 +151,71 @@ describe("beyondMergedHorizon", () => {
 describe("github", () => {
   test("reads open and merged pull requests and marks drafts", async () => {
     const { run, calls } = stub({
-      "--state open": { stdout: '[{"number":1,"headRefName":"a","isDraft":true}]' },
+      "--state open": {
+        stdout: JSON.stringify([
+          {
+            number: 1,
+            headRefName: "a",
+            isDraft: true,
+            mergeStateStatus: "BLOCKED",
+            reviewDecision: "CHANGES_REQUESTED",
+            statusCheckRollup: [
+              { __typename: "CheckRun", name: "lint", status: "COMPLETED", conclusion: "FAILURE" },
+            ],
+          },
+        ]),
+      },
       "--state merged": {
         stdout: '[{"number":2,"headRefName":"b","mergedAt":"2026-01-01T00:00:00Z"}]',
       },
     });
     const listing = await createForge("github", run).pullRequests("o/r");
 
-    expect(listing.open).toEqual([{ branch: "a", number: 1, state: "draft", mergedAt: null }]);
+    expect(listing.open).toEqual([
+      {
+        branch: "a",
+        number: 1,
+        state: "draft",
+        mergedAt: null,
+        checks: "failing",
+        failing: ["lint"],
+        review: "changes-requested",
+        mergeState: "blocked",
+      },
+    ]);
     expect(listing.merged).toEqual([
-      { branch: "b", number: 2, state: "merged", mergedAt: 1_767_225_600 },
+      { branch: "b", number: 2, state: "merged", mergedAt: 1_767_225_600, ...SETTLED_STATE },
     ]);
     expect(calls.every((call) => call.includes("--author @me"))).toBe(true);
+  });
+
+  // The merged query returns a hundred rows whose check history nothing reads.
+  test("asks for check and review state on the open query only", async () => {
+    const { run, calls } = stub({ "pr list": { stdout: "[]" } });
+    await createForge("github", run).pullRequests("o/r");
+
+    const [open, merged] = calls.filter((call) => call.includes("pr list"));
+    expect(open).toContain("statusCheckRollup");
+    expect(merged).not.toContain("statusCheckRollup");
+  });
+
+  test("a listing without a rollup reports checks it cannot read", async () => {
+    const { run } = stub({
+      "--state open": { stdout: '[{"number":1,"headRefName":"a"}]' },
+      "--state merged": { stdout: "[]" },
+    });
+    expect((await createForge("github", run).pullRequests("o/r")).open).toEqual([
+      {
+        branch: "a",
+        number: 1,
+        state: "open",
+        mergedAt: null,
+        checks: "unknown",
+        failing: [],
+        review: "none",
+        mergeState: "unknown",
+      },
+    ]);
   });
 
   test("a failed listing reports null rather than an empty repository", async () => {
@@ -226,13 +285,34 @@ describe("gitlab", () => {
       "--merged": {
         stdout: '[{"iid":7,"source_branch":"done","merged_at":"2026-01-01T00:00:00Z"}]',
       },
-      "mr list": { stdout: '[{"iid":5,"source_branch":"wip","draft":true}]' },
+      "mr list": {
+        stdout: JSON.stringify([
+          {
+            iid: 5,
+            source_branch: "wip",
+            draft: true,
+            has_conflicts: true,
+            pipeline: { status: "failed" },
+          },
+        ]),
+      },
     });
     const listing = await createForge("gitlab", run).pullRequests("group/app");
 
-    expect(listing.open).toEqual([{ branch: "wip", number: 5, state: "draft", mergedAt: null }]);
+    expect(listing.open).toEqual([
+      {
+        branch: "wip",
+        number: 5,
+        state: "draft",
+        mergedAt: null,
+        checks: "failing",
+        failing: [],
+        review: "unknown",
+        mergeState: "conflicting",
+      },
+    ]);
     expect(listing.merged).toEqual([
-      { branch: "done", number: 7, state: "merged", mergedAt: 1_767_225_600 },
+      { branch: "done", number: 7, state: "merged", mergedAt: 1_767_225_600, ...SETTLED_STATE },
     ]);
     expect(calls.some((call) => call.includes("--author ben"))).toBe(true);
   });
@@ -260,5 +340,123 @@ describe("gitlab", () => {
       forkOf: "ben/app",
       resolved: true,
     });
+  });
+});
+
+describe("rollUpChecks", () => {
+  const run = (name: string, conclusion: string) => ({
+    name,
+    status: "COMPLETED",
+    conclusion,
+  });
+
+  test("no checks is not a passing bar", () => {
+    expect(rollUpChecks([])).toEqual({ checks: "none", failing: [] });
+  });
+
+  test("names every failing job, sorted and deduplicated", () => {
+    expect(
+      rollUpChecks([
+        run("lint", "FAILURE"),
+        run("build", "TIMED_OUT"),
+        run("lint", "FAILURE"),
+        run("test", "SUCCESS"),
+      ]),
+    ).toEqual({ checks: "failing", failing: ["build", "lint"] });
+  });
+
+  test("a failure outranks a job still running", () => {
+    expect(rollUpChecks([{ name: "slow", status: "IN_PROGRESS" }, run("lint", "FAILURE")])).toEqual(
+      { checks: "failing", failing: ["lint"] },
+    );
+  });
+
+  test("an incomplete run is not read through its missing conclusion", () => {
+    expect(rollUpChecks([{ name: "slow", status: "QUEUED" }])).toEqual({
+      checks: "running",
+      failing: [],
+    });
+  });
+
+  test("a StatusContext reports through state instead of conclusion", () => {
+    expect(rollUpChecks([{ context: "ci/legacy", state: "FAILURE" }])).toEqual({
+      checks: "failing",
+      failing: ["ci/legacy"],
+    });
+    expect(rollUpChecks([{ context: "ci/legacy", state: "PENDING" }])).toEqual({
+      checks: "running",
+      failing: [],
+    });
+    expect(rollUpChecks([{ context: "ci/legacy", state: "SUCCESS" }])).toEqual({
+      checks: "passing",
+      failing: [],
+    });
+  });
+
+  test.each(["SUCCESS", "NEUTRAL", "SKIPPED"])("%s does not hold the bar", (conclusion) => {
+    expect(rollUpChecks([run("optional", conclusion)]).checks).toBe("passing");
+  });
+
+  test("an unnamed check still reports", () => {
+    expect(rollUpChecks([{ status: "COMPLETED", conclusion: "FAILURE" }])).toEqual({
+      checks: "failing",
+      failing: ["check"],
+    });
+  });
+});
+
+describe("reviewState", () => {
+  test.each([
+    ["APPROVED", "approved"],
+    ["CHANGES_REQUESTED", "changes-requested"],
+    ["REVIEW_REQUIRED", "review-required"],
+    // GitHub answers with an empty string where no review is required.
+    ["", "none"],
+    [null, "none"],
+    ["SOMETHING_NEW", "unknown"],
+  ] as const)("%s", (decision, expected) => {
+    expect(reviewState(decision)).toBe(expected);
+  });
+});
+
+describe("mergeState", () => {
+  test.each([
+    ["CLEAN", "clean"],
+    ["HAS_HOOKS", "clean"],
+    ["DIRTY", "conflicting"],
+    ["BEHIND", "behind"],
+    ["BLOCKED", "blocked"],
+    ["UNSTABLE", "unstable"],
+    ["UNKNOWN", "unknown"],
+    [null, "unknown"],
+  ] as const)("%s", (status, expected) => {
+    expect(mergeState(status)).toBe(expected);
+  });
+});
+
+describe("gitlab state", () => {
+  test.each([
+    ["mergeable", undefined, "clean"],
+    ["conflict", undefined, "conflicting"],
+    ["not_approved", undefined, "blocked"],
+    ["need_rebase", undefined, "behind"],
+    [null, undefined, "unknown"],
+    // A conflict flag settles the row whatever the detailed status says.
+    ["mergeable", true, "conflicting"],
+  ] as const)("%s with conflicts %s", (detailed, conflicts, expected) => {
+    expect(gitlabMergeState(detailed, conflicts)).toBe(expected);
+  });
+
+  test.each([
+    ["success", "passing"],
+    ["failed", "failing"],
+    ["canceled", "failing"],
+    ["running", "running"],
+    ["skipped", "passing"],
+    // A listing with no pipeline attached says nothing about the checks.
+    [null, "unknown"],
+    ["invented", "unknown"],
+  ] as const)("pipeline %s", (status, expected) => {
+    expect(gitlabChecks(status)).toBe(expected);
   });
 });

@@ -181,10 +181,16 @@ export interface FlagInput {
   readonly carried: number;
   readonly merged: boolean;
   readonly reused: boolean;
+  /** What the forge contributed, from `pullFlags`. */
+  readonly pull: readonly string[];
 }
 
+/**
+ * Forge flags lead, because on a row that needs the user they carry the reason
+ * and the checkout flags beside them are context.
+ */
 export function deriveFlags(input: FlagInput): string[] {
-  const flags: string[] = [];
+  const flags: string[] = [...input.pull];
   if (input.detached) flags.push("detached");
   if (input.status !== "clean") flags.push(input.status === "dirty" ? "dirty" : "unreadable");
   if (input.ahead === null) flags.push("unpushed:?");

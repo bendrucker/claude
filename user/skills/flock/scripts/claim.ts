@@ -5,7 +5,8 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { decodeJson } from "../../../../packages/decode/index";
-import { jsonRow, renderBoard, sortWorktreeRows, type BoardRow } from "./board";
+import { jsonRow, sortWorktreeRows, type BoardRow } from "./board";
+import { classify, pullFlags, renderBoard } from "./disposition";
 import { daysBefore, deferredPath, readDeferrals, staleKeys } from "./deferred";
 import { spawnRun, throttle, type Run } from "./exec";
 import {
@@ -377,13 +378,16 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
       const scan = await scanWorktree(ctx, { path: record.path, base, commitDate });
 
       const pull = record.branch === null ? undefined : pulls.get(record.branch);
+      const merged = record.branch !== null && mergedBranches.has(record.branch);
+      const reused = isReusedBranch(pull, scan.commit);
       const flags = deriveFlags({
         detached: record.branch === null,
         status: scan.status,
         ahead: scan.ahead,
         carried: scan.carried,
-        merged: record.branch !== null && mergedBranches.has(record.branch),
-        reused: isReusedBranch(pull, scan.commit),
+        merged,
+        reused,
+        pull: pull === undefined ? [] : pullFlags(pull),
       });
 
       const row: BoardRow = {
@@ -402,10 +406,33 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
         pull:
           pull === undefined
             ? null
-            : { ref: pullRequestRef(pull), number: pull.number, state: pull.state },
+            : {
+                ref: pullRequestRef(pull),
+                number: pull.number,
+                state: pull.state,
+                checks: pull.checks,
+                failing: pull.failing,
+                review: pull.review,
+                mergeState: pull.mergeState,
+              },
         prColumn: pull === undefined ? (unknownColumn ? "?" : "-") : pullRequestRef(pull),
         age: ageInDays(scan.commit, ctx.now),
         flags,
+        state: {
+          self: false,
+          working: false,
+          blocked: false,
+          pullUnknown: unknownColumn,
+          status: scan.status,
+          unpushed: scan.ahead,
+          carried: scan.carried,
+          mergedBranch: merged,
+          reused,
+        },
+        // A pane can claim this worktree only once every repository has been
+        // scanned, and the agent holding it changes the disposition, so the
+        // row is classified after `attachPanes` rather than here.
+        disposition: "parked",
       };
       return { row, commit: scan.commit };
     }),
@@ -467,6 +494,7 @@ function readPanes(snapshot: z.infer<typeof Snapshot>): {
 function attachPanes(
   rows: readonly BoardRow[],
   panes: readonly Pane[],
+  self: string,
 ): { rows: BoardRow[]; claimed: Set<string> } {
   const claimed = new Set<string>();
   const attached = rows.map((row) => {
@@ -477,9 +505,19 @@ function attachPanes(
     );
     if (pane === undefined) return row;
     claimed.add(pane.id);
-    return { ...row, pane: pane.id, agent: pane.agent };
+    const state = {
+      ...row.state,
+      self: pane.id === self,
+      working: pane.agent.endsWith("/working"),
+      blocked: pane.agent.endsWith("/blocked"),
+    };
+    return { ...row, pane: pane.id, agent: pane.agent, state };
   });
   return { rows: attached, claimed };
+}
+
+function disposeRows(rows: readonly BoardRow[]): BoardRow[] {
+  return rows.map((row) => ({ ...row, disposition: classify(row) }));
 }
 
 function idlePaneRows(
@@ -506,6 +544,18 @@ function idlePaneRows(
       prColumn: "-",
       age: null,
       flags: ["no worktree"],
+      state: {
+        self: false,
+        working: pane.agent.endsWith("/working"),
+        blocked: pane.agent.endsWith("/blocked"),
+        pullUnknown: false,
+        status: "clean",
+        unpushed: 0,
+        carried: 0,
+        mergedBranch: false,
+        reused: false,
+      },
+      disposition: "panes" as const,
     }));
 }
 
@@ -607,8 +657,10 @@ async function board(json: boolean): Promise<string> {
   );
   const warnings = scans.flatMap((scan) => scan.warnings);
   const sorted = sortWorktreeRows(scans.flatMap((scan) => scan.rows));
-  const { rows: withPanes, claimed } = attachPanes(sorted, panes);
-  const allRows = [...withPanes, ...idlePaneRows(panes, claimed, self)];
+  const { rows: withPanes, claimed } = attachPanes(sorted, panes, self);
+  const allRows = disposeRows([...withPanes, ...idlePaneRows(panes, claimed, self)]).filter(
+    (row) => row.disposition !== "self",
+  );
 
   const deferrals = await deferralLines(deferredPath(process.env), new Date());
   const selfWorkspace = process.env.HERDR_WORKSPACE_ID ?? "";

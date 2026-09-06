@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { branchLabel, fit, jsonRow, renderBoard, sortWorktreeRows, type BoardRow } from "./board";
+import {
+  branchLabel,
+  fit,
+  jsonRow,
+  renderTable,
+  rowCells,
+  sortWorktreeRows,
+  type BoardRow,
+} from "./board";
 
 function row(overrides: Partial<BoardRow>): BoardRow {
   return {
@@ -19,6 +27,18 @@ function row(overrides: Partial<BoardRow>): BoardRow {
     prColumn: "-",
     age: 0,
     flags: ["clean"],
+    state: {
+      self: false,
+      working: false,
+      blocked: false,
+      pullUnknown: false,
+      status: "clean",
+      unpushed: 0,
+      carried: 0,
+      mergedBranch: false,
+      reused: false,
+    },
+    disposition: "cleanup",
     ...overrides,
   };
 }
@@ -44,34 +64,36 @@ test("branchLabel marks a detached worktree and blanks a pane row", () => {
 });
 
 test("the table pads, truncates, and keeps the flags column whole", () => {
-  const rendered = renderBoard([
-    row({
-      pane: "wB2:p1",
-      agent: "claude/working",
-      prColumn: "merged#30366",
-      age: 12,
-      flags: ["dirty", "carries:2"],
-    }),
-    row({
-      repoLabel: "backnotprop/plannotator",
-      repo: "plannotator",
-      branch: "a-branch-name-that-will-not-fit-in-the-column",
-      ownedByViewer: false,
-      age: null,
-      flags: ["unreadable"],
-    }),
-    row({
-      kind: "pane",
-      pane: "w9W:p1",
-      agent: "claude/idle",
-      repoLabel: "Herdr",
-      branch: null,
-      worktree: null,
-      age: null,
-      prColumn: "-",
-      flags: ["no worktree"],
-    }),
-  ]);
+  const rendered = renderTable(
+    [
+      row({
+        pane: "wB2:p1",
+        agent: "claude/working",
+        prColumn: "merged#30366",
+        age: 12,
+        flags: ["dirty", "carries:2"],
+      }),
+      row({
+        repoLabel: "backnotprop/plannotator",
+        repo: "plannotator",
+        branch: "a-branch-name-that-will-not-fit-in-the-column",
+        ownedByViewer: false,
+        age: null,
+        flags: ["unreadable"],
+      }),
+      row({
+        kind: "pane",
+        pane: "w9W:p1",
+        agent: "claude/idle",
+        repoLabel: "Herdr",
+        branch: null,
+        worktree: null,
+        age: null,
+        prColumn: "-",
+        flags: ["no worktree"],
+      }),
+    ].map(rowCells),
+  );
 
   expect(rendered).toMatchInlineSnapshot(`
 "PANE      AGENT          REPO                     BRANCH                     PR            AGE  FLAGS
@@ -110,10 +132,30 @@ test("a json row carries the fields the table truncates or omits", () => {
         ownedByViewer: false,
         repoLabel: "backnotprop/plannotator",
         branch: "doc-containment-gate",
-        pull: { ref: "#1437", number: 1437, state: "open" },
+        pull: {
+          ref: "#1437",
+          number: 1437,
+          state: "open",
+          checks: "passing",
+          failing: [],
+          review: "none",
+          mergeState: "clean",
+        },
         prColumn: "#1437",
         age: 3,
         flags: ["dirty", "carries:1"],
+        disposition: "waiting",
+        state: {
+          self: false,
+          working: false,
+          blocked: false,
+          pullUnknown: false,
+          status: "dirty",
+          unpushed: 0,
+          carried: 1,
+          mergedBranch: false,
+          reused: false,
+        },
       }),
     ),
   ).toEqual({
@@ -128,9 +170,29 @@ test("a json row carries the fields the table truncates or omits", () => {
     branch: "doc-containment-gate",
     detached: false,
     worktree: "/wt/topic",
-    pr: { ref: "#1437", number: 1437, state: "open" },
+    pr: {
+      ref: "#1437",
+      number: 1437,
+      state: "open",
+      checks: "passing",
+      failing: [],
+      review: "none",
+      mergeState: "clean",
+    },
     prColumn: "#1437",
     age: 3,
     flags: ["dirty", "carries:1"],
+    disposition: "waiting",
+    state: {
+      self: false,
+      working: false,
+      blocked: false,
+      pullUnknown: false,
+      status: "dirty",
+      unpushed: 0,
+      carried: 1,
+      mergedBranch: false,
+      reused: false,
+    },
   });
 });

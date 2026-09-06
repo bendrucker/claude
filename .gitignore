@@ -41,3 +41,10 @@ node_modules/
 voice-baseline/
 contrast-baseline/
 similarity.json
+
+# Overlay directories carry a checkout's `.claude`, so the per-session state that
+# lands in one belongs to that machine rather than the repo.
+overlays/**/.claude/settings.local.json
+overlays/**/.claude/.cc-writes/
+overlays/**/.claude/worktrees/
+overlays/**/.claude/scheduled_tasks.lock

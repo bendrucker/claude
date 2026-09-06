@@ -1,0 +1,8 @@
+{
+  "name": "overlay",
+  "description": "Overlay Claude Code configuration onto third-party repositories",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

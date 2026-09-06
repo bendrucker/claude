@@ -1,0 +1,16 @@
+{
+  "description": "Warns when an overlay exists for the repository and .claude is not linked to it",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.ts\""
+          }
+        ]
+      }
+    ]
+  }
+}

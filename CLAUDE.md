@@ -8,6 +8,7 @@ This repository contains my personal Claude Code configuration and a plugin mark
 - `.claude-plugin/marketplace.json`: Marketplace definition listing all available plugins
 - `schemas/`: JSON Schemas for Claude Code config formats. Upstream-backed ones (`plugin`, `marketplace`, `settings`) keep only our edits as an RFC 6902 overlay in [`schemas/overlays/`](schemas/overlays/), merged with the live upstream base in memory at validation time; the rest are hand-authored
 - `user/`: User-level configuration, symlinked to `~/.claude`
+- `overlays/`: Per-repository `.claude` directories for third-party checkouts, linked into place by the `overlay` plugin
 - `docs/`: Reference material too long to auto-inject, linked from the rule that needs it
 - `.claude/`: Project-level configuration for this repository
 

@@ -27,6 +27,7 @@
     "plugins/plan",
     "plugins/tmux",
     "plugins/mac",
+    "plugins/overlay",
     "plugins/x-callback-url",
     "plugins/review",
     "plugins/comments",

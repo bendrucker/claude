@@ -18,8 +18,17 @@
           },
           {
             "name": "node:fs/promises",
-            "allowImportNames": ["mkdir", "mkdtemp", "readdir", "rm"],
-            "message": "Use Bun file APIs (Bun.file, Bun.write) instead of node:fs/promises. Directory operations (mkdir, mkdtemp, readdir, rm) are allowed."
+            "allowImportNames": [
+              "lstat",
+              "mkdir",
+              "mkdtemp",
+              "readdir",
+              "readlink",
+              "rename",
+              "rm",
+              "symlink"
+            ],
+            "message": "Use Bun file APIs (Bun.file, Bun.write) instead of node:fs/promises. Directory operations (mkdir, mkdtemp, readdir, rm) and the link operations Bun does not expose (lstat, readlink, rename, symlink) are allowed."
           },
           {
             "name": "fs",

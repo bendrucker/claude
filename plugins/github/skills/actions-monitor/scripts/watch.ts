@@ -322,10 +322,6 @@ function emit(event: Event): void {
   console.log(JSON.stringify(event));
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 export type Mergeability = {
   mergeable: Probe["mergeable"];
   mergeStateStatus: MergeStateStatus;
@@ -352,7 +348,7 @@ export async function resolveMergeable(
   prNumber: number,
   repo: string,
   run: ExecFn = exec,
-  sleepFn: (ms: number) => Promise<void> = sleep,
+  sleepFn: (ms: number) => Promise<void> = Bun.sleep,
 ): Promise<Mergeability> {
   let current: Mergeability = { mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" };
   for (let attempt = 0; attempt < MERGEABLE_UNKNOWN_RETRIES; attempt += 1) {
@@ -765,7 +761,7 @@ async function watch(options: RunOptions): Promise<void> {
       let probe = result.probe;
       if (options.mode === "pr" && prNumber !== null && probeIsUndetermined(probe)) {
         // oxlint-disable-next-line no-await-in-loop -- poll loop: each cycle reads state the previous cycle left behind.
-        const resolved = await resolveMergeable(prNumber, repo, exec, sleep);
+        const resolved = await resolveMergeable(prNumber, repo, exec, Bun.sleep);
         probe = {
           ...probe,
           mergeable: resolved.mergeable,
@@ -791,7 +787,7 @@ async function watch(options: RunOptions): Promise<void> {
     }
 
     // oxlint-disable-next-line no-await-in-loop -- poll interval between API cycles.
-    await sleep((intervalSeconds ?? DEFAULT_INTERVAL_SECONDS) * 1000);
+    await Bun.sleep((intervalSeconds ?? DEFAULT_INTERVAL_SECONDS) * 1000);
   }
 }
 

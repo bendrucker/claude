@@ -4,10 +4,6 @@ import { cli } from "cleye";
 import { fetchUrls, newUrls } from "./poll";
 import { readState } from "./store";
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function iteration(queues: string[], dataDir: string | undefined): Promise<void> {
   const state = await readState(dataDir);
   const dispatched = new Set(state.dispatched.map((d) => d.url));
@@ -47,12 +43,12 @@ const argv = cli({
 
 const { dataDir, queue: queues, interval } = argv.flags;
 
-// Run immediately on start, then loop with an internal setTimeout sleep so
+// Run immediately on start, then loop with an internal sleep so
 // Monitor sees a single long-lived process (no shell while/sleep loop, which
 // breaks on macOS due to PATH-stripped eval and nice(5) restrictions).
 while (true) {
   // oxlint-disable-next-line no-await-in-loop -- poll loop: the next iteration only runs after this one finishes.
   await iteration(queues, dataDir);
   // oxlint-disable-next-line no-await-in-loop -- poll interval between iterations.
-  await sleep(interval * 1000);
+  await Bun.sleep(interval * 1000);
 }

@@ -31,6 +31,9 @@
           }
         ]
       }
-    ]
+    ],
+    // `__dirname` rebuilt from `import.meta.url` recomputes what Bun already
+    // exposes on `import.meta`, and breaks if the URL parsing drifts.
+    "unicorn/prefer-import-meta-properties": "error"
   }
 }

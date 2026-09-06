@@ -66,6 +66,6 @@ console.log(`FALSE NEGATIVES (bad items missed, no lexical tell) — ${falseNega
 for (const fnItem of falseNegatives) {
   console.log(`  "${fnItem.text}"`);
   console.log(
-    `      signals fired: ${fnItem.signals.length !== 0 ? fnItem.signals.join(", ") : "(none)"}`,
+    `      signals fired: ${fnItem.signals.length > 0 ? fnItem.signals.join(", ") : "(none)"}`,
   );
 }

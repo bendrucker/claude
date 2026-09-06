@@ -77,7 +77,7 @@ function runScope(scope: string): Promise<FileCoverage[]> {
 // Run Bun coverage for every scope the target files belong to, then merge.
 // With no files, measure the default scope set (the repo's test roots).
 export async function runCoverage(files: string[]): Promise<FileCoverage[]> {
-  const scopes = files.length !== 0 ? resolveScopes(files) : DEFAULT_SCOPES;
+  const scopes = files.length > 0 ? resolveScopes(files) : DEFAULT_SCOPES;
   const reports = await Promise.all(scopes.map(runScope));
   return merge(...reports);
 }

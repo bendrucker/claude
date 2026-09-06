@@ -760,7 +760,7 @@ async function main(): Promise<void> {
   console.error(`  shape      ${argv.flags.agentic ? "agentic, capped session" : "one-shot"}`);
   console.error(`  base       ${base}`);
   console.error(
-    `  files      ${diff.files.length}${skipped.length !== 0 ? ` (${skipped.length} body omitted)` : ""}`,
+    `  files      ${diff.files.length}${skipped.length > 0 ? ` (${skipped.length} body omitted)` : ""}`,
   );
   console.error(`  angles     ${angles.length} (${angles.map((angle) => angle.id).join(", ")})`);
   console.error(

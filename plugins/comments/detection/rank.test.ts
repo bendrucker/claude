@@ -101,7 +101,7 @@ describe("rankComments", () => {
         fc.array(commentArb),
         fc.constantFrom<SortKey>("score", "lines", "chars"),
         (comments, sort) => {
-          const before = comments.slice();
+          const before = [...comments];
           const result = rankComments(comments, sort);
           expect(result).toEqual(rankOracle(comments, sort));
           expect(result).not.toBe(comments);
@@ -117,7 +117,8 @@ describe("rankCommentsWeighted", () => {
 
   const pathedArb = fc
     .tuple(commentArb, fc.constantFrom("a.ts", "b.ts", "c.ts"))
-    .map(([c, path]) => Object.assign({}, c, { path }));
+    // oxlint-disable-next-line oxc/no-map-spread -- this .map is fast-check's Arbitrary.map, not Array#map; the spread must copy so the generated comment isn't mutated in place.
+    .map(([c, path]) => ({ ...c, path }));
 
   test("matches rankComments when no path has a weight", () => {
     fc.assert(

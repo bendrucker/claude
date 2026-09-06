@@ -106,13 +106,13 @@ export function scoreHeadingBaseline(
   let tp = 0;
   let fp = 0;
   let fn = 0;
-  labeled.forEach((row, i) => {
+  for (const [i, row] of labeled.entries()) {
     const flagged = verdicts[i] === true;
     const want = SHOULD_FLAG.has(row.label);
     if (flagged && want) tp++;
     else if (flagged && !want) fp++;
     else if (!flagged && want) fn++;
-  });
+  }
   const ci = wilson(tp, tp + fp);
   return {
     total: labeled.length,

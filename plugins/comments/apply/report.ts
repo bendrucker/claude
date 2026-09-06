@@ -31,7 +31,7 @@ function firstLine(text: string): string {
 function actionLabel(verdict: Verdict): string {
   if (verdict.action !== "trim") return verdict.action;
   return (verdict.trimTo != null && verdict.trimTo !== "") ||
-    (verdict.trimToLines != null && verdict.trimToLines.length !== 0)
+    (verdict.trimToLines != null && verdict.trimToLines.length > 0)
     ? "trim"
     : "delete";
 }
@@ -89,7 +89,7 @@ export function renderReport(items: ReportItem[], options: { fix: boolean }): st
       }
       if (verdict.trimTo != null && verdict.trimTo !== "") {
         lines.push(color.dim(`      keep: ${firstLine(verdict.trimTo)}`));
-      } else if (verdict.trimToLines != null && verdict.trimToLines.length !== 0) {
+      } else if (verdict.trimToLines != null && verdict.trimToLines.length > 0) {
         lines.push(color.dim(`      keep lines: ${verdict.trimToLines.join(", ")}`));
       }
     }

@@ -210,7 +210,7 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
       ? [toks[0]]
       : [];
   const lowered = [...firstLower, ...lowercaseContent];
-  if (lowercaseContent.length >= 1 || lowered.length >= 2) {
+  if (lowercaseContent.length > 0 || lowered.length >= 2) {
     signals.push(`sentence case (${lowered.length} lowercase content words)`);
   }
 

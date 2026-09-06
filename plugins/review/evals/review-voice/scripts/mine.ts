@@ -192,11 +192,11 @@ async function main() {
         ? bodiesFromJson(row.content)
         : [{ body: row.content, file: null, line: null }];
 
-    extracted.forEach((entry, index) => {
+    for (const [index, entry] of extracted.entries()) {
       const body = entry.body.trim();
-      if (body.length < argv.flags.minChars) return;
+      if (body.length < argv.flags.minChars) continue;
       const key = normalize(body);
-      if (seen.has(key)) return;
+      if (seen.has(key)) continue;
       seen.add(key);
       candidates.push({
         id: idFor(row.host, row.session_id, row.file_path, index),
@@ -209,7 +209,7 @@ async function main() {
         line: entry.line,
         body,
       });
-    });
+    }
   }
 
   await mkdir(dirname(argv.flags.out), { recursive: true });

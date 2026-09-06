@@ -39,7 +39,7 @@ export function compilePlainWordlist(
 ): RegExp | null {
   const entries = parseLines(content);
   if (entries.length === 0) return null;
-  const fragments = Array.from(new Set(entries.map(escapeRegex)));
+  const fragments = [...new Set(entries.map(escapeRegex))];
   const prefix = options.prefix ?? String.raw`\b`;
   const suffix = options.suffix ?? String.raw`\b`;
   const flags = options.flags ?? "gi";

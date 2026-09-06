@@ -68,17 +68,21 @@
     // `it(...)` call but isn't one. Off here. Enabled only under
     // **/*.test.ts below, where a commented-out test can actually occur.
     "vitest/no-commented-out-tests": "off",
-    // This repo tests with bun:test, not vitest. The vitest plugin matches
-    // on the Jest-style API shape rather than the import, so it still
-    // applies correctly here.
-    "vitest/prefer-each": "error"
+    // vitest/prefer-each rewrites a loop over cases into `it.each`, which is
+    // only meaningful where the loop body is a test. Repo-wide it fires on any
+    // `for...of`, such as meme's render.ts drawing one canvas line per
+    // iteration. Off here, on under **/*.test.ts below. This repo tests with
+    // bun:test, and the plugin matches the Jest-style API shape rather than the
+    // import, so it still applies there.
+    "vitest/prefer-each": "off"
   },
   "overrides": [
     {
       "files": ["**/*.test.ts"],
       "rules": {
         "unicorn/consistent-function-scoping": "off",
-        "vitest/no-commented-out-tests": "error"
+        "vitest/no-commented-out-tests": "error",
+        "vitest/prefer-each": "error"
       }
     }
   ]

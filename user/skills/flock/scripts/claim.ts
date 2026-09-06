@@ -133,9 +133,10 @@ async function repoLocalWorktreeDirs(home: string): Promise<string[]> {
 
 /**
  * A worktree with no pane is where work that merged remotely but stayed open
- * locally hides, so the seeds reach past what herdr has actually opened. One
- * checkout resolves a whole repository, so each layout contributes one path
- * per repository rather than one per worktree.
+ * locally hides, so the seeds reach past what herdr has actually opened. Every
+ * checkout is offered rather than one per directory, because a half-removed
+ * one resolves to nothing and would otherwise take its whole repository off
+ * the board. The caller keys repositories by root, so the extras collapse.
  */
 async function seededCheckouts(home: string): Promise<string[]> {
   const owners = await directories(join(home, "src", ".worktrees"));
@@ -145,17 +146,12 @@ async function seededCheckouts(home: string): Promise<string[]> {
     ...(await repoLocalWorktreeDirs(home)),
   ];
 
-  const seeds = await Promise.all(
-    repoDirs.map(async (dir) => {
-      const candidates = await directories(dir);
-      const listings = await Promise.all(
-        candidates.map(async (path) => ({ path, names: await entryNames(path) })),
-      );
-      return listings.find((listing) => listing.names.includes(".git"))?.path;
-    }),
+  const candidates = (await Promise.all(repoDirs.map(directories))).flat();
+  const listings = await Promise.all(
+    candidates.map(async (path) => ({ path, names: await entryNames(path) })),
   );
 
-  return seeds.filter((seed): seed is string => seed !== undefined);
+  return listings.filter((listing) => listing.names.includes(".git")).map(({ path }) => path);
 }
 
 async function resolveRepository(git: Run, dir: string): Promise<Repository | null> {

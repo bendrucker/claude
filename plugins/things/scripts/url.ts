@@ -219,9 +219,13 @@ const XCALL_KILL_GRACE_SECONDS = 2;
 /** Slack over run.sh's own bounds, covering process startup and the Swift build. */
 const XCALL_BACKSTOP_MARGIN_MS = 15_000;
 
-function boundSeconds(env: Record<string, string | undefined>, name: string): number {
+function boundSeconds(
+  env: Record<string, string | undefined>,
+  name: string,
+  fallback = XCALL_BOUND_DEFAULT_SECONDS,
+): number {
   const seconds = Number(env[name]);
-  return Number.isFinite(seconds) && seconds > 0 ? seconds : XCALL_BOUND_DEFAULT_SECONDS;
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : fallback;
 }
 
 /**
@@ -233,11 +237,16 @@ function boundSeconds(env: Record<string, string | undefined>, name: string): nu
  *
  * The callback timeout counts twice. run.sh serializes on a lock first, and a
  * caller that finds the bridge busy waits out the holder's full turn before
- * starting its own.
+ * starting its own. XCALL_LOCK_WAIT_SECONDS overrides that wait, so the
+ * backstop reads it rather than assuming the derivation it defaults to.
  */
 export function xcallBackstopMs(env: Record<string, string | undefined>): number {
   const callback = boundSeconds(env, "XCALL_TIMEOUT_SECONDS");
-  const lockWait = callback + XCALL_KILL_GRACE_SECONDS + 1;
+  const lockWait = boundSeconds(
+    env,
+    "XCALL_LOCK_WAIT_SECONDS",
+    callback + XCALL_KILL_GRACE_SECONDS + 1,
+  );
   const bounds =
     boundSeconds(env, "XCALL_BUILD_TIMEOUT_SECONDS") +
     lockWait +

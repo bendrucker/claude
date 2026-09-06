@@ -69,8 +69,7 @@ export function summarize(rows: MeasuredTerm[]): OverlapSummary {
   };
 }
 
-// Place each curated entry in the ranking. An entry the contrast scores near
-// zero is one the corpus does not support.
+// An entry the contrast scores near zero is one the corpus does not support.
 export function recallOfCuratedEntries(
   curated: string[],
   ranked: RankedTerm[],

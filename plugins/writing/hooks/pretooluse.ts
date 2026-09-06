@@ -9,9 +9,9 @@ import {
   isPlanPath,
   isScratchPath,
 } from "../detection/paths";
-import * as tropes from "./check-tropes";
+import { check as checkTropes } from "./check-tropes";
 import { type HookResult, isPlanMode, type SyncHookJSONOutput, tierOf, toolInputOf } from "./io";
-import * as numbering from "./numbering";
+import { check as checkNumbering, type Mode } from "./numbering";
 import { appendRunLog, type RunLogEntry, type RunOutcome } from "./run-log";
 import { recentlyFired, recordFired } from "./session-state";
 
@@ -74,11 +74,11 @@ export async function dispatch(
   if (filePath != null && filePath !== "" && (isPlanPath(filePath) || isMemoryPath(filePath)))
     return finish(null, "silent");
 
-  const mode: numbering.Mode = input.tool_name === "Edit" ? "edit" : "write";
+  const mode: Mode = input.tool_name === "Edit" ? "edit" : "write";
   const checkers = [
-    () => numbering.check(input, mode),
+    () => checkNumbering(input, mode),
     () => (isMarkdownFile(ext) ? headingResult(input) : null),
-    () => tropes.check(input),
+    () => checkTropes(input),
   ];
 
   // One checker crashing must not take down the others or the run log.

@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { join } from "node:path";
 import { $ } from "bun";
 import { z } from "zod";
 import {
@@ -25,12 +25,12 @@ async function backdate(target: string) {
   await $`/usr/bin/touch -t 200001010000 ${target}`.quiet();
 }
 
-const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
-const resourcesDir = path.join(import.meta.dirname, "..", "resources");
-const plansFixtureDir = path.join(import.meta.dirname, "..", "fixtures", "plans");
+const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
+const resourcesDir = join(import.meta.dirname, "..", "resources");
+const plansFixtureDir = join(import.meta.dirname, "..", "fixtures", "plans");
 
 async function loadExtensions(database: Database) {
-  await database.run(await Bun.file(path.join(resourcesDir, "extensions.sql")).text());
+  await database.run(await Bun.file(join(resourcesDir, "extensions.sql")).text());
 }
 
 function filterParams(overrides: Record<string, string | null> = {}) {
@@ -49,7 +49,7 @@ let importsDir: string;
 // the network, which can exceed the default per-test timeout on a cold CI runner.
 // Warm the shared extension cache once so the per-test LOAD reads from disk.
 beforeAll(async () => {
-  const warmDir = mkdtempSync(path.join(tmpdir(), "session-warm-"));
+  const warmDir = mkdtempSync(join(tmpdir(), "session-warm-"));
   const warm = await getDb(warmDir);
   try {
     await loadExtensions(warm);
@@ -60,11 +60,11 @@ beforeAll(async () => {
 }, 120_000);
 
 async function importFixtureHost(label: string, opts: { source?: string } = {}) {
-  const projects = path.join(importsDir, label, "projects");
+  const projects = join(importsDir, label, "projects");
   mkdirSync(projects, { recursive: true });
   await $`cp -R ${fixturesDir}/. ${projects}`.quiet();
   await Bun.write(
-    path.join(importsDir, label, "manifest.json"),
+    join(importsDir, label, "manifest.json"),
     `${JSON.stringify({
       host: label,
       source: opts.source ?? `${label}:.claude/projects/`,
@@ -79,8 +79,8 @@ async function reindex() {
 }
 
 beforeEach(async () => {
-  tmpDir = mkdtempSync(path.join(tmpdir(), "session-test-"));
-  importsDir = path.join(tmpDir, "imports");
+  tmpDir = mkdtempSync(join(tmpdir(), "session-test-"));
+  importsDir = join(tmpDir, "imports");
   mkdirSync(importsDir, { recursive: true });
   db = await getDb(tmpDir);
   await reindex();
@@ -701,7 +701,7 @@ describe("cross-machine history", () => {
     await importFixtureHost("archive");
     for (const rel of ["-Users-test-project/basic.jsonl", "-Users-test-webapp/webapp.jsonl"]) {
       // oxlint-disable-next-line no-await-in-loop -- two fixture files; concurrency buys nothing.
-      await backdate(path.join(importsDir, "archive", "projects", rel));
+      await backdate(join(importsDir, "archive", "projects", rel));
     }
     await reindex();
 
@@ -723,7 +723,7 @@ describe("cross-machine history", () => {
 
     const removed = await forgetHost(db, "gone");
     expect(removed).toBe(Number(before?.n));
-    await rm(path.join(importsDir, "gone"), { recursive: true, force: true });
+    await rm(join(importsDir, "gone"), { recursive: true, force: true });
 
     const [after] = await db.query(
       "SELECT COUNT(*) AS n FROM raw WHERE host = 'gone'",
@@ -735,7 +735,7 @@ describe("cross-machine history", () => {
       z.object({ host: z.string() }),
     );
     expect(sessions.map((r) => r.host)).toEqual(["local"]);
-    expect(dirExists(path.join(importsDir, "gone"))).toBe(false);
+    expect(dirExists(join(importsDir, "gone"))).toBe(false);
   });
 
   // forget marks the derived tables stale before it deletes, which is what makes the
@@ -747,7 +747,7 @@ describe("cross-machine history", () => {
 
     await invalidateDerived(db);
     await deleteHostRows(db, "gone");
-    await rm(path.join(importsDir, "gone"), { recursive: true, force: true });
+    await rm(join(importsDir, "gone"), { recursive: true, force: true });
 
     await reindex();
 
@@ -1427,7 +1427,7 @@ describe("change catalog", () => {
     await reindex();
 
     // rsync -a re-syncs deliver new files with preserved (old) source mtimes.
-    const late = path.join(importsDir, "work", "projects", "-Users-test-project", "late.jsonl");
+    const late = join(importsDir, "work", "projects", "-Users-test-project", "late.jsonl");
     await Bun.write(
       late,
       `${JSON.stringify({
@@ -1451,13 +1451,7 @@ describe("change catalog", () => {
   it("reimports a file whose content changed and drops its stale rows", async () => {
     await importFixtureHost("edited");
     await reindex();
-    const target = path.join(
-      importsDir,
-      "edited",
-      "projects",
-      "-Users-test-project",
-      "basic.jsonl",
-    );
+    const target = join(importsDir, "edited", "projects", "-Users-test-project", "basic.jsonl");
     const original = await Bun.file(target).text();
     await Bun.write(
       target,
@@ -1483,13 +1477,7 @@ describe("change catalog", () => {
   it("drops rows for files that disappear", async () => {
     await importFixtureHost("shrinking");
     await reindex();
-    const target = path.join(
-      importsDir,
-      "shrinking",
-      "projects",
-      "-Users-test-project",
-      "basic.jsonl",
-    );
+    const target = join(importsDir, "shrinking", "projects", "-Users-test-project", "basic.jsonl");
     const [before] = await db.query(
       "SELECT COUNT(*) AS n FROM raw WHERE host = 'shrinking' AND source_file = $path",
       z.object({ n: z.bigint() }),
@@ -1515,7 +1503,7 @@ describe("change catalog", () => {
   it("keeps a host's rows when its root directory is missing", async () => {
     await importFixtureHost("unmounted");
     await reindex();
-    await rm(path.join(importsDir, "unmounted", "projects"), { recursive: true, force: true });
+    await rm(join(importsDir, "unmounted", "projects"), { recursive: true, force: true });
     await reindex();
 
     const [row] = await db.query(
@@ -1537,7 +1525,7 @@ describe("change catalog", () => {
       );
       expect(Number(before?.n)).toBeGreaterThan(0);
 
-      const subdir = path.join(importsDir, "guarded", "projects", "-Users-test-project");
+      const subdir = join(importsDir, "guarded", "projects", "-Users-test-project");
       await $`chmod 000 ${subdir}`.quiet();
       try {
         expect(reindex()).rejects.toThrow();
@@ -1579,7 +1567,7 @@ describe("pinned column derivation", () => {
   // A root that does not exist is skipped rather than read, so ensureIndex touches no
   // file and anything that changes in raw came from raw itself.
   async function reindexWithoutDisk() {
-    const gone = path.join(tmpDir, "gone");
+    const gone = join(tmpDir, "gone");
     await ensureIndex(db, { projectsDir: gone, importsDir: gone });
   }
 
@@ -1745,7 +1733,7 @@ describe("index version migration", () => {
     );
     expect(Number(before?.n)).toBeGreaterThan(0);
 
-    await rm(path.join(importsDir, "detached", "projects"), { recursive: true, force: true });
+    await rm(join(importsDir, "detached", "projects"), { recursive: true, force: true });
     await db.run("UPDATE index_meta SET version = 0");
     await reindex();
 
@@ -1760,7 +1748,7 @@ describe("index version migration", () => {
     await importFixtureHost("archived");
     await reindex();
 
-    const projects = path.join(importsDir, "archived", "projects");
+    const projects = join(importsDir, "archived", "projects");
     await rm(projects, { recursive: true, force: true });
     mkdirSync(projects, { recursive: true });
 
@@ -2181,8 +2169,8 @@ describe("stop-hook-noop-detector query", () => {
 });
 
 describe("plan-sections query", () => {
-  const plansGlob = path.join(plansFixtureDir, "*.md");
-  const featurePlan = path.join(plansFixtureDir, "feature-plan.md");
+  const plansGlob = join(plansFixtureDir, "*.md");
+  const featurePlan = join(plansFixtureDir, "feature-plan.md");
 
   const Section = z.object({
     session_id: z.string().nullable(),
@@ -2271,7 +2259,7 @@ describe("plan-sections query", () => {
     const missing = [...byFile.entries()]
       .filter(([, titles]) => !titles.has("Verification"))
       .map(([file]) => file);
-    expect(missing).toContain(path.join(plansFixtureDir, "quick-plan.md"));
+    expect(missing).toContain(join(plansFixtureDir, "quick-plan.md"));
     expect(missing).not.toContain(featurePlan);
   });
 
@@ -2287,7 +2275,7 @@ describe("plan-sections query", () => {
     }
 
     // quick-plan.md has no matching plan_calls row, so the LEFT JOIN leaves it null.
-    const quick = rows.filter((r) => r.file_path === path.join(plansFixtureDir, "quick-plan.md"));
+    const quick = rows.filter((r) => r.file_path === join(plansFixtureDir, "quick-plan.md"));
     expect(quick.length).toBeGreaterThan(0);
     for (const r of quick) expect(r.session_id).toBeNull();
   });
@@ -2301,7 +2289,7 @@ describe("plan-sections query", () => {
 });
 
 describe("skill-config-vs-observed query", () => {
-  const skillsFixtureDir = path.join(import.meta.dirname, "..", "fixtures", "skills");
+  const skillsFixtureDir = join(import.meta.dirname, "..", "fixtures", "skills");
 
   const SkillRow = z.object({
     source: z.string(),
@@ -2325,9 +2313,9 @@ describe("skill-config-vs-observed query", () => {
       SkillRow,
       filterParams({
         skill: null,
-        plugin_skill_glob: path.join(skillsFixtureDir, "cache/*/*/*/skills/*/SKILL.md"),
-        user_skill_glob: path.join(skillsFixtureDir, "user/*/SKILL.md"),
-        project_skill_glob: path.join(skillsFixtureDir, "project/*/SKILL.md"),
+        plugin_skill_glob: join(skillsFixtureDir, "cache/*/*/*/skills/*/SKILL.md"),
+        user_skill_glob: join(skillsFixtureDir, "user/*/SKILL.md"),
+        project_skill_glob: join(skillsFixtureDir, "project/*/SKILL.md"),
         ...overrides,
       }),
     );
@@ -2372,7 +2360,7 @@ describe("skill-config-vs-observed query", () => {
 });
 
 describe("index-health query", () => {
-  const projectsGlob = path.join(fixturesDir, "**", "*.jsonl");
+  const projectsGlob = join(fixturesDir, "**", "*.jsonl");
 
   const Health = z.object({
     check_name: z.string(),
@@ -2454,17 +2442,17 @@ describe("index-health query", () => {
   });
 
   it("alerts on disk files missing from the index", async () => {
-    const extraDir = path.join(tmpDir, "extra-projects", "-Users-test-extra");
+    const extraDir = join(tmpDir, "extra-projects", "-Users-test-extra");
     mkdirSync(extraDir, { recursive: true });
     await Bun.write(
-      path.join(extraDir, "unindexed.jsonl"),
+      join(extraDir, "unindexed.jsonl"),
       '{"type":"user","message":{"role":"user","content":"hi"},"sessionId":"extra","timestamp":"2024-02-01T00:00:00.000Z","uuid":"ex-1"}\n',
     );
     const rows = await runQuery(
       db,
       "index-health",
       Health,
-      healthParams({ projects_glob: path.join(tmpDir, "extra-projects", "**", "*.jsonl") }),
+      healthParams({ projects_glob: join(tmpDir, "extra-projects", "**", "*.jsonl") }),
     );
     const missing = rows.find((r) => r.check_name === "disk-not-indexed");
     expect(missing?.status).toBe("alert");
@@ -2475,14 +2463,14 @@ describe("index-health query", () => {
   });
 
   it("alerts on an imported host whose newest record lags the corpus", async () => {
-    const staleProjects = path.join(importsDir, "stale", "projects", "-Users-test-stale");
+    const staleProjects = join(importsDir, "stale", "projects", "-Users-test-stale");
     mkdirSync(staleProjects, { recursive: true });
     await Bun.write(
-      path.join(staleProjects, "old.jsonl"),
+      join(staleProjects, "old.jsonl"),
       '{"type":"user","message":{"role":"user","content":"old work"},"sessionId":"stale-session","timestamp":"2023-12-01T00:00:00.000Z","uuid":"st-1"}\n',
     );
     await Bun.write(
-      path.join(importsDir, "stale", "manifest.json"),
+      join(importsDir, "stale", "manifest.json"),
       `${JSON.stringify({
         host: "stale",
         source: "stale:.claude/projects/",
@@ -2504,7 +2492,7 @@ describe("index-health query", () => {
 describe("frontmatter query", () => {
   it("parses name and description from a SKILL.md frontmatter", async () => {
     await loadExtensions(db);
-    const skill = path.join(import.meta.dirname, "..", "SKILL.md");
+    const skill = join(import.meta.dirname, "..", "SKILL.md");
     const rows = await runQuery(
       db,
       "frontmatter",
@@ -2834,7 +2822,7 @@ describe("schema map", () => {
 
   it("falls back to the committed map when the index cannot be reached", async () => {
     const dataDir = process.env.CLAUDE_PLUGIN_DATA;
-    process.env.CLAUDE_PLUGIN_DATA = path.join(tmpDir, "absent");
+    process.env.CLAUDE_PLUGIN_DATA = join(tmpDir, "absent");
     try {
       const lines = (await schemaMap()).split("\n");
       expect(lines.map((line) => line.split(":")[0])).toEqual([...SURFACES]);

@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { execSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import * as os from "node:os";
-import * as path from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { findTemplate } from "./pr-template";
 
 type TemplateFile = [path: string, content: string];
@@ -12,7 +12,7 @@ describe("findTemplate", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = realpathSync(mkdtempSync(path.join(os.tmpdir(), "pr-template-")));
+    tempDir = realpathSync(mkdtempSync(join(tmpdir(), "pr-template-")));
     execSync("git init -q", { cwd: tempDir, stdio: "pipe" });
     execSync("git remote add origin git@github.com:user/repo.git", {
       cwd: tempDir,
@@ -27,8 +27,8 @@ describe("findTemplate", () => {
   async function writeFiles(files: TemplateFile[]) {
     await Promise.all(
       files.map(([file, content]) => {
-        const dest = path.join(tempDir, file);
-        mkdirSync(path.dirname(dest), { recursive: true });
+        const dest = join(tempDir, file);
+        mkdirSync(dirname(dest), { recursive: true });
         return Bun.write(dest, content);
       }),
     );

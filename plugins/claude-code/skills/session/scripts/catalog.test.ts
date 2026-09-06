@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
 import {
   CATALOG_PATH,
@@ -16,7 +16,7 @@ import {
 import { type Database, ensureIndex, getDb, runQuery } from "./db";
 import { loadQueryHeaders, parseQueryHeader, QUERIES_DIR, type QueryHeader } from "./query-header";
 
-const fixturesDir = path.join(import.meta.dirname, "..", "fixtures", "sessions");
+const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 
 const VALID = `-- ---
 -- name: demo
@@ -77,7 +77,7 @@ async function loadQueries(): Promise<[QueryHeader, string][]> {
   return Promise.all(
     headers.map(
       async (header) =>
-        [header, await Bun.file(path.join(QUERIES_DIR, `${header.name}.sql`)).text()] as [
+        [header, await Bun.file(join(QUERIES_DIR, `${header.name}.sql`)).text()] as [
           QueryHeader,
           string,
         ],
@@ -168,9 +168,7 @@ describe("generated reference docs", () => {
   });
 
   it("cites survey surfaces that exist as a query or a view", async () => {
-    const views = await Bun.file(
-      path.join(import.meta.dirname, "..", "resources", "views.sql"),
-    ).text();
+    const views = await Bun.file(join(import.meta.dirname, "..", "resources", "views.sql")).text();
     const known = new Set([
       ...(await loadQueryHeaders()).map((header) => header.name),
       ...[...views.matchAll(/CREATE OR REPLACE (?:VIEW|TABLE) ([a-z_]+)/g)].map(
@@ -231,9 +229,9 @@ describe("a header-bearing query", () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = mkdtempSync(path.join(tmpdir(), "session-catalog-"));
+    tmpDir = mkdtempSync(join(tmpdir(), "session-catalog-"));
     db = await getDb(tmpDir);
-    await ensureIndex(db, { projectsDir: fixturesDir, importsDir: path.join(tmpDir, "imports") });
+    await ensureIndex(db, { projectsDir: fixturesDir, importsDir: join(tmpDir, "imports") });
   });
 
   afterEach(async () => {
@@ -242,7 +240,7 @@ describe("a header-bearing query", () => {
   });
 
   it("still runs, because DuckDB reads the fence as comments", async () => {
-    expect(parseQueryHeader(await Bun.file(path.join(QUERIES_DIR, "stats.sql")).text()).name).toBe(
+    expect(parseQueryHeader(await Bun.file(join(QUERIES_DIR, "stats.sql")).text()).name).toBe(
       "stats",
     );
 

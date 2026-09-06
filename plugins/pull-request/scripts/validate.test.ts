@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import * as os from "node:os";
-import * as path from "node:path";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { type HookInput, processInput } from "./validate";
 
 function getPermissionDecision(result: Awaited<ReturnType<typeof processInput>>) {
@@ -34,14 +34,14 @@ describe("processInput", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(path.join(os.tmpdir(), "validate-test-"));
+    tempDir = mkdtempSync(join(tmpdir(), "validate-test-"));
   });
 
   afterEach(async () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  const repoRoot = path.join(import.meta.dir, "..", "..", "..");
+  const repoRoot = join(import.meta.dir, "..", "..", "..");
   const headSha = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" })
     .stdout.trim()
     .slice(0, 12);
@@ -84,7 +84,7 @@ describe("processInput", () => {
   });
 
   it("returns null for valid body", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, "## Summary\nFixes a bug");
     const result = await processInput(createInput(`gh pr create --body-file ${bodyFile}`));
     expect(result).toBeNull();
@@ -110,7 +110,7 @@ describe("processInput", () => {
     ["glab mr update --description", (body) => `glab mr update 3 --description "$(cat ${body})"`],
     ["glab mr update -d", (body) => `glab mr update 3 -d "$(cat ${body})"`],
   ])("checks the body behind %s", async (_form, build) => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, "## Two fixes found while testing\n\nReshapes the resolver.");
     const result = await processInput(createInput(build(bodyFile), repoRoot));
     expect(getPermissionDecision(result)).toBe("deny");
@@ -120,7 +120,7 @@ describe("processInput", () => {
   // The body file does not exist when the hook runs: the same command writes
   // it. The heredoc is the body.
   it("validates a body written by a heredoc in the same command", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     const command = `mkdir -p tmp && cat > ${bodyFile} <<'EOF'\n## Two fixes found while testing\n\nReshapes the resolver.\nEOF\ngh pr create --title T --body-file ${bodyFile}`;
     const result = await processInput(createInput(command, repoRoot));
     expect(getPermissionDecision(result)).toBe("deny");
@@ -128,15 +128,15 @@ describe("processInput", () => {
   });
 
   it("passes a clean body written by a heredoc in the same command", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     const command = `cat > ${bodyFile} <<'EOF'\n## Summary\n\nFixes a bug.\nEOF\ngh pr create --title T --body-file ${bodyFile}`;
     expect(await processInput(createInput(command, repoRoot))).toBeNull();
   });
 
   it("resolves a relative body file behind a cd", async () => {
-    const sub = path.join(tempDir, "sub");
+    const sub = join(tempDir, "sub");
     await Bun.write(
-      path.join(sub, "body.md"),
+      join(sub, "body.md"),
       "## Two fixes found while testing\n\nReshapes the resolver.",
     );
     const result = await processInput(
@@ -147,7 +147,7 @@ describe("processInput", () => {
   });
 
   it("denies body with test count", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, "## Test plan\nAdded 5 tests");
     const result = await processInput(createInput(`gh pr create --body-file ${bodyFile}`));
     expect(result).not.toBeNull();
@@ -155,7 +155,7 @@ describe("processInput", () => {
   });
 
   it("denies a backticked real commit SHA", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, `Builds on \`${headSha}\`.`);
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
@@ -165,7 +165,7 @@ describe("processInput", () => {
   });
 
   it("reports a verified SHA once when the body also has a backticked ref", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, `Builds on \`${headSha}\`. Closes \`#12\`.`);
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
@@ -175,7 +175,7 @@ describe("processInput", () => {
   });
 
   it("does not warn on a bare commit SHA", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, `Builds on ${headSha}.`);
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
@@ -184,7 +184,7 @@ describe("processInput", () => {
   });
 
   it("denies a sentence-case heading in a body file", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, "## Two fixes found while testing\n\nReshapes the resolver.");
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
@@ -194,7 +194,7 @@ describe("processInput", () => {
   });
 
   it("combines a test-count and a backticked SHA into one deny", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, `Builds on \`${headSha}\`.\n\nAdded 5 tests`);
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
@@ -206,7 +206,7 @@ describe("processInput", () => {
   });
 
   it("warns on the title the command sets", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, "Adds an LRU cache to the resolver.");
     const result = await processInput(
       createInput(
@@ -220,7 +220,7 @@ describe("processInput", () => {
   it("carries the title warning into the deny when the body file is missing", async () => {
     const result = await processInput(
       createInput(
-        `gh pr create --title "Add an LRU Cache to the Resolver and Wire It Through" --body-file ${path.join(tempDir, "missing.md")}`,
+        `gh pr create --title "Add an LRU Cache to the Resolver and Wire It Through" --body-file ${join(tempDir, "missing.md")}`,
         repoRoot,
       ),
     );
@@ -237,7 +237,7 @@ describe("processInput", () => {
   });
 
   it("carries warnings inside the deny instead of a separate warn", async () => {
-    const bodyFile = path.join(tempDir, "body.md");
+    const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, "## Changes to the cache\n\n- **src/cache.ts**: adds a cache");
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),

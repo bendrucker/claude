@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { execSync } from "node:child_process";
 import { mkdtempSync, realpathSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import * as os from "node:os";
-import * as path from "node:path";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   areaRefs,
   blameOwners,
@@ -28,13 +28,13 @@ describe("suggest-reviewers", () => {
     author: typeof ME,
     subject: string,
   ): Promise<void> {
-    await Bun.write(path.join(dir, file), content);
+    await Bun.write(join(dir, file), content);
     git(`add "${file}"`);
     git(`commit --author="${author.name} <${author.email}>" -m "${subject}"`);
   }
 
   beforeEach(() => {
-    dir = realpathSync(mkdtempSync(path.join(os.tmpdir(), "suggest-reviewers-")));
+    dir = realpathSync(mkdtempSync(join(tmpdir(), "suggest-reviewers-")));
     git("init -q");
     git("symbolic-ref HEAD refs/heads/main");
     git(`config user.name "${ME.name}"`);

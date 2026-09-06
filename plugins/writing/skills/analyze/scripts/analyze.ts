@@ -2,7 +2,7 @@
 import { mkdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { cli } from "cleye";
 import { corpusPath, profilePath, resolveDataDir } from "./data-dir";
 import { type Database, openSessionDb } from "./db";
@@ -27,8 +27,7 @@ import { auditStructuralPatterns } from "./structural";
 import { type TagSignatureRow, tagSequence } from "./tag-ngram";
 import { computeCorpusRates } from "./voice-delta";
 import { loadProfile, phraseProfileStat } from "./voice-profile";
-import type { WordlistEntry } from "./wordlists";
-import { loadWordlists } from "./wordlists";
+import { loadWordlists, type WordlistEntry } from "./wordlists";
 
 // Everything runAnalysis needs once flag parsing and date defaulting are done.
 // generatedAt is supplied by the caller so the orchestration stays pure (no
@@ -182,14 +181,14 @@ async function main(): Promise<void> {
     tagMinLift: argv.flags.tagMinLift,
     tagTop: argv.flags.tagTop,
     wordlistsDir:
-      argv.flags.wordlistsDir ?? path.join(import.meta.dirname, "..", "..", "..", "wordlists"),
+      argv.flags.wordlistsDir ?? join(import.meta.dirname, "..", "..", "..", "wordlists"),
     dataDir: resolveDataDir(argv.flags.dataDir),
     pasteMaxChars: argv.flags.pasteMaxChars,
     selfName: argv.flags.selfName,
     correctiveLimit: argv.flags.correctiveLimit,
   };
-  const dbPath = path.resolve(argv.flags.sessionDb ?? "");
-  const outPath = argv.flags.out ?? path.join("tmp", `trope-analysis-${today}.md`);
+  const dbPath = resolve(argv.flags.sessionDb ?? "");
+  const outPath = argv.flags.out ?? join("tmp", `trope-analysis-${today}.md`);
 
   const detectors: BatchDetectors = {};
   if (argv.flags.judge) {
@@ -209,14 +208,14 @@ async function main(): Promise<void> {
   }
 
   const sessionId = process.env.CLAUDE_SESSION_ID ?? "anonymous";
-  const isolatedPath = path.join(tmpdir(), `session-analyze-${sessionId}.duckdb`);
+  const isolatedPath = join(tmpdir(), `session-analyze-${sessionId}.duckdb`);
   console.error(`Copying session DB to ${isolatedPath}`);
   await Bun.write(isolatedPath, Bun.file(dbPath));
 
   const db = await openSessionDb(isolatedPath);
   try {
     const report = renderReport(await runAnalysis(db, config, detectors));
-    mkdirSync(path.dirname(outPath), { recursive: true });
+    mkdirSync(dirname(outPath), { recursive: true });
     await Bun.write(outPath, report);
     console.error(`Wrote report to ${outPath}`);
     process.stdout.write(`${outPath}\n`);

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import * as path from "node:path";
+import { join } from "node:path";
 import { z } from "zod";
 import { query } from "../duckdb";
 import {
@@ -14,7 +14,7 @@ import {
   WINDOW_DAYS,
 } from "../report";
 
-const CORPUS = path.join(import.meta.dirname, "results");
+const CORPUS = join(import.meta.dirname, "results");
 const NOW = new Date("2026-08-28T00:00:00.000Z");
 
 function epoch(iso: string): number {
@@ -23,7 +23,7 @@ function epoch(iso: string): number {
 
 test.each<{ name: string; dir: string; expected: boolean }>([
   { name: "a corpus with exports", dir: CORPUS, expected: true },
-  { name: "a directory that does not exist", dir: path.join(CORPUS, "missing"), expected: false },
+  { name: "a directory that does not exist", dir: join(CORPUS, "missing"), expected: false },
 ])("hasResults sees $name", ({ dir, expected }) => {
   expect(hasResults(dir)).toBe(expected);
 });
@@ -129,7 +129,7 @@ test("the runs view types every numeric column as a number", async () => {
 });
 
 test("loadSuites returns nothing for an empty corpus", async () => {
-  expect(await loadSuites(path.join(CORPUS, "missing"), NOW)).toEqual([]);
+  expect(await loadSuites(join(CORPUS, "missing"), NOW)).toEqual([]);
 });
 
 test("render lays out the rollup against the budget", async () => {

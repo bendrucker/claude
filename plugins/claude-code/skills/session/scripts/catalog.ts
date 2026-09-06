@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
-import * as path from "node:path";
+import { join, relative } from "node:path";
 import { loadQueryHeaders, type QueryHeader } from "./query-header";
 
-const REFERENCES_DIR = path.join(import.meta.dirname, "..", "references");
-export const CATALOG_PATH = path.join(REFERENCES_DIR, "catalog.md");
-export const DISCOVERY_PATH = path.join(REFERENCES_DIR, "discovery.md");
-export const SKILL_PATH = path.join(import.meta.dirname, "..", "SKILL.md");
+const REFERENCES_DIR = join(import.meta.dirname, "..", "references");
+export const CATALOG_PATH = join(REFERENCES_DIR, "catalog.md");
+export const DISCOVERY_PATH = join(REFERENCES_DIR, "discovery.md");
+export const SKILL_PATH = join(import.meta.dirname, "..", "SKILL.md");
 
 // Survey surfaces are per-dimension starting points, so the dimension registry lives here
 // and each query declares its membership in its own header.
@@ -152,7 +152,7 @@ if (import.meta.main) {
   await Promise.all(
     targets.map(async ([file, render]) => {
       await Bun.write(file, render(headers, await Bun.file(file).text()));
-      console.log(path.relative(process.cwd(), file));
+      console.log(relative(process.cwd(), file));
     }),
   );
 }

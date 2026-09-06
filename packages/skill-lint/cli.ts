@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { readdirSync } from "node:fs";
-import * as path from "node:path";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { lintSkill } from "../../plugins/claude-code/skills/skill/scripts/skill-lint/index";
 import { formatJson, formatText } from "./format";
@@ -50,7 +50,7 @@ async function resolveSkillDirs(patterns: string[]): Promise<string[]> {
   const perPattern = await Promise.all(
     patterns.map(async (pattern) => {
       if (!pattern.includes("*")) {
-        return (await Bun.file(path.join(pattern, "SKILL.md")).exists()) ? [pattern] : [];
+        return (await Bun.file(join(pattern, "SKILL.md")).exists()) ? [pattern] : [];
       }
 
       const base = pattern.split("*")[0] ?? "";
@@ -60,9 +60,9 @@ async function resolveSkillDirs(patterns: string[]): Promise<string[]> {
       if (!entries) return [];
       const candidates = entries
         .filter((d) => d.isDirectory())
-        .map((d) => path.join(base, d.name, suffix.replace(/^\*?\/?/, "")));
+        .map((d) => join(base, d.name, suffix.replace(/^\*?\/?/, "")));
       const present = await Promise.all(
-        candidates.map((p) => Bun.file(path.join(p, "SKILL.md")).exists()),
+        candidates.map((p) => Bun.file(join(p, "SKILL.md")).exists()),
       );
       return candidates.filter((_, index) => present[index]);
     }),

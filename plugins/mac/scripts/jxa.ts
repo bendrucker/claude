@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: hands off to osascript for JXA Apple Events, which the command sandbox blocks
 
-import * as acorn from "acorn";
+import { type Node, parse } from "acorn";
 import { cli } from "cleye";
 import { z } from "zod";
 
@@ -47,9 +47,9 @@ function walkNode(node: AstNode, visitor: (n: AstNode) => void): void {
 
 export function validateAppScope(source: string, app: string): ValidationResult {
   const stripped = stripShebang(source);
-  let ast: acorn.Node;
+  let ast: Node;
   try {
-    ast = acorn.parse(stripped, { ecmaVersion: 5, sourceType: "script" });
+    ast = parse(stripped, { ecmaVersion: 5, sourceType: "script" });
   } catch (error) {
     throw new Error(
       `Failed to parse JXA source: ${error instanceof Error ? error.message : String(error)}`,

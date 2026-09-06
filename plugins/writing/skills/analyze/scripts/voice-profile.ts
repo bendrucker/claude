@@ -39,7 +39,7 @@ export const VoiceProfile = z.object({
 });
 export type VoiceProfile = z.infer<typeof VoiceProfile>;
 
-export type { VoiceDeltaBaseline };
+export { VoiceDeltaBaseline } from "./voice-delta";
 
 export function buildProfile(docs: VoiceDocument[], generatedAt: string): VoiceProfile {
   const ngrams = new Map<number, Map<string, number>>(PROFILE_SIZES.map((n) => [n, new Map()]));

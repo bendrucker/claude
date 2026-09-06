@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { type DeliverableAudit, isDeliverableSurface } from "./deliverable-audit";
 import type { QuoteContext } from "./quote-context";
-import type { VoiceProfile } from "./voice-profile";
-import { phraseProfileStatStemmed } from "./voice-profile";
+import { phraseProfileStatStemmed, type VoiceProfile } from "./voice-profile";
 import type { WordlistEntry } from "./wordlists";
 
 export const FtsAuditRow = z.object({

@@ -3,7 +3,7 @@
 // the plugin data dir, which an upstream sandbox defect makes unwritable. Remove this
 // when the probe in docs/settings.md succeeds.
 import { mkdir } from "node:fs/promises";
-import * as path from "node:path";
+import { join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import {
@@ -58,7 +58,7 @@ if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(label)) {
 }
 
 const root = importRoot(label);
-const projectsDir = path.join(root, "projects");
+const projectsDir = join(root, "projects");
 if (!dirExists(projectsDir)) {
   console.error(`No corpus at ${projectsDir}.`);
   console.error("Sync the source machine's ~/.claude/projects/ there first, then re-run:");
@@ -71,7 +71,7 @@ if (!dirExists(projectsDir)) {
 // Re-running on a registered host is a re-sync: leave the manifest (source, policy,
 // imported_at) intact and just re-index the changed files.
 const existing = (await listImportedHosts()).find((h) => h.label === label)?.manifest;
-const manifestPath = path.join(root, "manifest.json");
+const manifestPath = join(root, "manifest.json");
 if (!existing) {
   await mkdir(getImportsDir(), { recursive: true, mode: 0o700 });
   const manifest: Manifest = {

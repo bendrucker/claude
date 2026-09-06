@@ -1,4 +1,4 @@
-import * as path from "node:path";
+import { join } from "node:path";
 import { countLines } from "../parse";
 import type { ReferenceResult, RuleResult } from "../types";
 import { codeSpans, lineAt } from "./markdown";
@@ -73,7 +73,7 @@ export function substitutionResults(content: string, refPath: string): RuleResul
 }
 
 export async function lintReference(skillDir: string, refPath: string): Promise<ReferenceResult> {
-  const fullPath = path.join(skillDir, refPath);
+  const fullPath = join(skillDir, refPath);
   const results: RuleResult[] = [];
   let lines = 0;
   const depth = getDepth(refPath);

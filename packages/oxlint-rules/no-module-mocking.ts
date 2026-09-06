@@ -4,8 +4,13 @@
 // Extended for bun:test, which upstream does not cover. The framework table
 // replaces upstream's hardcoded vi/jest checks.
 
-import { defineRule } from "@oxlint/plugins";
-import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins";
+import {
+  defineRule,
+  type ESTree,
+  type Scope,
+  type SourceCode,
+  type Variable,
+} from "@oxlint/plugins";
 
 /** Module-mocking entry points, keyed by the object they hang off. */
 const MOCKERS = new Map<string, { source: string; methods: ReadonlySet<string> }>([

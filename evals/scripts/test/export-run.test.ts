@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { join, relative } from "node:path";
 import type { CommandOptions, CommandResult, RunCommand } from "../command";
 import {
   assertSuiteMatch,
@@ -17,7 +17,7 @@ import {
 } from "../export-run";
 import { CONFIG_DIR_VAR } from "../promptfoo";
 
-const EXPORTS = path.join(import.meta.dirname, "exports");
+const EXPORTS = join(import.meta.dirname, "exports");
 
 interface Call {
   command: string[];
@@ -29,13 +29,13 @@ function exporter(fixture: string, calls: Call[]): RunCommand {
   return async (command, options) => {
     calls.push({ command: [...command], options });
     const target = command[command.indexOf("-o") + 1];
-    if (target !== undefined) await Bun.write(target, Bun.file(path.join(EXPORTS, fixture)));
+    if (target !== undefined) await Bun.write(target, Bun.file(join(EXPORTS, fixture)));
     return { code: 0, stdout: "", stderr: "" };
   };
 }
 
 async function withCorpus<T>(body: (dir: string) => Promise<T>): Promise<T> {
-  const dir = await mkdtemp(path.join(tmpdir(), "eval-results-"));
+  const dir = await mkdtemp(join(tmpdir(), "eval-results-"));
   try {
     return await body(dir);
   } finally {
@@ -52,11 +52,11 @@ test("exportRun files the export under the derived suite and run date", async ()
       run: exporter("described.json", calls),
     });
 
-    expect(path.relative(dir, exported.path)).toBe(
+    expect(relative(dir, exported.path)).toBe(
       "pr-body-a-b/2026-08-27-eval-xyz-2026-08-27T14-05-00.json",
     );
     expect(await Bun.file(exported.path).json()).toEqual(
-      await Bun.file(path.join(EXPORTS, "described.json")).json(),
+      await Bun.file(join(EXPORTS, "described.json")).json(),
     );
     expect(exported.payload.evalId).toBe("eval-xyz-2026-08-27T14:05:00");
   });
@@ -64,7 +64,7 @@ test("exportRun files the export under the derived suite and run date", async ()
   const [call] = calls;
   expect(call?.command.slice(0, 4)).toEqual(["bunx", "promptfoo", "export", "eval"]);
   expect(call?.command).toContain("latest");
-  expect(call?.options?.env?.[CONFIG_DIR_VAR]).toContain(path.join(".cache", "promptfoo"));
+  expect(call?.options?.env?.[CONFIG_DIR_VAR]).toContain(join(".cache", "promptfoo"));
 });
 
 test("exportRun honors suite and date overrides", async () => {
@@ -77,7 +77,7 @@ test("exportRun honors suite and date overrides", async () => {
       run: exporter("undated.json", []),
     });
 
-    expect(path.relative(dir, exported.path)).toBe(
+    expect(relative(dir, exported.path)).toBe(
       "pr-body/2026-08-26-eval-nod-2026-08-26T11-00-00.json",
     );
   });

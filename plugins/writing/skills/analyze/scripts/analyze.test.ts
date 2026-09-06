@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import * as path from "node:path";
+import { join } from "node:path";
 import { type AnalysisConfig, runAnalysis } from "./analyze";
 import { type Database, openSessionDb } from "./db";
 
@@ -53,9 +53,9 @@ async function seedRows(db: Database, projectPath: string): Promise<void> {
 }
 
 async function fixtureWordlists(): Promise<string> {
-  const dir = mkdtempSync(path.join(tmpdir(), "analyze-wordlists-"));
-  await Bun.write(path.join(dir, "vocabulary.txt"), "tapestry\ndelve\n");
-  await Bun.write(path.join(dir, "flowery-phrases.txt"), "source of truth\n");
+  const dir = mkdtempSync(join(tmpdir(), "analyze-wordlists-"));
+  await Bun.write(join(dir, "vocabulary.txt"), "tapestry\ndelve\n");
+  await Bun.write(join(dir, "flowery-phrases.txt"), "source of truth\n");
   return dir;
 }
 
@@ -74,7 +74,7 @@ function baseConfig(wordlistsDir: string): AnalysisConfig {
     wordlistsDir,
     // No profile on disk: loadProfile returns null and the deliverable-surface
     // rule is kept pending a baseline rather than measured for distinctiveness.
-    dataDir: path.join(tmpdir(), "analyze-no-such-data-dir"),
+    dataDir: join(tmpdir(), "analyze-no-such-data-dir"),
     pasteMaxChars: 2000,
     selfName: "",
     correctiveLimit: 25,

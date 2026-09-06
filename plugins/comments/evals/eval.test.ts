@@ -1,7 +1,18 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { loadPrompt } from "../judge/judge";
 import type { Verdict } from "../judge/schema";
-import { type Fixture, fixtureToInput, loadFixtures, scoreResults } from "./eval";
+import {
+  alignVerdicts,
+  clearVerdicts,
+  type Fixture,
+  fixtureToInput,
+  fixtureToShardComment,
+  loadFixtures,
+  scoreResults,
+} from "./eval";
 import { anthropicCommentJudge, judgeComments } from "./oracle";
 
 function fixture(over: Partial<Fixture>): Fixture {
@@ -77,6 +88,56 @@ describe("scoreResults", () => {
   });
 });
 
+describe("alignVerdicts", () => {
+  const fixtures = [fixture({ id: "a" }), fixture({ id: "b" })];
+
+  test("orders verdicts by fixture, not by the order the agents wrote them", () => {
+    const map = new Map([
+      ["b", verdict({ category: "narration" })],
+      ["a", verdict({ category: "restate-the-what" })],
+    ]);
+    expect(alignVerdicts(fixtures, map).map((v) => v.category)).toEqual([
+      "restate-the-what",
+      "narration",
+    ]);
+  });
+
+  test.each([
+    ["a fixture the judge skipped", [["a", verdict({})]], /No verdict for 1 fixture\(s\): b/],
+    [
+      "a verdict from another job",
+      [
+        ["a", verdict({})],
+        ["b", verdict({})],
+        ["c", verdict({})],
+      ],
+      /Verdicts name 1 unknown comment\(s\): c/,
+    ],
+    [
+      "a job dir belonging to another corpus, naming both causes",
+      [["x", verdict({})]],
+      /No verdict for 2 fixture\(s\): a, b\. Verdicts name 1 unknown comment\(s\): x/,
+    ],
+  ] as const)("rejects %s", (_name, entries, error) => {
+    expect(() => alignVerdicts(fixtures, new Map(entries))).toThrow(error);
+  });
+});
+
+describe("clearVerdicts", () => {
+  test("drops a previous run's verdicts and leaves the rest of the job dir alone", async () => {
+    const verdictsDir = join(await mkdtemp(join(tmpdir(), "comments-eval-test-")), "verdicts");
+    await Bun.write(join(verdictsDir, "verdict-0.json"), "{}");
+    await Bun.write(join(verdictsDir, "verdict-1.json"), "{}");
+    await Bun.write(join(verdictsDir, "notes.txt"), "keep me");
+
+    await clearVerdicts(verdictsDir);
+
+    expect(await Bun.file(join(verdictsDir, "verdict-0.json")).exists()).toBe(false);
+    expect(await Bun.file(join(verdictsDir, "verdict-1.json")).exists()).toBe(false);
+    expect(await Bun.file(join(verdictsDir, "notes.txt")).exists()).toBe(true);
+  });
+});
+
 describe("fixture corpus", () => {
   test("every committed fixture is valid and the corpus spans all three actions", async () => {
     const fixtures = await loadFixtures();
@@ -89,17 +150,20 @@ describe("fixture corpus", () => {
     for (const f of fixtures) {
       expect(f.context.length).toBeGreaterThan(0);
       expect(fixtureToInput(f).text).toBe(f.comment);
+      expect(fixtureToShardComment(f)).toMatchObject({ id: f.id, text: f.comment });
       if (f.action === "rewrite") expect(f.rewrite?.length).toBeGreaterThan(0);
     }
   });
 });
 
-// Live ship gate: the judge must keep every must-keep fixture (never trim or
-// rewrite a justified comment). Self-skips without an API key so CI stays
-// deterministic; run locally with ANTHROPIC_API_KEY.
+// The oracle's must-keep cross-check: it must never trim or rewrite a justified
+// comment. The gate of record runs the same corpus through the production
+// workflow (`eval.ts build`, then `score --gate`). This is the batched SDK
+// second opinion, and it samples, so a run can differ. Self-skips without an
+// API key, keeping CI off the API.
 const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 
-describe("ship gate", () => {
+describe("oracle must-keep check", () => {
   test.skipIf(!hasKey)(
     "judge keeps every must-keep comment",
     async () => {

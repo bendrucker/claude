@@ -1,12 +1,17 @@
 #!/usr/bin/env bun
 
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Glob } from "bun";
-import { cli } from "cleye";
+import { cli, command } from "cleye";
 import { table } from "table";
 import { z } from "zod";
+import { collectVerdicts } from "../apply/join";
 import { type Provenance, ProvenanceSchema } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
+import { workflowJudge } from "../judge/adapter";
+import { buildJob, type ShardComment, writeJob } from "../judge/job";
 import { loadPrompt } from "../judge/judge";
 import {
   SLOP_CATEGORIES,
@@ -17,7 +22,6 @@ import {
 } from "../judge/schema";
 import {
   anthropicCommentJudge,
-  type CommentJudge,
   type CommentJudgeInput,
   JUDGE_MODEL,
   judgeComments,
@@ -139,6 +143,19 @@ function validateFixture(value: unknown, file: string): Fixture {
   return fixture;
 }
 
+/** The fixture as the production judge sees it, so `buildJob` shards it unchanged. */
+export function fixtureToShardComment(fixture: Fixture): ShardComment {
+  return {
+    id: fixture.id,
+    path: fixture.path,
+    language: fixture.language,
+    kind: fixture.kind,
+    text: fixture.comment,
+    context: fixture.context,
+    provenance: fixture.provenance,
+  };
+}
+
 export function fixtureToInput(fixture: Fixture): CommentJudgeInput {
   return {
     path: fixture.path,
@@ -232,13 +249,97 @@ function report(fixtures: Fixture[], verdicts: Verdict[], metrics: Metrics): str
   return `${table(rows)}\n${summary}`;
 }
 
-async function run(judge: CommentJudge, gate: boolean): Promise<number> {
+/**
+ * Align the verdicts a judge wrote to the fixture order `scoreResults` expects,
+ * matching on the id `buildJob` carried into the shards. A fixture with no
+ * verdict, or a verdict naming no fixture, fails the run: the first means the
+ * judge skipped a comment, the second means the verdicts belong to another job.
+ */
+export function alignVerdicts(fixtures: Fixture[], verdicts: Map<string, Verdict>): Verdict[] {
+  const aligned: Verdict[] = [];
+  const unjudged: string[] = [];
+  for (const fixture of fixtures) {
+    const verdict = verdicts.get(fixture.id);
+    if (verdict) aligned.push(verdict);
+    else unjudged.push(fixture.id);
+  }
+  const ids = new Set(fixtures.map((fixture) => fixture.id));
+  const foreign = [...verdicts.keys()].filter((id) => !ids.has(id));
+  const problems: string[] = [];
+  if (unjudged.length > 0) {
+    problems.push(`No verdict for ${unjudged.length} fixture(s): ${unjudged.join(", ")}`);
+  }
+  if (foreign.length > 0) {
+    problems.push(`Verdicts name ${foreign.length} unknown comment(s): ${foreign.join(", ")}`);
+  }
+  if (problems.length > 0) throw new Error(problems.join(". "));
+  return aligned;
+}
+
+/** Where `build` materializes a job, kept apart from the audit's own job dirs. */
+const EVAL_JOB_BASE = join(tmpdir(), "comments-eval");
+
+/** Every verdict file in a job's verdicts dir, by absolute path. */
+async function verdictFiles(verdictsDir: string): Promise<string[]> {
+  const paths: string[] = [];
+  for await (const file of new Glob("verdict-*.json").scan(verdictsDir)) {
+    paths.push(join(verdictsDir, file));
+  }
+  return paths;
+}
+
+/**
+ * A job dir is keyed on the corpus and the rubric, so a re-run of an unchanged
+ * gate reuses the dir the last one wrote. Clearing it leaves a failed judging
+ * run with no verdicts for `score` to read, rather than the previous run's.
+ */
+export async function clearVerdicts(verdictsDir: string): Promise<void> {
+  await Promise.all((await verdictFiles(verdictsDir)).map((path) => rm(path)));
+}
+
+/**
+ * Shard the corpus through the production job writer and emit the `<preflight>`
+ * block for the Workflow tool, so the gate judges fixtures on the path that
+ * ships.
+ */
+async function build(jobBase: string): Promise<number> {
   const fixtures = await loadFixtures();
   if (fixtures.length === 0) {
     console.error("No fixtures found.");
     return 1;
   }
-  const verdicts = await judgeComments(judge, fixtures.map(fixtureToInput));
+  const descriptor = await buildJob(fixtures.map(fixtureToShardComment), { fix: false });
+  const written = await writeJob(descriptor, jobBase);
+  await clearVerdicts(written.verdictsDir);
+  console.error(
+    `${written.count} fixtures / ${written.shardCount} shards (prompt ${descriptor.promptSha.slice(0, 12)})`,
+  );
+  await workflowJudge((line) => {
+    console.log(line);
+  })(written);
+  console.error(`\nScore with: bun ${import.meta.path} score --job ${written.jobDir}`);
+  return 0;
+}
+
+/** Every verdict file the judging agents wrote for a job, folded into one id map. */
+async function readJobVerdicts(jobDir: string): Promise<Map<string, Verdict>> {
+  if (!(await Bun.file(join(jobDir, "job-args.json")).exists())) {
+    throw new Error(`No job at ${jobDir}. Pass the job dir printed by build.`);
+  }
+  const verdictsDir = join(jobDir, "verdicts");
+  const files = await verdictFiles(verdictsDir);
+  if (files.length === 0) {
+    throw new Error(`No verdict files in ${verdictsDir}. Run the judge workflow first.`);
+  }
+  const texts = await Promise.all(files.map((path) => Bun.file(path).text()));
+  const contents: unknown[] = [];
+  for (const text of texts) {
+    contents.push(JSON.parse(text));
+  }
+  return collectVerdicts(contents);
+}
+
+function gateOn(fixtures: Fixture[], verdicts: Verdict[], gate: boolean): number {
   const metrics = scoreResults(fixtures, verdicts);
   console.log(report(fixtures, verdicts, metrics));
   if (gate && metrics.keepViolations.length > 0) {
@@ -250,20 +351,79 @@ async function run(judge: CommentJudge, gate: boolean): Promise<number> {
   return 0;
 }
 
+async function score(jobDir: string | undefined, gate: boolean): Promise<number> {
+  if (jobDir == null || jobDir === "") throw new Error("--job <dir> is required.");
+  const fixtures = await loadFixtures();
+  return gateOn(fixtures, alignVerdicts(fixtures, await readJobVerdicts(jobDir)), gate);
+}
+
+async function oracle(model: string, gate: boolean): Promise<number> {
+  const fixtures = await loadFixtures();
+  if (fixtures.length === 0) {
+    console.error("No fixtures found.");
+    return 1;
+  }
+  const prompt = await loadPrompt();
+  console.error(`Judging fixtures on ${model} (prompt ${prompt.sha256.slice(0, 12)})`);
+  const judge = anthropicCommentJudge({ prompt: prompt.text, model });
+  return gateOn(fixtures, await judgeComments(judge, fixtures.map(fixtureToInput)), gate);
+}
+
+const GATE_FLAG = {
+  type: Boolean,
+  default: false,
+  description: "Exit non-zero when the judge trims or rewrites a must-keep comment",
+} as const;
+
 if (import.meta.main) {
-  const argv = cli({
-    name: "eval",
-    flags: {
-      model: { type: String, default: JUDGE_MODEL, description: "Judge model id" },
-      gate: {
-        type: Boolean,
-        default: false,
-        description: "Exit non-zero when the judge trims or rewrites a must-keep comment",
+  // cleye runs one handler synchronously, either a command's or the root's, so
+  // the handler parks its work here for the top-level await below. `--help`
+  // parks nothing and exits 0.
+  let task: Promise<number> | undefined;
+
+  const buildCmd = command(
+    {
+      name: "build",
+      flags: {
+        jobBase: { type: String, default: EVAL_JOB_BASE, description: "Where the job dir lands" },
       },
     },
-  });
-  const prompt = await loadPrompt();
-  console.error(`Judging fixtures on ${argv.flags.model} (prompt ${prompt.sha256.slice(0, 12)})`);
-  const judge = anthropicCommentJudge({ prompt: prompt.text, model: argv.flags.model });
-  process.exit(await run(judge, argv.flags.gate));
+    (parsed) => {
+      task = build(parsed.flags.jobBase);
+    },
+  );
+
+  const scoreCmd = command(
+    {
+      name: "score",
+      flags: {
+        job: { type: String, description: "The job dir printed by build" },
+        gate: GATE_FLAG,
+      },
+    },
+    (parsed) => {
+      task = score(parsed.flags.job, parsed.flags.gate);
+    },
+  );
+
+  await cli(
+    {
+      name: "eval",
+      flags: {
+        model: { type: String, default: JUDGE_MODEL, description: "Judge model id" },
+        gate: GATE_FLAG,
+      },
+      commands: [buildCmd, scoreCmd],
+    },
+    (parsed) => {
+      task = oracle(parsed.flags.model, parsed.flags.gate);
+    },
+  );
+
+  process.exit(
+    await (task?.catch((error: unknown) => {
+      console.error(error instanceof Error ? error.message : String(error));
+      return 1;
+    }) ?? 0),
+  );
 }

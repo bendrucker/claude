@@ -20,7 +20,7 @@ Both run extraction, intrinsic-complexity ranking, an agent fan-out for judging,
 - **`judge/`**: the versioned `prompt.md`, the verdict schema, per-verdict validation, and the job builder that shards comments for the Workflow.
 - **`workflow/`**: the committed Workflow script the skill hands the job to.
 - **`apply/`**: the deterministic edit engine, the verdict id-match against re-extracted comments, the branch writer, and the report renderer.
-- **`evals/`**: the labeled fixture corpus, the action-accuracy eval, and the SDK calibration oracle behind a must-keep ship gate.
+- **`evals/`**: the labeled fixture corpus and the action-accuracy eval, which scores it either through the production Workflow judge (the ship gate) or through the SDK oracle (a batched cross-check).
 - A preventive steering rule lives at `user/rules/code-comments.md`, scoped by path to code files.
 
 ## Density Hook
@@ -41,10 +41,18 @@ Deterministic extraction, ranking, the job builder, the edit engine, the verdict
 bun test plugins/comments
 ```
 
-The eval's ship gate runs the SDK oracle and needs `ANTHROPIC_API_KEY`:
+The ship gate scores the fixture corpus through the judge that ships. `build` shards the fixtures with the same writer `preflight` uses and prints a `<preflight>` block. Hand that to the Workflow tool as `preflight` does, then score the verdicts it wrote:
+
+```bash
+bun run plugins/comments/evals/eval.ts build
+# Workflow({ scriptPath: <scriptPath>, args: <the parsed contents of argsPath> })
+bun run plugins/comments/evals/eval.ts score --job <jobDir> --gate
+```
+
+The gate holds the must-keep comments at `keep` (canonical-API docstrings, genuine why-comments, regression-test rationale). Trimming or rewriting one of those is the destructive error the gate guards against.
+
+The SDK oracle cross-checks the rubric over the same corpus, scoring it in batched Messages calls. It needs `ANTHROPIC_API_KEY`, and it samples, so repeated runs can differ:
 
 ```bash
 bun run plugins/comments/evals/eval.ts --gate
 ```
-
-The gate holds the must-keep comments at `keep` (canonical-API docstrings, genuine why-comments, regression-test rationale). Trimming or rewriting one of those is the destructive error the gate guards against.

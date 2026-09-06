@@ -1,5 +1,9 @@
 .claude/settings.local.json
 .claude/hooks/logs/
+# herdr's installer writes this through the ~/.claude/hooks symlink and owns its
+# contents. claude-upgrade reinstalls it after every sync, so the deployed clone
+# always carries the installed herdr's version without git tracking a vendor file.
+user/hooks/herdr-agent-state.sh
 .prek/
 node_modules/
 .DS_Store

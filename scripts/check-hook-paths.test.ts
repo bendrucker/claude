@@ -17,8 +17,13 @@ test.each<{ name: string; command: string; expected: string[] }>([
   },
   {
     name: "quoted $HOME with trailing arguments",
+    command: 'bash "$HOME/.claude/hooks/report.sh" session',
+    expected: ["user/hooks/report.sh"],
+  },
+  {
+    name: "herdr installs its own script",
     command: 'bash "$HOME/.claude/hooks/herdr-agent-state.sh" session',
-    expected: ["user/hooks/herdr-agent-state.sh"],
+    expected: [],
   },
   {
     name: "braced HOME",

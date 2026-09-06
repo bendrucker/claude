@@ -24,10 +24,11 @@ const PROJECT_PREFIXES: Record<string, string> = {
 };
 
 /**
- * Installed by the plugin system into the cache under `~/.claude/plugins`,
- * which this repo does not check out.
+ * Paths an installer other than this repo puts in place: the plugin cache under
+ * `~/.claude/plugins`, and herdr's hook script, which `claude-upgrade` reinstalls
+ * after every sync.
  */
-const UNMANAGED = ["user/plugins/"];
+const UNMANAGED = ["user/plugins/", "user/hooks/herdr-agent-state.sh"];
 
 export interface Source {
   /** Repo-relative settings file. */

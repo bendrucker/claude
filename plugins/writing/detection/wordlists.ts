@@ -25,7 +25,7 @@ export function countWords(text: string): number {
   return text.match(WORD_TOKEN)?.length ?? 0;
 }
 
-function parseLines(content: string): string[] {
+export function parseLines(content: string): string[] {
   const lines: string[] = [];
   for (const raw of content.split(/\r?\n/)) {
     if (COMMENT_OR_BLANK.test(raw)) continue;
@@ -170,7 +170,7 @@ export function weightedStemHits(text: string, entries: StemmedWeight[]): Weight
 
 const WORDLISTS_DIR = join(import.meta.dirname, "..", "wordlists");
 
-async function readWordlist(name: string): Promise<string> {
+export async function readWordlist(name: string): Promise<string> {
   return Bun.file(join(WORDLISTS_DIR, name)).text();
 }
 

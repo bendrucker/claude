@@ -78,6 +78,19 @@ bun ${CLAUDE_SKILL_DIR}/scripts/judge-run.ts headings tmp/heading-labels.tsv
 
 See the "Meaning-Layer Judge" section of [references/methodology.md](references/methodology.md) for the rubric, prompt versioning, gate, and calibration protocol.
 
+## Detector Coverage
+
+`wordlist-overlap.ts` ranks agent-authored prose (corpus A) against the pre-agent voice baseline (corpus B) by log-odds with an informative Dirichlet prior, then measures how much of that ranking the shipped detectors already cover. It reports both directions: discovered terms a detector matches, and curated entries the ranking independently places.
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts
+bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts --baseline github-issues.txt --sizes 1 --sizes 2
+```
+
+Corpora A and B must match register. Contrasting mismatched genres raises the split-half null floor far above any real term and makes the ranking uninterpretable. Every run prints that floor, which is the z a finding has to clear.
+
+`--json` omits the example sentences the human-readable report already withholds, so no corpus prose reaches a file.
+
 ## Hook Health
 
 The PreToolUse dispatcher (`hooks/pretooluse.ts`) appends one JSONL line per run to `~/.claude/writing-hooks/log.jsonl` (controlled by `WRITING_HOOKS_LOG`, see the plugin README). That log is the runtime half of this skill's audit: the wordlist analysis judges rule precision from session history, and the health check judges hook behavior from what the dispatcher actually did.

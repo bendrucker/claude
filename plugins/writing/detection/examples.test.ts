@@ -10,6 +10,13 @@ import { PATTERNS, type PatternDef } from "./tropes";
 
 const ALL_PATTERNS: PatternDef[] = [...PATTERNS, ...BATCH_PATTERNS];
 
+// An unabridged example runs past 2000 characters and carries newlines, which
+// leaves reporter output unscannable. Bound and escape it for the title the way
+// the hand-built titles did before these cases became parameterized.
+function labeled(texts: readonly string[]): { label: string; text: string }[] {
+  return texts.map((text) => ({ label: JSON.stringify(text.slice(0, 60)), text }));
+}
+
 function hits(def: PatternDef, text: string): number {
   if (typeof def.test === "function") {
     return def.test(text).count;
@@ -25,12 +32,12 @@ describe("pattern examples", () => {
       expect(def.negatives.length).toBeGreaterThanOrEqual(2);
     });
 
-    it.each(def.positives)("matches: %s", (positive) => {
-      expect(hits(def, positive)).toBeGreaterThan(0);
+    it.each(labeled(def.positives))("matches: $label", ({ text }) => {
+      expect(hits(def, text)).toBeGreaterThan(0);
     });
 
-    it.each(def.negatives)("does not match: %s", (negative) => {
-      expect(hits(def, negative)).toBe(0);
+    it.each(labeled(def.negatives))("does not match: $label", ({ text }) => {
+      expect(hits(def, text)).toBe(0);
     });
   });
 

@@ -24,7 +24,15 @@ const BOUNDED_MS = 5_000;
 // temp dirs they then delete.
 const dirs: string[] = [];
 afterAll(() => {
-  for (const dir of dirs) Bun.spawnSync(["rm", "-rf", dir]);
+  for (const dir of dirs) {
+    // A scenario that parks a lock holder leaves it sleeping out the rest of
+    // its bound, which a repeated run would otherwise accumulate.
+    const holder = Bun.spawnSync(["cat", join(dir, "holder.pid")])
+      .stdout.toString()
+      .trim();
+    if (holder !== "") Bun.spawnSync(["kill", holder]);
+    Bun.spawnSync(["rm", "-rf", dir]);
+  }
 });
 
 interface Scenario {
@@ -71,6 +79,22 @@ const scenarios: Scenario[] = [
     build: 'echo "$SCRIPT_DIR/xcall-stub"',
     binary: 'echo "canceled" >&2; exit 2',
   },
+  {
+    // shlock reclaims a lock whose recorded pid is gone, so the holder has to
+    // outlive the wait. Its output goes to /dev/null because a child holding
+    // the stdout run.sh reads the binary path from would stall the build read.
+    // Cleanup reaps it through the pid file rather than waiting it out.
+    name: "another instance holds the bridge",
+    build: [
+      'lock="$XDG_CACHE_HOME/claude/x-callback-url/xcall.lock"',
+      'mkdir -p "$(dirname "$lock")"',
+      `sleep ${STUCK_SECONDS} >/dev/null 2>&1 &`,
+      'echo $! > "$SCRIPT_DIR/holder.pid"',
+      'shlock -f "$lock" -p "$(cat "$SCRIPT_DIR/holder.pid")"',
+      'echo "$SCRIPT_DIR/xcall-stub"',
+    ].join("\n"),
+    binary: 'echo "unreachable"',
+  },
 ];
 
 async function writeExecutable(path: string, contents: string): Promise<string> {
@@ -103,8 +127,13 @@ async function runScenario(scenario: Scenario): Promise<Outcome> {
   const proc = Bun.spawn([runner, "things:///version"], {
     env: {
       ...process.env,
+      // Scenarios run concurrently and run.sh serializes on a lock under
+      // XDG_CACHE_HOME. Sharing one would queue them behind each other, and the
+      // lock wait budgets for a single holder ahead, so a loser would exit 5.
+      XDG_CACHE_HOME: dir,
       XCALL_TIMEOUT_SECONDS: String(BOUND),
       XCALL_BUILD_TIMEOUT_SECONDS: String(BOUND),
+      XCALL_LOCK_WAIT_SECONDS: String(BOUND),
     },
     stdout: "pipe",
     stderr: "pipe",
@@ -174,6 +203,10 @@ test("run.sh bounds every wait and maps each outcome to its own exit code", asyn
     user cancels
       exit:   2
       stdout: (none)
-      stderr: canceled"
+      stderr: canceled
+    another instance holds the bridge
+      exit:   5
+      stdout: (none)
+      stderr: another xcall held the xcall-claude:// bridge for more than 1s"
   `);
 }, 15_000);

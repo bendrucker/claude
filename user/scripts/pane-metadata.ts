@@ -24,14 +24,34 @@ const CachedReport = z.object({
 });
 type CachedReport = z.infer<typeof CachedReport>;
 
+// The byte offset the transcript had been read to, and the title standing at
+// that point. Resuming from the offset is what keeps a transcript that grows
+// through the turn from being reread on every render.
+const CachedTitle = z.object({
+  offset: z.number(),
+  title: z.string().nullable(),
+});
+type CachedTitle = z.infer<typeof CachedTitle>;
+
+// The name the herdr sidebar config binds to as `$title`.
+const TITLE_TOKEN = "title";
+
 const SOURCE = "claude-statusline";
 const TTL_MS = 86_400_000;
 const REFRESH_MS = 3_600_000;
 const HERDR_TIMEOUT_MS = 5_000;
 const UNSAFE_NAME = /[^A-Za-z0-9._-]+/g;
 
+function cacheFile(sessionId: string, suffix: string): string {
+  return join(tmpdir(), "claude-pane-metadata", `${sessionId.replace(UNSAFE_NAME, "-")}${suffix}`);
+}
+
 export function cachePath(sessionId: string): string {
-  return join(tmpdir(), "claude-pane-metadata", `${sessionId.replace(UNSAFE_NAME, "-")}.json`);
+  return cacheFile(sessionId, ".json");
+}
+
+export function titleCachePath(sessionId: string): string {
+  return cacheFile(sessionId, ".title.json");
 }
 
 export function shouldReport(cached: CachedReport | null, sig: string, now: number): boolean {
@@ -41,8 +61,8 @@ export function shouldReport(cached: CachedReport | null, sig: string, now: numb
   return now - cached.at >= REFRESH_MS;
 }
 
-export function reportSignature(report: DialReport | null): string {
-  return `${brandGlyph}:${report ? `${report.token}=${report.value}` : ""}`;
+export function reportSignature(report: DialReport | null, title: string | null): string {
+  return `${brandGlyph}:${report ? `${report.token}=${report.value}` : ""}:${title ?? ""}`;
 }
 
 // The brand mark rides along on the dial's call rather than getting one of its
@@ -55,7 +75,15 @@ export function reportSignature(report: DialReport | null): string {
 // The dial is optional so that riding along costs the mark nothing:
 // `context_window` is absent until a turn has closed, and the pane should be
 // branded before then.
-export function reportArgs(paneId: string, report: DialReport | null): string[] {
+//
+// The title rides along the same way, and is only ever set: a session that has
+// not been named yet keeps whatever herdr already shows, where clearing would
+// blank the sidebar row that renders it.
+export function reportArgs(
+  paneId: string,
+  report: DialReport | null,
+  title: string | null,
+): string[] {
   const args = [
     "pane",
     "report-metadata",
@@ -67,6 +95,7 @@ export function reportArgs(paneId: string, report: DialReport | null): string[] 
     "--display-agent",
     brandGlyph,
   ];
+  if (title != null && title !== "") args.push("--token", `${TITLE_TOKEN}=${title}`);
   if (!report) return args;
 
   args.push("--token", `${report.token}=${report.value}`);
@@ -74,6 +103,87 @@ export function reportArgs(paneId: string, report: DialReport | null): string[] 
     if (name !== report.token) args.push("--clear-token", name);
   }
   return args;
+}
+
+const TitleRecord = z.looseObject({
+  type: z.string().optional().catch(undefined),
+  aiTitle: z.string().optional().catch(undefined),
+  customTitle: z.string().optional().catch(undefined),
+});
+
+// Claude Code names a session by appending a record to its transcript, and
+// appends another on every rename, so the last such record is the live title.
+// `/title` writes `custom-title` where the model's own naming writes `ai-title`.
+function recordTitle(line: string): string | null {
+  // Nearly every line is a turn, and a prompt quoting these names parses to some
+  // other `type`. Testing the raw line first keeps the scan off `JSON.parse` for
+  // all but a handful of lines in a transcript that runs to megabytes.
+  if (!line.includes("-title")) return null;
+  let record: z.infer<typeof TitleRecord>;
+  try {
+    record = TitleRecord.parse(JSON.parse(line));
+  } catch {
+    return null;
+  }
+  if (record.type === "ai-title") return record.aiTitle ?? null;
+  if (record.type === "custom-title") return record.customTitle ?? null;
+  return null;
+}
+
+// Reads the complete lines in a chunk of transcript, carrying `previous` forward
+// when the chunk names no title, and reports how many bytes it consumed so the
+// next chunk resumes on a line boundary. A trailing partial line is left for the
+// render that sees it finished.
+export function scanTitles(
+  chunk: string,
+  previous: string | null,
+): { title: string | null; consumed: number } {
+  const end = chunk.lastIndexOf("\n") + 1;
+  const complete = chunk.slice(0, end);
+
+  let title = previous;
+  for (const line of complete.split("\n")) {
+    // herdr strips control bytes out of token values, which would glue the words
+    // of a multi-line title together, so flatten whitespace here instead.
+    const found = recordTitle(line)?.replaceAll(/\s+/gu, " ").trim();
+    if (found != null && found !== "") title = found;
+  }
+  return { title, consumed: Buffer.byteLength(complete) };
+}
+
+async function readTitleCache(path: string): Promise<CachedTitle | null> {
+  try {
+    return CachedTitle.parse(await Bun.file(path).json());
+  } catch {
+    return null;
+  }
+}
+
+// The session title Claude Code has settled on, or null before it names one.
+// Read on every status line render, so only the bytes appended since the last
+// one are scanned. A transcript shorter than the cached offset was replaced
+// rather than appended to, and is read from the start.
+export async function readSessionTitle(
+  transcriptPath: string,
+  sessionId: string,
+): Promise<string | null> {
+  const path = titleCachePath(sessionId);
+  const cached = await readTitleCache(path);
+  try {
+    const file = Bun.file(transcriptPath);
+    const size = file.size;
+    const resume = cached != null && cached.offset <= size ? cached : { offset: 0, title: null };
+    if (resume.offset === size) return resume.title;
+
+    const { title, consumed } = scanTitles(
+      await file.slice(resume.offset, size).text(),
+      resume.title,
+    );
+    await Bun.write(path, JSON.stringify({ offset: resume.offset + consumed, title }));
+    return title;
+  } catch {
+    return cached?.title ?? null;
+  }
 }
 
 // `agent_session.value` is the Claude session UUID herdr's integration hook
@@ -117,6 +227,17 @@ async function readCache(path: string): Promise<CachedReport | null> {
   }
 }
 
+// The dial and the title are each optional and the child reads them by
+// position, so an absent one is passed as an empty placeholder rather than
+// shifting the argument after it.
+export function childArgs(
+  sessionId: string,
+  report: DialReport | null,
+  title: string | null,
+): string[] {
+  return [sessionId, report?.token ?? "", report?.value ?? "", title ?? ""];
+}
+
 // Called on every status line render, so the steady state has to be a file read
 // and nothing else. Only a changed report reaches herdr, and it reaches it
 // through a detached child: the status line must render at the same speed
@@ -124,11 +245,17 @@ async function readCache(path: string): Promise<CachedReport | null> {
 export async function reportPaneMetadata(
   sessionId: string,
   report: DialReport | null,
+  transcriptPath: string | null,
 ): Promise<void> {
   const paneId = process.env.HERDR_PANE_ID;
   if (paneId == null || paneId === "") return;
 
-  const sig = reportSignature(report);
+  const title =
+    transcriptPath != null && transcriptPath !== ""
+      ? await readSessionTitle(transcriptPath, sessionId)
+      : null;
+
+  const sig = reportSignature(report, title);
   const path = cachePath(sessionId);
   if (!shouldReport(await readCache(path), sig, Date.now())) return;
 
@@ -136,9 +263,9 @@ export async function reportPaneMetadata(
   // would otherwise turn every later render back into a spawn.
   await Bun.write(path, JSON.stringify({ sig, at: Date.now() }));
 
-  const argv = [process.execPath, import.meta.path, sessionId];
-  if (report) argv.push(report.token, report.value);
-  Bun.spawn(argv, { stdio: ["ignore", "ignore", "ignore"] }).unref();
+  Bun.spawn([process.execPath, import.meta.path, ...childArgs(sessionId, report, title)], {
+    stdio: ["ignore", "ignore", "ignore"],
+  }).unref();
 }
 
 function parseToken(value: string | undefined): ContextToken | null {
@@ -146,14 +273,16 @@ function parseToken(value: string | undefined): ContextToken | null {
 }
 
 if (import.meta.main) {
-  const [sessionId, token, value] = process.argv.slice(2);
+  const [sessionId, token, value, title] = process.argv.slice(2);
   const name = parseToken(token);
   if (sessionId != null && sessionId !== "") {
     const list = Bun.spawnSync(["herdr", "pane", "list"], { timeout: HERDR_TIMEOUT_MS });
     const paneId = list.success ? findPane(list.stdout.toString(), sessionId) : null;
     if (paneId != null && paneId !== "") {
       const report = name != null && value != null && value !== "" ? { token: name, value } : null;
-      Bun.spawnSync(["herdr", ...reportArgs(paneId, report)], { timeout: HERDR_TIMEOUT_MS });
+      Bun.spawnSync(["herdr", ...reportArgs(paneId, report, title ?? null)], {
+        timeout: HERDR_TIMEOUT_MS,
+      });
     }
   }
 }

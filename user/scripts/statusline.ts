@@ -22,6 +22,7 @@ const CurrentUsage = z.looseObject({
 
 const StatusInput = z.looseObject({
   session_id: str,
+  transcript_path: str,
   model: z.looseObject({ id: str, display_name: str }).nullish().catch(undefined),
   effort: z.looseObject({ level: str }).nullish().catch(undefined),
   context_window: z
@@ -376,11 +377,16 @@ if (import.meta.main) {
     const columns = Number.isInteger(parsed) && parsed > 0 ? parsed : 80;
     process.stdout.write(buildStatusLine(input, columns, resolveWorktree()));
 
-    // Not gated on the dial: the same report carries the brand mark, which has
-    // to keep being sent even on the renders before `context_window` shows up.
+    // Not gated on the dial: the same report carries the brand mark and the
+    // session title, which have to keep being sent even on the renders before
+    // `context_window` shows up.
     if (input.session_id != null && input.session_id !== "") {
       try {
-        await reportPaneMetadata(input.session_id, contextDial(input));
+        await reportPaneMetadata(
+          input.session_id,
+          contextDial(input),
+          input.transcript_path ?? null,
+        );
       } catch {
         // The sidebar mirror is best-effort, and the line is already written.
       }

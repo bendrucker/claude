@@ -28,7 +28,7 @@ Then spend a review when any of these hold:
 
 - the diff touches auth, permissions, sandbox config, secret handling, or network egress
 - it adds or changes a runtime surface: a hook, a script entry point, a CLI command, an API
-- it is over roughly 200 changed lines or 8 files, excluding tests, docs, and lockfiles
+- it is over roughly 100 changed lines or 4 files, excluding tests, docs, and lockfiles
 - `review:code` confirmed a real bug, or the session redirected enough that the diff wandered
 
 Nothing else qualifies. Prose, dependency bumps, and reverts never do, and neither does a config diff that stays clear of the risk surfaces in the first bullet. Editing sandbox or permissions config is the strongest reason on the list to spend, so "config" alone decides nothing.

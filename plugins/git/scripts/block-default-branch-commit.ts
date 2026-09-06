@@ -49,7 +49,7 @@ const HEREDOC_LEAD = /(?<![<\\])<<(?!<)/g;
 const HEREDOC_DELIMITER = /^(-?)[ \t]*((?:'[^']*'|"[^"]*"|\\.|[^\s'"\\<>|&;()])+)/;
 
 function unquoteWord(word: string): string {
-  return word.replace(/'([^']*)'|"([^"]*)"|\\(.)/g, (_, single, double, escaped) =>
+  return word.replaceAll(/'([^']*)'|"([^"]*)"|\\(.)/g, (_, single, double, escaped) =>
     String(single ?? double ?? escaped),
   );
 }

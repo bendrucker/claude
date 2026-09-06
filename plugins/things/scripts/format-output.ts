@@ -76,7 +76,7 @@ const columns = argv.flags.columns?.split(",");
 process.stdout.write(table([headers, ...rows]));
 
 function camelToTitle(s: string): string {
-  return s.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
+  return s.replaceAll(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase());
 }
 
 function isIsoDate(s: string): boolean {

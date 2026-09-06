@@ -56,7 +56,7 @@ const MrDiffs = z.array(
 type MrDiff = z.infer<typeof MrDiffs>[number];
 
 export function parseGlabPaginated(raw: string): unknown[] {
-  const fixed = raw.replace(/\]\s*\[/g, ",");
+  const fixed = raw.replaceAll(/\]\s*\[/g, ",");
   return Entries.parse(JSON.parse(fixed));
 }
 

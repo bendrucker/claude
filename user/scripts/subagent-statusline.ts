@@ -192,7 +192,7 @@ type TranscriptEntry = z.infer<typeof TranscriptEntry>;
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
 const basename = (p: unknown): string => text(p).split("/").pop() ?? "";
 const firstWord = (cmd: unknown): string => text(cmd).trim().split(/\s+/)[0] ?? "";
-const oneLine = (s: string): string => s.replace(/\s+/g, " ").trim();
+const oneLine = (s: string): string => s.replaceAll(/\s+/g, " ").trim();
 const firstText = (...values: unknown[]): string => values.map(text).find((s) => s !== "") ?? "";
 
 // A tool call renders as a verb plus its most telling argument: the file for
@@ -327,7 +327,7 @@ if (import.meta.main) {
   }
   if (!input) process.exit(0);
 
-  const slug = process.cwd().replace(/[/.]/g, "-");
+  const slug = process.cwd().replaceAll(/[/.]/g, "-");
   const projectDir = join(homedir(), ".claude", "projects", slug);
   const now = Date.now();
 

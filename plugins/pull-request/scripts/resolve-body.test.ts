@@ -157,7 +157,7 @@ describe("extractBodySpec", () => {
     ["gh pr create --body '## Open Item'", parts(literal("## Open Item"))],
     ["gh pr create -b '## Open Item'", parts(literal("## Open Item"))],
     ['gh pr create --body="## Open Item"', parts(literal("## Open Item"))],
-    ['gh pr create --body "a \\"quoted\\" word"', parts(literal('a "quoted" word'))],
+    [String.raw`gh pr create --body "a \"quoted\" word"`, parts(literal('a "quoted" word'))],
     ["gh pr create --body-file body.md", parts(file("body.md"))],
     ['gh pr create --body "Use \\`code\\` here"', parts(literal("Use `code` here"))],
     ["gh pr create --title 'x'", { kind: "none" }],
@@ -303,7 +303,7 @@ describe("command forms the skills document", () => {
     const body = "## Summary\n\nResolved through the form the skill documents.\n";
     await Bun.write(bodyPath, body);
     // Doc paths are placeholders (`tmp/pr-body-<branch>.md`, `file.md`).
-    const command = snippet.replace(/\S*\.md/g, bodyPath);
+    const command = snippet.replaceAll(/\S*\.md/g, bodyPath);
     expect(await resolveBody(command, REPO_ROOT)).toEqual({ kind: "text", text: body });
   });
 });
@@ -315,7 +315,7 @@ describe("extractTitle", () => {
     ['gh pr create --title="Add an LRU Cache"', "Add an LRU Cache"],
     ["gh pr create -t 'Add an LRU Cache'", "Add an LRU Cache"],
     ["gh pr create --title cache", "cache"],
-    ['gh pr create --title "a \\"quoted\\" word"', 'a "quoted" word'],
+    [String.raw`gh pr create --title "a \"quoted\" word"`, 'a "quoted" word'],
     ['glab mr create --title "Add an LRU Cache" --description x', "Add an LRU Cache"],
     ["gh pr edit 12 --body-file body.md", null],
     ['BODY=$(mktemp -t pr) && gh pr create --title "Real Title" --body-file "$BODY"', "Real Title"],

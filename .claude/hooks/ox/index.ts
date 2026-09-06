@@ -61,7 +61,7 @@ const GIT_COMMIT_PATTERN = new RegExp(
 // Quoted spans carry commit messages, grep patterns, and here-doc prose, where
 // the literal text `git commit` is data rather than an invocation.
 function stripQuoted(command: string): string {
-  return command.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, " ");
+  return command.replaceAll(/'[^']*'|"(?:[^"\\]|\\.)*"/g, " ");
 }
 
 export function invokesGitCommit(command: string): boolean {

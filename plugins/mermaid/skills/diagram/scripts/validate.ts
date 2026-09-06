@@ -82,7 +82,7 @@ async function validateBlock(block: MermaidBlock): Promise<ValidationError | nul
     return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return { line: block.line, message: message.replace(/\n/g, " ").trim() };
+    return { line: block.line, message: message.replaceAll("\n", " ").trim() };
   }
 }
 

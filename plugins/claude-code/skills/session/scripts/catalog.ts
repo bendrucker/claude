@@ -58,7 +58,7 @@ function renderParam(param: QueryHeader["params"][number]): string {
 }
 
 // Every line of a continuation block indents, so a fenced example stays inside the bullet.
-const indent = (block: string) => block.replace(/^(?=.)/gm, "  ");
+const indent = (block: string) => block.replaceAll(/^(?=.)/gm, "  ");
 
 function renderEntry(header: QueryHeader): string {
   const tail = [

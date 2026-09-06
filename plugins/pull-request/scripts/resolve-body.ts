@@ -23,13 +23,13 @@ function unquote(value: string): string {
 }
 
 function unescapeDoubleQuoted(text: string): string {
-  return text.replace(/\\(["`$\\])/g, "$1");
+  return text.replaceAll(/\\(["`$\\])/g, "$1");
 }
 
 function expandTmpdir(path: string): string {
   const tmpdir = process.env.TMPDIR?.replace(/\/$/, "");
   if (tmpdir == null || tmpdir === "") return path;
-  return path.replace(/\$\{TMPDIR\}|\$TMPDIR/g, tmpdir);
+  return path.replaceAll(/\$\{TMPDIR\}|\$TMPDIR/g, tmpdir);
 }
 
 function normalizeBodyPath(raw: string): string {

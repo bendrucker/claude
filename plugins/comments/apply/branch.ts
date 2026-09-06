@@ -37,7 +37,10 @@ export async function applyToBranch(
   }
 
   const gitDir = (await $`git rev-parse --git-dir`.quiet()).text().trim();
-  const indexFile = join(gitDir, `comments-apply-index-${options.branch.replace(/[^\w.-]/g, "_")}`);
+  const indexFile = join(
+    gitDir,
+    `comments-apply-index-${options.branch.replaceAll(/[^\w.-]/g, "_")}`,
+  );
   const env = { GIT_INDEX_FILE: indexFile };
 
   try {

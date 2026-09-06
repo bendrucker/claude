@@ -53,7 +53,7 @@ export function parseLinePorcelain(text: string): Map<number, BlamedLine> {
     const key = space === -1 ? raw : raw.slice(0, space);
     const value = space === -1 ? "" : raw.slice(space + 1);
     if (key === "author") current.author = value;
-    else if (key === "author-mail") current.mail = value.replace(/^<|>$/g, "");
+    else if (key === "author-mail") current.mail = value.replaceAll(/^<|>$/g, "");
     else if (key === "author-time") current.time = Number(value);
   }
   return lines;

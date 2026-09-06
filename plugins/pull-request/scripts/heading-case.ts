@@ -79,7 +79,7 @@ function restore(text: string, codeSpans: string[]): string {
 // identifiers with a lowercase first letter (`gitLab` -> `GitLab`, `iOS` ->
 // `IOS`). An internal capital marks those so they aren't re-cased.
 function isIdentifier(segment: string): boolean {
-  const letters = segment.replace(/[^A-Za-z]/g, "");
+  const letters = segment.replaceAll(/[^A-Za-z]/g, "");
   if (letters.length < 2) return false;
   return /[A-Z]/.test(letters.slice(1));
 }

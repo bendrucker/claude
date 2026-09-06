@@ -27,7 +27,7 @@ describe("compilePlainWordlist", () => {
 
   it("dedupes entries", () => {
     const re = compilePlainWordlist("foo\nfoo\n");
-    expect(re?.source).toBe("\\b(?:foo)\\b");
+    expect(re?.source).toBe(String.raw`\b(?:foo)\b`);
   });
 
   it("honors prefix/suffix/flags overrides", () => {

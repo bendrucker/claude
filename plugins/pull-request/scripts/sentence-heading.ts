@@ -100,7 +100,7 @@ function tokens(text: string): string[] {
 }
 
 function normalize(word: string): string {
-  return word.toLowerCase().replace(/[^a-z']/g, "");
+  return word.toLowerCase().replaceAll(/[^a-z']/g, "");
 }
 
 /**
@@ -135,7 +135,7 @@ const FUNCTION_WORDS = new Set([
 ]);
 
 function isContentWord(word: string): boolean {
-  const bare = word.replace(/[.,:?!"'()]/g, "");
+  const bare = word.replaceAll(/[.,:?!"'()]/g, "");
   if (bare === CODE_SENTINEL) return false;
   if (bare.length === 0) return false;
   // Tokens with internal code shape (digits, slashes, backticks) are not prose.
@@ -154,8 +154,8 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
   // A comma outside code/quotes signals list/clause structure. The contrast idiom ", not Y" is a
   // tight label device the user keeps ("`-F`, not `-f`"), so it is exempt.
   const maskedForComma = maskCode(raw)
-    .replace(/"[^"]*"/g, CODE_SENTINEL)
-    .replace(/,\s*not\b/gi, "");
+    .replaceAll(/"[^"]*"/g, CODE_SENTINEL)
+    .replaceAll(/,\s*not\b/gi, "");
   if (/,/.test(maskedForComma)) signals.push("comma (clause/list)");
 
   // A short label parenthetical is fine ("(Historical)", "(Working Notes)"). Flag parentheticals
@@ -165,7 +165,7 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
     const inner = parenMatch[1] ?? "";
     const innerMasked = maskCode(inner);
     const innerWords = tokens(innerMasked).map(normalize);
-    const hasComma = /,/.test(innerMasked.replace(/"[^"]*"/g, CODE_SENTINEL));
+    const hasComma = /,/.test(innerMasked.replaceAll(/"[^"]*"/g, CODE_SENTINEL));
     const hasPredicate = innerWords.some((w) => PREDICATE_VERBS.has(w));
     if (hasComma) signals.push("parenthetical clause (comma)");
     else if (hasPredicate) signals.push("parenthetical clause (verb)");

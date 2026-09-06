@@ -47,7 +47,7 @@ export function addInto(into: AddedLineStats, stats: AddedLineStats): void {
  * re-indented, and realigned lines don't count and each extra duplicate counts
  * once. Returns 1-based indices into the fragment's lines.
  */
-const lineKey = (line: string) => line.replace(/\s+/g, "");
+const lineKey = (line: string) => line.replaceAll(/\s+/g, "");
 
 export function addedLines(
   oldText: string,
@@ -73,7 +73,7 @@ export function addedLines(
 }
 
 function nonWsLen(s: string): number {
-  return s.replace(/\s/g, "").length;
+  return s.replaceAll(/\s/g, "").length;
 }
 
 const DELIMITER = /^\s*(?:\/\/+|\/\*+|\*+\/?|--|#+|;+|"""|''')?\s*/;

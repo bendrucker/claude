@@ -62,7 +62,7 @@ function context(text: string): SyncHookJSONOutput {
 // Blank out quoted spans so flag checks never match text inside argument
 // values (note bodies, field values), only real flags.
 export function stripQuoted(command: string): string {
-  return command.replace(/'[^']*'/g, " ").replace(/"[^"]*"/g, " ");
+  return command.replaceAll(/'[^']*'/g, " ").replaceAll(/"[^"]*"/g, " ");
 }
 
 // Segments approximate one process invocation each, so a `grep -q` elsewhere
@@ -90,7 +90,7 @@ export function lintGlab(command: string): string | null {
     if (!/\bglab\s+api\s+graphql\b/.test(segment)) continue;
     if (/query=["']?[^;&|]*\\\$/.test(segment)) {
       return [
-        "Escaped dollars (\\$) corrupt GraphQL variable declarations. Pass the query via a quoted heredoc so $ needs no escaping:",
+        String.raw`Escaped dollars (\$) corrupt GraphQL variable declarations. Pass the query via a quoted heredoc so $ needs no escaping:`,
         `glab api graphql -f query="$(cat <<'GQL'`,
         "mutation($projectPath: ID!, $iid: String!) { ... }",
         "GQL",

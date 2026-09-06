@@ -75,7 +75,7 @@ export function classifyHeadingBaseline(heading: string): HeadingVerdict {
     .trim();
 
   const words = analysis.split(/\s+/).filter((word) => word.length > 0);
-  const lower = words.map((word) => word.toLowerCase().replace(/[^a-z']/g, ""));
+  const lower = words.map((word) => word.toLowerCase().replaceAll(/[^a-z']/g, ""));
 
   // Interrogative-led headings ("Why X is Y", "What was wrong") are a
   // conventional rationale-section label, not the sentence-heading trope.
@@ -94,7 +94,7 @@ export function classifyHeadingBaseline(heading: string): HeadingVerdict {
       .slice(colonIndex + 1)
       .trim()
       .split(/\s+/)
-      .map((word) => word.toLowerCase().replace(/[^a-z']/g, ""))
+      .map((word) => word.toLowerCase().replaceAll(/[^a-z']/g, ""))
       .filter((word) => word.length > 0);
     const afterPredicate = after.some((word) => LINKING_VERBS.has(word) || word === "not");
     const preEnumerator =

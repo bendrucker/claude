@@ -11,7 +11,7 @@ import { decodeComments, type TuicrComment } from "./comment";
 
 /** Collapse whitespace runs so each comment prints on a single line. */
 export function oneLine(content: string): string {
-  return content.replace(/\s+/g, " ").trim();
+  return content.replaceAll(/\s+/g, " ").trim();
 }
 
 /** The Monitor event line for a freshly seen comment. */

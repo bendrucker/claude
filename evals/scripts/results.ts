@@ -56,8 +56,8 @@ export function runDate(payload: ExportPayload, override?: string): string {
 export function slug(value: string): string {
   return value
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-+|-+$/g, "");
 }
 
 export function suiteName(payload: ExportPayload, override?: string): string {
@@ -72,7 +72,7 @@ export function suiteName(payload: ExportPayload, override?: string): string {
 // promptfoo ids embed an ISO timestamp, whose colons are hostile to filenames and
 // to the S3 sync that mirrors them.
 export function safeId(evalId: string): string {
-  const id = evalId.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  const id = evalId.replaceAll(/[^A-Za-z0-9._-]+/g, "-").replaceAll(/^-+|-+$/g, "");
   if (id === "") throw new Error(`Eval id "${evalId}" has no characters usable in a filename`);
   return id;
 }

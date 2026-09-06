@@ -47,7 +47,7 @@ export const PROJECT_SETTINGS: Source = {
 export const SOURCES: Source[] = [USER_SETTINGS, PROJECT_SETTINGS];
 
 function quoteRegex(literal: string): string {
-  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return literal.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 /** Shell syntax that cannot appear inside an unquoted or quoted path. */

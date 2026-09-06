@@ -13,7 +13,7 @@ export const DEFAULT_VOCABULARY_SIZE = 300;
 const GRAM_SIZE = 3;
 
 export function normalizeForGrams(prose: string): string {
-  return prose.toLowerCase().replace(/\s+/g, " ").trim();
+  return prose.toLowerCase().replaceAll(/\s+/g, " ").trim();
 }
 
 export function countGrams(prose: string, into = new Map<string, number>()): Map<string, number> {

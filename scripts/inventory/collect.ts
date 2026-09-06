@@ -85,7 +85,7 @@ async function frontmatterOf(path: string): Promise<Frontmatter> {
 }
 
 function text(value: unknown): string {
-  return typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+  return typeof value === "string" ? value.trim().replaceAll(/\s+/g, " ") : "";
 }
 
 /** Tool lists appear as a comma-joined string or a YAML sequence. */

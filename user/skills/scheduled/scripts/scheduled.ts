@@ -97,7 +97,9 @@ export function planReconcile(
   installed: string[],
   prefix: string,
 ): ReconcilePlan {
-  const match = prefix.match(new RegExp(`^${LABEL_ROOT.replace(/\./g, "\\.")}\\.([^.]+)\\.$`));
+  const match = prefix.match(
+    new RegExp(`^${LABEL_ROOT.replaceAll(".", String.raw`\.`)}\\.([^.]+)\\.$`),
+  );
   if (!match) throw new Error(`prefix must look like "${LABEL_ROOT}.<group>.", got "${prefix}"`);
   const group = match[1];
 
@@ -113,7 +115,7 @@ export function planReconcile(
 }
 
 function xmlEscape(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 function plistString(value: string): string {
@@ -206,7 +208,9 @@ export async function listDescriptors(dir: string): Promise<DescriptorFile[]> {
 
 /** Short-form (`<group>.<label>`) identifiers for every `me.bendrucker.claude.*` agent installed on this machine. */
 async function listInstalledLabels(): Promise<string[]> {
-  const pattern = new RegExp(`^${LABEL_ROOT.replace(/\./g, "\\.")}\\.([^.]+)\\.(.+)\\.plist$`);
+  const pattern = new RegExp(
+    `^${LABEL_ROOT.replaceAll(".", String.raw`\.`)}\\.([^.]+)\\.(.+)\\.plist$`,
+  );
   const glob = new Bun.Glob(`${LABEL_ROOT}.*.*.plist`);
   const labels: string[] = [];
   for await (const file of glob.scan({ cwd: LAUNCH_AGENTS_DIR })) {

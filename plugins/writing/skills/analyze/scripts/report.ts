@@ -402,7 +402,7 @@ function renderMeaningAudit(input: ReportInput): string {
       for (const span of stat.spans) {
         // Spans are verbatim quotes and may contain newlines, which would
         // break the list item; collapse all whitespace runs to single spaces.
-        const flat = span.replace(/\s+/g, " ").trim();
+        const flat = span.replaceAll(/\s+/g, " ").trim();
         lines.push(`- ${stat.id}: "${esc(truncate(flat, 160))}"`);
       }
     }
@@ -503,7 +503,7 @@ function ruleTypeLabel(source: string): string {
 }
 
 function esc(s: string): string {
-  return s.replace(/\|/g, "\\|");
+  return s.replaceAll("|", String.raw`\|`);
 }
 
 function voiceBaselineSummary(profile: VoiceProfile | null): string {

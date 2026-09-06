@@ -18,7 +18,7 @@ const INBOX_PARAMS = new Set(["title", "titles", "notes", "tags", "checklist-ite
  * strings that end up in a snippet the user pastes into a shell.
  */
 export function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
+  return `'${value.replaceAll("'", String.raw`'\''`)}'`;
 }
 
 /**
@@ -79,8 +79,8 @@ if (import.meta.main) {
   for (const arg of argv._.params) {
     const eqIndex = arg.indexOf("=");
     if (eqIndex === -1) continue;
-    const key = arg.substring(0, eqIndex);
-    const value = arg.substring(eqIndex + 1);
+    const key = arg.slice(0, eqIndex);
+    const value = arg.slice(eqIndex + 1);
     if (INBOX_PARAMS.has(key)) {
       params.set(key, value);
     }

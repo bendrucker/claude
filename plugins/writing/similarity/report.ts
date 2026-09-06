@@ -19,7 +19,7 @@ export interface Report {
 }
 
 export function truncate(text: string, width: number): string {
-  const flat = text.replace(/\s+/g, " ").trim();
+  const flat = text.replaceAll(/\s+/g, " ").trim();
   // A negative end index counts from the end of the string, which would print
   // the tail of the passage rather than a prefix.
   const room = Math.max(1, Math.trunc(width));

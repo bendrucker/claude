@@ -134,12 +134,12 @@ function fragmentPattern(fragment: string): RegExp {
       if (code > 0x7f) {
         const utf8 = Buffer.from(char, "utf8")
           .toString("latin1")
-          .replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+          .replaceAll(/[\\^$.*+?()[\]{}|]/g, String.raw`\$&`);
         return `(?:${utf8}|\\\\u${code.toString(16).padStart(4, "0")})`;
       }
-      if (char === "\n") return "(?:\\n|\\\\n)";
+      if (char === "\n") return String.raw`(?:\n|\\n)`;
       if (char === "`" || char === "$") return `\\\\?\\${char}`;
-      return char.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+      return char.replaceAll(/[\\^$.*+?()[\]{}|]/g, String.raw`\$&`);
     })
     .join("");
   return new RegExp(escaped);

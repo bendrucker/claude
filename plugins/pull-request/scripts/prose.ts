@@ -116,7 +116,7 @@ export function hardWrappedParagraphs(body: string): WrappedParagraph[] {
       raw,
       // Consuming the whitespace on both sides of the break keeps a line that
       // ended in a space from joining as two, and drops the CR of a CRLF body.
-      unwrapped: raw.replace(/[ \t]*\r?\n[ \t]*/g, " "),
+      unwrapped: raw.replaceAll(/[ \t]*\r?\n[ \t]*/g, " "),
       start: start.offset,
       end: end.offset,
     });
@@ -153,7 +153,7 @@ export type NarrationTell = (typeof NARRATION_TELLS)[number];
 
 /** Regex source for one tell, shared with the eval scorer so both match identically. */
 export function narrationTellSource(tell: string): string {
-  return `\\b${tell.replace(/ /g, "\\s+")}\\b`;
+  return `\\b${tell.replaceAll(" ", String.raw`\s+`)}\\b`;
 }
 
 export const TITLE_LENGTH_LIMIT = 50;

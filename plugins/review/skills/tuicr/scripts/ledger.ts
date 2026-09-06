@@ -36,7 +36,7 @@ export function defaultLedgerDir(): string {
 }
 
 function sanitize(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return value.replaceAll(/[^a-zA-Z0-9._-]+/g, "-").replaceAll(/^-+|-+$/g, "");
 }
 
 const LedgerFile = z.object({

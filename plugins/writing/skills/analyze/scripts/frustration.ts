@@ -27,7 +27,7 @@ export const FRUSTRATION_TERMS = [
 export const GATED_TERMS = ["sounds like"];
 
 export function escapeRegex(literal: string): string {
-  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return literal.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
 
 // A DuckDB-compatible regex alternation with word boundaries. DuckDB's regexp

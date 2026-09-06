@@ -447,7 +447,7 @@ function renderGrid(cells: GridCell[]): string {
 
   const backs = [...new Set(cells.map((cell) => cell.back))];
   return table([
-    ["out \\ back", ...backs.map((back) => back ?? "?")],
+    [String.raw`out \ back`, ...backs.map((back) => back ?? "?")],
     ...outs.map((out) =>
       [out].concat(
         backs.map((back) => money(cells.find((cell) => cell.out === out && cell.back === back))),

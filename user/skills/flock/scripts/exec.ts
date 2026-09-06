@@ -51,7 +51,7 @@ export const spawnRun: Run = async (argv, options) => {
  */
 export function limiter(limit: number): <T>(task: () => Promise<T>) => Promise<T> {
   let active = 0;
-  const waiting: Array<() => void> = [];
+  const waiting: (() => void)[] = [];
 
   const release = (): void => {
     active -= 1;

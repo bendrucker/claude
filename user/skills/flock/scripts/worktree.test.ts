@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnRun, type CommandResult, type Run } from "./exec";
-import type { PullRequest } from "./forge";
+import { SETTLED_STATE, type PullRequest } from "./forge";
 import {
   ageInDays,
   carriedIgnoredPaths,
@@ -29,6 +29,7 @@ function flags(overrides: Partial<FlagInput>): string[] {
     carried: 0,
     merged: false,
     reused: false,
+    pull: [],
     ...overrides,
   });
 }
@@ -95,6 +96,7 @@ describe("deriveFlags", () => {
     [{ detached: true }, ["detached"]],
     [{ merged: true }, ["merged"]],
     [{ reused: true }, ["reused"]],
+    [{ pull: ["failing:lint", "conflicting"] }, ["failing:lint", "conflicting"]],
     [
       {
         detached: true,
@@ -103,8 +105,9 @@ describe("deriveFlags", () => {
         carried: 1,
         merged: true,
         reused: true,
+        pull: ["conflicting"],
       },
-      ["detached", "dirty", "unpushed:2", "carries:1", "merged", "reused"],
+      ["conflicting", "detached", "dirty", "unpushed:2", "carries:1", "merged", "reused"],
     ],
   ])("%o", (input, expected) => {
     expect(flags(input)).toEqual(expected);
@@ -163,7 +166,13 @@ describe("ageInDays", () => {
 });
 
 describe("isReusedBranch", () => {
-  const merged: PullRequest = { branch: "gzip", number: 2, state: "merged", mergedAt: 1000 };
+  const merged: PullRequest = {
+    branch: "gzip",
+    number: 2,
+    state: "merged",
+    mergedAt: 1000,
+    ...SETTLED_STATE,
+  };
 
   test.each([
     ["a commit after the merge", merged, 2000, true],

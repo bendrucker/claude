@@ -1,8 +1,44 @@
-export interface BoardPull {
+import type { PullState } from "./forge";
+import type { StatusRead } from "./worktree";
+
+export interface BoardPull extends PullState {
   readonly ref: string;
   readonly number: number;
   readonly state: "open" | "draft" | "merged";
 }
+
+/**
+ * Row state the table does not print but the sweep turns on. `flags` renders
+ * most of it, and re-reading a disposition out of rendered strings would make
+ * the classifier depend on how the board happens to spell them.
+ */
+export interface RowState {
+  /** The pane running this flock. It sweeps everything except itself. */
+  readonly self: boolean;
+  /** An agent is mid-turn in the pane holding this worktree. */
+  readonly working: boolean;
+  /** An agent has stopped on a prompt only the user can answer. */
+  readonly blocked: boolean;
+  /** The forge refused to list pull requests, so no absence here is trustworthy. */
+  readonly pullUnknown: boolean;
+  /** What `git status` reported, so a checkout it could not read stays distinct. */
+  readonly status: StatusRead;
+  readonly unpushed: number | null;
+  readonly carried: number;
+  readonly mergedBranch: boolean;
+  readonly reused: boolean;
+}
+
+/** Where a row lands in the sweep. `disposition.ts` decides which. */
+export type Disposition =
+  | "self"
+  | "needs-you"
+  | "merge"
+  | "cleanup"
+  | "waiting"
+  | "working"
+  | "parked"
+  | "panes";
 
 export interface BoardRow {
   readonly kind: "worktree" | "pane";
@@ -21,6 +57,8 @@ export interface BoardRow {
   readonly prColumn: string;
   readonly age: number | null;
   readonly flags: readonly string[];
+  readonly state: RowState;
+  readonly disposition: Disposition;
 }
 
 export const COLUMNS = [
@@ -58,28 +96,30 @@ export function rowCells(row: BoardRow): string[] {
   ];
 }
 
-export function renderTable(rows: readonly (readonly string[])[]): string {
-  const format = (cells: readonly string[], truncate: boolean): string =>
-    COLUMNS.map((column, index) => {
-      const raw = cells[index] ?? "";
-      if (column.width === null) return raw;
-      const value = truncate ? fit(raw, column.width) : raw;
-      return value.padEnd(column.width);
-    })
-      .join(" ")
-      .replace(/\s+$/, "");
-
-  return [
-    format(
-      COLUMNS.map((column) => column.header),
-      false,
-    ),
-    ...rows.map((cells) => format(cells, true)),
-  ].join("\n");
+function format(cells: readonly string[], truncate: boolean): string {
+  return COLUMNS.map((column, index) => {
+    const raw = cells[index] ?? "";
+    if (column.width === null) return raw;
+    const value = truncate ? fit(raw, column.width) : raw;
+    return value.padEnd(column.width);
+  })
+    .join(" ")
+    .replace(/\s+$/, "");
 }
 
-export function renderBoard(rows: readonly BoardRow[]): string {
-  return renderTable(rows.map(rowCells));
+export function headerRow(): string {
+  return format(
+    COLUMNS.map((column) => column.header),
+    false,
+  );
+}
+
+export function renderRows(rows: readonly (readonly string[])[]): string[] {
+  return rows.map((cells) => format(cells, true));
+}
+
+export function renderTable(rows: readonly (readonly string[])[]): string {
+  return [headerRow(), ...renderRows(rows)].join("\n");
 }
 
 function compare(left: string, right: string): number {
@@ -111,5 +151,7 @@ export function jsonRow(row: BoardRow): Record<string, unknown> {
     prColumn: row.prColumn,
     age: row.age,
     flags: [...row.flags],
+    disposition: row.disposition,
+    state: row.state,
   };
 }

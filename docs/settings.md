@@ -48,7 +48,7 @@ The rest are tool caches and state directories holding no credential material:
 
 - `~/.duckdb`: extensions installed on first `INSTALL ... FROM community`. Without it the `claude-code:session` skill dies on `IO Error: Failed to create directory`, having already been granted the egress to fetch them. The version in the path changes with each DuckDB release, so a fresh install re-denies. **Drop it** when no skill queries DuckDB with a community extension.
 - `~/.local/share/plannotator`: annotation history, drafts, and the feedback archive, rewritten on every run. Without it each save fails `EPERM`, and a review runs with no version diffs and no recovery copy. **Drop it** when no skill drives the `plannotator` CLI.
-- `~/.agent-browser`: the CLI's control socket. `agent-browser` sits in `excludedCommands`, but only a top-level match escapes, so a skill script that shells out to it runs sandboxed and fails with `Socket directory is not writable`. Another `excludedCommands` entry would not help. **Drop it** when the `agent-browser` skill stops invoking the CLI from a wrapper.
+- `~/.agent-browser`: the CLI's control socket. `agent-browser` sits in `excludedCommands`, but a match has to sit in the invocation's own chain, so a skill script that shells out to it runs sandboxed and fails with `Socket directory is not writable`. Another `excludedCommands` entry would not help. **Drop it** when the `agent-browser` skill stops invoking the CLI from a wrapper.
 - `~/Library/Caches/ms-playwright`: Playwright's unpacked browser builds. Without it an install fails at `mkdir` before reaching the download, which reads as a network problem. **Drop it** when no skill or work repo drives Playwright.
 - `~/.gradle` and `~/.config/jgit`: the Gradle wrapper's distribution lock and jgit's config lock, both written by Java builds in work repos. This fixes the filesystem half only, and a Gradle build that reaches the network still needs a full skip. **Drop both** when no Java repo is in rotation, and revisit if the egress half is ever granted, since the pair only pays off together.
 - `~/.claude/plans`: saved plan files, which copying one in fails without. No injected deny shadows it, unlike the `~/.claude` paths below. Permanent unless plan files move out of `~/.claude`.
@@ -61,7 +61,7 @@ The rest are tool caches and state directories holding no credential material:
 
 ## Escaped Commands
 
-`excludedCommands` entries run outside the sandbox, and only the top-level command of an invocation matches.
+`excludedCommands` entries run outside the sandbox. A match at any top-level position of the invocation's chain exempts every command in it, and that exemption outranks the `filesystem` denies, so an entry grants far more than the one verb it names. `git:*` means any invocation mentioning `git` at a chain position writes anywhere on disk. Judge a candidate on that reach.
 
 - Self-authenticating network tools: `git`, `linear`, `aws`, `gcloud`, `az`, `pulumi`, `ssh`, `scp`, `rsync`, `docker`. Each carries its own auth and already reaches the network.
 - macOS host integration (`mac` plugin): `open`, `osascript`, `shortcuts`, `pbcopy`, `pbpaste`, `security`, `defaults`, `screencapture`, `say`, `afplay`, `diskutil`, `networksetup`, `dscl`. Host APIs the sandbox cannot model.

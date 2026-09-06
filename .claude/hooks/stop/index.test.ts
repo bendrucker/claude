@@ -27,7 +27,7 @@ function stopInput(overrides?: Partial<StopHookInput>): StopHookInput {
   };
 }
 
-function createTranscriptContent(files: Array<{ path: string; tool: string }>): string {
+function createTranscriptContent(files: { path: string; tool: string }[]): string {
   return files
     .map((f) =>
       JSON.stringify({

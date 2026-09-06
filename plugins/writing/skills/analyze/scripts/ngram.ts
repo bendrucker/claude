@@ -178,7 +178,7 @@ function recordNgramSessions({
 }
 
 export function processRows(
-  rows: Array<{ session_id: string; text?: string }>,
+  rows: { session_id: string; text?: string }[],
   sizes: number[] = [2, 3, 4],
   options: ProcessRowsOptions = {},
 ): ProcessedRows {

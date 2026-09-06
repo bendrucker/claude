@@ -59,7 +59,7 @@ function firstNote(d: Discussion): Note | null {
   return d.notes?.[0] ?? null;
 }
 
-export type DiscussionSummary = {
+export interface DiscussionSummary {
   id: string;
   author: string;
   body: string;
@@ -68,7 +68,7 @@ export type DiscussionSummary = {
   file?: string;
   line?: number;
   lineRange?: { start: number; end: number } | null;
-};
+}
 
 export const DEFAULT_BODY_TRUNCATE = 80;
 
@@ -138,13 +138,13 @@ export function formatTable(summaries: DiscussionSummary[], truncate: number): s
   return table([["ID", "Author", "Resolved", "Location", "Body"], ...rows]);
 }
 
-export type FilterOptions = {
+export interface FilterOptions {
   author?: string;
   resolvable?: boolean;
   unresolved?: boolean;
   bots?: boolean;
   extra?: Set<string>;
-};
+}
 
 export function filterDiscussions(discussions: Discussion[], opts: FilterOptions): Discussion[] {
   return discussions.filter((d) => {

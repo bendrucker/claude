@@ -10,8 +10,15 @@ import {
 } from "./check-tropes";
 import config from "./hooks.json";
 
-type HookCommand = { type: string; command: string; if?: string };
-type HookEntry = { matcher: string; hooks: HookCommand[] };
+interface HookCommand {
+  type: string;
+  command: string;
+  if?: string;
+}
+interface HookEntry {
+  matcher: string;
+  hooks: HookCommand[];
+}
 
 const preToolUse = config.hooks.PreToolUse as HookEntry[];
 

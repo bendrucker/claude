@@ -19,10 +19,10 @@ const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
 const TIER_RANK = { deny: 0, ask: 1, context: 2 } as const;
 
-export type DispatchResult = {
+export interface DispatchResult {
   output: SyncHookJSONOutput | null;
   log: RunLogEntry;
-};
+}
 
 function filePathOf(input: PreToolUseHookInput): string | undefined {
   if (!FILE_OP_TOOLS.has(input.tool_name)) return undefined;

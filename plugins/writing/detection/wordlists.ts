@@ -1,14 +1,20 @@
 import { join } from "node:path";
 import { stemmer } from "stemmer";
 
-export type Hits = { count: number; sample: string };
-export type WeightedHits = { totalWeight: number; samples: string[] };
+export interface Hits {
+  count: number;
+  sample: string;
+}
+export interface WeightedHits {
+  totalWeight: number;
+  samples: string[];
+}
 
-export type PlainWordlistOptions = {
+export interface PlainWordlistOptions {
   flags?: string;
   prefix?: string;
   suffix?: string;
-};
+}
 
 const COMMENT_OR_BLANK = /^\s*(?:#|$)/;
 const WORD_TOKEN = /[a-zA-Z]+/g;
@@ -69,7 +75,11 @@ export function compileStemmedWordlist(content: string): (text: string) => Hits 
 
 const WEIGHTED_LINE = /^(\S+)\s+([0-9]+(?:\.[0-9]+)?)$/;
 
-export type StemmedWeight = { stem: string; weight: number; original: string };
+export interface StemmedWeight {
+  stem: string;
+  weight: number;
+  original: string;
+}
 
 export function compileWeightedStems(content: string): StemmedWeight[] {
   const entries: StemmedWeight[] = [];
@@ -92,7 +102,10 @@ export function compileWeightedStems(content: string): StemmedWeight[] {
   return entries;
 }
 
-export type StemmedPhrase = { stems: string[]; original: string };
+export interface StemmedPhrase {
+  stems: string[];
+  original: string;
+}
 
 export function compileStemmedPhrases(content: string): StemmedPhrase[] {
   const phrases: StemmedPhrase[] = [];
@@ -161,13 +174,13 @@ async function readWordlist(name: string): Promise<string> {
   return Bun.file(join(WORDLISTS_DIR, name)).text();
 }
 
-export type LoadedWordlists = {
+export interface LoadedWordlists {
   vocabulary: (text: string) => Hits;
   openers: RegExp | null;
   marketingVerbs: StemmedWeight[];
   softPhrasing: StemmedWeight[];
   floweryPhrases: StemmedPhrase[];
-};
+}
 
 async function load(): Promise<LoadedWordlists> {
   const [vocabularySrc, openersSrc, marketingSrc, softSrc, flowerySrc] = await Promise.all([

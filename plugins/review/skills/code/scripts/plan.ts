@@ -2,9 +2,13 @@ import { join } from "node:path";
 import { anglesIn, anglesSchema, type Angle, type Angles } from "./angles";
 import { effortsSchema, finderAgents, type Cell, type Efforts } from "./efforts";
 
-export type FinderBudget = { agents: number | null; diffLines: number | null; text: string };
+export interface FinderBudget {
+  agents: number | null;
+  diffLines: number | null;
+  text: string;
+}
 
-export type Plan = {
+export interface Plan {
   family: string;
   level: string;
   cellName: string;
@@ -20,7 +24,7 @@ export type Plan = {
   angles: Angle[];
   cleanupPrecedence: string | null;
   sweepGapFocus: string | null;
-};
+}
 
 const SKILL_DIR = join(import.meta.dirname, "..");
 

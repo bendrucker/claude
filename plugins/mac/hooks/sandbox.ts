@@ -22,7 +22,10 @@ const SCRIPT_INTERPRETERS = new Set(["bun", "node"]);
 const SCRIPT_EXTENSIONS = new Set([".ts", ".js", ".mjs", ".cjs", ".sh"]);
 const SCRIPT_MARKER = "claude:dangerouslyDisableSandbox";
 
-export type Invocation = { cmd: string; scriptArg?: string };
+export interface Invocation {
+  cmd: string;
+  scriptArg?: string;
+}
 
 export function extractCommands(command: string): Invocation[] {
   const segments = command.split(SHELL_OPERATORS);

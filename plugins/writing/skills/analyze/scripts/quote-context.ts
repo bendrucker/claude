@@ -45,7 +45,7 @@ interface Span {
 }
 
 function findStemmedSpan(text: string, needle: string[]): Span | null {
-  const tokens: Array<{ stem: string; start: number; end: number }> = [];
+  const tokens: { stem: string; start: number; end: number }[] = [];
   for (const match of text.matchAll(WORD_TOKEN)) {
     const word = match[0];
     tokens.push({

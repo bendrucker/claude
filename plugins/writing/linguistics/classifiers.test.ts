@@ -35,13 +35,13 @@ describe("CLASSIFIERS", () => {
 // Documented behavior of the compromise-backed candidates on invented
 // examples. These assertions record where each candidate stands today,
 // including known misses; the corpus eval decides promotion.
-const compromiseCases: Array<{
+const compromiseCases: {
   description: string;
   heading: string;
   finiteVerb: boolean;
   npTest: boolean;
   hybrid: boolean;
-}> = [
+}[] = [
   {
     description: "finite copula in Title Case (baseline parity)",
     heading: "Latency Is the Main Bottleneck",

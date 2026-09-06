@@ -61,7 +61,11 @@ function denialReason(result: PreToolUseHookSpecificOutput | null): string {
   expect(result?.permissionDecision).toBe("deny");
   return result?.permissionDecisionReason ?? "";
 }
-type GateRun = { stdout: string; stderr: string; exitCode: number };
+interface GateRun {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
 
 async function runGate(input: PreToolUseHookInput): Promise<GateRun> {
   const gate = Bun.spawn(["bun", join(import.meta.dir, "gate.ts")], {

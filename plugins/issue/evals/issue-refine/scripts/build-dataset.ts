@@ -69,7 +69,7 @@ const project = (p: string) =>
     .replace(/\/\.worktrees\/.*$/, "")
     .split(".")[0] ?? "";
 
-type Sample = {
+interface Sample {
   id: string;
   session_id: string;
   project: string;
@@ -78,7 +78,7 @@ type Sample = {
   brief: string;
   title: string;
   refined: string;
-};
+}
 
 const candidates: Sample[] = [];
 for (const [session_id, refined] of refinedBySession) {

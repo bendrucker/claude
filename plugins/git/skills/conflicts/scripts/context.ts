@@ -5,7 +5,7 @@ import { $ } from "bun";
 type Operation = "rebase" | "merge" | "cherry-pick" | null;
 
 async function detectOperation(): Promise<{ op: Operation; ref: string | null }> {
-  const checks: Array<{ op: Operation; ref: string }> = [
+  const checks: { op: Operation; ref: string }[] = [
     { op: "rebase", ref: "REBASE_HEAD" },
     { op: "merge", ref: "MERGE_HEAD" },
     { op: "cherry-pick", ref: "CHERRY_PICK_HEAD" },

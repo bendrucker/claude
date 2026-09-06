@@ -57,9 +57,7 @@ function mockEdit(
   };
 }
 
-function mockMultiEdit(
-  edits: Array<{ old_string?: string; new_string: string }>,
-): PreToolUseHookInput {
+function mockMultiEdit(edits: { old_string?: string; new_string: string }[]): PreToolUseHookInput {
   return {
     hook_event_name: "PreToolUse",
     session_id: "test",

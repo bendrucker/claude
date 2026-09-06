@@ -18,7 +18,10 @@ export interface ValidationResult {
   violations: Violation[];
 }
 
-type Transform = { x: number; y: number };
+interface Transform {
+  x: number;
+  y: number;
+}
 
 function attr(el: XmlElement, name: string, fallback = 0): number {
   const raw = el.getAttribute(name);

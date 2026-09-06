@@ -1,7 +1,13 @@
 {
   "$schema": "../node_modules/oxlint/configuration_schema.json",
   "rules": {
+    "typescript/array-type": "error", // Array<T> makes every array read like a lookup instead of a list
     "typescript/ban-ts-comment": "error",
+    "typescript/consistent-generic-constructors": "error", // repeating the type on both sides of `new` is redundant work
+    // Extending an object shape with `&` reduces conflicting members to never
+    // and says nothing, where `interface extends` reports the conflict at the
+    // declaration. The accepted cost is that interface merges across duplicates.
+    "typescript/consistent-type-definitions": "error",
     "typescript/explicit-module-boundary-types": "error",
     "typescript/no-deprecated": "error",
     "typescript/no-explicit-any": "error",

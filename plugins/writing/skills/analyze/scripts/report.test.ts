@@ -88,7 +88,7 @@ const meaningAuditInput: ReportInput = {
 
 const provenanceInput: ReportInput = { ...baseInput, voiceProfile: fixtureProfile };
 
-const cases: Array<{ name: string; input: ReportInput }> = [
+const cases: { name: string; input: ReportInput }[] = [
   { name: "empty scaffold", input: baseInput },
   {
     name: "structural trends table",

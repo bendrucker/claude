@@ -13,7 +13,7 @@ function price(text: string): number | null {
 }
 
 describe("AMOUNT", () => {
-  const CASES: Array<[string, number | null]> = [
+  const CASES: [string, number | null][] = [
     ["$5", 5],
     ["$234", 234],
     ["$1,234", 1234],

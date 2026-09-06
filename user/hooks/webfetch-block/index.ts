@@ -7,10 +7,10 @@ import { timeHook } from "../../scripts/hook-metrics";
 
 const WebFetchInput = z.looseObject({ url: z.string() });
 
-type BlockedPattern = {
+interface BlockedPattern {
   pattern: RegExp;
   suggestion: string;
-};
+}
 
 // Blocks URLs that require authentication, don't exist, or reject bot requests.
 // Services with plugins (GitHub, GitLab, Linear) handle blocking in their own hooks.

@@ -50,7 +50,7 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
   }
 
   const content = await Bun.file(transcriptPath).text();
-  const existChecks: Array<Promise<{ path: string; exists: boolean }>> = [];
+  const existChecks: Promise<{ path: string; exists: boolean }>[] = [];
 
   for (const line of content.split("\n")) {
     if (line.trim() === "") continue;

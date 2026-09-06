@@ -28,9 +28,9 @@ const noopSleep = (): Promise<void> => Promise.resolve();
 // Stub `exec` for probe* tests. Each entry maps a substring matcher (anything
 // the gh command line should contain) to a canned result. Tests assert that
 // commands are issued in the expected order by exhausting the array.
-function makeExec(scripted: Array<{ match: string; result: ExecResult }>): {
+function makeExec(scripted: { match: string; result: ExecResult }[]): {
   exec: ExecFn;
-  remaining: () => Array<{ match: string; result: ExecResult }>;
+  remaining: () => { match: string; result: ExecResult }[];
 } {
   const queue = [...scripted];
   return {
@@ -71,7 +71,7 @@ function baseProbe(overrides: Partial<Probe> = {}): Probe {
 }
 
 function advance(
-  probes: Array<{ probe: Probe; now?: number }>,
+  probes: { probe: Probe; now?: number }[],
   opts: { queuedTimeoutMinutes?: number; initial?: WatcherState } = {},
 ): { events: Event[]; state: WatcherState } {
   const queuedTimeoutMinutes = opts.queuedTimeoutMinutes ?? 15;
@@ -113,7 +113,7 @@ describe("parsePrUrl", () => {
 //   - queued (action):   { state: "QUEUED",      bucket: "pending" }
 //   - pending (status):  { state: "PENDING",     bucket: "pending" }
 describe("deriveChecksState", () => {
-  test.each<[string, Array<{ state: string; bucket: string; name: string }>, InternalState]>([
+  test.each<[string, { state: string; bucket: string; name: string }[], InternalState]>([
     ["empty checks", [], "running"],
     [
       "any check in fail bucket",

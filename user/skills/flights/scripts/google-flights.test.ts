@@ -13,7 +13,7 @@ import {
 // not fail. It silently searches for something else. These snapshots are the
 // regression guard for encodings that were verified against real search URLs.
 
-const CASES: Array<[string, SearchParams]> = [
+const CASES: [string, SearchParams][] = [
   [
     "one-way nonstop economy",
     { legs: [{ date: "2026-04-15", origin: "LAX", destination: "ORD" }] },

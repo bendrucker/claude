@@ -13,16 +13,16 @@ export type HookInput = z.infer<typeof HookInput>;
 // url-pattern's match() returns `any`.
 const Params = z.record(z.string(), z.string());
 
-type RouteMatch = {
+interface RouteMatch {
   type: string;
   params: Record<string, string>;
-};
+}
 
-type Route = {
+interface Route {
   pattern: UrlPattern;
   type: string;
   suggestion: (params: Record<string, string>) => string;
-};
+}
 
 // GitLab uses /-/ prefix for resource paths
 const routes: Route[] = [

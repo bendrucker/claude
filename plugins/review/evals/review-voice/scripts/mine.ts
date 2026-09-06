@@ -127,7 +127,7 @@ function workdirOf(fp: string): string {
 
 function bodiesFromJson(
   content: string,
-): Array<{ body: string; file: string | null; line: number | null }> {
+): { body: string; file: string | null; line: number | null }[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
@@ -137,7 +137,7 @@ function bodiesFromJson(
   const items = ReviewPayload.safeParse(parsed);
   if (!items.success) return [];
 
-  const out: Array<{ body: string; file: string | null; line: number | null }> = [];
+  const out: { body: string; file: string | null; line: number | null }[] = [];
   for (const item of items.data) {
     if (typeof item === "string") {
       out.push({ body: item, file: null, line: null });

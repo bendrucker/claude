@@ -41,7 +41,11 @@ export function editedContent(
 // dispatcher uses for session-scoped repeat suppression and the run log.
 // suppressible: false exempts a context-shaped output from repeat suppression
 // (deny-tier findings reformatted as per-file fix-it reminders).
-export type HookResult = { output: SyncHookJSONOutput; category: string; suppressible?: boolean };
+export interface HookResult {
+  output: SyncHookJSONOutput;
+  category: string;
+  suppressible?: boolean;
+}
 
 export type PermissionTier = "deny" | "ask" | "context";
 

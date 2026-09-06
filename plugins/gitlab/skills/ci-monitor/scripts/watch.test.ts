@@ -42,9 +42,9 @@ function makeProbe(overrides: Partial<Probe> = {}): Probe {
 
 // Stub `exec` for resolveMergeStatus tests: each entry maps a substring matcher
 // against the glab command line to a canned result, exhausted in order.
-function makeExec(scripted: Array<{ match: string; result: ExecResult }>): {
+function makeExec(scripted: { match: string; result: ExecResult }[]): {
   exec: ExecFn;
-  remaining: () => Array<{ match: string; result: ExecResult }>;
+  remaining: () => { match: string; result: ExecResult }[];
 } {
   const queue = [...scripted];
   return {
@@ -1002,8 +1002,7 @@ describe("probe pipeline selection", () => {
     state: "opened",
   });
 
-  const pipelinesJson = (records: Array<Record<string, unknown>>): string =>
-    JSON.stringify(records);
+  const pipelinesJson = (records: Record<string, unknown>[]): string => JSON.stringify(records);
 
   // Regression: an `external` pipeline is a commit status posted by another tool.
   // It is created green and carries no jobs, and because it is created last it

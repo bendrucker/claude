@@ -342,12 +342,12 @@ describe("formatThreads", () => {
     viewer: "bendrucker",
   };
 
-  const cases: Array<{
+  const cases: {
     name: string;
     threads: Thread[];
     total: number;
     options: Parameters<typeof formatThreads>[2];
-  }> = [
+  }[] = [
     { name: "empty result", threads: [], total: 10, options: baseOptions },
     {
       name: "reviewer-opener header",

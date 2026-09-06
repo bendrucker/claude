@@ -14,16 +14,16 @@ export type HookInput = z.infer<typeof HookInput>;
 const Params = z.record(z.string(), z.string());
 const RepoPath = z.looseObject({ _: z.string().optional().catch(undefined) });
 
-type RouteMatch = {
+interface RouteMatch {
   type: string;
   params: Record<string, string>;
-};
+}
 
-type Route = {
+interface Route {
   pattern: UrlPattern;
   type: string;
   suggestion: (params: Record<string, string>) => string;
-};
+}
 
 // Allow dots and other valid URL characters in segment values
 const patternOptions = { segmentValueCharset: "a-zA-Z0-9-_.~%" };

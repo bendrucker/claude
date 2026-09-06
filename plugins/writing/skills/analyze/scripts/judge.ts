@@ -156,6 +156,7 @@ export function byCriterion<T>(value: (key: CriterionKey) => T): Record<Criterio
 }
 
 /** The structured-output envelope both judges send to the API. */
+// oxlint-disable-next-line typescript/consistent-type-definitions -- an interface drops the implicit index signature the SDK's schema parameter needs.
 export type OutputSchema = {
   type: "object";
   properties: Record<string, unknown>;
@@ -327,7 +328,7 @@ const HAIKU_PRICING: ModelPricing = { input: 1, output: 5 };
  * diverge. The SQL defaults an unknown model to Opus rates, this defaults to
  * Haiku and warns. Raising that floor is a behavioral change, not a rate sync.
  */
-const FAMILY_PRICING: ReadonlyArray<readonly [string, ModelPricing]> = [
+const FAMILY_PRICING: readonly (readonly [string, ModelPricing])[] = [
   ["fable", { input: 10, output: 50 }],
   ["mythos", { input: 10, output: 50 }],
   ["opus", { input: 5, output: 25 }],

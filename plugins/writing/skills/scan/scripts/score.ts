@@ -7,23 +7,27 @@ import { compileStemmedWordlist, countWords } from "../../../detection/wordlists
 import { checkRegister, VOICE_DELTA_FEATURES } from "../../analyze/scripts/voice-delta";
 import type { VoiceProfile } from "../../analyze/scripts/voice-profile";
 
-export type CategoryScore = { category: string; hits: number; density: number };
+export interface CategoryScore {
+  category: string;
+  hits: number;
+  density: number;
+}
 
-export type GroupScore = {
+export interface GroupScore {
   group: string;
   wordCount: number;
   categories: CategoryScore[];
-};
+}
 
-export type ScoreReport = {
+export interface ScoreReport {
   filePath: string | undefined;
   groups: GroupScore[];
-};
+}
 
-export type ReportOptions = {
+export interface ReportOptions {
   comments: boolean;
   customMatch?: (text: string) => { count: number };
-};
+}
 
 const CUSTOM_VOCABULARY = "custom vocabulary";
 

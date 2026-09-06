@@ -13,11 +13,13 @@ import { runCheck, tracked } from "./check";
 const HOME_PREFIXES: Record<string, string> = {
   "~/.claude/": "user/",
   "$HOME/.claude/": "user/",
+  // oxlint-disable-next-line no-template-curly-in-string -- a literal prefix matched against hook command text, not an interpolation.
   "${HOME}/.claude/": "user/",
 };
 
 const PROJECT_PREFIXES: Record<string, string> = {
   "$CLAUDE_PROJECT_DIR/": "",
+  // oxlint-disable-next-line no-template-curly-in-string -- a literal prefix matched against hook command text, not an interpolation.
   "${CLAUDE_PROJECT_DIR}/": "",
 };
 

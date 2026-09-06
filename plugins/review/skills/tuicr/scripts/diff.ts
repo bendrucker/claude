@@ -1,8 +1,8 @@
-export type FileDiff = {
+export interface FileDiff {
   newLines: Set<number>;
   oldLines: Set<number>;
   oldPath?: string;
-};
+}
 
 export type ParsedDiff = Map<string, FileDiff>;
 

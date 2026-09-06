@@ -63,9 +63,7 @@ export function extractHeadings(markdown: string): string[] {
   return headings;
 }
 
-export function dedupeHeadings(
-  rows: Array<{ session_id: string; text?: string }>,
-): HeadingRecord[] {
+export function dedupeHeadings(rows: { session_id: string; text?: string }[]): HeadingRecord[] {
   const byHeading = new Map<string, { occurrences: number; sessions: Set<string> }>();
   for (const row of rows) {
     if (row.text == null || row.text === "") continue;
@@ -240,7 +238,7 @@ export function sampleForLabeling(
   disagreements: string[],
   sampleSize: number,
   disagreementCap: number,
-): Array<{ heading: string; source: "random" | "disagreement" }> {
+): { heading: string; source: "random" | "disagreement" }[] {
   const disagreementSet = new Set(disagreements.slice(0, disagreementCap));
   const pool = headings.map((record) => record.heading).filter((h) => !disagreementSet.has(h));
   for (let i = pool.length - 1; i > 0; i--) {
@@ -295,7 +293,7 @@ export function formatPowerReport(
   ].join("\n");
 }
 
-async function corpusFromDocs(dir: string): Promise<Array<{ session_id: string; text: string }>> {
+async function corpusFromDocs(dir: string): Promise<{ session_id: string; text: string }[]> {
   const files = readdirSync(dir)
     .filter((name) => name.endsWith(".md"))
     .toSorted();
@@ -383,7 +381,7 @@ async function main(): Promise<void> {
   const since = argv.flags.since ?? daysAgo(180);
   const until = argv.flags.until ?? today;
 
-  let rows: Array<{ session_id: string; text?: string }>;
+  let rows: { session_id: string; text?: string }[];
   let source: string;
   if (argv.flags.docs != null && argv.flags.docs !== "") {
     const dir = resolve(argv.flags.docs);

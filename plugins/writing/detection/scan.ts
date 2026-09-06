@@ -14,15 +14,18 @@ import { weightedStemHits } from "./wordlists";
 // never import this module: that is the wall that keeps them deterministic.
 export const BATCH_PATTERNS: PatternDef[] = [TRICOLON_PATTERN];
 
-export type ScanResult = {
+export interface ScanResult {
   line: number;
   col: number;
   category: string;
   matched: string;
   message: string;
-};
+}
 
-type Position = { line: number; col: number };
+interface Position {
+  line: number;
+  col: number;
+}
 
 function positionAt(text: string, index: number): Position {
   let line = 1;

@@ -85,12 +85,14 @@ See the "Meaning-Layer Judge" section of [references/methodology.md](references/
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts
 bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts --baseline github-issues.txt --sizes 1 --sizes 2
-bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts --kind docs
+bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts --kind message
 ```
 
 Corpora A and B must match register. Contrasting mismatched genres raises the split-half null floor far above any real term and makes the ranking uninterpretable. Every run prints that floor, which is the z a finding has to clear.
 
-Corpus A holds several genres, sorted by source path into the kinds `--kind` selects: `chat`, `plan`, `memory`, `scratch`, `docs`, and `other`. Only `docs`, the markdown committed to a repository for another reader, has a counterpart in a baseline of PR and issue text. Every run also splits each kind against itself, so the per-kind floors show what a pairing costs: unrestricted, the floor sits at 10.4 against a top score of 16.4, and `--kind docs` drops it to 4.3 against 13.9.
+Corpus A holds several genres, sorted by source pointer into the kinds `--kind` selects: `message`, `plan`, `memory`, `scratch`, `docs`, and `other`. `message` is prose the miner found on a command line rather than in a file (`gh pr create --body`, `git commit -m`), which makes it the same register as a baseline of PR and issue text. `docs` is the prose committed to a repository for another reader. The rest have no counterpart to pair against. `--study-filter` narrows the selected kinds further by a regex over the source.
+
+Every run also splits each kind against itself, so the per-kind floors price the pairing. Unrestricted, the floor sits at 10.4 against a top score of 16.4; `--kind message` drops it to 3.9 against 17.0. Over a single kind the aggregate control would repeat that kind's floor, so it is omitted.
 
 `--json` omits the example sentences the human-readable report already withholds, so no corpus prose reaches a file.
 

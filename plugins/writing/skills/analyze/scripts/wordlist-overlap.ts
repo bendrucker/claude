@@ -211,9 +211,13 @@ export function renderReport(report: OverlapReport): string {
     `  matched by any vocabulary-layer rule    ${summary.lexical} (${pct(summary.lexical, summary.considered)})`,
     `  example sentence trips any rule at all  ${summary.sentence} (${pct(summary.sentence, summary.considered)})`,
     "",
-    `null control (corpus A split in half): max z=${report.nullTop[0]?.z.toFixed(2) ?? "n/a"}, ` +
-      `top terms ${report.nullTop.map((row) => row.term).join(", ")}`,
-    "",
+    ...(report.nullTop.length > 0
+      ? [
+          `null control (corpus A split in half): max z=${report.nullTop[0]?.z.toFixed(2) ?? "n/a"}, ` +
+            `top terms ${report.nullTop.map((row) => row.term).join(", ")}`,
+          "",
+        ]
+      : []),
     "null floor by kind (each kind split against itself)",
     ...report.kindFloors.map(
       (floor) =>
@@ -246,6 +250,9 @@ export function renderReport(report: OverlapReport): string {
 if (import.meta.main) {
   const argv = cli({
     name: "wordlist-overlap",
+    // A mistyped flag would otherwise be ignored, and the report would answer a
+    // different question than the one asked.
+    strictFlags: true,
     help: {
       description:
         "Rank agent-authored prose against the pre-agent voice baseline by log-odds " +
@@ -266,6 +273,10 @@ if (import.meta.main) {
       kind: {
         type: [String],
         description: `Corpus A document kinds to keep. Repeatable. One of ${DOCUMENT_KINDS.join(", ")}.`,
+      },
+      studyFilter: {
+        type: String,
+        description: "Narrow the kinds further to corpus A sources matching this regex",
       },
       sizes: { type: [Number], description: "N-gram sizes. Default: 1 and 2" },
       prior: { type: Number, default: 500, description: "Dirichlet concentration (alpha-0)" },
@@ -298,16 +309,16 @@ if (import.meta.main) {
     }
     return kind;
   });
-  const selected = new Set(kinds);
+  const selected = new Set(kinds.length > 0 ? kinds : DOCUMENT_KINDS);
 
   const [studyAll, ...perRegister] = await Promise.all([
     readCorpus(studyPath),
     ...baselinePaths.map(readCorpus),
   ]);
-  const studyDocs =
-    selected.size === 0
-      ? studyAll
-      : studyAll.filter((doc) => selected.has(documentKind(doc.source)));
+  const filter = argv.flags.studyFilter === undefined ? null : new RegExp(argv.flags.studyFilter);
+  const studyDocs = studyAll.filter(
+    (doc) => selected.has(documentKind(doc.source)) && (filter?.test(doc.source) ?? true),
+  );
   const baselineDocs = perRegister.flat();
 
   // Min-count 1 over sizes 1 through 3 so every curated entry gets a position,
@@ -325,14 +336,16 @@ if (import.meta.main) {
   }));
 
   const nullOptions = { sizes, prior, minCount, minDocs };
-  const [leftDocs, rightDocs] = splitHalves(studyDocs);
+  const kindFloors = nullFloorByKind(studyDocs, nullOptions);
+  // Over a single kind the aggregate control splits the same documents into the
+  // same halves, so it would report that kind's floor a second time.
+  const [leftDocs, rightDocs]: [VoiceDocument[], VoiceDocument[]] =
+    kindFloors.length > 1 ? splitHalves(studyDocs) : [[], []];
   const nullRanked = rank(
     tokenizeCorpus(leftDocs, sizes),
     tokenizeCorpus(rightDocs, sizes),
     nullOptions,
   );
-  const kindFloors = nullFloorByKind(studyDocs, nullOptions);
-  const reportedKinds = kinds.length > 0 ? kinds : [...DOCUMENT_KINDS];
 
   const [plain, weighted] = await Promise.all([
     Promise.all(PLAIN_LISTS.map(readWordlist)),
@@ -347,7 +360,7 @@ if (import.meta.main) {
     const terms = measured.map(({ row: { example, ...row }, coverage }) => ({ row, coverage }));
     process.stdout.write(
       `${JSON.stringify(
-        { kinds: reportedKinds, kindFloors, summary: summarize(measured), recall, terms },
+        { kinds: [...selected], kindFloors, summary: summarize(measured), recall, terms },
         null,
         2,
       )}\n`,
@@ -358,7 +371,7 @@ if (import.meta.main) {
         studyPath,
         studyDocs: studyDocs.length,
         studyTokens: a.tokens,
-        kinds: reportedKinds,
+        kinds: [...selected],
         kindFloors,
         baselineNames,
         baselineDocs: baselineDocs.length,

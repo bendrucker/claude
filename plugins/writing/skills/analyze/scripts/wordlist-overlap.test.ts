@@ -202,7 +202,7 @@ describe("nullFloorByKind", () => {
     ];
     const floors = nullFloorByKind(docs, options);
     expect(floors.map((floor) => [floor.kind, floor.docs])).toEqual([
-      ["chat", 6],
+      ["message", 6],
       ["docs", 4],
     ]);
     for (const floor of floors) expect(Math.abs(floor.maxZ ?? 0)).toBeLessThan(0.5);

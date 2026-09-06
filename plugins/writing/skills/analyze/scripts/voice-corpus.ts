@@ -1,3 +1,5 @@
+import { isProseFile } from "../../../detection/paths";
+
 export interface VoiceDocument {
   source: string;
   meta: string;
@@ -33,15 +35,13 @@ export function parseCorpus(text: string): VoiceDocument[] {
   return docs;
 }
 
-// Corpus A mixes genres the pre-agent baseline has no counterpart for. Ranking
-// a plan file against hand-written PR prose measures the gap between genres
-// rather than between authors, so a contrast pairs one kind against a matching
-// register. The kind falls out of the source pointer: the file the prose was
-// written to, or a session id when it never reached a file.
-export type DocumentKind = "chat" | "plan" | "memory" | "scratch" | "docs" | "other";
+// The genre of a document, read off its source pointer: the file the prose was
+// written to, or a session id when the miner found it on a command line instead
+// (`gh pr create --body`, `git commit -m`), which makes it a message.
+export type DocumentKind = "message" | "plan" | "memory" | "scratch" | "docs" | "other";
 
 export const DOCUMENT_KINDS: readonly DocumentKind[] = [
-  "chat",
+  "message",
   "plan",
   "memory",
   "scratch",
@@ -56,11 +56,11 @@ const SCRATCH_DIR = /(?:^|\/)tmp\//;
 
 export function documentKind(source: string): DocumentKind {
   const path = source.replace(OCCURRENCE_SUFFIX, "");
-  if (!path.includes("/")) return "chat";
+  if (!path.includes("/")) return "message";
   if (path.includes("/.claude/plans/")) return "plan";
   if (path.includes("/memory/")) return "memory";
   if (SCRATCH_DIR.test(path)) return "scratch";
-  if (path.endsWith(".md")) return "docs";
+  if (isProseFile(path)) return "docs";
   return "other";
 }
 
@@ -69,14 +69,7 @@ export function isDocumentKind(value: string): value is DocumentKind {
 }
 
 export function groupByKind(docs: VoiceDocument[]): Map<DocumentKind, VoiceDocument[]> {
-  const groups = new Map<DocumentKind, VoiceDocument[]>();
-  for (const doc of docs) {
-    const kind = documentKind(doc.source);
-    const group = groups.get(kind);
-    if (group === undefined) groups.set(kind, [doc]);
-    else group.push(doc);
-  }
-  return groups;
+  return Map.groupBy(docs, (doc) => documentKind(doc.source));
 }
 
 export function formatDocument(doc: VoiceDocument): string {

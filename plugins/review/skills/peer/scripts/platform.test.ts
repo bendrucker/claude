@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { TuicrComment } from "./comment";
+import type { ReviewComment } from "./comment";
 import { parseDiff } from "./diff";
 import { toGitHubComment, toGitLabPosition, validateInDiff } from "./platform";
 
@@ -27,16 +27,14 @@ index 1111111..2222222 100644
  keep two
  keep three`;
 
-function comment(overrides: Partial<TuicrComment>): TuicrComment {
+function comment(overrides: Partial<ReviewComment>): ReviewComment {
   return {
     id: "c1",
-    location: "user/settings.json:150",
     path: "user/settings.json",
     start_line: null,
     end_line: null,
     side: "new",
     comment_type: "issue",
-    lifecycle_state: "local_draft",
     content: "comment",
     ...overrides,
   };
@@ -117,7 +115,7 @@ index 1111111..2222222 100644
 });
 
 describe("toGitHubComment", () => {
-  test.each<[string, Partial<TuicrComment>, ReturnType<typeof toGitHubComment>]>([
+  test.each<[string, Partial<ReviewComment>, ReturnType<typeof toGitHubComment>]>([
     [
       "maps a new-side comment to RIGHT",
       { start_line: 150, end_line: 150, side: "new" },
@@ -145,7 +143,7 @@ describe("toGitLabPosition", () => {
   test.each<
     [
       string,
-      Partial<TuicrComment>,
+      Partial<ReviewComment>,
       Parameters<typeof toGitLabPosition>[2],
       ReturnType<typeof toGitLabPosition>,
     ]

@@ -4,26 +4,20 @@ export const CommentType = z.enum(["issue", "suggestion", "note", "praise"]);
 export type CommentType = z.infer<typeof CommentType>;
 export const CommentSide = z.enum(["new", "old"]);
 export type CommentSide = z.infer<typeof CommentSide>;
-export const LifecycleState = z.enum(["local_draft", "pushed_draft", "submitted"]);
-export type LifecycleState = z.infer<typeof LifecycleState>;
-
-export const TuicrComment = z.looseObject({
+export const ReviewComment = z.looseObject({
   id: z.string(),
-  location: z.string(),
   path: z.string().nullable(),
   start_line: z.number().nullable(),
   end_line: z.number().nullable(),
   side: CommentSide.nullable(),
   comment_type: CommentType,
-  lifecycle_state: LifecycleState,
-  created_at: z.string().optional(),
   content: z.string(),
 });
-export type TuicrComment = z.infer<typeof TuicrComment>;
+export type ReviewComment = z.infer<typeof ReviewComment>;
 
 const CommentPayload = z.union([
-  z.looseObject({ comments: z.array(TuicrComment) }),
-  z.array(TuicrComment),
+  z.looseObject({ comments: z.array(ReviewComment) }),
+  z.array(ReviewComment),
 ]);
 
 export interface Anchor {
@@ -33,11 +27,10 @@ export interface Anchor {
 }
 
 /**
- * Resolve a comment's anchor from tuicr's `side`/`start_line`/`path` fields.
- * tuicr stamps `side` directly, so trust it; default to the new side when a
- * line-anchored comment omits it.
+ * Resolve a comment's anchor from its `side`/`start_line`/`path` fields.
+ * Default to the new side when a line-anchored comment omits it.
  */
-export function deriveAnchor(comment: TuicrComment): Anchor {
+export function deriveAnchor(comment: ReviewComment): Anchor {
   if (comment.path === null || comment.start_line === null) {
     throw new Error("comment has no anchor");
   }
@@ -49,7 +42,7 @@ export function deriveAnchor(comment: TuicrComment): Anchor {
 }
 
 /** Decode a comments JSON payload, accepting either `{ comments: [...] }` or a bare array. */
-export function decodeComments(raw: string): TuicrComment[] {
+export function decodeComments(raw: string): ReviewComment[] {
   const data = CommentPayload.parse(JSON.parse(raw));
   return Array.isArray(data) ? data : data.comments;
 }

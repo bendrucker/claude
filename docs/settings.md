@@ -55,7 +55,7 @@ The rest are tool caches and state directories holding no credential material:
 
 ## Sockets and Local Binding
 
-`allowUnixSockets` takes local IPC endpoints where secret material never leaves a dedicated agent: signing daemons, and the tmux and herdr sockets. The multiplexer sockets can inject keys into other panes, so they are command execution by another name. Accepted so layout, agent, and notification commands run sandboxed rather than escaped.
+`allowUnixSockets` takes local IPC endpoints where secret material never leaves a dedicated agent: signing daemons, and the herdr socket. The herdr socket can inject keys into other panes, so it is command execution by another name. Accepted so layout and agent commands run sandboxed rather than escaped.
 
 `allowLocalBinding` stays loopback-only.
 

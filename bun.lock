@@ -295,15 +295,6 @@
         "typescript": "^6.0.0",
       },
     },
-    "plugins/tmux": {
-      "name": "@bendrucker/claude-tmux",
-      "dependencies": {
-        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
-        "cleye": "^2.0.0",
-        "table": "^6.9.0",
-        "zod": "^4.4.3",
-      },
-    },
     "plugins/type-ignore": {
       "name": "@bendrucker/type-ignore",
       "dependencies": {
@@ -504,8 +495,6 @@
     "@bendrucker/claude-plan": ["@bendrucker/claude-plan@workspace:plugins/plan"],
 
     "@bendrucker/claude-review": ["@bendrucker/claude-review@workspace:plugins/review"],
-
-    "@bendrucker/claude-tmux": ["@bendrucker/claude-tmux@workspace:plugins/tmux"],
 
     "@bendrucker/claude-validate": ["@bendrucker/claude-validate@workspace:packages/validate"],
 

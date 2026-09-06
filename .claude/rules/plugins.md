@@ -13,7 +13,7 @@ Load the `claude-code:skill` skill when creating or modifying skills.
 
 ## Naming
 
-Commands, agents, and skills auto-namespace with `plugin-name:`, so `ci-monitor.md` in `gitlab` becomes `gitlab:ci-monitor`. An explicit prefix in frontmatter is optional. Anti-stuttering applies after the colon: `gitlab:gitlab-ci` is wrong, `gitlab:ci` is right. A plugin's primary skill may exactly match the plugin name (`writing:writing`, `tmux:tmux`); the form to avoid is the redundant suffix (`writing:writing-analyze`). Run `bun run skill-lint` to catch namespace mismatches and stuttering.
+Commands, agents, and skills auto-namespace with `plugin-name:`, so `ci-monitor.md` in `gitlab` becomes `gitlab:ci-monitor`. An explicit prefix in frontmatter is optional. Anti-stuttering applies after the colon: `gitlab:gitlab-ci` is wrong, `gitlab:ci` is right. A plugin's primary skill may exactly match the plugin name (`writing:writing`, `herdr:herdr`); the form to avoid is the redundant suffix (`writing:writing-analyze`). Run `bun run skill-lint` to catch namespace mismatches and stuttering.
 
 ## MCP Tool Naming
 

@@ -6,8 +6,8 @@
 --   `Operation not permitted` and adjacent Bash failures bucketed into concrete sandbox
 --   config gaps, with recurrence and date span.
 -- description: >-
---   The buckets are worktree writes, tmux sockets, process substitution, mktemp, TLS, and
---   the SSH agent, so each failure class becomes a settings diff. `agent_threads` counts
+--   The buckets are worktree writes, process substitution, mktemp, TLS, and the SSH agent,
+--   so each failure class becomes a settings diff. `agent_threads` counts
 --   distinct (session, agent) contexts while `sessions` counts distinct transcripts.
 --   Subagents stamp their rows with the parent's session id, so one fan-out where every
 --   agent hits the same gap once reads as a single session dominating a category. Rank on
@@ -31,7 +31,6 @@ SELECT
   host,
   CASE
     WHEN error_content LIKE '%/worktrees/agent-%Operation not permitted%' THEN 'worktree-agent-write'
-    WHEN error_content LIKE '%/.tmux/%' THEN 'tmux-socket'
     WHEN error_content LIKE '%/dev/fd/%' THEN 'process-substitution'
     WHEN error_content LIKE '%mktemp%' OR error_content LIKE '%mkstemp%' OR error_content LIKE '%mkdtemp%' THEN 'mktemp'
     WHEN error_content LIKE '%failed to verify certificate%' OR error_content LIKE '%OSStatus -26276%' THEN 'tls-github'

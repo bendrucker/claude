@@ -46,7 +46,7 @@ FLAGS reads `clean` or a comma-joined list, forge state first. `failing:lint,bui
 
 The checkout flags follow. Only `merged` clears a row for cleanup, and every other flag holds it. Three are not self-evident: `carries:N` counts gitignored files a recursive removal would take, `reused` means the `merged#N` beside it belongs to different work under a recycled branch name, and `unreadable` or `unpushed:?` mean git would not report the state at all, which raises the row rather than parking it.
 
-The AGENT column reads `<agent>/<status>`. A `blocked` status is an agent stopped on a prompt, which puts its row in `needs you` whatever else the row carries.
+The AGENT column reads `<agent>/<status>`. A `blocked` status is an agent stopped on a prompt, which puts its row in `needs you` whatever else the row carries. Any other status still means the pane is occupied, and an occupied pane holds its row out of `clean up`. The two resting statuses, `idle` and `done`, differ only in whether the tab has been seen, so an agent between the turns of a running workflow reads idle.
 
 An `incomplete:` line names what the board could not resolve. Retry it: `gh pr list --head <branch>` for the branches it names, `gh pr list` for a `?` PR column. Dispose of nothing the retry also leaves unresolved.
 

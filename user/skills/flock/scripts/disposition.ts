@@ -2,6 +2,7 @@ import {
   branchLabel,
   fit,
   headerRow,
+  heldByAgent,
   renderRows,
   rowCells,
   type BoardPull,
@@ -91,7 +92,12 @@ export function classify(row: BoardRow): Disposition {
   // is the user's to decide yet. A merge happens on the forge instead, and
   // holding it back would hide the one row the sweep exists to raise.
   const disposition = verdict(row);
-  return row.state.working && disposition !== "merge" ? "working" : disposition;
+  if (row.state.working) return disposition === "merge" ? disposition : "working";
+  // A resting agent owns the tree too, and cleanup is the one disposition that
+  // destroys it. Merge keeps its own path: an agent that finished the work
+  // rests in the pane it finished in, so holding merges on an occupied pane
+  // would empty the disposition rather than guard anything.
+  return disposition === "cleanup" && heldByAgent(row) ? "working" : disposition;
 }
 
 const FAILING_SHOWN = 3;

@@ -11,6 +11,7 @@ import {
   deriveFlags,
   filterCarried,
   isConventionalIgnored,
+  isMergedBranch,
   isReusedBranch,
   parseWorktreeList,
   readStatus,
@@ -162,6 +163,29 @@ describe("ageInDays", () => {
     [null, null],
   ])("%s", (commit, expected) => {
     expect(ageInDays(commit, now)).toBe(expected);
+  });
+});
+
+describe("isMergedBranch", () => {
+  // A branch with no commits of its own is an ancestor of the default branch
+  // from the moment it is created, so `git branch --merged` listed a branch
+  // whose work had not started as merged, and the board offered its worktree
+  // for removal with an agent still running in it.
+  test("a branch with no commits of its own has not merged", () => {
+    expect(isMergedBranch(result({ stdout: "" }))).toBe(false);
+    expect(isMergedBranch(result({ stdout: "\n" }))).toBe(false);
+  });
+
+  test.each([
+    ["every commit already carried by the default branch", "- aaa\n- bbb\n", true],
+    ["one commit still out", "- aaa\n+ bbb\n", false],
+    ["nothing carried yet", "+ aaa\n", false],
+  ] as const)("%s", (_name, stdout, expected) => {
+    expect(isMergedBranch(result({ stdout }))).toBe(expected);
+  });
+
+  test("a cherry git would not run claims nothing", () => {
+    expect(isMergedBranch(result({ ok: false, stderr: "unknown revision" }))).toBe(false);
   });
 });
 

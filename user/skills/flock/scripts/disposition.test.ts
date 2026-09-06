@@ -211,6 +211,56 @@ describe("a detached worktree", () => {
   });
 });
 
+describe("an agent resting in the pane", () => {
+  const merged = pull({ state: "merged", ref: "merged#1", checks: "none", mergeState: "unknown" });
+  const held = (agent: string, overrides: Partial<RowState> = {}): BoardRow =>
+    row({ pane: "wC1:p1", agent, pull: merged, state: state(overrides) });
+
+  // The pane holding an agent owns its worktree, and herdr splits one resting
+  // state into idle and done by whether the tab has been seen. An agent
+  // between the turns of a running workflow reads idle, so a cleanup offered
+  // against that row removes the tree the run is working in.
+  test.each<{ name: string; row: BoardRow; expected: Disposition }>([
+    { name: "idle never reads as finished", row: held("claude/idle"), expected: "working" },
+    { name: "done never reads as finished", row: held("claude/done"), expected: "working" },
+    {
+      name: "with a status herdr would not report holds the tree all the same",
+      row: held("claude/?"),
+      expected: "working",
+    },
+    {
+      name: "mid-turn holds the tree",
+      row: held("claude/working", { working: true }),
+      expected: "working",
+    },
+    {
+      name: "stopped on a prompt is the user's to answer",
+      row: held("claude/blocked", { blocked: true }),
+      expected: "needs-you",
+    },
+  ])("$name", ({ row: subject, expected }) => {
+    expect(classify(subject)).toBe(expected);
+  });
+
+  test("a shell sitting in the worktree is a person's prompt, not an agent", () => {
+    expect(classify(held("shell/idle"))).toBe("cleanup");
+  });
+
+  test("a worktree no pane holds is still a cleanup", () => {
+    expect(classify(row({ pull: merged }))).toBe("cleanup");
+  });
+
+  // Merge lands on the forge and leaves the tree alone, and the agent that
+  // finished the work is resting in the pane it finished in, so an occupied
+  // pane holding merges back would empty the disposition.
+  test.each<{ name: string; row: BoardRow; expected: Disposition }>([
+    { name: "resting", row: held("claude/idle", {}), expected: "merge" },
+    { name: "mid-turn", row: held("claude/working", { working: true }), expected: "merge" },
+  ])("a green pull request under an agent $name is still a merge", ({ row: subject, expected }) => {
+    expect(classify({ ...subject, pull: pull() })).toBe(expected);
+  });
+});
+
 describe("an agent holding the worktree", () => {
   test.each<{ name: string; row: BoardRow; expected: Disposition }>([
     {

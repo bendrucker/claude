@@ -29,6 +29,7 @@ import {
   ageInDays,
   carriedIgnoredPaths,
   deriveFlags,
+  isMergedBranch,
   isReusedBranch,
   parseWorktreeList,
   readStatus,
@@ -287,6 +288,7 @@ async function scanWorktree(
   ctx: Context,
   options: {
     readonly path: string;
+    readonly branch: string | null;
     readonly base: string | null;
     readonly commitDate: number | null;
   },
@@ -295,21 +297,31 @@ async function scanWorktree(
   ahead: number | null;
   carried: number;
   commit: number | null;
+  merged: boolean;
 }> {
-  const [status, ahead, carried, detachedDate] = await Promise.all([
+  const [status, ahead, carried, detachedDate, cherry] = await Promise.all([
     ctx.git(["git", "-C", options.path, "status", "--porcelain", "-z", "--ignore-submodules=none"]),
     aheadCount(ctx.git, options.path, options.base),
     carriedIgnoredPaths(ctx.git, options.path),
     options.commitDate === null
       ? ctx.git(["git", "-C", options.path, "log", "-1", "--format=%ct", "HEAD"])
       : Promise.resolve(null),
+    options.branch === null || options.base === null
+      ? Promise.resolve(null)
+      : ctx.git(["git", "-C", options.path, "cherry", `origin/${options.base}`, "HEAD"]),
   ]);
 
   const commit =
     options.commitDate ??
     (detachedDate !== null && detachedDate.ok ? toCount(detachedDate.stdout) : null);
 
-  return { status: readStatus(status), ahead, carried: carried.length, commit };
+  return {
+    status: readStatus(status),
+    ahead,
+    carried: carried.length,
+    commit,
+    merged: cherry !== null && isMergedBranch(cherry),
+  };
 }
 
 async function scanRepository(ctx: Context, repository: Repository): Promise<RepoScan> {
@@ -340,26 +352,6 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
     warnings.push(`${target}: worktrees could not be listed, so none of its rows appear below`);
   }
 
-  const mergedBranches =
-    base === null
-      ? new Set<string>()
-      : new Set(
-          (
-            await ctx.git([
-              "git",
-              "-C",
-              root,
-              "branch",
-              "--format=%(refname:short)",
-              "--merged",
-              `origin/${base}`,
-            ])
-          ).stdout
-            .split("\n")
-            .map((line) => line.trim())
-            .filter((line) => line !== ""),
-        );
-
   const commitDates = branchCommitDates(refs.stdout);
   const pulls = joinPullRequests(forge.listing.open ?? [], forge.listing.merged ?? []);
 
@@ -375,17 +367,21 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
   const scanned = await Promise.all(
     records.map(async (record) => {
       const commitDate = record.branch === null ? null : (commitDates.get(record.branch) ?? null);
-      const scan = await scanWorktree(ctx, { path: record.path, base, commitDate });
+      const scan = await scanWorktree(ctx, {
+        path: record.path,
+        branch: record.branch,
+        base,
+        commitDate,
+      });
 
       const pull = record.branch === null ? undefined : pulls.get(record.branch);
-      const merged = record.branch !== null && mergedBranches.has(record.branch);
       const reused = isReusedBranch(pull, scan.commit);
       const flags = deriveFlags({
         detached: record.branch === null,
         status: scan.status,
         ahead: scan.ahead,
         carried: scan.carried,
-        merged,
+        merged: scan.merged,
         reused,
         pull: pull === undefined ? [] : pullFlags(pull),
       });
@@ -426,7 +422,7 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
           status: scan.status,
           unpushed: scan.ahead,
           carried: scan.carried,
-          mergedBranch: merged,
+          mergedBranch: scan.merged,
           reused,
         },
         // A pane can claim this worktree only once every repository has been

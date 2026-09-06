@@ -59,7 +59,7 @@ Everything is optional and forwards to the script.
 - `--agentic`: review from a disposable checkout with tools instead of from inlined text. It is one capped session and refuses `--angles` above 1. See [Agentic Mode](#agentic-mode).
 - `--status`: print the tier and bands, spend nothing.
 - `--dry-run`: print the assembled prompts and their size, spend nothing.
-- `--max-bytes <n>`: raise or lower the 120 KB prompt cap. The 400 KB ceiling still refuses.
+- `--max-bytes <n>`: raise or lower the 120 KB prompt cap.
 - `--force`: run even when a prompt exceeds the size cap.
 
 ## Run It
@@ -125,7 +125,7 @@ The sandbox blocks Copilot writing to `~/.copilot`, which kills the run with `I/
 
 #### Prompt Size
 
-The prompt travels as an argv value. That bounds it by `ARG_MAX` as well as by cost. The 120 KB cap sits well under both, and `--max-bytes` moves it. A second ceiling at 400 KB refuses even under `--force`, because past that the spawn fails with `E2BIG` and no review runs at all.
+The prompt travels on stdin. Omitting `-p` is what selects that: Copilot reads stdin as the prompt and stays in the same non-interactive mode, so `ARG_MAX` does not bound it. The 120 KB cap is a spend guard rather than a size ceiling. `--max-bytes` moves it, and `--force` runs past it.
 
 #### What Reaches GitHub
 

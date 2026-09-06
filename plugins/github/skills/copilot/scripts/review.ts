@@ -37,13 +37,9 @@ const DEGRADE_BELOW = 150;
 // The plan grants 1500/month and resets on the 1st, so this is the nominal daily allowance that `pace` is judged against.
 const NOMINAL_DAILY = 1500 / 31;
 
-// Copilot takes the prompt as an argv value, so the cap has to stay clear of ARG_MAX
-// as well as of the plan's credit budget. The budget is the tighter of the two.
+// The prompt reaches Copilot on stdin, so the only thing this cap governs is spend: a bigger
+// prompt is more input tokens against a fixed plan budget. --force is what lifts it.
 const DEFAULT_MAX_BYTES = 120_000;
-
-// --force lifts the budget guard, not the operating-system one. Past this the spawn fails
-// with E2BIG and no review runs at all, so refuse with an explanation instead.
-const ABSOLUTE_MAX_BYTES = 400_000;
 
 const DIM = "\x1b[2m";
 const RED = "\x1b[31m";
@@ -474,11 +470,14 @@ interface RunOptions {
  * --no-custom-instructions keeps the repo's own instructions out of the review, and memory
  * is off in prompt mode, so a shared home carries session history and nothing else.
  *
+ * No -p: omitting it is what makes Copilot read the prompt from stdin, which is the same
+ * non-interactive mode with no ceiling on how much prompt fits.
+ *
  * A one-shot run enables no tools and sits outside the repo, so it is one turn against
  * inlined text and Copilot never fans out. An agentic run trades that for a capped session
  * inside a throwaway checkout.
  */
-export function copilotArgs(prompt: string, options: RunOptions): string[] {
+export function copilotArgs(options: RunOptions): string[] {
   return [
     "copilot",
     "--model",
@@ -491,20 +490,33 @@ export function copilotArgs(prompt: string, options: RunOptions): string[] {
     "--no-ask-user",
     "--no-custom-instructions",
     ...(options.agentic ? AGENTIC_TOOL_ARGS : []),
-    "-p",
-    prompt,
   ];
 }
 
-async function runCopilot(prompt: string, angle: Angle, options: RunOptions): Promise<Result> {
-  const args = copilotArgs(prompt, options);
+export interface Spawned {
+  stdout: ReadableStream<Uint8Array>;
+  stderr: ReadableStream<Uint8Array>;
+  exited: Promise<number>;
+}
 
-  const child = Bun.spawn(args, {
-    cwd: options.cwd,
+export type Spawn = (args: string[], stdin: Uint8Array, cwd: string) => Spawned;
+
+const spawnCopilot: Spawn = (args, stdin, cwd) =>
+  Bun.spawn(args, {
+    cwd,
     env: { ...process.env, HOME: COPILOT_HOME },
+    stdin,
     stdout: "pipe",
     stderr: "pipe",
   });
+
+export async function runCopilot(
+  prompt: string,
+  angle: Angle,
+  options: RunOptions,
+  spawn: Spawn = spawnCopilot,
+): Promise<Result> {
+  const child = spawn(copilotArgs(options), Buffer.from(prompt, "utf8"), options.cwd);
 
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(child.stdout).text(),
@@ -782,15 +794,6 @@ async function main(): Promise<void> {
       console.log(prompt);
     }
     return;
-  }
-
-  if (largest > ABSOLUTE_MAX_BYTES) {
-    console.error("");
-    console.error(
-      `${RED}Refusing: largest prompt is ${largest.toLocaleString()} bytes, past the ${ABSOLUTE_MAX_BYTES.toLocaleString()} argv ceiling that --force cannot lift.${RESET}`,
-    );
-    console.error(`${YELLOW}Narrow the diff with --base.${RESET}`);
-    process.exit(1);
   }
 
   if (largest > maxBytes && !argv.flags.force) {

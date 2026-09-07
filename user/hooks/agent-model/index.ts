@@ -56,9 +56,7 @@ export function spawnNeedsModel(toolInput: unknown): boolean {
   return agent.subagent_type === undefined || UNPINNED_TYPES.has(agent.subagent_type);
 }
 
-// The settings `env` block reaches the hook process, so the model a bare spawn
-// falls to is read here rather than assumed. Unset and `inherit` both mean the
-// parent's model.
+// Unset and `inherit` both mean the parent's model.
 export function subagentDefault(
   env: Record<string, string | undefined> = process.env,
 ): ModelFamily | null {
@@ -78,10 +76,8 @@ export function warning(family: ModelFamily, fromDefault: boolean): string {
   ].join("\n\n");
 }
 
-// The tool input decides first so a spawn that already names a model or a
-// pinned type costs no transcript read. That is most of them. A settings
-// default decides next, so the transcript is read only for a spawn that would
-// inherit.
+// Tool input first, then the settings default, so the transcript is read only
+// for a spawn that would inherit.
 export async function decide(
   input: HookInput,
   resolveFamily: () => Promise<ModelFamily | null>,

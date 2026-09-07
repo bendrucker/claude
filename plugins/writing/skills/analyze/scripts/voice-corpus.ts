@@ -72,6 +72,16 @@ export function groupByKind(docs: VoiceDocument[]): Map<DocumentKind, VoiceDocum
   return Map.groupBy(docs, (doc) => documentKind(doc.source));
 }
 
+// Alternate rather than cut, so both halves draw on the same sessions and dates.
+export function splitHalves<T>(items: T[]): [T[], T[]] {
+  const left: T[] = [];
+  const right: T[] = [];
+  for (const [index, item] of items.entries()) {
+    (index % 2 === 0 ? left : right).push(item);
+  }
+  return [left, right];
+}
+
 export function formatDocument(doc: VoiceDocument): string {
   return `===== ${doc.source} (${doc.meta}) =====\n${doc.body.trim()}\n`;
 }

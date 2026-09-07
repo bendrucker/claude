@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { rank, type RankedTerm, tokenizeCorpus } from "./fightin-words";
-import type { VoiceDocument } from "./voice-corpus";
+import { splitHalves, type VoiceDocument } from "./voice-corpus";
 import {
   coverageOf,
   curatedEntries,
@@ -8,7 +8,6 @@ import {
   nullFloorByKind,
   recallOfCuratedEntries,
   renderReport,
-  splitHalves,
   summarize,
 } from "./wordlist-overlap";
 
@@ -159,17 +158,7 @@ describe("recallOfCuratedEntries", () => {
   });
 });
 
-describe("splitHalves", () => {
-  test("alternates documents so both halves span the corpus", () => {
-    const [left, right] = splitHalves(["a", "b", "c", "d", "e"].map(makeDoc));
-    expect(left.map((doc) => doc.source)).toEqual(["a", "c", "e"]);
-    expect(right.map((doc) => doc.source)).toEqual(["b", "d"]);
-  });
-
-  test("an empty corpus splits into two empty halves", () => {
-    expect(splitHalves([])).toEqual([[], []]);
-  });
-
+describe("null control", () => {
   test("a homogeneous corpus contrasted with itself stays near zero", () => {
     const docs = Array.from({ length: 200 }, (_, index) => ({
       source: `doc-${index}`,

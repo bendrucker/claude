@@ -96,6 +96,19 @@ Every run also splits each kind against itself, so the per-kind floors price the
 
 `--json` omits the example sentences the human-readable report already withholds, so no corpus prose reaches a file.
 
+## Authorship Distance
+
+`burrows-delta.ts` scores agent-authored prose against the voice baseline by Burrows's Delta, the mean absolute difference of standardized frequencies over the most frequent words of the reference corpus. Burrows, "'Delta': a Measure of Stylistic Difference and a Guide to Likely Authorship", Literary and Linguistic Computing 17(3), 267-287 (2002).
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/burrows-delta.ts --kind message
+bun ${CLAUDE_SKILL_DIR}/scripts/burrows-delta.ts --kind message --bin-words 2000 --words 300
+```
+
+Baseline documents run 40 to 200 words, where a single word's rate is mostly sampling noise, so whole documents pool in corpus order into bins of `--bin-words` and the bin is the unit scored. Below 1,000 words the reference spread swamps the signal: separation falls from every bin clearing the floor to 18% at 500. Half the reference fits the word set and the standardizer, and the other half is scored to give the floor.
+
+The drift table carries the finding. Every register under the voice baseline is the same author, so the ones not spent on the reference are scored as controls, and they land where agent prose lands: agent commit messages sit 1.08 from the PR centroid against a 0.84 floor, while the author's own high-school essays sit at 1.16. Magnitude alone therefore cannot separate a different author from a different register. The signed per-word drift can: `to`, `be`, and `this` fall and `its`, `the`, and `and` rise across all four agent kinds, while the author's own registers move on `you`, `i`, `should`, and `would`.
+
 ## Hook Health
 
 The PreToolUse dispatcher (`hooks/pretooluse.ts`) appends one JSONL line per run to `~/.claude/writing-hooks/log.jsonl` (controlled by `WRITING_HOOKS_LOG`, see the plugin README). That log is the runtime half of this skill's audit: the wordlist analysis judges rule precision from session history, and the health check judges hook behavior from what the dispatcher actually did.

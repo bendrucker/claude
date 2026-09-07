@@ -8,6 +8,7 @@ import {
   mergeDocuments,
   parseCorpus,
   serializeCorpus,
+  splitHalves,
   type VoiceDocument,
 } from "./voice-corpus";
 
@@ -112,6 +113,29 @@ describe("isDocumentKind", () => {
     ["prose", false],
   ])("%s is a kind: %p", (value, expected) => {
     expect(isDocumentKind(value)).toBe(expected);
+  });
+});
+
+describe("splitHalves", () => {
+  test("alternates items so both halves span the corpus", () => {
+    expect(splitHalves(["a", "b", "c", "d", "e"])).toEqual([
+      ["a", "c", "e"],
+      ["b", "d"],
+    ]);
+  });
+
+  test("an empty corpus splits into two empty halves", () => {
+    expect(splitHalves([])).toEqual([[], []]);
+  });
+
+  test("both halves together are the whole corpus", () => {
+    fc.assert(
+      fc.property(fc.array(fc.integer()), (items) => {
+        const [left, right] = splitHalves(items);
+        const byValue = (x: number, y: number) => x - y;
+        expect([...left, ...right].toSorted(byValue)).toEqual(items.toSorted(byValue));
+      }),
+    );
   });
 });
 

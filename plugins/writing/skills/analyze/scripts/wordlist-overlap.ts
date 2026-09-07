@@ -26,6 +26,7 @@ import {
   groupByKind,
   isDocumentKind,
   parseCorpus,
+  splitHalves,
   type VoiceDocument,
 } from "./voice-corpus";
 
@@ -130,18 +131,8 @@ export function curatedEntries(plain: string[], weighted: string[]): string[] {
 const PLAIN_LISTS = ["vocabulary.txt", "flowery-phrases.txt", "openers.txt"];
 const WEIGHTED_LISTS = ["marketing-verbs.txt", "soft-phrasing.txt"];
 
-// Alternate documents so both halves draw on the same sessions and dates.
-// Contrasting them gives the null: the largest z reachable with no difference to
-// find, which is the floor a real term has to clear.
-export function splitHalves(docs: VoiceDocument[]): [VoiceDocument[], VoiceDocument[]] {
-  const left: VoiceDocument[] = [];
-  const right: VoiceDocument[] = [];
-  for (const [index, doc] of docs.entries()) {
-    (index % 2 === 0 ? left : right).push(doc);
-  }
-  return [left, right];
-}
-
+// Contrasting a corpus with itself gives the null: the largest z reachable with
+// no difference to find, which is the floor a real term has to clear.
 export interface KindFloor {
   kind: DocumentKind;
   docs: number;

@@ -17,6 +17,12 @@ export const RunLogEntry = z.object({
   outcome: RunOutcome,
   category: z.string().optional(),
   suppressed: z.boolean().optional(),
+  // Hashed file path, so repeated writes to one file correlate without the
+  // path itself landing in a log a report may quote.
+  target: z.string().optional(),
+  // Every category the checkers found this run, not only the tier winner.
+  // Absent when the run returned before the checkers ran.
+  categories: z.array(z.string()).optional(),
 });
 export type RunLogEntry = z.infer<typeof RunLogEntry>;
 

@@ -9,6 +9,10 @@ export interface CategoryHealth {
   fired: number;
   suppressed: number;
   share: number;
+  /** Shown findings followed by another checked run on the same file. */
+  revisited: number;
+  /** Revisited findings the later run no longer raised. */
+  accepted: number;
 }
 
 export interface HookHealth {
@@ -43,6 +47,49 @@ function percentile(sorted: number[], p: number): number {
 }
 
 const INJECTION_OUTCOMES = new Set<RunOutcome>(["context", "ask", "deny"]);
+
+export interface Acceptance {
+  revisited: number;
+  accepted: number;
+}
+
+// A fire count says how loud a rule is, not whether it was right. Pairing each
+// shown finding with the next checked run on the same file answers the second
+// question from ordinary use: a rule missing from that later run's `categories`
+// was acted on, one still present was written past. A suppressed finding was
+// never shown, so it seeds no pair, and a run that returned before the checkers
+// ran carries no `categories` and closes none.
+export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
+  const byTarget = new Map<string, RunLogEntry[]>();
+  for (const entry of entries) {
+    if (entry.target == null || entry.target === "") continue;
+    const key = `${entry.session_id}\u0000${entry.target}`;
+    const group = byTarget.get(key) ?? [];
+    group.push(entry);
+    byTarget.set(key, group);
+  }
+
+  const counts = new Map<string, Acceptance>();
+  for (const group of byTarget.values()) {
+    const ordered = group.toSorted((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+    for (const [index, entry] of ordered.entries()) {
+      const { category } = entry;
+      if (category == null || category === "") continue;
+      if (entry.suppressed === true || !INJECTION_OUTCOMES.has(entry.outcome)) continue;
+      const later = ordered.slice(index + 1).find((next) => next.categories != null);
+      if (later?.categories == null) continue;
+      const bucket = counts.get(category) ?? { revisited: 0, accepted: 0 };
+      bucket.revisited += 1;
+      if (!later.categories.includes(category)) bucket.accepted += 1;
+      counts.set(category, bucket);
+    }
+  }
+  return counts;
+}
+
+export function acceptRate(cat: CategoryHealth): number | null {
+  return cat.revisited > 0 ? cat.accepted / cat.revisited : null;
+}
 
 export function summarize(entries: RunLogEntry[]): HookHealth {
   const byOutcome: Record<RunOutcome, number> = {
@@ -89,12 +136,15 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
   durations.sort((a, b) => a - b);
   silentDurations.sort((a, b) => a - b);
 
+  const accepts = acceptance(entries);
   const categories = [...perCategory.entries()]
     .map(([category, counts]) => ({
       category,
       fired: counts.fired,
       suppressed: counts.suppressed,
       share: injections > 0 ? counts.fired / injections : 0,
+      revisited: accepts.get(category)?.revisited ?? 0,
+      accepted: accepts.get(category)?.accepted ?? 0,
     }))
     .toSorted((a, b) => (b.fired === a.fired ? b.suppressed - a.suppressed : b.fired - a.fired));
 
@@ -121,6 +171,8 @@ const DOMINANT_SHARE = 0.25;
 const MIN_FIRES_FOR_SUPPRESSION_SIGNAL = 5;
 const SILENT_P95_BUDGET_MS = 100;
 const SCRATCH_SHARE_CEILING = 0.6;
+const MIN_REVISITS = 20;
+const LOW_ACCEPT_RATE = 0.5;
 
 // Each opportunity names a concrete fix, mirroring the curation principle:
 // the log exists so audits read over/under-firing directly instead of
@@ -139,6 +191,12 @@ export function opportunities(health: HookHealth): string[] {
     if (cat.share >= DOMINANT_SHARE) {
       found.push(
         `"${cat.category}" is ${Math.round(cat.share * 100)}% of injections. Audit its precision: sample recent firings from session history and demote, narrow, or retire the rule if hits are unactionable.`,
+      );
+    }
+    const rate = acceptRate(cat);
+    if (cat.revisited >= MIN_REVISITS && rate !== null && rate < LOW_ACCEPT_RATE) {
+      found.push(
+        `"${cat.category}" was acted on after ${cat.accepted} of ${cat.revisited} shown findings. Sample those runs: prose the author rewrote past is prose the rule read wrong.`,
       );
     }
     if (cat.fired >= MIN_FIRES_FOR_SUPPRESSION_SIGNAL && cat.suppressed >= cat.fired) {
@@ -165,6 +223,14 @@ export function opportunities(health: HookHealth): string[] {
     found.push(
       `${Math.round(scratchShare * 100)}% of runs are skipped-scratch. Verify the scratch heuristic is not swallowing durable prose (check recent Write paths in session history against isScratchPath).`,
     );
+  }
+
+  const revisited = health.categories.reduce((sum, cat) => sum + cat.revisited, 0);
+  if (revisited < MIN_REVISITS) {
+    found.push(
+      `Acceptance is not measurable yet (${revisited} shown findings revisited, ${MIN_REVISITS} needed). Until it is, the fired column is a flag count and says nothing about whether a rule is right. Keep the log on.`,
+    );
+    return found;
   }
 
   if (found.length === 0) {
@@ -212,13 +278,17 @@ export function renderReport(health: HookHealth): string {
   if (health.categories.length > 0) {
     lines.push(
       table([
-        ["category", "fired", "suppressed", "share of injections"],
-        ...health.categories.map((cat) => [
-          cat.category,
-          String(cat.fired),
-          String(cat.suppressed),
-          formatShare(cat.share),
-        ]),
+        ["category", "fired", "suppressed", "share of injections", "acted on"],
+        ...health.categories.map((cat) => {
+          const rate = acceptRate(cat);
+          return [
+            cat.category,
+            String(cat.fired),
+            String(cat.suppressed),
+            formatShare(cat.share),
+            rate === null ? "n/a" : `${cat.accepted}/${cat.revisited} ${formatShare(rate)}`,
+          ];
+        }),
       ]),
     );
   }

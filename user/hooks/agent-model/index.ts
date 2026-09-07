@@ -71,7 +71,7 @@ export function warning(family: ModelFamily, fromDefault: boolean): string {
     : `inherits the parent's ${family}`;
   return [
     `This Agent spawn sets no \`model\` and no \`subagent_type\` that pins one, so it ${resolution} and bills the whole subagent at ${family} rates.`,
-    "CLAUDE.md: pick a spawn's `subagent_type` before its `model`, and pass an explicit cheap `model` when the type names none.",
+    "CLAUDE.md: pick a spawn's `subagent_type` before its `model`, and pass an explicit cheap `model` for a type without one.",
     'Either set `subagent_type` to `analyst` (read-only research, search, judging) or another type whose `bun run inventory agents` row names a model, or pass `model: "haiku"` or `model: "sonnet"`.',
   ].join("\n\n");
 }

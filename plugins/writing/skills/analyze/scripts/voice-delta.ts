@@ -123,19 +123,6 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
     },
   },
   {
-    id: "causal_language_rate",
-    label: "Causal language (since/because per 1k)",
-    provenance: "skill-encouraged",
-    source:
-      'SKILL.md Voice: "State the mechanism first, then the motivation" and "Hedge and name rejected alternatives honestly"',
-    compute: (text) => {
-      const stripped = stripCode(text);
-      const words = strippedWordCount(stripped);
-      const matches = stripped.match(/\b(since|because)\b/gi) ?? [];
-      return per1k(matches.length, words);
-    },
-  },
-  {
     id: "body_length",
     label: "Body length (words)",
     provenance: "skill-encouraged",
@@ -171,33 +158,6 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
         : (lengths[mid] ?? 0);
     },
     format: (rate) => rate.toFixed(1),
-  },
-  {
-    id: "p90_sentence_length",
-    label: "Sentence length p90 (words)",
-    provenance: "ungoverned",
-    source: "no skill text",
-    compute: (text) => {
-      const stripped = stripCode(text);
-      const sentences = sentenceSplit(stripped);
-      if (sentences.length === 0) return 0;
-      const lengths = sentences.map((s) => wordCount(s)).toSorted((a, b) => a - b);
-      const idx = Math.floor(lengths.length * 0.9);
-      return lengths[Math.min(idx, lengths.length - 1)] ?? 0;
-    },
-    format: (rate) => rate.toFixed(1),
-  },
-  {
-    id: "question_mark_rate",
-    label: "Question marks (per 1k words)",
-    provenance: "ungoverned",
-    source: "no skill text",
-    compute: (text) => {
-      const stripped = stripCode(text);
-      const words = strippedWordCount(stripped);
-      const qmarks = (stripped.match(/\?/g) ?? []).length;
-      return per1k(qmarks, words);
-    },
   },
   {
     id: "template_presence",

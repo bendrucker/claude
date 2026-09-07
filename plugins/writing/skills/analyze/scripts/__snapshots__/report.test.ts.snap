@@ -30,12 +30,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |
@@ -139,12 +136,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |
@@ -265,12 +259,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |
@@ -376,12 +367,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |
@@ -494,12 +482,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |
@@ -611,12 +596,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |
@@ -730,12 +712,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |
@@ -851,12 +830,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |
@@ -974,12 +950,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |
@@ -1086,12 +1059,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 3.20 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |
@@ -1195,12 +1165,9 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | feature | provenance | corpus rate | baseline rate | delta |
 | --- | --- | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 3.20 | 9.50 | -6.30 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 | (no baseline stat) | - |
 | Body length (words) | skill-encouraged | 0 | (no baseline stat) | - |
 | URL cross-references (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
 | Sentence length median (words) | ungoverned | 0.0 | (no baseline stat) | - |
-| Sentence length p90 (words) | ungoverned | 0.0 | (no baseline stat) | - |
-| Question marks (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% | 10% | -10.0pp |
 | Unique heading texts (count) | skill-prescribed | 0 | (no baseline stat) | - |
 | Has any heading (fraction of documents) | skill-prescribed | 0% | (no baseline stat) | - |
@@ -1304,12 +1271,9 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | feature | provenance | corpus rate | baseline rate | delta |
 | --- | --- | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 | 9.50 | -9.50 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 | (no baseline stat) | - |
 | Body length (words) | skill-encouraged | 0 | (no baseline stat) | - |
 | URL cross-references (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
 | Sentence length median (words) | ungoverned | 0.0 | (no baseline stat) | - |
-| Sentence length p90 (words) | ungoverned | 0.0 | (no baseline stat) | - |
-| Question marks (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 60% | 10% | +50.0pp |
 | Unique heading texts (count) | skill-prescribed | 0 | (no baseline stat) | - |
 | Has any heading (fraction of documents) | skill-prescribed | 0% | (no baseline stat) | - |
@@ -1413,12 +1377,9 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | feature | provenance | corpus rate | baseline rate | delta |
 | --- | --- | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 | 9.50 | -9.50 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 | (no baseline stat) | - |
 | Body length (words) | skill-encouraged | 0 | (no baseline stat) | - |
 | URL cross-references (per 1k words) | ungoverned | 2.50 | (no baseline stat) | - |
 | Sentence length median (words) | ungoverned | 0.0 | (no baseline stat) | - |
-| Sentence length p90 (words) | ungoverned | 0.0 | (no baseline stat) | - |
-| Question marks (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% | 10% | -10.0pp |
 | Unique heading texts (count) | skill-prescribed | 0 | (no baseline stat) | - |
 | Has any heading (fraction of documents) | skill-prescribed | 0% | (no baseline stat) | - |
@@ -1522,12 +1483,9 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | feature | provenance | corpus rate | baseline rate | delta |
 | --- | --- | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 | 9.50 | -9.50 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 | (no baseline stat) | - |
 | Body length (words) | skill-encouraged | 0 | (no baseline stat) | - |
 | URL cross-references (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
 | Sentence length median (words) | ungoverned | 0.0 | (no baseline stat) | - |
-| Sentence length p90 (words) | ungoverned | 0.0 | (no baseline stat) | - |
-| Question marks (per 1k words) | ungoverned | 0.00 | (no baseline stat) | - |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% | 10% | -10.0pp |
 | Unique heading texts (count) | skill-prescribed | 0 | (no baseline stat) | - |
 | Has any heading (fraction of documents) | skill-prescribed | 0% | (no baseline stat) | - |
@@ -1631,12 +1589,9 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | feature | provenance | corpus rate |
 | --- | --- | --- |
 | First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Causal language (since/because per 1k) | skill-encouraged | 0.00 |
 | Body length (words) | skill-encouraged | 0 |
 | URL cross-references (per 1k words) | ungoverned | 0.00 |
 | Sentence length median (words) | ungoverned | 0.0 |
-| Sentence length p90 (words) | ungoverned | 0.0 |
-| Question marks (per 1k words) | ungoverned | 0.00 |
 | Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
 | Unique heading texts (count) | skill-prescribed | 0 |
 | Has any heading (fraction of documents) | skill-prescribed | 0% |

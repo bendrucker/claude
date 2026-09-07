@@ -152,6 +152,20 @@ Register is not the explanation. Contrasting the human PR baseline against the h
 
 The `compromise` tagger runs per sentence and dominates the runtime, so sentences are tagged once and the cached tags serve both the ranking and the null. Tagging the unrestricted corpus costs about 75 seconds against roughly 5 seconds for `--kind message`.
 
+## Rate Feature Floors
+
+`rate-nulls.ts` measures each `voice-delta.ts` rate feature against a permutation null. Every feature reports a gap between the agent corpus mean and the baseline mean, and until this layer nothing said how large a gap the baseline reaches against itself.
+
+The baseline is shuffled and split into equal halves `--splits` times, and each feature's absolute between-half gap is recorded. The floor is the `--percentile` value of that distribution. This differs from the word and tag layers, which take one deterministic split and so read a single draw from the null-maximum distribution. Here the draws are cheap, because feature rates are computed once per document and each split only averages over index lists, so hundreds or thousands of splits cost about what one does. The word and tag layers should adopt the same shape.
+
+Splits drop the odd document so both halves are the same size. An unequal split would give the smaller half more spread and inflate the floor.
+
+Thirteen of the sixteen features clear their floor on the full corpus. Below it, held across seeds 1, 2, 3, 7 and 42 at 2,000 splits: `causal_language_rate` (0.94x its floor), `question_mark_rate` (0.97x) and `p90_sentence_length` (0.67x). All three were deleted. Two survivors clear thinly and should be re-checked as the baseline grows: `median_sentence_length` at 1.27x and `action_verb_opener_rate` at 1.56x.
+
+Per-kind runs are a sensitivity check, not the deciding measurement, because each kind contrasts a different register against the same PR and issue baseline. They agree on the deletions: `question_mark_rate` falls below its floor in five of six kinds and `causal_language_rate` in four. They also show that `template_presence` clears the full corpus at 5.95x while falling below its floor within `plan`, `memory` and `docs`, which is register sensitivity rather than noise, so it stays.
+
+A baseline of fewer than four documents cannot be split into halves that say anything about spread, so those features are reported unfloored and stay, with the reason printed. A `--kind` selection matching no corpus A document is refused rather than reported: every gap would equal the baseline mean, and a fabricated gap reads as signal.
+
 ## Rule Health Table
 
 Each rule is labeled in the **type** column by how the hook enforces it:

@@ -31,11 +31,7 @@ describe("VOICE_DELTA_FEATURES", () => {
       VOICE_DELTA_FEATURES.filter((f) => f.provenance === p)
         .map((f) => f.id)
         .toSorted();
-    expect(byProvenance("skill-encouraged")).toEqual([
-      "body_length",
-      "causal_language_rate",
-      "first_person_rate",
-    ]);
+    expect(byProvenance("skill-encouraged")).toEqual(["body_length", "first_person_rate"]);
     expect(byProvenance("skill-prescribed")).toEqual([
       "action_verb_opener_rate",
       "backtick_density",
@@ -48,8 +44,6 @@ describe("VOICE_DELTA_FEATURES", () => {
       "consequence_chain_rate",
       "median_sentence_length",
       "negative_contrast_rate",
-      "p90_sentence_length",
-      "question_mark_rate",
       "subordinate_coordinate_ratio",
       "url_rate",
     ]);
@@ -78,16 +72,6 @@ describe("first_person_rate", () => {
   });
 });
 
-describe("causal_language_rate", () => {
-  const compute = feature("causal_language_rate").compute;
-
-  test("counts since and because case-insensitively", () => {
-    // 14 words, 2 causal hits.
-    const text = "It failed because the lock timed out. Since retries masked it, I removed them.";
-    expect(compute(text)).toBeCloseTo((2 / 14) * 1000, 5);
-  });
-});
-
 describe("body_length", () => {
   const compute = feature("body_length").compute;
 
@@ -110,28 +94,17 @@ describe("url_rate", () => {
   });
 });
 
-describe("sentence length features", () => {
-  const text = "One two three. One two three four five. One two three four five six seven.";
+describe("median_sentence_length", () => {
+  const compute = feature("median_sentence_length").compute;
 
   test("median over sentence word counts", () => {
-    expect(feature("median_sentence_length").compute(text)).toBe(5);
+    expect(
+      compute("One two three. One two three four five. One two three four five six seven."),
+    ).toBe(5);
   });
 
-  test("p90 over sentence word counts", () => {
-    expect(feature("p90_sentence_length").compute(text)).toBe(7);
-  });
-
-  test("both return 0 for empty input", () => {
-    expect(feature("median_sentence_length").compute("")).toBe(0);
-    expect(feature("p90_sentence_length").compute("")).toBe(0);
-  });
-});
-
-describe("question_mark_rate", () => {
-  test("counts question marks per 1k words", () => {
-    // 5 words, 1 question mark.
-    const rate = feature("question_mark_rate").compute("Does this hold? It does.");
-    expect(rate).toBeCloseTo((1 / 5) * 1000, 5);
+  test("returns 0 for empty input", () => {
+    expect(compute("")).toBe(0);
   });
 });
 

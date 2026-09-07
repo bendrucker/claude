@@ -116,6 +116,16 @@
             "async": true
           }
         ]
+      },
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "async": true,
+            "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
+            "type": "command"
+          }
+        ]
       }
     ],
     "PermissionDenied": [

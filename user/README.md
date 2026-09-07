@@ -2,7 +2,7 @@
 
 This directory contains user-level Claude Code configuration, symlinked to `~/.claude/`.
 
-Run `scripts/install.sh` to create the symlinks.
+The [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in dotfiles creates the symlinks.
 
 ## Contents
 
@@ -13,12 +13,13 @@ Run `scripts/install.sh` to create the symlinks.
   - `webfetch-block/` - Steers WebFetch calls toward better tools
   - `session-limit/` - Warns when a session approaches its limit
   - `permission-denied/` - Logs auto mode classifier denials so the `autoMode` rules stay measurable
-  - `herdr-agent-state.sh` - Reports session state to herdr, vendored from `herdr integration install claude`
+  - `agent-model/` - Warns when an `Agent` spawn would silently inherit an expensive model
+  - `herdr-agent-state.sh` - Reports session identity to herdr
 
-## Vendored Hooks
+## Vendored Hook
 
-`hooks/herdr-agent-state.sh` originates from herdr's integration installer, which writes it to `~/.claude/hooks/`. Because that path is this directory through the symlink, the installed copy and the committed copy are the same file, and the committed copy is what every machine gets.
+`hooks/herdr-agent-state.sh` is herdr's file. Its installer writes it to `~/.claude/hooks/`, which is this directory through the symlink, and bumps `HERDR_INTEGRATION_VERSION` inside it when the contents change. The path is gitignored so the installer's write never dirties the deployed clone. The nightly `claude-upgrade` in dotfiles reruns the installer after each sync, so the deployed copy always matches the installed herdr. A fresh clone has no script until that runs.
 
-Keep it byte-identical to what the installer writes, header comments included. herdr owns the contents and bumps `HERDR_INTEGRATION_VERSION` when it changes them, so a herdr upgrade means rerunning `herdr integration install claude` and committing the resulting diff. Discard the installer's `settings.json` edits when you do: it cannot recognize the committed `$HOME`-form hook entry as its own, so it re-sorts the file and appends a duplicate absolute-path entry.
+The `SessionStart` entry that runs it is committed in `settings.json` in `$HOME` form. herdr's installer matches its own entry by exact command string, so it cannot recognize that form and appends a duplicate absolute-path entry on every install. `claude-upgrade` discards that edit. herdr's status check reads only the script's version marker, so the discarded edit costs nothing.
 
-`bun scripts/check-hook-paths.ts` fails if a hook command in either settings file points at a `~/.claude/` or `$CLAUDE_PROJECT_DIR/` path this repo does not ship, which is what catches a vendored script going missing or a hook path outliving the script it named.
+`bun scripts/check-hook-paths.ts` fails if a hook command in either settings file points at a `~/.claude/` or `$CLAUDE_PROJECT_DIR/` path this repo does not ship. That catches a hook path outliving the script it named. The herdr script is exempt because its installer ships it.

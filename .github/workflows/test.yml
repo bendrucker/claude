@@ -229,7 +229,7 @@ jobs:
 
       - name: Cache Playwright browsers
         if: runner.os == 'Linux' && steps.inspect.outputs.has_playwright == 'true'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}

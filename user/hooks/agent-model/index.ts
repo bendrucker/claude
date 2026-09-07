@@ -56,29 +56,46 @@ export function spawnNeedsModel(toolInput: unknown): boolean {
   return agent.subagent_type === undefined || UNPINNED_TYPES.has(agent.subagent_type);
 }
 
-export function warning(): string {
+// The settings `env` block reaches the hook process, so the model a bare spawn
+// falls to is read here rather than assumed. Unset and `inherit` both mean the
+// parent's model.
+export function subagentDefault(
+  env: Record<string, string | undefined> = process.env,
+): ModelFamily | null {
+  const value = env.CLAUDE_CODE_SUBAGENT_MODEL;
+  if (value === undefined || value === "" || value === "inherit") return null;
+  return modelFamily(value);
+}
+
+export function warning(family: ModelFamily, fromDefault: boolean): string {
+  const resolution = fromDefault
+    ? `runs on ${family}, the \`CLAUDE_CODE_SUBAGENT_MODEL\` default in settings,`
+    : `inherits the parent's ${family}`;
   return [
-    "This Agent spawn sets no `model` and no `subagent_type` that pins one, so it runs on opus, the `CLAUDE_CODE_SUBAGENT_MODEL` default in settings, and bills the whole subagent at opus rates.",
+    `This Agent spawn sets no \`model\` and no \`subagent_type\` that pins one, so it ${resolution} and bills the whole subagent at ${family} rates.`,
     "CLAUDE.md: pick a spawn's `subagent_type` before its `model`, and pass an explicit cheap `model` when the type names none.",
     'Either set `subagent_type` to `analyst` (read-only research, search, judging) or another type whose `bun run inventory agents` row names a model, or pass `model: "haiku"` or `model: "sonnet"`.',
   ].join("\n\n");
 }
 
 // The tool input decides first so a spawn that already names a model or a
-// pinned type costs no transcript read. That is most of them.
+// pinned type costs no transcript read. That is most of them. A settings
+// default decides next, so the transcript is read only for a spawn that would
+// inherit.
 export async function decide(
   input: HookInput,
   resolveFamily: () => Promise<ModelFamily | null>,
+  fallback: ModelFamily | null = subagentDefault(),
 ): Promise<SyncHookJSONOutput | null> {
   if (!spawnNeedsModel(input.tool_input)) return null;
 
-  const family = await resolveFamily();
+  const family = fallback ?? (await resolveFamily());
   if (family === null || !EXPENSIVE_FAMILIES.has(family)) return null;
 
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      additionalContext: warning(),
+      additionalContext: warning(family, fallback !== null),
     },
   };
 }

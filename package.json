@@ -72,6 +72,6 @@
     "zod": "^4.4.3"
   },
   "overrides": {
-    "@apidevtools/json-schema-ref-parser": "^15.0.0"
+    "@apidevtools/json-schema-ref-parser": "^16.0.0"
   }
 }

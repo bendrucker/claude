@@ -3,19 +3,18 @@
 // standardized frequencies over the most frequent words of a reference corpus.
 // Burrows (2002), "'Delta': a Measure of Stylistic Difference and a Guide to
 // Likely Authorship", Literary and Linguistic Computing 17(3), 267-287.
+// https://doi.org/10.1093/llc/17.3.267
 
 import { cli } from "cleye";
-import { contrastCorpusPath, registerPaths, resolveDataDir, voiceBaselineDir } from "./data-dir";
-import { type NGramCounts, processCorpus } from "./ngram";
 import {
-  DOCUMENT_KINDS,
-  documentKind,
-  type DocumentKind,
-  isDocumentKind,
-  readCorpus,
-  splitHalves,
-  type VoiceDocument,
-} from "./voice-corpus";
+  CORPUS_FLAGS,
+  corpusHeader,
+  type CorpusHeader,
+  corpusHeaderLines,
+  selectCorpora,
+} from "./corpus-selection";
+import { type NGramCounts, processCorpus } from "./ngram";
+import { readCorpus, splitHalves, type VoiceDocument } from "./voice-corpus";
 
 export interface Bin {
   tokens: number;
@@ -126,13 +125,6 @@ export function deltaFromCentroid(
 function quantileOfSorted(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
   return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? 0;
-}
-
-export function quantile(values: number[], p: number): number {
-  return quantileOfSorted(
-    values.toSorted((x, y) => x - y),
-    p,
-  );
 }
 
 export interface DeltaSummary {
@@ -274,14 +266,7 @@ function signed(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
 }
 
-export interface DeltaReport {
-  studyPath: string;
-  studyDocs: number;
-  studyTokens: number;
-  kinds: DocumentKind[];
-  baselineNames: string[];
-  baselineDocs: number;
-  baselineTokens: number;
+export interface DeltaReport extends CorpusHeader {
   binWords: number;
   wordCount: number;
   measurement: DeltaMeasurement;
@@ -291,9 +276,7 @@ export interface DeltaReport {
 export function renderReport(report: DeltaReport): string {
   const { measurement } = report;
   return [
-    `corpus A  ${report.studyDocs} docs, ${report.studyTokens.toLocaleString()} tokens  ` +
-      `kinds ${report.kinds.join(",")}  ${report.studyPath}`,
-    `corpus B  ${report.baselineDocs} docs, ${report.baselineTokens.toLocaleString()} tokens  ${report.baselineNames.join(", ")}`,
+    ...corpusHeaderLines(report),
     `bin ${report.binWords.toLocaleString()} words  words ${report.wordCount}  ` +
       `scored over ${measurement.scored.length} of ${measurement.words.length} carrying spread`,
     "",
@@ -328,24 +311,7 @@ if (import.meta.main) {
         "voice baseline by Burrows's Delta over the most frequent words of the baseline.",
     },
     flags: {
-      dataDir: { type: String, description: "Override the plugin data directory" },
-      study: {
-        type: String,
-        description: "Corpus A (agent-authored). Defaults to the contrast baseline.",
-      },
-      baseline: {
-        type: [String],
-        description:
-          "Corpus B register filenames. Repeatable. Default: github-prs.txt, github-issues.txt",
-      },
-      kind: {
-        type: [String],
-        description: `Corpus A document kinds to keep. Repeatable. One of ${DOCUMENT_KINDS.join(", ")}.`,
-      },
-      studyFilter: {
-        type: String,
-        description: "Narrow the kinds further to corpus A sources matching this regex",
-      },
+      ...CORPUS_FLAGS,
       binWords: { type: Number, default: 1000, description: "Words pooled into each bin" },
       words: { type: Number, default: 150, description: "Most frequent words to score over" },
       show: { type: Number, default: 25, description: "Words to print in the drift table" },
@@ -353,52 +319,18 @@ if (import.meta.main) {
     },
   });
 
-  const dataDir = resolveDataDir(argv.flags.dataDir);
-  const studyPath = argv.flags.study ?? contrastCorpusPath(dataDir);
-  const baselineNames = [
-    ...new Set(
-      argv.flags.baseline.length > 0
-        ? argv.flags.baseline
-        : ["github-prs.txt", "github-issues.txt"],
-    ),
-  ];
-
-  const registers = await registerPaths(dataDir);
-  const baselinePaths = baselineNames.map((name) => {
-    const found = registers.find((path) => path.endsWith(`/${name}`));
-    if (found === undefined) {
-      throw new Error(`No register ${name} under ${voiceBaselineDir(dataDir)}`);
-    }
-    return found;
-  });
-
-  const kinds = argv.flags.kind.map((kind) => {
-    if (!isDocumentKind(kind)) {
-      throw new Error(`Unknown kind ${kind}. One of ${DOCUMENT_KINDS.join(", ")}.`);
-    }
-    return kind;
-  });
-  const selected = new Set(kinds.length > 0 ? kinds : DOCUMENT_KINDS);
+  const selection = await selectCorpora(argv.flags);
+  const { baseline } = selection;
 
   // Every register under the voice baseline is the same author, so the ones not
   // spent on the reference price what a register shift alone costs.
-  const controlPaths = registers.filter((path) => !baselinePaths.includes(path));
-
-  const [studyAll, perRegister, perControl] = await Promise.all([
-    readCorpus(studyPath),
-    Promise.all(baselinePaths.map(readCorpus)),
-    Promise.all(controlPaths.map(readCorpus)),
-  ]);
-  const filter = argv.flags.studyFilter === undefined ? null : new RegExp(argv.flags.studyFilter);
-  const studyDocs = studyAll.filter(
-    (doc) => selected.has(documentKind(doc.source)) && (filter?.test(doc.source) ?? true),
-  );
-  const baselineDocs = perRegister.flat();
+  const controlPaths = selection.registers.filter((path) => !baseline.paths.includes(path));
+  const perControl = await Promise.all(controlPaths.map(readCorpus));
 
   const { binWords, words: wordCount } = argv.flags;
   const show = positiveInteger("show", argv.flags.show);
-  const study = { name: "study", bins: binDocuments(studyDocs, binWords) };
-  const referenceBins = binDocuments(baselineDocs, binWords);
+  const study = { name: "study", bins: binDocuments(selection.study.documents, binWords) };
+  const referenceBins = binDocuments(baseline.documents, binWords);
   const controls = perControl.map((docs, index) => ({
     name: controlPaths[index]?.split("/").pop() ?? "control",
     bins: binDocuments(docs, binWords),
@@ -409,7 +341,7 @@ if (import.meta.main) {
     process.stdout.write(
       `${JSON.stringify(
         {
-          kinds: [...selected],
+          kinds: selection.study.kinds,
           binWords,
           scored: measurement.scored,
           reference: measurement.reference,
@@ -424,13 +356,10 @@ if (import.meta.main) {
   } else {
     process.stdout.write(
       `${renderReport({
-        studyPath,
-        studyDocs: studyDocs.length,
-        studyTokens: totalTokens(study.bins),
-        kinds: [...selected],
-        baselineNames,
-        baselineDocs: baselineDocs.length,
-        baselineTokens: totalTokens(referenceBins),
+        ...corpusHeader(selection, {
+          study: totalTokens(study.bins),
+          baseline: totalTokens(referenceBins),
+        }),
         binWords,
         wordCount,
         measurement,

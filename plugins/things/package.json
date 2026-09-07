@@ -2,16 +2,16 @@
   "name": "things",
   "version": "1.0.0",
   "description": "",
+  "keywords": [],
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
   "main": "index.js",
   "scripts": {
     "types:generate": "sdef-to-dts /Applications/Things3.app --output src/Things3.d.ts",
     "build": "esbuild src/example.ts --bundle --platform=neutral --format=iife --log-level=error > /dev/null",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.0",
     "@modelcontextprotocol/sdk": "^1.30.0",

@@ -1,7 +1,6 @@
 {
   "name": "@bendrucker/claude",
   "private": true,
-  "type": "module",
   "workspaces": [
     "packages/skill-lint",
     "plugins/claude-code",
@@ -35,6 +34,7 @@
     "plugins/pull-request/evals/pr-body",
     "packages/oxlint-rules"
   ],
+  "type": "module",
   "scripts": {
     "build": "oxlint --type-aware --type-check",
     "check": "oxlint --type-aware && oxfmt --check",
@@ -48,6 +48,13 @@
     "skill-lint": "bun ./packages/skill-lint/cli.ts",
     "test": "bun test",
     "test:unit": "bun test"
+  },
+  "dependencies": {
+    "cleye": "^2.2.1",
+    "table": "^6.9.0",
+    "typescript": "^6.0.0",
+    "url-pattern": "^1.0.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.0",
@@ -63,13 +70,6 @@
     "oxlint": "^1.78.0",
     "oxlint-tsgolint": "^7.0.2001",
     "unist-util-visit": "^5.1.0"
-  },
-  "dependencies": {
-    "cleye": "^2.2.1",
-    "table": "^6.9.0",
-    "typescript": "^6.0.0",
-    "url-pattern": "^1.0.3",
-    "zod": "^4.4.3"
   },
   "overrides": {
     "@apidevtools/json-schema-ref-parser": "^15.0.0"

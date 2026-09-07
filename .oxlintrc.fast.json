@@ -1,11 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "extends": [
-    "./lint/base.json",
-    "./lint/bun.json",
-    "./lint/typescript.json",
-    "./packages/oxlint-rules/config.json"
-  ],
+  "extends": ["./lint/base.json", "./lint/bun.json", "./lint/typescript.json"],
   "ignorePatterns": [
     "**/fixtures/**",
     "**/*.d.ts",

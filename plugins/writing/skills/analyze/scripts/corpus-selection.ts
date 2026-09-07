@@ -1,5 +1,6 @@
 // Corpus A is agent-authored prose, corpus B one or more registers of the pre-agent voice baseline.
 
+import type { TypeFlag } from "cleye";
 import { contrastCorpusPath, registerPaths, resolveDataDir, voiceBaselineDir } from "./data-dir";
 import {
   DOCUMENT_KINDS,
@@ -32,13 +33,9 @@ export const CORPUS_FLAGS = {
   },
 } as const;
 
-export interface CorpusFlags {
-  dataDir?: string | undefined;
-  study?: string | undefined;
-  baseline: string[];
-  kind: string[];
-  studyFilter?: string | undefined;
-}
+// Derived, so a flag added above reaches selectCorpora rather than parsing into
+// a field nothing reads.
+export type CorpusFlags = TypeFlag<typeof CORPUS_FLAGS>["flags"];
 
 export interface StudyCorpus {
   path: string;
@@ -103,14 +100,13 @@ export async function selectCorpora(flags: CorpusFlags): Promise<CorpusSelection
   };
 }
 
-// Both counts are of what survived selection.
+// docs counts what selection kept. tokens counts what the script went on to
+// measure, which for Delta is post-binning and so drops the trailing part-bin.
 export interface CorpusHeader {
   study: { path: string; kinds: DocumentKind[]; docs: number; tokens: number };
   baseline: { names: string[]; docs: number; tokens: number };
 }
 
-// Tokens come from the caller because each script counts them at a different
-// stage: Delta after binning, overlap after tokenizing.
 export function corpusHeader(
   { study, baseline }: CorpusSelection,
   tokens: { study: number; baseline: number },

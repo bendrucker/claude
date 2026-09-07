@@ -56,9 +56,9 @@ export function spawnNeedsModel(toolInput: unknown): boolean {
   return agent.subagent_type === undefined || UNPINNED_TYPES.has(agent.subagent_type);
 }
 
-export function warning(family: ModelFamily): string {
+export function warning(): string {
   return [
-    `This Agent spawn sets no \`model\` and no \`subagent_type\` that pins one, so it inherits the parent's ${family} and bills the whole subagent at orchestrator rates.`,
+    "This Agent spawn sets no `model` and no `subagent_type` that pins one, so it runs on opus, the `CLAUDE_CODE_SUBAGENT_MODEL` default in settings, and bills the whole subagent at opus rates.",
     "CLAUDE.md: pick a spawn's `subagent_type` before its `model`, and pass an explicit cheap `model` when the type names none.",
     'Either set `subagent_type` to `analyst` (read-only research, search, judging) or another type whose `bun run inventory agents` row names a model, or pass `model: "haiku"` or `model: "sonnet"`.',
   ].join("\n\n");
@@ -78,7 +78,7 @@ export async function decide(
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      additionalContext: warning(family),
+      additionalContext: warning(),
     },
   };
 }

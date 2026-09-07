@@ -1,7 +1,7 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`warning text 1`] = `
-"This Agent spawn sets no \`model\` and no \`subagent_type\` that pins one, so it inherits the parent's opus and bills the whole subagent at orchestrator rates.
+"This Agent spawn sets no \`model\` and no \`subagent_type\` that pins one, so it runs on opus, the \`CLAUDE_CODE_SUBAGENT_MODEL\` default in settings, and bills the whole subagent at opus rates.
 
 CLAUDE.md: pick a spawn's \`subagent_type\` before its \`model\`, and pass an explicit cheap \`model\` when the type names none.
 

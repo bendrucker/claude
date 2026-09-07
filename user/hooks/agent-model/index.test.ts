@@ -53,7 +53,7 @@ describe("decide", () => {
     expect(specific?.hookEventName).toBe("PreToolUse");
     expect(specific).not.toHaveProperty("permissionDecision");
     expect(specific && "additionalContext" in specific ? specific.additionalContext : null).toBe(
-      family === null ? null : warning(family),
+      warning(),
     );
   });
 
@@ -69,7 +69,7 @@ describe("decide", () => {
 });
 
 test("warning text", () => {
-  expect(warning("opus")).toMatchSnapshot();
+  expect(warning()).toMatchSnapshot();
 });
 
 describe("spawnNeedsModel", () => {

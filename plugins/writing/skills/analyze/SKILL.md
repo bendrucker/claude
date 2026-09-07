@@ -109,6 +109,25 @@ Baseline documents run 40 to 200 words, where a single word's rate is mostly sam
 
 The drift table carries the finding. Every register under the voice baseline is the same author, so the ones not spent on the reference are scored as controls, and they land where agent prose lands: agent commit messages sit 1.08 from the PR centroid against a 0.84 floor, while the author's own high-school essays sit at 1.16. Magnitude alone therefore cannot separate a different author from a different register. The signed per-word drift can: `to`, `be`, and `this` fall and `its`, `the`, and `and` rise across all four agent kinds, while the author's own registers move on `you`, `i`, `should`, and `would`.
 
+## Structural Signatures
+
+`tag-signatures.ts` gives part-of-speech tag sequences the treatment `wordlist-overlap.ts` gives words: log-odds with an informative Dirichlet prior against the pre-agent voice baseline, gated on a split-half null floor. Vocabulary tells drift with model releases while the shape of a habit persists, so a sequence that clears its floor is a candidate for a rule no wordlist change invalidates.
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/tag-signatures.ts --kind message
+bun ${CLAUDE_SKILL_DIR}/scripts/tag-signatures.ts --sizes 3 --sizes 4 --show 60
+```
+
+The ranking pools the selected kinds, so the null splits that pooled corpus against itself and takes the largest z it reaches with no difference to find. Sequences of different lengths draw on different amounts of corpus mass, so the floor is computed per n-gram size, and shapes at or below their size's floor are dropped. Over `--kind message` the floors sit at 2.9, 2.5 and 3.7 for 3-, 4- and 5-grams and 253 of 901 shapes clear them. Unrestricted they are 4.2, 4.0 and 3.4 and 114 of 15,740 clear. Those shares are not comparable across configurations, because `--min-count` admits a different slice of the tail at each corpus size.
+
+A size the split produced no shapes of leaves its shapes ungated rather than dropped, printed as `n/a`, so an unmeasured size is visible instead of silently permissive.
+
+The `compromise` tagger runs over every sentence and dominates the runtime, so sentences are tagged once and reused for both the ranking and the null. Restricted to `--kind message` a run costs seconds; the unrestricted corpus costs about two minutes.
+
+Read the surviving head against several examples before promoting a shape to a rule. `compromise` tags unknown identifiers `NOUN`, and the example picker takes the shortest matching sentence, so the top nominal shapes surface fragments and code residue alongside prose.
+
+Examples are verbatim corpus prose, so `--json` omits them the way the word layer does.
+
 ## Hook Health
 
 The PreToolUse dispatcher (`hooks/pretooluse.ts`) appends one JSONL line per run to `~/.claude/writing-hooks/log.jsonl` (controlled by `WRITING_HOOKS_LOG`, see the plugin README). That log is the runtime half of this skill's audit: the wordlist analysis judges rule precision from session history, and the health check judges hook behavior from what the dispatcher actually did.

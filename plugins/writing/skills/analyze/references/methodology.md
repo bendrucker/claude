@@ -152,6 +152,20 @@ Register is not the explanation. Contrasting the human PR baseline against the h
 
 The `compromise` tagger runs per sentence and dominates the runtime, so sentences are tagged once and the cached tags serve both the ranking and the null. Tagging the unrestricted corpus costs about 75 seconds against roughly 5 seconds for `--kind message`.
 
+## Rate Feature Floors
+
+`rate-nulls.ts` measures each `voice-delta.ts` rate feature against a permutation null. Every feature reports a gap between the agent corpus mean and the baseline mean. The floor says how large a gap the baseline reaches against itself, which decides whether that gap is signal or sampling noise.
+
+The baseline is shuffled and split into equal halves `--splits` times, and each feature's absolute between-half gap is recorded. The floor is the `--percentile` value of that distribution, an estimate of the null maximum rather than the single draw the word and tag layers take. Splitting many times is cheap: feature rates are computed once per document, so each split only averages over index lists, and hundreds or thousands of splits cost about what one does.
+
+Splits drop the odd document so both halves are the same size. An unequal split would give the smaller half more spread and inflate the floor.
+
+All thirteen features in `voice-delta.ts` clear their floor on the full corpus. Retire a feature whose gap fails to clear its floor across several seeds at a high split count (2,000 splits). A single seed's floor is one draw from the null-maximum distribution and is not conclusive on its own. `median_sentence_length` (1.27x) and `action_verb_opener_rate` (1.56x) clear thinly and are worth re-checking as the baseline grows.
+
+Per-kind runs are a sensitivity check rather than the deciding measurement, because each kind contrasts a different register against the same PR and issue baseline. A feature that clears its floor on the full corpus but falls below it within some kinds is showing register sensitivity, and stays: `template_presence` clears the full corpus at 5.95x while falling below its floor within `plan`, `memory` and `docs`.
+
+A baseline of fewer than four documents cannot be split into halves that say anything about spread, so those features are reported unfloored and stay, with the reason printed. A `--kind` selection matching no corpus A document is refused rather than reported: every gap would equal the baseline mean, and a fabricated gap reads as signal.
+
 ## Rule Health Table
 
 Each rule is labeled in the **type** column by how the hook enforces it:

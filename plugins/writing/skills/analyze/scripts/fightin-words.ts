@@ -4,7 +4,7 @@
 // Identifying the Content of Political Conflict", section 3.5.
 
 import { stemmer } from "stemmer";
-import { type NGramCounts, processRows } from "./ngram";
+import { type NGramCounts, processRows, tokenizeSentence } from "./ngram";
 import type { VoiceDocument } from "./voice-corpus";
 
 export interface FightinWordsInput {
@@ -84,13 +84,17 @@ function assertSizes(sizes: number[]): void {
 
 // Counting per document rather than over one joined string keeps the spread,
 // which is what separates a habit from one document's quirk.
-export function tokenizeCorpus(docs: VoiceDocument[], sizes: number[]): TokenizedCorpus {
+export function tokenizeCorpus(
+  docs: VoiceDocument[],
+  sizes: number[],
+  tokenize: (sentence: string) => string[] = tokenizeSentence,
+): TokenizedCorpus {
   assertSizes(sizes);
   const examples = new Map<string, string>();
   const { stats, sessionSpread } = processRows(
     docs.map((doc) => ({ session_id: doc.source, text: doc.body })),
     sizes,
-    { examples },
+    { examples, tokenize },
   );
   return { tokens: stats.tokens, ngrams: stats.ngrams, spread: sessionSpread, examples };
 }

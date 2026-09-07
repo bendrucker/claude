@@ -138,6 +138,20 @@ Tag sequences draw from an alphabet of ~17 tags, so they are far denser than wor
 
 Each surfaced shape carries its shortest corpus example sentence. Examples are verbatim corpus text: the report is local-only, and any shape quoted elsewhere needs an invented example.
 
+#### Null-gated ranking
+
+`tag-signatures.ts` scores the same tag sequences against the voice baseline instead of the session user corpus, by log-odds with an informative Dirichlet prior, and gates each shape on a split-half null. Lift answers how much more often a shape appears; it cannot say which shapes a same-author split of the corpus would have raised anyway. The null answers that, which is why the ranking above it is read as evidence and the lift pass is not.
+
+The ranking pools every selected kind, so the null splits that same pooled population against itself rather than splitting each kind on its own, since a per-kind floor bounds only that kind, not the pooled population the ranking scores. It takes the largest z the split reaches with no difference to find. A 3-gram and a 5-gram over a 17-tag alphabet draw on different amounts of corpus mass, so each n-gram size carries its own floor. A size the split produced no shapes of leaves those shapes ungated and prints `n/a`, so an unmeasured size reads as unmeasured rather than as passing.
+
+Over `--kind message` the floors sit at 2.9, 2.5 and 3.7 for 3-, 4- and 5-grams, and 253 of 901 ranked shapes clear them. Unrestricted they are 4.2, 4.0 and 3.4, and 114 of 15,740 clear. Survival counts across configurations are not comparable: `--min-count` is an absolute threshold, so it admits a different slice of the tail at each corpus size, and the ratio moves with that slice rather than with how much signal is present.
+
+The surviving head is noun compounding (`NOUN NOUN NOUN` at z=20.4, `NOUN NOUN VERB` at 14.2). Two things temper it. `cleanText` leaves code residue that the tagger labels `NOUN`, and `compromise` tags any unknown identifier `NOUN` as well, so part of the nominal excess is identifier debris rather than prose habit. The example picker takes the shortest matching sentence, which favors fragments (`s = p`, `/ / /`) over readable prose. Confirm a shape against several examples before promoting it to a rule.
+
+Register is not the explanation. Contrasting the human PR baseline against the human issue baseline puts `NOUN NOUN NOUN` at z=1.3, against z=20 for agent prose against the same human text, so the nominal excess is not an artifact of pairing one genre with another.
+
+The `compromise` tagger runs per sentence and dominates the runtime, so sentences are tagged once and the cached tags serve both the ranking and the null. Tagging the unrestricted corpus costs about 75 seconds against roughly 5 seconds for `--kind message`.
+
 ## Rule Health Table
 
 Each rule is labeled in the **type** column by how the hook enforces it:

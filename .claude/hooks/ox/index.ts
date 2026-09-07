@@ -363,13 +363,26 @@ async function runOxlintPass(
   return output != null && MISSING_CHECKER.test(output) ? runOx(command, args, cwd) : output;
 }
 
+// Loading oxlint's JS plugin host costs a fixed ~150ms on top of a per-file
+// type-aware pass, whatever rules it carries. A tree that keeps its JS-plugin
+// rules in .oxlintrc.json and mirrors the rest into .oxlintrc.fast.json pays
+// that only at the gate, where the batch and whole-tree passes below still read
+// the default config. A tree without the file lints against its default config.
+const FAST_CONFIG = ".oxlintrc.fast.json";
+
+async function fastConfigArgs(cwd: string | undefined): Promise<string[]> {
+  const path = join(cwd ?? process.cwd(), FAST_CONFIG);
+  return (await Bun.file(path).exists()) ? ["-c", path] : [];
+}
+
 export async function runOxlintAgent(filePath: string): Promise<string | null> {
   const command = await oxlintCommand();
   if (!command) {
     return null;
   }
   const cwd = await oxWorkingTree(filePath);
-  return runOxlintPass(command, [...LINT_ARGS, filePath], cwd);
+  const config = await fastConfigArgs(cwd);
+  return runOxlintPass(command, [...config, ...LINT_ARGS, filePath], cwd);
 }
 
 async function runOxlintAgentBatch(files: string[]): Promise<string | null> {

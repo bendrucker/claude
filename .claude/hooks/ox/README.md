@@ -8,6 +8,8 @@ Runs [oxlint](https://oxc.rs/docs/guide/usage/linter.html) and [oxfmt](https://o
 
 When you `Edit` or `Write` a file oxlint understands, it runs and shows any issues as context. This is informational only. It never writes to the file, so your later edits in the same turn still match what is on disk. Formatting is deferred to the Stop and pre-commit gates.
 
+This pass reads `.oxlintrc.fast.json` where the working tree has one, falling back to the default config. Loading oxlint's JS plugin host costs a fixed ~150ms whatever rules it carries, so a tree that keeps its JS-plugin rules out of the fast config pays that only at the gates below, which always read the default config.
+
 #### Before Stopping (Stop)
 
 When the session ends, oxfmt formats all edited files, oxlint checks them, and a type check runs over each working tree those files belong to (`oxlint --type-aware --type-check`). If issues remain, the session is blocked until they're resolved or the budget below runs out.

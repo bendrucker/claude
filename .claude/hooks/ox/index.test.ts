@@ -151,6 +151,25 @@ async function createIgnoredFixture(baseDir: string): Promise<string> {
   return filePath;
 }
 
+// A repo whose default config flags the file and whose fast config does not.
+// The per-file pass must read the fast config, so a passing result proves the
+// default was skipped rather than that the file happens to be clean.
+async function createFastConfigFixture(baseDir: string): Promise<string> {
+  const repoDir = await mkdtemp(join(baseDir, "fast-config-repo-"));
+  await execAsync("git init", { cwd: repoDir });
+  await Bun.write(
+    join(repoDir, ".oxlintrc.json"),
+    JSON.stringify({ rules: { "no-dupe-keys": "error" } }),
+  );
+  await Bun.write(
+    join(repoDir, ".oxlintrc.fast.json"),
+    JSON.stringify({ rules: { "no-dupe-keys": "off" } }),
+  );
+  const filePath = join(repoDir, "duplicate.ts");
+  await Bun.write(filePath, await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text());
+  return filePath;
+}
+
 // The type-aware pass is skipped where node_modules is absent and falls back to
 // the plain pass where it is present without tsgolint, so `nodeModules` picks
 // which of the three shapes a fixture exercises. The empty tree stands in for a
@@ -215,6 +234,11 @@ describe("ox hook", () => {
 
     it("returns null for files the ox config ignores", async () => {
       const filePath = await createIgnoredFixture(tempDir);
+      expect(await runOxlintAgent(filePath)).toBeNull();
+    });
+
+    it("prefers the fast config over the default one", async () => {
+      const filePath = await createFastConfigFixture(tempDir);
       expect(await runOxlintAgent(filePath)).toBeNull();
     });
   });

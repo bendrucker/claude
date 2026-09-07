@@ -17,15 +17,17 @@ import {
   weightedStemHits,
   WORDLISTS,
 } from "../../../detection/wordlists";
-import { contrastCorpusPath, registerPaths, resolveDataDir, voiceBaselineDir } from "./data-dir";
+import {
+  CORPUS_FLAGS,
+  type CorpusHeader,
+  corpusHeaderLines,
+  selectCorpora,
+} from "./corpus-selection";
 import { rank, type RankedTerm, type RankOptions, stemTerm, tokenizeCorpus } from "./fightin-words";
 import {
   DOCUMENT_KINDS,
-  documentKind,
   type DocumentKind,
   groupByKind,
-  isDocumentKind,
-  readCorpus,
   splitHalves,
   type VoiceDocument,
 } from "./voice-corpus";
@@ -162,15 +164,8 @@ function pct(part: number, whole: number): string {
   return `${((part / whole) * 100).toFixed(1)}%`;
 }
 
-export interface OverlapReport {
-  studyPath: string;
-  studyDocs: number;
-  studyTokens: number;
-  kinds: DocumentKind[];
+export interface OverlapReport extends CorpusHeader {
   kindFloors: KindFloor[];
-  baselineNames: string[];
-  baselineDocs: number;
-  baselineTokens: number;
   prior: number;
   sizes: number[];
   minCount: number;
@@ -186,9 +181,7 @@ export interface OverlapReport {
 export function renderReport(report: OverlapReport): string {
   const { summary } = report;
   const lines = [
-    `corpus A  ${report.studyDocs} docs, ${report.studyTokens.toLocaleString()} tokens  ` +
-      `kinds ${report.kinds.join(",")}  ${report.studyPath}`,
-    `corpus B  ${report.baselineDocs} docs, ${report.baselineTokens.toLocaleString()} tokens  ${report.baselineNames.join(", ")}`,
+    ...corpusHeaderLines(report),
     `prior ${report.prior}  sizes ${report.sizes.join(",")}  min-count ${report.minCount}  min-docs ${report.minDocs}`,
     "",
     `top ${summary.considered} discovered terms`,
@@ -245,24 +238,7 @@ if (import.meta.main) {
         "the shipped detectors already cover.",
     },
     flags: {
-      dataDir: { type: String, description: "Override the plugin data directory" },
-      study: {
-        type: String,
-        description: "Corpus A (agent-authored). Defaults to the contrast baseline.",
-      },
-      baseline: {
-        type: [String],
-        description:
-          "Corpus B register filenames. Repeatable. Default: github-prs.txt, github-issues.txt",
-      },
-      kind: {
-        type: [String],
-        description: `Corpus A document kinds to keep. Repeatable. One of ${DOCUMENT_KINDS.join(", ")}.`,
-      },
-      studyFilter: {
-        type: String,
-        description: "Narrow the kinds further to corpus A sources matching this regex",
-      },
+      ...CORPUS_FLAGS,
       sizes: { type: [Number], description: "N-gram sizes. Default: 1 and 2" },
       prior: { type: Number, default: 500, description: "Dirichlet concentration (alpha-0)" },
       minCount: { type: Number, default: 5, description: "Minimum occurrences in corpus A" },
@@ -273,45 +249,15 @@ if (import.meta.main) {
     },
   });
 
-  const dataDir = resolveDataDir(argv.flags.dataDir);
   const sizes = argv.flags.sizes.length > 0 ? argv.flags.sizes : [1, 2];
-  const studyPath = argv.flags.study ?? contrastCorpusPath(dataDir);
-  const baselineNames =
-    argv.flags.baseline.length > 0 ? argv.flags.baseline : ["github-prs.txt", "github-issues.txt"];
-
-  const registers = await registerPaths(dataDir);
-  const baselinePaths = baselineNames.map((name) => {
-    const found = registers.find((path) => path.endsWith(`/${name}`));
-    if (found === undefined) {
-      throw new Error(`No register ${name} under ${voiceBaselineDir(dataDir)}`);
-    }
-    return found;
-  });
-
-  const kinds = argv.flags.kind.map((kind) => {
-    if (!isDocumentKind(kind)) {
-      throw new Error(`Unknown kind ${kind}. One of ${DOCUMENT_KINDS.join(", ")}.`);
-    }
-    return kind;
-  });
-  const selected = new Set(kinds.length > 0 ? kinds : DOCUMENT_KINDS);
-
-  const [studyAll, ...perRegister] = await Promise.all([
-    readCorpus(studyPath),
-    ...baselinePaths.map(readCorpus),
-  ]);
-  const filter = argv.flags.studyFilter === undefined ? null : new RegExp(argv.flags.studyFilter);
-  const studyDocs = studyAll.filter(
-    (doc) => selected.has(documentKind(doc.source)) && (filter?.test(doc.source) ?? true),
-  );
-  const baselineDocs = perRegister.flat();
+  const { study, baseline } = await selectCorpora(argv.flags);
 
   // Min-count 1 over sizes 1 through 3 so every curated entry gets a position,
   // including the three-word phrases. Tokenize once at the union of both.
   const curatedSizes = [1, 2, 3];
   const allSizes = [...new Set([...sizes, ...curatedSizes])].toSorted((x, y) => x - y);
-  const a = tokenizeCorpus(studyDocs, allSizes);
-  const b = tokenizeCorpus(baselineDocs, allSizes);
+  const a = tokenizeCorpus(study.documents, allSizes);
+  const b = tokenizeCorpus(baseline.documents, allSizes);
 
   const { prior, minCount, minDocs } = argv.flags;
   const ranked = rank(a, b, { sizes, prior, minCount, minDocs });
@@ -321,11 +267,11 @@ if (import.meta.main) {
   }));
 
   const nullOptions = { sizes, prior, minCount, minDocs };
-  const kindFloors = nullFloorByKind(studyDocs, nullOptions);
+  const kindFloors = nullFloorByKind(study.documents, nullOptions);
   // Over a single kind the aggregate control splits the same documents into the
   // same halves, so it would report that kind's floor a second time.
   const [leftDocs, rightDocs]: [VoiceDocument[], VoiceDocument[]] =
-    kindFloors.length > 1 ? splitHalves(studyDocs) : [[], []];
+    kindFloors.length > 1 ? splitHalves(study.documents) : [[], []];
   const nullRanked = rank(
     tokenizeCorpus(leftDocs, sizes),
     tokenizeCorpus(rightDocs, sizes),
@@ -345,7 +291,7 @@ if (import.meta.main) {
     const terms = measured.map(({ row: { example, ...row }, coverage }) => ({ row, coverage }));
     process.stdout.write(
       `${JSON.stringify(
-        { kinds: [...selected], kindFloors, summary: summarize(measured), recall, terms },
+        { kinds: study.kinds, kindFloors, summary: summarize(measured), recall, terms },
         null,
         2,
       )}\n`,
@@ -353,14 +299,14 @@ if (import.meta.main) {
   } else {
     process.stdout.write(
       `${renderReport({
-        studyPath,
-        studyDocs: studyDocs.length,
-        studyTokens: a.tokens,
-        kinds: [...selected],
+        study: {
+          path: study.path,
+          kinds: study.kinds,
+          docs: study.documents.length,
+          tokens: a.tokens,
+        },
+        baseline: { names: baseline.names, docs: baseline.documents.length, tokens: b.tokens },
         kindFloors,
-        baselineNames,
-        baselineDocs: baselineDocs.length,
-        baselineTokens: b.tokens,
         prior,
         sizes,
         minCount,

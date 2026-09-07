@@ -208,17 +208,17 @@ describe("renderReport", () => {
   test("formats the whole measurement", () => {
     expect(
       renderReport({
-        studyPath: "/data/contrast-baseline/claude-deliverables.txt",
-        studyDocs: 22,
-        studyTokens: 1234,
-        kinds: ["docs", "other"],
+        study: {
+          path: "/data/contrast-baseline/claude-deliverables.txt",
+          kinds: ["docs", "other"],
+          docs: 22,
+          tokens: 1234,
+        },
+        baseline: { names: ["github-prs.txt"], docs: 342, tokens: 5678 },
         kindFloors: [
           { kind: "docs", docs: 18, maxZ: 6.31 },
           { kind: "other", docs: 4, maxZ: null },
         ],
-        baselineNames: ["github-prs.txt"],
-        baselineDocs: 342,
-        baselineTokens: 5678,
         prior: 500,
         sizes: [1, 2],
         minCount: 5,

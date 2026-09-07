@@ -7,7 +7,6 @@ import {
   measure,
   mostFrequentWords,
   positiveInteger,
-  quantile,
   renderReport,
   standardize,
   summarizeDeltas,
@@ -128,23 +127,18 @@ describe("deltaFromCentroid", () => {
   });
 });
 
-describe("quantile", () => {
-  test.each<[string, number, number]>([
-    ["median", 0.5, 3],
-    ["p95 clamps to the last value", 0.95, 5],
-    ["floor", 0, 1],
-  ])("%s", (_name, p, expected) => {
-    expect(quantile([5, 1, 4, 2, 3], p)).toBe(expected);
-  });
-
-  test("an empty sample has no quantile", () => {
-    expect(quantile([], 0.5)).toBe(0);
-  });
-});
-
 describe("summarizeDeltas", () => {
   test("counts the bins and reports the middle and the tail", () => {
-    expect(summarizeDeltas([1, 2, 3, 4])).toEqual({ bins: 4, median: 3, p95: 4 });
+    expect(summarizeDeltas([5, 1, 4, 2, 3])).toEqual({ bins: 5, median: 3, p95: 5 });
+  });
+
+  // Nearest rank, so at 20 or fewer bins the tail is the sample maximum.
+  test("p95 is the largest value at this sample size", () => {
+    expect(summarizeDeltas([1, 2, 3, 4]).p95).toBe(4);
+  });
+
+  test("an empty sample has nothing to report", () => {
+    expect(summarizeDeltas([])).toEqual({ bins: 0, median: 0, p95: 0 });
   });
 });
 
@@ -237,13 +231,13 @@ describe("renderReport", () => {
     );
     expect(
       renderReport({
-        studyPath: "/data/contrast-baseline/claude-deliverables.txt",
-        studyDocs: 559,
-        studyTokens: 78_424,
-        kinds: ["message"],
-        baselineNames: ["github-prs.txt"],
-        baselineDocs: 342,
-        baselineTokens: 28_411,
+        study: {
+          path: "/data/contrast-baseline/claude-deliverables.txt",
+          kinds: ["message"],
+          docs: 559,
+          tokens: 78_424,
+        },
+        baseline: { names: ["github-prs.txt"], docs: 342, tokens: 28_411 },
         binWords: 1000,
         wordCount: 150,
         measurement,

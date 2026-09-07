@@ -98,7 +98,7 @@ Every run also splits each kind against itself, so the per-kind floors price the
 
 ## Authorship Distance
 
-`burrows-delta.ts` scores agent-authored prose against the voice baseline by Burrows's Delta, the mean absolute difference of standardized frequencies over the most frequent words of the reference corpus. Burrows, "'Delta': a Measure of Stylistic Difference and a Guide to Likely Authorship", Literary and Linguistic Computing 17(3), 267-287 (2002).
+`burrows-delta.ts` scores agent-authored prose against the voice baseline by Burrows's Delta, the mean absolute difference of standardized frequencies over the most frequent words of the reference corpus. Burrows, ["'Delta': a Measure of Stylistic Difference and a Guide to Likely Authorship"](https://doi.org/10.1093/llc/17.3.267), Literary and Linguistic Computing 17(3), 267-287 (2002).
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/burrows-delta.ts --kind message

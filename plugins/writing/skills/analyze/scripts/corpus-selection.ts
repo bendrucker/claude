@@ -1,6 +1,4 @@
-// Corpus A is agent-authored prose, corpus B one or more registers of the
-// pre-agent voice baseline. Every contrast script selects the pair the same way,
-// so the flags and the resolution live here rather than in each script.
+// Corpus A is agent-authored prose, corpus B one or more registers of the pre-agent voice baseline.
 
 import { contrastCorpusPath, registerPaths, resolveDataDir, voiceBaselineDir } from "./data-dir";
 import {
@@ -106,8 +104,7 @@ export async function selectCorpora(flags: CorpusFlags): Promise<CorpusSelection
   };
 }
 
-// What each report opens with, so the pair a run scored is legible from its
-// first two lines. Both counts are of what survived selection.
+// Both counts are of what survived selection.
 export interface CorpusHeader {
   study: { path: string; kinds: DocumentKind[]; docs: number; tokens: number };
   baseline: { names: string[]; docs: number; tokens: number };

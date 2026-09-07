@@ -6,6 +6,7 @@ import {
   deltaFromCentroid,
   measure,
   mostFrequentWords,
+  positiveInteger,
   quantile,
   renderReport,
   standardize,
@@ -16,11 +17,7 @@ import type { VoiceDocument } from "./voice-corpus";
 
 function makeBin(counts: Record<string, number>): Bin {
   const entries = Object.entries(counts);
-  return {
-    docs: 1,
-    tokens: entries.reduce((sum, [, count]) => sum + count, 0),
-    counts: new Map(entries),
-  };
+  return { tokens: entries.reduce((sum, [, count]) => sum + count, 0), counts: new Map(entries) };
 }
 
 // One word repeated is the shortest body with a known token count.
@@ -32,11 +29,24 @@ function makeDoc(word: string, times: number): VoiceDocument {
 // spread for the fitted sd to be anything but zero.
 const REFERENCE = [4, 5, 6, 4, 4, 6, 6, 5].map((x) => makeBin({ x, y: 10 - x }));
 
+describe("positiveInteger", () => {
+  test.each<[string, number]>([
+    ["zero", 0],
+    ["negative", -5],
+    ["fractional", 2.5],
+  ])("rejects a %s value", (_name, value) => {
+    expect(() => positiveInteger("bin size", value)).toThrow(/bin size must be a positive integer/);
+  });
+
+  test("returns the value it accepts", () => {
+    expect(positiveInteger("show", 25)).toBe(25);
+  });
+});
+
 describe("binDocuments", () => {
   test("pools whole documents until the bin reaches the target", () => {
     const bins = binDocuments([makeDoc("alpha", 6), makeDoc("beta", 6)], 10);
     expect(bins).toHaveLength(1);
-    expect(bins[0]?.docs).toBe(2);
     expect(bins[0]?.tokens).toBe(12);
     expect(bins[0]?.counts.get("alpha")).toBe(6);
   });
@@ -47,14 +57,6 @@ describe("binDocuments", () => {
 
   test("a document with no prose contributes nothing", () => {
     expect(binDocuments([{ source: "empty", meta: "", body: "" }], 1)).toEqual([]);
-  });
-
-  test.each<[string, number]>([
-    ["zero", 0],
-    ["negative", -5],
-    ["fractional", 2.5],
-  ])("rejects a %s bin size", (_name, size) => {
-    expect(() => binDocuments([], size)).toThrow(/positive integer/);
   });
 
   test("every emitted bin reaches the target size", () => {
@@ -179,6 +181,38 @@ describe("measure", () => {
     expect(result.study.aboveFloor).toBe(2);
   });
 
+  // Without the guard each half standardizes to nothing, every distance comes
+  // back 0.000, and the report reads as perfect agreement with the baseline.
+  test.each<[string, number]>([
+    ["no", 0],
+    ["one", 1],
+    ["three", 3],
+  ])("refuses a reference of %s bins", (_name, count) => {
+    expect(() => measure({ name: "study", bins: [] }, REFERENCE.slice(0, count), [], 2)).toThrow(
+      /each half needs/,
+    );
+  });
+
+  test("only the words carrying spread in the reference are scored", () => {
+    const flat = REFERENCE.map((bin) => ({ ...bin, counts: new Map([...bin.counts, ["z", 2]]) }));
+    const result = measure({ name: "study", bins: [makeBin({ x: 9, y: 1 })] }, flat, [], 3);
+    expect(result.words).toContain("z");
+    expect(result.scored).not.toContain("z");
+  });
+
+  // Each of these leaves every distance at 0.000, which reads as agreement with
+  // the baseline rather than as the missing measurement it is.
+  test("refuses a study that filled no bin", () => {
+    expect(() => measure({ name: "study", bins: [] }, REFERENCE, [], 2)).toThrow(/filled no bin/);
+  });
+
+  test("refuses a reference whose words all sit at one rate", () => {
+    const flat = [1, 2, 3, 4].map(() => makeBin({ x: 5, y: 5 }));
+    expect(() => measure({ name: "study", bins: [makeBin({ x: 9, y: 1 })] }, flat, [], 2)).toThrow(
+      /every distance would read 0.000/,
+    );
+  });
+
   test("controls are scored against the same centroid as the study", () => {
     const result = measure(
       { name: "study", bins: [makeBin({ x: 9, y: 1 })] },
@@ -195,7 +229,10 @@ describe("renderReport", () => {
     const measurement = measure(
       { name: "study", bins: [makeBin({ x: 9, y: 1 })] },
       REFERENCE,
-      [{ name: "sent-mail.txt", bins: [makeBin({ x: 7, y: 3 })] }],
+      [
+        { name: "sent-mail.txt", bins: [makeBin({ x: 7, y: 3 })] },
+        { name: "dictation.txt", bins: [] },
+      ],
       2,
     );
     expect(
@@ -215,7 +252,7 @@ describe("renderReport", () => {
     ).toMatchInlineSnapshot(`
       "corpus A  559 docs, 78,424 tokens  kinds message  /data/contrast-baseline/claude-deliverables.txt
       corpus B  342 docs, 28,411 tokens  github-prs.txt
-      bin 1,000 words  words 150  scored over 2 most frequent
+      bin 1,000 words  words 150  scored over 2 of 2 carrying spread
 
       delta from the reference centroid
         held-out reference        4 bins  median 1.000
@@ -223,6 +260,7 @@ describe("renderReport", () => {
 
       same author, other registers: the distance a register shift alone reaches
         sent-mail.txt             1 bins  median 2.000  above floor 1 (100.0%)
+        dictation.txt             0 bins  too little text to measure
 
       top 2 words by distance (signed mean z, reference held-out for comparison)
         x                study   +4.00  reference   +0.00

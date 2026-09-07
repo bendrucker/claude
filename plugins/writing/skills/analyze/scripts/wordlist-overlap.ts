@@ -25,7 +25,7 @@ import {
   type DocumentKind,
   groupByKind,
   isDocumentKind,
-  parseCorpus,
+  readCorpus,
   splitHalves,
   type VoiceDocument,
 } from "./voice-corpus";
@@ -155,12 +155,6 @@ export function nullFloorByKind(docs: VoiceDocument[], options: RankOptions): Ki
     );
     return { kind, docs: group.length, maxZ: ranked[0]?.z ?? null };
   });
-}
-
-async function readCorpus(path: string): Promise<VoiceDocument[]> {
-  const file = Bun.file(path);
-  if (!(await file.exists())) throw new Error(`No corpus at ${path}`);
-  return parseCorpus(await file.text());
 }
 
 function pct(part: number, whole: number): string {

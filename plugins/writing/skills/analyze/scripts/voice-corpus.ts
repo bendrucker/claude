@@ -64,6 +64,12 @@ export function documentKind(source: string): DocumentKind {
   return "other";
 }
 
+export async function readCorpus(path: string): Promise<VoiceDocument[]> {
+  const file = Bun.file(path);
+  if (!(await file.exists())) throw new Error(`No corpus at ${path}`);
+  return parseCorpus(await file.text());
+}
+
 export function isDocumentKind(value: string): value is DocumentKind {
   return (DOCUMENT_KINDS as readonly string[]).includes(value);
 }
@@ -72,7 +78,7 @@ export function groupByKind(docs: VoiceDocument[]): Map<DocumentKind, VoiceDocum
   return Map.groupBy(docs, (doc) => documentKind(doc.source));
 }
 
-// Alternate rather than cut, so both halves draw on the same sessions and dates.
+// Alternate rather than cut, so both halves span the same stretch of the corpus.
 export function splitHalves<T>(items: T[]): [T[], T[]] {
   const left: T[] = [];
   const right: T[] = [];

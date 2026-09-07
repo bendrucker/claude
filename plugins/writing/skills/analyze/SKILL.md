@@ -139,7 +139,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/rate-nulls.ts --kind message --splits 2000 --see
 
 The baseline is shuffled and split in half `--splits` times and each feature's between-half gap recorded. The floor is the `--percentile` value of that distribution, so it is an estimate of the null maximum rather than the single draw the word and tag layers take. Feature rates are computed once per document and the splits average over indices, which is why thousands of splits cost no more than a few.
 
-Every feature is printed with its gap, its floor, and the ratio between them. Thirteen of the sixteen features clear their floor on the full corpus. `causal_language_rate`, `question_mark_rate` and `p90_sentence_length` did not, held across four seeds at 2,000 splits, and were deleted.
+Every feature is printed with its gap, its floor, and the ratio between them. All thirteen features in `voice-delta.ts` clear their floor on the full corpus. Retire a feature whose gap fails to clear its floor across several seeds at a high split count (2,000 splits). A single seed's floor is one draw and is not conclusive on its own.
 
 A baseline too small to split leaves a feature unfloored, printed as `n/a`, and it stays. A `--kind` selection that matches no corpus A document is refused, since every gap would then equal the baseline mean and read as signal.
 

@@ -10,7 +10,7 @@
     "results": "bun ../../../../evals/scripts/export-run.ts --suite pr-body"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.116.0",
+    "@anthropic-ai/sdk": "^0.122.0",
     "cleye": "^2.2.1",
     "zod": "^4.4.3"
   },

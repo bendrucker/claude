@@ -1,10 +1,10 @@
 {
   "name": "skill-lint",
   "version": "0.0.1",
-  "type": "module",
   "bin": {
     "skill-lint": "./cli.ts"
   },
+  "type": "module",
   "scripts": {
     "test": "bun test"
   }

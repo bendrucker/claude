@@ -6,6 +6,7 @@ description: >
   cold intent-and-expressiveness audit reported back. Dispatch with a PR URL or number.
 disallowedTools: Edit, Write, NotebookEdit
 isolation: worktree
+model: inherit
 color: cyan
 initialPrompt: >
   Review this pull request with fresh eyes in your isolated worktree. Check out

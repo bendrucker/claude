@@ -71,11 +71,19 @@ A new host needs its secret kept outside the sandbox, and never add an upload-ca
 
 Go CLIs need no entry. `sandbox.network.allowMachLookup` lets Go's `crypto/x509` reach the system `trustd` daemon for TLS verification profile-wide.
 
+## Environment
+
+The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered under Hosts.
+
+`CLAUDE_CODE_SUBAGENT_MODEL=opus` is the model for a spawn with no `model` at the call site and none in the agent's frontmatter. Explicit params, pinned agents, and `model: inherit` (the built-in `Plan`, [`user/agents/review.md`](../user/agents/review.md)) all rank above it. The target is a Fable parent, where a bare `general-purpose` spawn otherwise inherits Fable: 150 did over July and August 2026, and the 35 implementation agents among them would have done the same work on Opus at half the rate. Under a Sonnet or Haiku parent it upgrades a bare spawn to Opus, which the `agent-model` hook flags. `Explore` already carries this cap in the CLI binary.
+
+**Drop it** if the hook's steering alone is enough. Around 2026-10-15, run the [`delegation`](../plugins/claude-code/skills/session/resources/queries/delegation.sql) query with `host` set to `local` and `after_date` to the day this shipped, and read the `generic` path under a `fable` parent. If every spawn there names a `model` or pins a type, the default never fired. Also drop it when a later CLI caps `general-purpose` under Fable natively.
+
 ## Hooks
 
 Why a hook entry in `user/settings.json` earns its place, and what would retire it, for the entries that ship no `README.md` of their own. The hook scripts live in [`user/hooks/`](../user/hooks).
 
-[`agent-model`](../user/hooks/agent-model) warns, on a `PreToolUse` matching `Agent`, when a spawn names neither a `model` nor a `subagent_type` that pins one and the parent is running opus or fable. It enforces the delegation rule already written in `user/CLAUDE.md`, which spawns were ignoring: over the 30 days to 2026-09-01, 34 `general-purpose` and 30 bare spawns under opus-family parents carried no `model` and resolved to opus, and their task descriptions were lookup and fan-out shaped. It emits `additionalContext` and no `permissionDecision`, so the spawn still proceeds. `PreToolUse` carries no model field, so the parent's family comes from the last assistant record in the tail of `transcript_path`, and an unresolvable model stays silent.
+[`agent-model`](../user/hooks/agent-model) warns, on a `PreToolUse` matching `Agent`, when a spawn names neither a `model` nor a `subagent_type` that pins one and the model it resolves to, `CLAUDE_CODE_SUBAGENT_MODEL` or else the parent's, is opus or fable. It enforces the delegation rule already written in `user/CLAUDE.md`, which spawns were ignoring: over the 30 days to 2026-09-01, 34 `general-purpose` and 30 bare spawns under opus-family parents carried no `model` and resolved to opus, and their task descriptions were lookup and fan-out shaped. It emits `additionalContext` and no `permissionDecision`, so the spawn still proceeds. `PreToolUse` carries no model field, so the parent's family comes from the last assistant record in the tail of `transcript_path`, and an unresolvable model stays silent.
 
 **Delete it** if the gap it targets has not closed. Around 2026-10-15, run the `claude-code:session` skill's [`delegation`](../plugins/claude-code/skills/session/resources/queries/delegation.sql) query with `host` set to `local` and `after_date` to the day this shipped, and read the `generic` path under an opus or fable `parent_family`. If `cheaper_override_rate_pct` has not risen and the count of spawns carrying no override has not fallen, the warning is not changing behavior and the hook goes.
 

@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import type { ModelFamily } from "../../scripts/model";
-import { decide, latestFamily, parentFamily, spawnNeedsModel, warning } from "./index";
+import {
+  decide,
+  latestFamily,
+  parentFamily,
+  spawnNeedsModel,
+  subagentDefault,
+  warning,
+} from "./index";
 
 const TMP_DIR = process.env.TMPDIR ?? "/tmp";
 
@@ -23,53 +30,76 @@ function assistant(model: string): AssistantRecord {
   return { type: "assistant", message: { role: "assistant", model } };
 }
 
+const bare = { description: "look up a symbol" };
+const generic = { subagent_type: "general-purpose" };
+
 describe("decide", () => {
-  test.each<[string, unknown, ModelFamily | null, boolean]>([
-    ["bare spawn under opus", { description: "look up a symbol" }, "opus", true],
-    ["general-purpose under opus", { subagent_type: "general-purpose" }, "opus", true],
-    ["bare spawn under fable", { description: "look up a symbol" }, "fable", true],
-    ["general-purpose under fable", { subagent_type: "general-purpose" }, "fable", true],
-    ["empty model string under opus", { model: "" }, "opus", true],
-    ["pinned type under opus", { subagent_type: "analyst" }, "opus", false],
-    ["fork under opus", { subagent_type: "fork" }, "opus", false],
-    [
-      "explicit model under opus",
-      { subagent_type: "general-purpose", model: "haiku" },
-      "opus",
-      false,
-    ],
-    ["bare spawn with explicit model", { model: "sonnet" }, "opus", false],
-    ["general-purpose under sonnet", { subagent_type: "general-purpose" }, "sonnet", false],
-    ["bare spawn under haiku", { description: "look up a symbol" }, "haiku", false],
-    ["bare spawn under an unknown parent", { description: "look up a symbol" }, null, false],
-    ["tool input that is not an object", "general-purpose", "opus", false],
-  ])("%s", async (_name, toolInput, family, warns) => {
-    const output = await decide(mockInput(toolInput), () => Promise.resolve(family));
+  test.each<[string, unknown, ModelFamily | null, ModelFamily | null, boolean]>([
+    ["bare spawn under opus", bare, "opus", null, true],
+    ["general-purpose under opus", generic, "opus", null, true],
+    ["bare spawn under fable", bare, "fable", null, true],
+    ["general-purpose under fable", generic, "fable", null, true],
+    ["empty model string under opus", { model: "" }, "opus", null, true],
+    ["pinned type under opus", { subagent_type: "analyst" }, "opus", null, false],
+    ["fork under opus", { subagent_type: "fork" }, "opus", null, false],
+    ["explicit model under opus", { ...generic, model: "haiku" }, "opus", null, false],
+    ["bare spawn with explicit model", { model: "sonnet" }, "opus", null, false],
+    ["general-purpose under sonnet", generic, "sonnet", null, false],
+    ["bare spawn under haiku", bare, "haiku", null, false],
+    ["bare spawn under an unknown parent", bare, null, null, false],
+    ["tool input that is not an object", "general-purpose", "opus", null, false],
+    ["bare spawn under fable with an opus default", bare, "fable", "opus", true],
+    ["bare spawn under sonnet with an opus default", bare, "sonnet", "opus", true],
+    ["bare spawn under fable with a sonnet default", bare, "fable", "sonnet", false],
+    ["explicit model with an opus default", { model: "haiku" }, "sonnet", "opus", false],
+  ])("%s", async (_name, toolInput, family, fallback, warns) => {
+    const output = await decide(mockInput(toolInput), () => Promise.resolve(family), fallback);
     if (!warns) {
       expect(output).toBeNull();
       return;
     }
+    const resolved = fallback ?? family;
+    if (resolved === null) throw new Error("a warning needs a resolved family");
     const specific = output?.hookSpecificOutput;
     expect(specific?.hookEventName).toBe("PreToolUse");
     expect(specific).not.toHaveProperty("permissionDecision");
     expect(specific && "additionalContext" in specific ? specific.additionalContext : null).toBe(
-      family === null ? null : warning(family),
+      warning(resolved, fallback !== null),
     );
   });
 
-  test("skips the transcript read when the spawn already names a model", async () => {
+  test.each<[string, unknown, ModelFamily | null]>([
+    ["the spawn already names a model", { model: "haiku" }, null],
+    ["a settings default applies", bare, "opus"],
+  ])("skips the transcript read when %s", async (_name, toolInput, fallback) => {
     let resolved = 0;
-    const output = await decide(mockInput({ model: "haiku" }), () => {
-      resolved++;
-      return Promise.resolve("opus" as ModelFamily);
-    });
-    expect(output).toBeNull();
+    await decide(
+      mockInput(toolInput),
+      () => {
+        resolved++;
+        return Promise.resolve("opus" as ModelFamily);
+      },
+      fallback,
+    );
     expect(resolved).toBe(0);
   });
 });
 
+describe("subagentDefault", () => {
+  test.each<[string, string | undefined, ModelFamily | null]>([
+    ["unset", undefined, null],
+    ["empty", "", null],
+    ["inherit", "inherit", null],
+    ["alias", "opus", "opus"],
+    ["full id", "claude-sonnet-5", "sonnet"],
+    ["unknown", "claude-unknown-1", null],
+  ])("%s", (_name, value, expected) => {
+    expect(subagentDefault({ CLAUDE_CODE_SUBAGENT_MODEL: value })).toBe(expected);
+  });
+});
+
 test("warning text", () => {
-  expect(warning("opus")).toMatchSnapshot();
+  expect([warning("opus", true), warning("fable", false)].join("\n\n---\n\n")).toMatchSnapshot();
 });
 
 describe("spawnNeedsModel", () => {

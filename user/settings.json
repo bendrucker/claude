@@ -600,6 +600,7 @@
     "TMPPREFIX": "/tmp/claude/zsh",
     "WORKTRUNK_WORKTREE_PATH": ".worktrees/{{ branch | sanitize }}",
     "CLAUDE_CODE_NO_FLICKER": "1",
-    "NODE_USE_ENV_PROXY": "1"
+    "NODE_USE_ENV_PROXY": "1",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "opus"
   }
 }

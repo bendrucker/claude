@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { check as headingCheck } from "./headings";
 import type { SyncHookJSONOutput } from "./io";
-import { dispatch } from "./pretooluse";
+import { dispatch, targetOf } from "./pretooluse";
 
 // Session-state files land in $TMPDIR. Redirect it so test runs do not litter
 // the shared OS temp dir with per-UUID state files.
@@ -64,9 +64,15 @@ describe("single output per tool call", () => {
     expect(typeof duration_ms).toBe("number");
     expect(stable).toMatchInlineSnapshot(`
       {
+        "categories": [
+          "numbering",
+          "title case heading",
+          "spaced em dash",
+        ],
         "category": "numbering",
         "ext": "md",
         "outcome": "context",
+        "target": "4ece0350c8d2e88b",
         "tool": "Write",
       }
     `);
@@ -266,6 +272,39 @@ describe("heading checker gate", () => {
       expect(log.category ?? null).toBe(direct?.category ?? null);
     },
   );
+});
+
+describe("accept-and-flag logging", () => {
+  const clean = { file_path: "docs/draft.md", content: "# Cache Layer\n\nPlain.\n" };
+
+  it("records every category the checkers found, not only the tier winner", async () => {
+    const { log } = await dispatch(
+      mockInput("Write", { file_path: "docs/draft.md", content: MULTI_VIOLATION }),
+    );
+    expect(log.categories?.length).toBeGreaterThan(1);
+    expect(log.categories).toContain(log.category);
+  });
+
+  it("records an empty category list when the checkers found nothing", async () => {
+    const { log } = await dispatch(mockInput("Write", clean));
+    expect(log.categories).toEqual([]);
+  });
+
+  it("omits the category list on a run that returned before the checkers", async () => {
+    const { log } = await dispatch(mockInput("Write", clean, { permission_mode: "plan" }));
+    expect(log.categories).toBeUndefined();
+  });
+
+  it("hashes the file path so repeat writes correlate without the path", async () => {
+    const { log } = await dispatch(mockInput("Write", clean));
+    expect(log.target).toBe(targetOf("docs/draft.md"));
+    expect(log.target).not.toContain("draft");
+  });
+
+  it("records no target for a tool that names no file", async () => {
+    const { log } = await dispatch(mockInput("Bash", { command: "echo hi" }));
+    expect(log.target).toBeUndefined();
+  });
 });
 
 describe("shared skips", () => {

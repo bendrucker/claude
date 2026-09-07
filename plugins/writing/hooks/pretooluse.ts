@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import {
   getExtension,
@@ -29,6 +30,11 @@ function filePathOf(input: PreToolUseHookInput): string | undefined {
   return toolInputOf(input).file_path;
 }
 
+/** Correlates successive writes to one file without logging the path. */
+export function targetOf(filePath: string): string {
+  return createHash("sha256").update(filePath, "utf8").digest("hex").slice(0, 16);
+}
+
 // Every heading check is markdown-only: `headings.check` returns null for any
 // other extension and for the Bash surface, which is most of what this hook
 // sees. Its module graph is not free, though. It reaches an AP title-case
@@ -52,12 +58,13 @@ export async function dispatch(
   const filePath = filePathOf(input);
   const ext = filePath != null && filePath !== "" ? getExtension(filePath) : "";
 
-  const base = {
+  const base: Omit<RunLogEntry, "duration_ms" | "outcome"> = {
     ts: new Date(now).toISOString(),
     session_id: input.session_id,
     tool: input.tool_name,
     ext,
   };
+  if (filePath != null && filePath !== "") base.target = targetOf(filePath);
 
   const finish = (
     output: SyncHookJSONOutput | null,
@@ -94,7 +101,12 @@ export async function dispatch(
       );
     }
   }
-  if (results.length === 0) return finish(null, "silent");
+  // `categories` records what the checkers found, which is what a later run on
+  // the same target is compared against. It is set only past this point: an
+  // earlier return means the checkers never ran, and an absent list must not
+  // read as a clean run.
+  const categories = results.map((result) => result.category);
+  if (results.length === 0) return finish(null, "silent", { categories });
 
   // Stable sort: within a tier the earliest checker keeps priority. A
   // suppressed winner falls through to the next result rather than muting
@@ -114,13 +126,14 @@ export async function dispatch(
       // oxlint-disable-next-line no-await-in-loop -- the loop returns at the first unsuppressed result, and recentlyFired reads state recordFired writes.
       await recordFired(input.session_id, result.category, now);
     }
-    return finish(result.output, tier, { category: result.category });
+    return finish(result.output, tier, { category: result.category, categories });
   }
-  return finish(
-    null,
-    "silent",
-    suppressed ? { category: suppressed.category, suppressed: true } : {},
-  );
+  const extra: Partial<RunLogEntry> = { categories };
+  if (suppressed) {
+    extra.category = suppressed.category;
+    extra.suppressed = true;
+  }
+  return finish(null, "silent", extra);
 }
 
 const HookInput = z.looseObject({

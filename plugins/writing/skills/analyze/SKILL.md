@@ -140,7 +140,11 @@ bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --since 2026-07-01 --json
 bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --log /path/to/log.jsonl
 ```
 
-It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, and per-category fire/suppress counts. The report ends with an opportunities list, each naming a concrete fix (including when a clean streak means flipping the `WRITING_HOOKS_LOG` default to off). Fixes land in the plugin (wordlists, `detection/`, `hooks/`), then the next audit's log confirms or refutes them.
+It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, per-category fire/suppress counts, and an acted-on column.
+
+A fire count says how loud a rule is, not whether it was right. The acted-on column pairs each shown finding with the next checked run on the same file: a rule the later run no longer raises was acted on, one it still raises was written past. That ratio is the precision proxy the fire count cannot give. It reads `n/a` until pairs close, and the opportunities list says acceptance is unmeasurable rather than printing a rate over no data. Recall stays outside the log's reach, since a rule that never fired leaves no line.
+
+The report ends with an opportunities list, each naming a concrete fix. Flipping the `WRITING_HOOKS_LOG` default to off is offered only once acceptance is measurable, since turning the log off before then forecloses the measurement. Fixes land in the plugin (wordlists, `detection/`, `hooks/`), then the next audit's log confirms or refutes them.
 
 ## Corpora and Verdicts
 

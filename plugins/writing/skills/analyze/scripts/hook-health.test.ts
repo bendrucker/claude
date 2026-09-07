@@ -1,6 +1,14 @@
 import { describe, expect, it, test } from "bun:test";
 import type { RunLogEntry } from "../../../hooks/run-log";
-import { type HookHealth, opportunities, parseLog, renderReport, summarize } from "./hook-health";
+import {
+  acceptance,
+  type CategoryHealth,
+  type HookHealth,
+  opportunities,
+  parseLog,
+  renderReport,
+  summarize,
+} from "./hook-health";
 
 function entry(overrides: Partial<RunLogEntry> = {}): RunLogEntry {
   return {
@@ -55,15 +63,92 @@ describe("summarize", () => {
     expect(health.byOutcome["skipped-scratch"]).toBe(1);
     expect(health.byTool.Bash).toBe(1);
     expect(health.categories).toEqual([
-      { category: "numbering", fired: 1, suppressed: 1, share: 0.5 },
-      { category: "spaced em dash", fired: 1, suppressed: 0, share: 0.5 },
+      { category: "numbering", fired: 1, suppressed: 1, share: 0.5, revisited: 0, accepted: 0 },
+      {
+        category: "spaced em dash",
+        fired: 1,
+        suppressed: 0,
+        share: 0.5,
+        revisited: 0,
+        accepted: 0,
+      },
     ]);
     expect(health.latency.max).toBe(20);
     expect(health.latency.silentP95).toBe(4);
   });
 });
 
+describe("acceptance", () => {
+  function shown(overrides: Partial<RunLogEntry> = {}): RunLogEntry {
+    return entry({ outcome: "context", category: "numbering", target: "f1", ...overrides });
+  }
+
+  it("counts a finding the next checked run no longer raises as acted on", () => {
+    const counts = acceptance([shown(), entry({ target: "f1", categories: [] })]);
+    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 1 });
+  });
+
+  it("counts a finding the next checked run still raises as revisited only", () => {
+    const counts = acceptance([shown(), entry({ target: "f1", categories: ["numbering"] })]);
+    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 0 });
+  });
+
+  it("pairs past a later run that ranked a different category first", () => {
+    const counts = acceptance([
+      shown(),
+      entry({
+        outcome: "deny",
+        category: "spaced em dash",
+        target: "f1",
+        categories: ["numbering"],
+      }),
+    ]);
+    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 0 });
+  });
+
+  it("seeds no pair from a suppressed finding", () => {
+    const counts = acceptance([
+      shown({ outcome: "silent", suppressed: true }),
+      entry({ target: "f1", categories: [] }),
+    ]);
+    expect(counts.size).toBe(0);
+  });
+
+  it("closes no pair on a run that returned before the checkers", () => {
+    const counts = acceptance([shown(), entry({ target: "f1", outcome: "skipped-scratch" })]);
+    expect(counts.size).toBe(0);
+  });
+
+  it("pairs only within one session and one file", () => {
+    const counts = acceptance([
+      shown(),
+      entry({ target: "f2", categories: [] }),
+      entry({ session_id: "s2", target: "f1", categories: [] }),
+    ]);
+    expect(counts.size).toBe(0);
+  });
+
+  it("ignores entries logged before targets were recorded", () => {
+    const counts = acceptance([
+      entry({ outcome: "context", category: "numbering" }),
+      entry({ categories: [] }),
+    ]);
+    expect(counts.size).toBe(0);
+  });
+});
+
 describe("opportunities", () => {
+  // Acceptance gates the retirement message, so a baseline that raises nothing
+  // still needs pairs closed.
+  const measured: CategoryHealth = {
+    category: "numbering",
+    fired: 10,
+    suppressed: 0,
+    share: 0.1,
+    revisited: 25,
+    accepted: 22,
+  };
+
   function baseline(overrides: Partial<HookHealth> = {}): HookHealth {
     const quiet = summarize(
       daysApart(
@@ -71,7 +156,7 @@ describe("opportunities", () => {
         7,
       ),
     );
-    return { ...quiet, ...overrides };
+    return { ...quiet, injections: 100, categories: [measured], ...overrides };
   }
 
   it("asks for more evidence on a thin log", () => {
@@ -83,7 +168,7 @@ describe("opportunities", () => {
   it("flags a category dominating injections", () => {
     const health = baseline({
       injections: 100,
-      categories: [{ category: "test result reporting", fired: 40, suppressed: 2, share: 0.4 }],
+      categories: [{ ...measured, category: "test result reporting", fired: 40, share: 0.4 }],
     });
     expect(opportunities(health).join("\n")).toContain("test result reporting");
   });
@@ -91,7 +176,7 @@ describe("opportunities", () => {
   it("flags a category suppressed as often as it fires", () => {
     const health = baseline({
       injections: 100,
-      categories: [{ category: "numbering", fired: 10, suppressed: 15, share: 0.1 }],
+      categories: [{ ...measured, suppressed: 15 }],
     });
     expect(opportunities(health).join("\n")).toContain("suppressed as often as it fires");
   });
@@ -112,6 +197,20 @@ describe("opportunities", () => {
     const health = baseline();
     health.byOutcome["skipped-scratch"] = Math.round(health.total * 0.7);
     expect(opportunities(health).join("\n")).toContain("skipped-scratch");
+  });
+
+  it("reports acceptance as unmeasurable rather than printing a rate", () => {
+    const found = opportunities(
+      baseline({ categories: [{ ...measured, revisited: 0, accepted: 0 }] }),
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("not measurable yet");
+    expect(found[0]).toContain("Keep the log on");
+  });
+
+  it("flags a rule acted on less than half the time", () => {
+    const health = baseline({ categories: [{ ...measured, revisited: 30, accepted: 9 }] });
+    expect(opportunities(health).join("\n")).toContain("acted on after 9 of 30");
   });
 
   it("points at the log retirement trigger when nothing is raised", () => {
@@ -136,5 +235,16 @@ describe("renderReport", () => {
     expect(report).toContain("runs/day");
     expect(report).toContain("numbering");
     expect(report).toContain("Opportunities:");
+  });
+
+  test("marks a rule with no closed pair n/a and prints the ratio once one closes", () => {
+    const unmeasured = summarize([entry({ outcome: "context", category: "numbering" })]);
+    expect(renderReport(unmeasured)).toContain("n/a");
+
+    const measured = summarize([
+      entry({ outcome: "context", category: "numbering", target: "f1" }),
+      entry({ ts: "2026-07-01T00:01:00.000Z", target: "f1", categories: [] }),
+    ]);
+    expect(renderReport(measured)).toContain("1/1 100%");
   });
 });

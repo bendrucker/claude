@@ -35,7 +35,7 @@ Context-tier findings are suppressed when the same rule category already fired i
 
 #### Run Log
 
-Every dispatcher run appends one JSONL line to `~/.claude/writing-hooks/log.jsonl` (rotated past 5 MB): timestamp, session, tool, extension, duration, outcome (`silent | context | ask | deny | skipped-scratch`), category, and suppression. This is the evidence surface for auditing the hooks' cost and precision. `WRITING_HOOKS_LOG=0` disables it, and a path value redirects it. The `writing:analyze` skill reads it through [`skills/analyze/scripts/hook-health.ts`](skills/analyze/scripts/hook-health.ts), which summarizes volume, latency, and per-rule fire/suppress counts and raises fix opportunities. Once two consecutive health checks come back stable, flip the default off.
+Every dispatcher run appends one JSONL line to `~/.claude/writing-hooks/log.jsonl` (rotated past 5 MB): timestamp, session, tool, extension, duration, outcome (`silent | context | ask | deny | skipped-scratch`), the winning category and whether it was suppressed, a hash of the file path, and every category the checkers found. The last two are what make acceptance measurable: a rule shown on one write and absent from the next write to the same file was acted on. This is the evidence surface for auditing the hooks' cost and precision. `WRITING_HOOKS_LOG=0` disables it, and a path value redirects it. The `writing:analyze` skill reads it through [`skills/analyze/scripts/hook-health.ts`](skills/analyze/scripts/hook-health.ts), which summarizes volume, latency, per-rule fire/suppress counts, and how often each rule was acted on, then raises fix opportunities. Once two consecutive health checks come back stable, flip the default off.
 
 ## Testing
 

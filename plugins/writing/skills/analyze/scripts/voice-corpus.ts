@@ -1,3 +1,5 @@
+import { isProseFile } from "../../../detection/paths";
+
 export interface VoiceDocument {
   source: string;
   meta: string;
@@ -31,6 +33,43 @@ export function parseCorpus(text: string): VoiceDocument[] {
   }
   flush();
   return docs;
+}
+
+// The genre of a document, read off its source pointer: the file the prose was
+// written to, or a session id when the miner found it on a command line instead
+// (`gh pr create --body`, `git commit -m`), which makes it a message.
+export type DocumentKind = "message" | "plan" | "memory" | "scratch" | "docs" | "other";
+
+export const DOCUMENT_KINDS: readonly DocumentKind[] = [
+  "message",
+  "plan",
+  "memory",
+  "scratch",
+  "docs",
+  "other",
+];
+
+// Sources carry an occurrence index so a file written repeatedly stays distinct.
+const OCCURRENCE_SUFFIX = /#\d+$/;
+// Tool inputs record scratch paths both absolutely and relative to a repo root.
+const SCRATCH_DIR = /(?:^|\/)tmp\//;
+
+export function documentKind(source: string): DocumentKind {
+  const path = source.replace(OCCURRENCE_SUFFIX, "");
+  if (!path.includes("/")) return "message";
+  if (path.includes("/.claude/plans/")) return "plan";
+  if (path.includes("/memory/")) return "memory";
+  if (SCRATCH_DIR.test(path)) return "scratch";
+  if (isProseFile(path)) return "docs";
+  return "other";
+}
+
+export function isDocumentKind(value: string): value is DocumentKind {
+  return (DOCUMENT_KINDS as readonly string[]).includes(value);
+}
+
+export function groupByKind(docs: VoiceDocument[]): Map<DocumentKind, VoiceDocument[]> {
+  return Map.groupBy(docs, (doc) => documentKind(doc.source));
 }
 
 export function formatDocument(doc: VoiceDocument): string {

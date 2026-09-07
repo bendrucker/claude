@@ -18,8 +18,16 @@ import {
   WORDLISTS,
 } from "../../../detection/wordlists";
 import { contrastCorpusPath, registerPaths, resolveDataDir, voiceBaselineDir } from "./data-dir";
-import { rank, type RankedTerm, stemTerm, tokenizeCorpus } from "./fightin-words";
-import { parseCorpus, type VoiceDocument } from "./voice-corpus";
+import { rank, type RankedTerm, type RankOptions, stemTerm, tokenizeCorpus } from "./fightin-words";
+import {
+  DOCUMENT_KINDS,
+  documentKind,
+  type DocumentKind,
+  groupByKind,
+  isDocumentKind,
+  parseCorpus,
+  type VoiceDocument,
+} from "./voice-corpus";
 
 const LAYER_BY_CATEGORY = new Map<string, DetectorLayer>(
   [...PATTERNS, ...WEIGHTED_PATTERNS].map((pattern) => [pattern.category, pattern.layer]),
@@ -134,6 +142,30 @@ export function splitHalves(docs: VoiceDocument[]): [VoiceDocument[], VoiceDocum
   return [left, right];
 }
 
+export interface KindFloor {
+  kind: DocumentKind;
+  docs: number;
+  maxZ: number | null;
+}
+
+// Splitting each kind against itself prices the genre gap. A kind whose own
+// floor sits near the cross-corpus scores offers nothing a contrast can read as
+// voice, and a kind with no counterpart register cannot be paired at all.
+export function nullFloorByKind(docs: VoiceDocument[], options: RankOptions): KindFloor[] {
+  const groups = groupByKind(docs);
+  return DOCUMENT_KINDS.filter((kind) => groups.has(kind)).map((kind) => {
+    const group = groups.get(kind) ?? [];
+    if (group.length < 2) return { kind, docs: group.length, maxZ: null };
+    const [left, right] = splitHalves(group);
+    const ranked = rank(
+      tokenizeCorpus(left, options.sizes),
+      tokenizeCorpus(right, options.sizes),
+      options,
+    );
+    return { kind, docs: group.length, maxZ: ranked[0]?.z ?? null };
+  });
+}
+
 async function readCorpus(path: string): Promise<VoiceDocument[]> {
   const file = Bun.file(path);
   if (!(await file.exists())) throw new Error(`No corpus at ${path}`);
@@ -149,6 +181,8 @@ export interface OverlapReport {
   studyPath: string;
   studyDocs: number;
   studyTokens: number;
+  kinds: DocumentKind[];
+  kindFloors: KindFloor[];
   baselineNames: string[];
   baselineDocs: number;
   baselineTokens: number;
@@ -167,7 +201,8 @@ export interface OverlapReport {
 export function renderReport(report: OverlapReport): string {
   const { summary } = report;
   const lines = [
-    `corpus A  ${report.studyDocs} docs, ${report.studyTokens.toLocaleString()} tokens  ${report.studyPath}`,
+    `corpus A  ${report.studyDocs} docs, ${report.studyTokens.toLocaleString()} tokens  ` +
+      `kinds ${report.kinds.join(",")}  ${report.studyPath}`,
     `corpus B  ${report.baselineDocs} docs, ${report.baselineTokens.toLocaleString()} tokens  ${report.baselineNames.join(", ")}`,
     `prior ${report.prior}  sizes ${report.sizes.join(",")}  min-count ${report.minCount}  min-docs ${report.minDocs}`,
     "",
@@ -176,8 +211,19 @@ export function renderReport(report: OverlapReport): string {
     `  matched by any vocabulary-layer rule    ${summary.lexical} (${pct(summary.lexical, summary.considered)})`,
     `  example sentence trips any rule at all  ${summary.sentence} (${pct(summary.sentence, summary.considered)})`,
     "",
-    `null control (corpus A split in half): max z=${report.nullTop[0]?.z.toFixed(2) ?? "n/a"}, ` +
-      `top terms ${report.nullTop.map((row) => row.term).join(", ")}`,
+    ...(report.nullTop.length > 0
+      ? [
+          `null control (corpus A split in half): max z=${report.nullTop[0]?.z.toFixed(2) ?? "n/a"}, ` +
+            `top terms ${report.nullTop.map((row) => row.term).join(", ")}`,
+          "",
+        ]
+      : []),
+    "null floor by kind (each kind split against itself)",
+    ...report.kindFloors.map(
+      (floor) =>
+        `  ${floor.kind.padEnd(8)} ${String(floor.docs).padStart(5)} docs  ` +
+        `max z=${floor.maxZ === null ? "n/a" : floor.maxZ.toFixed(2)}`,
+    ),
     "",
     `curated entries, ranked over ${report.curatedPool.toLocaleString()} terms at min-count 1`,
     ...report.recall.map((row) => {
@@ -204,6 +250,9 @@ export function renderReport(report: OverlapReport): string {
 if (import.meta.main) {
   const argv = cli({
     name: "wordlist-overlap",
+    // A mistyped flag would otherwise be ignored, and the report would answer a
+    // different question than the one asked.
+    strictFlags: true,
     help: {
       description:
         "Rank agent-authored prose against the pre-agent voice baseline by log-odds " +
@@ -221,9 +270,13 @@ if (import.meta.main) {
         description:
           "Corpus B register filenames. Repeatable. Default: github-prs.txt, github-issues.txt",
       },
+      kind: {
+        type: [String],
+        description: `Corpus A document kinds to keep. Repeatable. One of ${DOCUMENT_KINDS.join(", ")}.`,
+      },
       studyFilter: {
         type: String,
-        description: "Keep only corpus A documents whose source matches this regex",
+        description: "Narrow the kinds further to corpus A sources matching this regex",
       },
       sizes: { type: [Number], description: "N-gram sizes. Default: 1 and 2" },
       prior: { type: Number, default: 500, description: "Dirichlet concentration (alpha-0)" },
@@ -250,12 +303,22 @@ if (import.meta.main) {
     return found;
   });
 
-  const filter = argv.flags.studyFilter === undefined ? null : new RegExp(argv.flags.studyFilter);
+  const kinds = argv.flags.kind.map((kind) => {
+    if (!isDocumentKind(kind)) {
+      throw new Error(`Unknown kind ${kind}. One of ${DOCUMENT_KINDS.join(", ")}.`);
+    }
+    return kind;
+  });
+  const selected = new Set(kinds.length > 0 ? kinds : DOCUMENT_KINDS);
+
   const [studyAll, ...perRegister] = await Promise.all([
     readCorpus(studyPath),
     ...baselinePaths.map(readCorpus),
   ]);
-  const studyDocs = filter === null ? studyAll : studyAll.filter((doc) => filter.test(doc.source));
+  const filter = argv.flags.studyFilter === undefined ? null : new RegExp(argv.flags.studyFilter);
+  const studyDocs = studyAll.filter(
+    (doc) => selected.has(documentKind(doc.source)) && (filter?.test(doc.source) ?? true),
+  );
   const baselineDocs = perRegister.flat();
 
   // Min-count 1 over sizes 1 through 3 so every curated entry gets a position,
@@ -272,13 +335,17 @@ if (import.meta.main) {
     coverage: coverageOf(row.term, row.example),
   }));
 
-  const [leftDocs, rightDocs] = splitHalves(studyDocs);
-  const nullRanked = rank(tokenizeCorpus(leftDocs, sizes), tokenizeCorpus(rightDocs, sizes), {
-    sizes,
-    prior,
-    minCount,
-    minDocs,
-  });
+  const nullOptions = { sizes, prior, minCount, minDocs };
+  const kindFloors = nullFloorByKind(studyDocs, nullOptions);
+  // Over a single kind the aggregate control splits the same documents into the
+  // same halves, so it would report that kind's floor a second time.
+  const [leftDocs, rightDocs]: [VoiceDocument[], VoiceDocument[]] =
+    kindFloors.length > 1 ? splitHalves(studyDocs) : [[], []];
+  const nullRanked = rank(
+    tokenizeCorpus(leftDocs, sizes),
+    tokenizeCorpus(rightDocs, sizes),
+    nullOptions,
+  );
 
   const [plain, weighted] = await Promise.all([
     Promise.all(PLAIN_LISTS.map(readWordlist)),
@@ -292,7 +359,11 @@ if (import.meta.main) {
     // Examples carry verbatim corpus prose, which stays out of any file.
     const terms = measured.map(({ row: { example, ...row }, coverage }) => ({ row, coverage }));
     process.stdout.write(
-      `${JSON.stringify({ summary: summarize(measured), recall, terms }, null, 2)}\n`,
+      `${JSON.stringify(
+        { kinds: [...selected], kindFloors, summary: summarize(measured), recall, terms },
+        null,
+        2,
+      )}\n`,
     );
   } else {
     process.stdout.write(
@@ -300,6 +371,8 @@ if (import.meta.main) {
         studyPath,
         studyDocs: studyDocs.length,
         studyTokens: a.tokens,
+        kinds: [...selected],
+        kindFloors,
         baselineNames,
         baselineDocs: baselineDocs.length,
         baselineTokens: b.tokens,

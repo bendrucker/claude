@@ -10,7 +10,13 @@ import {
   selectCorpora,
 } from "./corpus-selection";
 
-const NO_FLAGS: CorpusFlags = { baseline: [], kind: [] };
+const NO_FLAGS: CorpusFlags = {
+  baseline: [],
+  kind: [],
+  dataDir: undefined,
+  study: undefined,
+  studyFilter: undefined,
+};
 
 function document(source: string, body: string): string {
   return `===== ${source} (2026-01-01) =====\n${body}\n`;

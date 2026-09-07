@@ -8,6 +8,7 @@
 import { cli } from "cleye";
 import {
   CORPUS_FLAGS,
+  corpusHeader,
   type CorpusHeader,
   corpusHeaderLines,
   selectCorpora,
@@ -355,17 +356,10 @@ if (import.meta.main) {
   } else {
     process.stdout.write(
       `${renderReport({
-        study: {
-          path: selection.study.path,
-          kinds: selection.study.kinds,
-          docs: selection.study.documents.length,
-          tokens: totalTokens(study.bins),
-        },
-        baseline: {
-          names: baseline.names,
-          docs: baseline.documents.length,
-          tokens: totalTokens(referenceBins),
-        },
+        ...corpusHeader(selection, {
+          study: totalTokens(study.bins),
+          baseline: totalTokens(referenceBins),
+        }),
         binWords,
         wordCount,
         measurement,

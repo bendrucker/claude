@@ -10,6 +10,8 @@ import {
   type VoiceDocument,
 } from "./voice-corpus";
 
+const DEFAULT_BASELINES = ["github-prs.txt", "github-issues.txt"];
+
 export const CORPUS_FLAGS = {
   dataDir: { type: String, description: "Override the plugin data directory" },
   study: {
@@ -18,8 +20,7 @@ export const CORPUS_FLAGS = {
   },
   baseline: {
     type: [String],
-    description:
-      "Corpus B register filenames. Repeatable. Default: github-prs.txt, github-issues.txt",
+    description: `Corpus B register filenames. Repeatable. Default: ${DEFAULT_BASELINES.join(", ")}`,
   },
   kind: {
     type: [String],
@@ -58,8 +59,6 @@ export interface CorpusSelection {
   registers: string[];
 }
 
-const DEFAULT_BASELINES = ["github-prs.txt", "github-issues.txt"];
-
 export async function selectCorpora(flags: CorpusFlags): Promise<CorpusSelection> {
   const dataDir = resolveDataDir(flags.dataDir);
   const studyPath = flags.study ?? contrastCorpusPath(dataDir);
@@ -82,8 +81,8 @@ export async function selectCorpora(flags: CorpusFlags): Promise<CorpusSelection
     }
     return kind;
   });
-  const kinds = named.length > 0 ? [...new Set(named)] : [...DOCUMENT_KINDS];
-  const selected = new Set(kinds);
+  const selected = new Set(named.length > 0 ? named : DOCUMENT_KINDS);
+  const kinds = [...selected];
   const filter = flags.studyFilter === undefined ? null : new RegExp(flags.studyFilter);
 
   const [studyAll, perRegister] = await Promise.all([
@@ -108,6 +107,23 @@ export async function selectCorpora(flags: CorpusFlags): Promise<CorpusSelection
 export interface CorpusHeader {
   study: { path: string; kinds: DocumentKind[]; docs: number; tokens: number };
   baseline: { names: string[]; docs: number; tokens: number };
+}
+
+// Tokens come from the caller because each script counts them at a different
+// stage: Delta after binning, overlap after tokenizing.
+export function corpusHeader(
+  { study, baseline }: CorpusSelection,
+  tokens: { study: number; baseline: number },
+): CorpusHeader {
+  return {
+    study: {
+      path: study.path,
+      kinds: study.kinds,
+      docs: study.documents.length,
+      tokens: tokens.study,
+    },
+    baseline: { names: baseline.names, docs: baseline.documents.length, tokens: tokens.baseline },
+  };
 }
 
 export function corpusHeaderLines({ study, baseline }: CorpusHeader): string[] {

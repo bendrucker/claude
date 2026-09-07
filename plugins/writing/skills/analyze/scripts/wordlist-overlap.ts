@@ -19,6 +19,7 @@ import {
 } from "../../../detection/wordlists";
 import {
   CORPUS_FLAGS,
+  corpusHeader,
   type CorpusHeader,
   corpusHeaderLines,
   selectCorpora,
@@ -250,7 +251,8 @@ if (import.meta.main) {
   });
 
   const sizes = argv.flags.sizes.length > 0 ? argv.flags.sizes : [1, 2];
-  const { study, baseline } = await selectCorpora(argv.flags);
+  const selection = await selectCorpora(argv.flags);
+  const { study, baseline } = selection;
 
   // Min-count 1 over sizes 1 through 3 so every curated entry gets a position,
   // including the three-word phrases. Tokenize once at the union of both.
@@ -299,13 +301,7 @@ if (import.meta.main) {
   } else {
     process.stdout.write(
       `${renderReport({
-        study: {
-          path: study.path,
-          kinds: study.kinds,
-          docs: study.documents.length,
-          tokens: a.tokens,
-        },
-        baseline: { names: baseline.names, docs: baseline.documents.length, tokens: b.tokens },
+        ...corpusHeader(selection, { study: a.tokens, baseline: b.tokens }),
         kindFloors,
         prior,
         sizes,

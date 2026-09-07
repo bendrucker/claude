@@ -3,7 +3,12 @@ import { mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type CorpusFlags, corpusHeaderLines, selectCorpora } from "./corpus-selection";
+import {
+  type CorpusFlags,
+  corpusHeader,
+  corpusHeaderLines,
+  selectCorpora,
+} from "./corpus-selection";
 
 const NO_FLAGS: CorpusFlags = { baseline: [], kind: [] };
 
@@ -91,8 +96,24 @@ describe("selectCorpora", () => {
   });
 });
 
+describe("corpusHeader", () => {
+  test("counts what survived selection, not what was on disk", async () => {
+    await withDataDir(async (dataDir) => {
+      const selection = await selectCorpora({ ...NO_FLAGS, dataDir, kind: ["message"] });
+      expect(corpusHeader(selection, { study: 78_424, baseline: 28_411 })).toEqual({
+        study: { path: selection.study.path, kinds: ["message"], docs: 1, tokens: 78_424 },
+        baseline: {
+          names: ["github-prs.txt", "github-issues.txt"],
+          docs: 2,
+          tokens: 28_411,
+        },
+      });
+    });
+  });
+});
+
 describe("corpusHeaderLines", () => {
-  test("names both corpora and what survived selection", () => {
+  test("names both corpora on one line each", () => {
     expect(
       corpusHeaderLines({
         study: { path: "/data/deliverables.txt", kinds: ["message"], docs: 559, tokens: 78_424 },

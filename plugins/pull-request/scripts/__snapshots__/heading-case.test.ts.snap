@@ -1,0 +1,38 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`correctHeadingCase rewrites a sentence-case heading 1`] = `"## Two Fixes Found While Testing"`;
+
+exports[`correctHeadingCase rewrites a over-capitalized stopwords 1`] = `"## Changes to the Parser"`;
+
+exports[`correctHeadingCase rewrites a hyphenated compound 1`] = `"## Follow-Up Tasks"`;
+
+exports[`correctHeadingCase rewrites a inline code in the heading 1`] = `"## Changes to \`validate.ts\` and the Parser"`;
+
+exports[`correctHeadingCase rewrites a closing hash sequence 1`] = `"## Two Fixes Found While Testing ##"`;
+
+exports[`correctHeadingCase rewrites a deeper level under prose 1`] = `
+"Intro.
+
+#### Known Limitation
+
+Detail."
+`;
+
+exports[`correctHeadingCase rewrites a several headings at once 1`] = `
+"## Null Floor
+
+Text.
+
+### Corpus Results
+
+More."
+`;
+
+exports[`correctHeadingCase rewrites a heading beside a fence holding a hash line 1`] = `
+"## Latch Placement
+
+\`\`\`sh
+# not a heading
+\`\`\`
+"
+`;

@@ -111,10 +111,10 @@ describe("processInput", () => {
     ["glab mr update -d", (body) => `glab mr update 3 -d "$(cat ${body})"`],
   ])("checks the body behind %s", async (_form, build) => {
     const bodyFile = join(tempDir, "body.md");
-    await Bun.write(bodyFile, "## Two fixes found while testing\n\nReshapes the resolver.");
+    await Bun.write(bodyFile, "Reshapes the resolver. Added 5 tests.");
     const result = await processInput(createInput(build(bodyFile), repoRoot));
     expect(getPermissionDecision(result)).toBe("deny");
-    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+    expect(getDenyReason(result)).toContain("test counts");
   });
 
   // The body file does not exist when the hook runs: the same command writes
@@ -134,16 +134,13 @@ describe("processInput", () => {
   });
 
   it("resolves a relative body file behind a cd", async () => {
-    const sub = join(tempDir, "sub");
-    await Bun.write(
-      join(sub, "body.md"),
-      "## Two fixes found while testing\n\nReshapes the resolver.",
-    );
+    const bodyFile = join(tempDir, "sub", "body.md");
+    await Bun.write(bodyFile, "Reshapes the resolver. Added 5 tests.");
     const result = await processInput(
       createInput("cd sub && gh pr create --title T --body-file body.md", tempDir),
     );
     expect(getPermissionDecision(result)).toBe("deny");
-    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+    expect(getDenyReason(result)).toContain("test counts");
   });
 
   it("denies body with test count", async () => {
@@ -183,14 +180,71 @@ describe("processInput", () => {
     expect(result).toBeNull();
   });
 
-  it("denies a sentence-case heading in a body file", async () => {
+  it("re-cases a sentence-case heading in the body file and lets the command run", async () => {
     const bodyFile = join(tempDir, "body.md");
     await Bun.write(bodyFile, "## Two fixes found while testing\n\nReshapes the resolver.");
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
     );
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain(
+      '"Two fixes found while testing" → "Two Fixes Found While Testing"',
+    );
+    expect(await Bun.file(bodyFile).text()).toBe(
+      "## Two Fixes Found While Testing\n\nReshapes the resolver.",
+    );
+  });
+
+  it("re-cases a relative body file behind a cd", async () => {
+    const bodyFile = join(tempDir, "sub", "body.md");
+    await Bun.write(bodyFile, "## Corpus results\n\nReshapes the resolver.");
+    const result = await processInput(
+      createInput("cd sub && gh pr create --title T --body-file body.md", tempDir),
+    );
+    expect(getAdditionalContext(result)).toContain(bodyFile);
+    expect(await Bun.file(bodyFile).text()).toBe("## Corpus Results\n\nReshapes the resolver.");
+  });
+
+  it("leaves the file alone and denies when another deny stands with the heading", async () => {
+    const bodyFile = join(tempDir, "body.md");
+    const body = "## Two fixes found while testing\n\nAdded 5 tests.";
+    await Bun.write(bodyFile, body);
+    const result = await processInput(
+      createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
+    );
     expect(getPermissionDecision(result)).toBe("deny");
     expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+    expect(getDenyReason(result)).toContain("test counts");
+    expect(await Bun.file(bodyFile).text()).toBe(body);
+  });
+
+  // The file the command names does not exist yet: the command's own heredoc
+  // writes it, and would overwrite anything the hook put there.
+  it("denies a heading in a heredoc body instead of correcting it", async () => {
+    const bodyFile = join(tempDir, "body.md");
+    const command = `cat > ${bodyFile} <<'EOF'\n## Two fixes found while testing\n\nReshapes it.\nEOF\ngh pr create --title T --body-file ${bodyFile}`;
+    const result = await processInput(createInput(command, repoRoot));
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+    expect(await Bun.file(bodyFile).exists()).toBe(false);
+  });
+
+  it("denies a heading in an inline body instead of correcting it", async () => {
+    const result = await processInput(
+      createInput(`gh pr create --title T --body '## Two fixes found while testing'`, repoRoot),
+    );
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+  });
+
+  it("re-cases once and stays silent on the retry", async () => {
+    const bodyFile = join(tempDir, "body.md");
+    await Bun.write(bodyFile, "## Null floor\n\nReshapes the resolver.");
+    const command = `gh pr create --body-file ${bodyFile}`;
+    await processInput(createInput(command, repoRoot));
+    const corrected = await Bun.file(bodyFile).text();
+    expect(await processInput(createInput(command, repoRoot))).toBeNull();
+    expect(await Bun.file(bodyFile).text()).toBe(corrected);
   });
 
   it("combines a test-count and a backticked SHA into one deny", async () => {
@@ -238,7 +292,7 @@ describe("processInput", () => {
 
   it("carries warnings inside the deny instead of a separate warn", async () => {
     const bodyFile = join(tempDir, "body.md");
-    await Bun.write(bodyFile, "## Changes to the cache\n\n- **src/cache.ts**: adds a cache");
+    await Bun.write(bodyFile, "Added 5 tests.\n\n- **src/cache.ts**: adds a cache");
     const result = await processInput(
       createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
     );

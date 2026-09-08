@@ -2,7 +2,8 @@
 
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { validateBody } from "./body-rules";
+import { type BodyContext, decide, headingCaseCorrection, scanBody } from "./body-rules";
+import type { HeadingCaseViolation } from "./heading-case";
 import { gitRepo } from "./repo";
 import { effectiveCwd, extractTitle, isPrBodyCommand, resolveBody } from "./resolve-body";
 
@@ -14,6 +15,13 @@ export const HookInput = z.looseObject({
 });
 export type HookInput = z.infer<typeof HookInput>;
 
+function correctionNote(file: string, headings: HeadingCaseViolation[]): string {
+  const changes = headings
+    .map((heading) => `"${heading.text}" → "${heading.suggested}"`)
+    .join("; ");
+  return `Section headings in \`${file}\` were re-cased to AP title case before this command ran: ${changes}. Nothing else in the body changed. Carry the corrected headings into any later edit of it.`;
+}
+
 export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {
   const command = BashInput.safeParse(input.tool_input).data?.command;
   if (command === undefined || !isPrBodyCommand(command)) {
@@ -21,11 +29,27 @@ export async function processInput(input: HookInput): Promise<SyncHookJSONOutput
   }
   const cwd = input.cwd ?? process.cwd();
   const resolved = await resolveBody(command, cwd);
-  return validateBody(resolved.kind === "text" ? resolved.text : "", {
+  const body = resolved.kind === "text" ? resolved.text : "";
+  const context: Partial<BodyContext> = {
     title: extractTitle(command),
     unreadable: resolved.kind === "unreadable" ? resolved.detail : null,
     ...gitRepo(effectiveCwd(command, cwd)),
-  });
+  };
+  const matches = await scanBody(body, context);
+
+  const file = resolved.kind === "text" ? resolved.file : null;
+  if (file === null) return decide(matches);
+  const correction = headingCaseCorrection(body, matches);
+  if (correction === null) return decide(matches);
+  try {
+    await Bun.write(file, correction.body);
+  } catch {
+    return decide(matches);
+  }
+  return decide(
+    matches.filter((match) => match.id !== "heading-case"),
+    correctionNote(file, correction.headings),
+  );
 }
 
 function denyWithError(reason: string): void {

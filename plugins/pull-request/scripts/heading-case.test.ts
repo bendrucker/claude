@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { extractHeadings, headingCaseViolations } from "./heading-case";
+import { correctHeadingCase, extractHeadings, headingCaseViolations } from "./heading-case";
 
 describe("headingCaseViolations", () => {
   test.each<[string, string, { text: string; suggested: string }[]]>([
@@ -113,5 +113,55 @@ describe("extractHeadings", () => {
 
   test("skips a `#` line inside a fenced code block", () => {
     expect(extractHeadings("```\n## fake\n```")).toEqual([]);
+  });
+});
+
+describe("correctHeadingCase", () => {
+  test.each<[string, string]>([
+    ["sentence-case heading", "## Two fixes found while testing"],
+    ["over-capitalized stopwords", "## Changes To The Parser"],
+    ["hyphenated compound", "## Follow-up tasks"],
+    ["inline code in the heading", "## Changes to `validate.ts` and the parser"],
+    ["closing hash sequence", "## Two fixes found while testing ##"],
+    ["deeper level under prose", "Intro.\n\n#### Known limitation\n\nDetail."],
+    ["several headings at once", "## Null floor\n\nText.\n\n### Corpus results\n\nMore."],
+    [
+      "heading beside a fence holding a hash line",
+      "## Latch placement\n\n```sh\n# not a heading\n```\n",
+    ],
+  ])("rewrites a %s", (_name, body) => {
+    const fix = correctHeadingCase(body);
+    expect(fix.skipped).toEqual([]);
+    expect(fix.applied.length).toBeGreaterThan(0);
+    expect(fix.body).toMatchSnapshot();
+    expect(headingCaseViolations(fix.body)).toEqual([]);
+    expect(correctHeadingCase(fix.body).body).toBe(fix.body);
+  });
+
+  test.each<[string, string]>([
+    ["already AP-cased headings", "## Changes to the Parser\n\nText.\n\n### API Notes"],
+    ["a hash line inside a fence", "Text.\n\n```md\n## two words lower\n```\n"],
+    ["an indented code block", "Text.\n\n    ## two words lower\n"],
+    ["a body with no headings", "Adds an LRU cache to the resolver.\n"],
+  ])("leaves %s untouched", (_name, body) => {
+    expect(correctHeadingCase(body)).toEqual({ body, applied: [], skipped: [] });
+  });
+
+  test.each<[string, string]>([
+    ["emphasis", "## **Two fixes** found while testing"],
+    ["a link", "## Two fixes found in [the resolver](https://example.com)"],
+    ["a setext underline", "Two fixes found while testing\n===\n"],
+  ])("reports a heading carrying %s as skipped", (_name, body) => {
+    const fix = correctHeadingCase(body);
+    expect(fix.body).toBe(body);
+    expect(fix.applied).toEqual([]);
+    expect(fix.skipped).toEqual(headingCaseViolations(body));
+  });
+
+  test("touches only the heading line", () => {
+    const body = "Intro prose stays as written.\n\n## Null floor\n\nProse below, also unchanged.\n";
+    expect(correctHeadingCase(body).body).toBe(
+      "Intro prose stays as written.\n\n## Null Floor\n\nProse below, also unchanged.\n",
+    );
   });
 });

@@ -421,12 +421,21 @@ function precedingHeredocs(text: string, heredocs: Heredoc[]): Heredoc[] {
 /** The body text a command will send, or why the hook cannot see it. */
 export type BodyResolution =
   | { kind: "none" }
-  | { kind: "text"; text: string }
+  | {
+      kind: "text";
+      text: string;
+      /**
+       * Absolute path the whole body was read from, so a caller may rewrite it.
+       * Null when any of the body came from the command itself, where a rewrite
+       * would be overwritten by the command or would have to edit shell syntax.
+       */
+      file: string | null;
+    }
   | { kind: "unreadable"; detail: string };
 
-async function readBodyFile(path: string, cwd: string): Promise<string | null> {
+async function readBodyFile(path: string): Promise<string | null> {
   try {
-    return await Bun.file(isAbsolute(path) ? path : join(cwd, path)).text();
+    return await Bun.file(path).text();
   } catch {
     return null;
   }
@@ -462,22 +471,26 @@ export async function resolveBody(command: string, cwd: string): Promise<BodyRes
   if (spec.kind !== "parts") return spec;
   const base = effectiveCwd(command, cwd);
   const chunks: string[] = [];
+  const files: string[] = [];
   for (const part of spec.parts) {
     if (part.kind === "literal") {
       chunks.push(part.text);
       continue;
     }
+    const path = isAbsolute(part.path) ? part.path : join(base, part.path);
     // oxlint-disable-next-line no-await-in-loop -- returns on the first unreadable part, and a command carries at most a few.
-    const text = await readBodyFile(part.path, base);
+    const text = await readBodyFile(path);
     if (text === null) {
       return {
         kind: "unreadable",
         detail: `body file \`${part.path}\`, which does not exist yet or could not be read`,
       };
     }
+    files.push(path);
     chunks.push(text);
   }
-  return { kind: "text", text: chunks.join("") };
+  const sole = spec.parts.length === 1 && files.length === 1 ? files[0] : undefined;
+  return { kind: "text", text: chunks.join(""), file: sole ?? null };
 }
 
 // Anchored to the `gh pr`/`glab mr` verb with heredoc bodies stripped and the

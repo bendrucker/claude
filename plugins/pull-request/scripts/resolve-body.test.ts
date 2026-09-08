@@ -304,7 +304,7 @@ describe("command forms the skills document", () => {
     await Bun.write(bodyPath, body);
     // Doc paths are placeholders (`tmp/pr-body-<branch>.md`, `file.md`).
     const command = snippet.replaceAll(/\S*\.md/g, bodyPath);
-    expect(await resolveBody(command, REPO_ROOT)).toEqual({ kind: "text", text: body });
+    expect(await resolveBody(command, REPO_ROOT)).toMatchObject({ kind: "text", text: body });
   });
 });
 

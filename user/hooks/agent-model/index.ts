@@ -15,7 +15,7 @@ const AgentInput = z.looseObject({
 // Types that name no model of their own, so the spawn site has to supply one.
 // Every other type either pins a model in its definition or is a deliberate
 // choice the parent already made.
-const UNPINNED_TYPES = new Set(["general-purpose"]);
+const UNPINNED_TYPES = new Set(["general-purpose", "Explore", "review:angle"]);
 
 const EXPENSIVE_FAMILIES = new Set<ModelFamily>(["opus", "fable"]);
 

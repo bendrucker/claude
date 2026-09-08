@@ -99,6 +99,7 @@ angles:
     name: "Angle F — typed-failure auditor"
     kind: correctness
     sets:
+      - core
       - full
     text: |
       Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.

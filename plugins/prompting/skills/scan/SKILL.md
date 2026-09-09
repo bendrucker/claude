@@ -18,7 +18,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts [<path>] [--all] [--quiet]
 
 It reports each finding as `file:line:col: rule: message` on stdout and a per-rule count table on stderr, and exits non-zero when it finds any. `--quiet` drops the table.
 
-Without `--all` it reads the paths that hold documents a model executes: `SKILL.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/agents`, `.claude/commands`, `.claude/rules`, a skill's `references/`, and a `prompts/` directory. Use `--all` for a prompt that lives somewhere else, such as one extracted from a string in a product repo.
+Without `--all` it reads the paths that hold documents a model executes: `SKILL.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/agents`, `.claude/commands`, `.claude/rules`, a skill's `references/`, and a `prompt/` or `prompts/` directory holding `.md` or `.txt` files. Use `--all` for a prompt that lives somewhere else, such as one extracted from a string in a product repo.
 
 ## Rules
 
@@ -30,7 +30,7 @@ Without `--all` it reads the paths that hold documents a model executes: `SKILL.
 
 A finding is a candidate. The scanner matches words rather than intent, so read the sentence and confirm it is an instruction before rewriting it. A descriptive sentence that happens to contain the phrase is a false hit.
 
-Load the `prompting` skill for the rewrite. Each rule maps to a section: Prescription for weak modality, Completion Criteria for a vague criterion, Pruning for a no-op.
+Load the `prompting` skill for the rewrite. Each rule maps to a section: Sentence Form for weak modality, Completion Criteria for a vague criterion, Pruning for a no-op.
 
 ## Gotchas
 

@@ -13,7 +13,9 @@ Load the `claude-code:skill` skill when creating or modifying skills.
 
 ## Audience
 
-`writing` owns prose a person reads. `prompting` owns documents a model executes. Place a skill in exactly one of them. The two audiences take opposite rules, so a skill that serves both drifts toward the human one and stops earning its place in either.
+`writing` owns prose a person reads. `prompting` owns documents a model executes. Place a skill in exactly one of them.
+
+The two share a plain-language core: active voice, no contrast frames, no hedging. They diverge on figurative language, which human prose uses and a model-executed document replaces with the literal fact, and on the mechanics only `prompting` has to state: placement against a context budget, pointer wording, completion criteria. A skill that serves both audiences drifts toward the human one and stops enforcing the mechanics.
 
 ## Naming
 

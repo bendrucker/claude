@@ -41,4 +41,6 @@ Deleting a plugin's `commands/`, `agents/`, or `hooks/` directory requires remov
 
 ## Dependencies
 
-Plugin-specific dependencies go in the plugin's own `plugins/<name>/package.json`, added to the root `workspaces` array. No cross-plugin imports, and no reaching into `packages/` via relative paths. Shared code goes to an npm workspace package, declared in each plugin's `package.json`. Run `bun scripts/check-plugin-imports.ts` to verify.
+A skill that loads a skill from another plugin creates a plugin dependency. Declare it in the `dependencies` array of the depending plugin's `plugin.json`, as a bare plugin name resolved against this marketplace. Declare it only when the skill is unusable without the target, since `dependencies` requires the named plugin to be enabled and cannot express a choice between two providers.
+
+Plugin-specific code dependencies go in the plugin's own `plugins/<name>/package.json`, added to the root `workspaces` array. No cross-plugin imports, and no reaching into `packages/` via relative paths. Shared code goes to an npm workspace package, declared in each plugin's `package.json`. Run `bun scripts/check-plugin-imports.ts` to verify.

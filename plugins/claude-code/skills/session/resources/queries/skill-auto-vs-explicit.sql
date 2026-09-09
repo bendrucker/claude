@@ -29,6 +29,9 @@
 --   `skill-config-vs-observed` for the disk-side universe. Marker names are matched to a
 --   skill by full name (`plugin:skill`) or, for an unnamespaced command, to a bare skill
 --   name or a plugin's entry skill (`<p>:<p>`), the only skills a bare `/name` invokes.
+--   A bare name observed on its own wins, since a personal or project skill shadows the
+--   plugin entry skill it collides with; with no disk side here, that is inferred from what
+--   was observed, so `skill-config-vs-observed` is the one that resolves it from disk.
 -- params:
 --   - name: min_calls
 --     default: 1
@@ -72,11 +75,14 @@ explicit_agg AS (
   JOIN call_agg ca
     ON m.command = ca.skill_name
     -- A bare command reaches a namespaced skill only when it is its plugin's entry skill
-    -- (`<p>:<p>`), the one form a bare `/<p>` invokes. Matching any trailing segment would
-    -- credit `/peer` to `review:peer`, which no bare command can reach.
+    -- (`<p>:<p>`), the one form a bare `/<p>` invokes, and only while nothing was observed
+    -- under that bare name: a personal or project skill of the same name takes it instead.
+    -- Matching any trailing segment would credit `/peer` to `review:peer`, which no bare
+    -- command can reach.
    OR (position(':' IN m.command) = 0
        AND m.command = split_part(ca.skill_name, ':', 1)
-       AND split_part(ca.skill_name, ':', 1) = split_part(ca.skill_name, ':', 2))
+       AND split_part(ca.skill_name, ':', 1) = split_part(ca.skill_name, ':', 2)
+       AND NOT EXISTS (SELECT 1 FROM call_agg shadow WHERE shadow.skill_name = m.command))
   GROUP BY ca.skill_name
 )
 SELECT

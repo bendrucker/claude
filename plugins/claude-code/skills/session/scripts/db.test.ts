@@ -2382,6 +2382,18 @@ describe("skill-config-vs-observed query", () => {
     expect(Number(typedOnly?.typed)).toBe(1);
   });
 
+  it("lets a personal skill shadow a plugin entry skill of the same name", async () => {
+    const rows = await skillRows();
+    const personal = rows.find((r) => r.skill_name === "twin" && r.source.startsWith("user:"));
+    expect(Number(personal?.calls)).toBe(1);
+    expect(Number(personal?.typed)).toBe(1);
+    // The plugin's copy answers to `twin:twin` alone, so the bare call and command are
+    // the personal skill's and must not be counted twice.
+    const plugin = rows.find((r) => r.skill_name === "twin:twin");
+    expect(Number(plugin?.calls)).toBe(0);
+    expect(Number(plugin?.typed)).toBe(0);
+  });
+
   it("matches bare observed calls to an entry skill (plugin = skill)", async () => {
     const rows = await skillRows();
     const solo = rows.find((r) => r.skill_name === "solo:solo");

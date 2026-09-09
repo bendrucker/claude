@@ -32,9 +32,10 @@
 --   Matching a configured skill to `skill_calls.skill_name`: a plugin skill's invocation
 --   name is `<plugin>:<skill-dir>` derived from the cache path, since frontmatter `name` is
 --   often unnamespaced, and an entry skill (`<p>:<p>`) also matches bare `<p>` calls, which
---   appear in real data. Personal and project skills match their bare dir name. A personal
---   skill sharing a plugin's name absorbs its bare calls. Built-in CLI skills have no
---   SKILL.md under these globs, so they never appear here.
+--   appear in real data. Personal and project skills match their bare dir name, and one
+--   sharing a plugin's name shadows it: the bare key goes to the local skill only, since
+--   the harness lists the plugin's copy under its namespaced name alone. Built-in CLI
+--   skills have no SKILL.md under these globs, so they never appear here.
 --
 --   Treat a 0 in calls as a lead to investigate rather than proof. The observed side only
 --   spans the index, and a newly added skill has no history.
@@ -70,23 +71,10 @@ WITH plugin_files AS (
     as_yaml_objects := true, filename := true)
   QUALIFY row_number() OVER (PARTITION BY marketplace, plugin, skill ORDER BY hash) = 1
 ),
-configured AS (
-  SELECT
-    'plugin:' || marketplace || '/' || plugin AS source,
-    plugin || ':' || skill AS skill_name,
-    CASE WHEN plugin = skill
-      THEN [plugin || ':' || skill, skill]
-      ELSE [plugin || ':' || skill]
-    END AS match_keys,
-    fm
-  FROM plugin_files
-
-  UNION ALL
-
+local_skills AS (
   SELECT
     'user:~/.claude/skills' AS source,
     regexp_extract(filename, '([^/]+)/SKILL\.md$', 1) AS skill_name,
-    [regexp_extract(filename, '([^/]+)/SKILL\.md$', 1)] AS match_keys,
     frontmatter::VARCHAR AS fm
   FROM read_yaml_frontmatter(
     COALESCE(TRY_CAST(getvariable('user_skill_glob') AS VARCHAR), '~/.claude/skills/*/SKILL.md'),
@@ -97,11 +85,30 @@ configured AS (
   SELECT
     'project:.claude/skills' AS source,
     regexp_extract(filename, '([^/]+)/SKILL\.md$', 1) AS skill_name,
-    [regexp_extract(filename, '([^/]+)/SKILL\.md$', 1)] AS match_keys,
     frontmatter::VARCHAR AS fm
   FROM read_yaml_frontmatter(
     COALESCE(TRY_CAST(getvariable('project_skill_glob') AS VARCHAR), '.claude/skills/*/SKILL.md'),
     as_yaml_objects := true, filename := true)
+),
+configured AS (
+  SELECT
+    'plugin:' || marketplace || '/' || plugin AS source,
+    plugin || ':' || skill AS skill_name,
+    -- An entry skill answers to a bare `<plugin>` only while no personal or project skill
+    -- claims that name. One that does shadows it, and the harness lists the plugin's copy
+    -- under its namespaced name alone, so the bare key belongs to the local skill.
+    CASE WHEN plugin = skill
+          AND NOT EXISTS (SELECT 1 FROM local_skills l WHERE l.skill_name = plugin)
+      THEN [plugin || ':' || skill, skill]
+      ELSE [plugin || ':' || skill]
+    END AS match_keys,
+    fm
+  FROM plugin_files
+
+  UNION ALL
+
+  SELECT source, skill_name, [skill_name] AS match_keys, fm
+  FROM local_skills
 ),
 keyed AS (
   SELECT

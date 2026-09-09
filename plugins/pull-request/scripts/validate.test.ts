@@ -237,22 +237,37 @@ describe("processInput", () => {
     expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
   });
 
-  // A generator writing the same path replaces the file after the hook reads
-  // it, so a correction would never reach the PR.
-  it("denies a heading in a body file the command regenerates", async () => {
-    const bodyFile = join(tempDir, "body.md");
-    const body = "## Two fixes found while testing\n\nReshapes the resolver.";
-    await Bun.write(bodyFile, body);
-    const result = await processInput(
-      createInput(
-        `generate > ${bodyFile} && gh pr create --title T --body-file ${bodyFile}`,
-        repoRoot,
-      ),
-    );
-    expect(getPermissionDecision(result)).toBe("deny");
-    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
-    expect(await Bun.file(bodyFile).text()).toBe(body);
-  });
+  // A generator writing the same file replaces it after the hook reads it, so a
+  // correction would never reach the PR. The two spellings of the path need not
+  // match for it to be the same file.
+  test.each<[string, (dir: string) => string]>([
+    [
+      "the same spelling",
+      (dir) =>
+        `generate > ${join(dir, "body.md")} && gh pr create -T --body-file ${join(dir, "body.md")}`,
+    ],
+    [
+      "a relative generator and an absolute body file",
+      (dir) =>
+        `cd ${dir} && generate > body.md && gh pr create -T --body-file ${join(dir, "body.md")}`,
+    ],
+    [
+      "an absolute generator and a relative body file",
+      (dir) =>
+        `cd ${dir} && generate > ${join(dir, "body.md")} && gh pr create -T --body-file body.md`,
+    ],
+  ])(
+    "denies a heading in a body file the command regenerates, through %s",
+    async (_name, build) => {
+      const bodyFile = join(tempDir, "body.md");
+      const body = "## Two fixes found while testing\n\nReshapes the resolver.";
+      await Bun.write(bodyFile, body);
+      const result = await processInput(createInput(build(tempDir), repoRoot));
+      expect(getPermissionDecision(result)).toBe("deny");
+      expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+      expect(await Bun.file(bodyFile).text()).toBe(body);
+    },
+  );
 
   it("re-cases without retyping the whitespace the author wrote", async () => {
     const bodyFile = join(tempDir, "body.md");

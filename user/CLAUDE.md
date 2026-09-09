@@ -37,6 +37,7 @@ Prefer accommodating Claude Code's native defaults over overriding them, since a
 - Finish a branch with `/ship`: it runs the warranted review passes, opens the PR, babysits CI to green, triages bot comments, and refreshes the body. Don't hand-chain `EnterWorktree` + `pull-request:create` for a branch finish.
 - `pull-request:create` remains the skill for opening a PR directly (it is what `/ship` calls). If it's unavailable, create the PR with an empty body.
 - Open PRs ready for review by default. Reserve `--draft` for speculative changes that need deep human review before merge. Draft status can suppress bot review.
+- Root every `find` at a directory that can plausibly hold the target. `find /` and `find ~` walk the whole disk. They run for a minute or more, and often hit the Bash timeout before returning anything. A hook denies them unless they carry `-maxdepth`. When the root has to stay broad, `fd -HI <pattern> <root>` walks the same tree in seconds.
 - When executing build commands, output to `/dev/null` to avoid creating binaries.
 - Store temporary files in `tmp/` directory.
 - The sandbox can write `/tmp`, `$TMPDIR`, and the repo. Never disable the sandbox for file writes; only bypass after a sandboxed run of that command actually failed.

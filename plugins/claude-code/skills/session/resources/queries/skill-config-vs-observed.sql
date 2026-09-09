@@ -5,13 +5,18 @@
 -- extensions: [yaml]
 -- summary: >-
 --   Installed skills that never fire, the curation instrument: SKILL.md frontmatter on disk
---   left-joined against observed `skill_calls`, zero-fire first.
+--   left-joined against observed `skill_calls` and typed slash commands, zero-fire first.
 -- description: >-
 --   `skills` counts what fired and never sees a skill that is installed but silent, even
 --   though every model-invocable skill pays its description into context on every session.
 --   Rows carry `description_chars`, which approximates that always-on cost, and
 --   `disable_model_invocation`, where a zero in calls is normal: those skills load no
 --   description into context and fire only via explicit slash use.
+--
+--   `typed` counts that slash use, so a `disable-model-invocation` skill can be judged at
+--   all. A typed invocation produces no Skill tool call, so `calls` alone reads every such
+--   skill as dead: `job`, `improve-codebase-architecture`, and `review:self` each sit at
+--   zero calls against 34, 14, and 7 typed. Retire on `calls` and `typed` both at zero.
 --
 --   The configured side reads local disk, not the index: plugin skills under the plugin
 --   cache (content is duplicated across version-hash directories, so it is pinned to one
@@ -112,6 +117,19 @@ observed AS (
   WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
     AND project_filter(s.project_path, getvariable('project'))
     AND host_filter(s.host, getvariable('host'))
+),
+-- Typed slash commands never produce a Skill tool call, so they are absent from
+-- `skill_calls` and counted here from the `<command-name>` marker the harness writes into
+-- the user message. The configured side bounds the rows, so built-in commands like
+-- `/compact` and `/clear`, which have no SKILL.md, cannot appear.
+markers AS (
+  SELECT ltrim(regexp_extract(r.data::VARCHAR, '<command-name>/?([^<]{1,60})</command-name>', 1), '/') AS command
+  FROM raw r
+  JOIN sessions s USING (host, session_id)
+  WHERE r.data::VARCHAR LIKE '%<command-name>%'
+    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
+    AND project_filter(s.project_path, getvariable('project'))
+    AND host_filter(s.host, getvariable('host'))
 )
 SELECT
   k.source,
@@ -122,7 +140,15 @@ SELECT
   -- FILTER guards the unmatched LEFT JOIN row: a (NULL, NULL) struct is not NULL,
   -- so a bare COUNT(DISTINCT ...) would report 1 session for a zero-fire skill.
   COUNT(DISTINCT (o.host, o.session_id)) FILTER (o.session_id IS NOT NULL) AS sessions,
-  MAX(o.timestamp) AS last_seen
+  MAX(o.timestamp) AS last_seen,
+  -- Correlated rather than joined: a second LEFT JOIN would multiply the observed rows and
+  -- inflate `calls`. Matched by full name, or by the segment after the colon for a marker
+  -- typed without its plugin namespace, with both sides guarded against ''.
+  (SELECT COUNT(*) FROM markers m
+    WHERE m.command = k.skill_name
+       OR (m.command <> ''
+           AND position(':' IN m.command) = 0
+           AND m.command = NULLIF(split_part(k.skill_name, ':', 2), ''))) AS typed
 FROM keyed k
 LEFT JOIN observed o ON o.skill_name = k.match_key
 GROUP BY k.source, k.skill_name, k.description_chars, k.disable_model_invocation

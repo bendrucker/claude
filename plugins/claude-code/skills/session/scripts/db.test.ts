@@ -2301,6 +2301,7 @@ describe("skill-config-vs-observed query", () => {
     calls: z.bigint(),
     sessions: z.bigint(),
     last_seen: z.date().nullable(),
+    typed: z.bigint(),
   });
   type SkillRow = z.infer<typeof SkillRow>;
 
@@ -2331,6 +2332,29 @@ describe("skill-config-vs-observed query", () => {
     expect(Number(peer[0]?.calls)).toBe(2);
     expect(Number(peer[0]?.sessions)).toBe(1);
     expect(peer[0]?.last_seen).not.toBeNull();
+  });
+
+  it("counts a typed slash command for a skill the model never loads", async () => {
+    const rows = await skillRows();
+    const typedOnly = rows.find((r) => r.skill_name === "typed-only");
+    expect(Number(typedOnly?.calls)).toBe(0);
+    expect(Number(typedOnly?.typed)).toBe(1);
+    expect(typedOnly?.disable_model_invocation).toBe(true);
+  });
+
+  it("counts a typed slash command alongside observed calls without inflating them", async () => {
+    const rows = await skillRows();
+    const peer = rows.find((r) => r.skill_name === "review:peer");
+    expect(Number(peer?.typed)).toBe(1);
+    // The correlated subquery must not multiply the observed join.
+    expect(Number(peer?.calls)).toBe(2);
+  });
+
+  it("reports zero typed for a skill that is never called and never typed", async () => {
+    const rows = await skillRows();
+    const never = rows.find((r) => r.skill_name === "never-used");
+    expect(Number(never?.calls)).toBe(0);
+    expect(Number(never?.typed)).toBe(0);
   });
 
   it("matches bare observed calls to an entry skill (plugin = skill)", async () => {

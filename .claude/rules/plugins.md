@@ -11,6 +11,10 @@ Creating or renaming a plugin directory requires adding or updating its entry in
 
 Load the `claude-code:skill` skill when creating or modifying skills.
 
+## Audience
+
+`writing` owns prose a person reads. `prompting` owns documents a model executes. Place a skill in exactly one of them. The two audiences take opposite rules, so a skill that serves both drifts toward the human one and stops earning its place in either.
+
 ## Naming
 
 Commands, agents, and skills auto-namespace with `plugin-name:`, so `ci-monitor.md` in `gitlab` becomes `gitlab:ci-monitor`. An explicit prefix in frontmatter is optional. Anti-stuttering applies after the colon: `gitlab:gitlab-ci` is wrong, `gitlab:ci` is right. A plugin's primary skill may exactly match the plugin name (`writing:writing`, `herdr:herdr`); the form to avoid is the redundant suffix (`writing:writing-analyze`). Run `bun run skill-lint` to catch namespace mismatches and stuttering.

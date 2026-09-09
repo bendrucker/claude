@@ -5,7 +5,5 @@
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
   },
-  "dependencies": [
-    "writing"
-  ]
+  "dependencies": ["prompting"]
 }

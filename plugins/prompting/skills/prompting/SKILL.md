@@ -1,9 +1,9 @@
 ---
-name: writing:agents
+name: prompting
 description: "Write a document a model executes: a product prompt, a system prompt, a skill, a tool or agent description, a CLAUDE.md or AGENTS.md, a reference file behind a pointer. Use when authoring or revising any of those, when deciding what belongs in a prompt versus behind a pointer, or when a prompt produces different behavior from run to run."
 ---
 
-# Writing for Agents
+# Prompting
 
 Rules for any document a model executes. The packaging differs and the writing does not. Each rule targets variance: the same document should drive the same process on every run.
 
@@ -50,6 +50,12 @@ Keep a concept's definition, rules, and caveats under one heading. Test a sectio
 Split a sequence when later steps tempt the model to finish the current one early. That works only across a real context break: a hand-off, a subagent dispatch, a separate request. An inline reference leaves the later steps in context.
 
 Merging two sequences has the reverse effect. Each step becomes visible from the one before it, and the model rushes toward the visible end.
+
+## Prescription
+
+State the goal and the constraints, then leave room to adapt. A document that dictates an exact sequence of tool calls degrades output and goes stale as the environment shifts. When a document keeps accreting steps to patch failures, the fix is usually a clearer goal.
+
+A goal still needs a completion criterion, or the model decides for itself when the goal is met.
 
 ## Completion Criteria
 

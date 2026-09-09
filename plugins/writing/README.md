@@ -1,11 +1,13 @@
 # Writing
 
-Writing style enforcement and slop detection for prose output (PR descriptions, review comments, Slack messages, documentation). Catches AI-generated and human writing patterns that read as vague, promotional, or templated.
+Writing style enforcement and slop detection for prose a person reads: PR descriptions, review comments, Slack messages, documentation. Catches AI-generated and human writing patterns that read as vague, promotional, or templated.
+
+Documents a model executes belong to the [prompting](../prompting) plugin. The two audiences take opposite rules, so keep the boundary hard: a skill here targets prose written to be read, and a skill there targets prose written to be run.
 
 ## Contents
 
 - **Hooks**: Step, phase, and part numbering detection, heading style enforcement, AI writing trope detection (em dashes, vocabulary, copula avoidance, promotional language, parallelism, connector density)
-- **Skills**: `writing:writing` system reminder for prose writing guidelines, `writing:analyze` session-history-based trope ruleset curation, `writing:rewrite` user-invoked text rewriter, `writing:scan` user-invoked trope detector (`audit` gates a directory, `score` measures one input's density), `writing:review` multi-agent document review, `writing:no-diary` cuts process narration out of a deliverable, `writing:agents` doctrine for documents a model executes (prompts, skills, tool descriptions, `CLAUDE.md`)
+- **Skills**: `writing:writing` system reminder for prose writing guidelines, `writing:analyze` session-history-based trope ruleset curation, `writing:rewrite` user-invoked text rewriter, `writing:scan` user-invoked trope detector (`audit` gates a directory, `score` measures one input's density), `writing:review` multi-agent document review, `writing:no-diary` cuts process narration out of a deliverable
 - **Agents**: `content`, `style`, `artifacts` (conditional review lenses)
 - **Scripts**: [`scripts/similarity.ts`](scripts/similarity.ts), the CLI over the [`similarity/`](similarity/) style-similarity engine
 

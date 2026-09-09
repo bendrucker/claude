@@ -232,9 +232,37 @@ function textEdit(
   const marker = match?.[1];
   const content = match?.[2];
   if (marker === undefined || content === undefined) return null;
-  if (content.replaceAll(/\s+/g, " ") !== violation.text) return null;
+  const recased = recase(content, violation);
+  if (recased === null) return null;
   const start = heading.start + marker.length;
-  return { start, end: start + content.length, text: violation.suggested };
+  return { start, end: start + content.length, text: recased };
+}
+
+// The source heading with only its words re-cased. The violation reports a
+// heading whose whitespace runs are each collapsed to one space, so writing it
+// back verbatim would retype a double space or a tab the author wrote. Each run
+// is copied from the source instead and only the words come from the
+// suggestion, which keeps the correction to the case it claims to change.
+// Null when the source does not word-for-word match the heading the violation
+// reports, which is how a heading carrying emphasis, a link, or an escape
+// declines the rewrite.
+function recase(content: string, violation: HeadingCaseViolation): string | null {
+  const source = content.split(/(\s+)/);
+  const reported = violation.text.split(/(\s+)/);
+  const suggested = violation.suggested.split(/(\s+)/);
+  if (source.length !== reported.length || source.length !== suggested.length) return null;
+  const out: string[] = [];
+  for (const [i, chunk] of source.entries()) {
+    const isGap = /^\s+$/.test(chunk);
+    if (isGap !== /^\s+$/.test(reported[i] ?? "")) return null;
+    if (isGap) {
+      out.push(chunk);
+      continue;
+    }
+    if (chunk !== reported[i]) return null;
+    out.push(suggested[i] ?? chunk);
+  }
+  return out.join("");
 }
 
 export interface HeadingCaseFix {

@@ -489,8 +489,29 @@ export async function resolveBody(command: string, cwd: string): Promise<BodyRes
     files.push(path);
     chunks.push(text);
   }
-  const sole = spec.parts.length === 1 && files.length === 1 ? files[0] : undefined;
-  return { kind: "text", text: chunks.join(""), file: sole ?? null };
+  return { kind: "text", text: chunks.join(""), file: rewritableFile(command, spec.parts, files) };
+}
+
+/**
+ * The one file the whole body was read from, when rewriting it would survive to
+ * the PR. Null when the body is assembled from more than one source, and null
+ * when the command names that path ahead of the PR verb: a generator writing
+ * the same file (`gen.py > body.md && gh pr create --body-file body.md`)
+ * replaces it after the hook reads it, so a correction would be discarded and
+ * the hook would report a fix the PR never carried. Naming the path is the
+ * signal a redirect, a `tee`, or an output flag all leave in the text, and it
+ * is read loosely: a command that merely reads the file ahead of the verb loses
+ * the correction, which costs a round trip rather than correctness.
+ */
+function rewritableFile(command: string, parts: BodyPart[], files: string[]): string | null {
+  if (parts.length !== 1 || files.length !== 1) return null;
+  const part = parts[0];
+  if (part?.kind !== "file") return null;
+  const text = parseCommand(command).text;
+  const prIndex = text.search(PR_BODY_COMMAND_PATTERN);
+  if (prIndex === -1) return null;
+  if (text.slice(0, prIndex).includes(part.path.replace(/^\.\//, ""))) return null;
+  return files[0] ?? null;
 }
 
 // Anchored to the `gh pr`/`glab mr` verb with heredoc bodies stripped and the

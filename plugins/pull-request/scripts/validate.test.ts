@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -235,6 +235,48 @@ describe("processInput", () => {
     );
     expect(getPermissionDecision(result)).toBe("deny");
     expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+  });
+
+  // A generator writing the same path replaces the file after the hook reads
+  // it, so a correction would never reach the PR.
+  it("denies a heading in a body file the command regenerates", async () => {
+    const bodyFile = join(tempDir, "body.md");
+    const body = "## Two fixes found while testing\n\nReshapes the resolver.";
+    await Bun.write(bodyFile, body);
+    const result = await processInput(
+      createInput(
+        `generate > ${bodyFile} && gh pr create --title T --body-file ${bodyFile}`,
+        repoRoot,
+      ),
+    );
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+    expect(await Bun.file(bodyFile).text()).toBe(body);
+  });
+
+  it("re-cases without retyping the whitespace the author wrote", async () => {
+    const bodyFile = join(tempDir, "body.md");
+    await Bun.write(bodyFile, "##  Two  fixes\tfound\n\nReshapes the resolver.");
+    await processInput(createInput(`gh pr create --body-file ${bodyFile}`, repoRoot));
+    expect(await Bun.file(bodyFile).text()).toBe("##  Two  Fixes\tFound\n\nReshapes the resolver.");
+  });
+
+  it("leaves the body whole and denies when the correction cannot be written", async () => {
+    const bodyFile = join(tempDir, "body.md");
+    const body = "## Two fixes found while testing\n\nReshapes the resolver.";
+    await Bun.write(bodyFile, body);
+    spawnSync("chmod", ["500", tempDir]);
+    try {
+      const result = await processInput(
+        createInput(`gh pr create --body-file ${bodyFile}`, repoRoot),
+      );
+      expect(getPermissionDecision(result)).toBe("deny");
+      expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+      expect(await Bun.file(bodyFile).text()).toBe(body);
+    } finally {
+      spawnSync("chmod", ["700", tempDir]);
+    }
+    expect(readdirSync(tempDir)).toEqual(["body.md"]);
   });
 
   it("re-cases once and stays silent on the retry", async () => {

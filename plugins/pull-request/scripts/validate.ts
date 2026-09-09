@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+// oxlint-disable-next-line no-restricted-imports -- Bun has no rename, and only a rename replaces the file atomically.
+import { rename } from "node:fs/promises";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { type BodyContext, decide, headingCaseCorrection, scanBody } from "./body-rules";
@@ -22,6 +24,27 @@ function correctionNote(file: string, headings: HeadingCaseViolation[]): string 
   return `Section headings in \`${file}\` were re-cased to AP title case before this command ran: ${changes}. Nothing else in the body changed. Carry the corrected headings into any later edit of it.`;
 }
 
+/**
+ * Replaces the file's contents, reporting whether it landed. The correction is
+ * written to a sibling and renamed over the source, so an interrupted or failed
+ * write leaves the author's body whole rather than truncated. The sibling
+ * shares the source's directory, and so its filesystem, which is what makes the
+ * rename atomic.
+ */
+async function replaceFile(file: string, text: string): Promise<boolean> {
+  const temp = `${file}.${process.pid}.hook`;
+  try {
+    await Bun.write(temp, text);
+    await rename(temp, file);
+    return true;
+  } catch {
+    await Bun.file(temp)
+      .delete()
+      .catch(() => {});
+    return false;
+  }
+}
+
 export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {
   const command = BashInput.safeParse(input.tool_input).data?.command;
   if (command === undefined || !isPrBodyCommand(command)) {
@@ -41,11 +64,7 @@ export async function processInput(input: HookInput): Promise<SyncHookJSONOutput
   if (file === null) return decide(matches);
   const correction = headingCaseCorrection(body, matches);
   if (correction === null) return decide(matches);
-  try {
-    await Bun.write(file, correction.body);
-  } catch {
-    return decide(matches);
-  }
+  if (!(await replaceFile(file, correction.body))) return decide(matches);
   return decide(
     matches.filter((match) => match.id !== "heading-case"),
     correctionNote(file, correction.headings),

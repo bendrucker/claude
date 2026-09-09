@@ -158,6 +158,17 @@ describe("correctHeadingCase", () => {
     expect(fix.skipped).toEqual(headingCaseViolations(body));
   });
 
+  test.each<[string, string, string]>([
+    ["a double space between words", "##  Two  fixes found", "##  Two  Fixes Found"],
+    ["a tab between words", "## Two\tfixes found", "## Two\tFixes Found"],
+    ["padding before a closing hash run", "## Two  fixes found  ##", "## Two  Fixes Found  ##"],
+  ])("keeps %s as written", (_name, body, expected) => {
+    const fix = correctHeadingCase(body);
+    expect(fix.body).toBe(expected);
+    expect(fix.skipped).toEqual([]);
+    expect(headingCaseViolations(fix.body)).toEqual([]);
+  });
+
   test("touches only the heading line", () => {
     const body = "Intro prose stays as written.\n\n## Null floor\n\nProse below, also unchanged.\n";
     expect(correctHeadingCase(body).body).toBe(

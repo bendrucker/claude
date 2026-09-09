@@ -5,9 +5,14 @@
 import { cli } from "cleye";
 import { z } from "zod";
 import { decodeJson } from "../../../packages/decode/index";
+import { styleText } from "../../scripts/style";
 import { findsUnboundedFromBroadRoot } from "./index";
 
 const DB = `${process.env.HOME}/.claude/plugins/data/claude-code-bendrucker/session.duckdb`;
+
+// The date reaches DuckDB inside a SQL literal, so it is checked before it is
+// interpolated rather than after.
+const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected a YYYY-MM-DD date");
 
 const BashCall = z.object({
   command: z.string(),
@@ -30,6 +35,9 @@ WHERE tc.tool_name = 'Bash' AND tc.command IS NOT NULL AND tc.timestamp >= DATE 
 `;
 
 export function readBashCalls(since: string): BashCall[] {
+  if (!IsoDate.safeParse(since).success) {
+    throw new Error(`--since expects a YYYY-MM-DD date, got ${JSON.stringify(since)}`);
+  }
   const proc = Bun.spawnSync(["duckdb", "-readonly", "-json", DB, "-c", SQL(since)]);
   if (proc.exitCode !== 0) {
     throw new Error(`duckdb failed: ${proc.stderr.toString().trim()}`);
@@ -53,7 +61,7 @@ export function audit(calls: BashCall[]): Audit {
   timed.sort((a, b) => a - b);
 
   const days = Math.max(new Set(calls.map((call) => call.day)).size, 1);
-  const fast = denied.filter((call) => call.ms >= 0 && call.ms < 2000).length;
+  const fast = timed.filter((ms) => ms < 2000).length;
 
   return {
     scanned: calls.length,
@@ -69,12 +77,12 @@ export function audit(calls: BashCall[]): Audit {
 // The thresholds docs/settings.md commits to.
 export function verdict({ perMonth, fastShare }: Audit): string {
   if (perMonth < 15) {
-    return "[33mRETIRE[0m: fires under 15 times a month, so the CLAUDE.md line alone covers it.";
+    return `${styleText("yellow", "RETIRE")}: fires under 15 times a month, so the CLAUDE.md line alone covers it.`;
   }
   if (fastShare > 0.1) {
-    return "[33mNARROW[0m: over a tenth of denials finished under 2s, so the root test is catching scoped searches.";
+    return `${styleText("yellow", "NARROW")}: over a tenth of denials finished under 2s, so the root test is catching scoped searches.`;
   }
-  return "[32mKEEP[0m: still firing on real disk-wide searches at acceptable precision.";
+  return `${styleText("green", "KEEP")}: still firing on real disk-wide searches at acceptable precision.`;
 }
 
 export function format(result: Audit): string {
@@ -104,5 +112,10 @@ if (import.meta.main) {
     },
   });
 
-  console.log(format(audit(readBashCalls(argv.flags.since))));
+  try {
+    console.log(format(audit(readBashCalls(argv.flags.since))));
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 }

@@ -11,6 +11,7 @@ const BashInput = z.looseObject({ command: z.string().optional().catch(undefined
 // data rather than an invocation.
 const HEREDOC_BODY = /<<-?[ \t]*(['"]?)(\w+)\1[\s\S]*?^[ \t]*\2[ \t]*$/gm;
 const QUOTED_SPAN = /'[^']*'|"(?:[^"\\]|\\.)*"/g;
+const SUBSTITUTION = /\$\(|`/;
 
 // `find` in command position. The leading alternation is what separates an
 // invocation from `mdfind`, `findutils`, and a `find` that is just a word in a
@@ -35,11 +36,14 @@ function stripHeredocs(command: string): string {
 }
 
 // Ranges the shell treats as literal text, where a `find` is an echo argument
-// or a grep pattern.
+// or a grep pattern. Double quotes keep expanding, so a span carrying a command
+// substitution runs the `find` inside it and stays in scope.
 function quotedRanges(command: string): [number, number][] {
   const ranges: [number, number][] = [];
   for (const match of command.matchAll(QUOTED_SPAN)) {
-    ranges.push([match.index, match.index + match[0].length]);
+    const span = match[0];
+    if (span.startsWith('"') && SUBSTITUTION.test(span)) continue;
+    ranges.push([match.index, match.index + span.length]);
   }
   return ranges;
 }

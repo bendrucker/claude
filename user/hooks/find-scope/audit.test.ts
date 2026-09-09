@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { audit, verdict } from "./audit";
+import { audit, readBashCalls, verdict } from "./audit";
 
 function calls(specs: { command: string; ms: number; day?: string }[]) {
   return specs.map(({ command, ms, day }) => ({ command, ms, day: day ?? "2026-09-01" }));
@@ -79,4 +79,13 @@ describe("verdict", () => {
   test("retirement outranks narrowing when the hook has gone quiet", () => {
     expect(verdict({ ...base, perMonth: 2, fastShare: 0.5 })).toContain("RETIRE");
   });
+});
+
+describe("readBashCalls", () => {
+  test.each(["2026-9-9", "yesterday", "2026-01-01'; DROP TABLE tool_calls; --"])(
+    "refuses %p before it reaches the query",
+    (since) => {
+      expect(() => readBashCalls(since)).toThrow("--since expects a YYYY-MM-DD date");
+    },
+  );
 });

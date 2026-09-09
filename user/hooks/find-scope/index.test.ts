@@ -62,6 +62,10 @@ describe("text that is not a find invocation", () => {
       command: [`cat > brief.md <<'BRIEF'`, `Do not run find / -name x here.`, `BRIEF`].join("\n"),
     },
     { name: "a git subcommand", command: `git find-object abc123` },
+    {
+      name: "prose beside a substitution in the same quoted span",
+      command: `echo "checked $(date): find / is slow"`,
+    },
     { name: "no find at all", command: `rg --files /Users/ben/.claude | head` },
     { name: "find with no operand", command: `find` },
   ])("allows $name", ({ command }) => {
@@ -80,6 +84,11 @@ describe("invocation position", () => {
       command: `grep -l q $(find / -name '*.ts')`,
     },
     { name: "inside backticks", command: "grep -l q `find / -name '*.ts'`" },
+    {
+      name: "inside a double-quoted command substitution",
+      command: `cat "$(find / -name '*.ts' | head -1)"`,
+    },
+    { name: "inside a double-quoted assignment", command: `X="$(find ~ -name x)"; echo $X` },
     { name: "under sudo", command: `sudo find / -name x` },
     { name: "under command", command: `command find / -name x` },
     { name: "on a continuation line", command: `echo start\nfind / -name x` },

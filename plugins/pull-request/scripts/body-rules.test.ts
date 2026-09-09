@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import {
   type BodyContext,
+  decide,
+  headingCaseCorrection,
   type RuleId,
   type RuleMatch,
   scanBody,
-  validateBody,
 } from "./body-rules";
 
 // Four short sentences, 29 words. Bulk for a test that needs a large body,
@@ -473,7 +474,7 @@ describe("rule messages", () => {
   });
 });
 
-describe("validateBody", () => {
+describe("decide", () => {
   test.each<[string, string, Partial<BodyContext>]>([
     [
       "bundles every deny and folds the warns in",
@@ -496,6 +497,42 @@ describe("validateBody", () => {
     ["notes a single warn", "The build is green.", {}],
     ["stays silent on a clean body", "## Summary\n\nFixes a bug.", {}],
   ])("%s", async (_name, body, context) => {
-    expect(await validateBody(body, context)).toMatchSnapshot();
+    expect(decide(await scanBody(body, context))).toMatchSnapshot();
+  });
+});
+
+describe("headingCaseCorrection", () => {
+  async function correctionFor(body: string, context: Partial<BodyContext> = {}) {
+    return headingCaseCorrection(body, await scanBody(body, context));
+  }
+
+  test.each<[string, string]>([
+    ["heading case is the only deny", "## Two fixes found while testing\n\nReshapes it."],
+    ["a warn rides along with it", "## Corpus results\n\nThe build is green."],
+  ])("corrects a body where %s", async (_name, body) => {
+    const correction = await correctionFor(body);
+    expect(correction?.body).toMatchSnapshot();
+    expect(correction?.headings).toMatchSnapshot();
+  });
+
+  test.each<[string, string, Partial<BodyContext>]>([
+    ["there is no heading violation", "## Summary\n\nFixes a bug.", {}],
+    ["another deny stands alongside it", "## Two fixes found while testing\n\nAdded 5 tests.", {}],
+    ["the flagged heading cannot be edited in place", "## **Two fixes** found while testing", {}],
+    ["the body is unreadable", "", { unreadable: "standard input" }],
+  ])("declines to correct when %s", async (_name, body, context) => {
+    expect(await correctionFor(body, context)).toBeNull();
+  });
+
+  test("reports the correction alongside the warns it does not fix", async () => {
+    const body = "## Corpus results\n\nThe build is green.";
+    const matches = await scanBody(body);
+    const correction = headingCaseCorrection(body, matches);
+    expect(
+      decide(
+        matches.filter((match) => match.id !== "heading-case"),
+        `Corrected: ${correction?.headings[0]?.suggested ?? ""}`,
+      ),
+    ).toMatchSnapshot();
   });
 });

@@ -2,7 +2,7 @@
 // inline flag values, body files, and the `cd`s ahead of them.
 
 import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
 
 // The `if` rules in hooks.json scope dispatch to `gh pr create`/`edit` and
 // `glab mr create`/`update`, covering compound (`cd <dir> && gh pr create ...`)
@@ -421,12 +421,21 @@ function precedingHeredocs(text: string, heredocs: Heredoc[]): Heredoc[] {
 /** The body text a command will send, or why the hook cannot see it. */
 export type BodyResolution =
   | { kind: "none" }
-  | { kind: "text"; text: string }
+  | {
+      kind: "text";
+      text: string;
+      /**
+       * Absolute path the whole body was read from, so a caller may rewrite it.
+       * Null when any of the body came from the command itself, where a rewrite
+       * would be overwritten by the command or would have to edit shell syntax.
+       */
+      file: string | null;
+    }
   | { kind: "unreadable"; detail: string };
 
-async function readBodyFile(path: string, cwd: string): Promise<string | null> {
+async function readBodyFile(path: string): Promise<string | null> {
   try {
-    return await Bun.file(isAbsolute(path) ? path : join(cwd, path)).text();
+    return await Bun.file(path).text();
   } catch {
     return null;
   }
@@ -462,22 +471,52 @@ export async function resolveBody(command: string, cwd: string): Promise<BodyRes
   if (spec.kind !== "parts") return spec;
   const base = effectiveCwd(command, cwd);
   const chunks: string[] = [];
+  const files: string[] = [];
   for (const part of spec.parts) {
     if (part.kind === "literal") {
       chunks.push(part.text);
       continue;
     }
+    const path = isAbsolute(part.path) ? part.path : join(base, part.path);
     // oxlint-disable-next-line no-await-in-loop -- returns on the first unreadable part, and a command carries at most a few.
-    const text = await readBodyFile(part.path, base);
+    const text = await readBodyFile(path);
     if (text === null) {
       return {
         kind: "unreadable",
         detail: `body file \`${part.path}\`, which does not exist yet or could not be read`,
       };
     }
+    files.push(path);
     chunks.push(text);
   }
-  return { kind: "text", text: chunks.join("") };
+  return { kind: "text", text: chunks.join(""), file: rewritableFile(command, spec.parts, files) };
+}
+
+/**
+ * The one file the whole body was read from, when rewriting it would survive to
+ * the PR. Null when the body is assembled from more than one source, and null
+ * when the command names that file ahead of the PR verb: a generator writing
+ * the same path (`gen.py > body.md && gh pr create --body-file body.md`)
+ * replaces it after the hook reads it, so a correction would be discarded and
+ * the hook would report a fix the PR never carried. Naming the file is the
+ * signal a redirect, a `tee`, or an output flag all leave in the text.
+ *
+ * The two spellings need not match, since `> body.md` and `--body-file
+ * $PWD/body.md` are the same file, so the match is on the file name alone.
+ * That also catches names that only look alike, which costs the author a round
+ * trip through the deny rather than a body the hook reported as fixed and did
+ * not fix.
+ */
+function rewritableFile(command: string, parts: BodyPart[], files: string[]): string | null {
+  if (parts.length !== 1 || files.length !== 1) return null;
+  const part = parts[0];
+  if (part?.kind !== "file") return null;
+  const text = parseCommand(command).text;
+  const prIndex = text.search(PR_BODY_COMMAND_PATTERN);
+  if (prIndex === -1) return null;
+  const name = basename(part.path);
+  if (name === "" || text.slice(0, prIndex).includes(name)) return null;
+  return files[0] ?? null;
 }
 
 // Anchored to the `gh pr`/`glab mr` verb with heredoc bodies stripped and the

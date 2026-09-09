@@ -3,7 +3,11 @@
 // author gets the note and keeps the decision.
 
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { headingCaseViolations } from "./heading-case";
+import {
+  correctHeadingCase,
+  type HeadingCaseViolation,
+  headingCaseViolations,
+} from "./heading-case";
 import { LINKING_VERBS } from "./linguistics/heading";
 import { countProseWords, headingTexts, linesOutsideFences, stripEmphasis } from "./markdown";
 import {
@@ -363,10 +367,37 @@ function bullets(matches: RuleMatch[]): string {
   return matches.map(({ message }) => `- ${message.replaceAll("\n", "\n  ")}`).join("\n");
 }
 
+export interface HeadingCaseCorrection {
+  /** The body with every flagged heading re-cased, ready to write back. */
+  body: string;
+  headings: HeadingCaseViolation[];
+}
+
+/**
+ * The body a caller who can rewrite the source file should write, or null when
+ * a deny stands. Heading case is mechanical, so correcting it costs the caller
+ * a round trip and teaches nothing a deny does not. It is corrected only when
+ * it is the sole deny and every flagged heading can be edited in place, so a
+ * deny reason never lists a fix the hook already applied.
+ */
+export function headingCaseCorrection(
+  body: string,
+  matches: RuleMatch[],
+): HeadingCaseCorrection | null {
+  const denies = matches.filter((match) => match.tier === "deny");
+  if (denies.length !== 1 || denies[0]?.id !== "heading-case") return null;
+  const fix = correctHeadingCase(body);
+  if (fix.applied.length === 0 || fix.skipped.length > 0) return null;
+  return { body: fix.body, headings: fix.applied };
+}
+
 // A deny reason carries an exact fix, so the whole set is worth reporting at
 // once: the model would otherwise rewrite the body, retry, and be blocked again
 // by the next one. Warnings ride along on a deny for the same reason.
-function decide(matches: RuleMatch[]): SyncHookJSONOutput | null {
+export function decide(
+  matches: RuleMatch[],
+  note: string | null = null,
+): SyncHookJSONOutput | null {
   const denies = matches.filter((match) => match.tier === "deny");
   const warns = matches.filter((match) => match.tier === "warn");
   if (denies.length > 0) {
@@ -380,24 +411,22 @@ function decide(matches: RuleMatch[]): SyncHookJSONOutput | null {
       },
     };
   }
-  if (warns.length === 0) {
+  const sections: string[] = [];
+  if (note !== null) sections.push(note);
+  if (warns.length > 0) {
+    const intro =
+      warns.length === 1
+        ? "This PR has a structural-slop pattern:"
+        : "This PR has structural-slop patterns:";
+    sections.push(`${intro}\n${bullets(warns)}`);
+  }
+  if (sections.length === 0) {
     return null;
   }
-  const intro =
-    warns.length === 1
-      ? "This PR has a structural-slop pattern:"
-      : "This PR has structural-slop patterns:";
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      additionalContext: `${intro}\n${bullets(warns)}`,
+      additionalContext: sections.join("\n\n"),
     },
   };
-}
-
-export async function validateBody(
-  body: string,
-  context: Partial<BodyContext> = {},
-): Promise<SyncHookJSONOutput | null> {
-  return decide(await scanBody(body, context));
 }

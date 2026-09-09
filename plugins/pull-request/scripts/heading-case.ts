@@ -142,6 +142,9 @@ interface ParsedHeading {
   depth: number;
   combined: string;
   codeSpans: string[];
+  /** Source offsets of the whole heading, or -1 when the parse carried no position. */
+  start: number;
+  end: number;
 }
 
 function parseHeadings(body: string): ParsedHeading[] {
@@ -149,7 +152,14 @@ function parseHeadings(body: string): ParsedHeading[] {
   const headings: ParsedHeading[] = [];
   visit(tree, "heading", (node: MdastHeading) => {
     const { combined, codeSpans } = reconstruct(node.children);
-    headings.push({ children: node.children, depth: node.depth, combined, codeSpans });
+    headings.push({
+      children: node.children,
+      depth: node.depth,
+      combined,
+      codeSpans,
+      start: node.position?.start.offset ?? -1,
+      end: node.position?.end.offset ?? -1,
+    });
   });
   return headings;
 }
@@ -162,30 +172,126 @@ export function extractHeadings(body: string): Heading[] {
   }));
 }
 
-export function headingCaseViolations(body: string): { text: string; suggested: string }[] {
-  const violations: { text: string; suggested: string }[] = [];
-  for (const { combined, codeSpans } of parseHeadings(body)) {
-    const trimmed = combined.trim();
-    if (trimmed.length === 0) continue;
+export interface HeadingCaseViolation {
+  text: string;
+  suggested: string;
+}
 
-    const original = trimmed.split(/\s+/);
-    const cased = apStyleTitleCase(trimmed, { stopwords: AP_STOPWORDS }).trim().split(/\s+/);
-    if (original.length !== cased.length) continue;
+function violationFor({ combined, codeSpans }: ParsedHeading): HeadingCaseViolation | null {
+  const trimmed = combined.trim();
+  if (trimmed.length === 0) return null;
 
-    const suggested: string[] = [];
-    let differs = false;
-    for (const [i, word] of original.entries()) {
-      const next = caseWord(word, cased[i] ?? word);
-      suggested.push(next);
-      if (next !== word) differs = true;
-    }
+  const original = trimmed.split(/\s+/);
+  const cased = apStyleTitleCase(trimmed, { stopwords: AP_STOPWORDS }).trim().split(/\s+/);
+  if (original.length !== cased.length) return null;
 
-    if (differs) {
-      violations.push({
-        text: restore(original.join(" "), codeSpans),
-        suggested: restore(suggested.join(" "), codeSpans),
-      });
-    }
+  const suggested: string[] = [];
+  let differs = false;
+  for (const [i, word] of original.entries()) {
+    const next = caseWord(word, cased[i] ?? word);
+    suggested.push(next);
+    if (next !== word) differs = true;
   }
-  return violations;
+  if (!differs) return null;
+
+  return {
+    text: restore(original.join(" "), codeSpans),
+    suggested: restore(suggested.join(" "), codeSpans),
+  };
+}
+
+export function headingCaseViolations(body: string): HeadingCaseViolation[] {
+  return parseHeadings(body)
+    .map(violationFor)
+    .filter((violation): violation is HeadingCaseViolation => violation !== null);
+}
+
+// An ATX heading split into its `#` marker, its display text, and any closing
+// `#` run. Trailing whitespace lands in the closing group because the text group
+// is lazy.
+const ATX_HEADING = /^(#{1,6}[ \t]+)(.*?)((?:[ \t]+#+)?[ \t]*)$/;
+
+interface Edit {
+  start: number;
+  end: number;
+  text: string;
+}
+
+// Offsets of the heading's display text, when the source is a plain ATX heading
+// whose raw text reads the same as the text the violation reports. A setext
+// heading, or one carrying emphasis, a link, or an escape, renders differently
+// than it is written, so rewriting it by offset would drop the syntax around
+// the words.
+function textEdit(
+  body: string,
+  heading: ParsedHeading,
+  violation: HeadingCaseViolation,
+): Edit | null {
+  if (heading.start < 0 || heading.end < 0) return null;
+  const match = body.slice(heading.start, heading.end).match(ATX_HEADING);
+  const marker = match?.[1];
+  const content = match?.[2];
+  if (marker === undefined || content === undefined) return null;
+  const recased = recase(content, violation);
+  if (recased === null) return null;
+  const start = heading.start + marker.length;
+  return { start, end: start + content.length, text: recased };
+}
+
+// The source heading with only its words re-cased. The violation reports a
+// heading whose whitespace runs are each collapsed to one space, so writing it
+// back verbatim would retype a double space or a tab the author wrote. Each run
+// is copied from the source instead and only the words come from the
+// suggestion, which keeps the correction to the case it claims to change.
+// Null when the source does not word-for-word match the heading the violation
+// reports, which is how a heading carrying emphasis, a link, or an escape
+// declines the rewrite.
+function recase(content: string, violation: HeadingCaseViolation): string | null {
+  const source = content.split(/(\s+)/);
+  const reported = violation.text.split(/(\s+)/);
+  const suggested = violation.suggested.split(/(\s+)/);
+  if (source.length !== reported.length || source.length !== suggested.length) return null;
+  const out: string[] = [];
+  for (const [i, chunk] of source.entries()) {
+    const isGap = /^\s+$/.test(chunk);
+    if (isGap !== /^\s+$/.test(reported[i] ?? "")) return null;
+    if (isGap) {
+      out.push(chunk);
+      continue;
+    }
+    if (chunk !== reported[i]) return null;
+    out.push(suggested[i] ?? chunk);
+  }
+  return out.join("");
+}
+
+export interface HeadingCaseFix {
+  /** The body with every applied heading rewritten and nothing else touched. */
+  body: string;
+  applied: HeadingCaseViolation[];
+  /** Violations whose source line the rewrite could not edit safely. */
+  skipped: HeadingCaseViolation[];
+}
+
+export function correctHeadingCase(body: string): HeadingCaseFix {
+  const applied: HeadingCaseViolation[] = [];
+  const skipped: HeadingCaseViolation[] = [];
+  const edits: Edit[] = [];
+  for (const heading of parseHeadings(body)) {
+    const violation = violationFor(heading);
+    if (violation === null) continue;
+    const edit = textEdit(body, heading, violation);
+    if (edit === null) {
+      skipped.push(violation);
+      continue;
+    }
+    applied.push(violation);
+    edits.push(edit);
+  }
+
+  let corrected = body;
+  for (const edit of edits.toReversed()) {
+    corrected = corrected.slice(0, edit.start) + edit.text + corrected.slice(edit.end);
+  }
+  return { body: corrected, applied, skipped };
 }

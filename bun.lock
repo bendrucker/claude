@@ -235,6 +235,18 @@
         "zod": "^4.4.3",
       },
     },
+    "plugins/prompting": {
+      "name": "@bendrucker/claude-prompting",
+      "dependencies": {
+        "cleye": "^2.2.1",
+        "mdast-util-from-markdown": "^2.0.2",
+        "table": "^6.9.0",
+        "unist-util-visit": "^5.1.0",
+      },
+      "devDependencies": {
+        "@types/mdast": "^4.0.4",
+      },
+    },
     "plugins/pull-request": {
       "name": "pull-request",
       "dependencies": {
@@ -493,6 +505,8 @@
     "@bendrucker/claude-oxlint-rules": ["@bendrucker/claude-oxlint-rules@workspace:packages/oxlint-rules"],
 
     "@bendrucker/claude-plan": ["@bendrucker/claude-plan@workspace:plugins/plan"],
+
+    "@bendrucker/claude-prompting": ["@bendrucker/claude-prompting@workspace:plugins/prompting"],
 
     "@bendrucker/claude-review": ["@bendrucker/claude-review@workspace:plugins/review"],
 

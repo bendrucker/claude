@@ -22,8 +22,7 @@ interface PatternRule {
   pattern: RegExp;
 }
 
-// An instruction the model can decline. The document reads as advice, so
-// whether it fires is left to the run.
+// The document reads as advice, so whether it fires is left to the run.
 const WEAK_MODALITY: PatternRule = {
   name: "weak-modality",
   message: "softens an instruction into a suggestion. State the instruction.",
@@ -31,8 +30,8 @@ const WEAK_MODALITY: PatternRule = {
     /\b(?:try to|feel free to|if possible|if necessary|as needed|(?:where|when|as) appropriate|you (?:may|might|could) want to|it(?:'s| is) (?:a good idea|often best|usually best|generally best) to|consider \w+ing)\b/gi,
 };
 
-// A bound the model cannot check, so it decides for itself when the work is
-// done. See Completion Criteria in the prompting skill.
+// The model decides for itself when the work is done. See Completion
+// Criteria in the prompting skill.
 const VAGUE_CRITERION: PatternRule = {
   name: "vague-criterion",
   message: "is a bound the model cannot check. Name the observable done-state.",
@@ -40,8 +39,6 @@ const VAGUE_CRITERION: PatternRule = {
     /\b(?:make sure|properly|correctly|appropriately|adequately|sufficiently|as much as (?:possible|needed)|if it makes sense|when (?:done|finished)|until satisfied)\b/gi,
 };
 
-// An instruction the model already follows by default. It spends context and
-// changes nothing. See Pruning in the prompting skill.
 const NO_OP: PatternRule = {
   name: "no-op",
   message: "restates a default the model already follows. Delete the sentence.",

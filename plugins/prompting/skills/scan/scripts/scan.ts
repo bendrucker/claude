@@ -7,9 +7,8 @@ import { type Finding, scanPrompt } from "./rules";
 
 const SKIP_SEGMENTS = ["node_modules", ".git", "fixtures", "__snapshots__"];
 
-// Documents a model executes, recognized by the paths the ecosystem settled on.
-// Pass an explicit file or glob for a prompt that lives somewhere else, such as
-// a string in a product repo extracted to a file.
+// Pass an explicit file or glob for a prompt that lives somewhere else, such
+// as a string in a product repo extracted to a file.
 const AGENT_FACING = [
   /(?:^|\/)SKILL\.md$/,
   /(?:^|\/)(?:CLAUDE|AGENTS)\.md$/,

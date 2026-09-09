@@ -31,6 +31,12 @@ describe("scanPrompt", () => {
     ["a quoted phrase", 'Replace a weak word ("be thorough") with a stronger one.'],
     ["frontmatter", "---\nname: never-used\ndescription: Please pick a name.\n---\n\nWrite it."],
     ["a curly-quoted phrase", "Replace a weak word (“be thorough”) with a stronger one."],
+    ["an emphasized quoted phrase", 'Replace a weak word ("*be thorough*") with a stronger one.'],
+    ["a linked quoted phrase", 'Replace a weak word ("[be thorough](x)") with a stronger one.'],
+    [
+      "a quote around a code span",
+      'Replace a weak word ("be `very` thorough") with a stronger one.',
+    ],
   ])("passes %s", (_label, source) => {
     expect(rules(source)).toEqual([]);
   });

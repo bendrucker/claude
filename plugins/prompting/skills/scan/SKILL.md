@@ -18,7 +18,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts [<path>] [--all] [--quiet]
 
 It reports each finding as `file:line:col: rule: message` on stdout and a per-rule count table on stderr, and exits non-zero when it finds any. `--quiet` drops the table.
 
-Without `--all` it reads the paths that hold documents a model executes: `SKILL.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/agents`, `.claude/commands`, `.claude/rules`, a skill's `references/`, and a `prompt/` or `prompts/` directory holding `.md` or `.txt` files. Use `--all` for a prompt that lives somewhere else, such as one extracted from a string in a product repo.
+Without `--all` it reads the paths that hold documents a model executes: `SKILL.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/agents`, `.claude/commands`, `.claude/rules`, a skill's `references/`, and a `prompt/` or `prompts/` directory holding `.md` or `.txt` files. Use `--all` for a prompt that lives somewhere else, such as one extracted from a string in a product repo. A directory walk reads `.md` and `.txt` under either setting, so `--all` widens which documents count without pulling in source files.
 
 ## Rules
 

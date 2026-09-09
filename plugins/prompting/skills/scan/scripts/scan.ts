@@ -25,12 +25,17 @@ export function shouldSkip(path: string): boolean {
   return SKIP_SEGMENTS.some((segment) => path.split("/").includes(segment));
 }
 
+// A directory walk reads whatever it finds, so it looks at documents alone.
+// `--all` drops the agent-facing filter and keeps this one, which is what stops
+// it from feeding source files and binaries to a prose scanner.
+const DOCUMENTS = "**/*.{md,txt}";
+
 export function toGlob(input: string): { cwd: string; pattern: string } {
   // readdirSync throws ENOTDIR on a file and ENOENT on a missing path, so a
   // successful call is the directory signal. (statSync is disallowed by oxlint.)
   try {
     readdirSync(input);
-    return { cwd: input, pattern: "**/*" };
+    return { cwd: input, pattern: DOCUMENTS };
   } catch {
     return { cwd: ".", pattern: input };
   }
@@ -99,7 +104,7 @@ if (import.meta.main) {
       all: {
         type: Boolean,
         default: false,
-        description: "Scan every markdown file under the path, skipping the agent-facing filter",
+        description: "Scan every document under the path, skipping the agent-facing filter",
       },
       quiet: {
         type: Boolean,

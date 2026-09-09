@@ -64,22 +64,43 @@ function locate(node: Text, offset: number): { line: number; col: number } {
   };
 }
 
-// Each opener pairs with its own closer, so a stray quote blanks nothing beyond
-// itself.
+// Each opener pairs with its own closer, so a stray quote exempts nothing
+// beyond itself.
 const QUOTED = /"[^"]*"|“[^”]*”|‘[^’]*’/g;
 
-// A quoted phrase is named rather than instructed, which is how a document
-// about prompting teaches a rule by showing the wording it rejects. Blanking
-// the span keeps every later offset in place.
-function withoutQuotes(value: string): string {
-  return value.replaceAll(QUOTED, (quoted) => " ".repeat(quoted.length));
+type Span = readonly [number, number];
+
+// Quotes pair over prose alone, so a quote inside a fence or an inline code
+// span cannot pair with one in a sentence. Every other character becomes a
+// space, which holds each source offset in place.
+function proseView(source: string, tree: Root): string {
+  const chars: string[] = Array.from({ length: source.length }, () => " ");
+  visit(tree, "text", (node) => {
+    const from = node.position?.start.offset;
+    const to = node.position?.end.offset;
+    if (from === undefined || to === undefined) return;
+    for (let i = from; i < to; i++) chars[i] = source.charAt(i);
+  });
+  return chars.join("");
 }
 
-function patternFindings(node: Text): Finding[] {
+// A quoted phrase is named, which is how a document about prompting teaches a
+// rule by showing the wording it rejects. Pairing over the whole source exempts
+// a quote that formatting splits across sibling nodes, such as "*be thorough*".
+function quotedSpans(source: string, tree: Root): Span[] {
+  return [...proseView(source, tree).matchAll(QUOTED)].map((match): Span => [
+    match.index,
+    match.index + match[0].length,
+  ]);
+}
+
+function patternFindings(node: Text, quoted: readonly Span[]): Finding[] {
+  const offset = node.position?.start.offset ?? 0;
   const found: Finding[] = [];
-  const searchable = withoutQuotes(node.value);
   for (const rule of PATTERN_RULES) {
-    for (const match of searchable.matchAll(rule.pattern)) {
+    for (const match of node.value.matchAll(rule.pattern)) {
+      const at = offset + match.index;
+      if (quoted.some(([from, to]) => at >= from && at < to)) continue;
       found.push({
         ...locate(node, match.index),
         rule: rule.name,
@@ -103,9 +124,11 @@ function parse(source: string): Root {
 
 /** Every finding in one document, ordered by position. */
 export function scanPrompt(source: string): Finding[] {
+  const tree = parse(source);
+  const quoted = quotedSpans(source, tree);
   const found: Finding[] = [];
-  visit(parse(source), "text", (node) => {
-    found.push(...patternFindings(node));
+  visit(tree, "text", (node) => {
+    found.push(...patternFindings(node, quoted));
   });
   return found.toSorted((a, b) => (a.line === b.line ? a.col - b.col : a.line - b.line));
 }

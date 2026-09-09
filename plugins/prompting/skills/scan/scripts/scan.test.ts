@@ -32,7 +32,10 @@ describe("shouldSkip", () => {
 
 describe("toGlob", () => {
   test("walks a directory", () => {
-    expect(toGlob(import.meta.dirname)).toEqual({ cwd: import.meta.dirname, pattern: "**/*" });
+    expect(toGlob(import.meta.dirname)).toEqual({
+      cwd: import.meta.dirname,
+      pattern: "**/*.{md,txt}",
+    });
   });
 
   test("passes a non-directory through as a pattern", () => {
@@ -52,6 +55,7 @@ describe("collectFiles", () => {
       Bun.write(join(root, "CLAUDE.md"), "Write it.\n"),
       Bun.write(join(root, "notes.md"), "Write it.\n"),
       Bun.write(join(root, "node_modules/CLAUDE.md"), "Write it.\n"),
+      Bun.write(join(root, "build.ts"), 'const note = "try to be thorough";\n'),
     ]);
   });
 
@@ -67,6 +71,10 @@ describe("collectFiles", () => {
   });
 
   test("drops the path filter under --all", async () => {
-    expect(await collectFiles(root, true)).toContain(join(root, "notes.md"));
+    expect(await collectFiles(root, true)).toEqual([
+      join(root, ".claude/rules/style.md"),
+      join(root, "CLAUDE.md"),
+      join(root, "notes.md"),
+    ]);
   });
 });

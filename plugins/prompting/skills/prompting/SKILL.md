@@ -15,7 +15,7 @@ Every document and every pointer spends one of two budgets.
 
 **Context load** is what always-loaded material costs the model: tokens and attention on every turn, whether or not the material fires. A system prompt section, a tool description, and a `CLAUDE.md` line all spend it.
 
-**Cognitive load** is what the material costs the human: knowing which documents exist and which one answers the question in front of them. Spend it where human judgment matters. Leave material a human chooses between reachable by that human rather than pointed at from the body.
+**Cognitive load** is what the material costs the human: knowing which documents exist and which one answers the question in front of them. Spend it where human judgment matters. Leave material a human chooses between reachable by that human. A pointer from the body makes the model choose instead.
 
 Material behind a pointer trades context load for the pointer's own line. Material nothing points at spends only cognitive load, and gets reached when the human remembers it.
 
@@ -75,7 +75,7 @@ Demand does not require steps. "Every rule applied" bounds a flat reference docu
 
 ## Leading Words
 
-A leading word is a compact concept from the model's pretraining, reused as the same token instead of restated as a sentence. Repeating the token accumulates a distributed definition, so a few tokens carry a rule that would otherwise take a paragraph.
+A leading word is a compact concept from the model's pretraining, reused as the same token every time the rule applies. Repeating the token accumulates a distributed definition, so a few tokens carry a rule that would otherwise take a paragraph.
 
 Choose an existing word before coining one. A coined word recruits nothing from pretraining, so define it in the document or it carries nothing.
 
@@ -100,7 +100,7 @@ Avoid metaphor, epigram, and personification. They aim at a human reader, and a 
 
 #### Positive Form
 
-State the target behavior. "Write one-line comments" beats a rule against long ones. A prohibition names the behavior it bans, which makes that behavior more available.
+State the target behavior: "Write one-line comments". A prohibition names the behavior it bans, which makes that behavior more available.
 
 Use an explicit ban only as a hard guardrail with no positive phrasing available. Pair every ban with the positive target.
 
@@ -118,7 +118,7 @@ Cache what the model cannot find by looking: the unwritten convention, the reaso
 
 #### No-ops
 
-Delete instructions the model already follows by default. Test each sentence against the model's default rather than a reader's expectation: does this line change behavior? Settle a disagreement by running the document. When a sentence fails, delete the whole sentence instead of trimming it.
+Delete instructions the model already follows by default. Test each sentence against the model's default: does this line change behavior? Settle a disagreement by running the document. When a sentence fails, delete the whole sentence.
 
 Replace a leading word too weak to beat the default ("be thorough" when the model is already thorough) with a stronger word.
 

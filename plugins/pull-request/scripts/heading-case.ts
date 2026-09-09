@@ -93,6 +93,13 @@ function reconstruct(
         walk(node.children);
       } else if ("value" in node) {
         push(node.value);
+      } else {
+        // A node that renders as neither text nor code still separates the words
+        // around it: a hard line break, an image, a footnote reference. Without a
+        // separator the words on either side concatenate into one nonsense token,
+        // which AP casing then reports as a suggestion matching nothing in the
+        // body.
+        push(" ");
       }
     }
   };

@@ -132,6 +132,8 @@ describe("correctHeadingCase", () => {
     ["heading carrying emphasis", "## **Two fixes** found while testing"],
     ["heading carrying a link", "## Two fixes found in [the resolver](https://example.com)"],
     ["setext heading", "Two fixes found while testing\n===\n"],
+    ["setext heading broken across lines", "Two fixes  \nfound while testing\n===\n"],
+    ["heading carrying an image", "## ![Coverage](badge.svg) two fixes found"],
   ])("rewrites a %s", (_name, body) => {
     const fix = correctHeadingCase(body);
     expect(fix.skipped).toEqual([]);
@@ -170,6 +172,20 @@ describe("correctHeadingCase", () => {
     expect(fix.body).toBe(expected);
     expect(fix.skipped).toEqual([]);
     expect(headingCaseViolations(fix.body)).toEqual([]);
+  });
+
+  test("declines the whole heading when one of its words cannot be mapped", () => {
+    const body = "## fixes found fol**low**up tasks";
+    const fix = correctHeadingCase(body);
+    expect(fix.body).toBe(body);
+    expect(fix.applied).toEqual([]);
+    expect(fix.skipped).toEqual(headingCaseViolations(body));
+  });
+
+  test("separates the words around a node that renders as neither text nor code", () => {
+    expect(headingCaseViolations("Two fixes  \nfound while testing\n===\n")).toEqual([
+      { text: "Two fixes found while testing", suggested: "Two Fixes Found While Testing" },
+    ]);
   });
 
   test("re-cases only the words inside markup, never the markup itself", () => {

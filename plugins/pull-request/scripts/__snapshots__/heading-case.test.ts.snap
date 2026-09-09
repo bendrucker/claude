@@ -46,3 +46,12 @@ exports[`correctHeadingCase rewrites a setext heading 1`] = `
 ===
 "
 `;
+
+exports[`correctHeadingCase rewrites a setext heading broken across lines 1`] = `
+"Two Fixes  
+Found While Testing
+===
+"
+`;
+
+exports[`correctHeadingCase rewrites a heading carrying an image 1`] = `"## ![Coverage](badge.svg) Two Fixes Found"`;

@@ -20,8 +20,10 @@ const SUBSTITUTION = /\$\(|`/;
 const FIND_INVOCATION = /(?:^|[\n;&|(`]|\$\(|\b(?:sudo|command|xargs|time|nice)\s+)\s*find(?=\s)/g;
 
 // Where a find invocation's own arguments stop. `-maxdepth` has to bind to the
-// find being judged rather than to something further down the pipeline.
-const COMMAND_END = /[\n;&|)`]/;
+// find being judged rather than to something further down the pipeline. A
+// backslash-escaped character belongs to find instead: `\(`, `\)`, and the `\;`
+// that terminates `-exec` are its own syntax.
+const COMMAND_END = /(?<!\\)[\n;&|)`]/;
 
 const LEADING_FLAG = /^-[HLPEsx]+$/;
 

@@ -8,7 +8,12 @@ import { decodeJson } from "../../../packages/decode/index";
 import { styleText } from "../../scripts/style";
 import { findsUnboundedFromBroadRoot } from "./index";
 
-const DB = `${process.env.HOME}/.claude/plugins/data/claude-code-bendrucker/session.duckdb`;
+// CLAUDE_PLUGIN_DATA is the session skill's own override for where its index
+// lives, so an audit run against a copied corpus honors it too.
+const DATA_DIR =
+  process.env.CLAUDE_PLUGIN_DATA ??
+  `${process.env.HOME}/.claude/plugins/data/claude-code-bendrucker`;
+const DB = `${DATA_DIR}/session.duckdb`;
 
 // The date reaches DuckDB inside a SQL literal, so it is checked before it is
 // interpolated rather than after.
@@ -55,12 +60,23 @@ export interface Audit {
   minutesSaved: number;
 }
 
+// A day with no Bash call is still a day the hook did not fire, so the rate
+// divides by the calendar span rather than by the days that carry activity.
+function calendarSpan(days: string[]): number {
+  const sorted = days.toSorted();
+  const first = sorted[0];
+  const last = sorted.at(-1);
+  if (first == null || last == null) return 1;
+  const elapsed = Date.parse(`${last}T00:00:00Z`) - Date.parse(`${first}T00:00:00Z`);
+  return Math.max(Math.round(elapsed / 86_400_000) + 1, 1);
+}
+
 export function audit(calls: BashCall[]): Audit {
   const denied = calls.filter((call) => findsUnboundedFromBroadRoot(call.command));
   const timed = denied.filter((call) => call.ms >= 0).map((call) => call.ms);
   timed.sort((a, b) => a - b);
 
-  const days = Math.max(new Set(calls.map((call) => call.day)).size, 1);
+  const days = calendarSpan(calls.map((call) => call.day));
   const fast = timed.filter((ms) => ms < 2000).length;
 
   return {

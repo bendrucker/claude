@@ -31,6 +31,17 @@ describe("audit", () => {
     expect(result.perMonth).toBe(30);
   });
 
+  test("counts idle days in the span, so a quiet week lowers the rate", () => {
+    const result = audit(
+      calls([
+        { command: "find / -name a", ms: 90_000, day: "2026-09-01" },
+        { command: "find / -name b", ms: 90_000, day: "2026-09-10" },
+      ]),
+    );
+
+    expect(result.perMonth).toBe(6);
+  });
+
   test("ignores calls with no recorded duration when measuring precision", () => {
     const result = audit(
       calls([

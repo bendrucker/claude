@@ -114,6 +114,18 @@ describe("-maxdepth binds to its own invocation", () => {
     );
   });
 
+  test("an escaped paren does not end the argument scan", () => {
+    expect(
+      findsUnboundedFromBroadRoot(String.raw`find / \( -name a -o -name b \) -maxdepth 2`),
+    ).toBe(false);
+  });
+
+  test("an -exec terminator does not end the argument scan", () => {
+    expect(findsUnboundedFromBroadRoot(String.raw`find ~ -type f -exec ls {} \; -maxdepth 1`)).toBe(
+      false,
+    );
+  });
+
   test("-maxdepth is not matched as a substring of another flag", () => {
     expect(findsUnboundedFromBroadRoot(`find / -name x-maxdepth`)).toBe(true);
   });

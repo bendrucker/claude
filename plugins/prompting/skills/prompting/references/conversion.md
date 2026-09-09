@@ -6,16 +6,16 @@ The procedure for rewriting an existing prompt, skill, or instruction file into 
 
 Rewrite these constructions wherever they appear:
 
-- Metaphor and idiom become the literal fact. "Backticks kill the link" becomes "backticked refs don't auto-link".
-- Epigrams get deleted. A short punchy sentence closing a rule for emphasis ("Arming the platform was the whole request.") adds no instruction. If it carries a distinct rule, state that rule plainly.
-- Personified artifacts become an actor and an action. "A title that wants a serial comma" becomes "if the title needs a serial comma".
-- Contrast frames ("X, not Y") become the positive instruction. Keep an explicit ban alongside it only when the wrong behavior is likely without one.
-- Cadence connectives get deleted. Sentence-opening "So" and "And", a trailing "though", and rhetorical questions add no instruction.
-- Writerly verbs become common ones: "mine" becomes "review", "arm" becomes "enable", "surface" becomes "report".
+- Rewrite metaphor and idiom as the literal fact. "Backticks kill the link" becomes "backticked refs don't auto-link".
+- Delete epigrams. A short punchy sentence closing a rule for emphasis ("Arming the platform was the whole request.") adds no instruction. If it carries a distinct rule, state that rule plainly.
+- Rewrite a personified artifact as an actor and an action. "A title that wants a serial comma" becomes "if the title needs a serial comma".
+- Rewrite a contrast frame ("X, not Y") as the positive instruction. Keep an explicit ban alongside it only when the wrong behavior is likely without one.
+- Delete cadence connectives. Sentence-opening "So" and "And", a trailing "though", and rhetorical questions add no instruction.
+- Replace writerly verbs with common ones: "mine" becomes "review", "arm" becomes "enable", "surface" becomes "report".
 
 ## Cuts
 
-Most of the reduction comes from deleting whole sentences rather than converting them:
+Delete these whole rather than converting them:
 
 - Duplicated rules. State each rule once, in the file and section where the model needs it, and cut the restatements. A body that summarizes its own reference file repeats it.
 - Second examples. One example per rule. An example repeated in two sections keeps the copy in the section that owns the rule.
@@ -28,9 +28,9 @@ Most of the reduction comes from deleting whole sentences rather than converting
 Conversion keeps these:
 
 - Every behavioral rule. Plain language changes the style and keeps every rule. A sentence that yields no rule when rewritten is the one to delete.
-- Domain terms. "Rebase", "worktree", and "auto-merge" are precise names. Keep them as written. A leading word is a domain term, so keep it too. Convert a metaphor used once for emphasis to its literal fact instead.
+- Domain terms. "Rebase", "worktree", and "auto-merge" are precise names. Keep them as written. A [leading word](../SKILL.md#leading-words) is a domain term, so keep it too. Convert a metaphor used once for emphasis to its literal fact instead.
 - Negative rules and detector lists. A ban on a specific construction is an executable instruction.
-- Short concrete examples and before/after pairs. They pin a rule down more cheaply than added prose.
+- Short concrete examples and before/after pairs. They state a rule more cheaply than added prose does.
 
 ## Procedure
 

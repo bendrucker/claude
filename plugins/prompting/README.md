@@ -4,7 +4,9 @@ Writing documents a model executes: product and system prompts, skills, tool and
 
 ## Contents
 
-- **Skills**: `prompting` doctrine for any document a model executes (placement, pointer wording, completion criteria, leading words, sentence form, pruning), with `references/conversion.md` for rewriting an existing document. `prompting:scan` reports prompt defects and gates on them
+- **Skills**:
+  - `prompting`: doctrine for any document a model executes, with `references/conversion.md` for rewriting an existing one
+  - `prompting:scan`: reports weak modality, vague completion criteria, and no-op instructions, and exits non-zero on any finding
 
 ## Testing
 

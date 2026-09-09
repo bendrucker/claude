@@ -5,7 +5,7 @@ description: "Write a document a model executes: a product prompt, a system prom
 
 # Prompting
 
-Rules for any document a model executes. The packaging differs and the writing does not. Each rule targets variance: the same document should drive the same process on every run.
+Rules for any document a model executes. Each rule targets variance: the same document should drive the same process on every run.
 
 To rewrite an existing document, see [references/conversion.md](references/conversion.md).
 
@@ -15,7 +15,7 @@ Every document and every pointer spends one of two budgets.
 
 **Context load** is what always-loaded material costs the model: tokens and attention on every turn, whether or not the material fires. A system prompt section, a tool description, and a `CLAUDE.md` line all spend it.
 
-**Cognitive load** is what the material costs the human: knowing which documents exist and which one answers the question in front of them. Spend it where human judgment matters. It buys agency, so leave it above zero.
+**Cognitive load** is what the material costs the human: knowing which documents exist and which one answers the question in front of them. Spend it where human judgment matters. Leave material a human chooses between reachable by that human rather than pointed at from the body.
 
 Material behind a pointer trades context load for the pointer's own line. Material nothing points at spends only cognitive load, and gets reached when the human remembers it.
 
@@ -27,13 +27,13 @@ Move reference that only some branches need out of a step sequence, even when it
 
 Bodies hold two kinds of material: the ordered actions the model performs, and the definitions and rules it consults while performing them. Keep a flat list of peer rules flat.
 
-A document can be too long even when every line is live and unique. Attention thins across the excess. Move reference behind pointers, then split by case or by sequence so each path carries only what it needs.
+A document can be too long even when every line is live and unique. Past that length the model attends unevenly across it. Move reference behind pointers, then split by case or by sequence so each path carries only what it needs.
 
 ## Pointers
 
 A pointer names material outside the context and states when to reach it. A skill description, a `CLAUDE.md` line naming a rule file, a `See <file>` link, and a tool description are all pointers.
 
-Wording decides whether the model reaches the material. Sharpen the wording before inlining anything.
+The pointer's wording determines whether the model reaches the material. Sharpen the wording before inlining anything.
 
 Write a pointer to state what the material is and which cases trigger it. Prune it harder than the body, because it costs every turn:
 
@@ -49,7 +49,7 @@ Keep a concept's definition, rules, and caveats under one heading. Test a sectio
 
 Split a sequence when later steps tempt the model to finish the current one early. That works only across a real context break: a hand-off, a subagent dispatch, a separate request. An inline reference leaves the later steps in context.
 
-Merging two sequences has the reverse effect. Each step becomes visible from the one before it, and the model rushes toward the visible end.
+Do not merge two sequences. Each step becomes visible from the one before it, and the model stops the earlier sequence at the later one's criterion.
 
 ## Prescription
 
@@ -65,7 +65,7 @@ End every unit of work on a completion criterion: the condition that tells the m
 
 Write a criterion the model can check. A vague bound such as "understanding reached" lets the model stop early.
 
-Sharpen the bound first. Split the sequence to hide later work only when the bound cannot be sharpened and you have observed the model stopping early.
+Sharpen the bound first. Split the sequence to hide later work only when the bound cannot be sharpened and you have observed the model stopping early. [Splitting](#splitting) governs the split.
 
 #### Demand
 
@@ -75,9 +75,9 @@ Demand does not require steps. "Every rule applied" bounds a flat reference docu
 
 ## Leading Words
 
-A leading word is a compact concept from the model's pretraining, reused as the same token instead of restated as a sentence. Repeating the token accumulates a distributed definition and anchors a region of behavior in few tokens.
+A leading word is a compact concept from the model's pretraining, reused as the same token instead of restated as a sentence. Repeating the token accumulates a distributed definition, so a few tokens carry a rule that would otherwise take a paragraph.
 
-Choose an existing word before coining one. A coined word recruits nothing from pretraining, so you pay in definition tokens what an existing word supplies free.
+Choose an existing word before coining one. A coined word recruits nothing from pretraining, so define it in the document or it carries nothing.
 
 In the body, the same word produces the same behavior at each appearance, and inside flat reference it names the class of thing to look for. In a pointer, share the word across the prompt, the docs, and the code so the model links them to the material.
 
@@ -85,10 +85,6 @@ Look for passages that collapse into one token:
 
 - "fast, deterministic, low-overhead" collapses to *tight*, as in a tight loop.
 - "a loop you believe in" collapses to *red*: the loop goes red on the bug or it does not.
-
-#### Positive Form
-
-State the target behavior. "Write one-line comments" beats a rule against long ones. A prohibition names the behavior it bans, which makes that behavior more available to the model rather than less. Use an explicit ban only as a hard guardrail with no positive phrasing available, and pair it with the positive target.
 
 ## Sentence Form
 
@@ -98,9 +94,15 @@ State the target behavior. "Write one-line comments" beats a rule against long o
 - Active voice with a named actor: the model, the user, or a tool.
 - Present tense and common verbs: write "check" where you would write "interrogate".
 
-State the rule first. Add the reason after it, in one clause, only when knowing why lets the model handle a case the rule does not list.
+State the rule first. When knowing why lets the model handle a case the rule does not list, add the reason after it in one clause. Cut a reason that only argues the rule is right.
 
-Metaphor, epigram, and personification aim at a human reader. They spend tokens without changing behavior, and a figurative phrasing is a weaker match target than a literal one when the model scans for the rule that applies.
+Avoid metaphor, epigram, and personification. They aim at a human reader, and a figurative phrasing is a weaker match target than a literal one when the model scans for the rule that applies.
+
+#### Positive Form
+
+State the target behavior. "Write one-line comments" beats a rule against long ones. A prohibition names the behavior it bans, which makes that behavior more available.
+
+Use an explicit ban only as a hard guardrail with no positive phrasing available. Pair every ban with the positive target.
 
 ## Pruning
 
@@ -124,4 +126,4 @@ Replace a leading word too weak to beat the default ("be thorough" when the mode
 
 Check each line against what the document does. Delete a line that never bore on the task, including exposition and branches that belong behind a pointer. Delete a line that has gone stale as the world it describes changed.
 
-Prune on a schedule. Adding feels safe and removing feels risky, so stale layers settle over the live material until a reader has to dig through them to find what still fires.
+Prune whenever the document is edited for another purpose. Adding is easier than removing, so stale layers accumulate over the live material until a reader cannot tell which lines still fire.

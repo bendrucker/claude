@@ -87,7 +87,7 @@ Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab
 
 ## Skill Authoring Best Practices
 
-Load the `prompting` skill before writing a skill body or a reference file. It carries the rules for every document a model executes: placement, pointer wording, prescription, completion criteria, leading words, sentence form, and pruning. This section covers what changes when the document is a Claude Code skill.
+Load the `prompting` skill before writing a skill body or a reference file. It carries the rules for every document a model executes. The sections below cover what changes when that document is a Claude Code skill.
 
 #### Descriptions
 
@@ -183,8 +183,6 @@ Load the guide that covers the question at hand:
 
 - **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, reasoning effort, skill-scoped hooks, anti-patterns
 - **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, plugin cache
-
-For the prose itself, load the `prompting` skill.
 
 ## Resources
 

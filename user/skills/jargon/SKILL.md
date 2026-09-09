@@ -1,12 +1,12 @@
 ---
 name: jargon
-description: "Restate your previous message so it lands: plain language, every acronym expanded, mechanisms in place of metaphors, and the context it assumed."
+description: "Restate your previous message in plain language: every acronym expanded, mechanisms in place of metaphors, and the context the message assumed the reader already had."
 disable-model-invocation: true
 ---
 
 # Jargon
 
-Restate your previous message. Keep every claim it made.
+Restate your previous message. Keep every claim it made. Restate the current turn only, and write later messages in your normal register.
 
 ## Language
 
@@ -19,8 +19,7 @@ Restate your previous message. Keep every claim it made.
 
 ## Context
 
-The message may have failed on its setup rather than its words. Open with what it was responding to and what changed, then restate the claims.
+Open with what the message was responding to and what changed, then restate the claims. A message fails on its missing setup as often as on its words.
 
-Use the terms this conversation and this repository already use. Introducing a new name for something already named is what lost the thread.
+Use the terms this conversation and this repository already use. A new name for something already named forces the reader to map it back before they can follow the claim.
 
-Restate the current turn only, and write later messages in your normal register.

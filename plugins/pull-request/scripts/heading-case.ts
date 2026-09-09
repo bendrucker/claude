@@ -202,7 +202,6 @@ export interface HeadingCaseViolation {
 }
 
 interface Correction {
-  /** Offset of the word inside the heading's combined text. */
   combinedStart: number;
   original: string;
   suggested: string;

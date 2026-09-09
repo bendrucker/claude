@@ -31,7 +31,7 @@ Review the diff for correctness bugs and cleanups: $ARGUMENTS
 - **`<target>`**: everything else, free-form. A PR number, branch, ref range, path, or a plain-English scope restriction ("only `src/parser.ts`", "focus on error handling", "skip the test churn").
 - **`ultra`**: not supported here. Stop and tell the user to type `/code-review ultra` themselves.
 
-With no effort level, use the session's effort. Default to `medium`.
+With no effort level, pass none. The Phase 1 script resolves `medium`.
 
 ## Phase 0 — Scope
 

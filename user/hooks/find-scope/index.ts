@@ -22,7 +22,6 @@ const FIND_INVOCATION = /(?:^|[\n;&|(`]|\$\(|\b(?:sudo|command|xargs|time|nice)\
 // find being judged rather than to something further down the pipeline.
 const COMMAND_END = /[\n;&|)`]/;
 
-// Flags that may sit between `find` and its first path operand.
 const LEADING_FLAG = /^-[HLPEsx]+$/;
 
 // Roots that put the whole disk or the whole home directory in scope. A deeper

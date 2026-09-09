@@ -1,9 +1,6 @@
 #!/usr/bin/env bun
 
-// The removal signal for the find-scope hook, per docs/settings.md. Replays the
-// matcher over the Bash calls the session index has recorded and reports the two
-// numbers that retire or narrow it: how often it fires, and how much of what it
-// catches was fast enough to have been worth allowing.
+// The removal signal for the find-scope hook, per docs/settings.md.
 
 import { cli } from "cleye";
 import { z } from "zod";
@@ -69,8 +66,7 @@ export function audit(calls: BashCall[]): Audit {
   };
 }
 
-// The thresholds docs/settings.md commits to, so the script states the verdict
-// rather than leaving the reader to apply them.
+// The thresholds docs/settings.md commits to.
 export function verdict({ perMonth, fastShare }: Audit): string {
   if (perMonth < 15) {
     return "[33mRETIRE[0m: fires under 15 times a month, so the CLAUDE.md line alone covers it.";

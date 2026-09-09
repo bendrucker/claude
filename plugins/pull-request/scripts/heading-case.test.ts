@@ -129,6 +129,9 @@ describe("correctHeadingCase", () => {
       "heading beside a fence holding a hash line",
       "## Latch placement\n\n```sh\n# not a heading\n```\n",
     ],
+    ["heading carrying emphasis", "## **Two fixes** found while testing"],
+    ["heading carrying a link", "## Two fixes found in [the resolver](https://example.com)"],
+    ["setext heading", "Two fixes found while testing\n===\n"],
   ])("rewrites a %s", (_name, body) => {
     const fix = correctHeadingCase(body);
     expect(fix.skipped).toEqual([]);
@@ -148,9 +151,9 @@ describe("correctHeadingCase", () => {
   });
 
   test.each<[string, string]>([
-    ["emphasis", "## **Two fixes** found while testing"],
-    ["a link", "## Two fixes found in [the resolver](https://example.com)"],
-    ["a setext underline", "Two fixes found while testing\n===\n"],
+    ["an escape", String.raw`## Two \_fixes\_ found while testing`],
+    ["an entity", "## Two fixes &amp; one regression"],
+    ["a word split across emphasis", "## fol**low**up tasks found here"],
   ])("reports a heading carrying %s as skipped", (_name, body) => {
     const fix = correctHeadingCase(body);
     expect(fix.body).toBe(body);
@@ -167,6 +170,13 @@ describe("correctHeadingCase", () => {
     expect(fix.body).toBe(expected);
     expect(fix.skipped).toEqual([]);
     expect(headingCaseViolations(fix.body)).toEqual([]);
+  });
+
+  test("re-cases only the words inside markup, never the markup itself", () => {
+    const body = "## Two fixes found in [the resolver](https://Example.com/A-Path)\n";
+    expect(correctHeadingCase(body).body).toBe(
+      "## Two Fixes Found in [the Resolver](https://Example.com/A-Path)\n",
+    );
   });
 
   test("touches only the heading line", () => {

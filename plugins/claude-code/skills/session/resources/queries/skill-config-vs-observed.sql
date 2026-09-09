@@ -16,7 +16,10 @@
 --   `typed` counts that slash use, so a `disable-model-invocation` skill can be judged at
 --   all. A typed invocation produces no Skill tool call, so `calls` alone reads every such
 --   skill as dead: `job`, `improve-codebase-architecture`, and `review:self` each sit at
---   zero calls against 34, 14, and 7 typed. Retire on `calls` and `typed` both at zero.
+--   zero calls against 22, 11, and 7 typed. Retire on `calls` and `typed` both at zero.
+--   It reads `command_markers`, so a transcript quoted in a tool result or mid-message is
+--   not read as an invocation, and it resolves a marker the same way an observed call
+--   resolves, meaning a bare `/<plugin>` credits that plugin's entry skill alone.
 --
 --   The configured side reads local disk, not the index: plugin skills under the plugin
 --   cache (content is duplicated across version-hash directories, so it is pinned to one
@@ -118,18 +121,26 @@ observed AS (
     AND project_filter(s.project_path, getvariable('project'))
     AND host_filter(s.host, getvariable('host'))
 ),
--- Typed slash commands never produce a Skill tool call, so they are absent from
--- `skill_calls` and counted here from the `<command-name>` marker the harness writes into
--- the user message. The configured side bounds the rows, so built-in commands like
--- `/compact` and `/clear`, which have no SKILL.md, cannot appear.
+-- Typed slash commands leave no Skill tool call, so they come from `command_markers`
+-- rather than `skill_calls`. The configured side bounds the rows, so built-in commands
+-- like `/compact` and `/clear`, which have no SKILL.md, cannot appear.
 markers AS (
-  SELECT ltrim(regexp_extract(r.data::VARCHAR, '<command-name>/?([^<]{1,60})</command-name>', 1), '/') AS command
-  FROM raw r
+  SELECT cm.command
+  FROM command_markers cm
   JOIN sessions s USING (host, session_id)
-  WHERE r.data::VARCHAR LIKE '%<command-name>%'
-    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
+  WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
     AND project_filter(s.project_path, getvariable('project'))
     AND host_filter(s.host, getvariable('host'))
+),
+-- Counted per configured skill before the join so it stays one row per skill and cannot
+-- multiply the observed rows behind `calls`. Matching reuses `match_key`, so a marker
+-- typed without a namespace credits only the entry skills a bare slash command can
+-- actually invoke, exactly as bare `skill_calls` rows do.
+typed_counts AS (
+  SELECT k.source, k.skill_name, COUNT(m.command) AS typed
+  FROM keyed k
+  LEFT JOIN markers m ON m.command = k.match_key
+  GROUP BY k.source, k.skill_name
 )
 SELECT
   k.source,
@@ -141,15 +152,11 @@ SELECT
   -- so a bare COUNT(DISTINCT ...) would report 1 session for a zero-fire skill.
   COUNT(DISTINCT (o.host, o.session_id)) FILTER (o.session_id IS NOT NULL) AS sessions,
   MAX(o.timestamp) AS last_seen,
-  -- Correlated rather than joined: a second LEFT JOIN would multiply the observed rows and
-  -- inflate `calls`. Matched by full name, or by the segment after the colon for a marker
-  -- typed without its plugin namespace, with both sides guarded against ''.
-  (SELECT COUNT(*) FROM markers m
-    WHERE m.command = k.skill_name
-       OR (m.command <> ''
-           AND position(':' IN m.command) = 0
-           AND m.command = NULLIF(split_part(k.skill_name, ':', 2), ''))) AS typed
+  -- One typed_counts row per skill against many keyed rows, so MAX reads that one value
+  -- back without the join touching `calls`.
+  MAX(t.typed) AS typed
 FROM keyed k
 LEFT JOIN observed o ON o.skill_name = k.match_key
+LEFT JOIN typed_counts t ON t.source = k.source AND t.skill_name = k.skill_name
 GROUP BY k.source, k.skill_name, k.description_chars, k.disable_model_invocation
 ORDER BY calls ASC, k.source, k.skill_name;

@@ -16,6 +16,9 @@ describe("scanPrompt", () => {
     ["no-op", "Be thorough when reading the diff."],
     ["no-op", "Please read the file first."],
     ["no-op", "Think step by step."],
+    ["no-op", "Use your best judgment."],
+    ["no-op", "Use your best judgement."],
+    ["weak-modality", 'A “stray opener. Try to keep going, then "quoted" text.'],
   ])("flags %s in %j", (rule, source) => {
     expect(rules(source)).toEqual([rule]);
   });
@@ -27,6 +30,7 @@ describe("scanPrompt", () => {
     ["inline code", "Run `make sure-clean` first."],
     ["a quoted phrase", 'Replace a weak word ("be thorough") with a stronger one.'],
     ["frontmatter", "---\nname: never-used\ndescription: Please pick a name.\n---\n\nWrite it."],
+    ["a curly-quoted phrase", "Replace a weak word (“be thorough”) with a stronger one."],
   ])("passes %s", (_label, source) => {
     expect(rules(source)).toEqual([]);
   });

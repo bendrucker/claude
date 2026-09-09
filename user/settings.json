@@ -427,6 +427,7 @@
     "newline@bendrucker": true,
     "github@bendrucker": true,
     "claude-code@bendrucker": true,
+    "prompting@bendrucker": true,
     "pull-request@bendrucker": true,
     "x-callback-url@bendrucker": true,
     "research@bendrucker": true,

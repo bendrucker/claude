@@ -179,7 +179,7 @@ A skill-scoped PostToolUse hook runs `skill-lint` automatically when SKILL.md fi
 
 ## References
 
-Load detailed guides as needed:
+Load the guide that covers the question at hand:
 
 - **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, reasoning effort, skill-scoped hooks, anti-patterns
 - **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, plugin cache

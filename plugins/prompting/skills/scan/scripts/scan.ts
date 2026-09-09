@@ -40,7 +40,9 @@ export async function collectFiles(input: string, all: boolean): Promise<string[
   const { cwd, pattern } = toGlob(input);
   const glob = new Bun.Glob(pattern);
   const files: string[] = [];
-  for await (const entry of glob.scan({ cwd, onlyFiles: true })) {
+  // `.claude/agents`, `.claude/commands`, and `.claude/rules` all sit under a
+  // dot directory, which Bun.Glob skips unless asked for it.
+  for await (const entry of glob.scan({ cwd, onlyFiles: true, dot: true })) {
     const path = cwd === "." ? entry : join(cwd, entry);
     if (shouldSkip(path)) continue;
     if (!all && !isAgentFacing(path)) continue;
@@ -109,10 +111,9 @@ if (import.meta.main) {
 
   const results = await scanFiles(await collectFiles(argv._.path ?? ".", argv.flags.all));
   for (const { path, findings } of results) {
+    const name = label(path);
     for (const finding of findings) {
-      console.log(
-        `${label(path)}:${finding.line}:${finding.col}: ${finding.rule}: ${finding.message}`,
-      );
+      console.log(`${name}:${finding.line}:${finding.col}: ${finding.rule}: ${finding.message}`);
     }
   }
   if (!argv.flags.quiet && results.length > 0) printSummary(results);

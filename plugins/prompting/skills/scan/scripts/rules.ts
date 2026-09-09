@@ -1,11 +1,14 @@
 // Defects in a document a model executes. Each rule names a failure the
 // `prompting` skill describes, so a finding maps to a rule the author can read.
 //
-// Rules run over mdast text nodes, which excludes fenced blocks and inline
-// code. A prompt quoting a bad instruction as an example keeps the example.
+// Rules run over mdast text nodes, which excludes fenced blocks, inline code,
+// and frontmatter. A prompt quoting a bad instruction as an example keeps the
+// example.
 
-import type { Text } from "mdast";
+import type { Root, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
+import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
+import { frontmatter } from "micromark-extension-frontmatter";
 import { visit } from "unist-util-visit";
 
 export interface Finding {
@@ -43,7 +46,7 @@ const NO_OP: PatternRule = {
   name: "no-op",
   message: "restates a default the model already follows. Delete the sentence.",
   pattern:
-    /\b(?:be (?:thorough|careful|concise|accurate|helpful|precise|diligent)|think (?:step by step|carefully|hard)|take your time|use your (?:best )?judg?ement|using your (?:best )?judg?ement|do your best|remember to|it(?:'s| is) important (?:to|that)|please|carefully)\b/gi,
+    /\b(?:be (?:thorough|careful|concise|accurate|helpful|precise|diligent)|think (?:step by step|carefully|hard)|take your time|(?:use|using) your (?:best )?judge?ment|do your best|remember to|it(?:'s| is) important (?:to|that)|please|carefully)\b/gi,
 };
 
 const PATTERN_RULES = [WEAK_MODALITY, VAGUE_CRITERION, NO_OP];
@@ -61,11 +64,15 @@ function locate(node: Text, offset: number): { line: number; col: number } {
   };
 }
 
+// Each opener pairs with its own closer, so a stray quote blanks nothing beyond
+// itself.
+const QUOTED = /"[^"]*"|“[^”]*”|‘[^’]*’/g;
+
 // A quoted phrase is named rather than instructed, which is how a document
 // about prompting teaches a rule by showing the wording it rejects. Blanking
 // the span keeps every later offset in place.
 function withoutQuotes(value: string): string {
-  return value.replaceAll(/["“‘][^"”’]*["”’]/g, (quoted) => " ".repeat(quoted.length));
+  return value.replaceAll(QUOTED, (quoted) => " ".repeat(quoted.length));
 }
 
 function patternFindings(node: Text): Finding[] {
@@ -84,20 +91,21 @@ function patternFindings(node: Text): Finding[] {
   return found;
 }
 
-// YAML frontmatter is data the harness reads, so it never carries instructions.
-// Parsing it as markdown turns a `name: never-used` field into prose.
-const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---\r?\n/;
+// Frontmatter is data the harness reads, so it never carries instructions. The
+// extension gives it a node of its own, which holds no text children and so
+// never reaches the rules, and every other node keeps its true source position.
+function parse(source: string): Root {
+  return fromMarkdown(source, {
+    extensions: [frontmatter(["yaml", "toml"])],
+    mdastExtensions: [frontmatterFromMarkdown(["yaml", "toml"])],
+  });
+}
 
 /** Every finding in one document, ordered by position. */
 export function scanPrompt(source: string): Finding[] {
   const found: Finding[] = [];
-  const frontmatter = FRONTMATTER.exec(source)?.[0] ?? "";
-  const offsetLines = frontmatter.length === 0 ? 0 : frontmatter.split("\n").length - 1;
-  visit(fromMarkdown(source.slice(frontmatter.length)), "text", (node) => {
+  visit(parse(source), "text", (node) => {
     found.push(...patternFindings(node));
   });
-  for (const finding of found) finding.line += offsetLines;
   return found.toSorted((a, b) => (a.line === b.line ? a.col - b.col : a.line - b.line));
 }
-
-export const RULE_NAMES = PATTERN_RULES.map((rule) => rule.name);

@@ -99,7 +99,7 @@ export function formatDenyOutput(): SyncHookJSONOutput {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
       permissionDecisionReason:
-        "`find` rooted at `/` or the home directory walks the whole disk and usually hits the Bash timeout without returning anything. Root it at a directory that can actually hold the target (`node_modules`, `~/.claude/plugins`, `$(go env GOMODCACHE)`), or use Glob with an explicit `path`. If the root has to stay broad, bound it with `-maxdepth`, or run `fd -HI <pattern> <root>`, which walks the same tree in seconds.",
+        "`find` rooted at `/` or the home directory walks the whole disk. It runs for a minute or more, and often hits the Bash timeout before returning anything. Root it at a directory that can actually hold the target (`node_modules`, `~/.claude/plugins`, `$(go env GOMODCACHE)`), or use Glob with an explicit `path`. If the root has to stay broad, bound it with `-maxdepth`, or run `fd -HI <pattern> <root>`, which walks the same tree in seconds.",
     },
   };
 }

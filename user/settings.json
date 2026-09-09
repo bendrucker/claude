@@ -224,6 +224,11 @@
             "type": "command",
             "command": "bun ~/.claude/hooks/worktree",
             "if": "Bash(git worktree *)"
+          },
+          {
+            "type": "command",
+            "command": "bun ~/.claude/hooks/find-scope",
+            "if": "Bash(find *)"
           }
         ]
       },

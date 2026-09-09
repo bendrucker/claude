@@ -5,7 +5,7 @@
 // and frontmatter. A prompt quoting a bad instruction as an example keeps the
 // example.
 
-import type { Root, Text } from "mdast";
+import type { Nodes, Root, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
 import { frontmatter } from "micromark-extension-frontmatter";
@@ -70,28 +70,42 @@ const QUOTED = /"[^"]*"|“[^”]*”|‘[^’]*’/g;
 
 type Span = readonly [number, number];
 
-// Quotes pair over prose alone, so a quote inside a fence or an inline code
-// span cannot pair with one in a sentence. Every other character becomes a
-// space, which holds each source offset in place.
-function proseView(source: string, tree: Root): string {
-  const chars: string[] = Array.from({ length: source.length }, () => " ");
-  visit(tree, "text", (node) => {
-    const from = node.position?.start.offset;
-    const to = node.position?.end.offset;
-    if (from === undefined || to === undefined) return;
-    for (let i = from; i < to; i++) chars[i] = source.charAt(i);
+// Paragraphs and headings are where prose lives. Pairing runs inside one of
+// them at a time, so an unmatched quote reaches the end of its own block and
+// no further.
+const BLOCKS = new Set(["paragraph", "heading", "tableCell"]);
+
+// One block's prose, with every character outside a text node replaced by a
+// space: formatting marks, inline code, and the delimiters mdast consumed. The
+// spaces hold each source offset in place, and dropping inline code keeps a
+// quote in `a "b` from pairing with one in the sentence around it.
+function proseView(source: string, block: Nodes): string {
+  const from = block.position?.start.offset;
+  const to = block.position?.end.offset;
+  if (from === undefined || to === undefined) return "";
+  const chars: string[] = Array.from({ length: to - from }, () => " ");
+  visit(block, "text", (node) => {
+    const start = node.position?.start.offset;
+    const end = node.position?.end.offset;
+    if (start === undefined || end === undefined) return;
+    for (let i = start; i < end; i++) chars[i - from] = source.charAt(i);
   });
   return chars.join("");
 }
 
 // A quoted phrase is named, which is how a document about prompting teaches a
-// rule by showing the wording it rejects. Pairing over the whole source exempts
-// a quote that formatting splits across sibling nodes, such as "*be thorough*".
+// rule by showing the wording it rejects. Pairing across the whole block exempts
+// a quote that formatting splits into sibling nodes, such as "*be thorough*".
 function quotedSpans(source: string, tree: Root): Span[] {
-  return [...proseView(source, tree).matchAll(QUOTED)].map((match): Span => [
-    match.index,
-    match.index + match[0].length,
-  ]);
+  const spans: Span[] = [];
+  visit(tree, (block) => {
+    if (!BLOCKS.has(block.type)) return;
+    const from = block.position?.start.offset ?? 0;
+    for (const match of proseView(source, block).matchAll(QUOTED)) {
+      spans.push([from + match.index, from + match.index + match[0].length]);
+    }
+  });
+  return spans;
 }
 
 function patternFindings(node: Text, quoted: readonly Span[]): Finding[] {

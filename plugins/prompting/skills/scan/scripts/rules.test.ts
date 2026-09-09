@@ -51,6 +51,11 @@ describe("scanPrompt", () => {
     expect(scanPrompt(source)).toMatchObject([{ line: 2, col: 6 }]);
   });
 
+  test("stops quote pairing at the end of a block", () => {
+    const source = 'A "stray opener.\n\nTry to keep going.\n\nThen "quoted" text.\n';
+    expect(scanPrompt(source)).toMatchObject([{ line: 3, rule: "weak-modality" }]);
+  });
+
   test("reports every finding in one document, ordered by position", () => {
     const source = "Please read it.\n\nMake sure it works.\n";
     expect(rules(source)).toEqual(["no-op", "vague-criterion"]);

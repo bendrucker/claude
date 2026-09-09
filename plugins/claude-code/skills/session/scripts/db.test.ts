@@ -1864,7 +1864,7 @@ describe("skill-auto-vs-explicit query", () => {
     expect(Number(create?.explicit)).toBe(0);
   });
 
-  it("keeps an unnamespaced skill from absorbing unparsed command markers", async () => {
+  it("credits a bare command to an unnamespaced skill, not a namespaced sibling", async () => {
     const rows = await runQuery(
       db,
       "skill-auto-vs-explicit",
@@ -1872,8 +1872,11 @@ describe("skill-auto-vs-explicit query", () => {
       filterParams({ min_calls: null }),
     );
     const solo = rows.find((r) => r.skill_name === "solo");
-    expect(Number(solo?.explicit)).toBe(0);
-    expect(Number(solo?.total)).toBe(1);
+    expect(Number(solo?.explicit)).toBe(1);
+    expect(Number(solo?.total)).toBe(2);
+    // A bare `/peer` cannot invoke `review:peer`, so only the namespaced marker counts.
+    const peer = rows.find((r) => r.skill_name === "review:peer");
+    expect(Number(peer?.explicit)).toBe(1);
   });
 });
 
@@ -2301,6 +2304,7 @@ describe("skill-config-vs-observed query", () => {
     calls: z.bigint(),
     sessions: z.bigint(),
     last_seen: z.date().nullable(),
+    typed: z.bigint(),
   });
   type SkillRow = z.infer<typeof SkillRow>;
 
@@ -2331,6 +2335,63 @@ describe("skill-config-vs-observed query", () => {
     expect(Number(peer[0]?.calls)).toBe(2);
     expect(Number(peer[0]?.sessions)).toBe(1);
     expect(peer[0]?.last_seen).not.toBeNull();
+  });
+
+  it("counts a typed slash command for a skill the model never loads", async () => {
+    const rows = await skillRows();
+    const typedOnly = rows.find((r) => r.skill_name === "typed-only");
+    expect(Number(typedOnly?.calls)).toBe(0);
+    expect(Number(typedOnly?.typed)).toBe(1);
+    expect(typedOnly?.disable_model_invocation).toBe(true);
+  });
+
+  it("counts a typed slash command alongside observed calls without inflating them", async () => {
+    const rows = await skillRows();
+    const peer = rows.find((r) => r.skill_name === "review:peer");
+    // A bare `/peer` is also in the fixture and must not land here: pre-aggregating typed
+    // counts keeps them off the observed join, which would otherwise multiply calls.
+    expect(Number(peer?.typed)).toBe(1);
+    expect(Number(peer?.calls)).toBe(2);
+  });
+
+  it("credits a bare typed command to the entry skill it can invoke", async () => {
+    const rows = await skillRows();
+    const solo = rows.find((r) => r.skill_name === "solo:solo");
+    expect(Number(solo?.typed)).toBe(1);
+    expect(Number(solo?.calls)).toBe(1);
+  });
+
+  it("reports zero typed for a skill that is never called and never typed", async () => {
+    const rows = await skillRows();
+    const never = rows.find((r) => r.skill_name === "never-used");
+    expect(Number(never?.calls)).toBe(0);
+    expect(Number(never?.typed)).toBe(0);
+  });
+
+  it("counts a name at the full length budget, once across a replayed line", async () => {
+    const rows = await skillRows();
+    const long = rows.find((r) => r.skill_name.length === 64);
+    expect(long).toBeDefined();
+    expect(Number(long?.typed)).toBe(1);
+  });
+
+  it("ignores a marker quoted in prose or dumped into a tool result", async () => {
+    const rows = await skillRows();
+    const typedOnly = rows.find((r) => r.skill_name === "typed-only");
+    // The fixture quotes `/typed-only` twice more, mid-sentence and inside a tool result.
+    expect(Number(typedOnly?.typed)).toBe(1);
+  });
+
+  it("lets a personal skill shadow a plugin entry skill of the same name", async () => {
+    const rows = await skillRows();
+    const personal = rows.find((r) => r.skill_name === "twin" && r.source.startsWith("user:"));
+    expect(Number(personal?.calls)).toBe(1);
+    expect(Number(personal?.typed)).toBe(1);
+    // The plugin's copy answers to `twin:twin` alone, so the bare call and command are
+    // the personal skill's and must not be counted twice.
+    const plugin = rows.find((r) => r.skill_name === "twin:twin");
+    expect(Number(plugin?.calls)).toBe(0);
+    expect(Number(plugin?.typed)).toBe(0);
   });
 
   it("matches bare observed calls to an entry skill (plugin = skill)", async () => {

@@ -11,6 +11,12 @@ Creating or renaming a plugin directory requires adding or updating its entry in
 
 Load the `claude-code:skill` skill when creating or modifying skills.
 
+## Audience
+
+`writing` owns prose a person reads. `prompting` owns documents a model executes. Place a skill in exactly one of them.
+
+The two share a plain-language core: active voice, no contrast frames, no hedging. They diverge on figurative language, which human prose uses and a model-executed document replaces with the literal fact, and on the mechanics only `prompting` has to state: placement against a context budget, pointer wording, completion criteria. A skill that serves both audiences drifts toward the human one and stops enforcing the mechanics.
+
 ## Naming
 
 Commands, agents, and skills auto-namespace with `plugin-name:`, so `ci-monitor.md` in `gitlab` becomes `gitlab:ci-monitor`. An explicit prefix in frontmatter is optional. Anti-stuttering applies after the colon: `gitlab:gitlab-ci` is wrong, `gitlab:ci` is right. A plugin's primary skill may exactly match the plugin name (`writing:writing`, `herdr:herdr`); the form to avoid is the redundant suffix (`writing:writing-analyze`). Run `bun run skill-lint` to catch namespace mismatches and stuttering.
@@ -41,4 +47,6 @@ Deleting a plugin's `commands/`, `agents/`, or `hooks/` directory requires remov
 
 ## Dependencies
 
-Plugin-specific dependencies go in the plugin's own `plugins/<name>/package.json`, added to the root `workspaces` array. No cross-plugin imports, and no reaching into `packages/` via relative paths. Shared code goes to an npm workspace package, declared in each plugin's `package.json`. Run `bun scripts/check-plugin-imports.ts` to verify.
+A skill that loads a skill from another plugin creates a plugin dependency. Declare it in the `dependencies` array of the depending plugin's `plugin.json`, as a bare plugin name resolved against this marketplace. Declare it only when the skill is unusable without the target, since `dependencies` requires the named plugin to be enabled and cannot express a choice between two providers.
+
+Plugin-specific code dependencies go in the plugin's own `plugins/<name>/package.json`, added to the root `workspaces` array. No cross-plugin imports, and no reaching into `packages/` via relative paths. Shared code goes to an npm workspace package, declared in each plugin's `package.json`. Run `bun scripts/check-plugin-imports.ts` to verify.

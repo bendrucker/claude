@@ -32,7 +32,8 @@
     ".claude/skills/agent-ideas",
     "plugins/comments/evals/comment-density",
     "plugins/pull-request/evals/pr-body",
-    "packages/oxlint-rules"
+    "packages/oxlint-rules",
+    "plugins/prompting"
   ],
   "type": "module",
   "scripts": {

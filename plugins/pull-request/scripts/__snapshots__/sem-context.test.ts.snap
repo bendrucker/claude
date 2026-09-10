@@ -1,0 +1,14 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`render renders a mixed diff grouped by file 1`] = `
+"Entities (origin/main...HEAD, structural only):
+  hooks/pretooluse.ts
+    M function dispatch
+    A function targetOf
+    R function oldName → newName
+    R function hooks/legacy.ts:relocated → relocated
+    M function ordering
+  scripts/scan.ts
+    D method retired
+  cosmetic-only: 1 entity · module-level: 1 · unparsed: 1 file"
+`;

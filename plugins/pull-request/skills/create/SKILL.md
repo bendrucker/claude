@@ -33,6 +33,8 @@ allowed-tools:
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts`
 
+!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/sem-context.ts`
+
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts`
 
 ## Title
@@ -47,6 +49,8 @@ allowed-tools:
 ## Body
 
 Lead with intent: why the change exists, the decisions a reviewer can't reconstruct from the diff, and how you know it works. Don't restate what the diff, the git log, or the status checks show. Review the session for content that never reached the code (rejected alternatives, scope changes, test observations) and state each as a self-contained decision, never as a delta against a plan the reviewer hasn't seen.
+
+The `Entities` block in the context lists what changed at the function and class level, so use it to judge what the change did, but lead the body with intent and never reproduce the list.
 
 - Open with a bare verb ("Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when it needs justifying. Don't restate the title.
 - Default to prose. Write a small PR as one paragraph with no headings. Add `##` sections only when the body is long enough to need them. Base length on substance, not diff size.

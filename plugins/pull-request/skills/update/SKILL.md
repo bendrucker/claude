@@ -28,6 +28,8 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts`
 
+!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/sem-context.ts`
+
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts`
 
 ## Workflow
@@ -42,7 +44,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 ## Writing
 
-1. Rewrite the PR body per [`sections.md`](../create/references/sections.md), the same rules the create skill follows. Load the `writing` skill for the full set of tropes to avoid. If a PR template is provided in context, preserve its structure.
+1. Rewrite the PR body per [`sections.md`](../create/references/sections.md), the same rules the create skill follows. Load the `writing` skill for the full set of tropes to avoid. If a PR template is provided in context, preserve its structure. The `Entities` block in the context lists what changed at the function and class level, so use it to judge what the change did, but lead the body with intent and never reproduce the list.
 2. Write the updated body to a temp file (e.g., `tmp/pr-body-<branch>.md`) and apply:
    - **GitHub**: `gh pr edit --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr update --description-file tmp/pr-body-<branch>.md`

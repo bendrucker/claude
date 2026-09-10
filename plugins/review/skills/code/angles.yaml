@@ -32,7 +32,7 @@ angles:
       - core
       - full
     text: |
-      For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+      For each modified entity in the scope block's entity list, run `sem impact <name> --file <path> --dependents` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
   - id: D
     name: "Angle D — language-pitfall specialist"
     kind: correctness

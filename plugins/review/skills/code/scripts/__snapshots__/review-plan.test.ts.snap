@@ -51,7 +51,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -118,7 +118,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -186,7 +186,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Angle D — language-pitfall specialist
 
@@ -301,7 +301,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -371,7 +371,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -442,7 +442,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Angle D — language-pitfall specialist
 
@@ -562,7 +562,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -633,7 +633,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -705,7 +705,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Angle D — language-pitfall specialist
 
@@ -825,7 +825,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -896,7 +896,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -964,7 +964,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each modified entity in the scope block's entity list, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. When the scope block carries no entity list, Grep for the symbol instead. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Angle D — language-pitfall specialist
 

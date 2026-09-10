@@ -4,7 +4,6 @@ import { cli } from "cleye";
 import { z } from "zod";
 
 const changeSchema = z.object({
-  entityId: z.string(),
   changeType: z.enum(["added", "modified", "deleted", "renamed", "moved", "reordered"]),
   entityType: z.string(),
   entityName: z.string(),
@@ -167,7 +166,10 @@ export async function scopeBlock(
   target: Target,
   sources: Sources = { runSem, mergeBase },
 ): Promise<string> {
-  const ref = "base" in target ? await sources.mergeBase(target.base) : target.range;
+  const { ref, label } =
+    "base" in target
+      ? { ref: await sources.mergeBase(target.base), label: `${target.base}...HEAD` }
+      : { ref: target.range, label: target.range };
   if (ref === null || ref === "") return "";
 
   const result = await sources.runSem(["diff", ref, "--format", "json"]);
@@ -176,9 +178,7 @@ export async function scopeBlock(
   }
 
   const changes = parseDiff(result.stdout);
-  if (changes === null) return "";
-
-  return render(changes, "base" in target ? `${target.base}...HEAD` : target.range);
+  return changes === null ? "" : render(changes, label);
 }
 
 if (import.meta.main) {

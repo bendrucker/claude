@@ -3,7 +3,6 @@ import { type Change, render, type SemResult, type Sources, scopeBlock } from ".
 
 function change(overrides: Partial<Change> = {}): Change {
   return {
-    entityId: "plugins/writing/hooks/pretooluse.ts::function::dispatch",
     changeType: "modified",
     entityType: "function",
     entityName: "dispatch",

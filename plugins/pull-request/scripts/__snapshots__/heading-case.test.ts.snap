@@ -36,3 +36,22 @@ exports[`correctHeadingCase rewrites a heading beside a fence holding a hash lin
 \`\`\`
 "
 `;
+
+exports[`correctHeadingCase rewrites a heading carrying emphasis 1`] = `"## **Two Fixes** Found While Testing"`;
+
+exports[`correctHeadingCase rewrites a heading carrying a link 1`] = `"## Two Fixes Found in [the Resolver](https://example.com)"`;
+
+exports[`correctHeadingCase rewrites a setext heading 1`] = `
+"Two Fixes Found While Testing
+===
+"
+`;
+
+exports[`correctHeadingCase rewrites a setext heading broken across lines 1`] = `
+"Two Fixes  
+Found While Testing
+===
+"
+`;
+
+exports[`correctHeadingCase rewrites a heading carrying an image 1`] = `"## ![Coverage](badge.svg) Two Fixes Found"`;

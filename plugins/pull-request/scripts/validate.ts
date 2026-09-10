@@ -21,7 +21,7 @@ function correctionNote(file: string, headings: HeadingCaseViolation[]): string 
   const changes = headings
     .map((heading) => `"${heading.text}" → "${heading.suggested}"`)
     .join("; ");
-  return `Section headings in \`${file}\` were re-cased to AP title case before this command ran: ${changes}. Nothing else in the body changed. Carry the corrected headings into any later edit of it.`;
+  return `Section headings in \`${file}\` were re-cased to AP title case in place before this command ran: ${changes}. Only letter case changed. The pairs above are display text, so any emphasis, link, or image the heading carries is missing from them and still in the file. Re-read the file before editing it.`;
 }
 
 /**

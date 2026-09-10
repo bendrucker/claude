@@ -518,7 +518,11 @@ describe("headingCaseCorrection", () => {
   test.each<[string, string, Partial<BodyContext>]>([
     ["there is no heading violation", "## Summary\n\nFixes a bug.", {}],
     ["another deny stands alongside it", "## Two fixes found while testing\n\nAdded 5 tests.", {}],
-    ["the flagged heading cannot be edited in place", "## **Two fixes** found while testing", {}],
+    [
+      "the flagged heading cannot be edited in place",
+      String.raw`## Two \_fixes\_ found while testing`,
+      {},
+    ],
     ["the body is unreadable", "", { unreadable: "standard input" }],
   ])("declines to correct when %s", async (_name, body, context) => {
     expect(await correctionFor(body, context)).toBeNull();

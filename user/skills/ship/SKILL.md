@@ -17,6 +17,7 @@ allowed-tools:
   - Skill(comments:audit)
   - Skill(github:copilot)
   - Skill(writing:review)
+  - Skill(review:human)
   - Skill(pull-request:create)
   - Skill(pull-request:babysit)
   - Skill(pull-request:follow-up)
@@ -43,6 +44,7 @@ Resolve the base to a **remote** ref so ship's view matches what the PR merges a
 - **`github:copilot`**: code changed on a repo I own *and* the diff clears the [Cross-Model Gate](references/passes.md). A second model reads the diff before the PR exists.
 - **`writing:review`**: diff touches prose (`.md`, `.mdx`, `.rst`, docs).
 - **`run`**: diff has a runtime surface. Drive the change in the real app, not just tests. Skip on docs-only and tests-only.
+- **`review:human`**: always, not diff-gated. Ben reads the cleaned diff last, for architecture and slop. `--skip human` drops it.
 
 Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQuestion` only on a real toss-up: refactor versus behavior change, or `medium` versus `high` effort.
 
@@ -51,7 +53,7 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 - `--merge`: drive to merged (babysit `--merge`). Default: green and ready.
 - `--effort <low|medium|high|xhigh>`: override inferred `review:code` effort.
 - `--simplify`: force `simplify` over `review:code`.
-- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code` (the old `code-review` is accepted as an alias), `simplify`, `comments`, `bot`, `copilot`, `writing`, `run` (the old `verify` is accepted as an alias).
+- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code` (the old `code-review` is accepted as an alias), `simplify`, `comments`, `bot`, `copilot`, `writing`, `run` (the old `verify` is accepted as an alias), `human`.
 - `--base <ref>`: base branch for gating. Default `main`; on a stack, the parent branch. Resolved to its upstream tracking ref (e.g. `origin/...`) before diffing.
 
 ## Pre-PR Reviews
@@ -64,6 +66,7 @@ Serialized before create: `review:code --fix`, `simplify`, and comment trims all
 4. **Correctness and quality**: `review:code <effort> --fix` or `simplify`.
 5. **`writing:review`** over touched prose. Address salient findings before the body is written.
 6. **`run`** to drive the change end to end.
+7. **`review:human`**: after every fix pass, so the cleaned diff is what gets seen. Terminal mode by default: it ends the turn, and Create runs only when the review resumes with approval.
 
 Dirty tree at the comment pass: ask whether to commit first. `comments:audit` operates on `HEAD` and needs a clean tree.
 

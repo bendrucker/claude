@@ -4,7 +4,7 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR, including after committing changes.
 
-argument-hint: "[--draft] [--no-auto] [--base <ref>] [--label <name>] [--no-review]"
+argument-hint: "[--draft] [--no-auto] [--base <ref>] [--label <name>] [--no-review] [--review-body] [--no-review-body]"
 allowed-tools:
   - mcp__github
   - Agent
@@ -13,6 +13,7 @@ allowed-tools:
   - Skill(gitlab:merge-request)
   - Skill(gitlab:api)
   - Skill(github:attach)
+  - Skill(review:human)
   - "Bash(git add:*)"
   - "Bash(git commit:*)"
   - "Bash(git push:*)"
@@ -71,6 +72,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
 - `--base <ref>`: parent branch to target. A branch whose parent is another topic branch is a stack layer. Only this flag or the user identifies one. The upstream ref tracks the branch's own remote copy, so it can't identify the parent. Default: the repo's default branch.
 - `--label <name>`: apply a label, repeatable. Confirm each label exists first, per [`references/labels.md`](references/labels.md). Default: none.
 - `--no-review`: don't request the hosted review. Default: on a repo that gates its hosted bot on a label, request it when the diff clears the metered-review gate and no local pass ran. See [`references/labels.md`](references/labels.md).
+- `--review-body`: put the drafted body in front of you before creating. Default: on when the Remote URL above names an owner other than you, off on your own repos. `--no-review-body` skips it.
 
 ## Workflow
 
@@ -81,6 +83,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
 1. Push the branch to remote: `git push -u origin HEAD`
 1. Resolve the label set against the repo before creating: any `--label` values, plus the review label when the local bot review step's gate said the diff warrants a metered review and that pass didn't already spend the credit. See [`references/labels.md`](references/labels.md).
 1. Draft the body. Past a single paragraph, read [`references/sections.md`](references/sections.md) first: audience tiers, session content, density and heading rules, evidence, optional sections, slop to cut.
+1. Review the body when `--review-body` applies: write it to `tmp/pr-body-<branch>.md`, run `review:human --doc tmp/pr-body-<branch>.md --summary "PR body for <repo>"`, and fold the feedback into the file before creating. Under `/ship` the diff was already reviewed, so this covers only the body.
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description-file tmp/pr-body-<branch>.md`

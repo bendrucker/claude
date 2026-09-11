@@ -92,6 +92,8 @@ The user is the next actor when someone asked the user a direct question, when t
 
 Someone else is the next actor when the user commented or reviewed last and nothing the user raised has been answered, when the item is approved or has changes requested and only the author can move it, and when it is blocked on work the user does not own. Open threads are not an exception: a thread carrying the user's unanswered comment is waiting on whoever it was addressed to.
 
+An entry collapsing several sources can carry both actors at once. The user wins that tie, because dropping the entry would drop a question addressed to the user. Carry only the parts that resolve to the user into the entry's summary and its recommended action, and leave the author-owned threads out of both.
+
 A re-review resolves on the revision rather than on its threads. Commits answering the user's earlier feedback make the user the next actor. Threads the author has not answered do not, and they stay out of the item's summary even when the item itself survives.
 
 Report the drop rather than hiding it. Each group ends with a one-line count of what the filter removed, such as `3 items waiting on their authors, not shown`. That count is how the user tells a filtered group from an empty one.

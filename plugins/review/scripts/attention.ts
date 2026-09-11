@@ -196,8 +196,11 @@ function herdrJson(args: string[]): string {
   }
 }
 
-function openPane(args: string[]): never {
+function openPane(args: string[], missingPlugin?: string): never {
   const outcome = openedPane(herdrJson(args));
+  if ("error" in outcome && missingPlugin != null && outcome.error.includes("plugin not found")) {
+    fail(missingPlugin);
+  }
   if ("error" in outcome) fail(outcome.error);
   console.log(`opened ${outcome.pane}`);
   process.exit(0);
@@ -222,7 +225,7 @@ const raiseCmd = command(
     // The marker lands first so a reply that follows the toast at once still
     // finds it and clears the label.
     const marker = markerPath(paneId);
-    mkdirSync(join(marker, ".."), { recursive: true });
+    mkdirSync(dirname(marker), { recursive: true });
     await Bun.write(marker, "");
     herdr(raiseArgs(paneId));
     herdr(notificationArgs(parsed.flags.summary));
@@ -236,8 +239,10 @@ const clearCmd = command(
     if (paneId == null) return;
     const marker = Bun.file(markerPath(paneId));
     if (!(await marker.exists())) return;
-    // The marker outlives a failed clear so the next prompt retries it.
-    if (herdr(clearArgs(paneId))) await marker.delete();
+    // The marker outlives a failed clear so the next prompt retries it, until
+    // the label's own TTL has expired it anyway.
+    const expired = Date.now() - marker.lastModified > TTL_MS;
+    if (herdr(clearArgs(paneId)) || expired) await marker.delete();
   },
 );
 
@@ -250,7 +255,7 @@ const openCmd = command(
       doc: { type: String, description: "Open plannotator-tui over this file" },
     },
   },
-  (parsed) => {
+  async (parsed) => {
     if (!parsed.flags.diff && parsed.flags.doc == null) {
       parsed.showHelp();
       process.exit(1);
@@ -258,13 +263,11 @@ const openCmd = command(
     const paneId =
       currentPane() ?? fail("not inside a herdr pane (HERDR_PANE_ID unset): use --browser");
     if (parsed.flags.doc != null) {
-      const outcome = openedPane(herdrJson(docOpenArgs(paneId, parsed.flags.doc)));
-      if ("error" in outcome && outcome.error.includes("plugin not found")) {
-        fail(`plannotator-tui not found: install the \`${ANNOTATE_PLUGIN}\` herdr plugin`);
-      }
-      if ("error" in outcome) fail(outcome.error);
-      console.log(`opened ${outcome.pane}`);
-      process.exit(0);
+      if (!(await Bun.file(parsed.flags.doc).exists())) fail(`no such file: ${parsed.flags.doc}`);
+      openPane(
+        docOpenArgs(paneId, parsed.flags.doc),
+        `plannotator-tui not found: install the \`${ANNOTATE_PLUGIN}\` herdr plugin`,
+      );
     }
     const workspace = process.env.HERDR_WORKSPACE_ID;
     const open =

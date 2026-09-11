@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
+import { z } from "zod";
 import {
   clearArgs,
   currentPane,
@@ -188,6 +190,27 @@ describe("openedPane", () => {
     ],
   ])("%s", (_name, stdout, expected) => {
     expect(openedPane(stdout)).toEqual(expected);
+  });
+});
+
+describe("hook marker path", () => {
+  const Hooks = z.object({
+    hooks: z.object({
+      UserPromptSubmit: z.tuple([
+        z.object({ hooks: z.tuple([z.object({ command: z.string() })]) }),
+      ]),
+    }),
+  });
+
+  test("the shell fast path resolves to markerPath()", async () => {
+    const file = Bun.file(join(import.meta.dirname, "..", "hooks", "hooks.json"));
+    const { command } = Hooks.parse(await file.json()).hooks.UserPromptSubmit[0].hooks[0];
+    const [, expr] = command.match(/\[ -f (.+?) \] &&/) ?? [];
+    expect(expr).toBeDefined();
+    const shell = Bun.spawnSync(["sh", "-c", `printf %s ${expr}`], {
+      env: { HOME: "/h", HERDR_PANE_ID: "wE5:p1", PATH: process.env.PATH },
+    });
+    expect(shell.stdout.toString()).toBe(markerPath("wE5:p1", "/h"));
   });
 });
 

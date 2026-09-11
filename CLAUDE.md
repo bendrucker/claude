@@ -41,6 +41,7 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 
 - `bun scripts/check-marketplace.ts`: verifies all plugin directories are listed in `marketplace.json`. Runs in CI.
 - `bun scripts/check-hook-paths.ts`: verifies every hook command in `user/settings.json` and `.claude/settings.json` names a tracked path, so a hook cannot outlive the script it invokes. Runs in CI.
+- `bun run plugin-lockfiles check`: verifies every plugin declaring dependencies ships a lockfile that agrees with its `package.json`, which is what Claude Code requires before it will install those dependencies into the plugin cache. `generate` writes them. Runs in CI.
 - `bun run schemas check`: fetches current upstream and verifies the upstream-backed schema overlays still apply, flagging overlay edits that upstream has absorbed and warning on edits that overwrite an upstream definition. Runs in CI.
 - `bun run skill-lint "plugins/<name>/skills/*"`: validates SKILL.md frontmatter and reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
 - `bun run check`: runs `oxlint --type-aware` then `oxfmt --check`. Runs in CI.

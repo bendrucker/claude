@@ -9,8 +9,6 @@ import {
   extractBodySpec,
   extractTitle,
   isPrBodyCommand,
-  parseCommand,
-  type ParsedCommand,
   resolveBody,
 } from "./resolve-body";
 
@@ -31,116 +29,13 @@ describe("isPrBodyCommand", () => {
     ["for f in *.ts; do wc -l $f; done", false],
     ["cat <<'EOF' > notes.md\nnothing here\nEOF", false],
     ["cat > notes.md <<'EOF'\nrun gh pr create --body-file x.md later\nEOF", false],
+    // The verb as an argument to something else: a note, a log line, a doc.
+    ["bun url.ts add --notes 'retry with gh pr edit 12 --body-file body.md'", false],
+    ['bun url.ts add --notes "Blocked.\nRun gh pr edit 12 --body-file body.md\nThen push."', false],
+    ["echo gh pr create --body-file body.md", false],
+    ["grep -r 'glab mr update' plugins/", false],
   ])("isPrBodyCommand(%p) -> %p", (command, expected) => {
     expect(isPrBodyCommand(command)).toBe(expected);
-  });
-});
-
-describe("parseCommand", () => {
-  test.each<[string, string, ParsedCommand]>([
-    [
-      "strips the body and captures a > redirect target",
-      "cat > body.md <<'EOF'\nProse.\nEOF\ngh pr create --body-file body.md",
-      {
-        text: "cat > body.md <<'EOF'\ngh pr create --body-file body.md",
-        heredocs: [
-          {
-            content: "Prose.\n",
-            quoted: true,
-            segment: "cat > body.md <<'EOF'",
-            target: "body.md",
-            offset: 14,
-          },
-        ],
-      },
-    ],
-    [
-      "finds a redirect written after the operator",
-      "cat <<'EOF' > body.md\nProse.\nEOF",
-      {
-        text: "cat <<'EOF' > body.md",
-        heredocs: [
-          {
-            content: "Prose.\n",
-            quoted: true,
-            segment: "cat <<'EOF' > body.md",
-            target: "body.md",
-            offset: 4,
-          },
-        ],
-      },
-    ],
-    [
-      "finds a tee sink and scopes the segment to its command",
-      "mkdir -p tmp && tee tmp/body.md <<'EOF'\nProse.\nEOF",
-      {
-        text: "mkdir -p tmp && tee tmp/body.md <<'EOF'",
-        heredocs: [
-          {
-            content: "Prose.\n",
-            quoted: true,
-            segment: " tee tmp/body.md <<'EOF'",
-            target: "tmp/body.md",
-            offset: 32,
-          },
-        ],
-      },
-    ],
-    [
-      "marks an unquoted delimiter and skips an append target",
-      "cat >> log.md <<EOF\n$VERSION\nEOF",
-      {
-        text: "cat >> log.md <<EOF",
-        heredocs: [
-          {
-            content: "$VERSION\n",
-            quoted: false,
-            segment: "cat >> log.md <<EOF",
-            target: null,
-            offset: 14,
-          },
-        ],
-      },
-    ],
-    [
-      "strips tabs under <<- and matches a tab-indented terminator",
-      "cat > body.md <<-'EOF'\n\tProse.\n\tEOF",
-      {
-        text: "cat > body.md <<-'EOF'",
-        heredocs: [
-          {
-            content: "Prose.\n",
-            quoted: true,
-            segment: "cat > body.md <<-'EOF'",
-            target: "body.md",
-            offset: 14,
-          },
-        ],
-      },
-    ],
-    [
-      "ignores a << inside a quoted argument",
-      'echo "<<EOF"\ngh pr create --body-file body.md',
-      { text: 'echo "<<EOF"\ngh pr create --body-file body.md', heredocs: [] },
-    ],
-    [
-      "gives an unterminated heredoc the rest of the command",
-      "cat > body.md <<'EOF'\nProse.\nMore prose.",
-      {
-        text: "cat > body.md <<'EOF'",
-        heredocs: [
-          {
-            content: "Prose.\nMore prose.\n",
-            quoted: true,
-            segment: "cat > body.md <<'EOF'",
-            target: "body.md",
-            offset: 14,
-          },
-        ],
-      },
-    ],
-  ])("%s", (_name, command, expected) => {
-    expect(parseCommand(command)).toEqual(expected);
   });
 });
 
@@ -222,6 +117,38 @@ describe("extractBodySpec", () => {
     ],
     // The shell feeds the last stdin redirection to the CLI.
     ["gh pr create --body-file - <<'A' <<'B'\nfirst\nA\nsecond\nB", parts(literal("second\n"))],
+    // Reading the PR back into the file it will be written from: the hook runs
+    // before the shell, so the path holds nothing the CLI will send.
+    [
+      "gh pr view 12 --json body -q .body > body.md && sed -i '' 's/a/b/' body.md && gh pr edit 12 --body-file body.md",
+      { kind: "none" },
+    ],
+    [
+      "gh pr view --json body --jq .body > body.md\ngh pr edit --body-file body.md",
+      { kind: "none" },
+    ],
+    [
+      "glab mr view 3 --output json | jq -r .description > d.md && glab mr update 3 --description-file d.md",
+      { kind: "none" },
+    ],
+    // A different PR, a different file, or no read at all: still the hook's
+    // business, because the body is not a copy of what is already published.
+    [
+      "gh pr view 12 --json body -q .body > body.md && gh pr edit 34 --body-file body.md",
+      parts(file("body.md")),
+    ],
+    [
+      "gh pr view 12 --json body -q .body > other.md && gh pr edit 12 --body-file body.md",
+      parts(file("body.md")),
+    ],
+    [
+      String.raw`printf 'Prose.\n' > body.md && gh pr edit 12 --body-file body.md`,
+      parts(file("body.md")),
+    ],
+    [
+      "gh pr view 12 --json body -q .body > body.md && cat > body.md <<'EOF'\nProse.\nEOF\ngh pr edit 12 --body-file body.md",
+      parts(literal("Prose.\n")),
+    ],
   ])("extractBodySpec(%p) -> %p", (command, expected) => {
     expect(extractBodySpec(command)).toEqual(expected);
   });
@@ -289,6 +216,16 @@ const DOCUMENTED_FORMS: [string, string][] = (
   )
 ).flat();
 
+// Prose names a flag on its own, without the subcommand that takes it. The
+// contract is about the flag reaching the body, so a bare form is run inside the
+// command it belongs to.
+function documentedCommand(snippet: string): string {
+  if (/^(?:gh|glab)\s/.test(snippet)) return snippet;
+  return /--description|(?<![\w-])-d\s/.test(snippet)
+    ? `glab mr update ${snippet}`
+    : `gh pr edit ${snippet}`;
+}
+
 // The skills are the only place a command form is written down, so a form that
 // lands there without the extractor learning it is invisible until an unchecked
 // body ships. These docs are read back and every body-carrying command in them
@@ -303,7 +240,7 @@ describe("command forms the skills document", () => {
     const body = "## Summary\n\nResolved through the form the skill documents.\n";
     await Bun.write(bodyPath, body);
     // Doc paths are placeholders (`tmp/pr-body-<branch>.md`, `file.md`).
-    const command = snippet.replaceAll(/\S*\.md/g, bodyPath);
+    const command = documentedCommand(snippet).replaceAll(/\S*\.md/g, bodyPath);
     expect(await resolveBody(command, REPO_ROOT)).toMatchObject({ kind: "text", text: body });
   });
 });

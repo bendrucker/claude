@@ -1,6 +1,6 @@
 ---
 name: prompting:scan
-description: "Report prompt defects in documents a model executes: weak modality, vague completion criteria, no-op instructions, stale measurements, ticket references, project status, and maintainer asides. Use to audit a repository's skills, CLAUDE.md, agent definitions, or a product's prompt files, or to gate them in CI or a pre-commit hook."
+description: "Report prompt defects a lexical scan finds in documents a model executes. Use to audit a repository's skills, CLAUDE.md, agent definitions, or a product's prompt files, or to gate them in CI or a pre-commit hook."
 argument-hint: "[<path>] [--all] [--quiet]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts:*)
@@ -30,13 +30,13 @@ Without `--all` it reads the paths that hold documents a model executes: `SKILL.
 - `status-prose`: the document reports its own progress. A model executing it cannot act on unfinished work, and the note outlives the state it describes.
 - `maintainer-aside`: prose held in a comment reaches the model, which pays for the tokens and cannot act on a note addressed to a person.
 
-The last four resolve by deleting the span, never by rewording it, so a fix that leaves the word count flat is a rephrase rather than a cut.
+`stale-measurement`, `ticket-ref`, `status-prose`, and `maintainer-aside` resolve by deleting the span rather than rewording it.
 
 ## Acting on a Finding
 
 A finding is a candidate. The scanner matches words rather than intent, so read the sentence and confirm it is an instruction before rewriting it. A descriptive sentence that happens to contain the phrase is a false hit.
 
-Load the `prompting` skill for the rewrite. Each rule maps to a section: Sentence Form for weak modality, Completion Criteria for a vague criterion, and Pruning for the rest, under No-ops for a no-op, Cache for a stale measurement, Relevance for a ticket reference or project status, and The Two Loads for a maintainer aside.
+Load the `prompting` skill for the rewrite. Each rule maps to a section: Sentence Form for weak modality, Completion Criteria for a vague criterion, and Pruning for the rest, under No-ops for a no-op, Cache for a stale measurement, and Relevance for a ticket reference, project status, or a maintainer aside.
 
 ## Gotchas
 

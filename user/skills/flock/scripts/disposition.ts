@@ -2,7 +2,6 @@ import {
   branchLabel,
   fit,
   headerRow,
-  heldByAgent,
   renderRows,
   rowCells,
   type BoardPull,
@@ -89,16 +88,11 @@ export function classify(row: BoardRow): Disposition {
   if (row.kind === "pane") return "panes";
 
   const disposition = verdict(row);
-  // A merge happens on the forge rather than in the tree, and the agent that
-  // finished the work is still resting in the pane it finished in, so gating
-  // merges on an occupied pane would empty the disposition rather than guard
-  // anything.
+  // A merge happens on the forge rather than in the tree.
   if (disposition === "merge") return disposition;
-  // An agent mid-turn owns the tree, so nothing that touches it is the user's
-  // to decide yet. A resting agent owns it too, and cleanup is the one
-  // remaining disposition that destroys it.
-  if (row.state.working) return "working";
-  return disposition === "cleanup" && heldByAgent(row.agent) ? "working" : disposition;
+  // Only a turn in flight owns the tree. A resting agent is one that finished,
+  // and the `occupied` flag carries its pane to the sweep's confirmation.
+  return row.state.working ? "working" : disposition;
 }
 
 const FAILING_SHOWN = 3;

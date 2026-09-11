@@ -12,7 +12,6 @@ allowed-tools:
   - Bash(herdr agent read:*)
   - Bash(herdr agent focus:*)
   - Bash(herdr pane read:*)
-  - Bash(herdr worktree list:*)
   - Bash(herdr workspace focus:*)
   - Bash(herdr workspace rename:*)
   - Bash(herdr workspace create:*)
@@ -44,9 +43,11 @@ The PR column reads `#N`, `draft#N`, `merged#N`, `-`, or `?`. The REPO column re
 
 FLAGS reads `clean` or a comma-joined list, forge state first. `failing:lint,build` names the jobs that went red, capped at three plus a count. `running` means CI has not finished, `conflicting` and `behind` come from the merge state, `blocked` marks a green pull request some other gate holds, `approved` and `changes-requested` come from the review, `checks:none` means the pull request runs no checks at all, and `checks:?` means the forge would not say.
 
-The checkout flags follow. Only `merged` clears a row for cleanup, and every other flag holds it. Three are not self-evident: `carries:N` counts gitignored files a recursive removal would take, `reused` means the `merged#N` beside it belongs to different work under a recycled branch name, and `unreadable` or `unpushed:?` mean git would not report the state at all, which raises the row rather than parking it.
+The checkout flags follow. `merged` and `occupied` leave a row clear for cleanup, and every other flag holds it. Not self-evident: `carries:N` counts gitignored files a recursive removal would take, `occupied` means an agent is sitting in the pane, `reused` means the `merged#N` beside it belongs to different work under a recycled branch name, and `unreadable` or `unpushed:?` mean git would not report the state at all, which raises the row rather than parking it.
 
-The AGENT column reads `<agent>/<status>`. A `blocked` status is an agent stopped on a prompt, which puts its row in `needs you` whatever else the row carries. Any other status still means the pane is occupied, and an occupied pane holds its row out of `clean up`. The two resting statuses, `idle` and `done`, differ only in whether the tab has been seen, so an agent between the turns of a running workflow reads idle.
+`unpushed:N` counts commits the forge does not have. A row with a pull request is counted against the commit that pull request carries, so a branch whose merge deleted its remote still reads as fully pushed.
+
+The AGENT column reads `<agent>/<status>`. A `blocked` status is an agent stopped on a prompt, which puts its row in `needs you` whatever else the row carries. Only `working` holds a row back, because a turn in flight owns the tree. An agent resting in `idle` or `done`, which differ only in whether the tab has been seen, leaves the row where its own state puts it and adds `occupied`. WS names the workspace holding the pane, which is what closes it once the worktree is gone.
 
 An `incomplete:` line names what the board could not resolve. Retry it: `gh pr list --head <branch>` for the branches it names, `gh pr list` for a `?` PR column. Dispose of nothing the retry also leaves unresolved.
 
@@ -76,7 +77,9 @@ Below the bar, the row is a report. Name the failing job, the reviewer's finding
 
 Check the rendered rows against the deferred keys first. A deferred row is held unless the state block re-raised it as stale.
 
-**Clean up.** Merged with nothing left in the tree. Confirm the pane is still empty with `herdr agent get` first, because an agent can take it between the board and the user's answer, and the removal would take the tree out from under it. Remove the worktree, close its workspace and panes, prune the branch. Read `open_workspace_id` out of `herdr worktree list --json` before removing the path, because herdr loses the mapping once the worktree is gone.
+**Clean up.** Merged with nothing left in the tree. Confirm with `herdr agent get` that the pane is empty, or that the `occupied` agent is still the one that finished, because a removal takes the tree out from under whoever is in it. Remove the worktree, close its workspace and panes, prune the branch. The row's WS column is the workspace to close.
+
+`git worktree remove` cannot delete the directory under the sandbox, under either `.worktrees/` or `~/.herdr/worktrees/`, so run it with the sandbox disabled the first time.
 
 **Merge.** Checks green, merge state clean, your repo. Re-read the bar immediately before merging, because both the board and your first lookup predate the user's answer. `gh pr merge --squash --delete-branch`, and stop there. The worktree becomes a cleanup row on a later sweep, once a fresh board shows it carrying nothing.
 

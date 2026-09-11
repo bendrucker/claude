@@ -6,6 +6,7 @@ import { spawnRun, type CommandResult, type Run } from "./exec";
 import { SETTLED_STATE, type PullRequest } from "./forge";
 import {
   ageInDays,
+  aheadCount,
   carriedIgnoredPaths,
   CONVENTIONAL_IGNORED,
   deriveFlags,
@@ -166,6 +167,55 @@ describe("ageInDays", () => {
   });
 });
 
+describe("aheadCount", () => {
+  const ranges = (counts: Record<string, string>): { run: Run; seen: string[] } => {
+    const seen: string[] = [];
+    const run: Run = (argv) => {
+      const range = argv.at(-1) ?? "";
+      seen.push(range);
+      const stdout = counts[range];
+      return Promise.resolve(
+        stdout === undefined ? result({ ok: false, stderr: "bad revision" }) : result({ stdout }),
+      );
+    };
+    return { run, seen };
+  };
+
+  test("counts against the pull request's head, not the upstream", async () => {
+    const { run, seen } = ranges({ "abc123..HEAD": "2\n" });
+    expect(await aheadCount(run, "/wt", { headOid: "abc123", base: "main" })).toBe(2);
+    expect(seen).toEqual(["abc123..HEAD"]);
+  });
+
+  // Counting from the base instead reported every commit the merge had taken.
+  test("a checkout sitting on the merged head is fully pushed", async () => {
+    const { run } = ranges({ "abc123..HEAD": "0\n" });
+    expect(await aheadCount(run, "/wt", { headOid: "abc123", base: "main" })).toBe(0);
+  });
+
+  test("a head this checkout does not carry leaves the count unreadable", async () => {
+    const { run, seen } = ranges({});
+    expect(await aheadCount(run, "/wt", { headOid: "abc123", base: "main" })).toBeNull();
+    expect(seen).toEqual(["abc123..HEAD"]);
+  });
+
+  test("a branch with no pull request counts against its upstream", async () => {
+    const { run } = ranges({ "@{u}..HEAD": "3\n" });
+    expect(await aheadCount(run, "/wt", { headOid: null, base: "main" })).toBe(3);
+  });
+
+  test("a branch with no upstream falls back to the base", async () => {
+    const { run, seen } = ranges({ "origin/main..HEAD": "5\n" });
+    expect(await aheadCount(run, "/wt", { headOid: null, base: "main" })).toBe(5);
+    expect(seen).toEqual(["@{u}..HEAD", "origin/main..HEAD"]);
+  });
+
+  test("no upstream and no base reports nothing rather than zero", async () => {
+    const { run } = ranges({});
+    expect(await aheadCount(run, "/wt", { headOid: null, base: null })).toBeNull();
+  });
+});
+
 describe("isMergedBranch", () => {
   // A branch with no commits of its own is an ancestor of the default branch
   // from the moment it is created, so `git branch --merged` listed a branch
@@ -195,6 +245,7 @@ describe("isReusedBranch", () => {
     number: 2,
     state: "merged",
     mergedAt: 1000,
+    headOid: null,
     ...SETTLED_STATE,
   };
 

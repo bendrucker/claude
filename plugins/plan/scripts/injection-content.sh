@@ -9,10 +9,20 @@ cat "$here/../references/guidelines.md"
 
 # The tail bounds cost on a large transcript. It counts JSONL entries, not lines
 # of one record, and the last assistant turn sits at the tail, so a generous
-# ceiling keeps it in range even in a long session. Empty model falls open.
+# ceiling keeps it in range even in a long session. Reversing that window lets
+# jq stop at the first assistant entry rather than parse every record in it.
+# tail -r is BSD, tac is GNU; neither ships both.
 model=""
 if [ -n "$transcript" ] && [ -f "$transcript" ]; then
-  model=$(tail -n 2000 "$transcript" | jq -rs '[.[] | select(.type == "assistant") | .message.model // empty] | last // empty' 2>/dev/null)
+  if tail -r </dev/null >/dev/null 2>&1; then
+    reverse=(tail -r)
+  else
+    reverse=(tac)
+  fi
+  model=$(
+    tail -n 2000 "$transcript" | "${reverse[@]}" |
+      jq -rn 'first(inputs | select(.type == "assistant") | .message.model // empty)' 2>/dev/null
+  )
 fi
 
 case "$model" in

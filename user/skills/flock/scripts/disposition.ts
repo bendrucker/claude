@@ -90,8 +90,8 @@ export function classify(row: BoardRow): Disposition {
   const disposition = verdict(row);
   // A merge happens on the forge rather than in the tree.
   if (disposition === "merge") return disposition;
-  // Only a turn in flight owns the tree. A resting agent is one that finished,
-  // and the `occupied` flag carries its pane to the sweep's confirmation.
+  // Only a turn in flight owns the tree. A resting status cannot say whether
+  // the agent finished, so `occupied` carries the pane to the sweep to read.
   return row.state.working ? "working" : disposition;
 }
 

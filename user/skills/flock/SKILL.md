@@ -77,9 +77,7 @@ Below the bar, the row is a report. Name the failing job, the reviewer's finding
 
 Check the rendered rows against the deferred keys first. A deferred row is held unless the state block re-raised it as stale.
 
-**Clean up.** Merged with nothing left in the tree. Confirm with `herdr agent get` that the pane is empty, or that the `occupied` agent is still the one that finished, because a removal takes the tree out from under whoever is in it. Remove the worktree, close its workspace and panes, prune the branch. The row's WS column is the workspace to close.
-
-`git worktree remove` cannot delete the directory under the sandbox, under either `.worktrees/` or `~/.herdr/worktrees/`, so run it with the sandbox disabled the first time.
+**Clean up.** Merged with nothing left in the tree. Confirm the pane first, because a removal takes the tree out from under whoever is in it. `herdr agent get` settles an empty one. An `occupied` row needs `herdr agent read`, because `idle` and `done` are one resting status whether the agent finished or is sitting between the turns of a running workflow, and only the pane's last output separates the two. Hold the row if it reads mid-workflow. Otherwise remove the worktree, close its workspace and panes, prune the branch. The row's WS column is the workspace to close.
 
 **Merge.** Checks green, merge state clean, your repo. Re-read the bar immediately before merging, because both the board and your first lookup predate the user's answer. `gh pr merge --squash --delete-branch`, and stop there. The worktree becomes a cleanup row on a later sweep, once a fresh board shows it carrying nothing.
 

@@ -192,26 +192,36 @@ describe("openedPane", () => {
 });
 
 describe("existingReviewr", () => {
-  const list = (panes: { pane_id: string; label?: string | null }[]) =>
+  const tree = "/repo/one";
+  const list = (panes: { pane_id: string; label?: string | null; cwd?: string }[]) =>
     JSON.stringify({ result: { panes } });
 
   test.each<[string, string, string | null]>([
     [
-      "a labeled pane",
-      list([{ pane_id: "wE5:p1" }, { pane_id: "wE5:p4", label: "reviewr" }]),
+      "a labeled pane over the same tree",
+      list([
+        { pane_id: "wE5:p1", cwd: tree },
+        { pane_id: "wE5:p4", label: "reviewr", cwd: tree },
+      ]),
       "wE5:p4",
     ],
     [
+      "a labeled pane over another tree",
+      list([{ pane_id: "wE5:p4", label: "reviewr", cwd: "/repo/two" }]),
+      null,
+    ],
+    ["a labeled pane with no cwd", list([{ pane_id: "wE5:p4", label: "reviewr" }]), null],
+    [
       "no reviewr pane",
       list([
-        { pane_id: "wE5:p1", label: null },
-        { pane_id: "wE5:p3", label: "Annotate" },
+        { pane_id: "wE5:p1", label: null, cwd: tree },
+        { pane_id: "wE5:p3", label: "Annotate", cwd: tree },
       ]),
       null,
     ],
     ["an error envelope", JSON.stringify({ error: { code: "server_unavailable" } }), null],
     ["no output", "", null],
   ])("%s", (_name, json, expected) => {
-    expect(existingReviewr(json)).toBe(expected);
+    expect(existingReviewr(json, tree)).toBe(expected);
   });
 });

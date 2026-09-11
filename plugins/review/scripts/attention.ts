@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { mkdirSync } from "node:fs";
+import { mkdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { cli, command } from "cleye";
@@ -134,13 +134,23 @@ export function openedPane(stdout: string): OpenOutcome {
 
 const PaneList = z.object({
   result: z.object({
-    panes: z.array(z.object({ pane_id: z.string(), label: z.string().nullish() })),
+    panes: z.array(
+      z.object({ pane_id: z.string(), label: z.string().nullish(), cwd: z.string().nullish() }),
+    ),
   }),
 });
 
-// reviewr labels its pane on launch. One per workspace is enough: a second
-// request re-uses the sidebar that is already up.
-export function existingReviewr(paneList: string): string | null {
+function canonical(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+}
+
+// reviewr labels its pane on launch. A sidebar already up over the same
+// working tree is re-used; one over another tree would show the wrong diff.
+export function existingReviewr(paneList: string, cwd: string): string | null {
   let json: unknown;
   try {
     json = JSON.parse(paneList);
@@ -149,7 +159,12 @@ export function existingReviewr(paneList: string): string | null {
   }
   const parsed = PaneList.safeParse(json);
   if (!parsed.success) return null;
-  return parsed.data.result.panes.find((pane) => pane.label === "reviewr")?.pane_id ?? null;
+  const tree = canonical(cwd);
+  return (
+    parsed.data.result.panes.find(
+      (pane) => pane.label === "reviewr" && pane.cwd != null && canonical(pane.cwd) === tree,
+    )?.pane_id ?? null
+  );
 }
 
 export function currentPane(env: Record<string, string | undefined> = process.env): string | null {
@@ -160,14 +175,16 @@ export function currentPane(env: Record<string, string | undefined> = process.en
 
 // Attention is best effort: a herdr that is down or slow must not fail the
 // skill that asked for it.
-function herdr(args: string[]): void {
+function herdr(args: string[]): boolean {
   try {
-    Bun.spawnSync(["herdr", ...args], {
-      timeout: HERDR_TIMEOUT_MS,
-      stdio: ["ignore", "ignore", "ignore"],
-    });
+    return (
+      Bun.spawnSync(["herdr", ...args], {
+        timeout: HERDR_TIMEOUT_MS,
+        stdio: ["ignore", "ignore", "ignore"],
+      }).exitCode === 0
+    );
   } catch {
-    return;
+    return false;
   }
 }
 
@@ -217,8 +234,8 @@ const clearCmd = command(
     if (paneId == null) return;
     const marker = Bun.file(markerPath(paneId));
     if (!(await marker.exists())) return;
-    herdr(clearArgs(paneId));
-    await marker.delete();
+    // The marker outlives a failed clear so the next prompt retries it.
+    if (herdr(clearArgs(paneId))) await marker.delete();
   },
 );
 
@@ -236,7 +253,8 @@ const openCmd = command(
       parsed.showHelp();
       process.exit(1);
     }
-    const paneId = currentPane() ?? fail("open needs a herdr pane (HERDR_PANE_ID unset)");
+    const paneId =
+      currentPane() ?? fail("not inside a herdr pane (HERDR_PANE_ID unset): use --browser");
     if (parsed.flags.doc != null) {
       const outcome = openedPane(herdrJson(docOpenArgs(paneId, parsed.flags.doc)));
       if ("error" in outcome && outcome.error.includes("plugin not found")) {
@@ -250,7 +268,7 @@ const openCmd = command(
     const open =
       workspace == null
         ? null
-        : existingReviewr(herdrJson(["pane", "list", "--workspace", workspace]));
+        : existingReviewr(herdrJson(["pane", "list", "--workspace", workspace]), process.cwd());
     if (open != null) {
       console.log(`reviewr already open (${open})`);
       process.exit(0);

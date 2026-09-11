@@ -22,7 +22,7 @@ Put the change in front of Ben and act on what comes back. `attention.ts` labels
 | `--browser`, diff | `plannotator review --git` | Blocks. Feedback is the tool result |
 | `--browser`, `--doc <file>` | `plannotator annotate <file> --gate --json --require-approval` | Blocks. The decision is the tool result |
 
-Terminal surfaces open as a split beside this pane, named explicitly and without taking focus, and deliver into it once it is idle. So the turn has to end before Send can land.
+Terminal surfaces open as a split beside this pane, named explicitly and without taking focus, and deliver into it once it is idle. So the turn has to end before Send can land. They need a herdr pane: outside herdr (`HERDR_PANE_ID` unset) run the gate instead, as if `--browser` were passed.
 
 ## Precondition
 

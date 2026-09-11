@@ -50,3 +50,13 @@ Deleting a plugin's `commands/`, `agents/`, or `hooks/` directory requires remov
 A skill that loads a skill from another plugin creates a plugin dependency. Declare it in the `dependencies` array of the depending plugin's `plugin.json`, as a bare plugin name resolved against this marketplace. Declare it only when the skill is unusable without the target, since `dependencies` requires the named plugin to be enabled and cannot express a choice between two providers.
 
 Plugin-specific code dependencies go in the plugin's own `plugins/<name>/package.json`, added to the root `workspaces` array. No cross-plugin imports, and no reaching into `packages/` via relative paths. Shared code goes to an npm workspace package, declared in each plugin's `package.json`. Run `bun scripts/check-plugin-imports.ts` to verify.
+
+### Lockfiles
+
+A plugin declaring dependencies also commits `package-lock.json` beside its `package.json`. Claude Code installs a plugin's dependencies when it caches the plugin, at install, at update, and at session start on a machine that has not cached it yet. That install runs only when it finds a lockfile, and a plugin carrying the manifest alone is skipped with nothing written to the debug log. Its scripts then fail on an unresolved import the first time anything invokes them.
+
+Generate the lockfiles with `bun run plugin-lockfiles generate`, which resolves each plugin in a scratch directory because npm otherwise walks up to the root `workspaces` declaration and writes a lockfile spanning the whole repo. `bun run plugin-lockfiles check` fails when a plugin is missing one or when its lockfile and manifest disagree, which is what makes `npm ci` fail under a frozen install.
+
+The install passes `--ignore-scripts` and gives up after 60 seconds. A dependency that compiles in a lifecycle script has no `node_modules` to load at runtime, so it needs its own bootstrap into `${CLAUDE_PLUGIN_DATA}`. Prebuilt platform packages, which is how `sharp`, `@napi-rs/canvas`, and `@duckdb/node-api` ship, install and load fine.
+
+Prefer npm's lockfile over `bun.lock`. Claude Code runs the matched lockfile's package manager from the user's PATH with no fallback, so an npm lockfile reaches installers without bun.

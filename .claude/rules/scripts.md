@@ -5,7 +5,9 @@ paths:
 
 # Bun
 
-Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs missing registry dependencies on first run, so most scripts run without a prior `bun install`.
+Hooks and scripts use [Bun](https://bun.sh) to run TypeScript. Bun auto-installs missing registry dependencies on first run, so repo-local scripts run without a prior `bun install`.
+
+Distributed plugin code does not get that guarantee. Auto-install needs the registry at the moment the script runs, and a sandboxed session reaches it through a filtering proxy, so a plugin script whose dependency has never been fetched fails on a resolution error instead of installing it. Claude Code installs a cached plugin's dependencies up front instead, covered in [`plugins.md`](plugins.md).
 
 #### Workspace Dependencies
 
@@ -19,7 +21,7 @@ Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` cod
 
 `packages/decode` wraps zod with the source label that makes a rejection traceable: `decodeJson(schema, text, "gh pr view output")`, plus `decodeStdin`, `decodeFile`, `decodeFileLines`, and `decodeJsonLines`. Repo-internal tooling imports it relatively (`../packages/decode/index`).
 
-Plugins cannot use it. A distributed plugin resolves its runtime deps through npm auto-install, which skips `workspace:*`, so a plugin declares `zod` in its own `package.json` and calls `schema.parse` directly.
+Plugins cannot use it. Workspace specifiers never resolve in a cached plugin, so a plugin declares `zod` in its own `package.json` and calls `schema.parse` directly.
 
 # Parsing Structured Text
 
@@ -35,7 +37,7 @@ Pick the parser by what is being read:
 
 Nodes carry position data, so a finding still reports an exact line and column.
 
-Bun auto-installs registry dependencies at runtime, so a distributed plugin declares its parser in its own `package.json` like any other npm dependency. The cross-plugin restriction in [`plugins.md`](plugins.md) covers `workspace:*` specifiers, not registry packages.
+A distributed plugin declares its parser in its own `package.json` like any other npm dependency, and ships the lockfile that gets it installed. The cross-plugin restriction in [`plugins.md`](plugins.md) covers `workspace:*` specifiers, not registry packages.
 
 A regex is fine inside a single node's text, where the grammar is already resolved: matching a word within one paragraph, a flag within one command string.
 

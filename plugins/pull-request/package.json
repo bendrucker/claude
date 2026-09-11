@@ -7,11 +7,13 @@
     "ap-style-title-case": "^2.0.0",
     "cleye": "^2.0.0",
     "mdast-util-from-markdown": "^2.0.2",
+    "mvdan-sh": "^0.10.1",
     "unist-util-visit": "^5.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/mdast": "^4.0.4",
+    "@types/mvdan-sh": "^0.10.9",
     "fast-check": "^4.8.0"
   }
 }

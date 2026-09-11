@@ -216,14 +216,17 @@ function inlineSpec(invocation: PrInvocation, value: Word): BodySpec {
   return { kind: "parts", parts };
 }
 
-export function extractBodySpec(command: string): BodySpec {
-  const invocation = findPrCommand(command);
-  if (invocation === null) return { kind: "none" };
+function bodySpec(invocation: PrInvocation): BodySpec {
   const flags = BODY_FLAGS[invocation.cli];
   const fileValue = flagValue(invocation.command.argv, flags.file);
   if (fileValue !== undefined) return fileSpec(invocation, fileValue);
   const inlineValue = flagValue(invocation.command.argv, flags.inline);
   return inlineValue === undefined ? { kind: "none" } : inlineSpec(invocation, inlineValue);
+}
+
+export function extractBodySpec(command: string): BodySpec {
+  const invocation = findPrCommand(command);
+  return invocation === null ? { kind: "none" } : bodySpec(invocation);
 }
 
 /** The body text a command will send, or why the hook cannot see it. */
@@ -296,9 +299,10 @@ function rewritableFile(
 }
 
 export async function resolveBody(command: string, cwd: string): Promise<BodyResolution> {
-  const spec = extractBodySpec(command);
   const invocation = findPrCommand(command);
-  if (spec.kind !== "parts" || invocation === null) return spec;
+  if (invocation === null) return { kind: "none" };
+  const spec = bodySpec(invocation);
+  if (spec.kind !== "parts") return spec;
   const base = effectiveCwd(command, cwd);
   const chunks: string[] = [];
   const files: string[] = [];

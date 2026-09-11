@@ -1,9 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { literal, parseShell, type ShellCommand } from "./shell";
 
-// The parse layer is what every body rule stands on, so these cases pin the
-// shell facts the resolver reads back: where a command sends its output, what a
-// heredoc delivers, and which words survive quoting as data.
+// The parse layer is what every body rule stands on.
 function summarize(command: string, env: NodeJS.ProcessEnv = {}) {
   return parseShell(command, env).map((entry: ShellCommand) => ({
     argv: entry.argv.map((word) => literal(word)),

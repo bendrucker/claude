@@ -1,7 +1,5 @@
 // Where a `gh pr` / `glab mr` command gets its body and title from: heredocs,
-// inline flag values, body files, and the `cd`s ahead of them. `shell.ts`
-// answers what the command runs; this decides what that means for the body the
-// CLI will send.
+// inline flag values, body files, and the `cd`s ahead of them.
 
 import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
@@ -15,9 +13,8 @@ interface PrVerb {
   argv: string[];
 }
 
-// The `if` rules in hooks.json scope dispatch to these four subcommands. The
-// hook repeats the check against the parsed command so it stays inert under any
-// other dispatch, including a command that merely quotes one of them.
+// The `if` rules in hooks.json scope dispatch to these four subcommands, and
+// the hook repeats the check so it stays inert under any other dispatch.
 const PR_VERBS: PrVerb[] = [
   { cli: "gh", argv: ["gh", "pr", "create"] },
   { cli: "gh", argv: ["gh", "pr", "edit"] },
@@ -30,9 +27,8 @@ const VIEW_VERBS: Record<PrCli, string[]> = {
   glab: ["glab", "mr", "view"],
 };
 
-// `-b` is `--body` on gh and `--target-branch` on glab; `-d` is `--description`
-// on glab and `--draft` on gh. A shorthand means a body only on the CLI that
-// owns it, so the flag sets are keyed by CLI.
+// `-b` is `--body` on gh and `--target-branch` on glab. `-d` is `--description`
+// on glab and `--draft` on gh. So the flag sets are keyed by CLI.
 const BODY_FLAGS: Record<PrCli, { file: string[]; inline: string[] }> = {
   gh: { file: ["--body-file"], inline: ["--body", "-b"] },
   glab: { file: ["--description-file"], inline: ["--description", "-d"] },
@@ -71,9 +67,8 @@ export function isPrBodyCommand(command: string): boolean {
   return findPrCommand(command) !== null;
 }
 
-// A flag's value: the next word for `--body x`, or the tail of the word itself
-// for `--body=x`. Splitting on segments rather than text keeps the expansion in
-// `--body="$X"` an expansion.
+// Splitting on segments rather than text keeps the expansion in `--body="$X"`
+// an expansion.
 function flagValue(argv: Word[], flags: string[]): Word | undefined {
   for (const [index, word] of argv.entries()) {
     const text = literal(word);
@@ -103,9 +98,8 @@ function unreadableExpansion(source: string): BodySpec {
   };
 }
 
-// Both spellings of stdin. `/dev/stdin` matters because reading it from the
-// hook would consume the hook's own (already-drained) stdin and validate an
-// empty body.
+// Reading `/dev/stdin` would consume the hook's own (already-drained) stdin and
+// validate an empty body.
 const STDIN_PATHS = new Set(["-", "/dev/stdin"]);
 
 /** Where a command leaves its stdout: a `>` redirect, or the sink `tee` names. */
@@ -117,27 +111,22 @@ function writeTarget(command: ShellCommand): string | null {
 }
 
 // `> body.md` and `--body-file $PWD/body.md` are the same file, so the match is
-// on the name alone. That also catches names that only look alike, which costs
-// the author a round trip through the deny rather than a body the hook reported
-// as checked and did not check.
+// on the name alone. Names that only look alike cost the author a deny, which
+// beats a body the hook reports as checked and did not check.
 function sameFile(target: string | null, path: string): boolean {
   const name = basename(path);
   return target !== null && name !== "" && basename(target) === name;
 }
 
-/**
- * The command whose output the last write to `path` ahead of the PR command
- * carries. The redirect lands on a pipeline's last stage, while the content
- * comes from its first, so the pipeline is followed back to its source.
- */
+// The redirect lands on a pipeline's last stage while the content comes from
+// its first, so the last write to `path` is followed back to its source.
 function lastWriteTo(preceding: ShellCommand[], path: string): ShellCommand | undefined {
   const write = preceding.findLast((command) => sameFile(writeTarget(command), path));
   if (write === undefined) return undefined;
   return preceding.find((command) => command.pipeline === write.pipeline);
 }
 
-// The last heredoc a command is fed, which is the one the shell leaves on its
-// stdin when several are attached.
+// The shell leaves the last of several heredocs on the command's stdin.
 function heredocSpec(command: ShellCommand): BodySpec {
   const heredoc = command.heredocs.at(-1);
   if (heredoc === undefined) return { kind: "none" };
@@ -151,23 +140,18 @@ function heredocSpec(command: ShellCommand): BodySpec {
   return { kind: "parts", parts: [{ kind: "literal", text: heredoc.content }] };
 }
 
-// The subcommand's first positional argument: a PR number, URL, or branch. Null
-// when the command leaves it off and the CLI resolves the current branch's PR,
-// which both commands in a round trip do.
+// A PR number, URL, or branch. Null when the command leaves it off and the CLI
+// resolves the current branch's PR, which both commands in a round trip do.
 function prSelector(command: ShellCommand, verb: string[]): string | null {
   const text = literal(command.argv[verb.length]);
   return text === null || text.startsWith("-") ? null : text;
 }
 
 /**
- * Whether the command reads the same PR it is about to edit into the body file:
- * `gh pr view <n> ... > body.md && <edit body.md> && gh pr edit <n> --body-file
- * body.md`. The hook runs before the shell, so whatever that path holds now is
- * not what the CLI will send, and no content the hook could read would change
- * the outcome. The trade is that an edit-in-place round trip ships unvalidated.
- *
- * A generator writing the same path (`printf ... > body.md`) is a different
- * shape and still has to hand the hook a body it can read.
+ * Whether the write into the body file read back the PR the command is about to
+ * edit. The hook runs before the shell, so that path holds nothing the CLI will
+ * send, and every check is skipped: an edit-in-place round trip ships
+ * unvalidated. A generator writing the same path still owes a readable body.
  */
 function readsBackSamePr(invocation: PrInvocation, write: ShellCommand): boolean {
   const verb = VIEW_VERBS[invocation.cli];
@@ -176,8 +160,7 @@ function readsBackSamePr(invocation: PrInvocation, write: ShellCommand): boolean
 }
 
 // What a path holds by the time the CLI reads it. A body written and passed in
-// one call resolves to the heredoc that wrote it, without touching a file the
-// command has not created yet.
+// one call resolves to its heredoc, since the file does not exist yet.
 function pathSpec(invocation: PrInvocation, path: string): BodySpec {
   const asFile: BodySpec = { kind: "parts", parts: [{ kind: "file", path }] };
   const write = lastWriteTo(invocation.preceding, path);
@@ -235,11 +218,7 @@ export type BodyResolution =
   | {
       kind: "text";
       text: string;
-      /**
-       * Absolute path the whole body was read from, so a caller may rewrite it.
-       * Null when any of the body came from the command itself, where a rewrite
-       * would be overwritten by the command or would have to edit shell syntax.
-       */
+      /** Absolute path the whole body was read from, when a caller may rewrite it. */
       file: string | null;
     }
   | { kind: "unreadable"; detail: string };
@@ -253,9 +232,8 @@ async function readBodyFile(path: string): Promise<string | null> {
 }
 
 // A `cd` ahead of the PR command moves where the CLI resolves a relative body
-// path, so the hook follows each one it can evaluate before reading files. A
-// `cd` on the failure side of a `||` runs only when the one before it failed,
-// which is not the path that reaches the PR command.
+// path. One on the failure side of a `||` runs only when the one before it
+// failed, so it is off the path that reaches the PR command.
 export function effectiveCwd(command: string, cwd: string): string {
   const invocation = findPrCommand(command);
   let dir = cwd;
@@ -277,9 +255,8 @@ export function effectiveCwd(command: string, cwd: string): string {
 /**
  * The one file the whole body was read from, when rewriting it would survive to
  * the PR. Null when the body is assembled from more than one source, and null
- * when a command ahead of the PR verb names that file: a generator writing the
- * same path replaces it after the hook reads it, so a correction would be
- * discarded and the hook would report a fix the PR never carried.
+ * when a command ahead of the PR verb names that file: it would replace the
+ * correction, and the hook would report a fix the PR never carried.
  */
 function rewritableFile(
   invocation: PrInvocation,

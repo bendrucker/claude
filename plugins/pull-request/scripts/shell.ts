@@ -1,7 +1,5 @@
 // A shell command as the list of simple commands it runs, with each word
-// evaluated as far as the hook can take it. This layer knows nothing about `gh`
-// or `glab`: it answers what the shell would do, and the caller decides what
-// that means for a PR body.
+// evaluated as far as the hook can take it.
 
 import sh, {
   type BinaryCmd,
@@ -20,11 +18,7 @@ import sh, {
 
 const { syntax } = sh;
 
-/**
- * What a word evaluates to. A word holds a sequence of these, because the shell
- * builds one argument out of literal runs and expansions side by side
- * (`$TMPDIR/body.md`).
- */
+/** A word holds a sequence of these, since `$TMPDIR/body.md` is one argument. */
 export type WordSegment =
   | { kind: "literal"; text: string }
   /** A substitution whose whole job is reading a file: `$(cat f)`, `$(< f)`. */
@@ -71,8 +65,6 @@ export function literal(word: Word | undefined): string | null {
   return text;
 }
 
-// Every node carries its own type name, so a predicate keyed on that name
-// narrows as soundly as the parser itself does.
 const isCall = (node: Node): node is CallExpr => syntax.NodeType(node) === "CallExpr";
 const isStatement = (node: Node): node is Stmt => syntax.NodeType(node) === "Stmt";
 const isLit = (node: Node): node is Lit => syntax.NodeType(node) === "Lit";
@@ -82,9 +74,8 @@ const isParameter = (node: Node): node is ParamExp => syntax.NodeType(node) === 
 const isSubstitution = (node: Node): node is CmdSubst => syntax.NodeType(node) === "CmdSubst";
 const isBinary = (node: Node): node is BinaryCmd => syntax.NodeType(node) === "BinaryCmd";
 
-// The parser exposes its operators as compile-time constants only, so each
-// value is read back from a command whose operator is known. That stays correct
-// across parser versions, where a copied literal would not.
+// The parser exposes its operators as compile-time constants only, so each is
+// read back from a command whose operator is known.
 function redirectOperatorOf(source: string): Redirect["Op"] | undefined {
   return syntax.NewParser().Parse(source, "probe.sh").Stmts[0]?.Redirs[0]?.Op;
 }
@@ -146,10 +137,8 @@ function substitutedFile(substitution: CmdSubst, context: Context): string | nul
   return literal(evaluateWord(operand, context));
 }
 
-// A variable resolves from the environment the hook runs in, which is the
-// environment the command will run in. An unset name stays unresolved rather
-// than expanding to nothing, so the hook reports it instead of reading the
-// wrong path.
+// An unset name stays unresolved rather than expanding to nothing, so a caller
+// reports it instead of reading the wrong path.
 function parameterSegment(expansion: ParamExp, context: Context): WordSegment {
   const source = sourceOf(expansion, context.command);
   const name = expansion.Param?.Value;
@@ -160,9 +149,8 @@ function parameterSegment(expansion: ParamExp, context: Context): WordSegment {
   return { kind: "literal", text: value };
 }
 
-// Double quotes protect everything but `$`, a backtick, and a quote of their
-// own, so a backslash survives into the argument unless it precedes one of
-// those or a newline. The parser hands the run back as written.
+// The parser hands back the run as written. A backslash survives into the
+// argument unless it precedes one of the characters quoting cannot protect.
 function unescapeQuoted(text: string): string {
   return text.replaceAll(/\\([$`"\\\n])/g, (_, escaped: string) =>
     escaped === "\n" ? "" : escaped,
@@ -195,9 +183,8 @@ function evaluateWord(word: SyntaxWord, context: Context): Word {
   return { source: sourceOf(word, context.command), segments };
 }
 
-// A heredoc body reaches the CLI as written, so its literal runs are taken
-// verbatim rather than evaluated. Any other part is an expansion the shell
-// rewrites first, which is what a caller needs to be told about.
+// A heredoc body reaches the CLI as written, so literal runs are taken
+// verbatim. Any other part is an expansion the shell rewrites first.
 function heredocOf(redirect: Redirect, context: Context): Heredoc | null {
   if (redirect.Op !== OPERATORS.heredoc && redirect.Op !== OPERATORS.dashHeredoc) return null;
   const parts = redirect.Hdoc?.Parts ?? [];
@@ -210,8 +197,8 @@ function heredocOf(redirect: Redirect, context: Context): Heredoc | null {
   };
 }
 
-// `<<-` drops leading tabs from every body line, including the one the closing
-// delimiter sat on, which the parser leaves as a trailing run.
+// `<<-` also strips the closing delimiter's own indent, which the parser leaves
+// as a trailing run.
 function stripLeadingTabs(content: string): string {
   return content
     .split("\n")
@@ -220,8 +207,7 @@ function stripLeadingTabs(content: string): string {
 }
 
 // `>>` appends and `2>` is a different stream, so neither leaves the file
-// holding just this command's output. The last write wins, as it does in the
-// shell.
+// holding just this command's output.
 function outputOf(redirects: Redirect[], context: Context): Word | null {
   const write = redirects.findLast(
     (redirect) =>
@@ -255,26 +241,21 @@ function statementCommand(
 }
 
 /**
- * The simple commands a shell command runs, in source order. The walk descends
- * into pipelines, subshells, brace groups, loops, and conditionals, so a
- * command is reached wherever it sits.
- *
+ * The simple commands a shell command runs, in source order, wherever they sit.
  * Empty when the text is not valid shell, which is also when no shell would run
- * it, so a caller reading that as "nothing to act on" matches what happens.
+ * it.
  */
 export function parseShell(command: string, env: NodeJS.ProcessEnv = process.env): ShellCommand[] {
   const context: Context = { command, env };
   const commands: ShellCommand[] = [];
-  // Source spans of the `||` right operands and of the pipelines. A binary is
-  // visited before the statements inside it, so by the time one of those is
-  // reached its span is already here, and the outermost pipeline is first.
+  // A binary is visited before the statements inside it, so a statement's spans
+  // are already here, outermost first.
   const fallbacks: Span[] = [];
   const pipelines: Span[] = [];
   try {
     const file = syntax.NewParser().Parse(command, "command.sh");
     syntax.Walk(file, (node) => {
-      // A command substitution belongs to the word that holds it, which
-      // evaluates it on its own. It is not a step in this command's sequence.
+      // The word holding it evaluates it, so it is no step in this sequence.
       if (isSubstitution(node)) return false;
       if (isBinary(node)) {
         if (PIPE_OPERATORS.has(node.Op)) pipelines.push(spanOf(node));

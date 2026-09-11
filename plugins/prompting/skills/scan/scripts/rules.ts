@@ -5,7 +5,7 @@
 // and frontmatter. A prompt quoting a bad instruction as an example keeps the
 // example.
 
-import type { Nodes, Root, Text } from "mdast";
+import type { Html, Nodes, Root, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
 import { frontmatter } from "micromark-extension-frontmatter";
@@ -19,10 +19,12 @@ export interface Finding {
   match: string;
 }
 
-interface PatternRule {
+export interface PatternRule {
   name: string;
   message: string;
   pattern: RegExp;
+  /** Skip inside a link, where the surrounding markup supplies the context. */
+  linkExempt?: boolean;
 }
 
 // The document reads as advice, so whether it fires is left to the run.
@@ -49,7 +51,89 @@ const NO_OP: PatternRule = {
     /\b(?:be (?:thorough|careful|concise|accurate|helpful|precise|diligent)|think (?:step by step|carefully|hard)|take your time|(?:use|using) your (?:best )?judge?ment|do your best|remember to|it(?:'s| is) important (?:to|that)|please|carefully)\b/gi,
 };
 
-const PATTERN_RULES = [WEAK_MODALITY, VAGUE_CRITERION, NO_OP];
+// A number a past run produced. The tool prints it again on the next run, so
+// the document caches its own output and drifts as the corpus behind it grows.
+// A modal ("can yield 2-3 cards") makes the number a budget instead.
+const MEASURED_OUTCOME: PatternRule = {
+  name: "stale-measurement",
+  message: "reports what a past run measured. The run prints it. Delete the sentence.",
+  pattern:
+    /(?<!\b(?:can|may|might|should|would|could|will|must|cannot)\s)\b(?:sits?|sat|lands?|landed|clears?|cleared|yields?|yielded|falls?|fell|drops?|dropped|rises?|rose|reaches|reached|scores?|scored|hovers?|averages?|stands? at|tops? out)\s+(?:at|to|from|around|about|near|below|above|by)?\s*[\d.]+/gi,
+};
+
+// A survival count out of a total, which only a run can know.
+const SURVIVAL_COUNT: PatternRule = {
+  name: "stale-measurement",
+  message: "counts what a past run produced. The run prints it. Delete the sentence.",
+  pattern:
+    /\b(?:\d[\d,]*|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen)\s+of\s+(?:\d[\d,]*|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen)\b/gi,
+};
+
+// "All thirteen features clear their floor", "All 47 tests pass": a tally the
+// document cannot keep current. Prose scopes an enumerated list with a small
+// spelled count ("all three patterns"), so only digits and larger counts read
+// as measured.
+const TALLY: PatternRule = {
+  name: "stale-measurement",
+  message: "tallies a result the run reports. Delete the sentence.",
+  pattern: /\ball\s+(?:\d[\d,]+|six|seven|eight|nine|ten|eleven|twelve|thirteen)\s+\w+/gi,
+};
+
+// An issue number sends the model to a tracker it cannot read, and the prose
+// around it goes stale when the issue closes.
+const TICKET_REF: PatternRule = {
+  name: "ticket-ref",
+  message: "points at a tracker the model cannot read. State the rule instead.",
+  pattern: /(?:^|[\s(])#\d{2,}\b/g,
+  linkExempt: true,
+};
+
+// The document reports its own progress. A model executing it cannot act on
+// unfinished work, and the note outlives the state it describes.
+const STATUS_PROSE: PatternRule = {
+  name: "status-prose",
+  message: "records project status the model cannot act on. Delete the sentence.",
+  pattern:
+    /\b(?:has|have) not (?:run|landed|shipped|happened)(?: yet)?\b|\bnot yet (?:run|wired|built|promoted|calibrated|implemented|landed|shipped|measured)\b|\(pending\)|\bcomes next\b|\bnothing is promoted\b|\bfor now\b|\bat the time of writing\b|\bcoming soon\b|\bstill (?:pending|outstanding|unbuilt)\b/gi,
+};
+
+const PATTERN_RULES = [
+  WEAK_MODALITY,
+  VAGUE_CRITERION,
+  NO_OP,
+  MEASURED_OUTCOME,
+  SURVIVAL_COUNT,
+  TALLY,
+  TICKET_REF,
+  STATUS_PROSE,
+];
+
+// A tooling directive addressed to a formatter or linter, not prose.
+const DIRECTIVE =
+  /^<!--\s*(?:prettier|markdownlint|eslint|oxlint|biome|shellcheck|vale|editorconfig|toc|omit|x-release)\b/i;
+
+// Prose held in a comment still reaches the model, which pays for every token
+// and has no way to act on a note addressed to a maintainer.
+function asideFindings(node: Html): Finding[] {
+  const value = node.value.trim();
+  if (!value.startsWith("<!--") || DIRECTIVE.test(value)) return [];
+  const words = value
+    .replaceAll(/<!--|-->/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (words.length < 8) return [];
+  const opening = words.slice(0, 6).join(" ");
+  return [
+    {
+      line: node.position?.start.line ?? 0,
+      col: node.position?.start.column ?? 0,
+      rule: "maintainer-aside",
+      message: `"${opening}..." is a note to a maintainer that the model reads and cannot act on. Move it out of the document.`,
+      match: opening,
+    },
+  ];
+}
 
 /** Line and column of an offset within a text node, in source coordinates. */
 function locate(node: Text, offset: number): { line: number; col: number } {
@@ -98,6 +182,13 @@ function proseView(source: string, block: Nodes): string {
 // a quote that formatting splits into sibling nodes, such as "*be thorough*".
 function quotedSpans(source: string, tree: Root): Span[] {
   const spans: Span[] = [];
+  // A blockquote is how a prompt shows the wording a rule accepts or rejects,
+  // so its prose is named rather than stated. Exempt the whole block.
+  visit(tree, "blockquote", (block) => {
+    const from = block.position?.start.offset;
+    const to = block.position?.end.offset;
+    if (from !== undefined && to !== undefined) spans.push([from, to]);
+  });
   visit(tree, (block) => {
     if (!BLOCKS.has(block.type)) return;
     const from = block.position?.start.offset ?? 0;
@@ -108,10 +199,16 @@ function quotedSpans(source: string, tree: Root): Span[] {
   return spans;
 }
 
-function patternFindings(node: Text, quoted: readonly Span[]): Finding[] {
+function patternFindings(
+  node: Text,
+  quoted: readonly Span[],
+  inLink: boolean,
+  rules: readonly PatternRule[],
+): Finding[] {
   const offset = node.position?.start.offset ?? 0;
   const found: Finding[] = [];
-  for (const rule of PATTERN_RULES) {
+  for (const rule of rules) {
+    if (rule.linkExempt && inLink) continue;
     for (const match of node.value.matchAll(rule.pattern)) {
       const at = offset + match.index;
       if (quoted.some(([from, to]) => at >= from && at < to)) continue;
@@ -136,13 +233,27 @@ function parse(source: string): Root {
   });
 }
 
-/** Every finding in one document, ordered by position. */
-export function scanPrompt(source: string): Finding[] {
+/**
+ * Every finding in one document, ordered by position. Takes the rule set so a
+ * candidate can be scored without being added to the shipping scanner first.
+ * Aside findings belong to the shipped set and are skipped for a custom one.
+ */
+export function scanWith(source: string, rules: readonly PatternRule[]): Finding[] {
   const tree = parse(source);
   const quoted = quotedSpans(source, tree);
   const found: Finding[] = [];
-  visit(tree, "text", (node) => {
-    found.push(...patternFindings(node, quoted));
+  visit(tree, "text", (node, _index, parent) => {
+    found.push(...patternFindings(node, quoted, parent?.type === "link", rules));
   });
+  if (rules === PATTERN_RULES) {
+    visit(tree, "html", (node) => {
+      found.push(...asideFindings(node));
+    });
+  }
   return found.toSorted((a, b) => (a.line === b.line ? a.col - b.col : a.line - b.line));
+}
+
+/** Every finding from the shipped rule set. */
+export function scanPrompt(source: string): Finding[] {
+  return scanWith(source, PATTERN_RULES);
 }

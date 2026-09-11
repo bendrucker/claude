@@ -84,6 +84,18 @@ One prioritized brief, grouped by project. Resolve each item to its project thro
 
 Within a group, order blocking items first, then oldest. Each item gets an identifier with a link, a one-line state, and a recommended action. The mode's phases set what to surface and label each item's role within its project.
 
+#### Next actor
+
+Every review-queue item, outbox item, and discussion thread resolves to a next actor before it earns a place in the brief. The test is who the item is waiting on. An open thread by itself does not answer that. Items waiting on someone else are dropped.
+
+The user is the next actor when someone asked the user a direct question, when the user has not reviewed the item at all or has not seen the revision now on the branch, when the user's own MR is blocked on something the user owns, or when the item needs a decision that is the user's to make.
+
+Someone else is the next actor when the user commented or reviewed last and nothing the user raised has been answered, when the item is approved or has changes requested and only the author can move it, and when it is blocked on work the user does not own. Open threads are not an exception: a thread carrying the user's unanswered comment is waiting on whoever it was addressed to.
+
+A re-review resolves on the revision rather than on its threads. Commits answering the user's earlier feedback make the user the next actor. Threads the author has not answered do not, and they stay out of the item's summary even when the item itself survives.
+
+Report the drop rather than hiding it. Each group ends with a one-line count of what the filter removed, such as `3 items waiting on their authors, not shown`. That count is how the user tells a filtered group from an empty one.
+
 An item with a matched agent gains one line under its existing entry:
 
 ```
@@ -94,7 +106,7 @@ A live session (`working`, `blocked`, or an interactive session whose `state` is
 
 An unmatched agent becomes its own entry only when it still wants something: `blocked`, `failed`, or `working`. Since gather runs with `--all`, unmatched `done` records are completed history and get dropped. Keeping them would fill a prioritized brief with finished work. Group what remains by the repo `cwd` resolves to, or `Misc` when it resolves to none. A blocked agent is blocking work and sorts with it under the ordering rule above.
 
-Close with the mode's cross-project synthesis: the day's sequence, or the night's open decisions. This is the triage gate. The brief covers everything gathered, and nothing executes until the user approves the order. Omit empty groups and never pad. An empty queue is a two-line brief.
+Close with the mode's cross-project synthesis: the day's sequence, or the night's open decisions. This is the triage gate. The brief covers everything that survived the next-actor filter, and nothing executes until the user approves the order. Omit groups that gathered nothing and never pad. A group whose items all resolved to another actor is not empty, so print its heading with the count line alone. An empty queue is a two-line brief.
 
 ### Act
 
@@ -105,7 +117,7 @@ Split recommended actions into two groups:
 
 Closing a tracker issue is safe only on evidence the orchestrator checked itself: that issue's own MR merged, or its acceptance criteria met in the code. A sub-agent reporting a merged MR is evidence about the MR. Confirm the MR belongs to the issue before it becomes evidence about the issue, since a linked MR may belong to a sibling.
 
-Drive inbound to zero. Every review request, message, notification, and email leaves the run with a terminal disposition: handled, reacted to or briefly acknowledged, deferred to the work tracker as a team-backlog item or to the personal inbox for your own next-steps and reminders when one is configured, or archived. Never stand up a tracker issue in place of a personal capture: when the user says "my inbox" that means the personal inbox, and when the destination is unclear, ask. Nothing stays in an ambiguous unread state. Where a reaction or brief acknowledgement closes a thread, prefer that over a filler reply. Draft a reply only when it carries real content, and keep it terse.
+Drive inbound to zero. Items the next-actor rule filtered out never enter this loop, since waiting on someone else is their disposition. Everything else that reached the brief leaves the run with a terminal disposition: handled, reacted to or briefly acknowledged, deferred to the work tracker as a team-backlog item or to the personal inbox for your own next-steps and reminders when one is configured, or archived. Never stand up a tracker issue in place of a personal capture: when the user says "my inbox" that means the personal inbox, and when the destination is unclear, ask. Nothing stays in an ambiguous unread state. Where a reaction or brief acknowledgement closes a thread, prefer that over a filler reply. Draft a reply only when it carries real content, and keep it terse.
 
 #### Questions
 

@@ -1,6 +1,6 @@
 ---
 name: prompting
-description: "Write a document a model executes: a product prompt, a system prompt, a skill, a tool or agent description, a CLAUDE.md or AGENTS.md, a reference file behind a pointer. Use when authoring or revising any of those, when deciding what belongs in a prompt versus behind a pointer, or when a prompt produces different behavior from run to run."
+description: "Write a document a model executes: a product prompt, a system prompt, a skill, a tool or agent description, a CLAUDE.md or AGENTS.md, a reference file behind a pointer. Use when authoring or revising any of those, when deciding what belongs in a prompt versus behind a pointer, when a prompt produces different behavior from run to run, or when a prompt sends the model down the wrong approach."
 ---
 
 # Prompting
@@ -41,9 +41,17 @@ Split a sequence when later steps tempt the model to finish the current one earl
 
 Do not merge two sequences. Each step becomes visible from the one before it, and the model stops the earlier sequence at the later one's criterion.
 
-## Prescription
+## Goal
 
-State the goal and the constraints, then leave room to adapt. A document that dictates an exact sequence of tool calls degrades output and goes stale as the environment shifts. When a document keeps accreting steps to patch failures, the fix is usually a clearer goal.
+Open on the goal: what the work is for, before any instruction. Then state the constraints and leave room to adapt.
+
+A document that gives the what without the why leaves the model to infer the goal, and it commits to the wrong approach when no instruction fits the case in front of it. That is the XY problem. The goal is what lets the model make a trade-off the document never anticipated.
+
+A document that dictates an exact sequence of tool calls degrades output and goes stale as the environment shifts. When a document keeps accreting steps to patch failures, the fix is usually a clearer goal.
+
+Pair the goal with the specific instructions the model needs to reach it. The goal sets the direction, and each instruction earns its place by correcting where the model goes wrong without it.
+
+The goal stays true as models change, and a steering instruction expires when the behavior it patches does. A stronger model takes more of the work from the goal and needs fewer instructions. Fix more of the process in the harness when a cheaper model runs the document.
 
 A goal still needs a completion criterion, or the model decides for itself when the goal is met.
 

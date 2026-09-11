@@ -278,7 +278,10 @@ const openCmd = command(
       console.log(`reviewr already open (${open})`);
       process.exit(0);
     }
-    openPane(reviewrOpenArgs(paneId));
+    openPane(
+      reviewrOpenArgs(paneId),
+      `reviewr not found: install the \`${REVIEWR_PLUGIN}\` herdr plugin`,
+    );
   },
 );
 

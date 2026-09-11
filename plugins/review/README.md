@@ -14,7 +14,7 @@ Code review workflows for Claude Code.
 
 ### Hooks
 
-- **`UserPromptSubmit`**: clears the `review` pane label `human` raised, once the reply lands
+- **`UserPromptSubmit`**: Clears the `review` pane label `human` raised, once the reply lands
 
 ### Agents
 

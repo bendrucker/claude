@@ -83,7 +83,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
 1. Push the branch to remote: `git push -u origin HEAD`
 1. Resolve the label set against the repo before creating: any `--label` values, plus the review label when the local bot review step's gate said the diff warrants a metered review and that pass didn't already spend the credit. See [`references/labels.md`](references/labels.md).
 1. Draft the body. Past a single paragraph, read [`references/sections.md`](references/sections.md) first: audience tiers, session content, density and heading rules, evidence, optional sections, slop to cut.
-1. Review the body when `--review-body` applies: write it to `tmp/pr-body-<branch>.md`, run `review:human --doc tmp/pr-body-<branch>.md --summary "PR body for <repo>"`, and fold the feedback into the file before creating. Under `/ship` the diff was already reviewed, so this covers only the body.
+1. Review the body when `--review-body` applies: write it to `tmp/pr-body-<branch>.md`, run `review:human --doc tmp/pr-body-<branch>.md --summary "PR body for <repo>"`, and fold the feedback into the file before creating. Inside herdr that ends the turn, and the steps below resume when the review comes back. Under `/ship` the diff was already reviewed. This step covers only the body.
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description-file tmp/pr-body-<branch>.md`

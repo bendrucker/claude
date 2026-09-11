@@ -1,6 +1,6 @@
 ---
 name: git:conflicts
-description: Resolving git merge conflicts during rebase, merge, or cherry-pick. Use when conflicts arise. Can also drive the operation to completion and push when asked (e.g. "fix conflicts and push").
+description: Resolve git merge conflicts from a rebase, merge, or cherry-pick. Use also for a request to finish the operation and push, such as "fix conflicts and push".
 argument-hint: "[--push]"
 allowed-tools:
   - Read
@@ -32,6 +32,8 @@ hooks:
 
 # Git Conflicts
 
+Every conflicted file ends as the result both sides intended: each side's change preserved, the file coherent, and nothing dropped that the merged result does not account for. Resolve a conflict these rules do not cover to that standard, and ask the user when the three versions do not reveal what each side intended.
+
 ## Status
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/status.ts`
@@ -44,9 +46,9 @@ hooks:
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/upstream.ts`
 
-## Three-Way Access
+## Resolving
 
-Git stores three versions in staging slots during a conflict:
+Git stores three versions of a conflicted file in staging slots:
 
 | Slot | Version | Command |
 |------|---------|---------|
@@ -54,31 +56,24 @@ Git stores three versions in staging slots during a conflict:
 | `:2:path` | Ours (HEAD) | `git show :2:path` |
 | `:3:path` | Theirs (incoming) | `git show :3:path` |
 
-## Resolving
+For each conflicted file, read all three slots, edit the file to the merged result, then `git add` it.
 
-For each conflicted file:
+- Regenerate a generated file, such as a lockfile or a build artifact, from its source instead of merging it by hand. Follow the project's `CLAUDE.md` for lockfile guidance.
+- When the correct result is unclear, keep both sides and ask the user which to keep.
+- When the file's purpose is unclear, ask the user before resolving it.
+- When repeated rebases hit the same conflict, [references/rerere.md](references/rerere.md) records a resolution and replays it.
 
-- Read the three slots above to understand base, ours, and theirs.
-- Edit the file to produce the correct merged result, then `git add` it.
-- For generated files (lockfiles, build artifacts), delete and regenerate rather than merge by hand. Follow the project's `CLAUDE.md` for lockfile-specific guidance.
-- Never silently drop either side. When in doubt, keep both and ask.
-- If a conflict is in a file you don't understand, ask rather than guess.
+Resolving is done when every conflicted file is staged and `git diff --cached --check` reports no conflict markers. Leave the commit, the continue, and the push to the user.
 
-## Committing and Pushing
+## Completing the Operation
 
-This step runs only when you are asked to take the operation to completion: the `--push` argument (its alias `push`), or a request like "fix conflicts and push". By default, on auto-activation or when asked only to resolve, stop after `git add` and do not commit, continue, or push.
+Take the operation past the staged resolution only when the user asks for it: the `--push` argument, its alias `push`, or a request such as "fix conflicts and push". Then:
 
-When driving to completion:
+1. When no rebase, merge, or cherry-pick is in progress and upstream has diverged, run `git merge origin/<default-branch>` to surface the conflicts. A clean merge goes straight to the push.
+2. Summarize the conflicts and confirm with `AskUserQuestion` before resolving 3 or more files, non-trivial code, or conflicts whose intent is ambiguous. Resolve without asking when the conflicts are generated files only, or fewer than 3 conflicts across 1-2 files with an obvious resolution.
+3. Resolve every conflicted file.
+4. Set aside the dirty files unrelated to the resolution, so the continue commits only the resolution. `git status --porcelain` lists them. Run `git stash push -m "conflicts: temp" -- <files>` for all of them at once. When that stash fails, which the sandbox causes by blocking the unlink of a protected file such as `.mcp.json`, stash the files one at a time and skip the failures. Hide each file that cannot be stashed with `git update-index --assume-unchanged <file>`.
+5. Continue with `git rebase --continue`, `git merge --continue`, or `git cherry-pick --continue`.
+6. Run `git push`, then restore the files you set aside: `git update-index --no-assume-unchanged <file>` for each hidden file, and `git stash pop` for a stash you created.
 
-1. **Initiate the merge if needed.** If no rebase, merge, or cherry-pick is in progress but upstream has diverged, run `git merge origin/<default-branch>` to surface conflicts. If it merges cleanly, push and finish.
-2. **Assess complexity before resolving.**
-   - **Simple** (generated files only, or fewer than 3 conflicts across 1-2 files with obvious resolutions): proceed.
-   - **Complex** (3+ files, non-trivial code, or ambiguous intent): summarize the conflicts and confirm with the user via `AskUserQuestion` before resolving.
-3. **Resolve** per the section above.
-4. **Stash unrelated dirty files.** Check `git status --porcelain` for unstaged changes beyond the resolved conflicts. Try `git stash push -m "conflicts: temp" -- <files>` for all of them at once. If the stash fails (the sandbox may block unlinking protected files like `.mcp.json`), stash individually and skip failures. For files that cannot be stashed, hide them with `git update-index --assume-unchanged <file>`.
-5. **Continue the operation** with `git rebase --continue`, `git merge --continue`, or `git cherry-pick --continue`.
-6. **Push and restore.** Run `git push`, then restore hidden files with `git update-index --no-assume-unchanged <file>` and `git stash pop` if anything was stashed.
-
-## References
-
-- [rerere.md](references/rerere.md) — Automatic resolution reuse for repeated rebases
+The operation is done when git reports no operation in progress, the branch is pushed, and every file you set aside is back in the working tree.

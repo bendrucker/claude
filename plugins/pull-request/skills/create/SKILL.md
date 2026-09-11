@@ -4,7 +4,7 @@ description: |
   Create a pull request, merge request, or change request with proper formatting and content guidelines.
   Invoke when the user wants to create, open, or submit a PR, MR, or CR, including after committing changes.
 
-argument-hint: "[--draft] [--no-auto] [--base <ref>] [--label <name>] [--no-review] [--review-body] [--no-review-body]"
+argument-hint: "[--draft] [--no-auto] [--base <ref>] [--label <name>] [--no-review] [--[no-]review-body]"
 allowed-tools:
   - mcp__github
   - Agent
@@ -72,7 +72,7 @@ Parse `$ARGUMENTS` for these flags. With none, create a PR/MR that is ready for 
 - `--base <ref>`: parent branch to target. A branch whose parent is another topic branch is a stack layer. Only this flag or the user identifies one. The upstream ref tracks the branch's own remote copy, so it can't identify the parent. Default: the repo's default branch.
 - `--label <name>`: apply a label, repeatable. Confirm each label exists first, per [`references/labels.md`](references/labels.md). Default: none.
 - `--no-review`: don't request the hosted review. Default: on a repo that gates its hosted bot on a label, request it when the diff clears the metered-review gate and no local pass ran. See [`references/labels.md`](references/labels.md).
-- `--review-body`: put the drafted body in front of you before creating. Default: on when the Remote URL above names an owner other than you, off on your own repos. `--no-review-body` skips it.
+- `--[no-]review-body`: put the drafted body in front of you before creating. Default: on when the Remote URL above names an owner other than you, off on your own repos.
 
 ## Workflow
 

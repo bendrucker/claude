@@ -219,11 +219,13 @@ const raiseCmd = command(
   async (parsed) => {
     const paneId = currentPane();
     if (paneId == null) return;
-    herdr(raiseArgs(paneId));
-    herdr(notificationArgs(parsed.flags.summary));
+    // The marker lands first so a reply that follows the toast at once still
+    // finds it and clears the label.
     const marker = markerPath(paneId);
     mkdirSync(join(marker, ".."), { recursive: true });
     await Bun.write(marker, "");
+    herdr(raiseArgs(paneId));
+    herdr(notificationArgs(parsed.flags.summary));
   },
 );
 

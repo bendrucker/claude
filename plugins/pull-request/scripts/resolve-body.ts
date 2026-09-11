@@ -6,15 +6,31 @@ import { basename, isAbsolute, join } from "node:path";
 
 // The `if` rules in hooks.json scope dispatch to `gh pr create`/`edit` and
 // `glab mr create`/`update`, covering compound (`cd <dir> && gh pr create ...`)
-// and env-prefixed (`GH_PAGER=cat gh pr create ...`) forms. This guard repeats
-// the check in-script so the validator is inert under any other dispatch, and
-// runs before the hook reads a body file or shells out to git. It matches the
-// heredoc-stripped text, so a heredoc body that merely mentions a create
-// command stays inert.
-const PR_BODY_COMMAND_PATTERN = /\b(?:gh pr (?:create|edit)|glab mr (?:create|update))\b/;
+// and env-prefixed (`GH_PAGER=cat gh pr create ...`) forms. The guards below
+// repeat the check in-script so the validator is inert under any other
+// dispatch, and run before the hook reads a body file or shells out to git.
+const PR_BODY_VERB = /gh pr (?:create|edit)|glab mr (?:create|update)/;
+
+// The verb has to sit where the shell would run it: at the start of the text or
+// after a separator, with env assignments allowed ahead of it. The same words
+// anywhere else are an argument to some other program, which is how a `--notes`
+// value quoting a PR command reaches this hook at all.
+function invocationPattern(verb: RegExp): RegExp {
+  return new RegExp(String.raw`(?:^|[\n;|&(){}])[ \t]*(?:\w+=\S*[ \t]+)*(${verb.source})\b`, "g");
+}
+
+const PR_BODY_INVOCATION = invocationPattern(PR_BODY_VERB);
+
+/** Offset of the verb itself, or -1 when the text holds no such invocation. */
+function invocationIndex(text: string, pattern: RegExp): number {
+  const match = firstUnquotedMatch(text, pattern, quotedSpans(text));
+  const verb = match?.[1];
+  if (match == null || verb === undefined) return -1;
+  return match.index + match[0].length - verb.length;
+}
 
 export function isPrBodyCommand(command: string): boolean {
-  return PR_BODY_COMMAND_PATTERN.test(parseCommand(command).text);
+  return invocationIndex(parseCommand(command).text, PR_BODY_INVOCATION) !== -1;
 }
 
 function unquote(value: string): string {
@@ -40,9 +56,9 @@ function normalizeBodyPath(raw: string): string {
 // herestrings out. A quoted or escaped delimiter makes the body literal.
 const HEREDOC_OPERATOR = /(?<!<)<<(-?)[ \t]*(?:'([^']+)'|"([^"]+)"|(\\)?([A-Za-z_][A-Za-z0-9_]*))/g;
 
-// Simple-command boundaries within one line. `|` stays inside a segment so a
-// heredoc piped into the CLI remains attached to the command it feeds.
-const SEGMENT_SEPARATOR = /&&|\|\||;/g;
+// Simple-command boundaries. `|` stays inside a segment so a heredoc piped
+// into the CLI remains attached to the command it feeds.
+const SEGMENT_SEPARATOR = /&&|\|\||;|\n/g;
 
 // Where a segment writes its heredoc: a single `>` redirect or a `tee` sink.
 // The redirect lookbehind skips `>>` (an append mixes the heredoc with the
@@ -80,9 +96,10 @@ interface PendingHeredoc {
   lines: string[];
 }
 
-// Spans of a line covered by a quoted string, so a `<<` inside an argument
-// (`grep "<<EOF" f`) is not read as an operator. Backslash escapes a quote
-// outside single quotes, where the shell treats it literally.
+// Spans covered by a quoted string, so a `<<` inside an argument (`grep "<<EOF"
+// f`) is not read as an operator. Backslash escapes a quote outside single
+// quotes, where the shell treats it literally. Quoting runs across newlines, so
+// a multi-line flag value scanned whole is one span.
 function quotedSpans(line: string): [number, number][] {
   const spans: [number, number][] = [];
   let open: string | null = null;
@@ -107,16 +124,8 @@ function quotedSpans(line: string): [number, number][] {
   return spans;
 }
 
-// Quoted spans across the whole (stripped) text, line by line, so flag
-// matching can skip a flag word sitting inside another flag's quoted value.
-function quotedSpansAll(text: string): [number, number][] {
-  const spans: [number, number][] = [];
-  let offset = 0;
-  for (const line of text.split("\n")) {
-    for (const [start, end] of quotedSpans(line)) spans.push([offset + start, offset + end]);
-    offset += line.length + 1;
-  }
-  return spans;
+function withinSpans(index: number, spans: [number, number][]): boolean {
+  return spans.some(([start, end]) => index > start && index <= end);
 }
 
 // First match whose own start sits outside every quoted span. The value a
@@ -128,7 +137,7 @@ function firstUnquotedMatch(
   spans: [number, number][],
 ): RegExpExecArray | null {
   for (const match of text.matchAll(pattern)) {
-    if (!spans.some(([start, end]) => match.index > start && match.index <= end)) return match;
+    if (!withinSpans(match.index, spans)) return match;
   }
   return null;
 }
@@ -137,8 +146,7 @@ function segmentAt(line: string, index: number, spans: [number, number][]): stri
   let start = 0;
   let end = line.length;
   for (const sep of line.matchAll(SEGMENT_SEPARATOR)) {
-    if (spans.some(([spanStart, spanEnd]) => sep.index > spanStart && sep.index <= spanEnd))
-      continue;
+    if (withinSpans(sep.index, spans)) continue;
     if (sep.index < index) {
       start = sep.index + sep[0].length;
     } else {
@@ -192,7 +200,7 @@ export function parseCommand(command: string): ParsedCommand {
     kept.push(line);
     const spans = quotedSpans(line);
     for (const match of line.matchAll(HEREDOC_OPERATOR)) {
-      if (spans.some(([start, end]) => match.index > start && match.index <= end)) continue;
+      if (withinSpans(match.index, spans)) continue;
       const segment = segmentAt(line, match.index, spans);
       queue.push({
         delimiter: match[2] ?? match[3] ?? match[5] ?? "",
@@ -381,6 +389,63 @@ function resolveHeredocParts(parts: BodyPart[], heredocs: Heredoc[]): BodySpec {
   return { kind: "parts", parts: resolved };
 }
 
+// Simple commands ahead of an offset, so a segment keeps its own redirect.
+function segmentsBefore(text: string, index: number): string[] {
+  const scope = text.slice(0, index);
+  const spans = quotedSpans(scope);
+  const segments: string[] = [];
+  let start = 0;
+  for (const separator of scope.matchAll(SEGMENT_SEPARATOR)) {
+    if (withinSpans(separator.index, spans)) continue;
+    segments.push(scope.slice(start, separator.index));
+    start = separator.index + separator[0].length;
+  }
+  segments.push(scope.slice(start));
+  return segments;
+}
+
+const PR_VIEW_INVOCATIONS: Record<PrCli, { verb: RegExp; pattern: RegExp }> = {
+  gh: { verb: /gh pr view/, pattern: invocationPattern(/gh pr view/) },
+  glab: { verb: /glab mr view/, pattern: invocationPattern(/glab mr view/) },
+};
+
+// The verb's first positional argument: a PR number, URL, or branch. Null when
+// the command leaves it off and the CLI resolves the current branch's PR, which
+// both commands in a round trip do.
+function prSelector(text: string, verb: RegExp): string | null {
+  const value = text.match(
+    new RegExp(String.raw`^(?:${verb.source})[ \t]+("[^"]*"|'[^']*'|[^-\s;|&<>][^\s;|&<>]*)`),
+  )?.[1];
+  return value === undefined ? null : unquote(value);
+}
+
+/**
+ * Whether the command reads the same PR it is about to edit into the body file:
+ * `gh pr view <n> ... > body.md && <edit body.md> && gh pr edit <n> --body-file
+ * body.md`. The hook runs before the shell, so whatever that path holds now is
+ * not what the CLI will send, and no content the hook could read would change
+ * the outcome. The trade is that an edit-in-place round trip ships unvalidated.
+ *
+ * A generator writing the same path (`printf ... > body.md`) is not this shape
+ * and still has to hand the hook a body it can read.
+ */
+function readsBackSamePr(text: string, path: string): boolean {
+  const cli = commandCli(text);
+  const editIndex = invocationIndex(text, PR_BODY_INVOCATION);
+  if (cli === null || editIndex === -1) return false;
+  const name = basename(normalizeBodyPath(path));
+  if (name === "") return false;
+  const selector = prSelector(text.slice(editIndex), PR_BODY_VERB);
+  const view = PR_VIEW_INVOCATIONS[cli];
+  return segmentsBefore(text, editIndex).some((segment) => {
+    const viewIndex = invocationIndex(segment, view.pattern);
+    if (viewIndex === -1) return false;
+    const target = segmentTarget(segment);
+    if (target === null || basename(target) !== name) return false;
+    return prSelector(segment.slice(viewIndex), view.verb) === selector;
+  });
+}
+
 // Both spellings of stdin. `/dev/stdin` matters because reading it from the
 // hook would consume the hook's own (already-drained) stdin and validate an
 // empty body.
@@ -389,21 +454,24 @@ const STDIN_PATHS = new Set(["-", "/dev/stdin"]);
 export function extractBodySpec(command: string): BodySpec {
   const { text, heredocs } = parseCommand(command);
   const flags = bodyFlags(text);
-  const spans = quotedSpansAll(text);
+  const spans = quotedSpans(text);
   const fileValue = firstUnquotedMatch(text, flagValuePattern(flags.file, true), spans)?.[1];
   if (fileValue != null && fileValue !== "") {
     const path = unquote(fileValue);
     if (STDIN_PATHS.has(path)) {
       // The last stdin redirection wins, as it does in the shell.
       const fed = heredocs.findLast(
-        (doc) => doc.target === null && PR_BODY_COMMAND_PATTERN.test(doc.segment),
+        (doc) => doc.target === null && invocationIndex(doc.segment, PR_BODY_INVOCATION) !== -1,
       );
       if (fed !== undefined) return heredocSpec(fed);
       return { kind: "unreadable", detail: `a body piped in on standard input (\`${path}\`)` };
     }
     const part = filePart(fileValue);
     if (part === null) return unreadableExpansion(path);
-    return resolveHeredocParts([part], precedingHeredocs(text, heredocs));
+    const spec = resolveHeredocParts([part], precedingHeredocs(text, heredocs));
+    const only = spec.kind === "parts" && spec.parts.length === 1 ? spec.parts[0] : undefined;
+    if (only?.kind === "file" && readsBackSamePr(text, only.path)) return { kind: "none" };
+    return spec;
   }
   const inlineValue = firstUnquotedMatch(text, flagValuePattern(flags.inline, true), spans)?.[1];
   if (inlineValue == null || inlineValue === "") return { kind: "none" };
@@ -413,7 +481,7 @@ export function extractBodySpec(command: string): BodySpec {
 }
 
 function precedingHeredocs(text: string, heredocs: Heredoc[]): Heredoc[] {
-  const prIndex = text.search(PR_BODY_COMMAND_PATTERN);
+  const prIndex = invocationIndex(text, PR_BODY_INVOCATION);
   if (prIndex === -1) return [];
   return heredocs.filter((doc) => doc.offset < prIndex);
 }
@@ -449,7 +517,7 @@ const CD_PATTERN = /(?:^|&&|;|\n)\s*cd\s+("(?:[^"\\]|\\.)*"|'[^']*'|[^\s;|&]+)/g
 
 export function effectiveCwd(command: string, cwd: string): string {
   const text = parseCommand(command).text;
-  const start = text.search(PR_BODY_COMMAND_PATTERN);
+  const start = invocationIndex(text, PR_BODY_INVOCATION);
   const scope = start === -1 ? text : text.slice(0, start);
   let dir = cwd;
   for (const match of scope.matchAll(CD_PATTERN)) {
@@ -512,7 +580,7 @@ function rewritableFile(command: string, parts: BodyPart[], files: string[]): st
   const part = parts[0];
   if (part?.kind !== "file") return null;
   const text = parseCommand(command).text;
-  const prIndex = text.search(PR_BODY_COMMAND_PATTERN);
+  const prIndex = invocationIndex(text, PR_BODY_INVOCATION);
   if (prIndex === -1) return null;
   const name = basename(part.path);
   if (name === "" || text.slice(0, prIndex).includes(name)) return null;
@@ -525,7 +593,7 @@ function rewritableFile(command: string, parts: BodyPart[], files: string[]): st
 // string, as the PR title.
 export function extractTitle(command: string): string | null {
   const text = parseCommand(command).text;
-  const start = text.search(PR_BODY_COMMAND_PATTERN);
+  const start = invocationIndex(text, PR_BODY_INVOCATION);
   const flags = bodyFlags(text);
   const scope = (start === -1 ? text : text.slice(start))
     .replace(flagValuePattern(flags.file, true), " ")

@@ -64,6 +64,38 @@ describe("processInput", () => {
     },
   );
 
+  // A PR command quoted inside another program's argument is prose, not an
+  // invocation, so the hook never reaches the body file its text names.
+  test.each<[string]>([
+    ["bun url.ts add --notes 'retry with gh pr edit 12 --body-file /nonexistent.md'"],
+    [
+      'bun url.ts add --notes "Blocked.\nRun gh pr edit 12 --body-file /nonexistent.md\nThen push."',
+    ],
+  ])("returns null for %p, where the PR command is an argument", async (command) => {
+    expect(await processInput(createInput(command))).toBeNull();
+  });
+
+  // The round trip: read the PR, edit the file, write it back. The hook runs
+  // before the shell, so no body it could read is the one the CLI sends.
+  test.each<[string]>([
+    [
+      "gh pr view 12 --json body -q .body > /nonexistent.md && gh pr edit 12 --body-file /nonexistent.md",
+    ],
+    [
+      "glab mr view 3 --output json | jq -r .description > /nonexistent.md && glab mr update 3 --description-file /nonexistent.md",
+    ],
+  ])("returns null for %p, a round trip through the same PR", async (command) => {
+    expect(await processInput(createInput(command))).toBeNull();
+  });
+
+  it("denies a generator writing the body file it will pass", async () => {
+    const result = await processInput(
+      createInput("printf 'Prose.' > /nonexistent.md && gh pr edit 12 --body-file /nonexistent.md"),
+    );
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("/nonexistent.md");
+  });
+
   it("returns null when tool_input has no command", async () => {
     const result = await processInput({ tool_input: {} });
     expect(result).toBeNull();

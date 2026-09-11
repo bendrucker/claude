@@ -31,6 +31,11 @@ describe("isPrBodyCommand", () => {
     ["for f in *.ts; do wc -l $f; done", false],
     ["cat <<'EOF' > notes.md\nnothing here\nEOF", false],
     ["cat > notes.md <<'EOF'\nrun gh pr create --body-file x.md later\nEOF", false],
+    // The verb as an argument to something else: a note, a log line, a doc.
+    ["bun url.ts add --notes 'retry with gh pr edit 12 --body-file body.md'", false],
+    ['bun url.ts add --notes "Blocked.\nRun gh pr edit 12 --body-file body.md\nThen push."', false],
+    ["echo gh pr create --body-file body.md", false],
+    ["grep -r 'glab mr update' plugins/", false],
   ])("isPrBodyCommand(%p) -> %p", (command, expected) => {
     expect(isPrBodyCommand(command)).toBe(expected);
   });
@@ -222,6 +227,38 @@ describe("extractBodySpec", () => {
     ],
     // The shell feeds the last stdin redirection to the CLI.
     ["gh pr create --body-file - <<'A' <<'B'\nfirst\nA\nsecond\nB", parts(literal("second\n"))],
+    // Reading the PR back into the file it will be written from: the hook runs
+    // before the shell, so the path holds nothing the CLI will send.
+    [
+      "gh pr view 12 --json body -q .body > body.md && sed -i '' 's/a/b/' body.md && gh pr edit 12 --body-file body.md",
+      { kind: "none" },
+    ],
+    [
+      "gh pr view --json body --jq .body > body.md\ngh pr edit --body-file body.md",
+      { kind: "none" },
+    ],
+    [
+      "glab mr view 3 --output json | jq -r .description > d.md && glab mr update 3 --description-file d.md",
+      { kind: "none" },
+    ],
+    // A different PR, a different file, or no read at all: still the hook's
+    // business, because the body is not a copy of what is already published.
+    [
+      "gh pr view 12 --json body -q .body > body.md && gh pr edit 34 --body-file body.md",
+      parts(file("body.md")),
+    ],
+    [
+      "gh pr view 12 --json body -q .body > other.md && gh pr edit 12 --body-file body.md",
+      parts(file("body.md")),
+    ],
+    [
+      String.raw`printf 'Prose.\n' > body.md && gh pr edit 12 --body-file body.md`,
+      parts(file("body.md")),
+    ],
+    [
+      "gh pr view 12 --json body -q .body > body.md && cat > body.md <<'EOF'\nProse.\nEOF\ngh pr edit 12 --body-file body.md",
+      parts(literal("Prose.\n")),
+    ],
   ])("extractBodySpec(%p) -> %p", (command, expected) => {
     expect(extractBodySpec(command)).toEqual(expected);
   });

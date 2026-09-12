@@ -7,22 +7,17 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { cli, command } from "cleye";
 import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { CONFIG_PATH, checkConfig, formatCheck, runDoctor } from "../src/doctor";
+import { checkConfig, configPath, formatCheck, runDoctor } from "../src/doctor";
 import { ring } from "../src/doorbell";
 import { append } from "../src/ledger";
-import { startServer } from "../src/server";
-import { createStubStore } from "../src/store";
+import { herdrListAgents, startDaemon } from "../src/server";
+import { createLedgerStore, DEFAULT_WORK_HOURS, stateDir } from "../src/store";
 import type { LedgerRow } from "../src/types";
 
 const HEALTHZ_TIMEOUT_MS = 1000;
 const HEALTHY_POLL_ATTEMPTS = 30;
 const HEALTHY_POLL_INTERVAL_MS = 100;
-
-function stateDir(): string {
-  return process.env.CHIEF_STATE_DIR ?? join(homedir(), ".local", "state", "chief");
-}
 
 function pidFile(): string {
   return join(stateDir(), "daemon.pid");
@@ -180,8 +175,23 @@ function sampleNowRow(now: Date = new Date()): LedgerRow {
 }
 
 const serveCmd = command({ name: "serve" }, async () => {
-  await startServer(
-    { store: createStubStore(), ingestDeps: { listAgents: () => Promise.resolve({ agents: [] }) } },
+  const { config } = await checkConfig(configPath());
+  const herdrAgent = config?.herdr.agent ?? "chief";
+  const workHours = config?.presence.workHours ?? DEFAULT_WORK_HOURS;
+  const ledgerPath = join(stateDir(), "ledger.jsonl");
+  const decisionsPath = join(stateDir(), "decisions.jsonl");
+  const spoolPath = join(stateDir(), "ingest.spool.jsonl");
+
+  await startDaemon(
+    {
+      ingestDeps: { listAgents: herdrListAgents },
+      ledgerPath,
+      spoolPath,
+      herdrAgent,
+      workHours,
+      createStore: (getLastDoorbell) =>
+        createLedgerStore({ ledgerPath, decisionsPath, workHours, getLastDoorbell }),
+    },
     { port: port() },
   );
   console.log(`chief serving on ${baseUrl()}`);
@@ -215,9 +225,9 @@ const bellCmd = command(
       return;
     }
 
-    const { config } = await checkConfig(CONFIG_PATH);
+    const { config } = await checkConfig(configPath());
     if (!config) {
-      console.error(`chief bell: could not read config at ${CONFIG_PATH}`);
+      console.error(`chief bell: could not read config at ${configPath()}`);
       process.exitCode = 1;
       return;
     }

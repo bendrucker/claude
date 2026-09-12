@@ -2,7 +2,9 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 
-export const CONFIG_PATH = join(homedir(), ".config", "chief", "config.json");
+export function configPath(): string {
+  return process.env.CHIEF_CONFIG ?? join(homedir(), ".config", "chief", "config.json");
+}
 const DEFAULT_BASE_URL = "http://127.0.0.1:7391";
 const PROBE_TIMEOUT_MS = 1500;
 
@@ -145,11 +147,11 @@ export interface DoctorDeps {
 
 export async function runDoctor(deps: DoctorDeps = {}): Promise<DoctorCheck[]> {
   const baseUrl = deps.baseUrl ?? DEFAULT_BASE_URL;
-  const configPath = deps.configPath ?? CONFIG_PATH;
+  const resolvedConfigPath = deps.configPath ?? configPath();
   const fetchImpl = deps.fetchImpl ?? fetch;
   const listAgents = deps.listAgents ?? herdrListAgents;
 
-  const { check: configCheck, config } = await checkConfig(configPath);
+  const { check: configCheck, config } = await checkConfig(resolvedConfigPath);
 
   return [
     await checkHealthz(baseUrl, fetchImpl),

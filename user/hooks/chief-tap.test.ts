@@ -1,9 +1,20 @@
-import { afterEach, expect, test } from "bun:test";
-import { rm } from "node:fs/promises";
+import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tap } from "./chief-tap";
 
-const SPOOL_PATH = join(import.meta.dirname, "__fixtures__", "chief-tap.test.jsonl");
+let dir: string;
+let SPOOL_PATH: string;
+
+beforeAll(async () => {
+  dir = await mkdtemp(join(tmpdir(), "chief-tap-"));
+  SPOOL_PATH = join(dir, "chief-tap.test.jsonl");
+});
+
+afterAll(async () => {
+  await rm(dir, { recursive: true, force: true });
+});
 
 afterEach(async () => {
   await rm(SPOOL_PATH, { force: true });

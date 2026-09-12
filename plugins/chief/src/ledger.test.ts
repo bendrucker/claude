@@ -1,10 +1,21 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { rm } from "node:fs/promises";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ack, append, drop, hold, read, resolve, transition } from "./ledger";
 import type { LedgerRow } from "./types";
 
-const PATH = join(import.meta.dirname, "__fixtures__", "ledger.test.jsonl");
+let dir: string;
+let PATH: string;
+
+beforeAll(async () => {
+  dir = await mkdtemp(join(tmpdir(), "chief-ledger-"));
+  PATH = join(dir, "ledger.test.jsonl");
+});
+
+afterAll(async () => {
+  await rm(dir, { recursive: true, force: true });
+});
 
 function row(overrides: Partial<LedgerRow> = {}): LedgerRow {
   return {

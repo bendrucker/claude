@@ -1,9 +1,20 @@
-import { afterEach, expect, test } from "bun:test";
-import { rm } from "node:fs/promises";
+import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { append, wasDecided } from "./decisions";
 
-const PATH = join(import.meta.dirname, "__fixtures__", "decisions.test.jsonl");
+let dir: string;
+let PATH: string;
+
+beforeAll(async () => {
+  dir = await mkdtemp(join(tmpdir(), "chief-decisions-"));
+  PATH = join(dir, "decisions.test.jsonl");
+});
+
+afterAll(async () => {
+  await rm(dir, { recursive: true, force: true });
+});
 
 afterEach(async () => {
   await rm(PATH, { force: true });

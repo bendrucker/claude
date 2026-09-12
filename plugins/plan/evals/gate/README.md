@@ -32,7 +32,7 @@ To test a rule change, edit `hooks/gate.ts`, replay with `--against results/repl
 
 ## Rework
 
-`rework.ts` replays a size deny: it writes the denied plan into a scratch `plans/` directory, runs `claude -p` with the planning guidelines appended to the system prompt, hands it the arm's deny reason, and records what the session did. `scripts/arms.ts` defines the arms. `current` is the shipped `sizeReason` text. `target` states the character count, a target of about 8,000 characters, and that the limit counts characters rather than bytes.
+`rework.ts` replays a size deny: it writes the denied plan into a scratch `plans/` directory, runs `claude -p` with the planning guidelines appended to the system prompt, hands it the arm's deny reason, and records what the session did. `scripts/arms.ts` defines the arms. `current` is the shipped `sizeReason` text. `target` states the character count, a target of about 8,000 characters, and that the limit counts characters rather than bytes. `count` states the count and the bytes note without a target.
 
 Every metric is mechanical, read from the stream-json transcript and the files left behind:
 

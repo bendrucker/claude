@@ -157,7 +157,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --log /path/to/log.jsonl
 
 It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, per-category fire/suppress counts, an acted-on column, and the unconfirmed pairs no whole-file re-scan closed.
 
-The acted-on column pairs each shown finding with the next checked run on the same file: a rule the later run no longer raises was acted on, one it still raises was written past. It reads `n/a` until pairs close, and the opportunities list reports acceptance as unmeasurable rather than printing a rate over no data. Recall is not measurable from this log, since a rule that never fires leaves no line.
+The acted-on column pairs each shown finding with the next whole-file re-scan of the same file: a rule that re-scan no longer raises was acted on, one it still raises was written past. Only a whole-file run decides. The checkers report the hits a run introduced, so a hunk-scoped `Edit` speaks only to its own new text, silent or not, and a finding followed by nothing else counts as `unconfirmed`. The acted-on column reads `n/a` until pairs close, and the opportunities list reports acceptance as unmeasurable rather than printing a rate over no data. Recall is not measurable from this log, since a rule that never fires leaves no line.
 
 The report ends with an opportunities list, each naming a concrete fix. Flipping the `WRITING_HOOKS_LOG` default to off is offered only once acceptance is measurable, since turning the log off before then forecloses the measurement. Fixes land in the plugin (wordlists, `detection/`, `hooks/`), then the next audit's log confirms or refutes them.
 

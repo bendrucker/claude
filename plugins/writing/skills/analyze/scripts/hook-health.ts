@@ -13,7 +13,7 @@ export interface CategoryHealth {
   revisited: number;
   /** Revisited findings the re-scan no longer raised. */
   accepted: number;
-  /** Shown findings whose only later runs scanned a hunk, where silence proves nothing. */
+  /** Shown findings whose only later runs scanned a hunk, which decides nothing either way. */
   unconfirmed: number;
 }
 
@@ -56,28 +56,27 @@ export interface Acceptance {
   unconfirmed: number;
 }
 
-// Tools whose scanned text is the whole file, so a rule absent from the run's
-// `categories` is absent from the file. An `Edit` or `MultiEdit` scans only its
-// own hunks.
+// Tools whose scanned text is the whole file, so the run's `categories` speak to
+// the file a finding named. An `Edit` or `MultiEdit` scans only its own hunks.
 const WHOLE_FILE_TOOLS = new Set(["Write"]);
 
 // A fire count measures how loud a rule is. Whether it was right takes a second
-// signal. Pairing each shown finding with a later run on the same file answers that
-// from ordinary use: a rule missing from that later run's `categories` was acted
-// on, one still present was written past. A suppressed finding was never shown,
-// so it seeds no pair, and a run that returned before the checkers ran carries
-// no `categories`.
+// signal. Pairing each shown finding with a whole-file re-scan of the same file
+// answers that from ordinary use: a rule missing from the re-scan's `categories`
+// was acted on, one still present was written past. A suppressed finding was
+// never shown, so it seeds no pair, and a run that returned before the checkers
+// ran carries no `categories`.
 //
-// Silence closes a pair only from a whole-file re-scan. A hunk-scoped edit
-// elsewhere in the file never scans the prose the rule flagged, so its silence
-// is scope rather than a fix, and counting it drives every rate toward 100%.
-// Those pairs land in `unconfirmed` so the discarded evidence stays visible.
-// A run that still raises the rule is decisive whatever it scanned, since the
-// prose was there to find.
+// Only a whole-file re-scan decides, in either direction. The checkers report
+// the hits a run newly introduced, so a hunk-scoped edit's `categories` describe
+// that hunk's own text: silence means the hunk introduced nothing, and a hit
+// means the hunk introduced one somewhere the finding never pointed. Neither
+// speaks to the prose the rule flagged. Those pairs land in `unconfirmed` so the
+// discarded evidence stays visible instead of inflating a rate in either column.
 //
-// One bias survives: a whole-file scan reports newly introduced hits, so a trope
-// left at an unchanged count also reads as absent. That skews the surviving rate
-// high, making it a floor on how often a rule is wrong.
+// One bias survives: a whole-file scan also reports only newly introduced hits,
+// so a trope left at an unchanged count reads as absent. That skews the
+// surviving rate high, making it a floor on how often a rule is wrong.
 export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
   const byTarget = new Map<string, RunLogEntry[]>();
   for (const entry of entries) {
@@ -97,17 +96,13 @@ export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
       if (entry.suppressed === true || !INJECTION_OUTCOMES.has(entry.outcome)) continue;
       const checked = ordered.slice(index + 1).filter((next) => next.categories != null);
       if (checked.length === 0) continue;
-      // A run still raising the rule is decisive whatever it scanned: the prose
-      // is there to find. Silence is decisive only from a whole-file scan.
-      const decisive = checked.find(
-        (next) => next.categories?.includes(category) === true || WHOLE_FILE_TOOLS.has(next.tool),
-      );
+      const rescan = checked.find((next) => WHOLE_FILE_TOOLS.has(next.tool));
       const bucket = counts.get(category) ?? { revisited: 0, accepted: 0, unconfirmed: 0 };
-      if (decisive?.categories == null) {
+      if (rescan?.categories == null) {
         bucket.unconfirmed += 1;
       } else {
         bucket.revisited += 1;
-        if (!decisive.categories.includes(category)) bucket.accepted += 1;
+        if (!rescan.categories.includes(category)) bucket.accepted += 1;
       }
       counts.set(category, bucket);
     }

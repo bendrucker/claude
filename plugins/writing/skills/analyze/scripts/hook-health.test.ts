@@ -1,6 +1,7 @@
 import { describe, expect, it, test } from "bun:test";
 import type { RunLogEntry } from "../../../hooks/run-log";
 import {
+  type Acceptance,
   acceptance,
   type CategoryHealth,
   type HookHealth,
@@ -92,79 +93,93 @@ describe("acceptance", () => {
     return entry({ outcome: "context", category: "numbering", target: "f1", ...overrides });
   }
 
-  it("counts a finding the next checked run no longer raises as acted on", () => {
-    const counts = acceptance([shown(), entry({ target: "f1", categories: [] })]);
-    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 1, unconfirmed: 0 });
-  });
+  const actedOn: Acceptance = { revisited: 1, accepted: 1, unconfirmed: 0 };
+  const writtenPast: Acceptance = { revisited: 1, accepted: 0, unconfirmed: 0 };
+  const undecided: Acceptance = { revisited: 0, accepted: 0, unconfirmed: 1 };
 
-  it("counts a finding the next checked run still raises as revisited only", () => {
-    const counts = acceptance([shown(), entry({ target: "f1", categories: ["numbering"] })]);
-    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 0, unconfirmed: 0 });
-  });
-
-  it("pairs past a later run that ranked a different category first", () => {
-    const counts = acceptance([
-      shown(),
-      entry({
-        outcome: "deny",
-        category: "spaced em dash",
-        target: "f1",
-        categories: ["numbering"],
-      }),
-    ]);
-    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 0, unconfirmed: 0 });
-  });
-
-  it("leaves a hunk-scoped edit's silence unconfirmed", () => {
-    const counts = acceptance([shown(), entry({ tool: "Edit", target: "f1", categories: [] })]);
-    expect(counts.get("numbering")).toEqual({ revisited: 0, accepted: 0, unconfirmed: 1 });
-  });
-
-  it("counts a hunk-scoped edit that still raises the rule as written past", () => {
-    const counts = acceptance([
-      shown(),
-      entry({ tool: "Edit", target: "f1", categories: ["numbering"] }),
-    ]);
-    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 0, unconfirmed: 0 });
-  });
-
-  it("closes the pair on a whole-file re-scan past a silent hunk edit", () => {
-    const counts = acceptance([
-      shown(),
-      entry({ tool: "Edit", target: "f1", categories: [] }),
-      entry({ tool: "Write", target: "f1", categories: [] }),
-    ]);
-    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 1, unconfirmed: 0 });
-  });
-
-  it("seeds no pair from a suppressed finding", () => {
-    const counts = acceptance([
-      shown({ outcome: "silent", suppressed: true }),
-      entry({ target: "f1", categories: [] }),
-    ]);
-    expect(counts.size).toBe(0);
-  });
-
-  it("closes no pair on a run that returned before the checkers", () => {
-    const counts = acceptance([shown(), entry({ target: "f1", outcome: "skipped-scratch" })]);
-    expect(counts.size).toBe(0);
-  });
-
-  it("pairs only within one session and one file", () => {
-    const counts = acceptance([
-      shown(),
-      entry({ target: "f2", categories: [] }),
-      entry({ session_id: "s2", target: "f1", categories: [] }),
-    ]);
-    expect(counts.size).toBe(0);
-  });
-
-  it("ignores entries logged before targets were recorded", () => {
-    const counts = acceptance([
-      entry({ outcome: "context", category: "numbering" }),
-      entry({ categories: [] }),
-    ]);
-    expect(counts.size).toBe(0);
+  test.each<{ name: string; entries: RunLogEntry[]; expected: Record<string, Acceptance> }>([
+    {
+      name: "a whole-file re-scan that no longer raises the rule counts as acted on",
+      entries: [shown(), entry({ target: "f1", categories: [] })],
+      expected: { numbering: actedOn },
+    },
+    {
+      name: "a whole-file re-scan that still raises the rule counts as written past",
+      entries: [shown(), entry({ target: "f1", categories: ["numbering"] })],
+      expected: { numbering: writtenPast },
+    },
+    {
+      name: "a re-scan pairs even when it ranked a different category first",
+      entries: [
+        shown(),
+        entry({
+          outcome: "deny",
+          category: "spaced em dash",
+          target: "f1",
+          categories: ["numbering"],
+        }),
+      ],
+      expected: { numbering: writtenPast },
+    },
+    {
+      name: "a hunk-scoped edit's silence decides nothing",
+      entries: [shown(), entry({ tool: "Edit", target: "f1", categories: [] })],
+      expected: { numbering: undecided },
+    },
+    {
+      // The checkers report the hits a run introduced, so this edit raised the
+      // rule over its own new text, not over the prose the finding named.
+      name: "a hunk-scoped edit that raises the rule again decides nothing",
+      entries: [shown(), entry({ tool: "Edit", target: "f1", categories: ["numbering"] })],
+      expected: { numbering: undecided },
+    },
+    {
+      name: "a whole-file re-scan decides past a silent hunk edit",
+      entries: [
+        shown(),
+        entry({ tool: "Edit", target: "f1", categories: [] }),
+        entry({ tool: "Write", target: "f1", categories: [] }),
+      ],
+      expected: { numbering: actedOn },
+    },
+    {
+      name: "a whole-file re-scan decides past a hunk edit that raised the rule",
+      entries: [
+        shown(),
+        entry({ tool: "Edit", target: "f1", categories: ["numbering"] }),
+        entry({ tool: "Write", target: "f1", categories: [] }),
+      ],
+      expected: { numbering: actedOn },
+    },
+    {
+      name: "a suppressed finding seeds no pair",
+      entries: [
+        shown({ outcome: "silent", suppressed: true }),
+        entry({ target: "f1", categories: [] }),
+      ],
+      expected: {},
+    },
+    {
+      name: "a run that returned before the checkers closes no pair",
+      entries: [shown(), entry({ target: "f1", outcome: "skipped-scratch" })],
+      expected: {},
+    },
+    {
+      name: "pairing stays within one session and one file",
+      entries: [
+        shown(),
+        entry({ target: "f2", categories: [] }),
+        entry({ session_id: "s2", target: "f1", categories: [] }),
+      ],
+      expected: {},
+    },
+    {
+      name: "entries logged before targets were recorded are ignored",
+      entries: [entry({ outcome: "context", category: "numbering" }), entry({ categories: [] })],
+      expected: {},
+    },
+  ])("$name", ({ entries, expected }) => {
+    expect(Object.fromEntries(acceptance(entries))).toEqual(expected);
   });
 });
 

@@ -1,6 +1,6 @@
 ---
 name: prompting
-description: "Write a document a model executes: a product prompt, a system prompt, a skill, a tool or agent description, a CLAUDE.md or AGENTS.md, a reference file behind a pointer. Use when authoring or revising any of those, when deciding what belongs in a prompt versus behind a pointer, or when a prompt produces different behavior from run to run."
+description: "Write a document a model executes: a product prompt, a system prompt, a skill, a tool or agent description, a CLAUDE.md or AGENTS.md, a reference file behind a pointer. Use when authoring or revising any of those, when deciding what belongs in a prompt versus behind a pointer, when a prompt produces different behavior from run to run, or when a prompt makes the model take the wrong approach."
 ---
 
 # Prompting
@@ -9,19 +9,9 @@ Rules for any document a model executes. Each rule targets variance: the same do
 
 To rewrite an existing document, see [references/conversion.md](references/conversion.md).
 
-## The Two Loads
-
-Every document and every pointer spends one of two budgets.
-
-**Context load** is what always-loaded material costs the model: tokens and attention on every turn, whether or not the material fires. A system prompt section, a tool description, and a `CLAUDE.md` line all spend it.
-
-**Cognitive load** is what the material costs the human: knowing which documents exist and which one answers the question in front of them. Spend it where human judgment matters. Leave material a human chooses between reachable by that human. A pointer from the body makes the model choose instead.
-
-Material behind a pointer trades context load for the pointer's own line. Material nothing points at spends only cognitive load, and gets reached when the human remembers it.
-
 ## Placement
 
-Put material in the body when every run needs it. Put it behind a pointer when only some runs reach it.
+Put material in the body when every run needs it. Put it behind a pointer when only some runs reach it. Leave it unpointed when a human should choose whether to reach it, because a pointer from the body hands that choice to the model.
 
 Move reference that only some branches need out of a step sequence, even when it is short. Leaving it in place makes the model attend to the surrounding steps inconsistently across runs, which costs more than the tokens do.
 
@@ -51,9 +41,15 @@ Split a sequence when later steps tempt the model to finish the current one earl
 
 Do not merge two sequences. Each step becomes visible from the one before it, and the model stops the earlier sequence at the later one's criterion.
 
-## Prescription
+## Goal
 
-State the goal and the constraints, then leave room to adapt. A document that dictates an exact sequence of tool calls degrades output and goes stale as the environment shifts. When a document keeps accreting steps to patch failures, the fix is usually a clearer goal.
+State the goal first: what the work is for, before any instruction. Then give the constraints and leave room to adapt.
+
+A document that gives the what without the why leaves the model to infer the goal, and it takes the wrong approach when no instruction fits the case. That is the XY problem. The goal lets the model make a trade-off the document never anticipated. Name where a run finds the conventions the document does not cover, and give them precedence over its defaults.
+
+A document that dictates an exact sequence of tool calls degrades output and goes stale as the environment shifts. When a document keeps accreting steps to patch failures, the fix is usually a clearer goal. Keep a step the goal cannot imply: an ordering constraint, or a call the model would not otherwise make. Cut a step that only restates what the goal already demands.
+
+Pair the goal with the instructions the model needs to reach it. Each instruction earns its place by correcting where the model goes wrong without it. The goal stays true as models change, and a steering instruction expires when the behavior it patches does. A stronger model takes more of the work from the goal and needs fewer instructions. Fix more of the process in the harness when a cheaper model runs the document.
 
 A goal still needs a completion criterion, or the model decides for itself when the goal is met.
 
@@ -65,7 +61,7 @@ End every unit of work on a completion criterion: the condition that tells the m
 
 Write a criterion the model can check. A vague bound such as "understanding reached" lets the model stop early.
 
-Sharpen the bound first. Split the sequence to hide later work only when the bound cannot be sharpened and you have observed the model stopping early. [Splitting](#splitting) governs the split.
+Sharpen the bound first. Split the sequence to hide later work only when the bound cannot be sharpened and you have observed the model stopping early.
 
 #### Demand
 
@@ -96,7 +92,7 @@ Look for passages that collapse into one token:
 
 State the rule first. When knowing why lets the model handle a case the rule does not list, add the reason after it in one clause. Cut a reason that only argues the rule is right.
 
-Avoid metaphor, epigram, and personification. They aim at a human reader, and a figurative phrasing is a weaker match target than a literal one when the model scans for the rule that applies.
+Write the literal fact instead of metaphor, epigram, or personification. A figurative phrasing is a weaker match target than a literal one when the model scans for the rule that applies.
 
 #### Positive Form
 

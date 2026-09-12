@@ -119,7 +119,7 @@ describe("acceptance", () => {
           categories: ["numbering"],
         }),
       ],
-      expected: { numbering: writtenPast },
+      expected: { numbering: writtenPast, "spaced em dash": undecided },
     },
     {
       name: "a hunk-scoped edit's silence decides nothing",
@@ -152,17 +152,19 @@ describe("acceptance", () => {
       expected: { numbering: actedOn },
     },
     {
-      name: "a suppressed finding seeds no pair",
-      entries: [
-        shown({ outcome: "silent", suppressed: true }),
-        entry({ target: "f1", categories: [] }),
-      ],
-      expected: {},
+      name: "a finding nothing followed stays counted as unconfirmed",
+      entries: [shown()],
+      expected: { numbering: undecided },
     },
     {
-      name: "a run that returned before the checkers closes no pair",
+      name: "a run that returned before the checkers leaves the finding unconfirmed",
       entries: [shown(), entry({ target: "f1", outcome: "skipped-scratch" })],
-      expected: {},
+      expected: { numbering: undecided },
+    },
+    {
+      name: "a whole-file run that returned before the checkers decides nothing",
+      entries: [shown(), entry({ tool: "Write", target: "f1", outcome: "skipped-scratch" })],
+      expected: { numbering: undecided },
     },
     {
       name: "pairing stays within one session and one file",
@@ -170,6 +172,14 @@ describe("acceptance", () => {
         shown(),
         entry({ target: "f2", categories: [] }),
         entry({ session_id: "s2", target: "f1", categories: [] }),
+      ],
+      expected: { numbering: undecided },
+    },
+    {
+      name: "a suppressed finding seeds no pair",
+      entries: [
+        shown({ outcome: "silent", suppressed: true }),
+        entry({ target: "f1", categories: [] }),
       ],
       expected: {},
     },

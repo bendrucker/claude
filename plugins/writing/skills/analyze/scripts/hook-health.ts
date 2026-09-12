@@ -13,7 +13,7 @@ export interface CategoryHealth {
   revisited: number;
   /** Revisited findings the re-scan no longer raised. */
   accepted: number;
-  /** Shown findings whose only later runs scanned a hunk, which decides nothing either way. */
+  /** Shown findings no whole-file re-scan reached, leaving nothing that decides them. */
   unconfirmed: number;
 }
 
@@ -71,8 +71,10 @@ const WHOLE_FILE_TOOLS = new Set(["Write"]);
 // the hits a run newly introduced, so a hunk-scoped edit's `categories` describe
 // that hunk's own text: silence means the hunk introduced nothing, and a hit
 // means the hunk introduced one somewhere the finding never pointed. Neither
-// speaks to the prose the rule flagged. Those pairs land in `unconfirmed` so the
-// discarded evidence stays visible instead of inflating a rate in either column.
+// speaks to the prose the rule flagged. Every shown finding no whole-file
+// re-scan reached lands in `unconfirmed`, whether hunk edits followed it or
+// nothing did, so `revisited` and `unconfirmed` together account for all of
+// them and the evidence the rate leaves out stays visible.
 //
 // One bias survives: a whole-file scan also reports only newly introduced hits,
 // so a trope left at an unchanged count reads as absent. That skews the
@@ -94,9 +96,9 @@ export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
       const { category } = entry;
       if (category == null || category === "") continue;
       if (entry.suppressed === true || !INJECTION_OUTCOMES.has(entry.outcome)) continue;
-      const checked = ordered.slice(index + 1).filter((next) => next.categories != null);
-      if (checked.length === 0) continue;
-      const rescan = checked.find((next) => WHOLE_FILE_TOOLS.has(next.tool));
+      const rescan = ordered
+        .slice(index + 1)
+        .find((next) => next.categories != null && WHOLE_FILE_TOOLS.has(next.tool));
       const bucket = counts.get(category) ?? { revisited: 0, accepted: 0, unconfirmed: 0 };
       if (rescan?.categories == null) {
         bucket.unconfirmed += 1;
@@ -253,7 +255,7 @@ export function opportunities(health: HookHealth): string[] {
   const unconfirmed = health.categories.reduce((sum, cat) => sum + cat.unconfirmed, 0);
   if (revisited < MIN_REVISITS) {
     found.push(
-      `Acceptance is not measurable yet (${revisited} shown findings re-scanned, ${MIN_REVISITS} needed; ${unconfirmed} more were followed only by hunk-scoped edits). Until it is, the fired column is a flag count and says nothing about whether a rule is right. Keep the log on.`,
+      `Acceptance is not measurable yet (${revisited} shown findings re-scanned, ${MIN_REVISITS} needed; ${unconfirmed} more never got a whole-file re-scan). Until it is, the fired column is a flag count and says nothing about whether a rule is right. Keep the log on.`,
     );
     return found;
   }

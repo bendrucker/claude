@@ -95,7 +95,12 @@ test.each<[string, HookPayload, Partial<LedgerRow>]>([
 
 test("a non-destructive PermissionRequest appends nothing", async () => {
   const row = await ingest(
-    { hook_event_name: "PermissionRequest", session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } },
+    {
+      hook_event_name: "PermissionRequest",
+      session_id: "s1",
+      tool_name: "Bash",
+      tool_input: { command: "ls" },
+    },
     deps(),
   );
   expect(row).toBeUndefined();

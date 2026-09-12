@@ -111,7 +111,10 @@ async function resolveSessionRows(
   }
 }
 
-export async function ingest(payload: HookPayload, deps: IngestDeps): Promise<LedgerRow | undefined> {
+export async function ingest(
+  payload: HookPayload,
+  deps: IngestDeps,
+): Promise<LedgerRow | undefined> {
   const ledgerPath = deps.ledgerPath ?? LEDGER_PATH;
   const now = (deps.now ?? (() => new Date()))();
 
@@ -145,7 +148,6 @@ export async function ingest(payload: HookPayload, deps: IngestDeps): Promise<Le
     kind: result.kind,
     title: payload.message ?? payload.tool_name ?? payload.hook_event_name,
     session: payload.session_id,
-    pane,
     tier: result.tier,
     releaseAt: releaseAtFor(
       result.releaseAt,
@@ -157,6 +159,7 @@ export async function ingest(payload: HookPayload, deps: IngestDeps): Promise<Le
     state: "open",
     reason: result.reason,
   };
+  if (pane !== undefined) row.pane = pane;
   if (payload.cwd != null && payload.cwd !== "") row.payload = { cwd: payload.cwd };
   append(row, ledgerPath);
   return row;

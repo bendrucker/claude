@@ -46,12 +46,27 @@ export async function read(path: string = LEDGER_PATH): Promise<Map<string, Ledg
   const latest = new Map<string, LedgerRow>();
   for (const line of (await file.text()).split("\n")) {
     if (line.trim() === "") continue;
-    let row: LedgerRow;
+    let parsed: z.infer<typeof LedgerRowSchema>;
     try {
-      row = LedgerRowSchema.parse(JSON.parse(line));
+      parsed = LedgerRowSchema.parse(JSON.parse(line));
     } catch {
       continue;
     }
+    const row: LedgerRow = {
+      id: parsed.id,
+      key: parsed.key,
+      ts: parsed.ts,
+      source: parsed.source,
+      kind: parsed.kind,
+      title: parsed.title,
+      tier: parsed.tier,
+      releaseAt: parsed.releaseAt,
+      state: parsed.state,
+      reason: parsed.reason,
+    };
+    if (parsed.session !== undefined) row.session = parsed.session;
+    if (parsed.pane !== undefined) row.pane = parsed.pane;
+    if (parsed.payload !== undefined) row.payload = parsed.payload;
     latest.set(row.id, row);
   }
   return latest;

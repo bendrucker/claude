@@ -32,11 +32,7 @@ describe("tier table", () => {
       { hook: "Notification", notificationType: "idle_prompt", message: "idle" },
       { kind: "idle", tier: "digest", releaseAt: "digest" },
     ],
-    [
-      "stop",
-      { hook: "Stop" },
-      { kind: "stop", tier: "digest", releaseAt: "digest" },
-    ],
+    ["stop", { hook: "Stop" }, { kind: "stop", tier: "digest", releaseAt: "digest" }],
     [
       "dispatch",
       { hook: "dispatch" },
@@ -47,7 +43,11 @@ describe("tier table", () => {
   });
 
   test("a non-destructive permission request tiers to nothing", () => {
-    const event: Event = { hook: "PermissionRequest", toolName: "Bash", toolInput: { command: "ls" } };
+    const event: Event = {
+      hook: "PermissionRequest",
+      toolName: "Bash",
+      toolInput: { command: "ls" },
+    };
     expect(tier(event)).toBeNull();
   });
 

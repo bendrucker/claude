@@ -14,13 +14,19 @@ test("wasDecided is false for a missing file", async () => {
 });
 
 test("wasDecided is true once a decision is appended", async () => {
-  append({ ts: "2026-01-01T00:00:00.000Z", id: "claude-hook:s1:idle_prompt", note: "fine", by: "ben" }, PATH);
+  append(
+    { ts: "2026-01-01T00:00:00.000Z", id: "claude-hook:s1:idle_prompt", note: "fine", by: "ben" },
+    PATH,
+  );
   expect(await wasDecided("claude-hook:s1:idle_prompt", PATH)).toBe(true);
   expect(await wasDecided("claude-hook:other", PATH)).toBe(false);
 });
 
 test("wasDecided tolerates a truncated last line", async () => {
-  append({ ts: "2026-01-01T00:00:00.000Z", id: "claude-hook:s1:idle_prompt", note: "fine", by: "ben" }, PATH);
+  append(
+    { ts: "2026-01-01T00:00:00.000Z", id: "claude-hook:s1:idle_prompt", note: "fine", by: "ben" },
+    PATH,
+  );
   await Bun.write(PATH, `${await Bun.file(PATH).text()}{"id":"broken"`);
   expect(await wasDecided("claude-hook:s1:idle_prompt", PATH)).toBe(true);
 });

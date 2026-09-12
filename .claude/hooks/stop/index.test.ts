@@ -144,6 +144,55 @@ describe("processStop", () => {
     expect(await processStop(stopInput({ transcript_path: transcriptPath }))).toBeNull();
   });
 
+  // The hook spawns `bun` and `prek` by name, so a stub earlier on PATH records
+  // the calls without running either for real.
+  async function recordedCalls(cwd: string): Promise<string[]> {
+    const stubDir = await mkdtemp(join(tmpdir(), "stop-hook-stub-"));
+    const bin = join(stubDir, "bin");
+    const log = join(stubDir, "calls.log");
+    await Promise.all(
+      ["bun", "prek"].map(async (name) => {
+        const stub = join(bin, name);
+        await Bun.write(stub, `#!/bin/sh\necho "${name} $*" >> "${log}"\n`);
+        Bun.spawnSync(["chmod", "+x", stub]);
+      }),
+    );
+
+    const filePath = join(cwd, "touched.ts");
+    await Bun.write(filePath, "export {}");
+    const transcriptPath = join(cwd, "transcript.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${bin}:${originalPath ?? ""}`;
+    try {
+      expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toBeNull();
+    } finally {
+      process.env.PATH = originalPath;
+    }
+
+    const file = Bun.file(log);
+    const text = (await file.exists()) ? await file.text() : "";
+    await rm(stubDir, { recursive: true, force: true });
+    return text.split("\n").filter((line) => line !== "");
+  }
+
+  it("installs before prek when the stop directory is a JS project", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-project-"));
+    await Bun.write(join(cwd, "package.json"), "{}");
+    expect(await recordedCalls(cwd)).toEqual([
+      `bun install --cwd ${cwd}`,
+      "prek run --files touched.ts",
+    ]);
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("runs prek without installing when the stop directory has no manifest", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-bare-"));
+    expect(await recordedCalls(cwd)).toEqual(["prek run --files touched.ts"]);
+    await rm(cwd, { recursive: true, force: true });
+  });
+
   it("returns null when every collected file is out-of-tree", async () => {
     const sibling = join(tempDir, "sibling-worktree");
     const filePath = join(sibling, "plugins", "mac", "plugin.json");

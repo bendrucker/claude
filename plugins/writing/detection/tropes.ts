@@ -1,3 +1,4 @@
+import { NO_NEGATION_PATTERN } from "./negation";
 import { isProseFile } from "./paths";
 import { splitParagraphs, splitSentences } from "./sentences";
 import {
@@ -22,11 +23,23 @@ export interface PatternMatch {
 
 export type DetectorLayer = "vocabulary" | "grammar" | "cross-sentence" | "meaning";
 
+/** One matched construction and its offset in the text the matcher was given. */
+export interface PatternSpan {
+  index: number;
+  matched: string;
+}
+
 export interface PatternDef {
   tier: PatternTier;
   layer: DetectorLayer;
   category: string;
   test: RegExp | ((text: string) => Hits);
+  /**
+   * Per-instance spans for the scan surface. A function `test` reports one
+   * Hits sample, which collapses a detector that flags many independent
+   * instances to a single scan result. Such a detector supplies this too.
+   */
+  spans?: (text: string) => PatternSpan[];
   message: (matched: string) => string;
   fileOnly?: boolean;
   sideEffectOnly?: boolean;
@@ -706,6 +719,7 @@ export const PATTERNS: PatternDef[] = [
     retire:
       "Add a word to the status carve-out (NO_X_ACTION_WORDS) when writing:scan shows it producing a false-positive nudge. Remove the pattern when the construction stops appearing in assistant deliverables or in corrective-feedback moments.",
   },
+  NO_NEGATION_PATTERN,
   {
     tier: "context",
     layer: "vocabulary",

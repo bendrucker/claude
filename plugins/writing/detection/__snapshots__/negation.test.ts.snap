@@ -1,0 +1,13 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`noNegationHits reports the samples in a paragraph mixing every case 1`] = `
+[
+  "holds no controls",
+  "cost no call",
+  "needs neither",
+  "Report no findings",
+  "found no defects",
+  "left nothing",
+  "leaves no one",
+]
+`;

@@ -41,6 +41,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
@@ -147,6 +149,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
@@ -270,6 +274,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
@@ -378,6 +384,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
@@ -493,6 +501,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
@@ -607,6 +617,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
@@ -723,6 +735,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
@@ -841,6 +855,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
@@ -961,6 +977,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
@@ -1070,6 +1088,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
@@ -1176,6 +1196,8 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% | (no baseline stat) | - |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 | (no baseline stat) | - |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 | (no baseline stat) | - |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 | (no baseline stat) | - |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
 
 ## Proposed Wordlist Removals
@@ -1282,6 +1304,8 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% | (no baseline stat) | - |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 | (no baseline stat) | - |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 | (no baseline stat) | - |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 | (no baseline stat) | - |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
 
 ## Proposed Wordlist Removals
@@ -1388,6 +1412,8 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% | (no baseline stat) | - |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 | (no baseline stat) | - |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 | (no baseline stat) | - |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 | (no baseline stat) | - |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
 
 ## Proposed Wordlist Removals
@@ -1494,6 +1520,8 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% | (no baseline stat) | - |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 | (no baseline stat) | - |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 | (no baseline stat) | - |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 | (no baseline stat) | - |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
 
 ## Proposed Wordlist Removals
@@ -1600,6 +1628,8 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
 | Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
 | Subordinate:coordinate clause ratio | ungoverned | 0.00 |
+| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
+| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals

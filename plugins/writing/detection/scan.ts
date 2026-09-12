@@ -54,6 +54,12 @@ function positionOfSample(text: string, sample: string): Position {
 
 function regexResults(stripped: string, def: PatternDef): ScanResult[] {
   if (typeof def.test === "function") {
+    if (def.spans) {
+      return def.spans(stripped).map(({ index, matched }) => {
+        const { line, col } = positionAt(stripped, index);
+        return { line, col, category: def.category, matched, message: def.message(matched) };
+      });
+    }
     const hits = def.test(stripped);
     if (hits.count === 0) return [];
     const { line, col } = positionOfSample(stripped, hits.sample);

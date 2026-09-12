@@ -16,6 +16,7 @@
 // features may produce per-document flags.
 
 import { z } from "zod";
+import { noNegationHits, notNegationHits } from "../../../detection/negation";
 
 export type Provenance = "skill-prescribed" | "skill-encouraged" | "ungoverned";
 
@@ -270,6 +271,34 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
       return subordinators.length / coordinators.length;
     },
     format: (rate) => rate.toFixed(2),
+  },
+  {
+    id: "no_negation_share",
+    label: "No-negation share (no-form of all negated indefinites)",
+    provenance: "skill-prescribed",
+    source:
+      'SKILL.md Word Choice: name the positive term first ("a no-op", "unchanged"), then verb negation when the negation is the point',
+    compute: (text) => {
+      const stripped = stripCode(text);
+      const noForm = noNegationHits(stripped).count;
+      const notForm = notNegationHits(stripped).count;
+      if (noForm + notForm === 0) return 0;
+      return noForm / (noForm + notForm);
+    },
+    format: (rate) => rate.toFixed(2),
+    isFraction: true,
+  },
+  {
+    id: "negation_rate",
+    label: "Negation (no-form and not-form per 1k)",
+    provenance: "skill-prescribed",
+    source:
+      'SKILL.md Word Choice: name the positive term first ("a no-op", "unchanged"), then verb negation when the negation is the point',
+    compute: (text) => {
+      const stripped = stripCode(text);
+      const words = strippedWordCount(stripped);
+      return per1k(noNegationHits(stripped).count + notNegationHits(stripped).count, words);
+    },
   },
   {
     id: "negative_contrast_rate",

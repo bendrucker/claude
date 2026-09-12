@@ -36,6 +36,8 @@ describe("VOICE_DELTA_FEATURES", () => {
       "action_verb_opener_rate",
       "backtick_density",
       "heading_rate",
+      "negation_rate",
+      "no_negation_share",
       "template_presence",
       "unique_heading_variety",
     ]);
@@ -233,6 +235,44 @@ describe("negative_contrast_rate", () => {
 
   test("returns 0 on prose without contrast constructions", () => {
     expect(compute("The loader refetches the row and writes it to the cache.")).toBe(0);
+  });
+});
+
+describe("no_negation_share", () => {
+  const compute = feature("no_negation_share").compute;
+
+  test("scores near 1 on a no-form paragraph", () => {
+    const text =
+      "The wrapper adds nothing to the default path. The audit found no defects. The retry holds no lock.";
+    expect(compute(text)).toBe(1);
+  });
+
+  test("scores near 0 on a not-form paragraph", () => {
+    const text =
+      "The wrapper doesn't add anything to the default path. The audit did not find any defects. The retry does not hold either lock.";
+    expect(compute(text)).toBe(0);
+  });
+
+  test("scores 0 on predication the baseline writes in the no-form", () => {
+    const text = "The build has no tests. There is no lock on the guard.";
+    expect(compute(text)).toBe(0);
+  });
+});
+
+describe("negation_rate", () => {
+  const compute = feature("negation_rate").compute;
+
+  test("counts both forms per 1k words", () => {
+    // 16 words, 2 constructions.
+    const text =
+      "The wrapper adds nothing, and the audit doesn't find anything worth a second run.";
+    const words = text.split(/\s+/).length;
+    expect(compute(text)).toBeCloseTo((2 / words) * 1000, 5);
+  });
+
+  test("scores 0 on a positive-frame rewrite", () => {
+    const text = "The wrapper is a no-op on the default path. The guard stays unchanged.";
+    expect(compute(text)).toBe(0);
   });
 });
 

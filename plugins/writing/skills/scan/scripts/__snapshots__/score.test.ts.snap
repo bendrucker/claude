@@ -29,6 +29,10 @@ exports[`renderVoiceDeltaTable rate, baseline, and delta columns for in-register
 ╟─────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
 ║ Subordinate:coordinate clause ratio                     │ ungoverned       │ 0.00  │ (no stat) │ -      ║
 ╟─────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ No-negation share (no-form of all negated indefinites)  │ skill-prescribed │ 0.00  │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
+║ Negation (no-form and not-form per 1k)                  │ skill-prescribed │ 0.00  │ (no stat) │ -      ║
+╟─────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────╢
 ║ Negative contrast (rather than/instead of/never per 1k) │ ungoverned       │ 0.00  │ (no stat) │ -      ║
 ╚═════════════════════════════════════════════════════════╧══════════════════╧═══════╧═══════════╧════════╝"
 `;
@@ -64,6 +68,10 @@ Register check: skipping baseline comparison (too short (1 sentence(s); need 3+)
 ╟─────────────────────────────────────────────────────────┼──────────────────┼──────╢
 ║ Subordinate:coordinate clause ratio                     │ ungoverned       │ 0.00 ║
 ╟─────────────────────────────────────────────────────────┼──────────────────┼──────╢
+║ No-negation share (no-form of all negated indefinites)  │ skill-prescribed │ 0.00 ║
+╟─────────────────────────────────────────────────────────┼──────────────────┼──────╢
+║ Negation (no-form and not-form per 1k)                  │ skill-prescribed │ 0.00 ║
+╟─────────────────────────────────────────────────────────┼──────────────────┼──────╢
 ║ Negative contrast (rather than/instead of/never per 1k) │ ungoverned       │ 0.00 ║
 ╚═════════════════════════════════════════════════════════╧══════════════════╧══════╝"
 `;
@@ -98,6 +106,10 @@ No baseline loaded. Run ingest-voice.ts then voice-profile.ts to build one.
 ║ Consequence chains (, so <det>) per 1k words            │ ungoverned       │ 0.00  ║
 ╟─────────────────────────────────────────────────────────┼──────────────────┼───────╢
 ║ Subordinate:coordinate clause ratio                     │ ungoverned       │ 0.00  ║
+╟─────────────────────────────────────────────────────────┼──────────────────┼───────╢
+║ No-negation share (no-form of all negated indefinites)  │ skill-prescribed │ 0.00  ║
+╟─────────────────────────────────────────────────────────┼──────────────────┼───────╢
+║ Negation (no-form and not-form per 1k)                  │ skill-prescribed │ 0.00  ║
 ╟─────────────────────────────────────────────────────────┼──────────────────┼───────╢
 ║ Negative contrast (rather than/instead of/never per 1k) │ ungoverned       │ 0.00  ║
 ╚═════════════════════════════════════════════════════════╧══════════════════╧═══════╝"

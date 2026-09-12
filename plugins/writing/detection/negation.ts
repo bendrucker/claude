@@ -1,6 +1,14 @@
-// No-negation (Tottie, Negation in English Speech and Writing, 1991): the negation rides on a negative indefinite in object position ("carries no weight") where English would otherwise put it on the verb ("doesn't carry weight"). The governing verbs are an open set that shifts by model generation, so this keys on the grammar and excludes the cases human writing prefers in the no-form.
+// No-negation (Tottie, Negation in English Speech and Writing, 1991): the
+// negation rides on a negative indefinite in object position ("carries no
+// weight") where English would otherwise put it on the verb ("doesn't carry
+// weight"). The governing verbs are an open set that shifts by model
+// generation, so this keys on the grammar and excludes the cases human writing
+// prefers in the no-form.
 //
-// Callers pass code-stripped text. collectMatches (tropes.ts) and scanAll (scan.ts) both run stripCode before invoking a pattern's test, and score.ts strips before its custom matcher, so importing stripCode here would only add a circular edge.
+// Callers pass code-stripped text. collectMatches (tropes.ts) and scanAll
+// (scan.ts) both run stripCode before invoking a pattern's test, and score.ts
+// strips before its custom matcher, so importing stripCode here would only add
+// a circular edge.
 
 import { COPULA_FORMS } from "../linguistics/tags";
 import { splitSentences } from "./sentences";

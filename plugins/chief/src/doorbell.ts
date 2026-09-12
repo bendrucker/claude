@@ -1,7 +1,7 @@
-export interface SpawnResult {
-  status: string;
-  [key: string]: unknown;
-}
+import { z } from "zod";
+
+const SpawnResult = z.looseObject({ status: z.string() });
+export type SpawnResult = z.infer<typeof SpawnResult>;
 
 export type Spawn = (agent: string, text: string) => Promise<SpawnResult>;
 export type Sleep = (ms: number) => Promise<void>;
@@ -17,7 +17,7 @@ async function herdrSpawn(agent: string, text: string): Promise<SpawnResult> {
   const proc = Bun.spawn(["herdr", "agent", "prompt", agent, text], { stdout: "pipe" });
   const output = await new Response(proc.stdout).text();
   await proc.exited;
-  return JSON.parse(output) as SpawnResult;
+  return SpawnResult.parse(JSON.parse(output));
 }
 
 async function retry(

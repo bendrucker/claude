@@ -1,7 +1,12 @@
 const RELEASE_INTERVAL_MS = 60_000;
 const FLOCK_INTERVAL_MS = 20 * 60_000;
 
-export type Schedule = (fn: () => void, ms: number) => Timer;
+export type Schedule = (fn: () => void, ms: number) => () => void;
+
+const REAL_SCHEDULE: Schedule = (fn, ms) => {
+  const id = setInterval(fn, ms);
+  return () => clearInterval(id);
+};
 
 export interface TimersDeps {
   releaseCheck: () => void | Promise<void>;
@@ -27,20 +32,20 @@ export function isWorkHours(now: Date, workHours: [string, string]): boolean {
 
 export function start(deps: TimersDeps): TimersHandle {
   const now = deps.now ?? (() => new Date());
-  const schedule = deps.schedule ?? ((fn, ms) => setInterval(fn, ms));
+  const schedule = deps.schedule ?? REAL_SCHEDULE;
 
-  const releaseTimer = schedule(() => {
+  const cancelRelease = schedule(() => {
     void deps.releaseCheck();
   }, RELEASE_INTERVAL_MS);
 
-  const flockTimer = schedule(() => {
+  const cancelFlock = schedule(() => {
     if (isWorkHours(now(), deps.workHours)) void deps.flockTick();
   }, FLOCK_INTERVAL_MS);
 
   return {
     stop: () => {
-      clearInterval(releaseTimer);
-      clearInterval(flockTimer);
+      cancelRelease();
+      cancelFlock();
     },
   };
 }

@@ -52,8 +52,8 @@ test("transition appends a superseding row", async () => {
   expect((await read(PATH)).get(next.id)).toEqual(next);
 });
 
-test("transition rejects an unknown id", async () => {
-  await expect(transition("claude-hook:missing", { state: "acked" }, PATH)).rejects.toThrow(
+test("transition rejects an unknown id", () => {
+  expect(transition("claude-hook:missing", { state: "acked" }, PATH)).rejects.toThrow(
     "no ledger row for id: claude-hook:missing",
   );
 });
@@ -91,9 +91,9 @@ describe("hold", () => {
     expect(held.releaseAt).toBe("2026-02-01T00:00:00.000Z");
   });
 
-  test("requires `for` or `until`", async () => {
+  test("requires `for` or `until`", () => {
     append(row(), PATH);
-    await expect(hold("claude-hook:s1:idle_prompt", {}, PATH)).rejects.toThrow(
+    expect(hold("claude-hook:s1:idle_prompt", {}, PATH)).rejects.toThrow(
       "hold requires `for` or `until`",
     );
   });

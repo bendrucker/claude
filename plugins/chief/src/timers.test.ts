@@ -12,14 +12,10 @@ test.each([
   expect(isWorkHours(now, ["09:00", "18:00"])).toBe(expected);
 });
 
-test("schedules a release check every tick and clears both timers on stop", () => {
+test("schedules a release check every tick and cancels both timers on stop", () => {
   const scheduled: { fn: () => void; ms: number }[] = [];
-  const cleared: unknown[] = [];
+  const canceled: number[] = [];
   let calls = 0;
-
-  const fakeClear = ((id: unknown) => {
-    cleared.push(id);
-  }) as typeof clearInterval;
 
   const handle = start({
     releaseCheck: () => {
@@ -31,8 +27,9 @@ test("schedules a release check every tick and clears both timers on stop", () =
     workHours: ["09:00", "18:00"],
     now: () => new Date(2026, 0, 1, 12, 0),
     schedule: (fn, ms) => {
+      const index = scheduled.length;
       scheduled.push({ fn, ms });
-      return scheduled.length as unknown as Timer;
+      return () => canceled.push(index);
     },
   });
 
@@ -41,11 +38,8 @@ test("schedules a release check every tick and clears both timers on stop", () =
   scheduled[1]?.fn();
   expect(calls).toBe(2);
 
-  const originalClearInterval = globalThis.clearInterval;
-  globalThis.clearInterval = fakeClear;
   handle.stop();
-  globalThis.clearInterval = originalClearInterval;
-  expect(cleared).toEqual([1, 2]);
+  expect(canceled).toEqual([0, 1]);
 });
 
 test("skips the /flock tick outside work hours", () => {
@@ -61,7 +55,7 @@ test("skips the /flock tick outside work hours", () => {
     now: () => new Date(2026, 0, 1, 20, 0),
     schedule: (fn) => {
       scheduled.push(fn);
-      return 0 as unknown as Timer;
+      return () => {};
     },
   });
 

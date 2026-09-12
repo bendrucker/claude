@@ -36,7 +36,9 @@ function topOfNextHour(now: Date): Date {
 
 export function nextBoundary(now: Date, presence: Presence): Date {
   const candidates = [topOfNextHour(now)];
-  if (presence.busyUntil) candidates.push(new Date(presence.busyUntil));
+  if (presence.busyUntil != null && presence.busyUntil !== "") {
+    candidates.push(new Date(presence.busyUntil));
+  }
   return candidates.reduce((earliest, candidate) => (candidate < earliest ? candidate : earliest));
 }
 

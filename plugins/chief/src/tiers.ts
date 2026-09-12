@@ -36,7 +36,7 @@ export interface TierResult {
 
 function commandOf(toolInput: unknown): string {
   if (typeof toolInput !== "object" || toolInput === null || !("command" in toolInput)) return "";
-  const { command } = toolInput as { command: unknown };
+  const { command } = toolInput;
   return typeof command === "string" ? command : "";
 }
 
@@ -83,5 +83,7 @@ export function tier(event: Event): TierResult | null {
       return result("stop");
     case "dispatch":
       return result("dispatch");
+    default:
+      return null;
   }
 }

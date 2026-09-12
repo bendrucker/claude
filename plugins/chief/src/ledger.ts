@@ -4,10 +4,27 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { z } from "zod";
 import { nextBoundary, nextDigest, parseDuration } from "./release";
 import type { LedgerRow, Presence } from "./types";
 
 export const LEDGER_PATH = join(homedir(), ".local", "state", "chief", "ledger.jsonl");
+
+const LedgerRowSchema = z.object({
+  id: z.string(),
+  key: z.string(),
+  ts: z.string(),
+  source: z.enum(["claude-hook", "herdr", "phone", "manual"]),
+  kind: z.string(),
+  title: z.string(),
+  session: z.string().optional(),
+  pane: z.string().optional(),
+  tier: z.enum(["now", "boundary", "digest"]),
+  releaseAt: z.string(),
+  state: z.enum(["open", "held", "pushed", "acked", "resolved", "dropped"]),
+  reason: z.string(),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
 
 const STUB_PRESENCE: Presence = {
   focus: null,
@@ -31,7 +48,7 @@ export async function read(path: string = LEDGER_PATH): Promise<Map<string, Ledg
     if (line.trim() === "") continue;
     let row: LedgerRow;
     try {
-      row = JSON.parse(line) as LedgerRow;
+      row = LedgerRowSchema.parse(JSON.parse(line));
     } catch {
       continue;
     }
@@ -55,7 +72,7 @@ export async function transition(
 
 export interface HoldInput {
   for?: string;
-  until?: "boundary" | "digest" | string;
+  until?: string;
 }
 
 export interface HoldContext {
@@ -75,22 +92,32 @@ export async function hold(
 }
 
 function holdReleaseAt(input: HoldInput, now: Date, ctx: HoldContext): string {
-  if (input.for) return new Date(now.getTime() + parseDuration(input.for)).toISOString();
+  if (input.for != null && input.for !== "") {
+    return new Date(now.getTime() + parseDuration(input.for)).toISOString();
+  }
   if (input.until === "boundary") {
     return nextBoundary(now, ctx.presence ?? STUB_PRESENCE).toISOString();
   }
   if (input.until === "digest") {
     return nextDigest(now, { workHours: ctx.workHours ?? DEFAULT_WORK_HOURS }).toISOString();
   }
-  if (input.until) return input.until;
+  if (input.until != null && input.until !== "") return input.until;
   throw new Error("hold requires `for` or `until`");
 }
 
-export function drop(id: string, path: string = LEDGER_PATH, now: Date = new Date()): Promise<LedgerRow> {
+export function drop(
+  id: string,
+  path: string = LEDGER_PATH,
+  now: Date = new Date(),
+): Promise<LedgerRow> {
   return transition(id, { state: "dropped" }, path, now);
 }
 
-export function ack(id: string, path: string = LEDGER_PATH, now: Date = new Date()): Promise<LedgerRow> {
+export function ack(
+  id: string,
+  path: string = LEDGER_PATH,
+  now: Date = new Date(),
+): Promise<LedgerRow> {
   return transition(id, { state: "acked" }, path, now);
 }
 

@@ -1,17 +1,19 @@
+import { z } from "zod";
 import { append, LEDGER_PATH, read, transition } from "./ledger";
 import { nextBoundary, nextDigest, parseDuration } from "./release";
 import { tier, type Event, type ReleaseRule } from "./tiers";
 import type { LedgerRow, Presence } from "./types";
 
-export interface HookPayload {
-  hook_event_name: string;
-  session_id: string;
-  notification_type?: string;
-  message?: string;
-  tool_name?: string;
-  tool_input?: unknown;
-  cwd?: string;
-}
+const HookPayloadSchema = z.object({
+  hook_event_name: z.string(),
+  session_id: z.string(),
+  notification_type: z.string().optional(),
+  message: z.string().optional(),
+  tool_name: z.string().optional(),
+  tool_input: z.unknown().optional(),
+  cwd: z.string().optional(),
+});
+export type HookPayload = z.infer<typeof HookPayloadSchema>;
 
 export interface HerdrAgent {
   pane: string;
@@ -89,6 +91,8 @@ function releaseAtFor(
       return nextBoundary(now, presence).toISOString();
     case "digest":
       return nextDigest(now, { workHours }).toISOString();
+    default:
+      return now.toISOString();
   }
 }
 
@@ -152,8 +156,8 @@ export async function ingest(payload: HookPayload, deps: IngestDeps): Promise<Le
     ),
     state: "open",
     reason: result.reason,
-    ...(payload.cwd ? { payload: { cwd: payload.cwd } } : {}),
   };
+  if (payload.cwd != null && payload.cwd !== "") row.payload = { cwd: payload.cwd };
   append(row, ledgerPath);
   return row;
 }
@@ -164,7 +168,7 @@ async function drainLines(lines: string[], deps: IngestDeps, count: number): Pro
 
   let payload: HookPayload | undefined;
   try {
-    payload = JSON.parse(line) as HookPayload;
+    payload = HookPayloadSchema.parse(JSON.parse(line));
   } catch {
     payload = undefined;
   }

@@ -4,15 +4,17 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { z } from "zod";
 
 export const DECISIONS_PATH = join(homedir(), ".local", "state", "chief", "decisions.jsonl");
 
-export interface Decision {
-  ts: string;
-  id: string;
-  note: string;
-  by: string;
-}
+const Decision = z.object({
+  ts: z.string(),
+  id: z.string(),
+  note: z.string(),
+  by: z.string(),
+});
+export type Decision = z.infer<typeof Decision>;
 
 export function append(decision: Decision, path: string = DECISIONS_PATH): void {
   mkdirSync(dirname(path), { recursive: true });
@@ -25,11 +27,14 @@ export async function wasDecided(id: string, path: string = DECISIONS_PATH): Pro
 
   for (const line of (await file.text()).split("\n")) {
     if (line.trim() === "") continue;
+    let json: unknown;
     try {
-      if ((JSON.parse(line) as Decision).id === id) return true;
+      json = JSON.parse(line);
     } catch {
       continue;
     }
+    const parsed = Decision.safeParse(json);
+    if (parsed.success && parsed.data.id === id) return true;
   }
   return false;
 }

@@ -8,12 +8,14 @@ import {
   FINITE_COPULAS,
   type TaggedSentence,
   type TaggedToken,
+  type Tense,
 } from "./tags";
 
 const CompromiseTerm = z.looseObject({
   text: z.string().catch(""),
   normal: z.string().optional().catch(undefined),
   tags: z.array(z.string()).optional().catch(undefined),
+  offset: z.object({ start: z.number(), length: z.number() }).optional().catch(undefined),
 });
 type CompromiseTerm = z.infer<typeof CompromiseTerm>;
 
@@ -61,16 +63,27 @@ function mapTerm(term: CompromiseTerm): Pick<TaggedToken, "tag" | "finite"> {
   return { tag, finite: false };
 }
 
+function tenseOf(tags: string[]): Tense | undefined {
+  if (tags.includes("PastTense")) return "past";
+  if (tags.includes("PresentTense")) return "present";
+  return undefined;
+}
+
 export const compromiseTagger: Tagger = {
   name: "compromise",
   tag(text: string): TaggedSentence[] {
-    const sentences = CompromiseSentences.parse(nlp(text).json());
+    const sentences = CompromiseSentences.parse(nlp(text).json({ offset: true }));
     return sentences.map((sentence) => ({
       text: sentence.text,
       tokens: sentence.terms.map((term) => ({
         text: term.text,
         normal: (term.normal ?? term.text).toLowerCase(),
         fine: term.tags ?? [],
+        tense: tenseOf(term.tags ?? []),
+        span:
+          term.offset === undefined
+            ? undefined
+            : { start: term.offset.start, end: term.offset.start + term.offset.length },
         ...mapTerm(term),
       })),
     }));

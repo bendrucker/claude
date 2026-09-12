@@ -11,7 +11,7 @@ Writing style enforcement and slop detection for prose output (PR descriptions, 
 
 ## Wordlists
 
-Word-list trope patterns live as line-delimited files under [`wordlists/`](wordlists/).
+Word-list trope patterns live as line-delimited files under [`wordlists/`](wordlists/). The `negation/` subdirectory holds the closed grammatical classes the no-negation detector reads (predication verbs, idiom heads, nonassertive forms, clause openers), which the analyze audit does not treat as trope candidates.
 
 #### Stemmed Wordlists
 

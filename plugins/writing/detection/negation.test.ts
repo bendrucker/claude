@@ -1,16 +1,29 @@
 import { describe, expect, it } from "bun:test";
 import * as fc from "fast-check";
-import {
-  CLOSED_CLASS_GOVERNORS,
-  NO_NEGATION_PATTERN,
-  noNegationHits,
-  noNegationSpans,
-  notNegationHits,
-  PREDICATION_GOVERNORS,
-} from "./negation";
+import { NO_NEGATION_PATTERN, noNegationHits, noNegationSpans, notNegationHits } from "./negation";
 import { scanAll } from "./scan";
+import { WORDLISTS } from "./wordlists";
 
 // Every sentence here is invented. None is quoted from a session or a corpus.
+
+// One word per closed class the tagger reports, plus the predication list.
+const EXCLUDED_GOVERNORS = [
+  "the",
+  "it",
+  "which",
+  "of",
+  "with",
+  "and",
+  "but",
+  "can",
+  "would",
+  "is",
+  "almost",
+  "practically",
+  "not",
+  "two",
+  ...WORDLISTS.negation.predication,
+];
 
 describe("noNegationHits", () => {
   const flag = [
@@ -93,12 +106,9 @@ describe("noNegationHits", () => {
   });
 
   it("never flags an excluded governing word", () => {
-    const governors = [...CLOSED_CLASS_GOVERNORS, ...PREDICATION_GOVERNORS].filter((word) =>
-      /^[a-z]+$/.test(word),
-    );
     fc.assert(
       fc.property(
-        fc.constantFrom(...governors),
+        fc.constantFrom(...EXCLUDED_GOVERNORS),
         fc.constantFrom("no", "none", "nothing", "nobody", "nowhere", "neither", "no one"),
         fc.constantFrom("controls", "trace", "flag", "entry", "call"),
         (governor, indefinite, head) => {

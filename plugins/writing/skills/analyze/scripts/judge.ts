@@ -7,8 +7,8 @@ import type { DeliverableRow } from "./dump";
 /**
  * Meaning-layer LLM judge (issue #791). Batch-only: this module is imported by
  * the analyze skill's scripts and the judge runner, never by hooks. Hooks stay
- * deterministic; the wall is the same one that keeps tagger adapters out of
- * `hooks/` (see linguistics.md "Modules").
+ * deterministic; the wall is the same one that keeps the `natural` adapter
+ * out of `hooks/` (see linguistics.md "Modules").
  *
  * The rule is the prompt: `resources/judge/prompt.md` is a committed, versioned
  * artifact. Every audit and every reproducibility tuple records its sha256, so

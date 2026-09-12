@@ -36,8 +36,19 @@ export interface TaggedToken {
    * gerunds, and participles are not.
    */
   finite: boolean;
+  /** Tense of a verb form, when the tagger marks one. */
+  tense?: Tense | undefined;
+  /** Character offsets into the tagged text, when the adapter reports them. */
+  span?: TokenSpan | undefined;
   /** Native tagger tags, for evidence strings and debugging. */
   fine: string[];
+}
+
+export type Tense = "past" | "present";
+
+export interface TokenSpan {
+  start: number;
+  end: number;
 }
 
 export interface TaggedSentence {

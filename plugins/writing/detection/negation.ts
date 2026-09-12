@@ -2,383 +2,80 @@
 // negation rides on a negative indefinite in object position ("carries no
 // weight") where English would otherwise put it on the verb ("doesn't carry
 // weight"). The governing verbs are an open set that shifts by model
-// generation, so this keys on the grammar and excludes the cases human writing
-// prefers in the no-form.
+// generation, so this keys on the grammar. The tagger supplies the word
+// classes, and the closed residue it cannot read (predication verbs, idiom
+// heads, the not-form's nonassertive forms and clause openers) lives in
+// wordlists/negation/.
 //
 // Callers pass code-stripped text. collectMatches (tropes.ts) and scanAll
 // (scan.ts) both run stripCode before invoking a pattern's test, and score.ts
 // strips before its custom matcher, so importing stripCode here would only add
 // a circular edge.
 
-import { COPULA_FORMS } from "../linguistics/tags";
+import { compromiseTagger } from "../linguistics/compromise";
+import type { CoarseTag, TaggedToken } from "../linguistics/tags";
 import { splitSentences } from "./sentences";
 import type { PatternDef, PatternSpan } from "./tropes";
-import type { Hits } from "./wordlists";
+import { type Hits, WORDLISTS } from "./wordlists";
 
-// "no one" is one indefinite, so it precedes the bare "no" alternative. A
-// hyphen marks the positive term the message asks for ("a no-op"), not a
-// negated object.
-const INDEFINITE = /\b(?:no\s+one(?![\w-])|nothing|nobody|nowhere|none|neither|no(?!-))\b/gi;
-const GOVERNING_WORD = /([A-Za-z]+(?:['’][A-Za-z]+)?)\s*$/;
-const FOLLOWING_WORDS =
-  /^(\s+[A-Za-z][A-Za-z'’-]*)(?:\s+([A-Za-z][A-Za-z'’-]*))?(?:\s+([A-Za-z][A-Za-z'’-]*))?(?:\s+([A-Za-z][A-Za-z'’-]*))?/;
+const INDEFINITES = new Set(["no", "none", "nothing", "nobody", "nowhere", "neither"]);
 // "no" and "neither" determine a noun, so the head word completes the window.
-const DETERMINER_INDEFINITE = /^(?:no|neither)$/i;
-
-/** Tottie's exception: `be` and `have` take the no-form in plain predication ("has no tests", "there is no lock"). */
-export const PREDICATION_GOVERNORS = new Set([
-  ...COPULA_FORMS,
-  "has",
-  "have",
-  "had",
-  "having",
-  "there",
-]);
+const DETERMINERS = new Set(["no", "neither"]);
 
 /** Closed classes take no object, so an indefinite after one is a quantified phrase or the next clause, never a negated object. */
-export const CLOSED_CLASS_GOVERNORS = new Set([
-  "a",
-  "an",
-  "the",
-  "this",
-  "that",
-  "these",
-  "those",
-  "each",
-  "every",
-  "all",
-  "some",
-  "both",
-  "any",
-  "another",
-  "other",
-  "such",
-  "few",
-  "many",
-  "much",
-  "most",
-  "several",
-  "its",
-  "their",
-  "his",
-  "her",
-  "our",
-  "my",
-  "your",
-  "i",
-  "you",
-  "he",
-  "she",
-  "it",
-  "we",
-  "they",
-  "me",
-  "him",
-  "us",
-  "them",
-  "who",
-  "whom",
-  "whose",
-  "which",
-  "what",
-  "here",
-  "itself",
-  "themselves",
-  "of",
-  "in",
-  "on",
-  "at",
-  "by",
-  "for",
-  "with",
-  "from",
-  "to",
-  "into",
-  "onto",
-  "over",
-  "under",
-  "above",
-  "below",
-  "about",
-  "across",
-  "after",
-  "before",
-  "between",
-  "through",
-  "during",
-  "without",
-  "within",
-  "against",
-  "among",
-  "beyond",
-  "besides",
-  "despite",
-  "per",
-  "via",
-  "than",
-  "like",
-  "upon",
-  "toward",
-  "towards",
-  "off",
-  "out",
-  "up",
-  "down",
-  "near",
-  "past",
-  "around",
-  "along",
-  "behind",
-  "beside",
-  "and",
-  "or",
-  "but",
-  "nor",
-  "so",
-  "because",
-  "since",
-  "although",
-  "whether",
-  "if",
-  "though",
-  "while",
-  "whereas",
-  "unless",
-  "until",
-  "when",
-  "whenever",
-  "where",
-  "wherever",
-  "if",
-  "as",
-  "whether",
-  "not",
-  "why",
-  "how",
-  "versus",
-  "vs",
-  "once",
-  "however",
-  "therefore",
-  "thus",
-  "hence",
-  "plus",
-  "can",
-  "could",
-  "will",
-  "would",
-  "shall",
-  "should",
-  "may",
-  "might",
-  "must",
-  "ought",
-  "almost",
-  "nearly",
-  "virtually",
-  "still",
-  "yet",
-  "just",
-  "only",
-  "even",
-  "also",
-  "now",
-  "otherwise",
-  "quite",
-  "rather",
-  "very",
-  "too",
-  "again",
-  "ever",
-  "perhaps",
-  "maybe",
-  "indeed",
-  "instead",
-  "else",
-  "alone",
+const CLOSED_CLASSES: ReadonlySet<CoarseTag> = new Set([
+  "DET",
+  "PRON",
+  "ADP",
+  "CONJ",
+  "AUX",
+  "COPULA",
+  "ADV",
+  "PART",
+  "NUM",
+  "PUNCT",
+  "CODE",
 ]);
+/** Tags that premodify the noun a determiner opens ("no other instance"). */
+const PREMODIFIERS: ReadonlySet<CoarseTag> = new Set(["ADJ", "ADV", "NUM"]);
+/** Tags that sit between a bare indefinite and its verb ("nothing else moves", "nothing ever landed"). */
+const SUBJECT_MODIFIERS: ReadonlySet<CoarseTag> = new Set(["ADV", "DET"]);
 
-/** Assurance verbs take a clause complement ("confirmed no importer exists"), whose subject is the indefinite. */
-export const CLAUSE_GOVERNORS = new Set([
-  "confirm",
-  "confirms",
-  "confirmed",
-  "confirming",
-  "verify",
-  "verifies",
-  "verified",
-  "verifying",
-  "ensure",
-  "ensures",
-  "ensured",
-  "ensuring",
-  "assert",
-  "asserts",
-  "asserted",
-  "asserting",
-  "guarantee",
-  "guarantees",
-  "guaranteed",
-  "sure",
-]);
-
-/** `no` in front of one of these heads an adverbial idiom, not a negated object. */
-export const IDIOM_HEADS = new Set([
-  "longer",
-  "more",
-  "further",
-  "less",
-  "fewer",
-  "later",
-  "sooner",
-  "doubt",
-  "matter",
-  "way",
-  "wonder",
-  "different",
-  "better",
-  "worse",
-  "greater",
-  "bigger",
-  "smaller",
-  "larger",
-  "shorter",
-  "faster",
-  "slower",
-  "higher",
-  "lower",
-  "closer",
-  "earlier",
-  "wider",
-  "narrower",
-  "easier",
-  "harder",
-  "cheaper",
-  "safer",
-  "stronger",
-  "weaker",
-]);
-
-/** Adverbs are open but suffixed, so the shape stands in for listing them. */
-const ADVERB_SUFFIX = /ly$/;
-
-/** A finite verb or auxiliary right after a bare indefinite makes it the subject of an embedded clause ("means nothing is archived", "work nobody performs"), which is obligatory no-negation. */
-const AUXILIARIES = new Set([
-  ...COPULA_FORMS,
-  "has",
-  "have",
-  "had",
-  "do",
-  "does",
-  "did",
-  "can",
-  "could",
-  "will",
-  "would",
-  "shall",
-  "should",
-  "may",
-  "might",
-  "must",
-]);
-// -s and -ed are the finite verb shapes. Adjectives share the -s ending only
-// through -ous, -ss, -us, and -is, and closed-class words ("as", "thus") are
-// checked by the set instead of the shape.
-const FINITE_VERB_SHAPE = /(?:[^osui]s|ed)$/i;
-const PAST_VERB_SHAPE = /ed$/i;
-
-// Adverbs sit between a subject and its verb ("nothing else does", "nothing
-// ever landed"), so the clause test reads past them.
-const SUBJECT_ADVERBS = new Set(["else", "ever", "never", "still", "yet", "even", "also", "just"]);
-const IRREGULAR_PAST = new Set([
-  "became",
-  "began",
-  "broke",
-  "brought",
-  "built",
-  "came",
-  "caught",
-  "chose",
-  "drew",
-  "drove",
-  "fell",
-  "felt",
-  "found",
-  "gave",
-  "got",
-  "grew",
-  "held",
-  "hit",
-  "kept",
-  "knew",
-  "led",
-  "left",
-  "lost",
-  "made",
-  "meant",
-  "met",
-  "paid",
-  "put",
-  "ran",
-  "read",
-  "rose",
-  "said",
-  "sat",
-  "saw",
-  "sent",
-  "set",
-  "shook",
-  "spent",
-  "split",
-  "spread",
-  "stood",
-  "struck",
-  "stuck",
-  "swept",
-  "taught",
-  "thought",
-  "threw",
-  "told",
-  "took",
-  "understood",
-  "went",
-  "woke",
-  "won",
-  "wrote",
-]);
-
-function isAdverb(word: string): boolean {
-  return SUBJECT_ADVERBS.has(word) || ADVERB_SUFFIX.test(word);
+interface Located {
+  token: TaggedToken;
+  start: number;
+  end: number;
 }
 
-function opensClause(words: (string | undefined)[], bare: boolean): boolean {
-  const lowered = words.filter((word) => word !== undefined).map((word) => word.toLowerCase());
-  const at = lowered.findIndex((word) => !isAdverb(word));
-  if (at < 0) return false;
-  const next = lowered[at] ?? "";
-  if (AUXILIARIES.has(next)) return true;
-  if (CLOSED_CLASS_GOVERNORS.has(next)) return false;
-  if (bare) return IRREGULAR_PAST.has(next) || FINITE_VERB_SHAPE.test(next);
-  // After a determiner head only the past shape is safe: "no new dispositions"
-  // puts an -s noun after an adjective head, "no kind held" a verb. A past form
-  // that ends the sentence is a participle ("found no defects reported"), since
-  // a clause verb carries its own complement.
-  const past = IRREGULAR_PAST.has(next) || PAST_VERB_SHAPE.test(next);
-  return past && at < lowered.length - 1;
+/**
+ * The tokens of one sentence with their character offsets into it. The tagger
+ * splits hyphenated words, so the pieces are rejoined under the last piece's
+ * tag ("one-shot", "no-op"), which also keeps "no-" out of the indefinites.
+ */
+function locate(sentence: string): Located[] {
+  const located: Located[] = [];
+  for (const token of compromiseTagger.tag(sentence).flatMap((tagged) => tagged.tokens)) {
+    if (token.span === undefined) continue;
+    const previous = located.at(-1);
+    if (previous !== undefined && sentence.slice(previous.end, token.span.start) === "-") {
+      const text = sentence.slice(previous.start, token.span.end);
+      previous.token = { ...token, text, normal: text.toLowerCase() };
+      previous.end = token.span.end;
+      continue;
+    }
+    located.push({ token, ...token.span });
+  }
+  return located;
 }
 
-function isExcludedGovernor(word: string): boolean {
-  const lower = word.toLowerCase();
-  const base = lower.split(/['’]/)[0] ?? lower;
-  const clitic = lower.slice(base.length).replaceAll("’", "'");
+/** Whether only whitespace separates a token from the one before it. */
+function adjacent(sentence: string, tokens: Located[], at: number): boolean {
+  const previous = tokens[at - 1];
+  const current = tokens[at];
   return (
-    PREDICATION_GOVERNORS.has(lower) ||
-    PREDICATION_GOVERNORS.has(base) ||
-    COPULA_FORMS.has(clitic) ||
-    CLOSED_CLASS_GOVERNORS.has(lower) ||
-    CLOSED_CLASS_GOVERNORS.has(base) ||
-    CLAUSE_GOVERNORS.has(lower) ||
-    ADVERB_SUFFIX.test(lower)
+    previous !== undefined &&
+    current !== undefined &&
+    sentence.slice(previous.end, current.start).trim() === ""
   );
 }
 
@@ -386,30 +83,60 @@ function collapse(text: string): string {
   return text.replaceAll(/\s+/g, " ");
 }
 
+// A finite verb after the indefinite makes it the subject of an embedded
+// clause ("means nothing is archived", "a repo no bot reviews"), which is
+// obligatory no-negation. A determiner's noun phrase comes first: the head
+// word whatever its tag ("no added ranges" tags the participle as a verb),
+// further premodifiers, and one noun, since a second noun opens a relative
+// clause on the object ("no glyph anyone would notice"). A past form that ends
+// the phrase is a participle on that noun ("found no defects reported"), since
+// a clause verb carries its own complement.
+function opensClause(
+  sentence: string,
+  tokens: Located[],
+  from: number,
+  determiner: boolean,
+): boolean {
+  let at = from;
+  if (determiner) {
+    const headIsNoun = tokens[at]?.token.tag === "NOUN";
+    if (adjacent(sentence, tokens, at)) at++;
+    while (adjacent(sentence, tokens, at) && PREMODIFIERS.has(tokens[at]?.token.tag ?? "X")) at++;
+    if (!headIsNoun && adjacent(sentence, tokens, at) && tokens[at]?.token.tag === "NOUN") at++;
+  } else {
+    while (adjacent(sentence, tokens, at) && SUBJECT_MODIFIERS.has(tokens[at]?.token.tag ?? "X"))
+      at++;
+  }
+  const next = tokens[at];
+  if (next === undefined || !adjacent(sentence, tokens, at)) return false;
+  const { tag, finite, tense } = next.token;
+  if (tag === "AUX" || tag === "COPULA") return true;
+  if (!finite) return false;
+  return !(determiner && tense === "past" && !adjacent(sentence, tokens, at + 1));
+}
+
 function sentenceSpans(sentence: string): PatternSpan[] {
+  const tokens = locate(sentence);
   const spans: PatternSpan[] = [];
-  for (const match of sentence.matchAll(INDEFINITE)) {
-    const start = match.index;
-    const governor = GOVERNING_WORD.exec(sentence.slice(0, start));
+  for (const [at, indefinite] of tokens.entries()) {
+    if (!INDEFINITES.has(indefinite.token.normal)) continue;
+    const governor = tokens[at - 1];
     // Nothing governs a sentence-initial indefinite: subject position has no
     // not-negation counterpart, so it is obligatory rather than chosen.
-    if (governor === null) continue;
-    if (isExcludedGovernor(governor[1] ?? "")) continue;
+    if (governor === undefined) continue;
+    if (CLOSED_CLASSES.has(governor.token.tag)) continue;
+    if (WORDLISTS.negation.predication.has(governor.token.normal)) continue;
 
-    const following = FOLLOWING_WORDS.exec(sentence.slice(start + match[0].length));
-    const headToken = following?.[1] ?? "";
-    const head = headToken === "" ? undefined : headToken.trim();
-    const determiner = DETERMINER_INDEFINITE.test(match[0]);
-    if (determiner && IDIOM_HEADS.has((head ?? "").toLowerCase())) continue;
-    // A bare indefinite is the subject when a verb follows it. A determiner
-    // form is the subject when an auxiliary follows its head ("no gate would").
-    const afterIndefinite = determiner
-      ? [following?.[2], following?.[3], following?.[4]]
-      : [head, following?.[2], following?.[3], following?.[4]];
-    if (opensClause(afterIndefinite, !determiner)) continue;
+    const determiner = DETERMINERS.has(indefinite.token.normal);
+    const head = determiner && adjacent(sentence, tokens, at + 1) ? tokens[at + 1] : undefined;
+    if (head !== undefined && WORDLISTS.negation.idioms.has(head.token.normal)) continue;
+    if (opensClause(sentence, tokens, at + 1, determiner)) continue;
 
-    const end = start + match[0].length + (determiner ? headToken.length : 0);
-    spans.push({ index: governor.index, matched: collapse(sentence.slice(governor.index, end)) });
+    const last = head ?? indefinite;
+    spans.push({
+      index: governor.start,
+      matched: collapse(sentence.slice(governor.start, last.end)),
+    });
   }
   return spans;
 }
@@ -433,57 +160,54 @@ export function noNegationHits(text: string): Hits {
   return { count: spans.length, sample: spans[0]?.matched ?? "" };
 }
 
-const NOT_CUE = /\b(?:not|never|cannot)\b|n['’]t\b/gi;
-const WORD_TOKEN = /[A-Za-z]+(?:['’][A-Za-z]+)?/g;
-const NONASSERTIVE = new Set(["any", "anything", "anyone", "anywhere", "either"]);
 const NONASSERTIVE_WINDOW = 4;
-const CLAUSE_BREAK = /[,;:()[\]\u2013\u2014]/;
-const CLAUSE_CONJUNCTIONS = new Set([
-  "but",
-  "so",
-  "because",
-  "since",
-  "while",
-  "whereas",
-  "unless",
-  "although",
-  "whether",
-  "if",
-]);
-const PARENTHETICAL_ADVERB = /,\s*(?:[A-Za-z]+ly|however|though|then|yet|still|also|too)\s*,/gi;
+const CLAUSE_BREAK = /[,;:()[\]–—]/;
 
 /**
  * The not-negation counterpart, for the no:not ratio. A negated verb licenses
  * the nonassertive indefinite that follows it ("doesn't add anything"), so the
- * window runs forward from the cue and stops at the sentence edge.
+ * window runs forward from the negative particle and stops at a clause edge.
  */
 export function notNegationHits(text: string): Hits {
   const samples: string[] = [];
-  for (const raw of splitSentences(text)) {
-    const sentence = raw.replace(PARENTHETICAL_ADVERB, " ");
+  for (const sentence of splitSentences(text)) {
+    const tokens = locate(sentence);
     const claimed = new Set<number>();
-    for (const cue of sentence.matchAll(NOT_CUE)) {
-      const licensed = nonassertiveAfter(sentence, cue.index + cue[0].length);
+    for (const [at, cue] of tokens.entries()) {
+      if (cue.token.tag !== "PART") continue;
+      const licensed = nonassertiveAfter(sentence, tokens, at);
       if (licensed === undefined || claimed.has(licensed)) continue;
       claimed.add(licensed);
-      samples.push(collapse(sentence.slice(cue.index, licensed)));
+      // A contraction's negative half has no text of its own, so the sample
+      // starts at its host ("doesn't").
+      const from = cue.token.text === "" ? (tokens[at - 1]?.start ?? cue.start) : cue.start;
+      samples.push(collapse(sentence.slice(from, tokens[licensed]?.end ?? cue.end)));
     }
   }
   return { count: samples.length, sample: samples[0] ?? "" };
 }
 
-/** End offset of the first nonassertive indefinite within the window after `from`. */
-function nonassertiveAfter(sentence: string, from: number): number | undefined {
-  WORD_TOKEN.lastIndex = from;
-  let previousEnd = from;
-  for (let seen = 0; seen < NONASSERTIVE_WINDOW; seen++) {
-    const word = WORD_TOKEN.exec(sentence);
-    if (word === null || CLAUSE_BREAK.test(sentence.slice(previousEnd, word.index)))
-      return undefined;
-    const lowered = word[0].toLowerCase();
-    if (CLAUSE_CONJUNCTIONS.has(lowered)) return undefined;
-    if (NONASSERTIVE.has(lowered)) return word.index + word[0].length;
-    previousEnd = word.index + word[0].length;
+/** Index of the first nonassertive indefinite within the window after the cue at `cueAt`. */
+function nonassertiveAfter(sentence: string, tokens: Located[], cueAt: number): number | undefined {
+  let previousEnd = tokens[cueAt]?.end ?? 0;
+  let seen = 0;
+  for (let at = cueAt + 1; at < tokens.length && seen < NONASSERTIVE_WINDOW; at++) {
+    const current = tokens[at];
+    if (current === undefined) return undefined;
+    const before = sentence.slice(previousEnd, current.start);
+    const after = sentence.slice(current.end, tokens[at + 1]?.start ?? sentence.length);
+    // A comma-bounded word is a parenthetical ("doesn't, however, add"), not a
+    // clause edge.
+    if (before.includes(",") && after.includes(",")) {
+      previousEnd = tokens[at + 1]?.start ?? current.end;
+      continue;
+    }
+    if (CLAUSE_BREAK.test(before)) return undefined;
+    const { normal, tag } = current.token;
+    if (WORDLISTS.negation.nonassertive.has(normal)) return at;
+    if (tag === "PUNCT" || WORDLISTS.negation.clauseOpeners.has(normal)) return undefined;
+    previousEnd = current.end;
+    seen++;
   }
   return undefined;
 }
@@ -516,7 +240,7 @@ export const NO_NEGATION_PATTERN: PatternDef = {
     "The sweep skips work nobody performs twice.",
   ],
   evidence:
-    "2026-09 session-corpus measurement over PR bodies, Write/Edit content, commit messages, and chat. The raw rate does not separate assistant prose from the human baseline, because both carry ordinary predication (has no tests, there is no lock). The no:not ratio does: on shared verbs assistant chat picks the no-form 4.4:1 against the human's 2.7:1, PR bodies reach 10:1, and for cost, say, show, find, and report the not-form never appears. 43% of 1,768 PR bodies carry an instance, and code comments run 2.67 per 1000 words. have forms supply 46% of raw hits and are Tottie's (1991) be/have exception, so they are excluded along with the other closed classes. Both taggers mis-tag the governing verb on this construction, which is why the detector decides it by closed-class exclusion instead. Calibration on 400 uniform-random hits from assistant chat and Write/Edit content, labeled in four rounds of 100 with each round drawn after the fixes the previous round motivated: precision 0.87, 0.90, 0.90, then 0.97 (Wilson 95% 0.92 to 0.99) on the final round. A separate 50-hit draw from the user role was 35 parts relayed agent text, so the human comparison comes from the voice corpus. The residual false positive is a relative clause on the determiner form whose verb is irregular or -s (a repo no bot reviews), which needs the governor's part of speech. Of the true hits, a third have a ready positive term (a no-op, unchanged, empty), two thirds carry a negation that is the content and belongs on the verb.",
+    "2026-09 session-corpus measurement over PR bodies, Write/Edit content, commit messages, and chat. The raw rate does not separate assistant prose from the human baseline, because both carry ordinary predication (has no tests, there is no lock). The no:not ratio does: on shared verbs assistant chat picks the no-form 4.4:1 against the human's 2.7:1, PR bodies reach 10:1, and for cost, say, show, find, and report the not-form never appears. 43% of 1,768 PR bodies carry an instance, and code comments run 2.67 per 1000 words. have forms supply 46% of raw hits and are Tottie's (1991) be/have exception, so they are excluded along with the other closed classes. compromise mis-tags the governing verb on this construction (holds, leaves, and cost come back as nouns), so the detector excludes governors by closed-class tag instead of requiring a verb tag, and reads the clause test off the tags after the indefinite. Calibration on 400 uniform-random hits from assistant chat and Write/Edit content, labeled in four rounds of 100 with each round drawn after the fixes the previous round motivated, using the lexical rule this tag-based rule replaced: precision 0.87, 0.90, 0.90, then 0.97 (Wilson 95% 0.92 to 0.99) on the final round. Re-scored over all 400 labels, the tag-based rule matches the lexical one (precision 0.958 against 0.955, recall 0.995 for both) without its 200-entry closed-class list or its irregular-past list. A separate 50-hit draw from the user role was 35 parts relayed agent text, so the human comparison comes from the voice corpus. The residual false positives are a governing noun the tagger cannot tell from a verb (a stage nothing enqueues) and a clause verb cut off by a code span. Of the true hits, a third have a ready positive term (a no-op, unchanged, empty), two thirds carry a negation that is the content and belongs on the verb.",
   retire:
-    "Retire the pattern when the no_negation_share rate feature sits at the human voice baseline for a 30-day window. Add a governing word to CLOSED_CLASS_GOVERNORS when writing:scan shows it flagging the human baseline at the assistant's rate.",
+    "Retire the pattern when the no_negation_share rate feature sits at the human voice baseline for a 30-day window. Add a governing word to wordlists/negation/predication.txt when writing:scan shows it flagging the human baseline at the assistant's rate.",
 };

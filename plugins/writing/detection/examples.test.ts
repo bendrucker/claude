@@ -6,7 +6,7 @@ import { PATTERNS, type PatternDef } from "./tropes";
 // carries invented positives (must match) and negatives (must not match), so a
 // pattern edit that breaks its own examples fails here deterministically. This
 // generalizes the linguistics/fixtures.ts approach from headings to every rule.
-// Batch-only patterns (tagger-backed, never hook-loaded) face the same gate.
+// Batch-only patterns (uncalibrated for the hook) face the same gate.
 
 const ALL_PATTERNS: PatternDef[] = [...PATTERNS, ...BATCH_PATTERNS];
 

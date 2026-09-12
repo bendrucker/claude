@@ -1,0 +1,9 @@
+# Nonassertive indefinites a negated verb licenses ("doesn't add anything"),
+# the not-form counterpart to the no-form's negative indefinites. Read by
+# detection/negation.ts, not by the analyze audit.
+any
+anything
+anyone
+anybody
+anywhere
+either

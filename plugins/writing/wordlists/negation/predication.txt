@@ -1,0 +1,9 @@
+# Governing words that take the no-form in plain predication, Tottie's (1991)
+# be/have exception: "has no tests", "there is no lock". Copula forms come
+# from the tagger (COPULA); these are the forms it tags as nouns or leaves
+# untagged. Read by detection/negation.ts, not by the analyze audit.
+has
+have
+had
+having
+there

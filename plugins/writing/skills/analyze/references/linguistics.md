@@ -28,11 +28,11 @@ Hook promotion turns on interval width. A sample with few positives carries inte
 
 `plugins/writing/linguistics/` is importable by both `hooks/` and `skills/analyze/scripts/`:
 
-- `tags.ts`, `preprocess.ts`, `grammar.ts`, `heading.ts`: pure, no tagger imports, safe for hooks. `heading.ts` exports `classifyHeadingBaseline`, the heuristic the hook runs today.
-- `tagger.ts`, `compromise.ts`, `natural.ts`: adapters mapping each tagger to one coarse tag set, so grammar rules stay tagger-neutral.
+- `tags.ts`, `preprocess.ts`, `grammar.ts`, `heading.ts`: pure, no tagger imports. `heading.ts` exports `classifyHeadingBaseline`, the heuristic the hook runs today.
+- `tagger.ts`, `compromise.ts`, `natural.ts`: adapters mapping each tagger to one coarse tag set, so grammar rules stay tagger-neutral. `compromise.ts` is a runtime dependency and the hook loads it for the no-negation detector (`detection/negation.ts`), which costs the hook about 60 ms of import on a Write.
 - `classifiers.ts`: eval-only. It imports the tagger adapters, including `natural`, a devDependency the plugin cache omits.
 
-Hooks must never import a tagger adapter. The plugin cache skips devDependencies, so a hook importing one works locally and breaks for every install.
+Hooks must never import `natural` or `classifiers.ts`. The plugin cache skips devDependencies, so a hook importing one works locally and breaks for every install. A hook detector built on `compromise` still has to clear the hook bar above on a labeled sample before it ships there.
 
 ## Tagger Failures
 

@@ -1,7 +1,14 @@
 import natural from "natural";
 import { mapPenn } from "./penn";
 import type { Tagger } from "./tagger";
-import { CODE_SENTINEL, type TaggedSentence } from "./tags";
+import { CODE_SENTINEL, type TaggedSentence, type Tense } from "./tags";
+
+const PENN_TENSE: Record<string, Tense> = {
+  VBD: "past",
+  VBN: "past",
+  VBZ: "present",
+  VBP: "present",
+};
 
 const lexicon = new natural.Lexicon("EN", "NN", "NNP");
 const ruleSet = new natural.RuleSet("EN");
@@ -22,6 +29,7 @@ export const naturalTagger: Tagger = {
         text: tagged.token,
         normal,
         fine: [tagged.tag],
+        tense: PENN_TENSE[tagged.tag],
         tag,
         finite,
       };

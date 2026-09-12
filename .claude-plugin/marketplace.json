@@ -178,6 +178,11 @@
       "name": "atuin",
       "description": "Query local shell history from atuin: recent commands, usage stats, and ad-hoc SQL over the history db",
       "source": "./plugins/atuin"
+    },
+    {
+      "name": "chief",
+      "description": "Triage alerts from Claude sessions, herdr panes, and phone into a tiered ledger so only what needs you gets through",
+      "source": "./plugins/chief"
     }
   ]
 }

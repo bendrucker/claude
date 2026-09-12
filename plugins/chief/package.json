@@ -1,0 +1,13 @@
+{
+  "name": "@bendrucker/claude-chief",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "cleye": "^2.2.1",
+    "zod": "^4.4.3"
+  }
+}

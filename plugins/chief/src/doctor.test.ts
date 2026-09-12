@@ -142,7 +142,7 @@ test("checkActReachable skips (never fails) when the tailnet probe cannot succee
 
 test("checkHerdrAgent matches the configured agent name", async () => {
   const found = await checkHerdrAgent(CONFIG, () =>
-    Promise.resolve({ agents: [{ agent: "chief", pane: "%1" }] }),
+    Promise.resolve({ agents: [{ name: "chief", agent: "claude", pane_id: "%1" }] }),
   );
   expect(found).toEqual({ name: "herdr agent list", status: "pass" });
 
@@ -177,7 +177,7 @@ test("runDoctor aggregates every check in order", async () => {
     actBaseUrl: "http://act.x",
     configPath: CONFIG_PATH,
     fetchImpl: fakeFetch(() => new Response("{}", { status: 200 })),
-    listAgents: () => Promise.resolve({ agents: [{ agent: "chief" }] }),
+    listAgents: () => Promise.resolve({ agents: [{ name: "chief" }] }),
   });
 
   expect(checks.map((check) => `${check.status} ${check.name}`)).toEqual([

@@ -28,8 +28,9 @@ const ConfigSchema = z.object({
 export type Config = z.infer<typeof ConfigSchema>;
 
 const HerdrAgentSchema = z.looseObject({
+  name: z.string().optional(),
   agent: z.string().optional(),
-  pane: z.string().optional(),
+  pane_id: z.string().optional(),
 });
 const HerdrAgentListSchema = z.object({ agents: z.array(HerdrAgentSchema) });
 const HerdrListResponseSchema = z.union([
@@ -162,7 +163,7 @@ export async function checkHerdrAgent(
 
   try {
     const { agents } = await listAgents();
-    const found = agents.some((agent) => agent.agent === config.herdr.agent);
+    const found = agents.some((agent) => agent.name === config.herdr.agent);
     return found ? pass(name) : fail(name, `no agent named ${config.herdr.agent}`);
   } catch (error) {
     return fail(name, error instanceof Error ? error.message : String(error));

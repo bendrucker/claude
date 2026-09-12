@@ -21,7 +21,7 @@ import type { Hits } from "./wordlists";
 const INDEFINITE = /\b(?:no\s+one(?![\w-])|nothing|nobody|nowhere|none|neither|no(?!-))\b/gi;
 const GOVERNING_WORD = /([A-Za-z]+(?:['’][A-Za-z]+)?)\s*$/;
 const FOLLOWING_WORDS =
-  /^(\s+[A-Za-z][A-Za-z'’-]*)(?:\s+([A-Za-z][A-Za-z'’-]*))?(?:\s+([A-Za-z][A-Za-z'’-]*))?/;
+  /^(\s+[A-Za-z][A-Za-z'’-]*)(?:\s+([A-Za-z][A-Za-z'’-]*))?(?:\s+([A-Za-z][A-Za-z'’-]*))?(?:\s+([A-Za-z][A-Za-z'’-]*))?/;
 // "no" and "neither" determine a noun, so the head word completes the window.
 const DETERMINER_INDEFINITE = /^(?:no|neither)$/i;
 
@@ -81,7 +81,6 @@ export const CLOSED_CLASS_GOVERNORS = new Set([
   "whose",
   "which",
   "what",
-  "there",
   "here",
   "itself",
   "themselves",
@@ -354,14 +353,18 @@ function isAdverb(word: string): boolean {
 
 function opensClause(words: (string | undefined)[], bare: boolean): boolean {
   const lowered = words.filter((word) => word !== undefined).map((word) => word.toLowerCase());
-  const next = lowered.find((word) => !isAdverb(word));
-  if (next === undefined) return false;
+  const at = lowered.findIndex((word) => !isAdverb(word));
+  if (at < 0) return false;
+  const next = lowered[at] ?? "";
   if (AUXILIARIES.has(next)) return true;
   if (CLOSED_CLASS_GOVERNORS.has(next)) return false;
-  if (IRREGULAR_PAST.has(next)) return true;
+  if (bare) return IRREGULAR_PAST.has(next) || FINITE_VERB_SHAPE.test(next);
   // After a determiner head only the past shape is safe: "no new dispositions"
-  // puts an -s noun after an adjective head, "no kind held" a verb.
-  return bare ? FINITE_VERB_SHAPE.test(next) : PAST_VERB_SHAPE.test(next);
+  // puts an -s noun after an adjective head, "no kind held" a verb. A past form
+  // that ends the sentence is a participle ("found no defects reported"), since
+  // a clause verb carries its own complement.
+  const past = IRREGULAR_PAST.has(next) || PAST_VERB_SHAPE.test(next);
+  return past && at < lowered.length - 1;
 }
 
 function isExcludedGovernor(word: string): boolean {
@@ -401,8 +404,8 @@ function sentenceSpans(sentence: string): PatternSpan[] {
     // A bare indefinite is the subject when a verb follows it. A determiner
     // form is the subject when an auxiliary follows its head ("no gate would").
     const afterIndefinite = determiner
-      ? [following?.[2], following?.[3]]
-      : [head, following?.[2], following?.[3]];
+      ? [following?.[2], following?.[3], following?.[4]]
+      : [head, following?.[2], following?.[3], following?.[4]];
     if (opensClause(afterIndefinite, !determiner)) continue;
 
     const end = start + match[0].length + (determiner ? headToken.length : 0);

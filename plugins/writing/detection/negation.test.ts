@@ -18,6 +18,8 @@ describe("noNegationHits", () => {
     "A classifier denial leaves no durable trace.",
     "Spaces past the ninth cost no call.",
     "We want no extra flag on the wrapper.",
+    "The audit found no defects reported.",
+    "The sweep leaves no lock held.",
     "The change adds none.",
     "The request returns nothing on a miss.",
     "Copilot-assisted commits carry no marker.",

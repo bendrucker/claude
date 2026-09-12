@@ -127,6 +127,7 @@ describe("notNegationHits", () => {
     "It does not apply, but anyone can run it.",
     "The guard is not held (anything else drains first).",
     "It doesn't apply but anyone can run it.",
+    "It is not clear whether anyone will run it.",
   ];
 
   it.each(flag)('flags: "%s"', (text) => {

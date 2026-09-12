@@ -160,7 +160,7 @@ The baseline is shuffled and split into equal halves `--splits` times, and each 
 
 Splits drop the odd document so both halves are the same size. An unequal split would give the smaller half more spread and inflate the floor.
 
-All thirteen features in `voice-delta.ts` clear their floor on the full corpus. Retire a feature whose gap fails to clear its floor across several seeds at a high split count (2,000 splits). A single seed's floor is one draw from the null-maximum distribution and is not conclusive on its own. `median_sentence_length` (1.27x) and `action_verb_opener_rate` (1.56x) clear thinly and are worth re-checking as the baseline grows.
+All fifteen features in `voice-delta.ts` clear their floor on the full corpus. Retire a feature whose gap fails to clear its floor across several seeds at a high split count (2,000 splits). A single seed's floor is one draw from the null-maximum distribution and is not conclusive on its own. `median_sentence_length` (1.27x) and `action_verb_opener_rate` (1.56x) clear thinly and are worth re-checking as the baseline grows.
 
 Per-kind runs are a sensitivity check rather than the deciding measurement, because each kind contrasts a different register against the same PR and issue baseline. A feature that clears its floor on the full corpus but falls below it within some kinds is showing register sensitivity, and stays: `template_presence` clears the full corpus at 5.95x while falling below its floor within `plan`, `memory` and `docs`.
 

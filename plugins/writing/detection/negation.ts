@@ -139,6 +139,8 @@ export const CLOSED_CLASS_GOVERNORS = new Set([
   "because",
   "since",
   "although",
+  "whether",
+  "if",
   "though",
   "while",
   "whereas",
@@ -442,6 +444,8 @@ const CLAUSE_CONJUNCTIONS = new Set([
   "whereas",
   "unless",
   "although",
+  "whether",
+  "if",
 ]);
 const PARENTHETICAL_ADVERB = /,\s*(?:[A-Za-z]+ly|however|though|then|yet|still|also|too)\s*,/gi;
 

@@ -8,6 +8,10 @@ Writing documents a model executes: product and system prompts, skills, tool and
   - `prompting`: doctrine for any document a model executes, with `references/conversion.md` for rewriting an existing one
   - `prompting:scan`: reports weak modality, vague completion criteria, and no-op instructions, and exits non-zero on any finding
 
+## Evals
+
+`evals/rule-precision` scores the scan rules against commits where a human deleted prose, and scores a candidate pattern before it ships.
+
 ## Testing
 
 ```sh

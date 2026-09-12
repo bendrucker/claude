@@ -19,6 +19,14 @@ describe("scanPrompt", () => {
     ["no-op", "Use your best judgment."],
     ["no-op", "Use your best judgement."],
     ["weak-modality", 'A “stray opener. Try to keep going, then "quoted" text.'],
+    ["stale-measurement", "The floor sits at 10.4 on the full corpus."],
+    ["stale-measurement", "Separation dropped to 18 on the shorter bins."],
+    ["stale-measurement", "253 of 901 shapes clear the floor."],
+    ["stale-measurement", "All thirteen features clear their floor."],
+    ["ticket-ref", "Treat the rates as uncalibrated until #791 lands."],
+    ["status-prose", "The comparison has not run yet."],
+    ["status-prose", "Calibration is still pending."],
+    ["status-prose", "A larger labeled pass comes next."],
   ])("flags %s in %j", (rule, source) => {
     expect(rules(source)).toEqual([rule]);
   });
@@ -37,6 +45,14 @@ describe("scanPrompt", () => {
       "a quote around a code span",
       'Replace a weak word ("be `very` thorough") with a stronger one.',
     ],
+    ["a scoping count", "Record a decision when all three hold."],
+    ["a budget rather than a result", "A long-form essay can yield 2-3 cards."],
+    ["a flag default", "Raise `--min-lift` (default 5.0) when the list is noisy."],
+    ["a blockquote example", "Flagged example:\n\n> All 47 tests pass, ensuring correctness.\n"],
+    ["a linked issue", "Teammates may idle ([#23415](https://example.com/23415))."],
+    ["an ordinary condition", "When something is still open, resolve it first."],
+    ["a formatter directive", "<!-- prettier-ignore-start -->"],
+    ["a short aside", "<!-- tuned by hand -->"],
   ])("passes %s", (_label, source) => {
     expect(rules(source)).toEqual([]);
   });
@@ -54,6 +70,12 @@ describe("scanPrompt", () => {
   test("stops quote pairing at the end of a block", () => {
     const source = 'A "stray opener.\n\nTry to keep going.\n\nThen "quoted" text.\n';
     expect(scanPrompt(source)).toMatchObject([{ line: 3, rule: "weak-modality" }]);
+  });
+
+  test("flags prose held in a comment", () => {
+    const source =
+      "# Doc\n\n<!--\nCuration note for maintainers. Skip this block when reviewing a document.\n-->\n";
+    expect(scanPrompt(source)).toMatchObject([{ line: 3, rule: "maintainer-aside" }]);
   });
 
   test("reports every finding in one document, ordered by position", () => {

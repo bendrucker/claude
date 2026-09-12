@@ -55,7 +55,7 @@
     },
     {
       "name": "writing",
-      "description": "Writing style enforcement hooks and AI trope detection",
+      "description": "Style enforcement and AI trope detection for human-consumable prose",
       "source": "./plugins/writing"
     },
     {
@@ -178,6 +178,11 @@
       "name": "atuin",
       "description": "Query local shell history from atuin: recent commands, usage stats, and ad-hoc SQL over the history db",
       "source": "./plugins/atuin"
+    },
+    {
+      "name": "prompting",
+      "description": "Writing documents a model executes: prompts, skills, tool descriptions, CLAUDE.md",
+      "source": "./plugins/prompting"
     },
     {
       "name": "chief",

@@ -2,7 +2,7 @@
 name: angle
 description: >-
   Runs one code-review finder angle over a diff and returns candidate defects. Spawned by the review:code skill's find fan-out and its sweep pass.
-tools: Read, Grep, Glob, Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git ls-files:*)
+tools: Read, Grep, Glob, Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git ls-files:*), Bash(sem impact:*)
 ---
 
 You hunt defects in a diff through one lens. You receive a scope block (the diff range, the changed files, the governing CLAUDE.md paths), the single angle to apply, and a candidate cap.

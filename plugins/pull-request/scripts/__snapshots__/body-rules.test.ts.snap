@@ -1,6 +1,6 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`validateBody bundles every deny and folds the warns in 1`] = `
+exports[`decide bundles every deny and folds the warns in 1`] = `
 {
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
@@ -17,7 +17,7 @@ Also worth addressing in the same edit:
 }
 `;
 
-exports[`validateBody carries a title warn into an unreadable-body deny 1`] = `
+exports[`decide carries a title warn into an unreadable-body deny 1`] = `
 {
   "hookSpecificOutput": {
     "hookEventName": "PreToolUse",
@@ -32,7 +32,7 @@ Also worth addressing in the same edit:
 }
 `;
 
-exports[`validateBody lists several warns 1`] = `
+exports[`decide lists several warns 1`] = `
 {
   "hookSpecificOutput": {
     "additionalContext": 
@@ -45,7 +45,7 @@ exports[`validateBody lists several warns 1`] = `
 }
 `;
 
-exports[`validateBody notes a single warn 1`] = `
+exports[`decide notes a single warn 1`] = `
 {
   "hookSpecificOutput": {
     "additionalContext": 
@@ -57,4 +57,48 @@ exports[`validateBody notes a single warn 1`] = `
 }
 `;
 
-exports[`validateBody stays silent on a clean body 1`] = `null`;
+exports[`decide stays silent on a clean body 1`] = `null`;
+
+exports[`headingCaseCorrection corrects a body where heading case is the only deny 1`] = `
+"## Two Fixes Found While Testing
+
+Reshapes it."
+`;
+
+exports[`headingCaseCorrection corrects a body where heading case is the only deny 2`] = `
+[
+  {
+    "suggested": "Two Fixes Found While Testing",
+    "text": "Two fixes found while testing",
+  },
+]
+`;
+
+exports[`headingCaseCorrection corrects a body where a warn rides along with it 1`] = `
+"## Corpus Results
+
+The build is green."
+`;
+
+exports[`headingCaseCorrection corrects a body where a warn rides along with it 2`] = `
+[
+  {
+    "suggested": "Corpus Results",
+    "text": "Corpus results",
+  },
+]
+`;
+
+exports[`headingCaseCorrection reports the correction alongside the warns it does not fix 1`] = `
+{
+  "hookSpecificOutput": {
+    "additionalContext": 
+"Corrected: Corpus Results
+
+This PR has a structural-slop pattern:
+- The body states that lint, types, tests, or a build passed. The PR's status checks already show that. Drop it, unless the result is one CI won't post: a manual check CI doesn't run, an intentional exclusion, or a pre-existing warning you're leaving in place."
+,
+    "hookEventName": "PreToolUse",
+  },
+}
+`;

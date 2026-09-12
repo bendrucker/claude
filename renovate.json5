@@ -53,6 +53,7 @@
       matchDatasources: ["git-refs"],
       prBodyNotes: [
         "📜 **Changelog**: [`{{{currentDigestShort}}}` → `{{{newDigestShort}}}`](https://github.com/{{{depName}}}/compare/{{{currentDigest}}}...{{{newDigest}}})",
+        "⚠️ **Reinstall after merge**: `claude plugin update` moves an installed payload only when the plugin manifest's `version` changes between these commits. When it does not, reinstall on each machine (`claude plugin uninstall <id>` then `claude plugin install <id>`), or `claude-plugin-audit` reports the plugin `pinned` every night.",
       ],
     },
   ],

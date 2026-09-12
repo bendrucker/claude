@@ -7,6 +7,7 @@ import {
   renderTable,
   rowCells,
   sortWorktreeRows,
+  withFlag,
   type BoardRow,
 } from "./board";
 
@@ -14,6 +15,7 @@ function row(overrides: Partial<BoardRow>): BoardRow {
   return {
     kind: "worktree",
     pane: null,
+    workspace: null,
     agent: null,
     owner: "bendrucker",
     repo: "claude",
@@ -69,6 +71,7 @@ test("the table pads, truncates, and keeps the flags column whole", () => {
     [
       row({
         pane: "wB2:p1",
+        workspace: "wB2",
         agent: "claude/working",
         prColumn: "merged#30366",
         age: 12,
@@ -85,6 +88,7 @@ test("the table pads, truncates, and keeps the flags column whole", () => {
       row({
         kind: "pane",
         pane: "w9W:p1",
+        workspace: "w9W",
         agent: "claude/idle",
         repoLabel: "Herdr",
         branch: null,
@@ -97,10 +101,10 @@ test("the table pads, truncates, and keeps the flags column whole", () => {
   );
 
   expect(rendered).toMatchInlineSnapshot(`
-"PANE      AGENT          REPO                     BRANCH                     PR            AGE  FLAGS
-wB2:p1    claude/working claude                   topic                      merged#30366  12   dirty,carries:2
--         -              backnotprop/plannotator  a-branch-name-that-will-n… -             ?    unreadable
-w9W:p1    claude/idle    Herdr                    -                          -             -    no worktree"
+"PANE      WS     AGENT          REPO                     BRANCH                     PR            AGE  FLAGS
+wB2:p1    wB2    claude/working claude                   topic                      merged#30366  12   dirty,carries:2
+-         -      -              backnotprop/plannotator  a-branch-name-that-will-n… -             ?    unreadable
+w9W:p1    w9W    claude/idle    Herdr                    -                          -             -    no worktree"
 `);
 });
 
@@ -125,6 +129,7 @@ test("a json row carries the fields the table truncates or omits", () => {
     jsonRow(
       row({
         pane: "wAW:p1",
+        workspace: "wAW",
         agent: "claude/idle",
         owner: "backnotprop",
         repo: "plannotator",
@@ -162,6 +167,7 @@ test("a json row carries the fields the table truncates or omits", () => {
   ).toEqual({
     kind: "worktree",
     pane: "wAW:p1",
+    workspace: "wAW",
     agent: "claude/idle",
     owner: "backnotprop",
     repo: "plannotator",
@@ -196,6 +202,11 @@ test("a json row carries the fields the table truncates or omits", () => {
       reused: false,
     },
   });
+});
+
+test("withFlag replaces the clean sentinel and appends to anything else", () => {
+  expect(withFlag(["clean"], "occupied")).toEqual(["occupied"]);
+  expect(withFlag(["merged"], "occupied")).toEqual(["merged", "occupied"]);
 });
 
 describe("heldByAgent", () => {

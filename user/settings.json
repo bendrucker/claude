@@ -250,6 +250,11 @@
             "type": "command",
             "command": "bun ~/.claude/hooks/worktree",
             "if": "Bash(git worktree *)"
+          },
+          {
+            "type": "command",
+            "command": "bun ~/.claude/hooks/find-scope",
+            "if": "Bash(find *)"
           }
         ]
       },
@@ -470,6 +475,7 @@
     "newline@bendrucker": true,
     "github@bendrucker": true,
     "claude-code@bendrucker": true,
+    "prompting@bendrucker": true,
     "pull-request@bendrucker": true,
     "x-callback-url@bendrucker": true,
     "research@bendrucker": true,
@@ -501,13 +507,6 @@
       "source": {
         "source": "github",
         "repo": "anthropics/claude-plugins-official"
-      }
-    },
-    "astral-sh": {
-      "source": {
-        "source": "github",
-        "repo": "astral-sh/claude-code-plugins",
-        "ref": "f3ce88a7ba830f53afd6d944c1d0278ed318e142"
       }
     },
     "ast-grep-marketplace": {

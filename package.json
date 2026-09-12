@@ -34,7 +34,8 @@
     "plugins/comments/evals/comment-density",
     "plugins/chief",
     "plugins/pull-request/evals/pr-body",
-    "packages/oxlint-rules"
+    "packages/oxlint-rules",
+    "plugins/prompting"
   ],
   "type": "module",
   "scripts": {
@@ -46,6 +47,7 @@
     "inventory": "bun scripts/inventory/index.ts",
     "lint": "oxlint --type-aware",
     "lint:fix": "oxlint --type-aware --fix",
+    "plugin-lockfiles": "bun scripts/plugin-lockfiles.ts",
     "schemas": "bun scripts/schemas/index.ts",
     "skill-lint": "bun ./packages/skill-lint/cli.ts",
     "test": "bun test",

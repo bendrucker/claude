@@ -1,0 +1,15 @@
+{
+  "description": "Clear the pane's review-requested label when the reviewer replies",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"$HERDR_PANE_ID\" ] && [ -f \"$HOME/.cache/claude/review-human/$(printf %s \"$HERDR_PANE_ID\" | tr : -)\" ] && bun \"${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts\" clear; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

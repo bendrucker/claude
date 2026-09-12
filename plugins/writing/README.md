@@ -1,6 +1,8 @@
 # Writing
 
-Writing style enforcement and slop detection for prose output (PR descriptions, review comments, Slack messages, documentation). Catches AI-generated and human writing patterns that read as vague, promotional, or templated.
+Writing style enforcement and slop detection for prose a person reads: PR descriptions, review comments, Slack messages, documentation. Catches AI-generated and human writing patterns that read as vague, promotional, or templated.
+
+Documents a model executes belong to the [prompting](../prompting) plugin. [`.claude/rules/plugins.md`](../../.claude/rules/plugins.md) states the audience rule.
 
 ## Contents
 

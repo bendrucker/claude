@@ -5,7 +5,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { decodeJson } from "../../../../packages/decode/index";
-import { heldByAgent, jsonRow, sortWorktreeRows, type BoardRow } from "./board";
+import { heldByAgent, jsonRow, sortWorktreeRows, withFlag, type BoardRow } from "./board";
 import { classify, pullFlags, renderBoard } from "./disposition";
 import { daysBefore, deferredPath, readDeferrals, staleKeys } from "./deferred";
 import { spawnRun, throttle, type Run } from "./exec";
@@ -27,6 +27,7 @@ import {
 } from "./forge";
 import {
   ageInDays,
+  aheadCount,
   carriedIgnoredPaths,
   deriveFlags,
   isMergedBranch,
@@ -70,6 +71,7 @@ const Snapshot = z.looseObject({
 
 interface Pane {
   readonly id: string;
+  readonly workspace: string;
   readonly label: string;
   readonly agent: string;
   readonly cwd: string;
@@ -202,28 +204,9 @@ async function defaultBranch(git: Run, root: string): Promise<string | null> {
   return master?.ok === true ? "master" : null;
 }
 
-function toCount(stdout: string): number | null {
+function toEpoch(stdout: string): number | null {
   const parsed = Number.parseInt(stdout.trim(), 10);
   return Number.isNaN(parsed) ? null : parsed;
-}
-
-/**
- * A worktree whose upstream branch has been deleted fails both counts, and the
- * shell original's `${ahead:-0}` turned that into a fully pushed row.
- */
-async function aheadCount(git: Run, worktree: string, base: string | null): Promise<number | null> {
-  const upstream = await git(["git", "-C", worktree, "rev-list", "--count", "@{u}..HEAD"]);
-  if (upstream.ok) return toCount(upstream.stdout);
-  if (base === null) return null;
-  const fallback = await git([
-    "git",
-    "-C",
-    worktree,
-    "rev-list",
-    "--count",
-    `origin/${base}..HEAD`,
-  ]);
-  return fallback.ok ? toCount(fallback.stdout) : null;
 }
 
 function branchCommitDates(stdout: string): Map<string, number> {
@@ -290,6 +273,7 @@ async function scanWorktree(
     readonly path: string;
     readonly branch: string | null;
     readonly base: string | null;
+    readonly headOid: string | null;
     readonly commitDate: number | null;
   },
 ): Promise<{
@@ -301,7 +285,7 @@ async function scanWorktree(
 }> {
   const [status, ahead, carried, detachedDate, cherry] = await Promise.all([
     ctx.git(["git", "-C", options.path, "status", "--porcelain", "-z", "--ignore-submodules=none"]),
-    aheadCount(ctx.git, options.path, options.base),
+    aheadCount(ctx.git, options.path, { headOid: options.headOid, base: options.base }),
     carriedIgnoredPaths(ctx.git, options.path),
     options.commitDate === null
       ? ctx.git(["git", "-C", options.path, "log", "-1", "--format=%ct", "HEAD"])
@@ -313,7 +297,7 @@ async function scanWorktree(
 
   const commit =
     options.commitDate ??
-    (detachedDate !== null && detachedDate.ok ? toCount(detachedDate.stdout) : null);
+    (detachedDate !== null && detachedDate.ok ? toEpoch(detachedDate.stdout) : null);
 
   return {
     status: readStatus(status),
@@ -367,14 +351,15 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
   const scanned = await Promise.all(
     records.map(async (record) => {
       const commitDate = record.branch === null ? null : (commitDates.get(record.branch) ?? null);
+      const pull = record.branch === null ? undefined : pulls.get(record.branch);
       const scan = await scanWorktree(ctx, {
         path: record.path,
         branch: record.branch,
         base,
+        headOid: pull?.headOid ?? null,
         commitDate,
       });
 
-      const pull = record.branch === null ? undefined : pulls.get(record.branch);
       const reused = isReusedBranch(pull, scan.commit);
       const flags = deriveFlags({
         detached: record.branch === null,
@@ -389,6 +374,7 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
       const row: BoardRow = {
         kind: "worktree",
         pane: null,
+        workspace: null,
         agent: null,
         owner,
         repo,
@@ -470,6 +456,7 @@ function readPanes(snapshot: z.infer<typeof Snapshot>): {
       const agent = pane.agent ?? "";
       return {
         id: pane.pane_id,
+        workspace: pane.workspace_id ?? "",
         label: labels.get(pane.workspace_id ?? "") ?? "",
         agent: `${agent === "" ? "shell" : agent}/${pane.agent_status ?? "?"}`,
         cwd: pane.foreground_cwd ?? pane.cwd ?? "",
@@ -521,7 +508,15 @@ function attachPanes(
       working: pane.agent.endsWith("/working"),
       blocked: pane.agent.endsWith("/blocked"),
     };
-    return { ...row, pane: pane.id, agent: pane.agent, state };
+    const flags = heldByAgent(pane.agent) ? withFlag(row.flags, "occupied") : row.flags;
+    return {
+      ...row,
+      pane: pane.id,
+      workspace: pane.workspace === "" ? null : pane.workspace,
+      agent: pane.agent,
+      flags,
+      state,
+    };
   });
   return { rows: attached, claimed };
 }
@@ -540,6 +535,7 @@ function idlePaneRows(
     .map((pane) => ({
       kind: "pane" as const,
       pane: pane.id,
+      workspace: pane.workspace === "" ? null : pane.workspace,
       agent: pane.agent,
       owner: "",
       repo: "",

@@ -47,6 +47,25 @@
       automerge: false,
     },
     {
+      // `claude plugin update` moves a payload only when the declared version
+      // string changes. These two track it to the release tag, so a merged bump
+      // reaches the install on its own. worktrunk declares no version and
+      // agent-browser no manifest, so their PRs stay manual as the reminder
+      // that only a forced reinstall will move them.
+      matchManagers: ["custom.regex"],
+      matchFileNames: ["user/settings.json"],
+      matchDatasources: ["github-releases"],
+      matchDepNames: ["backnotprop/plannotator", "schpet/linear-cli"],
+      automerge: true,
+    },
+    {
+      // Renovate splits majors into their own group, which stays manual: a
+      // major to a conditional action like paths-filter can pass CI by
+      // skipping the jobs it gates.
+      matchManagers: ["github-actions"],
+      groupName: "github-actions",
+    },
+    {
       // Digest bumps track a moving branch, so Renovate's version-delta changelog
       // engine has no release range to render. Link the GitHub compare view instead
       // so the commit list between the old and new SHA is one click away.

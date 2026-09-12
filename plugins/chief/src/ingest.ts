@@ -4,7 +4,7 @@ import { nextBoundary, nextDigest, parseDuration } from "./release";
 import { tier, type Event, type ReleaseRule } from "./tiers";
 import type { LedgerRow, Presence } from "./types";
 
-const HookPayloadSchema = z.object({
+export const HookPayloadSchema = z.object({
   hook_event_name: z.string(),
   session_id: z.string(),
   notification_type: z.string().optional(),

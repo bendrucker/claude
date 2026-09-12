@@ -458,9 +458,11 @@ export function notNegationHits(text: string): Hits {
   const samples: string[] = [];
   for (const raw of splitSentences(text)) {
     const sentence = raw.replace(PARENTHETICAL_ADVERB, " ");
+    const claimed = new Set<number>();
     for (const cue of sentence.matchAll(NOT_CUE)) {
       const licensed = nonassertiveAfter(sentence, cue.index + cue[0].length);
-      if (licensed === undefined) continue;
+      if (licensed === undefined || claimed.has(licensed)) continue;
+      claimed.add(licensed);
       samples.push(collapse(sentence.slice(cue.index, licensed)));
     }
   }

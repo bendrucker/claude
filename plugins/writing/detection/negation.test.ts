@@ -116,6 +116,7 @@ describe("notNegationHits", () => {
     "The change does not touch either path.",
     "It doesn't, however, add anything the default lacks.",
     "The worker cannot read or write anything outside the queue.",
+    "The guard does not and never will hold any lock.",
   ];
 
   const allow = [

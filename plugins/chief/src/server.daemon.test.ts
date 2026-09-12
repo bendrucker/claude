@@ -56,6 +56,7 @@ function boot(now: () => Date) {
       spoolPath: SPOOL_PATH,
       herdrAgent: "chief",
       workHours: ["09:00", "18:00"],
+      actSecret: "test-secret",
       createStore: (getLastDoorbell) =>
         createLedgerStore({ ledgerPath: LEDGER_PATH, decisionsPath: LEDGER_PATH, getLastDoorbell }),
       now,
@@ -68,7 +69,7 @@ function boot(now: () => Date) {
         return Promise.resolve({ status: "ok", attempts: 1 });
       },
     },
-    { port: 0 },
+    { port: 0, actPort: 0 },
   );
 
   return { daemon, scheduled, rung };
@@ -85,6 +86,7 @@ test("drains the ingest spool at start", async () => {
   } finally {
     running?.timers.stop();
     await running?.server.stop(true);
+    await running?.act.stop(true);
   }
 });
 
@@ -106,6 +108,7 @@ test("release check pushes due rows and rings the doorbell, feeding status.lastD
   } finally {
     running?.timers.stop();
     await running?.server.stop(true);
+    await running?.act.stop(true);
   }
 });
 
@@ -123,5 +126,6 @@ test("flock tick rings the doorbell during work hours", async () => {
   } finally {
     running?.timers.stop();
     await running?.server.stop(true);
+    await running?.act.stop(true);
   }
 });

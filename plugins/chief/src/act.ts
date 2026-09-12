@@ -144,7 +144,7 @@ function defaultPort(): number {
 
 export interface ActServerOptions {
   store: Store;
-  port?: number;
+  port?: number | undefined;
   secret: string;
 }
 

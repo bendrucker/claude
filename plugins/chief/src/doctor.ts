@@ -8,10 +8,15 @@ export function configPath(): string {
 const DEFAULT_BASE_URL = "http://127.0.0.1:7391";
 const PROBE_TIMEOUT_MS = 1500;
 
+const BarkConfigSchema = z.object({
+  url: z.string(),
+  devices: z.array(z.string()),
+  key: z.string(),
+  actUrl: z.string(),
+});
+
 const ConfigSchema = z.object({
-  ntfy: z
-    .object({ url: z.string(), topic: z.string(), replies: z.string(), token: z.string() })
-    .optional(),
+  bark: BarkConfigSchema.optional(),
   herdr: z.object({ agent: z.string() }),
   presence: z.object({
     focusFile: z.string(),
@@ -63,8 +68,11 @@ function skip(name: string, detail: string): DoctorCheck {
   return { name, status: "skip", detail };
 }
 
-export async function checkHealthz(baseUrl: string, fetchImpl: typeof fetch): Promise<DoctorCheck> {
-  const name = "daemon healthz";
+async function probeHealthz(
+  name: string,
+  baseUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<DoctorCheck> {
   try {
     const response = await fetchImpl(`${baseUrl}/healthz`, {
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
@@ -73,6 +81,10 @@ export async function checkHealthz(baseUrl: string, fetchImpl: typeof fetch): Pr
   } catch (error) {
     return fail(name, error instanceof Error ? error.message : String(error));
   }
+}
+
+export async function checkHealthz(baseUrl: string, fetchImpl: typeof fetch): Promise<DoctorCheck> {
+  return probeHealthz("daemon healthz", baseUrl, fetchImpl);
 }
 
 export interface ConfigCheckResult {
@@ -93,29 +105,52 @@ export async function checkConfig(path: string): Promise<ConfigCheckResult> {
   }
 }
 
-export async function checkNtfy(
+export async function checkBarkServer(
   config: Config | undefined,
   fetchImpl: typeof fetch,
 ): Promise<DoctorCheck> {
-  const name = "ntfy reachable";
-  if (!config) return skip(name, "config unavailable");
-  const { ntfy } = config;
-  if (!ntfy) return skip(name, "no ntfy block in config");
-
-  try {
-    const response = await fetchImpl(`${ntfy.url}/${ntfy.topic}/json`, {
-      headers: { Authorization: `Bearer ${ntfy.token}` },
-      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
-    });
-    if (response.status === 401 || response.status === 403) return fail(name, "token rejected");
-    return response.ok ? pass(name) : fail(name, `HTTP ${response.status}`);
-  } catch (error) {
-    return fail(name, error instanceof Error ? error.message : String(error));
-  }
+  const name = "bark server reachable";
+  if (!config?.bark) return skip(name, "no bark block in config");
+  return probeHealthz(name, config.bark.url, fetchImpl);
 }
 
-export function checkRepliesSubscription(): DoctorCheck {
-  return skip("ntfy replies subscription connected", "daemon-side; see status");
+export function checkBarkDevices(config: Config | undefined): DoctorCheck {
+  const count = config?.bark?.devices.length ?? 0;
+  const name = `bark devices set (${count})`;
+  if (!config?.bark) return skip(name, "no bark block in config");
+  return count > 0 ? pass(name) : fail(name, "no device keys configured");
+}
+
+function actPort(): number {
+  return process.env.CHIEF_ACT_PORT !== undefined ? Number(process.env.CHIEF_ACT_PORT) : 7392;
+}
+
+export function defaultActBaseUrl(): string {
+  return `http://127.0.0.1:${actPort()}`;
+}
+
+export async function checkActListening(
+  baseUrl: string,
+  fetchImpl: typeof fetch,
+): Promise<DoctorCheck> {
+  return probeHealthz("act page listening", baseUrl, fetchImpl);
+}
+
+export async function checkActReachable(
+  config: Config | undefined,
+  fetchImpl: typeof fetch,
+): Promise<DoctorCheck> {
+  const name = "act page reachable on tailnet";
+  if (!config?.bark) return skip(name, "no bark block in config");
+
+  try {
+    const response = await fetchImpl(`${config.bark.actUrl}/healthz`, {
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+    return response.ok ? pass(name) : skip(name, `HTTP ${response.status}`);
+  } catch (error) {
+    return skip(name, error instanceof Error ? error.message : String(error));
+  }
 }
 
 export async function checkHerdrAgent(
@@ -144,6 +179,7 @@ export async function checkFocusFile(config: Config | undefined): Promise<Doctor
 
 export interface DoctorDeps {
   baseUrl?: string;
+  actBaseUrl?: string;
   configPath?: string;
   fetchImpl?: typeof fetch;
   listAgents?: () => Promise<HerdrAgentListLike>;
@@ -151,6 +187,7 @@ export interface DoctorDeps {
 
 export async function runDoctor(deps: DoctorDeps = {}): Promise<DoctorCheck[]> {
   const baseUrl = deps.baseUrl ?? DEFAULT_BASE_URL;
+  const actBaseUrl = deps.actBaseUrl ?? defaultActBaseUrl();
   const resolvedConfigPath = deps.configPath ?? configPath();
   const fetchImpl = deps.fetchImpl ?? fetch;
   const listAgents = deps.listAgents ?? herdrListAgents;
@@ -160,8 +197,10 @@ export async function runDoctor(deps: DoctorDeps = {}): Promise<DoctorCheck[]> {
   return [
     await checkHealthz(baseUrl, fetchImpl),
     configCheck,
-    await checkNtfy(config, fetchImpl),
-    checkRepliesSubscription(),
+    await checkBarkServer(config, fetchImpl),
+    checkBarkDevices(config),
+    await checkActListening(actBaseUrl, fetchImpl),
+    await checkActReachable(config, fetchImpl),
     await checkHerdrAgent(config, listAgents),
     await checkFocusFile(config),
   ];

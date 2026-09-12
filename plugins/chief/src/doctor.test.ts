@@ -2,12 +2,14 @@ import { afterEach, expect, test } from "bun:test";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  checkActListening,
+  checkActReachable,
+  checkBarkDevices,
+  checkBarkServer,
   checkConfig,
   checkFocusFile,
   checkHealthz,
   checkHerdrAgent,
-  checkNtfy,
-  checkRepliesSubscription,
   formatCheck,
   runDoctor,
   type Config,
@@ -17,11 +19,11 @@ const CONFIG_PATH = join(import.meta.dirname, "__fixtures__", "doctor.config.tes
 const FOCUS_PATH = join(import.meta.dirname, "__fixtures__", "doctor.focus.test.json");
 
 const CONFIG: Config = {
-  ntfy: {
-    url: "http://127.0.0.1:2586",
-    topic: "chief",
-    replies: "chief-replies",
-    token: "tk_test",
+  bark: {
+    url: "http://127.0.0.1:8090",
+    devices: ["device-1"],
+    key: "0123456789abcdef",
+    actUrl: "https://chief.tailnet:7392",
   },
   herdr: { agent: "chief" },
   presence: { focusFile: FOCUS_PATH, calendar: true, workHours: ["09:00", "18:00"] },
@@ -68,28 +70,74 @@ test("checkConfig fails for a missing file and passes for a valid one", async ()
   expect(present.config).toEqual(CONFIG);
 });
 
-test("checkNtfy skips without config, fails on rejected token, passes on 200", async () => {
-  expect(await checkNtfy(undefined, fetch)).toEqual({
-    name: "ntfy reachable",
+test("checkBarkServer skips without a bark block, fails, or passes on the health probe", async () => {
+  expect(await checkBarkServer(undefined, fetch)).toEqual({
+    name: "bark server reachable",
     status: "skip",
-    detail: "config unavailable",
+    detail: "no bark block in config",
   });
 
-  const rejected = await checkNtfy(
+  const down = await checkBarkServer(
     CONFIG,
-    fakeFetch(() => new Response("no", { status: 401 })),
+    fakeFetch(() => new Response("nope", { status: 503 })),
   );
-  expect(rejected).toEqual({ name: "ntfy reachable", status: "fail", detail: "token rejected" });
+  expect(down).toEqual({ name: "bark server reachable", status: "fail", detail: "HTTP 503" });
 
-  const ok = await checkNtfy(
+  const ok = await checkBarkServer(
     CONFIG,
-    fakeFetch(() => new Response("[]", { status: 200 })),
+    fakeFetch(() => new Response("{}", { status: 200 })),
   );
-  expect(ok).toEqual({ name: "ntfy reachable", status: "pass" });
+  expect(ok).toEqual({ name: "bark server reachable", status: "pass" });
 });
 
-test("checkRepliesSubscription always skips", () => {
-  expect(checkRepliesSubscription().status).toBe("skip");
+test.each<{ name: string; config: Config | undefined; status: "pass" | "fail" | "skip" }>([
+  { name: "no bark block", config: undefined, status: "skip" },
+  {
+    name: "no devices",
+    config: { ...CONFIG, bark: { ...CONFIG.bark!, devices: [] } },
+    status: "fail",
+  },
+  { name: "one device", config: CONFIG, status: "pass" },
+])("checkBarkDevices: $name", ({ config, status }) => {
+  expect(checkBarkDevices(config).status).toBe(status);
+});
+
+test("checkActListening probes the loopback act page", async () => {
+  const ok = await checkActListening(
+    "http://127.0.0.1:7392",
+    fakeFetch(() => new Response("{}", { status: 200 })),
+  );
+  expect(ok).toEqual({ name: "act page listening", status: "pass" });
+
+  const down = await checkActListening(
+    "http://127.0.0.1:7392",
+    fakeFetch(() => new Response("nope", { status: 500 })),
+  );
+  expect(down).toEqual({ name: "act page listening", status: "fail", detail: "HTTP 500" });
+});
+
+test("checkActReachable skips (never fails) when the tailnet probe cannot succeed", async () => {
+  expect(await checkActReachable(undefined, fetch)).toEqual({
+    name: "act page reachable on tailnet",
+    status: "skip",
+    detail: "no bark block in config",
+  });
+
+  const unreachable = await checkActReachable(
+    CONFIG,
+    fakeFetch(() => new Response("nope", { status: 502 })),
+  );
+  expect(unreachable).toEqual({
+    name: "act page reachable on tailnet",
+    status: "skip",
+    detail: "HTTP 502",
+  });
+
+  const ok = await checkActReachable(
+    CONFIG,
+    fakeFetch(() => new Response("{}", { status: 200 })),
+  );
+  expect(ok).toEqual({ name: "act page reachable on tailnet", status: "pass" });
 });
 
 test("checkHerdrAgent matches the configured agent name", async () => {
@@ -126,6 +174,7 @@ test("runDoctor aggregates every check in order", async () => {
 
   const checks = await runDoctor({
     baseUrl: "http://x",
+    actBaseUrl: "http://act.x",
     configPath: CONFIG_PATH,
     fetchImpl: fakeFetch(() => new Response("{}", { status: 200 })),
     listAgents: () => Promise.resolve({ agents: [{ agent: "chief" }] }),
@@ -134,8 +183,10 @@ test("runDoctor aggregates every check in order", async () => {
   expect(checks.map((check) => `${check.status} ${check.name}`)).toEqual([
     "pass daemon healthz",
     "pass config parses",
-    "pass ntfy reachable",
-    "skip ntfy replies subscription connected",
+    "pass bark server reachable",
+    "pass bark devices set (1)",
+    "pass act page listening",
+    "pass act page reachable on tailnet",
     "pass herdr agent list",
     "pass Focus file readable",
   ]);

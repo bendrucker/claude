@@ -8,6 +8,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { cli, command } from "cleye";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { ensureActSecret } from "../src/act";
 import { checkConfig, configPath, formatCheck, runDoctor } from "../src/doctor";
 import { ring } from "../src/doorbell";
 import { append } from "../src/ledger";
@@ -181,6 +182,7 @@ const serveCmd = command({ name: "serve" }, async () => {
   const ledgerPath = join(stateDir(), "ledger.jsonl");
   const decisionsPath = join(stateDir(), "decisions.jsonl");
   const spoolPath = join(stateDir(), "ingest.spool.jsonl");
+  const actSecret = await ensureActSecret(join(stateDir(), "act.secret"));
 
   const daemonDeps: DaemonDeps = {
     ingestDeps: { listAgents: herdrListAgents, ignoreAgent: herdrAgent },
@@ -188,10 +190,11 @@ const serveCmd = command({ name: "serve" }, async () => {
     spoolPath,
     herdrAgent,
     workHours,
+    actSecret,
     createStore: (getLastDoorbell) =>
       createLedgerStore({ ledgerPath, decisionsPath, workHours, getLastDoorbell }),
   };
-  if (config?.ntfy) daemonDeps.ntfy = config.ntfy;
+  if (config?.bark) daemonDeps.bark = config.bark;
   // Test-only: shorten the /flock tick to watch it fire without waiting twenty minutes.
   const flockIntervalMs = Number(process.env.CHIEF_FLOCK_INTERVAL_MS);
   if (Number.isFinite(flockIntervalMs) && flockIntervalMs > 0)

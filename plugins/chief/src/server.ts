@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { startActServer } from "./act";
 import { read as readLedger, transition as transitionLedger } from "./ledger";
 import { ring, type RingResult } from "./doorbell";
 import {
@@ -10,8 +11,7 @@ import {
   type IngestDeps,
 } from "./ingest";
 import { createMcpServers, type McpServers } from "./mcp";
-import { publish, type NtfyConfig } from "./ntfy";
-import { subscribe, type Reply } from "./replies";
+import { publish, type BarkConfig } from "./bark";
 import { due } from "./release";
 import { start as startTimers, type Schedule, type TimersDeps, type TimersHandle } from "./timers";
 import type { Store } from "./store";
@@ -84,6 +84,7 @@ export interface ChiefServerDeps {
 export interface ChiefServerOptions {
   port?: number;
   hostname?: string;
+  actPort?: number;
 }
 
 export interface ChiefServer {
@@ -128,7 +129,8 @@ export interface DaemonDeps {
   spoolPath: string;
   herdrAgent: string;
   workHours: [string, string];
-  ntfy?: NtfyConfig;
+  bark?: BarkConfig;
+  actSecret: string;
   createStore: (getLastDoorbell: () => "ok" | "stalled" | null) => Store;
   now?: () => Date;
   schedule?: Schedule;
@@ -139,7 +141,7 @@ export interface DaemonDeps {
 
 export interface ChiefDaemon extends ChiefServer {
   timers: TimersHandle;
-  unsubscribe: () => void;
+  act: ReturnType<typeof Bun.serve>;
 }
 
 // chief serve drains the hook-tap spool once at start, then relies on timers.ts to poll the
@@ -173,14 +175,9 @@ export async function startDaemon(
     for (const row of due(rows, now())) {
       // oxlint-disable-next-line no-await-in-loop -- ledger transitions must serialize
       const pushed = await transitionLedger(row.id, { state: "pushed" }, deps.ledgerPath, now());
-      if (deps.ntfy) {
-        try {
-          // oxlint-disable-next-line no-await-in-loop -- one publish per row, in ledger order
-          const response = await publish(pushed, deps.ntfy);
-          if (!response.ok) console.error("ntfy publish", response.status, pushed.id);
-        } catch (error) {
-          console.error("ntfy publish", error);
-        }
+      if (deps.bark) {
+        // oxlint-disable-next-line no-await-in-loop -- one publish per row, in ledger order
+        await publish(pushed, deps.bark, deps.actSecret);
       }
       // oxlint-disable-next-line no-await-in-loop -- doorbell rings must serialize
       const result = await ringDoorbell(deps.herdrAgent);
@@ -195,31 +192,12 @@ export async function startDaemon(
 
   const startedAt = deps.startedAt ?? now();
   const server = startServer({ store, ingestDeps: deps.ingestDeps, startedAt }, options);
+  const act = startActServer({ store, port: options.actPort, secret: deps.actSecret });
 
   const timerDeps: TimersDeps = { releaseCheck, flockTick, workHours: deps.workHours, now };
   if (deps.schedule !== undefined) timerDeps.schedule = deps.schedule;
   if (deps.flockIntervalMs !== undefined) timerDeps.flockIntervalMs = deps.flockIntervalMs;
   const timers = startTimers(timerDeps);
 
-  const HOLD_FOR = ["1h", "3h", "1d"] as const;
-  async function applyReply(reply: Reply): Promise<void> {
-    if (reply.op === "drop") {
-      await transitionLedger(reply.id, { state: "dropped" }, deps.ledgerPath, now());
-      return;
-    }
-    if (reply.op !== "hold") return;
-    const holdFor = HOLD_FOR.find((value) => value === reply.for);
-    await store.hold(
-      holdFor !== undefined ? { id: reply.id, for: holdFor } : { id: reply.id, until: reply.until },
-    );
-  }
-  const unsubscribe = deps.ntfy
-    ? subscribe(
-        deps.ntfy,
-        (reply) =>
-          void applyReply(reply).catch((error: unknown) => console.error("ntfy reply", error)),
-      )
-    : () => {};
-
-  return { ...server, timers, unsubscribe };
+  return { ...server, timers, act };
 }

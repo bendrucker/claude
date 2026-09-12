@@ -114,6 +114,8 @@ describe("notNegationHits", () => {
     "The router never pages anyone on a retry.",
     "The worker cannot write anywhere outside the queue.",
     "The change does not touch either path.",
+    "It doesn't, however, add anything the default lacks.",
+    "The worker cannot read or write anything outside the queue.",
   ];
 
   const allow = [
@@ -124,6 +126,7 @@ describe("notNegationHits", () => {
     "It does not matter which worker drains the queue first, as long as any one of them does.",
     "It does not apply, but anyone can run it.",
     "The guard is not held (anything else drains first).",
+    "It doesn't apply but anyone can run it.",
   ];
 
   it.each(flag)('flags: "%s"', (text) => {

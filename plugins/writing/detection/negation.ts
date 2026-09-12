@@ -433,6 +433,17 @@ const WORD_TOKEN = /[A-Za-z]+(?:['’][A-Za-z]+)?/g;
 const NONASSERTIVE = new Set(["any", "anything", "anyone", "anywhere", "either"]);
 const NONASSERTIVE_WINDOW = 4;
 const CLAUSE_BREAK = /[,;:()[\]\u2013\u2014]/;
+const CLAUSE_CONJUNCTIONS = new Set([
+  "but",
+  "so",
+  "because",
+  "since",
+  "while",
+  "whereas",
+  "unless",
+  "although",
+]);
+const PARENTHETICAL_ADVERB = /,\s*(?:[A-Za-z]+ly|however|though|then|yet|still|also|too)\s*,/gi;
 
 /**
  * The not-negation counterpart, for the no:not ratio. A negated verb licenses
@@ -441,7 +452,8 @@ const CLAUSE_BREAK = /[,;:()[\]\u2013\u2014]/;
  */
 export function notNegationHits(text: string): Hits {
   const samples: string[] = [];
-  for (const sentence of splitSentences(text)) {
+  for (const raw of splitSentences(text)) {
+    const sentence = raw.replace(PARENTHETICAL_ADVERB, " ");
     for (const cue of sentence.matchAll(NOT_CUE)) {
       const licensed = nonassertiveAfter(sentence, cue.index + cue[0].length);
       if (licensed === undefined) continue;
@@ -459,7 +471,9 @@ function nonassertiveAfter(sentence: string, from: number): number | undefined {
     const word = WORD_TOKEN.exec(sentence);
     if (word === null || CLAUSE_BREAK.test(sentence.slice(previousEnd, word.index)))
       return undefined;
-    if (NONASSERTIVE.has(word[0].toLowerCase())) return word.index + word[0].length;
+    const lowered = word[0].toLowerCase();
+    if (CLAUSE_CONJUNCTIONS.has(lowered)) return undefined;
+    if (NONASSERTIVE.has(lowered)) return word.index + word[0].length;
     previousEnd = word.index + word[0].length;
   }
   return undefined;

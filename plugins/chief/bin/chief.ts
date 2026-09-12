@@ -192,6 +192,10 @@ const serveCmd = command({ name: "serve" }, async () => {
       createLedgerStore({ ledgerPath, decisionsPath, workHours, getLastDoorbell }),
   };
   if (config?.ntfy) daemonDeps.ntfy = config.ntfy;
+  // Test-only: shorten the /flock tick to watch it fire without waiting twenty minutes.
+  const flockIntervalMs = Number(process.env.CHIEF_FLOCK_INTERVAL_MS);
+  if (Number.isFinite(flockIntervalMs) && flockIntervalMs > 0)
+    daemonDeps.flockIntervalMs = flockIntervalMs;
   await startDaemon(daemonDeps, { port: port() });
   console.log(`chief serving on ${baseUrl()}`);
 });

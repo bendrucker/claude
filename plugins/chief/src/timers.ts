@@ -14,6 +14,7 @@ export interface TimersDeps {
   workHours: [string, string];
   now?: () => Date;
   schedule?: Schedule;
+  flockIntervalMs?: number;
 }
 
 export interface TimersHandle {
@@ -40,7 +41,7 @@ export function start(deps: TimersDeps): TimersHandle {
 
   const cancelFlock = schedule(() => {
     if (isWorkHours(now(), deps.workHours)) void deps.flockTick();
-  }, FLOCK_INTERVAL_MS);
+  }, deps.flockIntervalMs ?? FLOCK_INTERVAL_MS);
 
   return {
     stop: () => {

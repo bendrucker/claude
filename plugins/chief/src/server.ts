@@ -13,7 +13,7 @@ import { createMcpServers, type McpServers } from "./mcp";
 import { publish, type NtfyConfig } from "./ntfy";
 import { subscribe, type Reply } from "./replies";
 import { due } from "./release";
-import { start as startTimers, type Schedule, type TimersHandle } from "./timers";
+import { start as startTimers, type Schedule, type TimersDeps, type TimersHandle } from "./timers";
 import type { Store } from "./store";
 
 const PORT = 7391;
@@ -128,6 +128,7 @@ export interface DaemonDeps {
   createStore: (getLastDoorbell: () => "ok" | "stalled" | null) => Store;
   now?: () => Date;
   schedule?: Schedule;
+  flockIntervalMs?: number;
   startedAt?: Date;
   ring?: (agent: string, text?: string) => Promise<RingResult>;
 }
@@ -176,14 +177,10 @@ export async function startDaemon(
   const startedAt = deps.startedAt ?? now();
   const server = startServer({ store, ingestDeps: deps.ingestDeps, startedAt }, options);
 
-  const scheduleOption = deps.schedule !== undefined ? { schedule: deps.schedule } : {};
-  const timers = startTimers({
-    releaseCheck,
-    flockTick,
-    workHours: deps.workHours,
-    now,
-    ...scheduleOption,
-  });
+  const timerDeps: TimersDeps = { releaseCheck, flockTick, workHours: deps.workHours, now };
+  if (deps.schedule !== undefined) timerDeps.schedule = deps.schedule;
+  if (deps.flockIntervalMs !== undefined) timerDeps.flockIntervalMs = deps.flockIntervalMs;
+  const timers = startTimers(timerDeps);
 
   const HOLD_FOR = ["1h", "3h", "1d"] as const;
   async function applyReply(reply: Reply): Promise<void> {

@@ -12,7 +12,6 @@ import recorded from "./fixtures/re-presents.json";
 import {
   APPEND_ONLY_REASON,
   DENY_REASON,
-  growthReason,
   processInput,
   sizeReason,
   StateUnavailableError,
@@ -95,8 +94,6 @@ describe("first presentation", () => {
 });
 
 describe("unchanged re-present", () => {
-  // Equal-length prefixes keep the rewrite the same size as the original, so the
-  // sustained-growth branch stays out of tests about the hash check.
   const body = (prefix: string) =>
     Array.from({ length: 20 }, (_, i) => `${prefix} line ${i}`).join("\n");
   const plan = body("alpha");
@@ -237,7 +234,6 @@ describe("append-only re-present", () => {
 
   it("returns null for a genuine revision with low carry-over", async () => {
     await decision(initial);
-    // Same prefix length, so the rewrite does not trip the growth branch.
     const revised = lines(10, "note").join("\n");
     expect(await decision(revised)).toBeNull();
   });
@@ -288,80 +284,6 @@ describe("append-only re-present", () => {
   });
 });
 
-describe("sustained growth", () => {
-  // Each rewrite uses a distinct line prefix so carry-over stays low and the
-  // append-only check, which runs first, never fires.
-  const rewrite = (prefix: string, count: number) =>
-    Array.from({ length: count }, (_, i) => `${prefix} ${i}`).join("\n");
-
-  const skeletal = rewrite("alpha", 4);
-  const grown = rewrite("bravo", 12);
-  const grownAgain = rewrite("charlie", 30);
-
-  it("denies a second present above the high-water mark", async () => {
-    await decision(skeletal);
-    expect(denialReason(await decision(grown))).toBe(
-      growthReason(2, skeletal.length, grown.length),
-    );
-  });
-
-  it("stays silent on a first presentation, which has no high-water mark", async () => {
-    expect(await decision(grownAgain)).toBeNull();
-  });
-
-  it("stays silent when a later present comes in under the high-water mark", async () => {
-    await decision(grownAgain);
-    expect(await decision(grown)).toBeNull();
-  });
-
-  it("measures against the high-water mark, not the previous present", async () => {
-    await decision(grownAgain);
-    await decision(rewrite("delta", 6));
-    // Larger than the present before it, still under the high-water mark.
-    expect(await decision(rewrite("echo", 10))).toBeNull();
-  });
-
-  it("denies at most once per session", async () => {
-    await decision(skeletal);
-    expect((await decision(grown))?.permissionDecision).toBe("deny");
-    expect(await decision(rewrite("delta", 60))).toBeNull();
-  });
-
-  it("counts a present the append-only check denied, and reports its ordinal", async () => {
-    await decision(grownAgain);
-    await decision(grown);
-    // An append-only third present returns before the growth branch, so the
-    // growth denial is still available when a genuine rewrite lands fourth.
-    expect((await decision(`${grown}\nbravo tail`))?.permissionDecision).toBe("deny");
-    expect((await decision(rewrite("delta", 60)))?.permissionDecisionReason).toContain(
-      "Presentation 4",
-    );
-  });
-
-  it("allows and skips the check when the stored history is corrupt", async () => {
-    await decision(skeletal);
-    await Bun.write(join(stateRoot, "session-1", "exit-plan-presents"), "not json");
-    expect(await decision(grown)).toBeNull();
-  });
-
-  it("still catches an unchanged re-present after the growth denial has fired", async () => {
-    await decision(skeletal);
-    expect((await decision(grown))?.permissionDecisionReason).toBe(
-      growthReason(2, skeletal.length, grown.length),
-    );
-    expect((await decision(grown))?.permissionDecisionReason).toBe(DENY_REASON);
-  });
-
-  it("does not spend the denial on a plan that barely clears the high-water mark", async () => {
-    await decision(grownAgain);
-    // One character over the high-water mark falls inside the noise margin.
-    const barelyOver = rewrite("delta", 4).padEnd(grownAgain.length + 1, "x");
-    expect(await decision(barelyOver)).toBeNull();
-    // The denial is still available for growth that reads as accumulation.
-    expect((await decision(rewrite("echo", 60)))?.permissionDecision).toBe("deny");
-  });
-});
-
 // Every test above calls processInput directly, which proves the rules and not
 // that a decision survives the trip out. A gate can decide correctly and still
 // reach nobody, so drive the path the harness drives: spawn, parse, decide, print.
@@ -398,13 +320,9 @@ describe("harness invocation", () => {
 // decided nothing for its first month. A label naming only the rule would have
 // read as healthy throughout.
 describe("recorded re-presents", () => {
-  // The growth reason opens with per-presentation numbers, so match its fixed tail.
-  const growthTail = growthReason(0, 0, 0).split(". ").slice(1).join(". ");
-
   function rule(reason: string): string {
     if (reason === DENY_REASON) return "unchanged";
     if (reason === APPEND_ONLY_REASON) return "append-only";
-    if (reason.endsWith(growthTail)) return "growth";
     if (reason === sizeReason(0) || reason === sizeReason(1)) return "size";
     return "unrecognized";
   }

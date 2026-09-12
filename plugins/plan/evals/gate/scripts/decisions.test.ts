@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { APPEND_ONLY_REASON, DENY_REASON, growthReason, sizeReason } from "../../../hooks/gate";
+import { APPEND_ONLY_REASON, DENY_REASON, sizeReason } from "../../../hooks/gate";
 import { bySession, caseId, classifyResponse, type Decision, type Present } from "./decisions";
 
 describe("classifyResponse", () => {
@@ -11,7 +11,11 @@ describe("classifyResponse", () => {
       "This plan exceeds 12k characters. Plans this large are rarely approved",
       "gate:size",
     ],
-    ["growth", growthReason(2, 8000, 9000), "gate:growth"],
+    [
+      "growth, retired",
+      "Presentation 2 is larger than any before it (8000 -> 9000 chars).",
+      "gate:growth",
+    ],
     ["append-only", APPEND_ONLY_REASON, "gate:append-only"],
     [
       "append-only, 12k era",

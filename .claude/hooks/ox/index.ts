@@ -3,7 +3,7 @@
 import { execFile } from "node:child_process";
 import { readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
@@ -32,6 +32,7 @@ const StopInput = z.looseObject({
   hook_event_name: z.literal("Stop"),
   session_id: z.string(),
   transcript_path: z.string(),
+  cwd: z.string(),
   stop_hook_active: z.boolean().optional(),
 });
 
@@ -118,8 +119,7 @@ async function fileExists(filePath: string): Promise<boolean> {
 // A gitignored path (scratch under tmp/, a nested worktree) can never be
 // committed, so gating Stop on its lint errors blocks the session on throwaway
 // content. git check-ignore drops those while keeping new untracked source
-// files in scope, which `git ls-files` would not. Paths outside any repo exit
-// 128 and stay in scope.
+// files in scope, which `git ls-files` would not.
 async function isIgnored(filePath: string): Promise<boolean> {
   try {
     await execFileAsync("git", ["check-ignore", "-q", filePath], { cwd: dirname(filePath) });
@@ -127,6 +127,16 @@ async function isIgnored(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// The gate speaks for one project, so it considers only what lies under the
+// directory the session is working in. A file edited elsewhere belongs to
+// another repo or to no repo at all, such as a scratch script under the
+// session's own temp directory, and its lint errors are not this project's to
+// block on.
+function withinCwd(filePath: string, cwd: string): boolean {
+  const rel = relative(cwd, filePath);
+  return rel !== "" && !isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`);
 }
 
 // An argv array rather than a shell string, so a file path is never spliced
@@ -244,7 +254,7 @@ async function runOx(
   }
 }
 
-export async function parseTranscript(transcriptPath: string): Promise<string[]> {
+export async function parseTranscript(transcriptPath: string, cwd: string): Promise<string[]> {
   if (!(await fileExists(transcriptPath))) {
     return [];
   }
@@ -276,7 +286,7 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
 
   const checks = [...candidates].map(async (path) => ({
     path,
-    keep: (await fileExists(path)) && !(await isIgnored(path)),
+    keep: withinCwd(path, cwd) && (await fileExists(path)) && !(await isIgnored(path)),
   }));
   const results = await Promise.all(checks);
   return results.filter((result) => result.keep).map((result) => result.path);
@@ -617,7 +627,7 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
     return null;
   }
 
-  const sections = await runOxGate(await parseTranscript(input.transcript_path));
+  const sections = await runOxGate(await parseTranscript(input.transcript_path, input.cwd));
   if (sections == null || sections === "") {
     await clearBlocks(input.session_id);
     return null;

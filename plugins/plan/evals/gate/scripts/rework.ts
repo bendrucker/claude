@@ -7,6 +7,7 @@ import { ARMS, armReason } from "./arms";
 import { caseId, type Present, Presents } from "./decisions";
 import {
   type CaseResult,
+  CaseResult as CaseResultSchema,
   lineAccounting,
   nearLimit,
   overLimit,
@@ -101,7 +102,7 @@ async function runJob(job: Job, options: RunOptions): Promise<CaseResult | null>
   const resultPath = join(resultsDir, `${id}.json`);
   if (await Bun.file(resultPath).exists()) {
     console.log(`[${job.arm}] ${id} cached`);
-    return decodeJson(CaseResult, await Bun.file(resultPath).text(), resultPath);
+    return decodeJson(CaseResultSchema, await Bun.file(resultPath).text(), resultPath);
   }
 
   const dir = join(ROOT, "workdir", options.run, job.arm, id);

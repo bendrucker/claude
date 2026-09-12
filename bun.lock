@@ -242,6 +242,9 @@
         "table": "^6.9.0",
         "zod": "^4.4.3",
       },
+      "devDependencies": {
+        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
+      },
     },
     "plugins/pull-request": {
       "name": "pull-request",

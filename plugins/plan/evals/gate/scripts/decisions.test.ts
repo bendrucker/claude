@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { APPEND_ONLY_REASON, DENY_REASON, growthReason, sizeReason } from "../../../hooks/gate";
-import { bySession, caseId, classifyResponse, type Present } from "./decisions";
+import { bySession, caseId, classifyResponse, type Decision, type Present } from "./decisions";
 
 describe("classifyResponse", () => {
-  it.each([
+  it.each<[string, string | null, Decision]>([
     ["size, 10k era", sizeReason(0), "gate:size"],
     ["size, re-armed", sizeReason(1), "gate:size"],
     [

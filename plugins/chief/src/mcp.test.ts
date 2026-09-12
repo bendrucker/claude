@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { createMcpServers, type McpServers } from "./mcp";
 import { createStubStore } from "./store";
@@ -31,7 +32,9 @@ afterEach(async () => {
 
 async function connectClient(path: string): Promise<Client> {
   const client = new Client({ name: "test-client", version: "0.0.0" });
-  await client.connect(new StreamableHTTPClientTransport(new URL(`${baseUrl}${path}`)));
+  const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}${path}`));
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- StreamableHTTPClientTransport's sessionId getter returns string | undefined, which the SDK's own Transport interface (sessionId?: string) rejects under exactOptionalPropertyTypes.
+  await client.connect(transport as Transport);
   return client;
 }
 
@@ -46,8 +49,11 @@ function isTextContent(item: unknown): item is { type: "text"; text: string } {
   );
 }
 
-function textOf(content: unknown[]): string {
-  const item = content.find(isTextContent);
+function textOf(result: Awaited<ReturnType<Client["callTool"]>>): string {
+  if (!("content" in result) || !Array.isArray(result.content)) {
+    throw new Error("result has no content array");
+  }
+  const item = result.content.find(isTextContent);
   if (!item) throw new Error("no text content in result");
   return item.text;
 }
@@ -81,7 +87,7 @@ test("node path refuses hold", async () => {
 test("inbox returns the stub row", async () => {
   const client = await connectClient("/mcp");
   const result = await client.callTool({ name: "inbox", arguments: {} });
-  expect(JSON.parse(textOf(result.content))).toMatchInlineSnapshot(`
+  expect(JSON.parse(textOf(result))).toMatchInlineSnapshot(`
     [
       {
         "id": "claude-hook:s1:idle_prompt",
@@ -103,7 +109,7 @@ test("inbox returns the stub row", async () => {
 test("status via node path reports counts", async () => {
   const client = await connectClient("/node/mcp");
   const result = await client.callTool({ name: "status", arguments: {} });
-  expect(JSON.parse(textOf(result.content))).toMatchInlineSnapshot(`
+  expect(JSON.parse(textOf(result))).toMatchInlineSnapshot(`
     {
       "counts": {
         "boundary": {

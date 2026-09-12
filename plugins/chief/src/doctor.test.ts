@@ -17,7 +17,12 @@ const CONFIG_PATH = join(import.meta.dirname, "__fixtures__", "doctor.config.tes
 const FOCUS_PATH = join(import.meta.dirname, "__fixtures__", "doctor.focus.test.json");
 
 const CONFIG: Config = {
-  ntfy: { url: "http://127.0.0.1:2586", topic: "chief", replies: "chief-replies", token: "tk_test" },
+  ntfy: {
+    url: "http://127.0.0.1:2586",
+    topic: "chief",
+    replies: "chief-replies",
+    token: "tk_test",
+  },
   herdr: { agent: "chief" },
   presence: { focusFile: FOCUS_PATH, calendar: true, workHours: ["09:00", "18:00"] },
   grace: { permission: "3m", idle: "10m" },
@@ -29,13 +34,20 @@ afterEach(async () => {
 });
 
 function fakeFetch(handler: (url: string) => Response): typeof fetch {
-  return Object.assign((url: string | URL) => Promise.resolve(handler(url.toString())), {
-    preconnect: () => undefined,
-  });
+  return Object.assign(
+    (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      return Promise.resolve(handler(url));
+    },
+    { preconnect: () => undefined },
+  );
 }
 
 test("checkHealthz passes on a 200 and fails otherwise", async () => {
-  const ok = await checkHealthz("http://x", fakeFetch(() => new Response("{}", { status: 200 })));
+  const ok = await checkHealthz(
+    "http://x",
+    fakeFetch(() => new Response("{}", { status: 200 })),
+  );
   expect(ok).toEqual({ name: "daemon healthz", status: "pass" });
 
   const down = await checkHealthz(

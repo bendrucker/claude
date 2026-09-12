@@ -1,25 +1,25 @@
 import type { LedgerRow, Presence, Tier } from "./types";
 
 export interface InboxInput {
-  tier?: Tier;
-  state?: LedgerRow["state"];
-  limit?: number;
+  tier?: Tier | undefined;
+  state?: LedgerRow["state"] | undefined;
+  limit?: number | undefined;
 }
 
 export interface HoldInput {
   id: string;
-  for?: "1h" | "3h" | "1d";
-  until?: string;
+  for?: "1h" | "3h" | "1d" | undefined;
+  until?: string | undefined;
 }
 
 export interface AckInput {
   id: string;
-  note?: string;
+  note?: string | undefined;
 }
 
 export interface DispatchInput {
   text: string;
-  target?: "studio";
+  target?: "studio" | undefined;
 }
 
 export interface WhyInput {
@@ -30,7 +30,7 @@ export interface AppendInput {
   key: string;
   kind: string;
   title: string;
-  payload?: Record<string, unknown>;
+  payload?: Record<string, unknown> | undefined;
 }
 
 export interface StatusResult {
@@ -72,7 +72,11 @@ const EMPTY_STATE_COUNTS: Record<LedgerRow["state"], number> = {
 };
 
 function emptyCounts(): Record<Tier, Record<LedgerRow["state"], number>> {
-  return { now: { ...EMPTY_STATE_COUNTS }, boundary: { ...EMPTY_STATE_COUNTS }, digest: { ...EMPTY_STATE_COUNTS } };
+  return {
+    now: { ...EMPTY_STATE_COUNTS },
+    boundary: { ...EMPTY_STATE_COUNTS },
+    digest: { ...EMPTY_STATE_COUNTS },
+  };
 }
 
 export interface StubStoreOptions {
@@ -118,7 +122,8 @@ export function createStubStore(options: StubStoreOptions = {}): Store {
 
   return {
     inbox(input) {
-      const wantedStates = input.state !== undefined ? [input.state] : (["open", "held", "pushed"] as const);
+      const wantedStates: readonly LedgerRow["state"][] =
+        input.state !== undefined ? [input.state] : ["open", "held", "pushed"];
       const result = rows
         .filter((row) => input.tier === undefined || row.tier === input.tier)
         .filter((row) => wantedStates.includes(row.state))
@@ -127,7 +132,8 @@ export function createStubStore(options: StubStoreOptions = {}): Store {
       return Promise.resolve(result);
     },
     hold(input) {
-      const releaseAt = input.until != null && input.until !== "" ? input.until : now().toISOString();
+      const releaseAt =
+        input.until != null && input.until !== "" ? input.until : now().toISOString();
       return Promise.resolve(transition(input.id, { state: "held", releaseAt }));
     },
     ack(input) {

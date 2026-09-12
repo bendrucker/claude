@@ -64,7 +64,14 @@ Once ntfy serves:
 
 1. Install the ntfy iOS app, set its default server to the tailnet URL the installer printed for `tailscale serve`, and add the token from `~/.config/chief/config.json`. A subscription made before the default server is set goes to `ntfy.sh` with the topic name.
 2. Subscribe to the `chief` topic. Now and boundary rows arrive with Hold 1h, After meeting, and Drop buttons, which post to the `chief-replies` topic and land in the ledger as holds and drops.
-3. Add the `chief` and `chief-node` upstreams to `~/.config/tailgate/tailgate.hujson` by hand (the snippet is in the dotfiles PR), send tailgate SIGHUP, then add tailgate's `chief` URL as an Open Minis connector and complete the consent page.
+3. Add the `chief` and `chief-node` upstreams to `~/.config/tailgate/tailgate.hujson` by hand, mirroring the `things` upstream's policy entry, then send tailgate SIGHUP:
+
+   ```jsonc
+   "chief": { "transport": "http", "url": "http://127.0.0.1:7391/mcp" },
+   "chief-node": { "transport": "http", "url": "http://127.0.0.1:7391/node/mcp" },
+   ```
+
+4. Add tailgate's `chief` URL as an Open Minis connector and complete the consent page.
 
 ## Verifying
 

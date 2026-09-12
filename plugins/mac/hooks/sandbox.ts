@@ -1,20 +1,28 @@
 #!/usr/bin/env bun
 
 import { basename, extname } from "node:path";
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 
-const ToolInput = z.looseObject({ command: z.string().optional().catch(undefined) });
+// This hook gates every Bash call and cannot report a failure to load, so it
+// narrows its input by hand and carries no runtime dependency.
+interface HookInput {
+  tool_input?: unknown;
+}
 
-const HookInput = z.looseObject({
-  hook_event_name: z.literal("PreToolUse"),
-  session_id: z.string().catch(""),
-  transcript_path: z.string().catch(""),
-  cwd: z.string().catch(""),
-  tool_name: z.string().catch(""),
-  tool_input: z.unknown().catch(undefined),
-  tool_use_id: z.string().catch(""),
-}) satisfies z.ZodType<PreToolUseHookInput>;
+interface CommandInput {
+  command: string;
+}
+
+function hasCommand(toolInput: unknown): toolInput is CommandInput {
+  if (toolInput == null || typeof toolInput !== "object") return false;
+  if (!("command" in toolInput)) return false;
+  return typeof toolInput.command === "string" && toolInput.command !== "";
+}
+
+function isPreToolUse(value: unknown): value is HookInput {
+  if (value == null || typeof value !== "object") return false;
+  return "hook_event_name" in value && value.hook_event_name === "PreToolUse";
+}
 
 const SHELL_OPERATORS = /\s*(?:&&|\|\||[|;])\s*/;
 const SCRIPT_INTERPRETERS = new Set(["bun", "node"]);
@@ -77,7 +85,7 @@ export async function hasBypassMarker(path: string): Promise<boolean> {
   return head ? head.includes(SCRIPT_MARKER) : false;
 }
 
-function disableSandbox(toolInput: z.infer<typeof ToolInput>): SyncHookJSONOutput {
+function disableSandbox(toolInput: CommandInput): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
@@ -87,13 +95,13 @@ function disableSandbox(toolInput: z.infer<typeof ToolInput>): SyncHookJSONOutpu
 }
 
 export async function processInput(
-  input: PreToolUseHookInput,
+  input: HookInput,
   platform = process.platform,
 ): Promise<SyncHookJSONOutput | null> {
   if (platform !== "darwin") return null;
 
-  const toolInput = ToolInput.safeParse(input.tool_input).data;
-  if (toolInput?.command == null || toolInput.command === "") return null;
+  const toolInput = input.tool_input;
+  if (!hasCommand(toolInput)) return null;
 
   for (const { scriptArg } of extractCommands(toolInput.command)) {
     // oxlint-disable-next-line no-await-in-loop -- first match wins: the scan stops at the first command carrying a bypass marker.
@@ -106,13 +114,18 @@ export async function processInput(
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: unknown;
   try {
-    input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
+    input = JSON.parse(await Bun.stdin.text());
   } catch (error) {
     console.error(
       `[mac/sandbox] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
+    return;
+  }
+
+  if (!isPreToolUse(input)) {
+    console.error("[mac/sandbox] Hook input is not a PreToolUse event");
     return;
   }
 

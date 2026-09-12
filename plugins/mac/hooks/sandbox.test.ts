@@ -109,10 +109,14 @@ describe("processInput", () => {
     expect(result).toBeNull();
   });
 
-  test("returns null when command is undefined", async () => {
-    const input = makeInput({});
-    const result = await processInput(input, "darwin");
-    expect(result).toBeNull();
+  test.each([
+    ["command is undefined", {}],
+    ["command is empty", { command: "" }],
+    ["command is not a string", { command: 42 }],
+    ["tool input is not an object", "ls"],
+    ["tool input is absent", undefined],
+  ])("returns null when %s", async (_label, toolInput) => {
+    expect(await processInput(makeInput(toolInput), "darwin")).toBeNull();
   });
 
   test("disables sandbox for marked bun script", async () => {

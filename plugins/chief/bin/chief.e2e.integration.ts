@@ -4,8 +4,12 @@ import { join } from "node:path";
 import { startServer, type ChiefServer } from "../src/server";
 import { createStubStore } from "../src/store";
 
-const LEDGER_PATH = join(import.meta.dirname, "__fixtures__", "chief.e2e.test.jsonl");
-const MCP_CONFIG_PATH = join(import.meta.dirname, "__fixtures__", "chief.e2e.mcp-config.json");
+const LEDGER_PATH = join(import.meta.dirname, "__fixtures__", "chief.e2e.integration.jsonl");
+const MCP_CONFIG_PATH = join(
+  import.meta.dirname,
+  "__fixtures__",
+  "chief.e2e.integration.mcp-config.json",
+);
 
 const claudeAvailable = Bun.which("claude") !== null;
 
@@ -39,7 +43,7 @@ test.skipIf(!claudeAvailable)(
         [
           "claude",
           "-p",
-          "call the status tool and print its JSON",
+          "call the chief MCP server's status tool and print its raw JSON result",
           "--model",
           "haiku",
           "--strict-mcp-config",
@@ -57,5 +61,5 @@ test.skipIf(!claudeAvailable)(
       await chief?.server.stop(true);
     }
   },
-  60_000,
+  120_000,
 );

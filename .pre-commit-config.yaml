@@ -5,6 +5,7 @@ repos:
         name: Plugin tests
         language: system
         files: ^plugins/
+        require_serial: true
         entry: scripts/prek-check.sh plugin-test
 
       - id: plugin-validate

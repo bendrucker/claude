@@ -31,6 +31,7 @@
     "plugins/meme",
     ".claude/skills/agent-ideas",
     "plugins/comments/evals/comment-density",
+    "plugins/chief",
     "plugins/pull-request/evals/pr-body",
     "packages/oxlint-rules"
   ],

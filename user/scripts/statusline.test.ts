@@ -410,6 +410,12 @@ describe("pane metadata report", () => {
     },
   });
 
+  // A detached child racing a poll needs slack on a loaded machine. The poll has
+  // to expire inside the test's own budget so the named error surfaces instead of
+  // bun:test's generic timeout.
+  const reportPollMs = 20_000;
+  const reportTestMs = reportPollMs + 5_000;
+
   async function recordedArgs(transcript: string): Promise<string[]> {
     const dir = mkdtempSync(join(tmpdir(), "statusline-herdr-"));
     const bin = join(dir, "bin");
@@ -448,7 +454,7 @@ describe("pane metadata report", () => {
       // The reporting child is detached so the line renders at its own speed,
       // which lands the stub's log after the status line has already exited.
       // oxlint-disable no-await-in-loop -- polling for another process's write is sequential by nature.
-      const deadline = Date.now() + 10_000;
+      const deadline = Date.now() + reportPollMs;
       while (Date.now() < deadline) {
         const text = await Bun.file(log)
           .text()
@@ -457,7 +463,7 @@ describe("pane metadata report", () => {
         await Bun.sleep(25);
       }
       // oxlint-enable no-await-in-loop
-      return [];
+      throw new Error(`herdr stub never recorded report-metadata within ${reportPollMs}ms`);
     } finally {
       await Promise.all([
         rm(dir, { recursive: true, force: true }),
@@ -467,20 +473,28 @@ describe("pane metadata report", () => {
     }
   }
 
-  test("carries the title token and the dial to herdr", async () => {
-    const args = await recordedArgs(
-      `${JSON.stringify({ type: "ai-title", aiTitle: "Herdr sidebar redesign", sessionId })}\n`,
-    );
-    const tokens = args.filter((_arg, i) => args[i - 1] === "--token");
-    expect(tokens).toEqual(["title=Herdr sidebar redesign", dialToken]);
-  });
+  test(
+    "carries the title token and the dial to herdr",
+    async () => {
+      const args = await recordedArgs(
+        `${JSON.stringify({ type: "ai-title", aiTitle: "Herdr sidebar redesign", sessionId })}\n`,
+      );
+      const tokens = args.filter((_arg, i) => args[i - 1] === "--token");
+      expect(tokens).toEqual(["title=Herdr sidebar redesign", dialToken]);
+    },
+    reportTestMs,
+  );
 
-  test("clears the title before the session is named", async () => {
-    const args = await recordedArgs(
-      `${JSON.stringify({ type: "user", message: { role: "user", content: "hi" } })}\n`,
-    );
-    const tokens = args.filter((_arg, i) => args[i - 1] === "--token");
-    expect(tokens).toEqual([dialToken]);
-    expect(args.filter((_arg, i) => args[i - 1] === "--clear-token")).toContain("title");
-  });
+  test(
+    "clears the title before the session is named",
+    async () => {
+      const args = await recordedArgs(
+        `${JSON.stringify({ type: "user", message: { role: "user", content: "hi" } })}\n`,
+      );
+      const tokens = args.filter((_arg, i) => args[i - 1] === "--token");
+      expect(tokens).toEqual([dialToken]);
+      expect(args.filter((_arg, i) => args[i - 1] === "--clear-token")).toContain("title");
+    },
+    reportTestMs,
+  );
 });

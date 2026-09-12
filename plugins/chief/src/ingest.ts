@@ -183,8 +183,11 @@ export async function drainSpool(path: string, deps: IngestDeps): Promise<number
   const file = Bun.file(path);
   if (!(await file.exists())) return 0;
 
-  const lines = (await file.text()).split("\n").filter((line) => line.trim() !== "");
+  // Replay a snapshot, then keep only what a tap appended after it was taken.
+  const snapshot = await file.text();
+  const lines = snapshot.split("\n").filter((line) => line.trim() !== "");
   const count = await drainLines(lines, deps, 0);
-  await Bun.write(path, "");
+  const current = await Bun.file(path).text();
+  await Bun.write(path, current.slice(snapshot.length));
   return count;
 }

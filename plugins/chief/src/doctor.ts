@@ -9,7 +9,9 @@ const DEFAULT_BASE_URL = "http://127.0.0.1:7391";
 const PROBE_TIMEOUT_MS = 1500;
 
 const ConfigSchema = z.object({
-  ntfy: z.object({ url: z.string(), topic: z.string(), replies: z.string(), token: z.string() }),
+  ntfy: z
+    .object({ url: z.string(), topic: z.string(), replies: z.string(), token: z.string() })
+    .optional(),
   herdr: z.object({ agent: z.string() }),
   presence: z.object({
     focusFile: z.string(),
@@ -97,10 +99,12 @@ export async function checkNtfy(
 ): Promise<DoctorCheck> {
   const name = "ntfy reachable";
   if (!config) return skip(name, "config unavailable");
+  const { ntfy } = config;
+  if (!ntfy) return skip(name, "no ntfy block in config");
 
   try {
-    const response = await fetchImpl(`${config.ntfy.url}/${config.ntfy.topic}/json`, {
-      headers: { Authorization: `Bearer ${config.ntfy.token}` },
+    const response = await fetchImpl(`${ntfy.url}/${ntfy.topic}/json`, {
+      headers: { Authorization: `Bearer ${ntfy.token}` },
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
     if (response.status === 401 || response.status === 403) return fail(name, "token rejected");

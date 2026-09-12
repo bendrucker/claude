@@ -152,16 +152,31 @@ export async function startDaemon(
   const store = deps.createStore(() => lastDoorbell);
   await drainSpool(deps.spoolPath, deps.ingestDeps);
 
+  let releasing = false;
   async function releaseCheck(): Promise<void> {
+    // The doorbell's retry ladder can outlast the interval; a second pass would push the same rows again.
+    if (releasing) return;
+    releasing = true;
+    try {
+      await releaseDue();
+    } finally {
+      releasing = false;
+    }
+  }
+
+  async function releaseDue(): Promise<void> {
     const rows = [...(await readLedger(deps.ledgerPath)).values()];
     for (const row of due(rows, now())) {
       // oxlint-disable-next-line no-await-in-loop -- ledger transitions must serialize
       const pushed = await transitionLedger(row.id, { state: "pushed" }, deps.ledgerPath, now());
       if (deps.ntfy) {
-        // oxlint-disable-next-line no-await-in-loop -- one publish per row, in ledger order
-        await publish(pushed, deps.ntfy).catch((error: unknown) =>
-          console.error("ntfy publish", error),
-        );
+        try {
+          // oxlint-disable-next-line no-await-in-loop -- one publish per row, in ledger order
+          const response = await publish(pushed, deps.ntfy);
+          if (!response.ok) console.error("ntfy publish", response.status, pushed.id);
+        } catch (error) {
+          console.error("ntfy publish", error);
+        }
       }
       // oxlint-disable-next-line no-await-in-loop -- doorbell rings must serialize
       const result = await ringDoorbell(deps.herdrAgent);

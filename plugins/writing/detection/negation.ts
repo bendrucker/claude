@@ -289,6 +289,62 @@ const PAST_VERB_SHAPE = /ed$/i;
 // Adverbs sit between a subject and its verb ("nothing else does", "nothing
 // ever landed"), so the clause test reads past them.
 const SUBJECT_ADVERBS = new Set(["else", "ever", "never", "still", "yet", "even", "also", "just"]);
+const IRREGULAR_PAST = new Set([
+  "became",
+  "began",
+  "broke",
+  "brought",
+  "built",
+  "came",
+  "caught",
+  "chose",
+  "drew",
+  "drove",
+  "fell",
+  "felt",
+  "found",
+  "gave",
+  "got",
+  "grew",
+  "held",
+  "hit",
+  "kept",
+  "knew",
+  "led",
+  "left",
+  "lost",
+  "made",
+  "meant",
+  "met",
+  "paid",
+  "put",
+  "ran",
+  "read",
+  "rose",
+  "said",
+  "sat",
+  "saw",
+  "sent",
+  "set",
+  "shook",
+  "spent",
+  "split",
+  "spread",
+  "stood",
+  "struck",
+  "stuck",
+  "swept",
+  "taught",
+  "thought",
+  "threw",
+  "told",
+  "took",
+  "understood",
+  "went",
+  "woke",
+  "won",
+  "wrote",
+]);
 
 function isAdverb(word: string): boolean {
   return SUBJECT_ADVERBS.has(word) || ADVERB_SUFFIX.test(word);
@@ -300,6 +356,7 @@ function opensClause(words: (string | undefined)[], bare: boolean): boolean {
   if (next === undefined) return false;
   if (AUXILIARIES.has(next)) return true;
   if (CLOSED_CLASS_GOVERNORS.has(next)) return false;
+  if (IRREGULAR_PAST.has(next)) return true;
   // After a determiner head only the past shape is safe: "no new dispositions"
   // puts an -s noun after an adjective head, "no kind held" a verb.
   return bare ? FINITE_VERB_SHAPE.test(next) : PAST_VERB_SHAPE.test(next);
@@ -375,6 +432,7 @@ const NOT_CUE = /\b(?:not|never|cannot)\b|n['’]t\b/gi;
 const WORD_TOKEN = /[A-Za-z]+(?:['’][A-Za-z]+)?/g;
 const NONASSERTIVE = new Set(["any", "anything", "anyone", "anywhere", "either"]);
 const NONASSERTIVE_WINDOW = 4;
+const CLAUSE_BREAK = /[,;:()[\]\u2013\u2014]/;
 
 /**
  * The not-negation counterpart, for the no:not ratio. A negated verb licenses
@@ -396,10 +454,13 @@ export function notNegationHits(text: string): Hits {
 /** End offset of the first nonassertive indefinite within the window after `from`. */
 function nonassertiveAfter(sentence: string, from: number): number | undefined {
   WORD_TOKEN.lastIndex = from;
+  let previousEnd = from;
   for (let seen = 0; seen < NONASSERTIVE_WINDOW; seen++) {
     const word = WORD_TOKEN.exec(sentence);
-    if (word === null) return undefined;
+    if (word === null || CLAUSE_BREAK.test(sentence.slice(previousEnd, word.index)))
+      return undefined;
     if (NONASSERTIVE.has(word[0].toLowerCase())) return word.index + word[0].length;
+    previousEnd = word.index + word[0].length;
   }
   return undefined;
 }
@@ -432,7 +493,7 @@ export const NO_NEGATION_PATTERN: PatternDef = {
     "The sweep skips work nobody performs twice.",
   ],
   evidence:
-    "2026-09 session-corpus measurement over PR bodies, Write/Edit content, commit messages, and chat. The raw rate does not separate assistant prose from the human baseline, because both carry ordinary predication (has no tests, there is no lock). The no:not ratio does: on shared verbs assistant chat picks the no-form 4.4:1 against the human's 2.7:1, PR bodies reach 10:1, and for cost, say, show, find, and report the not-form never appears. 43% of 1,768 PR bodies carry an instance, and code comments run 2.67 per 1000 words. have forms supply 46% of raw hits and are Tottie's (1991) be/have exception, so they are excluded along with the other closed classes. Both taggers mis-tag the governing verb on this construction, which is why the detector decides it by closed-class exclusion instead. Calibration on 400 uniform-random hits from assistant chat and Write/Edit content, labeled in four rounds of 100 with each round drawn after the fixes the previous round motivated: precision 0.87, 0.90, 0.90, then 0.97 (Wilson 95% 0.92 to 0.99) on the final round. The residual false positive is a relative clause on the determiner form whose verb is irregular or -s (a repo no bot reviews), which needs the governor's part of speech. Of the true hits, a third have a ready positive term (a no-op, unchanged, empty), two thirds carry a negation that is the content and belongs on the verb.",
+    "2026-09 session-corpus measurement over PR bodies, Write/Edit content, commit messages, and chat. The raw rate does not separate assistant prose from the human baseline, because both carry ordinary predication (has no tests, there is no lock). The no:not ratio does: on shared verbs assistant chat picks the no-form 4.4:1 against the human's 2.7:1, PR bodies reach 10:1, and for cost, say, show, find, and report the not-form never appears. 43% of 1,768 PR bodies carry an instance, and code comments run 2.67 per 1000 words. have forms supply 46% of raw hits and are Tottie's (1991) be/have exception, so they are excluded along with the other closed classes. Both taggers mis-tag the governing verb on this construction, which is why the detector decides it by closed-class exclusion instead. Calibration on 400 uniform-random hits from assistant chat and Write/Edit content, labeled in four rounds of 100 with each round drawn after the fixes the previous round motivated: precision 0.87, 0.90, 0.90, then 0.97 (Wilson 95% 0.92 to 0.99) on the final round. A separate 50-hit draw from the user role was 35 parts relayed agent text, so the human comparison comes from the voice corpus. The residual false positive is a relative clause on the determiner form whose verb is irregular or -s (a repo no bot reviews), which needs the governor's part of speech. Of the true hits, a third have a ready positive term (a no-op, unchanged, empty), two thirds carry a negation that is the content and belongs on the verb.",
   retire:
     "Retire the pattern when the no_negation_share rate feature sits at the human voice baseline for a 30-day window. Add a governing word to CLOSED_CLASS_GOVERNORS when writing:scan shows it flagging the human baseline at the assistant's rate.",
 };

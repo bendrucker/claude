@@ -51,6 +51,8 @@ describe("noNegationHits", () => {
     "It catches disagreement no gate would notice.",
     "The agent confirmed no other instance survives the sweep.",
     "The stub declares a size no kind reached in the split.",
+    "A green probe means nothing went wrong in the sweep.",
+    "The trace lists a path no worker took twice.",
   ];
 
   it.each(flag)('flags: "%s"', (text) => {
@@ -120,6 +122,8 @@ describe("notNegationHits", () => {
     "Anything the parser rejects lands in the queue.",
     "The audit never ran.",
     "It does not matter which worker drains the queue first, as long as any one of them does.",
+    "It does not apply, but anyone can run it.",
+    "The guard is not held (anything else drains first).",
   ];
 
   it.each(flag)('flags: "%s"', (text) => {

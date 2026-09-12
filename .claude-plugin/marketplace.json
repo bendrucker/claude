@@ -181,7 +181,7 @@
     },
     {
       "name": "chief",
-      "description": "Notification triage daemon: tiers Claude Code hook events and herdr activity, releases them at boundaries or in a digest",
+      "description": "Triage alerts from Claude sessions, herdr panes, and phone into a tiered ledger so only what needs you gets through",
       "source": "./plugins/chief"
     }
   ]

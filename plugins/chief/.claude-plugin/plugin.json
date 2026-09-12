@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "chief",
+  "description": "Triage alerts from Claude sessions, herdr panes, and phone into a tiered ledger so only what needs you gets through",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  },
+  "mcpServers": {
+    "chief": {
+      "command": "bun",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/chief.ts", "mcp"]
+    }
+  }
+}

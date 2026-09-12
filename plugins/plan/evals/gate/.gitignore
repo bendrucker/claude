@@ -1,0 +1,6 @@
+# Mined presentations carry work-host plan text and never land in this repo.
+data/
+# Replay decisions and rework runs, regenerated per run.
+results/
+# Scratch plan directories the rework runner hands to each headless session.
+workdir/

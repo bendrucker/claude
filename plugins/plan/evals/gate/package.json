@@ -1,0 +1,16 @@
+{
+  "name": "plan-gate-eval",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mine": "bun scripts/mine.ts",
+    "replay": "bun scripts/replay.ts",
+    "rework": "bun scripts/rework.ts",
+    "report": "bun scripts/report.ts"
+  },
+  "dependencies": {
+    "cleye": "^2.2.1",
+    "table": "^6.9.0",
+    "zod": "^4.4.3"
+  }
+}

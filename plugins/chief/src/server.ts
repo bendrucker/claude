@@ -22,15 +22,30 @@ function hasAllowedHost(req: Request, allowedHosts: Set<string>): boolean {
   return allowedHosts.has(req.headers.get("host") ?? "");
 }
 
-export const HerdrAgentListSchema = z.object({
-  agents: z.array(z.object({ pane: z.string(), agent_session: z.object({ value: z.string() }) })),
+const HerdrAgentsSchema = z.object({
+  agents: z.array(
+    z.object({ pane_id: z.string(), agent_session: z.object({ value: z.string() }).nullable() }),
+  ),
 });
+// The CLI wraps its result in a { id, result } envelope.
+export const HerdrAgentListSchema = z.union([
+  z.object({ result: HerdrAgentsSchema }),
+  HerdrAgentsSchema,
+]);
 
 export async function herdrListAgents(): Promise<HerdrAgentList> {
   const proc = Bun.spawn(["herdr", "agent", "list"], { stdout: "pipe" });
   const output = await new Response(proc.stdout).text();
   await proc.exited;
-  return HerdrAgentListSchema.parse(JSON.parse(output));
+  const parsed = HerdrAgentListSchema.parse(JSON.parse(output));
+  const { agents } = "result" in parsed ? parsed.result : parsed;
+  return {
+    agents: agents.flatMap((agent) =>
+      agent.agent_session === null
+        ? []
+        : [{ pane: agent.pane_id, agent_session: agent.agent_session }],
+    ),
+  };
 }
 
 async function handleIngest(
@@ -79,6 +94,7 @@ export function startServer(deps: ChiefServerDeps, options: ChiefServerOptions =
   let allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
 
   const server = Bun.serve({
+    development: false,
     port,
     hostname: options.hostname ?? "127.0.0.1",
     fetch(req) {

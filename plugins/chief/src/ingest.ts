@@ -30,7 +30,7 @@ export async function resolvePane(
   sessionId: string,
   listAgents: ListAgents,
 ): Promise<string | undefined> {
-  const { agents } = await listAgents();
+  const { agents } = await listAgents().catch(() => ({ agents: [] }));
   return agents.find((agent) => agent.agent_session.value === sessionId)?.pane;
 }
 

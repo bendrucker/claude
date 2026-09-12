@@ -23,7 +23,7 @@ test.skipIf(!claudeAvailable)(
   async () => {
     let chief: ChiefServer | undefined;
     try {
-      chief = await startServer(
+      chief = startServer(
         {
           store: createStubStore(),
           ingestDeps: {

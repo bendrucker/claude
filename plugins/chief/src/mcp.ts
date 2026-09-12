@@ -100,8 +100,7 @@ function registerFullTools(server: McpServer, store: Store): void {
 }
 
 export interface McpEndpoint {
-  server: McpServer;
-  transport: WebStandardStreamableHTTPServerTransport;
+  handleRequest(req: Request): Promise<Response>;
 }
 
 export interface McpServers {
@@ -109,20 +108,26 @@ export interface McpServers {
   node: McpEndpoint;
 }
 
-async function connectedEndpoint(build: (server: McpServer) => void): Promise<McpEndpoint> {
-  const server = new McpServer({ name: "chief", version: "0.0.0" });
-  build(server);
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: () => crypto.randomUUID(),
-  });
-  await server.connect(transport);
-  return { server, transport };
+// One server and transport per request: a stateful transport binds to its first client and rejects
+// every later initialize, and the SDK's stateless transport refuses reuse across requests. The daemon
+// outlives many bridge and tailgate clients, and registering a handful of tools per request is cheap.
+function statelessEndpoint(build: (server: McpServer) => void): McpEndpoint {
+  return {
+    async handleRequest(req) {
+      const server = new McpServer({ name: "chief", version: "0.0.0" });
+      build(server);
+      const transport = new WebStandardStreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+      });
+      await server.connect(transport);
+      return transport.handleRequest(req);
+    },
+  };
 }
 
-export async function createMcpServers(store: Store): Promise<McpServers> {
-  const [full, node] = await Promise.all([
-    connectedEndpoint((server) => registerFullTools(server, store)),
-    connectedEndpoint((server) => registerNodeTools(server, store)),
-  ]);
-  return { full, node };
+export function createMcpServers(store: Store): McpServers {
+  return {
+    full: statelessEndpoint((server) => registerFullTools(server, store)),
+    node: statelessEndpoint((server) => registerNodeTools(server, store)),
+  };
 }

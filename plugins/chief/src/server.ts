@@ -70,11 +70,8 @@ export interface ChiefServer {
   mcp: McpServers;
 }
 
-export async function startServer(
-  deps: ChiefServerDeps,
-  options: ChiefServerOptions = {},
-): Promise<ChiefServer> {
-  const mcp = await createMcpServers(deps.store);
+export function startServer(deps: ChiefServerDeps, options: ChiefServerOptions = {}): ChiefServer {
+  const mcp = createMcpServers(deps.store);
   const startedAt = deps.startedAt ?? new Date();
   const port = options.port ?? PORT;
   let allowedHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
@@ -86,9 +83,9 @@ export async function startServer(
       const url = new URL(req.url);
       switch (url.pathname) {
         case "/mcp":
-          return mcp.full.transport.handleRequest(req);
+          return mcp.full.handleRequest(req);
         case "/node/mcp":
-          return mcp.node.transport.handleRequest(req);
+          return mcp.node.handleRequest(req);
         case "/ingest":
           return handleIngest(req, deps.ingestDeps, allowedHosts);
         case "/healthz":
@@ -151,7 +148,7 @@ export async function startDaemon(
   }
 
   const startedAt = deps.startedAt ?? now();
-  const server = await startServer({ store, ingestDeps: deps.ingestDeps, startedAt }, options);
+  const server = startServer({ store, ingestDeps: deps.ingestDeps, startedAt }, options);
 
   const scheduleOption = deps.schedule !== undefined ? { schedule: deps.schedule } : {};
   const timers = startTimers({

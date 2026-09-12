@@ -11,15 +11,15 @@ let servers: McpServers;
 let server: ReturnType<typeof Bun.serve>;
 let baseUrl: string;
 
-beforeEach(async () => {
-  servers = await createMcpServers(createStubStore({ startedAt: FIXED_NOW, now: () => FIXED_NOW }));
+beforeEach(() => {
+  servers = createMcpServers(createStubStore({ startedAt: FIXED_NOW, now: () => FIXED_NOW }));
   server = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
     fetch(req) {
       const url = new URL(req.url);
-      if (url.pathname === "/mcp") return servers.full.transport.handleRequest(req);
-      if (url.pathname === "/node/mcp") return servers.node.transport.handleRequest(req);
+      if (url.pathname === "/mcp") return servers.full.handleRequest(req);
+      if (url.pathname === "/node/mcp") return servers.node.handleRequest(req);
       return new Response("not found", { status: 404 });
     },
   });
@@ -147,4 +147,11 @@ test("status via node path reports counts", async () => {
       },
     }
   `);
+});
+
+test("a second client can initialize against the same endpoint", async () => {
+  const first = await connectClient("/mcp");
+  const second = await connectClient("/mcp");
+  const [a, b] = await Promise.all([first.listTools(), second.listTools()]);
+  expect(b.tools.map((tool) => tool.name)).toEqual(a.tools.map((tool) => tool.name));
 });

@@ -7,7 +7,7 @@ import { createStubStore } from "./store";
 
 const LEDGER_PATH = join(import.meta.dirname, "__fixtures__", "server.test.jsonl");
 
-async function boot(): Promise<ChiefServer> {
+function boot(): ChiefServer {
   return startServer(
     {
       store: createStubStore(),
@@ -26,7 +26,7 @@ afterEach(async () => {
 });
 
 test("healthz reports ok", async () => {
-  const { server } = await boot();
+  const { server } = boot();
   try {
     const response = await fetch(`http://127.0.0.1:${server.port}/healthz`, {
       headers: { host: `127.0.0.1:${server.port}` },
@@ -39,7 +39,7 @@ test("healthz reports ok", async () => {
 });
 
 test("ingest rejects a non-loopback Host", async () => {
-  const { server } = await boot();
+  const { server } = boot();
   try {
     const response = await fetch(`http://127.0.0.1:${server.port}/ingest`, {
       method: "POST",
@@ -54,7 +54,7 @@ test("ingest rejects a non-loopback Host", async () => {
 });
 
 test("ingest accepts a loopback Host and appends a tiered row", async () => {
-  const { server } = await boot();
+  const { server } = boot();
   try {
     const response = await fetch(`http://127.0.0.1:${server.port}/ingest`, {
       method: "POST",

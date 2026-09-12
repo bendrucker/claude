@@ -10,6 +10,8 @@ import {
   type IngestDeps,
 } from "./ingest";
 import { createMcpServers, type McpServers } from "./mcp";
+import { publish, type NtfyConfig } from "./ntfy";
+import { subscribe, type Reply } from "./replies";
 import { due } from "./release";
 import { start as startTimers, type Schedule, type TimersHandle } from "./timers";
 import type { Store } from "./store";
@@ -106,6 +108,7 @@ export interface DaemonDeps {
   spoolPath: string;
   herdrAgent: string;
   workHours: [string, string];
+  ntfy?: NtfyConfig;
   createStore: (getLastDoorbell: () => "ok" | "stalled" | null) => Store;
   now?: () => Date;
   schedule?: Schedule;
@@ -115,6 +118,7 @@ export interface DaemonDeps {
 
 export interface ChiefDaemon extends ChiefServer {
   timers: TimersHandle;
+  unsubscribe: () => void;
 }
 
 // chief serve drains the hook-tap spool once at start, then relies on timers.ts to poll the
@@ -135,7 +139,13 @@ export async function startDaemon(
     const rows = [...(await readLedger(deps.ledgerPath)).values()];
     for (const row of due(rows, now())) {
       // oxlint-disable-next-line no-await-in-loop -- ledger transitions must serialize
-      await transitionLedger(row.id, { state: "pushed" }, deps.ledgerPath, now());
+      const pushed = await transitionLedger(row.id, { state: "pushed" }, deps.ledgerPath, now());
+      if (deps.ntfy) {
+        // oxlint-disable-next-line no-await-in-loop -- one publish per row, in ledger order
+        await publish(pushed, deps.ntfy).catch((error: unknown) =>
+          console.error("ntfy publish", error),
+        );
+      }
       // oxlint-disable-next-line no-await-in-loop -- doorbell rings must serialize
       const result = await ringDoorbell(deps.herdrAgent);
       lastDoorbell = result.status;
@@ -159,5 +169,25 @@ export async function startDaemon(
     ...scheduleOption,
   });
 
-  return { ...server, timers };
+  const HOLD_FOR = ["1h", "3h", "1d"] as const;
+  async function applyReply(reply: Reply): Promise<void> {
+    if (reply.op === "drop") {
+      await transitionLedger(reply.id, { state: "dropped" }, deps.ledgerPath, now());
+      return;
+    }
+    if (reply.op !== "hold") return;
+    const holdFor = HOLD_FOR.find((value) => value === reply.for);
+    await store.hold(
+      holdFor !== undefined ? { id: reply.id, for: holdFor } : { id: reply.id, until: reply.until },
+    );
+  }
+  const unsubscribe = deps.ntfy
+    ? subscribe(
+        deps.ntfy,
+        (reply) =>
+          void applyReply(reply).catch((error: unknown) => console.error("ntfy reply", error)),
+      )
+    : () => {};
+
+  return { ...server, timers, unsubscribe };
 }

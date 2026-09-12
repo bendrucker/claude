@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 import { checkConfig, configPath, formatCheck, runDoctor } from "../src/doctor";
 import { ring } from "../src/doorbell";
 import { append } from "../src/ledger";
-import { herdrListAgents, startDaemon } from "../src/server";
+import { herdrListAgents, startDaemon, type DaemonDeps } from "../src/server";
 import { createLedgerStore, DEFAULT_WORK_HOURS, stateDir } from "../src/store";
 import type { LedgerRow } from "../src/types";
 
@@ -182,18 +182,17 @@ const serveCmd = command({ name: "serve" }, async () => {
   const decisionsPath = join(stateDir(), "decisions.jsonl");
   const spoolPath = join(stateDir(), "ingest.spool.jsonl");
 
-  await startDaemon(
-    {
-      ingestDeps: { listAgents: herdrListAgents },
-      ledgerPath,
-      spoolPath,
-      herdrAgent,
-      workHours,
-      createStore: (getLastDoorbell) =>
-        createLedgerStore({ ledgerPath, decisionsPath, workHours, getLastDoorbell }),
-    },
-    { port: port() },
-  );
+  const daemonDeps: DaemonDeps = {
+    ingestDeps: { listAgents: herdrListAgents },
+    ledgerPath,
+    spoolPath,
+    herdrAgent,
+    workHours,
+    createStore: (getLastDoorbell) =>
+      createLedgerStore({ ledgerPath, decisionsPath, workHours, getLastDoorbell }),
+  };
+  if (config?.ntfy) daemonDeps.ntfy = config.ntfy;
+  await startDaemon(daemonDeps, { port: port() });
   console.log(`chief serving on ${baseUrl()}`);
 });
 

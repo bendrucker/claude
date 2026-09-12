@@ -24,7 +24,11 @@ function hasAllowedHost(req: Request, allowedHosts: Set<string>): boolean {
 
 const HerdrAgentsSchema = z.object({
   agents: z.array(
-    z.object({ pane_id: z.string(), agent_session: z.object({ value: z.string() }).nullable() }),
+    z.object({
+      pane_id: z.string(),
+      name: z.string().optional(),
+      agent_session: z.object({ value: z.string() }).nullable(),
+    }),
   ),
 });
 // The CLI wraps its result in a { id, result } envelope.
@@ -43,7 +47,7 @@ export async function herdrListAgents(): Promise<HerdrAgentList> {
     agents: agents.flatMap((agent) =>
       agent.agent_session === null
         ? []
-        : [{ pane: agent.pane_id, agent_session: agent.agent_session }],
+        : [{ pane: agent.pane_id, name: agent.name, agent_session: agent.agent_session }],
     ),
   };
 }

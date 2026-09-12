@@ -183,7 +183,7 @@ const serveCmd = command({ name: "serve" }, async () => {
   const spoolPath = join(stateDir(), "ingest.spool.jsonl");
 
   const daemonDeps: DaemonDeps = {
-    ingestDeps: { listAgents: herdrListAgents },
+    ingestDeps: { listAgents: herdrListAgents, ignoreAgent: herdrAgent },
     ledgerPath,
     spoolPath,
     herdrAgent,

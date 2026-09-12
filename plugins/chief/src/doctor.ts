@@ -127,7 +127,7 @@ export async function checkHerdrAgent(
 
   try {
     const { agents } = await listAgents();
-    const found = agents.some((agent) => agent.agent === config.herdr.agent);
+    const found = agents.some((agent) => agent.name === config.herdr.agent);
     return found ? pass(name) : fail(name, `no agent named ${config.herdr.agent}`);
   } catch (error) {
     return fail(name, error instanceof Error ? error.message : String(error));

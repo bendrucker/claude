@@ -17,6 +17,7 @@ export type HookPayload = z.infer<typeof HookPayloadSchema>;
 
 export interface HerdrAgent {
   pane: string;
+  name?: string;
   agent_session: { value: string };
 }
 
@@ -45,6 +46,7 @@ const DEFAULT_GRACE_PERMISSION = "3m";
 
 export interface IngestDeps {
   listAgents: ListAgents;
+  ignoreAgent?: string;
   ledgerPath?: string;
   now?: () => Date;
   presence?: Presence;
@@ -138,7 +140,10 @@ export async function ingest(
   const result = tier(event);
   if (!result) return undefined;
 
-  const pane = await resolvePane(payload.session_id, deps.listAgents);
+  const { agents } = await deps.listAgents().catch(() => ({ agents: [] }));
+  const agent = agents.find((a) => a.agent_session.value === payload.session_id);
+  if (deps.ignoreAgent !== undefined && agent?.name === deps.ignoreAgent) return undefined;
+  const pane = agent?.pane;
   const key = `${payload.session_id}:${payload.notification_type ?? result.kind}`;
   const row: LedgerRow = {
     id: `claude-hook:${key}`,

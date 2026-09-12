@@ -185,3 +185,15 @@ test("does not throw on an already-resolved row when re-ingesting Stop", async (
   const rows = [...(await read(LEDGER_PATH)).values()];
   expect(rows.find((row) => row.kind === "permission_prompt")?.state).toBe("resolved");
 });
+
+test("ingest drops events from the chief agent's own session", async () => {
+  const listAgents: IngestDeps["listAgents"] = () =>
+    Promise.resolve({
+      agents: [{ pane: "%9", name: "chief", agent_session: { value: "chief-session" } }],
+    });
+  const row = await ingest(
+    { hook_event_name: "Stop", session_id: "chief-session" },
+    deps({ listAgents, ignoreAgent: "chief" }),
+  );
+  expect(row).toBeUndefined();
+});

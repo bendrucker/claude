@@ -126,6 +126,15 @@
             "type": "command"
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c 'bun \"$HOME/.claude/hooks/chief-tap.ts\"; exit 0'"
+          }
+        ]
       }
     ],
     "PermissionDenied": [
@@ -156,6 +165,14 @@
             "async": false,
             "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c 'bun \"$HOME/.claude/hooks/chief-tap.ts\"; exit 0'"
           }
         ]
       }
@@ -202,6 +219,15 @@
           }
         ],
         "matcher": "ExitPlanMode"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c 'bun \"$HOME/.claude/hooks/chief-tap.ts\"; exit 0'"
+          }
+        ],
+        "matcher": "AskUserQuestion"
       }
     ],
     "PreCompact": [
@@ -326,6 +352,15 @@
             "type": "command"
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c 'bun \"$HOME/.claude/hooks/chief-tap.ts\"; exit 0'"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -343,6 +378,14 @@
             "async": true,
             "command": "'/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c 'bun \"$HOME/.claude/hooks/chief-tap.ts\"; exit 0'"
           }
         ]
       }

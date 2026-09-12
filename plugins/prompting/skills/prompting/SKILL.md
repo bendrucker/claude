@@ -45,9 +45,9 @@ Do not merge two sequences. Each step becomes visible from the one before it, an
 
 State the goal first: what the work is for, before any instruction. Then give the constraints and leave room to adapt.
 
-A document that gives the what without the why leaves the model to infer the goal, and it takes the wrong approach when no instruction fits the case. That is the XY problem. The goal lets the model make a trade-off the document never anticipated.
+A document that gives the what without the why leaves the model to infer the goal, and it takes the wrong approach when no instruction fits the case. That is the XY problem. The goal lets the model make a trade-off the document never anticipated. Name where a run finds the conventions the document does not cover, and give them precedence over its defaults.
 
-A document that dictates an exact sequence of tool calls degrades output and goes stale as the environment shifts. When a document keeps accreting steps to patch failures, the fix is usually a clearer goal.
+A document that dictates an exact sequence of tool calls degrades output and goes stale as the environment shifts. When a document keeps accreting steps to patch failures, the fix is usually a clearer goal. Keep a step the goal cannot imply: an ordering constraint, or a call the model would not otherwise make. Cut a step that only restates what the goal already demands.
 
 Pair the goal with the instructions the model needs to reach it. Each instruction earns its place by correcting where the model goes wrong without it. The goal stays true as models change, and a steering instruction expires when the behavior it patches does. A stronger model takes more of the work from the goal and needs fewer instructions. Fix more of the process in the harness when a cheaper model runs the document.
 

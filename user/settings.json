@@ -466,13 +466,6 @@
         "repo": "anthropics/claude-plugins-official"
       }
     },
-    "astral-sh": {
-      "source": {
-        "source": "github",
-        "repo": "astral-sh/claude-code-plugins",
-        "ref": "f3ce88a7ba830f53afd6d944c1d0278ed318e142"
-      }
-    },
     "ast-grep-marketplace": {
       "source": {
         "source": "github",

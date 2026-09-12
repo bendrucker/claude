@@ -20,9 +20,7 @@ const IngestBodySchema = z.object({
 });
 
 export const HerdrAgentListSchema = z.object({
-  agents: z.array(
-    z.object({ pane: z.string(), agent_session: z.object({ value: z.string() }) }),
-  ),
+  agents: z.array(z.object({ pane: z.string(), agent_session: z.object({ value: z.string() }) })),
 });
 
 export async function herdrListAgents(): Promise<HerdrAgentList> {

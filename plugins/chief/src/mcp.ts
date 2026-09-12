@@ -45,7 +45,11 @@ function registerFullTools(server: McpServer, store: Store): void {
     {
       title: "Inbox",
       description: "Rows newest first, default open+held+pushed",
-      inputSchema: { tier: TierSchema.optional(), state: StateSchema.optional(), limit: z.number().optional() },
+      inputSchema: {
+        tier: TierSchema.optional(),
+        state: StateSchema.optional(),
+        limit: z.number().optional(),
+      },
     },
     async (args) => textResult(await store.inbox(args)),
   );

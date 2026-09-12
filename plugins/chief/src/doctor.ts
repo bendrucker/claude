@@ -18,7 +18,10 @@ const ConfigSchema = z.object({
 });
 export type Config = z.infer<typeof ConfigSchema>;
 
-const HerdrAgentSchema = z.looseObject({ agent: z.string().optional(), pane: z.string().optional() });
+const HerdrAgentSchema = z.looseObject({
+  agent: z.string().optional(),
+  pane: z.string().optional(),
+});
 const HerdrAgentListSchema = z.object({ agents: z.array(HerdrAgentSchema) });
 const HerdrListResponseSchema = z.union([
   HerdrAgentListSchema,
@@ -59,7 +62,9 @@ function skip(name: string, detail: string): DoctorCheck {
 export async function checkHealthz(baseUrl: string, fetchImpl: typeof fetch): Promise<DoctorCheck> {
   const name = "daemon healthz";
   try {
-    const response = await fetchImpl(`${baseUrl}/healthz`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    const response = await fetchImpl(`${baseUrl}/healthz`, {
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
     return response.ok ? pass(name) : fail(name, `HTTP ${response.status}`);
   } catch (error) {
     return fail(name, error instanceof Error ? error.message : String(error));
@@ -84,7 +89,10 @@ export async function checkConfig(path: string): Promise<ConfigCheckResult> {
   }
 }
 
-export async function checkNtfy(config: Config | undefined, fetchImpl: typeof fetch): Promise<DoctorCheck> {
+export async function checkNtfy(
+  config: Config | undefined,
+  fetchImpl: typeof fetch,
+): Promise<DoctorCheck> {
   const name = "ntfy reachable";
   if (!config) return skip(name, "config unavailable");
 

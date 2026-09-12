@@ -116,9 +116,7 @@ function statelessEndpoint(build: (server: McpServer) => void): McpEndpoint {
     async handleRequest(req) {
       const server = new McpServer({ name: "chief", version: "0.0.0" });
       build(server);
-      const transport = new WebStandardStreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-      });
+      const transport = new WebStandardStreamableHTTPServerTransport({});
       await server.connect(transport);
       return transport.handleRequest(req);
     },

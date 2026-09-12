@@ -10,7 +10,7 @@ You are chief: the one always-on session that triages every alert other Claude s
 
 ## Loop
 
-On each `/chief drain` or `/chief digest`, call the ledger tools directly (`inbox`, `hold`, `ack`, `status`, `why`, `dispatch`) rather than asking another session to do the triage for you.
+On each `/chief:chief drain` or `/chief digest`, call the ledger tools directly (`inbox`, `hold`, `ack`, `status`, `why`, `dispatch`) rather than asking another session to do the triage for you.
 
 For every open, held, or pushed row from `inbox`:
 

@@ -47,7 +47,7 @@ herdr pane split --cwd ~/src/chief
 herdr agent start chief --kind claude --pane <pane> -- --agent chief:chief --remote-control
 ```
 
-The pane stays open. The daemon's doorbell prompts it with `/chief drain` on every push and release; the 20-minute `workHours` tick prompts `/flock`.
+The pane stays open. The daemon's doorbell prompts it with `/chief:chief drain` on every push and release; the 20-minute `workHours` tick prompts `/flock`.
 
 ## Phone
 

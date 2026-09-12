@@ -41,7 +41,7 @@ async function retry(
 
 export function ring(
   agent: string,
-  text = "/chief drain",
+  text = "/chief:chief drain",
   spawn: Spawn = herdrSpawn,
   sleep: Sleep = (ms) => Bun.sleep(ms),
 ): Promise<RingResult> {

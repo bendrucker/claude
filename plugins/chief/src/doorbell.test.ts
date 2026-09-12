@@ -19,7 +19,7 @@ function statusSequence(statuses: string[]): {
 test("succeeds on the first spawn with no retries", async () => {
   const { spawn, calls } = statusSequence(["ok"]);
   const sleeps: number[] = [];
-  const result = await ring("chief", "/chief drain", spawn, (ms) => {
+  const result = await ring("chief", "/chief:chief drain", spawn, (ms) => {
     sleeps.push(ms);
     return Promise.resolve();
   });
@@ -31,7 +31,7 @@ test("succeeds on the first spawn with no retries", async () => {
 test("retries through the ladder until the agent unblocks", async () => {
   const { spawn } = statusSequence(["agent_blocked", "agent_blocked", "ok"]);
   const sleeps: number[] = [];
-  const result = await ring("chief", "/chief drain", spawn, (ms) => {
+  const result = await ring("chief", "/chief:chief drain", spawn, (ms) => {
     sleeps.push(ms);
     return Promise.resolve();
   });
@@ -42,7 +42,7 @@ test("retries through the ladder until the agent unblocks", async () => {
 test("reports stalled after exhausting the ladder", async () => {
   const { spawn } = statusSequence(["agent_blocked"]);
   const sleeps: number[] = [];
-  const result = await ring("chief", "/chief drain", spawn, (ms) => {
+  const result = await ring("chief", "/chief:chief drain", spawn, (ms) => {
     sleeps.push(ms);
     return Promise.resolve();
   });

@@ -64,6 +64,12 @@ test.each([
     expected: "held",
   },
   {
+    name: "drop",
+    run: (store: ReturnType<typeof createLedgerStore>) =>
+      store.drop({ id: "claude-hook:s1:idle_prompt" }),
+    expected: "dropped",
+  },
+  {
     name: "ack",
     run: (store: ReturnType<typeof createLedgerStore>) =>
       store.ack({ id: "claude-hook:s1:idle_prompt" }),
@@ -79,6 +85,19 @@ test.each([
   const next = await run(store);
   expect(next.state).toBe(expected);
 });
+
+test.each(["acked", "resolved", "dropped"] as const)(
+  "hold and drop ignore a %s row",
+  async (state) => {
+    appendLedger(row({ state }), LEDGER_PATH);
+    const store = createLedgerStore({ ledgerPath: LEDGER_PATH, decisionsPath: DECISIONS_PATH });
+
+    const held = await store.hold({ id: "claude-hook:s1:idle_prompt", for: "1h" });
+    expect(held.state).toBe(state);
+    const dropped = await store.drop({ id: "claude-hook:s1:idle_prompt" });
+    expect(dropped.state).toBe(state);
+  },
+);
 
 test("ack appends a decision using the row's reason as the default note", async () => {
   appendLedger(row(), LEDGER_PATH);

@@ -5,7 +5,9 @@ import { append as appendDecision } from "./decisions";
 import {
   ack as ledgerAck,
   append as appendLedger,
+  drop as ledgerDrop,
   hold as ledgerHold,
+  holdReleaseAt,
   read as ledgerRead,
   type HoldInput as LedgerHoldInput,
 } from "./ledger";
@@ -23,6 +25,10 @@ export interface HoldInput {
   id: string;
   for?: "1h" | "3h" | "1d" | undefined;
   until?: string | undefined;
+}
+
+export interface DropInput {
+  id: string;
 }
 
 export interface AckInput {
@@ -61,12 +67,17 @@ export interface WhyResult {
 export interface Store {
   inbox(input: InboxInput): Promise<LedgerRow[]>;
   hold(input: HoldInput): Promise<LedgerRow>;
+  drop(input: DropInput): Promise<LedgerRow>;
   ack(input: AckInput): Promise<LedgerRow>;
   dispatch(input: DispatchInput): Promise<LedgerRow>;
   status(): Promise<StatusResult>;
   why(input: WhyInput): Promise<WhyResult>;
   append(input: AppendInput): Promise<LedgerRow>;
 }
+
+// hold and drop no-op once a row has settled, so a stale phone action (or a retry) never
+// reopens a decision the chief agent or another device already made.
+const TERMINAL_STATES: ReadonlySet<LedgerRow["state"]> = new Set(["acked", "resolved", "dropped"]);
 
 const STUB_PRESENCE: Presence = {
   focus: null,
@@ -95,6 +106,7 @@ function emptyCounts(): Record<Tier, Record<LedgerRow["state"], number>> {
 export interface StubStoreOptions {
   rows?: LedgerRow[];
   presence?: Presence;
+  workHours?: [string, string];
   startedAt?: Date;
   lastDoorbell?: "ok" | "stalled" | null;
   now?: () => Date;
@@ -117,6 +129,7 @@ const SAMPLE_ROW: LedgerRow = {
 export function createStubStore(options: StubStoreOptions = {}): Store {
   const rows = options.rows ?? [SAMPLE_ROW];
   const presence = options.presence ?? STUB_PRESENCE;
+  const workHours = options.workHours ?? DEFAULT_WORK_HOURS;
   const startedAt = options.startedAt ?? new Date();
   const now = options.now ?? (() => new Date());
   let lastDoorbell = options.lastDoorbell ?? null;
@@ -145,9 +158,16 @@ export function createStubStore(options: StubStoreOptions = {}): Store {
       return Promise.resolve(result);
     },
     hold(input) {
-      const releaseAt =
-        input.until != null && input.until !== "" ? input.until : now().toISOString();
+      const current = find(input.id);
+      if (TERMINAL_STATES.has(current.state)) return Promise.resolve(current);
+      const nowValue = now();
+      const releaseAt = holdReleaseAt(input, nowValue, { presence, workHours });
       return Promise.resolve(transition(input.id, { state: "held", releaseAt }));
+    },
+    drop(input) {
+      const current = find(input.id);
+      if (TERMINAL_STATES.has(current.state)) return Promise.resolve(current);
+      return Promise.resolve(transition(input.id, { state: "dropped" }));
     },
     ack(input) {
       const reason = input.note != null && input.note !== "" ? input.note : find(input.id).reason;
@@ -346,12 +366,19 @@ export function createLedgerStore(options: LedgerStoreOptions = {}): Store {
         .toSorted((a, b) => b.ts.localeCompare(a.ts));
       return rows.slice(0, input.limit ?? rows.length);
     },
-    hold(input) {
+    async hold(input) {
+      const current = await find(input.id);
+      if (TERMINAL_STATES.has(current.state)) return current;
       return ledgerHold(input.id, toLedgerHoldInput(input), ledgerPath, {
         now: now(),
         presence,
         workHours,
       });
+    },
+    async drop(input) {
+      const current = await find(input.id);
+      if (TERMINAL_STATES.has(current.state)) return current;
+      return ledgerDrop(input.id, ledgerPath, now());
     },
     async ack(input) {
       const row = await find(input.id);

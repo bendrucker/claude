@@ -86,8 +86,8 @@ export async function transition(
 }
 
 export interface HoldInput {
-  for?: string;
-  until?: string;
+  for?: string | undefined;
+  until?: string | undefined;
 }
 
 export interface HoldContext {
@@ -106,7 +106,7 @@ export async function hold(
   return transition(id, { state: "held", releaseAt: holdReleaseAt(input, now, ctx) }, path, now);
 }
 
-function holdReleaseAt(input: HoldInput, now: Date, ctx: HoldContext): string {
+export function holdReleaseAt(input: HoldInput, now: Date, ctx: HoldContext): string {
   if (input.for != null && input.for !== "") {
     return new Date(now.getTime() + parseDuration(input.for)).toISOString();
   }

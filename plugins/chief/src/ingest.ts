@@ -17,7 +17,7 @@ export type HookPayload = z.infer<typeof HookPayloadSchema>;
 
 export interface HerdrAgent {
   pane: string;
-  name?: string;
+  name?: string | undefined;
   agent_session: { value: string };
 }
 

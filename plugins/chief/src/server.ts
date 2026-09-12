@@ -165,6 +165,9 @@ export async function startDaemon(
     releasing = true;
     try {
       await releaseDue();
+    } catch (error) {
+      lastDoorbell = "stalled";
+      console.error("release check failed", error);
     } finally {
       releasing = false;
     }
@@ -186,8 +189,13 @@ export async function startDaemon(
   }
 
   async function flockTick(): Promise<void> {
-    const result = await ringDoorbell(deps.herdrAgent, "/flock tick");
-    lastDoorbell = result.status;
+    try {
+      const result = await ringDoorbell(deps.herdrAgent, "/flock tick");
+      lastDoorbell = result.status;
+    } catch (error) {
+      lastDoorbell = "stalled";
+      console.error("flock tick failed", error);
+    }
   }
 
   const startedAt = deps.startedAt ?? now();

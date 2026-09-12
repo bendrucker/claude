@@ -1,7 +1,15 @@
 import { z } from "zod";
 
-const SpawnResult = z.looseObject({ status: z.string() });
-export type SpawnResult = z.infer<typeof SpawnResult>;
+// herdr answers with { id, result } on success and { id, error: { code } } on refusal.
+const HerdrEnvelope = z.looseObject({ error: z.looseObject({ code: z.string() }).optional() });
+export interface SpawnResult {
+  status: string;
+}
+
+export function parseSpawnOutput(output: string): SpawnResult {
+  const envelope = HerdrEnvelope.parse(JSON.parse(output));
+  return { status: envelope.error?.code ?? "ok" };
+}
 
 export type Spawn = (agent: string, text: string) => Promise<SpawnResult>;
 export type Sleep = (ms: number) => Promise<void>;
@@ -17,7 +25,7 @@ async function herdrSpawn(agent: string, text: string): Promise<SpawnResult> {
   const proc = Bun.spawn(["herdr", "agent", "prompt", agent, text], { stdout: "pipe" });
   const output = await new Response(proc.stdout).text();
   await proc.exited;
-  return SpawnResult.parse(JSON.parse(output));
+  return parseSpawnOutput(output);
 }
 
 async function retry(

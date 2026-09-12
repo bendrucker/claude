@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { RETRY_LADDER_MS, ring, type SpawnResult } from "./doorbell";
+import { parseSpawnOutput, RETRY_LADDER_MS, ring, type SpawnResult } from "./doorbell";
 
 function statusSequence(statuses: string[]): {
   spawn: () => Promise<SpawnResult>;
@@ -48,4 +48,18 @@ test("reports stalled after exhausting the ladder", async () => {
   });
   expect(result).toEqual({ status: "stalled", attempts: RETRY_LADDER_MS.length + 1 });
   expect(sleeps).toEqual(RETRY_LADDER_MS);
+});
+
+test.each([
+  { output: '{"id":"cli:agent:prompt","result":{"agent":{"name":"chief"}}}', status: "ok" },
+  {
+    output: '{"error":{"code":"agent_blocked","message":"blocked"},"id":"cli:agent:prompt"}',
+    status: "agent_blocked",
+  },
+  {
+    output: '{"error":{"code":"agent_not_found","message":"no"},"id":"cli:agent:prompt"}',
+    status: "agent_not_found",
+  },
+])("parseSpawnOutput maps herdr's envelope to $status", ({ output, status }) => {
+  expect(parseSpawnOutput(output)).toEqual({ status });
 });

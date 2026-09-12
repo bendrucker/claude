@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@napi-rs/canvas": "^0.1.65",
+    "@napi-rs/canvas": "^1.0.0",
     "cleye": "^2.2.1",
     "sharp": "^0.35.0",
     "zod": "^4.4.3"

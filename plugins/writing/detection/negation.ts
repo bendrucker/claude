@@ -1,16 +1,6 @@
-// No-negation (Tottie, Negation in English Speech and Writing, 1991): the
-// negation rides on a negative indefinite in object position ("carries no
-// weight") where English would otherwise put it on the verb ("doesn't carry
-// weight"). The governing verbs are an open set that shifts by model
-// generation, so this keys on the grammar and excludes the cases human writing
-// prefers in the no-form.
+// No-negation (Tottie, Negation in English Speech and Writing, 1991): the negation rides on a negative indefinite in object position ("carries no weight") where English would otherwise put it on the verb ("doesn't carry weight"). The governing verbs are an open set that shifts by model generation, so this keys on the grammar and excludes the cases human writing prefers in the no-form.
 //
-// Pure and tagger-free: hooks import this path through PATTERNS.
-//
-// Callers pass code-stripped text. collectMatches (tropes.ts) and scanAll
-// (scan.ts) both run stripCode before invoking a pattern's test, and score.ts
-// strips before its custom matcher, so importing stripCode here would only add
-// a circular edge.
+// Callers pass code-stripped text. collectMatches (tropes.ts) and scanAll (scan.ts) both run stripCode before invoking a pattern's test, and score.ts strips before its custom matcher, so importing stripCode here would only add a circular edge.
 
 import { COPULA_FORMS } from "../linguistics/tags";
 import { splitSentences } from "./sentences";
@@ -39,7 +29,6 @@ export const PREDICATION_GOVERNORS = new Set([
 
 /** Closed classes take no object, so an indefinite after one is a quantified phrase or the next clause, never a negated object. */
 export const CLOSED_CLASS_GOVERNORS = new Set([
-  // determiners and quantifiers
   "a",
   "an",
   "the",
@@ -68,7 +57,6 @@ export const CLOSED_CLASS_GOVERNORS = new Set([
   "our",
   "my",
   "your",
-  // pronouns
   "i",
   "you",
   "he",
@@ -89,7 +77,6 @@ export const CLOSED_CLASS_GOVERNORS = new Set([
   "here",
   "itself",
   "themselves",
-  // prepositions
   "of",
   "in",
   "on",
@@ -136,7 +123,6 @@ export const CLOSED_CLASS_GOVERNORS = new Set([
   "along",
   "behind",
   "beside",
-  // conjunctions and subordinators
   "and",
   "or",
   "but",
@@ -168,7 +154,6 @@ export const CLOSED_CLASS_GOVERNORS = new Set([
   "thus",
   "hence",
   "plus",
-  // modals
   "can",
   "could",
   "will",
@@ -179,7 +164,6 @@ export const CLOSED_CLASS_GOVERNORS = new Set([
   "might",
   "must",
   "ought",
-  // degree and stance adverbs
   "almost",
   "nearly",
   "virtually",
@@ -360,7 +344,6 @@ function sentenceSpans(sentence: string): PatternSpan[] {
   return spans;
 }
 
-/** Every no-negation construction in `text`, with its offset in `text`. */
 export function noNegationSpans(text: string): PatternSpan[] {
   const spans: PatternSpan[] = [];
   let cursor = 0;

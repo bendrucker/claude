@@ -263,7 +263,6 @@ describe("negation_rate", () => {
   const compute = feature("negation_rate").compute;
 
   test("counts both forms per 1k words", () => {
-    // 16 words, 2 constructions.
     const text =
       "The wrapper adds nothing, and the audit doesn't find anything worth a second run.";
     const words = text.split(/\s+/).length;

@@ -111,7 +111,7 @@ export async function checkNtfy(
 }
 
 export function checkRepliesSubscription(): DoctorCheck {
-  return skip("ntfy replies subscription connected", "not wired up yet");
+  return skip("ntfy replies subscription connected", "daemon-side; see status");
 }
 
 export async function checkHerdrAgent(

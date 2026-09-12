@@ -155,7 +155,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --since 2026-07-01 --json
 bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --log /path/to/log.jsonl
 ```
 
-It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, per-category fire/suppress counts, and an acted-on column.
+It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, per-category fire/suppress counts, an acted-on column, and the unconfirmed pairs no whole-file re-scan closed.
 
 The acted-on column pairs each shown finding with the next checked run on the same file: a rule the later run no longer raises was acted on, one it still raises was written past. It reads `n/a` until pairs close, and the opportunities list reports acceptance as unmeasurable rather than printing a rate over no data. Recall is not measurable from this log, since a rule that never fires leaves no line.
 

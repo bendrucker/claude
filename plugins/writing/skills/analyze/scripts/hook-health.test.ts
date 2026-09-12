@@ -63,7 +63,15 @@ describe("summarize", () => {
     expect(health.byOutcome["skipped-scratch"]).toBe(1);
     expect(health.byTool.Bash).toBe(1);
     expect(health.categories).toEqual([
-      { category: "numbering", fired: 1, suppressed: 1, share: 0.5, revisited: 0, accepted: 0 },
+      {
+        category: "numbering",
+        fired: 1,
+        suppressed: 1,
+        share: 0.5,
+        revisited: 0,
+        accepted: 0,
+        unconfirmed: 0,
+      },
       {
         category: "spaced em dash",
         fired: 1,
@@ -71,6 +79,7 @@ describe("summarize", () => {
         share: 0.5,
         revisited: 0,
         accepted: 0,
+        unconfirmed: 0,
       },
     ]);
     expect(health.latency.max).toBe(20);
@@ -85,12 +94,12 @@ describe("acceptance", () => {
 
   it("counts a finding the next checked run no longer raises as acted on", () => {
     const counts = acceptance([shown(), entry({ target: "f1", categories: [] })]);
-    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 1 });
+    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 1, unconfirmed: 0 });
   });
 
   it("counts a finding the next checked run still raises as revisited only", () => {
     const counts = acceptance([shown(), entry({ target: "f1", categories: ["numbering"] })]);
-    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 0 });
+    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 0, unconfirmed: 0 });
   });
 
   it("pairs past a later run that ranked a different category first", () => {
@@ -103,7 +112,29 @@ describe("acceptance", () => {
         categories: ["numbering"],
       }),
     ]);
-    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 0 });
+    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 0, unconfirmed: 0 });
+  });
+
+  it("leaves a hunk-scoped edit's silence unconfirmed", () => {
+    const counts = acceptance([shown(), entry({ tool: "Edit", target: "f1", categories: [] })]);
+    expect(counts.get("numbering")).toEqual({ revisited: 0, accepted: 0, unconfirmed: 1 });
+  });
+
+  it("counts a hunk-scoped edit that still raises the rule as written past", () => {
+    const counts = acceptance([
+      shown(),
+      entry({ tool: "Edit", target: "f1", categories: ["numbering"] }),
+    ]);
+    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 0, unconfirmed: 0 });
+  });
+
+  it("closes the pair on a whole-file re-scan past a silent hunk edit", () => {
+    const counts = acceptance([
+      shown(),
+      entry({ tool: "Edit", target: "f1", categories: [] }),
+      entry({ tool: "Write", target: "f1", categories: [] }),
+    ]);
+    expect(counts.get("numbering")).toEqual({ revisited: 1, accepted: 1, unconfirmed: 0 });
   });
 
   it("seeds no pair from a suppressed finding", () => {
@@ -147,6 +178,7 @@ describe("opportunities", () => {
     share: 0.1,
     revisited: 25,
     accepted: 22,
+    unconfirmed: 0,
   };
 
   function baseline(overrides: Partial<HookHealth> = {}): HookHealth {

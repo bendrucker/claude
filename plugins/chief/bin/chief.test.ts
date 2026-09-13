@@ -82,12 +82,18 @@ async function waitForExit(pid: number): Promise<void> {
 
 test("chief mcp starts the daemon, bridges tools, and respawns after the daemon dies", async () => {
   const port = await findFreePort();
+  const actPort = await findFreePort();
   stateDir = join(STATE_ROOT, `daemon-lifecycle-${port}`);
 
   const transport = new StdioClientTransport({
     command: "bun",
     args: [BIN_PATH, "mcp"],
-    env: { ...process.env, CHIEF_STATE_DIR: stateDir, CHIEF_PORT: String(port) },
+    env: {
+      ...process.env,
+      CHIEF_STATE_DIR: stateDir,
+      CHIEF_PORT: String(port),
+      CHIEF_ACT_PORT: String(actPort),
+    },
   });
   const client = new Client({ name: "chief-lifecycle-test", version: "0.0.0" });
   await client.connect(transport);
@@ -97,6 +103,7 @@ test("chief mcp starts the daemon, bridges tools, and respawns after the daemon 
     "ack",
     "append",
     "dispatch",
+    "drop",
     "hold",
     "inbox",
     "status",

@@ -102,7 +102,6 @@ test("chief mcp starts the daemon, bridges tools, and respawns after the daemon 
   expect(first.tools.map((tool) => tool.name).toSorted()).toEqual([
     "ack",
     "append",
-    "dispatch",
     "drop",
     "hold",
     "inbox",

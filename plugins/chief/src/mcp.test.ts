@@ -64,7 +64,6 @@ test("full path lists every tool", async () => {
   expect(tools.map((tool) => tool.name).toSorted()).toEqual([
     "ack",
     "append",
-    "dispatch",
     "drop",
     "hold",
     "inbox",

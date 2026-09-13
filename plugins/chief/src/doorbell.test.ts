@@ -1,5 +1,11 @@
 import { expect, test } from "bun:test";
-import { parseSpawnOutput, RETRY_LADDER_MS, ring, type SpawnResult } from "./doorbell";
+import {
+  parseAgentStatus,
+  parseSpawnOutput,
+  RETRY_LADDER_MS,
+  ring,
+  type SpawnResult,
+} from "./doorbell";
 
 function statusSequence(statuses: string[]): {
   spawn: () => Promise<SpawnResult>;
@@ -62,4 +68,18 @@ test.each([
   },
 ])("parseSpawnOutput maps herdr's envelope to $status", ({ output, status }) => {
   expect(parseSpawnOutput(output)).toEqual({ status });
+});
+
+test.each([
+  {
+    output: '{"id":"cli:agent:get","result":{"agent":{"name":"chief","agent_status":"working"}}}',
+    status: "working",
+  },
+  {
+    output: '{"error":{"code":"agent_not_found","message":"no"},"id":"cli:agent:get"}',
+    status: "unknown",
+  },
+  { output: "not json", status: "unknown" },
+])("parseAgentStatus reads herdr agent get as $status", ({ output, status }) => {
+  expect(parseAgentStatus(output)).toBe(status);
 });

@@ -10,7 +10,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ensureActSecret } from "../src/act";
 import { checkConfig, configPath, formatCheck, runDoctor } from "../src/doctor";
-import { ring } from "../src/doorbell";
+import { herdrStatus, ring } from "../src/doorbell";
 import { append } from "../src/ledger";
 import { herdrListAgents, startDaemon, type DaemonDeps } from "../src/server";
 import { createLedgerStore, DEFAULT_WORK_HOURS, stateDir } from "../src/store";
@@ -190,6 +190,7 @@ const serveCmd = command({ name: "serve" }, async () => {
     ledgerPath,
     spoolPath,
     herdrAgent,
+    agentStatus: herdrStatus,
     workHours,
     actSecret,
     createStore: (getLastDoorbell) =>

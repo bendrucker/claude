@@ -6,7 +6,7 @@ Triage alerts from Claude sessions, herdr panes, and phone into a tiered ledger 
 
 - **Agent**: [`chief`](agents/chief.md) reads the ledger, decides hold or ack per row, and never edits code or pushes.
 - **Skill**: [`chief:chief`](skills/chief/SKILL.md) drives the agent's `drain` and `digest` loops from the herdr pane. `disable-model-invocation`, invoked only by the doorbell and the periodic tick.
-- **MCP server**: `chief`, a stdio bridge to the daemon's HTTP API (`inbox`, `hold`, `ack`, `dispatch`, `status`, `why`).
+- **MCP server**: `chief`, a stdio bridge to the daemon's HTTP API (`inbox`, `hold`, `ack`, `drop`, `status`, `why`).
 
 ## Testing
 

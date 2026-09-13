@@ -42,7 +42,7 @@ async function waitFor(condition: () => Promise<boolean> | boolean): Promise<voi
   throw new Error("condition never became true");
 }
 
-function boot(now: () => Date) {
+function boot(now: () => Date, agentStatus = () => Promise.resolve("idle")) {
   const scheduled: { fn: () => void; ms: number }[] = [];
   const rung: { agent: string; text: string | undefined }[] = [];
 
@@ -69,6 +69,7 @@ function boot(now: () => Date) {
         rung.push({ agent, text });
         return Promise.resolve({ status: "ok", attempts: 1 });
       },
+      agentStatus,
     },
     { port: 0, actPort: 0 },
   );
@@ -106,6 +107,25 @@ test("release check pushes due rows and rings the doorbell, feeding status.lastD
     const rows = [...(await readLedger(LEDGER_PATH)).values()];
     expect(rows.find((candidate) => candidate.id === row().id)?.state).toBe("pushed");
     expect(rung).toEqual([{ agent: "chief", text: undefined }]);
+  } finally {
+    running?.timers.stop();
+    await running?.server.stop(true);
+    await running?.act.stop(true);
+  }
+});
+
+test("release check pushes but does not ring while the chief is working", async () => {
+  appendLedger(row(), LEDGER_PATH);
+  const { daemon, scheduled, rung } = boot(
+    () => new Date("2026-01-01T09:00:00.000Z"),
+    () => Promise.resolve("working"),
+  );
+  let running: ChiefDaemon | undefined;
+  try {
+    running = await daemon;
+    scheduled[0]?.fn();
+    await waitFor(async () => (await readLedger(LEDGER_PATH)).get(row().id)?.state === "pushed");
+    expect(rung).toEqual([]);
   } finally {
     running?.timers.stop();
     await running?.server.stop(true);

@@ -13,11 +13,34 @@ export function parseSpawnOutput(output: string): SpawnResult {
 
 export type Spawn = (agent: string, text: string) => Promise<SpawnResult>;
 export type Sleep = (ms: number) => Promise<void>;
+export type Status = (agent: string) => Promise<string>;
+
+const HerdrAgentGet = z.looseObject({
+  result: z
+    .looseObject({ agent: z.looseObject({ agent_status: z.string().optional() }) })
+    .optional(),
+});
+
+// "unknown" when herdr has no agent by that name or the output is not its envelope.
+export function parseAgentStatus(output: string): string {
+  try {
+    return HerdrAgentGet.parse(JSON.parse(output)).result?.agent.agent_status ?? "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+export async function herdrStatus(agent: string): Promise<string> {
+  const proc = Bun.spawn(["herdr", "agent", "get", agent], { stdout: "pipe", stderr: "ignore" });
+  const output = await new Response(proc.stdout).text();
+  await proc.exited;
+  return parseAgentStatus(output);
+}
 
 export const RETRY_LADDER_MS = [30_000, 120_000, 600_000];
 
 export interface RingResult {
-  status: "ok" | "stalled";
+  status: "ok" | "stalled" | "skipped";
   attempts: number;
 }
 

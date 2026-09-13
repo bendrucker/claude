@@ -89,16 +89,6 @@ function registerFullTools(server: McpServer, store: Store): void {
   );
 
   server.registerTool(
-    "dispatch",
-    {
-      title: "Dispatch",
-      description: "Dispatch text to a node as a boundary-tier row",
-      inputSchema: { text: z.string(), target: z.literal("studio").optional() },
-    },
-    async (args) => textResult(await store.dispatch(args)),
-  );
-
-  server.registerTool(
     "why",
     {
       title: "Why",

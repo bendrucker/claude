@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { startActServer } from "./act";
 import { read as readLedger, transition as transitionLedger } from "./ledger";
-import { ring, type RingResult } from "./doorbell";
+import { ring, type RingResult, type Status } from "./doorbell";
 import {
   drainSpool,
   HookPayloadSchema,
@@ -137,6 +137,7 @@ export interface DaemonDeps {
   flockIntervalMs?: number;
   startedAt?: Date;
   ring?: (agent: string, text?: string) => Promise<RingResult>;
+  agentStatus?: Status;
 }
 
 export interface ChiefDaemon extends ChiefServer {
@@ -153,6 +154,13 @@ export async function startDaemon(
 ): Promise<ChiefDaemon> {
   const now = deps.now ?? (() => new Date());
   const ringDoorbell = deps.ring ?? ring;
+  const agentStatus = deps.agentStatus ?? (() => Promise.resolve("unknown"));
+  // A working chief drains what is in the ledger already; herdr would only queue another drain behind it.
+  async function ringUnlessWorking(text?: string): Promise<RingResult> {
+    if ((await agentStatus(deps.herdrAgent)) === "working")
+      return { status: "skipped", attempts: 0 };
+    return ringDoorbell(deps.herdrAgent, text);
+  }
   let lastDoorbell: RingResult["status"] | null = null;
 
   const store = deps.createStore(() => lastDoorbell);
@@ -188,14 +196,14 @@ export async function startDaemon(
         await publish(pushed, deps.bark, deps.actSecret);
       }
       // oxlint-disable-next-line no-await-in-loop -- doorbell rings must serialize
-      const result = await ringDoorbell(deps.herdrAgent);
+      const result = await ringUnlessWorking();
       lastDoorbell = result.status;
     }
   }
 
   async function flockTick(): Promise<void> {
     try {
-      const result = await ringDoorbell(deps.herdrAgent, "/flock tick");
+      const result = await ringUnlessWorking("/flock tick");
       lastDoorbell = result.status;
     } catch (error) {
       lastDoorbell = "stalled";

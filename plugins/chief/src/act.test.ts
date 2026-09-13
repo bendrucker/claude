@@ -18,14 +18,16 @@ function row(overrides: Partial<LedgerRow> = {}): LedgerRow {
     releaseAt: "2026-01-01T09:03:00.000Z",
     state: "open",
     reason: "permission_prompt notification",
+    actor: "manual",
     ...overrides,
   };
 }
 
 let server: ReturnType<typeof startActServer>;
+let store: ReturnType<typeof createStubStore>;
 
 function boot(rows: LedgerRow[]): string {
-  const store = createStubStore({ rows, now: () => NOW });
+  store = createStubStore({ rows, now: () => NOW });
   server = startActServer({ store, port: 0, secret: SECRET });
   return `http://127.0.0.1:${server.port}`;
 }
@@ -74,6 +76,22 @@ test("POST hold-1h moves the row to held, releasing an hour out, and the page sa
 
   expect(text).toContain("Held until 10:00");
   expect(text).not.toContain("Hold 1h");
+
+  const { history } = await store.why({ id: row().id });
+  expect(history.at(-1)?.actor).toBe("phone");
+});
+
+test("POST drop on an open row records the phone as the actor", async () => {
+  const baseUrl = boot([row()]);
+  const token = actToken(row().id, SECRET);
+  await fetch(`${baseUrl}/act/${row().id}`, {
+    method: "POST",
+    body: new URLSearchParams({ t: token, op: "drop" }),
+  });
+
+  const { history } = await store.why({ id: row().id });
+  expect(history.at(-1)?.state).toBe("dropped");
+  expect(history.at(-1)?.actor).toBe("phone");
 });
 
 test("POST on an acked row leaves it acked and changes nothing", async () => {

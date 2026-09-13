@@ -172,6 +172,7 @@ function sampleNowRow(now: Date = new Date()): LedgerRow {
     releaseAt: now.toISOString(),
     state: "open",
     reason: "chief bell --test",
+    actor: "manual",
   };
 }
 

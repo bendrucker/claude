@@ -109,7 +109,7 @@ async function resolveSessionRows(
   );
   for (const row of rows) {
     // oxlint-disable-next-line no-await-in-loop -- transitions on the same ledger file must serialize
-    await transition(row.id, { state: "resolved" }, ledgerPath, now);
+    await transition(row.id, { state: "resolved", actor: "daemon" }, ledgerPath, now);
   }
 }
 
@@ -163,6 +163,7 @@ export async function ingest(
     ),
     state: "open",
     reason: result.reason,
+    actor: "daemon",
   };
   if (pane !== undefined) row.pane = pane;
   if (payload.cwd != null && payload.cwd !== "") row.payload = { cwd: payload.cwd };

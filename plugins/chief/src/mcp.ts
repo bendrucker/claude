@@ -65,7 +65,7 @@ function registerFullTools(server: McpServer, store: Store): void {
         until: z.string().optional(),
       },
     },
-    async (args) => textResult(await store.hold(args)),
+    async (args) => textResult(await store.hold({ ...args, actor: "chief" })),
   );
 
   server.registerTool(
@@ -75,7 +75,17 @@ function registerFullTools(server: McpServer, store: Store): void {
       description: "Acknowledge a row and record the decision",
       inputSchema: { id: z.string(), note: z.string().optional() },
     },
-    async (args) => textResult(await store.ack(args)),
+    async (args) => textResult(await store.ack({ ...args, actor: "chief" })),
+  );
+
+  server.registerTool(
+    "drop",
+    {
+      title: "Drop",
+      description: "Drop a row, same as the phone's Drop button",
+      inputSchema: { id: z.string() },
+    },
+    async (args) => textResult(await store.drop({ ...args, actor: "chief" })),
   );
 
   server.registerTool(

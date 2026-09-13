@@ -29,6 +29,7 @@ function row(overrides: Partial<LedgerRow> = {}): LedgerRow {
     releaseAt: "2026-01-01T08:00:00.000Z",
     state: "open",
     reason: "idle_prompt notification",
+    actor: "manual",
     ...overrides,
   };
 }
@@ -73,22 +74,35 @@ describe("hold", () => {
   test("`for` adds a duration to now", async () => {
     append(row(), PATH);
     const now = new Date("2026-01-01T00:00:00.000Z");
-    const held = await hold("claude-hook:s1:idle_prompt", { for: "1h" }, PATH, { now });
+    const held = await hold("claude-hook:s1:idle_prompt", { actor: "chief", for: "1h" }, PATH, {
+      now,
+    });
     expect(held.state).toBe("held");
     expect(held.releaseAt).toBe("2026-01-01T01:00:00.000Z");
+    expect(held.actor).toBe("chief");
   });
 
   test("`until: boundary` resolves via nextBoundary", async () => {
     append(row(), PATH);
     const now = new Date("2026-01-01T09:15:00.000Z");
-    const held = await hold("claude-hook:s1:idle_prompt", { until: "boundary" }, PATH, { now });
+    const held = await hold(
+      "claude-hook:s1:idle_prompt",
+      { actor: "chief", until: "boundary" },
+      PATH,
+      { now },
+    );
     expect(held.releaseAt).toBe("2026-01-01T10:00:00.000Z");
   });
 
   test("`until: digest` resolves via nextDigest", async () => {
     append(row(), PATH);
     const now = new Date("2026-01-01T19:00:00.000Z");
-    const held = await hold("claude-hook:s1:idle_prompt", { until: "digest" }, PATH, { now });
+    const held = await hold(
+      "claude-hook:s1:idle_prompt",
+      { actor: "chief", until: "digest" },
+      PATH,
+      { now },
+    );
     expect(held.releaseAt).toBe("2026-01-02T08:00:00.000Z");
   });
 
@@ -96,7 +110,7 @@ describe("hold", () => {
     append(row(), PATH);
     const held = await hold(
       "claude-hook:s1:idle_prompt",
-      { until: "2026-02-01T00:00:00.000Z" },
+      { actor: "chief", until: "2026-02-01T00:00:00.000Z" },
       PATH,
     );
     expect(held.releaseAt).toBe("2026-02-01T00:00:00.000Z");
@@ -104,7 +118,7 @@ describe("hold", () => {
 
   test("requires `for` or `until`", () => {
     append(row(), PATH);
-    expect(hold("claude-hook:s1:idle_prompt", {}, PATH)).rejects.toThrow(
+    expect(hold("claude-hook:s1:idle_prompt", { actor: "chief" }, PATH)).rejects.toThrow(
       "hold requires `for` or `until`",
     );
   });
@@ -114,8 +128,9 @@ test.each([
   ["drop", drop, "dropped"],
   ["ack", ack, "acked"],
   ["resolve", resolve, "resolved"],
-] as const)("%s transitions to %s", async (_name, op, state) => {
+] as const)("%s transitions to %s and records the actor", async (_name, op, state) => {
   append(row(), PATH);
-  const next = await op("claude-hook:s1:idle_prompt", PATH);
+  const next = await op("claude-hook:s1:idle_prompt", "chief", PATH);
   expect(next.state).toBe(state);
+  expect(next.actor).toBe("chief");
 });

@@ -68,6 +68,7 @@ describe("due", () => {
       releaseAt,
       state,
       reason: "test",
+      actor: "manual",
     };
   }
 

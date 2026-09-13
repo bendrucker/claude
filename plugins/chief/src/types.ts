@@ -1,5 +1,6 @@
 export type Tier = "now" | "boundary" | "digest";
 export type Source = "claude-hook" | "herdr" | "phone" | "manual";
+export type Actor = "phone" | "chief" | "daemon" | "manual";
 
 export interface LedgerRow {
   id: string; // stable identity: `${source}:${key}`
@@ -14,6 +15,7 @@ export interface LedgerRow {
   releaseAt: string; // ISO; "now" rows get ts
   state: "open" | "held" | "pushed" | "acked" | "resolved" | "dropped";
   reason: string; // why this tier, shown by `why`
+  actor: Actor; // who wrote this line. Old lines without one read back as "manual"
   payload?: Record<string, unknown>;
 }
 

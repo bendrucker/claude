@@ -6,9 +6,10 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { nextBoundary, nextDigest, parseDuration } from "./release";
-import type { LedgerRow, Presence } from "./types";
+import type { Actor, LedgerRow, Presence } from "./types";
 
 export const LEDGER_PATH = join(homedir(), ".local", "state", "chief", "ledger.jsonl");
+const LEGACY_ACTOR: Actor = "manual";
 
 const LedgerRowSchema = z.object({
   id: z.string(),
@@ -23,6 +24,7 @@ const LedgerRowSchema = z.object({
   releaseAt: z.string(),
   state: z.enum(["open", "held", "pushed", "acked", "resolved", "dropped"]),
   reason: z.string(),
+  actor: z.enum(["phone", "chief", "daemon", "manual"]).optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -63,6 +65,7 @@ export async function read(path: string = LEDGER_PATH): Promise<Map<string, Ledg
       releaseAt: parsed.releaseAt,
       state: parsed.state,
       reason: parsed.reason,
+      actor: parsed.actor ?? LEGACY_ACTOR,
     };
     if (parsed.session !== undefined) row.session = parsed.session;
     if (parsed.pane !== undefined) row.pane = parsed.pane;
@@ -86,6 +89,7 @@ export async function transition(
 }
 
 export interface HoldInput {
+  actor: Actor;
   for?: string | undefined;
   until?: string | undefined;
 }
@@ -103,7 +107,12 @@ export async function hold(
   ctx: HoldContext = {},
 ): Promise<LedgerRow> {
   const now = ctx.now ?? new Date();
-  return transition(id, { state: "held", releaseAt: holdReleaseAt(input, now, ctx) }, path, now);
+  return transition(
+    id,
+    { state: "held", releaseAt: holdReleaseAt(input, now, ctx), actor: input.actor },
+    path,
+    now,
+  );
 }
 
 export function holdReleaseAt(input: HoldInput, now: Date, ctx: HoldContext): string {
@@ -122,24 +131,27 @@ export function holdReleaseAt(input: HoldInput, now: Date, ctx: HoldContext): st
 
 export function drop(
   id: string,
+  actor: Actor,
   path: string = LEDGER_PATH,
   now: Date = new Date(),
 ): Promise<LedgerRow> {
-  return transition(id, { state: "dropped" }, path, now);
+  return transition(id, { state: "dropped", actor }, path, now);
 }
 
 export function ack(
   id: string,
+  actor: Actor,
   path: string = LEDGER_PATH,
   now: Date = new Date(),
 ): Promise<LedgerRow> {
-  return transition(id, { state: "acked" }, path, now);
+  return transition(id, { state: "acked", actor }, path, now);
 }
 
 export function resolve(
   id: string,
+  actor: Actor,
   path: string = LEDGER_PATH,
   now: Date = new Date(),
 ): Promise<LedgerRow> {
-  return transition(id, { state: "resolved" }, path, now);
+  return transition(id, { state: "resolved", actor }, path, now);
 }

@@ -22,6 +22,7 @@ function row(overrides: Partial<LedgerRow> = {}): LedgerRow {
     releaseAt: "2026-01-02T08:00:00.000Z",
     state: "open",
     reason: "idle_prompt notification",
+    actor: "manual",
     ...overrides,
   };
 }
@@ -60,31 +61,35 @@ test.each([
   {
     name: "hold",
     run: (store: ReturnType<typeof createLedgerStore>) =>
-      store.hold({ id: "claude-hook:s1:idle_prompt", for: "1h" }),
+      store.hold({ id: "claude-hook:s1:idle_prompt", actor: "chief", for: "1h" }),
     expected: "held",
   },
   {
     name: "drop",
     run: (store: ReturnType<typeof createLedgerStore>) =>
-      store.drop({ id: "claude-hook:s1:idle_prompt" }),
+      store.drop({ id: "claude-hook:s1:idle_prompt", actor: "chief" }),
     expected: "dropped",
   },
   {
     name: "ack",
     run: (store: ReturnType<typeof createLedgerStore>) =>
-      store.ack({ id: "claude-hook:s1:idle_prompt" }),
+      store.ack({ id: "claude-hook:s1:idle_prompt", actor: "chief" }),
     expected: "acked",
   },
-] as const)("$name transitions the row to $expected", async ({ run, expected }) => {
-  appendLedger(row(), LEDGER_PATH);
-  const store = createLedgerStore({
-    ledgerPath: LEDGER_PATH,
-    decisionsPath: DECISIONS_PATH,
-    now: () => new Date("2026-01-01T00:05:00.000Z"),
-  });
-  const next = await run(store);
-  expect(next.state).toBe(expected);
-});
+] as const)(
+  "$name transitions the row to $expected and records the actor",
+  async ({ run, expected }) => {
+    appendLedger(row(), LEDGER_PATH);
+    const store = createLedgerStore({
+      ledgerPath: LEDGER_PATH,
+      decisionsPath: DECISIONS_PATH,
+      now: () => new Date("2026-01-01T00:05:00.000Z"),
+    });
+    const next = await run(store);
+    expect(next.state).toBe(expected);
+    expect(next.actor).toBe("chief");
+  },
+);
 
 test.each(["acked", "resolved", "dropped"] as const)(
   "hold and drop ignore a %s row",
@@ -92,9 +97,9 @@ test.each(["acked", "resolved", "dropped"] as const)(
     appendLedger(row({ state }), LEDGER_PATH);
     const store = createLedgerStore({ ledgerPath: LEDGER_PATH, decisionsPath: DECISIONS_PATH });
 
-    const held = await store.hold({ id: "claude-hook:s1:idle_prompt", for: "1h" });
+    const held = await store.hold({ id: "claude-hook:s1:idle_prompt", actor: "chief", for: "1h" });
     expect(held.state).toBe(state);
-    const dropped = await store.drop({ id: "claude-hook:s1:idle_prompt" });
+    const dropped = await store.drop({ id: "claude-hook:s1:idle_prompt", actor: "chief" });
     expect(dropped.state).toBe(state);
   },
 );
@@ -107,7 +112,7 @@ test("ack appends a decision using the row's reason as the default note", async 
     now: () => new Date("2026-01-01T00:05:00.000Z"),
     by: "test-user",
   });
-  await store.ack({ id: "claude-hook:s1:idle_prompt" });
+  await store.ack({ id: "claude-hook:s1:idle_prompt", actor: "chief" });
   expect(await wasDecided("claude-hook:s1:idle_prompt", DECISIONS_PATH)).toBe(true);
   expect((await Bun.file(DECISIONS_PATH).text()).trim()).toBe(
     JSON.stringify({
@@ -163,6 +168,7 @@ test.each([
   const appended = await store.append({ key: `k:${kind}`, kind, title: "test append" });
   expect(appended.tier).toBe(tier);
   expect(appended.state).toBe("open");
+  expect(appended.actor).toBe("manual");
 });
 
 test("append persists the optional payload", async () => {
@@ -182,4 +188,5 @@ test("dispatch creates a manual row tiered via tier()", async () => {
   expect(dispatched.source).toBe("manual");
   expect(dispatched.kind).toBe("dispatch");
   expect(dispatched.state).toBe("open");
+  expect(dispatched.actor).toBe("chief");
 });

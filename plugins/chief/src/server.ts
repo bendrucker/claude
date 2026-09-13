@@ -177,7 +177,12 @@ export async function startDaemon(
     const rows = [...(await readLedger(deps.ledgerPath)).values()];
     for (const row of due(rows, now())) {
       // oxlint-disable-next-line no-await-in-loop -- ledger transitions must serialize
-      const pushed = await transitionLedger(row.id, { state: "pushed" }, deps.ledgerPath, now());
+      const pushed = await transitionLedger(
+        row.id,
+        { state: "pushed", actor: "daemon" },
+        deps.ledgerPath,
+        now(),
+      );
       if (deps.bark) {
         // oxlint-disable-next-line no-await-in-loop -- one publish per row, in ledger order
         await publish(pushed, deps.bark, deps.actSecret);

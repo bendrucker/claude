@@ -65,6 +65,7 @@ test("full path lists every tool", async () => {
     "ack",
     "append",
     "dispatch",
+    "drop",
     "hold",
     "inbox",
     "status",
@@ -90,6 +91,7 @@ test("inbox returns the stub row", async () => {
   expect(JSON.parse(textOf(result))).toMatchInlineSnapshot(`
     [
       {
+        "actor": "daemon",
         "id": "claude-hook:s1:idle_prompt",
         "key": "s1:idle_prompt",
         "kind": "idle",
@@ -104,6 +106,16 @@ test("inbox returns the stub row", async () => {
       },
     ]
   `);
+});
+
+test.each(["hold", "ack", "drop"] as const)("%s writes chief as the actor", async (name) => {
+  const client = await connectClient("/mcp");
+  const args =
+    name === "hold"
+      ? { id: "claude-hook:s1:idle_prompt", for: "1h" }
+      : { id: "claude-hook:s1:idle_prompt" };
+  const result = await client.callTool({ name, arguments: args });
+  expect(JSON.parse(textOf(result))).toMatchObject({ actor: "chief" });
 });
 
 test("status via node path reports counts", async () => {

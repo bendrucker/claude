@@ -22,6 +22,7 @@ function row(overrides: Partial<LedgerRow> = {}): LedgerRow {
     releaseAt: "2026-01-01T08:00:00.000Z",
     state: "open",
     reason: "idle_prompt notification",
+    actor: "manual",
     ...overrides,
   };
 }

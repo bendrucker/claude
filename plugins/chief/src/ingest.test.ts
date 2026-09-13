@@ -178,6 +178,7 @@ test("does not throw on an already-resolved row when re-ingesting Stop", async (
       releaseAt: "2026-01-01T00:03:00.000Z",
       state: "resolved",
       reason: "permission_prompt notification",
+      actor: "daemon",
     },
     LEDGER_PATH,
   );

@@ -13,7 +13,7 @@ import {
 } from "./ledger";
 import { nextBoundary, nextDigest, parseDuration } from "./release";
 import { tier, type Event, type ReleaseRule } from "./tiers";
-import type { LedgerRow, Presence, Tier } from "./types";
+import type { Actor, LedgerRow, Presence, Tier } from "./types";
 
 export interface InboxInput {
   tier?: Tier | undefined;
@@ -23,16 +23,19 @@ export interface InboxInput {
 
 export interface HoldInput {
   id: string;
+  actor: Actor;
   for?: "1h" | "3h" | "1d" | undefined;
   until?: string | undefined;
 }
 
 export interface DropInput {
   id: string;
+  actor: Actor;
 }
 
 export interface AckInput {
   id: string;
+  actor: Actor;
   note?: string | undefined;
 }
 
@@ -124,6 +127,7 @@ const SAMPLE_ROW: LedgerRow = {
   releaseAt: "2026-01-02T08:00:00.000Z",
   state: "open",
   reason: "idle_prompt notification",
+  actor: "daemon",
 };
 
 export function createStubStore(options: StubStoreOptions = {}): Store {
@@ -162,16 +166,18 @@ export function createStubStore(options: StubStoreOptions = {}): Store {
       if (TERMINAL_STATES.has(current.state)) return Promise.resolve(current);
       const nowValue = now();
       const releaseAt = holdReleaseAt(input, nowValue, { presence, workHours });
-      return Promise.resolve(transition(input.id, { state: "held", releaseAt }));
+      return Promise.resolve(
+        transition(input.id, { state: "held", releaseAt, actor: input.actor }),
+      );
     },
     drop(input) {
       const current = find(input.id);
       if (TERMINAL_STATES.has(current.state)) return Promise.resolve(current);
-      return Promise.resolve(transition(input.id, { state: "dropped" }));
+      return Promise.resolve(transition(input.id, { state: "dropped", actor: input.actor }));
     },
     ack(input) {
       const reason = input.note != null && input.note !== "" ? input.note : find(input.id).reason;
-      return Promise.resolve(transition(input.id, { state: "acked", reason }));
+      return Promise.resolve(transition(input.id, { state: "acked", reason, actor: input.actor }));
     },
     dispatch(input) {
       const row: LedgerRow = {
@@ -185,6 +191,7 @@ export function createStubStore(options: StubStoreOptions = {}): Store {
         releaseAt: now().toISOString(),
         state: "open",
         reason: "dispatch request",
+        actor: "chief",
       };
       rows.push(row);
       return Promise.resolve(row);
@@ -218,6 +225,7 @@ export function createStubStore(options: StubStoreOptions = {}): Store {
         releaseAt: now().toISOString(),
         state: "open",
         reason: `appended kind: ${input.kind}`,
+        actor: "manual",
       };
       if (input.payload !== undefined) row.payload = input.payload;
       rows.push(row);
@@ -269,11 +277,13 @@ function releaseAtFor(
 }
 
 function toLedgerHoldInput(input: HoldInput): LedgerHoldInput {
-  const ledgerInput: LedgerHoldInput = {};
+  const ledgerInput: LedgerHoldInput = { actor: input.actor };
   if (input.for !== undefined) ledgerInput.for = input.for;
   if (input.until !== undefined) ledgerInput.until = input.until;
   return ledgerInput;
 }
+
+const LEGACY_ACTOR: Actor = "manual";
 
 const HistoryRowSchema = z.object({
   id: z.string(),
@@ -288,6 +298,7 @@ const HistoryRowSchema = z.object({
   releaseAt: z.string(),
   state: z.enum(["open", "held", "pushed", "acked", "resolved", "dropped"]),
   reason: z.string(),
+  actor: z.enum(["phone", "chief", "daemon", "manual"]).optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -318,6 +329,7 @@ async function readHistory(path: string, id: string): Promise<LedgerRow[]> {
       releaseAt: parsed.releaseAt,
       state: parsed.state,
       reason: parsed.reason,
+      actor: parsed.actor ?? LEGACY_ACTOR,
     };
     if (parsed.session !== undefined) row.session = parsed.session;
     if (parsed.pane !== undefined) row.pane = parsed.pane;
@@ -378,12 +390,12 @@ export function createLedgerStore(options: LedgerStoreOptions = {}): Store {
     async drop(input) {
       const current = await find(input.id);
       if (TERMINAL_STATES.has(current.state)) return current;
-      return ledgerDrop(input.id, ledgerPath, now());
+      return ledgerDrop(input.id, input.actor, ledgerPath, now());
     },
     async ack(input) {
       const row = await find(input.id);
       const note = input.note ?? row.reason;
-      const next = await ledgerAck(input.id, ledgerPath, now());
+      const next = await ledgerAck(input.id, input.actor, ledgerPath, now());
       appendDecision({ ts: now().toISOString(), id: input.id, note, by }, decisionsPath);
       return next;
     },
@@ -402,6 +414,7 @@ export function createLedgerStore(options: LedgerStoreOptions = {}): Store {
         releaseAt: releaseAtFor(result.releaseAt, nowValue, presence, workHours, gracePermission),
         state: "open",
         reason: result.reason,
+        actor: "chief",
       };
       appendLedger(row, ledgerPath);
       return Promise.resolve(row);
@@ -439,6 +452,7 @@ export function createLedgerStore(options: LedgerStoreOptions = {}): Store {
           : nowValue.toISOString(),
         state: "open",
         reason: result?.reason ?? `appended kind: ${input.kind}`,
+        actor: "manual",
       };
       if (input.payload !== undefined) row.payload = input.payload;
       appendLedger(row, ledgerPath);

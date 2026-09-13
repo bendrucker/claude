@@ -126,11 +126,11 @@ function html(body: string, status = 200): Response {
 async function applyOp(store: Store, row: LedgerRow, op: string): Promise<LedgerRow> {
   switch (op) {
     case "hold-1h":
-      return store.hold({ id: row.id, for: "1h" });
+      return store.hold({ id: row.id, actor: "phone", for: "1h" });
     case "hold-boundary":
-      return store.hold({ id: row.id, until: "boundary" });
+      return store.hold({ id: row.id, actor: "phone", until: "boundary" });
     case "drop":
-      return store.drop({ id: row.id });
+      return store.drop({ id: row.id, actor: "phone" });
     default:
       return row;
   }

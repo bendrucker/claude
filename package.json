@@ -29,6 +29,7 @@
     "plugins/review",
     "plugins/comments",
     "plugins/meme",
+    "plugins/chief",
     ".claude/skills/agent-ideas",
     "plugins/comments/evals/comment-density",
     "plugins/pull-request/evals/pr-body",

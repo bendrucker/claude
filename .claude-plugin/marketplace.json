@@ -183,6 +183,11 @@
       "name": "prompting",
       "description": "Writing documents a model executes: prompts, skills, tool descriptions, CLAUDE.md",
       "source": "./plugins/prompting"
+    },
+    {
+      "name": "chief",
+      "description": "Triage alerts from Claude sessions, herdr panes, and phone into a tiered ledger so only what needs you gets through",
+      "source": "./plugins/chief"
     }
   ]
 }

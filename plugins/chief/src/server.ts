@@ -131,7 +131,7 @@ export interface DaemonDeps {
   workHours: [string, string];
   bark?: BarkConfig;
   actSecret: string;
-  createStore: (getLastDoorbell: () => "ok" | "stalled" | null) => Store;
+  createStore: (getLastDoorbell: () => "ok" | "stalled" | "skipped" | null) => Store;
   now?: () => Date;
   schedule?: Schedule;
   flockIntervalMs?: number;

@@ -59,7 +59,7 @@ export interface StatusResult {
   presence: Presence;
   counts: Record<Tier, Record<LedgerRow["state"], number>>;
   daemonUptimeMs: number;
-  lastDoorbell: "ok" | "stalled" | null;
+  lastDoorbell: "ok" | "stalled" | "skipped" | null;
 }
 
 export interface WhyResult {
@@ -111,7 +111,7 @@ export interface StubStoreOptions {
   presence?: Presence;
   workHours?: [string, string];
   startedAt?: Date;
-  lastDoorbell?: "ok" | "stalled" | null;
+  lastDoorbell?: "ok" | "stalled" | "skipped" | null;
   now?: () => Date;
 }
 
@@ -347,7 +347,7 @@ export interface LedgerStoreOptions {
   gracePermission?: string;
   now?: () => Date;
   startedAt?: Date;
-  getLastDoorbell?: () => "ok" | "stalled" | null;
+  getLastDoorbell?: () => "ok" | "stalled" | "skipped" | null;
   by?: string;
 }
 

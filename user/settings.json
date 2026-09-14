@@ -439,7 +439,6 @@
     "writing@bendrucker": true,
     "type-ignore@bendrucker": true,
     "agents-md@bendrucker": true,
-    "ast-grep@ast-grep-marketplace": true,
     "worktrunk@worktrunk": true,
     "plan@bendrucker": true,
     "linear-cli@linear-cli": true,
@@ -464,13 +463,6 @@
       "source": {
         "source": "github",
         "repo": "anthropics/claude-plugins-official"
-      }
-    },
-    "ast-grep-marketplace": {
-      "source": {
-        "source": "github",
-        "repo": "ast-grep/agent-skill",
-        "ref": "6b668aa526afdc623c1a9ed1d6ae920e04a717ad"
       }
     },
     "worktrunk": {

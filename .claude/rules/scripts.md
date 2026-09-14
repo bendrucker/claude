@@ -31,7 +31,7 @@ A regex over lines carries no grammar state, so it drifts at every edge: a delim
 
 Pick the parser by what is being read:
 
-- **Source code**: [`ast-grep`](https://ast-grep.github.io), which matches structurally with code-shaped patterns across every language its tree-sitter grammars cover. The `ast-grep` skill wraps it, and `ast-grep:outline` summarizes a file's structure.
+- **Source code**: [`ast-grep`](https://ast-grep.github.io), which matches structurally with code-shaped patterns across every language its tree-sitter grammars cover.
 - **Markdown**: `mdast-util-from-markdown` to parse and `unist-util-visit` to walk, typed by `@types/mdast`. [`plugins/pull-request/scripts/prose.ts`](../../plugins/pull-request/scripts/prose.ts) is the reference use.
 - **Data formats**: the format's own loader, such as `JSON.parse` or the `yaml` package, which returns a tree directly.
 

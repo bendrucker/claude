@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { execFile } from "node:child_process";
-import { readdir, rm } from "node:fs/promises";
+import { readdir, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -129,11 +129,22 @@ async function isIgnored(filePath: string): Promise<boolean> {
   }
 }
 
+// Containment is decided on real paths, since a link under the working
+// directory can name a file in another repo. Resolution doubles as the
+// existence check: a deleted file and a dangling link both fail it.
+async function realPath(filePath: string): Promise<string | null> {
+  try {
+    return await realpath(filePath);
+  } catch {
+    return null;
+  }
+}
+
 // The gate speaks for one project, so it considers only what lies under the
 // directory the session is working in. A file edited elsewhere belongs to
 // another repo or to no repo at all, such as a scratch script under the
 // session's own temp directory, and its lint errors are not this project's to
-// block on.
+// block on. Both arguments arrive resolved.
 function withinCwd(filePath: string, cwd: string): boolean {
   const rel = relative(cwd, filePath);
   return rel !== "" && !isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`);
@@ -284,10 +295,11 @@ export async function parseTranscript(transcriptPath: string, cwd: string): Prom
     }
   }
 
-  const checks = [...candidates].map(async (path) => ({
-    path,
-    keep: withinCwd(path, cwd) && (await fileExists(path)) && !(await isIgnored(path)),
-  }));
+  const root = (await realPath(cwd)) ?? cwd;
+  const checks = [...candidates].map(async (path) => {
+    const real = await realPath(path);
+    return { path, keep: real != null && withinCwd(real, root) && !(await isIgnored(path)) };
+  });
   const results = await Promise.all(checks);
   return results.filter((result) => result.keep).map((result) => result.path);
 }

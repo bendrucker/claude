@@ -356,6 +356,43 @@ describe("ox hook", () => {
       await rm(outside, { recursive: true, force: true });
     });
 
+    // Git commits the link, never the file it names, so an external target's
+    // lint errors are not this project's to answer for.
+    it("follows a symlink out of the working directory but not one that stays in", async () => {
+      const outside = await mkdtemp(join(tmpdir(), "ox-symlink-target-"));
+      const external = join(outside, "external.ts");
+      await Bun.write(external, "const a: any = 1;\n");
+      const target = join(tempDir, `symlink-target-${Date.now()}.ts`);
+      await Bun.write(target, "export const b = 1;\n");
+
+      const crossing = join(tempDir, `crossing-${Date.now()}.ts`);
+      const internal = join(tempDir, `internal-${Date.now()}.ts`);
+      await execAsync(`ln -s "${external}" "${crossing}"`);
+      await execAsync(`ln -s "${target}" "${internal}"`);
+
+      const transcriptPath = join(tempDir, `transcript-symlink-${Date.now()}.jsonl`);
+      await Bun.write(
+        transcriptPath,
+        createTranscriptContent([
+          { path: crossing, tool: "Write" },
+          { path: internal, tool: "Write" },
+        ]),
+      );
+
+      expect(await parseTranscript(transcriptPath, tempDir)).toEqual([internal]);
+      await rm(outside, { recursive: true, force: true });
+    });
+
+    it("drops a symlink whose target no longer exists", async () => {
+      const dangling = join(tempDir, `dangling-${Date.now()}.ts`);
+      await execAsync(`ln -s "${join(tempDir, "never-written.ts")}" "${dangling}"`);
+
+      const transcriptPath = join(tempDir, `transcript-dangling-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: dangling, tool: "Write" }]));
+
+      expect(await parseTranscript(transcriptPath, tempDir)).toEqual([]);
+    });
+
     it("does not shell-evaluate a path containing a command substitution", async () => {
       const repoDir = await mkdtemp(join(tempDir, "injection-repo-"));
       await execAsync("git init", { cwd: repoDir });

@@ -72,6 +72,21 @@ export function caseId(present: Pick<Present, "session" | "seq">): string {
   return `${present.session}-seq${present.seq}`;
 }
 
+// The short session prefix keys result files and replay rows, so two sessions
+// sharing it would swap cached results. Refuse the corpus rather than the run.
+export function assertDistinctSessions(presents: readonly Present[]): void {
+  const owners = new Map<string, string>();
+  for (const present of presents) {
+    const owner = owners.get(present.session);
+    if (owner !== undefined && owner !== present.session_id) {
+      throw new Error(
+        `session prefix ${present.session} names both ${owner} and ${present.session_id}`,
+      );
+    }
+    owners.set(present.session, present.session_id);
+  }
+}
+
 /** Groups presents by host and session, each list in presentation order. */
 export function bySession(presents: readonly Present[]): Map<string, Present[]> {
   const sessions = new Map<string, Present[]>();

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { APPEND_ONLY_REASON, DENY_REASON, sizeReason } from "../../../hooks/gate";
-import { bySession, caseId, classifyResponse, type Decision, type Present } from "./decisions";
+import {
+  assertDistinctSessions,
+  bySession,
+  caseId,
+  classifyResponse,
+  type Decision,
+  type Present,
+} from "./decisions";
 
 describe("classifyResponse", () => {
   it.each<[string, string | null, Decision]>([
@@ -88,4 +95,20 @@ describe("bySession", () => {
 
 it("names a case by session prefix and sequence", () => {
   expect(caseId(present({ seq: 3 }))).toBe("01234567-seq3");
+});
+
+describe("assertDistinctSessions", () => {
+  it("accepts one session per prefix, across hosts and sequences", () => {
+    const presents = [
+      present({ seq: 1 }),
+      present({ seq: 2 }),
+      present({ host: "work", session_id: "fedcba9876543210", session: "fedcba98" }),
+    ];
+    expect(() => assertDistinctSessions(presents)).not.toThrow();
+  });
+
+  it("refuses two sessions sharing a prefix", () => {
+    const presents = [present({}), present({ session_id: "0123456700000000" })];
+    expect(() => assertDistinctSessions(presents)).toThrow(/names both/);
+  });
 });

@@ -8,7 +8,15 @@ import { table } from "table";
 import { z } from "zod";
 import { decodeJson } from "../../../../../packages/decode/index";
 import { processInput } from "../../../hooks/gate";
-import { bySession, caseId, type Decision, gateRule, type Present, Presents } from "./decisions";
+import {
+  assertDistinctSessions,
+  bySession,
+  caseId,
+  type Decision,
+  gateRule,
+  type Present,
+  Presents,
+} from "./decisions";
 
 // Replay recorded presentations through the gate as it is checked out now, one state directory per session, and compare its decisions with what the gate of the day actually did.
 
@@ -63,6 +71,7 @@ async function replaySession(
 }
 
 export async function replay(presents: readonly Present[]): Promise<ReplayRow[]> {
+  assertDistinctSessions(presents);
   const root = await mkdtemp(join(tmpdir(), "plan-gate-replay-"));
   try {
     const sessions = [...bySession(presents).values()];

@@ -4,7 +4,7 @@ import { basename, join } from "node:path";
 import { cli } from "cleye";
 import { decodeJson } from "../../../../../packages/decode/index";
 import { ARMS, armReason } from "./arms";
-import { caseId, type Present, Presents } from "./decisions";
+import { assertDistinctSessions, caseId, type Present, Presents } from "./decisions";
 import {
   type CaseResult,
   CaseResult as CaseResultSchema,
@@ -101,25 +101,26 @@ async function runJob(job: Job, options: RunOptions): Promise<CaseResult | null>
     return decodeJson(CaseResultSchema, await Bun.file(resultPath).text(), resultPath);
   }
 
+  // Validate the arm before any filesystem work: the deny reason is the check.
+  const reason = armReason(job.arm, job.present.plan);
   const dir = join(ROOT, "workdir", options.run, job.arm, id);
   const plansDir = join(dir, "plans");
+  const planFile = planFileName(job.present);
+  if (options.dryRun) {
+    console.log(`[${job.arm}] ${id} (${job.present.chars} chars) in ${dir}`);
+    console.log(`  ${reason}`);
+    return null;
+  }
+
   await rm(dir, { recursive: true, force: true });
   await mkdir(plansDir, { recursive: true });
-  const planFile = planFileName(job.present);
   await Bun.write(join(plansDir, planFile), job.present.plan);
-
-  const reason = armReason(job.arm, job.present.plan);
   const argv = command(
     options.model,
     options.maxTurns,
     options.guidelines,
     prompt(`plans/${planFile}`, reason),
   );
-  if (options.dryRun) {
-    console.log(`[${job.arm}] ${id} (${job.present.chars} chars) in ${dir}`);
-    console.log(`  ${reason}`);
-    return null;
-  }
 
   const proc = Bun.spawn(argv, { cwd: dir, stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr, exitCode] = await Promise.all([
@@ -130,6 +131,12 @@ async function runJob(job: Job, options: RunOptions): Promise<CaseResult | null>
   await mkdir(resultsDir, { recursive: true });
   await Bun.write(join(resultsDir, `${id}.jsonl`), stdout);
   if (stderr.trim() !== "") await Bun.write(join(resultsDir, `${id}.stderr`), stderr);
+  // A failed session leaves its transcript for diagnosis but no result file, so
+  // the next run retries it instead of reporting the failure as an arm outcome.
+  if (exitCode !== 0) {
+    console.log(`[${job.arm}] ${id} exited ${exitCode}, not recorded`);
+    return null;
+  }
 
   const transcript = transcriptMetrics(stdout.split("\n"));
   const planPath = join(plansDir, planFile);
@@ -182,6 +189,15 @@ function defaultRunLabel(): string {
   return new Date().toISOString().slice(0, 16).replaceAll(/[-:]/g, "").replace("T", "-");
 }
 
+// The label becomes a path segment under results/ and workdir/, and the workdir
+// is removed recursively per case, so it has to stay a single plain segment.
+export function runLabel(label: string): string {
+  if (!/^[\w.-]+$/.test(label) || label === "." || label === "..") {
+    throw new Error(`run label must be a single path segment, got ${JSON.stringify(label)}`);
+  }
+  return label;
+}
+
 if (import.meta.main) {
   const argv = cli({
     name: "rework",
@@ -211,6 +227,7 @@ if (import.meta.main) {
     await Bun.file(argv.flags.presents).text(),
     argv.flags.presents,
   );
+  assertDistinctSessions(presents);
   let cases = selectCases(presents);
   if (argv.flags.case.length > 0) cases = cases.filter((p) => argv.flags.case.includes(caseId(p)));
   if (argv.flags.limit !== undefined) cases = cases.slice(0, argv.flags.limit);
@@ -218,7 +235,7 @@ if (import.meta.main) {
   const jobs = arms.flatMap((arm) => cases.map((present) => ({ arm, present })));
 
   const options: RunOptions = {
-    run: argv.flags.run ?? defaultRunLabel(),
+    run: runLabel(argv.flags.run ?? defaultRunLabel()),
     model: argv.flags.model,
     maxTurns: argv.flags.maxTurns,
     guidelines: await Bun.file(GUIDELINES).text(),

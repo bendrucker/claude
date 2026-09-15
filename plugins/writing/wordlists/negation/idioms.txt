@@ -1,0 +1,36 @@
+# Heads of adverbial "no" idioms ("no longer", "no doubt", "no better than").
+# "no" in front of one of these is not a negated object. Read by
+# detection/negation.ts, not by the analyze audit.
+longer
+more
+further
+less
+fewer
+later
+sooner
+doubt
+matter
+way
+wonder
+different
+better
+worse
+greater
+bigger
+smaller
+larger
+shorter
+faster
+slower
+higher
+lower
+closer
+earlier
+wider
+narrower
+easier
+harder
+cheaper
+safer
+stronger
+weaker

@@ -35,6 +35,11 @@ export function parseLines(content: string): string[] {
   return lines;
 }
 
+/** Lowercased entries of a closed grammatical class, looked up by a token's normal form. */
+export function compileWordSet(content: string): Set<string> {
+  return new Set(parseLines(content).map((entry) => entry.toLowerCase()));
+}
+
 function escapeRegex(literal: string): string {
   return literal.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 }
@@ -180,16 +185,38 @@ export interface LoadedWordlists {
   marketingVerbs: StemmedWeight[];
   softPhrasing: StemmedWeight[];
   floweryPhrases: StemmedPhrase[];
+  negation: NegationWordlists;
+}
+
+/** Closed classes the no-negation detector cannot read off the tagger. */
+export interface NegationWordlists {
+  predication: Set<string>;
+  idioms: Set<string>;
+  nonassertive: Set<string>;
+  clauseOpeners: Set<string>;
+}
+
+async function loadNegation(): Promise<NegationWordlists> {
+  const read = async (name: string) => compileWordSet(await readWordlist(`negation/${name}.txt`));
+  const [predication, idioms, nonassertive, clauseOpeners] = await Promise.all([
+    read("predication"),
+    read("idioms"),
+    read("nonassertive"),
+    read("clause-openers"),
+  ]);
+  return { predication, idioms, nonassertive, clauseOpeners };
 }
 
 async function load(): Promise<LoadedWordlists> {
-  const [vocabularySrc, openersSrc, marketingSrc, softSrc, flowerySrc] = await Promise.all([
-    readWordlist("vocabulary.txt"),
-    readWordlist("openers.txt"),
-    readWordlist("marketing-verbs.txt"),
-    readWordlist("soft-phrasing.txt"),
-    readWordlist("flowery-phrases.txt"),
-  ]);
+  const [vocabularySrc, openersSrc, marketingSrc, softSrc, flowerySrc, negation] =
+    await Promise.all([
+      readWordlist("vocabulary.txt"),
+      readWordlist("openers.txt"),
+      readWordlist("marketing-verbs.txt"),
+      readWordlist("soft-phrasing.txt"),
+      readWordlist("flowery-phrases.txt"),
+      loadNegation(),
+    ]);
 
   const vocabulary = compileStemmedWordlist(vocabularySrc);
 
@@ -203,7 +230,7 @@ async function load(): Promise<LoadedWordlists> {
   const softPhrasing = compileWeightedStems(softSrc);
   const floweryPhrases = compileStemmedPhrases(flowerySrc);
 
-  return { vocabulary, openers, marketingVerbs, softPhrasing, floweryPhrases };
+  return { vocabulary, openers, marketingVerbs, softPhrasing, floweryPhrases, negation };
 }
 
 export const WORDLISTS: LoadedWordlists = await load();

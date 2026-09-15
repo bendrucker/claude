@@ -2,9 +2,8 @@
  * Tricolon detector: three consecutive sentences whose coarse POS shapes
  * are near-identical, the escalating-triad structure from linguistics.md.
  *
- * This module imports the compromise tagger adapter, so only batch tooling
- * (scan, score, analyze) may import it, never hooks. Same wall as
- * classifiers.ts: hooks stay deterministic with zero tagger imports.
+ * Batch-only (scan, score, analyze) until the session-corpus calibration
+ * clears the hook bar in linguistics.md.
  */
 import { splitSentences } from "../detection/sentences";
 import type { PatternDef } from "../detection/tropes";
@@ -98,7 +97,7 @@ export const TRICOLON_PATTERN: PatternDef = {
     "The cache begins cold on the first request of the day. Entries accumulate as traffic arrives, and reads accelerate once the working set stabilizes. Nobody should tune anything before measuring real production load.",
   ],
   evidence:
-    "Literature heuristic. Session-corpus calibration pending per the #769 labeling protocol. Normalized edit distance over coarse POS shapes (DET/PUNCT/NUM filtered), threshold 0.35, 6+ tokens per sentence. Batch-only: this module imports the compromise tagger, so hooks never load it.",
+    "Literature heuristic. Session-corpus calibration pending per the #769 labeling protocol. Normalized edit distance over coarse POS shapes (DET/PUNCT/NUM filtered), threshold 0.35, 6+ tokens per sentence. Batch-only until calibrated: the hook bar is precision-critical and the threshold is uncalibrated.",
   retire:
     "Remove if the labeled eval pass shows precision below the batch bar, or recalibrate the threshold if the session corpus places parallel triads elsewhere. Remove outright if assistant deliverables stop producing tricolons.",
 };

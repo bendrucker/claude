@@ -25,6 +25,7 @@ The hook enforces most of these automatically; the rest ship in the scan and rev
 - Don't write "reaching for X." Use "use X" or "prefer X over Y."
 - Don't write "dig into" / "dive into." Name what you're looking at.
 - Hedging verbs ("looks like", "appears to", "seems to") are vague. State directly or name the uncertainty.
+- Negation is often throat-clearing. Name what the thing is: "a no-op", "unchanged", "idempotent". When the negation is the point, put it on the verb ("doesn't add anything", "isn't needed"). Moving it onto the noun ("adds nothing", "needs no change", "carries no weight") reads as literary. "Has no tests" and "there is no lock" are plain statements and stay.
 - No gravity markers. "Load-bearing", "the honest answer", "worth noting/flagging", "the full picture", and "the cleanup story" all assert that something matters instead of saying why. Replace each with its substance: name what breaks without the dependency, state the fact plainly, make the point without announcing it.
 
 #### PR and Review Prose

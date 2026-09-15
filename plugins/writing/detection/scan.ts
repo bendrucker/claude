@@ -9,9 +9,11 @@ import {
 } from "./tropes";
 import { weightedStemHits } from "./wordlists";
 
-// Patterns that import tagger adapters and therefore run only on the batch
-// surfaces (scan, score). Hooks import detection/tropes directly and must
-// never import this module: that is the wall that keeps them deterministic.
+// Patterns that run only on the batch surfaces (scan, score) because their
+// calibration has not cleared the hook bar in linguistics.md. Hooks import
+// detection/tropes directly and never this module. A tagger import is not what
+// keeps a pattern here: compromise is a runtime dependency and no-negation
+// runs it in the hook. natural stays a devDependency and out of hooks.
 export const BATCH_PATTERNS: PatternDef[] = [TRICOLON_PATTERN];
 
 export interface ScanResult {
@@ -54,6 +56,12 @@ function positionOfSample(text: string, sample: string): Position {
 
 function regexResults(stripped: string, def: PatternDef): ScanResult[] {
   if (typeof def.test === "function") {
+    if (def.spans) {
+      return def.spans(stripped).map(({ index, matched }) => {
+        const { line, col } = positionAt(stripped, index);
+        return { line, col, category: def.category, matched, message: def.message(matched) };
+      });
+    }
     const hits = def.test(stripped);
     if (hits.count === 0) return [];
     const { line, col } = positionOfSample(stripped, hits.sample);

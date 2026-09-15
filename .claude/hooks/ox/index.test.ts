@@ -98,7 +98,8 @@ function mockStopHookInput(
     session_id: sessionId,
     hook_event_name: "Stop",
     transcript_path: transcriptPath,
-    cwd: process.cwd(),
+    // The gate reads only files under cwd, and these fixtures live in tempDir.
+    cwd: tempDir,
     stop_hook_active: stopHookActive,
   };
 }
@@ -245,7 +246,7 @@ describe("ox hook", () => {
 
   describe("parseTranscript", () => {
     it("returns empty array for non-existent transcript", async () => {
-      expect(await parseTranscript("/nonexistent/path.jsonl")).toEqual([]);
+      expect(await parseTranscript("/nonexistent/path.jsonl", tempDir)).toEqual([]);
     });
 
     test.each(["Edit", "Write"])("extracts file paths from %s tool uses", async (tool) => {
@@ -253,7 +254,7 @@ describe("ox hook", () => {
       const transcriptPath = join(tempDir, `transcript-${tool}-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool }]));
 
-      const files = await parseTranscript(transcriptPath);
+      const files = await parseTranscript(transcriptPath, tempDir);
       expect(files).toContain(filePath);
     });
 
@@ -263,7 +264,7 @@ describe("ox hook", () => {
       const transcriptPath = join(tempDir, `transcript-md-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: mdPath, tool: "Write" }]));
 
-      const files = await parseTranscript(transcriptPath);
+      const files = await parseTranscript(transcriptPath, tempDir);
       expect(files).toEqual([]);
     });
 
@@ -274,7 +275,7 @@ describe("ox hook", () => {
       const transcriptPath = join(tempDir, `transcript-wf-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: wfPath, tool: "Edit" }]));
 
-      const files = await parseTranscript(transcriptPath);
+      const files = await parseTranscript(transcriptPath, tempDir);
       expect(files).toEqual([]);
     });
 
@@ -283,7 +284,7 @@ describe("ox hook", () => {
       const transcriptPath = join(tempDir, `transcript-read-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Read" }]));
 
-      const files = await parseTranscript(transcriptPath);
+      const files = await parseTranscript(transcriptPath, tempDir);
       expect(files).toEqual([]);
     });
 
@@ -298,7 +299,7 @@ describe("ox hook", () => {
         ]),
       );
 
-      const files = await parseTranscript(transcriptPath);
+      const files = await parseTranscript(transcriptPath, tempDir);
       expect(files).toHaveLength(1);
     });
 
@@ -309,7 +310,7 @@ describe("ox hook", () => {
         createTranscriptContent([{ path: "/nonexistent/deleted.ts", tool: "Write" }]),
       );
 
-      const files = await parseTranscript(transcriptPath);
+      const files = await parseTranscript(transcriptPath, tempDir);
       expect(files).toEqual([]);
     });
 
@@ -331,8 +332,65 @@ describe("ox hook", () => {
         ]),
       );
 
-      const files = await parseTranscript(transcriptPath);
+      const files = await parseTranscript(transcriptPath, tempDir);
       expect(files).toEqual([tracked]);
+    });
+
+    it("drops a file edited outside the session's working directory", async () => {
+      const outside = await mkdtemp(join(tmpdir(), "ox-scratchpad-"));
+      const scratch = join(outside, "probe.ts");
+      await Bun.write(scratch, "const a: any = 1;\n");
+      const inside = join(tempDir, "kept.ts");
+      await Bun.write(inside, "export const b = 1;\n");
+
+      const transcriptPath = join(tempDir, `transcript-outside-${Date.now()}.jsonl`);
+      await Bun.write(
+        transcriptPath,
+        createTranscriptContent([
+          { path: scratch, tool: "Write" },
+          { path: inside, tool: "Write" },
+        ]),
+      );
+
+      expect(await parseTranscript(transcriptPath, tempDir)).toEqual([inside]);
+      await rm(outside, { recursive: true, force: true });
+    });
+
+    // Git commits the link, never the file it names, so an external target's
+    // lint errors are not this project's to answer for.
+    it("follows a symlink out of the working directory but not one that stays in", async () => {
+      const outside = await mkdtemp(join(tmpdir(), "ox-symlink-target-"));
+      const external = join(outside, "external.ts");
+      await Bun.write(external, "const a: any = 1;\n");
+      const target = join(tempDir, `symlink-target-${Date.now()}.ts`);
+      await Bun.write(target, "export const b = 1;\n");
+
+      const crossing = join(tempDir, `crossing-${Date.now()}.ts`);
+      const internal = join(tempDir, `internal-${Date.now()}.ts`);
+      await execAsync(`ln -s "${external}" "${crossing}"`);
+      await execAsync(`ln -s "${target}" "${internal}"`);
+
+      const transcriptPath = join(tempDir, `transcript-symlink-${Date.now()}.jsonl`);
+      await Bun.write(
+        transcriptPath,
+        createTranscriptContent([
+          { path: crossing, tool: "Write" },
+          { path: internal, tool: "Write" },
+        ]),
+      );
+
+      expect(await parseTranscript(transcriptPath, tempDir)).toEqual([internal]);
+      await rm(outside, { recursive: true, force: true });
+    });
+
+    it("drops a symlink whose target no longer exists", async () => {
+      const dangling = join(tempDir, `dangling-${Date.now()}.ts`);
+      await execAsync(`ln -s "${join(tempDir, "never-written.ts")}" "${dangling}"`);
+
+      const transcriptPath = join(tempDir, `transcript-dangling-${Date.now()}.jsonl`);
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: dangling, tool: "Write" }]));
+
+      expect(await parseTranscript(transcriptPath, tempDir)).toEqual([]);
     });
 
     it("does not shell-evaluate a path containing a command substitution", async () => {
@@ -349,7 +407,7 @@ describe("ox hook", () => {
         createTranscriptContent([{ path: malicious, tool: "Write" }]),
       );
 
-      const files = await parseTranscript(transcriptPath);
+      const files = await parseTranscript(transcriptPath, tempDir);
       expect(files).toEqual([malicious]);
       expect(await Bun.file(join(repoDir, "pwned")).exists()).toBe(false);
     });

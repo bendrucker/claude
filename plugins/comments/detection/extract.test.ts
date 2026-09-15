@@ -178,6 +178,30 @@ describe("extractComments: config languages", () => {
   });
 });
 
+describe("extractComments: shellscript", () => {
+  test("a shebang stays separate from the comment run below it", async () => {
+    const source = [
+      "#!/usr/bin/env bash",
+      "# Rebuild the cache",
+      "# so the theme is found.",
+      "set -euo pipefail",
+      "build # trailing",
+    ].join("\n");
+    expect(await summarize(source, "shellscript")).toEqual([
+      { kind: "line", text: "#!/usr/bin/env bash" },
+      { kind: "line", text: "# Rebuild the cache\n# so the theme is found." },
+      { kind: "line", text: "# trailing" },
+    ]);
+  });
+
+  test("a `#` comment on line 1 still coalesces with the run below it", async () => {
+    const source = ["# first", "# second"].join("\n");
+    expect(await summarize(source, "shellscript")).toEqual([
+      { kind: "line", text: "# first\n# second" },
+    ]);
+  });
+});
+
 describe("languageForPath", () => {
   test.each([
     ["a.py", "python"],

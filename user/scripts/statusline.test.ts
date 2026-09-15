@@ -431,9 +431,9 @@ describe("pane metadata report", () => {
     try {
       mkdirSync(bin);
       const herdr = join(bin, "herdr");
-      // One line per argument, written aside and renamed into place. A reader
-      // that caught the log mid-loop would see a record whose tokens had not
-      // been appended yet, which reads as a status line that reported nothing.
+      // A reader that caught the log mid-loop would see a record whose tokens
+      // had not been appended yet, which reads as a status line that reported
+      // nothing.
       await Bun.write(
         herdr,
         [

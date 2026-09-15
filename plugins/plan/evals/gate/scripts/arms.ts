@@ -10,8 +10,7 @@ const MOVE_DETAIL =
   "(<plan>-decisions.md is the common one), or split the work into smaller plans. " +
   "The limit counts characters, not bytes.";
 
-// States the measured size and a target below the limit. In the first Opus run
-// the target number turned the rework into a precision loop aimed at 8,000.
+// In the first Opus run the target number turned the rework into a precision loop aimed at 8,000.
 export function targetReason(length: number): string {
   return (
     `This plan is ${count(length)} characters, over the ${count(SIZE_LIMIT)}-character limit. ` +
@@ -25,7 +24,6 @@ export function countReason(length: number): string {
   return `This plan is ${count(length)} characters, over the ${count(SIZE_LIMIT)}-character limit. ${MOVE_DETAIL}`;
 }
 
-/** Each arm maps the denied plan to the deny reason the session receives. */
 export const ARMS: Readonly<Record<string, (plan: string) => string>> = {
   current: () => sizeReason(0),
   target: (plan) => targetReason(plan.length),

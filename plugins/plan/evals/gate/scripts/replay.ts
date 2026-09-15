@@ -10,10 +10,7 @@ import { decodeJson } from "../../../../../packages/decode/index";
 import { processInput } from "../../../hooks/gate";
 import { bySession, caseId, type Decision, gateRule, type Present, Presents } from "./decisions";
 
-// Replay recorded presentations through the gate as it is checked out now, one
-// state directory per session, and compare its decisions with what the gate of
-// the day actually did. Edit a rule, replay, and diff against a saved run to see
-// exactly which presentations change hands.
+// Replay recorded presentations through the gate as it is checked out now, one state directory per session, and compare its decisions with what the gate of the day actually did.
 
 export const ReplayRow = z.object({
   id: z.string(),
@@ -76,7 +73,6 @@ export async function replay(presents: readonly Present[]): Promise<ReplayRow[]>
   }
 }
 
-/** Rows whose replay decision differs from the baseline run, keyed by id. */
 export function changed(rows: readonly ReplayRow[], baseline: readonly ReplayRow[]): ReplayRow[] {
   const before = new Map(baseline.map((row) => [row.id, row.replay]));
   return rows.filter((row) => before.has(row.id) && before.get(row.id) !== row.replay);

@@ -14,10 +14,7 @@ import {
   transcriptMetrics,
 } from "./metrics";
 
-// Replay a size deny: hand a headless session the denied plan and one arm's deny
-// reason, let it rework the file, and record what it did. Sessions run bare
-// (no settings, hooks, or plugins) with the planning guidelines appended to the
-// system prompt, matching what the plan-mode injection delivers.
+// Sessions run bare (no settings, hooks, or plugins) with the planning guidelines appended to the system prompt, matching what the plan-mode injection delivers.
 
 const ROOT = join(import.meta.dirname, "..");
 const GUIDELINES = join(ROOT, "..", "..", "references", "guidelines.md");
@@ -29,8 +26,7 @@ export interface Job {
   present: Present;
 }
 
-// Egress rule: the mined file holds work-host plans too. Only local plans are
-// handed to a model, and only ones the size rule denied.
+// Egress rule: the mined file holds work-host plans too.
 export function selectCases(presents: readonly Present[]): Present[] {
   return presents.filter((p) => p.host === "local" && p.actual === "gate:size");
 }

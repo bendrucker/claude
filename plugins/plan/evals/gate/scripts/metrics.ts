@@ -1,9 +1,6 @@
 import { z } from "zod";
 import { SIZE_LIMIT } from "./arms";
 
-// Everything measured about a rework is mechanical: what the transcript shows the
-// session doing, and what the plan directory holds when it stops.
-
 const ToolUse = z.looseObject({
   type: z.string(),
   name: z.string().optional(),

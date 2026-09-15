@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+  bandError,
   clearsFloor,
+  describeBand,
   type FeatureFloor,
   featureFloors,
   type FloorOptions,
@@ -10,9 +12,10 @@ import {
   rateMatrix,
   renderReport,
   shuffledHalves,
+  withinLength,
 } from "./rate-nulls";
 import type { VoiceDocument } from "./voice-corpus";
-import { VOICE_DELTA_FEATURES } from "./voice-delta";
+import { RETIRED_FEATURES, VOICE_DELTA_FEATURES } from "./voice-delta";
 
 function doc(source: string, body: string): VoiceDocument {
   return { source, meta: "", body };
@@ -30,11 +33,74 @@ function floorOf(floors: FeatureFloor[], id: string): FeatureFloor {
   return found;
 }
 
+describe("withinLength", () => {
+  const short = doc("short", "Three short words.");
+  const long = doc("long", Array.from({ length: 50 }, () => "word").join(" "));
+
+  test("keeps every document when no bound is set", () => {
+    expect(withinLength([short, long], {})).toHaveLength(2);
+  });
+
+  test("drops documents under the minimum", () => {
+    expect(withinLength([short, long], { min: 10 })).toEqual([long]);
+  });
+
+  test("drops documents over the maximum", () => {
+    expect(withinLength([short, long], { max: 10 })).toEqual([short]);
+  });
+
+  test("keeps documents inside a band with both bounds", () => {
+    expect(withinLength([short, long], { min: 2, max: 10 })).toEqual([short]);
+  });
+
+  test("counts words rather than code punctuation", () => {
+    const punctuated = doc("code", "`a` `b` `c` {} => ()");
+    expect(withinLength([punctuated], { min: 4 })).toEqual([]);
+  });
+});
+
+describe("bandError", () => {
+  test("accepts an absent band and a well-ordered one", () => {
+    expect(bandError({})).toBeNull();
+    expect(bandError({ min: 100, max: 400 })).toBeNull();
+  });
+
+  test("rejects a NaN bound, which cleye yields for an unparseable or negative value", () => {
+    expect(bandError({ min: Number.NaN })).toContain("--min-words");
+    expect(bandError({ max: Number.NaN })).toContain("--max-words");
+  });
+
+  test("rejects a negative bound", () => {
+    expect(bandError({ min: -5 })).toContain("--min-words");
+  });
+
+  test("rejects a minimum above the maximum", () => {
+    expect(bandError({ min: 400, max: 100 })).toContain("selects nothing");
+  });
+});
+
+describe("describeBand", () => {
+  test("says nothing when no bound is set", () => {
+    expect(describeBand({})).toBeNull();
+  });
+
+  test("names both ends, substituting defaults for an open side", () => {
+    expect(describeBand({ min: 100, max: 400 })).toContain("100-400 words");
+    expect(describeBand({ min: 100 })).toContain("100-∞ words");
+    expect(describeBand({ max: 400 })).toContain("0-400 words");
+  });
+});
+
 describe("rateMatrix", () => {
   test("holds one rate per document for every feature", () => {
     const matrix = rateMatrix([doc("a", PLAIN), doc("b", HEAVY)]);
     expect(matrix.size).toBe(VOICE_DELTA_FEATURES.length);
     for (const rates of matrix.values()) expect(rates).toHaveLength(2);
+  });
+
+  test("scores the feature set it is given", () => {
+    const matrix = rateMatrix([doc("a", PLAIN)], RETIRED_FEATURES);
+    expect([...matrix.keys()]).toEqual(RETIRED_FEATURES.map((f) => f.id));
   });
 });
 

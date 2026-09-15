@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   checkRegister,
   computeCorpusRates,
+  RETIRED_FEATURES,
   sentenceSplit,
   VOICE_DELTA_FEATURES,
   type VoiceDeltaFeature,
@@ -44,6 +45,7 @@ describe("VOICE_DELTA_FEATURES", () => {
     expect(byProvenance("ungoverned")).toEqual([
       "backtick_manifest_bullet_rate",
       "consequence_chain_rate",
+      "discourse_marker_rate",
       "median_sentence_length",
       "negative_contrast_rate",
       "subordinate_coordinate_ratio",
@@ -57,6 +59,68 @@ describe("VOICE_DELTA_FEATURES", () => {
     for (const f of VOICE_DELTA_FEATURES) {
       expect(f.source).not.toMatch(/\bvs\.?\b/i);
     }
+  });
+});
+
+describe("RETIRED_FEATURES", () => {
+  test("stays disjoint from the live set, so a retired candidate reaches no profile", () => {
+    const live = new Set(VOICE_DELTA_FEATURES.map((f) => f.id));
+    for (const f of RETIRED_FEATURES) expect(live.has(f.id)).toBe(false);
+  });
+
+  test("carries the same shape as a live feature, so the null can score it", () => {
+    const ids = RETIRED_FEATURES.map((f) => f.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const f of RETIRED_FEATURES) {
+      expect(["skill-prescribed", "skill-encouraged", "ungoverned"]).toContain(f.provenance);
+      expect(f.source.length).toBeGreaterThan(0);
+      expect(Number.isFinite(f.compute("One sentence. Another sentence."))).toBe(true);
+    }
+  });
+});
+
+function retired(id: string): VoiceDeltaFeature {
+  const found = RETIRED_FEATURES.find((f) => f.id === id);
+  if (!found) throw new Error(`missing retired feature: ${id}`);
+  return found;
+}
+
+describe("paragraph_length_uniformity", () => {
+  const compute = retired("paragraph_length_uniformity").compute;
+
+  test("scores 1 when every paragraph is the same length", () => {
+    expect(compute("one two three.\n\nfour five six.")).toBe(1);
+  });
+
+  test("ignores headings, which are not prose paragraphs", () => {
+    const even = "one two three.\n\nfour five six.";
+    expect(compute(`# Title\n\n${even}\n\n## Section`)).toBe(compute(even));
+  });
+
+  test("ignores list items", () => {
+    const even = "one two three.\n\nfour five six.";
+    expect(compute(`${even}\n\n- a\n- b c d e f g h`)).toBe(compute(even));
+  });
+
+  test("returns 0 with fewer than two paragraphs", () => {
+    expect(compute("# Title\n\n- only a bullet")).toBe(0);
+  });
+});
+
+describe("parallel_construction_rate", () => {
+  const compute = retired("parallel_construction_rate").compute;
+
+  test("counts an ordered list, which a bullet pattern misses", () => {
+    expect(compute("1. the parser returns a row\n2. the parser returns a page")).toBe(1);
+  });
+
+  test("counts a nested item as its own unit", () => {
+    const text = "- the parser returns a row\n  - the parser returns a page";
+    expect(compute(text)).toBe(1);
+  });
+
+  test("scores 0 when adjacent units open differently", () => {
+    expect(compute("- the parser returns a row\n- a router drops the page")).toBe(0);
   });
 });
 
@@ -272,6 +336,31 @@ describe("negation_rate", () => {
   test("scores 0 on a positive-frame rewrite", () => {
     const text = "The wrapper is a no-op on the default path. The guard stays unchanged.";
     expect(compute(text)).toBe(0);
+  });
+});
+
+describe("discourse_marker_rate", () => {
+  const compute = feature("discourse_marker_rate").compute;
+
+  test("counts single-word connectives per 1k words", () => {
+    // 9 words, 1 marker.
+    const text = "The cache was cold. However, the loader retried it.";
+    expect(compute(text)).toBeCloseTo((1 / 9) * 1000, 5);
+  });
+
+  test("counts a multi-word connective as a single marker", () => {
+    // The four words of "on the other hand" contribute one match.
+    const text = "It retries. On the other hand, it drops the row.";
+    const words = 10;
+    expect(compute(text)).toBeCloseTo((1 / words) * 1000, 5);
+  });
+
+  test("ignores markers inside code spans", () => {
+    expect(compute("Call `however(x)` and `thus(y)` from the handler.")).toBe(0);
+  });
+
+  test("returns 0 on prose with no connectives", () => {
+    expect(compute("The loader refetches the row and writes it back.")).toBe(0);
   });
 });
 

@@ -44,6 +44,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 
@@ -152,6 +153,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 
@@ -277,6 +279,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 
@@ -387,6 +390,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 
@@ -504,6 +508,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 
@@ -620,6 +625,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 
@@ -738,6 +744,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 
@@ -858,6 +865,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 
@@ -980,6 +988,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 
@@ -1091,6 +1100,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 
@@ -1199,6 +1209,7 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
 
 ## Proposed Wordlist Removals
 
@@ -1307,6 +1318,7 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
 
 ## Proposed Wordlist Removals
 
@@ -1415,6 +1427,7 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
 
 ## Proposed Wordlist Removals
 
@@ -1523,6 +1536,7 @@ Baseline: 5 documents (computed 2026-01-01). Each rate is the mean across the de
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 | (no baseline stat) | - |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 | (no baseline stat) | - |
 
 ## Proposed Wordlist Removals
 
@@ -1631,6 +1645,7 @@ No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\
 | No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
 | Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
 | Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
+| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
 
 ## Proposed Wordlist Removals
 

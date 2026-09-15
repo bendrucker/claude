@@ -146,14 +146,20 @@ describe("processStop", () => {
 
   // The hook spawns `bun` and `prek` by name, so a stub earlier on PATH records
   // the calls without running either for real.
-  async function recordedCalls(cwd: string): Promise<string[]> {
+  async function recordedCalls(
+    cwd: string,
+    exitCodes: Record<string, number> = {},
+  ): Promise<string[]> {
     const stubDir = await mkdtemp(join(tmpdir(), "stop-hook-stub-"));
     const bin = join(stubDir, "bin");
     const log = join(stubDir, "calls.log");
     await Promise.all(
       ["bun", "prek"].map(async (name) => {
         const stub = join(bin, name);
-        await Bun.write(stub, `#!/bin/sh\necho "${name} $*" >> "${log}"\n`);
+        await Bun.write(
+          stub,
+          `#!/bin/sh\necho "${name} $*" >> "${log}"\nexit ${exitCodes[name] ?? 0}\n`,
+        );
         Bun.spawnSync(["chmod", "+x", stub]);
       }),
     );
@@ -177,19 +183,34 @@ describe("processStop", () => {
     return text.split("\n").filter((line) => line !== "");
   }
 
-  it("installs before prek when the stop directory is a JS project", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-project-"));
-    await Bun.write(join(cwd, "package.json"), "{}");
-    expect(await recordedCalls(cwd)).toEqual([
-      `bun install --cwd ${cwd}`,
-      "prek run --files touched.ts",
-    ]);
-    await rm(cwd, { recursive: true, force: true });
-  });
-
-  it("runs prek without installing when the stop directory has no manifest", async () => {
-    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-bare-"));
-    expect(await recordedCalls(cwd)).toEqual(["prek run --files touched.ts"]);
+  test.each<{
+    name: string;
+    manifest: boolean;
+    exitCodes?: Record<string, number>;
+    expected: (cwd: string) => string[];
+  }>([
+    {
+      name: "installs before prek when the stop directory is a JS project",
+      manifest: true,
+      expected: (cwd) => [`bun install --cwd ${cwd}`, "prek run --files touched.ts"],
+    },
+    {
+      name: "runs prek anyway when the install fails",
+      manifest: true,
+      exitCodes: { bun: 1 },
+      expected: (cwd) => [`bun install --cwd ${cwd}`, "prek run --files touched.ts"],
+    },
+    {
+      name: "runs prek without installing when the stop directory has no manifest",
+      manifest: false,
+      expected: () => ["prek run --files touched.ts"],
+    },
+  ])("$name", async ({ manifest, exitCodes, expected }) => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+    if (manifest) {
+      await Bun.write(join(cwd, "package.json"), "{}");
+    }
+    expect(await recordedCalls(cwd, exitCodes)).toEqual(expected(cwd));
     await rm(cwd, { recursive: true, force: true });
   });
 

@@ -439,8 +439,8 @@ describe("pane metadata report", () => {
         [
           "#!/bin/sh",
           `if [ "$2" = list ]; then printf '%s' '${paneList}'; exit 0; fi`,
-          `for arg in "$@"; do printf '%s\\n' "$arg" >> ${log}.part; done`,
-          `mv ${log}.part ${log}`,
+          `for arg in "$@"; do printf '%s\\n' "$arg" >> "${log}.part"; done`,
+          `mv "${log}.part" "${log}"`,
           "",
         ].join("\n"),
       );

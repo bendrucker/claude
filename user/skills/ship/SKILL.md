@@ -17,6 +17,7 @@ allowed-tools:
   - Skill(comments:audit)
   - Skill(github:copilot)
   - Skill(writing:review)
+  - Skill(review:human)
   - Skill(pull-request:create)
   - Skill(pull-request:babysit)
   - Skill(pull-request:follow-up)
@@ -36,13 +37,14 @@ Default end state **green and ready**: CI green, bot comments triaged, body refr
 
 Resolve the base to a **remote** ref so ship's view matches what the PR merges against. From the base branch (default `main`, or `--base <parent>` on a stack), take its tracking ref via `git rev-parse --abbrev-ref --symbolic-full-name <base>@{u}`, falling back to `origin/<base>`. Fetch it first (`git fetch`) so a stale local `<base>` never inflates the diff with already-merged commits. Diff `git diff <resolved>...HEAD`, plus a plain `git diff` for uncommitted work, and thread the resolved ref as `--base` to every gated pass (including `review:code`). Gate each pass on the file set, its size, and the content behind any judgment call (new comments, refactor or new behavior). Full matrix and heuristics: [`references/passes.md`](references/passes.md).
 
-- **`plan:review`**: a substantial approved plan is in context (`~/.claude/plans/` file) *and* the session ran long or redirected enough that the diff could have drifted from it. Skip otherwise ([full gate](references/passes.md)).
+- **`plan:review`**: a substantial approved plan is in context (`~/.claude/plans/` file) *and* the session ran long or redirected enough that the diff could have drifted from it. Skip otherwise ([full gate](references/passes.md#plan-review)).
 - **Correctness and quality**: code changed. Exactly one of `review:code <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs/config-only.
 - **`comments:audit`**: diff adds code comments.
-- **`pull-request:follow-up --local`**: a supported review bot is available for the repo *and* the diff clears the [Bot Review Gate](references/passes.md). Runs the hosted reviewer locally before the PR exists.
-- **`github:copilot`**: code changed on a repo I own *and* the diff clears the [Cross-Model Gate](references/passes.md). A second model reads the diff before the PR exists.
+- **`pull-request:follow-up --local`**: a supported review bot is available for the repo *and* the diff clears the [Bot Review Gate](references/passes.md#bot-review-gate). Runs the hosted reviewer locally before the PR exists.
+- **`github:copilot`**: code changed on a repo I own *and* the diff clears the [Cross-Model Gate](references/passes.md#cross-model-gate). A second model reads the diff before the PR exists.
 - **`writing:review`**: diff touches prose (`.md`, `.mdx`, `.rst`, docs).
 - **`run`**: diff has a runtime surface. Drive the change in the real app, not just tests. Skip on docs-only and tests-only.
+- **`review:human`**: always on. Ben reads the cleaned diff last, for architecture and slop. `--skip human` drops it, and passes `--no-review-body` through to create.
 
 Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQuestion` only on a real toss-up: refactor versus behavior change, or `medium` versus `high` effort.
 
@@ -51,7 +53,7 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 - `--merge`: drive to merged (babysit `--merge`). Default: green and ready.
 - `--effort <low|medium|high|xhigh>`: override inferred `review:code` effort.
 - `--simplify`: force `simplify` over `review:code`.
-- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code` (the old `code-review` is accepted as an alias), `simplify`, `comments`, `bot`, `copilot`, `writing`, `run` (the old `verify` is accepted as an alias).
+- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code` (the old `code-review` is accepted as an alias), `simplify`, `comments`, `bot`, `copilot`, `writing`, `run` (the old `verify` is accepted as an alias), `human`.
 - `--base <ref>`: base branch for gating. Default `main`; on a stack, the parent branch. Resolved to its upstream tracking ref (e.g. `origin/...`) before diffing.
 
 ## Pre-PR Reviews
@@ -64,12 +66,14 @@ Serialized before create: `review:code --fix`, `simplify`, and comment trims all
 4. **Correctness and quality**: `review:code <effort> --fix` or `simplify`.
 5. **`writing:review`** over touched prose. Address salient findings before the body is written.
 6. **`run`** to drive the change end to end.
+7. **Join `plan:review`** when it was gated in, and act on fix-worthy drift before the human review sees the diff. Carry deferred follow-ups into the report.
+8. **`review:human`**: after every fix pass and the join, so the cleaned diff is what gets seen ([Human Review](references/passes.md#human-review)). Terminal mode by default: it ends the turn, and Create runs only when the review resumes with approval.
 
 Dirty tree at the comment pass: ask whether to commit first. `comments:audit` operates on `HEAD` and needs a clean tree.
 
 #### Comment Trims
 
-`comments:audit` commits trims to a fresh `comments/audit-<hash>` branch off `HEAD`, leaving the tree untouched. Run `comments:audit --base <base> --fix` and capture the branch name. No branch means nothing to trim: skip. Otherwise dispatch a short-lived `general-purpose` Agent with that name to fast-forward and delete it (rationale and rejected alternatives: [`references/passes.md`](references/passes.md)):
+`comments:audit` commits trims to a fresh `comments/audit-<hash>` branch off `HEAD`, leaving the tree untouched. Run `comments:audit --base <base> --fix` and capture the branch name. No branch means nothing to trim: skip. Otherwise dispatch a short-lived `general-purpose` Agent with that name to fast-forward and delete it (rationale and rejected alternatives: [`references/passes.md`](references/passes.md#comment-trims)):
 
 ```
 git merge --ff-only comments/audit-<hash>
@@ -78,17 +82,19 @@ git branch -d comments/audit-<hash>
 
 ## Create
 
-Join the background `plan:review` first if it was gated in. Act on fix-worthy drift before the PR exists, and carry any deferred follow-ups into the report. Then `pull-request:create` commits the working-tree fixes, pushes, opens the PR. Capture the URL: babysit and body-refresh need it.
+The plan-review join and the human review are behind you. `pull-request:create` commits the working-tree fixes, pushes, opens the PR. Capture the URL: babysit and body-refresh need it.
+
+Pass `--no-review-body` through when `/ship --skip human` was given, so create's own body review honors the skip.
 
 Pass `--base <parent>` through when `/ship --base` named a stack parent. Create needs it to target the PR at the parent and to link the layer into the stack on GitHub. Without it the PR opens against the default branch and carries every lower layer's diff.
 
-Pass `--label review` only when the [Bot Review Gate](references/passes.md) routed to the hosted channel (local CLI unavailable); the review then starts with the PR. A local pass already covered the diff, so labeling after it pays a second credit for the same review.
+Pass `--label review` only when the [Bot Review Gate](references/passes.md#bot-review-gate) routed to the hosted channel (local CLI unavailable); the review then starts with the PR. A local pass already covered the diff, so labeling after it pays a second credit for the same review.
 
 ## Babysit
 
 `pull-request:babysit <url>` watches CI and fixes trivial failures to green.
 
-- `--reviews` (default on): after first green, hand bot comments to `pull-request:follow-up --auto`. Covers a bot review landing after the green push with no CI event to key off ([why](references/passes.md)).
+- `--reviews` (default on): after first green, hand bot comments to `pull-request:follow-up --auto`. Covers a bot review landing after the green push with no CI event to key off ([why](references/passes.md#babysit-and-reviews)).
 - `--merge`: only when `/ship --merge` was passed; else stop at green.
 
 ## Refresh the Body

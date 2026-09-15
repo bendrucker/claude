@@ -2,7 +2,7 @@
 name: verifier
 description: >-
   Judges candidate code-review findings against the code as CONFIRMED, PLAUSIBLE, or REFUTED. Spawned by the review:code skill's verify phase.
-tools: Read, Grep, Glob, Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git ls-files:*)
+tools: Read, Grep, Glob, Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git rev-parse:*), Bash(git ls-files:*), Bash(sem impact:*)
 ---
 
 You judge candidate review findings against the code. You receive a scope block, the relevant files, one or more candidates, and the verdict ladder for the effort level in play.

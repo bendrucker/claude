@@ -87,6 +87,16 @@ Why a hook entry in `user/settings.json` earns its place, and what would retire 
 
 **Delete it** if the gap it targets has not closed. Around 2026-10-15, run the `claude-code:session` skill's [`delegation`](../plugins/claude-code/skills/session/resources/queries/delegation.sql) query with `host` set to `local` and `after_date` to the day this shipped, and read the `generic` path under an opus or fable `parent_family`. If `cheaper_override_rate_pct` has not risen and the count of spawns carrying no override has not fallen, the warning is not changing behavior and the hook goes.
 
+[`find-scope`](../user/hooks/find-scope) denies, on a `PreToolUse` matching `Bash`, a `find` whose first operand is `/`, `~`, `$HOME`, or a bare home directory and which carries no `-maxdepth`. Over the 262,859 Bash calls recorded between 2026-04-21 and 2026-09-09 the matcher fires on 237, a tenth of a percent, and those 237 ran a median of 85 seconds and burned 5.1 hours between them. A third returned nothing at all, having hit the 120-second Bash timeout or been pushed to the background. The native instruction to prefer Grep and Glob over the shell was already in force for every one of them, which is why this is a hook rather than another line of prose. The `if` filter keeps the spawn to roughly 2,500 Bash calls a month. Matching hooks run in parallel, and this one overlaps the `worktree` hook rather than queueing behind it.
+
+Blanket forms of this rule do not survive the same corpus. Capping every `find` at a two-second timeout, the shape this was modeled on, fires on about one `find` call in five, and the narrowly rooted ones it would kill run a median around 300 milliseconds with a legitimate multi-second tail. Restricting the deny to a broad root and no depth bound holds precision at 95.4%: of the 237, only 11 finished under two seconds, and 8 of those were a `known/path || find / ...` fallback whose primary succeeded. That fallback shape stays denied on purpose, because across all 26 of its occurrences the fallback did run, at a median of 40 seconds.
+
+**Delete it** if the behavior stops. Around 2026-12-01, re-run the matcher over the corpus from the day this shipped. If it fires fewer than about 15 times a month, the model has stopped running disk-wide `find` and the `user/CLAUDE.md` line alone is enough. **Narrow it** instead if the fast denials grow past roughly one in ten, which would mean scoped searches are being caught and the root test needs tightening.
+
+```
+bun user/hooks/find-scope/audit.ts --since <ship-date>
+```
+
 ## Sandbox Findings
 
 Mechanism behind the rules in [`settings.md`](../.claude/rules/settings.md), and the cases no setting can fix.

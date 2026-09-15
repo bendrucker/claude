@@ -25,6 +25,35 @@ SELECT
 FROM raw r
 WHERE r.type IN ('user', 'assistant');
 
+-- Typed slash commands, one row per invocation. The harness expands `/name` into a user
+-- message carrying a `<command-name>` marker and emits no Skill tool_use, so this is the
+-- only trace a typed invocation leaves and `skill_calls` never sees one. Scoped to a user
+-- message that opens with the marker block: a transcript quoted in prose or dumped into a
+-- tool result is text about an invocation, not one. Replayed lines (rewind and resume
+-- repeat a uuid) are deduped, as `content_items` does for tool calls. `command` is the name
+-- as typed, namespaced (`plugin:skill`) or bare, and callers resolve it to a skill.
+CREATE OR REPLACE VIEW command_markers AS
+WITH typed AS (
+  SELECT
+    m.host,
+    m.session_id,
+    m.timestamp,
+    m.project_path,
+    ltrim(trim(regexp_extract(m.content_text, '<command-name>([^<]*)</command-name>', 1)), '/') AS command,
+    m.source_file,
+    m.source_line
+  FROM messages m
+  WHERE m.type = 'user'
+    AND m.content_text LIKE '%<command-name>%'
+    AND (m.content_text LIKE '<command-name>%' OR m.content_text LIKE '<command-message>%')
+  QUALIFY (m.data->>'$.uuid') IS NULL
+    OR ROW_NUMBER() OVER (
+         PARTITION BY m.host, m.session_id, (m.data->>'$.uuid')
+         ORDER BY m.source_line DESC, m.source_file DESC
+       ) = 1
+)
+SELECT * FROM typed WHERE command <> '';
+
 -- One label per session, from the sidecar title records the harness writes beside the
 -- transcript. A session can accumulate several as the title is regenerated or renamed, so
 -- a user-set `custom-title` wins over a generated `ai-title`, which wins over the

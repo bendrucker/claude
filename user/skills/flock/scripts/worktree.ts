@@ -174,6 +174,36 @@ export async function carriedIgnoredPaths(run: Run, worktree: string): Promise<s
   return filterCarried(await descend(run, worktree, [""], CARRY_DEPTH));
 }
 
+function toCount(result: CommandResult): number | null {
+  const parsed = Number.parseInt(result.stdout.trim(), 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Commits the forge does not have. A pull request's head oid survives the branch
+ * deletion a merge performs, where `@{u}` does not and the base counts the whole
+ * branch.
+ */
+export async function aheadCount(
+  run: Run,
+  worktree: string,
+  options: { readonly headOid: string | null; readonly base: string | null },
+): Promise<number | null> {
+  const count = (range: string): Promise<CommandResult> =>
+    run(["git", "-C", worktree, "rev-list", "--count", range]);
+
+  if (options.headOid !== null) {
+    const pushed = await count(`${options.headOid}..HEAD`);
+    return pushed.ok ? toCount(pushed) : null;
+  }
+
+  const upstream = await count("@{u}..HEAD");
+  if (upstream.ok) return toCount(upstream);
+  if (options.base === null) return null;
+  const fallback = await count(`origin/${options.base}..HEAD`);
+  return fallback.ok ? toCount(fallback) : null;
+}
+
 export interface FlagInput {
   readonly detached: boolean;
   readonly status: StatusRead;

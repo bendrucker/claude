@@ -41,19 +41,21 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 
 - `bun scripts/check-marketplace.ts`: verifies all plugin directories are listed in `marketplace.json`. Runs in CI.
 - `bun scripts/check-hook-paths.ts`: verifies every hook command in `user/settings.json` and `.claude/settings.json` names a tracked path, so a hook cannot outlive the script it invokes. Runs in CI.
+- `bun run plugin-lockfiles check`: verifies every plugin declaring dependencies ships a lockfile that agrees with its `package.json`, which is what Claude Code requires before it will install those dependencies into the plugin cache. `generate` writes them. Runs in CI.
 - `bun run schemas check`: fetches current upstream and verifies the upstream-backed schema overlays still apply, flagging overlay edits that upstream has absorbed and warning on edits that overwrite an upstream definition. Runs in CI.
 - `bun run skill-lint "plugins/<name>/skills/*"`: validates SKILL.md frontmatter and reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
 - `bun run check`: runs `oxlint --type-aware` then `oxfmt --check`. Runs in CI.
 
 ## Evals
 
-Per-skill harnesses live inside the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, with a README per harness covering its loop: `pull-request/evals/pr-body`, `issue/evals/issue-refine`, `review/evals/review-voice`, `writing/evals/writing`, and `comments/evals/comment-density`. They share a shape: mine a sample, label it in a browser, then score or A/B. Hand-made ground truth stays tracked (`scenarios/`, `labels.json`, `briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, as is the shared `evals/results/` corpus, and some hold work-repo content that must not land here. The generic layer stays in [`evals/`](evals/): the corpus, the export and cost scripts, and their tests.
+Per-skill harnesses live inside the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, with a README per harness covering its loop: `pull-request/evals/pr-body`, `issue/evals/issue-refine`, `review/evals/review-voice`, `writing/evals/writing`, `comments/evals/comment-density`, and `prompting/evals/rule-precision`. They share a shape: mine a sample, label it in a browser, then score or A/B. Hand-made ground truth stays tracked (`scenarios/`, `labels.json`, `briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, as is the shared `evals/results/` corpus, and some hold work-repo content that must not land here. The generic layer stays in [`evals/`](evals/): the corpus, the export and cost scripts, and their tests.
 
 - `bun run --cwd plugins/pull-request/evals/pr-body eval:smoke` for two cases and `eval` for all eight, both promptfoo A/B runs. `scripts/judge.ts <run-dir>` is retained as the blinded audit reference for the rubric graders. Also `scripts/mine.ts`, `label/server.ts`, and `calibrate.ts` for the heading screen, whose classifier `labels.json` calibrates
 - `bun plugins/issue/evals/issue-refine/scripts/build-dataset.ts`, then `label/server.ts`, then `scripts/ab-report.ts` and `scripts/judge.ts`
 - `bun plugins/review/evals/review-voice/scripts/mine.ts`, then `label/server.ts`, then `scripts/report.ts`
 - `bun plugins/writing/evals/writing/scripts/mine.ts`, then `label/server.ts` (scorer and judge are not built yet)
 - `bun plugins/comments/evals/eval.ts build`, hand the printed `<preflight>` block to the Workflow tool, then `score --job <dir> --gate`. This is the comments judge's ship gate: it scores the labeled corpus through the workflow that ships, on subscription auth. `eval.ts --gate` scores the same corpus through the SDK oracle as a keyed cross-check
+- `bun plugins/prompting/evals/rule-precision/precision.ts --commit <sha>` scores the scan rules by per-line precision against commits where a human deleted prose, and `--rule 'name=/re/'` scores a candidate without editing the scanner
 
 `pull-request:create`, `pull-request:follow-up`, `review:follow-up`, and `writing:no-diary` each carry a `promptfooconfig.yaml` under their `evals/` dir: an in-repo promptfoo suite that loads the plugin and grades cases with `llm-rubric` asserts. Those four run manually; `eval.yml` wires only the pr-body suite into CI. [`evals/scripts/`](evals/scripts/) files promptfoo runs into the durable corpus and reports what they cost.
 

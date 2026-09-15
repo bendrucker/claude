@@ -1,0 +1,10 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`render files sort and group their own rows 1`] = `
+"Entities (origin/main...HEAD, structural only):
+  a.ts
+    M function first
+  z.ts
+    M function last
+    A function also-last"
+`;

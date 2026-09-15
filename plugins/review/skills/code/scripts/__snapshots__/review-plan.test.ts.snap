@@ -26,7 +26,7 @@ exports[`renders the default / medium plan 1`] = `
 "CELL medium   family default   level medium
 
   mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
-  angles      core (8)
+  angles      core (9)
   candidates  6 per angle
   verify      1 vote, 3-state ladder
   cap         8
@@ -51,7 +51,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -81,6 +81,10 @@ Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claud
 
 Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
 
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
+
 CLEANUP PRECEDENCE
 Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
 `;
@@ -89,7 +93,7 @@ exports[`renders the default / high plan 1`] = `
 "CELL high   family default   level high
 
   mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
-  angles      core (8)
+  angles      core (9)
   candidates  6 per angle
   verify      1 vote, recall-biased ladder
   cap         10
@@ -114,7 +118,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -143,6 +147,10 @@ Both need a fix inside the code this change introduced. Skip structure the diff 
 Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
 
 Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
 
 CLEANUP PRECEDENCE
 Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
@@ -178,7 +186,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Angle D — language-pitfall specialist
 
@@ -268,7 +276,7 @@ exports[`renders the claude-sonnet-5 / medium plan 1`] = `
 "CELL medium   family claude-sonnet-5   level medium
 
   mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
-  angles      core (8)
+  angles      core (9)
   candidates  6 per angle
   verify      1 vote, 3-state ladder
   cap         8
@@ -293,7 +301,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -323,6 +331,10 @@ Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claud
 
 Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
 
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
+
 CLEANUP PRECEDENCE
 Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
 `;
@@ -331,7 +343,7 @@ exports[`renders the claude-sonnet-5 / high plan 1`] = `
 "CELL high   family claude-sonnet-5   level high
 
   mode        fan-out: one Agent per angle, subagent_type review:angle, model sonnet
-  angles      core (8)
+  angles      core (9)
   candidates  6 per angle
   verify      1 vote, recall-biased ladder
   cap         10
@@ -359,7 +371,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -388,6 +400,10 @@ Both need a fix inside the code this change introduced. Skip structure the diff 
 Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
 
 Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
 
 CLEANUP PRECEDENCE
 Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
@@ -426,7 +442,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Angle D — language-pitfall specialist
 
@@ -517,7 +533,7 @@ exports[`renders the claude-opus-4-8 / medium plan 1`] = `
 "CELL inline-med   family claude-opus-4-8   level medium
 
   mode        inline: work through the angles in sequence in this context, no subagents
-  angles      core (8)
+  angles      core (9)
   candidates  6 per angle
   verify      dedup only, no verify pass
   cap         8
@@ -546,7 +562,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -576,6 +592,10 @@ Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claud
 
 Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
 
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
+
 CLEANUP PRECEDENCE
 Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
 `;
@@ -584,7 +604,7 @@ exports[`renders the claude-opus-4-8 / high plan 1`] = `
 "CELL inline-high   family claude-opus-4-8   level high
 
   mode        inline: work through the angles in sequence in this context, no subagents
-  angles      core (8)
+  angles      core (9)
   candidates  6 per angle
   verify      dedup only, no verify pass
   cap         10
@@ -613,7 +633,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -642,6 +662,10 @@ Both need a fix inside the code this change introduced. Skip structure the diff 
 Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
 
 Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
 
 CLEANUP PRECEDENCE
 Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
@@ -681,7 +705,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Angle D — language-pitfall specialist
 
@@ -772,7 +796,7 @@ exports[`renders the claude-fable-5 / medium plan 1`] = `
 "CELL inline-med   family claude-fable-5   level medium
 
   mode        inline: work through the angles in sequence in this context, no subagents
-  angles      core (8)
+  angles      core (9)
   candidates  6 per angle
   verify      dedup only, no verify pass
   cap         8
@@ -801,7 +825,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -831,6 +855,10 @@ Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claud
 
 Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
 
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
+
 CLEANUP PRECEDENCE
 Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
 `;
@@ -839,7 +867,7 @@ exports[`renders the claude-fable-5 / high plan 1`] = `
 "CELL inline-high   family claude-fable-5   level high
 
   mode        inline: work through the angles in sequence in this context, no subagents
-  angles      core (8)
+  angles      core (9)
   candidates  6 per angle
   verify      dedup only, no verify pass
   cap         10
@@ -868,7 +896,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Reuse
 
@@ -897,6 +925,10 @@ Both need a fix inside the code this change introduced. Skip structure the diff 
 Find the CLAUDE.md files that govern the changed code: the user-level \`~/.claude/CLAUDE.md\`, the repo-root \`CLAUDE.md\`, plus any \`CLAUDE.md\` or \`CLAUDE.local.md\` in a directory that is an ancestor of a changed file (a directory's CLAUDE.md only applies to files at or below it). Read each one that exists, then check the diff for clear violations of the rules they state.
 
 Only flag a violation when you can quote the exact rule and the exact line that breaks it — no style preferences, no vague "spirit of the doc" inferences. In the finding, name the CLAUDE.md path and quote the rule so the report can cite it. If no CLAUDE.md applies, return nothing for this angle.
+
+### Angle F — typed-failure auditor
+
+Flag an expected failure that leaves its module as a thrown exception, a rejected promise, or a panic while the signature promises a value: a lookup miss, a rejected payload, an unavailable dependency, a write that lost a race. A catch that flattens several of those into one error the caller cannot branch on counts too. Also flag input that reaches typed code in the shape it arrived in, with no parse between: a request body, a database row, a cache hit, an RPC response, an environment variable.
 
 CLEANUP PRECEDENCE
 Cleanup, altitude, and conventions candidates use the same \`file\`/\`line\`/\`summary\` shape; in \`failure_scenario\`, state the concrete cost (what is duplicated, wasted, harder to maintain, or which CLAUDE.md rule is broken) instead of a crash. Correctness bugs always outrank cleanup, altitude, and conventions findings when the output cap forces a cut."
@@ -932,7 +964,7 @@ For every line the diff DELETES or replaces, name the invariant or behavior it e
 
 ### Angle C — cross-file tracer
 
-For each function the diff changes, find its callers (Grep for the symbol) and check whether the change breaks any call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. Also check callees: does a parallel change in the same PR make a call unsafe?
+For each entity the scope block's entity list marks changed, run \`sem impact <name> --file <path> --dependents\` and check every dependent for a broken call site: a new precondition, a changed return shape, a new exception, a timing/ordering dependency. \`sem impact\` resolves only entities that still exist, so trace a deleted or renamed one by Grepping its old name. The entity list is not the whole diff either: module-level and unparsed changes collapse into its trailing counts, so read those hunks in the diff and Grep the symbols they touch, and Grep every symbol when the scope block carries no entity list. Also check callees: does a parallel change in the same PR make a call unsafe?
 
 ### Angle D — language-pitfall specialist
 

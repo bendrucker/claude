@@ -97,6 +97,9 @@ jobs:
       - name: Check workspace dependencies
         run: bun scripts/check-workspace-deps.ts
 
+      - name: Check plugin lockfiles
+        run: bun run plugin-lockfiles check
+
       - name: Check plugin imports
         run: bun scripts/check-plugin-imports.ts
 

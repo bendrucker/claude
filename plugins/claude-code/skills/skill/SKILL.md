@@ -87,29 +87,23 @@ Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab
 
 ## Skill Authoring Best Practices
 
+Load the `prompting` skill before writing a skill body or a reference file. It carries the rules for every document a model executes. The sections below cover what changes when that document is a Claude Code skill.
+
 #### Descriptions
 
-The description field is a trigger, not a summary. It's what Claude scans to decide whether to activate the skill. Write it for the model: trigger terms, use cases, and "Use when..." phrasing. Make it slightly pushy to combat under-triggering.
+The `description` field is the pointer Claude scans to decide whether to activate the skill. Write it for the model and make it slightly pushy, since under-triggering is the common failure. The wording rules are in the `prompting` skill.
 
-#### Skip the Obvious
+#### Gotchas
 
-The context window is a public good. Don't restate what Claude already knows. Spend tokens on what pushes Claude out of its defaults: gotchas, internal conventions, non-obvious constraints. The highest-signal content in any skill is a `## Gotchas` section documenting failure modes hit in practice; grow it as edge cases surface.
-
-#### Plain Language
-
-Write skill prose as instructions, in the imperative, with conditions before instructions and common verbs. Metaphor, epigram, and personification aim at a human reader and make weaker match targets than literal statements. See [references/plain-language.md](references/plain-language.md) for the sentence forms, the conversions, and the procedure for converting an existing skill.
+The highest-signal content in any skill is a `## Gotchas` section documenting failure modes hit in practice. Grow it as edge cases surface.
 
 #### Progressive Disclosure
 
-A skill is a folder, not just a markdown file. Keep `SKILL.md` a concise hub and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them. Organize references by domain and gate conditional detail behind a pointer, so a question about one domain loads only that file.
+A skill is a folder. Keep `SKILL.md` a concise hub and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them. Organize references by domain. A question about one domain then loads only that file.
 
-See [references/information-hierarchy.md](references/information-hierarchy.md) for what body, reference, and pointer each cost, how to word a pointer, and when a document earns a split.
+A model-invocable skill's `description` costs tokens in every session. Keep an invoked skill's body under roughly 4k tokens, since it is re-injected in full at every compaction. A `references/` file costs nothing until its pointer fires.
 
-#### Don't Railroad Claude
-
-State the goal and constraints, then leave room to adapt. Prefer outcome-oriented instructions over step-by-step scripts.
-
-Goal and constraints still need a done-state: the observable condition that says the work is finished. A vague one lets Claude stop early. A demanding one drives thorough work without adding a step. See [references/levers.md](references/levers.md) for completion criteria, leading words, and pruning.
+Split one skill into two by invocation when the branches need different frontmatter: a different `model`, different `allowed-tools`, or one branch routed by the model while the other stays user-invoked.
 
 #### First-Run Setup
 
@@ -185,12 +179,9 @@ A skill-scoped PostToolUse hook runs `skill-lint` automatically when SKILL.md fi
 
 ## References
 
-Load detailed guides as needed:
+Load the guide that covers the question at hand:
 
-- **[references/information-hierarchy.md](references/information-hierarchy.md)** - What body, reference, and pointer cost, pointer wording, splitting
-- **[references/levers.md](references/levers.md)** - Completion criteria, leading words, positive form, pruning
 - **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, reasoning effort, skill-scoped hooks, anti-patterns
-- **[references/plain-language.md](references/plain-language.md)** - Plain-language rules for skill prose and the conversion procedure
 - **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, plugin cache
 
 ## Resources

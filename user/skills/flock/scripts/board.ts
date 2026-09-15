@@ -43,6 +43,8 @@ export type Disposition =
 export interface BoardRow {
   readonly kind: "worktree" | "pane";
   readonly pane: string | null;
+  /** herdr loses the pane's workspace once the worktree is gone. */
+  readonly workspace: string | null;
   readonly agent: string | null;
   readonly owner: string;
   readonly repo: string;
@@ -63,6 +65,7 @@ export interface BoardRow {
 
 export const COLUMNS = [
   { header: "PANE", width: 9 },
+  { header: "WS", width: 6 },
   { header: "AGENT", width: 14 },
   { header: "REPO", width: 24 },
   { header: "BRANCH", width: 26 },
@@ -85,19 +88,24 @@ export function branchLabel(row: Pick<BoardRow, "branch" | "detached" | "kind">)
 }
 
 /**
- * herdr rests an agent in `idle` or `done`, one state split by whether the tab
- * has been seen, so neither reports the work over: an agent between the turns
- * of a running workflow reads idle. The pane is occupied until the agent
- * leaves it. A shell is a person's prompt rather than an agent, and holds
- * nothing.
+ * An agent occupies its pane whatever its status. herdr splits one resting
+ * state into `idle` and `done` by whether the tab has been seen, so an agent
+ * between the turns of a running workflow reads idle. A shell is a person's
+ * prompt rather than an agent, and occupies nothing.
  */
 export function heldByAgent(agent: string | null): boolean {
   return agent !== null && !agent.startsWith("shell/");
 }
 
+/** `clean` is the sentinel for no flags, so a later flag replaces it. */
+export function withFlag(flags: readonly string[], flag: string): string[] {
+  return [...flags.filter((entry) => entry !== "clean"), flag];
+}
+
 export function rowCells(row: BoardRow): string[] {
   return [
     row.pane ?? "-",
+    row.workspace ?? "-",
     row.agent ?? "-",
     row.repoLabel,
     branchLabel(row),
@@ -149,6 +157,7 @@ export function jsonRow(row: BoardRow): Record<string, unknown> {
   return {
     kind: row.kind,
     pane: row.pane,
+    workspace: row.workspace,
     agent: row.agent,
     owner: row.owner,
     repo: row.repo,

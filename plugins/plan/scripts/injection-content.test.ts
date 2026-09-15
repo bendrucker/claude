@@ -16,13 +16,18 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-async function transcriptWith(models: string[]): Promise<string> {
-  const lines = models.map((model) =>
-    JSON.stringify({ type: "assistant", message: { role: "assistant", model, content: [] } }),
-  );
-  const path = join(dir, "transcript.jsonl");
+function assistantLine(model: string): string {
+  return JSON.stringify({ type: "assistant", message: { role: "assistant", model, content: [] } });
+}
+
+async function transcriptOf(lines: string[], name = "transcript.jsonl"): Promise<string> {
+  const path = join(dir, name);
   await Bun.write(path, `${lines.join("\n")}\n`);
   return path;
+}
+
+async function transcriptWith(models: string[]): Promise<string> {
+  return transcriptOf(models.map(assistantLine));
 }
 
 async function assemble(transcript: string | null): Promise<string> {
@@ -84,6 +89,33 @@ describe("fail open", () => {
       path,
       `${JSON.stringify({ type: "user", message: { role: "user", content: [] } })}\n`,
     );
+    const out = await assemble(path);
+    expect(out).toContain("Planning Guidelines");
+    expect(out).not.toContain("# Delegation");
+  });
+});
+
+describe("bounded reverse scan", () => {
+  test("stops before entries the last assistant turn sits above", async () => {
+    const path = await transcriptOf(["not json", "{also not", assistantLine("claude-opus-5")]);
+    const out = await assemble(path);
+    expect(out).toContain("# Delegation");
+  });
+
+  test("skips an assistant entry carrying no model", async () => {
+    const path = await transcriptOf([
+      assistantLine("claude-opus-5"),
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [] } }),
+    ]);
+    const out = await assemble(path);
+    expect(out).toContain("# Delegation");
+  });
+
+  test("ignores an assistant entry older than the window", async () => {
+    const filler = Array.from({ length: 2000 }, () =>
+      JSON.stringify({ type: "user", message: { role: "user", content: [] } }),
+    );
+    const path = await transcriptOf([assistantLine("claude-opus-5"), ...filler]);
     const out = await assemble(path);
     expect(out).toContain("Planning Guidelines");
     expect(out).not.toContain("# Delegation");

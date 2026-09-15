@@ -4,7 +4,7 @@ Gating decisions for ship's pre-PR reviews: which pass runs, `review:code` effor
 
 ## Gating Matrix
 
-Most passes gate on the diff against the resolved base (the upstream tracking ref, resolved per `SKILL.md`) plus the working tree. `plan:review` gates on the plan and the session, not the diff (see [Plan Review](#plan-review)).
+Most passes gate on the diff against the resolved base (the upstream tracking ref, resolved per `SKILL.md`) plus the working tree. `plan:review` gates on the plan and the session (see [Plan Review](#plan-review)), and `review:human` is always on (see [Human Review](#human-review)).
 
 | Trigger | Pass | Notes |
 |---|---|---|
@@ -15,8 +15,9 @@ Most passes gate on the diff against the resolved base (the upstream tracking re
 | Code changes on a repo whose remote owner is `bendrucker`, clearing the [Cross-Model Gate](#cross-model-gate) | `github:copilot` | Same slot as the local bot pass. Findings fix in-branch |
 | Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | |
 | A runtime surface | `run` | Ship declines docs-only and tests-only |
+| Always, unless `--skip human` | `review:human` | Last pre-PR pass. Ends the turn until the review comes back |
 
-Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `copilot`, `writing`, `run`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
+Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `copilot`, `writing`, `run`, `human`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
 
 ## Bot Review Gate
 
@@ -69,15 +70,16 @@ It is read-only and writes nothing, so it runs as a background dispatch rather t
 flowchart TD
     S([ship start]) --> G{plan:review gated in?}
     G -->|no| F1[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, writing, run]
-    F1 --> C([create PR])
+    F1 --> H[review:human, ends the turn until the review returns]
+    H --> C([create PR])
     G -->|yes| D[dispatch plan:review in background]
     D --> F2[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, writing, run]
     D -. concurrent .-> R[plan:review reasons over plan + diff]
     F2 --> J{join: findings?}
     R -.-> J
-    J -->|fix-worthy drift| A[act before create]
-    J -->|none, common| C
-    A --> C
+    J -->|fix-worthy drift| A[act on the drift]
+    J -->|none, common| H
+    A --> H
 ```
 
 ## Effort Inference
@@ -96,6 +98,10 @@ Infer `review:code` effort from the diff unless `--effort` overrides. `high` is 
 ## Code-Review Versus Simplify
 
 Alternatives, not a pair. Pick `simplify` for a pure refactor or cleanup with no new behavior: extraction, renaming, dedup, dead-code removal, moving code. It covers reuse, simplification, efficiency, and altitude, and does not hunt bugs. Pick `review:code` for anything with new behavior, a bug fix, or a feature, which need the correctness coverage `simplify` skips. `--simplify` forces the `simplify` path.
+
+## Human Review
+
+`review:human` runs last so Ben sees the diff the fix passes left, with nothing in it a later pass would rewrite. Terminal mode is the default. The DAG's create node waits on it: the turn ends at the request, and Create runs when the review resumes with approval.
 
 ## Babysit and Reviews
 

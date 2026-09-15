@@ -99,6 +99,7 @@ export interface PullRequest extends PullState {
   readonly number: number;
   readonly state: "open" | "draft" | "merged";
   readonly mergedAt: number | null;
+  readonly headOid: string | null;
 }
 
 /** One entry of GitHub's `statusCheckRollup`, which mixes two shapes. */
@@ -237,15 +238,17 @@ export function pullRequestRef(pull: PullRequest): string {
 }
 
 /**
- * A branch reused after its pull request merged appears in both listings, and
- * the open row is the truthful one.
+ * A branch reused after its pull request merged appears in both listings under
+ * two numbers, and the open row is the truthful one. One number in both is a
+ * pull request that merged after the open listing was indexed.
  */
 export function joinPullRequests(
   open: readonly PullRequest[],
   merged: readonly PullRequest[],
 ): Map<string, PullRequest> {
+  const landed = new Set(merged.map((pull) => pull.number));
   const byBranch = new Map<string, PullRequest>();
-  for (const pull of [...open, ...merged]) {
+  for (const pull of [...open.filter((entry) => !landed.has(entry.number)), ...merged]) {
     if (!byBranch.has(pull.branch)) byBranch.set(pull.branch, pull);
   }
   return byBranch;
@@ -325,6 +328,7 @@ const GitHubPullRequests = z.array(
   z.looseObject({
     number: z.number(),
     headRefName: z.string(),
+    headRefOid: z.string().nullish(),
     isDraft: z.boolean().optional(),
     mergedAt: z.string().nullish(),
     mergeStateStatus: z.string().nullish(),
@@ -343,10 +347,11 @@ const GitHubPullRequests = z.array(
   }),
 );
 
-// Requested only on the open query. The merged query returns a hundred rows
-// whose check history no disposition reads, and asking for a rollup there
-// would multiply the response for nothing.
-const OPEN_FIELDS = "number,headRefName,isDraft,mergeStateStatus,reviewDecision,statusCheckRollup";
+// A rollup on the merged query's hundred rows would multiply the response for
+// a check history no disposition reads.
+const OPEN_FIELDS =
+  "number,headRefName,headRefOid,isDraft,mergeStateStatus,reviewDecision,statusCheckRollup";
+const MERGED_FIELDS = "number,headRefName,headRefOid,mergedAt";
 
 function githubPullRequest(
   pull: z.infer<typeof GitHubPullRequests>[number],
@@ -357,6 +362,7 @@ function githubPullRequest(
     number: pull.number,
     state: state === "merged" ? "merged" : pull.isDraft === true ? "draft" : "open",
     mergedAt: epochSeconds(pull.mergedAt),
+    headOid: pull.headRefOid ?? null,
   } as const;
   if (state === "merged") return { ...identity, ...SETTLED_STATE };
 
@@ -441,7 +447,7 @@ function githubForge(run: Run): Forge {
           "--limit",
           String(MERGED_LIMIT),
           "--json",
-          "number,headRefName,mergedAt",
+          MERGED_FIELDS,
         ]),
       ]);
 
@@ -475,6 +481,7 @@ const GitLabMergeRequests = z.array(
   z.looseObject({
     iid: z.number(),
     source_branch: z.string(),
+    sha: z.string().nullish(),
     draft: z.boolean().optional(),
     work_in_progress: z.boolean().optional(),
     merged_at: z.string().nullish(),
@@ -498,6 +505,7 @@ function gitlabMergeRequest(
           ? "draft"
           : "open",
     mergedAt: epochSeconds(request.merged_at),
+    headOid: request.sha ?? null,
   } as const;
   if (state === "merged") return { ...identity, ...SETTLED_STATE };
 

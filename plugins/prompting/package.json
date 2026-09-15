@@ -1,0 +1,16 @@
+{
+  "name": "@bendrucker/claude-prompting",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "cleye": "^2.2.1",
+    "mdast-util-from-markdown": "^2.0.2",
+    "mdast-util-frontmatter": "^2.0.1",
+    "micromark-extension-frontmatter": "^2.0.0",
+    "table": "^6.9.0",
+    "unist-util-visit": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.4"
+  }
+}

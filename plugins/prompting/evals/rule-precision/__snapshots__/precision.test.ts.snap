@@ -1,0 +1,15 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`render states the floor it applied 1`] = `
+"ground truth: 953 of 8840 prose lines removed across 135 documents
+a rule clears when its interval's lower bound reaches 11% on 10+ hits
+precision here is a lower bound: the human cut what they were looking for, not every defect
+╔════════════╤═════════╤═════════════╤═══════════╤══════════════╤══════════════════╗
+║ Rule       │ Flagged │ Cut by hand │ Precision │ 95% interval │ Verdict          ║
+╟────────────┼─────────┼─────────────┼───────────┼──────────────┼──────────────────╢
+║ no-op      │ 17      │ 12          │ 71%       │ 47% - 87%    │ clears           ║
+╟────────────┼─────────┼─────────────┼───────────┼──────────────┼──────────────────╢
+║ ticket-ref │ 7       │ 1           │ 14%       │ 3% - 51%     │ too few to judge ║
+╚════════════╧═════════╧═════════════╧═══════════╧══════════════╧══════════════════╝
+"
+`;

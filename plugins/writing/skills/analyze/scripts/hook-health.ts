@@ -9,10 +9,12 @@ export interface CategoryHealth {
   fired: number;
   suppressed: number;
   share: number;
-  /** Shown findings followed by another checked run on the same file. */
+  /** Shown findings followed by a whole-file re-scan of the same file. */
   revisited: number;
-  /** Revisited findings the later run no longer raised. */
+  /** Revisited findings the re-scan no longer raised. */
   accepted: number;
+  /** Shown findings no whole-file re-scan reached, leaving nothing that decides them. */
+  unconfirmed: number;
 }
 
 export interface HookHealth {
@@ -51,14 +53,32 @@ const INJECTION_OUTCOMES = new Set<RunOutcome>(["context", "ask", "deny"]);
 export interface Acceptance {
   revisited: number;
   accepted: number;
+  unconfirmed: number;
 }
 
-// A fire count says how loud a rule is, not whether it was right. Pairing each
-// shown finding with the next checked run on the same file answers the second
-// question from ordinary use: a rule missing from that later run's `categories`
+// Tools whose scanned text is the whole file, so the run's `categories` speak to
+// the file a finding named. An `Edit` or `MultiEdit` scans only its own hunks.
+const WHOLE_FILE_TOOLS = new Set(["Write"]);
+
+// A fire count measures how loud a rule is. Whether it was right takes a second
+// signal. Pairing each shown finding with a whole-file re-scan of the same file
+// answers that from ordinary use: a rule missing from the re-scan's `categories`
 // was acted on, one still present was written past. A suppressed finding was
 // never shown, so it seeds no pair, and a run that returned before the checkers
-// ran carries no `categories` and closes none.
+// ran carries no `categories`.
+//
+// Only a whole-file re-scan decides, in either direction. The checkers report
+// the hits a run newly introduced, so a hunk-scoped edit's `categories` describe
+// that hunk's own text: silence means the hunk introduced nothing, and a hit
+// means the hunk introduced one somewhere the finding never pointed. Neither
+// speaks to the prose the rule flagged. Every shown finding no whole-file
+// re-scan reached lands in `unconfirmed`, whether hunk edits followed it or
+// nothing did, so `revisited` and `unconfirmed` together account for all of
+// them and the evidence the rate leaves out stays visible.
+//
+// One bias survives: a whole-file scan also reports only newly introduced hits,
+// so a trope left at an unchanged count reads as absent. That skews the
+// surviving rate high, making it a floor on how often a rule is wrong.
 export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
   const byTarget = new Map<string, RunLogEntry[]>();
   for (const entry of entries) {
@@ -76,11 +96,16 @@ export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
       const { category } = entry;
       if (category == null || category === "") continue;
       if (entry.suppressed === true || !INJECTION_OUTCOMES.has(entry.outcome)) continue;
-      const later = ordered.slice(index + 1).find((next) => next.categories != null);
-      if (later?.categories == null) continue;
-      const bucket = counts.get(category) ?? { revisited: 0, accepted: 0 };
-      bucket.revisited += 1;
-      if (!later.categories.includes(category)) bucket.accepted += 1;
+      const rescan = ordered
+        .slice(index + 1)
+        .find((next) => next.categories != null && WHOLE_FILE_TOOLS.has(next.tool));
+      const bucket = counts.get(category) ?? { revisited: 0, accepted: 0, unconfirmed: 0 };
+      if (rescan?.categories == null) {
+        bucket.unconfirmed += 1;
+      } else {
+        bucket.revisited += 1;
+        if (!rescan.categories.includes(category)) bucket.accepted += 1;
+      }
       counts.set(category, bucket);
     }
   }
@@ -145,6 +170,7 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
       share: injections > 0 ? counts.fired / injections : 0,
       revisited: accepts.get(category)?.revisited ?? 0,
       accepted: accepts.get(category)?.accepted ?? 0,
+      unconfirmed: accepts.get(category)?.unconfirmed ?? 0,
     }))
     .toSorted((a, b) => (b.fired === a.fired ? b.suppressed - a.suppressed : b.fired - a.fired));
 
@@ -226,9 +252,10 @@ export function opportunities(health: HookHealth): string[] {
   }
 
   const revisited = health.categories.reduce((sum, cat) => sum + cat.revisited, 0);
+  const unconfirmed = health.categories.reduce((sum, cat) => sum + cat.unconfirmed, 0);
   if (revisited < MIN_REVISITS) {
     found.push(
-      `Acceptance is not measurable yet (${revisited} shown findings revisited, ${MIN_REVISITS} needed). Until it is, the fired column is a flag count and says nothing about whether a rule is right. Keep the log on.`,
+      `Acceptance is not measurable yet (${revisited} shown findings re-scanned, ${MIN_REVISITS} needed; ${unconfirmed} more never got a whole-file re-scan). Until it is, the fired column is a flag count and says nothing about whether a rule is right. Keep the log on.`,
     );
     return found;
   }
@@ -278,7 +305,7 @@ export function renderReport(health: HookHealth): string {
   if (health.categories.length > 0) {
     lines.push(
       table([
-        ["category", "fired", "suppressed", "share of injections", "acted on"],
+        ["category", "fired", "suppressed", "share of injections", "acted on", "unconfirmed"],
         ...health.categories.map((cat) => {
           const rate = acceptRate(cat);
           return [
@@ -287,6 +314,7 @@ export function renderReport(health: HookHealth): string {
             String(cat.suppressed),
             formatShare(cat.share),
             rate === null ? "n/a" : `${cat.accepted}/${cat.revisited} ${formatShare(rate)}`,
+            String(cat.unconfirmed),
           ];
         }),
       ]),

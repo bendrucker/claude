@@ -1,0 +1,8 @@
+{
+  "name": "prompting",
+  "description": "Writing documents a model executes: prompts, skills, tool descriptions, CLAUDE.md",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

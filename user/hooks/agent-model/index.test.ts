@@ -32,6 +32,8 @@ function assistant(model: string): AssistantRecord {
 
 const bare = { description: "look up a symbol" };
 const generic = { subagent_type: "general-purpose" };
+const explore = { subagent_type: "Explore" };
+const angle = { subagent_type: "review:angle" };
 
 describe("decide", () => {
   test.each<[string, unknown, ModelFamily | null, ModelFamily | null, boolean]>([
@@ -39,6 +41,10 @@ describe("decide", () => {
     ["general-purpose under opus", generic, "opus", null, true],
     ["bare spawn under fable", bare, "fable", null, true],
     ["general-purpose under fable", generic, "fable", null, true],
+    ["Explore under opus", explore, "opus", null, true],
+    ["review:angle under opus", angle, "opus", null, true],
+    ["Explore with an explicit model", { ...explore, model: "haiku" }, "opus", null, false],
+    ["review:angle under sonnet", angle, "sonnet", null, false],
     ["empty model string under opus", { model: "" }, "opus", null, true],
     ["pinned type under opus", { subagent_type: "analyst" }, "opus", null, false],
     ["fork under opus", { subagent_type: "fork" }, "opus", null, false],
@@ -107,7 +113,10 @@ describe("spawnNeedsModel", () => {
     ["bare spawn", { description: "look up a symbol" }, true],
     ["general-purpose", { subagent_type: "general-purpose" }, true],
     ["empty model string", { subagent_type: "general-purpose", model: "" }, true],
+    ["Explore", { subagent_type: "Explore" }, true],
+    ["review:angle", { subagent_type: "review:angle" }, true],
     ["pinned type", { subagent_type: "analyst" }, false],
+    ["a review type outside the set", { subagent_type: "review:verifier" }, false],
     ["explicit model", { model: "sonnet" }, false],
     ["non-object input", 7, false],
   ])("%s", (_name, toolInput, expected) => {

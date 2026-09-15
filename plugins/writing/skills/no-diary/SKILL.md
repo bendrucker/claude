@@ -1,9 +1,11 @@
 ---
 name: writing:no-diary
 description: >-
-  Cut process narration, past states, session leakage, and provenance from a
-  deliverable (PR or MR body, code comment, doc, skill, review comment, issue,
-  plan) so it states the result rather than how the work happened.
+  Cut slop, jargon, process narration, past states, session leakage, and
+  provenance from a deliverable (PR or MR body, code comment, doc, skill, review
+  comment, issue, plan) so it states the result rather than how the work
+  happened. Use when asked to de-slop, de-jargon, trim, shorten, or cut down one
+  of those, or when told that one reads as slop or runs too long.
 argument-hint: "[<file> | <pr> | <section> | <text>]"
 user-invocable: true
 allowed-tools:
@@ -26,6 +28,7 @@ allowed-tools:
 - A PR or MR number or URL reads the body through `gh` or `glab`, with the commands in `references/surfaces.md`.
 - A section name or heading locates it in the artifact under discussion.
 - A description with no target names the problem in the deliverable in play.
+- A fraction or a keep-list (`50%`, `keep: the warning and the upstream link`) sets the target length. Cut to it, taking the `Removals` in order, and say what went beyond the diary.
 
 With no arguments, resolve the target in this order: text the user pasted this turn, the file this session last wrote or edited, then the PR for the current branch. Ask only when two candidates are equally live.
 

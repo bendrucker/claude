@@ -59,6 +59,16 @@ export function violations({ ids, marketplaces, listed }: Sources): string[] {
   return messages;
 }
 
+/**
+ * Declared marketplaces that no enabled id names. Claude Code clones each one
+ * on every machine and checks it nightly, so a declaration nothing consumes is
+ * recurring work with no payoff.
+ */
+export function unusedMarketplaces({ ids, marketplaces }: Sources): string[] {
+  const used = new Set(ids.map((id) => parseId(id)?.marketplace).filter((name) => name != null));
+  return [...marketplaces].filter((name) => !used.has(name)).toSorted();
+}
+
 export async function sources(): Promise<Sources> {
   const [settings, plugins] = await Promise.all([loadSettings(), loadPlugins()]);
   return {
@@ -70,10 +80,18 @@ export async function sources(): Promise<Sources> {
 
 if (import.meta.main) {
   await runCheck(
-    async () => ({
-      header: "Enabled plugins that do not resolve:",
-      violations: violations(await sources()),
-    }),
-    { success: "Every enabled plugin id resolves" },
+    async () => {
+      const source = await sources();
+      return {
+        header: "Plugin ids and marketplaces that do not resolve:",
+        violations: [
+          ...violations(source),
+          ...unusedMarketplaces(source).map(
+            (name) => `${name}: declared in extraKnownMarketplaces, no enabled plugin uses it`,
+          ),
+        ],
+      };
+    },
+    { success: "Every enabled plugin id and declared marketplace resolves" },
   );
 }

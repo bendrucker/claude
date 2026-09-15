@@ -10,6 +10,10 @@ The feature or project name.
 
 Restate the problem from product requirements. Keep it concise.
 
+### Non-Goals
+
+Name what this spec deliberately does not cover, and why, so a reader stops looking for it.
+
 ### Architecture
 
 High-level system design:

@@ -28,12 +28,12 @@ Flag items that need collaboration lead time (a reviewer in another timezone, a 
 
 ## Review Debt
 
-Review debt is inbound requests you did not reach today, unanswered threads on others' PRs/MRs, and any message, notification, or email still awaiting your reply or filing. Choose one path per item:
+Review debt is what the next-actor rule in `SKILL.md` still resolves to you: inbound requests you did not reach today, threads on others' PRs/MRs awaiting your reply, and any message, notification, or email still awaiting your reply or filing. Choose one path per item:
 
 - Reply now: draft per the contract in `SKILL.md` and include it in the brief. Posting a draft the user approved is safe.
 - Carry to tomorrow: capture it where it belongs per Tracker Hygiene below, so tomorrow's start gather surfaces it rather than a memory.
 
-Never silently drop an item.
+Never silently drop an item. An item the next-actor rule sent back to its author is not debt, and the group's count line is where it gets reported.
 
 ## Unpushed Work Sweep
 

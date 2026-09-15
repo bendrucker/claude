@@ -36,7 +36,7 @@ function pull(
   state: PullRequest["state"],
   mergedAt: number | null = null,
 ): PullRequest {
-  return { branch, number, state, mergedAt, ...SETTLED_STATE };
+  return { branch, number, state, mergedAt, headOid: null, ...SETTLED_STATE };
 }
 
 describe("parseRemote", () => {
@@ -101,6 +101,13 @@ describe("joinPullRequests", () => {
     expect(pullRequestRef(joined.get("done")!)).toBe("merged#4");
   });
 
+  // The open listing comes from a search index that lags a merge by a minute or
+  // so, which rendered a landed pull request as conflicting.
+  test("a pull request in both listings takes its merged record", () => {
+    const joined = joinPullRequests([pull("ship", 9, "open")], [pull("ship", 9, "merged")]);
+    expect(pullRequestRef(joined.get("ship")!)).toBe("merged#9");
+  });
+
   test("the first of several open pull requests on a branch wins", () => {
     const joined = joinPullRequests([pull("b", 1, "open"), pull("b", 2, "draft")], []);
     expect(joined.get("b")?.number).toBe(1);
@@ -156,6 +163,7 @@ describe("github", () => {
           {
             number: 1,
             headRefName: "a",
+            headRefOid: "aaa111",
             isDraft: true,
             mergeStateStatus: "BLOCKED",
             reviewDecision: "CHANGES_REQUESTED",
@@ -166,7 +174,8 @@ describe("github", () => {
         ]),
       },
       "--state merged": {
-        stdout: '[{"number":2,"headRefName":"b","mergedAt":"2026-01-01T00:00:00Z"}]',
+        stdout:
+          '[{"number":2,"headRefName":"b","headRefOid":"bbb222","mergedAt":"2026-01-01T00:00:00Z"}]',
       },
     });
     const listing = await createForge("github", run).pullRequests("o/r");
@@ -177,6 +186,7 @@ describe("github", () => {
         number: 1,
         state: "draft",
         mergedAt: null,
+        headOid: "aaa111",
         checks: "failing",
         failing: ["lint"],
         review: "changes-requested",
@@ -184,7 +194,14 @@ describe("github", () => {
       },
     ]);
     expect(listing.merged).toEqual([
-      { branch: "b", number: 2, state: "merged", mergedAt: 1_767_225_600, ...SETTLED_STATE },
+      {
+        branch: "b",
+        number: 2,
+        state: "merged",
+        mergedAt: 1_767_225_600,
+        headOid: "bbb222",
+        ...SETTLED_STATE,
+      },
     ]);
     expect(calls.every((call) => call.includes("--author @me"))).toBe(true);
   });
@@ -199,6 +216,13 @@ describe("github", () => {
     expect(merged).not.toContain("statusCheckRollup");
   });
 
+  test("asks both queries for the head oid", async () => {
+    const { run, calls } = stub({ "pr list": { stdout: "[]" } });
+    await createForge("github", run).pullRequests("o/r");
+
+    expect(calls.filter((call) => call.includes("headRefOid"))).toHaveLength(2);
+  });
+
   test("a listing without a rollup reports checks it cannot read", async () => {
     const { run } = stub({
       "--state open": { stdout: '[{"number":1,"headRefName":"a"}]' },
@@ -210,6 +234,7 @@ describe("github", () => {
         number: 1,
         state: "open",
         mergedAt: null,
+        headOid: null,
         checks: "unknown",
         failing: [],
         review: "none",
@@ -283,13 +308,15 @@ describe("gitlab", () => {
     const { run, calls } = stub({
       "api user": { stdout: '{"username":"ben"}' },
       "--merged": {
-        stdout: '[{"iid":7,"source_branch":"done","merged_at":"2026-01-01T00:00:00Z"}]',
+        stdout:
+          '[{"iid":7,"source_branch":"done","sha":"ddd444","merged_at":"2026-01-01T00:00:00Z"}]',
       },
       "mr list": {
         stdout: JSON.stringify([
           {
             iid: 5,
             source_branch: "wip",
+            sha: "ccc333",
             draft: true,
             has_conflicts: true,
             pipeline: { status: "failed" },
@@ -305,6 +332,7 @@ describe("gitlab", () => {
         number: 5,
         state: "draft",
         mergedAt: null,
+        headOid: "ccc333",
         checks: "failing",
         failing: [],
         review: "unknown",
@@ -312,7 +340,14 @@ describe("gitlab", () => {
       },
     ]);
     expect(listing.merged).toEqual([
-      { branch: "done", number: 7, state: "merged", mergedAt: 1_767_225_600, ...SETTLED_STATE },
+      {
+        branch: "done",
+        number: 7,
+        state: "merged",
+        mergedAt: 1_767_225_600,
+        headOid: "ddd444",
+        ...SETTLED_STATE,
+      },
     ]);
     expect(calls.some((call) => call.includes("--author ben"))).toBe(true);
   });

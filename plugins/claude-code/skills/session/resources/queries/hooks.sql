@@ -18,6 +18,14 @@
 --   `hook_denies` view, which `hook-blocks` reports and `index-health` sizes. It is not
 --   folded in here because a recovered deny carries no command and no duration, so it
 --   cannot key to a row or contribute to the latency columns.
+--
+--   A PreToolUse hook's `duration_ms` can inherit wall-clock from the tool call it gates
+--   when that tool is a known-slow class (AppleScript/JXA automation is the observed case).
+--   `excess_p95_ms` corrects for host-wide slowdowns, not for a tail concentrated in one
+--   downstream tool class, so it will not catch this. Before filing a latency finding, join
+--   the slowest rows to `tool_calls` on `tool_use_id` and check whether the tail
+--   concentrates in one tool class. The mechanism is unconfirmed, so verify the correlation
+--   before citing it as a cause.
 -- params:
 --   - name: event
 --     meaning: hook_event filter

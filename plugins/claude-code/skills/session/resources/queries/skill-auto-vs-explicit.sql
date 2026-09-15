@@ -14,8 +14,8 @@
 --   a Skill tool call. The harness expands `/name` into a user message carrying a
 --   `<command-name>` marker, and no Skill tool_use follows: across the corpus fewer than 1%
 --   of Skill calls have a matching slash command anywhere earlier in the session. So
---   `explicit` is counted from those markers in `raw`, and `model_auto` plus `chained` from
---   `skill_calls`. Reading explicitness off the Skill call alone cannot work. Whether args
+--   `explicit` is counted from those markers via `command_markers`, and `model_auto` plus
+--   `chained` from `skill_calls`. Reading explicitness off the Skill call alone cannot work. Whether args
 --   were passed says nothing, since passing args is ordinary model routing, so keying on it
 --   reads every parameterized skill as 100% explicit and makes its description look
 --   unearned.
@@ -27,8 +27,11 @@
 --   Blind spot: the skill universe here is whatever appears in `skill_calls`, so a skill
 --   the user only ever types and the model never loads has no row at all. Use
 --   `skill-config-vs-observed` for the disk-side universe. Marker names are matched to a
---   skill by full name (`plugin:skill`) or, for an unnamespaced command, by the segment
---   after the colon, so two plugins exposing the same trailing name collapse into one row.
+--   skill by full name (`plugin:skill`) or, for an unnamespaced command, to a bare skill
+--   name or a plugin's entry skill (`<p>:<p>`), the only skills a bare `/name` invokes.
+--   A bare name observed on its own wins, since a personal or project skill shadows the
+--   plugin entry skill it collides with; with no disk side here, that is inferred from what
+--   was observed, so `skill-config-vs-observed` is the one that resolves it from disk.
 -- params:
 --   - name: min_calls
 --     default: 1
@@ -61,26 +64,25 @@ call_agg AS (
   FROM calls
   GROUP BY skill_name
 ),
--- The marker is emitted verbatim into the user message, so it is matched against the raw
--- JSON text rather than a pinned column. The length bound keeps a runaway match from
--- swallowing the rest of the line.
 markers AS (
-  SELECT ltrim(regexp_extract(r.data::VARCHAR, '<command-name>/?([^<]{1,60})</command-name>', 1), '/') AS command
-  FROM raw r
+  SELECT cm.command
+  FROM command_markers cm
   JOIN scoped_sessions USING (host, session_id)
-  WHERE r.data::VARCHAR LIKE '%<command-name>%'
 ),
 explicit_agg AS (
   SELECT ca.skill_name, COUNT(*) AS explicit
   FROM markers m
   JOIN call_agg ca
     ON m.command = ca.skill_name
-    -- Both sides must be non-empty: split_part returns '' for an unnamespaced skill
-    -- name, and an unparsed marker yields '', so without the guard every such skill
-    -- absorbs every such marker.
-   OR (m.command <> ''
-       AND position(':' IN m.command) = 0
-       AND m.command = NULLIF(split_part(ca.skill_name, ':', 2), ''))
+    -- A bare command reaches a namespaced skill only when it is its plugin's entry skill
+    -- (`<p>:<p>`), the one form a bare `/<p>` invokes, and only while nothing was observed
+    -- under that bare name: a personal or project skill of the same name takes it instead.
+    -- Matching any trailing segment would credit `/peer` to `review:peer`, which no bare
+    -- command can reach.
+   OR (position(':' IN m.command) = 0
+       AND m.command = split_part(ca.skill_name, ':', 1)
+       AND split_part(ca.skill_name, ':', 1) = split_part(ca.skill_name, ':', 2)
+       AND NOT EXISTS (SELECT 1 FROM call_agg shadow WHERE shadow.skill_name = m.command))
   GROUP BY ca.skill_name
 )
 SELECT

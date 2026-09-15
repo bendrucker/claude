@@ -35,6 +35,7 @@ function row(overrides: Partial<BoardRow> = {}): BoardRow {
   return {
     kind: "worktree",
     pane: null,
+    workspace: null,
     agent: null,
     owner: "bendrucker",
     repo: "claude",
@@ -216,17 +217,15 @@ describe("an agent resting in the pane", () => {
   const held = (agent: string, overrides: Partial<RowState> = {}): BoardRow =>
     row({ pane: "wC1:p1", agent, pull: merged, state: state(overrides) });
 
-  // The pane holding an agent owns its worktree, and herdr splits one resting
-  // state into idle and done by whether the tab has been seen. An agent
-  // between the turns of a running workflow reads idle, so a cleanup offered
-  // against that row removes the tree the run is working in.
+  // Holding a resting agent's merged worktree back collapsed the row into
+  // `working`, where nobody ever saw it was ready for cleanup.
   test.each<{ name: string; row: BoardRow; expected: Disposition }>([
-    { name: "idle never reads as finished", row: held("claude/idle"), expected: "working" },
-    { name: "done never reads as finished", row: held("claude/done"), expected: "working" },
+    { name: "idle is ready for cleanup", row: held("claude/idle"), expected: "cleanup" },
+    { name: "done is ready for cleanup", row: held("claude/done"), expected: "cleanup" },
     {
-      name: "with a status herdr would not report holds the tree all the same",
+      name: "with a status herdr would not report is ready for cleanup",
       row: held("claude/?"),
-      expected: "working",
+      expected: "cleanup",
     },
     {
       name: "mid-turn holds the tree",
@@ -250,9 +249,6 @@ describe("an agent resting in the pane", () => {
     expect(classify(row({ pull: merged }))).toBe("cleanup");
   });
 
-  // Merge lands on the forge and leaves the tree alone, and the agent that
-  // finished the work is resting in the pane it finished in, so an occupied
-  // pane holding merges back would empty the disposition.
   test.each<{ name: string; row: BoardRow; expected: Disposition }>([
     { name: "resting", row: held("claude/idle", {}), expected: "merge" },
     { name: "mid-turn", row: held("claude/working", { working: true }), expected: "merge" },
@@ -267,6 +263,11 @@ describe("an agent holding the worktree", () => {
       name: "mid-turn holds back a cleanup",
       row: row({ pull: pull({ state: "merged" }), state: state({ working: true }) }),
       expected: "working",
+    },
+    {
+      name: "resting does not hold back a cleanup",
+      row: row({ agent: "claude/idle", pull: pull({ state: "merged" }) }),
+      expected: "cleanup",
     },
     {
       name: "mid-turn holds back a report",

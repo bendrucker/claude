@@ -1,6 +1,6 @@
 {
   "name": "writing",
-  "description": "Writing style enforcement hooks and AI trope detection",
+  "description": "Style enforcement and AI trope detection for human-consumable prose",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { execFile } from "node:child_process";
-import { isAbsolute, relative, sep } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import { promisify } from "node:util";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -85,6 +85,22 @@ export async function parseTranscript(transcriptPath: string): Promise<string[]>
   return [...files];
 }
 
+// prek hooks run repo scripts that import workspace packages, so the tree needs
+// its dependencies present. A session can stop anywhere, including a directory
+// that is not a JS project at all, where there is nothing to install. Failing to
+// install is also not a check failure, and prek reports a missing dependency
+// itself, so neither case belongs in the block path.
+async function installDependencies(cwd: string): Promise<void> {
+  if (!(await fileExists(join(cwd, "package.json")))) {
+    return;
+  }
+  try {
+    await execFileAsync("bun", ["install", "--cwd", cwd]);
+  } catch {
+    // must never break the hook
+  }
+}
+
 export function scopePaths(files: string[], cwd: string): string[] {
   const scoped: string[] = [];
   for (const file of files) {
@@ -115,8 +131,9 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
     return null;
   }
 
+  await installDependencies(input.cwd);
+
   try {
-    await execFileAsync("bun", ["install", "--cwd", input.cwd]);
     await execFileAsync("prek", ["run", "--files", ...relativePaths], {
       cwd: input.cwd,
       timeout: PREK_TIMEOUT,

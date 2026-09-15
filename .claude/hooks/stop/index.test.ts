@@ -144,6 +144,76 @@ describe("processStop", () => {
     expect(await processStop(stopInput({ transcript_path: transcriptPath }))).toBeNull();
   });
 
+  // The hook spawns `bun` and `prek` by name, so a stub earlier on PATH records
+  // the calls without running either for real.
+  async function recordedCalls(
+    cwd: string,
+    exitCodes: Record<string, number> = {},
+  ): Promise<string[]> {
+    const stubDir = await mkdtemp(join(tmpdir(), "stop-hook-stub-"));
+    const bin = join(stubDir, "bin");
+    const log = join(stubDir, "calls.log");
+    await Promise.all(
+      ["bun", "prek"].map(async (name) => {
+        const stub = join(bin, name);
+        await Bun.write(
+          stub,
+          `#!/bin/sh\necho "${name} $*" >> "${log}"\nexit ${exitCodes[name] ?? 0}\n`,
+        );
+        Bun.spawnSync(["chmod", "+x", stub]);
+      }),
+    );
+
+    const filePath = join(cwd, "touched.ts");
+    await Bun.write(filePath, "export {}");
+    const transcriptPath = join(cwd, "transcript.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+    const originalPath = process.env.PATH;
+    process.env.PATH = `${bin}:${originalPath ?? ""}`;
+    try {
+      expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toBeNull();
+    } finally {
+      process.env.PATH = originalPath;
+    }
+
+    const file = Bun.file(log);
+    const text = (await file.exists()) ? await file.text() : "";
+    await rm(stubDir, { recursive: true, force: true });
+    return text.split("\n").filter((line) => line !== "");
+  }
+
+  test.each<{
+    name: string;
+    manifest: boolean;
+    exitCodes?: Record<string, number>;
+    expected: (cwd: string) => string[];
+  }>([
+    {
+      name: "installs before prek when the stop directory is a JS project",
+      manifest: true,
+      expected: (cwd) => [`bun install --cwd ${cwd}`, "prek run --files touched.ts"],
+    },
+    {
+      name: "runs prek anyway when the install fails",
+      manifest: true,
+      exitCodes: { bun: 1 },
+      expected: (cwd) => [`bun install --cwd ${cwd}`, "prek run --files touched.ts"],
+    },
+    {
+      name: "runs prek without installing when the stop directory has no manifest",
+      manifest: false,
+      expected: () => ["prek run --files touched.ts"],
+    },
+  ])("$name", async ({ manifest, exitCodes, expected }) => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+    if (manifest) {
+      await Bun.write(join(cwd, "package.json"), "{}");
+    }
+    expect(await recordedCalls(cwd, exitCodes)).toEqual(expected(cwd));
+    await rm(cwd, { recursive: true, force: true });
+  });
+
   it("returns null when every collected file is out-of-tree", async () => {
     const sibling = join(tempDir, "sibling-worktree");
     const filePath = join(sibling, "plugins", "mac", "plugin.json");

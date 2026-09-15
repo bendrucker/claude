@@ -18,7 +18,7 @@ const HookInput = z.looseObject({
   tool_use_id: z.string().catch(""),
 }) satisfies z.ZodType<PreToolUseHookInput>;
 
-const SIZE_THRESHOLD = 10_000;
+export const SIZE_THRESHOLD = 10_000;
 // The size rule re-arms while a re-present is still over the threshold, so a
 // rework that shrinks but not enough is caught once more. The cap keeps a deny
 // loop impossible: past it, the presentation goes to the user's own approval.
@@ -35,10 +35,6 @@ const APPEND_ONLY_MIN_ADDED = 1;
 // only on plans over 30 unique lines, since below that the 0.9 floor is stricter.
 const APPEND_ONLY_MAX_REMOVED = 3;
 
-// Only one growth denial fires per session, so a plan that lands a hair over the
-// high-water mark must not spend it. Require a margin that reads as accumulation.
-const GROWTH_MIN_EXCESS_RATIO = 0.05;
-
 // Every rule below denies. On ExitPlanMode a PreToolUse "ask" is inert: the tool
 // runs its own plan-approval prompt, and the harness drops the hook's
 // permissionDecisionReason and systemMessage alike, so neither the user nor the
@@ -51,14 +47,6 @@ export const DENY_REASON =
 export const APPEND_ONLY_REASON =
   "This plan keeps nearly every line of the one that was just rejected. Rework it: " +
   "delete the text the feedback superseded rather than adding new text around it.";
-
-export function growthReason(ordinal: number, previousMax: number, length: number): string {
-  return (
-    `Presentation ${ordinal} is larger than any before it (${previousMax} -> ${length} chars). ` +
-    "Growth from added scope is fine. Otherwise, delete superseded design and move " +
-    "finished research into a <plan>-<topic>.md file the plan links."
-  );
-}
 
 export function sizeReason(priorFires: number): string {
   const opening =
@@ -104,7 +92,7 @@ async function writeState(path: string, content: string): Promise<void> {
   }
 }
 
-function normalizeLines(plan: string): Set<string> {
+export function normalizeLines(plan: string): Set<string> {
   const lines = new Set<string>();
   for (const rawLine of plan.split("\n")) {
     const line = rawLine.trim();
@@ -118,17 +106,6 @@ function parseLineSet(raw: string): Set<string> | null {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === "string")) return null;
     return new Set(parsed);
-  } catch {
-    return null;
-  }
-}
-
-const PresentHistory = z.object({ count: z.number(), maxLength: z.number() });
-type PresentHistory = z.infer<typeof PresentHistory>;
-
-function parsePresentHistory(raw: string): PresentHistory | null {
-  try {
-    return PresentHistory.safeParse(JSON.parse(raw)).data ?? null;
   } catch {
     return null;
   }
@@ -178,8 +155,6 @@ export async function processInput(
 
   const hashPath = join(dir, "exit-plan-hash");
   const linesPath = join(dir, "exit-plan-lines");
-  const presentsPath = join(dir, "exit-plan-presents");
-  const growthAskedPath = join(dir, "exit-plan-growth-asked");
   const askedPath = join(dir, "exit-plan-size-asked");
 
   const hash = createHash("sha256").update(plan).digest("hex");
@@ -194,32 +169,9 @@ export async function processInput(
     return formatDecision(DENY_REASON);
   }
 
-  // Past the unchanged-text check, so an unchanged resubmission neither advances
-  // the count nor raises the high-water mark. Every other presentation does,
-  // denied or not: the hook cannot observe what happened after it answered.
-  const presentsRaw = await readState(presentsPath);
-  const history = presentsRaw === null ? null : parsePresentHistory(presentsRaw);
-  const ordinal = (history?.count ?? 0) + 1;
-  await writeState(
-    presentsPath,
-    JSON.stringify({ count: ordinal, maxLength: Math.max(history?.maxLength ?? 0, plan.length) }),
-  );
-
   const previousLines = previousLinesRaw === null ? null : parseLineSet(previousLinesRaw);
   if (previousLines !== null && isAppendOnlyRevision(previousLines, currentLines)) {
     return formatDecision(APPEND_ONLY_REASON);
-  }
-
-  // A non-null history means this is at least the second present, which is the
-  // gate: the plan travels to a fresh session rather than looping in this one,
-  // so there is no draft-then-detail round for growth to be part of.
-  if (
-    history !== null &&
-    plan.length > history.maxLength * (1 + GROWTH_MIN_EXCESS_RATIO) &&
-    (await readState(growthAskedPath)) === null
-  ) {
-    await writeState(growthAskedPath, "asked");
-    return formatDecision(growthReason(ordinal, history.maxLength, plan.length));
   }
 
   if (plan.length > SIZE_THRESHOLD) {

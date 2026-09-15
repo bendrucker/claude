@@ -33,6 +33,7 @@
     "plugins/comments/evals/comment-density",
     "plugins/pull-request/evals/pr-body",
     "packages/oxlint-rules",
+    "plugins/plan/evals/gate",
     "plugins/prompting"
   ],
   "type": "module",

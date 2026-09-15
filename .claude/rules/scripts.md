@@ -23,6 +23,8 @@ Repo-internal tooling (`scripts/`, `.claude/hooks/`) must import `packages/` cod
 
 Plugins cannot use it. Workspace specifiers never resolve in a cached plugin, so a plugin declares `zod` in its own `package.json` and calls `schema.parse` directly.
 
+A plugin hook that gates a tool call drops the dependency instead. A missing package throws at import, and Claude Code treats a hook that wrote nothing to stdout as a hook with no decision to add, so the call proceeds ungated. Such a hook imports only node builtins and narrows its input with a `value is T` predicate over the one field it reads. [`plugins/mac/hooks/sandbox.ts`](../../plugins/mac/hooks/sandbox.ts) is the only one, and a test runs a copy of it from a directory with no `node_modules` above it.
+
 # Parsing Structured Text
 
 Parse structured text with a real parser and match against the tree it returns. This holds for any language a script reads: source code, markup, config, or data.

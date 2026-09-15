@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, sep } from "node:path";
+import { dirname, join, sep } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { extractCommands, hasBypassMarker, processInput } from "./sandbox";
 
@@ -23,7 +23,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  const { rm } = await import("node:fs/promises");
   await rm(fixtureDir, { recursive: true, force: true });
 });
 
@@ -109,10 +108,14 @@ describe("processInput", () => {
     expect(result).toBeNull();
   });
 
-  test("returns null when command is undefined", async () => {
-    const input = makeInput({});
-    const result = await processInput(input, "darwin");
-    expect(result).toBeNull();
+  test.each([
+    ["command is undefined", {}],
+    ["command is empty", { command: "" }],
+    ["command is not a string", { command: 42 }],
+    ["tool input is not an object", "ls"],
+    ["tool input is absent", undefined],
+  ])("returns null when %s", async (_label, toolInput) => {
+    expect(await processInput(makeInput(toolInput), "darwin")).toBeNull();
   });
 
   test("disables sandbox for marked bun script", async () => {
@@ -169,6 +172,83 @@ describe("processInput", () => {
     expect(result?.hookSpecificOutput).toMatchObject({
       hookEventName: "PreToolUse",
       updatedInput: { dangerouslyDisableSandbox: true },
+    });
+  });
+});
+
+function ancestors(start: string): string[] {
+  const dirs = [start];
+  for (let dir = dirname(start); dir !== dirs.at(-1); dir = dirname(dir)) {
+    dirs.push(dir);
+  }
+  return dirs;
+}
+
+async function holdsNodeModules(dir: string): Promise<boolean> {
+  try {
+    return (await readdir(dir)).includes("node_modules");
+  } catch {
+    return false;
+  }
+}
+
+describe.skipIf(process.platform !== "darwin")("dependency-free execution", () => {
+  let isolatedDir: string;
+  let hookCopy: string;
+
+  beforeAll(async () => {
+    isolatedDir = join(fixtureDir, "isolated");
+    await mkdir(isolatedDir);
+    hookCopy = join(isolatedDir, "sandbox.ts");
+    await Bun.write(hookCopy, Bun.file(join(import.meta.dirname, "sandbox.ts")));
+  });
+
+  async function runHook(
+    command: string,
+  ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+    const proc = Bun.spawn(["bun", "--no-install", hookCopy], {
+      cwd: isolatedDir,
+      stdin: Buffer.from(
+        JSON.stringify({
+          hook_event_name: "PreToolUse",
+          tool_name: "Bash",
+          tool_input: { command },
+        }),
+      ),
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    return { exitCode, stdout, stderr };
+  }
+
+  test("resolves no node_modules from the copy's directory", async () => {
+    expect(await Promise.all(ancestors(isolatedDir).map(holdsNodeModules))).not.toContain(true);
+  });
+
+  test("emits the bypass for a marked script", async () => {
+    const command = `bun ${markedScriptPath}`;
+    expect(await runHook(command)).toEqual({
+      exitCode: 0,
+      stderr: "",
+      stdout: `${JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          updatedInput: { command, dangerouslyDisableSandbox: true },
+        },
+      })}\n`,
+    });
+  });
+
+  test("emits nothing for an unmarked script", async () => {
+    expect(await runHook(`bun ${unmarkedScriptPath}`)).toEqual({
+      exitCode: 0,
+      stderr: "",
+      stdout: "",
     });
   });
 });

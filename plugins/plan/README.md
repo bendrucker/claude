@@ -4,9 +4,11 @@ Planning mode guidelines and context injection for Claude Code.
 
 ## Contents
 
-- **Skill** `plan:review`: reviews how an implementation diverged from its approved plan, forking a clean-context agent over the plan and the diff to surface drift and follow-ups
-- **Hook**: Injects planning guidelines the first time a session reaches plan mode, whether that first signal is the `EnterPlanMode` call, a prompt, or a tool call, and appends delegation guidance when the orchestrator runs on an expensive model
-- **Hook**: Gates `ExitPlanMode`, denying an unchanged plan resubmission, a resubmission that keeps the prior plan nearly intact, once per session a resubmission larger than every presentation before it, and a plan over 10k characters, re-arming while a rework stays over the threshold up to two fires per session
+- **Skill** `plan:review`: reviews how an implementation diverged from its approved plan, dispatching a clean-context agent over the plan and the diff to surface drift and follow-ups
+- **Hooks**:
+  - `scripts/context.sh` and `scripts/plan-inject.sh`: inject planning guidelines the first time a session reaches plan mode, whether that first signal is the `EnterPlanMode` call, a prompt, or a tool call, and append delegation guidance when the orchestrator runs on an expensive model
+  - `hooks/gate.ts`: gates `ExitPlanMode`, denying an unchanged plan resubmission, a resubmission that keeps the prior plan nearly intact, and a plan over 10k characters, re-arming while a rework stays over the threshold up to two fires per session
+- **Evals** `evals/gate/`: offline replay of every recorded presentation through the gate, plus headless rework runs that compare deny texts
 
 ## How It Works
 
@@ -14,7 +16,7 @@ Two hooks share one job: inject the guidelines exactly once per plan-mode sessio
 
 A third entry registers the same script on `PostToolUse` with matcher `EnterPlanMode`. A session that researches in auto mode, enters plan mode, and writes the plan in one turn reaches its next tool call only at `ExitPlanMode`, so under the `PreToolUse` entry alone the guidelines arrive after the plan they were meant to shape. This entry needs no mode test, because `EnterPlanMode` carries the pre-switch mode before it runs. `PostToolUse` is what makes it safe: reaching it means the call landed, so an interrupted `EnterPlanMode` cannot spend the marker and silence both paths for the rest of the session. The script also exits on a payload carrying `agent_id`, since a subagent's call would otherwise spend the parent's marker on context only the subagent sees.
 
-Both paths call `scripts/injection-content.sh` to assemble the content. It emits `references/guidelines.md` always, and reads the latest assistant `model` from the transcript. When that model is an expensive orchestrator (opus, fable, mythos), it appends `references/delegation.md`, which requires the plan to carry a Delegation section laying out the agent/model/effort DAG. `UserPromptSubmit` returns the content on stdout; `PreToolUse` returns it as `hookSpecificOutput.additionalContext`. Any read or parse problem falls back to the guidelines alone.
+Both paths call `scripts/injection-content.sh` to assemble the content. It emits `references/guidelines.md` always, and reads the latest assistant `model` from the transcript. When that model is an expensive orchestrator (opus, fable, mythos), it appends `references/delegation.md`, which requires the plan to carry a Delegation section laying out the agent/model/effort DAG. `UserPromptSubmit` returns the content on stdout. `PreToolUse` returns it as `hookSpecificOutput.additionalContext`. Any read or parse problem falls back to the guidelines alone.
 
 The `PreToolUse` gate hook keeps per-session state under `/tmp/claude/<session_id>/` and runs three checks in order. It denies a resubmission whose text is unchanged from the last presentation. It denies a resubmission that keeps nearly every prior line and introduces at least one new one, which catches a line swap that nets zero growth as well as a plain append. It denies a plan over 10k characters, the same limit the injected guidelines state, re-arming while a rework remains over the threshold, capped at two fires per session so a deny loop is impossible.
 
@@ -24,7 +26,7 @@ A missing session id or a plan that is not a string fails open silently, since n
 
 Each denial reason states the fix directly: rework against the feedback, delete superseded text, move detail to sidecar files, or split the plan.
 
-`plan:review` reads the approved plan from the file Claude Code writes under `~/.claude/plans/` and injects into the session on plan exit. It forks a clean-context agent that diffs the plan against the branch's base (resolved from the open PR, not assumed to be `main`) using the rubric in `skills/review/references/divergence.md`.
+`plan:review` reads the approved plan from the file Claude Code writes under `~/.claude/plans/` and injects into the session on plan exit. It dispatches a clean-context agent that diffs the plan against the branch's base (resolved from the open PR, not assumed to be `main`) using the rubric in `skills/review/references/divergence.md`.
 
 ## Testing
 

@@ -95,6 +95,14 @@ describe("measureAddedLines", () => {
     expect(result.codeLines).toBe(2);
   });
 
+  test("a shebang does not exempt the comments beneath it", async () => {
+    const fragment = ["#!/usr/bin/env bash", "# say hi", "echo hi"].join("\n");
+    const result = await measure(fragment, "shellscript");
+    expect(result.commentCount).toBe(1);
+    expect(result.commentLines).toBe(1);
+    expect(result.commentChars).toBe(6);
+  });
+
   test("only added lines are measured", async () => {
     const fragment = ["// old comment", "const x = 1;"].join("\n");
     const result = await measureAddedLines(fragment, new Set([2]), "typescript");

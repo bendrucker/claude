@@ -65,8 +65,18 @@ export function isDirective(text: string): boolean {
   });
 }
 
+/**
+ * The shebang test the extractor and this gate must agree on. Grammars that
+ * scope `#` comments scope the shebang too, so the extractor ends a comment run
+ * at one; were the two definitions to diverge, a run would absorb the shebang
+ * again and exempt the prose below it along with it.
+ */
+export function isShebangLine(line: string): boolean {
+  return line.startsWith("#!");
+}
+
 export function isShebang(comment: Comment): boolean {
-  return comment.startLine === 1 && comment.text.startsWith("#!");
+  return comment.startLine === 1 && isShebangLine(comment.text);
 }
 
 /** A license header lives in a file's first lines; the same words deeper down are prose. */

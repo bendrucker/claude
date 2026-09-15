@@ -5,6 +5,7 @@ import {
   type Highlighter,
   type ThemedToken,
 } from "shiki";
+import { isShebangLine } from "./exempt";
 import { lineStartOffsets, sliceRange } from "./offsets";
 import type { Comment, CommentKind, Language } from "./types";
 
@@ -71,8 +72,13 @@ function mergeKind(a: CommentKind, b: CommentKind): CommentKind {
  * run, keeping standalone comments over distinct code separate. Block and
  * docstring comments already coalesce via their open scope, so only `line` runs
  * are merged here.
+ *
+ * A shebang ends its run too. Grammars that scope `#` comments also scope the
+ * shebang, and absorbing the prose beneath it would make the whole run read as
+ * a shebang, which the collect-time gate exempts from judging entirely.
  */
-function coalesceLineRuns(comments: Comment[]): Comment[] {
+function coalesceLineRuns(comments: Comment[], lines: string[]): Comment[] {
+  const shebang = isShebangLine(lines[0] ?? "");
   const merged: Comment[] = [];
   for (const comment of comments) {
     const prev = merged[merged.length - 1];
@@ -81,7 +87,8 @@ function coalesceLineRuns(comments: Comment[]): Comment[] {
       prev.kind === "line" &&
       comment.kind === "line" &&
       comment.startLine === prev.endLine + 1 &&
-      comment.startColumn === prev.startColumn
+      comment.startColumn === prev.startColumn &&
+      !(shebang && prev.startLine === 1)
     ) {
       prev.endLine = comment.endLine;
       prev.endColumn = comment.endColumn;
@@ -175,7 +182,7 @@ function extract(highlighter: Highlighter, source: string, language: BundledLang
   }
   if (current != null) comments.push(current);
 
-  const merged = coalesceLineRuns(comments);
+  const merged = coalesceLineRuns(comments, lines);
 
   for (const comment of merged) {
     comment.text = sliceRange(

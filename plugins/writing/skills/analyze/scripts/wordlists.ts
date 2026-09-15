@@ -9,8 +9,6 @@ export interface WordlistEntry {
 
 const FileError = z.looseObject({ code: z.string().optional().catch(undefined) });
 
-// Audits the top-level phrase lists only. Subdirectories hold closed
-// grammatical classes a detector reads (wordlists/negation/), not candidates.
 export async function loadWordlists(dir: string): Promise<WordlistEntry[]> {
   let files: string[];
   try {

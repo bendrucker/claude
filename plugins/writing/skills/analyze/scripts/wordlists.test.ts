@@ -34,6 +34,18 @@ describe("loadWordlists", () => {
     }
   });
 
+  test("skips lists nested in subdirectories", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "wordlists-"));
+    try {
+      await Bun.write(join(dir, "openers.txt"), "perfect\n");
+      await Bun.write(join(dir, "negation", "predication.txt"), "exist\n");
+      const entries = await loadWordlists(dir);
+      expect(entries.map((e) => e.phrase)).toEqual(["perfect"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   test("strips trailing weight suffixes from entries", async () => {
     const dir = mkdtempSync(join(tmpdir(), "wordlists-"));
     try {

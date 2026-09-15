@@ -5,6 +5,7 @@ import {
   type Highlighter,
   type ThemedToken,
 } from "shiki";
+import { isShebangLine } from "./exempt";
 import { lineStartOffsets, sliceRange } from "./offsets";
 import type { Comment, CommentKind, Language } from "./types";
 
@@ -77,7 +78,7 @@ function mergeKind(a: CommentKind, b: CommentKind): CommentKind {
  * a shebang, which the collect-time gate exempts from judging entirely.
  */
 function coalesceLineRuns(comments: Comment[], lines: string[]): Comment[] {
-  const shebang = (lines[0] ?? "").startsWith("#!");
+  const shebang = isShebangLine(lines[0] ?? "");
   const merged: Comment[] = [];
   for (const comment of comments) {
     const prev = merged[merged.length - 1];

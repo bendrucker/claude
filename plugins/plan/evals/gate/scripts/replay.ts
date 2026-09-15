@@ -43,7 +43,9 @@ function hookInput(present: Present): PreToolUseHookInput {
     transcript_path: "",
     cwd: "",
     tool_name: "ExitPlanMode",
-    tool_input: { plan: present.plan },
+    // A call mined without plan text reaches the gate the way it did live: no
+    // plan field, which the gate passes through untouched.
+    tool_input: present.plan === "" ? {} : { plan: present.plan },
     tool_use_id: caseId(present),
   };
 }

@@ -1,6 +1,6 @@
-import { sizeReason } from "../../../hooks/gate";
+import { SIZE_THRESHOLD as SIZE_LIMIT, sizeReason } from "../../../hooks/gate";
 
-export const SIZE_LIMIT = 10_000;
+export { SIZE_THRESHOLD as SIZE_LIMIT } from "../../../hooks/gate";
 export const TARGET_CHARS = 8_000;
 
 const count = (n: number): string => n.toLocaleString("en-US");

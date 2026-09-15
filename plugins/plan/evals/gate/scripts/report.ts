@@ -9,9 +9,17 @@ import { type CaseResult, CaseResult as CaseResultSchema, median } from "./metri
 const ROOT = join(import.meta.dirname, "..");
 const WC_LOOP_MIN = 3;
 
+async function subdirectories(dir: string): Promise<string[]> {
+  const entries = await readdir(dir, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .toSorted();
+}
+
 export async function loadRun(dir: string): Promise<Map<string, CaseResult[]>> {
   const byArm = new Map<string, CaseResult[]>();
-  const arms = await readdir(dir);
+  const arms = await subdirectories(dir);
   await Promise.all(
     arms.map(async (arm) => {
       const armDir = join(dir, arm);
@@ -62,7 +70,10 @@ export function summaryRows(byArm: Map<string, CaseResult[]>): string[][] {
       pct(results.filter((r) => r.over_limit).length, results.length),
       pct(results.filter((r) => r.near_limit).length, results.length),
       pct(results.filter((r) => r.sidecars.length > 0).length, results.length),
-      pct(median(results.map((r) => r.lines.deleted)), median(results.map((r) => r.lines.before))),
+      pct(
+        median(results.map((r) => (r.lines.before === 0 ? 0 : r.lines.deleted / r.lines.before))),
+        1,
+      ),
     ]);
   }
   return rows;
@@ -97,9 +108,16 @@ export function caseRows(byArm: Map<string, CaseResult[]>): string[][] {
   return rows;
 }
 
+// results/ also holds logs and the saved replay baselines, so a run is the
+// latest directory that has an arm directory inside it.
 async function latestRun(resultsDir: string): Promise<string> {
-  const runs = (await readdir(resultsDir)).toSorted();
-  const latest = runs.at(-1);
+  const candidates = await subdirectories(resultsDir);
+  const withArms = await Promise.all(
+    candidates.map(async (run) =>
+      (await subdirectories(join(resultsDir, run))).length > 0 ? run : null,
+    ),
+  );
+  const latest = withArms.findLast((run) => run !== null);
   if (latest === undefined) throw new Error(`no runs under ${resultsDir}`);
   return latest;
 }

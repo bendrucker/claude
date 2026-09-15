@@ -27,6 +27,9 @@ const MinedRow = z.object({
 });
 
 export function sql(since: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
+    throw new Error(`--since must be a YYYY-MM-DD date, got ${JSON.stringify(since)}`);
+  }
   return `
 WITH presents AS (
   SELECT ci.host,

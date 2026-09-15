@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeLines } from "../../../hooks/gate";
 import { SIZE_LIMIT } from "./arms";
 
 const ToolUse = z.looseObject({
@@ -86,15 +87,6 @@ export const LineAccounting = z.object({
   deleted: z.number(),
 });
 export type LineAccounting = z.infer<typeof LineAccounting>;
-
-export function normalizeLines(text: string): Set<string> {
-  const lines = new Set<string>();
-  for (const raw of text.split("\n")) {
-    const line = raw.trim();
-    if (line !== "") lines.add(line);
-  }
-  return lines;
-}
 
 /**
  * Where each line of the denied plan ended up: still in the plan, in a sidecar,

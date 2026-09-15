@@ -18,7 +18,7 @@ const HookInput = z.looseObject({
   tool_use_id: z.string().catch(""),
 }) satisfies z.ZodType<PreToolUseHookInput>;
 
-const SIZE_THRESHOLD = 10_000;
+export const SIZE_THRESHOLD = 10_000;
 // The size rule re-arms while a re-present is still over the threshold, so a
 // rework that shrinks but not enough is caught once more. The cap keeps a deny
 // loop impossible: past it, the presentation goes to the user's own approval.
@@ -92,7 +92,7 @@ async function writeState(path: string, content: string): Promise<void> {
   }
 }
 
-function normalizeLines(plan: string): Set<string> {
+export function normalizeLines(plan: string): Set<string> {
   const lines = new Set<string>();
   for (const rawLine of plan.split("\n")) {
     const line = rawLine.trim();

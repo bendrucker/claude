@@ -15,15 +15,23 @@ import {
   type CorpusSelection,
   selectCorpora,
 } from "./corpus-selection";
-import { VOICE_DELTA_FEATURES } from "./voice-delta";
+import {
+  RETIRED_FEATURES,
+  strippedWordCount,
+  VOICE_DELTA_FEATURES,
+  type VoiceDeltaFeature,
+} from "./voice-delta";
 import type { VoiceDocument } from "./voice-corpus";
 
 /** Feature id to the feature's rate for each document, in corpus order. */
 export type RateMatrix = Map<string, number[]>;
 
-export function rateMatrix(docs: VoiceDocument[]): RateMatrix {
+export function rateMatrix(
+  docs: VoiceDocument[],
+  features: VoiceDeltaFeature[] = VOICE_DELTA_FEATURES,
+): RateMatrix {
   const matrix: RateMatrix = new Map();
-  for (const feature of VOICE_DELTA_FEATURES) {
+  for (const feature of features) {
     matrix.set(
       feature.id,
       docs.map((doc) => feature.compute(doc.body)),
@@ -99,9 +107,10 @@ export function featureFloors(
   study: VoiceDocument[],
   baseline: VoiceDocument[],
   options: FloorOptions,
+  features: VoiceDeltaFeature[] = VOICE_DELTA_FEATURES,
 ): FeatureFloor[] {
-  const studyRates = rateMatrix(study);
-  const baselineRates = rateMatrix(baseline);
+  const studyRates = rateMatrix(study, features);
+  const baselineRates = rateMatrix(baseline, features);
   const all = Array.from({ length: baseline.length }, (_, index) => index);
   const random = mulberry32(options.seed);
   const halves = Array.from({ length: options.splits }, () =>
@@ -112,7 +121,7 @@ export function featureFloors(
       ? `baseline holds ${baseline.length} documents, fewer than the ${MIN_BASELINE_DOCS} a split needs`
       : null;
 
-  return VOICE_DELTA_FEATURES.map((feature) => {
+  return features.map((feature) => {
     const rates = baselineRates.get(feature.id) ?? [];
     const baselineMean = meanOf(rates, all);
     const studyMean = meanOf(
@@ -193,6 +202,49 @@ function words(docs: VoiceDocument[]): number {
   return docs.reduce((total, doc) => total + (doc.body.match(/\S+/g) ?? []).length, 0);
 }
 
+export interface LengthBand {
+  min?: number | undefined;
+  max?: number | undefined;
+}
+
+// Corpus A documents run several times longer than corpus B's, so any feature
+// that varies with document length reports that length difference as voice.
+// Restricting both corpora to one length band separates the two: a gap that
+// survives the band is about how the prose is written, and one that collapses
+// was body_length measured a second time.
+export function withinLength(docs: VoiceDocument[], band: LengthBand): VoiceDocument[] {
+  if (band.min === undefined && band.max === undefined) return docs;
+  return docs.filter((doc) => {
+    const count = strippedWordCount(doc.body);
+    return count >= (band.min ?? 0) && count <= (band.max ?? Number.POSITIVE_INFINITY);
+  });
+}
+
+// cleye hands back NaN both for a value it cannot parse and for `--min-words
+// -5`, where it reads the negative number as another flag. NaN survives the
+// `undefined` check and then fails every comparison, so an unchecked band
+// silently drops the whole corpus and blames the kind selection on the way out.
+export function bandError(band: LengthBand): string | null {
+  for (const [flag, value] of [
+    ["--min-words", band.min],
+    ["--max-words", band.max],
+  ] as const) {
+    if (value === undefined) continue;
+    if (!Number.isInteger(value) || value < 0) {
+      return `${flag} needs a whole number of words at or above zero.`;
+    }
+  }
+  if (band.min !== undefined && band.max !== undefined && band.min > band.max) {
+    return `--min-words ${band.min} is above --max-words ${band.max}, so the band selects nothing.`;
+  }
+  return null;
+}
+
+export function describeBand(band: LengthBand): string | null {
+  if (band.min === undefined && band.max === undefined) return null;
+  return `length band  ${band.min ?? 0}-${band.max ?? "∞"} words, applied to both corpora`;
+}
+
 function selectionTokens(selection: CorpusSelection): { study: number; baseline: number } {
   return { study: words(selection.study.documents), baseline: words(selection.baseline.documents) };
 }
@@ -209,14 +261,43 @@ if (import.meta.main) {
       splits: { type: Number, default: 500, description: "Random splits of corpus B" },
       percentile: { type: Number, default: 95, description: "Floor percentile across splits" },
       seed: { type: Number, default: 1, description: "PRNG seed" },
+      minWords: { type: Number, description: "Keep only documents of at least this many words" },
+      maxWords: { type: Number, description: "Keep only documents of at most this many words" },
+      candidates: {
+        type: Boolean,
+        description: "Also score the retired candidates in RETIRED_FEATURES",
+      },
       json: { type: Boolean, description: "Emit the floors as JSON" },
     },
   });
 
-  const selection = await selectCorpora(argv.flags);
-  if (selection.study.documents.length === 0) {
-    // Every gap would equal the baseline mean, which reads as signal and is not.
-    console.error(`No corpus A documents for kinds ${selection.study.kinds.join(",")}.`);
+  const band: LengthBand = { min: argv.flags.minWords, max: argv.flags.maxWords };
+  const invalid = bandError(band);
+  if (invalid !== null) {
+    console.error(invalid);
+    process.exit(1);
+  }
+
+  const selected = await selectCorpora(argv.flags);
+  const selection: CorpusSelection = {
+    ...selected,
+    study: { ...selected.study, documents: withinLength(selected.study.documents, band) },
+    baseline: { ...selected.baseline, documents: withinLength(selected.baseline.documents, band) },
+  };
+  const banded = describeBand(band);
+  // A gap measured against an absent corpus equals the other corpus's mean,
+  // which reads as a large effect. Name whichever input emptied the set, since
+  // the band and the kind selection both reach here.
+  for (const [label, documents] of [
+    ["A", selection.study.documents],
+    ["B", selection.baseline.documents],
+  ] as const) {
+    if (documents.length > 0) continue;
+    const cause =
+      banded === null
+        ? `kinds ${selection.study.kinds.join(",")}`
+        : `kinds ${selection.study.kinds.join(",")} inside the ${band.min ?? 0}-${band.max ?? "∞"} word band`;
+    console.error(`No corpus ${label} documents for ${cause}.`);
     process.exit(1);
   }
   const options: FloorOptions = {
@@ -224,12 +305,21 @@ if (import.meta.main) {
     percentile: argv.flags.percentile,
     seed: argv.flags.seed,
   };
-  const floors = featureFloors(selection.study.documents, selection.baseline.documents, options);
+  const features = argv.flags.candidates
+    ? [...VOICE_DELTA_FEATURES, ...RETIRED_FEATURES]
+    : VOICE_DELTA_FEATURES;
+  const floors = featureFloors(
+    selection.study.documents,
+    selection.baseline.documents,
+    options,
+    features,
+  );
 
   if (argv.flags.json) {
-    console.log(JSON.stringify({ options, floors }, null, 2));
+    console.log(JSON.stringify({ options, band, floors }, null, 2));
   } else {
     console.log(corpusHeaderLines(corpusHeader(selection, selectionTokens(selection))).join("\n"));
+    if (banded !== null) console.log(banded);
     console.log("");
     console.log(renderReport(floors, options));
   }

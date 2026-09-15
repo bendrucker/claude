@@ -15,6 +15,9 @@
 // per-document flags. They are rates-only in every surface. Only ungoverned
 // features may produce per-document flags.
 
+import type { Nodes, Paragraph, Parent } from "mdast";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { visit } from "unist-util-visit";
 import { z } from "zod";
 import { noNegationHits, notNegationHits } from "../../../detection/negation";
 
@@ -68,8 +71,10 @@ function stripCode(text: string): string {
     .replaceAll(/https?:\/\/\S+/g, " URL ");
 }
 
-// Count total words in stripped text. Avoids counting code tokens.
-function strippedWordCount(text: string): number {
+// Count total words in stripped text. Avoids counting code tokens. Exported so
+// the rate-nulls length band measures a document the same way the rates that
+// band gates normalize it.
+export function strippedWordCount(text: string): number {
   return wordCount(stripCode(text));
 }
 
@@ -106,6 +111,12 @@ const SUBORDINATORS =
 // PR bodies and review comments. The writing skill already bans "X, not Y"
 // contrast. This measures the wider family the wordlists do not reach.
 const NEGATIVE_CONTRAST = /\b(?:rather than|instead of|not\s+\w+,?\s+but|never)\b/gi;
+
+// Multi-word markers lead the alternation because JS picks the first matching
+// branch at a position, and a shorter branch listed first would clip the longer
+// phrase.
+const DISCOURSE_MARKERS =
+  /\b(?:on the other hand|in other words|at the same time|as a result|in addition|in contrast|in particular|in short|in fact|that said|for instance|for example|to that end|as such|however|moreover|furthermore|additionally|consequently|therefore|thus|hence|nevertheless|nonetheless|meanwhile|similarly|likewise|conversely|accordingly|subsequently|notably|importantly|ultimately|overall|indeed|arguably|crucially|specifically|essentially|fundamentally)\b/gi;
 
 export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
   {
@@ -311,6 +322,155 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
       const matches = stripped.match(NEGATIVE_CONTRAST) ?? [];
       return per1k(matches.length, words);
     },
+  },
+  {
+    id: "discourse_marker_rate",
+    label: "Discourse markers (however/therefore/in addition per 1k)",
+    provenance: "ungoverned",
+    source:
+      "no skill text and no wordlist covers the connective family. A deficit feature: agent prose runs well under the baseline",
+    compute: (text) => {
+      const stripped = stripCode(text);
+      const words = strippedWordCount(stripped);
+      const matches = stripped.match(DISCOURSE_MARKERS) ?? [];
+      return per1k(matches.length, words);
+    },
+  },
+];
+
+function mean(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function standardDeviation(values: number[]): number {
+  if (values.length < 2) return 0;
+  const average = mean(values);
+  const variance =
+    values.reduce((total, value) => total + (value - average) ** 2, 0) / values.length;
+  return Math.sqrt(variance);
+}
+
+// Articles carry no parallelism signal, since "the parser returns" and "a
+// router returns" open alike. tricolon.ts drops the same class from its shapes.
+const PARALLEL_LEADING_ARTICLE = /^(?:the|a|an)\s+/i;
+// Shorter units share an opening by chance, the reason tricolon.ts gates its
+// triples at six tokens.
+const PARALLEL_MIN_TOKENS = 3;
+
+// Block structure comes from the parser. A line pattern misses ordered markers
+// ("1. ") and reads every nesting depth as one level, and the corpus nests
+// lists heavily.
+function blockText(node: Nodes): string {
+  let text = "";
+  visit(node, (child) => {
+    if (child.type === "text" || child.type === "inlineCode") text += child.value;
+  });
+  return text;
+}
+
+function rootParagraphs(text: string): Paragraph[] {
+  return fromMarkdown(text).children.filter((node) => node.type === "paragraph");
+}
+
+// Every list item and every sentence of a free-standing paragraph, in document
+// order, since the rate compares each unit against the one before it. A list
+// item contributes its own paragraphs and leaves any list nested inside it to
+// the items of that list.
+function parallelUnits(text: string): string[] {
+  const units: string[] = [];
+  visit(fromMarkdown(text), (node: Nodes, _index, parent: Parent | undefined) => {
+    if (node.type === "listItem") {
+      const own = node.children
+        .filter((child) => child.type === "paragraph")
+        .map(blockText)
+        .join(" ");
+      if (own.length > 0) units.push(own);
+      return;
+    }
+    if (node.type === "paragraph" && parent?.type !== "listItem") {
+      units.push(...sentenceSplit(blockText(node)));
+    }
+  });
+  return units;
+}
+
+function parallelOpener(unit: string): string | null {
+  if (wordCount(unit) < PARALLEL_MIN_TOKENS) return null;
+  const words =
+    unit
+      .trim()
+      .replace(PARALLEL_LEADING_ARTICLE, "")
+      .match(/\b[a-zA-Z'-]+\b/g) ?? [];
+  return words[0]?.toLowerCase() ?? null;
+}
+
+// Candidates measured against the permutation null and left out of
+// VOICE_DELTA_FEATURES. `rate-nulls.ts --candidates` scores them, so a
+// retirement stays reproducible and can be revisited as the baseline grows.
+// Nothing else reads this array: a retired candidate never reaches a profile,
+// a report, or a per-document flag. references/methodology.md holds the
+// measurements that put each one here.
+export const RETIRED_FEATURES: VoiceDeltaFeature[] = [
+  {
+    id: "sentence_length_burstiness",
+    label: "Sentence-length burstiness (−1 regular, +1 bursty)",
+    provenance: "ungoverned",
+    source: "no skill text. Retired: tracks document length, not voice",
+    // Goh-Barabási burstiness, (σ − μ)/(σ + μ), bounded to [−1, 1]. Bounded
+    // because corpus rates are an unweighted mean over documents, where one
+    // short document's coefficient of variation would otherwise dominate.
+    compute: (text) => {
+      const sentences = sentenceSplit(stripCode(text));
+      if (sentences.length < 2) return 0;
+      const lengths = sentences.map((sentence) => wordCount(sentence));
+      const average = mean(lengths);
+      const deviation = standardDeviation(lengths);
+      if (average + deviation === 0) return 0;
+      return (deviation - average) / (deviation + average);
+    },
+    format: (rate) => rate.toFixed(3),
+  },
+  {
+    id: "parallel_construction_rate",
+    label: "Parallel openers (fraction of adjacent unit pairs)",
+    provenance: "ungoverned",
+    source: "no skill text. Retired: below its floor at every stratification",
+    compute: (text) => {
+      const openers = parallelUnits(text).map(parallelOpener);
+      let pairs = 0;
+      let parallel = 0;
+      for (let index = 1; index < openers.length; index++) {
+        const previous = openers[index - 1];
+        const current = openers[index];
+        if (previous == null || current == null) continue;
+        pairs++;
+        if (previous === current) parallel++;
+      }
+      return pairs === 0 ? 0 : parallel / pairs;
+    },
+    isFraction: true,
+    format: (rate) => `${(rate * 100).toFixed(1)}%`,
+  },
+  {
+    id: "paragraph_length_uniformity",
+    label: "Paragraph-length uniformity (1 = every paragraph equal)",
+    provenance: "ungoverned",
+    source: "no skill text. Retired: tracks document length, not voice",
+    compute: (text) => {
+      // Prose paragraphs alone. Splitting on blank lines counts each heading as
+      // a one-word paragraph, and headings are where the two corpora differ
+      // most, so the variance measured that way tracks heading density.
+      const lengths = rootParagraphs(text).map((node) => wordCount(blockText(node)));
+      if (lengths.length < 2) return 0;
+      const average = mean(lengths);
+      if (average === 0) return 0;
+      // Complement of the coefficient of variation, clamped so one outsized
+      // paragraph reads as zero uniformity rather than negative.
+      return 1 - Math.min(standardDeviation(lengths) / average, 1);
+    },
+    isFraction: true,
+    format: (rate) => `${(rate * 100).toFixed(1)}%`,
   },
 ];
 

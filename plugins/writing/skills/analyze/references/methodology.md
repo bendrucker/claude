@@ -160,11 +160,36 @@ The baseline is shuffled and split into equal halves `--splits` times, and each 
 
 Splits drop the odd document so both halves are the same size. An unequal split would give the smaller half more spread and inflate the floor.
 
-All fifteen features in `voice-delta.ts` clear their floor on the full corpus. Retire a feature whose gap fails to clear its floor across several seeds at a high split count (2,000 splits). A single seed's floor is one draw from the null-maximum distribution and is not conclusive on its own. `median_sentence_length` (1.27x) and `action_verb_opener_rate` (1.56x) clear thinly and are worth re-checking as the baseline grows. `no_negation_share` (20x) and `negation_rate` (2.5x) clear on the same corpus.
+All sixteen features in `voice-delta.ts` clear their floor on the full corpus. Retire a feature whose gap fails to clear its floor across several seeds at a high split count (2,000 splits). A single seed's floor is one draw from the null-maximum distribution and is not conclusive on its own. `median_sentence_length` (1.27x) and `action_verb_opener_rate` (1.56x) clear thinly and are worth re-checking as the baseline grows. `no_negation_share` (20x) and `negation_rate` (2.5x) clear on the same corpus.
 
 Per-kind runs are a sensitivity check rather than the deciding measurement, because each kind contrasts a different register against the same PR and issue baseline. A feature that clears its floor on the full corpus but falls below it within some kinds is showing register sensitivity, and stays: `template_presence` clears the full corpus at 5.95x while falling below its floor within `plan`, `memory` and `docs`.
 
-A baseline of fewer than four documents cannot be split into halves that say anything about spread, so those features are reported unfloored and stay, with the reason printed. A `--kind` selection matching no corpus A document is refused rather than reported: every gap would equal the baseline mean, and a fabricated gap reads as signal.
+A baseline of fewer than four documents cannot be split into halves that say anything about spread, so those features are reported unfloored and stay, with the reason printed. An empty corpus is refused rather than reported, because every gap would equal the other corpus's mean and a fabricated gap reads as signal. Both a `--kind` selection and a length band can empty either side, and the refusal names whichever one applies.
+
+#### Length Confound
+
+Corpus A averages 295 words per document against corpus B's 92. Any feature that varies with length carries that difference into its gap and reads as voice. `--min-words` and `--max-words` restrict both corpora to one band, which separates the two questions. A gap that survives the band is about how the prose is written. A gap that collapses inside it was `body_length` measured again with more noise.
+
+The band discriminates rather than flattens. Restricted to 100-400 words, 15 of the 16 features still clear. `consequence_chain_rate` leads both runs, and the backtick pair stays near the top: `backtick_manifest_bullet_rate` reads 5.68x on the full corpus and 6.81x banded, `backtick_density` 7.43x and 5.66x. `body_length` itself falls from 17.25x to 2.53x, which is the band doing its job. The one feature that drops below its floor is `action_verb_opener_rate` (0.42x), already flagged as thin on the full corpus. `median_sentence_length` holds at 1.04x and discourse markers at 1.41x, so all three belong on the same re-check list as the baseline grows.
+
+Run the band before promoting a new feature. Three of the four structural metrics measured here failed it. Every ratio below is gap over floor at 2,000 splits, seed 1:
+
+| candidate | full corpus | 100-400 words | disposition |
+|---|---|---|---|
+| discourse marker density | 1.63x | 1.41x | shipped |
+| sentence-length burstiness | 1.37x | 0.35x | retired, length artifact |
+| paragraph-length uniformity | 0.21x | 0.90x | retired, below floor everywhere |
+| parallel-construction rate | 0.38x | 0.80x | retired, below floor everywhere |
+
+Burstiness, discourse markers and tricolon come from #790. Paragraph-length uniformity joined them as a fourth candidate.
+
+Burstiness shows the trap. It clears the full corpus at 1.37x on a gap of 0.0527 and falls to 0.35x inside the band, confirming the corpus comparison that first retired it as a detector. Parallel construction, measured as shared openers between adjacent list items and sentences, sits below its floor at every stratification. Paragraph uniformity never clears either. The tagger-backed `tricolon.ts` remains the parallelism detector.
+
+Paragraph uniformity also shows why the block parse has to come from `mdast-util-from-markdown`. Splitting on blank lines counted every heading as a one-word paragraph, which inflated the variance in whichever corpus carried more headings and read as 2.03x on the full corpus. Parsing the blocks drops it to 0.21x, so the apparent effect was the measurement rather than the prose.
+
+Discourse markers survive because the band leaves the raw gap intact: 1.68 markers per 1k words on the full corpus against 1.82 inside it. The feature is a deficit rather than an excess. The baseline runs 2.02 per 1k words against agent prose at 0.34, and a per-document reading flags prose that lacks connectives.
+
+A retired candidate stays in `RETIRED_FEATURES` rather than leaving the codebase, and `--candidates` scores it alongside the live set. Every row of the table above reproduces from the flags and can be revisited as the baseline grows. Nothing else reads that array, and a retired candidate never reaches a profile, a report, or a per-document flag.
 
 ## Rule Health Table
 

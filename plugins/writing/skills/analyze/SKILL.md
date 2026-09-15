@@ -135,13 +135,16 @@ Examples are verbatim corpus prose, so `--json` omits them the way the word laye
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/rate-nulls.ts
 bun ${CLAUDE_SKILL_DIR}/scripts/rate-nulls.ts --kind message --splits 2000 --seed 7
+bun ${CLAUDE_SKILL_DIR}/scripts/rate-nulls.ts --splits 2000 --min-words 100 --max-words 400
 ```
 
 The baseline is shuffled and split in half `--splits` times and each feature's between-half gap recorded. The floor is the `--percentile` value of that distribution, so it is an estimate of the null maximum rather than the single draw the word and tag layers take. Feature rates are computed once per document and the splits average over indices, which is why thousands of splits cost no more than a few.
 
-Every feature is printed with its gap, its floor, and the ratio between them. All fifteen features in `voice-delta.ts` clear their floor on the full corpus. Retire a feature whose gap fails to clear its floor across several seeds at a high split count (2,000 splits). A single seed's floor is one draw and is not conclusive on its own.
+Every feature is printed with its gap, its floor, and the ratio between them. All sixteen features in `voice-delta.ts` clear their floor on the full corpus. Retire a feature whose gap fails to clear its floor across several seeds at a high split count (2,000 splits). A single seed's floor is one draw and is not conclusive on its own.
 
-A baseline too small to split leaves a feature unfloored, printed as `n/a`, and it stays. A `--kind` selection that matches no corpus A document is refused, since every gap would then equal the baseline mean and read as signal.
+Corpus A documents run about three times longer than corpus B's. `--min-words` and `--max-words` hold both corpora to one length band, which separates voice from document length. Run the band before promoting any new feature. `--candidates` also scores the retired candidates in `RETIRED_FEATURES`, which is what makes a retirement reproducible from the flags. `references/methodology.md` carries the measurements.
+
+A baseline too small to split leaves a feature unfloored, printed as `n/a`, and it stays. An empty corpus is refused, since every gap would then equal the other corpus's mean and read as signal. A `--kind` selection and a length band can each empty either side, and the refusal names the cause.
 
 ## Hook Health
 

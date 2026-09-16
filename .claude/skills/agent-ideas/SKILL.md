@@ -3,7 +3,7 @@ name: agent-ideas
 description: Harvest agent-tooling ideas from prominent developers.
 disable-model-invocation: true
 allowed-tools:
-  - Bash(bun packages/agent-ideas/fetch.ts:*)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/../../../packages/agent-ideas/fetch.ts:*)
   - Read
   - Grep
   - Glob
@@ -28,10 +28,10 @@ Harvest agent-tooling ideas from a curated list of thinkers and map them to conc
 
 ## Fetch
 
-Pull the last 8 days of posts across all feed sources, from the repo root:
+Pull the last 8 days of posts across all feed sources:
 
 ```bash
-bun packages/agent-ideas/fetch.ts > tmp/agent-ideas-posts.json
+bun ${CLAUDE_SKILL_DIR}/../../../packages/agent-ideas/fetch.ts > tmp/agent-ideas-posts.json
 ```
 
 Each result is `{source, sourceType, feedUrl, posts:[{title,url,date,excerpt}], error?}`. Sources with `error` set could not be fetched; note them but don't block. `x-only` sources are absent here by design (the local phase handles them after teleport).
@@ -39,7 +39,7 @@ Each result is `{source, sourceType, feedUrl, posts:[{title,url,date,excerpt}], 
 Narrow to specific sources or widen the window with flags:
 
 ```bash
-bun packages/agent-ideas/fetch.ts --days 14 --source simon --source mario
+bun ${CLAUDE_SKILL_DIR}/../../../packages/agent-ideas/fetch.ts --days 14 --source simon --source mario
 ```
 
 ## Mine

@@ -1,8 +1,7 @@
 /**
  * Action rates per comment shape, measured from the (features, verdict) pairs
- * each preflight run leaves in the job base. Reads are tolerant: a partial,
- * abandoned, or older-format job dir is skipped rather than failing a run whose
- * real work is judging this change's comments.
+ * each preflight run leaves in the job base. Reads skip an unusable job dir
+ * rather than failing a run whose real work is judging this change's comments.
  */
 
 import { readdir } from "node:fs/promises";

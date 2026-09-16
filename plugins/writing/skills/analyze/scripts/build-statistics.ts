@@ -3,9 +3,7 @@
 // data dir in ~/.claude/plugins, which the sandbox denies.
 
 // Takes the three measurements the analyze reports print and persists them to
-// the plugin data dir, where the scan surfaces read them. The corpora and the
-// run log stay on this machine, so the artifact is the only part that travels,
-// and it travels no further than the data dir.
+// the plugin data dir, where the scan surfaces read them.
 //
 // Sections write independently and merge into whatever is already on disk. The
 // tag signatures cost minutes of tagging, so refreshing the run-log numbers

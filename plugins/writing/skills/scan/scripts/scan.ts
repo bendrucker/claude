@@ -6,12 +6,19 @@ import { table } from "table";
 import { isMemoryPath, isPlanPath, isProseFile } from "../../../detection/paths";
 import { type ScanResult, scanAll } from "../../../detection/scan";
 import { readInput } from "../../../scripts/io";
-import { profilePath, resolveDataDir } from "../../analyze/scripts/data-dir";
+import { profilePath, resolveDataDir, statisticsPath } from "../../analyze/scripts/data-dir";
+import {
+  acceptanceByCategory,
+  acceptedShare,
+  loadStatistics,
+  type WritingStatistics,
+} from "../../analyze/scripts/statistics";
 import { loadProfile } from "../../analyze/scripts/voice-profile";
 import {
   buildReport,
   loadCustomMatch,
   type ReportOptions,
+  renderSignatureTable,
   renderTable,
   renderVoiceDeltaTable,
   shouldScoreComments,
@@ -94,7 +101,59 @@ function printViolations(results: FileViolations[]): void {
   }
 }
 
-function printSummary(results: FileViolations[]): void {
+// A rule the author wrote past more often than it changed the prose is firing on
+// text the author meant, so its findings here deserve less weight than its count.
+const LOW_ACCEPT_SHARE = 0.5;
+
+/**
+ * The per-category counts, carrying what the run log recorded after each of
+ * these rules last fired: whether a whole-file re-scan still raised it. A count
+ * says how loud a rule is here, and the acceptance says whether it was worth
+ * listening to. The column appears only where a fired category was measured.
+ */
+export function renderCategories(
+  counts: ReadonlyMap<string, number>,
+  statistics: WritingStatistics | null,
+): string {
+  const acceptance = acceptanceByCategory(statistics);
+  // A category the log only ever fired is still unmeasured, so the column
+  // appears once one of the rules firing here has a pair behind it.
+  const measured = [...counts.keys()].some(
+    (category) => (acceptance.get(category)?.revisited ?? 0) > 0,
+  );
+
+  const headers = measured ? ["Category", "Count", "Acted on"] : ["Category", "Count"];
+  const rows = [...counts.entries()]
+    .toSorted((a, b) => b[1] - a[1])
+    .map(([category, count]) => {
+      const row = [category, String(count)];
+      if (!measured) return row;
+      const health = acceptance.get(category);
+      row.push(
+        health === undefined || health.revisited === 0
+          ? "-"
+          : `${health.accepted}/${health.revisited}`,
+      );
+      return row;
+    });
+  const lines = [table([headers, ...rows]).trimEnd()];
+
+  if (measured) {
+    const written = [...counts.keys()]
+      .map((category) => acceptance.get(category))
+      .filter((health) => health !== undefined)
+      .filter((health) => (acceptedShare(health) ?? 1) < LOW_ACCEPT_SHARE)
+      .map((health) => health.category);
+    if (written.length > 0) {
+      lines.push(
+        `Written past more often than acted on: ${written.join(", ")}. Weigh their findings below accordingly.`,
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
+function printSummary(results: FileViolations[], statistics: WritingStatistics | null): void {
   const byCategory = new Map<string, number>();
   const byFile = new Map<string, number>();
   let total = 0;
@@ -106,10 +165,7 @@ function printSummary(results: FileViolations[]): void {
     }
   }
 
-  const categoryRows = [...byCategory.entries()]
-    .toSorted((a, b) => b[1] - a[1])
-    .map(([category, count]) => [category, String(count)]);
-  console.error(table([["Category", "Count"], ...categoryRows]));
+  console.error(`${renderCategories(byCategory, statistics)}\n`);
 
   const noisiest = [...byFile.entries()]
     .toSorted((a, b) => b[1] - a[1])
@@ -142,6 +198,11 @@ const auditCmd = command(
         description: "Suppress the trailing summary table",
         default: false,
       },
+      dataDir: {
+        type: String,
+        description:
+          "Local data dir holding statistics.json, whose measured per-rule acceptance annotates the summary (default: CLAUDE_PLUGIN_DATA or ~/.claude/plugins/data/writing-bendrucker)",
+      },
     },
   },
   async (argv) => {
@@ -155,7 +216,8 @@ const auditCmd = command(
     printViolations(results);
 
     if (results.length > 0 && !argv.flags.noSummary) {
-      printSummary(results);
+      const statistics = await loadStatistics(statisticsPath(resolveDataDir(argv.flags.dataDir)));
+      printSummary(results, statistics);
     }
 
     process.exit(results.length > 0 ? 1 : 0);
@@ -220,8 +282,13 @@ const scoreCmd = command(
 
     if (argv.flags.voiceDelta) {
       const dataDir = resolveDataDir(argv.flags.dataDir);
-      const profileData = await loadProfile(profilePath(dataDir));
-      console.log(`\n${renderVoiceDeltaTable(text, profileData)}`);
+      const [profileData, statistics] = await Promise.all([
+        loadProfile(profilePath(dataDir)),
+        loadStatistics(statisticsPath(dataDir)),
+      ]);
+      console.log(`\n${renderVoiceDeltaTable(text, profileData, statistics)}`);
+      const signatures = renderSignatureTable(text, statistics);
+      if (signatures !== null) console.log(`\n${signatures}`);
     }
 
     process.exit(0);

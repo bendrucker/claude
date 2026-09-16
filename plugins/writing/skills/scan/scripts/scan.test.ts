@@ -4,7 +4,8 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readInput } from "../../../scripts/io";
-import { collectFiles, scanFiles, shouldSkip, toGlob } from "./scan";
+import type { CategoryAcceptance, WritingStatistics } from "../../analyze/scripts/statistics";
+import { collectFiles, renderCategories, scanFiles, shouldSkip, toGlob } from "./scan";
 
 describe("shouldSkip", () => {
   it("skips node_modules", () => {
@@ -113,5 +114,41 @@ describe("readInput", () => {
     expect(await readInput("The function reads input.")).toEqual({
       text: "The function reads input.",
     });
+  });
+});
+
+describe("renderCategories", () => {
+  const counts = new Map([
+    ["trope", 5],
+    ["hedge", 2],
+  ]);
+  // Invented acceptance. The real rates come from a run log that stays on the
+  // machine whose sessions wrote it.
+  const health = (categories: CategoryAcceptance[]): WritingStatistics => ({
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    hookHealth: { runs: 100, spanDays: 30, categories },
+  });
+
+  it("counts categories alone until the log has measured one of them", () => {
+    expect(renderCategories(counts, null)).not.toContain("Acted on");
+    const elsewhere = health([{ category: "passive", fired: 90, revisited: 40, accepted: 30 }]);
+    expect(renderCategories(counts, elsewhere)).not.toContain("Acted on");
+    const fired = health([{ category: "trope", fired: 90, revisited: 0, accepted: 0 }]);
+    expect(renderCategories(counts, fired)).not.toContain("Acted on");
+  });
+
+  it("carries the acceptance beside the count and flags a rule written past", () => {
+    const measured = health([
+      { category: "trope", fired: 90, revisited: 40, accepted: 30 },
+      { category: "hedge", fired: 90, revisited: 40, accepted: 4 },
+    ]);
+    expect(renderCategories(counts, measured)).toMatchSnapshot();
+  });
+
+  it("reports a thin category's counts without reading a rate off them", () => {
+    const thin = health([{ category: "trope", fired: 9, revisited: 4, accepted: 0 }]);
+    const rendered = renderCategories(counts, thin);
+    expect(rendered).toContain("0/4");
+    expect(rendered).not.toContain("Written past");
   });
 });

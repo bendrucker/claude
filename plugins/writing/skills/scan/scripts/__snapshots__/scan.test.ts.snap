@@ -1,0 +1,12 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`renderCategories carries the acceptance beside the count and flags a rule written past 1`] = `
+"╔══════════╤═══════╤══════════╗
+║ Category │ Count │ Acted on ║
+╟──────────┼───────┼──────────╢
+║ trope    │ 5     │ 30/40    ║
+╟──────────┼───────┼──────────╢
+║ hedge    │ 2     │ 4/40     ║
+╚══════════╧═══════╧══════════╝
+Written past more often than acted on: hedge. Weigh their findings below accordingly."
+`;

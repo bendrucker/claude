@@ -120,3 +120,54 @@ No baseline loaded. Run ingest-voice.ts then voice-profile.ts to build one.
 ║ Discourse markers (however/therefore/in addition per 1k) │ ungoverned       │ 0.00  ║
 ╚══════════════════════════════════════════════════════════╧══════════════════╧═══════╝"
 `;
+
+exports[`renderVoiceDeltaTable with null floors adds a verdict per feature and names the bands a delta failed 1`] = `
+"Voice Delta Features
+╔══════════════════════════════════════════════════════════╤══════════════════╤═══════╤═══════════╤════════╤════════════╗
+║ Feature                                                  │ Provenance       │ Rate  │ Baseline  │ Delta  │ Null       ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ First-person voice (I/we per 1k)                         │ skill-encouraged │ 52.63 │ 9.50      │ +43.13 │ clears     ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Body length (words)                                      │ skill-encouraged │ 19    │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ URL cross-references (per 1k words)                      │ ungoverned       │ 0.00  │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Sentence length median (words)                           │ ungoverned       │ 6.0   │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Template presence (## Changes + ## Testing)              │ skill-prescribed │ 0%    │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Unique heading texts (count)                             │ skill-prescribed │ 0     │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Has any heading (fraction of documents)                  │ skill-prescribed │ 0%    │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Action-verb opener lines (fraction of lines)             │ skill-prescribed │ 0.0%  │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Backtick density (per 1k words)                          │ skill-prescribed │ 0.00  │ (no stat) │ -      │ noise      ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Backtick-manifest bullets (fraction of bullets)          │ ungoverned       │ 0.0%  │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Consequence chains (, so <det>) per 1k words             │ ungoverned       │ 0.00  │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Subordinate:coordinate clause ratio                      │ ungoverned       │ 0.00  │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ No-negation share (no-form of all negated indefinites)   │ skill-prescribed │ 0.00  │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Negation (no-form and not-form per 1k)                   │ skill-prescribed │ 0.00  │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Negative contrast (rather than/instead of/never per 1k)  │ ungoverned       │ 0.00  │ (no stat) │ -      │ unmeasured ║
+╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
+║ Discourse markers (however/therefore/in addition per 1k) │ ungoverned       │ 0.00  │ (no stat) │ -      │ unmeasured ║
+╚══════════════════════════════════════════════════════════╧══════════════════╧═══════╧═══════════╧════════╧════════════╝
+Null floor: 500 splits of the baseline against itself at the 95th percentile, over the full corpus and the 100-400 word band.
+Read the delta on these as sampling spread: Backtick density (per 1k words) (100-400 word band)."
+`;
+
+exports[`renderSignatureTable reads the document's hit share against the two corpus shares 1`] = `
+"Corpus Signatures
+1 of 5 tag n-grams land on one of 1 confirmed shapes (20.0%). Agent corpus 15.8%, baseline 6.5%.
+╔═════════════════╤══════╗
+║ Shape           │ Hits ║
+╟─────────────────┼──────╢
+║ DET NOUN COPULA │ 1    ║
+╚═════════════════╧══════╝"
+`;

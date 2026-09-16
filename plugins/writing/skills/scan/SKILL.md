@@ -34,6 +34,8 @@ Run either subcommand with `--help` for its flags.
 
 Each violation prints as `path:line:col: category: message`. A summary table follows on stderr with per-category counts and the noisiest files.
 
+Where `writing:analyze` has written its statistics artifact, the category table carries an `Acted on` column: how often a later whole-file re-scan stopped raising that rule after it fired in a real session. A rule the author wrote past more often than acted on is named below the table, so its count reads as volume instead of as findings worth the same weight as the rest. `--data-dir` points at a different artifact.
+
 Audit is report-only. Fix flagged files with `writing:rewrite` or direct edits at the reported positions.
 
 ## Score
@@ -51,6 +53,10 @@ For non-prose source files, single-line comments (`//`, `#`) are extracted and s
 #### Voice Delta
 
 `--voice-delta` appends a table of voice rate features (first-person rate, sentence length, backtick density, and friends) beside the rates from the local voice baseline. Each feature carries a provenance label: **skill-prescribed** drift means tune the skill, **skill-encouraged** deficits mean the skill is under-applied, and **ungoverned** features are genuine voice signal. The register check skips inputs too short or too markdown-heavy to compare against the PR-body baseline.
+
+A `Null` column appears where `writing:analyze` measured the permutation floors. `clears` means the corpus gap beat the floor in every length band measured, `noise` names a delta to read as sampling spread, and `unmeasured` means no run covered that feature. The bands a feature failed are listed under the table.
+
+A second table follows where the artifact carries tag signatures: the share of this document's part-of-speech n-grams landing on a shape over-represented in the agent corpus, read against the agent and baseline shares. The share is the reportable number because a corpus separates on how often these shapes recur. One occurrence is within the range of any document.
 
 #### Custom Vocabulary
 

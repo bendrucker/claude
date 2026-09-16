@@ -164,6 +164,20 @@ The acted-on column pairs each shown finding with the next whole-file re-scan of
 
 The report ends with an opportunities list, each naming a concrete fix. Flipping the `WRITING_HOOKS_LOG` default to off is offered only once acceptance is measurable, since turning the log off before then forecloses the measurement. Fixes land in the plugin (wordlists, `detection/`, `hooks/`), then the next audit's log confirms or refutes them.
 
+## Statistics Artifact
+
+The three measurements above answer questions the scan surfaces ask on every run, and each costs minutes against corpora that never leave this machine. `build-statistics.ts` runs them once and persists the verdicts to `statistics.json` in the plugin data dir, which is where `writing:scan` reads them.
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts
+bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts --section rate-nulls --splits 2000 --min-words 100 --max-words 400
+bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts --section hook-health --since 2026-07-01
+```
+
+`--section` is repeatable and defaults to all three. Sections merge into whatever is on disk, so refreshing the run-log numbers keeps the tag signatures that cost minutes of tagging. Rate nulls key on the length band: a rebuild replaces the run covering the same band and leaves the others, and `scan score --voice-delta` reads a feature as signal only where it cleared every band measured. Run the full corpus and the 100-400 word band both, or a length artifact clears on the one floor that cannot see it.
+
+The corpora and the run log stay here. The artifact is the only part that travels, and it travels no further than the data dir.
+
 ## Corpora and Verdicts
 
 Each rule is judged on the surface where the hook fires it: chat-surface rules against the user's chat, deliverable-surface rules (`flowery-phrases.txt`, `soft-phrasing.txt`) against the voice baseline. Lift gates new candidate phrases only (`--min-lift`, default 5.0, plus session count >= 3), never removals: the smoothed user baseline compresses lift for any word the user never types, which would flag the model's strongest tells for removal. Voice-delta features carry provenance labels (**skill-prescribed**, **skill-encouraged**, **ungoverned**) so drift points at the right fix, and they are aggregate trends only, never per-document flags.

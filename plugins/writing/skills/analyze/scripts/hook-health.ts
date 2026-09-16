@@ -329,7 +329,7 @@ export function renderReport(health: HookHealth): string {
   return lines.join("\n");
 }
 
-async function readLog(path: string, since?: string): Promise<RunLogEntry[]> {
+export async function readLog(path: string, since?: string): Promise<RunLogEntry[]> {
   const texts: string[] = [];
   for (const candidate of [`${path}.1`, path]) {
     const file = Bun.file(candidate);

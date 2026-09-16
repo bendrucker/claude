@@ -54,3 +54,11 @@ export function contrastCorpusPath(dataDir: string): string {
 export function similarityProfilePath(dataDir: string): string {
   return join(voiceBaselineDir(dataDir), "similarity.json");
 }
+
+// Measurements the analyze scripts take against corpora that never leave this
+// machine. Persisting them lets the scan surfaces read a verdict without
+// re-running a job that costs minutes, and keeps the corpora themselves out of
+// the repository.
+export function statisticsPath(dataDir: string): string {
+  return join(dataDir, "statistics.json");
+}

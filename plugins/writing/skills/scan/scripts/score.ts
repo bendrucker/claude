@@ -4,7 +4,18 @@ import { isProseFile } from "../../../detection/paths";
 import { scanAll } from "../../../detection/scan";
 import { stripCode } from "../../../detection/tropes";
 import { compileStemmedWordlist, countWords } from "../../../detection/wordlists";
-import { checkRegister, VOICE_DELTA_FEATURES } from "../../analyze/scripts/voice-delta";
+import {
+  describeRun,
+  failedBands,
+  measuredFeature,
+  type WritingStatistics,
+} from "../../analyze/scripts/statistics";
+import { matchShapes } from "../../analyze/scripts/tag-ngram";
+import {
+  checkRegister,
+  sentenceSplit,
+  VOICE_DELTA_FEATURES,
+} from "../../analyze/scripts/voice-delta";
 import type { VoiceProfile } from "../../analyze/scripts/voice-profile";
 
 export interface CategoryScore {
@@ -145,8 +156,15 @@ export async function loadCustomMatch(
 
 // Render voice-delta features for a single document. Accepts the loaded profile
 // (null when not available). Skips baseline comparison when the input is
-// out-of-register (too short or non-prose markdown fraction).
-export function renderVoiceDeltaTable(text: string, profile: VoiceProfile | null): string {
+// out-of-register (too short or non-prose markdown fraction). The statistics
+// artifact, when present, carries the permutation null each feature's corpus
+// gap was measured against, which separates the features whose delta means
+// something from the ones a same-corpus split reaches on its own.
+export function renderVoiceDeltaTable(
+  text: string,
+  profile: VoiceProfile | null,
+  statistics: WritingStatistics | null = null,
+): string {
   const register = checkRegister(text);
   const baseline = profile?.voiceDelta ?? null;
 
@@ -161,10 +179,13 @@ export function renderVoiceDeltaTable(text: string, profile: VoiceProfile | null
   }
 
   const hasBaseline = baseline !== null && register.inRegister;
+  const runs = statistics?.rateNulls?.runs ?? [];
+  const gated = hasBaseline && runs.length > 0;
 
   const headers = hasBaseline
     ? ["Feature", "Provenance", "Rate", "Baseline", "Delta"]
     : ["Feature", "Provenance", "Rate"];
+  if (gated) headers.push("Null");
 
   const rows: string[][] = [];
   for (const feature of VOICE_DELTA_FEATURES) {
@@ -172,23 +193,95 @@ export function renderVoiceDeltaTable(text: string, profile: VoiceProfile | null
     const fmt = feature.format ?? ((r: number) => r.toFixed(2));
     const rateStr = fmt(rate);
 
+    const row: string[] = [feature.label, feature.provenance, rateStr];
     if (hasBaseline) {
       const baselineRate = baseline.rates[feature.id];
       if (baselineRate === undefined) {
-        rows.push([feature.label, feature.provenance, rateStr, "(no stat)", "-"]);
+        row.push("(no stat)", "-");
       } else {
         const baselineStr = fmt(baselineRate);
         const delta = rate - baselineRate;
         const deltaStr = feature.isFraction
           ? `${delta >= 0 ? "+" : ""}${(delta * 100).toFixed(1)}pp`
           : `${delta >= 0 ? "+" : ""}${delta.toFixed(2)}`;
-        rows.push([feature.label, feature.provenance, rateStr, baselineStr, deltaStr]);
+        row.push(baselineStr, deltaStr);
       }
-    } else {
-      rows.push([feature.label, feature.provenance, rateStr]);
     }
+    if (gated) {
+      const failed = failedBands(statistics, feature.id);
+      const verdict = measuredFeature(statistics, feature.id)
+        ? failed.length === 0
+          ? "clears"
+          : "noise"
+        : "unmeasured";
+      row.push(verdict);
+    }
+    rows.push(row);
   }
 
   lines.push(table([headers, ...rows]).trimEnd());
+
+  if (gated) {
+    const first = runs[0];
+    if (first !== undefined) {
+      lines.push(
+        `Null floor: ${first.splits} splits of the baseline against itself at the ${first.percentile}th percentile, over the ${runs.map(describeRun).join(" and the ")}.`,
+      );
+    }
+    const noise = VOICE_DELTA_FEATURES.map((feature) => ({
+      feature,
+      failed: failedBands(statistics, feature.id),
+    })).filter((entry) => entry.failed.length > 0);
+    if (noise.length > 0) {
+      lines.push(
+        `Read the delta on these as sampling spread: ${noise
+          .map((entry) => `${entry.feature.label} (${entry.failed.join(", ")})`)
+          .join("; ")}.`,
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
+const SIGNATURE_ROWS = 8;
+
+function share(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+// Part-of-speech shapes over-represented in the agent corpus that survive a
+// split of that corpus against itself. One occurrence decides nothing, so the
+// reportable number is the share of the document's tag n-grams landing on a
+// confirmed shape, read against the two corpus shares.
+export function renderSignatureTable(
+  text: string,
+  statistics: WritingStatistics | null,
+): string | null {
+  const signatures = statistics?.tagSignatures;
+  if (signatures === undefined || signatures.shapes.length === 0) return null;
+
+  const shapes = new Set(signatures.shapes.map((signature) => signature.shape));
+  const match = matchShapes(sentenceSplit(stripCode(text)), signatures.sizes, shapes);
+  const lines = ["Corpus Signatures"];
+
+  if (match.total === 0) {
+    lines.push(`This document offers no tag ${signatures.sizes.join("/")}-grams to match.`);
+    return lines.join("\n");
+  }
+
+  lines.push(
+    `${match.hits} of ${match.total} tag n-grams land on one of ${shapes.size} confirmed shapes (${share(match.hits / match.total)}). ` +
+      `Agent corpus ${share(signatures.studyShare)}, baseline ${share(signatures.baselineShare)}.`,
+  );
+
+  if (match.byShape.length > 0) {
+    lines.push(
+      table([
+        ["Shape", "Hits"],
+        ...match.byShape.slice(0, SIGNATURE_ROWS).map(({ shape, count }) => [shape, String(count)]),
+      ]).trimEnd(),
+    );
+  }
   return lines.join("\n");
 }

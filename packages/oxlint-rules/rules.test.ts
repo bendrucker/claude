@@ -95,14 +95,17 @@ const CASES: Record<string, { allows: Case[]; rejects: Case[] }> = {
   },
 };
 
+/** Backstop for a hung spawn, orders of magnitude above what a cold start costs. */
+const TIMEOUT_MS = 120_000;
+
 /** Runs oxlint, surfacing a spawn that died or crashed instead of parsing its empty output. */
 function oxlint(args: string[]): string {
-  const result = Bun.spawnSync([OXLINT, ...args]);
+  const result = Bun.spawnSync([OXLINT, ...args], { timeout: TIMEOUT_MS });
   const stdout = result.stdout.toString();
   if (stdout.trim() !== "") return stdout;
   const stderr = result.stderr.toString().trim();
   throw new Error(
-    `oxlint wrote no output (exit ${result.exitCode}, signal ${result.signalCode}): ${
+    `oxlint wrote no output within ${TIMEOUT_MS}ms (exit ${result.exitCode}, signal ${result.signalCode}): ${
       stderr === "" ? "(no stderr)" : stderr
     }`,
   );

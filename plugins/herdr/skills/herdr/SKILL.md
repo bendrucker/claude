@@ -200,6 +200,8 @@ The search covers output already on screen. A line from an earlier run matches i
 
 Add `--format ansi` when color is the evidence, as in a diff or a test summary. Otherwise take the text.
 
+The `❯` line at the bottom of a Claude pane carries Claude Code's own prompt suggestion, ghost text the harness wrote rather than input the user typed. Take a pane's content from above that line and leave the line itself out of what you report. When the user asks what is sitting in that prompt, `--format ansi` tells the two apart: a suggestion arrives wrapped in `ESC[2m`, and typed text carries no styling.
+
 `pane read --lines` draws on the pane's screen and the host's scrollback. An agent painting the terminal's alternate screen feeds neither, so its scrolled-away rows sit beyond `pane read` at any `--lines`. `agent read` recovers them for a recognized agent at rest, paging history out through the agent's own mouse-scroll interface. A deep read during `working`, `blocked`, or `unknown` comes back truncated or as an `agent_not_idle` error. When the history is unreachable either way, ask the agent to write its full response as markdown under a temp directory and reply with nothing but the path, then read the file yourself. Hold that fallback until a read has come up short.
 
 ## Plugins

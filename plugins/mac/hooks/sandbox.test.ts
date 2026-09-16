@@ -161,6 +161,10 @@ describe("extractScripts", () => {
     expect(extractScripts("P=/abs/path bun $P/run.ts", base)).toEqual(["/abs/path/run.ts"]);
   });
 
+  test("follows cd - back to the previous directory", () => {
+    expect(extractScripts("cd /repo\ncd /other\ncd -\nbun run.ts", base)).toEqual(["/repo/run.ts"]);
+  });
+
   test("unwinds a subshell cd at the closing paren", () => {
     expect(extractScripts("(cd /repo && bun a.ts)\nbun b.ts", base)).toEqual([
       "/repo/a.ts",
@@ -186,6 +190,10 @@ describe("hasBypassMarker", () => {
 
   test("returns false for nonexistent path", async () => {
     expect(await hasBypassMarker("/nonexistent/path")).toBe(false);
+  });
+
+  test("returns false for a directory", async () => {
+    expect(await hasBypassMarker(fixtureDir)).toBe(false);
   });
 });
 

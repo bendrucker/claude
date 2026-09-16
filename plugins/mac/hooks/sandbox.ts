@@ -183,6 +183,7 @@ export function extractScripts(command: string, cwd: string): string[] {
   const scripts: string[] = [];
   // One directory per subshell level, so a `cd` unwinds with the `)` that ends it.
   const directories = [cwd];
+  let previous = cwd;
 
   for (const { tokens, depth } of tokenize(command)) {
     while (directories.length > depth + 1) directories.pop();
@@ -216,8 +217,15 @@ export function extractScripts(command: string, cwd: string): string[] {
     const name = basename(executable);
     if (name === "cd") {
       const target = tokens[index + 1];
-      directories[directories.length - 1] =
-        target === undefined ? homedir() : resolvePath(target, directory, scoped);
+      const argument = target === undefined ? "" : expandToken(target, scoped);
+      const next =
+        argument === ""
+          ? homedir()
+          : argument === "-"
+            ? previous
+            : resolvePath(target ?? [], directory, scoped);
+      previous = directory;
+      directories[directories.length - 1] = next;
       continue;
     }
 
@@ -238,6 +246,9 @@ export function extractScripts(command: string, cwd: string): string[] {
 async function readHead(path: string, length = 65536): Promise<Buffer | null> {
   try {
     const file = Bun.file(path);
+    // A directory, a device, or a FIFO at this path would read as garbage or
+    // block the hook forever, so only a regular file is opened.
+    if (!(await file.stat()).isFile()) return null;
     const slice = file.slice(0, length);
     return Buffer.from(await slice.arrayBuffer());
   } catch {
@@ -270,7 +281,7 @@ export async function processInput(
 
   // The session's cwd is where the command runs. The hook's own is only a
   // fallback, since Claude Code starts it from the project root either way.
-  const cwd = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : process.cwd();
+  const cwd = typeof input.cwd === "string" && isAbsolute(input.cwd) ? input.cwd : process.cwd();
 
   for (const script of extractScripts(toolInput.command, cwd)) {
     // oxlint-disable-next-line no-await-in-loop -- first match wins: the scan stops at the first script carrying a bypass marker.

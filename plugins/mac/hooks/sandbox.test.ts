@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { extractScripts, hasBypassMarker, processInput, tokenize } from "./sandbox";
+import { extractScripts, hasBypassMarker, processInput, tokenize, tokenText } from "./sandbox";
 
 let fixtureDir: string;
 let markedScriptPath: string;
@@ -65,7 +65,20 @@ describe("tokenize", () => {
     ["subshells", "(bun a.ts)", [["bun", "a.ts"]]],
     ["redirections", "bun a.ts 2>&1", [["bun", "a.ts", "2>"], ["1"]]],
   ])("splits on %s", (_label, command, expected) => {
-    expect(tokenize(command)).toEqual(expected);
+    expect(tokenize(command).map(({ tokens }) => tokens.map(tokenText))).toEqual(expected);
+  });
+
+  test("marks single-quoted text as unexpandable", () => {
+    expect(tokenize(`bun '$P' "$Q"`)).toEqual([
+      {
+        depth: 0,
+        tokens: [
+          [{ text: "bun", expands: true }],
+          [{ text: "$P", expands: false }],
+          [{ text: "$Q", expands: true }],
+        ],
+      },
+    ]);
   });
 });
 
@@ -126,6 +139,33 @@ describe("extractScripts", () => {
 
   test("strips quotes around a script path", () => {
     expect(extractScripts('P=/abs/path\nbun "$P/run.ts"', base)).toEqual(["/abs/path/run.ts"]);
+  });
+
+  test("leaves a single-quoted variable unexpanded", () => {
+    expect(extractScripts("P=/abs/path/run.ts\nbun '$P'", base)).toEqual(["/base/$P"]);
+  });
+
+  test("leaves a backslash-escaped variable unexpanded", () => {
+    expect(extractScripts("P=/abs/path/run.ts\nbun \\$P", base)).toEqual(["/base/$P"]);
+  });
+
+  test("leaves a single-quoted tilde unexpanded", () => {
+    expect(extractScripts("bun '~/run.ts'", base)).toEqual(["/base/~/run.ts"]);
+  });
+
+  test("keeps a command-prefix assignment out of later segments", () => {
+    expect(extractScripts("P=/abs/path/run.ts echo hi\nbun $P", base)).toEqual(["/base/$P"]);
+  });
+
+  test("uses a command-prefix assignment for its own command", () => {
+    expect(extractScripts("P=/abs/path bun $P/run.ts", base)).toEqual(["/abs/path/run.ts"]);
+  });
+
+  test("unwinds a subshell cd at the closing paren", () => {
+    expect(extractScripts("(cd /repo && bun a.ts)\nbun b.ts", base)).toEqual([
+      "/repo/a.ts",
+      "/base/b.ts",
+    ]);
   });
 
   test("leaves an unresolved variable unexpanded", () => {

@@ -40,33 +40,62 @@ const ASSIGNMENT = /^([A-Za-z_]\w*)=([^]*)$/;
 const EXPANSION = /\$\{(\w+)\}|\$(\w+)/g;
 const SCRIPT_MARKER = "claude:dangerouslyDisableSandbox";
 
+/** One run of a token's text. Single quotes and a backslash suppress expansion. */
+interface TokenPart {
+  text: string;
+  expands: boolean;
+}
+
+/** One argument, split where its quoting changes. */
+export type Token = TokenPart[];
+
+export interface Segment {
+  tokens: Token[];
+  /** Subshell nesting, so a `cd` inside `( … )` does not outlive it. */
+  depth: number;
+}
+
+export function tokenText(token: Token): string {
+  return token.map((part) => part.text).join("");
+}
+
 /**
- * Splits a command into the simple commands it runs, as token lists with quotes
- * removed.
+ * Splits a command into the simple commands it runs, as tokens carrying where
+ * their text came from.
  *
  * Newlines separate commands the way `;` does, which is what makes a `cd` on its
  * own line the whole story to a splitter that only knows operators. Quote state
  * carries across separators so a `;` or a newline inside an argument stays part
  * of that argument.
  */
-export function tokenize(command: string): string[][] {
-  const segments: string[][] = [];
-  let tokens: string[] = [];
+export function tokenize(command: string): Segment[] {
+  const segments: Segment[] = [];
+  let depth = 0;
+  let tokens: Token[] = [];
+  let parts: TokenPart[] = [];
   let current = "";
+  let expands = true;
   // A quoted empty string is a token; an empty buffer between spaces is not.
   let open = false;
   let quote: string | null = null;
 
-  function endToken(): void {
-    if (!open) return;
-    tokens.push(current);
+  function endPart(next: boolean): void {
+    if (current !== "") parts.push({ text: current, expands });
     current = "";
+    expands = next;
+  }
+
+  function endToken(): void {
+    endPart(true);
+    if (!open) return;
+    tokens.push(parts);
+    parts = [];
     open = false;
   }
 
   function endSegment(): void {
     endToken();
-    if (tokens.length > 0) segments.push(tokens);
+    if (tokens.length > 0) segments.push({ tokens, depth });
     tokens = [];
   }
 
@@ -74,8 +103,10 @@ export function tokenize(command: string): string[][] {
     const char = command[index] ?? "";
 
     if (quote != null) {
-      if (char === quote) quote = null;
-      else {
+      if (char === quote) {
+        endPart(true);
+        quote = null;
+      } else {
         current += char;
         open = true;
       }
@@ -83,19 +114,24 @@ export function tokenize(command: string): string[][] {
     }
 
     if (char === "'" || char === '"') {
+      endPart(char === '"');
       quote = char;
       open = true;
     } else if (char === "\\" && index + 1 < command.length) {
       const escaped = command[++index] ?? "";
       // A backslash before a newline continues the same command.
       if (escaped !== "\n") {
+        endPart(false);
         current += escaped;
+        endPart(true);
         open = true;
       }
     } else if (SEPARATORS.has(char)) {
       // `&&` and `||` are one separator, so the pair is consumed together.
       if ((char === "&" || char === "|") && command[index + 1] === char) index++;
       endSegment();
+      if (char === "(") depth++;
+      else if (char === ")") depth = Math.max(0, depth - 1);
     } else if (WHITESPACE.has(char)) {
       endToken();
     } else {
@@ -122,10 +158,17 @@ function expandHome(value: string): string {
   return value.startsWith("~/") ? join(homedir(), value.slice(2)) : value;
 }
 
+/** A token's value, with each part expanded only where the shell would expand it. */
+function expandToken(token: Token, variables: Map<string, string>): string {
+  return token.map((part) => (part.expands ? expand(part.text, variables) : part.text)).join("");
+}
+
 /** A path as the shell would reach it: expanded, and rooted at the command's own cwd. */
-function resolvePath(value: string, cwd: string, variables: Map<string, string>): string {
-  const expanded = expandHome(expand(value, variables));
-  return isAbsolute(expanded) ? expanded : resolve(cwd, expanded);
+function resolvePath(token: Token, cwd: string, variables: Map<string, string>): string {
+  const expanded = expandToken(token, variables);
+  // `~` is a path only unquoted.
+  const value = token[0]?.expands === true ? expandHome(expanded) : expanded;
+  return isAbsolute(value) ? value : resolve(cwd, value);
 }
 
 /**
@@ -138,38 +181,54 @@ function resolvePath(value: string, cwd: string, variables: Map<string, string>)
 export function extractScripts(command: string, cwd: string): string[] {
   const variables = new Map<string, string>();
   const scripts: string[] = [];
-  let directory = cwd;
+  // One directory per subshell level, so a `cd` unwinds with the `)` that ends it.
+  const directories = [cwd];
 
-  for (const tokens of tokenize(command)) {
+  for (const { tokens, depth } of tokenize(command)) {
+    while (directories.length > depth + 1) directories.pop();
+    while (directories.length <= depth) directories.push(directories.at(-1) ?? cwd);
+    const directory = directories.at(-1) ?? cwd;
+
     let index = 0;
-    while (SEGMENT_PREFIXES.has(tokens[index] ?? "")) index++;
+    while (SEGMENT_PREFIXES.has(tokenText(tokens[index] ?? []))) index++;
 
-    // Assignments ahead of a command, and segments that are only assignments,
-    // both name paths that a later `$VAR` resolves to.
+    const assignments = new Map<string, string>();
     while (index < tokens.length) {
-      const assignment = ASSIGNMENT.exec(tokens[index] ?? "");
-      if (assignment == null) break;
-      variables.set(assignment[1] ?? "", expand(assignment[2] ?? "", variables));
+      const token = tokens[index] ?? [];
+      const name = ASSIGNMENT.exec(tokenText(token))?.[1];
+      if (name == null) break;
+      assignments.set(name, expandToken(token, variables).slice(name.length + 1));
       index++;
     }
 
     const cmd = tokens[index];
-    if (cmd == null || cmd === "") continue;
+    // A segment of assignments alone sets them for the rest of the shell. Ahead
+    // of a command they last only for it, so a later `$VAR` must not see them.
+    if (cmd === undefined) {
+      for (const [name, value] of assignments) variables.set(name, value);
+      continue;
+    }
 
-    const name = basename(cmd);
+    const scoped = new Map([...variables, ...assignments]);
+    const executable = expandToken(cmd, scoped);
+    if (executable === "") continue;
+
+    const name = basename(executable);
     if (name === "cd") {
       const target = tokens[index + 1];
-      directory = target == null ? homedir() : resolvePath(target, directory, variables);
+      directories[directories.length - 1] =
+        target === undefined ? homedir() : resolvePath(target, directory, scoped);
       continue;
     }
 
     if (SCRIPT_INTERPRETERS.has(name)) {
       const next = tokens[index + 1];
-      if (next != null && next !== "" && !next.startsWith("-")) {
-        scripts.push(resolvePath(next, directory, variables));
+      const arg = next === undefined ? "" : expandToken(next, scoped);
+      if (next !== undefined && arg !== "" && !arg.startsWith("-")) {
+        scripts.push(resolvePath(next, directory, scoped));
       }
     } else if (SCRIPT_EXTENSIONS.has(extname(name))) {
-      scripts.push(resolvePath(cmd, directory, variables));
+      scripts.push(resolvePath(cmd, directory, scoped));
     }
   }
 

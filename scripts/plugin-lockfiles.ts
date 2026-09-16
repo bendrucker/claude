@@ -8,7 +8,7 @@ import { cli, command } from "cleye";
 import { z } from "zod";
 import { decodeFile } from "../packages/decode/index";
 import { loadPlugins } from "../packages/marketplace/index";
-import { runCheck } from "./check";
+import { runCheck, tracked } from "./check";
 
 /**
  * Lockfile names Claude Code accepts, in the order it checks them.
@@ -60,6 +60,28 @@ async function pluginPackages(): Promise<PluginPackage[]> {
   return packages
     .filter((entry) => entry !== null)
     .toSorted((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Manifests below a plugin root, which the cache install never reaches.
+ *
+ * Claude Code installs from the plugin root alone. In the checkout a nested
+ * manifest still resolves, because the root `workspaces` declaration hoists
+ * every member into one `node_modules` at the repo root, so the gap only shows
+ * up once the plugin is cached and its scripts fail on an unresolved import.
+ * Eval harnesses are exempt: they run from the checkout and never ship.
+ */
+export function nestedManifests(manifests: string[]): string[] {
+  return manifests
+    .filter((file) => {
+      const segments = file.split("/");
+      return segments[0] === "plugins" && segments.length > 3 && !segments.includes("evals");
+    })
+    .map(
+      (file) =>
+        `${file.split("/")[1]}: ${file} sits below the plugin root, where Claude Code never installs it`,
+    )
+    .toSorted();
 }
 
 async function existingLockfile(dir: string): Promise<string | null> {
@@ -143,7 +165,10 @@ export function violation(
 const check = command({ name: "check" }, async () => {
   await runCheck(
     async () => {
-      const plugins = await pluginPackages();
+      const [plugins, manifests] = await Promise.all([
+        pluginPackages(),
+        tracked("plugins/*package.json", join(import.meta.dirname, "..")),
+      ]);
       const violations = await Promise.all(
         plugins.map(async (plugin) => {
           const lockfile = await existingLockfile(plugin.dir);
@@ -155,14 +180,17 @@ const check = command({ name: "check" }, async () => {
       return {
         header: [
           "Claude Code installs a plugin's dependencies when it caches the plugin, but only",
-          "when the plugin root holds a lockfile beside package.json. Run `bun run",
-          "plugin-lockfiles generate` to refresh these:",
+          "from a package.json at the plugin root with a lockfile beside it. Hoist a nested",
+          "manifest into its plugin root, then run `bun run plugin-lockfiles generate`:",
           "",
         ],
-        violations: violations.filter((entry) => entry !== null),
+        violations: [
+          ...violations.filter((entry) => entry !== null),
+          ...nestedManifests(manifests),
+        ],
       };
     },
-    { success: "Every plugin declaring dependencies ships a lockfile" },
+    { success: "Every plugin declares its dependencies at its root and ships a lockfile" },
   );
 });
 
@@ -209,7 +237,7 @@ if (import.meta.main) {
       commands: [check, generateCommand],
       help: {
         description:
-          "Manage the lockfiles Claude Code needs to install plugin dependencies. It installs them when it caches a plugin, but only when the plugin root holds a lockfile beside package.json, and skips a plugin without one silently. `generate` writes those lockfiles, `check` fails when one is missing or disagrees with package.json.",
+          "Manage the lockfiles Claude Code needs to install plugin dependencies. It installs them when it caches a plugin, but only when the plugin root holds a lockfile beside package.json, and skips a plugin without one silently. `generate` writes those lockfiles, `check` fails when one is missing, disagrees with package.json, or when a manifest sits below the plugin root where the install never reaches it.",
       },
     },
     (parsed) => parsed.showHelp(),

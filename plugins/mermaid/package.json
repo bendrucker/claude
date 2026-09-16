@@ -1,14 +1,14 @@
 {
-  "name": "session",
-  "version": "1.0.0",
+  "name": "@bendrucker/claude-mermaid",
   "private": true,
   "type": "module",
   "dependencies": {
     "cleye": "^2.2.1",
-    "table": "^6.9.0",
+    "jsdom": "^30.0.0",
+    "mermaid": "^11.4.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@duckdb/node-api": "1.5.0-r.1"
+    "@types/jsdom": "^30.0.0"
   }
 }

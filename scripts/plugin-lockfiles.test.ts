@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { ranges, violation } from "./plugin-lockfiles";
+import { nestedManifests, ranges, violation } from "./plugin-lockfiles";
 
 test.each<{
   name: string;
@@ -64,4 +64,31 @@ test("ranges separates a dependency from a devDependency of the same name", () =
   expect(ranges({ dependencies: { zod: "^4.4.3" } })).not.toBe(
     ranges({ devDependencies: { zod: "^4.4.3" } }),
   );
+});
+
+test.each<{ name: string; manifests: string[]; expected: string[] }>([
+  {
+    name: "a manifest at the plugin root",
+    manifests: ["plugins/writing/package.json"],
+    expected: [],
+  },
+  {
+    name: "a manifest under a skill",
+    manifests: ["plugins/claude-code/skills/session/package.json"],
+    expected: [
+      "claude-code: plugins/claude-code/skills/session/package.json sits below the plugin root, where Claude Code never installs it",
+    ],
+  },
+  {
+    name: "an eval harness, which never ships",
+    manifests: ["plugins/pull-request/evals/pr-body/package.json"],
+    expected: [],
+  },
+  {
+    name: "a manifest outside plugins/",
+    manifests: ["packages/skill-lint/package.json"],
+    expected: [],
+  },
+])("nestedManifests: $name", ({ manifests, expected }) => {
+  expect(nestedManifests(manifests)).toEqual(expected);
 });

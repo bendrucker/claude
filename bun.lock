@@ -27,7 +27,7 @@
         "unist-util-visit": "^5.1.0",
       },
     },
-    ".claude/skills/agent-ideas": {
+    "packages/agent-ideas": {
       "name": "agent-ideas",
       "version": "1.0.0",
       "dependencies": {
@@ -1296,7 +1296,7 @@
 
     "agent-base": ["agent-base@9.0.0", "", {}, "sha512-TQf59BsZnytt8GdJKLPfUZ54g/iaUL2OWDSFCCvMOhsHduDQxO8xC4PNeyIkVcA5KwL2phPSv0douC0fgWzmnA=="],
 
-    "agent-ideas": ["agent-ideas@workspace:.claude/skills/agent-ideas"],
+    "agent-ideas": ["agent-ideas@workspace:packages/agent-ideas"],
 
     "ai": ["ai@6.0.273", "", { "dependencies": { "@ai-sdk/gateway": "3.0.186", "@ai-sdk/provider": "3.0.15", "@ai-sdk/provider-utils": "4.0.50", "@opentelemetry/api": "^1.9.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-FbX1TxGbhKbu14T+rzXxUjYnR6BzDq91Ve7A/71EngmpwVP2Df8z42M0sXqE7HJTinrz31JhjqSnGy5V8tVReQ=="],
 

@@ -3,8 +3,8 @@
 import { cli } from "cleye";
 import { XMLParser } from "fast-xml-parser";
 import { z } from "zod";
-import { decode } from "../../../../packages/decode/index";
-import { type Source, sources } from "../sources";
+import { decode } from "../decode/index";
+import { type Source, sources } from "./sources";
 
 export interface Post {
   title: string;

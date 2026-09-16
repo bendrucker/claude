@@ -5,7 +5,7 @@
  * retune sources. Keep it small and high-signal. A source earns its place by
  * regularly producing ideas that map to concrete artifacts in this repo.
  *
- * - `rss` / `blog` / `newsletter`: fetched automatically by `scripts/fetch.ts`.
+ * - `rss` / `blog` / `newsletter`: fetched automatically by `fetch.ts`.
  *   Set `feedUrl` to a working Atom/RSS URL.
  * - `x-only`: no usable feed; handled by the local triage phase via the
  *   browser fallback after teleport. Leave `feedUrl` null.

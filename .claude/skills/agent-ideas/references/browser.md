@@ -6,9 +6,9 @@ so read these authors' recent posts directly from the browser.
 
 ## Which Authors
 
-Read the `x-only` entries from `sources.ts` (their `xHandle` is the timeline to
-open). As of this writing: Boris Cherny (`bcherny`), Dillon Mulroy
-(`dillon_mulroy`), Dex Horthy (`dexhorthy`).
+Read the `x-only` entries from `packages/agent-ideas/sources.ts` (their
+`xHandle` is the timeline to open). As of this writing: Boris Cherny
+(`bcherny`), Dillon Mulroy (`dillon_mulroy`), Dex Horthy (`dexhorthy`).
 
 ## Flow
 

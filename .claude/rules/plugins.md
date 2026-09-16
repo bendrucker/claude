@@ -51,6 +51,8 @@ A skill that loads a skill from another plugin creates a plugin dependency. Decl
 
 Plugin-specific code dependencies go in the plugin's own `plugins/<name>/package.json`, added to the root `workspaces` array. No cross-plugin imports, and no reaching into `packages/` via relative paths. Shared code goes to an npm workspace package, declared in each plugin's `package.json`. Run `bun scripts/check-plugin-imports.ts` to verify.
 
+That manifest belongs at the plugin root, never under a skill. One manifest per plugin covers every skill in it, and a skill's scripts resolve against the plugin root's `node_modules`. A nested manifest still resolves in the checkout, where the root `workspaces` declaration hoists every member into a single `node_modules`, so the gap first appears in the cached copy as an unresolved import at runtime. `bun run plugin-lockfiles check` fails on one. Eval harnesses under `plugins/<name>/evals/` keep their own manifests, since they run from the checkout and never ship.
+
 ### Lockfiles
 
 A plugin declaring dependencies also commits `package-lock.json` beside its `package.json`. Claude Code installs a plugin's dependencies when it caches the plugin, at install, at update, and at session start on a machine that has not cached it yet. That install runs only when it finds a lockfile, and a plugin carrying the manifest alone is skipped with nothing written to the debug log. Its scripts then fail on an unresolved import the first time anything invokes them.

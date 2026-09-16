@@ -38,7 +38,7 @@ const SEGMENT_PREFIXES = new Set(["do", "then", "else", "elif", "!", "time", "ex
 const INTERPRETER_PREFIXES = new Set(["run"]);
 const SEPARATORS = new Set([";", "\n", "&", "|", "(", ")"]);
 const WHITESPACE = new Set([" ", "\t", "\r"]);
-// What a backslash escapes inside double quotes. It stays literal before anything else.
+// A backslash stays literal in double quotes unless it precedes one of these characters.
 const DOUBLE_QUOTED_ESCAPES = new Set(["$", "`", '"', "\\", "\n"]);
 const ASSIGNMENT = /^([A-Za-z_]\w*)=([^]*)$/;
 const EXPANSION = /\$\{(\w+)\}|\$(\w+)/g;
@@ -232,12 +232,10 @@ function expandHome(value: string): string {
   return value.startsWith("~/") ? join(homedir(), value.slice(2)) : value;
 }
 
-/** A token's value, with each part expanded only where the shell would expand it. */
 function expandToken(token: Token, variables: Map<string, string>): string {
   return token.map((part) => (part.expands ? expand(part.text, variables) : part.text)).join("");
 }
 
-/** A path as the shell would reach it: expanded, and rooted at the command's own cwd. */
 function resolvePath(token: Token, cwd: string, variables: Map<string, string>): string {
   const expanded = expandToken(token, variables);
   // `~` is a path only unquoted.

@@ -1,10 +1,14 @@
 /**
- * Action rates per comment shape, measured from the (features, verdict) pairs each preflight run leaves in the job base.
+ * Action rates per comment shape, measured from the (features, verdict) pairs
+ * each preflight run leaves in the job base. Reads are tolerant: a partial,
+ * abandoned, or older-format job dir is skipped rather than failing a run whose
+ * real work is judging this change's comments.
  */
 
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import { VERDICT_ACTIONS, type VerdictAction } from "../judge/schema";
 import type { CommentFeatures } from "./features";
 
 /** Shapes with a measurable rate. Size already drives the score, so these are what it misses. */
@@ -46,6 +50,11 @@ const VerdictsFile = z.looseObject({
   ),
 });
 
+/** An action this version does not know is no evidence either way, so the pair is dropped. */
+function isAction(action: string): action is VerdictAction {
+  return (VERDICT_ACTIONS as readonly string[]).includes(action);
+}
+
 export interface ShapeRate {
   shape: Shape;
   judged: number;
@@ -79,15 +88,18 @@ async function readRun(jobDir: string): Promise<{ shapes: Shape[]; actioned: boo
     names.map((name) => readJson(join(verdictsDir, name), VerdictsFile)),
   );
 
+  // A shard can be re-judged, leaving a second verdict file covering the same
+  // comments, so the first verdict per id is the one that counts.
+  const seen = new Set<string>();
   const pairs: { shapes: Shape[]; actioned: boolean }[] = [];
   for (const file of files) {
     for (const entry of file?.verdicts ?? []) {
       const row = features[entry.id];
-      if (row === undefined) continue;
-      pairs.push({
-        shapes: commentShapes(row),
-        actioned: entry.verdict.action !== "keep",
-      });
+      if (row === undefined || seen.has(entry.id)) continue;
+      const action = entry.verdict.action;
+      if (!isAction(action)) continue;
+      seen.add(entry.id);
+      pairs.push({ shapes: commentShapes(row), actioned: action !== "keep" });
     }
   }
   return pairs;
@@ -126,7 +138,8 @@ export async function readHistory(jobBase: string): Promise<AuditHistory> {
  */
 export const MIN_JUDGED = 30;
 
-// The rate is bounded so one shape cannot swamp the file signal or push a short comment past a long one on its own.
+// The rate is bounded so one shape cannot swamp the file signal or push a
+// short comment past a long one on its own.
 const MIN_WEIGHT = 0.5;
 const MAX_WEIGHT = 2;
 
@@ -151,10 +164,7 @@ export function shapeWeights(history: AuditHistory): Map<Shape, number> {
  * shapes, so a shape the judge keeps offsets one it acts on, and 1 for a comment
  * carrying no shape with a measured rate.
  */
-export function shapeWeight(
-  features: ShapeFeatures,
-  weights: ReadonlyMap<Shape, number>,
-): number {
+export function shapeWeight(features: ShapeFeatures, weights: ReadonlyMap<Shape, number>): number {
   const matched = commentShapes(features)
     .map((shape) => weights.get(shape))
     .filter((weight) => weight !== undefined);

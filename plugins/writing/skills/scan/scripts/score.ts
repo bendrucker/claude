@@ -5,7 +5,8 @@ import { scanAll } from "../../../detection/scan";
 import { stripCode } from "../../../detection/tropes";
 import { compileStemmedWordlist, countWords } from "../../../detection/wordlists";
 import {
-  describeRun,
+  describeBand,
+  describeRunMethod,
   failedBands,
   measuredFeature,
   type WritingStatistics,
@@ -154,7 +155,11 @@ export async function loadCustomMatch(
   return compileStemmedWordlist(content);
 }
 
-// Skips baseline comparison when the input is out-of-register (too short or non-prose markdown fraction). The statistics artifact, when present, carries the permutation null each feature's corpus gap was measured against, which separates the features whose delta means something from the ones a same-corpus split reaches on its own.
+// Skips baseline comparison when the input is out-of-register (too short or
+// non-prose markdown fraction). The statistics artifact, when present, carries
+// the permutation null each feature's corpus gap was measured against, which
+// separates the features whose delta means something from the ones a
+// same-corpus split reaches on its own.
 export function renderVoiceDeltaTable(
   text: string,
   profile: VoiceProfile | null,
@@ -217,12 +222,9 @@ export function renderVoiceDeltaTable(
   lines.push(table([headers, ...rows]).trimEnd());
 
   if (gated) {
-    const first = runs[0];
-    if (first !== undefined) {
-      lines.push(
-        `Null floor: ${first.splits} splits of the baseline against itself at the ${first.percentile}th percentile, over the ${runs.map(describeRun).join(" and the ")}.`,
-      );
-    }
+    lines.push(
+      `Null floor: splits of the baseline against itself, over the ${runs.map(describeRunMethod).join(" and the ")}.`,
+    );
     const noise = VOICE_DELTA_FEATURES.map((feature) => ({
       feature,
       failed: failedBands(statistics, feature.id),
@@ -267,7 +269,7 @@ export function renderSignatureTable(
 
   lines.push(
     `${match.hits} of ${match.total} tag n-grams land on one of ${shapes.size} confirmed shapes (${share(match.hits / match.total)}). ` +
-      `Agent corpus ${share(signatures.studyShare)}, baseline ${share(signatures.baselineShare)}.`,
+      `Over the ${describeBand(signatures)}, agent corpus ${share(signatures.studyShare)}, baseline ${share(signatures.baselineShare)}.`,
   );
 
   if (match.byShape.length > 0) {

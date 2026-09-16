@@ -158,13 +158,13 @@ exports[`renderVoiceDeltaTable with null floors adds a verdict per feature and n
 ╟──────────────────────────────────────────────────────────┼──────────────────┼───────┼───────────┼────────┼────────────╢
 ║ Discourse markers (however/therefore/in addition per 1k) │ ungoverned       │ 0.00  │ (no stat) │ -      │ unmeasured ║
 ╚══════════════════════════════════════════════════════════╧══════════════════╧═══════╧═══════════╧════════╧════════════╝
-Null floor: 500 splits of the baseline against itself at the 95th percentile, over the full corpus and the 100-400 word band.
+Null floor: splits of the baseline against itself, over the full corpus (500 splits at the 95th percentile) and the 100-400 word band (500 splits at the 95th percentile).
 Read the delta on these as sampling spread: Backtick density (per 1k words) (100-400 word band)."
 `;
 
 exports[`renderSignatureTable reads the document's hit share against the two corpus shares 1`] = `
 "Corpus Signatures
-1 of 5 tag n-grams land on one of 1 confirmed shapes (20.0%). Agent corpus 15.8%, baseline 6.5%.
+1 of 5 tag n-grams land on one of 1 confirmed shapes (20.0%). Over the 100-400 word band, agent corpus 15.8%, baseline 6.5%.
 ╔═════════════════╤══════╗
 ║ Shape           │ Hits ║
 ╟─────────────────┼──────╢

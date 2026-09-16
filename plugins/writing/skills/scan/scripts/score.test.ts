@@ -206,6 +206,8 @@ describe("renderSignatureTable", () => {
     generatedAt: "2026-01-01T00:00:00.000Z",
     tagSignatures: {
       sizes: [3],
+      minWords: 100,
+      maxWords: 400,
       studyShare: 0.158,
       baselineShare: 0.065,
       shapes: [{ shape: "DET NOUN COPULA", n: 40, z: 6.2 }],
@@ -226,7 +228,14 @@ describe("renderSignatureTable", () => {
     expect(renderSignatureTable(inRegisterText, null)).toBeNull();
     const none = {
       generatedAt: "2026-01-01T00:00:00.000Z",
-      tagSignatures: { sizes: [3], studyShare: 0, baselineShare: 0, shapes: [] },
+      tagSignatures: {
+        sizes: [3],
+        minWords: null,
+        maxWords: null,
+        studyShare: 0,
+        baselineShare: 0,
+        shapes: [],
+      },
     };
     expect(renderSignatureTable(inRegisterText, none)).toBeNull();
   });

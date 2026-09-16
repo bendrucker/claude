@@ -6,7 +6,8 @@ import {
   acceptanceByCategory,
   acceptedShare,
   clearsFloor,
-  describeRun,
+  describeBand,
+  describeRunMethod,
   failedBands,
   loadStatistics,
   measuredFeature,
@@ -36,7 +37,7 @@ const statistics: WritingStatistics = {
   rateNulls: { runs: [full, banded] },
 };
 
-describe("describeRun", () => {
+describe("describeBand", () => {
   const cases: { name: string; run: RateNullRun; expected: string }[] = [
     { name: "an unbounded run is the full corpus", run: full, expected: "full corpus" },
     { name: "a two-sided band names both ends", run: banded, expected: "100-400 word band" },
@@ -45,7 +46,15 @@ describe("describeRun", () => {
   ];
 
   it.each(cases)("$name", ({ run: subject, expected }) => {
-    expect(describeRun(subject)).toBe(expected);
+    expect(describeBand(subject)).toBe(expected);
+  });
+});
+
+describe("describeRunMethod", () => {
+  it("carries each run's own split count, since bands rebuild separately", () => {
+    expect(describeRunMethod({ ...banded, splits: 2000 })).toBe(
+      "100-400 word band (2000 splits at the 95th percentile)",
+    );
   });
 });
 

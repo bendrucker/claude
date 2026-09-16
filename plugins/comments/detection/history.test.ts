@@ -107,6 +107,27 @@ describe("readHistory", () => {
     expect((await readHistory(base)).judged).toBe(1);
   });
 
+  it("skips a verdict carrying an action this version does not know", async () => {
+    const base = newJobBase();
+    await writeRun(base, "one", [
+      { id: "a", features: {}, action: "trim" },
+      { id: "b", features: {}, action: "kepe" },
+    ]);
+    const history = await readHistory(base);
+    expect(history.judged).toBe(1);
+    expect(history.actioned).toBe(1);
+  });
+
+  it("counts a comment once when a re-judged shard verdicts it twice", async () => {
+    const base = newJobBase();
+    await writeRun(base, "one", [{ id: "a", features: {}, action: "trim" }]);
+    await Bun.write(
+      join(base, "one", "verdicts", "shard-0-retry.json"),
+      JSON.stringify({ verdicts: [{ id: "a", verdict: { action: "keep" } }] }),
+    );
+    expect((await readHistory(base)).judged).toBe(1);
+  });
+
   it("skips a job dir that never reached its verdicts", async () => {
     const base = newJobBase();
     await writeRun(base, "one", [{ id: "a", features: {}, action: "trim" }]);

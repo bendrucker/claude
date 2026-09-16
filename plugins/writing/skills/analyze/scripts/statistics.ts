@@ -31,19 +31,35 @@ export const RateNullRun = z.object({
 export type RateNullRun = z.infer<typeof RateNullRun>;
 
 /**
- * One run per length band, so a feature earns its delta only after clearing every band rather than merely tracking the agent corpus's longer documents.
+ * One run per length band, so a feature earns its delta only after clearing
+ * every band rather than merely tracking the agent corpus's longer documents.
  */
 export const RateNulls = z.object({ runs: z.array(RateNullRun) });
 export type RateNulls = z.infer<typeof RateNulls>;
 
-export function describeRun(run: RateNullRun): string {
-  if (run.minWords === null && run.maxWords === null) return "full corpus";
-  return `${run.minWords ?? 0}-${run.maxWords ?? "∞"} word band`;
+/**
+ * A run's band beside the splits that produced its floor. Each band is measured
+ * on its own, and a rebuild replaces one band without touching another, so two
+ * runs in one artifact can carry different split counts.
+ */
+export function describeRunMethod(run: RateNullRun): string {
+  return `${describeBand(run)} (${run.splits} splits at the ${run.percentile}th percentile)`;
 }
 
-/** Two runs measure the same thing when they cover the same length band. */
-export function sameBand(a: RateNullRun, b: RateNullRun): boolean {
+interface Band {
+  minWords: number | null;
+  maxWords: number | null;
+}
+
+/** Two measurements cover the same ground when they cover the same length band. */
+export function sameBand(a: Band, b: Band): boolean {
   return a.minWords === b.minWords && a.maxWords === b.maxWords;
+}
+
+/** The band a set of shares was measured over, for a report that prints them. */
+export function describeBand(band: Band): string {
+  if (band.minWords === null && band.maxWords === null) return "full corpus";
+  return `${band.minWords ?? 0}-${band.maxWords ?? "∞"} word band`;
 }
 
 export const TagShape = z.object({
@@ -56,6 +72,13 @@ export type TagShape = z.infer<typeof TagShape>;
 
 export const TagSignatures = z.object({
   sizes: z.array(z.number()),
+  /**
+   * The length band both corpora were held to, since the shares below describe
+   * only the documents inside it. A banded build replaces an unbanded one, so a
+   * reader that ignored this would compare every document against a slice.
+   */
+  minWords: z.number().nullable().default(null),
+  maxWords: z.number().nullable().default(null),
   /**
    * Share of each corpus's tag n-grams that land on a confirmed signature.
    * A document's own share reads against these two poles, which is the only
@@ -108,7 +131,7 @@ export function failedBands(statistics: WritingStatistics | null, featureId: str
   const failed: string[] = [];
   for (const run of statistics?.rateNulls?.runs ?? []) {
     const floor = run.floors.find((rate) => rate.featureId === featureId);
-    if (floor !== undefined && !clearsFloor(floor)) failed.push(describeRun(run));
+    if (floor !== undefined && !clearsFloor(floor)) failed.push(describeBand(run));
   }
   return failed;
 }
@@ -119,7 +142,8 @@ export function measuredFeature(statistics: WritingStatistics | null, featureId:
   );
 }
 
-// A rate over a handful of findings tracks whichever way the handful fell.
+// A rate over a handful of revisited findings tracks whichever way the handful
+// fell.
 const MIN_REVISITS = 20;
 
 /**

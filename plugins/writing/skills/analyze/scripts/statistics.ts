@@ -1,8 +1,7 @@
 // The measurements the analyze reports take against the local corpora and the
-// hook run log, persisted so the scan surfaces can read a verdict instead of
-// printing every number as if it were equally meaningful. The corpora are
-// local-only, so every section is optional and every consumer must render
-// unchanged when the file is absent.
+// hook run log, persisted so the scan surfaces can read a verdict rather than
+// raw numbers. The corpora are local-only, so every section is optional and
+// every consumer must render unchanged when the file is absent.
 
 import { z } from "zod";
 
@@ -37,11 +36,6 @@ export type RateNullRun = z.infer<typeof RateNullRun>;
 export const RateNulls = z.object({ runs: z.array(RateNullRun) });
 export type RateNulls = z.infer<typeof RateNulls>;
 
-/**
- * A run's band beside the splits that produced its floor. Each band is measured
- * on its own, and a rebuild replaces one band without touching another, so two
- * runs in one artifact can carry different split counts.
- */
 export function describeRunMethod(run: RateNullRun): string {
   return `${describeBand(run)} (${run.splits} splits at the ${run.percentile}th percentile)`;
 }
@@ -51,12 +45,10 @@ interface Band {
   maxWords: number | null;
 }
 
-/** Two measurements cover the same ground when they cover the same length band. */
 export function sameBand(a: Band, b: Band): boolean {
   return a.minWords === b.minWords && a.maxWords === b.maxWords;
 }
 
-/** The band a set of shares was measured over, for a report that prints them. */
 export function describeBand(band: Band): string {
   if (band.minWords === null && band.maxWords === null) return "full corpus";
   return `${band.minWords ?? 0}-${band.maxWords ?? "∞"} word band`;
@@ -80,9 +72,9 @@ export const TagSignatures = z.object({
   minWords: z.number().nullable().default(null),
   maxWords: z.number().nullable().default(null),
   /**
-   * Share of each corpus's tag n-grams that land on a confirmed signature.
-   * A document's own share reads against these two poles, which is the only
-   * honest reading: one shape in one document decides nothing.
+   * Share of each corpus's tag n-grams landing on a confirmed signature. A
+   * document's own share reads against these two poles: one shape in one
+   * document decides nothing.
    */
   studyShare: z.number(),
   baselineShare: z.number(),

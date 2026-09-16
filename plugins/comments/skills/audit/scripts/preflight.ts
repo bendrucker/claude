@@ -65,24 +65,33 @@ function preview(text: string): string {
 }
 
 /**
- * One line on what the accumulated pairs say. Shapes past the threshold report
- * the lift they apply. Shapes under it report their count, so the evidence is
- * visible while it builds rather than appearing the run it starts to matter.
+ * Shapes past the threshold report the rate they steer by. Shapes under it
+ * report their pair count, so a shape's evidence is visible while it builds
+ * rather than appearing the run it starts to matter.
  */
-function describeHistory(history: AuditHistory): string | null {
+export function describeHistory(history: AuditHistory): string | null {
   if (history.judged === 0) return null;
   const rate = `${Math.round((history.actioned / history.judged) * 100)}%`;
+  const parts = [
+    `History: ${history.actioned}/${history.judged} judged comments actioned across ${history.runs} runs (${rate}).`,
+  ];
+
   const steering = history.shapes.filter((shape) => shape.judged >= MIN_JUDGED);
-  const detail =
-    steering.length > 0
-      ? steering
-          .map(
-            (shape) =>
-              `${shape.shape} ${Math.round((shape.actioned / shape.judged) * 100)}% of ${shape.judged}`,
-          )
-          .join(", ")
-      : `no shape has reached the ${MIN_JUDGED} pairs that steer ranking`;
-  return `History: ${history.actioned}/${history.judged} judged comments actioned across ${history.runs} runs (${rate}). ${detail}.`;
+  if (steering.length > 0) {
+    const rates = steering.map(
+      (shape) =>
+        `${shape.shape} ${Math.round((shape.actioned / shape.judged) * 100)}% of ${shape.judged}`,
+    );
+    parts.push(`Steering: ${rates.join(", ")}.`);
+  }
+
+  const building = history.shapes.filter((shape) => shape.judged < MIN_JUDGED);
+  if (building.length > 0) {
+    const counts = building.map((shape) => `${shape.shape} ${shape.judged}`);
+    parts.push(`Under the ${MIN_JUDGED} pairs that steer ranking: ${counts.join(", ")}.`);
+  }
+
+  return parts.join(" ");
 }
 
 async function collect(

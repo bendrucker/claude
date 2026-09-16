@@ -106,10 +106,9 @@ function printViolations(results: FileViolations[]): void {
 const LOW_ACCEPT_SHARE = 0.5;
 
 /**
- * The per-category counts, carrying what the run log recorded after each of
- * these rules last fired: whether a whole-file re-scan still raised it. A count
- * says how loud a rule is here, and the acceptance says whether it was worth
- * listening to. The column appears only where a fired category was measured.
+ * Per-category counts, from the run log's record of whether a later whole-file
+ * re-scan still raised each rule after it last fired. The column appears only
+ * for categories where acceptance was measured.
  */
 export function renderCategories(
   counts: ReadonlyMap<string, number>,

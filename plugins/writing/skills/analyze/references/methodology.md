@@ -191,6 +191,16 @@ Discourse markers survive because the band leaves the raw gap intact: 1.68 marke
 
 A retired candidate stays in `RETIRED_FEATURES` rather than leaving the codebase, and `--candidates` scores it alongside the live set. Every row of the table above reproduces from the flags and can be revisited as the baseline grows. Nothing else reads that array, and a retired candidate never reaches a profile, a report, or a per-document flag.
 
+## Statistics Artifact
+
+`build-statistics.ts` persists the verdicts from the three measurements above to `statistics.json` in the plugin data dir, where the `writing:scan` surfaces read them. Each section writes independently and merges into whatever is already on disk, so refreshing the run-log numbers keeps the tag signatures that cost minutes of tagging.
+
+Rate nulls accumulate per band. The artifact holds one run per length band, keyed on the `--min-words`/`--max-words` pair, and a rebuild replaces the run covering the same band while leaving the others. A feature reads as signal in `scan` only where it cleared the floor in every band the artifact carries, which is what stops the length confound above from certifying an artifact as voice.
+
+Tag signatures hold one band only, since the two corpus shares they report describe a single population. A banded rebuild replaces a full-corpus run outright rather than sitting beside it. A `--min-words`/`--max-words` pass meant for the floors should therefore carry `--section rate-nulls`.
+
+Every section is optional, and every consumer renders unchanged when the file is absent. The artifact carries verdicts and rates, never corpus text, which is what keeps the corpora local while the readings travel as far as the data dir.
+
 ## Rule Health Table
 
 Each rule is labeled in the **type** column by how the hook enforces it:

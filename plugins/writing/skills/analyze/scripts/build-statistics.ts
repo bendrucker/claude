@@ -48,7 +48,6 @@ function byBand(a: RateNullRun, b: RateNullRun): number {
   return bandWidth(b) - bandWidth(a);
 }
 
-/** Share of a corpus's tag n-grams, at the measured sizes, landing on a confirmed shape. */
 function shapeShare(corpus: TokenizedCorpus, sizes: number[], shapes: Set<string>): number {
   let hits = 0;
   let total = 0;

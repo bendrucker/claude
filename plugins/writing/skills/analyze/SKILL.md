@@ -166,7 +166,7 @@ The report ends with an opportunities list, each naming a concrete fix. Flipping
 
 ## Statistics Artifact
 
-The three measurements above answer questions the scan surfaces ask on every run, and each costs minutes against corpora that never leave this machine. `build-statistics.ts` runs them once and persists the verdicts to `statistics.json` in the plugin data dir, which is where `writing:scan` reads them.
+Structural Signatures, Rate Feature Floors, and Hook Health each measure against data that never leaves this machine, and the two corpus passes cost minutes. `build-statistics.ts` runs them once and persists the verdicts to `statistics.json` in the plugin data dir. `writing:scan` reads that file.
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts
@@ -174,9 +174,11 @@ bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts --section rate-nulls --split
 bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts --section hook-health --since 2026-07-01
 ```
 
-`--section` is repeatable and defaults to all three. Sections merge into whatever is on disk, so refreshing the run-log numbers keeps the tag signatures that cost minutes of tagging. Rate nulls key on the length band: a rebuild replaces the run covering the same band and leaves the others, and `scan score --voice-delta` reads a feature as signal only where it cleared every band measured. Run the full corpus and the 100-400 word band both, or a length artifact clears on the one floor that cannot see it.
+`--section` takes `rate-nulls`, `tag-signatures`, or `hook-health`, is repeatable, and defaults to all three. Sections merge into whatever is on disk, so refreshing the run-log numbers keeps the tag signatures that cost minutes of tagging.
 
-The corpora and the run log stay here. The artifact is the only part that travels, and it travels no further than the data dir.
+Run rate nulls over both the full corpus and the 100-400 word band. `scan score --voice-delta` reads a feature as signal only where it cleared every band measured. Tag signatures hold one band at a time, so narrow `--min-words`/`--max-words` to `--section rate-nulls` unless the signatures should be re-mined inside that band. [`references/methodology.md`](references/methodology.md) covers how the sections merge.
+
+The corpora and the run log stay on this machine. Only `statistics.json` moves, into the plugin data dir.
 
 ## Corpora and Verdicts
 

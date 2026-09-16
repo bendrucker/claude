@@ -1,9 +1,5 @@
 import type { Comment } from "./types";
 
-/**
- * Deterministic per-comment features, logged next to each run's verdicts so
- * preflight can accumulate (features, verdict) pairs across runs.
- */
 export interface CommentFeatures {
   lines: number;
   chars: number;

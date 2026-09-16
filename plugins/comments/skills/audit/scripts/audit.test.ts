@@ -4,12 +4,13 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { $ } from "bun";
 import { z } from "zod";
+import type { Shape, ShapeRate } from "../../../detection/history";
 import { shardJudge, type ShardJudge } from "../../../judge/adapter";
 import type { ShardComment, WrittenJob } from "../../../judge/job";
 import type { Verdict } from "../../../judge/schema";
 import { apply, type ApplyOptions, type ApplyResult } from "./apply";
 import type { AuditIo } from "./io";
-import { preflight, type PreflightOptions } from "./preflight";
+import { describeHistory, preflight, type PreflightOptions } from "./preflight";
 
 const TS_SOURCE = [
   "// increment the counter",
@@ -186,6 +187,40 @@ async function readJson<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 async function show(ref: string, path: string): Promise<string> {
   return (await git("show", `${ref}:${path}`)).text();
 }
+
+describe("describeHistory", () => {
+  function shape(name: Shape, judged: number, actioned: number): ShapeRate {
+    return { shape: name, judged, actioned };
+  }
+
+  test("says nothing before any run has left a pair", () => {
+    expect(describeHistory({ runs: 0, judged: 0, actioned: 0, shapes: [] })).toBeNull();
+  });
+
+  test("counts a shape that is still accumulating, so its evidence is visible", () => {
+    const line = describeHistory({
+      runs: 2,
+      judged: 40,
+      actioned: 6,
+      shapes: [shape("why-marker", 12, 3)],
+    });
+    expect(line).toBe(
+      "History: 6/40 judged comments actioned across 2 runs (15%). Under the 30 pairs that steer ranking: why-marker 12.",
+    );
+  });
+
+  test("separates the shapes that steer from the ones still building", () => {
+    const line = describeHistory({
+      runs: 5,
+      judged: 100,
+      actioned: 20,
+      shapes: [shape("why-marker", 30, 12), shape("ticket-id", 4, 1)],
+    });
+    expect(line).toBe(
+      "History: 20/100 judged comments actioned across 5 runs (20%). Steering: why-marker 40% of 30. Under the 30 pairs that steer ranking: ticket-id 4.",
+    );
+  });
+});
 
 describe("preflight", () => {
   test("shards the ranked comments and the judge answers each shard on disk", async () => {

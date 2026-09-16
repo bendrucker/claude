@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -396,19 +397,10 @@ describe("emitRateLimits", () => {
 // chain that carries them (stdin schema, transcript scan, detached child,
 // argv) has no seam a unit test can reach.
 describe("pane metadata report", () => {
-  const sessionId = "9f0b1c2d-3e4f-5061-7283-94a5b6c7d8e9";
-
   // Derived rather than inlined: a private-use glyph pasted into an assertion is
   // one bad paste away from asserting some other icon.
   const dial = contextDial({ context_window: { used_percentage: 30 } });
   const dialToken = `${dial?.token}=${dial?.value}`;
-
-  const paneList = JSON.stringify({
-    result: {
-      type: "pane_list",
-      panes: [{ pane_id: "w2:p2", agent_session: { agent: "claude", value: sessionId } }],
-    },
-  });
 
   // A detached child racing a poll needs slack on a loaded machine. The budget
   // runs from test entry, not from the poll, so slow setup cannot push the poll
@@ -419,6 +411,18 @@ describe("pane metadata report", () => {
 
   async function recordedArgs(transcript: string): Promise<string[]> {
     const deadline = Date.now() + reportBudgetMs;
+    // The report cache sits under tmpdir() keyed by session id, so a fixed id
+    // shares it with every other process on the machine. A concurrent or
+    // interrupted run leaves behind an entry whose signature matches, the status
+    // line takes the report as already sent, and the poll waits out its budget
+    // on a stub that was never called.
+    const sessionId = randomUUID();
+    const paneList = JSON.stringify({
+      result: {
+        type: "pane_list",
+        panes: [{ pane_id: "w2:p2", agent_session: { agent: "claude", value: sessionId } }],
+      },
+    });
     const dir = mkdtempSync(join(tmpdir(), "statusline-herdr-"));
     const bin = join(dir, "bin");
     const log = join(dir, "argv");
@@ -427,12 +431,16 @@ describe("pane metadata report", () => {
     try {
       mkdirSync(bin);
       const herdr = join(bin, "herdr");
+      // A reader that caught the log mid-loop would see a record whose tokens
+      // had not been appended yet, which reads as a status line that reported
+      // nothing.
       await Bun.write(
         herdr,
         [
           "#!/bin/sh",
           `if [ "$2" = list ]; then printf '%s' '${paneList}'; exit 0; fi`,
-          `for arg in "$@"; do printf '%s\\n' "$arg" >> ${log}; done`,
+          `for arg in "$@"; do printf '%s\\n' "$arg" >> "${log}.part"; done`,
+          `mv "${log}.part" "${log}"`,
           "",
         ].join("\n"),
       );
@@ -478,7 +486,7 @@ describe("pane metadata report", () => {
     "carries the title token and the dial to herdr",
     async () => {
       const args = await recordedArgs(
-        `${JSON.stringify({ type: "ai-title", aiTitle: "Herdr sidebar redesign", sessionId })}\n`,
+        `${JSON.stringify({ type: "ai-title", aiTitle: "Herdr sidebar redesign" })}\n`,
       );
       const tokens = args.filter((_arg, i) => args[i - 1] === "--token");
       expect(tokens).toEqual(["title=Herdr sidebar redesign", dialToken]);

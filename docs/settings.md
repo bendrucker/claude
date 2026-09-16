@@ -97,6 +97,22 @@ Blanket forms of this rule do not survive the same corpus. Capping every `find` 
 bun user/hooks/find-scope/audit.ts --since <ship-date>
 ```
 
+`moshi-hook claude-hook` takes ten entries across eight events: one each on `PermissionRequest`, `SessionStart`, `SessionEnd`, `Stop`, and `UserPromptSubmit`, a `permission_prompt` match on `Notification`, and an `AskUserQuestion` and `ExitPlanMode` pair on each of `PreToolUse` and `PostToolUse`. They carry approvals and session state to Moshi, which is what lets a permission prompt be answered away from the machine. `moshi-hook install --target claude` writes all ten, so treat them as generated output and regenerate rather than hand-edit. The `async` flags are the generator's. `PermissionRequest` alone stays synchronous, blocking to return a remote `permissionDecision`. The other nine run fire-and-forget, `Stop` included. That is a narrower synchronous set than the vibe-island bridge keeps under [`hooks.md`](../.claude/rules/hooks.md), which holds `Stop` and `StopFailure` back because Claude Code kills their backgrounded processes before they finish. Moshi's `Stop` entry is exposed to that same race, and changing it by hand lasts only until the next `install`.
+
+Regenerate against a scratch config directory. A plain `install` writes `~/.claude/settings.json` through the symlink into the deployed `~/.claude-repo` clone, and re-sorts every key in the file on its way through. `moshi-hook` honors `CLAUDE_CONFIG_DIR`, and `jq -S` sorts away the reordering that would otherwise swamp the comparison:
+
+```sh
+mkdir -p "$TMPDIR/cc" && cp user/settings.json "$TMPDIR/cc/settings.json"
+CLAUDE_CONFIG_DIR="$TMPDIR/cc" moshi-hook install --target claude
+jq -S .hooks user/settings.json > "$TMPDIR/before.json"
+jq -S .hooks "$TMPDIR/cc/settings.json" > "$TMPDIR/after.json"
+diff "$TMPDIR/before.json" "$TMPDIR/after.json"
+```
+
+`moshi-hook status` calls these entries stale whenever an event it owns also holds a hook it did not write, because it compares the event's whole group list against its own generated output. Branch `chief` adds a `chief-tap.ts` entry to five of them, which is enough to make `status` name `Notification`, `PermissionRequest`, `PostToolUse`, `SessionStart`, and `Stop` outdated against a file whose Moshi entries are current. Appending one `/bin/sh -c 'true'` group to `Stop` in a scratch copy reproduces it. Re-running `install` does not clear the report, because it leaves the foreign group in place and re-appends its own entry last. Read `status` against a scratch copy of the tracked file before acting on it, where the same command reports `claude current`.
+
+**Delete them** when a permission prompt no longer needs answering off the machine, which `moshi-hook unpair` and `moshi-hook uninstall --target claude` would follow. Re-run the regeneration above when a `moshi-hook` release changes the hook set, and take the generator's output for the entries it owns. Verified against 0.3.22.
+
 ## Sandbox Findings
 
 Mechanism behind the rules in [`settings.md`](../.claude/rules/settings.md), and the cases no setting can fix.

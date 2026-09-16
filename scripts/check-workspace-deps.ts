@@ -58,6 +58,19 @@ export function unlistedWorkspaces(manifests: string[], dirs: string[]): string[
   return manifests.map((file) => dirname(file)).filter((dir) => !dirs.includes(dir));
 }
 
+/**
+ * Workspace directories under `.claude/`, which Claude Code protects from writes.
+ *
+ * Bun materializes a node_modules inside every workspace member, and Claude Code
+ * denies writes under the active project's `.claude/` so an agent cannot rewrite
+ * the skills and hooks governing it. A member there fails `bun install` with
+ * "failed to symlink dependencies for package" and leaves its exclusive
+ * dependencies uninstalled. Keep the code in `packages/` and point the skill at it.
+ */
+export function protectedWorkspaces(dirs: string[]): string[] {
+  return dirs.filter((dir) => dir === ".claude" || dir.startsWith(".claude/"));
+}
+
 async function checkDeps(): Promise<string[]> {
   const cwd = join(import.meta.dirname, "..");
   const [root, manifests, sources] = await Promise.all([
@@ -94,6 +107,13 @@ async function checkDeps(): Promise<string[]> {
   const violations = new Map<string, string>();
   for (const dir of unlistedWorkspaces(manifests, dirs)) {
     violations.set(`${dir}\0`, `${dir}: has a package.json but is not a root workspace`);
+  }
+
+  for (const dir of protectedWorkspaces(dirs)) {
+    violations.set(
+      `${dir}\0protected`,
+      `${dir}: workspace under .claude/, where the sandbox denies the node_modules bun install writes`,
+    );
   }
 
   for (const scan of scanned) {

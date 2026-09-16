@@ -1,5 +1,10 @@
 import { expect, test } from "bun:test";
-import { importedPackages, owningWorkspace, unlistedWorkspaces } from "./check-workspace-deps";
+import {
+  importedPackages,
+  owningWorkspace,
+  protectedWorkspaces,
+  unlistedWorkspaces,
+} from "./check-workspace-deps";
 
 test.each<{ name: string; source: string; expected: string[] }>([
   { name: "bare package", source: `import { z } from "zod";`, expected: ["zod"] },
@@ -63,4 +68,17 @@ test.each<{ name: string; manifests: string[]; expected: string[] }>([
   },
 ])("unlistedWorkspaces: $name", ({ manifests, expected }) => {
   expect(unlistedWorkspaces(manifests, DIRS)).toEqual(expected);
+});
+
+test.each<{ name: string; dirs: string[]; expected: string[] }>([
+  { name: "packages and plugins are writable", dirs: [".", "packages/agent-ideas"], expected: [] },
+  {
+    name: "a skill workspace is where bun install breaks",
+    dirs: [".", ".claude/skills/agent-ideas"],
+    expected: [".claude/skills/agent-ideas"],
+  },
+  { name: "the config root itself", dirs: [".", ".claude"], expected: [".claude"] },
+  { name: "a sibling prefix is not the config dir", dirs: [".", ".claudex"], expected: [] },
+])("protectedWorkspaces: $name", ({ dirs, expected }) => {
+  expect(protectedWorkspaces(dirs)).toEqual(expected);
 });

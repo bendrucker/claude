@@ -89,6 +89,11 @@ test.each<{ name: string; manifests: string[]; expected: string[] }>([
     manifests: ["packages/skill-lint/package.json"],
     expected: [],
   },
+  {
+    name: "a nested file whose name only ends in the manifest name",
+    manifests: ["plugins/writing/skills/scan/dev-package.json"],
+    expected: [],
+  },
 ])("nestedManifests: $name", ({ manifests, expected }) => {
   expect(nestedManifests(manifests)).toEqual(expected);
 });

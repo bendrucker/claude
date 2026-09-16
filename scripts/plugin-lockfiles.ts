@@ -73,14 +73,17 @@ async function pluginPackages(): Promise<PluginPackage[]> {
  */
 export function nestedManifests(manifests: string[]): string[] {
   return manifests
-    .filter((file) => {
+    .flatMap((file) => {
       const segments = file.split("/");
-      return segments[0] === "plugins" && segments.length > 3 && !segments.includes("evals");
+      // The pathspec that collects these matches any path ending in the name, so
+      // a `dev-package.json` beside a skill would otherwise read as a manifest.
+      if (segments.at(-1) !== "package.json") return [];
+      if (segments[0] !== "plugins" || segments.length <= 3) return [];
+      if (segments.includes("evals")) return [];
+      return [
+        `${segments[1]}: ${file} sits below the plugin root, where Claude Code never installs it`,
+      ];
     })
-    .map(
-      (file) =>
-        `${file.split("/")[1]}: ${file} sits below the plugin root, where Claude Code never installs it`,
-    )
     .toSorted();
 }
 

@@ -154,12 +154,7 @@ export async function loadCustomMatch(
   return compileStemmedWordlist(content);
 }
 
-// Render voice-delta features for a single document. Accepts the loaded profile
-// (null when not available). Skips baseline comparison when the input is
-// out-of-register (too short or non-prose markdown fraction). The statistics
-// artifact, when present, carries the permutation null each feature's corpus
-// gap was measured against, which separates the features whose delta means
-// something from the ones a same-corpus split reaches on its own.
+// Skips baseline comparison when the input is out-of-register (too short or non-prose markdown fraction). The statistics artifact, when present, carries the permutation null each feature's corpus gap was measured against, which separates the features whose delta means something from the ones a same-corpus split reaches on its own.
 export function renderVoiceDeltaTable(
   text: string,
   profile: VoiceProfile | null,

@@ -1,12 +1,5 @@
 /**
- * Action rates per comment shape, measured from the runs already on disk. Every
- * preflight writes a `features.json` beside the verdicts its judges produce, so
- * the job base accumulates (features, verdict) pairs across runs. Reading them
- * back turns the descriptive features into a measured prior on which shapes the
- * judge acts on, which is what ranks the next run's shards.
- *
- * Reads are tolerant. A partial, abandoned, or older-format job dir is skipped
- * rather than failing a run whose real work is judging this change's comments.
+ * Action rates per comment shape, measured from the (features, verdict) pairs each preflight run leaves in the job base.
  */
 
 import { readdir } from "node:fs/promises";
@@ -133,8 +126,7 @@ export async function readHistory(jobBase: string): Promise<AuditHistory> {
  */
 export const MIN_JUDGED = 30;
 
-// Bounded like the density weights, so one shape's rate cannot swamp the file
-// signal or push a short comment past a long one on its own.
+// The rate is bounded so one shape cannot swamp the file signal or push a short comment past a long one on its own.
 const MIN_WEIGHT = 0.5;
 const MAX_WEIGHT = 2;
 

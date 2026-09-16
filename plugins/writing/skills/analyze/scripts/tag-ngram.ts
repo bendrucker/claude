@@ -39,11 +39,7 @@ export interface ShapeMatch {
   byShape: { shape: string; count: number }[];
 }
 
-/**
- * Match a document's tag n-grams against a set of corpus-confirmed shapes. The
- * hit share is the reportable number: a corpus separates on how often these
- * shapes recur, and one occurrence in one document distinguishes nothing.
- */
+/** The hit share is the reportable number: a corpus separates on how often these shapes recur, and one occurrence in one document distinguishes nothing. */
 export function matchShapes(
   sentences: string[],
   sizes: number[],

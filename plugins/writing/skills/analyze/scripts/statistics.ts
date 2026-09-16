@@ -31,11 +31,7 @@ export const RateNullRun = z.object({
 export type RateNullRun = z.infer<typeof RateNullRun>;
 
 /**
- * One run per length band. The agent corpus averages several times the document
- * length of the baseline, so a feature that varies with length clears the
- * full-corpus floor on that difference alone. Restricting both corpora to one
- * band separates the two, and a feature earns its delta only by clearing every
- * band measured.
+ * One run per length band, so a feature earns its delta only after clearing every band rather than merely tracking the agent corpus's longer documents.
  */
 export const RateNulls = z.object({ runs: z.array(RateNullRun) });
 export type RateNulls = z.infer<typeof RateNulls>;
@@ -117,15 +113,13 @@ export function failedBands(statistics: WritingStatistics | null, featureId: str
   return failed;
 }
 
-/** Whether any run measured this feature at all, which decides between a verdict and a blank. */
 export function measuredFeature(statistics: WritingStatistics | null, featureId: string): boolean {
   return (statistics?.rateNulls?.runs ?? []).some((run) =>
     run.floors.some((rate) => rate.featureId === featureId),
   );
 }
 
-// hook-health gates its own advice on evidence sufficiency for the same reason:
-// a rate over a handful of findings tracks whichever way the handful fell.
+// A rate over a handful of findings tracks whichever way the handful fell.
 const MIN_REVISITS = 20;
 
 /**

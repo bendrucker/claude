@@ -1,10 +1,7 @@
 import type { Comment } from "./types";
 
 /**
- * Deterministic per-comment features, logged next to the verdicts each run so
- * production runs accumulate (features, verdict) pairs. `history.ts` reads the
- * pairs back into an action rate per comment shape, which weights the next
- * run's ranking. Nothing here routes a comment away from the judge.
+ * Deterministic per-comment features, logged next to each run's verdicts so preflight can accumulate (features, verdict) pairs across runs.
  */
 export interface CommentFeatures {
   lines: number;

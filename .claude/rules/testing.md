@@ -24,3 +24,5 @@ After changing a plugin script, run it directly with real arguments as well as i
 ## CI Structure
 
 `.github/workflows/test.yml` runs one matrix job per plugin, a `hooks` job over `./.claude ./user scripts/`, and a `validate` job over `packages/`. New plugin tests join the existing matrix instead of getting their own job.
+
+A pull request runs only the plugins its changed files name. A plugin whose tests cover something outside its own directory, such as a checked copy of another plugin's file, declares those paths in `plugins/<name>/.ci.json` under `paths` so a change there selects it too.

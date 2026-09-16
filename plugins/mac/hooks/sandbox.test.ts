@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, sep } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { extractCommands, hasBypassMarker, processInput } from "./sandbox";
+import { extractScripts, hasBypassMarker, processInput, tokenize } from "./sandbox";
 
 let fixtureDir: string;
 let markedScriptPath: string;
@@ -40,51 +40,98 @@ function makeInput(toolInput: unknown, toolName = "Bash"): PreToolUseHookInput {
 
 const bashInput = (command: string) => makeInput({ command });
 
-describe("extractCommands", () => {
-  test("captures bun script arg", () => {
-    expect(extractCommands("bun watch.ts --pr 42")).toEqual([
-      { cmd: "bun", scriptArg: "watch.ts" },
-    ]);
+describe("tokenize", () => {
+  test.each<[string, string, string[][]]>([
+    [
+      "operators",
+      "bun a.ts && bun b.ts | jq .",
+      [
+        ["bun", "a.ts"],
+        ["bun", "b.ts"],
+        ["jq", "."],
+      ],
+    ],
+    [
+      "newlines",
+      "cd /repo\nbun a.ts",
+      [
+        ["cd", "/repo"],
+        ["bun", "a.ts"],
+      ],
+    ],
+    ["line continuations", "bun a.ts \\\n  --pr 42", [["bun", "a.ts", "--pr", "42"]]],
+    ["quoted separators", 'bun a.ts notes="one; two"', [["bun", "a.ts", "notes=one; two"]]],
+    ["quoted newlines", 'bun a.ts notes="one\ntwo"', [["bun", "a.ts", "notes=one\ntwo"]]],
+    ["subshells", "(bun a.ts)", [["bun", "a.ts"]]],
+    ["redirections", "bun a.ts 2>&1", [["bun", "a.ts", "2>"], ["1"]]],
+  ])("splits on %s", (_label, command, expected) => {
+    expect(tokenize(command)).toEqual(expected);
   });
+});
 
-  test("captures node script arg", () => {
-    expect(extractCommands("node ./scripts/run.js")).toEqual([
-      { cmd: "node", scriptArg: "./scripts/run.js" },
-    ]);
-  });
+describe("extractScripts", () => {
+  const base = "/base";
 
-  test("captures env-prefixed bun script arg", () => {
-    expect(extractCommands("FOO=bar bun watch.ts")).toEqual([
-      { cmd: "bun", scriptArg: "watch.ts" },
-    ]);
-  });
-
-  test("captures bun script arg through a pipe", () => {
-    expect(extractCommands("bun watch.ts | jq .rate")).toEqual([
-      { cmd: "bun", scriptArg: "watch.ts" },
-      { cmd: "jq" },
-    ]);
-  });
-
-  test("skips bun flag-bearing invocation", () => {
-    expect(extractCommands("bun --silent watch.ts")).toEqual([{ cmd: "bun" }]);
-  });
-
-  test("absolute bun script path", () => {
-    expect(extractCommands("bun /abs/path/watch.ts")).toEqual([
-      { cmd: "bun", scriptArg: "/abs/path/watch.ts" },
-    ]);
+  test.each<[string, string, string[]]>([
+    ["bun script arg", "bun watch.ts --pr 42", ["/base/watch.ts"]],
+    ["node script arg", "node ./scripts/run.js", ["/base/scripts/run.js"]],
+    ["env-prefixed bun script arg", "FOO=bar bun watch.ts", ["/base/watch.ts"]],
+    ["script arg through a pipe", "bun watch.ts | jq .rate", ["/base/watch.ts"]],
+    ["absolute bun script path", "bun /abs/path/watch.ts", ["/abs/path/watch.ts"]],
+    ["directly executed script", "./scripts/run.sh foo", ["/base/scripts/run.sh"]],
+    ["every script in a chain", "bun a.ts && bun b.ts", ["/base/a.ts", "/base/b.ts"]],
+  ])("captures %s", (_label, command, expected) => {
+    expect(extractScripts(command, base)).toEqual(expected);
   });
 
   test.each<[string, string]>([
-    ["/abs/path/refresh.ts --refresh", "/abs/path/refresh.ts"],
-    ["./scripts/run.sh foo", "./scripts/run.sh"],
-  ])("directly executed script %p is its own script arg", (command, expected) => {
-    expect(extractCommands(command)).toEqual([{ cmd: expected, scriptArg: expected }]);
+    ["bun flag-bearing invocation", "bun --silent watch.ts"],
+    ["plain binary", "git status"],
+    ["absolute binary", "/usr/bin/touch x"],
+  ])("finds no script in %s", (_label, command) => {
+    expect(extractScripts(command, base)).toEqual([]);
   });
 
-  test.each<[string]>([["git status"], ["/usr/bin/touch x"]])("no script arg for %p", (command) => {
-    expect(extractCommands(command)).toEqual([{ cmd: command.split(" ")[0] ?? "" }]);
+  test("resolves a relative path against a tracked cd", () => {
+    expect(extractScripts("cd /repo\nbun plugins/mac/scripts/jxa.ts Things3", base)).toEqual([
+      "/repo/plugins/mac/scripts/jxa.ts",
+    ]);
+  });
+
+  test("resolves a relative path against a cd in the same chain", () => {
+    expect(extractScripts("cd /repo && bun scripts/jxa.ts", base)).toEqual([
+      "/repo/scripts/jxa.ts",
+    ]);
+  });
+
+  test("finds the script behind a shell keyword", () => {
+    expect(extractScripts("for id in a b; do bun run.ts $id; done", base)).toEqual([
+      "/base/run.ts",
+    ]);
+  });
+
+  test("expands home", () => {
+    expect(extractScripts("bun ~/scripts/run.ts", base)).toEqual([
+      join(homedir(), "scripts/run.ts"),
+    ]);
+  });
+
+  test("expands a variable assigned earlier in the command", () => {
+    expect(extractScripts("P=/abs/path\nbun $P/run.ts", base)).toEqual(["/abs/path/run.ts"]);
+  });
+
+  test("expands a braced variable from the environment", () => {
+    expect(extractScripts(`bun \${HOME}/run.ts`, base)).toEqual([join(homedir(), "run.ts")]);
+  });
+
+  test("strips quotes around a script path", () => {
+    expect(extractScripts('P=/abs/path\nbun "$P/run.ts"', base)).toEqual(["/abs/path/run.ts"]);
+  });
+
+  test("leaves an unresolved variable unexpanded", () => {
+    expect(extractScripts("bun $NOT_A_REAL_VARIABLE_HERE/run.ts", base)).toEqual([
+      "/base/$NOT_A_REAL_VARIABLE_HERE/run.ts",
+    ]);
   });
 });
 
@@ -164,6 +211,47 @@ describe("processInput", () => {
       hookEventName: "PreToolUse",
       updatedInput: { dangerouslyDisableSandbox: true },
     });
+  });
+
+  test("disables sandbox for a marked script on a later line", async () => {
+    const input = bashInput(`cd /Users/ben/src/bendrucker/claude\nbun ${markedScriptPath} Things3`);
+    const result = await processInput(input, "darwin");
+    expect(result?.hookSpecificOutput).toMatchObject({
+      hookEventName: "PreToolUse",
+      updatedInput: { dangerouslyDisableSandbox: true },
+    });
+  });
+
+  test("disables sandbox for a marked script behind a variable", async () => {
+    const input = bashInput(`P=${markedScriptPath}\nbun $P update id=abc completed=true`);
+    const result = await processInput(input, "darwin");
+    expect(result?.hookSpecificOutput).toMatchObject({
+      hookEventName: "PreToolUse",
+      updatedInput: { dangerouslyDisableSandbox: true },
+    });
+  });
+
+  test("disables sandbox for a marked script inside a loop body", async () => {
+    const input = bashInput(`for id in a b; do\n  bun ${markedScriptPath} -e "1"\ndone`);
+    const result = await processInput(input, "darwin");
+    expect(result?.hookSpecificOutput).toMatchObject({
+      hookEventName: "PreToolUse",
+      updatedInput: { dangerouslyDisableSandbox: true },
+    });
+  });
+
+  test("resolves a relative script path against the session cwd", async () => {
+    const input = { ...bashInput("bun marked.ts"), cwd: fixtureDir };
+    const result = await processInput(input, "darwin");
+    expect(result?.hookSpecificOutput).toMatchObject({
+      hookEventName: "PreToolUse",
+      updatedInput: { dangerouslyDisableSandbox: true },
+    });
+  });
+
+  test("ignores a marked path that only appears inside an argument", async () => {
+    const input = bashInput(`git commit -m "ran bun ${markedScriptPath} by hand"`);
+    expect(await processInput(input, "darwin")).toBeNull();
   });
 
   test("processes Monitor tool input the same as Bash", async () => {

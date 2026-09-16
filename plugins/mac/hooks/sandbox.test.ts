@@ -64,6 +64,16 @@ describe("tokenize", () => {
     ["quoted newlines", 'bun a.ts notes="one\ntwo"', [["bun", "a.ts", "notes=one\ntwo"]]],
     ["subshells", "(bun a.ts)", [["bun", "a.ts"]]],
     ["redirections", "bun a.ts 2>&1", [["bun", "a.ts", "2>"], ["1"]]],
+    ["brace groups", "{ bun a.ts; }", [["{", "bun", "a.ts"], ["}"]]],
+    [
+      "comments",
+      "bun a.ts # bun b.ts\nbun c.ts",
+      [
+        ["bun", "a.ts"],
+        ["bun", "c.ts"],
+      ],
+    ],
+    ["heredocs", "cat <<'EOF'\nbun a.ts\nEOF\nbun b.ts", [["cat"], ["bun", "b.ts"]]],
   ])("splits on %s", (_label, command, expected) => {
     expect(tokenize(command).map(({ tokens }) => tokens.map(tokenText))).toEqual(expected);
   });
@@ -86,96 +96,86 @@ describe("extractScripts", () => {
   const base = "/base";
 
   test.each<[string, string, string[]]>([
-    ["bun script arg", "bun watch.ts --pr 42", ["/base/watch.ts"]],
-    ["node script arg", "node ./scripts/run.js", ["/base/scripts/run.js"]],
-    ["env-prefixed bun script arg", "FOO=bar bun watch.ts", ["/base/watch.ts"]],
-    ["script arg through a pipe", "bun watch.ts | jq .rate", ["/base/watch.ts"]],
-    ["absolute bun script path", "bun /abs/path/watch.ts", ["/abs/path/watch.ts"]],
-    ["directly executed script", "./scripts/run.sh foo", ["/base/scripts/run.sh"]],
-    ["every script in a chain", "bun a.ts && bun b.ts", ["/base/a.ts", "/base/b.ts"]],
-  ])("captures %s", (_label, command, expected) => {
+    ["captures a bun script argument", "bun watch.ts --pr 42", ["/base/watch.ts"]],
+    ["captures a node script argument", "node ./scripts/run.js", ["/base/scripts/run.js"]],
+    ["captures a script behind an env prefix", "FOO=bar bun watch.ts", ["/base/watch.ts"]],
+    ["captures a script behind an interpreter flag", "bun --silent watch.ts", ["/base/watch.ts"]],
+    ["captures a script behind a run subcommand", "bun run watch.ts", ["/base/watch.ts"]],
+    ["captures a script feeding a pipe", "bun watch.ts | jq .rate", ["/base/watch.ts"]],
+    ["captures an absolute script path", "bun /abs/path/watch.ts", ["/abs/path/watch.ts"]],
+    ["captures a directly executed script", "./scripts/run.sh foo", ["/base/scripts/run.sh"]],
+    ["captures every script in a chain", "bun a.ts && bun b.ts", ["/base/a.ts", "/base/b.ts"]],
+    ["captures a script inside a brace group", "{ cd /repo && bun a.ts; }", ["/repo/a.ts"]],
+    ["finds no script in a plain binary", "git status", []],
+    ["finds no script in an absolute binary", "/usr/bin/touch x", []],
+    ["finds no script in a comment", "git status # bun watch.ts", []],
+    ["finds no script in a heredoc body", "cat > w.sh <<'EOF'\nbun jxa.ts\nEOF", []],
+    [
+      "resolves a relative path against a tracked cd",
+      "cd /repo\nbun plugins/mac/scripts/jxa.ts Things3",
+      ["/repo/plugins/mac/scripts/jxa.ts"],
+    ],
+    [
+      "resolves a relative path against a cd in the same chain",
+      "cd /repo && bun scripts/jxa.ts",
+      ["/repo/scripts/jxa.ts"],
+    ],
+    [
+      "finds the script behind a shell keyword",
+      "for id in a b; do bun run.ts $id; done",
+      ["/base/run.ts"],
+    ],
+    ["expands home", "bun ~/scripts/run.ts", [join(homedir(), "scripts/run.ts")]],
+    [
+      "expands a variable assigned earlier in the command",
+      "P=/abs/path\nbun $P/run.ts",
+      ["/abs/path/run.ts"],
+    ],
+    [
+      "expands a braced variable from the environment",
+      `bun \${HOME}/run.ts`,
+      [join(homedir(), "run.ts")],
+    ],
+    ["strips quotes around a script path", 'P=/abs/path\nbun "$P/run.ts"', ["/abs/path/run.ts"]],
+    ["leaves a single-quoted variable unexpanded", "P=/abs/path/run.ts\nbun '$P'", ["/base/$P"]],
+    [
+      "leaves a backslash-escaped variable unexpanded",
+      "P=/abs/path/run.ts\nbun \\$P",
+      ["/base/$P"],
+    ],
+    [
+      "leaves a variable escaped inside double quotes unexpanded",
+      'P=/abs/path/run.ts\nbun "\\$P"',
+      ["/base/$P"],
+    ],
+    ["leaves a single-quoted tilde unexpanded", "bun '~/run.ts'", ["/base/~/run.ts"]],
+    [
+      "keeps a command-prefix assignment out of later segments",
+      "P=/abs/path/run.ts echo hi\nbun $P",
+      ["/base/$P"],
+    ],
+    [
+      "uses a command-prefix assignment for its own command",
+      "P=/abs/path bun $P/run.ts",
+      ["/abs/path/run.ts"],
+    ],
+    [
+      "follows cd - back to the previous directory",
+      "cd /repo\ncd /other\ncd -\nbun run.ts",
+      ["/repo/run.ts"],
+    ],
+    [
+      "unwinds a subshell cd at the closing paren",
+      "(cd /repo && bun a.ts)\nbun b.ts",
+      ["/repo/a.ts", "/base/b.ts"],
+    ],
+    [
+      "leaves an unresolved variable unexpanded",
+      "bun $NOT_A_REAL_VARIABLE_HERE/run.ts",
+      ["/base/$NOT_A_REAL_VARIABLE_HERE/run.ts"],
+    ],
+  ])("%s", (_label, command, expected) => {
     expect(extractScripts(command, base)).toEqual(expected);
-  });
-
-  test.each<[string, string]>([
-    ["bun flag-bearing invocation", "bun --silent watch.ts"],
-    ["plain binary", "git status"],
-    ["absolute binary", "/usr/bin/touch x"],
-  ])("finds no script in %s", (_label, command) => {
-    expect(extractScripts(command, base)).toEqual([]);
-  });
-
-  test("resolves a relative path against a tracked cd", () => {
-    expect(extractScripts("cd /repo\nbun plugins/mac/scripts/jxa.ts Things3", base)).toEqual([
-      "/repo/plugins/mac/scripts/jxa.ts",
-    ]);
-  });
-
-  test("resolves a relative path against a cd in the same chain", () => {
-    expect(extractScripts("cd /repo && bun scripts/jxa.ts", base)).toEqual([
-      "/repo/scripts/jxa.ts",
-    ]);
-  });
-
-  test("finds the script behind a shell keyword", () => {
-    expect(extractScripts("for id in a b; do bun run.ts $id; done", base)).toEqual([
-      "/base/run.ts",
-    ]);
-  });
-
-  test("expands home", () => {
-    expect(extractScripts("bun ~/scripts/run.ts", base)).toEqual([
-      join(homedir(), "scripts/run.ts"),
-    ]);
-  });
-
-  test("expands a variable assigned earlier in the command", () => {
-    expect(extractScripts("P=/abs/path\nbun $P/run.ts", base)).toEqual(["/abs/path/run.ts"]);
-  });
-
-  test("expands a braced variable from the environment", () => {
-    expect(extractScripts(`bun \${HOME}/run.ts`, base)).toEqual([join(homedir(), "run.ts")]);
-  });
-
-  test("strips quotes around a script path", () => {
-    expect(extractScripts('P=/abs/path\nbun "$P/run.ts"', base)).toEqual(["/abs/path/run.ts"]);
-  });
-
-  test("leaves a single-quoted variable unexpanded", () => {
-    expect(extractScripts("P=/abs/path/run.ts\nbun '$P'", base)).toEqual(["/base/$P"]);
-  });
-
-  test("leaves a backslash-escaped variable unexpanded", () => {
-    expect(extractScripts("P=/abs/path/run.ts\nbun \\$P", base)).toEqual(["/base/$P"]);
-  });
-
-  test("leaves a single-quoted tilde unexpanded", () => {
-    expect(extractScripts("bun '~/run.ts'", base)).toEqual(["/base/~/run.ts"]);
-  });
-
-  test("keeps a command-prefix assignment out of later segments", () => {
-    expect(extractScripts("P=/abs/path/run.ts echo hi\nbun $P", base)).toEqual(["/base/$P"]);
-  });
-
-  test("uses a command-prefix assignment for its own command", () => {
-    expect(extractScripts("P=/abs/path bun $P/run.ts", base)).toEqual(["/abs/path/run.ts"]);
-  });
-
-  test("follows cd - back to the previous directory", () => {
-    expect(extractScripts("cd /repo\ncd /other\ncd -\nbun run.ts", base)).toEqual(["/repo/run.ts"]);
-  });
-
-  test("unwinds a subshell cd at the closing paren", () => {
-    expect(extractScripts("(cd /repo && bun a.ts)\nbun b.ts", base)).toEqual([
-      "/repo/a.ts",
-      "/base/b.ts",
-    ]);
-  });
-
-  test("leaves an unresolved variable unexpanded", () => {
-    expect(extractScripts("bun $NOT_A_REAL_VARIABLE_HERE/run.ts", base)).toEqual([
-      "/base/$NOT_A_REAL_VARIABLE_HERE/run.ts",
-    ]);
   });
 });
 
@@ -299,6 +299,18 @@ describe("processInput", () => {
 
   test("ignores a marked path that only appears inside an argument", async () => {
     const input = bashInput(`git commit -m "ran bun ${markedScriptPath} by hand"`);
+    expect(await processInput(input, "darwin")).toBeNull();
+  });
+
+  test("ignores a marked path inside a heredoc body", async () => {
+    const input = bashInput(
+      `cat > ${fixtureDir}/wrapper.sh <<'EOF'\n#!/bin/bash\nbun ${markedScriptPath} Things3\nEOF`,
+    );
+    expect(await processInput(input, "darwin")).toBeNull();
+  });
+
+  test("ignores a marked path inside a comment", async () => {
+    const input = bashInput(`rm -rf ${fixtureDir}/scratch # bun ${markedScriptPath}`);
     expect(await processInput(input, "darwin")).toBeNull();
   });
 

@@ -33,9 +33,13 @@ const SCRIPT_INTERPRETERS = new Set(["bun", "node"]);
 const SCRIPT_EXTENSIONS = new Set([".ts", ".js", ".mjs", ".cjs", ".sh"]);
 // Words that stand ahead of the command they introduce, so the command's own
 // name is the token past them.
-const SEGMENT_PREFIXES = new Set(["do", "then", "else", "elif", "!", "time", "exec", "nohup"]);
+const SEGMENT_PREFIXES = new Set(["do", "then", "else", "elif", "!", "time", "exec", "nohup", "{"]);
+// `run` stands between an interpreter and its script the way a flag does.
+const INTERPRETER_PREFIXES = new Set(["run"]);
 const SEPARATORS = new Set([";", "\n", "&", "|", "(", ")"]);
 const WHITESPACE = new Set([" ", "\t", "\r"]);
+// What a backslash escapes inside double quotes. It stays literal before anything else.
+const DOUBLE_QUOTED_ESCAPES = new Set(["$", "`", '"', "\\", "\n"]);
 const ASSIGNMENT = /^([A-Za-z_]\w*)=([^]*)$/;
 const EXPANSION = /\$\{(\w+)\}|\$(\w+)/g;
 const SCRIPT_MARKER = "claude:dangerouslyDisableSandbox";
@@ -78,6 +82,9 @@ export function tokenize(command: string): Segment[] {
   // A quoted empty string is a token; an empty buffer between spaces is not.
   let open = false;
   let quote: string | null = null;
+  // Delimiters of the heredocs opened on the line being read, in the order the
+  // shell will consume their bodies once that line ends.
+  let pending: string[] = [];
 
   function endPart(next: boolean): void {
     if (current !== "") parts.push({ text: current, expands });
@@ -99,17 +106,72 @@ export function tokenize(command: string): Segment[] {
     tokens = [];
   }
 
+  /** The word after `<<`, unquoted, or null where no heredoc opens there. */
+  function readDelimiter(start: number): { delimiter: string; next: number } | null {
+    let cursor = command[start] === "-" ? start + 1 : start;
+    while (WHITESPACE.has(command[cursor] ?? "")) cursor++;
+    let delimiter = "";
+    let mark: string | null = null;
+    for (; cursor < command.length; cursor++) {
+      const char = command[cursor] ?? "";
+      if (mark != null) {
+        if (char === mark) mark = null;
+        else delimiter += char;
+      } else if (char === "'" || char === '"') mark = char;
+      else if (char === "\\") delimiter += command[++cursor] ?? "";
+      else if (WHITESPACE.has(char) || SEPARATORS.has(char)) break;
+      else delimiter += char;
+    }
+    return delimiter === "" ? null : { delimiter, next: cursor };
+  }
+
+  /**
+   * Walks past the bodies of the heredocs this line opened, ending at the last
+   * delimiter line. The body is data the shell hands to a command, so a script
+   * named in it never runs and never grants a bypass.
+   */
+  function skipBodies(newline: number): number {
+    let cursor = newline;
+    for (const delimiter of pending) {
+      while (cursor < command.length) {
+        const end = command.indexOf("\n", cursor + 1);
+        const line = command.slice(cursor + 1, end === -1 ? command.length : end);
+        cursor = end === -1 ? command.length : end;
+        if (line.trim() === delimiter) break;
+      }
+    }
+    pending = [];
+    return cursor;
+  }
+
   for (let index = 0; index < command.length; index++) {
     const char = command[index] ?? "";
 
     if (quote != null) {
-      if (char === quote) {
+      if (quote === '"' && char === "\\" && DOUBLE_QUOTED_ESCAPES.has(command[index + 1] ?? "")) {
+        const escaped = command[++index] ?? "";
+        if (escaped !== "\n") {
+          endPart(false);
+          current += escaped;
+          endPart(true);
+        }
+        open = true;
+      } else if (char === quote) {
         endPart(true);
         quote = null;
       } else {
         current += char;
         open = true;
       }
+      continue;
+    }
+
+    // `#` opens a comment only where a word would start, so the rest of the line
+    // is text the shell never runs.
+    if (char === "#" && !open) {
+      const end = command.indexOf("\n", index);
+      if (end === -1) break;
+      index = end - 1;
       continue;
     }
 
@@ -126,11 +188,23 @@ export function tokenize(command: string): Segment[] {
         endPart(true);
         open = true;
       }
+    } else if (char === "<" && command[index + 1] === "<" && command[index + 2] !== "<") {
+      // `<<<` is a here-string, which carries no body.
+      const heredoc = readDelimiter(index + 2);
+      if (heredoc === null) {
+        current += char;
+        open = true;
+      } else {
+        endToken();
+        pending.push(heredoc.delimiter);
+        index = heredoc.next - 1;
+      }
     } else if (SEPARATORS.has(char)) {
       // `&&` and `||` are one separator, so the pair is consumed together.
       if ((char === "&" || char === "|") && command[index + 1] === char) index++;
       endSegment();
-      if (char === "(") depth++;
+      if (char === "\n" && pending.length > 0) index = skipBodies(index);
+      else if (char === "(") depth++;
       else if (char === ")") depth = Math.max(0, depth - 1);
     } else if (WHITESPACE.has(char)) {
       endToken();
@@ -230,11 +304,14 @@ export function extractScripts(command: string, cwd: string): string[] {
     }
 
     if (SCRIPT_INTERPRETERS.has(name)) {
-      const next = tokens[index + 1];
-      const arg = next === undefined ? "" : expandToken(next, scoped);
-      if (next !== undefined && arg !== "" && !arg.startsWith("-")) {
-        scripts.push(resolvePath(next, directory, scoped));
+      let argument = index + 1;
+      while (argument < tokens.length) {
+        const text = expandToken(tokens[argument] ?? [], scoped);
+        if (text !== "" && !text.startsWith("-") && !INTERPRETER_PREFIXES.has(text)) break;
+        argument++;
       }
+      const script = tokens[argument];
+      if (script !== undefined) scripts.push(resolvePath(script, directory, scoped));
     } else if (SCRIPT_EXTENSIONS.has(extname(name))) {
       scripts.push(resolvePath(cmd, directory, scoped));
     }

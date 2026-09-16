@@ -11,9 +11,22 @@ import {
 } from "../../../detection/collect";
 import { densityWeights, type ScoredFile } from "../../../detection/density";
 import type { DiffOptions } from "../../../detection/diff";
+import {
+  type AuditHistory,
+  MIN_JUDGED,
+  readHistory,
+  shapeWeight,
+  shapeWeights,
+} from "../../../detection/history";
 import { rankCommentsWeighted, type SortKey } from "../../../detection/rank";
 import type { JudgeAdapter } from "../../../judge/adapter";
-import { buildJob, type BuildJobOptions, writeJob, type WrittenJob } from "../../../judge/job";
+import {
+  buildJob,
+  type BuildJobOptions,
+  DEFAULT_JOB_BASE,
+  writeJob,
+  type WrittenJob,
+} from "../../../judge/job";
 import { AuditError, type AuditIo } from "./io";
 
 /**
@@ -49,6 +62,27 @@ export interface PreflightDeps {
 function preview(text: string): string {
   const firstLine = text.split("\n")[0] ?? "";
   return firstLine.length > 64 ? `${firstLine.slice(0, 61)}...` : firstLine;
+}
+
+/**
+ * One line on what the accumulated pairs say. Shapes past the threshold report
+ * the lift they apply. Shapes under it report their count, so the evidence is
+ * visible while it builds rather than appearing the run it starts to matter.
+ */
+function describeHistory(history: AuditHistory): string | null {
+  if (history.judged === 0) return null;
+  const rate = `${Math.round((history.actioned / history.judged) * 100)}%`;
+  const steering = history.shapes.filter((shape) => shape.judged >= MIN_JUDGED);
+  const detail =
+    steering.length > 0
+      ? steering
+          .map(
+            (shape) =>
+              `${shape.shape} ${Math.round((shape.actioned / shape.judged) * 100)}% of ${shape.judged}`,
+          )
+          .join(", ")
+      : `no shape has reached the ${MIN_JUDGED} pairs that steer ranking`;
+  return `History: ${history.actioned}/${history.judged} judged comments actioned across ${history.runs} runs (${rate}). ${detail}.`;
 }
 
 async function collect(
@@ -95,7 +129,18 @@ export async function preflight(
   const densities: ScoredFile[] = [];
   const comments = await collect(options, (file) => densities.push(file));
 
-  const ranked = rankCommentsWeighted(comments, densityWeights(densities), options.sort);
+  // Past runs left (features, verdict) pairs in the job base. Their action rate
+  // per comment shape is a measured prior the intrinsic score cannot see: two
+  // comments of the same length rank apart when the judge has been acting on
+  // one's shape and keeping the other's.
+  const history = await readHistory(options.jobBase ?? DEFAULT_JOB_BASE);
+  const weights = shapeWeights(history);
+  const ranked = rankCommentsWeighted(
+    comments,
+    densityWeights(densities),
+    options.sort,
+    (comment) => shapeWeight(comment.features, weights),
+  );
   const limited = typeof options.limit === "number" ? ranked.slice(0, options.limit) : ranked;
   if (limited.length === 0) {
     io.log(color.dim("No comments to judge."));
@@ -114,7 +159,7 @@ export async function preflight(
 
   // Deterministic features per judged comment, keyed by the same id the
   // verdicts use. Each run leaves a (features, verdict) pair in its job dir,
-  // the training data for routing obvious comments away from the judge later.
+  // which is what `readHistory` reads back to weight the ranking above.
   const features = Object.fromEntries(
     limited.map((c) => [
       c.id,
@@ -139,6 +184,8 @@ export async function preflight(
       `  ${color.dim(String(c.score.score).padStart(5))}  ${c.path}:${c.startLine}  ${preview(c.text)}`,
     );
   }
+  const evidence = describeHistory(history);
+  if (evidence !== null) io.log(color.dim(evidence));
   io.log("");
 
   await judge(written);

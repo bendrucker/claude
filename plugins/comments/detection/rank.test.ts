@@ -140,6 +140,13 @@ describe("rankCommentsWeighted", () => {
     expect(rankCommentsWeighted([long, short], new Map([["heavy.ts", 5]]))).toEqual([short, long]);
   });
 
+  test("a per-comment weight reorders comments sharing a file", () => {
+    const short = pathed("// short one", "a.ts");
+    const long = pathed("// a noticeably longer comment", "a.ts");
+    const weigh = (c: { text: string }) => (c.text === short.text ? 4 : 1);
+    expect(rankCommentsWeighted([long, short], new Map(), "score", weigh)).toEqual([short, long]);
+  });
+
   test("is stable for ties and does not mutate the input", () => {
     const a = pathed("// tie", "a.ts");
     const b = pathed("// tie", "b.ts");

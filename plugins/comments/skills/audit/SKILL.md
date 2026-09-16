@@ -91,6 +91,16 @@ roughly 250 agents; `--path` and `--limit` cap that.
 `--all` requires a clean working tree, because it reads the working tree but
 applies from HEAD. Commit or stash first if preflight reports a dirty tree.
 
+Every run leaves its comment features beside the verdicts in its job dir. The
+job base therefore accumulates (features, verdict) pairs. Preflight reads them
+back into an action rate per comment shape (divider rule, ticket id, why marker,
+code aligned) and weights the ranking by it: two comments of the same length
+rank apart when the judge has been acting on one's shape and keeping the
+other's. A shape enters the ranking once thirty pairs carry it, under a clamped
+lift that keeps it from outweighing the file's density. The summary reports the
+accumulated rate on every run, which is how a shape's evidence stays visible
+while it builds.
+
 ## Judge
 
 Read `argsPath` (it is JSON) and call the Workflow tool with the

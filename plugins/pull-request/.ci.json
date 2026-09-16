@@ -1,0 +1,3 @@
+{
+  "paths": ["plugins/writing/linguistics/", "plugins/writing/hooks/heading-case.ts"]
+}

@@ -240,15 +240,7 @@ describe("dispatch", () => {
 
   test("emits the partial record when the failure lands after the worktree exists", async () => {
     const stderr = envelope("agent_pane_busy");
-    const { run } = fakeRunner([
-      AGENT_LIST,
-      GIT_COMMON,
-      REMOTES,
-      ok(""),
-      WORKTREE,
-      fail(stderr),
-      AGENT_LIST,
-    ]);
+    const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, REMOTES, ok(""), WORKTREE, fail(stderr)]);
 
     const failure = await failureOf(dispatch(options, run));
     expect(failure.message).toBe(stderr);
@@ -355,17 +347,17 @@ describe("dispatch", () => {
       ok(""),
       WORKTREE,
       fail(stderr),
-      AGENT_LIST,
     ]);
 
     const failure = await failureOf(dispatch(options, run));
     expect(failure.message).toBe(stderr);
     expect(failure.partial?.path).toBe("/tmp/worktrees/demo/fix-thing");
     expect(calls.filter((argv) => argv[2] === "start")).toHaveLength(1);
+    expect(calls.filter((argv) => argv[2] === "list")).toHaveLength(1);
   });
 
   test("never substitutes a name the caller asked for", async () => {
-    const stderr = envelope("agent_pane_busy");
+    const stderr = envelope("agent_name_taken");
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,

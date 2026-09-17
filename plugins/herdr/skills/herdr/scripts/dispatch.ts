@@ -315,21 +315,15 @@ export async function dispatch(
   let name = wanted;
   let started = await run(startArgv(name));
   // Another dispatch can bind a derived name between the list above and this
-  // start. A relist that now shows the name taken is that race, and the
-  // worktree already exists, so it takes the next free name. Any other failure
-  // is the caller's to see, and an explicit name has no substitute.
-  if (
-    options.name == null &&
-    started.code !== 0 &&
-    envelopeCode(started.stderr) !== "agent_not_ready"
-  ) {
+  // start, and herdr names that race. The worktree already exists by then, so
+  // the dispatch takes the next free name instead of leaving it without an
+  // agent. A name the caller asked for has no substitute.
+  if (options.name == null && envelopeCode(started.stderr) === "agent_name_taken") {
     const live = agentNames(
       await requiredJson(run, ["herdr", "agent", "list"], AgentList, partial),
     );
-    if (live.has(name)) {
-      name = deriveName(options.branch, live);
-      started = await run(startArgv(name));
-    }
+    name = deriveName(options.branch, live);
+    started = await run(startArgv(name));
   }
   // A brand-new worktree draws Claude Code's trust dialog. The name binds
   // anyway, and agent prompt stays refused until the dialog settles.

@@ -199,6 +199,42 @@ describe("renderVoiceDeltaTable with null floors", () => {
       renderVoiceDeltaTable(inRegisterText, fixtureProfile),
     );
   });
+
+  // A band rebuilt before a feature existed carries no floor for it. Reading
+  // the one run that does cover it as `clears` would certify a gap against the
+  // length confound the banding exists to rule out.
+  it("withholds clears from a feature a stored band never measured", () => {
+    const partial: WritingStatistics = {
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      rateNulls: {
+        runs: [
+          {
+            splits: 500,
+            percentile: 95,
+            seed: 1,
+            minWords: null,
+            maxWords: null,
+            floors: [
+              { featureId: "first_person_rate", gap: 4, floor: 1 },
+              { featureId: "backtick_density", gap: 2, floor: 1 },
+            ],
+          },
+          {
+            splits: 500,
+            percentile: 95,
+            seed: 1,
+            minWords: 100,
+            maxWords: 400,
+            floors: [{ featureId: "first_person_rate", gap: 4, floor: 1 }],
+          },
+        ],
+      },
+    };
+    const rendered = renderVoiceDeltaTable(inRegisterText, fixtureProfile, partial);
+    expect(rendered).toContain("partial");
+    expect(rendered).toContain("No floor covers these features in every band");
+    expect(rendered).toContain("100-400 word band");
+  });
 });
 
 describe("renderSignatureTable", () => {

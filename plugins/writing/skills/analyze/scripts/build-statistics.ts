@@ -7,6 +7,8 @@
 // numbers alone must not drop them.
 
 import { mkdirSync } from "node:fs";
+// oxlint-disable-next-line no-restricted-imports -- Bun has no rename, and only a rename replaces the file atomically.
+import { rename } from "node:fs/promises";
 import { dirname } from "node:path";
 import { cli } from "cleye";
 import { resolveLogPath } from "../../../hooks/run-log";
@@ -199,12 +201,30 @@ if (import.meta.main) {
     }
   }
 
+  // Re-read here rather than trusting the copy taken before the tagging. Two
+  // runs rebuilding different sections both start from the artifact as it was
+  // minutes ago, and the one that finishes second would otherwise write the
+  // other's section back to the state it read. A section this run computed
+  // wins. Every other section comes off the newest file on disk.
+  const latest = (await loadStatistics(out)) ?? existing;
+  const keep = <T>(section: Section, computed: T | undefined, disk: T | undefined) =>
+    wanted.has(section) ? computed : (disk ?? computed);
+
   const statistics: WritingStatistics = { generatedAt: new Date().toISOString() };
-  if (rateNulls !== undefined) statistics.rateNulls = rateNulls;
-  if (tagSignatures !== undefined) statistics.tagSignatures = tagSignatures;
-  if (hookHealth !== undefined) statistics.hookHealth = hookHealth;
+  const merged = {
+    rateNulls: keep("rate-nulls", rateNulls, latest?.rateNulls),
+    tagSignatures: keep("tag-signatures", tagSignatures, latest?.tagSignatures),
+    hookHealth: keep("hook-health", hookHealth, latest?.hookHealth),
+  };
+  if (merged.rateNulls !== undefined) statistics.rateNulls = merged.rateNulls;
+  if (merged.tagSignatures !== undefined) statistics.tagSignatures = merged.tagSignatures;
+  if (merged.hookHealth !== undefined) statistics.hookHealth = merged.hookHealth;
 
   mkdirSync(dirname(out), { recursive: true });
-  await Bun.write(out, `${JSON.stringify(statistics, null, 2)}\n`);
+  // Rename rather than write in place, so a scan reading concurrently sees
+  // either the old artifact or the new one and never a half-written file.
+  const staging = `${out}.${process.pid}.tmp`;
+  await Bun.write(staging, `${JSON.stringify(statistics, null, 2)}\n`);
+  await rename(staging, out);
   console.log(out);
 }

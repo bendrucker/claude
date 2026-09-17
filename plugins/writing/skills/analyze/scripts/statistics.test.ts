@@ -11,6 +11,7 @@ import {
   failedBands,
   loadStatistics,
   measuredFeature,
+  unmeasuredBands,
   type RateNullRun,
   byBand,
   sameBand,
@@ -121,6 +122,31 @@ describe("failedBands", () => {
 
   it("is empty when no statistics were written", () => {
     expect(failedBands(null, "clears_everywhere")).toEqual([]);
+  });
+});
+
+describe("unmeasuredBands", () => {
+  // Bands rebuild independently, so the banded run here predates the feature
+  // the full-corpus run measures. Reporting that feature as cleared would
+  // certify a gap no band-restricted null ever tested, which is the length
+  // confound the banding exists to catch.
+  it("names the band a retained run never measured", () => {
+    expect(unmeasuredBands(statistics, "unfloored")).toEqual(["100-400 word band"]);
+  });
+
+  it("is empty for a feature every stored run carries", () => {
+    expect(unmeasuredBands(statistics, "clears_everywhere")).toEqual([]);
+  });
+
+  it("names every band for a feature no run measured", () => {
+    expect(unmeasuredBands(statistics, "never_measured")).toEqual([
+      "full corpus",
+      "100-400 word band",
+    ]);
+  });
+
+  it("is empty when no statistics were written", () => {
+    expect(unmeasuredBands(null, "clears_everywhere")).toEqual([]);
   });
 });
 

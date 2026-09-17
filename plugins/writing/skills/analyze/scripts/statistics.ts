@@ -120,10 +120,11 @@ export const WritingStatistics = z.object({
 export type WritingStatistics = z.infer<typeof WritingStatistics>;
 
 /**
- * The artifact, or null where it is absent or unreadable. A torn write is the
- * same answer as no file: `build-statistics.ts` writes it in place while a scan
- * may be reading, and a scan whose real work is finding tropes must not die on
- * the statistics it only annotates with.
+ * The artifact, or null where it is absent or unreadable. A file this version
+ * cannot parse is the same answer as no file: a scan whose real work is finding
+ * tropes must not die on the statistics it only annotates with. `build-statistics.ts`
+ * renames its output into place, so the unreadable case is an older format or a
+ * damaged file rather than a write caught in progress.
  */
 export async function loadStatistics(path: string): Promise<WritingStatistics | null> {
   const file = Bun.file(path);
@@ -145,6 +146,20 @@ export function failedBands(statistics: WritingStatistics | null, featureId: str
     if (floor !== undefined && !clearsFloor(floor)) failed.push(describeBand(run));
   }
   return failed;
+}
+
+/**
+ * The bands whose run carries no floor for this feature, empty when every
+ * stored run measured it. Bands rebuild independently, so a run retained from
+ * before a feature existed never tested it, and a gap that cleared only the
+ * bands that do cover it is a length artifact this cannot rule out.
+ */
+export function unmeasuredBands(statistics: WritingStatistics | null, featureId: string): string[] {
+  const missing: string[] = [];
+  for (const run of statistics?.rateNulls?.runs ?? []) {
+    if (!run.floors.some((rate) => rate.featureId === featureId)) missing.push(describeBand(run));
+  }
+  return missing;
 }
 
 export function measuredFeature(statistics: WritingStatistics | null, featureId: string): boolean {

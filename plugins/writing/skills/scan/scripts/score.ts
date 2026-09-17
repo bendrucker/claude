@@ -9,14 +9,12 @@ import {
   describeRunMethod,
   failedBands,
   measuredFeature,
+  unmeasuredBands,
   type WritingStatistics,
 } from "../../analyze/scripts/statistics";
+import { cleanText, splitSentences } from "../../analyze/scripts/ngram";
 import { matchShapes } from "../../analyze/scripts/tag-ngram";
-import {
-  checkRegister,
-  sentenceSplit,
-  VOICE_DELTA_FEATURES,
-} from "../../analyze/scripts/voice-delta";
+import { checkRegister, VOICE_DELTA_FEATURES } from "../../analyze/scripts/voice-delta";
 import type { VoiceProfile } from "../../analyze/scripts/voice-profile";
 
 export interface CategoryScore {
@@ -189,6 +187,7 @@ export function renderVoiceDeltaTable(
 
   const rows: string[][] = [];
   const noise: { feature: (typeof VOICE_DELTA_FEATURES)[number]; failed: string[] }[] = [];
+  const partial: { feature: (typeof VOICE_DELTA_FEATURES)[number]; failed: string[] }[] = [];
   for (const feature of VOICE_DELTA_FEATURES) {
     const rate = feature.compute(text);
     const fmt = feature.format ?? ((r: number) => r.toFixed(2));
@@ -210,13 +209,17 @@ export function renderVoiceDeltaTable(
     }
     if (gated) {
       const failed = failedBands(statistics, feature.id);
-      const verdict = measuredFeature(statistics, feature.id)
-        ? failed.length === 0
-          ? "clears"
-          : "noise"
-        : "unmeasured";
+      const missing = unmeasuredBands(statistics, feature.id);
+      const verdict = !measuredFeature(statistics, feature.id)
+        ? "unmeasured"
+        : failed.length > 0
+          ? "noise"
+          : missing.length > 0
+            ? "partial"
+            : "clears";
       row.push(verdict);
-      if (failed.length > 0) noise.push({ feature, failed });
+      if (verdict === "noise") noise.push({ feature, failed });
+      if (verdict === "partial") partial.push({ feature, failed: missing });
     }
     rows.push(row);
   }
@@ -227,6 +230,13 @@ export function renderVoiceDeltaTable(
     lines.push(
       `Null floor: splits of the baseline against itself, over the ${runs.map(describeRunMethod).join(" and the ")}.`,
     );
+    if (partial.length > 0) {
+      lines.push(
+        `No floor covers these features in every band, which leaves the delta unestablished: ${partial
+          .map((entry) => `${entry.feature.label} (${entry.failed.join(", ")})`)
+          .join("; ")}.`,
+      );
+    }
     if (noise.length > 0) {
       lines.push(
         `Read the delta on these as sampling spread: ${noise
@@ -257,7 +267,11 @@ export function renderSignatureTable(
   if (signatures === undefined || signatures.shapes.length === 0) return null;
 
   const shapes = new Set(signatures.shapes.map((signature) => signature.shape));
-  const match = matchShapes(sentenceSplit(stripCode(text)), signatures.sizes, shapes);
+  // The corpus shares below were mined through cleanText and splitSentences,
+  // which drop URLs, headings, tables, and identifiers and end a window at a
+  // newline. A document tagged any other way reports its hits against a
+  // different denominator, so the comparison has to run the same pipeline.
+  const match = matchShapes([...splitSentences(cleanText(text))], signatures.sizes, shapes);
   const lines = ["Corpus Signatures"];
 
   if (match.total === 0) {

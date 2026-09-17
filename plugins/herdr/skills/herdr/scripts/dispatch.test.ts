@@ -39,8 +39,6 @@ const AGENT_GET = ok(
   }),
 );
 
-// Bun discovers the runner's calls in order, so a scripted fake both drives the
-// sequence and records the argv arrays each step spawned.
 function fakeRunner(responses: readonly CommandResult[]): { run: Runner; calls: string[][] } {
   const calls: string[][] = [];
   let index = 0;

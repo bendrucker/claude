@@ -17,8 +17,7 @@ export interface CommandResult {
 
 export type Runner = (argv: readonly string[]) => Promise<CommandResult>;
 
-// The sandbox marker covers the whole invocation, so every subprocess takes an
-// argv array. Nothing user-supplied reaches a shell.
+// The sandbox marker covers the whole invocation, so every subprocess takes an argv array.
 export const spawnRunner: Runner = async (argv) => {
   const proc = Bun.spawn([...argv], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr, code] = await Promise.all([
@@ -44,8 +43,7 @@ export interface DispatchResult {
   root: string;
 }
 
-// Carries the text to forward on stderr, plus whatever was already created when
-// the failure landed. A partial record means a worktree exists that nobody owns.
+// A partial record means a worktree exists that nobody owns.
 export class DispatchError extends Error {
   readonly partial: DispatchRecord | null;
 
@@ -83,8 +81,7 @@ const ErrorEnvelope = z.object({
   error: z.object({ code: z.string(), message: z.string() }),
 });
 
-// herdr writes its JSON envelope on stderr. Read the code to tell an expected
-// outcome from a real failure. Anything unparseable is a real failure.
+// herdr writes its JSON envelope on stderr. Anything unparseable is a real failure.
 export function envelopeCode(stderr: string): string | null {
   let json: unknown;
   try {

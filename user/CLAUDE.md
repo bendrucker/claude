@@ -73,7 +73,7 @@ claude-cli://open?q=<url-encoded prompt>&cwd=<absolute main repo path>
 
 ## Worktrees
 
-Any change intended to become its own PR starts in a worktree, created with `worktrunk:wt-switch-create`. Stay put only when the session is already on a topic branch inside one.
+Any change intended to become its own PR starts in a worktree, created with `worktrunk:wt-switch-create`. Stay put only when the session is already on a topic branch inside one. Work handed to a sibling agent starts in its own worktree too, created through the `herdr:herdr` skill so this session stays put.
 
 I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 

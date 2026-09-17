@@ -1,0 +1,382 @@
+#!/usr/bin/env bun
+// claude:dangerouslyDisableSandbox: appends the dispatch ledger in the plugin data dir under ~/.claude/plugins
+import { cli } from "cleye";
+import { z } from "zod";
+import { appendDispatch, resolveDataDir } from "./ledger";
+
+const BRANCH_PATTERN = /^[A-Za-z0-9._/-]+$/;
+const AGENT_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
+const MAX_AGENT_NAME = 32;
+const MAX_TASK_SUMMARY = 120;
+
+export interface CommandResult {
+  code: number;
+  stdout: string;
+  stderr: string;
+}
+
+export type Runner = (argv: readonly string[]) => Promise<CommandResult>;
+
+// The sandbox marker covers the whole invocation, so every subprocess takes an
+// argv array. Nothing user-supplied reaches a shell.
+export const spawnRunner: Runner = async (argv) => {
+  const proc = Bun.spawn([...argv], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { code, stdout, stderr };
+};
+
+export interface DispatchRecord {
+  workspace: string;
+  pane: string;
+  agent: string | null;
+  path: string;
+  branch: string;
+  session: string | null;
+  status: string;
+}
+
+export interface DispatchResult {
+  record: DispatchRecord;
+  root: string;
+}
+
+// Carries the text to forward on stderr, plus whatever was already created when
+// the failure landed. A partial record means a worktree exists that nobody owns.
+export class DispatchError extends Error {
+  readonly partial: DispatchRecord | null;
+
+  constructor(message: string, partial: DispatchRecord | null) {
+    super(message);
+    this.name = "DispatchError";
+    this.partial = partial;
+  }
+}
+
+const WorktreeCreated = z.object({
+  result: z.object({
+    workspace: z.object({ workspace_id: z.string() }),
+    root_pane: z.object({ pane_id: z.string() }),
+    worktree: z.object({ path: z.string() }),
+  }),
+});
+
+const AgentList = z.object({
+  result: z.object({
+    agents: z.array(z.object({ name: z.string().nullish() })),
+  }),
+});
+
+const AgentInfo = z.object({
+  result: z.object({
+    agent: z.object({
+      agent_status: z.string(),
+      agent_session: z.object({ value: z.string() }).nullish(),
+    }),
+  }),
+});
+
+const ErrorEnvelope = z.object({
+  error: z.object({ code: z.string(), message: z.string() }),
+});
+
+// herdr writes its JSON envelope on stderr. Read the code to tell an expected
+// outcome from a real failure. Anything unparseable is a real failure.
+export function envelopeCode(stderr: string): string | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(stderr);
+  } catch {
+    return null;
+  }
+  const parsed = ErrorEnvelope.safeParse(json);
+  return parsed.success ? parsed.data.error.code : null;
+}
+
+export function deriveName(branch: string, taken: ReadonlySet<string>): string {
+  const slug = branch
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9_-]/g, "-")
+    .replaceAll(/-+/g, "-")
+    .replace(/^[^a-z]+/, "")
+    .slice(0, MAX_AGENT_NAME);
+  const base = slug === "" ? "agent" : slug;
+
+  let candidate = base;
+  for (let n = 2; taken.has(candidate); n += 1) {
+    const suffix = `-${n}`;
+    candidate = base.slice(0, MAX_AGENT_NAME - suffix.length) + suffix;
+  }
+  return candidate;
+}
+
+export function taskSummary(prompt: string): string {
+  const line =
+    prompt
+      .split("\n")
+      .map((entry) => entry.trim())
+      .find((entry) => entry !== "") ?? "";
+  return line.slice(0, MAX_TASK_SUMMARY);
+}
+
+export function formatRecord(record: DispatchRecord): string {
+  return JSON.stringify(record);
+}
+
+function decode<T>(
+  schema: z.ZodType<T>,
+  result: CommandResult,
+  label: string,
+  partial: DispatchRecord | null,
+): T {
+  let json: unknown;
+  try {
+    json = JSON.parse(result.stdout);
+  } catch {
+    throw new DispatchError(
+      `${label} did not return JSON: ${result.stdout.slice(0, 200)}`,
+      partial,
+    );
+  }
+  const parsed = schema.safeParse(json);
+  if (!parsed.success)
+    throw new DispatchError(
+      `${label} returned an unexpected shape: ${parsed.error.message}`,
+      partial,
+    );
+  return parsed.data;
+}
+
+async function required(
+  run: Runner,
+  argv: readonly string[],
+  partial: DispatchRecord | null,
+): Promise<CommandResult> {
+  const result = await run(argv);
+  if (result.code !== 0) throw new DispatchError(result.stderr, partial);
+  return result;
+}
+
+export interface DispatchOptions {
+  repo: string;
+  branch: string;
+  prompt: string;
+  name?: string | undefined;
+  base: string;
+  timeout: number;
+}
+
+export async function dispatch(
+  options: DispatchOptions,
+  run: Runner = spawnRunner,
+): Promise<DispatchResult> {
+  if (!BRANCH_PATTERN.test(options.branch))
+    throw new DispatchError(
+      `branch ${JSON.stringify(options.branch)} must match ${BRANCH_PATTERN.source}`,
+      null,
+    );
+  if (options.name != null && !AGENT_NAME_PATTERN.test(options.name))
+    throw new DispatchError(
+      `agent name ${JSON.stringify(options.name)} must match ${AGENT_NAME_PATTERN.source}`,
+      null,
+    );
+
+  let name = options.name;
+  if (name == null) {
+    const listed = decode(
+      AgentList,
+      await required(run, ["herdr", "agent", "list"], null),
+      "herdr agent list",
+      null,
+    );
+    const taken = new Set(
+      listed.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])),
+    );
+    name = deriveName(options.branch, taken);
+  }
+
+  const root = (
+    await required(run, ["git", "-C", options.repo, "rev-parse", "--show-toplevel"], null)
+  ).stdout.trim();
+  await required(run, ["git", "-C", root, "fetch", "origin"], null);
+
+  const created = decode(
+    WorktreeCreated,
+    await required(
+      run,
+      [
+        "herdr",
+        "worktree",
+        "create",
+        "--cwd",
+        root,
+        "--branch",
+        options.branch,
+        "--base",
+        options.base,
+        "--label",
+        options.branch,
+        "--no-focus",
+      ],
+      null,
+    ),
+    "herdr worktree create",
+    null,
+  );
+
+  // Everything past here has a worktree behind it, so a failure carries the
+  // record forward rather than leaving the checkout orphaned without a trace.
+  const partial: DispatchRecord = {
+    workspace: created.result.workspace.workspace_id,
+    pane: created.result.root_pane.pane_id,
+    agent: null,
+    path: created.result.worktree.path,
+    branch: options.branch,
+    session: null,
+    status: "unknown",
+  };
+
+  const started = await run([
+    "herdr",
+    "agent",
+    "start",
+    name,
+    "--kind",
+    "claude",
+    "--pane",
+    partial.pane,
+  ]);
+  // A brand-new worktree draws Claude Code's trust dialog. The name binds
+  // anyway, and agent prompt stays refused until the dialog settles.
+  const ready = started.code === 0;
+  if (!ready && envelopeCode(started.stderr) !== "agent_not_ready")
+    throw new DispatchError(started.stderr, partial);
+  partial.agent = name;
+
+  if (ready) {
+    const prompted = await run([
+      "herdr",
+      "agent",
+      "prompt",
+      name,
+      options.prompt,
+      "--wait",
+      "--until",
+      "working",
+      "--timeout",
+      String(options.timeout),
+    ]);
+    // A turn that finishes inside the timeout can settle back to idle before
+    // the wait observes working. The prompt still landed.
+    const code = prompted.code === 0 ? null : envelopeCode(prompted.stderr);
+    if (prompted.code !== 0 && code !== "timeout" && code !== "agent_prompt_stalled")
+      throw new DispatchError(prompted.stderr, partial);
+  }
+
+  const info = decode(
+    AgentInfo,
+    await required(run, ["herdr", "agent", "get", name], partial),
+    "herdr agent get",
+    partial,
+  );
+
+  return {
+    root,
+    record: {
+      ...partial,
+      session: info.result.agent.agent_session?.value ?? null,
+      status: info.result.agent.agent_status,
+    },
+  };
+}
+
+async function readPrompt(path: string | undefined): Promise<string> {
+  if (path == null || path === "") return Bun.stdin.text();
+  const file = Bun.file(path);
+  if (!(await file.exists())) {
+    process.stderr.write(`no prompt file at ${path}\n`);
+    process.exit(2);
+  }
+  return file.text();
+}
+
+if (import.meta.main) {
+  const argv = cli({
+    name: "dispatch",
+    help: {
+      description:
+        "Create a worktree, start a Claude agent in its root pane, and hand it a prompt. The repository's own checkout is never moved.",
+    },
+    flags: {
+      repo: { type: String, default: process.cwd(), description: "Repository to branch from" },
+      branch: { type: String, description: "Branch to create for the dispatched agent (required)" },
+      prompt: { type: String, description: "File holding the prompt; reads stdin when absent" },
+      name: { type: String, description: "Agent name; derived from the branch when absent" },
+      base: { type: String, default: "origin/main", description: "Ref the new branch starts from" },
+      dataDir: {
+        type: String,
+        description: "Dispatch ledger directory; defaults to the plugin data dir",
+      },
+      timeout: {
+        type: Number,
+        default: 15_000,
+        description: "Milliseconds to wait for the agent to start working",
+      },
+    },
+  });
+
+  if (argv.flags.branch == null || argv.flags.branch === "") {
+    process.stderr.write("--branch is required\n");
+    argv.showHelp();
+    process.exit(2);
+  }
+
+  const prompt = await readPrompt(argv.flags.prompt);
+  if (prompt.trim() === "") {
+    process.stderr.write("the prompt is empty; pass --prompt <file> or pipe it on stdin\n");
+    process.exit(2);
+  }
+
+  try {
+    const { record, root } = await dispatch({
+      repo: argv.flags.repo,
+      branch: argv.flags.branch,
+      prompt,
+      name: argv.flags.name,
+      base: argv.flags.base,
+      timeout: argv.flags.timeout,
+    });
+
+    // The agent is already running and the caller needs its identifiers, so a
+    // ledger failure warns rather than failing the dispatch.
+    try {
+      appendDispatch(
+        {
+          ts: new Date().toISOString(),
+          task: taskSummary(prompt),
+          repo: root,
+          branch: record.branch,
+          workspace: record.workspace,
+          pane: record.pane,
+          agent: record.agent,
+          session: record.session,
+        },
+        resolveDataDir(argv.flags.dataDir),
+      );
+    } catch (error) {
+      process.stderr.write(
+        `warning: dispatch ledger not written: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    }
+
+    process.stdout.write(`${formatRecord(record)}\n`);
+  } catch (error) {
+    if (!(error instanceof DispatchError)) throw error;
+    process.stderr.write(error.message.endsWith("\n") ? error.message : `${error.message}\n`);
+    if (error.partial != null) process.stderr.write(`${formatRecord(error.partial)}\n`);
+    process.exit(1);
+  }
+}

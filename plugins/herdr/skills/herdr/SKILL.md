@@ -6,6 +6,7 @@ argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
   - Bash(herdr api snapshot:*)
   - Bash(herdr --help:*)
   - Bash(herdr agent --help:*)
@@ -104,7 +105,9 @@ Leave lifecycle reporting to the scraper. `pane report-agent` overrides the dete
 
 Each agent pane carries `agent_session.value`, the Claude session UUID.
 
-A reference to work by branch, repo, or task usually names a pane already doing it. Match it against the `cwd` and `title` columns in the orientation block, then hand off to that pane instead of duplicating the checkout here.
+Hand off to an existing pane when its `title` or `cwd` names this task. Match against those two columns in the orientation block.
+
+A repo match is not a task match. A pane with no `cwd` of its own under a `primary` workspace sits in that repo's default-branch checkout, so an idle agent there is between tasks rather than on this one. Work bound for its own pull request gets a fresh worktree and a fresh agent under [Dispatch](#dispatch).
 
 Hand off with `agent prompt --wait`, which blocks until the agent settles at `idle`, `done`, or `blocked`, then collect with `agent read`:
 
@@ -125,9 +128,19 @@ An agent parked on its own interactive UI answers to logical key names: `herdr a
 
 `herdr agent focus` brings a pane to the foreground for the user. `herdr agent attach` connects to it directly.
 
-### Starting an Agent
+### Dispatch
 
-A sibling agent that needs its own checkout gets it from `herdr worktree create`, which leaves this session where it is. `worktrunk:wt-switch-create` re-roots the calling session instead.
+New work headed for its own pull request goes to a new worktree and a new agent in one call:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo <path> --branch <branch> --prompt <file>
+```
+
+It fetches, creates the worktree on `origin/main` (`--base` overrides), starts a Claude agent in the new workspace's root pane, and prompts it. The primary checkout is never moved. One JSON line reports the workspace, pane, agent name, worktree path, branch, and session id, and a herdr failure comes back as herdr's own error envelope.
+
+`worktrunk:wt-switch-create` re-roots this session instead.
+
+### Starting an Agent
 
 `agent start` attaches an agent to an existing free pane, sitting at its interactive prompt with nothing in the foreground. Split first, start second:
 

@@ -38,7 +38,9 @@ export const spawnRunner: Runner = async (argv, options) => {
       stdin: "ignore",
       stdout: "pipe",
       stderr: "pipe",
-      env: options?.env == null ? undefined : { ...process.env, ...options.env },
+      // Bun inherits this environment by default, so spreading it keeps that
+      // behavior while letting a caller add to it.
+      env: { ...process.env, ...options?.env },
     });
   } catch (error) {
     // Spawning throws when the binary is missing, which would escape the

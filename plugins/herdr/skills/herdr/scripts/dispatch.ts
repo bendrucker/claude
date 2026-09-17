@@ -206,8 +206,6 @@ function decode<T>(
   return parsed.data;
 }
 
-// A step whose failure the caller can recover from: it succeeded, or herdr
-// named a code the caller tolerates.
 function fatal(result: CommandResult, ...tolerated: readonly string[]): boolean {
   if (result.code === 0) return false;
   const code = envelopeCode(result.stderr);

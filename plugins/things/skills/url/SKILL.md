@@ -1,6 +1,6 @@
 ---
 name: things:url
-description: Create, update, and manage Things 3 tasks and projects, including quick inbox captures. Not for reads. Use things:jxa to query data.
+description: Write to Things 3 from this machine's CLI, including quick inbox captures. Prefer the things MCP tools, which reach the same writes from any machine. Use this skill for a raw json data= payload, or when that server is unreachable.
 argument-hint: "<add | update | show | search | json | capture> [key=value ...]"
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts:*)"

@@ -1,6 +1,6 @@
 ---
 name: things:jxa
-description: Read and query Things 3 data (lists, todos, projects, tags, logbook). Not for writes. Use things:url to create, update, or capture to the inbox.
+description: Read and query Things 3 data from this machine's CLI (lists, todos, projects, tags, logbook). Prefer the things MCP tools, which reach the same reads from any machine. Use this skill when that server is unreachable.
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/format-output.ts:*)"
   - "Skill(mac:jxa-run)"

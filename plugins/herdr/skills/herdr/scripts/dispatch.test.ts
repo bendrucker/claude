@@ -69,7 +69,10 @@ const options = {
   timeout: 15_000,
 };
 
-const HAPPY_PATH = [AGENT_LIST, ok("/repo\n"), ok(""), WORKTREE, ok(""), ok(""), AGENT_GET];
+const GIT_COMMON = ok("/repo/.git\n");
+const REMOTES = ok("origin\nupstream\n");
+
+const HAPPY_PATH = [AGENT_LIST, GIT_COMMON, REMOTES, ok(""), WORKTREE, ok(""), ok(""), AGENT_GET];
 
 describe("deriveName", () => {
   test.each([
@@ -106,6 +109,10 @@ describe("envelopeCode", () => {
     expect(envelopeCode(envelope("agent_not_ready"))).toBe("agent_not_ready");
   });
 
+  test("reads an envelope written behind other output", () => {
+    expect(envelopeCode(`warming up\n${envelope("timeout")}\n`)).toBe("timeout");
+  });
+
   test("returns null for anything that is not one", () => {
     expect(envelopeCode("git: command not found\n")).toBeNull();
     expect(envelopeCode(JSON.stringify({ result: { type: "agent_info" } }))).toBeNull();
@@ -118,6 +125,8 @@ describe("validation", () => {
     ["branch", { ...options, branch: "fix $(whoami)" }],
     ["name", { ...options, name: "Reviewer" }],
     ["name", { ...options, name: "rm -rf" }],
+    ["branch", { ...options, branch: "-x" }],
+    ["prompt", { ...options, prompt: "x".repeat(200_000) }],
   ])("rejects a hostile %s before spawning", async (_field, bad) => {
     const { run, calls } = fakeRunner([]);
     await failureOf(dispatch(bad, run));
@@ -132,7 +141,8 @@ describe("dispatch", () => {
 
     expect(calls).toEqual([
       ["herdr", "agent", "list"],
-      ["git", "-C", "/repo", "rev-parse", "--show-toplevel"],
+      ["git", "-C", "/repo", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+      ["git", "-C", "/repo", "remote"],
       ["git", "-C", "/repo", "fetch", "origin"],
       [
         "herdr",
@@ -172,6 +182,30 @@ describe("dispatch", () => {
     expect(formatRecord(record)).toMatchSnapshot();
   });
 
+  test("fetches nothing when the base names no remote", async () => {
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      WORKTREE,
+      ok(""),
+      ok(""),
+      AGENT_GET,
+    ]);
+    await dispatch({ ...options, base: "release-2026" }, run);
+    expect(calls.map((argv) => argv.slice(0, 4))).not.toContainEqual([
+      "git",
+      "-C",
+      "/repo",
+      "fetch",
+    ]);
+  });
+
+  test("fetches the remote the base names", async () => {
+    const { run, calls } = fakeRunner(HAPPY_PATH);
+    await dispatch({ ...options, base: "upstream/main" }, run);
+    expect(calls).toContainEqual(["git", "-C", "/repo", "fetch", "upstream"]);
+  });
+
   test("uses an explicit name that no live agent holds", async () => {
     const { run, calls } = fakeRunner(HAPPY_PATH);
     const { record } = await dispatch({ ...options, name: "custom" }, run);
@@ -192,7 +226,7 @@ describe("dispatch", () => {
       "linked_worktree_source",
       "New and open worktree actions start from the repo parent workspace.",
     );
-    const { run } = fakeRunner([AGENT_LIST, ok("/repo\n"), ok(""), fail(stderr)]);
+    const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, REMOTES, ok(""), fail(stderr)]);
 
     const failure = await failureOf(dispatch(options, run));
     expect(failure.message).toBe(stderr);
@@ -201,7 +235,7 @@ describe("dispatch", () => {
 
   test("emits the partial record when the failure lands after the worktree exists", async () => {
     const stderr = envelope("agent_pane_busy");
-    const { run } = fakeRunner([AGENT_LIST, ok("/repo\n"), ok(""), WORKTREE, fail(stderr)]);
+    const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, REMOTES, ok(""), WORKTREE, fail(stderr)]);
 
     const failure = await failureOf(dispatch(options, run));
     expect(failure.message).toBe(stderr);
@@ -223,7 +257,8 @@ describe("dispatch", () => {
     );
     const { run, calls } = fakeRunner([
       AGENT_LIST,
-      ok("/repo\n"),
+      GIT_COMMON,
+      REMOTES,
       ok(""),
       WORKTREE,
       fail(envelope("agent_not_ready")),
@@ -248,7 +283,8 @@ describe("dispatch", () => {
       );
       const { run } = fakeRunner([
         AGENT_LIST,
-        ok("/repo\n"),
+        GIT_COMMON,
+        REMOTES,
         ok(""),
         WORKTREE,
         ok(""),
@@ -265,7 +301,8 @@ describe("dispatch", () => {
   test("rejects a herdr payload that does not match the expected shape", async () => {
     const { run } = fakeRunner([
       AGENT_LIST,
-      ok("/repo\n"),
+      GIT_COMMON,
+      REMOTES,
       ok(""),
       ok(JSON.stringify({ result: {} })),
     ]);

@@ -130,13 +130,13 @@ An agent parked on its own interactive UI answers to logical key names: `herdr a
 
 ### Dispatch
 
-New work headed for its own pull request goes to a new worktree and a new agent in one call:
+Work from [Sibling Agents](#sibling-agents) that needs its own worktree and agent gets both in one call:
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo <path> --branch <branch> --prompt <file>
+bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
 ```
 
-It fetches, creates the worktree on `origin/main` (`--base` overrides), starts a Claude agent in the new workspace's root pane, and prompts it. The primary checkout is never moved. One JSON line reports the workspace, pane, agent name, worktree path, branch, session id, and whether the prompt landed. A trust dialog at startup leaves `prompted` false, and the agent then needs `agent read` and `agent send-keys` before it can take the work. A herdr failure comes back as herdr's own error envelope.
+It resolves the repository's primary checkout from anywhere inside it, fetches, creates the worktree on `origin/main` (`--base` overrides), starts a Claude agent in the new workspace's root pane, and prompts it. The primary checkout is never moved. One JSON line reports the workspace, pane, agent name, worktree path, branch, session id, and whether the prompt landed. A trust dialog at startup leaves `prompted` false, and the agent then needs `agent read` and `agent send-keys` before it can take the work. A failed herdr step exits 1 and forwards herdr's own error envelope. dispatch.ts's own failures exit 1 with plain text instead.
 
 `worktrunk:wt-switch-create` re-roots this session instead.
 

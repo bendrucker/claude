@@ -4,5 +4,6 @@
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
-  }
+  },
+  "dependencies": ["mac"]
 }

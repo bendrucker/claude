@@ -1,13 +1,17 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger in the plugin data dir under ~/.claude/plugins
+import { dirname } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
 import { appendDispatch, resolveDataDir } from "./ledger";
 
-const BRANCH_PATTERN = /^[A-Za-z0-9._/-]+$/;
+const BRANCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 const AGENT_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const MAX_AGENT_NAME = 32;
 const MAX_TASK_SUMMARY = 120;
+// The prompt travels as one argv element, and the whole argv shares an
+// operating-system limit that a large paste can exhaust.
+const MAX_PROMPT_BYTES = 128 * 1024;
 
 export interface CommandResult {
   code: number;
@@ -84,16 +88,22 @@ const ErrorEnvelope = z.object({
   error: z.object({ code: z.string(), message: z.string() }),
 });
 
-// herdr writes its JSON envelope on stderr. Anything unparseable is a real failure.
+// herdr writes its JSON envelope on stderr, sometimes behind other output, so
+// the last line is tried after the whole stream.
 export function envelopeCode(stderr: string): string | null {
-  let json: unknown;
-  try {
-    json = JSON.parse(stderr);
-  } catch {
-    return null;
+  const lines = stderr.split("\n").filter((line) => line.trim() !== "");
+  const last = lines.at(-1);
+  for (const text of last == null ? [stderr] : [stderr, last]) {
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      continue;
+    }
+    const parsed = ErrorEnvelope.safeParse(json);
+    if (parsed.success) return parsed.data.error.code;
   }
-  const parsed = ErrorEnvelope.safeParse(json);
-  return parsed.success ? parsed.data.error.code : null;
+  return null;
 }
 
 export function deriveName(branch: string, taken: ReadonlySet<string>): string {
@@ -160,6 +170,17 @@ async function required(
   return result;
 }
 
+// A base like origin/main needs its remote updated first. A local ref names no
+// remote, and fetching one the repository does not have would fail the dispatch.
+async function baseRemote(run: Runner, root: string, base: string): Promise<string | null> {
+  const candidate = base.split("/")[0];
+  if (candidate == null || candidate === base) return null;
+  const listed = await run(["git", "-C", root, "remote"]);
+  if (listed.code !== 0) return null;
+  const remotes = new Set(listed.stdout.split("\n").map((line) => line.trim()));
+  return remotes.has(candidate) ? candidate : null;
+}
+
 export interface DispatchOptions {
   repo: string;
   branch: string;
@@ -183,6 +204,12 @@ export async function dispatch(
       `agent name ${JSON.stringify(options.name)} must match ${AGENT_NAME_PATTERN.source}`,
       null,
     );
+  const promptBytes = Buffer.byteLength(options.prompt);
+  if (promptBytes > MAX_PROMPT_BYTES)
+    throw new DispatchError(
+      `the prompt is ${promptBytes} bytes, over the ${MAX_PROMPT_BYTES} an argument carries. Point the agent at a file instead of pasting its contents.`,
+      null,
+    );
 
   // A name already bound would fail agent start, after the worktree exists. Read
   // the live names first so a collision is caught before anything is created.
@@ -202,10 +229,20 @@ export async function dispatch(
       null,
     );
 
-  const root = (
-    await required(run, ["git", "-C", options.repo, "rev-parse", "--show-toplevel"], null)
+  // herdr refuses a linked worktree as the source of a new one, and this skill
+  // is most often loaded from inside one. The common git dir names the primary
+  // checkout from anywhere in the repository.
+  const commonDir = (
+    await required(
+      run,
+      ["git", "-C", options.repo, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+      null,
+    )
   ).stdout.trim();
-  await required(run, ["git", "-C", root, "fetch", "origin"], null);
+  const root = dirname(commonDir);
+
+  const remote = await baseRemote(run, root, options.base);
+  if (remote != null) await required(run, ["git", "-C", root, "fetch", remote], null);
 
   const created = decode(
     WorktreeCreated,

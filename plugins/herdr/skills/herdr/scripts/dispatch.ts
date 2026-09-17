@@ -314,14 +314,20 @@ export async function dispatch(
 
   let name = wanted;
   let started = await run(startArgv(name));
-  // Another dispatch can bind the name between the list above and this start.
-  // The worktree already exists by now, so take the next free name instead of
-  // leaving it without an agent.
-  if (started.code !== 0 && envelopeCode(started.stderr) !== "agent_not_ready") {
-    const live = await requiredJson(run, ["herdr", "agent", "list"], AgentList, partial);
-    const retry = deriveName(options.branch, agentNames(live));
-    if (retry !== name) {
-      name = retry;
+  // Another dispatch can bind a derived name between the list above and this
+  // start. A relist that now shows the name taken is that race, and the
+  // worktree already exists, so it takes the next free name. Any other failure
+  // is the caller's to see, and an explicit name has no substitute.
+  if (
+    options.name == null &&
+    started.code !== 0 &&
+    envelopeCode(started.stderr) !== "agent_not_ready"
+  ) {
+    const live = agentNames(
+      await requiredJson(run, ["herdr", "agent", "list"], AgentList, partial),
+    );
+    if (live.has(name)) {
+      name = deriveName(options.branch, live);
       started = await run(startArgv(name));
     }
   }

@@ -346,21 +346,39 @@ describe("dispatch", () => {
     expect(calls.at(-1)).toEqual(["herdr", "agent", "get", "fix-thing-2"]);
   });
 
-  test("keeps the partial record when no other name is free either", async () => {
-    const { run } = fakeRunner([
+  test("forwards an unrelated start failure rather than renaming", async () => {
+    const stderr = envelope("agent_pane_busy");
+    const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
       REMOTES,
       ok(""),
       WORKTREE,
-      fail(envelope("agent_pane_busy")),
+      fail(stderr),
       AGENT_LIST,
-      fail(envelope("agent_pane_busy", "still busy")),
     ]);
 
     const failure = await failureOf(dispatch(options, run));
+    expect(failure.message).toBe(stderr);
     expect(failure.partial?.path).toBe("/tmp/worktrees/demo/fix-thing");
-    expect(failure.partial?.agent).toBeNull();
+    expect(calls.filter((argv) => argv[2] === "start")).toHaveLength(1);
+  });
+
+  test("never substitutes a name the caller asked for", async () => {
+    const stderr = envelope("agent_pane_busy");
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      WORKTREE,
+      fail(stderr),
+    ]);
+
+    const failure = await failureOf(dispatch({ ...options, name: "custom" }, run));
+    expect(failure.message).toBe(stderr);
+    expect(calls.filter((argv) => argv[2] === "start")).toHaveLength(1);
+    expect(calls.filter((argv) => argv[2] === "list")).toHaveLength(1);
   });
 
   test("rejects a herdr payload that does not match the expected shape", async () => {

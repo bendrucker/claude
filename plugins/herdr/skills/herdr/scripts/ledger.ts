@@ -4,17 +4,21 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-// One line per dispatch, so a later session can see what was handed out and to
-// which agent. No status: the ledger records the hand-off, not its outcome.
+// One line per dispatch, written as soon as the worktree exists, so a later
+// session can see what was handed out and to which agent. A dispatch that
+// failed after that point leaves a checkout nobody owns, which is the case
+// cleanup most needs, so `orphaned` rows carry the path with a null agent.
 export interface DispatchLedgerRow {
   ts: string;
   task: string;
   repo: string;
   branch: string;
+  path: string;
   workspace: string;
   pane: string;
   agent: string | null;
   session: string | null;
+  outcome: "dispatched" | "orphaned";
 }
 
 // A cached plugin resolves no import across a plugin boundary, so each plugin

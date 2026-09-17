@@ -1,7 +1,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { z } from "zod";
 import {
   type CommandResult,
@@ -34,6 +34,8 @@ const WORKTREE = ok(
     },
   }),
 );
+const STARTED = ok(JSON.stringify({ result: { agent: { agent_status: "idle" } } }));
+const BASE_OK = ok("abc123\n");
 const AGENT_GET = ok(
   JSON.stringify({
     result: { agent: { agent_status: "working", agent_session: { value: "sess-1" } } },
@@ -45,7 +47,8 @@ function fakeRunner(responses: readonly CommandResult[]): { run: Runner; calls: 
   let index = 0;
   const run: Runner = (argv) => {
     calls.push([...argv]);
-    const response = responses[index] ?? ok("");
+    const response = responses[index];
+    if (response == null) throw new Error(`unscripted call ${index + 1}: ${argv.join(" ")}`);
     index += 1;
     return Promise.resolve(response);
   };
@@ -73,7 +76,17 @@ const options = {
 const GIT_COMMON = ok("worktree /repo\nHEAD abc123\nbranch refs/heads/main\n\n");
 const REMOTES = ok("origin\nupstream\n");
 
-const HAPPY_PATH = [AGENT_LIST, GIT_COMMON, REMOTES, ok(""), WORKTREE, ok(""), ok(""), AGENT_GET];
+const HAPPY_PATH = [
+  AGENT_LIST,
+  GIT_COMMON,
+  REMOTES,
+  ok(""),
+  BASE_OK,
+  WORKTREE,
+  STARTED,
+  ok(""),
+  AGENT_GET,
+];
 
 describe("deriveName", () => {
   test.each([
@@ -99,6 +112,10 @@ describe("taskSummary", () => {
     ["  padded  \nsecond", "padded"],
     ["\n\n\nafter blanks\nmore", "after blanks"],
     ["x".repeat(200), "x".repeat(120)],
+    ["# Fix the parser\nbody", "Fix the parser"],
+    ["---\n## Task\n", "Task"],
+    ["- do the thing", "do the thing"],
+    ["> quoted ask", "quoted ask"],
     ["", ""],
   ])("%p", (prompt, expected) => {
     expect(taskSummary(prompt)).toBe(expected);
@@ -147,6 +164,7 @@ describe("dispatch", () => {
       ["git", "-C", "/repo", "worktree", "list", "--porcelain"],
       ["git", "-C", "/repo", "remote"],
       ["git", "-C", "/repo", "fetch", "origin"],
+      ["git", "-C", "/repo", "rev-parse", "--verify", "--quiet", "origin/main"],
       [
         "herdr",
         "worktree",
@@ -191,8 +209,9 @@ describe("dispatch", () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
+      BASE_OK,
       WORKTREE,
-      ok(""),
+      STARTED,
       ok(""),
       AGENT_GET,
     ]);
@@ -231,7 +250,7 @@ describe("dispatch", () => {
       "linked_worktree_source",
       "New and open worktree actions start from the repo parent workspace.",
     );
-    const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, REMOTES, ok(""), fail(stderr)]);
+    const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, REMOTES, ok(""), BASE_OK, fail(stderr)]);
 
     const failure = await failureOf(dispatch(options, run));
     expect(failure.message).toBe(stderr);
@@ -240,7 +259,15 @@ describe("dispatch", () => {
 
   test("emits the partial record when the failure lands after the worktree exists", async () => {
     const stderr = envelope("agent_pane_busy");
-    const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, REMOTES, ok(""), WORKTREE, fail(stderr)]);
+    const { run } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      BASE_OK,
+      WORKTREE,
+      fail(stderr),
+    ]);
 
     const failure = await failureOf(dispatch(options, run));
     expect(failure.message).toBe(stderr);
@@ -265,6 +292,7 @@ describe("dispatch", () => {
       GIT_COMMON,
       REMOTES,
       ok(""),
+      BASE_OK,
       WORKTREE,
       fail(envelope("agent_not_ready")),
       blocked,
@@ -291,8 +319,9 @@ describe("dispatch", () => {
         GIT_COMMON,
         REMOTES,
         ok(""),
+        BASE_OK,
         WORKTREE,
-        ok(""),
+        STARTED,
         fail(envelope(code)),
         idle,
       ]);
@@ -300,6 +329,9 @@ describe("dispatch", () => {
       const { record } = await dispatch(options, run);
       expect(record.status).toBe("idle");
       expect(record.session).toBe("sess-2");
+      // Neither code confirms the agent took the work, so the caller is told
+      // to read the pane rather than that the prompt landed.
+      expect(record.prompted).toBe(false);
     },
   );
 
@@ -325,10 +357,11 @@ describe("dispatch", () => {
       GIT_COMMON,
       REMOTES,
       ok(""),
+      BASE_OK,
       WORKTREE,
       fail(envelope("agent_name_taken")),
       relisted,
-      ok(""),
+      STARTED,
       ok(""),
       AGENT_GET,
     ]);
@@ -338,6 +371,99 @@ describe("dispatch", () => {
     expect(calls.at(-1)).toEqual(["herdr", "agent", "get", "fix-thing-2"]);
   });
 
+  test("keeps retrying when the replacement name races too", async () => {
+    const took = (...names: string[]) =>
+      ok(JSON.stringify({ result: { agents: names.map((name) => ({ name })) } }));
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      BASE_OK,
+      WORKTREE,
+      fail(envelope("agent_name_taken")),
+      took("fix-thing"),
+      fail(envelope("agent_name_taken")),
+      took("fix-thing", "fix-thing-2"),
+      STARTED,
+      ok(""),
+      ok(JSON.stringify({ result: { agent: { agent_status: "working" } } })),
+    ]);
+
+    const { record } = await dispatch(options, run);
+    expect(record.agent).toBe("fix-thing-3");
+    expect(calls.filter((argv) => argv[2] === "start")).toHaveLength(3);
+  });
+
+  test("gives up on the name after a bounded number of races", async () => {
+    const took = ok(JSON.stringify({ result: { agents: [{ name: "fix-thing" }] } }));
+    const taken = envelope("agent_name_taken");
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      BASE_OK,
+      WORKTREE,
+      fail(taken),
+      took,
+      fail(taken),
+      took,
+      fail(taken),
+    ]);
+
+    const failure = await failureOf(dispatch(options, run));
+    expect(failure.message).toBe(taken);
+    expect(failure.partial?.path).toBe("/tmp/worktrees/demo/fix-thing");
+    expect(calls.filter((argv) => argv[2] === "start")).toHaveLength(3);
+  });
+
+  test("waits for idle before prompting an agent that came up working", async () => {
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      BASE_OK,
+      WORKTREE,
+      ok(JSON.stringify({ result: { agent: { agent_status: "working" } } })),
+      ok(""),
+      ok(""),
+      AGENT_GET,
+    ]);
+
+    const { record } = await dispatch(options, run);
+    expect(calls).toContainEqual([
+      "herdr",
+      "agent",
+      "wait",
+      "fix-thing",
+      "--until",
+      "idle",
+      "--timeout",
+      "15000",
+    ]);
+    expect(record.prompted).toBe(true);
+  });
+
+  test("leaves the prompt unsent when a startup turn never settles", async () => {
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      BASE_OK,
+      WORKTREE,
+      ok(JSON.stringify({ result: { agent: { agent_status: "working" } } })),
+      fail(envelope("timeout")),
+      AGENT_GET,
+    ]);
+
+    const { record } = await dispatch(options, run);
+    expect(record.prompted).toBe(false);
+    expect(calls.filter((argv) => argv[2] === "prompt")).toHaveLength(0);
+  });
+
   test("forwards an unrelated start failure rather than renaming", async () => {
     const stderr = envelope("agent_pane_busy");
     const { run, calls } = fakeRunner([
@@ -345,6 +471,7 @@ describe("dispatch", () => {
       GIT_COMMON,
       REMOTES,
       ok(""),
+      BASE_OK,
       WORKTREE,
       fail(stderr),
     ]);
@@ -363,6 +490,7 @@ describe("dispatch", () => {
       GIT_COMMON,
       REMOTES,
       ok(""),
+      BASE_OK,
       WORKTREE,
       fail(stderr),
     ]);
@@ -392,10 +520,43 @@ const LedgerRow = z.object({
   task: z.string(),
   repo: z.string(),
   branch: z.string(),
+  path: z.string(),
   workspace: z.string(),
   pane: z.string(),
   agent: z.string().nullable(),
   session: z.string().nullable(),
+  outcome: z.enum(["dispatched", "orphaned"]),
+});
+
+describe("cli", () => {
+  const script = join(import.meta.dir, "dispatch.ts");
+  const filled = join(mkdtempSync(join(tmpdir(), "dispatch-cli-")), "prompt.txt");
+
+  beforeAll(async () => {
+    await Bun.write(filled, "do the thing\n");
+  });
+
+  test.each([
+    ["no branch", ["--prompt", filled], 2, /--branch is required/],
+    ["a bad branch", ["--branch", "bad branch", "--prompt", filled], 1, /must match/],
+    ["a missing prompt file", ["--branch", "ok", "--prompt", "/nope/gone.txt"], 2, /cannot read/],
+    ["an empty prompt", ["--branch", "ok", "--prompt", "/dev/null"], 2, /prompt is empty/],
+    [
+      "a non-numeric timeout",
+      ["--branch", "ok", "--prompt", filled, "--timeout", "abc"],
+      2,
+      /--timeout must be a positive/,
+    ],
+  ])("rejects %s", async (_label, args, status, expected) => {
+    const proc = Bun.spawn(["bun", script, ...args], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stderr, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
+    expect(code).toBe(status);
+    expect(stderr).toMatch(expected);
+  });
 });
 
 describe("spawnRunner", () => {
@@ -414,10 +575,12 @@ describe("ledger", () => {
       task: "do the thing",
       repo: "/repo",
       branch: "fix-thing",
+      path: "/tmp/worktrees/demo/fix-thing",
       workspace: "wZZ",
       pane: "wZZ:p1",
       agent: "fix-thing",
       session: "sess-1",
+      outcome: "dispatched" as const,
     };
 
     appendDispatch(row, dataDir);

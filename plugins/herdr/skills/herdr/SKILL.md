@@ -105,9 +105,7 @@ Leave lifecycle reporting to the scraper. `pane report-agent` overrides the dete
 
 Each agent pane carries `agent_session.value`, the Claude session UUID.
 
-Hand off to an existing pane when its `title` or `cwd` names this task. Match against those two columns in the orientation block.
-
-A repo match is not a task match. Every pane under a `primary` workspace sits in that repo's default-branch checkout whatever its `cwd`, so an idle agent there is between tasks rather than on this one. Work bound for its own pull request gets a fresh worktree and a fresh agent under [Dispatch](#dispatch).
+Work bound for its own pull request always goes through [Dispatch](#dispatch). Hand off to an existing pane only for work already in flight there, matched on its `title` or `cwd` in the orientation block. A blank `cwd` under a `primary` workspace is that repo's main checkout, never that pane.
 
 Hand off with `agent prompt --wait`, which blocks until the agent settles at `idle`, `done`, or `blocked`, then collect with `agent read`:
 
@@ -116,27 +114,27 @@ herdr agent prompt <target> "the request" --wait --timeout 900000
 herdr agent read <target> --source recent-unwrapped --lines 80
 ```
 
-Drop `--wait` only to leave an agent running unattended, then collect with `agent wait` followed by `agent read`.
+Drop `--wait` to leave an agent running, then collect with `agent wait` and `agent read`.
 
 That wait tracks lifecycle state rather than one turn, so prompting a working agent can return when its earlier turn settles. A prompt that draws no state change within five seconds returns `agent_prompt_stalled` instead of blocking. `agent wait --until <state>` narrows to the states you name, for a running agent you expect to stop for input.
 
-`agent prompt` writes through the pane's live bracketed-paste mode and presses Enter after a short delay. A multi-line prompt arrives as one paste instead of submitting at the first newline.
+`agent prompt` pastes through the pane's bracketed-paste mode and presses Enter after a short delay, so a multi-line prompt arrives as one paste.
 
 `agent wait` and `pane wait-output` block server-side, so use them instead of polling `pane get`. For state herdr exposes no wait for, such as a plugin's output through `plugin log list`, use `Monitor`.
 
-An agent parked on its own interactive UI answers to logical key names: `herdr agent send-keys <target> esc`. Modifiers join with `+`, as in `ctrl+c`, `ctrl+u`, and `shift+tab`. Only `C-c` and `c-c` are aliased to that form, so any other `-` spelling returns `invalid_key`. In a plain pane, `pane send-text` stages literal text without submitting it, and `pane run` presses Enter.
+An agent parked on its own interactive UI answers to logical key names: `herdr agent send-keys <target> esc`. Modifiers join with `+`, as in `ctrl+c` and `shift+tab`. Only `C-c` and `c-c` are aliased to that form, so any other `-` spelling returns `invalid_key`. In a plain pane, `pane send-text` stages literal text without submitting it, and `pane run` presses Enter.
 
 `herdr agent focus` brings a pane to the foreground for the user. `herdr agent attach` connects to it directly.
 
 ### Dispatch
 
-Work from [Sibling Agents](#sibling-agents) that needs its own worktree and agent gets both in one call:
+New work needing its own worktree and agent gets both in one call:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
 ```
 
-It finds the repository's primary checkout from anywhere inside it, fetches the base's remote, creates the worktree on `origin/main` (`--base` overrides), starts a Claude agent in the new workspace's root pane, and prompts it. The primary checkout never moves. One JSON line carries the workspace, pane, agent name, worktree path, branch, session id, and `prompted`. A trust dialog at startup leaves `prompted` false, so read the pane and answer it before reporting the work handed off. A failing herdr step forwards its error envelope, and dispatch.ts's own failures are plain text. Each dispatch appends to `dispatches.jsonl` in the plugin data dir.
+It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it, leaving this checkout where it is. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir.
 
 `worktrunk:wt-switch-create` re-roots this session instead.
 
@@ -149,7 +147,7 @@ pane=$(herdr pane split --current --direction right --cwd "$PWD" --no-focus | jq
 herdr agent start reviewer --kind claude --pane "$pane"
 ```
 
-A session that refuses the command substitution runs the two steps separately, reading `.result.pane.pane_id` out of the split and passing it to `--pane`.
+If the command substitution is refused, run the two steps separately and pass `.result.pane.pane_id` to `--pane`.
 
 Only `agent start` binds a name. An agent launched through `pane run` or `pane send-text` never gets one, and `agent start` against that pane returns `agent_pane_busy`. Target it by pane ID, which `agent prompt`, `agent read`, and `agent wait` all accept.
 
@@ -165,7 +163,7 @@ For Claude, herdr's integration hook reports only session identity. The `idle`, 
 
 `blocked` means herdr recognized an approval or question UI. `unknown` means an agent is present and the scraper could not classify it, which is no evidence that it finished.
 
-Debug that with `herdr agent explain <pane>`, which prints the manifest rule that fired, the region it read, and the text it matched.
+`herdr agent explain <pane>` prints the manifest rule that fired, the region it read, and the text it matched.
 
 ## Collaborative File Viewing
 

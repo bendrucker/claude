@@ -11,6 +11,8 @@ const MAX_TASK_SUMMARY = 120;
 // The prompt travels as one argv element, and the whole argv shares an
 // operating-system limit that a large paste can exhaust.
 const MAX_PROMPT_BYTES = 128 * 1024;
+const FETCH_TIMEOUT_MS = 60_000;
+const NAME_ATTEMPTS = 3;
 
 export interface CommandResult {
   code: number;
@@ -18,25 +20,51 @@ export interface CommandResult {
   stderr: string;
 }
 
-export type Runner = (argv: readonly string[]) => Promise<CommandResult>;
+export interface RunOptions {
+  // Kills the process after this many milliseconds. A fetch over SSH waits on
+  // an agent that may be waiting on a hardware key, which never returns
+  // unattended.
+  timeoutMs?: number;
+  env?: Record<string, string>;
+}
+
+export type Runner = (argv: readonly string[], options?: RunOptions) => Promise<CommandResult>;
 
 // The sandbox marker covers the whole invocation, so every subprocess takes an argv array.
-export const spawnRunner: Runner = async (argv) => {
+export const spawnRunner: Runner = async (argv, options) => {
   let proc: Bun.Subprocess<"ignore", "pipe", "pipe">;
   try {
-    proc = Bun.spawn([...argv], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+    proc = Bun.spawn([...argv], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+      env: options?.env == null ? undefined : { ...process.env, ...options.env },
+    });
   } catch (error) {
     // Spawning throws when the binary is missing, which would escape the
     // DispatchError contract and lose the partial record with it.
     const reason = error instanceof Error ? error.message : String(error);
     return { code: 127, stdout: "", stderr: `${argv[0]}: ${reason}\n` };
   }
-  const [stdout, stderr, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  return { code, stdout, stderr };
+  const timer =
+    options?.timeoutMs == null ? null : setTimeout(() => proc.kill(), options.timeoutMs);
+  try {
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    // A signal is how the kill above shows up, and the process itself writes
+    // nothing to explain why it stopped.
+    if (options?.timeoutMs == null || proc.signalCode == null) return { code, stdout, stderr };
+    return {
+      code: code === 0 ? 124 : code,
+      stdout,
+      stderr: `${stderr}${argv[0]}: killed after ${options.timeoutMs}ms\n`,
+    };
+  } finally {
+    if (timer != null) clearTimeout(timer);
+  }
 };
 
 export interface DispatchRecord {
@@ -60,6 +88,9 @@ export interface DispatchResult {
 // A partial record means a worktree exists that nobody owns.
 export class DispatchError extends Error {
   readonly partial: DispatchRecord | null;
+  // The primary checkout, filled in once dispatch has resolved it, so a
+  // partial record reaches the ledger with the repository it belongs to.
+  root: string | null = null;
 
   constructor(message: string, partial: DispatchRecord | null) {
     super(message);
@@ -89,6 +120,10 @@ const AgentInfo = z.object({
       agent_session: z.object({ value: z.string() }).nullish(),
     }),
   }),
+});
+
+const AgentStarted = z.object({
+  result: z.object({ agent: z.object({ agent_status: z.string() }) }),
 });
 
 const ErrorEnvelope = z.object({
@@ -131,11 +166,13 @@ export function deriveName(branch: string, taken: ReadonlySet<string>): string {
 }
 
 export function taskSummary(prompt: string): string {
+  // A prompt file often opens with a heading or a rule, so the summary is the
+  // first line that still carries words once the markup is off the front.
   const line =
     prompt
       .split("\n")
-      .map((entry) => entry.trim())
-      .find((entry) => entry !== "") ?? "";
+      .map((entry) => entry.replace(/^[\s>#*+-]+/, "").trim())
+      .find((entry) => /\w/.test(entry)) ?? "";
   return line.slice(0, MAX_TASK_SUMMARY);
 }
 
@@ -179,8 +216,9 @@ async function required(
   run: Runner,
   argv: readonly string[],
   partial: DispatchRecord | null,
+  options?: RunOptions,
 ): Promise<CommandResult> {
-  const result = await run(argv);
+  const result = await run(argv, options);
   if (result.code !== 0)
     throw new DispatchError(
       result.stderr.trim() === "" ? `${argv.join(" ")} exited ${result.code}` : result.stderr,
@@ -210,6 +248,85 @@ async function baseRemote(run: Runner, root: string, base: string): Promise<stri
 
 function agentNames(listed: z.infer<typeof AgentList>): ReadonlySet<string> {
   return new Set(listed.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])));
+}
+
+// A derived name can be bound by another dispatch between the list above and
+// this start, and herdr names that race. The worktree already exists by then,
+// so the dispatch takes the next free name rather than leaving it without an
+// agent. The replacement can lose the same race, so the retry is bounded. A
+// name the caller asked for has no substitute.
+async function startNamed(
+  run: Runner,
+  options: DispatchOptions,
+  partial: DispatchRecord,
+  name: string,
+  attempt = 1,
+): Promise<{ name: string; started: CommandResult }> {
+  const started = await run([
+    "herdr",
+    "agent",
+    "start",
+    name,
+    "--kind",
+    "claude",
+    "--pane",
+    partial.pane,
+  ]);
+  if (
+    options.name != null ||
+    attempt >= NAME_ATTEMPTS ||
+    envelopeCode(started.stderr) !== "agent_name_taken"
+  )
+    return { name, started };
+
+  const live = agentNames(await requiredJson(run, ["herdr", "agent", "list"], AgentList, partial));
+  return startNamed(run, options, partial, deriveName(options.branch, live), attempt + 1);
+}
+
+// agent prompt --wait does not track turns, so a startup turn still running
+// would satisfy --until working and report work the agent never took. A
+// submission from idle is what makes the observed transition this prompt's.
+async function deliver(
+  run: Runner,
+  name: string,
+  options: DispatchOptions,
+  partial: DispatchRecord,
+  started: CommandResult,
+): Promise<boolean> {
+  const info = decode(AgentStarted, started, "herdr agent start", partial);
+  if (info.result.agent.agent_status !== "idle") {
+    const settled = await run([
+      "herdr",
+      "agent",
+      "wait",
+      name,
+      "--until",
+      "idle",
+      "--timeout",
+      String(options.timeout),
+    ]);
+    if (settled.code !== 0) return false;
+  }
+
+  const submitted = await run([
+    "herdr",
+    "agent",
+    "prompt",
+    name,
+    options.prompt,
+    "--wait",
+    "--until",
+    "working",
+    "--timeout",
+    String(options.timeout),
+  ]);
+  // Neither tolerated code confirms delivery. agent_prompt_stalled means
+  // nothing was observed after the paste, which a fast turn and a lost Enter
+  // both produce. A timeout under --until working means the agent reached
+  // blocked and stayed there, where a dialog may be holding the prompt.
+  if (fatal(submitted, "timeout", "agent_prompt_stalled"))
+    throw new DispatchError(submitted.stderr, partial);
+  return submitted.code === 0;
 }
 
 export interface DispatchOptions {
@@ -273,94 +390,91 @@ export async function dispatch(
   if (root == null || root === "")
     throw new DispatchError(`git named no worktree for ${options.repo}`, null);
 
-  const remote = await baseRemote(run, root, options.base);
-  if (remote != null) await required(run, ["git", "-C", root, "fetch", remote], null);
+  try {
+    const remote = await baseRemote(run, root, options.base);
+    if (remote != null)
+      await required(run, ["git", "-C", root, "fetch", remote], null, {
+        timeoutMs: FETCH_TIMEOUT_MS,
+        // Unattended, a credential prompt would wait for input nobody is there
+        // to give. The timeout covers an SSH agent that waits on a hardware key.
+        env: { GIT_TERMINAL_PROMPT: "0" },
+      });
 
-  const created = await requiredJson(
-    run,
-    [
-      "herdr",
-      "worktree",
-      "create",
-      "--cwd",
+    // herdr rejects an unknown base too, after paying for the worktree attempt.
+    const verified = await run([
+      "git",
+      "-C",
       root,
-      "--branch",
-      options.branch,
-      "--base",
+      "rev-parse",
+      "--verify",
+      "--quiet",
       options.base,
-      "--label",
-      options.branch,
-      "--no-focus",
-    ],
-    WorktreeCreated,
-    null,
-  );
-
-  // Everything past here has a worktree behind it, so a failure carries the
-  // record forward rather than leaving the checkout orphaned without a trace.
-  const partial: DispatchRecord = {
-    workspace: created.result.workspace.workspace_id,
-    pane: created.result.root_pane.pane_id,
-    agent: null,
-    path: created.result.worktree.path,
-    branch: options.branch,
-    session: null,
-    status: "unknown",
-    prompted: false,
-  };
-
-  const startArgv = (bound: string) =>
-    ["herdr", "agent", "start", bound, "--kind", "claude", "--pane", partial.pane] as const;
-
-  let name = wanted;
-  let started = await run(startArgv(name));
-  // Another dispatch can bind a derived name between the list above and this
-  // start, and herdr names that race. The worktree already exists by then, so
-  // the dispatch takes the next free name instead of leaving it without an
-  // agent. A name the caller asked for has no substitute.
-  if (options.name == null && envelopeCode(started.stderr) === "agent_name_taken") {
-    const live = agentNames(
-      await requiredJson(run, ["herdr", "agent", "list"], AgentList, partial),
-    );
-    name = deriveName(options.branch, live);
-    started = await run(startArgv(name));
-  }
-  // A brand-new worktree draws Claude Code's trust dialog. The name binds
-  // anyway, and agent prompt stays refused until the dialog settles.
-  const ready = started.code === 0;
-  if (fatal(started, "agent_not_ready")) throw new DispatchError(started.stderr, partial);
-  partial.agent = name;
-
-  if (ready) {
-    const submitted = await run([
-      "herdr",
-      "agent",
-      "prompt",
-      name,
-      options.prompt,
-      "--wait",
-      "--until",
-      "working",
-      "--timeout",
-      String(options.timeout),
     ]);
-    // A turn that finishes inside the timeout can settle back to idle before
-    // the wait observes working. The prompt still landed.
-    if (fatal(submitted, "timeout", "agent_prompt_stalled"))
-      throw new DispatchError(submitted.stderr, partial);
-    partial.prompted = true;
+    if (verified.code !== 0)
+      throw new DispatchError(
+        `base ${JSON.stringify(options.base)} names no commit in ${root}`,
+        null,
+      );
+
+    const created = await requiredJson(
+      run,
+      [
+        "herdr",
+        "worktree",
+        "create",
+        "--cwd",
+        root,
+        "--branch",
+        options.branch,
+        "--base",
+        options.base,
+        "--label",
+        options.branch,
+        "--no-focus",
+      ],
+      WorktreeCreated,
+      null,
+    );
+
+    // Everything past here has a worktree behind it, so a failure carries the
+    // record forward rather than leaving the checkout orphaned without a trace.
+    const partial: DispatchRecord = {
+      workspace: created.result.workspace.workspace_id,
+      pane: created.result.root_pane.pane_id,
+      agent: null,
+      path: created.result.worktree.path,
+      branch: options.branch,
+      session: null,
+      status: "unknown",
+      prompted: false,
+    };
+
+    const { name, started } = await startNamed(run, options, partial, wanted);
+
+    // A brand-new worktree draws Claude Code's trust dialog. The name binds
+    // anyway, and agent prompt stays refused until the dialog settles.
+    const ready = started.code === 0;
+    if (fatal(started, "agent_not_ready")) throw new DispatchError(started.stderr, partial);
+    partial.agent = name;
+
+    if (ready) partial.prompted = await deliver(run, name, options, partial, started);
+
+    const info = await requiredJson(run, ["herdr", "agent", "get", name], AgentInfo, partial);
+
+    return {
+      root,
+      record: {
+        ...partial,
+        session: info.result.agent.agent_session?.value ?? null,
+        status: info.result.agent.agent_status,
+      },
+    };
+  } catch (error) {
+    // Only this frame knows the checkout a partial record came from, and the
+    // ledger records it against that repository.
+    if (error instanceof DispatchError) error.root ??= root;
+    throw error;
   }
-
-  const info = await requiredJson(run, ["herdr", "agent", "get", name], AgentInfo, partial);
-
-  return {
-    root,
-    record: {
-      ...partial,
-      session: info.result.agent.agent_session?.value ?? null,
-      status: info.result.agent.agent_status,
-    },
-  };
 }
 
 async function readPrompt(path: string | undefined): Promise<string> {
@@ -405,11 +519,46 @@ if (import.meta.main) {
     process.exit(2);
   }
 
+  if (!Number.isFinite(argv.flags.timeout) || argv.flags.timeout <= 0) {
+    process.stderr.write("--timeout must be a positive number of milliseconds\n");
+    process.exit(2);
+  }
+
   const prompt = await readPrompt(argv.flags.prompt);
   if (prompt.trim() === "") {
     process.stderr.write("the prompt is empty; pass --prompt <file> or pipe it on stdin\n");
     process.exit(2);
   }
+
+  // The agent is already running and the caller needs its identifiers, so a
+  // ledger failure warns rather than failing the dispatch.
+  const writeLedger = (
+    record: DispatchRecord,
+    repo: string,
+    outcome: "dispatched" | "orphaned",
+  ) => {
+    try {
+      appendDispatch(
+        {
+          ts: new Date().toISOString(),
+          task: taskSummary(prompt),
+          repo,
+          branch: record.branch,
+          path: record.path,
+          workspace: record.workspace,
+          pane: record.pane,
+          agent: record.agent,
+          session: record.session,
+          outcome,
+        },
+        resolveDataDir(argv.flags.dataDir),
+      );
+    } catch (error) {
+      process.stderr.write(
+        `warning: dispatch ledger not written: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    }
+  };
 
   try {
     const { record, root } = await dispatch({
@@ -423,36 +572,20 @@ if (import.meta.main) {
 
     if (!record.prompted)
       process.stderr.write(
-        `warning: ${record.agent ?? "the agent"} came up into a dialog and never received the prompt. Read it with \`herdr agent read ${record.pane}\`, answer it with \`herdr agent send-keys\`, then submit the prompt yourself.\n`,
+        `warning: herdr could not confirm ${record.agent ?? "the agent"} received the prompt. Read the pane with \`herdr agent read ${record.pane}\`: answer any dialog with \`herdr agent send-keys\` and submit the prompt yourself, or confirm the agent is already working on it.\n`,
       );
 
-    // The agent is already running and the caller needs its identifiers, so a
-    // ledger failure warns rather than failing the dispatch.
-    try {
-      appendDispatch(
-        {
-          ts: new Date().toISOString(),
-          task: taskSummary(prompt),
-          repo: root,
-          branch: record.branch,
-          workspace: record.workspace,
-          pane: record.pane,
-          agent: record.agent,
-          session: record.session,
-        },
-        resolveDataDir(argv.flags.dataDir),
-      );
-    } catch (error) {
-      process.stderr.write(
-        `warning: dispatch ledger not written: ${error instanceof Error ? error.message : String(error)}\n`,
-      );
-    }
-
+    writeLedger(record, root, "dispatched");
     process.stdout.write(`${formatRecord(record)}\n`);
   } catch (error) {
     if (!(error instanceof DispatchError)) throw error;
     process.stderr.write(error.message.endsWith("\n") ? error.message : `${error.message}\n`);
-    if (error.partial != null) process.stderr.write(`${formatRecord(error.partial)}\n`);
+    // The record reaches the caller before the ledger is touched, so a ledger
+    // failure cannot cost them the only copy of it.
+    if (error.partial != null) {
+      process.stderr.write(`${formatRecord(error.partial)}\n`);
+      writeLedger(error.partial, error.root ?? argv.flags.repo, "orphaned");
+    }
     process.exit(1);
   }
 }

@@ -17,8 +17,8 @@ export interface DispatchLedgerRow {
   session: string | null;
 }
 
-// A cross-plugin import cannot resolve in a cached plugin, so this mirrors
-// plugins/writing/skills/analyze/scripts/data-dir.ts rather than sharing it.
+// A cached plugin resolves no import across a plugin boundary, so each plugin
+// resolves its own data dir.
 export function resolveDataDir(override?: string): string {
   if (override != null && override !== "") return override;
   if (process.env.CLAUDE_PLUGIN_DATA != null && process.env.CLAUDE_PLUGIN_DATA !== "")

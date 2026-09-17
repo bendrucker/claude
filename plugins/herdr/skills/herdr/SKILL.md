@@ -136,7 +136,7 @@ Work from [Sibling Agents](#sibling-agents) that needs its own worktree and agen
 bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
 ```
 
-It resolves the repository's primary checkout from anywhere inside it, fetches, creates the worktree on `origin/main` (`--base` overrides), starts a Claude agent in the new workspace's root pane, and prompts it. The primary checkout is never moved. One JSON line reports the workspace, pane, agent name, worktree path, branch, session id, and whether the prompt landed. A trust dialog at startup leaves `prompted` false, and the agent then needs `agent read` and `agent send-keys` before it can take the work. A failed herdr step exits 1 and forwards herdr's own error envelope. dispatch.ts's own failures exit 1 with plain text instead.
+It finds the repository's primary checkout from anywhere inside it, fetches the base's remote, creates the worktree on `origin/main` (`--base` overrides), starts a Claude agent in the new workspace's root pane, and prompts it. The primary checkout never moves. One JSON line carries the workspace, pane, agent name, worktree path, branch, session id, and `prompted`. A trust dialog at startup leaves `prompted` false, so read the pane and answer it before reporting the work handed off. A failing herdr step forwards its error envelope, and dispatch.ts's own failures are plain text. Each dispatch appends to `dispatches.jsonl` in the plugin data dir.
 
 `worktrunk:wt-switch-create` re-roots this session instead.
 

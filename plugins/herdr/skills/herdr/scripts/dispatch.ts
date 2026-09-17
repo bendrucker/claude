@@ -91,19 +91,19 @@ const ErrorEnvelope = z.object({
 // herdr writes its JSON envelope on stderr, sometimes behind other output, so
 // the last line is tried after the whole stream.
 export function envelopeCode(stderr: string): string | null {
-  const lines = stderr.split("\n").filter((line) => line.trim() !== "");
-  const last = lines.at(-1);
-  for (const text of last == null ? [stderr] : [stderr, last]) {
-    let json: unknown;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      continue;
-    }
-    const parsed = ErrorEnvelope.safeParse(json);
-    if (parsed.success) return parsed.data.error.code;
+  const lastLine = stderr.split("\n").findLast((line) => line.trim() !== "");
+  return readEnvelope(stderr) ?? (lastLine == null ? null : readEnvelope(lastLine));
+}
+
+function readEnvelope(text: string): string | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return null;
   }
-  return null;
+  const parsed = ErrorEnvelope.safeParse(json);
+  return parsed.success ? parsed.data.error.code : null;
 }
 
 export function deriveName(branch: string, taken: ReadonlySet<string>): string {
@@ -160,6 +160,14 @@ function decode<T>(
   return parsed.data;
 }
 
+// A step whose failure the caller can recover from: it succeeded, or herdr
+// named a code the caller tolerates.
+function fatal(result: CommandResult, ...tolerated: readonly string[]): boolean {
+  if (result.code === 0) return false;
+  const code = envelopeCode(result.stderr);
+  return code == null || !tolerated.includes(code);
+}
+
 async function required(
   run: Runner,
   argv: readonly string[],
@@ -168,6 +176,15 @@ async function required(
   const result = await run(argv);
   if (result.code !== 0) throw new DispatchError(result.stderr, partial);
   return result;
+}
+
+async function requiredJson<T>(
+  run: Runner,
+  argv: readonly string[],
+  schema: z.ZodType<T>,
+  partial: DispatchRecord | null,
+): Promise<T> {
+  return decode(schema, await required(run, argv, partial), argv.slice(0, 3).join(" "), partial);
 }
 
 // A base like origin/main needs its remote updated first. A local ref names no
@@ -213,12 +230,7 @@ export async function dispatch(
 
   // A name already bound would fail agent start, after the worktree exists. Read
   // the live names first so a collision is caught before anything is created.
-  const listed = decode(
-    AgentList,
-    await required(run, ["herdr", "agent", "list"], null),
-    "herdr agent list",
-    null,
-  );
+  const listed = await requiredJson(run, ["herdr", "agent", "list"], AgentList, null);
   const taken = new Set(
     listed.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])),
   );
@@ -244,27 +256,23 @@ export async function dispatch(
   const remote = await baseRemote(run, root, options.base);
   if (remote != null) await required(run, ["git", "-C", root, "fetch", remote], null);
 
-  const created = decode(
+  const created = await requiredJson(
+    run,
+    [
+      "herdr",
+      "worktree",
+      "create",
+      "--cwd",
+      root,
+      "--branch",
+      options.branch,
+      "--base",
+      options.base,
+      "--label",
+      options.branch,
+      "--no-focus",
+    ],
     WorktreeCreated,
-    await required(
-      run,
-      [
-        "herdr",
-        "worktree",
-        "create",
-        "--cwd",
-        root,
-        "--branch",
-        options.branch,
-        "--base",
-        options.base,
-        "--label",
-        options.branch,
-        "--no-focus",
-      ],
-      null,
-    ),
-    "herdr worktree create",
     null,
   );
 
@@ -294,8 +302,7 @@ export async function dispatch(
   // A brand-new worktree draws Claude Code's trust dialog. The name binds
   // anyway, and agent prompt stays refused until the dialog settles.
   const ready = started.code === 0;
-  if (!ready && envelopeCode(started.stderr) !== "agent_not_ready")
-    throw new DispatchError(started.stderr, partial);
+  if (fatal(started, "agent_not_ready")) throw new DispatchError(started.stderr, partial);
   partial.agent = name;
 
   if (ready) {
@@ -313,18 +320,12 @@ export async function dispatch(
     ]);
     // A turn that finishes inside the timeout can settle back to idle before
     // the wait observes working. The prompt still landed.
-    const code = submitted.code === 0 ? null : envelopeCode(submitted.stderr);
-    if (submitted.code !== 0 && code !== "timeout" && code !== "agent_prompt_stalled")
+    if (fatal(submitted, "timeout", "agent_prompt_stalled"))
       throw new DispatchError(submitted.stderr, partial);
     partial.prompted = true;
   }
 
-  const info = decode(
-    AgentInfo,
-    await required(run, ["herdr", "agent", "get", name], partial),
-    "herdr agent get",
-    partial,
-  );
+  const info = await requiredJson(run, ["herdr", "agent", "get", name], AgentInfo, partial);
 
   return {
     root,

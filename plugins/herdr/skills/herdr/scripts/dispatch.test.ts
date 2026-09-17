@@ -179,7 +179,9 @@ describe("dispatch", () => {
       expect(call.some((arg) => mutating.has(arg))).toBe(false);
 
     expect(root).toBe("/repo");
-    expect(formatRecord(record)).toMatchSnapshot();
+    expect(formatRecord(record)).toMatchInlineSnapshot(
+      `"{"workspace":"wZZ","pane":"wZZ:p1","agent":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":"sess-1","status":"working","prompted":true}"`,
+    );
   });
 
   test("fetches nothing when the base names no remote", async () => {

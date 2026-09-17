@@ -103,9 +103,9 @@ Leave lifecycle reporting to the scraper. `pane report-agent` overrides the dete
 
 ## Sibling Agents
 
-Each agent pane carries `agent_session.value`, the Claude session UUID.
+Each agent pane carries `agent_session.value`, its Claude session UUID.
 
-Work bound for its own pull request always goes through [Dispatch](#dispatch). Hand off to an existing pane only for work already in flight there, matched on its `title` or `cwd` in the orientation block. A blank `cwd` under a `primary` workspace is that repo's main checkout, never that pane.
+Work bound for its own pull request always goes through [Dispatch](#dispatch), whatever an existing pane suggests. Otherwise hand off only to a pane whose `title` or `cwd` names work in flight there. A `primary` workspace is the repo's main checkout, so no pane under one is a hand-off target whatever `cwd` it prints.
 
 Hand off with `agent prompt --wait`, which blocks until the agent settles at `idle`, `done`, or `blocked`, then collect with `agent read`:
 
@@ -134,7 +134,7 @@ New work needing its own worktree and agent gets both in one call:
 bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
 ```
 
-It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it, leaving this checkout where it is. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir.
+It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir.
 
 `worktrunk:wt-switch-create` re-roots this session instead.
 

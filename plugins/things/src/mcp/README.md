@@ -5,16 +5,32 @@ An MCP server exposing Things 3 over stdio. It speaks JSON-RPC on stdin and stdo
 [tailgate](https://github.com/bendrucker/tailgate) supplies everything this server does not. It is an OAuth 2.0 resource server published through Tailscale Funnel, and it spawns this server as a child process, so reaching Things from a phone or a laptop goes through tailgate's OAuth flow, token introspection, audience validation, and per-identity policy.
 
 ```text
-phone / laptop / claude.ai
-            │ OAuth
-            ▼
-   Tailscale Funnel ──► tailgate ──► things stdio (child process)
-                            │ introspect, audience, policy
-                            ▼
-                          tsidp
+phone / laptop / claude.ai / Claude Code
+                    │ OAuth
+                    ▼
+           Tailscale Funnel ──► tailgate ──► things stdio (child process)
+                                    │ introspect, audience, policy
+                                    ▼
+                                  tsidp
 ```
 
 Identity comes from [tsidp](https://tailscale.com/docs/features/tsidp), so a caller's identity is their tailnet login.
+
+## Claude Code as a Client
+
+`scripts/mcp-setup.ts` configures a machine and logs it in:
+
+```bash
+bun scripts/mcp-setup.ts https://<node>.<tailnet>.ts.net/mcp/things
+```
+
+It takes the URL from `THINGS_MCP_URL` when given no argument, which keeps the tailnet hostname out of the repo. Run against an entry that already names that URL, it logs in and leaves the entry alone, which is what a tailgate restart calls for.
+
+The URL has to match the upstream's canonical resource URI byte for byte. tailgate compares a token's audience as an exact string on both sides, so a URL differing by a trailing slash authenticates and then fails every call. The script rejects one, along with a query, a fragment, and a bare origin.
+
+The entry goes in at user scope rather than a tracked `.mcp.json`, because the URL names the tailnet. Consent happens in a browser on a tailnet device and binds to a tailnet identity, not to whichever Claude account the machine is signed into.
+
+Tokens live in tailgate's memory, so restarting it costs one login per machine. Reload configuration with `SIGHUP`, which leaves issued tokens alone.
 
 ## Stdout Discipline
 

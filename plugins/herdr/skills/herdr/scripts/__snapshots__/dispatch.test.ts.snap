@@ -1,3 +1,3 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`dispatch runs the sequence and never moves the checkout 1`] = `"{"workspace":"wZZ","pane":"wZZ:p1","agent":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":"sess-1","status":"working"}"`;
+exports[`dispatch runs the sequence and never moves the checkout 1`] = `"{"workspace":"wZZ","pane":"wZZ:p1","agent":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":"sess-1","status":"working","prompted":true}"`;

@@ -36,6 +36,9 @@ export interface DispatchRecord {
   branch: string;
   session: string | null;
   status: string;
+  // False when a trust or permission dialog held the agent at start, so the
+  // worktree and the name exist but the agent never received the work.
+  prompted: boolean;
 }
 
 export interface DispatchResult {
@@ -181,19 +184,23 @@ export async function dispatch(
       null,
     );
 
-  let name = options.name;
-  if (name == null) {
-    const listed = decode(
-      AgentList,
-      await required(run, ["herdr", "agent", "list"], null),
-      "herdr agent list",
+  // A name already bound would fail agent start, after the worktree exists. Read
+  // the live names first so a collision is caught before anything is created.
+  const listed = decode(
+    AgentList,
+    await required(run, ["herdr", "agent", "list"], null),
+    "herdr agent list",
+    null,
+  );
+  const taken = new Set(
+    listed.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])),
+  );
+  const name = options.name ?? deriveName(options.branch, taken);
+  if (taken.has(name))
+    throw new DispatchError(
+      `agent name ${JSON.stringify(name)} is already bound to a live agent`,
       null,
     );
-    const taken = new Set(
-      listed.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])),
-    );
-    name = deriveName(options.branch, taken);
-  }
 
   const root = (
     await required(run, ["git", "-C", options.repo, "rev-parse", "--show-toplevel"], null)
@@ -234,6 +241,7 @@ export async function dispatch(
     branch: options.branch,
     session: null,
     status: "unknown",
+    prompted: false,
   };
 
   const started = await run([
@@ -254,7 +262,7 @@ export async function dispatch(
   partial.agent = name;
 
   if (ready) {
-    const prompted = await run([
+    const submitted = await run([
       "herdr",
       "agent",
       "prompt",
@@ -268,9 +276,10 @@ export async function dispatch(
     ]);
     // A turn that finishes inside the timeout can settle back to idle before
     // the wait observes working. The prompt still landed.
-    const code = prompted.code === 0 ? null : envelopeCode(prompted.stderr);
-    if (prompted.code !== 0 && code !== "timeout" && code !== "agent_prompt_stalled")
-      throw new DispatchError(prompted.stderr, partial);
+    const code = submitted.code === 0 ? null : envelopeCode(submitted.stderr);
+    if (submitted.code !== 0 && code !== "timeout" && code !== "agent_prompt_stalled")
+      throw new DispatchError(submitted.stderr, partial);
+    partial.prompted = true;
   }
 
   const info = decode(
@@ -346,6 +355,11 @@ if (import.meta.main) {
       base: argv.flags.base,
       timeout: argv.flags.timeout,
     });
+
+    if (!record.prompted)
+      process.stderr.write(
+        `warning: ${record.agent ?? "the agent"} came up into a dialog and never received the prompt. Read it with \`herdr agent read ${record.pane}\`, answer it with \`herdr agent send-keys\`, then submit the prompt yourself.\n`,
+      );
 
     // The agent is already running and the caller needs its identifiers, so a
     // ledger failure warns rather than failing the dispatch.

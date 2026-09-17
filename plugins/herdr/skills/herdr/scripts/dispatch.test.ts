@@ -172,11 +172,19 @@ describe("dispatch", () => {
     expect(formatRecord(record)).toMatchSnapshot();
   });
 
-  test("skips agent list when the name is given", async () => {
-    const { run, calls } = fakeRunner([ok("/repo\n"), ok(""), WORKTREE, ok(""), ok(""), AGENT_GET]);
-    await dispatch({ ...options, name: "custom" }, run);
-    expect(calls[0]).toEqual(["git", "-C", "/repo", "rev-parse", "--show-toplevel"]);
+  test("uses an explicit name that no live agent holds", async () => {
+    const { run, calls } = fakeRunner(HAPPY_PATH);
+    const { record } = await dispatch({ ...options, name: "custom" }, run);
     expect(calls.at(-1)).toEqual(["herdr", "agent", "get", "custom"]);
+    expect(record.agent).toBe("custom");
+  });
+
+  test("rejects an explicit name a live agent holds, before creating anything", async () => {
+    const { run, calls } = fakeRunner([AGENT_LIST]);
+    const failure = await failureOf(dispatch({ ...options, name: "reviewer" }, run));
+    expect(failure.message).toMatch(/already bound to a live agent/);
+    expect(failure.partial).toBeNull();
+    expect(calls).toEqual([["herdr", "agent", "list"]]);
   });
 
   test("forwards a herdr envelope untouched with no partial record", async () => {
@@ -205,6 +213,7 @@ describe("dispatch", () => {
       branch: "fix-thing",
       session: null,
       status: "unknown",
+      prompted: false,
     });
   });
 
@@ -226,6 +235,7 @@ describe("dispatch", () => {
     expect(record.agent).toBe("fix-thing");
     expect(record.status).toBe("blocked");
     expect(record.session).toBeNull();
+    expect(record.prompted).toBe(false);
   });
 
   test.each(["timeout", "agent_prompt_stalled"])(

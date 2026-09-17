@@ -136,7 +136,7 @@ New work headed for its own pull request goes to a new worktree and a new agent 
 bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo <path> --branch <branch> --prompt <file>
 ```
 
-It fetches, creates the worktree on `origin/main` (`--base` overrides), starts a Claude agent in the new workspace's root pane, and prompts it. The primary checkout is never moved. One JSON line reports the workspace, pane, agent name, worktree path, branch, and session id, and a herdr failure comes back as herdr's own error envelope.
+It fetches, creates the worktree on `origin/main` (`--base` overrides), starts a Claude agent in the new workspace's root pane, and prompts it. The primary checkout is never moved. One JSON line reports the workspace, pane, agent name, worktree path, branch, session id, and whether the prompt landed. A trust dialog at startup leaves `prompted` false, and the agent then needs `agent read` and `agent send-keys` before it can take the work. A herdr failure comes back as herdr's own error envelope.
 
 `worktrunk:wt-switch-create` re-roots this session instead.
 

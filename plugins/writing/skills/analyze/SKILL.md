@@ -164,6 +164,24 @@ The acted-on column pairs each shown finding with the next whole-file re-scan of
 
 The report ends with an opportunities list, each naming a concrete fix. Flipping the `WRITING_HOOKS_LOG` default to off is offered only once acceptance is measurable, since turning the log off before then forecloses the measurement. Fixes land in the plugin (wordlists, `detection/`, `hooks/`), then the next audit's log confirms or refutes them.
 
+## Statistics Artifact
+
+Structural Signatures, Rate Feature Floors, and Hook Health each measure against data that never leaves this machine, and the two corpus passes cost minutes. `build-statistics.ts` runs them once and persists the verdicts to `statistics.json` in the plugin data dir. `writing:scan` reads that file.
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts
+bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts --section rate-nulls --splits 2000 --min-words 100 --max-words 400
+bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts --section hook-health --since 2026-07-01
+```
+
+`--section` takes `rate-nulls`, `tag-signatures`, or `hook-health`, is repeatable, and defaults to all three. Sections merge into whatever is on disk, so refreshing the run-log numbers keeps the tag signatures that cost minutes of tagging.
+
+Run rate nulls over both the full corpus and the 100-400 word band. `scan score --voice-delta` reads a feature as signal only where it cleared every band measured. Tag signatures hold one band at a time, so narrow `--min-words`/`--max-words` to `--section rate-nulls` unless the signatures should be re-mined inside that band. [`references/methodology.md`](references/methodology.md) covers how the sections merge.
+
+A `statistics.json` that fails to parse reads the same as an absent one. A scan then leaves its annotations off instead of failing over an artifact it only decorates with. A rebuild names the file it ignored, because it drops every section it is not recomputing.
+
+The corpora and the run log stay on this machine. Only `statistics.json` moves, into the plugin data dir.
+
 ## Corpora and Verdicts
 
 Each rule is judged on the surface where the hook fires it: chat-surface rules against the user's chat, deliverable-surface rules (`flowery-phrases.txt`, `soft-phrasing.txt`) against the voice baseline. Lift gates new candidate phrases only (`--min-lift`, default 5.0, plus session count >= 3), never removals: the smoothed user baseline compresses lift for any word the user never types, which would flag the model's strongest tells for removal. Voice-delta features carry provenance labels (**skill-prescribed**, **skill-encouraged**, **ungoverned**) so drift points at the right fix, and they are aggregate trends only, never per-document flags.

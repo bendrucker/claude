@@ -34,6 +34,8 @@ Run either subcommand with `--help` for its flags.
 
 Each violation prints as `path:line:col: category: message`. A summary table follows on stderr with per-category counts and the noisiest files.
 
+Once the statistics artifact carries a measured re-scan for one of the rules firing here, the category table gains an `Acted on` column reading `accepted/revisited`, with `-` for an unmeasured category: how often a later whole-file re-scan stopped raising that rule after it fired in a real session. A rule the author wrote past more often than acted on is named below the table. Read its count as volume. `--data-dir` points at a different artifact.
+
 Audit is report-only. Fix flagged files with `writing:rewrite` or direct edits at the reported positions.
 
 ## Score
@@ -51,6 +53,10 @@ For non-prose source files, single-line comments (`//`, `#`) are extracted and s
 #### Voice Delta
 
 `--voice-delta` appends a table of voice rate features (first-person rate, sentence length, backtick density, and friends) beside the rates from the local voice baseline. Each feature carries a provenance label: **skill-prescribed** drift means tune the skill, **skill-encouraged** deficits mean the skill is under-applied, and **ungoverned** features are genuine voice signal. The register check skips inputs too short or too markdown-heavy to compare against the PR-body baseline.
+
+A `Null` column appears where `writing:analyze` measured the permutation floors. `clears` means the corpus gap beat the floor in every length band measured (a band is a document-word-count range, which holds both corpora to comparable lengths), `noise` names a delta to read as sampling spread, `partial` means some stored band carries no floor for that feature, so the bands left untested could still be where the delta comes from, and `unmeasured` means no run covered it at all. The bands behind a `noise` or `partial` verdict are listed under the table.
+
+A second table follows where the artifact carries tag signatures: the share of this document's part-of-speech n-grams landing on a shape over-represented in the agent corpus, read against the agent and baseline shares, both measured over the length band the table names. Corpora separate on how often a shape recurs, which makes the share the number to read. Treat a single hit as noise.
 
 #### Custom Vocabulary
 

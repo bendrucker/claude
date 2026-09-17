@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { processRows } from "./ngram";
-import { tagSequence } from "./tag-ngram";
+import { matchShapes, tagSequence } from "./tag-ngram";
 
 // Invented sentences exercising the structural shapes the signature
 // miner exists to catch: passive voice, participial openers, "not X
@@ -60,5 +60,44 @@ describe("tag sequences through processRows", () => {
   it("skips rows without text", () => {
     const { stats } = processRows([{ session_id: "c" }], [3], { tokenize });
     expect(stats.tokens).toBe(0);
+  });
+});
+
+// A stub tagger keeps the shapes literal, so the window arithmetic is what the
+// assertions read rather than the adapter's judgment about a sentence.
+const stubTags: Record<string, string[]> = {
+  a: ["DET", "NOUN", "VERB", "DET", "NOUN"],
+  b: ["NOUN", "VERB"],
+  short: ["NOUN"],
+};
+const stub = (sentence: string) => stubTags[sentence] ?? [];
+
+describe("matchShapes", () => {
+  it("counts every window the sizes offer", () => {
+    const match = matchShapes(["a", "b"], [2], new Set(), stub);
+    expect(match).toEqual({ hits: 0, total: 5, byShape: [] });
+  });
+
+  it("counts windows across several sizes", () => {
+    expect(matchShapes(["a"], [2, 3], new Set(), stub).total).toBe(7);
+  });
+
+  it("credits a shape once per occurrence", () => {
+    const match = matchShapes(["a", "b"], [2], new Set(["NOUN VERB"]), stub);
+    expect(match.hits).toBe(2);
+    expect(match.byShape).toEqual([{ shape: "NOUN VERB", count: 2 }]);
+  });
+
+  it("ranks shapes by count, breaking ties alphabetically", () => {
+    const shapes = new Set(["NOUN VERB", "DET NOUN", "VERB DET"]);
+    expect(matchShapes(["a"], [2], shapes, stub).byShape).toEqual([
+      { shape: "DET NOUN", count: 2 },
+      { shape: "NOUN VERB", count: 1 },
+      { shape: "VERB DET", count: 1 },
+    ]);
+  });
+
+  it("offers no windows for a sentence shorter than the size", () => {
+    expect(matchShapes(["short"], [2], new Set(["NOUN VERB"]), stub).total).toBe(0);
   });
 });

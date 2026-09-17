@@ -1,11 +1,5 @@
 import type { Comment } from "./types";
 
-/**
- * Deterministic per-comment features, logged next to the verdicts each run so
- * production runs accumulate (features, verdict) pairs. Once enough pairs
- * exist, thresholds fitted on them can route obvious comments away from the
- * judge; until then the features are descriptive and gate nothing.
- */
 export interface CommentFeatures {
   lines: number;
   chars: number;

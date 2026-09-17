@@ -1,7 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import { compileStemmedWordlist } from "../../../detection/wordlists";
+import type { WritingStatistics } from "../../analyze/scripts/statistics";
 import type { VoiceProfile } from "../../analyze/scripts/voice-profile";
-import { buildReport, renderTable, renderVoiceDeltaTable, scoreComments, scoreText } from "./score";
+import {
+  buildReport,
+  renderSignatureTable,
+  renderTable,
+  renderVoiceDeltaTable,
+  scoreComments,
+  scoreText,
+} from "./score";
 
 function category(report: ReturnType<typeof buildReport>, group: string, name: string) {
   return report.groups.find((g) => g.group === group)?.categories.find((c) => c.category === name);
@@ -136,5 +144,135 @@ describe("renderVoiceDeltaTable", () => {
   it("omits the baseline column when the comparison is skipped or unavailable", () => {
     expect(renderVoiceDeltaTable("Too short.", fixtureProfile)).not.toContain("Baseline");
     expect(renderVoiceDeltaTable(inRegisterText, null)).not.toContain("Baseline");
+  });
+});
+
+// Invented floors over the live feature ids. The real artifact is built from
+// corpora that stay on the machine that measured them.
+const gatedStatistics: WritingStatistics = {
+  generatedAt: "2026-01-01T00:00:00.000Z",
+  rateNulls: {
+    runs: [
+      {
+        splits: 500,
+        percentile: 95,
+        seed: 1,
+        minWords: null,
+        maxWords: null,
+        floors: [
+          { featureId: "first_person_rate", gap: 4, floor: 1 },
+          { featureId: "backtick_density", gap: 2, floor: 1 },
+        ],
+      },
+      {
+        splits: 500,
+        percentile: 95,
+        seed: 1,
+        minWords: 100,
+        maxWords: 400,
+        floors: [
+          { featureId: "first_person_rate", gap: 4, floor: 1 },
+          { featureId: "backtick_density", gap: 0.5, floor: 1 },
+        ],
+      },
+    ],
+  },
+};
+
+describe("renderVoiceDeltaTable with null floors", () => {
+  it("adds a verdict per feature and names the bands a delta failed", () => {
+    expect(
+      renderVoiceDeltaTable(inRegisterText, fixtureProfile, gatedStatistics),
+    ).toMatchSnapshot();
+  });
+
+  it("holds the verdict column back without a baseline to gate", () => {
+    expect(renderVoiceDeltaTable(inRegisterText, null, gatedStatistics)).not.toContain("Null");
+    expect(renderVoiceDeltaTable("Too short.", fixtureProfile, gatedStatistics)).not.toContain(
+      "Null floor:",
+    );
+  });
+
+  it("holds it back when no null has been measured", () => {
+    const empty = { generatedAt: "2026-01-01T00:00:00.000Z", rateNulls: { runs: [] } };
+    expect(renderVoiceDeltaTable(inRegisterText, fixtureProfile, empty)).toBe(
+      renderVoiceDeltaTable(inRegisterText, fixtureProfile),
+    );
+  });
+
+  // A band rebuilt before a feature existed carries no floor for it. Reading
+  // the one run that does cover it as `clears` would certify a gap against the
+  // length confound the banding exists to rule out.
+  it("withholds clears from a feature a stored band never measured", () => {
+    const partial: WritingStatistics = {
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      rateNulls: {
+        runs: [
+          {
+            splits: 500,
+            percentile: 95,
+            seed: 1,
+            minWords: null,
+            maxWords: null,
+            floors: [
+              { featureId: "first_person_rate", gap: 4, floor: 1 },
+              { featureId: "backtick_density", gap: 2, floor: 1 },
+            ],
+          },
+          {
+            splits: 500,
+            percentile: 95,
+            seed: 1,
+            minWords: 100,
+            maxWords: 400,
+            floors: [{ featureId: "first_person_rate", gap: 4, floor: 1 }],
+          },
+        ],
+      },
+    };
+    const rendered = renderVoiceDeltaTable(inRegisterText, fixtureProfile, partial);
+    expect(rendered).toContain("partial");
+    expect(rendered).toContain("No floor covers these features in every band");
+    expect(rendered).toContain("100-400 word band");
+  });
+});
+
+describe("renderSignatureTable", () => {
+  const signed: WritingStatistics = {
+    generatedAt: "2026-01-01T00:00:00.000Z",
+    tagSignatures: {
+      sizes: [3],
+      minWords: 100,
+      maxWords: 400,
+      studyShare: 0.158,
+      baselineShare: 0.065,
+      shapes: [{ shape: "DET NOUN COPULA", n: 40, z: 6.2 }],
+    },
+  };
+
+  it("reads the document's hit share against the two corpus shares", () => {
+    expect(
+      renderSignatureTable("The flag is removed after the rollout.", signed),
+    ).toMatchSnapshot();
+  });
+
+  it("says so when the document offers no n-grams to match", () => {
+    expect(renderSignatureTable("Yes.", signed)).toContain("no tag 3-grams");
+  });
+
+  it("renders nothing until the signatures have been mined", () => {
+    expect(renderSignatureTable(inRegisterText, null)).toBeNull();
+    const none = {
+      generatedAt: "2026-01-01T00:00:00.000Z",
+      tagSignatures: {
+        sizes: [3],
+        minWords: null,
+        maxWords: null,
+        studyShare: 0,
+        baselineShare: 0,
+        shapes: [],
+      },
+    };
+    expect(renderSignatureTable(inRegisterText, none)).toBeNull();
   });
 });

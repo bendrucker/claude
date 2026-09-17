@@ -18,6 +18,7 @@ Uses only **public APIs** from Cultured Code — URL scheme (`things:///`) for w
 - `scripts/format-output.ts` — Generic stdin JSON → table formatter with `--json`, `--columns`, `--count-prefix`
 - `scripts/url.ts` — URL scheme wrapper with auth token, encoding, and bulk update via JSON command
 - `scripts/reorder.ts` — List reordering via URL scheme (bun TypeScript, reuses `url.ts` exports)
+- `scripts/mcp-setup.ts` — Configures the MCP server at user scope and logs in, taking the URL from an argument or `THINGS_MCP_URL`
 
 Write verification uses the `x-callback-url` plugin's `xcall` skill.
 

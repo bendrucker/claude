@@ -11,6 +11,7 @@ import {
   envelopeCode,
   formatRecord,
   type Runner,
+  spawnRunner,
   taskSummary,
 } from "./dispatch";
 import { appendDispatch, ledgerPath, resolveDataDir } from "./ledger";
@@ -300,6 +301,21 @@ describe("dispatch", () => {
     },
   );
 
+  test("fails the dispatch when the repository cannot list its remotes", async () => {
+    const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, fail("fatal: not a git repository\n")]);
+    const failure = await failureOf(dispatch(options, run));
+    expect(failure.message).toMatch(/not a git repository/);
+    expect(failure.partial).toBeNull();
+  });
+
+  test("names the step when it fails without writing to stderr", async () => {
+    const { run } = fakeRunner([AGENT_LIST, { code: 128, stdout: "", stderr: "  \n" }]);
+    const failure = await failureOf(dispatch(options, run));
+    expect(failure.message).toBe(
+      "git -C /repo rev-parse --path-format=absolute --git-common-dir exited 128",
+    );
+  });
+
   test("rejects a herdr payload that does not match the expected shape", async () => {
     const { run } = fakeRunner([
       AGENT_LIST,
@@ -322,6 +338,14 @@ const LedgerRow = z.object({
   pane: z.string(),
   agent: z.string().nullable(),
   session: z.string().nullable(),
+});
+
+describe("spawnRunner", () => {
+  test("reports a missing binary as a result rather than throwing", async () => {
+    const result = await spawnRunner(["herdr-does-not-exist-9f3a"]);
+    expect(result.code).toBe(127);
+    expect(result.stderr).toMatch(/herdr-does-not-exist-9f3a/);
+  });
 });
 
 describe("ledger", () => {

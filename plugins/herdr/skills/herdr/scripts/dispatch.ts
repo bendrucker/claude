@@ -23,7 +23,15 @@ export type Runner = (argv: readonly string[]) => Promise<CommandResult>;
 
 // The sandbox marker covers the whole invocation, so every subprocess takes an argv array.
 export const spawnRunner: Runner = async (argv) => {
-  const proc = Bun.spawn([...argv], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+  let proc: Bun.Subprocess<"ignore", "pipe", "pipe">;
+  try {
+    proc = Bun.spawn([...argv], { stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+  } catch (error) {
+    // Spawning throws when the binary is missing, which would escape the
+    // DispatchError contract and lose the partial record with it.
+    const reason = error instanceof Error ? error.message : String(error);
+    return { code: 127, stdout: "", stderr: `${argv[0]}: ${reason}\n` };
+  }
   const [stdout, stderr, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
@@ -174,7 +182,11 @@ async function required(
   partial: DispatchRecord | null,
 ): Promise<CommandResult> {
   const result = await run(argv);
-  if (result.code !== 0) throw new DispatchError(result.stderr, partial);
+  if (result.code !== 0)
+    throw new DispatchError(
+      result.stderr.trim() === "" ? `${argv.join(" ")} exited ${result.code}` : result.stderr,
+      partial,
+    );
   return result;
 }
 
@@ -192,8 +204,7 @@ async function requiredJson<T>(
 async function baseRemote(run: Runner, root: string, base: string): Promise<string | null> {
   const candidate = base.split("/")[0];
   if (candidate == null || candidate === base) return null;
-  const listed = await run(["git", "-C", root, "remote"]);
-  if (listed.code !== 0) return null;
+  const listed = await required(run, ["git", "-C", root, "remote"], null);
   const remotes = new Set(listed.stdout.split("\n").map((line) => line.trim()));
   return remotes.has(candidate) ? candidate : null;
 }
@@ -339,12 +350,13 @@ export async function dispatch(
 
 async function readPrompt(path: string | undefined): Promise<string> {
   if (path == null || path === "") return Bun.stdin.text();
-  const file = Bun.file(path);
-  if (!(await file.exists())) {
-    process.stderr.write(`no prompt file at ${path}\n`);
-    process.exit(2);
-  }
-  return file.text();
+  return Bun.file(path)
+    .text()
+    .catch((error: unknown) => {
+      const reason = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`cannot read the prompt at ${path}: ${reason}\n`);
+      process.exit(2);
+    });
 }
 
 if (import.meta.main) {

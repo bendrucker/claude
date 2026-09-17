@@ -1,7 +1,6 @@
 /**
  * Action rates per comment shape, measured from the (features, verdict) pairs
- * each preflight run leaves in the job base. Reads skip an unusable job dir
- * rather than failing a run whose real work is judging this change's comments.
+ * each preflight run leaves in the job base.
  */
 
 import { readdir } from "node:fs/promises";
@@ -104,6 +103,7 @@ async function readRun(jobDir: string): Promise<{ shapes: Shape[]; actioned: boo
   return pairs;
 }
 
+/** Skips an unusable job dir rather than failing a run whose real work is judging this change's comments. */
 export async function readHistory(jobBase: string): Promise<AuditHistory> {
   const dirs = await readdir(jobBase).catch(() => []);
   const runs = await Promise.all(dirs.map((dir) => readRun(join(jobBase, dir))));

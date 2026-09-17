@@ -1,7 +1,5 @@
-// The measurements the analyze reports take against the local corpora and the
-// hook run log, persisted so the scan surfaces can read a verdict rather than
-// raw numbers. The corpora are local-only, so every section is optional and
-// every consumer must render unchanged when the file is absent.
+// Every section is optional, since the corpora are local-only, and every
+// consumer must render unchanged when the file is absent.
 
 import { z } from "zod";
 
@@ -54,8 +52,22 @@ export function describeBand(band: Band): string {
   return `${band.minWords ?? 0}-${band.maxWords ?? "∞"} word band`;
 }
 
+function bandWidth(band: Band): number {
+  return (band.maxWords ?? Number.POSITIVE_INFINITY) - (band.minWords ?? 0);
+}
+
+/** Widest band first, so the full corpus leads the runs a report prints. */
+export function byBand(a: Band, b: Band): number {
+  const widths = bandWidth(b) - bandWidth(a);
+  // Two open-ended bands both measure infinitely wide, and subtracting those
+  // yields NaN, which sorts as a tie and leaves the order to whatever the merge
+  // happened to append last. The one starting lower contains the other.
+  if (widths !== 0 && !Number.isNaN(widths)) return widths;
+  return (a.minWords ?? 0) - (b.minWords ?? 0);
+}
+
 export const TagShape = z.object({
-  /** Space-joined coarse tag sequence, as tag-signatures ranks it. */
+  /** Space-joined coarse tag sequence. */
   shape: z.string(),
   n: z.number(),
   z: z.number(),
@@ -107,10 +119,17 @@ export const WritingStatistics = z.object({
 });
 export type WritingStatistics = z.infer<typeof WritingStatistics>;
 
+/**
+ * The artifact, or null where it is absent or unreadable. A torn write is the
+ * same answer as no file: `build-statistics.ts` writes it in place while a scan
+ * may be reading, and a scan whose real work is finding tropes must not die on
+ * the statistics it only annotates with.
+ */
 export async function loadStatistics(path: string): Promise<WritingStatistics | null> {
   const file = Bun.file(path);
   if (!(await file.exists())) return null;
-  return WritingStatistics.parse(await file.json());
+  const parsed = WritingStatistics.safeParse(await file.json().catch(() => null));
+  return parsed.success ? parsed.data : null;
 }
 
 /** An unfloored feature stays, since an absent floor means the null never ran. */

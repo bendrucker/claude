@@ -38,11 +38,10 @@ export function rankComments<T extends Comment>(comments: T[], sort: SortKey = "
 
 /**
  * Rank like `rankComments`, but multiply each comment's sort metric by its
- * file's weight (1 when the path has no entry), so comments in density-heavy
- * files rise ahead of equally scored comments in lighter files. `weigh` applies
- * a second per-comment multiplier, which is where a measured prior on the
- * comment's own shape enters. With an empty weight map and no `weigh` the order
- * matches `rankComments`.
+ * file's weight (1 when the path has no entry). `weigh` applies a second
+ * per-comment multiplier, which is where a measured prior on the comment's own
+ * shape enters. With an empty weight map and no `weigh` the order matches
+ * `rankComments`.
  */
 export function rankCommentsWeighted<T extends Comment & { path: string }>(
   comments: T[],

@@ -136,13 +136,16 @@ export async function preflight(
   // content in hand, weights the ranking so the shard budget lands on the
   // heaviest files first.
   const densities: ScoredFile[] = [];
-  const comments = await collect(options, (file) => densities.push(file));
-
   // Past runs left (features, verdict) pairs in the job base. Their action rate
   // per comment shape is a measured prior the intrinsic score cannot see: two
   // comments of the same length rank apart when the judge has been acting on
-  // one's shape and keeping the other's.
-  const history = await readHistory(options.jobBase ?? DEFAULT_JOB_BASE);
+  // one's shape and keeping the other's. Reading them neither feeds nor reads
+  // the collect walk, and this run's own job dir lands later, so the two walks
+  // overlap.
+  const [comments, history] = await Promise.all([
+    collect(options, (file) => densities.push(file)),
+    readHistory(options.jobBase ?? DEFAULT_JOB_BASE),
+  ]);
   const weights = shapeWeights(history);
   const ranked = rankCommentsWeighted(
     comments,

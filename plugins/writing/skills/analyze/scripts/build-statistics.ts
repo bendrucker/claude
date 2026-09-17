@@ -2,12 +2,9 @@
 // claude:dangerouslyDisableSandbox: writes statistics.json under the plugin
 // data dir in ~/.claude/plugins, which the sandbox denies.
 
-// Takes the three measurements the analyze reports print and persists them to
-// the plugin data dir, where the scan surfaces read them.
-//
-// Sections write independently and merge into whatever is already on disk. The
-// tag signatures cost minutes of tagging, so refreshing the run-log numbers
-// alone must not drop them.
+// Sections write independently and merge into whatever is already on disk.
+// The tag signatures cost minutes of tagging, so refreshing the run-log
+// numbers alone must not drop them.
 
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -19,6 +16,7 @@ import { rank, type TokenizedCorpus, tokenizeCorpus } from "./fightin-words";
 import { acceptance, readLog, summarize } from "./hook-health";
 import { bandError, featureFloors, type LengthBand, withinLength } from "./rate-nulls";
 import {
+  byBand,
   describeBand,
   type HookAcceptance,
   loadStatistics,
@@ -35,15 +33,6 @@ type Section = (typeof SECTIONS)[number];
 
 function isSection(value: string): value is Section {
   return (SECTIONS as readonly string[]).includes(value);
-}
-
-function bandWidth(run: RateNullRun): number {
-  return (run.maxWords ?? Number.POSITIVE_INFINITY) - (run.minWords ?? 0);
-}
-
-/** Widest band first, so the full corpus leads the runs a report prints. */
-function byBand(a: RateNullRun, b: RateNullRun): number {
-  return bandWidth(b) - bandWidth(a);
 }
 
 function shapeShare(corpus: TokenizedCorpus, sizes: number[], shapes: Set<string>): number {
@@ -112,10 +101,44 @@ if (import.meta.main) {
   const dataDir = resolveDataDir(argv.flags.dataDir);
   const out = statisticsPath(dataDir);
   const existing = await loadStatistics(out);
+  // A merge reads the sections it is not rebuilding off the existing file, so
+  // an unreadable one silently narrows this run to the sections it computes.
+  // Say so: the tag signatures it would drop cost minutes to mine.
+  if (existing === null && (await Bun.file(out).exists())) {
+    console.error(`Ignoring unreadable ${out}. Sections not rebuilt here are dropped.`);
+  }
 
   let rateNulls: RateNulls | undefined = existing?.rateNulls;
   let tagSignatures: TagSignatures | undefined = existing?.tagSignatures;
   let hookHealth: HookAcceptance | undefined = existing?.hookHealth;
+
+  // Checked ahead of the corpus tagging, which costs minutes. An unreadable
+  // run log then fails before that work is thrown away.
+  if (wanted.has("hook-health")) {
+    const path = argv.flags.log ?? resolveLogPath();
+    if (path == null || path === "") {
+      console.error("Logging is disabled (WRITING_HOOKS_LOG). Pass --log <path>.");
+      process.exit(1);
+    }
+    const entries = await readLog(path, argv.flags.since);
+    if (entries.length === 0) {
+      console.error(`No run-log entries at ${path}.`);
+      process.exit(1);
+    }
+    const health = summarize(entries);
+    const accepts = acceptance(entries);
+    hookHealth = {
+      runs: health.total,
+      spanDays: health.spanDays,
+      categories: health.categories.map((category) => ({
+        category: category.category,
+        fired: category.fired,
+        revisited: accepts.get(category.category)?.revisited ?? 0,
+        accepted: accepts.get(category.category)?.accepted ?? 0,
+      })),
+    };
+    console.error(`hook-health: ${health.categories.length} categories over ${health.total} runs`);
+  }
 
   if (wanted.has("rate-nulls") || wanted.has("tag-signatures")) {
     const selected = await selectCorpora(argv.flags);
@@ -174,32 +197,6 @@ if (import.meta.main) {
       };
       console.error(`tag-signatures: ${signatures.length} shapes clear their null`);
     }
-  }
-
-  if (wanted.has("hook-health")) {
-    const path = argv.flags.log ?? resolveLogPath();
-    if (path == null || path === "") {
-      console.error("Logging is disabled (WRITING_HOOKS_LOG). Pass --log <path>.");
-      process.exit(1);
-    }
-    const entries = await readLog(path, argv.flags.since);
-    if (entries.length === 0) {
-      console.error(`No run-log entries at ${path}.`);
-      process.exit(1);
-    }
-    const health = summarize(entries);
-    const accepts = acceptance(entries);
-    hookHealth = {
-      runs: health.total,
-      spanDays: health.spanDays,
-      categories: health.categories.map((category) => ({
-        category: category.category,
-        fired: category.fired,
-        revisited: accepts.get(category.category)?.revisited ?? 0,
-        accepted: accepts.get(category.category)?.accepted ?? 0,
-      })),
-    };
-    console.error(`hook-health: ${health.categories.length} categories over ${health.total} runs`);
   }
 
   const statistics: WritingStatistics = { generatedAt: new Date().toISOString() };

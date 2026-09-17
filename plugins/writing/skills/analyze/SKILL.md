@@ -178,6 +178,8 @@ bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts --section hook-health --sinc
 
 Run rate nulls over both the full corpus and the 100-400 word band. `scan score --voice-delta` reads a feature as signal only where it cleared every band measured. Tag signatures hold one band at a time, so narrow `--min-words`/`--max-words` to `--section rate-nulls` unless the signatures should be re-mined inside that band. [`references/methodology.md`](references/methodology.md) covers how the sections merge.
 
+A `statistics.json` that fails to parse reads the same as an absent one. A scan then leaves its annotations off instead of failing over an artifact it only decorates with. A rebuild names the file it ignored, because it drops every section it is not recomputing.
+
 The corpora and the run log stay on this machine. Only `statistics.json` moves, into the plugin data dir.
 
 ## Corpora and Verdicts

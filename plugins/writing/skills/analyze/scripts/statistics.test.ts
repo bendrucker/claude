@@ -12,6 +12,7 @@ import {
   loadStatistics,
   measuredFeature,
   type RateNullRun,
+  byBand,
   sameBand,
   type WritingStatistics,
 } from "./statistics";
@@ -69,6 +70,26 @@ describe("sameBand", () => {
 
   it("separates bands sharing one bound", () => {
     expect(sameBand(banded, run(100, 500, []))).toBe(false);
+  });
+});
+
+describe("byBand", () => {
+  const openTop = run(100, null, []);
+
+  it("leads with the full corpus, whichever order the merge appended", () => {
+    expect([banded, full].toSorted(byBand)).toEqual([full, banded]);
+    expect([full, banded].toSorted(byBand)).toEqual([full, banded]);
+  });
+
+  // Both bands run to infinity, so comparing their widths alone ties and leaves
+  // the order to however the merge appended them.
+  it("leads with the full corpus against an open-topped band", () => {
+    expect([openTop, full].toSorted(byBand)).toEqual([full, openTop]);
+    expect([full, openTop].toSorted(byBand)).toEqual([full, openTop]);
+  });
+
+  it("puts a wider band ahead of a narrower one", () => {
+    expect([banded, run(100, 900, [])].toSorted(byBand)).toEqual([run(100, 900, []), banded]);
   });
 });
 
@@ -153,10 +174,17 @@ describe("loadStatistics", () => {
     expect(await loadStatistics(path)).toEqual(statistics);
   });
 
-  it("rejects a file whose sections do not match the schema", async () => {
+  it("reads a file whose sections do not match the schema as absent", async () => {
     const dir = mkdtempSync(join(tmpdir(), "statistics-"));
     const path = join(dir, "statistics.json");
     await Bun.write(path, JSON.stringify({ generatedAt: 1 }));
-    expect(loadStatistics(path)).rejects.toThrow();
+    expect(await loadStatistics(path)).toBeNull();
+  });
+
+  it("reads a torn write as absent rather than failing the scan reading it", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "statistics-"));
+    const path = join(dir, "statistics.json");
+    await Bun.write(path, '{"generatedAt":"2026-09-16T00:00:00Z","hookHealth":{"runs":1,"span');
+    expect(await loadStatistics(path)).toBeNull();
   });
 });

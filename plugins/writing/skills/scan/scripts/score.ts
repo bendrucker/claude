@@ -188,6 +188,7 @@ export function renderVoiceDeltaTable(
   if (gated) headers.push("Null");
 
   const rows: string[][] = [];
+  const noise: { feature: (typeof VOICE_DELTA_FEATURES)[number]; failed: string[] }[] = [];
   for (const feature of VOICE_DELTA_FEATURES) {
     const rate = feature.compute(text);
     const fmt = feature.format ?? ((r: number) => r.toFixed(2));
@@ -215,6 +216,7 @@ export function renderVoiceDeltaTable(
           : "noise"
         : "unmeasured";
       row.push(verdict);
+      if (failed.length > 0) noise.push({ feature, failed });
     }
     rows.push(row);
   }
@@ -225,10 +227,6 @@ export function renderVoiceDeltaTable(
     lines.push(
       `Null floor: splits of the baseline against itself, over the ${runs.map(describeRunMethod).join(" and the ")}.`,
     );
-    const noise = VOICE_DELTA_FEATURES.map((feature) => ({
-      feature,
-      failed: failedBands(statistics, feature.id),
-    })).filter((entry) => entry.failed.length > 0);
     if (noise.length > 0) {
       lines.push(
         `Read the delta on these as sampling spread: ${noise

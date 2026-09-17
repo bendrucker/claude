@@ -288,6 +288,24 @@ describe("processInput", () => {
     });
   });
 
+  test("disables sandbox past a command substitution and a multi-line quoted value", async () => {
+    const input = bashInput(
+      [
+        `q=$(printf '%s' 'a prompt' | jq -sRr @uri)`,
+        `notes="First line.`,
+        ``,
+        `Repo: /Users/ben/src/bendrucker/claude`,
+        `Launch: claude-cli://open?q=\${q}&cwd=%2FUsers%2Fben"`,
+        `bun ${markedScriptPath} add title="A todo" tags=claude-code notes="$notes"`,
+      ].join("\n"),
+    );
+    const result = await processInput(input, "darwin");
+    expect(result?.hookSpecificOutput).toMatchObject({
+      hookEventName: "PreToolUse",
+      updatedInput: { dangerouslyDisableSandbox: true },
+    });
+  });
+
   test("resolves a relative script path against the session cwd", async () => {
     const input = { ...bashInput("bun marked.ts"), cwd: fixtureDir };
     const result = await processInput(input, "darwin");

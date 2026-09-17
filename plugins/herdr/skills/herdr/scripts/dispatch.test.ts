@@ -70,7 +70,7 @@ const options = {
   timeout: 15_000,
 };
 
-const GIT_COMMON = ok("/repo/.git\n");
+const GIT_COMMON = ok("worktree /repo\nHEAD abc123\nbranch refs/heads/main\n\n");
 const REMOTES = ok("origin\nupstream\n");
 
 const HAPPY_PATH = [AGENT_LIST, GIT_COMMON, REMOTES, ok(""), WORKTREE, ok(""), ok(""), AGENT_GET];
@@ -144,7 +144,7 @@ describe("dispatch", () => {
 
     expect(calls).toEqual([
       ["herdr", "agent", "list"],
-      ["git", "-C", "/repo", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+      ["git", "-C", "/repo", "worktree", "list", "--porcelain"],
       ["git", "-C", "/repo", "remote"],
       ["git", "-C", "/repo", "fetch", "origin"],
       [
@@ -240,7 +240,15 @@ describe("dispatch", () => {
 
   test("emits the partial record when the failure lands after the worktree exists", async () => {
     const stderr = envelope("agent_pane_busy");
-    const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, REMOTES, ok(""), WORKTREE, fail(stderr)]);
+    const { run } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      WORKTREE,
+      fail(stderr),
+      AGENT_LIST,
+    ]);
 
     const failure = await failureOf(dispatch(options, run));
     expect(failure.message).toBe(stderr);
@@ -313,9 +321,46 @@ describe("dispatch", () => {
   test("names the step when it fails without writing to stderr", async () => {
     const { run } = fakeRunner([AGENT_LIST, { code: 128, stdout: "", stderr: "  \n" }]);
     const failure = await failureOf(dispatch(options, run));
-    expect(failure.message).toBe(
-      "git -C /repo rev-parse --path-format=absolute --git-common-dir exited 128",
+    expect(failure.message).toBe("git -C /repo worktree list --porcelain exited 128");
+  });
+
+  test("takes the next free name when the wanted one binds before the start", async () => {
+    const relisted = ok(
+      JSON.stringify({ result: { agents: [{ name: "reviewer" }, { name: "fix-thing" }] } }),
     );
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      WORKTREE,
+      fail(envelope("agent_name_taken")),
+      relisted,
+      ok(""),
+      ok(""),
+      AGENT_GET,
+    ]);
+
+    const { record } = await dispatch(options, run);
+    expect(record.agent).toBe("fix-thing-2");
+    expect(calls.at(-1)).toEqual(["herdr", "agent", "get", "fix-thing-2"]);
+  });
+
+  test("keeps the partial record when no other name is free either", async () => {
+    const { run } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      WORKTREE,
+      fail(envelope("agent_pane_busy")),
+      AGENT_LIST,
+      fail(envelope("agent_pane_busy", "still busy")),
+    ]);
+
+    const failure = await failureOf(dispatch(options, run));
+    expect(failure.partial?.path).toBe("/tmp/worktrees/demo/fix-thing");
+    expect(failure.partial?.agent).toBeNull();
   });
 
   test("rejects a herdr payload that does not match the expected shape", async () => {
@@ -325,6 +370,7 @@ describe("dispatch", () => {
       REMOTES,
       ok(""),
       ok(JSON.stringify({ result: {} })),
+      AGENT_LIST,
     ]);
     const failure = await failureOf(dispatch(options, run));
     expect(failure.message).toMatch(/herdr worktree create returned an unexpected shape/);

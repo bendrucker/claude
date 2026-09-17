@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger in the plugin data dir under ~/.claude/plugins
-import { dirname } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
 import { appendDispatch, resolveDataDir } from "./ledger";
@@ -209,6 +208,10 @@ async function baseRemote(run: Runner, root: string, base: string): Promise<stri
   return remotes.has(candidate) ? candidate : null;
 }
 
+function agentNames(listed: z.infer<typeof AgentList>): ReadonlySet<string> {
+  return new Set(listed.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])));
+}
+
 export interface DispatchOptions {
   repo: string;
   branch: string;
@@ -246,27 +249,29 @@ export async function dispatch(
   // A name already bound would fail agent start, after the worktree exists. Read
   // the live names first so a collision is caught before anything is created.
   const listed = await requiredJson(run, ["herdr", "agent", "list"], AgentList, null);
-  const taken = new Set(
-    listed.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])),
-  );
-  const name = options.name ?? deriveName(options.branch, taken);
-  if (taken.has(name))
+  const taken = agentNames(listed);
+  const wanted = options.name ?? deriveName(options.branch, taken);
+  if (taken.has(wanted))
     throw new DispatchError(
-      `agent name ${JSON.stringify(name)} is already bound to a live agent`,
+      `agent name ${JSON.stringify(wanted)} is already bound to a live agent`,
       null,
     );
 
   // herdr refuses a linked worktree as the source of a new one, and this skill
-  // is most often loaded from inside one. The common git dir names the primary
-  // checkout from anywhere in the repository.
-  const commonDir = (
-    await required(
-      run,
-      ["git", "-C", options.repo, "rev-parse", "--path-format=absolute", "--git-common-dir"],
-      null,
-    )
-  ).stdout.trim();
-  const root = dirname(commonDir);
+  // is most often loaded from inside one. The porcelain listing puts the main
+  // worktree first whatever the repository's git layout.
+  const listing = await required(
+    run,
+    ["git", "-C", options.repo, "worktree", "list", "--porcelain"],
+    null,
+  );
+  const root = listing.stdout
+    .split("\n")
+    .find((line) => line.startsWith("worktree "))
+    ?.slice("worktree ".length)
+    .trim();
+  if (root == null || root === "")
+    throw new DispatchError(`git named no worktree for ${options.repo}`, null);
 
   const remote = await baseRemote(run, root, options.base);
   if (remote != null) await required(run, ["git", "-C", root, "fetch", remote], null);
@@ -304,16 +309,22 @@ export async function dispatch(
     prompted: false,
   };
 
-  const started = await run([
-    "herdr",
-    "agent",
-    "start",
-    name,
-    "--kind",
-    "claude",
-    "--pane",
-    partial.pane,
-  ]);
+  const startArgv = (bound: string) =>
+    ["herdr", "agent", "start", bound, "--kind", "claude", "--pane", partial.pane] as const;
+
+  let name = wanted;
+  let started = await run(startArgv(name));
+  // Another dispatch can bind the name between the list above and this start.
+  // The worktree already exists by now, so take the next free name instead of
+  // leaving it without an agent.
+  if (started.code !== 0 && envelopeCode(started.stderr) !== "agent_not_ready") {
+    const live = await requiredJson(run, ["herdr", "agent", "list"], AgentList, partial);
+    const retry = deriveName(options.branch, agentNames(live));
+    if (retry !== name) {
+      name = retry;
+      started = await run(startArgv(name));
+    }
+  }
   // A brand-new worktree draws Claude Code's trust dialog. The name binds
   // anyway, and agent prompt stays refused until the dialog settles.
   const ready = started.code === 0;

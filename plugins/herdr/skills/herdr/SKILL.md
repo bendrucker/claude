@@ -107,7 +107,7 @@ Each agent pane carries `agent_session.value`, the Claude session UUID.
 
 Hand off to an existing pane when its `title` or `cwd` names this task. Match against those two columns in the orientation block.
 
-A repo match is not a task match. A pane with no `cwd` of its own under a `primary` workspace sits in that repo's default-branch checkout, so an idle agent there is between tasks rather than on this one. Work bound for its own pull request gets a fresh worktree and a fresh agent under [Dispatch](#dispatch).
+A repo match is not a task match. Every pane under a `primary` workspace sits in that repo's default-branch checkout whatever its `cwd`, so an idle agent there is between tasks rather than on this one. Work bound for its own pull request gets a fresh worktree and a fresh agent under [Dispatch](#dispatch).
 
 Hand off with `agent prompt --wait`, which blocks until the agent settles at `idle`, `done`, or `blocked`, then collect with `agent read`:
 

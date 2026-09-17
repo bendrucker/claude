@@ -128,6 +128,8 @@ describe("validation", () => {
     ["name", { ...options, name: "rm -rf" }],
     ["branch", { ...options, branch: "-x" }],
     ["prompt", { ...options, prompt: "x".repeat(200_000) }],
+    ["base", { ...options, base: "-unstable" }],
+    ["base", { ...options, base: "  " }],
   ])("rejects a hostile %s before spawning", async (_field, bad) => {
     const { run, calls } = fakeRunner([]);
     await failureOf(dispatch(bad, run));

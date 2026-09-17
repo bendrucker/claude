@@ -232,6 +232,10 @@ export async function dispatch(
       `agent name ${JSON.stringify(options.name)} must match ${AGENT_NAME_PATTERN.source}`,
       null,
     );
+  // A ref may hold ~, ^, and @{}, so only the leading dash that herdr's own
+  // parser would read as a flag is out.
+  if (options.base.startsWith("-") || options.base.trim() === "")
+    throw new DispatchError(`base ${JSON.stringify(options.base)} must name a ref`, null);
   const promptBytes = Buffer.byteLength(options.prompt);
   if (promptBytes > MAX_PROMPT_BYTES)
     throw new DispatchError(

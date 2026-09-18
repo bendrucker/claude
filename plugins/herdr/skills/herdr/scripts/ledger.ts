@@ -302,7 +302,7 @@ export function formatAge(ts: string, now: Date): string {
 
 function plain(rows: readonly (readonly string[])[]): string {
   return table(
-    rows.map((row) => [...row]),
+    rows.map((row) => row.map((cell) => cell.replaceAll(/\s+/g, " ").trim())),
     {
       border: getBorderCharacters("void"),
       columnDefault: { paddingLeft: 0, paddingRight: 2 },

@@ -265,6 +265,19 @@ describe("status", () => {
       "projects\nno projects\n\nthreads\nno open threads\n",
     );
   });
+
+  test("keeps every item on one line when a field carries newlines", () => {
+    const status = buildStatus(
+      [{ slug: "p", name: "P", description: "first line\nsecond  line\n" }],
+      [row({ pr: "https://example.com/pr/1\nstray" })],
+      {},
+      null,
+    );
+    const lines = formatStatus(status, NOW).trimEnd().split("\n");
+    expect(lines).toHaveLength(6);
+    expect(lines[1]).toContain("first line second line");
+    expect(lines[5]).toContain("https://example.com/pr/1 stray");
+  });
 });
 
 describe("formatAge", () => {

@@ -22,6 +22,8 @@ Read the topic files `MEMORY.md` indexes before scoping or dispatching, because 
 
 A tracker URL as `$0` needs a slug before anything else: derive one from the project's name, then re-run both commands above with it. They ran against the raw URL, which misses an existing directory and the project's threads. Use the derived slug for the directory and for every `project=` tag.
 
+A slug starts with a lowercase letter and runs at most 27 characters of lowercase letters, digits, hyphens, and underscores. That keeps `lead-<slug>` a legal herdr agent name. `status` drops a project whose slug breaks the rule, which reads as a missing project rather than an error.
+
 ## Files
 
 The project directory is `<data dir>/projects/<slug>/`, where the data dir is `$CLAUDE_PLUGIN_DATA` or, unset, `~/.claude/plugins/data/herdr-bendrucker`. Write these with `Write` and `Edit`.

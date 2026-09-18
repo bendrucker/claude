@@ -122,6 +122,8 @@ function isDirectory(path: string): boolean {
     readdirSync(realpathSync(path));
     return true;
   } catch {
+    // Whatever the specific failure, an absent path, a dangling symlink, a
+    // permission error, the answer to "is this a usable directory" is false.
     return false;
   }
 }
@@ -179,6 +181,8 @@ async function revParse(dir: string): Promise<string | null> {
     const rev = await $`git rev-parse --show-toplevel --abbrev-ref HEAD`.cwd(dir).quiet().nothrow();
     return rev.exitCode === 0 ? rev.text() : null;
   } catch {
+    // The comment above already names the one cause: `dir` is not a
+    // directory, so the spawn throws before rev-parse runs.
     return null;
   }
 }

@@ -20,7 +20,9 @@ Each todo carries `id`, `name`, `creationDate`, `dueDate`, `activationDate`, and
 
 Apply the midnight heuristic: a task is a repeating instance when `creationDate` ends with `T00:00:00`, midnight local time in ISO. Manually created tasks carry non-zero hours, minutes, or seconds.
 
-Things refuses to reschedule a repeating todo, so `update_todos` cannot move one with `when`. Report overdue repeating instances as a group and leave them scheduled where they are. Completing one is the only disposal Things accepts, so offer that instead of a deferral that would report success and change nothing.
+Things refuses to reschedule a repeating todo. A `when` update is a no-op on one: the write reports success and the todo stays where it was. That covers Defer, Drop, and the reschedule `reorder_todos` runs on. Keep every repeating instance out of all three, whether or not it is overdue.
+
+Completion is the only disposal Things accepts on one. Report the overdue repeating instances as a group and offer that, and leave the rest scheduled where they are.
 
 ## Grouping
 
@@ -35,6 +37,8 @@ Per group, use `AskUserQuestion`:
 - **Complete**: mark done
 - **Drop**: move to Someday
 
+Offer a repeating instance Keep and Complete only. Defer and Drop both write `when`, which it rejects.
+
 ## Batch Operations
 
 One `update_todos` call per decision group, passing every id in that group:
@@ -44,6 +48,8 @@ One `update_todos` call per decision group, passing every id in that group:
 - Drop: `when: "someday"`
 
 Batches rate-limit to 250 operations per 10 seconds, so group by target rather than calling per todo.
+
+Build the Defer and Drop batches from the one-off todos alone. A repeating instance takes `completed: true`.
 
 ## Ordering
 
@@ -59,8 +65,12 @@ Present the proposed order and confirm it before writing.
 
 `reorder_todos` with `list: "today"` and `ids` in confirmed top-to-bottom order.
 
-It reschedules each todo out of Today and back, which replaces a specific date with the list itself. Hold back a todo carrying a date it needs to keep, and say which ones were held back.
+It reschedules each todo out of Today and back, which replaces a specific date with the list itself. Hold back a todo carrying a date it needs to keep, along with every repeating instance, and say which ones were held back.
+
+It moves the ids it receives to the top of Today in the given order, and returns the count it was handed rather than a reading of the list. Held-back todos keep their own positions below or among them.
 
 ## Summary
 
-Report kept, deferred by date, completed, and the final Today order as a numbered list.
+Re-run `list_todos` with `list: "today"` once the writes land, and read the final order off that result. The proposed order describes what was asked for, and this describes what Things holds.
+
+Report kept, deferred by date, completed, and that final Today order as a numbered list. Name any todo whose state came back other than the decision it was given.

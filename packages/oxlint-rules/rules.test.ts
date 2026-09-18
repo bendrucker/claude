@@ -74,6 +74,35 @@ const CASES: Record<string, { allows: Case[]; rejects: Case[] }> = {
       ["an undefined comparison", "export const o = { a, ...(b === undefined ? {} : { b }) };"],
     ],
   },
+  "no-silent-catch": {
+    allows: [
+      [
+        "a rethrow after a narrow",
+        "export function f() { try { g(); } catch (error) { if (!(error instanceof RangeError)) throw error; return null; } }",
+      ],
+      [
+        "a commented swallow",
+        "export function f() { try { g(); } catch { /* an absent config file means defaults */ return null; } }",
+      ],
+      [
+        "a return computed from the error",
+        "export function f() { try { g(); } catch (error) { return error.message; } }",
+      ],
+      [
+        "a catch with a non-return statement",
+        "export function f() { try { g(); } catch { r(); } }",
+      ],
+    ],
+    rejects: [
+      ["a null default", "export function f() { try { g(); } catch (error) { return null; } }"],
+      ["an undefined default", "export function f() { try { g(); } catch { return undefined; } }"],
+      ["a false default", "export function f() { try { g(); } catch (error) { return false; } }"],
+      ["an empty string default", 'export function f() { try { g(); } catch { return ""; } }'],
+      ["an empty array default", "export function f() { try { g(); } catch { return []; } }"],
+      ["an empty object default", "export function f() { try { g(); } catch { return {}; } }"],
+      ["a bare return", "export function f() { try { g(); } catch (error) { return; } }"],
+    ],
+  },
   "no-module-mocking": {
     allows: [
       ["spying on an owned object", 'import { spyOn } from "bun:test"; spyOn(console, "log");'],

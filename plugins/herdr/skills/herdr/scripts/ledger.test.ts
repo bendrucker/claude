@@ -14,6 +14,7 @@ import {
   openThreads,
   parseProject,
   parseTags,
+  primaryRoot,
   projectsDir,
   readLedger,
   readProjects,
@@ -159,6 +160,20 @@ describe("appendOutcome", () => {
     expect(openThreads(rows).map((entry) => entry.branch)).toEqual(["fix-thing"]);
   });
 
+  test("drops the previous note and keeps the pr", async () => {
+    const dataDir = await fixture();
+    const done = await appendOutcome(
+      { repo: "/repo", branch: "fix-thing", state: "done", pr: "https://example.test/pr/3" },
+      dataDir,
+    );
+    expect(done.note).toBeUndefined();
+    const blocked = await appendOutcome(
+      { repo: "/repo", branch: "fix-thing", state: "blocked", note: "reopened" },
+      dataDir,
+    );
+    expect(blocked).toMatchObject({ note: "reopened", pr: "https://example.test/pr/3" });
+  });
+
   test("refuses a thread the ledger never saw", async () => {
     let message = "";
     try {
@@ -191,6 +206,40 @@ describe("projects", () => {
 
   test("is empty without a projects directory", async () => {
     expect(await readProjects(mkdtempSync(join(tmpdir(), "ledger-")))).toEqual([]);
+  });
+
+  test.each([["Ledger"], ["a".repeat(28)], ["1st"]])("rejects the slug %s", (slug) => {
+    expect(() => parseProject(slug, PROJECT)).toThrow(/to name a lead-/);
+  });
+});
+
+describe("primaryRoot", () => {
+  test("folds a linked worktree and a subdirectory onto the main worktree", async () => {
+    const main = mkdtempSync(join(tmpdir(), "ledger-repo-"));
+    const git = (...args: string[]) => Bun.spawn(["git", "-C", main, ...args]).exited;
+    await git("init", "-q");
+    await git(
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@t",
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "x",
+    );
+    mkdirSync(join(main, "sub"));
+    const linked = join(main, "sub", "linked");
+    await git("worktree", "add", "-q", linked, "-b", "linked");
+    const root = await primaryRoot(main);
+    expect(root).not.toBe(linked);
+    expect(await primaryRoot(linked)).toBe(root);
+    expect(await primaryRoot(join(main, "sub"))).toBe(root);
+  });
+
+  test("returns a path git does not know as given", async () => {
+    expect(await primaryRoot("/nonexistent/repo")).toBe("/nonexistent/repo");
   });
 });
 
@@ -226,6 +275,7 @@ describe("formatAge", () => {
     ["2026-09-16T13:00:00.000Z", "47h"],
     ["2026-09-16T11:00:00.000Z", "2d"],
     ["2026-09-18T13:00:00.000Z", "0m"],
+    ["yesterday", "?"],
   ])("%s reads as %s", (ts, expected) => {
     expect(formatAge(ts, NOW)).toBe(expected);
   });
@@ -234,13 +284,12 @@ describe("formatAge", () => {
 describe("cli", () => {
   const script = join(import.meta.dir, "ledger.ts");
 
-  // An empty PATH keeps herdr out of reach, so the lead state reads as unknown.
-  const run = async (...args: string[]) => {
+  const runOn = async (path: string, ...args: string[]) => {
     const proc = Bun.spawn([process.execPath, script, ...args], {
       stdin: "ignore",
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, PATH: "/nonexistent" },
+      env: { ...process.env, PATH: path },
     });
     const [stdout, stderr, code] = await Promise.all([
       new Response(proc.stdout).text(),
@@ -249,6 +298,17 @@ describe("cli", () => {
     ]);
     return { stdout, stderr, code };
   };
+  // An empty PATH keeps herdr out of reach, so the lead state reads as unknown.
+  const run = (...args: string[]) => runOn("/nonexistent", ...args);
+
+  test("status survives a herdr that answers with something other than JSON", async () => {
+    const bin = mkdtempSync(join(tmpdir(), "ledger-bin-"));
+    await Bun.write(join(bin, "herdr"), "#!/bin/sh\necho not json\n");
+    await Bun.spawn(["chmod", "+x", join(bin, "herdr")]).exited;
+    const result = await runOn(bin, "status", "--data-dir", await fixture());
+    expect(result.code).toBe(0);
+    expect(result.stdout).toMatch(/lead:unknown/);
+  });
 
   test("status prints the routing block, the threads, and JSON on request", async () => {
     const dataDir = await fixture();
@@ -293,6 +353,12 @@ describe("cli", () => {
     ["no subcommand", [], 2, /ledger/],
     ["outcome without a state", ["outcome", "--branch", "x"], 2, /--branch and --state/],
     ["outcome with a bad state", ["outcome", "--branch", "x", "--state", "won"], 2, /--state/],
+    [
+      "outcome with a state only dispatch writes",
+      ["outcome", "--branch", "x", "--state", "dispatched"],
+      2,
+      /--state/,
+    ],
     ["status with a bad tag", ["status", "--tag", "nope"], 2, /must be <key>=<value>/],
   ])("rejects %s", async (_label, args, status, expected) => {
     const result = await run(...args);

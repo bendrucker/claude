@@ -10,13 +10,18 @@ import { getBorderCharacters, table } from "table";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
-export const OUTCOMES = ["dispatched", "orphaned", "done", "blocked", "abandoned"] as const;
+// Only dispatch writes the first two; `outcome` records how a thread came back.
+export const CLOSING = ["done", "blocked", "abandoned"] as const;
+export type Closing = (typeof CLOSING)[number];
+export const OUTCOMES = ["dispatched", "orphaned", ...CLOSING] as const;
 export type Outcome = (typeof OUTCOMES)[number];
 
 // A thread stays on the board while someone still owes it a result.
 const OPEN: ReadonlySet<Outcome> = new Set(["dispatched", "blocked"]);
 
 const TAG_KEY = /^[a-z][a-z0-9_-]*$/;
+// herdr agent names are `^[a-z][a-z0-9_-]{0,31}$`, and `lead-` takes five of those.
+const LEAD_SLUG = /^[a-z][a-z0-9_-]{0,26}$/;
 
 // One line per dispatch, written as soon as the worktree exists, so a later
 // session can see what was handed out and to which agent. A dispatch that
@@ -163,13 +168,14 @@ export function openThreads(
 export interface OutcomeInput {
   repo: string;
   branch: string;
-  state: Outcome;
+  state: Closing;
   pr?: string;
   note?: string;
 }
 
 // The outcome row copies the thread's identifiers from its latest row, so
-// every row stands alone and folding needs no join.
+// every row stands alone and folding needs no join. The note explains one
+// state, so it does not carry over to the next.
 export async function appendOutcome(
   input: OutcomeInput,
   dataDir: string,
@@ -179,16 +185,43 @@ export async function appendOutcome(
   const latest = latestRows(await readLedger(dataDir)).find((row) => threadKey(row) === key);
   if (latest == null)
     throw new Error(`no dispatch of ${input.branch} in ${input.repo} in ${ledgerPath(dataDir)}`);
-  const row: DispatchLedgerRow = { ...latest, ts: now().toISOString(), outcome: input.state };
+  const { note: _previous, ...carried } = latest;
+  const row: DispatchLedgerRow = { ...carried, ts: now().toISOString(), outcome: input.state };
   if (input.pr != null) row.pr = input.pr;
   if (input.note != null) row.note = input.note;
   appendDispatch(row, dataDir);
   return row;
 }
 
+async function capture(argv: string[]): Promise<string | null> {
+  let proc: Bun.Subprocess<"ignore", "pipe", "ignore">;
+  try {
+    proc = Bun.spawn(argv, { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+  } catch {
+    return null;
+  }
+  const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  return code === 0 ? stdout : null;
+}
+
+// dispatch records a thread against the primary worktree, which git lists
+// first, so an outcome typed from a linked worktree or a subdirectory folds
+// onto the same thread. A path git does not know is returned as given.
+export async function primaryRoot(repo: string): Promise<string> {
+  const listing = await capture(["git", "-C", repo, "worktree", "list", "--porcelain"]);
+  const root = listing
+    ?.split("\n")
+    .find((line) => line.startsWith("worktree "))
+    ?.slice("worktree ".length)
+    .trim();
+  return root == null || root === "" ? repo : root;
+}
+
 // `project.md` is shaped like a skill: frontmatter carries the routing line, the
 // body carries the standing instructions, and only the frontmatter is read here.
 export function parseProject(slug: string, text: string): Project {
+  if (!LEAD_SLUG.test(slug))
+    throw new Error(`projects/${slug}: slug must match ${LEAD_SLUG} to name a lead-${slug} agent`);
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
   if (match == null) throw new Error(`projects/${slug}/project.md has no frontmatter`);
   const frontmatter = Frontmatter.parse(parseYaml(match[1]));
@@ -225,19 +258,15 @@ const AgentList = z.object({
 
 // Null when herdr cannot answer, which is not the same as no agents.
 export async function liveAgents(): Promise<ReadonlySet<string> | null> {
-  let proc: Bun.Subprocess<"ignore", "pipe", "ignore">;
+  const stdout = await capture(["herdr", "agent", "list"]);
+  if (stdout == null) return null;
+  let parsed: unknown;
   try {
-    proc = Bun.spawn(["herdr", "agent", "list"], {
-      stdin: "ignore",
-      stdout: "pipe",
-      stderr: "ignore",
-    });
+    parsed = JSON.parse(stdout);
   } catch {
     return null;
   }
-  const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
-  if (code !== 0) return null;
-  const listed = AgentList.safeParse(JSON.parse(stdout));
+  const listed = AgentList.safeParse(parsed);
   if (!listed.success) return null;
   return new Set(
     listed.data.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])),
@@ -250,19 +279,21 @@ export function buildStatus(
   tags: Record<string, string>,
   live: ReadonlySet<string> | null,
 ): Status {
-  const threads = openThreads(rows, tags);
+  const open = latestRows(rows).filter((row) => OPEN.has(row.outcome));
   return {
     projects: projects.map((project) => ({
       ...project,
       lead: live == null ? "unknown" : live.has(leadName(project.slug)) ? "live" : "none",
-      open: openThreads(rows, { project: project.slug }).length,
+      open: open.filter((row) => row.tags?.project === project.slug).length,
     })),
-    threads,
+    threads: open.filter((row) => hasTags(row, tags)),
   };
 }
 
 export function formatAge(ts: string, now: Date): string {
-  const minutes = Math.max(0, Math.floor((now.getTime() - Date.parse(ts)) / 60_000));
+  const elapsed = now.getTime() - Date.parse(ts);
+  if (Number.isNaN(elapsed)) return "?";
+  const minutes = Math.max(0, Math.floor(elapsed / 60_000));
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
   if (hours < 48) return `${hours}h`;
@@ -329,26 +360,26 @@ if (import.meta.main) {
         repo: {
           type: String,
           default: process.cwd(),
-          description: "Repository the thread was dispatched from",
+          description: "Repository the thread was dispatched from, or any worktree of it",
         },
         branch: { type: String, description: "Branch the thread works on (required)" },
-        state: { type: String, description: `One of ${OUTCOMES.join(", ")} (required)` },
+        state: { type: String, description: `One of ${CLOSING.join(", ")} (required)` },
         pr: { type: String, description: "Pull request URL" },
         note: { type: String, description: "Why, when the state is blocked or abandoned" },
         dataDir,
       },
     },
     async (argv) => {
-      const state = z.enum(OUTCOMES).safeParse(argv.flags.state);
+      const state = z.enum(CLOSING).safeParse(argv.flags.state);
       if (argv.flags.branch == null || argv.flags.branch === "" || !state.success) {
-        process.stderr.write(`--branch and --state (${OUTCOMES.join(", ")}) are required\n`);
+        process.stderr.write(`--branch and --state (${CLOSING.join(", ")}) are required\n`);
         argv.showHelp();
         process.exit(2);
       }
       try {
         const row = await appendOutcome(
           {
-            repo: argv.flags.repo,
+            repo: await primaryRoot(argv.flags.repo),
             branch: argv.flags.branch,
             state: state.data,
             pr: argv.flags.pr,

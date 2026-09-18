@@ -389,11 +389,9 @@ export async function ensureSchema(db: Database): Promise<boolean> {
   }
 
   const [row] = await db.query("SELECT COUNT(*) AS n FROM index_meta", z.object({ n: z.bigint() }));
-  if (!row || row.n === 0n) {
-    await db.run(`INSERT INTO index_meta VALUES (${INDEX_VERSION}, NULL, NULL)`);
-  } else {
-    await db.run(`UPDATE index_meta SET version = ${INDEX_VERSION}`);
-  }
+  await (!row || row.n === 0n
+    ? db.run(`INSERT INTO index_meta VALUES (${INDEX_VERSION}, NULL, NULL)`)
+    : db.run(`UPDATE index_meta SET version = ${INDEX_VERSION}`));
   return reconcilePinned(db);
 }
 

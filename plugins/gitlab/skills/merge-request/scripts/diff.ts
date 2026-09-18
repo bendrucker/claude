@@ -84,13 +84,11 @@ export function validateLineInDiff(
         `Old line ${opts.oldLine} of ${file} is not within a diff hunk. Valid old-line ranges: ${ranges}`,
       );
     }
-  } else if (opts.line !== undefined) {
-    if (!isLineInDiff(hunks, opts.line, "new")) {
-      const ranges = hunks.map((h) => `${h.newStart}-${h.newStart + h.newCount - 1}`).join(", ");
-      throw new Error(
-        `Line ${opts.line} of ${file} is not within a diff hunk. Valid new-line ranges: ${ranges}`,
-      );
-    }
+  } else if (opts.line !== undefined && !isLineInDiff(hunks, opts.line, "new")) {
+    const ranges = hunks.map((h) => `${h.newStart}-${h.newStart + h.newCount - 1}`).join(", ");
+    throw new Error(
+      `Line ${opts.line} of ${file} is not within a diff hunk. Valid new-line ranges: ${ranges}`,
+    );
   }
 }
 

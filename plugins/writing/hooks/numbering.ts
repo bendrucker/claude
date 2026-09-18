@@ -126,13 +126,7 @@ export async function check(input: PreToolUseHookInput, mode: Mode): Promise<Hoo
   if (!hasNumberingHint(content)) return null;
 
   const ext = getExtension(filePath);
-  let match: string | null = null;
-
-  if (isMarkdownFile(ext)) {
-    match = await checkMarkdown(content);
-  } else {
-    match = await checkCode(content, ext);
-  }
+  const match = isMarkdownFile(ext) ? await checkMarkdown(content) : await checkCode(content, ext);
 
   if (match == null || match === "") {
     return null;

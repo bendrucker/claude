@@ -404,7 +404,7 @@ async function listCommand(dirs: string[], withLoadState: boolean): Promise<void
 function resolveFullLabel(input: string): string {
   if (input.startsWith(`${LABEL_ROOT}.`)) return input;
   const dot = input.indexOf(".");
-  if (dot < 0)
+  if (dot === -1)
     throw new Error(`expected "<group>.<label>" or a full launchd label, got "${input}"`);
   return fullLabel(input.slice(0, dot), input.slice(dot + 1));
 }

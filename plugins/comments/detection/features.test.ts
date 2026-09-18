@@ -10,7 +10,7 @@ function comment(text: string, startLine: number): Comment {
     startLine,
     endLine: startLine + commentLines.length - 1,
     startColumn: 0,
-    endColumn: commentLines[commentLines.length - 1]?.length ?? 0,
+    endColumn: commentLines.at(-1)?.length ?? 0,
   };
 }
 

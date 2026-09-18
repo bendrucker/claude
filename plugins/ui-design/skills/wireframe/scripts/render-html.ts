@@ -74,7 +74,7 @@ if (import.meta.main) {
   const args = argv._.files;
   const scale = argv.flags.scale;
 
-  const lastArg = args[args.length - 1];
+  const lastArg = args.at(-1);
   const hasOutputPath = lastArg !== undefined && extname(lastArg) === ".png";
   const outputPath = hasOutputPath ? lastArg : undefined;
   const files = hasOutputPath ? args.slice(0, -1) : args;

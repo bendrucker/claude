@@ -33,7 +33,7 @@ await mkdir(argv.flags.feedback, { recursive: true });
 
 async function readAllFeedback(): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
-  let names: string[] = [];
+  let names: string[];
   try {
     names = await readdir(argv.flags.feedback);
   } catch {

@@ -382,7 +382,9 @@ async function runOxlintPass(
     return runOx(command, args, cwd);
   }
   const output = await runOx(command, ["--type-aware", ...args], cwd);
-  return output != null && MISSING_CHECKER.test(output) ? runOx(command, args, cwd) : output;
+  return output?.includes("Failed to find tsgolint executable")
+    ? runOx(command, args, cwd)
+    : output;
 }
 
 // Loading oxlint's JS plugin host costs a fixed ~150ms on top of a per-file
@@ -446,7 +448,6 @@ async function runOxfmtWrite(files: string[]): Promise<void> {
 // section is dropped instead of blocking. The presence of `node_modules`
 // decides it rather than the diagnostics themselves, so one typo'd package name
 // in an installed tree cannot silence the whole gate.
-const MISSING_CHECKER = /Failed to find tsgolint executable/;
 
 async function installed(cwd: string | undefined): Promise<boolean> {
   try {
@@ -492,7 +493,7 @@ async function runTypeCheck(files: string[]): Promise<TypeCheckResult> {
         return { output: null, needsInstall: true };
       }
       const output = await runOx(command, TYPE_CHECK_ARGS, cwd);
-      return output != null && MISSING_CHECKER.test(output)
+      return output?.includes("Failed to find tsgolint executable")
         ? { output: null, needsInstall: true }
         : { output, needsInstall: false };
     }),
@@ -747,7 +748,7 @@ async function restage(paths: string[]): Promise<void> {
   try {
     await execFileAsync("git", ["add", "--", ...paths]);
   } catch {
-    return;
+    // Restaging is best-effort: a failure here leaves the working tree as it was.
   }
 }
 

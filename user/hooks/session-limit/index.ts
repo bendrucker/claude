@@ -98,8 +98,8 @@ export function evaluate(
   const fiveResetsAt = rl.five_hour?.resets_at ?? 0;
   const sevenResetsAt = rl.seven_day?.resets_at ?? 0;
 
-  const priorFiveBand = prev && prev.fiveHourResetsAt === fiveResetsAt ? prev.fiveHourBand : 0;
-  const priorSevenBand = prev && prev.sevenDayResetsAt === sevenResetsAt ? prev.sevenDayBand : 0;
+  const priorFiveBand = prev?.fiveHourResetsAt === fiveResetsAt ? prev.fiveHourBand : 0;
+  const priorSevenBand = prev?.sevenDayResetsAt === sevenResetsAt ? prev.sevenDayBand : 0;
 
   const messages: string[] = [];
 

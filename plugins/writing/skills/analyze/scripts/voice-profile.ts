@@ -160,7 +160,7 @@ function lookupNgram(
 // Derive a coarse source label from a document pointer for the profile's
 // provenance list. A GitHub PR URL becomes "github"; anything else is "other".
 function hostOf(source: string): string {
-  if (/github\.com/.test(source)) return "github";
+  if (source.includes("github.com")) return "github";
   return "other";
 }
 

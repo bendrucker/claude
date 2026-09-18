@@ -33,13 +33,10 @@ export async function openSessionDb(dbPath: string): Promise<Database> {
 
   async function setParams(params: Record<string, string | null>): Promise<void> {
     for (const [key, value] of Object.entries(params)) {
-      if (value === null) {
-        // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query below reads back.
-        await connection.run(`SET VARIABLE "${key}" = NULL`);
-      } else {
-        // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query below reads back.
-        await connection.run(`SET VARIABLE "${key}" = $value`, { value });
-      }
+      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query below reads back.
+      await (value === null
+        ? connection.run(`SET VARIABLE "${key}" = NULL`)
+        : connection.run(`SET VARIABLE "${key}" = $value`, { value }));
     }
   }
 

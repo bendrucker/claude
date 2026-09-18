@@ -295,9 +295,7 @@ async function scanWorktree(
       : ctx.git(["git", "-C", options.path, "cherry", `origin/${options.base}`, "HEAD"]),
   ]);
 
-  const commit =
-    options.commitDate ??
-    (detachedDate !== null && detachedDate.ok ? toEpoch(detachedDate.stdout) : null);
+  const commit = options.commitDate ?? (detachedDate?.ok ? toEpoch(detachedDate.stdout) : null);
 
   return {
     status: readStatus(status),

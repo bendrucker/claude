@@ -156,7 +156,7 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
   const maskedForComma = maskCode(raw)
     .replaceAll(/"[^"]*"/g, CODE_SENTINEL)
     .replaceAll(/,\s*not\b/gi, "");
-  if (/,/.test(maskedForComma)) signals.push("comma (clause/list)");
+  if (maskedForComma.includes(",")) signals.push("comma (clause/list)");
 
   // A short label parenthetical is fine ("(Historical)", "(Working Notes)"). Flag parentheticals
   // that contain a comma or a predicate verb (a clause).
@@ -165,7 +165,7 @@ export function classifyPrHeading(heading: string): PrHeadingResult {
     const inner = parenMatch[1] ?? "";
     const innerMasked = maskCode(inner);
     const innerWords = tokens(innerMasked).map(normalize);
-    const hasComma = /,/.test(innerMasked.replaceAll(/"[^"]*"/g, CODE_SENTINEL));
+    const hasComma = innerMasked.replaceAll(/"[^"]*"/g, CODE_SENTINEL).includes(",");
     const hasPredicate = innerWords.some((w) => PREDICATE_VERBS.has(w));
     if (hasComma) signals.push("parenthetical clause (comma)");
     else if (hasPredicate) signals.push("parenthetical clause (verb)");

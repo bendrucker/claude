@@ -17,7 +17,15 @@
     "typescript/no-unsafe-member-access": "error",
     "typescript/no-unsafe-return": "error",
     "typescript/only-throw-error": "error",
+    // `indexOf(x) !== -1` makes the reader translate an index comparison back into an existence check.
+    "typescript/prefer-includes": "error",
+    // `||` falls through on `0`, `''`, and `false`, swapping in the fallback for a value that was valid.
+    "typescript/prefer-nullish-coalescing": "error",
+    // A chain of `&&` guards re-tests each link and breaks silently if one is dropped or reordered.
+    "typescript/prefer-optional-chain": "error",
     "typescript/prefer-promise-reject-errors": "error",
+    // A `slice`/`substring` comparison allocates a throwaway string just to test a prefix or suffix.
+    "typescript/prefer-string-starts-ends-with": "error",
     "typescript/require-await": "error",
     "typescript/strict-boolean-expressions": [
       "error",

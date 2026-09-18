@@ -138,7 +138,9 @@ export function dirExists(target: string): boolean {
   try {
     readdirSync(target);
     return true;
-  } catch {
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? error.code : undefined;
+    if (code !== "ENOENT" && code !== "ENOTDIR") throw error;
     return false;
   }
 }
@@ -153,7 +155,8 @@ export interface ImportedHost {
 function readDirEntries(dir: string) {
   try {
     return readdirSync(dir, { withFileTypes: true });
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return [];
   }
 }

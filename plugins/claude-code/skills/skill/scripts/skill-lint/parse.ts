@@ -1,5 +1,5 @@
-import { parse as parseYaml } from "yaml";
-import type { z } from "zod";
+import { parse as parseYaml, YAMLParseError } from "yaml";
+import { type z, ZodError } from "zod";
 import { Frontmatter, type SkillContent } from "./types";
 
 const FRONTMATTER_REGEX = /^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/;
@@ -27,7 +27,8 @@ export function parseSkill(raw: string): SkillContent {
 function parseFrontmatter(yamlContent: string): z.infer<typeof Frontmatter> {
   try {
     return Frontmatter.parse(parseYaml(yamlContent) ?? {});
-  } catch {
+  } catch (error) {
+    if (!(error instanceof YAMLParseError) && !(error instanceof ZodError)) throw error;
     return {};
   }
 }

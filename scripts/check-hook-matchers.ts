@@ -50,7 +50,9 @@ export function violations(entries: MatcherEntryContext[]): string[] {
     for (const command of entry.hooks) {
       if (command.if === undefined) continue;
       if (!SINGLE_RULE.test(command.if)) {
-        messages.push(`${file}: "if" must be exactly one permission rule, got "${command.if}"`);
+        messages.push(
+          `${file}: "if" must be exactly one permission rule, got "${command.if}". Use a single Tool(specifier) like Bash(gh pr create:*).`,
+        );
         continue;
       }
       if (command.if.startsWith("WebFetch(") && !WEBFETCH_RULE.test(command.if)) {
@@ -95,7 +97,8 @@ export async function allMatcherEntries(): Promise<MatcherEntryContext[]> {
 if (import.meta.main) {
   await runCheck(
     async () => ({
-      header: "Hook matchers that cannot fire:",
+      header:
+        "Hook matchers that cannot fire. Check matcher syntax in hooks.json or settings.json hook entries: use tool names only, never permission-rule syntax.",
       violations: violations(await allMatcherEntries()),
     }),
     { success: 'All hook matchers match tool names and every "if" holds one permission rule' },

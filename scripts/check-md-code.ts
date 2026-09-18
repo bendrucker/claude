@@ -77,7 +77,9 @@ export async function checkFile(file: string): Promise<string[]> {
     const error = checkBlock(node);
     if (error === null) return;
     const line = node.position?.start.line ?? 0;
-    violations.push(`${file}:${line} [${node.lang}] ${error}`);
+    violations.push(
+      `${file}:${line} [${node.lang}] ${error}. Fix the syntax error or tag the fence with 'fragment' to skip parsing.`,
+    );
   });
 
   return violations;

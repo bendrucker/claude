@@ -106,13 +106,16 @@ async function checkDeps(): Promise<string[]> {
   // one workspace reports once, naming the first file as the place to look.
   const violations = new Map<string, string>();
   for (const dir of unlistedWorkspaces(manifests, dirs)) {
-    violations.set(`${dir}\0`, `${dir}: has a package.json but is not a root workspace`);
+    violations.set(
+      `${dir}\0`,
+      `${dir}: has a package.json but is not a root workspace; add to "workspaces" in package.json`,
+    );
   }
 
   for (const dir of protectedWorkspaces(dirs)) {
     violations.set(
       `${dir}\0protected`,
-      `${dir}: workspace under .claude/, where the sandbox denies the node_modules bun install writes`,
+      `${dir}: workspace under .claude/, where the sandbox denies the node_modules bun install writes; move to packages/`,
     );
   }
 

@@ -21,8 +21,6 @@ export interface CommandResult {
 }
 
 export interface RunOptions {
-  // A fetch over SSH waits on an agent that may be waiting on a hardware key,
-  // which never returns unattended.
   timeoutMs?: number;
   env?: Record<string, string>;
 }

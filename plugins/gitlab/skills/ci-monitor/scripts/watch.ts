@@ -348,10 +348,11 @@ export function selectPipeline(
       ? [mergeRequestPipelines, branchPipelines]
       : [branchPipelines, mergeRequestPipelines];
   const partition = preferred.length > 0 ? preferred : fallback;
-  return partition.reduce<PipelineRecord | null>(
-    (best, record) => (best === null || record.id > best.id ? record : best),
-    null,
-  );
+  let latest: PipelineRecord | null = null;
+  for (const record of partition) {
+    if (latest === null || record.id > latest.id) latest = record;
+  }
+  return latest;
 }
 
 export interface JobRecord {

@@ -32,7 +32,7 @@ afterAll(async () => {
   await rm(tempDir, { recursive: true, force: true });
 });
 
-const logSpy = spyOn(console, "log").mockImplementation(() => {});
+const logSpy = spyOn(console, "log").mockImplementation(() => undefined);
 
 afterEach(() => {
   logSpy.mockClear();

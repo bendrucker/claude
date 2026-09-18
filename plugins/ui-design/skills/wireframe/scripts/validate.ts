@@ -23,12 +23,14 @@ interface Transform {
   y: number;
 }
 
+const IDENTITY_TRANSFORM: Transform = { x: 0, y: 0 };
+
 function attr(el: XmlElement, name: string, fallback = 0): number {
   const raw = el.getAttribute(name);
   return Number.parseFloat(raw != null && raw !== "" ? raw : String(fallback));
 }
 
-function getBounds(el: XmlElement, t: Transform = { x: 0, y: 0 }): Bounds | null {
+function getBounds(el: XmlElement, t: Transform = IDENTITY_TRANSFORM): Bounds | null {
   switch (el.tagName) {
     case "rect":
       return {

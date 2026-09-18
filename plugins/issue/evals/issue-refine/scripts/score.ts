@@ -268,10 +268,10 @@ if (title !== "") {
 }
 
 const score = violations.reduce((s, v) => s + SEVERITY_WEIGHT[v.severity], 0);
-const byFinding = violations.reduce<Record<number, number>>((m, v) => {
-  m[v.finding] = (m[v.finding] ?? 0) + 1;
-  return m;
-}, {});
+const byFinding: Record<number, number> = {};
+for (const violation of violations) {
+  byFinding[violation.finding] = (byFinding[violation.finding] ?? 0) + 1;
+}
 
 if (argv.flags.json) {
   console.log(JSON.stringify({ title, type, score, byFinding, violations }, null, 2));

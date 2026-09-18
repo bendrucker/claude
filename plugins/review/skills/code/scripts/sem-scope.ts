@@ -149,6 +149,8 @@ export const mergeBase: MergeBase = async (base) => {
   }
 };
 
+const DEFAULT_SOURCES: Sources = { runSem, mergeBase };
+
 export type Target = { base: string } | { range: string };
 
 function parseDiff(stdout: string): Change[] | null {
@@ -164,7 +166,7 @@ function parseDiff(stdout: string): Change[] | null {
 // than a missing binary leaves it out silently.
 export async function scopeBlock(
   target: Target,
-  sources: Sources = { runSem, mergeBase },
+  sources: Sources = DEFAULT_SOURCES,
 ): Promise<string> {
   const { ref, label } =
     "base" in target

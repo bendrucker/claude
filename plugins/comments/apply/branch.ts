@@ -70,6 +70,6 @@ export async function applyToBranch(
   } finally {
     await Bun.file(indexFile)
       .delete()
-      .catch(() => {});
+      .catch(() => undefined);
   }
 }

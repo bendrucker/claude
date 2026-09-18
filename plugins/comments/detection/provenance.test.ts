@@ -208,7 +208,7 @@ describe("ProvenanceIndex", () => {
 
   test.each<[string, string, () => Promise<void>]>([
     ["a staged file", "b.ts", async () => void (await git("add", "b.ts"))],
-    ["an untracked file", "new.ts", async () => {}],
+    ["an untracked file", "new.ts", () => Promise.resolve()],
   ])("%s blames as wholly uncommitted", async (_, path, stage) => {
     await Bun.write(join(dir, path), "// fresh\n");
     await stage();

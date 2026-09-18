@@ -490,6 +490,15 @@ async function main(): Promise<void> {
  * total). Without labels, fall back to the leader classifier's flag count over
  * the corpus, the upper-bound positive count active labeling would target.
  */
+function classifierWithMostFlags(stats: readonly ClassifierStats[]): ClassifierStats {
+  let leader = stats[0];
+  if (leader === undefined) throw new Error("no classifier stats to evaluate");
+  for (const row of stats) {
+    if (row.flags > leader.flags) leader = row;
+  }
+  return leader;
+}
+
 function currentSampleForPower(
   corpusSize: number,
   evaluation: Evaluation,
@@ -500,7 +509,7 @@ function currentSampleForPower(
     const positives = randomOnly.filter((row) => SHOULD_FLAG.has(row.label)).length;
     return { positives, total: randomOnly.length, label: "labeled random subset" };
   }
-  const leader = evaluation.stats.reduce((best, row) => (row.flags > best.flags ? row : best));
+  const leader = classifierWithMostFlags(evaluation.stats);
   return { positives: leader.flags, total: corpusSize, label: `${leader.name} flags` };
 }
 

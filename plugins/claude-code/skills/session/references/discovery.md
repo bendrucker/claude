@@ -31,7 +31,7 @@ This table and the Tier-2 list below are generated from the `-- ---` headers on 
 | Turns and compaction | `stop-hook-noop-detector` | `activity` (compactions, API errors) |
 | Skill economy | `skill-auto-vs-explicit` | `skills`, `skill-activity` |
 | Planning | `plans` | `plan_sessions`, `plan_calls` |
-| Outcomes | `outcomes` | `pr_links`, `plan_calls`, `file_operations` |
+| Outcomes | `dispatches`, `outcomes` | `pr_links`, `plan_calls`, `file_operations` |
 <!-- /generated:dimensions -->
 
 Use `records`, `fields`, `schema`, and `keys` whenever a dimension needs a path that isn't pinned: `SELECT kind, COUNT(*) FROM records GROUP BY kind` is the full taxonomy, and `fields` infers the JSON keys under any path.

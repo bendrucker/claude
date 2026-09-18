@@ -119,7 +119,7 @@ Drop `--wait` to leave an agent running, then collect with `agent wait` and `age
 
 That wait tracks lifecycle state rather than one turn, so prompting a working agent can return when its earlier turn settles. When no state change follows within five seconds, `agent prompt` returns `agent_prompt_stalled` instead of blocking. `agent wait --until <state>` narrows to the states you name, for a running agent you expect to stop for input.
 
-`agent prompt` pastes through the pane's bracketed-paste mode and presses Enter after a short delay, so a multi-line prompt arrives as one paste.
+`agent prompt` pastes through the pane's bracketed-paste mode and presses Enter after a short delay, so a multi-line prompt arrives as one paste. That Enter also submits whatever the user had half-typed in the pane, so a pane the user types in, such as a chief or lead, gets `SendMessage` or `herdr notification show` instead, and `agent prompt` goes to agents nobody is sitting at.
 
 `agent wait` and `pane wait-output` block server-side, so use them instead of polling `pane get`. For state herdr exposes no wait for, such as a plugin's output through `plugin log list`, use `Monitor`.
 

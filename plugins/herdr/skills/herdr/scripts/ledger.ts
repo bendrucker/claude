@@ -22,6 +22,10 @@ export type Outcome = (typeof OUTCOMES)[number];
 // A thread stays on the board while someone still owes it a result.
 const OPEN: ReadonlySet<Outcome> = new Set(["dispatched", "blocked"]);
 
+// Nothing prunes an append-only ledger, so a row's size has to be a constant.
+// dispatch already cuts `task` to 120, and `note` is the other free-text field.
+const MAX_NOTE = 500;
+
 const TAG_KEY = /^[a-z][a-z0-9_-]*$/;
 // herdr agent names are `^[a-z][a-z0-9_-]{0,31}$`, and `lead-` takes five of those.
 const LEAD_SLUG = /^[a-z][a-z0-9_-]{0,26}$/;
@@ -191,15 +195,15 @@ export async function appendOutcome(
   const { note: _previous, ...carried } = latest;
   const row: DispatchLedgerRow = { ...carried, ts: now().toISOString(), outcome: input.state };
   if (input.pr != null) row.pr = input.pr;
-  if (input.note != null) row.note = input.note;
+  if (input.note != null) row.note = input.note.slice(0, MAX_NOTE);
   appendDispatch(row, dataDir);
   return row;
 }
 
-// A wedged herdr server leaves `herdr agent list` running with nothing to say,
-// and status prints nothing until it answers. Both callers already treat a
-// failure as unknown, so a deadline takes that path. SIGKILL cannot be ignored,
-// which is what makes the deadline a bound rather than a request.
+// A wedged herdr server leaves `herdr agent list` with nothing to say, and
+// status prints nothing until it answers. Both callers read a failure as
+// unknown, so the deadline lands on a path that exists. SIGKILL, because a
+// process that ignores SIGTERM would keep the deadline from binding.
 export const CAPTURE_TIMEOUT_MS = 5_000;
 
 export async function capture(

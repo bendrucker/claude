@@ -184,6 +184,16 @@ describe("appendOutcome", () => {
     }
     expect(message).toMatch(/no dispatch of nope in \/repo/);
   });
+
+  test("cuts a note down so a row keeps a fixed ceiling", async () => {
+    const dataDir = await fixture();
+    const blocked = await appendOutcome(
+      { repo: "/repo", branch: "fix-thing", state: "blocked", note: "w".repeat(900) },
+      dataDir,
+    );
+    expect(blocked.note).toBe("w".repeat(500));
+    expect(JSON.stringify(blocked).length).toBeLessThan(1_000);
+  });
 });
 
 describe("projects", () => {

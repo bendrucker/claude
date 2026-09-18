@@ -38,6 +38,9 @@ export async function getDefaultBranch(cwd?: string, repoRoot?: string): Promise
     await Bun.write(cacheFile, defaultBranch);
     return defaultBranch;
   } catch {
+    // Any step here (not a repo, gh unavailable, an unwritable cache file)
+    // leaves the default branch undetermined, which every caller already
+    // treats as "unknown."
     return null;
   }
 }

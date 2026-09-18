@@ -131,7 +131,8 @@ function bodiesFromJson(
   let parsed: unknown;
   try {
     parsed = JSON.parse(content);
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
     return [];
   }
   const items = ReviewPayload.safeParse(parsed);

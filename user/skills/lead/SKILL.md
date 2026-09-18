@@ -64,6 +64,7 @@ The prompt carries:
 - The scope: what this pull request covers, and what it leaves to the others.
 - Finish with `/ship`. No auto-merge, because the user merges on GitHub.
 - `SendMessage` `lead-$0` with the PR URL and anything that changes the plan.
+- A lesson later threads would want goes in the `--note` of the thread's own `ledger.ts outcome` call. The lead is the writer for `MEMORY.md` and the topic files beside it.
 
 ## Collect
 
@@ -75,7 +76,7 @@ Record every thread that settles:
 bun ~/.claude-repo/plugins/herdr/skills/herdr/scripts/ledger.ts outcome --repo <repo> --branch <branch> --state <done|blocked|abandoned> [--pr <url>] [--note <why>]
 ```
 
-A blocked or abandoned thread carries `--note` with why, in one sentence. When a thread reports something that changes the remaining plan, write it to `MEMORY.md` or its topic file before dispatching the next one. The project is finished when the State block's threads read `no open threads`.
+A blocked or abandoned thread carries `--note` with why, in one sentence. Read the note on every thread that closes and write your own summary of what it teaches into `MEMORY.md` or a topic file. Keep the summary short, because memory is inlined into every brief you write from here on. When a thread reports something that changes the remaining plan, write it down before dispatching the next one. The project is finished when the State block's threads read `no open threads`.
 
 ## Report
 

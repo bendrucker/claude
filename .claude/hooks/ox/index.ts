@@ -629,7 +629,9 @@ async function recordBlocks(sessionId: string, blocks: number): Promise<boolean>
     await Bun.write(blockCountPath(sessionId), JSON.stringify({ blocks }));
     return true;
   } catch {
-    // An unwritable count file must not fail the hook. The caller treats an absent count as zero.
+    // An unwritable count file must not fail the hook. The caller's compound
+    // check treats that as a signal to skip blocking this round entirely
+    // (see the comment above it).
     return false;
   }
 }

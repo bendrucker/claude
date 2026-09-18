@@ -151,7 +151,10 @@ export async function shipped(): Promise<Set<string>> {
 export function violations(refs: Reference[], shippedPaths: Set<string>): string[] {
   return refs
     .filter((reference) => !shippedPaths.has(reference.path))
-    .map((reference) => `${reference.file} ${reference.event}: ${reference.path}`);
+    .map(
+      (reference) =>
+        `${reference.file} ${reference.event}: ${reference.path} not tracked in git. Add to repo or remove from hook command.`,
+    );
 }
 
 export async function load(): Promise<Reference[]> {
@@ -168,7 +171,8 @@ if (import.meta.main) {
     async () => {
       const [refs, files] = await Promise.all([load(), shipped()]);
       return {
-        header: "Hook commands naming paths this repo does not ship:",
+        header:
+          "Hook commands name untracked paths. Track paths in git or remove the hook references.",
         violations: violations(refs, files),
       };
     },

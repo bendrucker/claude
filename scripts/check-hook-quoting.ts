@@ -17,7 +17,10 @@ async function checkQuoting(): Promise<string[]> {
       if (!hook.command.includes("${CLAUDE_PLUGIN_ROOT}")) continue;
 
       if (hook.command.search(UNQUOTED_PATH) !== -1) {
-        violations.push(`${file}: ${hook.command}`);
+        // oxlint-disable-next-line no-template-curly-in-string -- names the variable in the report, so it must stay unexpanded.
+        violations.push(
+          `${file}: ${hook.command} has unquoted \${CLAUDE_PLUGIN_ROOT} paths. Wrap path variables in double quotes.`,
+        );
       }
     }
   }
@@ -27,8 +30,9 @@ async function checkQuoting(): Promise<string[]> {
 
 await runCheck(
   async () => ({
-    // oxlint-disable-next-line no-template-curly-in-string -- names the variable in the report, so it must stay unexpanded.
-    header: "Hook commands with unquoted ${CLAUDE_PLUGIN_ROOT} paths:",
+    header:
+      // oxlint-disable-next-line no-template-curly-in-string -- names the variable in the report, so it must stay unexpanded.
+      "Hook commands have unquoted ${CLAUDE_PLUGIN_ROOT} paths. Quote all path variable references.",
     violations: await checkQuoting(),
   }),
   // oxlint-disable-next-line no-template-curly-in-string -- names the variable in the report, so it must stay unexpanded.

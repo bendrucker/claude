@@ -7,7 +7,8 @@ await runCheck(
   async () => {
     const plugins = await loadPlugins();
     return {
-      header: "Plugins in marketplace but not enabled in settings.json:",
+      header:
+        "Plugins in marketplace but not enabled in settings.json. Enable in user/settings.json enabledPlugins list.",
       violations: plugins.filter((p) => p.listing && !p.enabled).map((p) => p.name),
     };
   },

@@ -7,7 +7,8 @@ await runCheck(
   async () => {
     const plugins = await loadPlugins();
     return {
-      header: "Plugins missing from marketplace.json:",
+      header:
+        "Plugins missing from marketplace.json. Add these plugins to the marketplace.json configuration.",
       violations: plugins
         .filter((p) => p.dir !== undefined && p.listing?.local !== true)
         .map((p) => p.name),

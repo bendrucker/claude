@@ -44,11 +44,13 @@ export function violations({ ids, marketplaces, listed }: Sources): string[] {
   for (const id of ids) {
     const parsed = parseId(id);
     if (!parsed) {
-      messages.push(`${id}: not of the form <plugin>@<marketplace>`);
+      messages.push(`${id}: not of the form <plugin>@<marketplace>; use "name@marketplace" format`);
       continue;
     }
     if (!marketplaces.has(parsed.marketplace)) {
-      messages.push(`${id}: marketplace "${parsed.marketplace}" is not in extraKnownMarketplaces`);
+      messages.push(
+        `${id}: marketplace "${parsed.marketplace}" is not in extraKnownMarketplaces; add it to settings.json`,
+      );
       continue;
     }
     if (parsed.marketplace === OWN && !listed.has(parsed.name)) {
@@ -87,7 +89,8 @@ if (import.meta.main) {
         violations: [
           ...violations(source),
           ...unusedMarketplaces(source).map(
-            (name) => `${name}: declared in extraKnownMarketplaces, no enabled plugin uses it`,
+            (name) =>
+              `${name}: declared in extraKnownMarketplaces, no enabled plugin uses it; remove from extraKnownMarketplaces`,
           ),
         ],
       };

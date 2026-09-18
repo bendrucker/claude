@@ -50,13 +50,13 @@ Write a prompt file. State the task and its scope. Say no auto-merge and that Be
 bun ~/.claude-repo/plugins/herdr/skills/herdr/scripts/dispatch.ts --repo <repo> --branch <branch> --prompt <file> --tag by=chief
 ```
 
-`prompted: false` on the result line means herdr never confirmed the hand-off, so prompt the agent yourself before treating it as running.
+`prompted: false` on the result line means herdr never confirmed the hand-off. Read the pane before resending, since the prompt may have landed and only the confirmation failed.
 
 ## Projects
 
 When an unmatched request looks like several PRs or a set of decisions to settle, say so in one line and ask whether Ben wants a project. Dispatch it as a one-off unless he answers yes. Most requests stay one-offs.
 
-If he does want one, `Write` a stub at `~/.claude/plugins/data/herdr-bendrucker/projects/<slug>/project.md`. Its frontmatter carries `name`, a one-line `description` naming what the project covers so a later request in that area matches it, and `tracker` when the request names an issue or project URL. Start its lead as above and hand the request over. The lead writes the body.
+If he does want one, `Write` a stub at `~/.claude/plugins/data/herdr-bendrucker/projects/<slug>/project.md`. The slug has to match `^[a-z][a-z0-9_-]{0,26}$`, since it names the `lead-<slug>` agent, and a project whose slug does not is skipped and never routes. Its frontmatter carries `name`, a one-line `description` naming what the project covers so a later request in that area matches it, and `tracker` when the request names an issue or project URL. Start its lead as above and hand the request over. The lead writes the body.
 
 ## Collect
 

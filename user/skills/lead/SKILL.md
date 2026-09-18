@@ -16,7 +16,15 @@ You coordinate the project `$0` end to end. You settle its scope, keep its memor
 
 !`s=~/.claude-repo/plugins/herdr/skills/herdr/scripts/ledger.ts; if [ -f "$s" ]; then bun "$s" status --tag "project=$0" 2>&1; else echo "NO LEDGER at $s"; fi`
 
-Settle `$0` into a slug before reading anything above. A slug is already settled. A tracker URL is not: read the tracker, derive a slug from the project's name, and re-run both commands with it. The block above ran against the raw URL, which misses an existing project's directory and its threads, so treat what it printed as empty until the re-run replaces it. Use the settled slug for the directory, for every `project=` tag, and for the `lead-<slug>` session name.
+Settle `$0` into a slug before reading anything above. A slug is already settled. A tracker URL is not: read the tracker and derive a slug from the project's name. The block above ran against the raw URL, which misses an existing project's directory and its threads, so treat what it printed as empty and load the real state with the settled slug in place of `<slug>`:
+
+```bash
+d="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/herdr-bendrucker}/projects/<slug>"
+tail -n +1 "$d"/project.md "$d"/MEMORY.md
+bun ~/.claude-repo/plugins/herdr/skills/herdr/scripts/ledger.ts status --tag project=<slug>
+```
+
+Use the settled slug for the directory, for every `project=` tag, and for the `lead-<slug>` session name.
 
 A slug starts with a lowercase letter and runs at most 27 characters of lowercase letters, digits, hyphens, and underscores. That keeps `lead-<slug>` a legal herdr agent name. `status` drops a project whose slug breaks the rule, which reads as a missing project rather than an error.
 

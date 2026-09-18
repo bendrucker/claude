@@ -28,7 +28,7 @@ Use the settled slug for the directory, for every `project=` tag, and for the `l
 
 A slug starts with a lowercase letter and runs at most 27 characters of lowercase letters, digits, hyphens, and underscores. That keeps `lead-<slug>` a legal herdr agent name. `status` drops a project whose slug breaks the rule, which reads as a missing project rather than an error.
 
-Then read the blocks. `NO PROJECT DIRECTORY` means the settled slug has no project yet: start at Scope and create it. `NO LEDGER` names a script that is not on disk, so run the same command out of a checkout of `bendrucker/claude`. Any other error in place of the status blocks came from the ledger itself, so repair that before trusting the thread list.
+Then read the blocks. `NO PROJECT DIRECTORY` means the settled slug has no project yet: start at Scope and create it. `NO LEDGER` names a script that is not on disk. Run the same command out of a checkout of `bendrucker/claude`. Any other error in place of the status blocks came from the ledger itself, so repair that before trusting the thread list.
 
 Read the topic files `MEMORY.md` indexes before scoping or dispatching, because the block prints the index rather than the decisions under it.
 

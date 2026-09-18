@@ -32,7 +32,8 @@
     "plugins/pull-request/evals/pr-body",
     "packages/oxlint-rules",
     "plugins/plan/evals/gate",
-    "plugins/prompting"
+    "plugins/prompting",
+    "plugins/herdr"
   ],
   "type": "module",
   "scripts": {

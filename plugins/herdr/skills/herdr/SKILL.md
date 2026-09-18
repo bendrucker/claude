@@ -6,6 +6,7 @@ argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
   - Bash(herdr api snapshot:*)
   - Bash(herdr --help:*)
   - Bash(herdr agent --help:*)
@@ -66,7 +67,7 @@ Most commands answer with a single-line JSON envelope. Pipe them through `jq -r 
 {"id":"cli:pane:list","result":{"panes":[...],"type":"pane_list"}}
 ```
 
-Others print plain text, and `jq` on those dies with `Invalid numeric literal`. Terminal content and human explanations are one kind: `pane read`, `agent read`, `agent explain`. Anything reporting local installation instead of live session state is the other: `plugin list`, `plugin config-dir`, `config check`, `integration status`, `server agent-manifests`.
+Others print plain text, and `jq` on those fails with `Invalid numeric literal`. Terminal content and human explanations are one kind: `pane read`, `agent read`, `agent explain`. Anything reporting local installation instead of live session state is the other: `plugin list`, `plugin config-dir`, `config check`, `integration status`, `server agent-manifests`.
 
 Exit 1 is a server error with JSON on stderr: parse it. Exit 2 is a syntax error, wrong before it reached the server.
 
@@ -96,15 +97,15 @@ Leave the server alone. `herdr server stop` takes down every pane process the se
 
 Close only what you opened. A pane you split for the user to read counts as theirs. Close your own scratch panes with `herdr pane close` when the work is done.
 
-Read another agent's approval dialog and hand it to the user. Answering it is theirs. `agent prompt` refuses a `blocked` agent on its own, and `send-keys` carries no such check.
+Read another agent's approval dialog and hand it to the user. The user answers it. `agent prompt` refuses a `blocked` agent on its own, and `send-keys` does not check.
 
 Leave lifecycle reporting to the scraper. `pane report-agent` overrides the detection manifest for a Claude pane and leaves herdr's view wrong.
 
 ## Sibling Agents
 
-Each agent pane carries `agent_session.value`, the Claude session UUID.
+Each agent pane carries `agent_session.value`, its Claude session UUID.
 
-A reference to work by branch, repo, or task usually names a pane already doing it. Match it against the `cwd` and `title` columns in the orientation block, then hand off to that pane instead of duplicating the checkout here.
+Work bound for its own pull request always goes through [Dispatch](#dispatch), whatever an existing pane shows. Otherwise hand off only to a pane whose `title` or `cwd` names work in flight there. A `primary` workspace is the repo's main checkout, so no pane under one is a hand-off target whatever `cwd` it prints.
 
 Hand off with `agent prompt --wait`, which blocks until the agent settles at `idle`, `done`, or `blocked`, then collect with `agent read`:
 
@@ -113,21 +114,31 @@ herdr agent prompt <target> "the request" --wait --timeout 900000
 herdr agent read <target> --source recent-unwrapped --lines 80
 ```
 
-Drop `--wait` only to leave an agent running unattended, then collect with `agent wait` followed by `agent read`.
+Drop `--wait` to leave an agent running, then collect with `agent wait` and `agent read`.
 
-That wait tracks lifecycle state rather than one turn, so prompting a working agent can return when its earlier turn settles. A prompt that draws no state change within five seconds returns `agent_prompt_stalled` instead of blocking. `agent wait --until <state>` narrows to the states you name, for a running agent you expect to stop for input.
+That wait tracks lifecycle state rather than one turn, so prompting a working agent can return when its earlier turn settles. When no state change follows within five seconds, `agent prompt` returns `agent_prompt_stalled` instead of blocking. `agent wait --until <state>` narrows to the states you name, for a running agent you expect to stop for input.
 
-`agent prompt` writes through the pane's live bracketed-paste mode and presses Enter after a short delay. A multi-line prompt arrives as one paste instead of submitting at the first newline.
+`agent prompt` pastes through the pane's bracketed-paste mode and presses Enter after a short delay, so a multi-line prompt arrives as one paste.
 
 `agent wait` and `pane wait-output` block server-side, so use them instead of polling `pane get`. For state herdr exposes no wait for, such as a plugin's output through `plugin log list`, use `Monitor`.
 
-An agent parked on its own interactive UI answers to logical key names: `herdr agent send-keys <target> esc`. Modifiers join with `+`, as in `ctrl+c`, `ctrl+u`, and `shift+tab`. Only `C-c` and `c-c` are aliased to that form, so any other `-` spelling returns `invalid_key`. In a plain pane, `pane send-text` stages literal text without submitting it, and `pane run` presses Enter.
+An agent sitting in its own interactive UI takes logical key names: `herdr agent send-keys <target> esc`. Modifiers join with `+`, as in `ctrl+c` and `shift+tab`. Only `C-c` and `c-c` are aliased to that form, so any other `-` spelling returns `invalid_key`. In a plain pane, `pane send-text` stages literal text without submitting it, and `pane run` presses Enter.
 
 `herdr agent focus` brings a pane to the foreground for the user. `herdr agent attach` connects to it directly.
 
-### Starting an Agent
+### Dispatch
 
-A sibling agent that needs its own checkout gets it from `herdr worktree create`, which leaves this session where it is. `worktrunk:wt-switch-create` re-roots the calling session instead.
+New work needing its own worktree and agent gets both in one call:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
+```
+
+It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir.
+
+`worktrunk:wt-switch-create` re-roots this session instead.
+
+### Starting an Agent
 
 `agent start` attaches an agent to an existing free pane, sitting at its interactive prompt with nothing in the foreground. Split first, start second:
 
@@ -136,7 +147,7 @@ pane=$(herdr pane split --current --direction right --cwd "$PWD" --no-focus | jq
 herdr agent start reviewer --kind claude --pane "$pane"
 ```
 
-A session that refuses the command substitution runs the two steps separately, reading `.result.pane.pane_id` out of the split and passing it to `--pane`.
+If the command substitution is refused, run the two steps separately and pass `.result.pane.pane_id` to `--pane`.
 
 Only `agent start` binds a name. An agent launched through `pane run` or `pane send-text` never gets one, and `agent start` against that pane returns `agent_pane_busy`. Target it by pane ID, which `agent prompt`, `agent read`, and `agent wait` all accept.
 
@@ -148,11 +159,11 @@ An agent that comes up into a permission or trust dialog returns `agent_not_read
 
 For Claude, herdr's integration hook reports only session identity. The `idle`, `working`, `blocked`, and `done` states come from matching the pane's screen against a detection manifest, so an unusual or suppressed terminal title reads as `unknown`.
 
-`idle` and `done` are one resting state, split by whether the pane's tab has been seen. Seen rests at `idle`. Work that finished in a tab nobody looked at rests at `done`. The user focusing that tab marks it seen, and so does a `focus` command you issue. Plain reads never do, so an agent followed entirely through `agent read` stays `done`.
+`idle` and `done` are one resting state, split by whether the pane's tab has been seen. A seen tab rests at `idle`. Work that finished in a tab nobody looked at rests at `done`. The user focusing that tab marks it seen, and so does a `focus` command you issue. Plain reads never do, so an agent followed entirely through `agent read` stays `done`.
 
-`blocked` means herdr recognized an approval or question UI. `unknown` means an agent is present and the scraper could not classify it, which is no evidence that it finished.
+`blocked` means herdr recognized an approval or question UI. `unknown` means an agent is present and the scraper could not classify it, and does not mean it finished.
 
-Debug that with `herdr agent explain <pane>`, which prints the manifest rule that fired, the region it read, and the text it matched.
+`herdr agent explain <pane>` prints the manifest rule that fired, the region it read, and the text it matched.
 
 ## Collaborative File Viewing
 
@@ -165,7 +176,7 @@ herdr pane run "$pane" markless --watch path/to/file.md
 
 Use `markless --watch` for markdown and `$EDITOR` for everything else.
 
-`pane run` hands the command string to the pane's own interactive shell, which parses it a second time. Send one command with ordinary quoting. Write anything longer to a file and run `bash <path>`, since a multi-statement string dies on a bare `parse error` inside the pane where your tool result never shows it.
+`pane run` hands the command string to the pane's own interactive shell, which parses it a second time. Send one command with ordinary quoting. Write anything longer to a file and run `bash <path>`, since a multi-statement string fails with a bare `parse error` inside the pane where your tool result never shows it.
 
 That shell also inherits the new pane's directory, and mise activates tools per directory. A mise-managed tool available elsewhere can come back `command not found` here. Confirm the pane started the viewer before telling the user to look at it:
 
@@ -200,9 +211,9 @@ The search covers output already on screen. A line from an earlier run matches i
 
 Add `--format ansi` when color is the evidence, as in a diff or a test summary. Otherwise take the text.
 
-The `❯` line at the bottom of a Claude pane carries Claude Code's own prompt suggestion, ghost text the harness wrote rather than input the user typed. Take a pane's content from above that line and leave the line itself out of what you report. When the user asks what is sitting in that prompt, `--format ansi` tells the two apart: a suggestion arrives wrapped in `ESC[2m`, and typed text carries no styling.
+The `❯` line at the bottom of a Claude pane carries Claude Code's own prompt suggestion, ghost text the harness wrote rather than input the user typed. Take a pane's content from above that line and leave the line itself out of what you report. When the user asks what is sitting in that prompt, `--format ansi` tells the two apart: a suggestion arrives wrapped in `ESC[2m`, and typed text is unstyled.
 
-`pane read --lines` draws on the pane's screen and the host's scrollback. An agent painting the terminal's alternate screen feeds neither, so its scrolled-away rows sit beyond `pane read` at any `--lines`. `agent read` recovers them for a recognized agent at rest, paging history out through the agent's own mouse-scroll interface. A deep read during `working`, `blocked`, or `unknown` comes back truncated or as an `agent_not_idle` error. When the history is unreachable either way, ask the agent to write its full response as markdown under a temp directory and reply with nothing but the path, then read the file yourself. Hold that fallback until a read has come up short.
+`pane read --lines` reads the pane's screen and the host's scrollback. An agent drawing on the terminal's alternate screen writes to neither, so `pane read` misses its scrolled-away rows at any `--lines`. `agent read` recovers them for a recognized agent at rest, paging history out through the agent's own mouse-scroll interface. A deep read during `working`, `blocked`, or `unknown` comes back truncated or as an `agent_not_idle` error. When the history is unreachable either way, ask the agent to write its full response as markdown under a temp directory and reply with nothing but the path, then read the file yourself. Use that fallback only after a read returns too little.
 
 ## Plugins
 

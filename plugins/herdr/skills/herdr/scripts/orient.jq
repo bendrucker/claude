@@ -7,7 +7,7 @@
     | ($w.worktree.checkout_path // "") as $root
     | "\($w.workspace_id)  \($w.label // "")\(if $w.focused then "  *focused*" else "" end)"
       + ( if $w.worktree
-          then "  [\($w.worktree.repo_name)\(if $w.worktree.is_linked_worktree then " worktree" else "" end)] \($root)"
+          then "  [\($w.worktree.repo_name) \(if $w.worktree.is_linked_worktree then "worktree" else "primary" end)] \($root)"
           else "" end )
     , ( $panes[]
         | select(.workspace_id == $w.workspace_id)

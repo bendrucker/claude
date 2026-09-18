@@ -252,12 +252,12 @@ function renderRuleHealthTable(input: ReportInput): string {
   lines.push("| phrase | source | type | surface | model/M | baseline/M | lift | status |");
   lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const r of input.ruleHealth) {
-    const status =
-      r.status === "keep"
-        ? r.noData && r.surface === "deliverable"
-          ? "keep (no baseline)"
-          : "keep"
-        : `remove (${r.removeReason})`;
+    let status: string;
+    if (r.status === "keep") {
+      status = r.noData && r.surface === "deliverable" ? "keep (no baseline)" : "keep";
+    } else {
+      status = `remove (${r.removeReason})`;
+    }
     const ruleType = ruleTypeLabel(r.entry.source);
     lines.push(
       `| \`${esc(r.entry.phrase)}\` | ${r.entry.source} | ${ruleType} | ${r.surface} | ${fmtPerM(r.modelPerM)} | ${fmtPerM(r.baselinePerM)} | ${fmtLiftAgainstRate(r.lift, r.baselinePerM)} | ${status} |`,
@@ -302,7 +302,14 @@ function renderStructuralAudit(input: ReportInput): string {
     lines.push("| --- | --- | --- | --- | --- | --- | --- |");
     const sorted = rows.toSorted((a, b) => b.assistantHits - a.assistantHits);
     for (const r of sorted) {
-      const scope = r.sideEffectOnly ? "side-effect" : r.fileOnly ? "file-only" : "all";
+      let scope: string;
+      if (r.sideEffectOnly) {
+        scope = "side-effect";
+      } else if (r.fileOnly) {
+        scope = "file-only";
+      } else {
+        scope = "all";
+      }
       lines.push(
         `| ${r.category} | ${scope} | ${r.assistantHits} | ${r.userHits} | ${r.assistantRows} | ${r.assistantSessions} | ${esc(r.retire)} |`,
       );
@@ -514,12 +521,14 @@ function voiceBaselineSummary(profile: VoiceProfile | null): string {
 
 function formatQuote(quote: QuoteContext | null): string {
   if (!quote) return "(no deliverable occurrence found)";
-  const pointer =
-    quote.filePath != null && quote.filePath !== ""
-      ? quote.filePath
-      : quote.sourceFile != null && quote.sourceFile !== ""
-        ? `${quote.sourceFile}:${quote.sourceLine ?? "?"}`
-        : "(no source pointer)";
+  let pointer: string;
+  if (quote.filePath != null && quote.filePath !== "") {
+    pointer = quote.filePath;
+  } else if (quote.sourceFile != null && quote.sourceFile !== "") {
+    pointer = `${quote.sourceFile}:${quote.sourceLine ?? "?"}`;
+  } else {
+    pointer = "(no source pointer)";
+  }
   return `"${quote.window}" (${pointer})`;
 }
 

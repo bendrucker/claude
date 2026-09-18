@@ -907,12 +907,14 @@ async function watch(options: RunOptions): Promise<void> {
     throw new Error("Invalid watcher target state");
   };
 
-  const intervalTarget: PipelineTarget | null =
-    target.mode === "mr" && iid !== null
-      ? { kind: "mr", iid }
-      : target.mode === "branch"
-        ? { kind: "branch", branch: target.branch }
-        : null;
+  let intervalTarget: PipelineTarget | null;
+  if (target.mode === "mr" && iid !== null) {
+    intervalTarget = { kind: "mr", iid };
+  } else if (target.mode === "branch") {
+    intervalTarget = { kind: "branch", branch: target.branch };
+  } else {
+    intervalTarget = null;
+  }
 
   let state = initialState();
   let intervalSeconds: number | null = options.intervalSeconds;

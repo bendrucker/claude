@@ -8,7 +8,15 @@ function color(code: number, text: string): string {
 }
 
 function pctColor(pct: number): (text: string) => string {
-  const code = pct >= 90 ? 32 : pct >= 70 ? 33 : 31; // green / yellow / red
+  // green / yellow / red
+  let code: number;
+  if (pct >= 90) {
+    code = 32;
+  } else if (pct >= 70) {
+    code = 33;
+  } else {
+    code = 31;
+  }
   return (text) => color(code, text);
 }
 

@@ -58,12 +58,14 @@ export function isThrowawayRemove(command: string): boolean {
 
 export function formatDenyOutput(subcommand: string): SyncHookJSONOutput {
   const base = `Use the worktrunk skill (/worktrunk) instead of \`git worktree ${subcommand}\`.`;
-  const reason =
-    subcommand === "add"
-      ? `${base} For a throwaway verification checkout, add it under \`tmp/\`.`
-      : subcommand === "remove"
-        ? `${base} Throwaway worktrees under \`tmp/\` or \`.worktrees/\` may be removed directly.`
-        : base;
+  let reason: string;
+  if (subcommand === "add") {
+    reason = `${base} For a throwaway verification checkout, add it under \`tmp/\`.`;
+  } else if (subcommand === "remove") {
+    reason = `${base} Throwaway worktrees under \`tmp/\` or \`.worktrees/\` may be removed directly.`;
+  } else {
+    reason = base;
+  }
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",

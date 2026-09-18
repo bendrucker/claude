@@ -192,16 +192,24 @@ function drawBox(
   }
 
   const align = box.align ?? "center";
-  const x =
-    align === "left" ? region.x : align === "right" ? region.x + region.w : region.x + region.w / 2;
+  let x: number;
+  if (align === "left") {
+    x = region.x;
+  } else if (align === "right") {
+    x = region.x + region.w;
+  } else {
+    x = region.x + region.w / 2;
+  }
   const blockHeight = fit.lines.length * fit.fontPx * LINE_HEIGHT;
   const valign = defaultValign(box, anchor);
-  const yStart =
-    valign === "top"
-      ? region.y
-      : valign === "bottom"
-        ? region.y + region.h - blockHeight
-        : region.y + (region.h - blockHeight) / 2;
+  let yStart: number;
+  if (valign === "top") {
+    yStart = region.y;
+  } else if (valign === "bottom") {
+    yStart = region.y + region.h - blockHeight;
+  } else {
+    yStart = region.y + (region.h - blockHeight) / 2;
+  }
 
   ctx.font = fontString(font, fit.fontPx);
   ctx.textAlign = align;

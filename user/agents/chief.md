@@ -31,7 +31,7 @@ Match every request against the projects block before anything else.
 
 On a match, hand the request to that project's lead: `herdr agent prompt lead-<slug> "<the request>"`. The lead owns scope, decisions, and its own threads from there, and reports back by `SendMessage`.
 
-When that project's line reads anything but `lead:live`, start the lead first. Open a pane in the project's workspace, then:
+When that project's line reads `lead:none`, start the lead first. `lead:unknown` means herdr did not answer, so confirm with `herdr agent list` before starting one, since a second lead for a project collides with the first. Open a pane in the project's workspace, then:
 
 ```
 herdr agent start lead-<slug> --kind claude --pane <pane> -- --name lead-<slug>

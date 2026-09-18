@@ -11,6 +11,9 @@
     "no-await-in-loop": "error",
     "no-duplicate-imports": "error",
     "no-empty": "error",
+    // An empty function body stands in for logic that was never written,
+    // so a caller invoking it gets silence instead of an error.
+    "no-empty-function": "error",
     "no-lonely-if": "error",
     "no-template-curly-in-string": "warn",
     "no-underscore-dangle": ["error", { "allow": ["__typename", "__dirname"] }],
@@ -35,7 +38,16 @@
     "unicorn/custom-error-definition": "error",
     "unicorn/explicit-length-check": "error",
     "unicorn/no-array-for-each": "error",
+    // A `.reduce()` accumulator's shape lives inside the callback, so a
+    // reader has to simulate the whole loop to see what's being built.
+    "unicorn/no-array-reduce": "error",
+    // An object literal default only applies when the whole argument is
+    // omitted, so it reads like per-field fallbacks it doesn't provide.
+    "unicorn/no-object-as-default-parameter": "error",
     "unicorn/prefer-array-find": "error",
+    // Reassigning a parameter to fill in a missing value hides the
+    // fallback in the function body instead of the signature.
+    "unicorn/prefer-default-parameters": "error",
     "unicorn/prefer-export-from": "error",
     "unicorn/prefer-math-min-max": "error",
     "unicorn/prefer-set-has": "error",

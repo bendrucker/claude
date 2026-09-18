@@ -21,6 +21,7 @@ export interface JXAArray<T> {
  */
 export function toArray<T>(jxaArr: JXAArray<T>): T[] {
   const arr: T[] = [];
+  // oxlint-disable-next-line typescript/prefer-for-of -- JXAArray has no Symbol.iterator, so a for...of loop over it wouldn't compile. This index loop is the conversion this function exists to do.
   for (let i = 0; i < jxaArr.length; i++) {
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- a JXA bridge array is dense over 0..length-1, which noUncheckedIndexedAccess cannot express.
     arr.push(jxaArr[i] as T);

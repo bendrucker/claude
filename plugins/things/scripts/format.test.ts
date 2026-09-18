@@ -58,7 +58,7 @@ describe("selectColumns", () => {
     const mockExit = spyOn(process, "exit").mockImplementation(() => {
       throw new Error("process.exit");
     });
-    const mockError = spyOn(console, "error").mockImplementation(() => {});
+    const mockError = spyOn(console, "error").mockImplementation(() => undefined);
 
     try {
       selectColumns(headers, rows, ["unknown"]);

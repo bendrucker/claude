@@ -17,6 +17,9 @@
     "typescript/no-unsafe-member-access": "error",
     "typescript/no-unsafe-return": "error",
     "typescript/only-throw-error": "error",
+    // A hand-indexed `for` loop over a whole array carries an index
+    // variable that a `for...of` loop wouldn't need to introduce at all.
+    "typescript/prefer-for-of": "error",
     "typescript/prefer-promise-reject-errors": "error",
     "typescript/require-await": "error",
     "typescript/strict-boolean-expressions": [

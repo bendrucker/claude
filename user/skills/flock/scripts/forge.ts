@@ -168,9 +168,8 @@ const REVIEW_DECISIONS: Record<string, ReviewState> = {
 
 /** GitHub returns an empty decision where the repository requires no review. */
 export function reviewState(decision: string | null | undefined): ReviewState {
-  const raw = decision ?? "";
-  if (raw === "") return "none";
-  return REVIEW_DECISIONS[raw] ?? "unknown";
+  if (decision === null || decision === undefined || decision === "") return "none";
+  return REVIEW_DECISIONS[decision] ?? "unknown";
 }
 
 const MERGE_STATES: Record<string, MergeState> = {
@@ -227,9 +226,8 @@ const GITLAB_PIPELINE_STATES: Record<string, CheckState> = {
  * names behind it, so a GitLab failure is reported without one.
  */
 export function gitlabChecks(status: string | null | undefined): CheckState {
-  const raw = status ?? "";
-  if (raw === "") return "unknown";
-  return GITLAB_PIPELINE_STATES[raw] ?? "unknown";
+  if (status === null || status === undefined || status === "") return "unknown";
+  return GITLAB_PIPELINE_STATES[status] ?? "unknown";
 }
 
 export function pullRequestRef(pull: PullRequest): string {

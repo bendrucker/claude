@@ -215,10 +215,10 @@ async function main() {
   await mkdir(dirname(argv.flags.out), { recursive: true });
   await Bun.write(argv.flags.out, `${JSON.stringify(candidates, null, 2)}\n`);
 
-  const byHost = candidates.reduce<Record<string, number>>((acc, c) => {
-    acc[c.host] = (acc[c.host] ?? 0) + 1;
-    return acc;
-  }, {});
+  const byHost: Record<string, number> = {};
+  for (const candidate of candidates) {
+    byHost[candidate.host] = (byHost[candidate.host] ?? 0) + 1;
+  }
 
   if (candidates.length === 0) {
     console.log("No review-comment candidates found in the session index.");

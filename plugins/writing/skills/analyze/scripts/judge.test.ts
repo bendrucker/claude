@@ -279,7 +279,7 @@ describe("modelPricing", () => {
   });
 
   test("an unrecognized family falls back to haiku rates and warns", async () => {
-    const warn = spyOn(console, "error").mockImplementation(() => {});
+    const warn = spyOn(console, "error").mockImplementation(() => undefined);
     try {
       const estimate = await estimateCost(["doc"], {
         promptText: "prompt",
@@ -295,7 +295,7 @@ describe("modelPricing", () => {
   });
 
   test("a matched family does not warn", async () => {
-    const warn = spyOn(console, "error").mockImplementation(() => {});
+    const warn = spyOn(console, "error").mockImplementation(() => undefined);
     try {
       await estimateCost(["doc"], {
         promptText: "prompt",

@@ -99,10 +99,19 @@ function parseFares(lines: string[]): AwardFare[] {
     // cabin's label.
     const available = amounts.some((value) => value > 0);
 
+    // With a discount the page lists the old price first, then the new one.
+    let milesValue: number | null;
+    if (!available) {
+      milesValue = null;
+    } else if (discounted) {
+      milesValue = amounts[1] ?? null;
+    } else {
+      milesValue = amounts[0] ?? null;
+    }
+
     fares.push({
       cabin: line,
-      // With a discount the page lists the old price first, then the new one.
-      miles: available ? (discounted ? (amounts[1] ?? null) : (amounts[0] ?? null)) : null,
+      miles: milesValue,
       standardMiles: available && discounted ? (amounts[0] ?? null) : null,
       taxes: available ? amount(taxes) : null,
       awardType: firstMatch(scope, AWARD_TYPE),

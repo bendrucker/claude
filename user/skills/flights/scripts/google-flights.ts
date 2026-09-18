@@ -283,11 +283,14 @@ export function parseGrid(text: string): GridCell[] {
     const price = amount(match[1]);
     if (price === null) continue;
     const rest = match[2] ?? "";
-    const tier = rest.includes("cheapest price")
-      ? "cheapest"
-      : rest.includes("low price")
-        ? "low"
-        : null;
+    let tier: "cheapest" | "low" | null;
+    if (rest.includes("cheapest price")) {
+      tier = "cheapest";
+    } else if (rest.includes("low price")) {
+      tier = "low";
+    } else {
+      tier = null;
+    }
     const span = /, ([A-Z][a-z]{2} \d{1,2}) to ([A-Z][a-z]{2} \d{1,2})/.exec(rest);
 
     const out = span?.[1];

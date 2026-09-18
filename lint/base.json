@@ -12,6 +12,9 @@
     "no-duplicate-imports": "error",
     "no-empty": "error",
     "no-lonely-if": "error",
+    // A ternary nested inside another packs two decisions into one expression,
+    // forcing the reader to unravel both to see what it actually returns.
+    "no-nested-ternary": "error",
     "no-template-curly-in-string": "warn",
     "no-underscore-dangle": ["error", { "allow": ["__typename", "__dirname"] }],
     "no-unsafe-optional-chaining": "off",

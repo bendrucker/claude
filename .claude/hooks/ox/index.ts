@@ -230,12 +230,14 @@ async function resolveCommand(pkg: string, binName: string): Promise<OxCommand |
   }
   const local = await localBin(pkg, binName);
   const global = local == null ? Bun.which(binName) : null;
-  const resolved =
-    local != null
-      ? { bin: "bun", prefix: [local] }
-      : global != null
-        ? { bin: global, prefix: [] }
-        : null;
+  let resolved: OxCommand | null;
+  if (local != null) {
+    resolved = { bin: "bun", prefix: [local] };
+  } else if (global != null) {
+    resolved = { bin: global, prefix: [] };
+  } else {
+    resolved = null;
+  }
   commandCache.set(pkg, resolved);
   return resolved;
 }

@@ -35,11 +35,12 @@ When `ListAgents` leaves `lead-<slug>` out, start the lead first. A `lead:unknow
 
 ```
 herdr agent start lead-<slug> --kind claude --pane <pane> -- --name lead-<slug>
+herdr agent prompt lead-<slug> "/lead <slug>"
 ```
 
-`SendMessage` `lead-<slug>` with `/lead <slug>`, then the request. Load `herdr:herdr` for the pane mechanics.
+The bootstrap goes over the pane: a new pane holds no draft to clobber, and `/lead <slug>` typed there invokes the skill, while the same text arriving as a peer message may not. Load `herdr:herdr` for the pane mechanics.
 
-The lead owns scope, decisions, and its own threads from there, and reports back the same way.
+Send the request itself, and every hand-off after it, with `SendMessage`. The lead owns scope, decisions, and its own threads from there, and reports back the same way.
 
 An unmatched request is a one-off. Dispatch it yourself.
 

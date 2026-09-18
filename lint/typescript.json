@@ -4,10 +4,22 @@
     "typescript/array-type": "error",
     "typescript/ban-ts-comment": "error",
     "typescript/consistent-generic-constructors": "error",
+    // An index signature admits any key of the right type, so a typo'd
+    // property name is accepted instead of rejected as an unknown key.
+    "typescript/consistent-indexed-object-style": "error",
+    // Mixing assertion styles hides which casts were actually reviewed
+    // versus which ones were bolted on to silence the compiler.
+    "typescript/consistent-type-assertions": "error",
     "typescript/consistent-type-definitions": "error",
+    // Bracket access defeats the property-rename and typo safety that dot
+    // notation gets from the compiler.
+    "typescript/dot-notation": "error",
     "typescript/explicit-module-boundary-types": "error",
     "typescript/no-deprecated": "error",
     "typescript/no-explicit-any": "error",
+    // An explicit annotation that drifts from the initializer's real type
+    // is still accepted, so the mismatch goes unnoticed.
+    "typescript/no-inferrable-types": "error",
     "typescript/no-misused-promises": "error",
     "typescript/no-non-null-assertion": "error",
     "typescript/no-unnecessary-condition": ["error", { "allowConstantLoopConditions": "always" }],
@@ -16,9 +28,22 @@
     "typescript/no-unsafe-call": "error",
     "typescript/no-unsafe-member-access": "error",
     "typescript/no-unsafe-return": "error",
+    // An `as` cast to a non-nullable type can drift from the operand's real
+    // type across a refactor without the compiler re-checking it, the way
+    // the `!` operator does.
+    "typescript/non-nullable-type-assertion-style": "error",
     "typescript/only-throw-error": "error",
+    // `.filter()[0]` builds and discards the rest of the filtered array to
+    // read a single element back out of it.
+    "typescript/prefer-find": "error",
     "typescript/prefer-promise-reject-errors": "error",
+    // A private field assigned only in the constructor but left mutable
+    // lets later code reassign it without the compiler objecting.
+    "typescript/prefer-readonly": "error",
     "typescript/require-await": "error",
+    // Adding a `+` operand of an unsafe or mismatched type silently
+    // coerces to a string or `NaN` instead of being rejected.
+    "typescript/restrict-plus-operands": "error",
     "typescript/strict-boolean-expressions": [
       "error",
       {
@@ -29,7 +54,10 @@
         "allowNullableObject": true,
         "allowNullableBoolean": true
       }
-    ]
+    ],
+    // A `switch` over a union that skips a member falls through silently
+    // instead of being rejected when the union grows.
+    "typescript/switch-exhaustiveness-check": "error"
   },
   "overrides": [
     {

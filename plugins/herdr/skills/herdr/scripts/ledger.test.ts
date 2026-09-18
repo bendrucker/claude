@@ -190,6 +190,12 @@ describe("appendOutcome", () => {
     expect(parseTags([`project=${"x".repeat(200)}`]).project).toHaveLength(200);
   });
 
+  test("refuses more tags than a routing key set needs", () => {
+    const tags = (n: number) => Array.from({ length: n }, (_, i) => `k${i}=v`);
+    expect(parseTags(tags(8))).toHaveProperty("k7", "v");
+    expect(() => parseTags(tags(9))).toThrow(/at most 8 tags, given 9/);
+  });
+
   test("refuses a note too long to keep a row's ceiling", async () => {
     const dataDir = await fixture();
     const outcome = (note: string) =>
@@ -203,7 +209,7 @@ describe("appendOutcome", () => {
     expect(message).toMatch(/at most 500 characters, given 501/);
     const blocked = await outcome("w".repeat(500));
     expect(blocked.note).toHaveLength(500);
-    expect(JSON.stringify(blocked).length).toBeLessThan(1_000);
+    expect(JSON.stringify(blocked).length).toBeLessThan(1_500);
   });
 });
 

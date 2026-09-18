@@ -22,17 +22,20 @@ export type Outcome = (typeof OUTCOMES)[number];
 // A thread stays on the board while someone still owes it a result.
 const OPEN: ReadonlySet<Outcome> = new Set(["dispatched", "blocked"]);
 
-// Nothing prunes an append-only ledger, so the free text a caller supplies is
-// bounded and a row keeps a size the reader can count on. An oversized value is
-// refused rather than trimmed, because a note is written to carry a reason and
-// half a reason reads as the whole one. dispatch cuts `task` to 120 on its own,
-// from a prompt nobody typed for the ledger. Every other field is an identifier
-// git or herdr supplies, bounded by whatever bounds it there.
+// Nothing prunes an append-only ledger, so every caller-supplied field carries
+// a limit and a row has a ceiling: 2.9 KB with all of them at once, against a
+// typical 450 bytes. An oversized value is refused rather than trimmed, because
+// a note is written to carry a reason and half a reason reads as the whole one.
+// dispatch cuts `task` to 120 on its own, from a prompt nobody typed for the
+// ledger. Every other field is an identifier git or herdr supplies.
 export const MAX_NOTE = 500;
 
 const TAG_KEY = /^[a-z][a-z0-9_-]*$/;
 // A tag is a routing key that has to fit a filter argument and a table column.
+// The count is capped too, because per-value limits alone leave the row
+// unbounded and routing needs a handful of keys rather than an open map.
 export const MAX_TAG_VALUE = 200;
+export const MAX_TAGS = 8;
 // herdr agent names are `^[a-z][a-z0-9_-]{0,31}$`, and `lead-` takes five of those.
 const LEAD_SLUG = /^[a-z][a-z0-9_-]{0,26}$/;
 
@@ -117,6 +120,8 @@ export function parseTags(values: readonly string[]): Record<string, string> {
       throw new Error(`tag "${key}" takes a value of at most ${MAX_TAG_VALUE} characters`);
     tags[key] = value.slice(at + 1);
   }
+  if (Object.keys(tags).length > MAX_TAGS)
+    throw new Error(`at most ${MAX_TAGS} tags, given ${Object.keys(tags).length}`);
   return tags;
 }
 

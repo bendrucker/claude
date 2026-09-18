@@ -17,7 +17,7 @@ test("a missing profile is absent rather than an error", async () => {
 });
 
 test("a round trip preserves the profile", async () => {
-  expect(await writeThenLoad(() => {})).toEqual(profile);
+  expect(await writeThenLoad(() => undefined)).toEqual(profile);
 });
 
 // Every distance is taken index-by-index, so a profile that disagrees with the

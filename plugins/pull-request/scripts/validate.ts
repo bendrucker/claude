@@ -40,7 +40,7 @@ async function replaceFile(file: string, text: string): Promise<boolean> {
   } catch {
     await Bun.file(temp)
       .delete()
-      .catch(() => {});
+      .catch(() => undefined);
     return false;
   }
 }

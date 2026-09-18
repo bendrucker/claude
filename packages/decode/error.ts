@@ -10,10 +10,15 @@ function preview(text: string): string {
 }
 
 function formatPath(path: readonly PropertyKey[]): string {
-  return path.reduce<string>((acc, segment) => {
-    if (typeof segment === "number") return `${acc}[${segment}]`;
-    return acc === "" ? String(segment) : `${acc}.${String(segment)}`;
-  }, "");
+  let formatted = "";
+  for (const segment of path) {
+    if (typeof segment === "number") {
+      formatted = `${formatted}[${segment}]`;
+    } else {
+      formatted = formatted === "" ? String(segment) : `${formatted}.${String(segment)}`;
+    }
+  }
+  return formatted;
 }
 
 function prettify(error: z.ZodError): string {

@@ -160,7 +160,8 @@ async function capture(command: string[]): Promise<string | null> {
     const proc = Bun.spawn(command, { stdout: "pipe", stderr: "ignore", timeout: TIMEOUT_MS });
     const stdout = await new Response(proc.stdout).text();
     return (await proc.exited) === 0 ? stdout.trim() : null;
-  } catch {
+  } catch (error) {
+    if (!isMissingBinary(error)) throw error;
     return null;
   }
 }
@@ -174,7 +175,10 @@ export function gitLookups(): BaseLookups {
       if (commonDir === null) return null;
       try {
         return await Bun.file(join(commonDir, "wt", "stack")).text();
-      } catch {
+      } catch (error) {
+        if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") {
+          throw error;
+        }
         return null;
       }
     },

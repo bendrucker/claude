@@ -834,6 +834,8 @@ function detectProjectFromRemote(): string | null {
   try {
     return parseProject(result.stdout);
   } catch {
+    // parseProject only throws when this remote has no group/project path to
+    // read, so falling through to the next detection source is correct here.
     return null;
   }
 }

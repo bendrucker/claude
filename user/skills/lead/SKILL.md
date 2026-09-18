@@ -16,13 +16,13 @@ You coordinate the project `$0` end to end. You settle its scope, keep its memor
 
 !`s=~/.claude-repo/plugins/herdr/skills/herdr/scripts/ledger.ts; if [ -f "$s" ]; then bun "$s" status --tag "project=$0" 2>&1; else echo "NO LEDGER at $s"; fi`
 
-`NO PROJECT DIRECTORY` means this slug has no project yet: start at Scope and create it. `NO LEDGER` names a script that is not on disk, so run the same command out of a checkout of `bendrucker/claude`. Any other error in place of the status blocks came from the ledger itself, so repair that before trusting the thread list.
-
-Read the topic files `MEMORY.md` indexes before scoping or dispatching, because the block prints the index rather than the decisions under it.
-
-A tracker URL as `$0` needs a slug before anything else: derive one from the project's name, then re-run both commands above with it. They ran against the raw URL, which misses an existing directory and the project's threads. Use the derived slug for the directory and for every `project=` tag.
+Settle `$0` into a slug before reading anything above. A slug is already settled. A tracker URL is not: read the tracker, derive a slug from the project's name, and re-run both commands with it. The block above ran against the raw URL, which misses an existing project's directory and its threads, so treat what it printed as empty until the re-run replaces it. Use the settled slug for the directory, for every `project=` tag, and for the `lead-<slug>` session name.
 
 A slug starts with a lowercase letter and runs at most 27 characters of lowercase letters, digits, hyphens, and underscores. That keeps `lead-<slug>` a legal herdr agent name. `status` drops a project whose slug breaks the rule, which reads as a missing project rather than an error.
+
+Then read the blocks. `NO PROJECT DIRECTORY` means the settled slug has no project yet: start at Scope and create it. `NO LEDGER` names a script that is not on disk, so run the same command out of a checkout of `bendrucker/claude`. Any other error in place of the status blocks came from the ledger itself, so repair that before trusting the thread list.
+
+Read the topic files `MEMORY.md` indexes before scoping or dispatching, because the block prints the index rather than the decisions under it.
 
 ## Files
 

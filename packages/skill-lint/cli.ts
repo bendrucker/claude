@@ -41,7 +41,8 @@ Exit codes:
 function tryReaddir(dir: string) {
   try {
     return readdirSync(dir, { withFileTypes: true });
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return null;
   }
 }

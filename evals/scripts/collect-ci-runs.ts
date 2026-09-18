@@ -79,7 +79,8 @@ export async function discoverExports(dir: string): Promise<DiscoveredExport[]> 
   let entries: string[];
   try {
     entries = readdirSync(dir, { recursive: true }).map(String);
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return [];
   }
 
@@ -101,7 +102,8 @@ function readExport(file: string, text: string): DiscoveredExport | null {
   try {
     const parsed = ExportPayload.safeParse(JSON.parse(text));
     return parsed.success ? { path: file, payload: parsed.data } : null;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
     return null;
   }
 }

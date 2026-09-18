@@ -8,6 +8,8 @@ The [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in d
 
 - `CLAUDE.md` - Global instructions that apply to all projects
 - `settings.json` - User settings (plugins, permissions, sandbox, hooks)
+- `agents/` - User-level agents, available to dispatch from any project
+  - `chief` - A singleton coordinator, launched as its own session with `claude --agent chief --name chief` from `~` in the Chief workspace
 - `hooks/` - User-level hooks that run across all projects
   - `worktree/` - Validates bash commands in worktrunk worktrees
   - `webfetch-block/` - Steers WebFetch calls toward better tools

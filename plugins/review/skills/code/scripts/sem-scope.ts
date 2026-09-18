@@ -200,12 +200,14 @@ if (import.meta.main) {
   });
 
   const { base, range } = argv.flags;
-  const target: Target | null =
-    base !== undefined && range === undefined
-      ? { base }
-      : range !== undefined && base === undefined
-        ? { range }
-        : null;
+  let target: Target | null;
+  if (base !== undefined && range === undefined) {
+    target = { base };
+  } else if (range !== undefined && base === undefined) {
+    target = { range };
+  } else {
+    target = null;
+  }
 
   if (target === null) {
     console.error("Pass exactly one of --base <ref> or --range <a>...<b>.");

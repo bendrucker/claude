@@ -139,14 +139,16 @@ export function renderTask(
   // every teammate. The clean meta description (or stdin description) covers the
   // gap before the teammate's first action; the name is the last resort.
   const fallback = description ?? task.description ?? null;
-  let text =
-    activity != null && activity !== ""
-      ? activity
-      : fallback != null && fallback !== ""
-        ? formatDescription(fallback, agentType)
-        : task.name != null && task.name !== ""
-          ? task.name
-          : "agent";
+  let text: string;
+  if (activity != null && activity !== "") {
+    text = activity;
+  } else if (fallback != null && fallback !== "") {
+    text = formatDescription(fallback, agentType);
+  } else if (task.name != null && task.name !== "") {
+    text = task.name;
+  } else {
+    text = "agent";
+  }
   let content = build(text, true);
 
   if (columns != null && Bun.stringWidth(content) > columns) {

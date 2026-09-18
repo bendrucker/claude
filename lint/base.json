@@ -28,6 +28,9 @@
     // conversion behind an operator that reads as something else.
     "no-implicit-coercion": "error",
     "no-lonely-if": "error",
+    // A ternary nested inside another packs two decisions into one expression,
+    // forcing the reader to unravel both to see what it actually returns.
+    "no-nested-ternary": "error",
     // Reassigning a parameter overwrites the caller's argument binding, so a
     // later read of it no longer reflects what was passed in.
     "no-param-reassign": "error",

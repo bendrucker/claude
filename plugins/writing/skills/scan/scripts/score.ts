@@ -210,13 +210,16 @@ export function renderVoiceDeltaTable(
     if (gated) {
       const failed = failedBands(statistics, feature.id);
       const missing = unmeasuredBands(statistics, feature.id);
-      const verdict = !measuredFeature(statistics, feature.id)
-        ? "unmeasured"
-        : failed.length > 0
-          ? "noise"
-          : missing.length > 0
-            ? "partial"
-            : "clears";
+      let verdict: string;
+      if (!measuredFeature(statistics, feature.id)) {
+        verdict = "unmeasured";
+      } else if (failed.length > 0) {
+        verdict = "noise";
+      } else if (missing.length > 0) {
+        verdict = "partial";
+      } else {
+        verdict = "clears";
+      }
       row.push(verdict);
       if (verdict === "noise") noise.push({ feature, failed });
       if (verdict === "partial") partial.push({ feature, failed: missing });

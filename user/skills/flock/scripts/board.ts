@@ -103,6 +103,14 @@ export function withFlag(flags: readonly string[], flag: string): string[] {
 }
 
 export function rowCells(row: BoardRow): string[] {
+  let ageCell: string;
+  if (row.age !== null) {
+    ageCell = String(row.age);
+  } else if (row.kind === "pane") {
+    ageCell = "-";
+  } else {
+    ageCell = "?";
+  }
   return [
     row.pane ?? "-",
     row.workspace ?? "-",
@@ -110,7 +118,7 @@ export function rowCells(row: BoardRow): string[] {
     row.repoLabel,
     branchLabel(row),
     row.prColumn,
-    row.age === null ? (row.kind === "pane" ? "-" : "?") : String(row.age),
+    ageCell,
     row.flags.join(","),
   ];
 }

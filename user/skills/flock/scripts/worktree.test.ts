@@ -145,11 +145,14 @@ describe("filterCarried", () => {
 
   test("every constant entry matches something", () => {
     for (const entry of CONVENTIONAL_IGNORED) {
-      const sample = entry.endsWith("/")
-        ? `nested/${entry}`
-        : entry.startsWith("*")
-          ? `nested/sample${entry.slice(1)}`
-          : `nested/${entry}`;
+      let sample: string;
+      if (entry.endsWith("/")) {
+        sample = `nested/${entry}`;
+      } else if (entry.startsWith("*")) {
+        sample = `nested/sample${entry.slice(1)}`;
+      } else {
+        sample = `nested/${entry}`;
+      }
       expect(isConventionalIgnored(sample)).toBe(true);
     }
   });

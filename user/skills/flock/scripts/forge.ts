@@ -355,10 +355,18 @@ function githubPullRequest(
   pull: z.infer<typeof GitHubPullRequests>[number],
   state: "open" | "merged",
 ): PullRequest {
+  let pullState: "merged" | "draft" | "open";
+  if (state === "merged") {
+    pullState = "merged";
+  } else if (pull.isDraft === true) {
+    pullState = "draft";
+  } else {
+    pullState = "open";
+  }
   const identity = {
     branch: pull.headRefName,
     number: pull.number,
-    state: state === "merged" ? "merged" : pull.isDraft === true ? "draft" : "open",
+    state: pullState,
     mergedAt: epochSeconds(pull.mergedAt),
     headOid: pull.headRefOid ?? null,
   } as const;
@@ -493,15 +501,18 @@ function gitlabMergeRequest(
   request: z.infer<typeof GitLabMergeRequests>[number],
   state: "open" | "merged",
 ): PullRequest {
+  let requestState: "merged" | "draft" | "open";
+  if (state === "merged") {
+    requestState = "merged";
+  } else if (request.draft === true || request.work_in_progress === true) {
+    requestState = "draft";
+  } else {
+    requestState = "open";
+  }
   const identity = {
     branch: request.source_branch,
     number: request.iid,
-    state:
-      state === "merged"
-        ? "merged"
-        : request.draft === true || request.work_in_progress === true
-          ? "draft"
-          : "open",
+    state: requestState,
     mergedAt: epochSeconds(request.merged_at),
     headOid: request.sha ?? null,
   } as const;

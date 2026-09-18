@@ -163,6 +163,14 @@ export function renderReport(floors: FeatureFloor[], options: FloorOptions): str
   const ordered = floors.toSorted((a, b) => (margin(b) ?? -1) - (margin(a) ?? -1));
   const rows = ordered.map((floor) => {
     const ratio = margin(floor);
+    let verdict: string;
+    if (!clearsFloor(floor)) {
+      verdict = "noise";
+    } else if (floor.floor === null) {
+      verdict = "unmeasured";
+    } else {
+      verdict = "clears";
+    }
     return [
       floor.featureId,
       floor.provenance,
@@ -171,7 +179,7 @@ export function renderReport(floors: FeatureFloor[], options: FloorOptions): str
       fixed(floor.gap),
       floor.floor === null ? "n/a" : fixed(floor.floor),
       ratio === null ? "n/a" : `${ratio.toFixed(2)}x`,
-      clearsFloor(floor) ? (floor.floor === null ? "unmeasured" : "clears") : "noise",
+      verdict,
     ];
   });
 

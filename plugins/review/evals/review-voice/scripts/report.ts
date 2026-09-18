@@ -52,7 +52,7 @@ type Label = z.infer<typeof Label>;
 
 async function readLabels(dir: string): Promise<Map<string, Label>> {
   const map = new Map<string, Label>();
-  let names: string[] = [];
+  let names: string[];
   try {
     names = await readdir(dir);
   } catch {

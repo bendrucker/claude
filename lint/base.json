@@ -6,6 +6,8 @@
     "suspicious": "error"
   },
   "rules": {
+    // A switch missing a default leaves a new case value unhandled, falling through silently.
+    "default-case": "error",
     "eqeqeq": ["error", "always", { "null": "ignore" }],
     "max-depth": "error",
     "no-await-in-loop": "error",
@@ -26,16 +28,28 @@
         "ignoreRestSiblings": true
       }
     ],
+    // An assignment overwritten before it's ever read wastes the write.
+    "no-useless-assignment": "error",
+    // A trailing `return` with no expression restates the function's implicit end.
+    "no-useless-return": "error",
     "prefer-object-spread": "error",
     "prefer-template": "error",
     "import/no-namespace": ["error", { "ignore": ["fast-check"] }],
+    // Branches that repeat the same statement hide which lines are the actual difference between them.
+    "oxc/branches-sharing-code": "error",
     "oxc/no-map-spread": "error",
     "promise/avoid-new": "error",
     "unicorn/catch-error-name": "error",
+    // Mixing `> -1` and `!== -1` for the same existence check reads as two different tests of one fact.
+    "unicorn/consistent-existence-index-check": "error",
     "unicorn/custom-error-definition": "error",
     "unicorn/explicit-length-check": "error",
     "unicorn/no-array-for-each": "error",
+    // An else block holding only an if is the else-if it never became, one indent deeper than it needs to be.
+    "unicorn/no-lonely-if": "error",
     "unicorn/prefer-array-find": "error",
+    // `arr[arr.length - 1]` recomputes an index that `.at(-1)` states directly.
+    "unicorn/prefer-at": "error",
     "unicorn/prefer-export-from": "error",
     "unicorn/prefer-math-min-max": "error",
     "unicorn/prefer-set-has": "error",
@@ -43,6 +57,8 @@
     "unicorn/prefer-string-raw": "error",
     "unicorn/prefer-string-replace-all": "error",
     "unicorn/prefer-string-slice": "error",
+    // An if/else that only assigns or returns duplicates the branch target for what is one expression.
+    "unicorn/prefer-ternary": "error",
     // The vitest plugin matches the Jest-style API shape, not the import, so it
     // covers this repo's bun:test suites. These two rules read source prose and
     // ordinary loops as tests, so they run only over test files.

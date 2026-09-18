@@ -26,11 +26,7 @@ export async function processInput(input: PreToolUseHookInput): Promise<void> {
 
   const hasNewline = await hasTrailingNewline(filePath);
 
-  if (hasNewline === null) {
-    await setState("newline", filePath, "");
-  } else {
-    await setState("newline", filePath, hasNewline ? "1" : "");
-  }
+  await setState("newline", filePath, hasNewline ? "1" : "");
 }
 
 async function main(): Promise<void> {

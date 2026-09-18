@@ -146,7 +146,7 @@ export function noNegationSpans(text: string): PatternSpan[] {
   let cursor = 0;
   for (const sentence of splitSentences(text)) {
     const base = text.indexOf(sentence, cursor);
-    if (base < 0) continue;
+    if (base === -1) continue;
     cursor = base + sentence.length;
     for (const span of sentenceSpans(sentence)) {
       spans.push({ index: base + span.index, matched: span.matched });

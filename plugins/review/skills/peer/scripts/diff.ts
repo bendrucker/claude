@@ -39,7 +39,7 @@ export function parseDiff(diffText: string): ParsedDiff {
   let oldLine = 0;
 
   const lines = diffText.split("\n");
-  if (lines.length > 0 && lines[lines.length - 1] === "") {
+  if (lines.length > 0 && lines.at(-1) === "") {
     lines.pop();
   }
 
@@ -117,7 +117,7 @@ export function parseDiff(diffText: string): ParsedDiff {
 
     if (line.startsWith("--- ")) {
       const oldMatch = OLD_PATH.exec(line);
-      if (oldMatch && oldMatch[1] !== undefined && current) {
+      if (oldMatch?.[1] !== undefined && current) {
         const oldPath = stripDevNull(oldMatch[1]);
         if (
           oldPath != null &&
@@ -133,7 +133,7 @@ export function parseDiff(diffText: string): ParsedDiff {
 
     if (line.startsWith("+++ ")) {
       const newMatch = NEW_PATH.exec(line);
-      if (newMatch && newMatch[1] !== undefined && current) {
+      if (newMatch?.[1] !== undefined && current) {
         const newPath = stripDevNull(newMatch[1]);
         if (
           newPath != null &&

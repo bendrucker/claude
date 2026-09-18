@@ -60,8 +60,8 @@ if (!first) {
 }
 
 const keys = Object.keys(first);
-let headers = keys.map(camelToTitle);
-let rows = items.map((item) =>
+const allHeaders = keys.map(camelToTitle);
+const allRows = items.map((item) =>
   keys.map((k) => {
     const v = item[k];
     if (v == null) return "";
@@ -72,7 +72,7 @@ let rows = items.map((item) =>
 );
 
 const columns = argv.flags.columns?.split(",");
-[headers, rows] = selectColumns(headers, rows, columns);
+const [headers, rows] = selectColumns(allHeaders, allRows, columns);
 process.stdout.write(table([headers, ...rows]));
 
 function camelToTitle(s: string): string {

@@ -16,8 +16,6 @@ export function isPlanPath(filePath: string): boolean {
   return home !== "" && filePath.startsWith(`${home}/.claude/plans/`);
 }
 
-const JOBS_PATH_PATTERN = /\/\.claude\/jobs\//;
-
 // Scratch prose is internal handoff text (job scripts, worktree tmp/ notes,
 // $TMPDIR files) that no human reads at the write site. Content that matters
 // leaves through an egress surface (--body-file, --field key=@file), where the
@@ -28,7 +26,7 @@ export function isScratchPath(filePath: string, cwd: string = process.cwd()): bo
   const resolved = resolve(cwd, filePath);
   const tmpDir = process.env.TMPDIR;
   if (tmpDir != null && tmpDir !== "" && resolved.startsWith(`${resolve(tmpDir)}/`)) return true;
-  if (JOBS_PATH_PATTERN.test(resolved)) return true;
+  if (resolved.includes("/.claude/jobs/")) return true;
   if (resolved.startsWith("/tmp/") || resolved.startsWith("/private/tmp/")) return true;
   const root = resolve(cwd);
   if (!resolved.startsWith(`${root}/`)) return false;

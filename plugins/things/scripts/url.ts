@@ -428,28 +428,29 @@ if (import.meta.main) {
     ? defaultActions
     : { ...defaultActions, findXcallRunner: () => Promise.resolve(null) };
 
+  let dispatchCommand: string;
+  let dispatchParams: Map<string, string>;
   if (useBulkJson) {
     const attributes: Record<string, string> = {};
     for (const [key, value] of params) {
       attributes[key] = value;
     }
     const payload = buildJsonPayload(ids, attributes);
-    const jsonParams = new Map<string, string>();
-    jsonParams.set("data", payload);
-    const result = await dispatch("json", jsonParams, callbackActions);
-    if (result.output !== null) {
-      console.log(result.output);
-    }
-    if (argv.flags.callback) warnFallback(result);
+    dispatchParams = new Map<string, string>();
+    dispatchParams.set("data", payload);
+    dispatchCommand = "json";
   } else {
     const singleId = ids.at(0);
     if (singleId !== undefined) {
       params.set("id", singleId);
     }
-    const result = await dispatch(command, params, callbackActions);
-    if (result.output !== null) {
-      console.log(result.output);
-    }
-    if (argv.flags.callback) warnFallback(result);
+    dispatchCommand = command;
+    dispatchParams = params;
   }
+
+  const result = await dispatch(dispatchCommand, dispatchParams, callbackActions);
+  if (result.output !== null) {
+    console.log(result.output);
+  }
+  if (argv.flags.callback) warnFallback(result);
 }

@@ -134,7 +134,16 @@ New work needing its own worktree and agent gets both in one call:
 bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
 ```
 
-It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir.
+It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir. `--tag <key>=<value>`, repeatable, records who dispatched it and what for (`--tag by=chief`, `--tag project=<slug>`).
+
+The ledger is the record of what is out and what came back:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts status [--tag project=<slug>] [--json]
+bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts outcome --repo "$REPO" --branch "$BRANCH" --state done --pr "$PR_URL"
+```
+
+`status` prints the projects (one line per `projects/<slug>/project.md` in the data dir: slug, description, whether a `lead-<slug>` agent is live, open thread count), then every thread whose latest row is `dispatched` or `blocked` and carries each given tag. `outcome` appends a row with the thread's new state (`done`, `blocked`, `abandoned`), an optional `--pr`, and a `--note` saying why when it is blocked or abandoned. The latest row per repo and branch is the thread's state.
 
 `worktrunk:wt-switch-create` re-roots this session instead.
 

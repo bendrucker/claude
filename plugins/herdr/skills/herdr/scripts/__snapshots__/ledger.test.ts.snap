@@ -1,0 +1,21 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`status renders the routing block and the open threads 1`] = `
+"projects
+ledger  Dispatch ledger, project routing, and the chief and lead sessions that read it  lead:live  open:1
+
+threads
+branch     state       agent      pane    age  pr  tags
+fix-thing  blocked     fix-thing  wZZ:p1  30m  -   project=ledger by=lead-ledger
+one-off    dispatched  one-off    wA:p1   3h   -   by=chief
+"
+`;
+
+exports[`status marks the lead unknown when herdr cannot answer, and the blocks empty when they are 1`] = `
+"projects
+p  d  lead:unknown  open:0
+
+threads
+no open threads
+"
+`;

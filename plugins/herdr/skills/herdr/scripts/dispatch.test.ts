@@ -2,7 +2,6 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "bun:test";
-import { z } from "zod";
 import {
   type CommandResult,
   deriveName,
@@ -14,7 +13,7 @@ import {
   spawnRunner,
   taskSummary,
 } from "./dispatch";
-import { appendDispatch, ledgerPath, resolveDataDir } from "./ledger";
+import { appendDispatch, LedgerRow, ledgerPath, resolveDataDir } from "./ledger";
 
 const ok = (stdout: string): CommandResult => ({ code: 0, stdout, stderr: "" });
 const fail = (stderr: string): CommandResult => ({ code: 1, stdout: "", stderr });
@@ -515,19 +514,6 @@ describe("dispatch", () => {
   });
 });
 
-const LedgerRow = z.object({
-  ts: z.string(),
-  task: z.string(),
-  repo: z.string(),
-  branch: z.string(),
-  path: z.string(),
-  workspace: z.string(),
-  pane: z.string(),
-  agent: z.string().nullable(),
-  session: z.string().nullable(),
-  outcome: z.enum(["dispatched", "orphaned"]),
-});
-
 describe("cli", () => {
   const script = join(import.meta.dir, "dispatch.ts");
   const filled = join(mkdtempSync(join(tmpdir(), "dispatch-cli-")), "prompt.txt");
@@ -541,6 +527,12 @@ describe("cli", () => {
     ["a bad branch", ["--branch", "bad branch", "--prompt", filled], 1, /must match/],
     ["a missing prompt file", ["--branch", "ok", "--prompt", "/nope/gone.txt"], 2, /cannot read/],
     ["an empty prompt", ["--branch", "ok", "--prompt", "/dev/null"], 2, /prompt is empty/],
+    [
+      "a bare tag",
+      ["--branch", "ok", "--prompt", filled, "--tag", "chief"],
+      2,
+      /must be <key>=<value>/,
+    ],
     [
       "a non-numeric timeout",
       ["--branch", "ok", "--prompt", filled, "--timeout", "abc"],

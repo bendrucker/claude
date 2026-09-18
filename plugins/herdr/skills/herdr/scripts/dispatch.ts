@@ -2,7 +2,7 @@
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger in the plugin data dir under ~/.claude/plugins
 import { cli } from "cleye";
 import { z } from "zod";
-import { appendDispatch, resolveDataDir } from "./ledger";
+import { appendDispatch, type DispatchLedgerRow, parseTags, resolveDataDir } from "./ledger";
 
 const BRANCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 const AGENT_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
@@ -504,6 +504,11 @@ if (import.meta.main) {
         type: String,
         description: "Dispatch ledger directory; defaults to the plugin data dir",
       },
+      tag: {
+        type: [String],
+        description:
+          "key=value recorded on the ledger row, such as project=<slug> or by=chief; repeatable",
+      },
       timeout: {
         type: Number,
         default: 15_000,
@@ -523,6 +528,14 @@ if (import.meta.main) {
     process.exit(2);
   }
 
+  let tags: Record<string, string>;
+  try {
+    tags = parseTags(argv.flags.tag);
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exit(2);
+  }
+
   const prompt = await readPrompt(argv.flags.prompt);
   if (prompt.trim() === "") {
     process.stderr.write("the prompt is empty; pass --prompt <file> or pipe it on stdin\n");
@@ -536,22 +549,21 @@ if (import.meta.main) {
     repo: string,
     outcome: "dispatched" | "orphaned",
   ) => {
+    const row: DispatchLedgerRow = {
+      ts: new Date().toISOString(),
+      task: taskSummary(prompt),
+      repo,
+      branch: record.branch,
+      path: record.path,
+      workspace: record.workspace,
+      pane: record.pane,
+      agent: record.agent,
+      session: record.session,
+      outcome,
+    };
+    if (Object.keys(tags).length > 0) row.tags = tags;
     try {
-      appendDispatch(
-        {
-          ts: new Date().toISOString(),
-          task: taskSummary(prompt),
-          repo,
-          branch: record.branch,
-          path: record.path,
-          workspace: record.workspace,
-          pane: record.pane,
-          agent: record.agent,
-          session: record.session,
-          outcome,
-        },
-        resolveDataDir(argv.flags.dataDir),
-      );
+      appendDispatch(row, resolveDataDir(argv.flags.dataDir));
     } catch (error) {
       process.stderr.write(
         `warning: dispatch ledger not written: ${error instanceof Error ? error.message : String(error)}\n`,

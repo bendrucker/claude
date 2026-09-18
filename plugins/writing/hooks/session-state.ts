@@ -23,6 +23,7 @@ async function readState(sessionId: string): Promise<SessionState> {
     const parsed = SessionState.safeParse(await file.json());
     return parsed.success ? parsed.data : {};
   } catch {
+    // A missing or corrupt state file must not fail the hook. Start from no suppressions.
     return {};
   }
 }

@@ -66,6 +66,7 @@ export async function checkCode(content: string, ext: string): Promise<string | 
   try {
     execSync("command -v sg", { stdio: ["pipe", "pipe", "pipe"] });
   } catch {
+    // sg not installed must not fail the hook. Skip the ast-grep check.
     return null;
   }
 
@@ -109,6 +110,7 @@ async function fileAlreadyNumbered(filePath: string, ext: string): Promise<boole
     if (!(await file.exists())) return false;
     existing = await file.text();
   } catch {
+    // A missing or unreadable file must not fail the hook. Treat it as unnumbered.
     return false;
   }
 

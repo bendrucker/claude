@@ -500,6 +500,68 @@ describe("dispatch", () => {
     expect(calls.filter((argv) => argv[2] === "list")).toHaveLength(1);
   });
 
+  test("stamps the thread's tags on the pane once the agent has started", async () => {
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      BASE_OK,
+      WORKTREE,
+      STARTED,
+      ok(""),
+      ok(""),
+      AGENT_GET,
+    ]);
+
+    const { record } = await dispatch(
+      { ...options, tags: { project: "demo", by: "lead-chief" } },
+      run,
+    );
+
+    const stamped = calls.findIndex((argv) => argv[2] === "report-metadata");
+    expect(calls[stamped]).toEqual([
+      "herdr",
+      "pane",
+      "report-metadata",
+      "wZZ:p1",
+      "--source",
+      "dispatch",
+      "--token",
+      "project=demo",
+      "--token",
+      "by=lead-chief",
+    ]);
+    expect(stamped).toBeGreaterThan(calls.findIndex((argv) => argv[2] === "start"));
+    expect(record.prompted).toBe(true);
+  });
+
+  test("stamps nothing when the thread carries no tags", async () => {
+    const { run, calls } = fakeRunner(HAPPY_PATH);
+    await dispatch({ ...options, tags: {} }, run);
+    expect(calls.filter((argv) => argv[2] === "report-metadata")).toEqual([]);
+  });
+
+  test("keeps the dispatch and its record when the tokens are refused", async () => {
+    const { run } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      REMOTES,
+      ok(""),
+      BASE_OK,
+      WORKTREE,
+      STARTED,
+      fail(envelope("pane_not_found")),
+      ok(""),
+      AGENT_GET,
+    ]);
+
+    const { record } = await dispatch({ ...options, tags: { project: "demo" } }, run);
+    expect(record.prompted).toBe(true);
+    expect(record.agent).toBe("fix-thing");
+    expect(record.session).toBe("sess-1");
+  });
+
   test("rejects a herdr payload that does not match the expected shape", async () => {
     const { run } = fakeRunner([
       AGENT_LIST,

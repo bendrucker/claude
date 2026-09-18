@@ -100,7 +100,7 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  main().catch((error) => {
+  main().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[pull-request/validate] Unexpected error: ${message}`);
     denyWithError(`Validation hook encountered an error: ${message}`);

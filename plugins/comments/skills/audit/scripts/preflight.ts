@@ -93,7 +93,9 @@ export async function preflight(
   // content in hand, weights the ranking so the shard budget lands on the
   // heaviest files first.
   const densities: ScoredFile[] = [];
-  const comments = await collect(options, (file) => densities.push(file));
+  const comments = await collect(options, (file) => {
+    densities.push(file);
+  });
 
   const ranked = rankCommentsWeighted(comments, densityWeights(densities), options.sort);
   const limited = typeof options.limit === "number" ? ranked.slice(0, options.limit) : ranked;

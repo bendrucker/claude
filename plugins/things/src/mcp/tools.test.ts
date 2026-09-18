@@ -82,7 +82,9 @@ describe("validateCaptureTitles", () => {
     ["title only", "one", undefined],
     ["titles only", undefined, ["one", "two"]],
   ])("accepts %s", (_name, title, titles) => {
-    expect(() => validateCaptureTitles(title, titles)).not.toThrow();
+    expect(() => {
+      validateCaptureTitles(title, titles);
+    }).not.toThrow();
   });
 
   test.each<[string, string | undefined, string[] | undefined, string]>([
@@ -94,13 +96,17 @@ describe("validateCaptureTitles", () => {
     ["whitespace title only", "  ", undefined, "title or titles is required"],
     ["a blank entry among titles", undefined, ["one", ""], "titles[1] must be a non-empty string"],
   ])("rejects %s", (_name, title, titles, message) => {
-    expect(() => validateCaptureTitles(title, titles)).toThrow(message);
+    expect(() => {
+      validateCaptureTitles(title, titles);
+    }).toThrow(message);
   });
 });
 
 describe("validateNonBlank", () => {
   test("accepts non-empty values", () => {
-    expect(() => validateNonBlank(["abc", "def"], "ids")).not.toThrow();
+    expect(() => {
+      validateNonBlank(["abc", "def"], "ids");
+    }).not.toThrow();
   });
 
   test.each<[string, string[], string, string]>([
@@ -108,7 +114,9 @@ describe("validateNonBlank", () => {
     ["whitespace only", ["  "], "ids", 'ids[0] must be a non-empty string, got "  "'],
     ["names the field", [""], "titles", 'titles[0] must be a non-empty string, got ""'],
   ])("rejects %s", (_name, values, field, message) => {
-    expect(() => validateNonBlank(values, field)).toThrow(message);
+    expect(() => {
+      validateNonBlank(values, field);
+    }).toThrow(message);
   });
 });
 

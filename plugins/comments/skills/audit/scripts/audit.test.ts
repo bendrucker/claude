@@ -97,7 +97,18 @@ interface Capture {
 function capture(): Capture {
   const out: string[] = [];
   const err: string[] = [];
-  return { io: { log: (line) => out.push(line), warn: (line) => err.push(line) }, out, err };
+  return {
+    io: {
+      log: (line) => {
+        out.push(line);
+      },
+      warn: (line) => {
+        err.push(line);
+      },
+    },
+    out,
+    err,
+  };
 }
 
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");

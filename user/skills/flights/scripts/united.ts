@@ -337,6 +337,8 @@ if (import.meta.main) {
         description: "Build united.com search URLs and parse rendered award results.",
       },
     },
-    (parsed) => parsed.showHelp(),
+    (parsed) => {
+      parsed.showHelp();
+    },
   );
 }

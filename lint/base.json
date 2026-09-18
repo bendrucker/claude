@@ -31,6 +31,9 @@
     "import/no-namespace": ["error", { "ignore": ["fast-check"] }],
     "oxc/no-map-spread": "error",
     "promise/avoid-new": "error",
+    // A promise chain with no catch and no return lets a rejection disappear
+    // instead of propagating to a caller or being handled.
+    "promise/catch-or-return": "error",
     "unicorn/catch-error-name": "error",
     "unicorn/custom-error-definition": "error",
     "unicorn/explicit-length-check": "error",

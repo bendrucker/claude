@@ -61,7 +61,11 @@ describe("failure messages", () => {
       text: `{"number":${"9".repeat(400)}`,
     },
   ])("$title", ({ text, schema = Review }) => {
-    expect(message(() => decodeJson(schema, text, "gh pr view output"))).toMatchSnapshot();
+    expect(
+      message(() => {
+        decodeJson(schema, text, "gh pr view output");
+      }),
+    ).toMatchSnapshot();
   });
 });
 
@@ -92,7 +96,11 @@ describe("decode", () => {
   });
 
   test("reports a syntax-free failure without an input echo", () => {
-    expect(message(() => decode(Tag, { name: 1 }, "catalog entry"))).toMatchSnapshot();
+    expect(
+      message(() => {
+        decode(Tag, { name: 1 }, "catalog entry");
+      }),
+    ).toMatchSnapshot();
   });
 });
 
@@ -113,13 +121,19 @@ describe("decodeJsonLines", () => {
       text: '{"name":"a"}\n\n\n{"name":3}',
     },
   ])("$title", ({ text }) => {
-    expect(message(() => decodeJsonLines(Tag, text, "transcript"))).toMatchSnapshot();
+    expect(
+      message(() => {
+        decodeJsonLines(Tag, text, "transcript");
+      }),
+    ).toMatchSnapshot();
   });
 });
 
 describe("DecodeError", () => {
   test("carries the source and the zod issues", () => {
-    const error = thrown(() => decodeJson(Review, '{"number":"12"}', "gh pr view output"));
+    const error = thrown(() => {
+      decodeJson(Review, '{"number":"12"}', "gh pr view output");
+    });
     expect(error.source).toBe("gh pr view output");
     expect(error.issues.map((issue) => issue.path.join("."))).toEqual([
       "number",
@@ -129,7 +143,11 @@ describe("DecodeError", () => {
   });
 
   test("a syntax failure carries no issues", () => {
-    expect(thrown(() => decodeJson(Review, "{", "gh pr view output")).issues).toEqual([]);
+    expect(
+      thrown(() => {
+        decodeJson(Review, "{", "gh pr view output");
+      }).issues,
+    ).toEqual([]);
   });
 });
 

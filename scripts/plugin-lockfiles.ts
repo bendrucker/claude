@@ -243,6 +243,8 @@ if (import.meta.main) {
           "Manage the lockfiles Claude Code needs to install plugin dependencies. It installs them when it caches a plugin, but only when the plugin root holds a lockfile beside package.json, and skips a plugin without one silently. `generate` writes those lockfiles, `check` fails when one is missing, disagrees with package.json, or when a manifest sits below the plugin root where the install never reaches it.",
       },
     },
-    (parsed) => parsed.showHelp(),
+    (parsed) => {
+      parsed.showHelp();
+    },
   );
 }

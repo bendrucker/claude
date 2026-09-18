@@ -31,8 +31,8 @@ export function profilePath(dataDir: string): string {
 // there is a register, so adding one needs no code change.
 export async function registerPaths(dataDir: string): Promise<string[]> {
   const dir = voiceBaselineDir(dataDir);
-  const entries = await readdir(dir).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return [];
+  const entries = await readdir(dir).catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
     throw error;
   });
   return entries

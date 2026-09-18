@@ -6,6 +6,10 @@
     "typescript/consistent-generic-constructors": "error",
     "typescript/consistent-type-definitions": "error",
     "typescript/explicit-module-boundary-types": "error",
+    // A void-returning expression used as a value reads as though it produces
+    // one, but it evaluates to undefined, and the mistake surfaces only where
+    // that undefined is used later.
+    "typescript/no-confusing-void-expression": "error",
     "typescript/no-deprecated": "error",
     "typescript/no-explicit-any": "error",
     "typescript/no-misused-promises": "error",
@@ -19,6 +23,10 @@
     "typescript/only-throw-error": "error",
     "typescript/prefer-promise-reject-errors": "error",
     "typescript/require-await": "error",
+    // Returning a promise without awaiting it inside a try block lets the
+    // rejection surface after the function has already returned, skipping
+    // the enclosing catch.
+    "typescript/return-await": "error",
     "typescript/strict-boolean-expressions": [
       "error",
       {
@@ -29,7 +37,13 @@
         "allowNullableObject": true,
         "allowNullableBoolean": true
       }
-    ]
+    ],
+    // A callback typed to return void accepts any return type, so a function
+    // that returns a real value there has that value silently discarded.
+    "typescript/strict-void-return": "error",
+    // A catch callback's error parameter typed as anything but unknown lets
+    // its properties be read without confirming the rejection has that shape.
+    "typescript/use-unknown-in-catch-callback-variable": "error"
   },
   "overrides": [
     {

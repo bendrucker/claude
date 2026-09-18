@@ -24,10 +24,30 @@ test("a round trip preserves the profile", async () => {
 // live feature table scores against the wrong columns and returns a number
 // nothing downstream can tell is wrong.
 test.each([
-  ["a renamed feature", (d: StyleProfile) => (d.featureIds = [...d.featureIds].toReversed())],
-  ["a dropped feature", (d: StyleProfile) => d.featureIds.pop()],
-  ["a truncated scaler", (d: StyleProfile) => d.scaler.mean.pop()],
-  ["a truncated centroid", (d: StyleProfile) => d.voice.rhythmCentroid.pop()],
+  [
+    "a renamed feature",
+    (d: StyleProfile) => {
+      d.featureIds = [...d.featureIds].toReversed();
+    },
+  ],
+  [
+    "a dropped feature",
+    (d: StyleProfile) => {
+      d.featureIds.pop();
+    },
+  ],
+  [
+    "a truncated scaler",
+    (d: StyleProfile) => {
+      d.scaler.mean.pop();
+    },
+  ],
+  [
+    "a truncated centroid",
+    (d: StyleProfile) => {
+      d.voice.rhythmCentroid.pop();
+    },
+  ],
 ])("%s is rejected", (_name, mutate) => {
   expect(writeThenLoad(mutate)).rejects.toThrow(/stale/i);
 });

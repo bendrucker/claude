@@ -130,7 +130,9 @@ describe("store", () => {
       const state: InboxState = { dispatched: [makeDispatch()] };
       const duplicate = makeDispatch({ sessionId: "sess-other" });
 
-      expect(() => addDispatch(state, duplicate)).toThrow("Review already dispatched");
+      expect(() => {
+        addDispatch(state, duplicate);
+      }).toThrow("Review already dispatched");
     });
   });
 

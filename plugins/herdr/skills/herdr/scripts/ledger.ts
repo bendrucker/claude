@@ -22,11 +22,17 @@ export type Outcome = (typeof OUTCOMES)[number];
 // A thread stays on the board while someone still owes it a result.
 const OPEN: ReadonlySet<Outcome> = new Set(["dispatched", "blocked"]);
 
-// Nothing prunes an append-only ledger, so a row's size has to be a constant.
-// dispatch already cuts `task` to 120, and `note` is the other free-text field.
-const MAX_NOTE = 500;
+// Nothing prunes an append-only ledger, so the free text a caller supplies is
+// bounded and a row keeps a size the reader can count on. An oversized value is
+// refused rather than trimmed, because a note is written to carry a reason and
+// half a reason reads as the whole one. dispatch cuts `task` to 120 on its own,
+// from a prompt nobody typed for the ledger. Every other field is an identifier
+// git or herdr supplies, bounded by whatever bounds it there.
+export const MAX_NOTE = 500;
 
 const TAG_KEY = /^[a-z][a-z0-9_-]*$/;
+// A tag is a routing key that has to fit a filter argument and a table column.
+export const MAX_TAG_VALUE = 200;
 // herdr agent names are `^[a-z][a-z0-9_-]{0,31}$`, and `lead-` takes five of those.
 const LEAD_SLUG = /^[a-z][a-z0-9_-]{0,26}$/;
 
@@ -107,6 +113,8 @@ export function parseTags(values: readonly string[]): Record<string, string> {
     const key = at === -1 ? value : value.slice(0, at);
     if (at === -1 || !TAG_KEY.test(key) || value.length === at + 1)
       throw new Error(`tag "${value}" must be <key>=<value> with a key matching ${TAG_KEY}`);
+    if (value.length - at - 1 > MAX_TAG_VALUE)
+      throw new Error(`tag "${key}" takes a value of at most ${MAX_TAG_VALUE} characters`);
     tags[key] = value.slice(at + 1);
   }
   return tags;
@@ -194,8 +202,10 @@ export async function appendOutcome(
     throw new Error(`no dispatch of ${input.branch} in ${input.repo} in ${ledgerPath(dataDir)}`);
   const { note: _previous, ...carried } = latest;
   const row: DispatchLedgerRow = { ...carried, ts: now().toISOString(), outcome: input.state };
+  if (input.note != null && input.note.length > MAX_NOTE)
+    throw new Error(`--note takes at most ${MAX_NOTE} characters, given ${input.note.length}`);
   if (input.pr != null) row.pr = input.pr;
-  if (input.note != null) row.note = input.note.slice(0, MAX_NOTE);
+  if (input.note != null) row.note = input.note;
   appendDispatch(row, dataDir);
   return row;
 }
@@ -389,7 +399,10 @@ if (import.meta.main) {
         branch: { type: String, description: "Branch the thread works on (required)" },
         state: { type: String, description: `One of ${CLOSING.join(", ")} (required)` },
         pr: { type: String, description: "Pull request URL" },
-        note: { type: String, description: "Why, when the state is blocked or abandoned" },
+        note: {
+          type: String,
+          description: `Why, when the state is blocked or abandoned (at most ${MAX_NOTE} characters)`,
+        },
         dataDir,
       },
     },
@@ -424,7 +437,10 @@ if (import.meta.main) {
       name: "status",
       help: { description: "Print the projects and the open threads, optionally filtered by tag." },
       flags: {
-        tag: { type: [String], description: "Only threads carrying this key=value; repeatable" },
+        tag: {
+          type: [String],
+          description: `Only threads carrying this key=value; repeatable (value at most ${MAX_TAG_VALUE} characters)`,
+        },
         json: { type: Boolean, description: "Print the status as JSON" },
         dataDir,
       },

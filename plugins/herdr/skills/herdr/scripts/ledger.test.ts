@@ -185,13 +185,24 @@ describe("appendOutcome", () => {
     expect(message).toMatch(/no dispatch of nope in \/repo/);
   });
 
-  test("cuts a note down so a row keeps a fixed ceiling", async () => {
+  test("rejects a tag value too long to sit in a column", () => {
+    expect(() => parseTags([`project=${"x".repeat(201)}`])).toThrow(/at most 200 characters/);
+    expect(parseTags([`project=${"x".repeat(200)}`]).project).toHaveLength(200);
+  });
+
+  test("refuses a note too long to keep a row's ceiling", async () => {
     const dataDir = await fixture();
-    const blocked = await appendOutcome(
-      { repo: "/repo", branch: "fix-thing", state: "blocked", note: "w".repeat(900) },
-      dataDir,
-    );
-    expect(blocked.note).toBe("w".repeat(500));
+    const outcome = (note: string) =>
+      appendOutcome({ repo: "/repo", branch: "fix-thing", state: "blocked", note }, dataDir);
+    let message = "";
+    try {
+      await outcome("w".repeat(501));
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(/at most 500 characters, given 501/);
+    const blocked = await outcome("w".repeat(500));
+    expect(blocked.note).toHaveLength(500);
     expect(JSON.stringify(blocked).length).toBeLessThan(1_000);
   });
 });

@@ -83,6 +83,7 @@ The rest, by name, described in [`references/catalog.md`](references/catalog.md)
 - Hooks: `hook-block-then-retry-success`, `hook-config-vs-observed`
 - Skills: `skills`, `skill-activity`
 - Files, tokens, activity: `files`, `diagnostics`, `usage-spikes`, `top-sessions`
+- Dispatch: `dispatches`
 - Planning and review: `plans`, `plan-iterations`, `plan-sections`, `plan-sizes`, `review-precision`
 - Schema and index: `schema`, `keys`, `fields`, `field-drift`, `frontmatter`
 

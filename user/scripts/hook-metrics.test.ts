@@ -167,7 +167,7 @@ test("a failing write never throws out of the hook", async () => {
   const path = join(dir, "worktree.jsonl");
   await Bun.write(join(path, "occupied"), "x");
 
-  expect(() =>
+  expect(() => {
     appendHookMetric(
       "worktree",
       {
@@ -179,8 +179,8 @@ test("a failing write never throws out of the hook", async () => {
         outcome: "silent",
       },
       path,
-    ),
-  ).not.toThrow();
+    );
+  }).not.toThrow();
 
   const returned = await timeHook("worktree", { session_id: "abc" }, () => null, path);
   expect(returned).toBeNull();

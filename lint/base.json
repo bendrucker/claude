@@ -42,6 +42,9 @@
     "oxc/branches-sharing-code": "error",
     "oxc/no-map-spread": "error",
     "promise/avoid-new": "error",
+    // A promise chain with no catch and no return lets a rejection disappear
+    // instead of propagating to a caller or being handled.
+    "promise/catch-or-return": "error",
     "unicorn/catch-error-name": "error",
     // Mixing `> -1` and `!== -1` for the same existence check reads as two different tests of one fact.
     "unicorn/consistent-existence-index-check": "error",

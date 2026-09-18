@@ -42,6 +42,7 @@ setDefaultTimeout(30_000);
 
 const Reported = z.looseObject({ additionalContext: z.string().optional() });
 
+// oxlint-disable-next-line typescript/strict-void-return -- tsc resolves promisify(exec) through Node's [util.promisify.custom] overload correctly; a cast narrow enough to satisfy this rule trips typescript/no-unsafe-type-assertion instead.
 const execAsync = promisify(exec);
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures");

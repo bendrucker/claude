@@ -92,7 +92,9 @@ test("append writes one JSON line per denial and creates the directory", async (
 });
 
 test("append writes nothing when logging is disabled", () => {
-  expect(() => append(record({}, STAMP), null)).not.toThrow();
+  expect(() => {
+    append(record({}, STAMP), null);
+  }).not.toThrow();
 });
 
 test("append rotates once the log passes the size cap", async () => {

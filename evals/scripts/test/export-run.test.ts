@@ -110,7 +110,9 @@ test.each<{ name: string; description?: string; suite: string; ok: boolean }>([
   { name: "a run with no description", suite: "pr-body", ok: false },
 ])("assertSuiteMatch rejects filing $name under the wrong suite", ({ description, suite, ok }) => {
   const payload = { evalId: "eval-x", config: { description } };
-  const attempt = () => assertSuiteMatch(payload, suite);
+  const attempt = () => {
+    assertSuiteMatch(payload, suite);
+  };
   if (ok) expect(attempt).not.toThrow();
   else expect(attempt).toThrow(/pass its eval id explicitly/);
 });

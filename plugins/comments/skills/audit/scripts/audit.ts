@@ -79,7 +79,12 @@ const preflightCmd = command(
       const { base, mr, all, path, sort, limit, shardSize, fix } = parsed.flags;
       await preflight(
         { base, mr, all, pathGlobs: path, sort: parseSort(sort), limit, shardSize, fix },
-        { io: consoleIo, judge: workflowJudge((line) => consoleIo.log(line)) },
+        {
+          io: consoleIo,
+          judge: workflowJudge((line) => {
+            consoleIo.log(line);
+          }),
+        },
       );
     }),
 );

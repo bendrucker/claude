@@ -276,7 +276,7 @@ function rowKey(scenarioId: string, arm: Arm | "original", seed: number): string
 
 /** Rows a previous invocation of the same --run-id already paid for. */
 async function readRecorded(runDir: string): Promise<GenerationRow[]> {
-  return (await Bun.file(generationsPath(runDir)).exists()) ? await readGenerations(runDir) : [];
+  return (await Bun.file(generationsPath(runDir)).exists()) ? readGenerations(runDir) : [];
 }
 
 function defaultRunId(): string {

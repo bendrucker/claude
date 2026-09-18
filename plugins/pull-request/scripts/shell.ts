@@ -272,6 +272,8 @@ export function parseShell(command: string, env: NodeJS.ProcessEnv = process.env
       return true;
     });
   } catch {
+    // The doc comment above already covers this: unparseable shell runs
+    // nothing, so an empty command list is the correct answer, not a bug.
     return [];
   }
   return commands;

@@ -39,7 +39,8 @@ function draftOf(output: unknown): z.infer<typeof Draft> | null {
   try {
     const retry = Draft.safeParse(JSON.parse(output));
     return retry.success ? retry.data : null;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
     return null;
   }
 }

@@ -49,7 +49,8 @@ async function readGitRemote(cwd: string): Promise<string | null> {
     });
     const url = await new Response(proc.stdout).text();
     return (await proc.exited) === 0 ? url.trim() : null;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return null;
   }
 }
@@ -57,7 +58,8 @@ async function readGitRemote(cwd: string): Promise<string | null> {
 async function readGhHosts(): Promise<string | null> {
   try {
     return await Bun.file(join(homedir(), ".config", "gh", "hosts.yml")).text();
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return null;
   }
 }
@@ -81,7 +83,8 @@ async function commitExists(cwd: string, sha: string): Promise<boolean> {
       stderr: "ignore",
     });
     return (await proc.exited) === 0;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return false;
   }
 }

@@ -13,6 +13,9 @@ function git(args: string, cwd?: string): string {
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
   } catch {
+    // execSync throws alike for a missing git binary and a failing command
+    // (a bad ref, a directory outside any repo), and reviewer suggestion is
+    // best effort either way.
     return "";
   }
 }

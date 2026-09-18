@@ -23,7 +23,8 @@ export async function getResourceName(filePath: string, type: string): Promise<s
     const content = await Bun.file(filePath).text();
     const match = content.match(/^name:\s*(.+)$/m);
     return match?.[1]?.trim() ?? null;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return null;
   }
 }
@@ -101,6 +102,7 @@ async function main(): Promise<void> {
   try {
     input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch {
+    // Malformed hook input must not crash the hook. Skip this invocation.
     return;
   }
 

@@ -22,6 +22,8 @@ async function lastImports(): Promise<Record<string, string>> {
     );
     return Object.fromEntries(rows.map((r) => [r.host, r.last_import ?? "-"]));
   } catch {
+    // An older or newer session DB may lack the `meta` table or column this
+    // query expects. Showing dashes beats failing the whole `hosts` listing.
     return {};
   } finally {
     db.close();

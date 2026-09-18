@@ -329,9 +329,8 @@ async function deliver(
   return submitted.code === 0;
 }
 
-// The sidebar reads pane tokens, so a thread's tags show there rather than only
-// in the ledger. They are display only, and a refused call costs the labels
-// rather than the dispatch behind them.
+// Pane tokens show a thread's tags in the sidebar, not only the ledger.
+// They're display only, so a failed call loses the labels but not the dispatch.
 async function stampTokens(run: Runner, pane: string, tags: Record<string, string>): Promise<void> {
   const entries = Object.entries(tags);
   if (entries.length === 0) return;

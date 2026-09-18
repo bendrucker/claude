@@ -349,6 +349,8 @@ function resolveWorktree(): WorktreeData | null {
       ahead: cur.main?.ahead ?? 0,
     };
   } catch {
+    // `wt` missing or its output shape changed: the statusline renders
+    // without the worktree section rather than crashing the prompt.
     return null;
   }
 }

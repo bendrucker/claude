@@ -169,8 +169,8 @@ export interface OutcomeInput {
   repo: string;
   branch: string;
   state: Closing;
-  pr?: string;
-  note?: string;
+  pr?: string | undefined;
+  note?: string | undefined;
 }
 
 // The outcome row copies the thread's identifiers from its latest row, so
@@ -224,7 +224,7 @@ export function parseProject(slug: string, text: string): Project {
     throw new Error(`projects/${slug}: slug must match ${LEAD_SLUG} to name a lead-${slug} agent`);
   const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
   if (match == null) throw new Error(`projects/${slug}/project.md has no frontmatter`);
-  const frontmatter = Frontmatter.parse(parseYaml(match[1]));
+  const frontmatter = Frontmatter.parse(parseYaml(match[1] ?? ""));
   return { slug, ...frontmatter };
 }
 

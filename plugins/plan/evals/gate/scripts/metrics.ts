@@ -37,7 +37,8 @@ function parseLine(line: string): z.infer<typeof StreamLine> | null {
   try {
     const parsed = StreamLine.safeParse(JSON.parse(line));
     return parsed.success ? parsed.data : null;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
     return null;
   }
 }

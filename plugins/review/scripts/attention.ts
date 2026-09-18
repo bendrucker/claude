@@ -154,7 +154,8 @@ export function existingReviewr(paneList: string, cwd: string): string | null {
   let json: unknown;
   try {
     json = JSON.parse(paneList);
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
     return null;
   }
   const parsed = PaneList.safeParse(json);
@@ -184,6 +185,7 @@ function herdr(args: string[]): boolean {
       }).exitCode === 0
     );
   } catch {
+    // Per the comment above: down, slow, or missing, herdr must not fail the caller.
     return false;
   }
 }
@@ -192,6 +194,7 @@ function herdrJson(args: string[]): string {
   try {
     return Bun.spawnSync(["herdr", ...args], { timeout: HERDR_TIMEOUT_MS }).stdout.toString();
   } catch {
+    // Per the comment above: down, slow, or missing, herdr must not fail the caller.
     return "";
   }
 }

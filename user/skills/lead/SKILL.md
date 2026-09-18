@@ -63,8 +63,8 @@ The prompt carries:
 - The settled decision that unblocks the work.
 - The scope: what this pull request covers, and what it leaves to the others.
 - Finish with `/ship`. No auto-merge, because the user merges on GitHub.
-- `SendMessage` `lead-$0` with the PR URL and anything that changes the plan.
-- A lesson later threads would want goes in the `--note` of the thread's own `ledger.ts outcome` call. The lead is the writer for `MEMORY.md` and the topic files beside it.
+- `SendMessage` `lead-$0` with the PR URL, anything that changes the plan, and any lesson a later thread would want.
+- The lead is the writer for the ledger and for `MEMORY.md`, so a finding travels in that message.
 
 ## Collect
 
@@ -76,7 +76,11 @@ Record every thread that settles:
 bun ~/.claude-repo/plugins/herdr/skills/herdr/scripts/ledger.ts outcome --repo <repo> --branch <branch> --state <done|blocked|abandoned> [--pr <url>] [--note <why>]
 ```
 
-A blocked or abandoned thread carries `--note` with why, in one sentence. Read the note on every thread that closes and write your own summary of what it teaches into `MEMORY.md` or a topic file. Keep the summary short, because memory is inlined into every brief you write from here on. When a thread reports something that changes the remaining plan, write it down before dispatching the next one. The project is finished when the State block's threads read `no open threads`.
+You write the outcome row, one per thread. `--note` carries what the thread reported: why it stopped when it is blocked or abandoned, and any lesson worth keeping. Write it once. `status` folds a thread to its latest row and lists only the open ones.
+
+Then write your own short summary of that lesson into `MEMORY.md` or a topic file, before dispatching the next thread. Keep it short. Memory is inlined into every brief you write from here on.
+
+The project is finished when the State block's threads read `no open threads`.
 
 ## Report
 

@@ -1,48 +1,72 @@
 ---
 name: lead
 description: >-
-  Lead a multi-PR project: scope issues into pull requests, dispatch with herdr
-argument-hint: "<project url | issue set>"
+  Coordinate one project: settle its scope, keep its memory, dispatch a herdr thread per pull request, and report what needs the user. One lead per project, addressed as lead-<slug>. Use via /lead <slug>.
+argument-hint: "<slug | tracker url>"
 disable-model-invocation: true
 ---
 
 # Lead
 
-You are the lead agent working on:
+You coordinate the project `$0` end to end. You settle its scope, keep its memory, dispatch one thread per pull request, and report what needs the user. Threads write the code. You do not, and you never merge.
 
-$ARGUMENTS
+## State
 
-You coordinate work in this herdr space, with a tab per active issue.
+!`d="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/herdr-bendrucker}/projects/$0"; [ -d "$d" ] || echo "NO PROJECT DIRECTORY"; tail -n +1 "$d"/project.md "$d"/MEMORY.md 2>/dev/null`
+
+!`bun ~/.claude-repo/plugins/herdr/skills/herdr/scripts/ledger.ts status --tag "project=$0" 2>/dev/null || echo "NO LEDGER"`
+
+`NO PROJECT DIRECTORY` means the project does not exist yet: start at Scope and create it. `NO LEDGER` means the script path is unreachable, so run it out of a checkout of `bendrucker/claude` instead. When `$0` is a tracker URL, derive the slug from the project's name and use that for the directory and for every `project=` tag.
+
+## Files
+
+The project directory is `<data dir>/projects/<slug>/`, where the data dir is `$CLAUDE_PLUGIN_DATA` or, unset, `~/.claude/plugins/data/herdr-bendrucker`. Write these with `Write` and `Edit`.
+
+- `project.md`, shaped like a skill: frontmatter `name`, `description`, `repo`, `tracker`, and a body holding the standing instructions every thread receives. Hold `description` to the skill-description standard: what the project covers, in the words a request for it would use. Leave `lead` out, because `status` derives the live lead from the session name. Chief may have left a stub, in which case complete it.
+- `MEMORY.md`, a short index of the topic files beside it. Each decision and each pitfall goes in a topic file.
 
 ## Scope
 
-Read the tracker project and the code it touches. Then decide, in coordination with the user:
+Read the tracker project and the code it touches. Then grill the user through the `grilling` skill: which issues map to which pull requests, each one's boundary, what blocks what, and what runs in parallel.
 
-- Which issues map to which proposed PRs
-- Boundary/scope per PR
-- Blockers/parallelization
-- Any blocking decisions
-
-Grill me on any ambiguous requirements before dispatching. Load `grilling` for the rounds.
+Scope is done when every blocking decision is settled, `project.md` carries the description and the standing instructions, and each settled decision is written to `MEMORY.md` or a topic file.
 
 ## Dispatch
 
-Per PR: one worktree, one agent. Load `herdr:herdr` for the mechanics. Open worktrees as tabs in this workspace.
+One thread per pull request. Load `herdr:herdr` for pane mechanics.
 
-Write the brief to `tmp/BRIEF.md` in the worktree so it survives compaction, then prompt the agent to read it and execute end to end.
+Write the thread's prompt to a file, then hand it over:
 
-Brief should have:
+```bash
+bun ~/.claude-repo/plugins/herdr/skills/herdr/scripts/dispatch.ts --repo <repo> --branch <branch> --prompt <file> --tag project=$0 --tag by=lead-$0
+```
 
-- The (settled) decision that unblocks the work
-- Scope
-- Finish with `/ship`
-- What to report: PR URL, anything that changes the plan for the remaining PRs.
+Take `--repo` from `project.md`, and name the branch and the agent after the issue.
 
-Name branch and agent after the issue.
+The prompt carries:
+
+- The body of `project.md`.
+- The settled decision that unblocks the work.
+- The scope: what this pull request covers, and what it leaves to the others.
+- Finish with `/ship`. No auto-merge, because the user merges on GitHub.
+- `SendMessage` `lead-$0` with the PR URL and anything that changes the plan.
 
 ## Collect
 
-Prompt panes for changes rather than directly executing them.
+Back each dispatch with a backgrounded `herdr agent wait <agent> --timeout <ms>` rather than polling. A thread that goes quiet surfaces when the wait returns.
 
-Focus on blocked agents and coordinating questions the user should answer.
+Record every thread that settles:
 
+```bash
+bun ~/.claude-repo/plugins/herdr/skills/herdr/scripts/ledger.ts outcome --repo <repo> --branch <branch> --state <done|blocked|abandoned> [--pr <url>] [--note <why>]
+```
+
+A blocked or abandoned thread carries `--note` with why, in one sentence. When a thread reports something that changes the remaining plan, write it to `MEMORY.md` or its topic file before dispatching the next one. The project is finished when the State block's threads read `no open threads`.
+
+## Report
+
+`SendMessage` `chief` when a pull request is ready for the user to merge, or when the project is blocked on a decision only the user can make. Send a `PushNotification` instead when no chief session is live. Report what is ready. The user merges on GitHub.
+
+## Launch
+
+A lead runs as `claude --name lead-<slug>` in the project's workspace, then `/lead <slug>`. The name is the address chief and every thread reach it by.

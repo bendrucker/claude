@@ -16,6 +16,9 @@ const NAME_ATTEMPTS = 3;
 // Pane metadata is namespaced per reporter, so this source owns the tokens a
 // dispatch sets and nothing else writing to the pane can collide with them.
 const TOKEN_SOURCE = "dispatch";
+// A ledger tag key caps neither its length nor its case, and herdr takes a
+// narrower name than that.
+const TOKEN_NAME = /^[A-Za-z0-9_-]{1,32}$/;
 
 export interface CommandResult {
   code: number;
@@ -333,7 +336,15 @@ async function deliver(
 // They're display only, so a failed call loses the labels but not the dispatch.
 async function stampTokens(run: Runner, pane: string, tags: Record<string, string>): Promise<void> {
   const entries = Object.entries(tags);
-  if (entries.length === 0) return;
+  // herdr refuses the whole call over a single name it cannot take, so a key it
+  // will not carry costs its own label rather than every other tag's.
+  const named = entries.filter(([key]) => TOKEN_NAME.test(key));
+  const refused = entries.filter(([key]) => !TOKEN_NAME.test(key)).map(([key]) => key);
+  if (refused.length > 0)
+    process.stderr.write(
+      `warning: ${refused.join(", ")} cannot be shown on ${pane}; a token name takes at most 32 characters\n`,
+    );
+  if (named.length === 0) return;
   const stamped = await run([
     "herdr",
     "pane",
@@ -341,7 +352,7 @@ async function stampTokens(run: Runner, pane: string, tags: Record<string, strin
     pane,
     "--source",
     TOKEN_SOURCE,
-    ...entries.flatMap(([key, value]) => ["--token", `${key}=${value}`]),
+    ...named.flatMap(([key, value]) => ["--token", `${key}=${value}`]),
   ]);
   if (stamped.code === 0) return;
   const reason =

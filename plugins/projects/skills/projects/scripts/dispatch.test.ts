@@ -87,6 +87,13 @@ const HAPPY_PATH = [
   AGENT_GET,
 ];
 
+// The stamp lands between the agent start and the prompt.
+const withStamp = (stamp: CommandResult): CommandResult[] => [
+  ...HAPPY_PATH.slice(0, 7),
+  stamp,
+  ...HAPPY_PATH.slice(7),
+];
+
 describe("deriveName", () => {
   test.each([
     ["fix-thing", new Set<string>(), "fix-thing"],
@@ -501,18 +508,7 @@ describe("dispatch", () => {
   });
 
   test("stamps the thread's tags on the pane once the agent has started", async () => {
-    const { run, calls } = fakeRunner([
-      AGENT_LIST,
-      GIT_COMMON,
-      REMOTES,
-      ok(""),
-      BASE_OK,
-      WORKTREE,
-      STARTED,
-      ok(""),
-      ok(""),
-      AGENT_GET,
-    ]);
+    const { run, calls } = fakeRunner(withStamp(ok("")));
 
     const { record } = await dispatch(
       { ...options, tags: { project: "demo", by: "lead-chief" } },
@@ -536,25 +532,28 @@ describe("dispatch", () => {
     expect(record.prompted).toBe(true);
   });
 
-  test("stamps nothing when the thread carries no tags", async () => {
+  test("leaves out a key herdr cannot carry and stamps the rest", async () => {
+    const { run, calls } = fakeRunner(withStamp(ok("")));
+    await dispatch(
+      { ...options, tags: { project: "demo", [`by-${"x".repeat(40)}`]: "chief" } },
+      run,
+    );
+    const stamped = calls.find((argv) => argv[2] === "report-metadata");
+    expect(stamped?.filter((arg) => arg === "--token")).toHaveLength(1);
+    expect(stamped).toContain("project=demo");
+  });
+
+  test.each([
+    ["the thread carries no tags", {}],
+    ["no key can be a token name", { [`by-${"x".repeat(40)}`]: "chief" }],
+  ])("stamps nothing when %s", async (_label, tags) => {
     const { run, calls } = fakeRunner(HAPPY_PATH);
-    await dispatch({ ...options, tags: {} }, run);
+    await dispatch({ ...options, tags }, run);
     expect(calls.filter((argv) => argv[2] === "report-metadata")).toEqual([]);
   });
 
   test("keeps the dispatch and its record when the tokens are refused", async () => {
-    const { run } = fakeRunner([
-      AGENT_LIST,
-      GIT_COMMON,
-      REMOTES,
-      ok(""),
-      BASE_OK,
-      WORKTREE,
-      STARTED,
-      fail(envelope("pane_not_found")),
-      ok(""),
-      AGENT_GET,
-    ]);
+    const { run } = fakeRunner(withStamp(fail(envelope("pane_not_found"))));
 
     const { record } = await dispatch({ ...options, tags: { project: "demo" } }, run);
     expect(record.prompted).toBe(true);

@@ -46,6 +46,9 @@ export function extractHeadings(markdown: string): string[] {
   try {
     ast = fromMarkdown(markdown);
   } catch {
+    // The eval feeds arbitrary transcript text through the same parser the
+    // hook uses, and mdast throws in shapes too varied to name. Any failure
+    // means this sample has no headings to score.
     return [];
   }
   const headings: string[] = [];

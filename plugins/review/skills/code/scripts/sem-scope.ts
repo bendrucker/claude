@@ -144,7 +144,8 @@ export const mergeBase: MergeBase = async (base) => {
     });
     const stdout = await new Response(proc.stdout).text();
     return (await proc.exited) === 0 ? stdout.trim() : null;
-  } catch {
+  } catch (error) {
+    if (!missingBinary(error)) throw error;
     return null;
   }
 };
@@ -155,7 +156,8 @@ function parseDiff(stdout: string): Change[] | null {
   try {
     const parsed = diffSchema.safeParse(JSON.parse(stdout));
     return parsed.success ? parsed.data.changes : null;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
     return null;
   }
 }

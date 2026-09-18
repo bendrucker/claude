@@ -16,7 +16,8 @@ function toRepoRelative(file: string): string {
 function hasTests(dir: string): boolean {
   try {
     return readdirSync(dir).some((entry) => entry.endsWith(".test.ts"));
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return false;
   }
 }

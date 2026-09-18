@@ -40,7 +40,8 @@ export function parseCooldowns(text: string): Cooldown[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
     return [];
   }
   const entries = z.array(z.unknown()).safeParse(parsed).data ?? [];

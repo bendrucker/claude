@@ -28,6 +28,7 @@ export const defaultEnv: LintEnv = {
     try {
       return await Bun.file(path).text();
     } catch {
+      // A missing or unreadable marker must not fail the hook. Treat it as absent.
       return null;
     }
   },

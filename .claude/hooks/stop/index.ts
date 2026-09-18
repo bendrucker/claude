@@ -166,6 +166,7 @@ async function main(): Promise<void> {
   try {
     input = await decodeStdin(StopInput, "stop hook input");
   } catch {
+    // Malformed hook input must not crash the hook. Skip this invocation.
     return;
   }
 

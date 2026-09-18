@@ -226,7 +226,8 @@ export type BodyResolution =
 async function readBodyFile(path: string): Promise<string | null> {
   try {
     return await Bun.file(path).text();
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return null;
   }
 }

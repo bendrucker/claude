@@ -5,6 +5,7 @@
     "local/no-chained-type-assertions": "error",
     "local/no-conditional-empty-object-spread": "error",
     "local/no-module-mocking": "error",
+    "local/no-silent-catch": "error",
     "local/no-terminal-width": "error",
     "local/no-unknown-returns": "error"
   },
@@ -12,7 +13,8 @@
     {
       "files": ["**/*.test.ts"],
       "rules": {
-        "local/no-chained-type-assertions": "off"
+        "local/no-chained-type-assertions": "off",
+        "local/no-silent-catch": "off"
       }
     }
   ]

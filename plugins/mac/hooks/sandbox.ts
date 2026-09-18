@@ -327,6 +327,7 @@ async function readHead(path: string, length = 65536): Promise<Buffer | null> {
     const slice = file.slice(0, length);
     return Buffer.from(await slice.arrayBuffer());
   } catch {
+    // A missing or unreadable file must not fail the hook. Treat it as no marker.
     return null;
   }
 }

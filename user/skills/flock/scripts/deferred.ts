@@ -63,7 +63,8 @@ const LOCK_RETRY_MS = 25;
 async function lockAgeMs(lock: string): Promise<number | null> {
   try {
     return Date.now() - (await stat(lock)).mtimeMs;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return null;
   }
 }

@@ -100,7 +100,8 @@ ORDER BY suite;`;
 export function hasResults(dir: string): boolean {
   try {
     return readdirSync(dir, { recursive: true }).some((entry) => String(entry).endsWith(".json"));
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return false;
   }
 }

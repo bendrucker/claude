@@ -4,7 +4,16 @@
     "typescript/array-type": "error",
     "typescript/ban-ts-comment": "error",
     "typescript/consistent-generic-constructors": "error",
+    // An index signature admits any key of the right type, so a typo'd
+    // property name is accepted instead of rejected as an unknown key.
+    "typescript/consistent-indexed-object-style": "error",
+    // Mixing assertion styles hides which casts were actually reviewed
+    // versus which ones were bolted on to silence the compiler.
+    "typescript/consistent-type-assertions": "error",
     "typescript/consistent-type-definitions": "error",
+    // Bracket access defeats the property-rename and typo safety that dot
+    // notation gets from the compiler.
+    "typescript/dot-notation": "error",
     "typescript/explicit-module-boundary-types": "error",
     // A void-returning expression used as a value reads as though it produces
     // one, but it evaluates to undefined, and the mistake surfaces only where
@@ -12,6 +21,9 @@
     "typescript/no-confusing-void-expression": "error",
     "typescript/no-deprecated": "error",
     "typescript/no-explicit-any": "error",
+    // An explicit annotation that drifts from the initializer's real type
+    // is still accepted, so the mismatch goes unnoticed.
+    "typescript/no-inferrable-types": "error",
     "typescript/no-misused-promises": "error",
     "typescript/no-non-null-assertion": "error",
     "typescript/no-unnecessary-condition": ["error", { "allowConstantLoopConditions": "always" }],
@@ -20,7 +32,14 @@
     "typescript/no-unsafe-call": "error",
     "typescript/no-unsafe-member-access": "error",
     "typescript/no-unsafe-return": "error",
+    // An `as` cast to a non-nullable type can drift from the operand's real
+    // type across a refactor without the compiler re-checking it, the way
+    // the `!` operator does.
+    "typescript/non-nullable-type-assertion-style": "error",
     "typescript/only-throw-error": "error",
+    // `.filter()[0]` builds and discards the rest of the filtered array to
+    // read a single element back out of it.
+    "typescript/prefer-find": "error",
     // A hand-indexed `for` loop over a whole array carries an index
     // variable that a `for...of` loop wouldn't need to introduce at all.
     "typescript/prefer-for-of": "error",
@@ -31,9 +50,15 @@
     // A chain of `&&` guards re-tests each link and breaks silently if one is dropped or reordered.
     "typescript/prefer-optional-chain": "error",
     "typescript/prefer-promise-reject-errors": "error",
+    // A private field assigned only in the constructor but left mutable
+    // lets later code reassign it without the compiler objecting.
+    "typescript/prefer-readonly": "error",
     // A `slice`/`substring` comparison allocates a throwaway string just to test a prefix or suffix.
     "typescript/prefer-string-starts-ends-with": "error",
     "typescript/require-await": "error",
+    // Adding a `+` operand of an unsafe or mismatched type silently
+    // coerces to a string or `NaN` instead of being rejected.
+    "typescript/restrict-plus-operands": "error",
     // Returning a promise without awaiting it inside a try block lets the
     // rejection surface after the function has already returned, skipping
     // the enclosing catch.
@@ -52,6 +77,9 @@
     // A callback typed to return void accepts any return type, so a function
     // that returns a real value there has that value silently discarded.
     "typescript/strict-void-return": "error",
+    // A `switch` over a union that skips a member falls through silently
+    // instead of being rejected when the union grows.
+    "typescript/switch-exhaustiveness-check": "error",
     // A catch callback's error parameter typed as anything but unknown lets
     // its properties be read without confirming the rejection has that shape.
     "typescript/use-unknown-in-catch-callback-variable": "error"

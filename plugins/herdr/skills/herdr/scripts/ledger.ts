@@ -87,8 +87,7 @@ export function appendDispatch(row: DispatchLedgerRow, dataDir: string): void {
   appendFileSync(ledgerPath(dataDir), `${JSON.stringify(row)}\n`);
 }
 
-// `key=value` as typed on a command line. The key is constrained so a tag can
-// be a filter argument and a column header without escaping.
+// The key is constrained so a tag can be a filter argument and a column header without escaping.
 export function parseTags(values: readonly string[]): Record<string, string> {
   const tags: Record<string, string> = {};
   for (const value of values) {
@@ -285,8 +284,7 @@ function plain(rows: readonly (readonly string[])[]): string {
     .trimEnd();
 }
 
-// The routing block first, then the open threads, each block one line per
-// item so a compaction hook can print it verbatim.
+// Each block is one line per item, so a compaction hook can print it verbatim.
 export function formatStatus(status: Status, now: Date): string {
   const projects =
     status.projects.length === 0

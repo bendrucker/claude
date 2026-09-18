@@ -29,16 +29,17 @@ It prints the projects block, then one line per open thread. Answer a question a
 
 Match every request against the projects block before anything else.
 
-On a match, hand the request to that project's lead: `herdr agent prompt lead-<slug> "<the request>"`. The lead owns scope, decisions, and its own threads from there, and reports back by `SendMessage`.
+On a match, hand the request to that project's lead with `SendMessage` to `lead-<slug>`. That lands in the session's queue. `herdr agent prompt` types into the pane instead, and a lead's pane is one Ben sits in, so a request arriving mid-draft merges with what he was typing and submits it.
 
-When that project's line reads `lead:none`, start the lead first. `lead:unknown` means herdr did not answer, so confirm with `herdr agent list` before starting one, since a second lead for a project collides with the first. Open a pane in the project's workspace, then:
+When `ListAgents` leaves `lead-<slug>` out, start the lead first. A `lead:unknown` status line means herdr did not answer, so read the listing before starting one, since a second lead for a project collides with the first. Open a pane in the project's workspace, then:
 
 ```
 herdr agent start lead-<slug> --kind claude --pane <pane> -- --name lead-<slug>
-herdr agent prompt lead-<slug> "/lead <slug>"
 ```
 
-Load `herdr:herdr` for the pane mechanics.
+`SendMessage` `lead-<slug>` with `/lead <slug>`, then the request. Load `herdr:herdr` for the pane mechanics.
+
+The lead owns scope, decisions, and its own threads from there, and reports back the same way.
 
 An unmatched request is a one-off. Dispatch it yourself.
 

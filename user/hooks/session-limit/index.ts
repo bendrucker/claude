@@ -147,6 +147,7 @@ async function readJson<S extends z.ZodType>(schema: S, path: string): Promise<z
   try {
     return await decodeFile(schema, path);
   } catch {
+    // A missing or corrupt marker must not fail the hook. Treat it as absent.
     return null;
   }
 }
@@ -186,6 +187,7 @@ export async function processInput(
       mkdirSync(dirname(path), { recursive: true });
       await Bun.write(path, `${JSON.stringify(result.marker)}\n`);
     } catch {
+      // An unwritable marker must not fail the hook. The next prompt retries the write.
       return null;
     }
   }

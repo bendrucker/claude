@@ -109,7 +109,8 @@ async function directories(dir: string): Promise<string[]> {
       .filter((entry) => entry.isDirectory())
       .map((entry) => join(dir, entry.name))
       .toSorted();
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return [];
   }
 }
@@ -117,7 +118,8 @@ async function directories(dir: string): Promise<string[]> {
 async function entryNames(dir: string): Promise<string[]> {
   try {
     return await readdir(dir);
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
     return [];
   }
 }

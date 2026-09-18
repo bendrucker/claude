@@ -300,6 +300,8 @@ async function readMeta(base: string): Promise<AgentMeta | null> {
   try {
     return AgentMeta.parse(await Bun.file(`${base}.meta.json`).json());
   } catch {
+    // A sidecar that's missing, mid-write, or from a harness layout the
+    // schema no longer matches is an enrichment miss, not a statusline crash.
     return null;
   }
 }

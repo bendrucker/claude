@@ -14,9 +14,13 @@ You coordinate the project `$0` end to end. You settle its scope, keep its memor
 
 !`d="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/herdr-bendrucker}/projects/$0"; [ -d "$d" ] || echo "NO PROJECT DIRECTORY"; tail -n +1 "$d"/project.md "$d"/MEMORY.md 2>/dev/null`
 
-!`bun ~/.claude-repo/plugins/herdr/skills/herdr/scripts/ledger.ts status --tag "project=$0" 2>/dev/null || echo "NO LEDGER"`
+!`s=~/.claude-repo/plugins/herdr/skills/herdr/scripts/ledger.ts; if [ -f "$s" ]; then bun "$s" status --tag "project=$0" 2>&1; else echo "NO LEDGER at $s"; fi`
 
-`NO PROJECT DIRECTORY` means the project does not exist yet: start at Scope and create it. `NO LEDGER` means the script path is unreachable, so run it out of a checkout of `bendrucker/claude` instead. When `$0` is a tracker URL, derive the slug from the project's name and use that for the directory and for every `project=` tag.
+`NO PROJECT DIRECTORY` means this slug has no project yet: start at Scope and create it. `NO LEDGER` names a script that is not on disk, so run the same command out of a checkout of `bendrucker/claude`. Any other error in place of the status blocks came from the ledger itself, so repair that before trusting the thread list.
+
+Read the topic files `MEMORY.md` indexes before scoping or dispatching, because the block prints the index rather than the decisions under it.
+
+A tracker URL as `$0` needs a slug before anything else: derive one from the project's name, then re-run both commands above with it. They ran against the raw URL, which misses an existing directory and the project's threads. Use the derived slug for the directory and for every `project=` tag.
 
 ## Files
 

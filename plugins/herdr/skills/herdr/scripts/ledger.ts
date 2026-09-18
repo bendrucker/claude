@@ -6,6 +6,9 @@ import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { cli, command } from "cleye";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
+import { frontmatter } from "micromark-extension-frontmatter";
 import { getBorderCharacters, table } from "table";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
@@ -193,10 +196,25 @@ export async function appendOutcome(
   return row;
 }
 
-async function capture(argv: string[]): Promise<string | null> {
+// A wedged herdr server leaves `herdr agent list` running with nothing to say,
+// and status prints nothing until it answers. Both callers already treat a
+// failure as unknown, so a deadline takes that path. SIGKILL cannot be ignored,
+// which is what makes the deadline a bound rather than a request.
+export const CAPTURE_TIMEOUT_MS = 5_000;
+
+export async function capture(
+  argv: string[],
+  timeout: number = CAPTURE_TIMEOUT_MS,
+): Promise<string | null> {
   let proc: Bun.Subprocess<"ignore", "pipe", "ignore">;
   try {
-    proc = Bun.spawn(argv, { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
+    proc = Bun.spawn(argv, {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "ignore",
+      timeout,
+      killSignal: "SIGKILL",
+    });
   } catch {
     return null;
   }
@@ -222,10 +240,12 @@ export async function primaryRoot(repo: string): Promise<string> {
 export function parseProject(slug: string, text: string): Project {
   if (!LEAD_SLUG.test(slug))
     throw new Error(`projects/${slug}: slug must match ${LEAD_SLUG} to name a lead-${slug} agent`);
-  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
-  if (match == null) throw new Error(`projects/${slug}/project.md has no frontmatter`);
-  const frontmatter = Frontmatter.parse(parseYaml(match[1] ?? ""));
-  return { slug, ...frontmatter };
+  const [node] = fromMarkdown(text, {
+    extensions: [frontmatter("yaml")],
+    mdastExtensions: [frontmatterFromMarkdown("yaml")],
+  }).children;
+  if (node?.type !== "yaml") throw new Error(`projects/${slug}/project.md has no frontmatter`);
+  return { slug, ...Frontmatter.parse(parseYaml(node.value) ?? {}) };
 }
 
 export async function readProjects(

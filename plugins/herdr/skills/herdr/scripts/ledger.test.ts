@@ -6,6 +6,7 @@ import {
   appendDispatch,
   appendOutcome,
   buildStatus,
+  capture,
   type DispatchLedgerRow,
   formatAge,
   formatStatus,
@@ -210,6 +211,23 @@ describe("projects", () => {
 
   test.each([["Ledger"], ["a".repeat(28)], ["1st"]])("rejects the slug %s", (slug) => {
     expect(() => parseProject(slug, PROJECT)).toThrow(/to name a lead-/);
+  });
+
+  test("reports what an empty frontmatter block is missing", () => {
+    expect(() => parseProject("ledger", "---\n---\n\nBody.\n")).toThrow(/name/);
+  });
+
+  test("keeps a rule inside a block scalar out of the fence", () => {
+    const text = "---\nname: N\ndescription: |\n  one\n  ---\n  two\n---\n\nBody.\n";
+    expect(parseProject("ledger", text).description).toBe("one\n---\ntwo\n");
+  });
+});
+
+describe("capture", () => {
+  test("gives up on a command that outruns its deadline", async () => {
+    const started = Date.now();
+    expect(await capture(["sleep", "30"], 100)).toBeNull();
+    expect(Date.now() - started).toBeLessThan(5_000);
   });
 });
 

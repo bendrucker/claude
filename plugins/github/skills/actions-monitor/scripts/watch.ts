@@ -330,7 +330,8 @@ export interface Mergeability {
 function parseMergeability(stdout: string): Mergeability | null {
   try {
     return MergeabilityView.parse(JSON.parse(stdout));
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError) && !(error instanceof z.ZodError)) throw error;
     return null;
   }
 }

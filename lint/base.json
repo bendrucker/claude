@@ -6,17 +6,31 @@
     "suspicious": "error"
   },
   "rules": {
+    // A callback that falls through without returning corrupts every
+    // downstream element with a silent `undefined`.
+    "array-callback-return": "error",
     // A switch missing a default leaves a new case value unhandled, falling through silently.
     "default-case": "error",
     "eqeqeq": ["error", "always", { "null": "ignore" }],
     "max-depth": "error",
+    // Nesting keeps going instead of naming and extracting the inner logic.
+    "max-nested-callbacks": "error",
     "no-await-in-loop": "error",
     "no-duplicate-imports": "error",
+    // An `else` after a `return` nests the rest of the function instead of
+    // returning early.
+    "no-else-return": "error",
     "no-empty": "error",
     // An empty function body stands in for logic that was never written,
     // so a caller invoking it gets silence instead of an error.
     "no-empty-function": "error",
+    // A shorthand coercion like `!!x` or `""+x` hides the intended
+    // conversion behind an operator that reads as something else.
+    "no-implicit-coercion": "error",
     "no-lonely-if": "error",
+    // Reassigning a parameter overwrites the caller's argument binding, so a
+    // later read of it no longer reflects what was passed in.
+    "no-param-reassign": "error",
     "no-template-curly-in-string": "warn",
     "no-underscore-dangle": ["error", { "allow": ["__typename", "__dirname"] }],
     "no-unsafe-optional-chaining": "off",
@@ -35,38 +49,109 @@
     "no-useless-assignment": "error",
     // A trailing `return` with no expression restates the function's implicit end.
     "no-useless-return": "error",
+    // A TODO/FIXME stands in for the fix indefinitely instead of tracking it.
+    "no-warning-comments": "error",
+    // Repeating the key and value name is an easy source of a copy-paste
+    // mismatch between the two.
+    "object-shorthand": "error",
+    // A `let` nobody reassigns means a future accidental reassignment goes
+    // uncaught.
+    "prefer-const": "error",
     "prefer-object-spread": "error",
     "prefer-template": "error",
+    // A circular import loads with a partially-initialized binding, and
+    // which side resolves first depends on import order.
+    "import/no-cycle": "error",
     "import/no-namespace": ["error", { "ignore": ["fast-check"] }],
     // Branches that repeat the same statement hide which lines are the actual difference between them.
     "oxc/branches-sharing-code": "error",
+    // Spreading an accumulator inside a loop copies the whole thing on every
+    // iteration, turning a linear pass quadratic.
+    "oxc/no-accumulating-spread": "error",
     "oxc/no-map-spread": "error",
     "promise/avoid-new": "error",
     // A promise chain with no catch and no return lets a rejection disappear
     // instead of propagating to a caller or being handled.
     "promise/catch-or-return": "error",
+    // A value returned from `finally` silently overrides whatever the
+    // try/catch block already returned or threw.
+    "promise/no-return-in-finally": "error",
     "unicorn/catch-error-name": "error",
+    // Mixing conditional spread styles for "nothing to add" leaves it
+    // unclear whether the empty case was actually considered.
+    "unicorn/consistent-empty-array-spread": "error",
     // Mixing `> -1` and `!== -1` for the same existence check reads as two different tests of one fact.
     "unicorn/consistent-existence-index-check": "error",
     "unicorn/custom-error-definition": "error",
+    // A thrown error with no message surfaces as an empty string with no
+    // clue what happened.
+    "unicorn/error-message": "error",
     "unicorn/explicit-length-check": "error",
+    // A blanket eslint-disable silences every rule at once, hiding future
+    // violations the disable was never meant to cover.
+    "unicorn/no-abusive-eslint-disable": "error",
     "unicorn/no-array-for-each": "error",
     // A `.reduce()` accumulator's shape lives inside the callback, so a
     // reader has to simulate the whole loop to see what's being built.
     "unicorn/no-array-reduce": "error",
+    // `instanceof Array` fails across realms and for arrays built with a
+    // different prototype chain.
+    "unicorn/no-instanceof-array": "error",
     // An else block holding only an if is the else-if it never became, one indent deeper than it needs to be.
     "unicorn/no-lonely-if": "error",
     // An object literal default only applies when the whole argument is
     // omitted, so it reads like per-field fallbacks it doesn't provide.
     "unicorn/no-object-as-default-parameter": "error",
+    // `typeof x === "undefined"` masks a genuine ReferenceError for an
+    // undeclared variable behind a false "just undefined" result.
+    "unicorn/no-typeof-undefined": "error",
+    // Positional holes in a destructure leave it unclear which index each
+    // name binds to as the array shifts.
+    "unicorn/no-unreadable-array-destructuring": "error",
+    // Wrapping an already-resolved value adds a redundant microtask tick
+    // that hides the real async boundary.
+    "unicorn/no-useless-promise-resolve-reject": "error",
+    // A case duplicating `default` drifts silently if only one of the two
+    // is updated later.
+    "unicorn/no-useless-switch-case": "error",
     "unicorn/prefer-array-find": "error",
+    // A manual reduce-to-flatten is an easy off-by-one away from an
+    // accumulation bug that `.flat()` doesn't have.
+    "unicorn/prefer-array-flat": "error",
+    // `.map().flat()` allocates an intermediate array only to flatten it
+    // away.
+    "unicorn/prefer-array-flat-map": "error",
+    // `.filter().length > 0` builds the whole filtered array just to test
+    // truthiness.
+    "unicorn/prefer-array-some": "error",
     // `arr[arr.length - 1]` recomputes an index that `.at(-1)` states directly.
     "unicorn/prefer-at": "error",
     // Reassigning a parameter to fill in a missing value hides the
     // fallback in the function body instead of the signature.
     "unicorn/prefer-default-parameters": "error",
     "unicorn/prefer-export-from": "error",
+    // `.indexOf() !== -1` leaks a numeric index nobody uses, and `> -1`
+    // misclassifies an `.indexOf()` result of 0.
+    "unicorn/prefer-includes": "error",
+    // Repeating the condition on both sides of a ternary lets one branch's
+    // condition drift from the other when only one is edited.
+    "unicorn/prefer-logical-operator-over-ternary": "error",
     "unicorn/prefer-math-min-max": "error",
+    // Wrapping a native coercion in an arrow function adds a closure that's
+    // pure indirection over the coercion itself.
+    "unicorn/prefer-native-coercion-functions": "error",
+    // A bare specifier like `fs` can resolve to a same-named npm package
+    // instead of the builtin.
+    "unicorn/prefer-node-protocol": "error",
+    // A hand-rolled reduce-to-object mutates a fresh object every
+    // iteration instead of building the result once.
+    "unicorn/prefer-object-from-entries": "error",
+    // An unused `catch (error)` binding discards a caught bug's detail
+    // even from logs.
+    "unicorn/prefer-optional-catch-binding": "error",
+    // `.match(regex)` allocates a full match array just to check
+    // truthiness.
+    "unicorn/prefer-regexp-test": "error",
     "unicorn/prefer-set-has": "error",
     "unicorn/prefer-spread": "error",
     "unicorn/prefer-string-raw": "error",

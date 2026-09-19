@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { PullRequest } from "./capture";
 import { ago, agents, DAY, fixture, NOW, observe, pr, row } from "./fixture";
 import { readProjects } from "./projects";
 import { buildStatus, formatAge, formatStatus, type Need, type Observed } from "./status";

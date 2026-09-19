@@ -290,12 +290,14 @@ export function extractScripts(command: string, cwd: string): string[] {
     if (name === "cd") {
       const target = tokens[index + 1];
       const argument = target === undefined ? "" : expandToken(target, scoped);
-      const next =
-        argument === ""
-          ? homedir()
-          : argument === "-"
-            ? previous
-            : resolvePath(target ?? [], directory, scoped);
+      let next: string;
+      if (argument === "") {
+        next = homedir();
+      } else if (argument === "-") {
+        next = previous;
+      } else {
+        next = resolvePath(target ?? [], directory, scoped);
+      }
       previous = directory;
       directories[directories.length - 1] = next;
       continue;

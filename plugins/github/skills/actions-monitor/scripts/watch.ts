@@ -575,12 +575,14 @@ export function probePr(prNumber: number, repo: string, run: ExecFn = exec): Pro
 
 function buildRunProbe(run: RunView, fallbackRunId: string | null): Probe {
   const rawId = run.databaseId;
-  const runId =
-    typeof rawId === "number"
-      ? String(rawId)
-      : typeof rawId === "string" && rawId.length > 0
-        ? rawId
-        : fallbackRunId;
+  let runId: string | null;
+  if (typeof rawId === "number") {
+    runId = String(rawId);
+  } else if (typeof rawId === "string" && rawId.length > 0) {
+    runId = rawId;
+  } else {
+    runId = fallbackRunId;
+  }
   return {
     sha: run.headSha,
     state: deriveRunListState(run),

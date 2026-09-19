@@ -71,7 +71,14 @@ for (const brief of briefs) {
   totalBefore += b.score;
   totalAfter += a.score;
   const delta = a.score - b.score;
-  const arrow = delta < 0 ? "improved" : delta > 0 ? "regressed" : "unchanged";
+  let arrow: string;
+  if (delta < 0) {
+    arrow = "improved";
+  } else if (delta > 0) {
+    arrow = "regressed";
+  } else {
+    arrow = "unchanged";
+  }
   console.log(`\n${brief}`);
   console.log(
     `  score   before ${b.score}  ->  after ${a.score}   (${delta >= 0 ? "+" : ""}${delta}, ${arrow})`,

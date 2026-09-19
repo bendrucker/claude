@@ -289,16 +289,18 @@ export function sessionScore(input: ScoredFile[]): SessionScore {
   const codeExcess = scored
     .filter((file) => file.share < DOCS_PASS_SHARE)
     .reduce((sum, file) => sum + file.excessChars, 0);
-  const tier: Tier =
-    stats.addedLines < MIN_ADDED_LINES
-      ? "none"
-      : share >= DOCS_PASS_SHARE && codeExcess < STRONG_EXCESS_CHARS
-        ? "docs-pass"
-        : excessChars >= STRONG_EXCESS_CHARS
-          ? "strong"
-          : reports
-            ? "report"
-            : "none";
+  let tier: Tier;
+  if (stats.addedLines < MIN_ADDED_LINES) {
+    tier = "none";
+  } else if (share >= DOCS_PASS_SHARE && codeExcess < STRONG_EXCESS_CHARS) {
+    tier = "docs-pass";
+  } else if (excessChars >= STRONG_EXCESS_CHARS) {
+    tier = "strong";
+  } else if (reports) {
+    tier = "report";
+  } else {
+    tier = "none";
+  }
   const worstFiles = scored
     .filter((file) => file.excessChars > 0)
     .toSorted((a, b) => b.excessChars - a.excessChars)

@@ -42,7 +42,10 @@ function list<S extends z.ZodType>(item: S) {
     .union([z.array(item), item])
     .optional()
     .catch(undefined)
-    .transform((value) => (value === undefined ? [] : Array.isArray(value) ? value : [value]));
+    .transform((value) => {
+      if (value === undefined) return [];
+      return Array.isArray(value) ? value : [value];
+    });
 }
 
 const Elements = list(Element);

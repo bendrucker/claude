@@ -391,7 +391,15 @@ async function listCommand(dirs: string[], withLoadState: boolean): Promise<void
                 `gui/${uid}/${fullLabel(group, label.slice(group.length + 1))}`,
               ]).exitCode === 0
             : false;
-        row.push(installed ? (loaded ? "yes" : "no") : "-");
+        let loadState: string;
+        if (!installed) {
+          loadState = "-";
+        } else if (loaded) {
+          loadState = "yes";
+        } else {
+          loadState = "no";
+        }
+        row.push(loadState);
       }
       row.push(entry ? scheduleSummary(entry.descriptor.schedule) : "-");
       rows.push(row);

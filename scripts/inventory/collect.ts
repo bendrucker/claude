@@ -159,13 +159,21 @@ async function readAgent(path: string): Promise<Agent> {
   const allowed = toolList(data.tools);
   const denied = toolList(data.disallowedTools);
   const name = text(data.name);
+  let tools: string;
+  if (allowed !== "") {
+    tools = allowed;
+  } else if (denied !== "") {
+    tools = `all except ${denied}`;
+  } else {
+    tools = "";
+  }
 
   return {
     ...origin(path),
     name: namespaced(path, name !== "" ? name : basename(path, ".md")),
     description: text(data.description),
     model: text(data.model),
-    tools: allowed !== "" ? allowed : denied !== "" ? `all except ${denied}` : "",
+    tools,
   };
 }
 

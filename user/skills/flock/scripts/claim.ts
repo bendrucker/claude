@@ -369,6 +369,13 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
         pull: pull === undefined ? [] : pullFlags(pull),
       });
 
+      let prColumn: string;
+      if (pull === undefined) {
+        prColumn = unknownColumn ? "?" : "-";
+      } else {
+        prColumn = pullRequestRef(pull);
+      }
+
       const row: BoardRow = {
         kind: "worktree",
         pane: null,
@@ -395,7 +402,7 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
                 review: pull.review,
                 mergeState: pull.mergeState,
               },
-        prColumn: pull === undefined ? (unknownColumn ? "?" : "-") : pullRequestRef(pull),
+        prColumn,
         age: ageInDays(scan.commit, ctx.now),
         flags,
         state: {
@@ -460,7 +467,11 @@ function readPanes(snapshot: z.infer<typeof Snapshot>): {
         cwd: pane.foreground_cwd ?? pane.cwd ?? "",
       };
     })
-    .toSorted((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+    .toSorted((left, right) => {
+      if (left.id < right.id) return -1;
+      if (left.id > right.id) return 1;
+      return 0;
+    });
 
   const repoRoots = workspaces
     .map((workspace) => workspace.worktree?.repo_root ?? "")
@@ -670,14 +681,17 @@ async function board(json: boolean): Promise<string> {
   const selfWorkspace = process.env.HERDR_WORKSPACE_ID ?? "";
 
   if (json) {
+    let status: string;
+    if (flockWorkspace === "") {
+      status = "UNCLAIMED";
+    } else if (flockWorkspace === selfWorkspace) {
+      status = "OK";
+    } else {
+      status = "ELSEWHERE";
+    }
     return JSON.stringify(
       {
-        status:
-          flockWorkspace === ""
-            ? "UNCLAIMED"
-            : flockWorkspace === selfWorkspace
-              ? "OK"
-              : "ELSEWHERE",
+        status,
         self,
         workspace: flockWorkspace === "" ? null : flockWorkspace,
         incomplete: warnings,

@@ -50,16 +50,19 @@ const loaded = await Promise.all(
     const file = Bun.file(join(argv.flags.out, `${id}.md`));
     if (!(await file.exists())) return { id, sample: null };
     const { title, type, body } = parseIssue(await file.text());
+    let sampleType: string;
+    if (typeof brief.type === "string" && brief.type !== "") {
+      sampleType = brief.type;
+    } else if (type !== "") {
+      sampleType = type;
+    } else {
+      sampleType = "unknown";
+    }
     return {
       id,
       sample: {
         id,
-        type:
-          typeof brief.type === "string" && brief.type !== ""
-            ? brief.type
-            : type !== ""
-              ? type
-              : "unknown",
+        type: sampleType,
         size: brief.size ?? "full",
         project: brief.project ?? "synthetic",
         brief: brief.brief,

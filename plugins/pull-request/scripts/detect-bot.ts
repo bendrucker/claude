@@ -87,11 +87,14 @@ function pause(cooldowns: Cooldown[], provider: string, remote: string | null, n
       Date.parse(record.pausedUntil) > now.getTime() &&
       (record.remote === undefined || record.remote === remote),
   );
-  if (live.length === 0) return null;
   // Overlapping pauses are conjunctive: the provider is back only once the last one lifts.
-  const latest = live.reduce((a, b) =>
-    Date.parse(a.pausedUntil) >= Date.parse(b.pausedUntil) ? a : b,
-  );
+  let latest: Cooldown | undefined;
+  for (const record of live) {
+    if (latest === undefined || Date.parse(record.pausedUntil) > Date.parse(latest.pausedUntil)) {
+      latest = record;
+    }
+  }
+  if (latest === undefined) return null;
   return `paused until ${resumeDate(latest.pausedUntil)} (${latest.reason})`;
 }
 

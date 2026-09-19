@@ -63,7 +63,7 @@ describe("buildAttribution", () => {
 });
 
 describe("printCaptured", () => {
-  const silenceLog = () => spyOn(console, "log").mockImplementation(() => {});
+  const silenceLog = () => spyOn(console, "log").mockImplementation(() => undefined);
   let log: ReturnType<typeof silenceLog>;
 
   beforeEach(() => {

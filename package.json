@@ -33,7 +33,7 @@
     "packages/oxlint-rules",
     "plugins/plan/evals/gate",
     "plugins/prompting",
-    "plugins/herdr"
+    "plugins/projects"
   ],
   "type": "module",
   "scripts": {

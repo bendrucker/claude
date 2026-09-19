@@ -152,13 +152,6 @@
         "zod": "^4.4.3",
       },
     },
-    "plugins/herdr": {
-      "name": "herdr",
-      "dependencies": {
-        "cleye": "^2.2.1",
-        "zod": "^4.4.3",
-      },
-    },
     "plugins/issue": {
       "name": "issue",
       "dependencies": {
@@ -234,6 +227,21 @@
       },
       "devDependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
+      },
+    },
+    "plugins/projects": {
+      "name": "projects",
+      "dependencies": {
+        "cleye": "^2.2.1",
+        "mdast-util-from-markdown": "^2.0.2",
+        "mdast-util-frontmatter": "^2.0.1",
+        "micromark-extension-frontmatter": "^2.0.0",
+        "table": "^6.9.0",
+        "yaml": "^2.7.1",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@types/mdast": "^4.0.4",
       },
     },
     "plugins/prompting": {
@@ -1830,8 +1838,6 @@
 
     "hast-util-whitespace": ["hast-util-whitespace@3.0.0", "", { "dependencies": { "@types/hast": "^3.0.0" } }, "sha512-88JUN06ipLwsnv+dVn+OIYOvAuvBMy/Qoi6O7mQHxdPXpjy+Cd6xRkWwux7DKO+4sYILtLBRIKgsdpS2gQc7qw=="],
 
-    "herdr": ["herdr@workspace:plugins/herdr"],
-
     "hono": ["hono@4.13.5", "", {}, "sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw=="],
 
     "hookified": ["hookified@1.15.1", "", {}, "sha512-MvG/clsADq1GPM2KGo2nyfaWVyn9naPiXrqIe4jYjXNZQt238kWyOGrsyc/DmRAQ+Re6yeo6yX/yoNCG5KAEVg=="],
@@ -2333,6 +2339,8 @@
     "prettier": ["prettier@1.19.1", "", { "bin": { "prettier": "./bin-prettier.js" } }, "sha512-s7PoyDv/II1ObgQunCbB9PdLmUcBZcnWOcxDh7O0N/UwDEsHyqkW+Qh28jW+mVuCdx7gLB0BotYI1Y6uI9iyew=="],
 
     "pretty-ms": ["pretty-ms@9.3.1", "", { "dependencies": { "parse-ms": "^4.0.0" } }, "sha512-HzMy3Geq23nVALD/M2LliU+F+M+gVNsvkQWWqeBZ8HDiCgzo6YPJ/Omrmtq24EFrIsk0a3EkQGEd7bDOo+IhGA=="],
+
+    "projects": ["projects@workspace:plugins/projects"],
 
     "promise-limit": ["promise-limit@2.7.0", "", {}, "sha512-7nJ6v5lnJsXwGprnGXga4wx6d1POjvi5Qmf1ivTRxTjH4Z/9Czja/UCMLVmB9N93GeWOU93XaFaEt6jbuoagNw=="],
 

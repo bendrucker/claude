@@ -1,0 +1,8 @@
+{
+  "name": "projects",
+  "description": "Coordinate parallel agent work: dispatch a worktree thread per pull request, record each thread on an append-only ledger, and route requests to projects",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

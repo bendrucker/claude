@@ -450,7 +450,8 @@
     "comments@bendrucker": true,
     "agent-browser@agent-browser": true,
     "plannotator@plannotator": true,
-    "herdr@bendrucker": true
+    "herdr@bendrucker": true,
+    "projects@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {

@@ -107,23 +107,27 @@ describe("validateLineInDiff", () => {
   ];
 
   it("passes for valid new line", () => {
-    expect(() => validateLineInDiff(diffs, "src/app.ts", { line: 15 })).not.toThrow();
+    expect(() => {
+      validateLineInDiff(diffs, "src/app.ts", { line: 15 });
+    }).not.toThrow();
   });
 
   it("passes for valid old line", () => {
-    expect(() => validateLineInDiff(diffs, "src/app.ts", { oldLine: 12 })).not.toThrow();
+    expect(() => {
+      validateLineInDiff(diffs, "src/app.ts", { oldLine: 12 });
+    }).not.toThrow();
   });
 
   it("throws for line outside diff", () => {
-    expect(() => validateLineInDiff(diffs, "src/app.ts", { line: 50 })).toThrow(
-      "not within a diff hunk",
-    );
+    expect(() => {
+      validateLineInDiff(diffs, "src/app.ts", { line: 50 });
+    }).toThrow("not within a diff hunk");
   });
 
   it("throws for unknown file", () => {
-    expect(() => validateLineInDiff(diffs, "unknown.ts", { line: 1 })).toThrow(
-      "not found in MR diff",
-    );
+    expect(() => {
+      validateLineInDiff(diffs, "unknown.ts", { line: 1 });
+    }).toThrow("not found in MR diff");
   });
 });
 

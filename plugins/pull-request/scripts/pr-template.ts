@@ -30,7 +30,7 @@ export async function findTemplate(provider: Provider, repoRoot: string): Promis
     // oxlint-disable-next-line no-await-in-loop -- first match wins: a later candidate must not be read once an earlier one exists.
     if (await file.exists()) {
       // oxlint-disable-next-line no-await-in-loop -- first match wins: a later candidate must not be read once an earlier one exists.
-      return await file.text();
+      return file.text();
     }
   }
   return null;

@@ -136,9 +136,9 @@ export function exitOnRejection(): void {
 
 export async function readBody(file: string | undefined): Promise<string> {
   if (file === "-" || file == null || file === "") {
-    return await Bun.stdin.text();
+    return Bun.stdin.text();
   }
-  return await Bun.file(file).text();
+  return Bun.file(file).text();
 }
 
 export async function glabApiPost(path: string, payload: Record<string, unknown>): Promise<void> {

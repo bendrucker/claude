@@ -69,5 +69,7 @@ await cli(
         "Manage upstream-backed JSON schemas. Each is the upstream SchemaStore base fetched live plus an RFC 6902 overlay of our edits, merged in memory at validation time. `check` fetches current upstream, verifies the overlay still applies, flags ops upstream has absorbed, and warns on ops that overwrite an upstream definition.",
     },
   },
-  (parsed) => parsed.showHelp(),
+  (parsed) => {
+    parsed.showHelp();
+  },
 );

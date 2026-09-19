@@ -872,7 +872,7 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  main().catch((error) => {
+  main().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });

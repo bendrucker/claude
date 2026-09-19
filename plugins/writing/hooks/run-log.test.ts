@@ -55,7 +55,9 @@ describe("appendRunLog", () => {
   });
 
   it("does nothing when logging is disabled", () => {
-    expect(() => appendRunLog(entry(), null)).not.toThrow();
+    expect(() => {
+      appendRunLog(entry(), null);
+    }).not.toThrow();
   });
 
   it("rotates once the file exceeds the size cap", async () => {

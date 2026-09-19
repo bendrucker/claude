@@ -104,11 +104,15 @@ describe("assertDistinctSessions", () => {
       present({ seq: 2 }),
       present({ host: "work", session_id: "fedcba9876543210", session: "fedcba98" }),
     ];
-    expect(() => assertDistinctSessions(presents)).not.toThrow();
+    expect(() => {
+      assertDistinctSessions(presents);
+    }).not.toThrow();
   });
 
   it("refuses two sessions sharing a prefix", () => {
     const presents = [present({}), present({ session_id: "0123456700000000" })];
-    expect(() => assertDistinctSessions(presents)).toThrow(/names both/);
+    expect(() => {
+      assertDistinctSessions(presents);
+    }).toThrow(/names both/);
   });
 });

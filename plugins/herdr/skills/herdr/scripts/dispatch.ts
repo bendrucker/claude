@@ -48,7 +48,11 @@ export const spawnRunner: Runner = async (argv, options) => {
     return { code: 127, stdout: "", stderr: `${argv[0]}: ${reason}\n` };
   }
   const timer =
-    options?.timeoutMs == null ? null : setTimeout(() => proc.kill(), options.timeoutMs);
+    options?.timeoutMs == null
+      ? null
+      : setTimeout(() => {
+          proc.kill();
+        }, options.timeoutMs);
   try {
     const [stdout, stderr, code] = await Promise.all([
       new Response(proc.stdout).text(),

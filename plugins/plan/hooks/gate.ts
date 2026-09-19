@@ -213,5 +213,7 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  main().catch((error: unknown) => failOpen("failed to decide on this presentation", error));
+  main().catch((error: unknown) => {
+    failOpen("failed to decide on this presentation", error);
+  });
 }

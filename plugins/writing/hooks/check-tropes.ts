@@ -128,7 +128,7 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     const bodies = await Promise.all(
       files.map(async (path) => {
         const file = Bun.file(path);
-        return (await file.exists()) ? await file.text() : null;
+        return (await file.exists()) ? file.text() : null;
       }),
     );
     texts.push(...bodies.filter((body) => body !== null));

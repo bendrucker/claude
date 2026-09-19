@@ -68,9 +68,11 @@ function runScope(scope: string): Promise<FileCoverage[]> {
       stdio: "ignore",
     });
     child.on("close", () => {
-      readLcov(coverageDir).then(resolve, reject);
+      readLcov(coverageDir).then(resolve).catch(reject);
     });
-    child.on("error", () => resolve([]));
+    child.on("error", () => {
+      resolve([]);
+    });
   });
 }
 

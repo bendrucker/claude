@@ -143,7 +143,9 @@ export async function preflight(
   // the collect walk, and this run's own job dir lands later, so the two walks
   // overlap.
   const [comments, history] = await Promise.all([
-    collect(options, (file) => densities.push(file)),
+    collect(options, (file) => {
+      densities.push(file);
+    }),
     readHistory(options.jobBase ?? DEFAULT_JOB_BASE),
   ]);
   const weights = shapeWeights(history);

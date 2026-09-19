@@ -542,6 +542,8 @@ if (import.meta.main) {
         description: "Build Google Flights search URLs and parse rendered results.",
       },
     },
-    (parsed) => parsed.showHelp(),
+    (parsed) => {
+      parsed.showHelp();
+    },
   );
 }

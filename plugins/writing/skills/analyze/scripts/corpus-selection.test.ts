@@ -95,7 +95,7 @@ describe("selectCorpora", () => {
   ])("refuses %s", async (_name, flags, message) => {
     await withDataDir(async (dataDir) => {
       const failure = await selectCorpora({ ...NO_FLAGS, dataDir, ...flags }).catch(
-        (error: Error) => error.message,
+        (error: unknown) => (error instanceof Error ? error.message : String(error)),
       );
       expect(failure).toMatch(message);
     });

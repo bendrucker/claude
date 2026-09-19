@@ -7,6 +7,7 @@ import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { decodeJson, decodeStdin } from "../../../packages/decode/index";
 
+// oxlint-disable-next-line typescript/strict-void-return -- tsc resolves promisify(execFile) through Node's [util.promisify.custom] overload correctly; a cast narrow enough to satisfy this rule trips typescript/no-unsafe-type-assertion instead.
 const execFileAsync = promisify(execFile);
 const PREK_TIMEOUT = 120_000;
 

@@ -5,8 +5,12 @@ export interface AuditIo {
 }
 
 export const consoleIo: AuditIo = {
-  log: (line) => console.log(line),
-  warn: (line) => console.error(line),
+  log: (line) => {
+    console.log(line);
+  },
+  warn: (line) => {
+    console.error(line);
+  },
 };
 
 /** A failure the user can act on. The CLI prints the message alone and exits 1. */

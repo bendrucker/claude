@@ -558,6 +558,7 @@ if (import.meta.main) {
       agent: record.agent,
       session: record.session,
       outcome,
+      prompted: record.prompted,
     };
     if (Object.keys(tags).length > 0) row.tags = tags;
     try {

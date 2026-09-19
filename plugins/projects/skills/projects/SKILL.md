@@ -21,7 +21,7 @@ New work needing its own worktree and agent gets both in one call:
 bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
 ```
 
-It creates the worktree off `origin/main`, starts a Claude agent in it through herdr, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A failure prints the error, then the partial record once the worktree exists. A dispatch that reaches worktree creation appends to the ledger, whether it completes or lands as `orphaned`. One that fails validation first leaves the ledger unchanged. `--tag <key>=<value>`, repeatable, records who dispatched it and what for (`--tag by=chief`, `--tag project=<slug>`).
+It creates the worktree off `origin/main`, starts a Claude agent in it through herdr, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. `prompted: false` reaches the ledger row too, where `status` reports the thread under `waiting-on-you` until herdr reports its agent working. A failure prints the error, then the partial record once the worktree exists. A dispatch that reaches worktree creation appends to the ledger, whether it completes or lands as `orphaned`. One that fails validation first leaves the ledger unchanged. `--tag <key>=<value>`, repeatable, records who dispatched it and what for (`--tag by=chief`, `--tag project=<slug>`).
 
 Load `herdr:herdr` for the pane mechanics around a dispatched agent: reading it, prompting it again, waiting on it. `worktrunk:wt-switch-create` re-roots this session instead of dispatching.
 
@@ -34,7 +34,20 @@ bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts status --tag project=ledger
 bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts outcome --repo "$REPO" --branch "$BRANCH" --state done --pr "$PR_URL"
 ```
 
-`status` prints the projects (one line per `projects/<slug>/project.md`: slug, description, lead state, open thread count), then every thread whose latest row is `dispatched` or `blocked` and carries each given tag. Without `--tag` it lists every open thread, and `--json` returns the same as data. The lead state is `live` when a `lead-<slug>` agent is running, `none` when herdr lists no such agent, and `unknown` when herdr could not be asked, which is not a reason to start one.
+`status` prints the projects (one line per `projects/<slug>/project.md`: slug, description, lead state, open thread count), then every open thread, each tagged with its `need`. A thread its agent called `done` stays open while its pull request does. The lead state is `live` when a `lead-<slug>` agent is running, `none` when herdr lists no such agent, and `unknown` when herdr could not be asked, which is not a reason to start one.
+
+Threads sort by need, in this order:
+
+- `waiting-on-you`: herdr reports the thread's agent blocked on a dialog, the dispatch never delivered its prompt and its agent is not working, the ledger records the thread `blocked`, or the agent is gone from a thread still `dispatched` and under a week old.
+- `ready-for-review`: the pull request is open, unapproved, and out of draft. A thread whose agent called it `done` stays here until that request merges or closes.
+- `landing`: the pull request is approved, merged, or closed. The note says which, and a merged or closed one takes an `outcome` row to record its result.
+- `working`: herdr reports the agent working.
+- `idle`: herdr reports the agent idle and the thread has no pull request.
+- `stale`: the thread's latest row is over a week old and no agent is left.
+
+The list gives sort order. Precedence runs differently: a thread stopped on Ben reports `waiting-on-you` whatever its pull request says, a pull request decides ahead of the thread's age, and age decides ahead of a missing agent.
+
+Pull request state comes from one `gh pr view` per thread, bounded to rows under a fortnight old, and reads `unknown` when gh cannot answer, so a machine offline still gets a status. `--tag <key>=<value>` narrows to the threads carrying each pair. `--json` returns the same as data, with each thread's `need` and, for a thread that has one, its pull request state.
 
 `outcome` appends a row with the thread's new state (`done`, `blocked`, `abandoned`), an optional `--pr`, and a `--note` saying why when it is blocked or abandoned. `--repo` may be any worktree of the repository. The latest row per repo and branch is the thread's state.
 
@@ -44,7 +57,7 @@ The board renders the same data as a TUI:
 bun ${CLAUDE_SKILL_DIR}/scripts/board.ts [--watch]
 ```
 
-`--watch` re-renders every ten seconds (`--interval <seconds>` overrides it), one section per workspace with each project's threads nested under its description. Without it the board prompts for a project or a thread, then focuses that agent's pane or sends it a message.
+`--watch` re-renders every ten seconds (`--interval <seconds>` overrides it), one section per need with each thread's project slug on its row, or its repository where the thread carries no project tag. Without it the board prompts for a project or a thread, then focuses that agent's pane or sends it a message. Both views find a thread's agent by the session it was dispatched with, so one that moved panes still reads as itself. The picker falls back to the pane the ledger recorded, and reports that it has no agent to reach when another agent has taken that pane over.
 
 ## Projects
 

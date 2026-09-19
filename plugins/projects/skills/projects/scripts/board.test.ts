@@ -4,14 +4,20 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import { choices, focus, formatBoard, groupThreads, message, targetAgent } from "./board";
 import type { CommandResult, Runner } from "./dispatch";
-import { NOW, PROJECT, row } from "./fixture";
+import { agents, NOW, observe, pr, PROJECT, row } from "./fixture";
 import { projectsDir, readProjects } from "./projects";
-import { buildStatus, type Status } from "./status";
+import { buildStatus, type Need, type Status, type Thread } from "./status";
 import { appendDispatch, readLedger } from "./threads";
 
 const ESC = "";
 
-// Two workspaces, so the board has more than one section to order.
+const thread = (need: Need, overrides: Partial<Thread> = {}): Thread => ({
+  ...row({}),
+  need,
+  ...overrides,
+});
+
+// One thread per need the board can reach, so it has more than one section to order.
 async function board(): Promise<Status> {
   const dataDir = mkdtempSync(join(tmpdir(), "board-"));
   const rows = [
@@ -49,35 +55,40 @@ async function board(): Promise<Status> {
     await readProjects(dataDir),
     await readLedger(dataDir),
     {},
-    new Set(["lead-ledger", "add-outcomes"]),
+    observe({
+      agents: agents(
+        ["wZZ:p1", "fix-thing", "working"],
+        ["wZZ:p2", "add-outcomes", "idle"],
+        ["wLD:p1", "lead-ledger", "idle"],
+      ),
+      pullRequests: new Map([["https://example.test/pr/1", pr()]]),
+    }),
   );
 }
 
 describe("groupThreads", () => {
-  test("nests tagged threads under their project, in workspace order", async () => {
+  test("gathers the threads by what they need, in the order Ben works through them", async () => {
     expect(
       groupThreads(await board()).map((group) => [
-        group.workspace,
-        group.projects.map((project) => [project.slug, project.threads.map((r) => r.branch)]),
-        group.threads.map((r) => r.branch),
+        group.need,
+        group.threads.map((entry) => entry.branch),
       ]),
     ).toEqual([
-      ["claude", [["ledger", ["fix-thing", "add-outcomes"]]], []],
-      ["dotfiles", [], ["one-off"]],
+      ["waiting-on-you", ["add-outcomes", "one-off"]],
+      ["working", ["fix-thing"]],
     ]);
   });
 });
 
 describe("formatBoard", () => {
-  test("renders a section per workspace", async () => {
+  test("renders a section per need, with every row naming where it came from", async () => {
     expect(formatBoard(await board(), NOW)).toMatchInlineSnapshot(`
-      "claude
-        ledger  Dispatch ledger, project routing, and the chief and lead sessions that read it
-          fix-thing     dispatched  fix-thing     3h   -
-          add-outcomes  blocked     add-outcomes  30m  https://example.test/pr/1
+      "waiting-on-you
+        ledger  add-outcomes  blocked     add-outcomes  30m  https://example.test/pr/1
+        repo    one-off       dispatched  -             24h  -
 
-      dotfiles
-        one-off  dispatched  -  24h  -
+      working
+        ledger  fix-thing     dispatched  fix-thing     3h   -
       "
     `);
   });
@@ -86,14 +97,14 @@ describe("formatBoard", () => {
     const status: Status = {
       projects: [],
       threads: [
-        row({ branch: "first", pr: "https://example.test/pr/1\nstray line" }),
-        row({ branch: "second", agent: "second" }),
+        thread("idle", { branch: "first", pr: "https://example.test/pr/1\nstray line" }),
+        thread("idle", { branch: "second", agent: "second" }),
       ],
     };
     expect(formatBoard(status, NOW)).toMatchInlineSnapshot(`
-      "wZZ
-        first   dispatched  fix-thing  3h  https://example.test/pr/1 stray line
-        second  dispatched  second     3h  -
+      "idle
+        repo  first   dispatched  fix-thing  3h  https://example.test/pr/1 stray line
+        repo  second  dispatched  second     3h  -
       "
     `);
   });
@@ -102,7 +113,7 @@ describe("formatBoard", () => {
     const status: Status = {
       projects: [],
       threads: [
-        row({
+        thread("idle", {
           branch: `${ESC}[2Jwiped`,
           agent: "bell",
           pr: "https://example.test/pr/1‮",
@@ -115,12 +126,12 @@ describe("formatBoard", () => {
   });
 
   test("keeps the board's own color codes when it paints", () => {
-    const status: Status = { projects: [], threads: [row({ branch: "painted" })] };
-    expect(formatBoard(status, NOW, { color: true })).toContain(`${ESC}[1mwZZ${ESC}[0m`);
+    const status: Status = { projects: [], threads: [thread("waiting-on-you")] };
+    expect(formatBoard(status, NOW, { color: true })).toContain(`${ESC}[1mwaiting-on-you${ESC}[0m`);
   });
 
   test("renders an empty field as the same placeholder a missing one gets", () => {
-    const status: Status = { projects: [], threads: [row({ branch: "blank", pr: "" })] };
+    const status: Status = { projects: [], threads: [thread("idle", { branch: "blank", pr: "" })] };
     expect(formatBoard(status, NOW).trimEnd().endsWith("-")).toBe(true);
   });
 
@@ -142,7 +153,7 @@ describe("formatBoard", () => {
       .trimEnd()
       .split("\n");
     expect(lines.every((line) => line.length <= 20)).toBe(true);
-    expect(lines).toContain("  ledger  Dispatch …");
+    expect(lines).toContain("  ledger  add-outco…");
   });
 
   test("says so when nothing is open", () => {
@@ -156,28 +167,37 @@ describe("targets", () => {
     expect(choices(await board(), NOW).map((choice) => choice.label)).toMatchInlineSnapshot(`
       [
         "ledger  Dispatch ledger, project routing, and the chief and lead sessions that read it  lead:live  open:2",
-        "fix-thing     dispatched  fix-thing     3h   -",
-        "add-outcomes  blocked     add-outcomes  30m  https://example.test/pr/1",
-        "one-off       dispatched  -             24h  -",
+        "waiting-on-you  ledger  add-outcomes  blocked     add-outcomes  30m  https://example.test/pr/1",
+        "waiting-on-you  repo    one-off       dispatched  -             24h  -",
+        "working         ledger  fix-thing     dispatched  fix-thing     3h   -",
       ]
     `);
   });
 
   test("resolves a project to its lead and a thread to its agent", async () => {
-    const [project, , , oneOff] = choices(await board(), NOW);
+    const [project, blocked] = choices(await board(), NOW);
     expect(targetAgent(project!.target)).toBe("lead-ledger");
-    expect(targetAgent(oneOff!.target)).toBeNull();
+    expect(targetAgent(blocked!.target)).toBe("add-outcomes");
   });
 
-  test("has nothing to target when a thread's agent is no longer live", async () => {
-    const [, thread] = choices(await board(), NOW);
-    expect(targetAgent(thread!.target, new Set(["fix-thing"]))).toBe("fix-thing");
-    expect(targetAgent(thread!.target, new Set())).toBeNull();
+  test("falls back to a thread's pane when its agent is no longer live", async () => {
+    const [, , oneOff, working] = choices(await board(), NOW);
+    expect(oneOff!.label).toMatch(/one-off/);
+    expect(targetAgent(oneOff!.target, agents())).toBe("wA:p1");
+    expect(working!.label).toMatch(/fix-thing/);
+    expect(targetAgent(working!.target, agents(["wZZ:p1", "fix-thing", "idle"]))).toBe("fix-thing");
+    expect(targetAgent(working!.target, agents())).toBe("wZZ:p1");
+  });
+
+  test("refuses a pane another agent has taken over", async () => {
+    const [, , , working] = choices(await board(), NOW);
+    expect(targetAgent(working!.target, agents(["wZZ:p1", "someone-else", "idle"]))).toBeNull();
   });
 
   test("keeps every name targetable when herdr cannot say who is live", async () => {
-    const [project] = choices(await board(), NOW);
+    const [project, , , working] = choices(await board(), NOW);
     expect(targetAgent(project!.target, null)).toBe("lead-ledger");
+    expect(targetAgent(working!.target, null)).toBe("fix-thing");
   });
 
   test("has no lead to target when none is live", () => {

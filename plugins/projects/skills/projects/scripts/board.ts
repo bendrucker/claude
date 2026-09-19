@@ -1,57 +1,47 @@
 #!/usr/bin/env bun
+import { basename } from "node:path";
 import { cancel, intro, isCancel, log, outro, select, text } from "@clack/prompts";
 import { cli } from "cleye";
 import { getBorderCharacters, table } from "table";
-import { liveAgents } from "./capture";
+import { type Agents, listAgents, readPullRequests } from "./capture";
 import { type CommandResult, type Runner, spawnRunner } from "./dispatch";
 import { leadName, readProjects } from "./projects";
-import { buildStatus, formatAge, type ProjectStatus, type Status } from "./status";
-import { type DispatchLedgerRow, readLedger, resolveDataDir } from "./threads";
+import {
+  buildStatus,
+  formatAge,
+  type Need,
+  NEEDS,
+  oneLine,
+  type ProjectStatus,
+  type Status,
+  type Thread,
+} from "./status";
+import { latestRows, readLedger, resolveDataDir } from "./threads";
 
 const TRUNCATE = 120;
 const INTERVAL_SECONDS = 10;
 
 const BOLD = "1";
-const CYAN = "36";
 const YELLOW = "33";
 
-export interface ProjectGroup {
-  slug: string;
-  description: string;
-  threads: DispatchLedgerRow[];
+export interface NeedGroup {
+  need: Need;
+  threads: Thread[];
 }
 
-export interface WorkspaceGroup {
-  workspace: string;
-  projects: ProjectGroup[];
-  threads: DispatchLedgerRow[];
-}
-
-// Every order is first-seen, which is dispatch order.
-export function groupThreads(status: Status): WorkspaceGroup[] {
-  const descriptions = new Map(
-    status.projects.map((project) => [project.slug, project.description]),
-  );
-  const workspaces = new Map<string, WorkspaceGroup>();
+// Groups follow the display order of the needs, threads inside one follow
+// first-seen order, which is dispatch order.
+export function groupThreads(status: Status): NeedGroup[] {
+  const groups = new Map<Need, NeedGroup>();
   for (const row of status.threads) {
-    let workspace = workspaces.get(row.workspace);
-    if (workspace == null) {
-      workspace = { workspace: row.workspace, projects: [], threads: [] };
-      workspaces.set(row.workspace, workspace);
+    let group = groups.get(row.need);
+    if (group == null) {
+      group = { need: row.need, threads: [] };
+      groups.set(row.need, group);
     }
-    const slug = row.tags?.project;
-    if (slug == null) {
-      workspace.threads.push(row);
-      continue;
-    }
-    let project = workspace.projects.find((entry) => entry.slug === slug);
-    if (project == null) {
-      project = { slug, description: descriptions.get(slug) ?? "", threads: [] };
-      workspace.projects.push(project);
-    }
-    project.threads.push(row);
+    group.threads.push(row);
   }
-  return [...workspaces.values()];
+  return NEEDS.flatMap((need) => groups.get(need) ?? []);
 }
 
 interface Line {
@@ -74,53 +64,34 @@ function plain(rows: readonly (readonly string[])[]): string[] {
     .slice(0, rows.length);
 }
 
-// Every value here is written straight to a terminal, so escape and format
-// bytes go before the whitespace does. A newline additionally makes table()
-// emit more lines than it was given rows, which slides every later row under
-// the wrong header.
-function oneLine(value: string): string {
-  return value
-    .replaceAll(/[\p{Cc}\p{Cf}]/gu, " ")
-    .replaceAll(/\s+/g, " ")
-    .trim();
+// A trailing empty cell disappears once the line is trimmed, so a thread with
+// no note costs nothing.
+function optional(value: string | null | undefined): string {
+  return value == null ? "" : oneLine(value);
 }
 
 function cell(value: string | null | undefined): string {
-  const collapsed = value == null ? "" : oneLine(value);
+  const collapsed = optional(value);
   return collapsed === "" ? "-" : collapsed;
 }
 
-function threadCells(row: DispatchLedgerRow, now: Date, indent = ""): string[] {
+// Grouping by need drops the workspace headings, which leaves an untagged
+// thread silent about the checkout it came from. Its repository is the same
+// kind of identity a project slug is, and fits the same cell.
+function origin(row: Thread): string {
+  return row.tags?.project ?? basename(row.repo);
+}
+
+function threadCells(row: Thread, now: Date, indent = ""): string[] {
   return [
-    `${indent}${oneLine(row.branch)}`,
+    `${indent}${cell(origin(row))}`,
+    oneLine(row.branch),
     row.outcome,
     cell(row.agent),
     formatAge(row.ts, now),
     cell(row.pr),
+    optional(row.note),
   ];
-}
-
-// Headers and thread rows interleave, so the rows go through one table per
-// workspace for alignment and the headers are spliced back into the result.
-function section(group: WorkspaceGroup, now: Date): Line[] {
-  const entries: ({ header: Line } | { cells: string[] })[] = [
-    { header: { text: oneLine(group.workspace), style: BOLD } },
-  ];
-  for (const project of group.projects) {
-    entries.push({
-      header: {
-        text: `  ${oneLine(project.slug)}  ${oneLine(project.description)}`.trimEnd(),
-        style: CYAN,
-      },
-    });
-    for (const row of project.threads) entries.push({ cells: threadCells(row, now, "    ") });
-  }
-  for (const row of group.threads) entries.push({ cells: threadCells(row, now, "  ") });
-  const rendered = plain(entries.flatMap((entry) => ("cells" in entry ? [entry.cells] : [])));
-  let index = 0;
-  return entries.map((entry) =>
-    "header" in entry ? entry.header : { text: rendered[index++] ?? "" },
-  );
 }
 
 function clip(value: string, width: number): string {
@@ -139,10 +110,17 @@ export interface BoardOptions {
 
 export function formatBoard(status: Status, now: Date, options: BoardOptions = {}): string {
   const truncate = options.truncate ?? TRUNCATE;
+  const groups = groupThreads(status);
+  // One table across every group keeps the columns aligned down the board.
+  const rendered = plain(
+    groups.flatMap((group) => group.threads.map((row) => threadCells(row, now, "  "))),
+  );
   const lines: Line[] = [];
-  for (const group of groupThreads(status)) {
+  let next = 0;
+  for (const group of groups) {
     if (lines.length > 0) lines.push({ text: "" });
-    lines.push(...section(group, now));
+    lines.push({ text: group.need, style: BOLD });
+    lines.push(...group.threads.map(() => ({ text: rendered[next++] ?? "" })));
   }
   if (lines.length === 0) lines.push({ text: "no open threads" });
   // Warnings go in the board because watch mode clears the screen over stderr.
@@ -157,24 +135,23 @@ export function formatBoard(status: Status, now: Date, options: BoardOptions = {
     .join("\n")}\n`;
 }
 
-export type Target =
-  | { kind: "project"; project: ProjectStatus }
-  | { kind: "thread"; row: DispatchLedgerRow };
+export type Target = { kind: "project"; project: ProjectStatus } | { kind: "thread"; row: Thread };
 
-// A null live set means herdr could not answer, so every name stays targetable
-// and herdr reports the failure itself.
-export function targetAgent(
-  target: Target,
-  live: ReadonlySet<string> | null = null,
-): string | null {
-  const name =
-    target.kind === "thread"
-      ? target.row.agent
-      : target.project.lead === "none"
-        ? null
-        : leadName(target.project.slug);
-  if (name == null) return null;
-  return live == null || live.has(name) ? name : null;
+// A null listing means herdr could not answer, so every name stays targetable
+// and herdr reports the failure itself. A thread whose name is gone falls back
+// to the pane the ledger recorded, which every agent command takes, unless
+// herdr reports that pane under another name: a focus or a prompt meant for
+// this thread must never reach whoever took the pane over.
+export function targetAgent(target: Target, agents: Agents | null = null): string | null {
+  if (target.kind === "thread") {
+    const name = target.row.agent;
+    if (name != null && (agents == null || agents.names.has(name))) return name;
+    const occupant = agents?.panes.get(target.row.pane);
+    return occupant != null && occupant.name !== name ? null : target.row.pane;
+  }
+  if (target.project.lead === "none") return null;
+  const name = leadName(target.project.slug);
+  return agents == null || agents.names.has(name) ? name : null;
 }
 
 function targetLabel(target: Target): string {
@@ -187,11 +164,7 @@ export interface Choice {
 }
 
 export function choices(status: Status, now: Date, truncate = TRUNCATE): Choice[] {
-  const threads: DispatchLedgerRow[] = [];
-  for (const group of groupThreads(status)) {
-    for (const project of group.projects) threads.push(...project.threads);
-    threads.push(...group.threads);
-  }
+  const threads = groupThreads(status).flatMap((group) => group.threads);
   const projectLines = plain(
     status.projects.map((project) => [
       oneLine(project.slug),
@@ -200,7 +173,9 @@ export function choices(status: Status, now: Date, truncate = TRUNCATE): Choice[
       `open:${project.open}`,
     ]),
   );
-  const threadLines = plain(threads.map((row) => threadCells(row, now)));
+  // The picker is one flat list, so each row carries the need the board would
+  // have put in a heading above it.
+  const threadLines = plain(threads.map((row) => [row.need, ...threadCells(row, now)]));
   const label = (lines: string[], index: number): string => clip(lines[index] ?? "", truncate);
   const picked: Choice[] = status.projects.map((project, index) => ({
     target: { kind: "project", project },
@@ -225,21 +200,28 @@ export function message(
 
 export interface BoardData {
   status: Status;
-  live: ReadonlySet<string> | null;
+  agents: Agents | null;
   warnings: string[];
 }
 
-export async function loadStatus(dataDir: string): Promise<BoardData> {
+export async function loadStatus(dataDir: string, now: Date = new Date()): Promise<BoardData> {
   const warnings: string[] = [];
   const warn = (warning: string): void => {
     warnings.push(warning);
   };
-  const [projects, rows, live] = await Promise.all([
+  const [projects, rows] = await Promise.all([
     readProjects(dataDir, warn),
     readLedger(dataDir, warn),
-    liveAgents(),
   ]);
-  return { status: buildStatus(projects, rows, {}, live), live, warnings };
+  const [agents, pullRequests] = await Promise.all([
+    listAgents(),
+    readPullRequests(latestRows(rows), now),
+  ]);
+  return {
+    status: buildStatus(projects, rows, {}, { agents, pullRequests, now }),
+    agents,
+    warnings,
+  };
 }
 
 function reason(error: unknown): string {
@@ -260,9 +242,10 @@ function positive(value: number, flag: string): number {
 async function watch(dataDir: string, intervalMs: number, truncate: number): Promise<void> {
   for (;;) {
     let board: string;
+    const now = new Date();
     try {
-      const { status, warnings } = await loadStatus(dataDir);
-      board = formatBoard(status, new Date(), { truncate, color: true, warnings });
+      const { status, warnings } = await loadStatus(dataDir, now);
+      board = formatBoard(status, now, { truncate, color: true, warnings });
     } catch (error) {
       board = `${clip(oneLine(reason(error)), truncate)}\n`;
     }
@@ -275,15 +258,16 @@ async function interactive(dataDir: string, truncate: number, run: Runner): Prom
   intro("herdr board");
   for (;;) {
     let data: BoardData;
+    const now = new Date();
     try {
-      data = await loadStatus(dataDir);
+      data = await loadStatus(dataDir, now);
     } catch (error) {
       cancel(reason(error));
       process.exitCode = 1;
       return;
     }
     for (const warning of data.warnings) log.warn(oneLine(warning));
-    const options = choices(data.status, new Date(), truncate);
+    const options = choices(data.status, now, truncate);
     if (options.length === 0) {
       outro("no projects or open threads");
       return;
@@ -298,7 +282,7 @@ async function interactive(dataDir: string, truncate: number, run: Runner): Prom
     }
     const choice = options[Number(picked)];
     if (choice == null) return;
-    const agent = targetAgent(choice.target, data.live);
+    const agent = targetAgent(choice.target, data.agents);
     if (agent == null) {
       log.warn(`${targetLabel(choice.target)} has no live agent`);
       continue;

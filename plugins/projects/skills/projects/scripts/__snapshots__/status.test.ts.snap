@@ -5,9 +5,9 @@ exports[`status renders the routing block and the open threads 1`] = `
 ledger  Dispatch ledger, project routing, and the chief and lead sessions that read it  lead:live  open:1
 
 threads
-branch     state       agent      pane    age  pr  tags
-fix-thing  blocked     fix-thing  wZZ:p1  30m  -   project=ledger by=lead-ledger
-one-off    dispatched  one-off    wA:p1   3h   -   by=chief
+branch     need            state       agent      pane    age  pr  tags                           note
+fix-thing  waiting-on-you  blocked     fix-thing  wZZ:p1  30m  -   project=ledger by=lead-ledger  needs a decision
+one-off    idle            dispatched  one-off    wA:p1   3h   -   by=chief
 "
 `;
 

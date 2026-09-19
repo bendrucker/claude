@@ -1,17 +1,18 @@
 ---
 name: projects
 description: >-
-  Dispatch work to a sibling agent in its own worktree, record what each thread returned on the dispatch ledger, and list the projects and open threads. Load this when handing a pull request's worth of work to another agent, when recording that a dispatched thread finished or blocked, when asking what is out and what came back, or when a request names a project, a lead, a thread, or the ledger.
-argument-hint: "[status [--tag k=v] | outcome | dispatch]"
+  Dispatch work to a sibling agent in its own worktree, record what each thread returned on the dispatch ledger, raise what needs Ben on the queue, and list the projects and open threads. Load this when handing a pull request's worth of work to another agent, when recording that a dispatched thread finished or blocked, when a decision is Ben's to make, when asking what is out and what came back, or when a request names a project, a lead, a thread, the queue, or the ledger.
+argument-hint: "[status [--tag k=v] | outcome | dispatch | ask]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts:*)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/queue.ts:*)
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/board.ts:*)
 ---
 
 # Projects
 
-Everything here reads and writes the plugin data dir, `$CLAUDE_PLUGIN_DATA` or `~/.claude/plugins/data/projects-bendrucker`. The ledger is `dispatches.jsonl` there, append-only and read at query time. Project directories are `projects/<slug>/`.
+Everything here reads and writes the plugin data dir, `$CLAUDE_PLUGIN_DATA` or `~/.claude/plugins/data/projects-bendrucker`. The ledger is `dispatches.jsonl` there and the queue is `queue.jsonl`, both append-only and read at query time. Project directories are `projects/<slug>/`.
 
 ## Dispatch
 
@@ -34,7 +35,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts status --tag project=ledger
 bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts outcome --repo "$REPO" --branch "$BRANCH" --state done --pr "$PR_URL"
 ```
 
-`status` prints the projects (one line per `projects/<slug>/project.md`: slug, description, lead state, open thread count), then every open thread, each tagged with its `need`. A thread its agent called `done` stays open while its pull request does. The lead state is `live` when a `lead-<slug>` agent is running, `none` when herdr lists no such agent, and `unknown` when herdr could not be asked, which is not a reason to start one.
+`status` prints the open queue items oldest first, then the projects (one line per `projects/<slug>/project.md`: slug, description, lead state, open thread count), then every open thread, each tagged with its `need`. A thread its agent called `done` stays open while its pull request does. The lead state is `live` when a `lead-<slug>` agent is running, `none` when herdr lists no such agent, and `unknown` when herdr could not be asked, which is not a reason to start one.
 
 Threads sort by need, in this order:
 
@@ -49,15 +50,38 @@ The list gives sort order. Precedence runs differently: a thread stopped on Ben 
 
 Pull request state comes from one `gh pr view` per thread, bounded to rows under a fortnight old, and reads `unknown` when gh cannot answer, so a machine offline still gets a status. `--tag <key>=<value>` narrows to the threads carrying each pair. `--json` returns the same as data, with each thread's `need` and, for a thread that has one, its pull request state.
 
-`outcome` appends a row with the thread's new state (`done`, `blocked`, `abandoned`), an optional `--pr`, and a `--note` saying why when it is blocked or abandoned. `--repo` may be any worktree of the repository. The latest row per repo and branch is the thread's state.
+`outcome` appends a row with the thread's new state (`done`, `blocked`, `abandoned`), an optional `--pr`, and a `--note` saying why when it is blocked or abandoned. `--repo` may be any worktree of the repository. The latest row per repo and branch is the thread's state. A `done` outcome carrying a `--pr` also raises a review on the queue and prints that item as a second line.
 
-The board renders the same data as a TUI:
+## Queue
+
+The queue holds what needs Ben himself. Raise an item as soon as the work stops on him:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/queue.ts ask --agent "$AGENT" "$QUESTION"
+bun ${CLAUDE_SKILL_DIR}/scripts/queue.ts push --review --url "$PR_URL" --repo "$REPO" --branch "$BRANCH" "$WHAT_TO_READ"
+```
+
+`ask` raises a question, `push --review` something to read. Both take `--url`, `--repo` and `--branch` to name the thread it came from, `--agent` and `--pane` to say where an answer goes back. Text runs to 500 characters, like a ledger note.
+
+Only Ben clears an item, or a lead writing on his word with `--by <who>`:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/queue.ts ack <id> [--by <who>]
+bun ${CLAUDE_SKILL_DIR}/scripts/queue.ts answer <id> "$ANSWER"
+bun ${CLAUDE_SKILL_DIR}/scripts/queue.ts list [--json]
+```
+
+`ack` clears an item he only had to see. `answer` records the answer, sends it to the item's agent with `herdr agent prompt`, and records whether that landed. Never answer your own item. A review item pointing at a GitHub pull request or issue clears itself once that request merges or closes, which `status` and `list` check as they read.
+
+## Board
+
+The board renders the queue and the ledger together as a TUI:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/board.ts [--watch]
 ```
 
-`--watch` re-renders every ten seconds (`--interval <seconds>` overrides it), one section per need with each thread's project slug on its row, or its repository where the thread carries no project tag. Without it the board prompts for a project or a thread, then focuses that agent's pane or sends it a message. Both views find a thread's agent by the session it was dispatched with, so one that moved panes still reads as itself. The picker falls back to the pane the ledger recorded, and reports that it has no agent to reach when another agent has taken that pane over.
+`--watch` re-renders every ten seconds (`--interval <seconds>` overrides it). The queue heads it as `NEEDS YOU`, with the threads the board derived as `waiting-on-you` kept under it as `observed`, then one section per remaining need, each thread's project slug on its row, or its repository where the thread carries no project tag. Without it the board prompts for an item, a project or a thread. An item offers ack, answer, and focus on the pane it came from. A project or a thread focuses that agent's pane or sends it a message. Both views find a thread's agent by the session it was dispatched with, so one that moved panes still reads as itself. The picker falls back to the pane the ledger recorded, and reports that it has no agent to reach when another agent has taken that pane over.
 
 ## Projects
 

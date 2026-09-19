@@ -1,7 +1,12 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`status renders the routing block and the open threads 1`] = `
-"projects
+exports[`status renders the queue, the routing block, and the open threads 1`] = `
+"queue
+id  kind      age  thread      text                              url
+q1  review    2h   done-thing  record what each thread returned  https://example.test/pr/1
+q2  question  45m  one-off     which base branch?                -
+
+projects
 ledger  Dispatch ledger, project routing, and the chief and lead sessions that read it  lead:live  open:1
 
 threads
@@ -12,7 +17,10 @@ one-off    idle            dispatched  one-off    wA:p1   3h   -   by=chief
 `;
 
 exports[`status marks the lead unknown when herdr cannot answer, and the blocks empty when they are 1`] = `
-"projects
+"queue
+no open items
+
+projects
 p  d  lead:unknown  open:0
 
 threads

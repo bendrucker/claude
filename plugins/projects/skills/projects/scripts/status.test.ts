@@ -1,18 +1,20 @@
 import { describe, expect, test } from "bun:test";
 import type { PullRequest } from "./capture";
-import { ago, agents, DAY, fixture, NOW, observe, pr, row } from "./fixture";
+import { ago, agents, DAY, fixture, item, NOW, observe, pr, row } from "./fixture";
+import { openItems, readQueue } from "./items";
 import { readProjects } from "./projects";
 import { buildStatus, formatAge, formatStatus, type Need, type Observed } from "./status";
 import { type DispatchLedgerRow, readLedger } from "./threads";
 
 describe("status", () => {
-  test("renders the routing block and the open threads", async () => {
+  test("renders the queue, the routing block, and the open threads", async () => {
     const dataDir = await fixture();
     const status = buildStatus(
       await readProjects(dataDir),
       await readLedger(dataDir),
       {},
       observe({ agents: agents(["wLD:p1", "lead-ledger", "idle"], ["wA:p1", "one-off", "idle"]) }),
+      openItems(readQueue(dataDir)),
     );
     expect(status.projects).toMatchObject([{ slug: "ledger", lead: "live", open: 1 }]);
     expect(formatStatus(status, NOW)).toMatchSnapshot();
@@ -24,7 +26,7 @@ describe("status", () => {
     expect(status.projects[0]?.lead).toBe("unknown");
     expect(formatStatus(status, NOW)).toMatchSnapshot();
     expect(formatStatus(buildStatus([], none, {}, observe()), NOW)).toBe(
-      "projects\nno projects\n\nthreads\nno open threads\n",
+      "queue\nno open items\n\nprojects\nno projects\n\nthreads\nno open threads\n",
     );
   });
 
@@ -34,11 +36,13 @@ describe("status", () => {
       [row({ pr: "https://example.com/pr/1\nstray" })],
       {},
       observe(),
+      [item({ text: "first\nsecond" })],
     );
     const lines = formatStatus(status, NOW).trimEnd().split("\n");
-    expect(lines).toHaveLength(6);
-    expect(lines[1]).toContain("first line second line");
-    expect(lines[5]).toContain("https://example.com/pr/1 stray");
+    expect(lines).toHaveLength(10);
+    expect(lines[2]).toContain("first second");
+    expect(lines[5]).toContain("first line second line");
+    expect(lines[9]).toContain("https://example.com/pr/1 stray");
   });
 });
 

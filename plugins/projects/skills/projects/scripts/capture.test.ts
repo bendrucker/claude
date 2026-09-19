@@ -2,7 +2,15 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { capture, primaryRoot, readPullRequests } from "./capture";
+import {
+  capture,
+  primaryRoot,
+  readPullRequests,
+  readResolutions,
+  resolveGitHub,
+  type Resolution,
+  resolveUrl,
+} from "./capture";
 import { ago, DAY, NOW, pr, row } from "./fixture";
 
 describe("capture", () => {
@@ -99,5 +107,71 @@ describe("readPullRequests", () => {
     });
     expect(looked.size).toBe(40);
     expect(peak).toBe(8);
+  });
+});
+
+describe("resolvers", () => {
+  // gh reads a pull request and an issue under different subcommands.
+  const asking = (
+    stdout: string | null,
+  ): { asked: string[][]; run: (argv: string[]) => Promise<string | null> } => {
+    const asked: string[][] = [];
+    return {
+      asked,
+      run: (argv) => {
+        asked.push([...argv]);
+        return Promise.resolve(stdout);
+      },
+    };
+  };
+
+  test.each<[string, string, string, Resolution]>([
+    ["a merged pull request", "MERGED", "pull/12", "closed"],
+    ["a closed issue", "CLOSED", "issues/12", "closed"],
+    ["an open pull request", "OPEN", "pull/12", "open"],
+    ["a state gh does not name", "DRAFT", "pull/12", "unknown"],
+  ])("reads %s as %s", async (_label, state, path, expected) => {
+    const url = `https://github.com/bendrucker/claude/${path}`;
+    const { asked, run } = asking(`{"state":"${state}"}`);
+    expect(await resolveGitHub(new URL(url), run)).toBe(expected);
+    expect(asked).toEqual([
+      ["gh", path.startsWith("pull") ? "pr" : "issue", "view", url, "--json", "state"],
+    ]);
+  });
+
+  test.each<[string, string | null]>([
+    ["a gh that could not answer", null],
+    ["a gh that answered with something other than JSON", "not json"],
+    ["a gh that answered with a shape the resolver does not read", "{}"],
+  ])("resolves %s to unknown", async (_label, stdout) => {
+    const { run } = asking(stdout);
+    expect(await resolveGitHub(new URL("https://github.com/bendrucker/claude/pull/12"), run)).toBe(
+      "unknown",
+    );
+  });
+
+  test.each<[string, string]>([
+    ["a host nothing can read", "https://linear.app/ben/issue/ENG-1"],
+    ["a github path that is neither", "https://github.com/bendrucker/claude"],
+    ["something that is not a url", "not a url"],
+  ])("resolves %s to unknown", async (_label, url) => {
+    expect(await resolveUrl(url)).toBe("unknown");
+  });
+
+  test("looks up only the urls a resolver knows", async () => {
+    const asked: string[] = [];
+    const looked = await readResolutions(
+      [
+        "https://github.com/bendrucker/claude/pull/1",
+        "https://linear.app/ben/issue/ENG-1",
+        "not a url",
+      ],
+      (url) => {
+        asked.push(url);
+        return Promise.resolve("open");
+      },
+    );
+    expect(asked).toEqual(["https://github.com/bendrucker/claude/pull/1"]);
+    expect([...looked.keys()]).toEqual(["https://github.com/bendrucker/claude/pull/1"]);
   });
 });

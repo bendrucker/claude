@@ -78,6 +78,8 @@ bun ${CLAUDE_PLUGIN_ROOT}/skills/projects/scripts/ledger.ts outcome --repo <repo
 
 You write the outcome row, one per thread. `--note` carries what the thread reported, within 500 characters: why it stopped when it is blocked or abandoned, and any lesson worth keeping. Write it once. `status` folds a thread to its latest row and lists only the open ones.
 
+When a thread stops on a decision only the user can make, raise it with `bun ${CLAUDE_PLUGIN_ROOT}/skills/projects/scripts/queue.ts ask --agent <agent> "<question>"` and wait. Never answer your own item.
+
 Then write your own short summary of that lesson into `MEMORY.md` or a topic file, before dispatching the next thread. Keep it short. Memory is inlined into every brief you write from here on.
 
 The project is finished when the State block's threads read `no open threads`.

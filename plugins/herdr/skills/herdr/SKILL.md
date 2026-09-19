@@ -6,7 +6,6 @@ argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh)
-  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
   - Bash(herdr api snapshot:*)
   - Bash(herdr --help:*)
   - Bash(herdr agent --help:*)
@@ -118,7 +117,7 @@ Drop `--wait` to leave an agent running, then collect with `agent wait` and `age
 
 That wait tracks lifecycle state rather than one turn, so prompting a working agent can return when its earlier turn settles. When no state change follows within five seconds, `agent prompt` returns `agent_prompt_stalled` instead of blocking. `agent wait --until <state>` narrows to the states you name, for a running agent you expect to stop for input.
 
-`agent prompt` pastes through the pane's bracketed-paste mode and presses Enter after a short delay, so a multi-line prompt arrives as one paste.
+`agent prompt` pastes through the pane's bracketed-paste mode and presses Enter after a short delay, so a multi-line prompt arrives as one paste. That Enter also submits whatever the user had half-typed in the pane, so a pane the user types in, such as a chief or lead, gets `SendMessage` or `herdr notification show` instead, and `agent prompt` goes to agents nobody is sitting at.
 
 `agent wait` and `pane wait-output` block server-side, so use them instead of polling `pane get`. For state herdr exposes no wait for, such as a plugin's output through `plugin log list`, use `Monitor`.
 
@@ -128,15 +127,7 @@ An agent sitting in its own interactive UI takes logical key names: `herdr agent
 
 ### Dispatch
 
-New work needing its own worktree and agent gets both in one call:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
-```
-
-It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir.
-
-`worktrunk:wt-switch-create` re-roots this session instead.
+New work needing its own worktree and agent goes through the `projects:projects` skill, whose `dispatch.ts` creates the worktree, starts a Claude agent in it here, prompts it, and records the thread on the dispatch ledger. `worktrunk:wt-switch-create` re-roots this session instead.
 
 ### Starting an Agent
 

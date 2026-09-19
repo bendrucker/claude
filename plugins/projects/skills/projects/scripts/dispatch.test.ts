@@ -2,7 +2,6 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeAll, describe, expect, test } from "bun:test";
-import { z } from "zod";
 import {
   type CommandResult,
   deriveName,
@@ -14,7 +13,7 @@ import {
   spawnRunner,
   taskSummary,
 } from "./dispatch";
-import { appendDispatch, ledgerPath, resolveDataDir } from "./ledger";
+import { appendDispatch, LedgerRow, ledgerPath, resolveDataDir } from "./threads";
 
 const ok = (stdout: string): CommandResult => ({ code: 0, stdout, stderr: "" });
 const fail = (stderr: string): CommandResult => ({ code: 1, stdout: "", stderr });
@@ -86,6 +85,13 @@ const HAPPY_PATH = [
   STARTED,
   ok(""),
   AGENT_GET,
+];
+
+// The stamp lands between the agent start and the prompt.
+const withStamp = (stamp: CommandResult): CommandResult[] => [
+  ...HAPPY_PATH.slice(0, 7),
+  stamp,
+  ...HAPPY_PATH.slice(7),
 ];
 
 describe("deriveName", () => {
@@ -501,6 +507,60 @@ describe("dispatch", () => {
     expect(calls.filter((argv) => argv[2] === "list")).toHaveLength(1);
   });
 
+  test("stamps the thread's tags on the pane once the agent has started", async () => {
+    const { run, calls } = fakeRunner(withStamp(ok("")));
+
+    const { record } = await dispatch(
+      { ...options, tags: { project: "demo", by: "lead-chief" } },
+      run,
+    );
+
+    const stamped = calls.findIndex((argv) => argv[2] === "report-metadata");
+    expect(calls[stamped]).toEqual([
+      "herdr",
+      "pane",
+      "report-metadata",
+      "wZZ:p1",
+      "--source",
+      "dispatch",
+      "--token",
+      "project=demo",
+      "--token",
+      "by=lead-chief",
+    ]);
+    expect(stamped).toBeGreaterThan(calls.findIndex((argv) => argv[2] === "start"));
+    expect(record.prompted).toBe(true);
+  });
+
+  test("leaves out a key herdr cannot carry and stamps the rest", async () => {
+    const { run, calls } = fakeRunner(withStamp(ok("")));
+    await dispatch(
+      { ...options, tags: { project: "demo", [`by-${"x".repeat(40)}`]: "chief" } },
+      run,
+    );
+    const stamped = calls.find((argv) => argv[2] === "report-metadata");
+    expect(stamped?.filter((arg) => arg === "--token")).toHaveLength(1);
+    expect(stamped).toContain("project=demo");
+  });
+
+  test.each([
+    ["the thread carries no tags", {}],
+    ["no key can be a token name", { [`by-${"x".repeat(40)}`]: "chief" }],
+  ])("stamps nothing when %s", async (_label, tags) => {
+    const { run, calls } = fakeRunner(HAPPY_PATH);
+    await dispatch({ ...options, tags }, run);
+    expect(calls.filter((argv) => argv[2] === "report-metadata")).toEqual([]);
+  });
+
+  test("keeps the dispatch and its record when the tokens are refused", async () => {
+    const { run } = fakeRunner(withStamp(fail(envelope("pane_not_found"))));
+
+    const { record } = await dispatch({ ...options, tags: { project: "demo" } }, run);
+    expect(record.prompted).toBe(true);
+    expect(record.agent).toBe("fix-thing");
+    expect(record.session).toBe("sess-1");
+  });
+
   test("rejects a herdr payload that does not match the expected shape", async () => {
     const { run } = fakeRunner([
       AGENT_LIST,
@@ -513,19 +573,6 @@ describe("dispatch", () => {
     const failure = await failureOf(dispatch(options, run));
     expect(failure.message).toMatch(/herdr worktree create returned an unexpected shape/);
   });
-});
-
-const LedgerRow = z.object({
-  ts: z.string(),
-  task: z.string(),
-  repo: z.string(),
-  branch: z.string(),
-  path: z.string(),
-  workspace: z.string(),
-  pane: z.string(),
-  agent: z.string().nullable(),
-  session: z.string().nullable(),
-  outcome: z.enum(["dispatched", "orphaned"]),
 });
 
 describe("cli", () => {
@@ -541,6 +588,12 @@ describe("cli", () => {
     ["a bad branch", ["--branch", "bad branch", "--prompt", filled], 1, /must match/],
     ["a missing prompt file", ["--branch", "ok", "--prompt", "/nope/gone.txt"], 2, /cannot read/],
     ["an empty prompt", ["--branch", "ok", "--prompt", "/dev/null"], 2, /prompt is empty/],
+    [
+      "a bare tag",
+      ["--branch", "ok", "--prompt", filled, "--tag", "chief"],
+      2,
+      /must be <key>=<value>/,
+    ],
     [
       "a non-numeric timeout",
       ["--branch", "ok", "--prompt", filled, "--timeout", "abc"],

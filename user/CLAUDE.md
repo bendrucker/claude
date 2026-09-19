@@ -73,7 +73,7 @@ claude-cli://open?q=<url-encoded prompt>&cwd=<absolute main repo path>
 
 ## Worktrees
 
-Any change intended to become its own PR starts in a worktree, created with `worktrunk:wt-switch-create`. Stay put only when the session is already on a topic branch inside one. Work handed to a sibling agent for its own pull request starts in a worktree too, created through the `herdr:herdr` skill's dispatch so this session stays put.
+Any change intended to become its own PR starts in a worktree, created with `worktrunk:wt-switch-create`. Stay put only when the session is already on a topic branch inside one. Work handed to a sibling agent for its own pull request starts in a worktree too, created through the `projects:projects` skill's dispatch so this session stays put.
 
 I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 
@@ -96,7 +96,7 @@ Machine setup lives in [`bendrucker/dotfiles`](https://github.com/bendrucker/dot
 - Setup beyond dropping a file in place: `install.sh` steps, `symlinks.conf` entries, launchd agents, and macOS permission grants like Screen Recording and Accessibility.
 - Recurring jobs, including work the nightly `claude-upgrade` should carry.
 
-Work in another repo that turns out to need a change in either repo goes to a sibling agent through the `herdr:herdr` skill, which leaves this session on its own task. Report the PR back to me, or tell me what the change is where herdr is unavailable.
+Work in another repo that turns out to need a change in either repo goes to a sibling agent through the `projects:projects` skill's dispatch, which leaves this session on its own task. Report the PR back to me, or tell me what the change is where herdr is unavailable.
 
 ## Stacked PRs
 

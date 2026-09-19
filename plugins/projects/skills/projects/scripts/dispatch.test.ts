@@ -13,7 +13,7 @@ import {
   spawnRunner,
   taskSummary,
 } from "./dispatch";
-import { appendDispatch, LedgerRow, ledgerPath, resolveDataDir } from "./ledger";
+import { appendDispatch, LedgerRow, ledgerPath, resolveDataDir } from "./threads";
 
 const ok = (stdout: string): CommandResult => ({ code: 0, stdout, stderr: "" });
 const fail = (stderr: string): CommandResult => ({ code: 1, stdout: "", stderr });

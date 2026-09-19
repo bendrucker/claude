@@ -6,8 +6,6 @@ argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh)
-  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
-  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts:*)
   - Bash(herdr api snapshot:*)
   - Bash(herdr --help:*)
   - Bash(herdr agent --help:*)
@@ -129,24 +127,7 @@ An agent sitting in its own interactive UI takes logical key names: `herdr agent
 
 ### Dispatch
 
-New work needing its own worktree and agent gets both in one call:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
-```
-
-It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A failure prints the error, then the partial record once the worktree exists. A dispatch that reaches worktree creation appends to `dispatches.jsonl` in the plugin data dir, whether it completes or lands as `orphaned`. One that fails validation first leaves the ledger unchanged. `--tag <key>=<value>`, repeatable, records who dispatched it and what for (`--tag by=chief`, `--tag project=<slug>`).
-
-The ledger is the record of what is out and what came back:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts status --tag project=ledger
-bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts outcome --repo "$REPO" --branch "$BRANCH" --state done --pr "$PR_URL"
-```
-
-`status` prints the projects (one line per `projects/<slug>/project.md` in the data dir: slug, description, lead state, open thread count), then every thread whose latest row is `dispatched` or `blocked` and carries each given tag. Without `--tag` it lists every open thread, and `--json` returns the same as data. The lead state is `live` when a `lead-<slug>` agent is running, `none` when herdr lists no such agent, and `unknown` when herdr could not be asked, which is not a reason to start one. `outcome` appends a row with the thread's new state (`done`, `blocked`, `abandoned`), an optional `--pr`, and a `--note` saying why when it is blocked or abandoned. `--repo` may be any worktree of the repository. The latest row per repo and branch is the thread's state.
-
-`worktrunk:wt-switch-create` re-roots this session instead.
+New work needing its own worktree and agent goes through the `projects:projects` skill, whose `dispatch.ts` creates the worktree, starts a Claude agent in it here, prompts it, and records the thread on the dispatch ledger. `worktrunk:wt-switch-create` re-roots this session instead.
 
 ### Starting an Agent
 

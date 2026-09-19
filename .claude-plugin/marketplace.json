@@ -160,6 +160,11 @@
       "source": "./plugins/herdr"
     },
     {
+      "name": "projects",
+      "description": "Coordinate parallel agent work: dispatch a worktree thread per pull request, record each thread on an append-only ledger, and route requests to projects",
+      "source": "./plugins/projects"
+    },
+    {
       "name": "comments",
       "description": "Detect AI slop code comments in a diff and steer clean comment generation",
       "source": "./plugins/comments"

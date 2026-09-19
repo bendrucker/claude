@@ -2,7 +2,7 @@
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger in the plugin data dir under ~/.claude/plugins
 import { cli } from "cleye";
 import { z } from "zod";
-import { appendDispatch, type DispatchLedgerRow, parseTags, resolveDataDir } from "./ledger";
+import { appendDispatch, type DispatchLedgerRow, parseTags, resolveDataDir } from "./threads";
 
 const BRANCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 const AGENT_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;

@@ -259,7 +259,7 @@ export function isReusedBranch(
   pull: PullRequest | undefined,
   branchCommit: number | null,
 ): boolean {
-  if (pull === undefined || pull.state !== "merged") return false;
+  if (pull?.state !== "merged") return false;
   if (pull.mergedAt === null || branchCommit === null) return false;
   return branchCommit > pull.mergedAt;
 }

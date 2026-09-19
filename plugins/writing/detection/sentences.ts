@@ -1,5 +1,4 @@
 const HEADING = /^#{1,6}\s/;
-const TABLE_ROW = /^\|/;
 
 /**
  * Split text into sentences, filtering out headings and table rows.
@@ -12,7 +11,7 @@ export function splitSentences(text: string): string[] {
     .split(/(?<!\d)[.!?]+(?=\s|$)|\n+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
-    .filter((s) => !TABLE_ROW.test(s))
+    .filter((s) => !s.startsWith("|"))
     .filter((s) => !HEADING.test(s));
 }
 

@@ -52,13 +52,10 @@ export function nodeAdapter(db: Database): QueryAdapter {
   return {
     async bind(params) {
       for (const [name, value] of bindings(params)) {
-        if (typeof value === "string") {
-          // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query reads back.
-          await db.run(`SET VARIABLE "${name}" = $value`, { value });
-        } else {
-          // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query reads back.
-          await db.run(`SET VARIABLE "${name}" = ${sqlLiteral(value)}`);
-        }
+        // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query reads back.
+        await (typeof value === "string"
+          ? db.run(`SET VARIABLE "${name}" = $value`, { value })
+          : db.run(`SET VARIABLE "${name}" = ${sqlLiteral(value)}`));
       }
       return "";
     },

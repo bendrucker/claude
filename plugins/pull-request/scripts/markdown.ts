@@ -22,7 +22,11 @@ export function linesOutsideFences(body: string): string[] {
         lines.push("");
         continue;
       }
-      if (marker[0] === fence[0] && marker.length >= fence.length && match?.[2]?.trim() === "") {
+      if (
+        marker.startsWith(fence.charAt(0)) &&
+        marker.length >= fence.length &&
+        match?.[2]?.trim() === ""
+      ) {
         fence = null;
       }
       continue;

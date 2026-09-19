@@ -36,7 +36,7 @@ const html = join(import.meta.dirname, "index.html");
 
 async function readAllLabels(): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
-  let names: string[] = [];
+  let names: string[];
   try {
     names = await readdir(argv.flags.labels);
   } catch {

@@ -332,6 +332,8 @@ export function computeFileEdits(
       case "rewrite":
         applyRewrite(item, lines, deletions, spanInserts, skips, maxWidth);
         break;
+      default:
+        item.verdict.action satisfies never;
     }
   }
 

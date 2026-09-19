@@ -19,9 +19,7 @@ const theme = { name: "bare", settings: [] };
 let highlighterPromise: Promise<Highlighter> | null = null;
 
 function getHighlighter(): Promise<Highlighter> {
-  if (highlighterPromise == null) {
-    highlighterPromise = createHighlighter({ themes: [theme], langs: [] });
-  }
+  highlighterPromise ??= createHighlighter({ themes: [theme], langs: [] });
   return highlighterPromise;
 }
 
@@ -81,10 +79,9 @@ function coalesceLineRuns(comments: Comment[], lines: string[]): Comment[] {
   const shebang = isShebangLine(lines[0] ?? "");
   const merged: Comment[] = [];
   for (const comment of comments) {
-    const prev = merged[merged.length - 1];
+    const prev = merged.at(-1);
     if (
-      prev != null &&
-      prev.kind === "line" &&
+      prev?.kind === "line" &&
       comment.kind === "line" &&
       comment.startLine === prev.endLine + 1 &&
       comment.startColumn === prev.startColumn &&

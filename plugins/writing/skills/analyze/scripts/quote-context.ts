@@ -26,7 +26,7 @@ export function findQuote(phrase: string, rows: SourceRow[], radius = 60): Quote
   for (const row of rows) {
     if (row.text == null || row.text === "") continue;
     const idx = row.text.toLowerCase().indexOf(lowered);
-    if (idx >= 0) return makeContext(row, idx, idx + phrase.length, radius);
+    if (idx !== -1) return makeContext(row, idx, idx + phrase.length, radius);
   }
 
   const needle = (lowered.match(WORD_TOKEN) ?? []).map((w) => stemmer(w));

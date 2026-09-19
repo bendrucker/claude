@@ -5,7 +5,7 @@ import type { FileDiff, LineRange } from "./types";
 function coalesce(lineNumbers: number[]): LineRange[] {
   const ranges: LineRange[] = [];
   for (const n of lineNumbers) {
-    const last = ranges[ranges.length - 1];
+    const last = ranges.at(-1);
     if (last && n === last.end + 1) {
       last.end = n;
     } else {

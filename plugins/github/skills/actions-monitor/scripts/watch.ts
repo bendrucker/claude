@@ -693,7 +693,7 @@ type RunOptions = {
 async function watch(options: RunOptions): Promise<void> {
   let prNumber: number | null = null;
   let branch: string | null = null;
-  let repo: string | null = null;
+  let repo: string | null;
 
   if (options.mode === "pr") {
     const parsed = parsePrUrl(options.prUrl);

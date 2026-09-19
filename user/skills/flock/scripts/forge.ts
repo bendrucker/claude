@@ -45,13 +45,13 @@ export function forgeKind(host: string, gitlabHost: string | null): ForgeKind | 
   const normalized = host.toLowerCase();
   if (normalized === "github.com" || normalized.endsWith(".github.com")) return "github";
   if (normalized === "gitlab.com" || normalized.startsWith("gitlab.")) return "gitlab";
-  if (gitlabHost !== null && normalized === gitlabHost.toLowerCase()) return "gitlab";
+  if (normalized === gitlabHost?.toLowerCase()) return "gitlab";
   return null;
 }
 
 export function slugParts(slug: string): { owner: string; repo: string } {
   const cut = slug.lastIndexOf("/");
-  if (cut < 0) return { owner: "", repo: slug };
+  if (cut === -1) return { owner: "", repo: slug };
   return { owner: slug.slice(0, cut), repo: slug.slice(cut + 1) };
 }
 

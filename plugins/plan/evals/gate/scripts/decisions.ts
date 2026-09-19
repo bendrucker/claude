@@ -28,7 +28,6 @@ const RULE_PATTERNS: readonly [GateRule, RegExp][] = [
   ],
 ];
 
-const SILENT_REJECTION = /STOP what you are doing and wait for the user/;
 const REJECTION = /doesn't want to proceed|was rejected|^YOUR PLAN WAS NOT APPROVED/;
 
 export function gateRule(reason: string): GateRule | null {
@@ -45,7 +44,9 @@ export function classifyResponse(response: string | null | undefined): Decision 
   if (rule !== null) return `gate:${rule}`;
   if (/approved your plan|approved exiting plan mode/.test(response)) return "approved";
   if (REJECTION.test(response)) {
-    return SILENT_REJECTION.test(response) ? "user:rejected-silent" : "user:rejected";
+    return response.includes("STOP what you are doing and wait for the user")
+      ? "user:rejected-silent"
+      : "user:rejected";
   }
   return "unknown";
 }

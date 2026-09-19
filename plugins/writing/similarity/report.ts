@@ -56,7 +56,7 @@ function leadingFeatureTable(score: DocumentScore, profile: StyleProfile): strin
   for (const id of LEADING_FEATURE_IDS) {
     const index = profile.featureIds.indexOf(id);
     const delta = deltas[index];
-    if (index < 0 || delta === undefined) continue;
+    if (index === -1 || delta === undefined) continue;
     const observed = rawValue(score.rhythmVector[index] ?? 0, profile, index);
     const voiceMean = rawValue(profile.voice.rhythmCentroid[index] ?? 0, profile, index);
     rows.push([

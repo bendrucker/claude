@@ -49,7 +49,7 @@ function positionOfSample(text: string, sample: string): Position {
   for (const candidate of [sample, sample.split(" / ")[0] ?? ""]) {
     if (candidate.length === 0) continue;
     const index = lower.indexOf(candidate.toLowerCase());
-    if (index >= 0) return positionAt(text, index);
+    if (index !== -1) return positionAt(text, index);
   }
   return { line: 1, col: 1 };
 }

@@ -642,7 +642,7 @@ describe("deriveEvents run-id mode", () => {
     expect(events.find((e) => e.type === "conflicts")).toBeUndefined();
     expect(events.find((e) => e.type === "pr-closed")).toBeUndefined();
     const statuses = events.filter((e) => e.type === "status");
-    expect(statuses[statuses.length - 1]).toMatchObject({
+    expect(statuses.at(-1)).toMatchObject({
       state: "success",
       sha: "s1",
     });

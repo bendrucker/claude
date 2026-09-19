@@ -38,7 +38,7 @@ describe("JUDGE_CRITERIA", () => {
     const ids = JUDGE_CRITERIA.map((c) => c.id);
     expect(ids[0]).toBe("information-density");
     expect(ids[1]).toBe("motivation-presence");
-    expect(ids[ids.length - 1]).toBe("press-release-structure");
+    expect(ids.at(-1)).toBe("press-release-structure");
   });
 
   test("every criterion carries layer, question, and lifecycle metadata", () => {

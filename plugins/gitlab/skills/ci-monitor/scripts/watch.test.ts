@@ -399,7 +399,6 @@ describe("deriveEvents", () => {
     expect(r3.events).toEqual([{ type: "status", state: "running", sha: "sha1", run_id: "100" }]);
 
     const r4 = deriveEvents(makeProbe({ state: "success" }), state, 3, 15);
-    state = r4.state;
     expect(r4.events).toEqual([{ type: "status", state: "success", sha: "sha1", run_id: "100" }]);
   });
 
@@ -598,7 +597,7 @@ describe("deriveEvents", () => {
 describe("api-error tracking", () => {
   it("increments on failure and emits at threshold", () => {
     let state = initialState();
-    let events: { type: string }[] = [];
+    let events: { type: string }[];
     for (let i = 0; i < 4; i += 1) {
       const outcome = registerApiError(state, 5);
       state = outcome.state;

@@ -71,7 +71,7 @@ async function findStdoutWrites(): Promise<string[]> {
           writes.push(`${name}: ${code}`);
         }
         // A Bun shell call inherits stdout unless something in the chain takes it.
-        if (/\$`/.test(line) && !CAPTURES_STDOUT.test(line)) {
+        if (line.includes("$`") && !CAPTURES_STDOUT.test(line)) {
           writes.push(`${name}: ${code}`);
         }
       }

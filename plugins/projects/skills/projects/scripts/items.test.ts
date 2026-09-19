@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
@@ -55,6 +55,14 @@ describe("readQueue", () => {
   test("is empty without a file", () => {
     expect(readQueue(dir())).toEqual([]);
   });
+
+  // An unreadable queue read as an empty one would report nothing waiting while
+  // items sit in the file.
+  test("raises a queue it cannot read rather than reporting nothing waiting", () => {
+    const dataDir = dir();
+    mkdirSync(queuePath(dataDir));
+    expect(() => readQueue(dataDir)).toThrow();
+  });
 });
 
 describe("push", () => {
@@ -88,6 +96,12 @@ describe("push", () => {
     const dataDir = dir();
     await Bun.write(queuePath(dataDir), `{"id":"q7","state":"nonsense"}\n`);
     expect(pushItem({ kind: "review", text: "read it" }, dataDir).id).toBe("q8");
+  });
+
+  test("raises a queue it cannot read rather than restarting the ids", () => {
+    const dataDir = dir();
+    mkdirSync(queuePath(dataDir));
+    expect(() => pushItem({ kind: "review", text: "read it" }, dataDir)).toThrow();
   });
 
   test("gives concurrent pushes distinct ids", async () => {
@@ -198,6 +212,35 @@ describe("clearing", () => {
     expect(answered).toMatchObject({ answer: "go ahead", delivered: false });
   });
 
+  test("refuses an already cleared item before its agent hears the answer", async () => {
+    const dataDir = raised({ agent: "fix-thing" });
+    clearItem({ id: "q1", state: "acked", by: "ben" }, dataDir);
+    const { calls, run } = record();
+    let message = "";
+    try {
+      await answerItem("q1", "use the lock", "ben", dataDir, run);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch("q1 is already acked");
+    expect(calls).toEqual([]);
+  });
+
+  test("says the agent already has the answer when the row lands too late", async () => {
+    const dataDir = raised({ agent: "fix-thing" });
+    const { run } = record();
+    let message = "";
+    try {
+      await answerItem("q1", "use the lock", "ben", dataDir, async (argv) => {
+        clearItem({ id: "q1", state: "acked", by: "ben" }, dataDir);
+        return run(argv);
+      });
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch("fix-thing already has the answer");
+  });
+
   test("refuses an answer too long to keep a row's ceiling", async () => {
     let message = "";
     try {
@@ -260,6 +303,16 @@ describe("resolveLanded", () => {
     });
     expect(calls).toEqual([]);
     expect(left.map((entry) => entry.id)).toEqual(["q1", "q2"]);
+  });
+
+  test("drops a review another reader resolved first", async () => {
+    const url = "https://github.com/bendrucker/claude/pull/1";
+    const dataDir = dataDirWith(review(url));
+    const left = await resolveLanded(openItems(readQueue(dataDir)), dataDir, (urls) => {
+      clearItem({ id: "q1", state: "resolved", by: "pr" }, dataDir);
+      return landed({ [url]: "closed" })(urls);
+    });
+    expect(left).toEqual([]);
   });
 
   test("leaves a question alone even when its url landed", async () => {

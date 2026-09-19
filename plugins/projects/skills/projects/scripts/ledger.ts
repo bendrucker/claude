@@ -70,7 +70,7 @@ const outcome = command(
             pushItem(
               {
                 kind: "review",
-                text: row.task,
+                text: row.task.trim() === "" ? row.branch : row.task,
                 url: row.pr,
                 thread: { repo: row.repo, branch: row.branch },
                 agent: row.agent ?? undefined,
@@ -110,14 +110,21 @@ const status = command(
     }
     const dir = resolveDataDir(argv.flags.dataDir);
     const now = new Date();
-    const [projects, rows] = await Promise.all([readProjects(dir), readLedger(dir)]);
-    const [agents, pullRequests, queue] = await Promise.all([
-      listAgents(),
-      readPullRequests(latestRows(rows), now),
-      resolveLanded(openItems(readQueue(dir)), dir),
-    ]);
-    const built = buildStatus(projects, rows, tags, { agents, pullRequests, now }, queue);
-    process.stdout.write(argv.flags.json ? `${JSON.stringify(built)}\n` : formatStatus(built, now));
+    try {
+      const [projects, rows] = await Promise.all([readProjects(dir), readLedger(dir)]);
+      const [agents, pullRequests, queue] = await Promise.all([
+        listAgents(),
+        readPullRequests(latestRows(rows), now),
+        resolveLanded(openItems(readQueue(dir)), dir),
+      ]);
+      const built = buildStatus(projects, rows, tags, { agents, pullRequests, now }, queue);
+      process.stdout.write(
+        argv.flags.json ? `${JSON.stringify(built)}\n` : formatStatus(built, now),
+      );
+    } catch (error) {
+      process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+      process.exit(1);
+    }
   },
 );
 

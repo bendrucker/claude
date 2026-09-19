@@ -58,17 +58,22 @@ export function queuePath(dataDir: string): string {
 // A line that fails to parse is reported and skipped rather than failing the
 // read: the queue is reprinted at every compaction, and one bad line must not
 // hide every good one.
+function readQueueText(path: string): string | null {
+  try {
+    return readFileSync(path, "utf8");
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
 export function readQueue(
   dataDir: string,
   warn: (message: string) => void = (message) => process.stderr.write(`${message}\n`),
 ): QueueItem[] {
   const path = queuePath(dataDir);
-  let text: string;
-  try {
-    text = readFileSync(path, "utf8");
-  } catch {
-    return [];
-  }
+  const text = readQueueText(path);
+  if (text == null) return [];
   const items: QueueItem[] = [];
   for (const [index, line] of text.split("\n").entries()) {
     if (line.trim() === "") continue;
@@ -152,12 +157,8 @@ const Identified = z.object({ id: z.string() });
 // Ids are read without validating the rest of the row, because a row the
 // schema rejects still holds an id that must not be handed out twice.
 function nextId(dataDir: string): string {
-  let text: string;
-  try {
-    text = readFileSync(queuePath(dataDir), "utf8");
-  } catch {
-    return "q1";
-  }
+  const text = readQueueText(queuePath(dataDir));
+  if (text == null) return "q1";
   let highest = 0;
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
@@ -223,9 +224,15 @@ export interface ClearInput {
   delivered?: boolean | undefined;
 }
 
-function find(id: string, dataDir: string): QueueItem {
+function cleared(id: string, dataDir: string): boolean {
+  const latest = latestItems(readQueue(dataDir, () => {})).find((item) => item.id === id);
+  return latest != null && latest.state !== "open";
+}
+
+function findOpen(id: string, dataDir: string): QueueItem {
   const latest = latestItems(readQueue(dataDir, () => {})).find((item) => item.id === id);
   if (latest == null) throw new Error(`no queue item ${id} in ${queuePath(dataDir)}`);
+  if (latest.state !== "open") throw new Error(`${id} is already ${latest.state}`);
   return latest;
 }
 
@@ -238,8 +245,7 @@ export function clearItem(
   now: () => Date = () => new Date(),
 ): QueueItem {
   return withLock(dataDir, () => {
-    const latest = find(input.id, dataDir);
-    if (latest.state !== "open") throw new Error(`${input.id} is already ${latest.state}`);
+    const latest = findOpen(input.id, dataDir);
     const { answer: _answer, delivered: _delivered, by: _by, ...carried } = latest;
     const row: QueueItem = {
       ...carried,
@@ -265,10 +271,21 @@ export async function answerItem(
   now?: () => Date,
 ): Promise<QueueItem> {
   bounded("answer", answer);
-  const agent = find(id, dataDir).agent;
+  const agent = findOpen(id, dataDir).agent;
   const delivered =
     agent == null ? false : (await run(["herdr", "agent", "prompt", agent, answer])).code === 0;
-  return clearItem({ id, state: "answered", by, answer, delivered }, dataDir, now);
+  try {
+    return clearItem({ id, state: "answered", by, answer, delivered }, dataDir, now);
+  } catch (error) {
+    const why = error instanceof Error ? error.message : String(error);
+    // Something cleared the item while the answer was in flight. Saying only
+    // that the write failed would invite a retry the agent has already heard.
+    if (delivered)
+      throw new Error(`${why}, and ${agent ?? "the agent"} already has the answer`, {
+        cause: error,
+      });
+    throw error;
+  }
 }
 
 // A review item points at the thing being reviewed, so a request that merged or
@@ -295,7 +312,9 @@ export async function resolveLanded(
       clearItem({ id: item.id, state: "resolved", by: "pr" }, dataDir, now);
       return [];
     } catch {
-      return [item];
+      // Another reader clearing it first reaches the same end, so only a write
+      // that left the item open puts it back on the list.
+      return cleared(item.id, dataDir) ? [] : [item];
     }
   });
 }

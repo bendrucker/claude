@@ -2,8 +2,9 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { fixture } from "./fixture";
-import { openItems, readQueue } from "./items";
+import { fixture, row } from "./fixture";
+import { clearItem, openItems, readQueue } from "./items";
+import { appendDispatch } from "./threads";
 
 describe("cli", () => {
   const script = join(import.meta.dir, "ledger.ts");
@@ -138,6 +139,32 @@ describe("cli", () => {
     expect(status.stdout).not.toMatch(/fix-thing\s+waiting-on-you/);
     expect(status.stdout).toMatch(/open:0/);
     expect(status.stdout).not.toMatch(/needs a decision/);
+
+    // The review is the only thing still naming the branch, so clearing it
+    // takes the thread out of status entirely.
+    clearItem({ id: "q4", state: "acked", by: "ben" }, dataDir);
+    expect((await runOn(bin, "status", "--data-dir", dataDir)).stdout).not.toMatch(/fix-thing/);
+  });
+
+  test("labels a review with the branch when the thread has no task", async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), "ledger-untasked-"));
+    appendDispatch(row({ task: "" }), dataDir);
+    const result = await run(
+      "outcome",
+      "--data-dir",
+      dataDir,
+      "--repo",
+      "/repo",
+      "--branch",
+      "fix-thing",
+      "--state",
+      "done",
+      "--pr",
+      "https://example.test/pr/3",
+    );
+    expect(result.code).toBe(0);
+    const [, queued] = result.stdout.trim().split("\n");
+    expect(JSON.parse(queued!)).toMatchObject({ kind: "review", text: "fix-thing" });
   });
 
   test("raises no review for a thread that came back without one", async () => {

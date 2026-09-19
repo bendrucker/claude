@@ -50,7 +50,7 @@ The list gives sort order. Precedence runs differently: a thread stopped on Ben 
 
 Pull request state comes from one `gh pr view` per thread, bounded to rows under a fortnight old, and reads `unknown` when gh cannot answer, so a machine offline still gets a status. `--tag <key>=<value>` narrows to the threads carrying each pair. `--json` returns the same as data, with each thread's `need` and, for a thread that has one, its pull request state.
 
-`outcome` appends a row with the thread's new state (`done`, `blocked`, `abandoned`), an optional `--pr`, and a `--note` saying why when it is blocked or abandoned. `--repo` may be any worktree of the repository. The latest row per repo and branch is the thread's state. A `done` outcome carrying a `--pr` also raises a review on the queue and prints that item as a second line, so there is no second command to learn.
+`outcome` appends a row with the thread's new state (`done`, `blocked`, `abandoned`), an optional `--pr`, and a `--note` saying why when it is blocked or abandoned. `--repo` may be any worktree of the repository. The latest row per repo and branch is the thread's state. A `done` outcome carrying a `--pr` also raises a review on the queue and prints that item as a second line.
 
 ## Queue
 

@@ -146,10 +146,14 @@ const list = command(
   },
   async (argv) => {
     const dir = resolveDataDir(argv.flags.dataDir);
-    const items = await resolveLanded(openItems(readQueue(dir)), dir);
-    process.stdout.write(
-      argv.flags.json ? `${JSON.stringify(items)}\n` : `${formatQueue(items, new Date())}\n`,
-    );
+    try {
+      const items = await resolveLanded(openItems(readQueue(dir)), dir);
+      process.stdout.write(
+        argv.flags.json ? `${JSON.stringify(items)}\n` : `${formatQueue(items, new Date())}\n`,
+      );
+    } catch (error) {
+      fail(error);
+    }
   },
 );
 

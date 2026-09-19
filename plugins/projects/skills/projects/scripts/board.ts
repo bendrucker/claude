@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+// claude:dangerouslyDisableSandbox: clears queue items in the plugin data dir under ~/.claude/plugins
 import { basename } from "node:path";
 import { cancel, intro, isCancel, log, outro, select, text } from "@clack/prompts";
 import { cli } from "cleye";
@@ -17,11 +18,13 @@ import {
 import { leadName, readProjects } from "./projects";
 import {
   buildStatus,
+  cell,
   formatAge,
   itemCells,
   type Need,
   NEEDS,
   oneLine,
+  optional,
   type ProjectStatus,
   type Status,
   type Thread,
@@ -77,17 +80,6 @@ function plain(rows: readonly (readonly string[])[]): string[] {
     .split("\n")
     .map((line) => line.trimEnd())
     .slice(0, rows.length);
-}
-
-// A trailing empty cell disappears once the line is trimmed, so a thread with
-// no note costs nothing.
-function optional(value: string | null | undefined): string {
-  return value == null ? "" : oneLine(value);
-}
-
-function cell(value: string | null | undefined): string {
-  const collapsed = optional(value);
-  return collapsed === "" ? "-" : collapsed;
 }
 
 // Grouping by need drops the workspace headings, which leaves an untagged

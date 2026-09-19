@@ -166,8 +166,9 @@ export async function resolveGitHub(
   }
   const view = TargetView.safeParse(parsed);
   if (!view.success) return "unknown";
-  if (view.data.state === "OPEN") return "open";
-  return view.data.state === "MERGED" || view.data.state === "CLOSED" ? "closed" : "unknown";
+  const state = GH_STATES[view.data.state];
+  if (state == null) return "unknown";
+  return state === "open" ? "open" : "closed";
 }
 
 // A queue item points at whatever the work is tracked in, so the lookup is
@@ -176,19 +177,25 @@ const RESOLVERS: Record<string, (url: URL) => Promise<Resolution>> = {
   "github.com": (url) => resolveGitHub(url),
 };
 
-export function resolverFor(url: string): ((url: URL) => Promise<Resolution>) | null {
+interface Lookup {
+  url: URL;
+  resolve: (url: URL) => Promise<Resolution>;
+}
+
+export function resolverFor(url: string): Lookup | null {
   let parsed: URL;
   try {
     parsed = new URL(url);
   } catch {
     return null;
   }
-  return RESOLVERS[parsed.hostname] ?? null;
+  const resolve = RESOLVERS[parsed.hostname];
+  return resolve == null ? null : { url: parsed, resolve };
 }
 
 export function resolveUrl(url: string): Promise<Resolution> {
-  const resolver = resolverFor(url);
-  return resolver == null ? Promise.resolve<Resolution>("unknown") : resolver(new URL(url));
+  const lookup = resolverFor(url);
+  return lookup == null ? Promise.resolve<Resolution>("unknown") : lookup.resolve(lookup.url);
 }
 
 // Every url a resolver knows costs a subprocess, so a host nothing can read is

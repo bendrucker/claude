@@ -167,8 +167,14 @@ function plain(rows: readonly (readonly string[])[]): string {
     .trimEnd();
 }
 
-function placeholder(value: string | null | undefined): string {
-  const collapsed = value == null ? "" : oneLine(value);
+// A trailing empty cell disappears once the line is trimmed, so a row with no
+// note costs nothing.
+export function optional(value: string | null | undefined): string {
+  return value == null ? "" : oneLine(value);
+}
+
+export function cell(value: string | null | undefined): string {
+  const collapsed = optional(value);
   return collapsed === "" ? "-" : collapsed;
 }
 
@@ -179,9 +185,9 @@ export function itemCells(item: QueueItem, now: Date, indent = ""): string[] {
     `${indent}${item.id}`,
     item.kind,
     formatAge(item.ts, now),
-    placeholder(item.thread?.branch ?? item.agent),
+    cell(item.thread?.branch ?? item.agent),
     oneLine(item.text),
-    placeholder(item.url),
+    cell(item.url),
   ];
 }
 

@@ -6,6 +6,7 @@ argument-hint: "[status [--tag k=v] | outcome | dispatch]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts:*)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/board.ts:*)
 ---
 
 # Projects
@@ -36,6 +37,14 @@ bun ${CLAUDE_SKILL_DIR}/scripts/ledger.ts outcome --repo "$REPO" --branch "$BRAN
 `status` prints the projects (one line per `projects/<slug>/project.md`: slug, description, lead state, open thread count), then every thread whose latest row is `dispatched` or `blocked` and carries each given tag. Without `--tag` it lists every open thread, and `--json` returns the same as data. The lead state is `live` when a `lead-<slug>` agent is running, `none` when herdr lists no such agent, and `unknown` when herdr could not be asked, which is not a reason to start one.
 
 `outcome` appends a row with the thread's new state (`done`, `blocked`, `abandoned`), an optional `--pr`, and a `--note` saying why when it is blocked or abandoned. `--repo` may be any worktree of the repository. The latest row per repo and branch is the thread's state.
+
+The board renders the same data as a TUI:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/board.ts [--watch]
+```
+
+`--watch` re-renders every ten seconds (`--interval <seconds>` overrides it), one section per workspace with each project's threads nested under its description. Without it the board prompts for a project or a thread, then focuses that agent's pane or sends it a message.
 
 ## Projects
 

@@ -42,6 +42,8 @@ export const LedgerRow = z.object({
   agent: z.string().nullable(),
   session: z.string().nullable(),
   outcome: z.enum(OUTCOMES),
+  // False when a dialog held the agent at start, so the prompt was never sent.
+  prompted: z.boolean().optional(),
   tags: z.record(z.string(), z.string()).optional(),
   pr: z.string().optional(),
   note: z.string().optional(),
@@ -163,7 +165,7 @@ export async function appendOutcome(
   const latest = latestRows(await readLedger(dataDir)).find((row) => threadKey(row) === key);
   if (latest == null)
     throw new Error(`no dispatch of ${input.branch} in ${input.repo} in ${ledgerPath(dataDir)}`);
-  const { note: _previous, ...carried } = latest;
+  const { note: _previous, prompted: _prompted, ...carried } = latest;
   const row: DispatchLedgerRow = { ...carried, ts: now().toISOString(), outcome: input.state };
   if (input.note != null && input.note.length > MAX_NOTE)
     throw new Error(`--note takes at most ${MAX_NOTE} characters, given ${input.note.length}`);

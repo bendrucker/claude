@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
-import { capture, primaryRoot } from "./capture";
+import { capture, primaryRoot, readPullRequests } from "./capture";
+import { ago, DAY, NOW, pr, row } from "./fixture";
 
 describe("capture", () => {
   test("gives up on a command that outruns its deadline", async () => {
@@ -39,5 +40,64 @@ describe("primaryRoot", () => {
 
   test("returns a path git does not know as given", async () => {
     expect(await primaryRoot("/nonexistent/repo")).toBe("/nonexistent/repo");
+  });
+});
+
+describe("readPullRequests", () => {
+  test("looks each distinct pull request up once, and only inside the fortnight", async () => {
+    const asked: string[] = [];
+    const looked = await readPullRequests(
+      [
+        row({ branch: "a", pr: "https://pr/1" }),
+        row({ branch: "b", pr: "https://pr/1" }),
+        row({ branch: "c", ts: ago(NOW, 15 * DAY), pr: "https://pr/2" }),
+        row({ branch: "d", ts: ago(NOW, 13 * DAY), pr: "https://pr/3" }),
+        row({ branch: "e", ts: "yesterday", pr: "https://pr/4" }),
+        row({ branch: "f" }),
+      ],
+      NOW,
+      (url) => {
+        asked.push(url);
+        return Promise.resolve(pr());
+      },
+    );
+    expect(asked).toEqual(["https://pr/1", "https://pr/3"]);
+    expect([...looked.keys()]).toEqual(["https://pr/1", "https://pr/3"]);
+  });
+
+  test("asks only about outcomes a thread can still reach the board under", async () => {
+    const asked: string[] = [];
+    await readPullRequests(
+      [
+        row({ branch: "a", outcome: "dispatched", pr: "https://pr/dispatched" }),
+        row({ branch: "b", outcome: "blocked", pr: "https://pr/blocked" }),
+        row({ branch: "c", outcome: "done", pr: "https://pr/done" }),
+        row({ branch: "d", outcome: "abandoned", pr: "https://pr/abandoned" }),
+        row({ branch: "e", outcome: "orphaned", pr: "https://pr/orphaned" }),
+      ],
+      NOW,
+      (url) => {
+        asked.push(url);
+        return Promise.resolve(pr());
+      },
+    );
+    expect(asked).toEqual(["https://pr/dispatched", "https://pr/blocked", "https://pr/done"]);
+  });
+
+  test("keeps the lookups in flight under a ceiling", async () => {
+    let live = 0;
+    let peak = 0;
+    const rows = Array.from({ length: 40 }, (_, index) =>
+      row({ branch: `b${index}`, pr: `https://pr/${index}` }),
+    );
+    const looked = await readPullRequests(rows, NOW, async (_url) => {
+      live += 1;
+      peak = Math.max(peak, live);
+      await Bun.sleep(1);
+      live -= 1;
+      return pr();
+    });
+    expect(looked.size).toBe(40);
+    expect(peak).toBe(8);
   });
 });

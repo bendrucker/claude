@@ -2,12 +2,13 @@
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger in the plugin data dir under ~/.claude/plugins
 import { cli, command } from "cleye";
 import { z } from "zod";
-import { liveAgents, primaryRoot } from "./capture";
+import { listAgents, primaryRoot, readPullRequests } from "./capture";
 import { readProjects } from "./projects";
 import { buildStatus, formatStatus } from "./status";
 import {
   appendOutcome,
   CLOSING,
+  latestRows,
   MAX_NOTE,
   MAX_TAG_VALUE,
   parseTags,
@@ -88,15 +89,14 @@ const status = command(
       process.exit(2);
     }
     const dir = resolveDataDir(argv.flags.dataDir);
-    const [projects, rows, live] = await Promise.all([
-      readProjects(dir),
-      readLedger(dir),
-      liveAgents(),
+    const now = new Date();
+    const [projects, rows] = await Promise.all([readProjects(dir), readLedger(dir)]);
+    const [agents, pullRequests] = await Promise.all([
+      listAgents(),
+      readPullRequests(latestRows(rows), now),
     ]);
-    const built = buildStatus(projects, rows, tags, live);
-    process.stdout.write(
-      argv.flags.json ? `${JSON.stringify(built)}\n` : formatStatus(built, new Date()),
-    );
+    const built = buildStatus(projects, rows, tags, { agents, pullRequests, now });
+    process.stdout.write(argv.flags.json ? `${JSON.stringify(built)}\n` : formatStatus(built, now));
   },
 );
 

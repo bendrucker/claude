@@ -113,7 +113,7 @@ test("an untracked path is a violation", () => {
     "user",
   ]);
   expect(violations(references(settings, USER_SETTINGS), tracked)).toEqual([
-    "user/settings.json Stop: user/hooks/gone",
+    "user/settings.json Stop: user/hooks/gone not tracked in git. Add to repo or remove from hook command.",
   ]);
 });
 

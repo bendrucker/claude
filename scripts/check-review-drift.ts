@@ -71,7 +71,9 @@ async function binaryVersion(binary: string): Promise<string> {
   const out = await new Response(proc.stdout).text();
   const version = out.match(/\d+\.\d+\.\d+/)?.[0];
   if (version == null || version === "")
-    throw new Error(`Could not read a version from \`${binary} --version\`.`);
+    throw new Error(
+      `Could not read a version from \`${binary} --version\`. Verify the binary is a valid Claude Code executable.`,
+    );
   return version;
 }
 
@@ -90,7 +92,9 @@ async function snapshotFragments(version: string): Promise<Map<string, string>> 
   const body = await Bun.file(join(SNAPSHOT_DIR, `upstream-${version}.md`)).text();
   const heading = body.match(/^## .*finder angles, verbatim.*$/m);
   if (!heading) {
-    throw new Error(`upstream-${version}.md has no "finder angles, verbatim" section to compare.`);
+    throw new Error(
+      `upstream-${version}.md has no "finder angles, verbatim" section to compare; add the section to the snapshot file.`,
+    );
   }
   const section = body.slice((heading.index ?? 0) + heading[0].length);
   const fragments = new Map<string, string>();
@@ -185,7 +189,7 @@ await runCheck(
     for (const [label, fragment] of await snapshotFragments(snapshot)) {
       if (!fragmentPattern(fragment).test(bundle)) {
         violations.push(
-          `${label}: no longer present verbatim in ${version}. Decide whether to adopt the new text.`,
+          `${label}: no longer present verbatim in ${version}. Update SKILL.md, angles.yaml, or efforts.yaml to match.`,
         );
       }
     }

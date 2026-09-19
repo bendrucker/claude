@@ -82,7 +82,8 @@ async function checkMatchers(): Promise<string[]> {
 if (import.meta.main) {
   await runCheck(
     async () => ({
-      header: "MCP hook matchers missing plugin variants:",
+      header:
+        "MCP hook matchers missing plugin variants. Add both mcp__plugin_* and mcp__claude_ai_* variants to each matcher pattern.",
       violations: await checkMatchers(),
     }),
     { success: "All MCP hook matchers include plugin and Claude AI variants" },

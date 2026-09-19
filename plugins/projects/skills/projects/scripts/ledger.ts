@@ -3,6 +3,7 @@
 import { cli, command } from "cleye";
 import { z } from "zod";
 import { listAgents, primaryRoot, readPullRequests } from "./capture";
+import { openItems, pushItem, readQueue, resolveLanded } from "./items";
 import { readProjects } from "./projects";
 import { buildStatus, formatStatus } from "./status";
 import {
@@ -48,6 +49,7 @@ const outcome = command(
       argv.showHelp();
       process.exit(2);
     }
+    const dir = resolveDataDir(argv.flags.dataDir);
     try {
       const row = await appendOutcome(
         {
@@ -57,9 +59,28 @@ const outcome = command(
           pr: argv.flags.pr,
           note: argv.flags.note,
         },
-        resolveDataDir(argv.flags.dataDir),
+        dir,
       );
       process.stdout.write(`${JSON.stringify(row)}\n`);
+      // A finished thread behind a pull request is a review Ben owes, so the
+      // one command the lead already runs raises it. The queue item prints as
+      // a second line.
+      if (row.outcome === "done" && row.pr != null)
+        process.stdout.write(
+          `${JSON.stringify(
+            pushItem(
+              {
+                kind: "review",
+                text: row.task,
+                url: row.pr,
+                thread: { repo: row.repo, branch: row.branch },
+                agent: row.agent ?? undefined,
+                pane: row.pane,
+              },
+              dir,
+            ),
+          )}\n`,
+        );
     } catch (error) {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
       process.exit(1);
@@ -91,11 +112,12 @@ const status = command(
     const dir = resolveDataDir(argv.flags.dataDir);
     const now = new Date();
     const [projects, rows] = await Promise.all([readProjects(dir), readLedger(dir)]);
-    const [agents, pullRequests] = await Promise.all([
+    const [agents, pullRequests, queue] = await Promise.all([
       listAgents(),
       readPullRequests(latestRows(rows), now),
+      resolveLanded(openItems(readQueue(dir)), dir),
     ]);
-    const built = buildStatus(projects, rows, tags, { agents, pullRequests, now });
+    const built = buildStatus(projects, rows, tags, { agents, pullRequests, now }, queue);
     process.stdout.write(argv.flags.json ? `${JSON.stringify(built)}\n` : formatStatus(built, now));
   },
 );

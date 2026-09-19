@@ -5,10 +5,20 @@ import { cli } from "cleye";
 import { getBorderCharacters, table } from "table";
 import { type Agents, listAgents, readPullRequests } from "./capture";
 import { type CommandResult, type Runner, spawnRunner } from "./dispatch";
+import {
+  answerItem,
+  BEN,
+  clearItem,
+  openItems,
+  type QueueItem,
+  readQueue,
+  resolveLanded,
+} from "./items";
 import { leadName, readProjects } from "./projects";
 import {
   buildStatus,
   formatAge,
+  itemCells,
   type Need,
   NEEDS,
   oneLine,
@@ -23,6 +33,11 @@ const INTERVAL_SECONDS = 10;
 
 const BOLD = "1";
 const YELLOW = "33";
+
+// The items Ben was asked for directly, with the threads the board inferred he
+// is holding up kept beneath them.
+const NEEDS_YOU = "NEEDS YOU";
+const OBSERVED = "observed";
 
 export interface NeedGroup {
   need: Need;
@@ -111,13 +126,25 @@ export interface BoardOptions {
 export function formatBoard(status: Status, now: Date, options: BoardOptions = {}): string {
   const truncate = options.truncate ?? TRUNCATE;
   const groups = groupThreads(status);
+  const waiting = groups.find((group) => group.need === "waiting-on-you")?.threads ?? [];
+  const rest = groups.filter((group) => group.need !== "waiting-on-you");
+  const items = plain(status.queue.map((item) => itemCells(item, now, "  ")));
   // One table across every group keeps the columns aligned down the board.
-  const rendered = plain(
-    groups.flatMap((group) => group.threads.map((row) => threadCells(row, now, "  "))),
-  );
+  const rendered = plain([
+    ...waiting.map((row) => threadCells(row, now, "    ")),
+    ...rest.flatMap((group) => group.threads.map((row) => threadCells(row, now, "  "))),
+  ]);
   const lines: Line[] = [];
   let next = 0;
-  for (const group of groups) {
+  if (status.queue.length > 0 || waiting.length > 0) {
+    lines.push({ text: NEEDS_YOU, style: BOLD });
+    lines.push(...items.map((item) => ({ text: item })));
+    if (waiting.length > 0) {
+      lines.push({ text: `  ${OBSERVED}` });
+      lines.push(...waiting.map(() => ({ text: rendered[next++] ?? "" })));
+    }
+  }
+  for (const group of rest) {
     if (lines.length > 0) lines.push({ text: "" });
     lines.push({ text: group.need, style: BOLD });
     lines.push(...group.threads.map(() => ({ text: rendered[next++] ?? "" })));
@@ -135,27 +162,40 @@ export function formatBoard(status: Status, now: Date, options: BoardOptions = {
     .join("\n")}\n`;
 }
 
-export type Target = { kind: "project"; project: ProjectStatus } | { kind: "thread"; row: Thread };
+export type Target =
+  | { kind: "project"; project: ProjectStatus }
+  | { kind: "thread"; row: Thread }
+  | { kind: "item"; item: QueueItem };
+
+// A name herdr no longer lists falls back to the pane the row recorded, which
+// every agent command takes, unless herdr reports that pane under another name:
+// a focus or a prompt meant for this target must never reach whoever took the
+// pane over.
+function liveTarget(
+  name: string | null,
+  pane: string | null,
+  agents: Agents | null,
+): string | null {
+  if (name != null && (agents == null || agents.names.has(name))) return name;
+  if (pane == null) return null;
+  const occupant = agents?.panes.get(pane);
+  return occupant != null && occupant.name !== name ? null : pane;
+}
 
 // A null listing means herdr could not answer, so every name stays targetable
-// and herdr reports the failure itself. A thread whose name is gone falls back
-// to the pane the ledger recorded, which every agent command takes, unless
-// herdr reports that pane under another name: a focus or a prompt meant for
-// this thread must never reach whoever took the pane over.
+// and herdr reports the failure itself.
 export function targetAgent(target: Target, agents: Agents | null = null): string | null {
-  if (target.kind === "thread") {
-    const name = target.row.agent;
-    if (name != null && (agents == null || agents.names.has(name))) return name;
-    const occupant = agents?.panes.get(target.row.pane);
-    return occupant != null && occupant.name !== name ? null : target.row.pane;
-  }
+  if (target.kind === "thread") return liveTarget(target.row.agent, target.row.pane, agents);
+  if (target.kind === "item")
+    return liveTarget(target.item.agent ?? null, target.item.pane ?? null, agents);
   if (target.project.lead === "none") return null;
   const name = leadName(target.project.slug);
   return agents == null || agents.names.has(name) ? name : null;
 }
 
 function targetLabel(target: Target): string {
-  return oneLine(target.kind === "project" ? target.project.slug : target.row.branch);
+  if (target.kind === "project") return oneLine(target.project.slug);
+  return oneLine(target.kind === "item" ? target.item.id : target.row.branch);
 }
 
 export interface Choice {
@@ -165,6 +205,7 @@ export interface Choice {
 
 export function choices(status: Status, now: Date, truncate = TRUNCATE): Choice[] {
   const threads = groupThreads(status).flatMap((group) => group.threads);
+  const itemLines = plain(status.queue.map((item) => itemCells(item, now)));
   const projectLines = plain(
     status.projects.map((project) => [
       oneLine(project.slug),
@@ -177,10 +218,14 @@ export function choices(status: Status, now: Date, truncate = TRUNCATE): Choice[
   // have put in a heading above it.
   const threadLines = plain(threads.map((row) => [row.need, ...threadCells(row, now)]));
   const label = (lines: string[], index: number): string => clip(lines[index] ?? "", truncate);
-  const picked: Choice[] = status.projects.map((project, index) => ({
-    target: { kind: "project", project },
-    label: label(projectLines, index),
+  // The queue leads, because an item is Ben's to clear before anything the
+  // board worked out for itself.
+  const picked: Choice[] = status.queue.map((item, index) => ({
+    target: { kind: "item", item },
+    label: label(itemLines, index),
   }));
+  for (const [index, project] of status.projects.entries())
+    picked.push({ target: { kind: "project", project }, label: label(projectLines, index) });
   for (const [index, row] of threads.entries())
     picked.push({ target: { kind: "thread", row }, label: label(threadLines, index) });
   return picked;
@@ -213,12 +258,13 @@ export async function loadStatus(dataDir: string, now: Date = new Date()): Promi
     readProjects(dataDir, warn),
     readLedger(dataDir, warn),
   ]);
-  const [agents, pullRequests] = await Promise.all([
+  const [agents, pullRequests, queue] = await Promise.all([
     listAgents(),
     readPullRequests(latestRows(rows), now),
+    resolveLanded(openItems(readQueue(dataDir, warn)), dataDir),
   ]);
   return {
-    status: buildStatus(projects, rows, {}, { agents, pullRequests, now }),
+    status: buildStatus(projects, rows, {}, { agents, pullRequests, now }, queue),
     agents,
     warnings,
   };
@@ -254,6 +300,68 @@ async function watch(dataDir: string, intervalMs: number, truncate: number): Pro
   }
 }
 
+function report(result: CommandResult, done: string): void {
+  if (result.code === 0) {
+    outro(done);
+    return;
+  }
+  log.error(result.stderr.trim() === "" ? `herdr exited ${result.code}` : result.stderr.trim());
+  outro("failed");
+  process.exitCode = 1;
+}
+
+// An item is Ben's to clear, so the actions on one write the queue rather than
+// reaching for the agent. Focus is offered only while there is still a pane to
+// look at.
+async function actOnItem(
+  item: QueueItem,
+  agent: string | null,
+  dataDir: string,
+  run: Runner,
+): Promise<void> {
+  const action = await select({
+    message: item.id,
+    options: [
+      { value: "ack", label: "Acknowledge" },
+      { value: "answer", label: "Answer" },
+      ...(agent == null ? [] : [{ value: "focus", label: "Focus the pane" }]),
+    ],
+  });
+  if (isCancel(action)) {
+    cancel("nothing sent");
+    return;
+  }
+  if (action === "focus" && agent != null) {
+    report(await focus(agent, run), `focus ${agent}`);
+    return;
+  }
+  try {
+    if (action === "ack") {
+      clearItem({ id: item.id, state: "acked", by: BEN }, dataDir);
+      outro(`acked ${item.id}`);
+      return;
+    }
+    const body = await text({
+      message: `Answer ${item.id}`,
+      validate: (value) => (value.trim() === "" ? "An answer cannot be empty" : undefined),
+    });
+    if (isCancel(body)) {
+      cancel("nothing sent");
+      return;
+    }
+    const answered = await answerItem(item.id, body, BEN, dataDir, run);
+    outro(
+      answered.delivered === true
+        ? `answered ${item.id}, delivered to ${answered.agent}`
+        : `answered ${item.id}`,
+    );
+  } catch (error) {
+    log.error(reason(error));
+    outro("failed");
+    process.exitCode = 1;
+  }
+}
+
 async function interactive(dataDir: string, truncate: number, run: Runner): Promise<void> {
   intro("herdr board");
   for (;;) {
@@ -283,6 +391,10 @@ async function interactive(dataDir: string, truncate: number, run: Runner): Prom
     const choice = options[Number(picked)];
     if (choice == null) return;
     const agent = targetAgent(choice.target, data.agents);
+    if (choice.target.kind === "item") {
+      await actOnItem(choice.target.item, agent, dataDir, run);
+      return;
+    }
     if (agent == null) {
       log.warn(`${targetLabel(choice.target)} has no live agent`);
       continue;
@@ -298,25 +410,19 @@ async function interactive(dataDir: string, truncate: number, run: Runner): Prom
       cancel("nothing sent");
       return;
     }
-    let result: CommandResult;
-    if (action === "focus") result = await focus(agent, run);
-    else {
-      const body = await text({
-        message: `Message ${agent}`,
-        validate: (value) => (value.trim() === "" ? "A message cannot be empty" : undefined),
-      });
-      if (isCancel(body)) {
-        cancel("nothing sent");
-        return;
-      }
-      result = await message(agent, body, run);
+    if (action === "focus") {
+      report(await focus(agent, run), `focus ${agent}`);
+      return;
     }
-    if (result.code === 0) outro(`${action} ${agent}`);
-    else {
-      log.error(result.stderr.trim() === "" ? `herdr exited ${result.code}` : result.stderr.trim());
-      outro("failed");
-      process.exitCode = 1;
+    const body = await text({
+      message: `Message ${agent}`,
+      validate: (value) => (value.trim() === "" ? "A message cannot be empty" : undefined),
+    });
+    if (isCancel(body)) {
+      cancel("nothing sent");
+      return;
     }
+    report(await message(agent, body, run), `message ${agent}`);
     return;
   }
 }

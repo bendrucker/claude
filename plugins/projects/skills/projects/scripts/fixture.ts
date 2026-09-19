@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Agents, PullRequest } from "./capture";
+import { appendItem, type QueueItem } from "./items";
 import { projectsDir } from "./projects";
 import type { Observed } from "./status";
 import { appendDispatch, type DispatchLedgerRow } from "./threads";
@@ -52,6 +53,15 @@ export const row = (overrides: Partial<DispatchLedgerRow>): DispatchLedgerRow =>
   ...overrides,
 });
 
+export const item = (overrides: Partial<QueueItem>): QueueItem => ({
+  id: "q1",
+  ts: "2026-09-18T09:00:00.000Z",
+  kind: "question",
+  text: "which base branch?",
+  state: "open",
+  ...overrides,
+});
+
 export const PROJECT = `---
 name: Ledger routing
 description: Dispatch ledger, project routing, and the chief and lead sessions that read it
@@ -63,9 +73,11 @@ Standing instructions for every thread.
 `;
 
 // A ledger with one finished thread, one blocked thread, one open one-off, and
-// one orphan, beside one readable project and one that fails to parse. The ages
-// are relative so the CLI tests, which run against the real clock, stay inside
-// the window a pull request lookup covers.
+// one orphan, beside one readable project and one that fails to parse, and a
+// queue holding one review, one question, and one item already answered. The
+// ages are relative so the CLI tests, which run against the real clock, stay
+// inside the window a pull request lookup covers. Queue urls point at a host no
+// resolver knows, so nothing auto-resolves out from under a test.
 export async function fixture(now: Date = NOW): Promise<string> {
   const dataDir = mkdtempSync(join(tmpdir(), "ledger-"));
   const dispatched = ago(now, 3 * 60 * MINUTE);
@@ -96,6 +108,29 @@ export async function fixture(now: Date = NOW): Promise<string> {
     }),
   ];
   for (const entry of rows) appendDispatch(entry, dataDir);
+  const items = [
+    item({
+      id: "q1",
+      ts: ago(now, 2 * 60 * MINUTE),
+      kind: "review",
+      text: "record what each thread returned",
+      url: "https://example.test/pr/1",
+      thread: { repo: "/repo", branch: "done-thing" },
+      agent: "done-thing",
+      pane: "wZZ:p3",
+    }),
+    item({ id: "q2", ts: ago(now, 45 * MINUTE), agent: "one-off", pane: "wA:p1" }),
+    item({
+      id: "q3",
+      ts: ago(now, 3 * 60 * MINUTE),
+      text: "ship the trial?",
+      state: "answered",
+      answer: "yes",
+      delivered: true,
+      by: "ben",
+    }),
+  ];
+  for (const entry of items) appendItem(entry, dataDir);
   mkdirSync(join(projectsDir(dataDir), "ledger"), { recursive: true });
   mkdirSync(join(projectsDir(dataDir), "broken"), { recursive: true });
   await Bun.write(join(projectsDir(dataDir), "ledger", "project.md"), PROJECT);

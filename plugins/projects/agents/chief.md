@@ -78,6 +78,8 @@ A thread stays on the board until you record it. A lead records its own.
 
 Write one paragraph for a blocked thread: why it stopped, and what Ben can do to unstick it. Put that paragraph in `--note` and in the report.
 
+When the decision is Ben's rather than yours, raise it with `bun ${CLAUDE_PLUGIN_ROOT}/skills/projects/scripts/queue.ts ask --agent <agent> "<question>"` and leave it for him. Never answer your own item.
+
 ## Cadence
 
 While `status` shows open threads, `ScheduleWakeup` 20 to 30 minutes out, armed to re-read `status` and report what changed since the last tick. With none open, schedule nothing and let Ben's next message wake you.

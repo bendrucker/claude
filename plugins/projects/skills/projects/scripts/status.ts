@@ -1,5 +1,6 @@
 import { getBorderCharacters, table } from "table";
 import type { Agent, Agents, PullRequest, PullRequests } from "./capture";
+import type { QueueItem } from "./items";
 import { leadName, type Project } from "./projects";
 import { type DispatchLedgerRow, formatTags, hasTags, latestRows, OPEN } from "./threads";
 
@@ -103,6 +104,9 @@ export interface ProjectStatus extends Project {
 export interface Status {
   projects: ProjectStatus[];
   threads: Thread[];
+  // What Ben was asked for directly, already folded and ordered by its own
+  // module, so the status pass only carries it through.
+  queue: QueueItem[];
 }
 
 export function buildStatus(
@@ -110,10 +114,12 @@ export function buildStatus(
   rows: readonly DispatchLedgerRow[],
   tags: Record<string, string>,
   observed: Observed,
+  queue: readonly QueueItem[] = [],
 ): Status {
   const live = observed.agents?.names ?? null;
   const threads = latestRows(rows).flatMap((row) => deriveThread(row, observed) ?? []);
   return {
+    queue: [...queue],
     projects: projects.map((project) => ({
       ...project,
       lead: live == null ? "unknown" : live.has(leadName(project.slug)) ? "live" : "none",
@@ -161,6 +167,33 @@ function plain(rows: readonly (readonly string[])[]): string {
     .trimEnd();
 }
 
+function placeholder(value: string | null | undefined): string {
+  const collapsed = value == null ? "" : oneLine(value);
+  return collapsed === "" ? "-" : collapsed;
+}
+
+// The cells the queue prints wherever it appears, so the board and the status
+// block stay one format. An item names the thread it came from when it has
+// one, and the agent that asked otherwise.
+export function itemCells(item: QueueItem, now: Date, indent = ""): string[] {
+  return [
+    `${indent}${item.id}`,
+    item.kind,
+    formatAge(item.ts, now),
+    placeholder(item.thread?.branch ?? item.agent),
+    oneLine(item.text),
+    placeholder(item.url),
+  ];
+}
+
+export function formatQueue(items: readonly QueueItem[], now: Date): string {
+  if (items.length === 0) return "no open items";
+  return plain([
+    ["id", "kind", "age", "thread", "text", "url"],
+    ...items.map((item) => itemCells(item, now)),
+  ]);
+}
+
 // Each block is one line per item, so a compaction hook can print it verbatim.
 export function formatStatus(status: Status, now: Date): string {
   const projects =
@@ -191,5 +224,5 @@ export function formatStatus(status: Status, now: Date): string {
             row.note ?? "",
           ]),
         ]);
-  return `projects\n${projects}\n\nthreads\n${threads}\n`;
+  return `queue\n${formatQueue(status.queue, now)}\n\nprojects\n${projects}\n\nthreads\n${threads}\n`;
 }

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 import { fixture } from "./fixture";
+import { openItems, readQueue } from "./items";
 
 describe("cli", () => {
   const script = join(import.meta.dir, "ledger.ts");
@@ -43,11 +44,13 @@ describe("cli", () => {
     expect(result.stdout).toMatch(/lead:unknown/);
   });
 
-  test("status prints the routing block, the threads, and JSON on request", async () => {
+  test("status prints the queue, the routing block, the threads, and JSON on request", async () => {
     const dataDir = await fixture(new Date());
     const text = await run("status", "--data-dir", dataDir);
     expect(text.code).toBe(0);
-    expect(text.stdout).toMatch(/^projects\nledger\s+Dispatch ledger.*lead:unknown\s+open:2\n/);
+    expect(text.stdout).toMatch(/^queue\nid\s+kind\s+age/);
+    expect(text.stdout).toMatch(/\nq1\s+review\s+\S+\s+done-thing\s+record what each thread/);
+    expect(text.stdout).toMatch(/\nprojects\nledger\s+Dispatch ledger.*lead:unknown\s+open:2\n/);
     expect(text.stdout).toMatch(/\nfix-thing\s+waiting-on-you\s+blocked/);
     expect(text.stdout).toMatch(/\ndone-thing\s+ready-for-review\s+done/);
 
@@ -55,6 +58,7 @@ describe("cli", () => {
     expect(json.code).toBe(0);
     const parsed: unknown = JSON.parse(json.stdout);
     expect(parsed).toEqual({
+      queue: [expect.objectContaining({ id: "q1" }), expect.objectContaining({ id: "q2" })],
       projects: [expect.objectContaining({ slug: "ledger", open: 2 })],
       threads: [expect.objectContaining({ branch: "one-off", need: "idle" })],
     });
@@ -117,11 +121,43 @@ describe("cli", () => {
       "https://example.test/pr/3",
     );
     expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout)).toMatchObject({ branch: "fix-thing", outcome: "done" });
+    const [outcome, queued] = result.stdout.trim().split("\n");
+    expect(JSON.parse(outcome!)).toMatchObject({ branch: "fix-thing", outcome: "done" });
+    // The lead types one command, and the review Ben now owes comes with it.
+    expect(JSON.parse(queued!)).toMatchObject({
+      id: "q4",
+      kind: "review",
+      text: "fix the thing",
+      url: "https://example.test/pr/3",
+      thread: { repo: "/repo", branch: "fix-thing" },
+      agent: "fix-thing",
+      pane: "wZZ:p1",
+      state: "open",
+    });
+    expect(openItems(readQueue(dataDir)).map((item) => item.id)).toEqual(["q1", "q2", "q4"]);
     const status = await runOn(bin, "status", "--data-dir", dataDir);
-    expect(status.stdout).not.toMatch(/fix-thing/);
+    expect(status.stdout).not.toMatch(/fix-thing\s+waiting-on-you/);
     expect(status.stdout).toMatch(/open:0/);
     expect(status.stdout).not.toMatch(/needs a decision/);
+  });
+
+  test("raises no review for a thread that came back without one", async () => {
+    const dataDir = await fixture(new Date());
+    const result = await run(
+      "outcome",
+      "--data-dir",
+      dataDir,
+      "--repo",
+      "/repo",
+      "--branch",
+      "fix-thing",
+      "--state",
+      "abandoned",
+      "--note",
+      "superseded",
+    );
+    expect(result.stdout.trim().split("\n")).toHaveLength(1);
+    expect(openItems(readQueue(dataDir)).map((item) => item.id)).toEqual(["q1", "q2"]);
   });
 
   test.each<[string, string[], number, RegExp]>([

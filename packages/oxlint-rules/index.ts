@@ -3,6 +3,7 @@ import { eslintCompatPlugin } from "@oxlint/plugins";
 import { noChainedTypeAssertionsRule } from "./no-chained-type-assertions.ts";
 import { noConditionalEmptyObjectSpreadRule } from "./no-conditional-empty-object-spread.ts";
 import { noModuleMockingRule } from "./no-module-mocking.ts";
+import { noSilentCatchRule } from "./no-silent-catch.ts";
 import { noTerminalWidthRule } from "./no-terminal-width.ts";
 import { noUnknownReturnsRule } from "./no-unknown-returns.ts";
 
@@ -13,6 +14,7 @@ const plugin = eslintCompatPlugin({
     "no-chained-type-assertions": noChainedTypeAssertionsRule,
     "no-conditional-empty-object-spread": noConditionalEmptyObjectSpreadRule,
     "no-module-mocking": noModuleMockingRule,
+    "no-silent-catch": noSilentCatchRule,
     "no-terminal-width": noTerminalWidthRule,
     "no-unknown-returns": noUnknownReturnsRule,
   },

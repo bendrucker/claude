@@ -147,6 +147,8 @@ function readEnvelope(text: string): string | null {
   try {
     json = JSON.parse(text);
   } catch {
+    // This probes arbitrary stderr text for an envelope, so non-JSON input is
+    // the ordinary case rather than a failure: it just means there is none.
     return null;
   }
   const parsed = ErrorEnvelope.safeParse(json);

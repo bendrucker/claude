@@ -17,7 +17,8 @@ async function readStore(): Promise<StateStore> {
   }
   try {
     return StateStore.parse(await file.json());
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError) && !(error instanceof z.ZodError)) throw error;
     return {};
   }
 }

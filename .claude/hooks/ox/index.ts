@@ -126,6 +126,7 @@ async function isIgnored(filePath: string): Promise<boolean> {
     await execFileAsync("git", ["check-ignore", "-q", filePath], { cwd: dirname(filePath) });
     return true;
   } catch {
+    // git check-ignore exits non-zero for a tracked path, which this reads as "not ignored."
     return false;
   }
 }
@@ -137,6 +138,7 @@ async function realPath(filePath: string): Promise<string | null> {
   try {
     return await realpath(filePath);
   } catch {
+    // A deleted file or dangling link must not fail the hook. Treat it as unresolvable.
     return null;
   }
 }
@@ -176,6 +178,7 @@ async function localBin(pkg: string, binName: string): Promise<string | null> {
     const bin = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[binName];
     return bin != null && bin !== "" ? join(dirname(manifestPath), bin) : null;
   } catch {
+    // A missing or malformed manifest must not fail the hook. Fall back to the caller's other lookup.
     return null;
   }
 }
@@ -214,6 +217,8 @@ function mainCheckout(): Promise<string | null> {
       const gitDir = stdout.trim();
       return gitDir !== "" ? dirname(gitDir) : null;
     } catch {
+      // A missing git or a directory outside any repo must not fail the hook. The gate falls back
+      // to whatever `binManifest` finds locally.
       return null;
     }
   })();
@@ -457,6 +462,7 @@ async function installed(cwd: string | undefined): Promise<boolean> {
     await readdir(join(cwd ?? process.cwd(), "node_modules"));
     return true;
   } catch {
+    // Per the comment above: no node_modules means uninstalled, so the type section drops instead of blocking.
     return false;
   }
 }
@@ -623,6 +629,9 @@ async function recordBlocks(sessionId: string, blocks: number): Promise<boolean>
     await Bun.write(blockCountPath(sessionId), JSON.stringify({ blocks }));
     return true;
   } catch {
+    // An unwritable count file must not fail the hook. The caller's compound
+    // check treats that as a signal to skip blocking this round entirely
+    // (see the comment above it).
     return false;
   }
 }

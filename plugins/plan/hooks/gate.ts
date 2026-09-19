@@ -80,6 +80,7 @@ async function readState(path: string): Promise<string | null> {
   try {
     return await Bun.file(path).text();
   } catch {
+    // A missing or unreadable state file must not fail the hook. Treat it as no state yet.
     return null;
   }
 }
@@ -107,6 +108,7 @@ function parseLineSet(raw: string): Set<string> | null {
     if (!Array.isArray(parsed) || !parsed.every((item) => typeof item === "string")) return null;
     return new Set(parsed);
   } catch {
+    // Corrupt or malformed state must not fail the hook. Treat it as no prior state.
     return null;
   }
 }

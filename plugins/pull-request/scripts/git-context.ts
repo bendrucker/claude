@@ -15,6 +15,8 @@ function diff(): string {
     try {
       return exec("git diff --cached");
     } catch {
+      // Both diff strategies failed: no commits yet and nothing staged, or no
+      // repo at all. There is no diff to show either way.
       return "";
     }
   }

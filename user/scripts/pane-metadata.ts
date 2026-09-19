@@ -129,7 +129,8 @@ function recordTitle(line: string): string | null {
   let record: z.infer<typeof TitleRecord>;
   try {
     record = TitleRecord.parse(JSON.parse(line));
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError) && !(error instanceof z.ZodError)) throw error;
     return null;
   }
   if (record.type === "ai-title") return record.aiTitle ?? null;
@@ -158,6 +159,8 @@ async function readCacheFile<T>(path: string, schema: z.ZodType<T>): Promise<T |
   try {
     return schema.parse(await Bun.file(path).json());
   } catch {
+    // Per the comment below: caching is best effort, so a missing, corrupt,
+    // or stale-schema cache file counts as a cache miss.
     return null;
   }
 }
@@ -221,7 +224,8 @@ export function findPane(paneList: string, sessionId: string): string | null {
   let parsed: z.infer<typeof PaneList>;
   try {
     parsed = PaneList.parse(JSON.parse(paneList));
-  } catch {
+  } catch (error) {
+    if (!(error instanceof SyntaxError) && !(error instanceof z.ZodError)) throw error;
     return null;
   }
   const pane = parsed.result?.panes?.find((p) => p.agent_session?.value === sessionId);

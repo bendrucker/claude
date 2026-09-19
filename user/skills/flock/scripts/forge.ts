@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { decodeJson } from "../../../../packages/decode/index";
+import { DecodeError, decodeJson } from "../../../../packages/decode/index";
 import type { Run } from "./exec";
 
 export type ForgeKind = "github" | "gitlab";
@@ -23,7 +23,8 @@ export function parseRemote(url: string): Remote | null {
       const parsed = new URL(trimmed);
       host = parsed.hostname;
       path = parsed.pathname;
-    } catch {
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
       return null;
     }
   } else {
@@ -391,7 +392,8 @@ function githubForge(run: Run): Forge {
     if (!result.ok) return null;
     try {
       return decodeJson(GitHubUser, result.stdout, "gh api user").login;
-    } catch {
+    } catch (error) {
+      if (!(error instanceof DecodeError)) throw error;
       return null;
     }
   });
@@ -466,7 +468,8 @@ function githubForge(run: Run): Forge {
           return decodeJson(GitHubPullRequests, result.stdout, "gh pr list").map((pull) =>
             githubPullRequest(pull, state),
           );
-        } catch {
+        } catch (error) {
+          if (!(error instanceof DecodeError)) throw error;
           return null;
         }
       };
@@ -535,7 +538,8 @@ function gitlabForge(run: Run): Forge {
     if (!result.ok) return null;
     try {
       return decodeJson(GitLabUser, result.stdout, "glab api user").username;
-    } catch {
+    } catch (error) {
+      if (!(error instanceof DecodeError)) throw error;
       return null;
     }
   });
@@ -588,7 +592,8 @@ function gitlabForge(run: Run): Forge {
           return decodeJson(GitLabMergeRequests, result.stdout, "glab mr list").map((request) =>
             gitlabMergeRequest(request, state),
           );
-        } catch {
+        } catch (error) {
+          if (!(error instanceof DecodeError)) throw error;
           return null;
         }
       };

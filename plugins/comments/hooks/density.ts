@@ -48,6 +48,7 @@ function blockedEarlier(transcript: string): boolean {
     try {
       parsed = JSON.parse(line);
     } catch {
+      // A malformed transcript line must not fail the hook. Treat it as no block.
       return false;
     }
     const decoded = TranscriptLine.safeParse(parsed);
@@ -78,6 +79,7 @@ async function main(): Promise<void> {
   try {
     input = StopInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch {
+    // Malformed hook input must not crash the hook. Skip this invocation.
     return;
   }
   if (input.hook_event_name !== "Stop") return;
@@ -89,6 +91,7 @@ async function main(): Promise<void> {
   try {
     transcript = await Bun.file(path).text();
   } catch {
+    // A missing or unreadable transcript must not fail the hook. Skip this invocation.
     return;
   }
 

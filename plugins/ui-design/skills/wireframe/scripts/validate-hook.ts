@@ -65,6 +65,7 @@ async function main(): Promise<void> {
   try {
     input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch {
+    // Malformed hook input must not crash the hook. Skip this invocation.
     return;
   }
 

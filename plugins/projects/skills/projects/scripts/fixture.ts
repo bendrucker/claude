@@ -72,10 +72,7 @@ tracker: https://example.test/projects/ledger
 Standing instructions for every thread.
 `;
 
-// A ledger with one finished thread, one blocked thread, one open one-off, and
-// one orphan, beside one readable project and one that fails to parse, and a
-// queue holding one review, one question, and one item already answered. The
-// ages are relative so the CLI tests, which run against the real clock, stay
+// The ages are relative so the CLI tests, which run against the real clock, stay
 // inside the window a pull request lookup covers. Queue urls point at a host no
 // resolver knows, so nothing auto-resolves out from under a test.
 export async function fixture(now: Date = NOW): Promise<string> {

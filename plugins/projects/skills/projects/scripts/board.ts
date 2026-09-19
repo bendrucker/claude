@@ -311,8 +311,7 @@ function report(result: CommandResult, done: string): void {
 }
 
 // An item is Ben's to clear, so the actions on one write the queue rather than
-// reaching for the agent. Focus is offered only while there is still a pane to
-// look at.
+// reaching for the agent.
 async function actOnItem(
   item: QueueItem,
   agent: string | null,

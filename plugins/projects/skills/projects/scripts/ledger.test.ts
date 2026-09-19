@@ -123,7 +123,6 @@ describe("cli", () => {
     expect(result.code).toBe(0);
     const [outcome, queued] = result.stdout.trim().split("\n");
     expect(JSON.parse(outcome!)).toMatchObject({ branch: "fix-thing", outcome: "done" });
-    // The lead types one command, and the review Ben now owes comes with it.
     expect(JSON.parse(queued!)).toMatchObject({
       id: "q4",
       kind: "review",

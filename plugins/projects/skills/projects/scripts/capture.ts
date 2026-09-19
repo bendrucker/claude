@@ -171,8 +171,7 @@ export async function resolveGitHub(
 }
 
 // A queue item points at whatever the work is tracked in, so the lookup is
-// chosen by host and a host with none resolves to nothing rather than a guess.
-// Linear and Things join here.
+// chosen by host, and a host with none resolves to nothing.
 const RESOLVERS: Record<string, (url: URL) => Promise<Resolution>> = {
   "github.com": (url) => resolveGitHub(url),
 };
@@ -193,7 +192,7 @@ export function resolveUrl(url: string): Promise<Resolution> {
 }
 
 // Every url a resolver knows costs a subprocess, so a host nothing can read is
-// left out rather than looked up.
+// left out.
 export function readResolutions(
   urls: readonly string[],
   resolve: (url: string) => Promise<Resolution> = resolveUrl,

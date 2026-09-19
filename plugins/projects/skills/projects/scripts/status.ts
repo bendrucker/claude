@@ -173,8 +173,7 @@ function placeholder(value: string | null | undefined): string {
 }
 
 // The cells the queue prints wherever it appears, so the board and the status
-// block stay one format. An item names the thread it came from when it has
-// one, and the agent that asked otherwise.
+// block stay one format.
 export function itemCells(item: QueueItem, now: Date, indent = ""): string[] {
   return [
     `${indent}${item.id}`,

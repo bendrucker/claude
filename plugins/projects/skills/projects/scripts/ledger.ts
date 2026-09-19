@@ -63,8 +63,7 @@ const outcome = command(
       );
       process.stdout.write(`${JSON.stringify(row)}\n`);
       // A finished thread behind a pull request is a review Ben owes, so the
-      // one command the lead already runs raises it. The queue item prints as
-      // a second line.
+      // one command the lead already runs raises it.
       if (row.outcome === "done" && row.pr != null)
         process.stdout.write(
           `${JSON.stringify(

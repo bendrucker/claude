@@ -13,6 +13,12 @@ const MAX_TASK_SUMMARY = 120;
 const MAX_PROMPT_BYTES = 128 * 1024;
 const FETCH_TIMEOUT_MS = 60_000;
 const NAME_ATTEMPTS = 3;
+// Pane metadata is namespaced per reporter, so this source owns the tokens a
+// dispatch sets and nothing else writing to the pane can collide with them.
+const TOKEN_SOURCE = "dispatch";
+// A ledger tag key caps neither its length nor its case, and herdr takes a
+// narrower name than that.
+const TOKEN_NAME = /^[A-Za-z0-9_-]{1,32}$/;
 
 export interface CommandResult {
   code: number;
@@ -326,6 +332,36 @@ async function deliver(
   return submitted.code === 0;
 }
 
+// Pane tokens show a thread's tags in the sidebar, not only the ledger.
+// They're display only, so a failed call loses the labels but not the dispatch.
+async function stampTokens(run: Runner, pane: string, tags: Record<string, string>): Promise<void> {
+  const entries = Object.entries(tags);
+  // herdr refuses the whole call over a single name it cannot take, so a key it
+  // will not carry costs its own label rather than every other tag's.
+  const named = entries.filter(([key]) => TOKEN_NAME.test(key));
+  const refused = entries.filter(([key]) => !TOKEN_NAME.test(key)).map(([key]) => key);
+  if (refused.length > 0)
+    process.stderr.write(
+      `warning: ${refused.join(", ")} cannot be shown on ${pane}; a token name takes at most 32 characters\n`,
+    );
+  if (named.length === 0) return;
+  const stamped = await run([
+    "herdr",
+    "pane",
+    "report-metadata",
+    pane,
+    "--source",
+    TOKEN_SOURCE,
+    ...named.flatMap(([key, value]) => ["--token", `${key}=${value}`]),
+  ]);
+  if (stamped.code === 0) return;
+  const reason =
+    stamped.stderr.trim() === ""
+      ? `herdr pane report-metadata exited ${stamped.code}`
+      : stamped.stderr.trim();
+  process.stderr.write(`warning: tags not shown on ${pane}: ${reason}\n`);
+}
+
 export interface DispatchOptions {
   repo: string;
   branch: string;
@@ -333,6 +369,7 @@ export interface DispatchOptions {
   name?: string | undefined;
   base: string;
   timeout: number;
+  tags?: Record<string, string> | undefined;
 }
 
 export async function dispatch(
@@ -454,6 +491,8 @@ export async function dispatch(
     if (fatal(started, "agent_not_ready")) throw new DispatchError(started.stderr, partial);
     partial.agent = name;
 
+    await stampTokens(run, partial.pane, options.tags ?? {});
+
     if (ready) partial.prompted = await deliver(run, name, options, partial, started);
 
     const info = await requiredJson(run, ["herdr", "agent", "get", name], AgentInfo, partial);
@@ -505,7 +544,7 @@ if (import.meta.main) {
       tag: {
         type: [String],
         description:
-          "key=value recorded on the ledger row, such as project=<slug> or by=chief; repeatable",
+          "key=value recorded on the ledger row and shown on the agent's pane, such as project=<slug> or by=chief; repeatable",
       },
       timeout: {
         type: Number,
@@ -577,6 +616,7 @@ if (import.meta.main) {
       name: argv.flags.name,
       base: argv.flags.base,
       timeout: argv.flags.timeout,
+      tags,
     });
 
     if (!record.prompted)

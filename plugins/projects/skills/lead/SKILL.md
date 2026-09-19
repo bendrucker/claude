@@ -1,7 +1,7 @@
 ---
 name: lead
 description: >-
-  Coordinate one project: settle its scope, keep its memory, dispatch a thread per pull request, and report what needs the user. One lead per project, addressed as lead-<slug>. Use via /lead <slug>.
+  Coordinate one project: settle its scope, keep its memory, dispatch a thread per pull request, and report what needs the user. One lead per project, addressed as lead-<slug>. Use via /projects:lead <slug>.
 argument-hint: "<slug | tracker url>"
 disable-model-invocation: true
 ---
@@ -14,21 +14,21 @@ You coordinate the project `$0` end to end. You settle its scope, keep its memor
 
 !`d="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/projects-bendrucker}/projects/$0"; [ -d "$d" ] || echo "NO PROJECT DIRECTORY"; tail -n +1 "$d"/project.md "$d"/MEMORY.md 2>/dev/null`
 
-!`s=~/.claude-repo/plugins/projects/skills/projects/scripts/ledger.ts; if [ -f "$s" ]; then bun "$s" status --tag "project=$0" 2>&1; else echo "NO LEDGER at $s"; fi`
+!`bun ${CLAUDE_PLUGIN_ROOT}/skills/projects/scripts/ledger.ts status --tag "project=$0" 2>&1`
 
 Settle `$0` into a slug before reading anything above. A slug is already settled. A tracker URL is not: read the tracker and derive a slug from the project's name. The block above ran against the raw URL, which misses an existing project's directory and its threads, so treat what it printed as empty and load the real state with the settled slug in place of `<slug>`:
 
 ```bash
 d="${CLAUDE_PLUGIN_DATA:-$HOME/.claude/plugins/data/projects-bendrucker}/projects/<slug>"
 tail -n +1 "$d"/project.md "$d"/MEMORY.md
-bun ~/.claude-repo/plugins/projects/skills/projects/scripts/ledger.ts status --tag project=<slug>
+bun ${CLAUDE_PLUGIN_ROOT}/skills/projects/scripts/ledger.ts status --tag project=<slug>
 ```
 
 Use the settled slug for the directory, for every `project=` tag, and for the `lead-<slug>` session name.
 
 A slug starts with a lowercase letter and runs at most 27 characters of lowercase letters, digits, hyphens, and underscores. That keeps `lead-<slug>` a legal herdr agent name. `status` drops a project whose slug breaks the rule, which reads as a missing project rather than an error.
 
-Then read the blocks. `NO PROJECT DIRECTORY` means the settled slug has no project yet: start at Scope and create it. `NO LEDGER` names a script that is not on disk. Run the same command out of a checkout of `bendrucker/claude`. Any other error in place of the status blocks came from the ledger itself, so repair that before trusting the thread list.
+Then read the blocks. `NO PROJECT DIRECTORY` means the settled slug has no project yet: start at Scope and create it. An error in place of the status block came from the ledger itself, so repair that before trusting the thread list.
 
 Read the topic files `MEMORY.md` indexes before scoping or dispatching, because the block prints the index rather than the decisions under it.
 
@@ -52,7 +52,7 @@ One thread per pull request. Load `projects:projects` for the dispatch and `herd
 Write the thread's prompt to a file, then hand it over:
 
 ```bash
-bun ~/.claude-repo/plugins/projects/skills/projects/scripts/dispatch.ts --repo <repo> --branch <branch> --prompt <file> --tag project=$0 --tag by=lead-$0
+bun ${CLAUDE_PLUGIN_ROOT}/skills/projects/scripts/dispatch.ts --repo <repo> --branch <branch> --prompt <file> --tag project=$0 --tag by=lead-$0
 ```
 
 Take `--repo` from `project.md`, and name the branch and the agent after the issue.
@@ -73,7 +73,7 @@ Back each dispatch with a backgrounded `herdr agent wait <agent> --timeout <ms>`
 Record every thread that settles:
 
 ```bash
-bun ~/.claude-repo/plugins/projects/skills/projects/scripts/ledger.ts outcome --repo <repo> --branch <branch> --state <done|blocked|abandoned> [--pr <url>] [--note <why>]
+bun ${CLAUDE_PLUGIN_ROOT}/skills/projects/scripts/ledger.ts outcome --repo <repo> --branch <branch> --state <done|blocked|abandoned> [--pr <url>] [--note <why>]
 ```
 
 You write the outcome row, one per thread. `--note` carries what the thread reported, within 500 characters: why it stopped when it is blocked or abandoned, and any lesson worth keeping. Write it once. `status` folds a thread to its latest row and lists only the open ones.
@@ -88,4 +88,4 @@ The project is finished when the State block's threads read `no open threads`.
 
 ## Launch
 
-A lead runs as `claude --name lead-<slug>` in the project's workspace, then `/lead <slug>`. The name is the address chief and every thread reach it by.
+A lead runs as `claude --name lead-<slug>` in the project's workspace, then `/projects:lead <slug>`. The name is the address chief and every thread reach it by.

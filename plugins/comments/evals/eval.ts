@@ -290,10 +290,7 @@ function finishBucket(bucket: Bucket): void {
 
 /**
  * Whether a verdict satisfies a fixture's label. A `keep` fixture passes when
- * its fact survives, so a trim down to the fact is not destructive. A `trim`
- * with gold `trimTo` passes on any flag whose surviving text carries the fact
- * within `RETENTION_CEILING`. The rest, and any fixture built without a fact,
- * score on action.
+ * its fact survives, so a trim down to the fact is not destructive.
  */
 function outcomeOf(fixture: Fixture, verdict: Verdict): "pass" | ActionMismatch["reason"] {
   const { fact } = fixture;

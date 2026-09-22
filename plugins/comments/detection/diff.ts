@@ -1,5 +1,6 @@
 import { $ } from "bun";
-import { join } from "node:path";
+import { realpath } from "node:fs/promises";
+import { join, sep } from "node:path";
 import parseDiff from "parse-diff";
 import type { FileDiff, LineRange } from "./types";
 
@@ -64,13 +65,18 @@ export async function listUntracked(cwd: string, staged = false): Promise<string
     .filter((line) => line !== "");
 }
 
-/** An untracked file is new, so every line it has counts as added. */
+/**
+ * An untracked file is new, so every line it has counts as added. A symlink
+ * resolving outside `cwd` is skipped, keeping content from elsewhere out of the job.
+ */
 async function untrackedDiffs(cwd: string): Promise<FileDiff[]> {
   const paths = await listUntracked(cwd);
+  const root = await realpath(cwd);
   const diffs = await Promise.all(
     paths.map(async (path): Promise<FileDiff | null> => {
       const file = Bun.file(join(cwd, path));
       if (!(await file.exists())) return null;
+      if (!(await realpath(join(cwd, path))).startsWith(root + sep)) return null;
       const text = await file.text();
       const lines = text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
       return lines === 0 ? null : { path, added: [{ start: 1, end: lines }] };

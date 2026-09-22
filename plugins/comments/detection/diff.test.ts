@@ -215,6 +215,7 @@ describe("resolveDiff", () => {
     await commit({ "a.ts": "one\ntwo\n" });
     await Bun.write(join(dir, "a.ts"), "zero\none\ntwo\n");
     await Bun.write(join(dir, "new.ts"), "x\ny\n");
+    await $`ln -s /etc/hosts outside.ts`.cwd(dir).quiet();
   });
 
   afterEach(async () => {
@@ -223,7 +224,7 @@ describe("resolveDiff", () => {
 
   test.each<{ name: string; options: DiffOptions; expected: ReturnType<typeof parseUnifiedDiff> }>([
     {
-      name: "default scope includes untracked files whole",
+      name: "default scope includes untracked files whole, skipping links out of the repo",
       options: {},
       expected: [
         { path: "a.ts", added: [{ start: 1, end: 1 }] },

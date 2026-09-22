@@ -8,6 +8,8 @@
   "action": "keep",
   "category": null,
   "trimToLines": null,
+  "fact": "NULL until ENG-2068",
+  "quoted": "extraction_mode is NULL until ENG-2068; only name it when present",
   "source": "main get_records.py:1203",
   "note": "Must-pass. Explains why the mode is guarded with a truthiness check: the field is always NULL until a tracked change lands. Contains an ENG ticket so a deterministic tell fires, but the comment states a real why, not a roadmap breadcrumb. Calibration twin of the regression-test negative."
 }

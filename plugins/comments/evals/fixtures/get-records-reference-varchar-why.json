@@ -8,6 +8,11 @@
   "action": "keep",
   "category": null,
   "trimToLines": null,
+  "fact": [
+    "VARCHAR[]",
+    "polymorphic"
+  ],
+  "quoted": "skip rather than iterate a string into character targets and mis-classify it",
   "source": "main get_records.py:661",
   "note": "Must-pass. Why-on-non-obvious: the isinstance guard looks like defensive boilerplate, but the comment explains the real failure it prevents (iterating a stray string character-by-character and mislabeling the field polymorphic). The intent is not inferable from the type check alone."
 }

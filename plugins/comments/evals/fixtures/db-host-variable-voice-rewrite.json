@@ -8,6 +8,7 @@
   "action": "rewrite",
   "category": "voice",
   "rewrite": "// Reset the per-host variable so a later query with no host param covers every host.",
+  "quoted": "spans",
   "source": "comment-skill db.ts:263",
   "note": "Owner labeled this bad for the contrastive 'spans all hosts rather than inheriting the last one'. The load-bearing fact (resetting the variable un-scopes later host-less queries) survives; the 'rather than' framing is the voice to strip. Gold rewrite is provisional pending owner confirmation. The gate scores the action only."
 }

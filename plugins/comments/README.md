@@ -49,7 +49,11 @@ bun run plugins/comments/evals/eval.ts build
 bun run plugins/comments/evals/eval.ts score --job <jobDir> --gate
 ```
 
-The gate holds the must-keep comments at `keep` (canonical-API docstrings, genuine why-comments, regression-test rationale). Trimming or rewriting one of those is the destructive error the gate guards against.
+The gate scores fact survival on `keep` fixtures and on `trim` fixtures with a gold `trimTo`. The rest score on predicted action. A `keep` fixture passes when the judge keeps it, or trims or rewrites it without losing its labeled `fact`. Dropping that fact is the destructive error, and any `keep` fixture that drops it fails the gate. A `trim` fixture with a gold `trimTo` passes when the judge trims or rewrites it to text that still carries its fact, and the report shows surviving characters against the gold.
+
+The report separates keep precision from slop recall. `--gate` also fails when headline slop recall falls under `RECALL_FLOOR` in `evals/eval.ts`.
+
+Fixtures that `judge/prompt.md` quotes are marked `quoted`. Their precision and recall report as a separate bucket, outside the headline numbers and the recall floor. The must-keep check still covers them.
 
 The SDK oracle cross-checks the rubric over the same corpus, scoring it in batched Messages calls. It needs `ANTHROPIC_API_KEY`, and it samples, so repeated runs can differ:
 

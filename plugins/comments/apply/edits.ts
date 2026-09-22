@@ -69,7 +69,7 @@ export const SENTENCE_CONNECTIVES = new Set([
 const isBlank = (line: string): boolean => line.trim().length === 0;
 
 /** A line's prose: leading/trailing comment markers and whitespace stripped. */
-function stripCommentMarkers(line: string): string {
+export function stripCommentMarkers(line: string): string {
   return line
     .trim()
     .replace(/^(?:\/\*+|\/\/+|#+|--+|;+|"""|'''|\*+)\s*/, "")

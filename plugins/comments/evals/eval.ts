@@ -508,7 +508,7 @@ async function readJobVerdicts(jobDir: string): Promise<Map<string, Verdict>> {
  * workflow measures on the current rubric, so it catches a judge that keeps
  * everything without failing today's.
  */
-export const RECALL_FLOOR = 0.8;
+export const RECALL_FLOOR = 1;
 
 /** Why a gated run fails, or an empty list when it passes. */
 export function gateFailures(metrics: Metrics): string[] {

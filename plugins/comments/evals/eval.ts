@@ -203,7 +203,6 @@ export function carriesFact(text: string, facts: string[]): boolean {
   return facts.every((fact) => haystack.includes(normalizeForMatch(fact)));
 }
 
-/** The comment text left after the verdict is applied. */
 function survivingText(fixture: Fixture, verdict: Verdict): string {
   if (verdict.action === "keep") return fixture.comment;
   if (verdict.action === "rewrite") return verdict.rewrite ?? "";
@@ -234,11 +233,9 @@ export interface Bucket {
 
 export interface Metrics {
   total: number;
-  /** Fixtures that passed their label's check. */
   correct: number;
   /** correct / total. 1 when there is nothing to score. */
   accuracy: number;
-  /** Every fixture that failed, with the action it was labeled and the one it got. */
   mismatches: ActionMismatch[];
   /** `keep` fixtures whose fact did not survive. The ship gate. */
   keepViolations: string[];

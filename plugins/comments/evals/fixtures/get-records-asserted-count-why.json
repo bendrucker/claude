@@ -8,6 +8,7 @@
   "action": "keep",
   "category": null,
   "trimToLines": null,
+  "fact": "only an explicit 0",
   "source": "main get_records.py:1247",
   "note": "Must-pass. Explains why the predicate is asserted != 0 rather than a positive-count test: it folds the unverifiable NULL/missing case in with the rows-claimed case, treating only an explicit 0 as empty. The boolean alone does not show that intent."
 }

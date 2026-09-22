@@ -8,6 +8,8 @@
   "action": "keep",
   "category": null,
   "trimToLines": null,
+  "fact": "NULL is accepted by the constraint",
+  "quoted": "Null out legacy values so the constraint can be added",
   "source": "main migrations/eb8ee9d4839c:26",
   "note": "Must-pass. Genuine why: explains the non-obvious SQL three-valued-logic fact that NULL passes an IN check constraint, which is why nulling legacy values before adding the constraint is safe. The code (UPDATE ... SET NULL then create_check_constraint) does not reveal this reasoning."
 }

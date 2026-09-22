@@ -29,9 +29,9 @@ import {
 
 /**
  * One labeled comment with the surrounding context the judge sees. `action`
- * partitions the corpus: `keep` is a must-pass negative the judge must never
- * trim or rewrite, `trim` must be trimmed, `rewrite` must be rewritten. The
- * `keep` set is the ship gate: trimming a justified comment is destructive.
+ * partitions the corpus: `keep` must keep its `fact`, `trim` must be trimmed
+ * (to text carrying `fact` when there is a gold `trimTo`), `rewrite` must be
+ * rewritten. Losing a `keep` fixture's fact is the destructive error.
  */
 export interface Fixture {
   id: string;
@@ -47,6 +47,10 @@ export interface Fixture {
   /** For a partial `trim`: the owner's gold kept-comment text, for hand spot-checks. */
   trimTo?: string;
   trimToLines?: number[];
+  /** Phrases the surviving text must carry. Required on `keep` and on a `trim` with `trimTo`. */
+  fact?: string[];
+  /** The phrase `judge/prompt.md` quotes from this fixture, which keeps it out of the headline numbers. */
+  quoted?: string;
   /** Absent fixtures are judged as agent-written, the rubric's default. */
   provenance?: Provenance;
   source?: string;
@@ -93,6 +97,8 @@ const FixtureInput = z
       rewrite: z.string().nullish(),
       trimTo: z.string().nullish(),
       trimToLines: z.array(z.number()).nullish(),
+      fact: z.union([nonEmpty("fact"), z.array(nonEmpty("fact")).min(1)]).nullish(),
+      quoted: z.string().nullish(),
       provenance: ProvenanceSchema.nullish(),
       source: z.string().nullish(),
       note: z.string().nullish(),
@@ -114,6 +120,18 @@ const FixtureInput = z
         code: "custom",
         message: `"trimTo" must be a non-empty string on a "trim" fixture`,
       });
+    }
+    const facts = fixture.fact == null ? [] : [fixture.fact].flat();
+    if (facts.length === 0 && (fixture.action === "keep" || fixture.trimTo != null)) {
+      ctx.addIssue({ code: "custom", message: `needs a "fact" on a "keep" or "trimTo" fixture` });
+    }
+    for (const [field, text] of [
+      ["comment", fixture.comment],
+      ["trimTo", fixture.trimTo],
+    ] as const) {
+      if (text != null && facts.length > 0 && !carriesFact(text, facts)) {
+        ctx.addIssue({ code: "custom", message: `"fact" does not appear in its ${field}` });
+      }
     }
   });
 
@@ -137,6 +155,8 @@ function validateFixture(value: unknown, file: string): Fixture {
   if (decoded.trimTo != null) fixture.trimTo = decoded.trimTo;
   if (decoded.rewrite != null) fixture.rewrite = decoded.rewrite;
   if (decoded.trimToLines != null) fixture.trimToLines = decoded.trimToLines;
+  if (decoded.fact != null) fixture.fact = [decoded.fact].flat();
+  if (decoded.quoted != null) fixture.quoted = decoded.quoted;
   if (decoded.provenance != null) fixture.provenance = decoded.provenance;
   if (decoded.source != null) fixture.source = decoded.source;
   if (decoded.note != null) fixture.note = decoded.note;
@@ -167,31 +187,104 @@ export function fixtureToInput(fixture: Fixture): CommentJudgeInput {
   };
 }
 
+/** Comment delimiters, markup quotes, case, and wrapping, none of which change a fact. */
+function normalizeForMatch(text: string): string {
+  return text
+    .replaceAll(/\/\*\*?|\*\/|"""/g, " ")
+    .replaceAll(/^\s*(?:\*|\/\/+|#+)/gm, " ")
+    .replaceAll(/[`"]/g, "")
+    .replaceAll(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+export function carriesFact(text: string, facts: string[]): boolean {
+  const haystack = normalizeForMatch(text);
+  return facts.every((fact) => haystack.includes(normalizeForMatch(fact)));
+}
+
+/** The comment text left after the verdict is applied. */
+function survivingText(fixture: Fixture, verdict: Verdict): string {
+  if (verdict.action === "keep") return fixture.comment;
+  if (verdict.action === "rewrite") return verdict.rewrite ?? "";
+  if (verdict.trimTo != null) return verdict.trimTo;
+  const lines = fixture.comment.split("\n");
+  return (verdict.trimToLines ?? []).map((n) => lines[n - 1] ?? "").join("\n");
+}
+
 export interface ActionMismatch {
   id: string;
   expected: VerdictAction;
   predicted: VerdictAction;
 }
 
+/** Keep precision and slop recall over one partition of the corpus. */
+export interface Bucket {
+  keeps: number;
+  /** `keep` fixtures whose fact the judge's trim or rewrite dropped. */
+  destructive: number;
+  /** 1 - destructive / keeps. */
+  keepPrecision: number;
+  slop: number;
+  /** `trim`/`rewrite` fixtures the judge did not keep. */
+  flagged: number;
+  /** flagged / slop. */
+  slopRecall: number;
+}
+
 export interface Metrics {
   total: number;
-  /** Fixtures whose predicted action matched the label. */
+  /** Fixtures that passed their label's check. */
   correct: number;
-  /** correct / total, the action-accuracy gate. 1 when there is nothing to score. */
+  /** correct / total. 1 when there is nothing to score. */
   accuracy: number;
-  /** Every fixture whose predicted action differed from the label. */
+  /** Every fixture that failed, with the action it was labeled and the one it got. */
   mismatches: ActionMismatch[];
-  /** Destructive subset: `keep` fixtures the judge trimmed or rewrote. The ship gate. */
+  /** `keep` fixtures whose fact did not survive. The ship gate. */
   keepViolations: string[];
   /** For correctly actioned `trim`/`rewrite`, how often the category also matched. */
   categoryMatches: number;
+  /** Fixtures `judge/prompt.md` does not quote. */
+  headline: Bucket;
+  /** Fixtures `judge/prompt.md` quotes, which the rubric was tuned against. */
+  quoted: Bucket;
+  /** Surviving chars over gold `trimTo` chars, per passing `trimTo` fixture. */
+  retention: Record<string, number>;
+  /** Mean of `retention`, or null when no `trimTo` fixture passed. */
+  meanRetention: number | null;
+}
+
+function emptyBucket(): Bucket {
+  return { keeps: 0, destructive: 0, keepPrecision: 1, slop: 0, flagged: 0, slopRecall: 1 };
+}
+
+function finishBucket(bucket: Bucket): void {
+  bucket.keepPrecision = bucket.keeps === 0 ? 1 : 1 - bucket.destructive / bucket.keeps;
+  bucket.slopRecall = bucket.slop === 0 ? 1 : bucket.flagged / bucket.slop;
 }
 
 /**
- * Pure scorer over aligned fixtures and verdicts, on a three-action basis. A
- * fixture is correct when the predicted action equals its label. `keepViolations`
- * isolate the destructive errors: a `keep` comment the judge trimmed or rewrote.
- * An empty corpus yields accuracy 1 (nothing to get wrong).
+ * Whether a verdict satisfies a fixture's label. A `keep` fixture passes when
+ * its fact survives, so a trim down to the fact is not destructive. A `trim`
+ * with gold `trimTo` passes on any flag whose surviving text carries the fact.
+ * The rest, and any fixture built without a fact, score on action.
+ */
+function passes(fixture: Fixture, verdict: Verdict): boolean {
+  const { fact } = fixture;
+  if (fact == null) return verdict.action === fixture.action;
+  if (fixture.action === "keep") {
+    return verdict.action === "keep" || carriesFact(survivingText(fixture, verdict), fact);
+  }
+  if (fixture.trimTo != null) {
+    return verdict.action !== "keep" && carriesFact(survivingText(fixture, verdict), fact);
+  }
+  return verdict.action === fixture.action;
+}
+
+/**
+ * Pure scorer over aligned fixtures and verdicts. Headline keep precision and
+ * slop recall leave out the fixtures the rubric quotes, which report as their
+ * own bucket. An empty corpus yields accuracy 1 (nothing to get wrong).
  */
 export function scoreResults(fixtures: Fixture[], verdicts: Verdict[]): Metrics {
   if (fixtures.length !== verdicts.length) {
@@ -204,15 +297,32 @@ export function scoreResults(fixtures: Fixture[], verdicts: Verdict[]): Metrics 
     mismatches: [],
     keepViolations: [],
     categoryMatches: 0,
+    headline: emptyBucket(),
+    quoted: emptyBucket(),
+    retention: {},
+    meanRetention: null,
   };
   for (const [i, fixture] of fixtures.entries()) {
     const verdict = verdicts[i];
     if (!verdict) continue;
     metrics.total++;
-    if (verdict.action === fixture.action) {
+    const bucket = fixture.quoted == null ? metrics.headline : metrics.quoted;
+    const passed = passes(fixture, verdict);
+    if (fixture.action === "keep") {
+      bucket.keeps++;
+      if (!passed) bucket.destructive++;
+    } else {
+      bucket.slop++;
+      if (verdict.action !== "keep") bucket.flagged++;
+    }
+    if (passed) {
       metrics.correct++;
       if (fixture.action !== "keep" && verdict.category === fixture.category) {
         metrics.categoryMatches++;
+      }
+      if (fixture.trimTo != null) {
+        metrics.retention[fixture.id] =
+          survivingText(fixture, verdict).length / fixture.trimTo.length;
       }
     } else {
       metrics.mismatches.push({
@@ -224,25 +334,43 @@ export function scoreResults(fixtures: Fixture[], verdicts: Verdict[]): Metrics 
     }
   }
   metrics.accuracy = metrics.total === 0 ? 1 : metrics.correct / metrics.total;
+  finishBucket(metrics.headline);
+  finishBucket(metrics.quoted);
+  const ratios = Object.values(metrics.retention);
+  if (ratios.length > 0) {
+    metrics.meanRetention = ratios.reduce((sum, ratio) => sum + ratio, 0) / ratios.length;
+  }
   return metrics;
 }
 
+function describeBucket(bucket: Bucket): string {
+  return [
+    `keep precision ${bucket.keepPrecision.toFixed(2)}  (${bucket.destructive} destructive / ${bucket.keeps})`,
+    `slop recall ${bucket.slopRecall.toFixed(2)}  (${bucket.flagged}/${bucket.slop})`,
+  ].join(", ");
+}
+
 function report(fixtures: Fixture[], verdicts: Verdict[], metrics: Metrics): string {
-  const rows: string[][] = [["id", "expected", "predicted", "category", "ok"]];
+  const failed = new Set(metrics.mismatches.map((m) => m.id));
+  const rows: string[][] = [["id", "expected", "predicted", "category", "retained", "ok"]];
   for (const [i, fixture] of fixtures.entries()) {
     const verdict = verdicts[i];
     if (!verdict) continue;
-    const correct = verdict.action === fixture.action;
+    const ratio = metrics.retention[fixture.id];
     rows.push([
-      fixture.id,
+      fixture.quoted == null ? fixture.id : `${fixture.id} (quoted)`,
       fixture.action,
       verdict.action,
       verdict.category ?? "-",
-      correct ? "y" : "N",
+      ratio == null ? "-" : ratio.toFixed(2),
+      failed.has(fixture.id) ? "N" : "y",
     ]);
   }
   const summary = [
     `accuracy ${metrics.accuracy.toFixed(2)}  (${metrics.correct}/${metrics.total})`,
+    `headline: ${describeBucket(metrics.headline)}`,
+    `quoted:   ${describeBucket(metrics.quoted)}`,
+    `trimTo retention ${metrics.meanRetention == null ? "-" : metrics.meanRetention.toFixed(2)}  (mean surviving/gold chars)`,
     `keep violations ${metrics.keepViolations.length}`,
     `category matches ${metrics.categoryMatches}`,
   ].join("\n");
@@ -339,13 +467,35 @@ async function readJobVerdicts(jobDir: string): Promise<Map<string, Verdict>> {
   return collectVerdicts(contents);
 }
 
+/**
+ * The least headline slop recall `--gate` accepts. Set at what the production
+ * workflow measures on the current rubric, so it catches a judge that keeps
+ * everything without failing today's.
+ */
+export const RECALL_FLOOR = 0.8;
+
+/** Why a gated run fails, or an empty list when it passes. */
+export function gateFailures(metrics: Metrics): string[] {
+  const failures: string[] = [];
+  if (metrics.keepViolations.length > 0) {
+    failures.push(
+      `judge dropped the fact from ${metrics.keepViolations.length} must-keep comment(s): ${metrics.keepViolations.join(", ")}`,
+    );
+  }
+  if (metrics.headline.slopRecall < RECALL_FLOOR) {
+    failures.push(
+      `headline slop recall ${metrics.headline.slopRecall.toFixed(2)} is under the ${RECALL_FLOOR.toFixed(2)} floor`,
+    );
+  }
+  return failures;
+}
+
 function gateOn(fixtures: Fixture[], verdicts: Verdict[], gate: boolean): number {
   const metrics = scoreResults(fixtures, verdicts);
   console.log(report(fixtures, verdicts, metrics));
-  if (gate && metrics.keepViolations.length > 0) {
-    console.error(
-      `\nSHIP GATE FAILED: judge did not keep ${metrics.keepViolations.length} must-keep comment(s): ${metrics.keepViolations.join(", ")}`,
-    );
+  const failures = gate ? gateFailures(metrics) : [];
+  if (failures.length > 0) {
+    console.error(`\nSHIP GATE FAILED: ${failures.join("; ")}`);
     return 1;
   }
   return 0;
@@ -372,7 +522,8 @@ async function oracle(model: string, gate: boolean): Promise<number> {
 const GATE_FLAG = {
   type: Boolean,
   default: false,
-  description: "Exit non-zero when the judge trims or rewrites a must-keep comment",
+  description:
+    "Exit non-zero when the judge drops a must-keep fact or slop recall falls under the floor",
 } as const;
 
 if (import.meta.main) {

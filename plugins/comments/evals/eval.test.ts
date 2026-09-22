@@ -6,11 +6,14 @@ import { loadPrompt } from "../judge/judge";
 import type { Verdict } from "../judge/schema";
 import {
   alignVerdicts,
+  carriesFact,
   clearVerdicts,
   type Fixture,
   fixtureToInput,
   fixtureToShardComment,
+  gateFailures,
   loadFixtures,
+  RECALL_FLOOR,
   scoreResults,
 } from "./eval";
 import { anthropicCommentJudge, judgeComments } from "./oracle";
@@ -83,8 +86,159 @@ describe("scoreResults", () => {
     expect(m.keepViolations).toEqual([]);
   });
 
+  const keepWithFact = fixture({
+    id: "keep",
+    action: "keep",
+    category: null,
+    comment: "# Retries share a backoff.\n# The broker rate-limits per key.",
+    fact: ["rate-limits per key"],
+  });
+
+  test.each([
+    ["keep", verdict({ action: "keep", category: null }), true],
+    [
+      "a trim that carries the fact",
+      verdict({ trimTo: "# The broker rate-limits\n# per KEY." }),
+      true,
+    ],
+    [
+      "a rewrite that carries the fact",
+      verdict({ action: "rewrite", rewrite: "# rate-limits per key" }),
+      true,
+    ],
+    ["a trim that drops the fact", verdict({ trimTo: "# Retries share a backoff." }), false],
+    ["a whole-comment trim", verdict({}), false],
+    ["a line-range trim that keeps the fact", verdict({ trimToLines: [2] }), true],
+  ] as const)("a keep fixture judged %s passes: %p", (_name, v, passed) => {
+    const m = scoreResults([keepWithFact], [v]);
+    expect(m.keepViolations).toEqual(passed ? [] : ["keep"]);
+    expect(m.headline.destructive).toBe(passed ? 0 : 1);
+  });
+
+  const trimWithGold = fixture({
+    id: "gold",
+    comment: "# Walk the queue and retry. The broker rate-limits per key.",
+    trimTo: "# The broker rate-limits per key.",
+    fact: ["rate-limits per key"],
+  });
+
+  test.each([
+    ["the gold trim", verdict({ trimTo: "# The broker rate-limits per key." }), true],
+    [
+      "a rewrite that carries the fact",
+      verdict({
+        action: "rewrite",
+        category: "voice",
+        rewrite: "# Walk and retry; the broker rate-limits per key.",
+      }),
+      true,
+    ],
+    ["a whole-comment trim", verdict({}), false],
+    ["keep", verdict({ action: "keep", category: null }), false],
+  ] as const)("a trimTo fixture judged %s passes: %p", (_name, v, passed) => {
+    expect(scoreResults([trimWithGold], [v]).correct).toBe(passed ? 1 : 0);
+  });
+
+  test("records surviving chars against the gold trimTo", () => {
+    const m = scoreResults(
+      [trimWithGold, { ...trimWithGold, id: "gold-2" }],
+      [
+        verdict({ trimTo: "# The broker rate-limits per key." }),
+        verdict({ trimTo: "# Walk the queue and retry. The broker rate-limits per key." }),
+      ],
+    );
+    expect(m.retention.gold).toBe(1);
+    expect(m.retention["gold-2"]).toBeCloseTo(59 / 33);
+    expect(m.meanRetention).toBeCloseTo((1 + 59 / 33) / 2);
+  });
+
+  test("splits keep precision and slop recall between headline and quoted fixtures", () => {
+    const fixtures = [
+      { ...keepWithFact, id: "k1" },
+      { ...keepWithFact, id: "k2" },
+      fixture({ id: "t1" }),
+      fixture({ id: "t2" }),
+      fixture({ id: "r1", action: "rewrite", category: "voice", rewrite: "# fact" }),
+      { ...keepWithFact, id: "kq", quoted: "per key" },
+      fixture({ id: "tq", quoted: "c" }),
+    ];
+    const verdicts = [
+      verdict({ action: "keep", category: null }),
+      verdict({}),
+      verdict({}),
+      verdict({ action: "keep", category: null }),
+      verdict({ action: "trim" }),
+      verdict({}),
+      verdict({}),
+    ];
+    const m = scoreResults(fixtures, verdicts);
+    expect(m.headline).toEqual({
+      keeps: 2,
+      destructive: 1,
+      keepPrecision: 0.5,
+      slop: 3,
+      flagged: 2,
+      slopRecall: 2 / 3,
+    });
+    expect(m.quoted).toMatchObject({ keeps: 1, destructive: 1, slop: 1, flagged: 1 });
+    expect(m.keepViolations).toEqual(["k2", "kq"]);
+  });
+
   test("throws when verdict count does not match fixtures", () => {
     expect(() => scoreResults([fixture({})], [])).toThrow();
+  });
+});
+
+describe("carriesFact", () => {
+  test.each([
+    [
+      "a fact rewrapped across comment lines",
+      "# the broker\n# rate-limits per key",
+      "rate-limits per key",
+      true,
+    ],
+    ["a fact inside markup quotes", '"""Prefers ``IsNameField``."""', "IsNameField", true],
+    [
+      "a fact in a block comment, different case",
+      "/**\n * Rate-Limits\n * per key\n */",
+      "rate-limits per key",
+      true,
+    ],
+    ["a paraphrase", "# the broker throttles each key", "rate-limits per key", false],
+  ])("%s: %p", (_name, text, fact, expected) => {
+    expect(carriesFact(text, [fact])).toBe(expected);
+  });
+
+  test("requires every phrase", () => {
+    expect(carriesFact("# 2.5 each", ["2.5", "3.0"])).toBe(false);
+  });
+});
+
+describe("gateFailures", () => {
+  test("fails on a dropped keep fact and on slop recall under the floor", () => {
+    const keep = fixture({
+      id: "k",
+      action: "keep",
+      category: null,
+      comment: "# fact",
+      fact: ["fact"],
+    });
+    const trim = fixture({ id: "t" });
+    const passing = scoreResults(
+      [keep, trim],
+      [verdict({ action: "keep", category: null }), verdict({})],
+    );
+    expect(gateFailures(passing)).toEqual([]);
+
+    const keepsEverything = scoreResults([trim], [verdict({ action: "keep", category: null })]);
+    expect(gateFailures(keepsEverything)).toEqual([
+      `headline slop recall 0.00 is under the ${RECALL_FLOOR.toFixed(2)} floor`,
+    ]);
+
+    const destructive = scoreResults([keep], [verdict({})]);
+    expect(gateFailures(destructive)).toEqual([
+      "judge dropped the fact from 1 must-keep comment(s): k",
+    ]);
   });
 });
 
@@ -154,10 +308,53 @@ describe("fixture corpus", () => {
       if (f.action === "rewrite") expect(f.rewrite?.length).toBeGreaterThan(0);
     }
   });
+
+  test("every quoted phrase still appears in the rubric", async () => {
+    const prompt = (await loadPrompt()).text;
+    const quoted = (await loadFixtures()).filter((f) => f.quoted != null);
+    expect(quoted.length).toBeGreaterThan(0);
+    for (const f of quoted) {
+      expect({ id: f.id, quoted: carriesFact(prompt, [f.quoted ?? ""]) }).toEqual({
+        id: f.id,
+        quoted: true,
+      });
+    }
+  });
 });
 
-// The oracle's must-keep cross-check: it must never trim or rewrite a justified
-// comment. The gate of record runs the same corpus through the production
+describe("fixture validation", () => {
+  const base = {
+    id: "x",
+    path: "a.py",
+    language: "python",
+    kind: "line",
+    comment: "# the broker rate-limits per key",
+    context: "1: x = 1",
+  };
+
+  test.each([
+    ["a keep with no fact", { action: "keep" }, /needs a "fact"/],
+    [
+      "a fact missing from the comment",
+      { action: "keep", fact: "backoff" },
+      /does not appear in its comment/,
+    ],
+    [
+      "a fact missing from the gold trimTo",
+      { action: "trim", category: "restate-the-what", trimTo: "# per key", fact: "rate-limits" },
+      /does not appear in its trimTo/,
+    ],
+  ] as const)("rejects %s", async (_name, over, message) => {
+    const dir = await mkdtemp(join(tmpdir(), "comments-eval-fixture-"));
+    await Bun.write(join(dir, "x.json"), JSON.stringify({ ...base, ...over }));
+    const thrown = await loadFixtures(dir).catch((error: unknown) => error);
+    expect(thrown).toBeInstanceOf(Error);
+    expect(String(thrown)).toMatch(message);
+  });
+});
+
+// The oracle's must-keep cross-check: it must never drop a justified comment's
+// fact. The gate of record runs the same corpus through the production
 // workflow (`eval.ts build`, then `score --gate`). This is the batched SDK
 // second opinion, and it samples, so a run can differ. Self-skips without an
 // API key, keeping CI off the API.
@@ -165,14 +362,13 @@ const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
 
 describe("oracle must-keep check", () => {
   test.skipIf(!hasKey)(
-    "judge keeps every must-keep comment",
+    "judge keeps every must-keep fact",
     async () => {
       const fixtures = (await loadFixtures()).filter((f) => f.action === "keep");
       const prompt = await loadPrompt();
       const judge = anthropicCommentJudge({ prompt: prompt.text });
       const verdicts = await judgeComments(judge, fixtures.map(fixtureToInput));
-      const violated = fixtures.filter((_, i) => verdicts[i]?.action !== "keep").map((f) => f.id);
-      expect(violated).toEqual([]);
+      expect(scoreResults(fixtures, verdicts).keepViolations).toEqual([]);
     },
     120_000,
   );

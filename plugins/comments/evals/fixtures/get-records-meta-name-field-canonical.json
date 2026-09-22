@@ -8,6 +8,7 @@
   "action": "keep",
   "category": null,
   "trimToLines": null,
+  "fact": "IsNameField",
   "source": "main get_records.py:1140 (substitute for the Aembit OAuth/PKCE canonical-name case)",
   "note": "Must-pass. A one-line docstring that largely restates the function name, yet earns its place by surfacing the canonical Salesforce metadata flag IsNameField that the identifier abbreviates. Name-restatement passes when it introduces a searchable proper noun. Stands in for the Aembit OAuth 2.0 + PKCE docstring, which is not reachable from the two pinned repos (blob search disabled, no aembit path in app/api)."
 }

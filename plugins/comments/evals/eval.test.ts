@@ -61,7 +61,9 @@ describe("scoreResults", () => {
     expect(m.total).toBe(4);
     expect(m.correct).toBe(3);
     expect(m.accuracy).toBeCloseTo(0.75);
-    expect(m.mismatches).toEqual([{ id: "keep-violated", expected: "keep", predicted: "trim" }]);
+    expect(m.mismatches).toEqual([
+      { id: "keep-violated", expected: "keep", predicted: "trim", reason: "action" },
+    ]);
     expect(m.keepViolations).toEqual(["keep-violated"]);
   });
 
@@ -205,6 +207,8 @@ describe("carriesFact", () => {
       true,
     ],
     ["a paraphrase", "# the broker throttles each key", "rate-limits per key", false],
+    ["a number inside a larger number", "// weight 12.5, threshold 3.0", "2.5", false],
+    ["a phrase with trailing brackets", "# referenceTo is VARCHAR[].", "VARCHAR[]", true],
   ])("%s: %p", (_name, text, fact, expected) => {
     expect(carriesFact(text, [fact])).toBe(expected);
   });

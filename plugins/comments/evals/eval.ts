@@ -7,6 +7,7 @@ import { Glob } from "bun";
 import { cli, command } from "cleye";
 import { table } from "table";
 import { z } from "zod";
+import { stripCommentMarkers } from "../apply/edits";
 import { collectVerdicts } from "../apply/join";
 import { type Provenance, ProvenanceSchema } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
@@ -98,7 +99,7 @@ const FixtureInput = z
       trimTo: z.string().nullish(),
       trimToLines: z.array(z.number()).nullish(),
       fact: z.union([nonEmpty("fact"), z.array(nonEmpty("fact")).min(1)]).nullish(),
-      quoted: z.string().nullish(),
+      quoted: nonEmpty("quoted").nullish(),
       provenance: ProvenanceSchema.nullish(),
       source: z.string().nullish(),
       note: z.string().nullish(),
@@ -190,17 +191,24 @@ export function fixtureToInput(fixture: Fixture): CommentJudgeInput {
 /** Comment delimiters, markup quotes, case, and wrapping, none of which change a fact. */
 function normalizeForMatch(text: string): string {
   return text
-    .replaceAll(/\/\*\*?|\*\/|"""/g, " ")
-    .replaceAll(/^\s*(?:\*|\/\/+|#+)/gm, " ")
+    .split("\n")
+    .map(stripCommentMarkers)
+    .join(" ")
     .replaceAll(/[`"]/g, "")
     .replaceAll(/\s+/g, " ")
     .trim()
     .toLowerCase();
 }
 
+/** Every phrase appears in the text, bounded so `2.5` does not match inside `12.5`. */
 export function carriesFact(text: string, facts: string[]): boolean {
   const haystack = normalizeForMatch(text);
-  return facts.every((fact) => haystack.includes(normalizeForMatch(fact)));
+  return facts.every((fact) => {
+    const needle = normalizeForMatch(fact);
+    const before = /^\w/.test(needle) ? String.raw`(?<!\w)` : "";
+    const after = /\w$/.test(needle) ? String.raw`(?!\w)` : "";
+    return new RegExp(before + RegExp.escape(needle) + after).test(haystack);
+  });
 }
 
 function survivingText(fixture: Fixture, verdict: Verdict): string {
@@ -215,6 +223,8 @@ export interface ActionMismatch {
   id: string;
   expected: VerdictAction;
   predicted: VerdictAction;
+  /** `fact` when the action was acceptable but the surviving text lost the fact. */
+  reason: "action" | "fact";
 }
 
 /** Keep precision and slop recall over one partition of the corpus. */
@@ -247,7 +257,7 @@ export interface Metrics {
   quoted: Bucket;
   /** Surviving chars over gold `trimTo` chars, per passing `trimTo` fixture. */
   retention: Record<string, number>;
-  /** Mean of `retention`, or null when no `trimTo` fixture passed. */
+  /** Mean of `retention` over headline fixtures, or null when none passed. */
   meanRetention: number | null;
 }
 
@@ -322,10 +332,12 @@ export function scoreResults(fixtures: Fixture[], verdicts: Verdict[]): Metrics 
           survivingText(fixture, verdict).length / fixture.trimTo.length;
       }
     } else {
+      const flaggedAsLabeled = fixture.action === "keep" || verdict.action !== "keep";
       metrics.mismatches.push({
         id: fixture.id,
         expected: fixture.action,
         predicted: verdict.action,
+        reason: flaggedAsLabeled && fixture.fact != null ? "fact" : "action",
       });
       if (fixture.action === "keep") metrics.keepViolations.push(fixture.id);
     }
@@ -333,7 +345,9 @@ export function scoreResults(fixtures: Fixture[], verdicts: Verdict[]): Metrics 
   metrics.accuracy = metrics.total === 0 ? 1 : metrics.correct / metrics.total;
   finishBucket(metrics.headline);
   finishBucket(metrics.quoted);
-  const ratios = Object.values(metrics.retention);
+  const ratios = fixtures
+    .filter((fixture) => fixture.quoted == null)
+    .flatMap((fixture) => metrics.retention[fixture.id] ?? []);
   if (ratios.length > 0) {
     metrics.meanRetention = ratios.reduce((sum, ratio) => sum + ratio, 0) / ratios.length;
   }
@@ -348,7 +362,7 @@ function describeBucket(bucket: Bucket): string {
 }
 
 function report(fixtures: Fixture[], verdicts: Verdict[], metrics: Metrics): string {
-  const failed = new Set(metrics.mismatches.map((m) => m.id));
+  const failed = new Map(metrics.mismatches.map((m) => [m.id, m.reason]));
   const rows: string[][] = [["id", "expected", "predicted", "category", "retained", "ok"]];
   for (const [i, fixture] of fixtures.entries()) {
     const verdict = verdicts[i];
@@ -360,14 +374,14 @@ function report(fixtures: Fixture[], verdicts: Verdict[], metrics: Metrics): str
       verdict.action,
       verdict.category ?? "-",
       ratio == null ? "-" : ratio.toFixed(2),
-      failed.has(fixture.id) ? "N" : "y",
+      failed.has(fixture.id) ? `N (${failed.get(fixture.id)})` : "y",
     ]);
   }
   const summary = [
     `accuracy ${metrics.accuracy.toFixed(2)}  (${metrics.correct}/${metrics.total})`,
     `headline: ${describeBucket(metrics.headline)}`,
     `quoted:   ${describeBucket(metrics.quoted)}`,
-    `trimTo retention ${metrics.meanRetention == null ? "-" : metrics.meanRetention.toFixed(2)}  (mean surviving/gold chars)`,
+    `trimTo retention ${metrics.meanRetention == null ? "-" : metrics.meanRetention.toFixed(2)}  (headline mean surviving/gold chars)`,
     `keep violations ${metrics.keepViolations.length}`,
     `category matches ${metrics.categoryMatches}`,
   ].join("\n");

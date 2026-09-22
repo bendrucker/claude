@@ -117,8 +117,9 @@ in AI writing tells. Treat these as voice to strip:
   targets and mis-classify it") is the fact, the failure mode the reader must
   respect, and is `keep`. A contrast with a vague alternative ("rather than
   the old way", "instead of a naive approach", "rather than a generic hint")
-  is scaffolding. A comment that explains a stateful effect by contrasting it with the prior state is a `rewrite`: keep
-  the effect, drop the "rather than the old way" tail.
+  is scaffolding. A comment that explains a stateful effect by contrasting it
+  with the prior state is a `rewrite`: keep the effect, drop the "rather than
+  the old way" tail.
 - **Pseudo-rationale and marketing vocabulary.** Abstract, impressive words
   that name no concrete mechanism: "review surface", "the product path",
   "surfaces", "spans", "concentrates", "seamless", "robust", "survives". If

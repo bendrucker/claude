@@ -78,6 +78,10 @@ export async function loadFixtures(dir: string = FIXTURES_DIR): Promise<Fixture[
  */
 export const RETENTION_CEILING = 0.9;
 
+function overCeiling(kept: string, comment: string): boolean {
+  return kept.length > RETENTION_CEILING * comment.length;
+}
+
 const nonEmpty = (name: string) =>
   z.string({ error: `missing required string "${name}"` }).min(1, {
     error: `missing required string "${name}"`,
@@ -129,10 +133,7 @@ const FixtureInput = z
         message: `"trimTo" must be a non-empty string on a "trim" fixture`,
       });
     }
-    if (
-      fixture.trimTo != null &&
-      fixture.trimTo.length > RETENTION_CEILING * fixture.comment.length
-    ) {
+    if (fixture.trimTo != null && overCeiling(fixture.trimTo, fixture.comment)) {
       ctx.addIssue({ code: "custom", message: `"trimTo" is over the retention ceiling itself` });
     }
     const facts = fixture.fact == null ? [] : [fixture.fact].flat();
@@ -273,9 +274,7 @@ export interface Metrics {
   quoted: Bucket;
   /** Surviving chars over gold `trimTo` chars, per flagged `trimTo` fixture that kept its fact. */
   retention: Record<string, number>;
-  /** `trimTo` fixtures whose retention exceeds `RETENTION_CEILING`. */
-  overRetained: string[];
-  /** Mean of `retention` over headline fixtures, or null when none passed. */
+  /** Mean of `retention` over headline fixtures, or null when none was recorded. */
   meanRetention: number | null;
 }
 
@@ -292,17 +291,20 @@ function finishBucket(bucket: Bucket): void {
  * Whether a verdict satisfies a fixture's label. A `keep` fixture passes when
  * its fact survives, so a trim down to the fact is not destructive.
  */
-function outcomeOf(fixture: Fixture, verdict: Verdict): "pass" | ActionMismatch["reason"] {
+function outcomeOf(
+  fixture: Fixture,
+  verdict: Verdict,
+  surviving: string,
+): "pass" | ActionMismatch["reason"] {
   const { fact } = fixture;
   if (fact == null) return verdict.action === fixture.action ? "pass" : "action";
-  const surviving = survivingText(fixture, verdict);
   if (fixture.action === "keep") {
     return verdict.action === "keep" || carriesFact(surviving, fact) ? "pass" : "fact";
   }
   if (fixture.trimTo != null) {
     if (verdict.action === "keep") return "action";
     if (!carriesFact(surviving, fact)) return "fact";
-    return surviving.length / fixture.comment.length > RETENTION_CEILING ? "retention" : "pass";
+    return overCeiling(surviving, fixture.comment) ? "retention" : "pass";
   }
   return verdict.action === fixture.action ? "pass" : "action";
 }
@@ -326,7 +328,6 @@ export function scoreResults(fixtures: Fixture[], verdicts: Verdict[]): Metrics 
     headline: emptyBucket(),
     quoted: emptyBucket(),
     retention: {},
-    overRetained: [],
     meanRetention: null,
   };
   for (const [i, fixture] of fixtures.entries()) {
@@ -334,7 +335,8 @@ export function scoreResults(fixtures: Fixture[], verdicts: Verdict[]): Metrics 
     if (!verdict) continue;
     metrics.total++;
     const bucket = fixture.quoted == null ? metrics.headline : metrics.quoted;
-    const outcome = outcomeOf(fixture, verdict);
+    const surviving = survivingText(fixture, verdict);
+    const outcome = outcomeOf(fixture, verdict, surviving);
     const passed = outcome === "pass";
     if (fixture.action === "keep") {
       bucket.keeps++;
@@ -356,11 +358,9 @@ export function scoreResults(fixtures: Fixture[], verdicts: Verdict[]): Metrics 
         reason: outcome,
       });
       if (fixture.action === "keep") metrics.keepViolations.push(fixture.id);
-      if (outcome === "retention") metrics.overRetained.push(fixture.id);
     }
     if (fixture.trimTo != null && (outcome === "pass" || outcome === "retention")) {
-      metrics.retention[fixture.id] =
-        survivingText(fixture, verdict).length / fixture.trimTo.length;
+      metrics.retention[fixture.id] = surviving.length / fixture.trimTo.length;
     }
   }
   metrics.accuracy = metrics.total === 0 ? 1 : metrics.correct / metrics.total;
@@ -373,6 +373,11 @@ export function scoreResults(fixtures: Fixture[], verdicts: Verdict[]): Metrics 
     metrics.meanRetention = ratios.reduce((sum, ratio) => sum + ratio, 0) / ratios.length;
   }
   return metrics;
+}
+
+/** `trimTo` fixtures whose trim kept the fact but passed `RETENTION_CEILING`. */
+function overRetained(metrics: Metrics): string[] {
+  return metrics.mismatches.filter((m) => m.reason === "retention").map((m) => m.id);
 }
 
 function describeBucket(bucket: Bucket): string {
@@ -404,7 +409,7 @@ function report(fixtures: Fixture[], verdicts: Verdict[], metrics: Metrics): str
     `quoted:   ${describeBucket(metrics.quoted)}`,
     `trimTo retention ${metrics.meanRetention == null ? "-" : metrics.meanRetention.toFixed(2)}  (headline mean surviving/gold chars)`,
     `keep violations ${metrics.keepViolations.length}`,
-    `over retention ceiling ${metrics.overRetained.length}  (surviving/original > ${RETENTION_CEILING.toFixed(2)})`,
+    `over retention ceiling ${overRetained(metrics).length}  (surviving/original > ${RETENTION_CEILING.toFixed(2)})`,
     `category matches ${metrics.categoryMatches}`,
   ].join("\n");
   return `${table(rows)}\n${summary}`;
@@ -515,9 +520,10 @@ export function gateFailures(metrics: Metrics): string[] {
       `judge dropped the fact from ${metrics.keepViolations.length} must-keep comment(s): ${metrics.keepViolations.join(", ")}`,
     );
   }
-  if (metrics.overRetained.length > 0) {
+  const overCeilingIds = overRetained(metrics);
+  if (overCeilingIds.length > 0) {
     failures.push(
-      `judge's trim kept over ${RETENTION_CEILING.toFixed(2)} of the comment on ${metrics.overRetained.length} comment(s): ${metrics.overRetained.join(", ")}`,
+      `judge's trim kept over ${RETENTION_CEILING.toFixed(2)} of the comment on ${overCeilingIds.length} comment(s): ${overCeilingIds.join(", ")}`,
     );
   }
   if (metrics.headline.slopRecall < RECALL_FLOOR) {

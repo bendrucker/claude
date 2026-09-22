@@ -158,7 +158,6 @@ describe("scoreResults", () => {
     expect(m.retention.gold).toBe(1);
     expect(m.retention["gold-2"]).toBeCloseTo(59 / 33);
     expect(m.meanRetention).toBeCloseTo((1 + 59 / 33) / 2);
-    expect(m.overRetained).toEqual(["gold-2"]);
     expect(m.mismatches).toEqual([
       { id: "gold-2", expected: "trim", predicted: "trim", reason: "retention" },
     ]);

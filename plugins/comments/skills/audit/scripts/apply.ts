@@ -159,7 +159,7 @@ export async function apply(options: ApplyOptions, io: AuditIo): Promise<ApplyRe
       if (match.verdict.action !== "keep") editItems.push(toEditItem(match.comment, match.verdict));
     }
     if (editItems.length > 0) {
-      const result = computeFileEdits(source, editItems, { maxWidth: options.maxWidth });
+      const result = computeFileEdits(source, editItems, { maxWidth: options.maxWidth, language });
       for (const skip of result.skips) {
         manual.push(`${path}:${skip.startLine}  ${skip.detail}`);
         skippedComments.add(`${path}:${skip.startLine}`);

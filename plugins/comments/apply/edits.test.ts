@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { CommentKind } from "../detection/types";
 import type { Verdict } from "../judge/schema";
-import { computeFileEdits, type EditItem } from "./edits";
+import { computeFileEdits, type EditItem, type FileEditOptions } from "./edits";
 
 function verdict(over: Partial<Verdict> = {}): Verdict {
   return {
@@ -37,7 +37,7 @@ describe("computeFileEdits", () => {
     source: string;
     items: EditItem[];
     expected: string;
-    options?: { maxWidth?: number };
+    options?: FileEditOptions;
     skipsEmpty?: boolean;
     skipsLength?: number;
     skipDetail?: RegExp;
@@ -308,6 +308,7 @@ describe("computeFileEdits", () => {
         }),
       ],
       expected: 'class E(Exception):\n    """Raised when x."""',
+      options: { language: "python" },
       skipsLength: 1,
       skipDetail: /no body/,
     },
@@ -316,6 +317,7 @@ describe("computeFileEdits", () => {
       source: "if ok; then\n  # nothing yet\nfi",
       items: [item({ startLine: 2, endLine: 2, startColumn: 2, endColumn: 15 })],
       expected: "if ok; then\n  # nothing yet\nfi",
+      options: { language: "shellscript" },
       skipsLength: 1,
       skipDetail: /no body/,
     },
@@ -332,6 +334,15 @@ describe("computeFileEdits", () => {
         }),
       ],
       expected: "def f():\n    return 1",
+      options: { language: "python" },
+      skipsEmpty: true,
+    },
+    {
+      name: "empty block: deletes a fallthrough comment under a case label outside Python and shell",
+      source: "switch (x) {\n  case 1:\n    // falls through\n  case 2:\n    go();\n}",
+      items: [item({ startLine: 3, endLine: 3, startColumn: 4, endColumn: 20 })],
+      expected: "switch (x) {\n  case 1:\n  case 2:\n    go();\n}",
+      options: { language: "typescript" },
       skipsEmpty: true,
     },
     {

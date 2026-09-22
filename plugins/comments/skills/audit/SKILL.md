@@ -45,7 +45,7 @@ Two scopes run the same pipeline. The flags select scope and narrow it:
 
 - Default, `--base <ref>`, `--mr <iid>`: diff scope. Judges the comments a change
   introduced. Default is the working tree (staged, unstaged, and untracked).
-  `--base main` diffs the working tree against the merge-base with a ref.
+  `--base main` diffs the same working tree against the merge-base with a ref.
   `--mr <iid>` is a GitLab merge request over `glab`.
 - `--all`: repo scope. Judges every tracked code file's comments.
 - `--path <glob>`: narrow either scope to matching paths. Repeatable. Prefer it on
@@ -149,9 +149,9 @@ formatter would fix (a stray blank, a collapsed trailing comment past the line
 width). `--format` takes a shell command template: `{}` is replaced with the
 repo-relative path, the file's new content is piped on stdin, stdout is taken as
 the formatted content, and the command runs from the repo root. A non-zero exit
-warns and keeps the unformatted content, as does output with under half the
-input's lines or none of its comments, which an in-place formatter's progress
-chatter produces. Examples:
+warns and keeps the unformatted content. So does output with under half the
+input's lines, which is what an in-place formatter's progress chatter looks
+like, or output that keeps none of the input's comments. Examples:
 
 ```bash
 --format 'ruff format --stdin-filename {} -'
@@ -173,8 +173,9 @@ Comments the applier cannot change safely are left in place and listed for
 manual handling:
 
 - a comment interleaved with code;
-- a deletion that would leave a Python or shell block with no body, such as a
-  class whose only statement is its docstring;
+- a deletion that would leave a block with no body under a line ending in `:`,
+  `then`, `do`, or `else`, such as a Python class whose only statement is its
+  docstring;
 - a `trimTo` or `rewrite` whose text carries a comment form the site cannot
   host, such as `//` text replacing a `/** */` block;
 - a `trimTo` or `rewrite` at a comment whose own delimiters the applier does

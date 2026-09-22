@@ -50,7 +50,8 @@ export interface DiffOptions {
 
 /**
  * Files git neither tracks nor ignores, relative to `cwd`. `staged` adds the
- * index too, for an unborn branch with no HEAD to diff.
+ * index too, for an unborn branch with no HEAD to diff. A symlink resolving
+ * outside `cwd` is skipped, keeping content from elsewhere out of the job.
  */
 export async function listUntracked(cwd: string, staged = false): Promise<string[]> {
   const listed = staged
@@ -58,26 +59,27 @@ export async function listUntracked(cwd: string, staged = false): Promise<string
     : $`git ls-files --others --exclude-standard`;
   const result = await listed.cwd(cwd).quiet().nothrow();
   if (result.exitCode !== 0) return [];
-  return result
+  const root = await realpath(cwd);
+  const paths = result
     .text()
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line !== "");
+  const inside = await Promise.all(
+    paths.map(async (path) => {
+      const full = join(cwd, path);
+      return (await Bun.file(full).exists()) && (await realpath(full)).startsWith(root + sep);
+    }),
+  );
+  return paths.filter((_, i) => inside[i]);
 }
 
-/**
- * An untracked file is new, so every line it has counts as added. A symlink
- * resolving outside `cwd` is skipped, keeping content from elsewhere out of the job.
- */
+/** An untracked file is new, so every line it has counts as added. */
 async function untrackedDiffs(cwd: string): Promise<FileDiff[]> {
   const paths = await listUntracked(cwd);
-  const root = await realpath(cwd);
   const diffs = await Promise.all(
     paths.map(async (path): Promise<FileDiff | null> => {
-      const file = Bun.file(join(cwd, path));
-      if (!(await file.exists())) return null;
-      if (!(await realpath(join(cwd, path))).startsWith(root + sep)) return null;
-      const text = await file.text();
+      const text = await Bun.file(join(cwd, path)).text();
       const lines = text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
       return lines === 0 ? null : { path, added: [{ start: 1, end: lines }] };
     }),

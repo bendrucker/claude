@@ -1,4 +1,4 @@
-import type { CommentKind } from "../detection/types";
+import type { CommentKind, Language } from "../detection/types";
 import type { Verdict } from "../judge/schema";
 import { type CommentStyle, conformToStyle, detectStyle, hasDelimiters } from "./comment-syntax";
 
@@ -31,6 +31,8 @@ export interface FileEditOptions {
    * repo's own would refuse edits that are in fact fine.
    */
   maxWidth?: number | undefined;
+  /** Gates the empty-block guard, whose openers are Python's and shell's syntax. */
+  language?: Language | undefined;
 }
 
 const isBlank = (line: string): boolean => line.trim().length === 0;
@@ -132,11 +134,11 @@ function replaceSpan(
     return;
   }
   const textLines = conformed.split("\n");
-  // Interior lines take the file's line ending, the last keeps the one its span ended with.
+  const spanEnding = lineEnding(lines[item.endLine - 1]);
+  // An unterminated last line carries no ending of its own, so interior lines fall back to the file's.
+  const interior = item.endLine < lines.length ? spanEnding : eol;
   const withEndings = (produced: string[]): string[] =>
-    produced.map((line, i) =>
-      i === produced.length - 1 ? `${line}${lineEnding(lines[item.endLine - 1])}` : `${line}${eol}`,
-    );
+    produced.map((line, i) => `${line}${i === produced.length - 1 ? spanEnding : interior}`);
 
   if (wsBefore && wsAfter) {
     const indent = before;
@@ -257,7 +259,7 @@ export function computeFileEdits(
   items: EditItem[],
   options: FileEditOptions = {},
 ): FileEditResult {
-  const { maxWidth } = options;
+  const { maxWidth, language } = options;
   const lines = source.split("\n");
   const eol = source.includes("\r\n") ? "\r" : "";
   const deletions = new Set<number>();
@@ -294,7 +296,9 @@ export function computeFileEdits(
         item.verdict.action satisfies never;
     }
   }
-  restoreEmptiedBlocks(removed, lines, deletions, spanInserts, skips);
+  if (language === "python" || language === "shellscript") {
+    restoreEmptiedBlocks(removed, lines, deletions, spanInserts, skips);
+  }
 
   const out: string[] = [];
   let lastPushed = "";

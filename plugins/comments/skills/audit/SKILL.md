@@ -6,8 +6,8 @@ description: >-
   comments a change introduced) or a whole repo, ranks by intrinsic complexity,
   fans out judging agents, and applies the trims to a fresh branch. Use when
   asked to audit, trim, or clean up code comments, or as the comment pass of a
-  branch-finishing flow. Not a general code review: skip it when the change
-  added no comments.
+  branch-finishing flow. Not a general code review: run it only on a change
+  that introduces comments.
 argument-hint: "[--all] [--base <ref>] [--mr <iid>] [--path <glob>] [--sort <key>] [--limit <n>] [--report] [--fix] [--format <template>] [--max-width <n>]"
 allowed-tools:
   - Bash
@@ -17,64 +17,31 @@ allowed-tools:
 
 # Comments Audit
 
-Find low-value comments and act on them. A deterministic Shiki pass extracts
-comments over TextMate grammars, the scope selects which to judge, a fan-out of
-Claude Code agents judges each against the owner's comment model, and a
-deterministic applier writes the changes to a branch. The judge returns one of
-three actions per comment: `keep` (it earns its place), `trim` (it carries no
-fact, delete or shorten it), or `rewrite` (it carries a real fact under AI voice,
-strip the voice and keep the fact). A comment earns its place when it adds
-information not readily available in the adjacent code. Nearly every comment
-the audit sees was written by a coding agent, so the judge defaults to `trim`
-and slims what it keeps. Each comment carries its `git blame` provenance
-(uncommitted lines, committing authors, and agent trailers such as
-`Co-Authored-By` or `Claude-Session`), which the judge reads as evidence of
-authorship. See [`judge/prompt.md`](../../judge/prompt.md) for the full model
-and carve-outs.
+Find low-value comments and act on them. A comment earns its place when it adds information not readily available in the adjacent code. The judge returns one action per comment: `keep`, `trim` (delete or shorten), or `rewrite` (keep the fact, strip the AI voice). [`judge/prompt.md`](../../judge/prompt.md) holds the comment model and its carve-outs.
 
-Model-invocable so `ship` can run it as its comment pass. A misfire costs one
-cheap extraction plus a fan-out of a few agents. The consent gate at
-[Preflight](#preflight) caps a repo-scale run.
-
-The pipeline is three steps: `preflight` (extract, rank, build the job), the
-Workflow tool (judge), and `apply` (write the trims or report them).
+The pipeline is three steps, run in order: `preflight` (extract, rank, build the job), the Workflow tool (judge), and `apply` (write the trims or report them).
 
 ## Scope and Flags
 
-Two scopes run the same pipeline. The flags select scope and narrow it:
-
-- Default, `--base <ref>`, `--mr <iid>`: diff scope. Judges the comments a change
-  introduced. Default is the working tree (staged plus unstaged). `--base main`
-  is the merge-base with a ref. `--mr <iid>` is a GitLab merge request over `glab`.
+- Default, `--base <ref>`, `--mr <iid>`: diff scope. Judges the comments a change introduced. Default is the working tree (staged plus unstaged). `--base main` is the merge-base with a ref. `--mr <iid>` is a GitLab merge request over `glab`.
 - `--all`: repo scope. Judges every tracked code file's comments.
-- `--path <glob>`: narrow either scope to matching paths. Repeatable. Prefer it on
-  a first `--all` run on a large repo to cap the agent count.
-- `--sort lines|chars|score` (default `score`): rank by intrinsic comment
-  complexity so the longest, densest comments judge first.
+- `--path <glob>`: narrow either scope to matching paths. Repeatable. Use it on a first `--all` run on a large repo to cap the agent count.
+- `--sort lines|chars|score` (default `score`): rank by comment complexity so the longest, densest comments judge first.
 - `--limit <n>`: keep only the top N ranked comments.
-
-Both scopes exempt machine-meaningful comments deterministically: lint and
-compiler directives (`eslint-disable`, `noqa`, `go:generate`), shebang lines,
-and license headers never reach the judge.
 - `--fix`: ask the judge for a concrete suggestion per finding.
 - `--report`: at apply time, print findings instead of writing a branch.
-- `--format <template>`: at apply time, pipe each edited file through a
-  formatter before committing.
-- `--max-width <n>`: at apply time, refuse a splice that would exceed `n`
-  columns. Width goes unchecked when the flag is absent.
+- `--format <template>`: at apply time, pipe each edited file through a formatter before committing.
+- `--max-width <n>`: at apply time, refuse a splice that would exceed `n` columns.
 
 ## Preflight
 
-Run from the repository you are auditing (the script resolves the git root
-itself, so stay in the target repo rather than `cd`-ing into the plugin):
+Run from the repository you are auditing. The script resolves the git root itself, so stay in the target repo rather than `cd`-ing into the plugin:
 
 ```bash
 bun <plugin-dir>/skills/audit/scripts/audit.ts preflight $ARGUMENTS
 ```
 
-This extracts and ranks the comments, builds the judging job on disk, and prints
-a human summary (`N comments / M files / ~K agents / ~T tokens`) followed by a
-machine block:
+The script prints a human summary followed by a machine block:
 
 ```
 <preflight>
@@ -82,28 +49,19 @@ machine block:
 </preflight>
 ```
 
-Read the `<preflight>` block. At ten shards or fewer, state the count, file
-count, and token estimate in one line and fan out at once. That covers every
-diff-scope run and a small repo. Above ten shards, present those numbers and
-**wait for the user to confirm before fanning out**. A 5,000-comment repo is
-roughly 250 agents; `--path` and `--limit` cap that.
+Read the `<preflight>` block. At ten shards or fewer, state the comment count, file count, and token estimate in one line and fan out at once. Above ten shards, present those numbers and **wait for the user to confirm before fanning out**.
 
-`--all` requires a clean working tree, because it reads the working tree but
-applies from HEAD. Commit or stash first if preflight reports a dirty tree.
+`--all` preflight and every apply require a clean working tree. When preflight reports a dirty tree, commit first. When apply reports one, commit first or run it with `--report`. The default scope audits the working tree, so it can only report until those changes are committed.
 
 ## Judge
 
-Read `argsPath` (it is JSON) and call the Workflow tool with the
-`scriptPath` from the preflight block and `args` set to the parsed contents of
-`argsPath`:
+Read `argsPath` (JSON) and call the Workflow tool with the `scriptPath` from the preflight block and `args` set to the parsed contents:
 
 ```
 Workflow({ scriptPath: <scriptPath>, args: <parsed job-args.json> })
 ```
 
-Each agent reads one shard, judges its comments, and writes verdicts to disk. The
-workflow logs a small summary (shard count and how many were flagged). The bulk
-verdicts stay on disk, off the conversation, for `apply` to read.
+Each agent judges one shard and writes its verdicts to disk for `apply` to read. The workflow log carries only a shard count and how many were flagged.
 
 ## Apply
 
@@ -111,66 +69,19 @@ verdicts stay on disk, off the conversation, for `apply` to read.
 bun <plugin-dir>/skills/audit/scripts/audit.ts apply --job <jobDir> [--report] [--fix] [--format <template>] [--max-width <n>]
 ```
 
-Default apply re-extracts the judged files and matches verdicts to comments by
-id at their current position, applies the trims and rewrites, and commits to a
-fresh `comments/audit-<hash>` branch off HEAD. The commit is built with git
-plumbing, so the working tree is never modified and the current branch stays
-checked out. A `rewrite` replaces the comment span in place with the de-voiced
-text, so the diff shows the cleaned comment. A partial trim carries the kept
-comment as rewritten text (`trimTo`) and is spliced the same way; a legacy
-line-range trim (`trimToLines`) that would strand a mid-sentence fragment is
-refused and listed for manual handling instead. A comment that moved or changed
-since preflight gets a new id, matches no verdict, and is skipped. Review the
-result with `git diff HEAD..comments/audit-<hash>`. Apply requires a clean
-working tree. The success message and `--report` both open with a
-`N delete / M trim / K rewrite across F files` split, counting only what
-auto-applies: a `trim` that keeps nothing is reported as `delete`, and refused
-verdicts appear as a `, J to manual handling` tail.
+Apply re-extracts the judged files, matches verdicts to comments by id, and commits the trims and rewrites to a fresh `comments/audit-<hash>` branch off HEAD. It uses git plumbing, so the working tree and current branch stay untouched. A comment that moved or changed since preflight matches no verdict and is skipped. Comments the applier cannot splice safely stay in place and are listed with the reason. Hand those to the user for manual handling.
 
-`--report` prints the findings grouped by file (`path:line  action  category
-confidence  rationale`, with an old → new preview for each rewrite and a
-`keep:` preview for each partial trim) and writes nothing. Use it to review
-before applying, or on a dirty tree.
+`--report` prints the findings grouped by file and writes nothing. Use it to review before applying, or on a dirty tree.
 
 ### Formatting
 
-The applier splices lines without running a formatter, which can leave debris a
-formatter would fix (a stray blank, a collapsed trailing comment past the line
-width). `--format` takes a shell command template: `{}` is replaced with the
-repo-relative path, the file's new content is piped on stdin, stdout is taken as
-the formatted content, and the command runs from the repo root. A non-zero exit
-warns and keeps the unformatted content. Examples:
+The applier splices lines without running a formatter. `--format` takes a shell command template: `{}` is replaced with the repo-relative path, the file's new content is piped on stdin, stdout is taken as the formatted content, and the command runs from the repo root:
 
 ```bash
 --format 'ruff format --stdin-filename {} -'
 --format 'prettier --stdin-filepath {}'
 ```
 
-Pick the formatter from the target repo's own configuration and pass it
-explicitly, or omit the flag. NEVER guess at, auto-discover, or auto-execute a
-formatter the repo does not configure.
+Pass only a formatter the target repo configures. When the repo configures none, omit the flag.
 
-Without `--format`, `--max-width` is the only guard on wrapping. Set it to the
-limit the target repo already enforces (its formatter config, `.editorconfig`,
-or linter rule). Never invent one: a limit below the repo's real width refuses
-edits that would have been fine.
-
-### Manual Handling
-
-Comments the applier cannot change safely are left in place and listed for
-manual handling:
-
-- a comment interleaved with code;
-- a `trimToLines` range that would drop a block's opening or closing delimiter,
-  or whose kept line would open mid-sentence;
-- a `trimTo` or `rewrite` whose text carries a comment form the site cannot
-  host, such as `//` text replacing a `/** */` block;
-- a `trimTo` or `rewrite` at a comment whose own delimiters the applier does
-  not recognize, such as Ruby's `=begin`/`=end`;
-- a `trimTo` or `rewrite` that would produce a line past `--max-width`.
-
-For a `trimTo` or `rewrite`, the applier reads the delimiters the comment
-already uses and re-emits them, so text that arrives as bare prose still
-splices as a valid comment at the right indentation. Doc-comment markers
-(`/**`, `///`, `//!`) survive the round trip rather than decaying to their
-plain form.
+Without `--format`, `--max-width` is the only guard on wrapping. Set it to the width the target repo already enforces (its formatter config, `.editorconfig`, or a linter rule). When the repo enforces none, omit the flag.

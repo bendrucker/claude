@@ -40,6 +40,15 @@ const isBlank = (line: string): boolean => line.trim().length === 0;
 /** The `\r` a CRLF line keeps after `split("\n")`, re-appended to any line rebuilt from it. */
 const lineEnding = (line: string | undefined): string => (line?.endsWith("\r") ? "\r" : "");
 
+/** A line's prose: leading/trailing comment markers and whitespace stripped. */
+export function stripCommentMarkers(line: string): string {
+  return line
+    .trim()
+    .replace(/^(?:\/\*+|\/\/+|#+|--+|;+|"""|'''|\*+)\s*/, "")
+    .replace(/\s*(?:\*+\/|"""|''')$/, "")
+    .trim();
+}
+
 const indentOf = (line: string): number => line.length - line.trimStart().length;
 
 /** A code line: neither blank nor a `#` comment, the forms a Python or shell block cannot live on alone. */

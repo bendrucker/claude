@@ -248,20 +248,9 @@ function restoreEmptiedBlocks(
 }
 
 /**
- * Rewrite a file by acting on each comment's verdict. Builds a deletion mask,
- * per-line replacements, and span inserts over `source.split("\n")`, then applies
- * them once, never mutating line indices mid-loop. By action:
- *
- * - `keep` → left untouched;
- * - `trim` with `trimTo` → replace the comment span with the kept, rewritten text;
- * - `trim` whole, full-line comment → delete its lines;
- * - `trim` whole, trailing line comment after code → strip it, keep the code;
- * - `rewrite` → replace the comment span with the indented de-voiced text;
- * - anything that would risk broken syntax, including a deletion that empties a
- *   Python or shell block → skip and flag for manual handling.
- *
- * Overlapping verdicts on one line resolve with deletion winning over a replace.
- * A span insert at a line takes precedence over its own span's deletions.
+ * Rewrite a file by acting on each comment's verdict. Overlapping verdicts on
+ * one line resolve with deletion winning over a replace. A span insert at a
+ * line takes precedence over its own span's deletions.
  */
 export function computeFileEdits(
   source: string,

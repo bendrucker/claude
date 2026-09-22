@@ -27,10 +27,7 @@ export function renderTemplate(template: string, path: string): string {
 /**
  * Run the formatter template over one file's content: content on stdin, `{}`
  * in the template replaced with the file's path, stdout taken as the formatted
- * content. Runs in the current working directory (the repo root on the apply
- * path). A non-zero exit returns the original content with `formatted: false`,
- * as does output that cannot be the formatted file: under half the input's
- * lines, or no comments where the input had some.
+ * content.
  */
 export async function formatContent(
   template: string,

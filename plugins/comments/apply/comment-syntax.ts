@@ -130,8 +130,10 @@ export function hasDelimiters(style: CommentStyle): boolean {
  * Make judge-authored text splice-ready for a site in `style`: strip the text's
  * own common indentation (the applier owns indentation) and give it the site's
  * delimiters, re-emitting them when the text is bare prose. Every line of a line
- * comment carries the prefix. Returning null here is a refusal rather than a
- * splice that would break the file.
+ * comment carries the prefix. Returns null, a refusal rather than a splice that
+ * breaks the file, when the text carries a comment form the site cannot host,
+ * when text would trail a block's close, or when the site's markers went
+ * unrecognized.
  */
 export function conformToStyle(text: string, style: CommentStyle): string | null {
   const lines = stripCommonIndent(text);

@@ -56,6 +56,7 @@ const DIRECTIVES: RegExp[] = [
   /^ktlint\b/i,
   /^LCOV_EXCL/,
   /^swiftlint:/,
+  // Config and infrastructure
   /^yamllint\s+(disable|enable)/,
   /^tflint-ignore\b/,
   /^checkov:skip\b/,

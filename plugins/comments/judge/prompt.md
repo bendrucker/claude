@@ -64,22 +64,35 @@ Most comments that earn `keep` are one sentence. Length is a signal on its own:
 a comment longer than the code it describes is carrying something other than
 facts. For every comment over one sentence, test each sentence on its own:
 cut the ones that restate the adjacent code or narrate the change, and keep the
-ones that each carry a fact. A why comment that walks the reader through a
-failure mode (what the guard prevents, what a wrong value would mean, which of
-two sources is trusted and why) carries a fact in every sentence and stays
-whole, and a pointer such as `(see _duckdb_type)` beside those facts is no
-reason to trim. A sentence that frames the fact ("Null out legacy values so
-the constraint can be added") is part of the explanation. A human why comment
-loses a sentence only when that sentence repeats the code token for token.
-`trimTo` is for a fact that sits beside filler, and a comment that comes out
-of this test as several fact-bearing sentences is `keep` at its current
-length.
+ones that each carry a fact. A sentence carries a fact only when a reader
+about to change this code needs it and cannot read it off the code. Cut:
+
+- a restatement of what the function returns or which cases it covers, when
+  the body shows it;
+- a cross-reference to another function, along with any explanation of the
+  concern that function owns;
+- the history of a bug: the old implementation, the error text it produced,
+  why it went unnoticed;
+- a walkthrough of what a test sets up and asserts;
+- a contrast with an alternative the code does not take, when the fact
+  stands without it.
+
+A sentence that frames the fact ("Null out legacy values so the constraint can
+be added") is part of the explanation. A sentence that says why the code keys
+on a condition carries a fact, even when it names the fields the code reads.
+When the facts left after the cut are shorter than the comment, the action is
+`trim` with that shorter text in `trimTo`, however well reasoned the rest
+reads. `keep` means the cut removes
+nothing.
 
 A docstring opens with the contract in one line. Each sentence after it
 stands on its own: it stays when it states a fact the signature and body
-cannot, such as which of two candidate sources is authoritative and why, or a
-type constraint a downstream operator imposes. Trim:
+cannot, such as which of two candidate sources is authoritative and why. When
+one sentence holds both that fact and a fallback list, keep the fact and cut
+the list. Trim:
 
+- anything the contract line already says, or a check in the body shows;
+- fallback orders and candidate lists the body enumerates;
 - parameter and return lists that repeat a typed signature;
 - "Raises" and "Returns" sections that restate the types or the obvious;
 - usage examples that mirror the signature;
@@ -101,11 +114,10 @@ in AI writing tells. Treat these as voice to strip:
   does not take pads a restatement with an extra clause. The fact is what the
   code does. State that plainly. A contrast whose other side names a concrete
   failure the code prevents ("skip rather than iterate a string into character
-  targets and mis-classify it", "rather than a blanket TIMESTAMP hint") is the
-  fact, the failure mode the reader must respect, and is `keep`. Only a
-  contrast with an unnamed or abstract alternative ("rather than the old way",
-  "instead of a naive approach") is scaffolding. A comment that explains a
-  stateful effect by contrasting it with the prior state is a `rewrite`: keep
+  targets and mis-classify it") is the fact, the failure mode the reader must
+  respect, and is `keep`. A contrast with a vague alternative ("rather than
+  the old way", "instead of a naive approach", "rather than a generic hint")
+  is scaffolding. A comment that explains a stateful effect by contrasting it with the prior state is a `rewrite`: keep
   the effect, drop the "rather than the old way" tail.
 - **Pseudo-rationale and marketing vocabulary.** Abstract, impressive words
   that name no concrete mechanism: "review surface", "the product path",
@@ -154,7 +166,8 @@ For `trim` and `rewrite`, name the failing shape:
 
 ## Protected Comments
 
-These are good comments. Leave them alone, at their current length:
+These carry facts to preserve. Protection covers the fact, so the Length test
+still cuts the sentences around it:
 
 - The two justified shapes from What to Decide, plainly written.
 - A one-line docstring that surfaces canonical upstream API names for
@@ -162,9 +175,10 @@ These are good comments. Leave them alone, at their current length:
   OAuth 2.0 + PKCE authorization URL."""` introduces searchable proper nouns
   the name abbreviates. Name-restatement is fine when it adds a searchable
   proper noun.
-- Verbose rationale in a regression test about the bug or anti-pattern it
-  defends against, even when it cites a ticket. Being fully explicit there is
-  correct. A ticket reference inside a regression-rationale comment is a fact.
+- A regression test's statement of the bug it defends against: the ticket, the
+  invariant, and the mechanism that broke it, stated as a present fact about
+  the source it must avoid. The previous implementation, the incident story,
+  the error text, and a walkthrough of the test body go.
 - A guard or TODO anchored to a ticket that resolves a real, present code
   condition. `# extraction_mode is NULL until ENG-2068; only name it when
   present` explains a guard the code cannot, and `# TODO(ENG-4102): drop once

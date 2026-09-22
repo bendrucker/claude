@@ -49,7 +49,7 @@ bun run plugins/comments/evals/eval.ts build
 bun run plugins/comments/evals/eval.ts score --job <jobDir> --gate
 ```
 
-The gate scores fact survival on `keep` fixtures and on `trim` fixtures with a gold `trimTo`. The rest score on predicted action. A `keep` fixture passes when the judge keeps it, or trims or rewrites it without losing its labeled `fact`. Dropping that fact is the destructive error, and any `keep` fixture that drops it fails the gate. A `trim` fixture with a gold `trimTo` passes when the judge trims or rewrites it to text that still carries its fact, and the report shows surviving characters against the gold.
+The gate scores fact survival on `keep` fixtures and on `trim` fixtures with a gold `trimTo`. The rest score on predicted action. A `keep` fixture passes when the judge keeps it, or trims or rewrites it without losing its labeled `fact`. Dropping that fact is the destructive error, and any `keep` fixture that drops it fails the gate. A `trim` fixture with a gold `trimTo` passes when the judge trims or rewrites it to text that still carries its fact, and the report shows surviving characters against the gold. A trim that keeps more than `RETENTION_CEILING` of the original comment fails, so an echo of the whole comment cannot pass.
 
 The report separates keep precision from slop recall. `--gate` also fails when headline slop recall falls under `RECALL_FLOOR` in `evals/eval.ts`.
 

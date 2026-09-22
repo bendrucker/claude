@@ -63,16 +63,9 @@ export interface Verdict {
    * contract as `rewrite` (delimiters included, no leading indentation), so a
    * kept clause whose sentence started on a dropped line reads as a complete
    * sentence, and the cut may land mid-line. Omitted when the whole comment
-   * should go. Preferred over `trimToLines`.
+   * should go.
    */
   trimTo?: string;
-  /**
-   * Deprecated line-range form of a partial trim, still accepted by the
-   * applier: the lines worth keeping, numbered 1-based and relative to the
-   * comment (line 1 is the comment's first line). Empty means delete the whole
-   * comment. Prefer `trimTo`, which cannot strand a mid-sentence fragment.
-   */
-  trimToLines?: number[];
 }
 
 /**
@@ -92,9 +85,6 @@ export function verdictSchema(): Record<string, unknown> {
       rewrite: { anyOf: [{ type: "string" }, { type: "null" }] },
       suggestedFix: { anyOf: [{ type: "string" }, { type: "null" }] },
       trimTo: { anyOf: [{ type: "string" }, { type: "null" }] },
-      trimToLines: {
-        anyOf: [{ type: "array", items: { type: "integer" } }, { type: "null" }],
-      },
     },
     required: ["action", "confidence", "rationale"],
     additionalProperties: false,

@@ -100,15 +100,15 @@ export async function measureAddedLines(
   extracted?: Comment[],
 ): Promise<AddedLineStats> {
   const stats = emptyStats();
+  const lines = fragment.split("\n");
   let comments: Comment[];
   try {
     comments = (extracted ?? (await extractComments(fragment, language))).filter(
-      (c) => !isExemptComment(c),
+      (c) => !isExemptComment(c, lines),
     );
   } catch {
     return stats;
   }
-  const lines = fragment.split("\n");
   const intervals = new Map<number, [number, number][]>();
   for (const c of comments) {
     for (let ln = c.startLine; ln <= c.endLine; ln++) {

@@ -46,7 +46,6 @@ export interface Fixture {
   rewrite?: string | null;
   /** For a partial `trim`: the owner's gold kept-comment text, for hand spot-checks. */
   trimTo?: string;
-  trimToLines?: number[];
   /** Absent fixtures are judged as agent-written, the rubric's default. */
   provenance?: Provenance;
   source?: string;
@@ -92,7 +91,6 @@ const FixtureInput = z
         .nullish(),
       rewrite: z.string().nullish(),
       trimTo: z.string().nullish(),
-      trimToLines: z.array(z.number()).nullish(),
       provenance: ProvenanceSchema.nullish(),
       source: z.string().nullish(),
       note: z.string().nullish(),
@@ -136,7 +134,6 @@ function validateFixture(value: unknown, file: string): Fixture {
   };
   if (decoded.trimTo != null) fixture.trimTo = decoded.trimTo;
   if (decoded.rewrite != null) fixture.rewrite = decoded.rewrite;
-  if (decoded.trimToLines != null) fixture.trimToLines = decoded.trimToLines;
   if (decoded.provenance != null) fixture.provenance = decoded.provenance;
   if (decoded.source != null) fixture.source = decoded.source;
   if (decoded.note != null) fixture.note = decoded.note;

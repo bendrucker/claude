@@ -117,10 +117,9 @@ src/a.ts
     expect(out).toContain("new: // each host keeps its own connection");
   });
 
-  test("includes the suggestion and keep-lines only with --fix", () => {
-    const item = reportItem({ verdict: verdict({ suggestedFix: "delete it", trimToLines: [2] }) });
+  test("includes the suggestion only with --fix", () => {
+    const item = reportItem({ verdict: verdict({ suggestedFix: "delete it" }) });
     expect(strip(renderReport([item], { fix: true }))).toContain("fix: delete it");
-    expect(strip(renderReport([item], { fix: true }))).toContain("keep lines: 2");
     expect(strip(renderReport([item], { fix: false }))).not.toContain("fix: delete it");
   });
 });
@@ -129,7 +128,7 @@ describe("summarize", () => {
   test("splits flagged verdicts by delete, trim, and rewrite and counts distinct files", () => {
     const items = [
       reportItem({ path: "src/a.ts" }),
-      reportItem({ path: "src/a.ts", verdict: verdict({ trimToLines: [1] }) }),
+      reportItem({ path: "src/a.ts", verdict: verdict({ trimTo: "# kept too" }) }),
       reportItem({ path: "src/b.ts", verdict: verdict({ trimTo: "# kept" }) }),
       reportItem({
         path: "src/b.ts",
@@ -143,7 +142,7 @@ describe("summarize", () => {
   test("counts only what applies, moving refused verdicts to a manual-handling tail", () => {
     const items = [
       reportItem({ path: "src/a.ts" }),
-      reportItem({ path: "src/b.ts", verdict: verdict({ trimToLines: [2] }), skipped: true }),
+      reportItem({ path: "src/b.ts", verdict: verdict({ trimTo: "# kept" }), skipped: true }),
     ];
     expect(summarize(items)).toBe(
       "1 delete / 0 trim / 0 rewrite across 1 file(s), 1 to manual handling",

@@ -25,15 +25,12 @@ function firstLine(text: string): string {
 }
 
 /**
- * A `trim` that keeps nothing (no `trimTo`, no `trimToLines`) removes the whole
- * comment, so it reads as `delete`; a `trim` that keeps part stays `trim`.
+ * A `trim` that keeps nothing (no `trimTo`) removes the whole comment, so it
+ * reads as `delete`; a `trim` that keeps part stays `trim`.
  */
 function actionLabel(verdict: Verdict): string {
   if (verdict.action !== "trim") return verdict.action;
-  return (verdict.trimTo != null && verdict.trimTo !== "") ||
-    (verdict.trimToLines != null && verdict.trimToLines.length > 0)
-    ? "trim"
-    : "delete";
+  return verdict.trimTo != null && verdict.trimTo !== "" ? "trim" : "delete";
 }
 
 /**
@@ -89,8 +86,6 @@ export function renderReport(items: ReportItem[], options: { fix: boolean }): st
       }
       if (verdict.trimTo != null && verdict.trimTo !== "") {
         lines.push(color.dim(`      keep: ${firstLine(verdict.trimTo)}`));
-      } else if (verdict.trimToLines != null && verdict.trimToLines.length > 0) {
-        lines.push(color.dim(`      keep lines: ${verdict.trimToLines.join(", ")}`));
       }
     }
     blocks.push(lines.join("\n"));

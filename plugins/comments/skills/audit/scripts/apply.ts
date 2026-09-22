@@ -171,7 +171,12 @@ export async function apply(options: ApplyOptions, io: AuditIo): Promise<ApplyRe
   if (options.format != null && options.format !== "" && !options.report) {
     for (const [path, content] of edits) {
       // oxlint-disable-next-line no-await-in-loop -- bounds formatter subprocess fan-out to one `sh -c` per edited file at a time.
-      const formatted = await formatContent(options.format, path, content);
+      const formatted = await formatContent(
+        options.format,
+        path,
+        content,
+        languageForPath(path) ?? "",
+      );
       if (formatted.formatted) {
         edits.set(path, formatted.content);
       } else {

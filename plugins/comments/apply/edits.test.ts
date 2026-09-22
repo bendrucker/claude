@@ -82,51 +82,6 @@ describe("computeFileEdits", () => {
       skipDetail: /interleaved/,
     },
     {
-      name: "case (c): keeps the comment-relative line and deletes the rest of the span",
-      source: "op = 1;\n# Data migration: convert\n# tool calls have args\ndo_thing();",
-      items: [
-        item({
-          startLine: 2,
-          endLine: 3,
-          startColumn: 0,
-          endColumn: 22,
-          kind: "line",
-          verdict: verdict({ trimToLines: [2] }),
-        }),
-      ],
-      expected: "op = 1;\n# tool calls have args\ndo_thing();",
-    },
-    {
-      name: "case (c): skips a trim that would drop a block's opening or closing delimiter",
-      source: "a();\n/**\n * keep this\n * drop this\n */\nb();",
-      items: [
-        item({
-          startLine: 2,
-          endLine: 5,
-          startColumn: 0,
-          endColumn: 3,
-          kind: "docstring",
-          verdict: verdict({ trimToLines: [2] }),
-        }),
-      ],
-      expected: "a();\n/**\n * keep this\n * drop this\n */\nb();",
-      skipDetail: /delimiter/,
-    },
-    {
-      name: "case (c): an empty trim falls back to full deletion",
-      source: "x = 1;\n// gone\ny = 2;",
-      items: [
-        item({
-          startLine: 2,
-          endLine: 2,
-          startColumn: 0,
-          endColumn: 7,
-          verdict: verdict({ trimToLines: [] }),
-        }),
-      ],
-      expected: "x = 1;\ny = 2;",
-    },
-    {
       name: "trimTo: replaces an indented full-line comment span with the kept text",
       source:
         "code();\n    // walk the list and retry each entry, reusing\n    // the same backoff: rate-limited per key\n    more();",
@@ -190,119 +145,6 @@ describe("computeFileEdits", () => {
       ],
       expected: "x = 1; /* note */ y = 2;",
       skipDetail: /interleaved/,
-    },
-    {
-      name: "fragment guard: skips a trimToLines keep opening with 'the' after an unterminated drop",
-      source:
-        "op();\n# walk the queue and retry each entry, reusing\n# the same backoff: rate-limited per key\ndone();",
-      items: [
-        item({
-          startLine: 2,
-          endLine: 3,
-          startColumn: 0,
-          endColumn: "# the same backoff: rate-limited per key".length,
-          verdict: verdict({ trimToLines: [2] }),
-        }),
-      ],
-      expected:
-        "op();\n# walk the queue and retry each entry, reusing\n# the same backoff: rate-limited per key\ndone();",
-      skipDetail: /mid-sentence fragment/,
-    },
-    {
-      name: "fragment guard: skips a trimToLines keep opening with 'others' after an unterminated drop",
-      source:
-        "op();\n// dedupe entries that repeat and drop\n// others that expired already\ndone();",
-      items: [
-        item({
-          startLine: 2,
-          endLine: 3,
-          startColumn: 0,
-          endColumn: "// others that expired already".length,
-          verdict: verdict({ trimToLines: [2] }),
-        }),
-      ],
-      expected:
-        "op();\n// dedupe entries that repeat and drop\n// others that expired already\ndone();",
-      skipDetail: /mid-sentence fragment/,
-    },
-    {
-      name: "fragment guard: matches a connective carrying trailing punctuation",
-      source:
-        "op();\n# retry each entry with the backoff\n# that, in turn, the broker chose\ndone();",
-      items: [
-        item({
-          startLine: 2,
-          endLine: 3,
-          startColumn: 0,
-          endColumn: "# that, in turn, the broker chose".length,
-          verdict: verdict({ trimToLines: [2] }),
-        }),
-      ],
-      expected:
-        "op();\n# retry each entry with the backoff\n# that, in turn, the broker chose\ndone();",
-      skipDetail: /mid-sentence fragment/,
-    },
-    {
-      name: "fragment guard: strips SQL-style markers before reading the boundary",
-      source:
-        "op();\n-- walk the table and update rows, keeping\n-- the same checksum as before\ndone();",
-      items: [
-        item({
-          startLine: 2,
-          endLine: 3,
-          startColumn: 0,
-          endColumn: "-- the same checksum as before".length,
-          verdict: verdict({ trimToLines: [2] }),
-        }),
-      ],
-      expected:
-        "op();\n-- walk the table and update rows, keeping\n-- the same checksum as before\ndone();",
-      skipDetail: /mid-sentence fragment/,
-    },
-    {
-      name: "fragment guard: does not fire on a sentence-opening preposition",
-      source: "op();\n# walk the queue and rebuild it\n# For each entry, retry once.\ndone();",
-      items: [
-        item({
-          startLine: 2,
-          endLine: 3,
-          startColumn: 0,
-          endColumn: "# For each entry, retry once.".length,
-          verdict: verdict({ trimToLines: [2] }),
-        }),
-      ],
-      expected: "op();\n# For each entry, retry once.\ndone();",
-      skipsEmpty: true,
-    },
-    {
-      name: "fragment guard: does not fire on an identifier-led kept line",
-      source: "op();\n# checks each flag value\n# bool is coerced to int here\ndone();",
-      items: [
-        item({
-          startLine: 2,
-          endLine: 3,
-          startColumn: 0,
-          endColumn: "# bool is coerced to int here".length,
-          verdict: verdict({ trimToLines: [2] }),
-        }),
-      ],
-      expected: "op();\n# bool is coerced to int here\ndone();",
-      skipsEmpty: true,
-    },
-    {
-      name: "fragment guard: does not fire when the dropped boundary ends a sentence",
-      source: "op();\n# The loop retries each entry.\n# The broker rate-limits per key.\ndone();",
-      items: [
-        item({
-          startLine: 2,
-          endLine: 3,
-          startColumn: 0,
-          endColumn: "# The broker rate-limits per key.".length,
-          verdict: verdict({ trimToLines: [2] }),
-        }),
-      ],
-      expected: "op();\n# The broker rate-limits per key.\ndone();",
-      skipsEmpty: true,
     },
     {
       name: "width: refuses a splice over an explicit maxWidth",
@@ -454,6 +296,65 @@ describe("computeFileEdits", () => {
       skipsEmpty: true,
     },
     {
+      name: "empty block: refuses deleting a docstring that is a class's only body",
+      source: 'class E(Exception):\n    """Raised when x."""',
+      items: [
+        item({
+          startLine: 2,
+          endLine: 2,
+          startColumn: 4,
+          endColumn: '    """Raised when x."""'.length,
+          kind: "docstring",
+        }),
+      ],
+      expected: 'class E(Exception):\n    """Raised when x."""',
+      skipsLength: 1,
+      skipDetail: /no body/,
+    },
+    {
+      name: "empty block: refuses deleting a shell comment that is a then-branch's only body",
+      source: "if ok; then\n  # nothing yet\nfi",
+      items: [item({ startLine: 2, endLine: 2, startColumn: 2, endColumn: 15 })],
+      expected: "if ok; then\n  # nothing yet\nfi",
+      skipsLength: 1,
+      skipDetail: /no body/,
+    },
+    {
+      name: "empty block: deletes a docstring when a statement survives in the body",
+      source: 'def f():\n    """Says what f does."""\n    return 1',
+      items: [
+        item({
+          startLine: 2,
+          endLine: 2,
+          startColumn: 4,
+          endColumn: '    """Says what f does."""'.length,
+          kind: "docstring",
+        }),
+      ],
+      expected: "def f():\n    return 1",
+      skipsEmpty: true,
+    },
+    {
+      name: "crlf: keeps CRLF endings on a stripped trailing comment and a rewrite",
+      source: "a = 1  # note\r\n  # spans all hosts\r\nb = 2\r\n",
+      items: [
+        item({ startLine: 1, endLine: 1, startColumn: 7, endColumn: 13 }),
+        item({
+          startLine: 2,
+          endLine: 2,
+          startColumn: 2,
+          endColumn: 19,
+          verdict: verdict({
+            action: "rewrite",
+            category: "voice",
+            rewrite: "# one connection per host\n# reused across retries",
+          }),
+        }),
+      ],
+      expected: "a = 1\r\n  # one connection per host\r\n  # reused across retries\r\nb = 2\r\n",
+      skipsEmpty: true,
+    },
+    {
       name: "resolution: deletion wins over a replacement on the same line",
       source: "keep();\nval(); // note\nmore();",
       items: [
@@ -601,11 +502,10 @@ const FixtureFile = z.looseObject({
   comment: z.string(),
   kind: z.enum(["line", "block", "docstring"]) satisfies z.ZodType<CommentKind>,
   trimTo: z.string(),
-  trimToLines: z.array(z.number()),
 });
 
 describe("migration-data-migration-mixed convention", () => {
-  test("trimToLines:[2] keeps the genuine why line and drops the restatement", async () => {
+  test("trimTo keeps the genuine why line and drops the restatement", async () => {
     const fixture = FixtureFile.parse(
       JSON.parse(
         await Bun.file(
@@ -621,7 +521,6 @@ describe("migration-data-migration-mixed convention", () => {
     );
     const [first = "", second = ""] = fixture.comment.split("\n");
     expect(fixture.comment.split("\n")).toHaveLength(2);
-    expect(fixture.trimToLines).toEqual([2]);
 
     const source = [first, second, "op.execute()"].join("\n");
     const editItem = (over: Partial<Verdict>) =>
@@ -634,10 +533,8 @@ describe("migration-data-migration-mixed convention", () => {
         verdict: verdict(over),
       });
 
-    for (const over of [{ trimToLines: fixture.trimToLines }, { trimTo: fixture.trimTo }]) {
-      const result = computeFileEdits(source, [editItem(over)]);
-      expect(result.content).toContain("Tool calls have tool_args");
-      expect(result.content).not.toContain("Data migration: Convert");
-    }
+    const result = computeFileEdits(source, [editItem({ trimTo: fixture.trimTo })]);
+    expect(result.content).toContain("Tool calls have tool_args");
+    expect(result.content).not.toContain("Data migration: Convert");
   });
 });

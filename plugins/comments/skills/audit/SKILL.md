@@ -44,8 +44,9 @@ Workflow tool (judge), and `apply` (write the trims or report them).
 Two scopes run the same pipeline. The flags select scope and narrow it:
 
 - Default, `--base <ref>`, `--mr <iid>`: diff scope. Judges the comments a change
-  introduced. Default is the working tree (staged plus unstaged). `--base main`
-  is the merge-base with a ref. `--mr <iid>` is a GitLab merge request over `glab`.
+  introduced. Default is the working tree (staged, unstaged, and untracked).
+  `--base main` diffs the working tree against the merge-base with a ref.
+  `--mr <iid>` is a GitLab merge request over `glab`.
 - `--all`: repo scope. Judges every tracked code file's comments.
 - `--path <glob>`: narrow either scope to matching paths. Repeatable. Prefer it on
   a first `--all` run on a large repo to cap the agent count.
@@ -128,13 +129,11 @@ fresh `comments/audit-<hash>` branch off HEAD. The commit is built with git
 plumbing, so the working tree is never modified and the current branch stays
 checked out. A `rewrite` replaces the comment span in place with the de-voiced
 text, so the diff shows the cleaned comment. A partial trim carries the kept
-comment as rewritten text (`trimTo`) and is spliced the same way; a legacy
-line-range trim (`trimToLines`) that would strand a mid-sentence fragment is
-refused and listed for manual handling instead. A comment that moved or changed
-since preflight gets a new id, matches no verdict, and is skipped. Review the
-result with `git diff HEAD..comments/audit-<hash>`. Apply requires a clean
-working tree. The success message and `--report` both open with a
-`N delete / M trim / K rewrite across F files` split, counting only what
+comment as rewritten text (`trimTo`) and is spliced the same way. A comment
+that moved or changed since preflight gets a new id, matches no verdict, and is
+skipped. Review the result with `git diff HEAD..comments/audit-<hash>`. Apply
+requires a clean working tree. The success message and `--report` both open
+with a `N delete / M trim / K rewrite across F files` split, counting only what
 auto-applies: a `trim` that keeps nothing is reported as `delete`, and refused
 verdicts appear as a `, J to manual handling` tail.
 
@@ -150,7 +149,9 @@ formatter would fix (a stray blank, a collapsed trailing comment past the line
 width). `--format` takes a shell command template: `{}` is replaced with the
 repo-relative path, the file's new content is piped on stdin, stdout is taken as
 the formatted content, and the command runs from the repo root. A non-zero exit
-warns and keeps the unformatted content. Examples:
+warns and keeps the unformatted content, as does output with under half the
+input's lines or none of its comments, which an in-place formatter's progress
+chatter produces. Examples:
 
 ```bash
 --format 'ruff format --stdin-filename {} -'
@@ -172,8 +173,8 @@ Comments the applier cannot change safely are left in place and listed for
 manual handling:
 
 - a comment interleaved with code;
-- a `trimToLines` range that would drop a block's opening or closing delimiter,
-  or whose kept line would open mid-sentence;
+- a deletion that would leave a Python or shell block with no body, such as a
+  class whose only statement is its docstring;
 - a `trimTo` or `rewrite` whose text carries a comment form the site cannot
   host, such as `//` text replacing a `/** */` block;
 - a `trimTo` or `rewrite` at a comment whose own delimiters the applier does

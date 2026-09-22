@@ -48,7 +48,27 @@ describe("formatContent", () => {
         error: "produced empty output for non-empty input",
       },
     },
+    {
+      name: "keeps the original content when an in-place formatter prints chatter",
+      template: "echo 'src/a.ts 5ms (unchanged)'",
+      content: "// note\nconst x = 1;\nconst y = 2;\nexport { x, y };\n",
+      expected: {
+        content: "// note\nconst x = 1;\nconst y = 2;\nexport { x, y };\n",
+        formatted: false,
+        error: "output has under half the input's lines",
+      },
+    },
+    {
+      name: "keeps the original content when the output drops every comment",
+      template: "grep -v //",
+      content: "// note\nconst x = 1;\n",
+      expected: {
+        content: "// note\nconst x = 1;\n",
+        formatted: false,
+        error: "output carries none of the input's comments",
+      },
+    },
   ])("$name", async ({ template, content, expected }) => {
-    expect(await formatContent(template, "src/a b.ts", content)).toEqual(expected);
+    expect(await formatContent(template, "src/a b.ts", content, "typescript")).toEqual(expected);
   });
 });

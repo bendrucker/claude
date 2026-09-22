@@ -8,9 +8,6 @@
   "action": "trim",
   "category": "restate-the-what",
   "trimTo": "# Tool calls have tool_args, tool returns have tool_content",
-  "trimToLines": [
-    2
-  ],
   "source": "main migrations/9f1891b12937:60",
   "note": "Mixed block. Line 1 restates the UPDATE ... SET type = CASE below it. Line 2 (tool calls have tool_args, tool returns have tool_content) is the genuine why: it explains the tool_content-is-not-null heuristic the CASE keys on, which the SQL alone does not motivate."
 }

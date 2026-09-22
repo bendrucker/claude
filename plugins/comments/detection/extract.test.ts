@@ -129,6 +129,13 @@ describe("extractComments: line-run coalescing", () => {
     ]);
   });
 
+  test.each([
+    ["two trailing comments", "x = 1  # foo\ny = 2  # bar\nz = 3", ["# foo", "# bar"]],
+    ["a trailing then a full-line comment", "x = 1  # foo\n       # bar", ["# foo", "# bar"]],
+  ])("%s at one column stay separate", async (_name, source, texts) => {
+    expect((await extractComments(source, "python")).map((c) => c.text)).toEqual(texts);
+  });
+
   test("a line comment does not merge into a following block comment", async () => {
     expect(await summarize(["// line", "/* block */"].join("\n"), "typescript")).toEqual([
       { kind: "line", text: "// line" },

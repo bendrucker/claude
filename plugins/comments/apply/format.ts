@@ -5,6 +5,9 @@
  * auto-discovered or auto-executed beyond it.
  */
 
+import { extractComments } from "../detection/extract";
+import type { Language } from "../detection/types";
+
 export interface FormatResult {
   content: string;
   formatted: boolean;
@@ -25,12 +28,15 @@ export function renderTemplate(template: string, path: string): string {
  * Run the formatter template over one file's content: content on stdin, `{}`
  * in the template replaced with the file's path, stdout taken as the formatted
  * content. Runs in the current working directory (the repo root on the apply
- * path). A non-zero exit returns the original content with `formatted: false`.
+ * path). A non-zero exit returns the original content with `formatted: false`,
+ * as does output that cannot be the formatted file: under half the input's
+ * lines, or no comments where the input had some.
  */
 export async function formatContent(
   template: string,
   path: string,
   content: string,
+  language: Language,
 ): Promise<FormatResult> {
   const proc = Bun.spawn(["sh", "-c", renderTemplate(template, path)], {
     stdin: new TextEncoder().encode(content),
@@ -49,6 +55,18 @@ export async function formatContent(
   // nothing. Taking its stdout would empty the file.
   if (content.trim().length > 0 && stdout.trim().length === 0) {
     return { content, formatted: false, error: "produced empty output for non-empty input" };
+  }
+  // An in-place formatter that reports progress (`prettier --write {}`) exits 0
+  // with its chatter on stdout.
+  if (stdout.split("\n").length < content.split("\n").length / 2) {
+    return { content, formatted: false, error: "output has under half the input's lines" };
+  }
+  const [before, after] = await Promise.all([
+    extractComments(content, language),
+    extractComments(stdout, language),
+  ]);
+  if (before.length > 0 && after.length === 0) {
+    return { content, formatted: false, error: "output carries none of the input's comments" };
   }
   return { content: stdout, formatted: true };
 }

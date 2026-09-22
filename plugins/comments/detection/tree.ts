@@ -10,6 +10,7 @@ import {
   type SessionScore,
 } from "./density";
 import { isGeneratedFile } from "./collect";
+import { listUntracked } from "./diff";
 import { languageForPath } from "./extract";
 
 const MAX_FILE_CHARS = 2_000_000;
@@ -97,13 +98,8 @@ async function changedFiles(root: string, base: string | null): Promise<ChangedF
     }
   }
   // An unborn branch has no base to diff against, so its staged files are new too.
-  const listed =
-    base == null
-      ? $`git ls-files --cached --others --exclude-standard`
-      : $`git ls-files --others --exclude-standard`;
-  const others = await listed.cwd(root).quiet().nothrow();
-  if (others.exitCode === 0) {
-    for (const path of lines(others.text())) files.set(path, { path, source: path });
+  for (const path of await listUntracked(root, base == null)) {
+    files.set(path, { path, source: path });
   }
   return [...files.values()];
 }

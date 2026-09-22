@@ -111,10 +111,10 @@ describe("parseVerdict", () => {
     }
   });
 
-  test("preserves suggestedFix and numeric trimToLines", () => {
-    const v = parseVerdict(raw({ suggestedFix: "drop it", trimToLines: [1, "x", 3] }), "x");
+  test("preserves suggestedFix and drops a legacy trimToLines", () => {
+    const v = parseVerdict(raw({ suggestedFix: "drop it", trimToLines: [1, 3] }), "x");
     expect(v.suggestedFix).toBe("drop it");
-    expect(v.trimToLines).toEqual([1, 3]);
+    expect(v).not.toHaveProperty("trimToLines");
   });
 });
 

@@ -53,6 +53,23 @@ describe("isDirective", () => {
     "# nosemgrep",
     "// noinspection SpellCheckingInspection",
     "// @formatter:off",
+    '/// <reference types="vite/client" />',
+    "/* global window, document */",
+    "/* exported main */",
+    "//export GoCallback",
+    "# pyright: ignore[reportGeneralTypeIssues]",
+    "// tslint:disable-next-line",
+    "// deno-lint-ignore no-explicit-any",
+    "// swiftlint:disable line_length",
+    "# yamllint disable-line rule:line-length",
+    "# tflint-ignore: terraform_unused_declarations",
+    "# checkov:skip=CKV_AWS_20: public bucket",
+    "# hadolint ignore=DL3008",
+    "/*#__PURE__*/",
+    '/* webpackChunkName: "admin" */',
+    "/* @vite-ignore */",
+    "/*! lib v1.0 | MIT */",
+    "/**\n * @license MIT\n */",
   ])("matches %s", (text) => {
     expect(isDirective(text)).toBe(true);
   });
@@ -64,6 +81,9 @@ describe("isDirective", () => {
     "# the linter flags this pattern, so we restructure the loop",
     "// regional failover requires a second bucket",
     "-- pragma comments are documented in the runbook",
+    "// global state is reset between tests",
+    "// export the handler so the router can find it",
+    "// @flow is enabled in the file header",
   ])("passes prose %s", (text) => {
     expect(isDirective(text)).toBe(false);
   });
@@ -109,5 +129,25 @@ describe("isExemptComment", () => {
     expect(isExemptComment(comment("# noqa"))).toBe(true);
     expect(isExemptComment(comment("#!/bin/sh", 1))).toBe(true);
     expect(isExemptComment(comment("// SPDX-License-Identifier: MIT", 1))).toBe(true);
+  });
+
+  test.each<{ name: string; target: Comment; lines?: string[]; exempt: boolean }>([
+    { name: "a head pragma", target: comment("/** @jest-environment jsdom */", 1), exempt: true },
+    { name: "a flow pragma", target: comment("// @flow strict", 2), exempt: true },
+    { name: "a pragma below the head", target: comment("// @flow strict", 40), exempt: false },
+    {
+      name: 'a cgo preamble above import "C"',
+      target: comment("// #include <stdlib.h>", 3),
+      lines: ["package main", "", "// #include <stdlib.h>", 'import "C"'],
+      exempt: true,
+    },
+    {
+      name: "a comment above an ordinary import",
+      target: comment("// the formatter", 3),
+      lines: ["package main", "", "// the formatter", 'import "fmt"'],
+      exempt: false,
+    },
+  ])("$name", ({ target, lines, exempt }) => {
+    expect(isExemptComment(target, lines)).toBe(exempt);
   });
 });

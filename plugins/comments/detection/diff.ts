@@ -1,4 +1,5 @@
 import { $ } from "bun";
+import { join } from "node:path";
 import parseDiff from "parse-diff";
 import type { FileDiff, LineRange } from "./types";
 
@@ -46,23 +47,67 @@ export interface DiffOptions {
   mr?: string;
 }
 
-async function captureDiff(options: DiffOptions): Promise<string> {
+/**
+ * Files git neither tracks nor ignores, relative to `cwd`. `staged` adds the
+ * index too, for an unborn branch with no HEAD to diff.
+ */
+export async function listUntracked(cwd: string, staged = false): Promise<string[]> {
+  const listed = staged
+    ? $`git ls-files --cached --others --exclude-standard`
+    : $`git ls-files --others --exclude-standard`;
+  const result = await listed.cwd(cwd).quiet().nothrow();
+  if (result.exitCode !== 0) return [];
+  return result
+    .text()
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+}
+
+/** An untracked file is new, so every line it has counts as added. */
+async function untrackedDiffs(cwd: string): Promise<FileDiff[]> {
+  const paths = await listUntracked(cwd);
+  const diffs = await Promise.all(
+    paths.map(async (path): Promise<FileDiff | null> => {
+      const file = Bun.file(join(cwd, path));
+      if (!(await file.exists())) return null;
+      const text = await file.text();
+      const lines = text.split("\n").length - (text.endsWith("\n") ? 1 : 0);
+      return lines === 0 ? null : { path, added: [{ start: 1, end: lines }] };
+    }),
+  );
+  return diffs.filter((diff) => diff != null);
+}
+
+/**
+ * The local modes diff against the working tree, where collection reads the
+ * new content: `--base` from the merge base, the default from HEAD.
+ */
+async function captureDiff(options: DiffOptions, cwd: string): Promise<string> {
   if (options.mr != null && options.mr !== "") {
-    return (await $`glab mr diff ${options.mr}`.quiet().nothrow()).text();
+    return (await $`glab mr diff ${options.mr}`.cwd(cwd).quiet().nothrow()).text();
   }
   if (options.base != null && options.base !== "") {
-    const mergeBase = (await $`git merge-base HEAD ${options.base}`.quiet().nothrow())
+    const mergeBase = (await $`git merge-base HEAD ${options.base}`.cwd(cwd).quiet().nothrow())
       .text()
       .trim();
     const ref = mergeBase !== "" ? mergeBase : options.base;
-    return (await $`git diff ${ref}..HEAD`.quiet().nothrow()).text();
+    return (await $`git diff ${ref}`.cwd(cwd).quiet().nothrow()).text();
   }
-  const head = (await $`git diff HEAD`.quiet().nothrow()).text();
+  const head = (await $`git diff HEAD`.cwd(cwd).quiet().nothrow()).text();
   if (head.trim() !== "") return head;
-  return (await $`git diff --cached`.quiet().nothrow()).text();
+  return (await $`git diff --cached`.cwd(cwd).quiet().nothrow()).text();
 }
 
-/** Resolve a diff base and parse it into per-file added line ranges. */
-export async function resolveDiff(options: DiffOptions = {}): Promise<FileDiff[]> {
-  return parseUnifiedDiff(await captureDiff(options));
+/**
+ * Resolve a diff base and parse it into per-file added line ranges. The local
+ * modes add untracked files whole.
+ */
+export async function resolveDiff(
+  options: DiffOptions = {},
+  cwd: string = process.cwd(),
+): Promise<FileDiff[]> {
+  const tracked = parseUnifiedDiff(await captureDiff(options, cwd));
+  if (options.mr != null && options.mr !== "") return tracked;
+  return [...tracked, ...(await untrackedDiffs(cwd))];
 }

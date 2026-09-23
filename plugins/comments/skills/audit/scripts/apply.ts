@@ -5,7 +5,7 @@ import { computeFileEdits, type EditItem } from "../../../apply/edits";
 import { formatContent } from "../../../apply/format";
 import { collectVerdicts, matchVerdicts } from "../../../apply/join";
 import { color, type ReportItem, renderReport, summarize } from "../../../apply/report";
-import { docCommentOf, goDocLead } from "../../../detection/doc";
+import { docCommentOf } from "../../../detection/doc";
 import { extractComments, languageForPath } from "../../../detection/extract";
 import type { Comment, Language } from "../../../detection/types";
 import { verdictPath } from "../../../judge/adapter";
@@ -44,7 +44,6 @@ function toEditItem(
   lines: string[],
   language: Language,
 ): EditItem {
-  const doc = docCommentOf(comment, lines, language);
   return {
     startLine: comment.startLine,
     endLine: comment.endLine,
@@ -52,8 +51,7 @@ function toEditItem(
     endColumn: comment.endColumn,
     kind: comment.kind,
     verdict,
-    doc,
-    lead: language === "go" && doc ? goDocLead(doc) : null,
+    doc: docCommentOf(comment, lines, language),
   };
 }
 

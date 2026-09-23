@@ -22,7 +22,7 @@ export type DocComment = z.infer<typeof DocCommentSchema>;
 
 const GO_PACKAGE = /^package\s+(\w+)/;
 const GO_DECL = /^(?:func\s+(?:\([^)]*\)\s*)?|(?:type|var|const)\s+)(\w+)/;
-const GO_GROUP = /^(?:type|var|const)\s*\(\s*$/;
+const GO_GROUP = /^(?:type|var|const)\s*\(\s*(?:\/\/.*)?$/;
 const GO_SPEC = /^\s+(\w+)\b/;
 
 const RUST_ITEM =
@@ -101,7 +101,7 @@ function goDoc(comment: Comment, lines: string[]): DocComment | null {
   if (GO_GROUP.test(opener)) {
     return { target: "declaration", subject: spec[1], exported, required: exported };
   }
-  if (/\b(?:struct|interface)\s*\{\s*$/.test(opener)) {
+  if (/\b(?:struct|interface)\s*\{\s*(?:\/\/.*)?$/.test(opener)) {
     return { target: "declaration", subject: spec[1], exported, required: false };
   }
   return null;
@@ -113,7 +113,7 @@ function rustDoc(comment: Comment, lines: string[]): DocComment | null {
     return { target: "module", subject: null, exported: true, required: false };
   }
   if (!/^(?:\/\/\/(?!\/)|\/\*\*(?![*/]))/.test(text)) return null;
-  const next = declarationAfter(comment, lines, /^#!?\[/);
+  const next = declarationAfter(comment, lines, /^(?:#!?\[|\/\/)/);
   if (next == null) return null;
   const item = RUST_ITEM.exec(next.trim());
   const exported = /^pub\s/.test(next.trim());
@@ -122,7 +122,7 @@ function rustDoc(comment: Comment, lines: string[]): DocComment | null {
 
 function jsDoc(comment: Comment, lines: string[]): DocComment | null {
   if (!/^\/\*\*(?![*/])/.test(comment.text.trimStart())) return null;
-  const next = declarationAfter(comment, lines, /^@\w/);
+  const next = declarationAfter(comment, lines, /^(?:@\w|\/\/)/);
   if (next == null) return null;
   const trimmed = next.trim();
   const decl = JS_DECL.exec(trimmed);
@@ -160,7 +160,7 @@ function cFamilyDoc(comment: Comment, lines: string[], language: Language): DocC
   const slashes = language !== "java" && language !== "kotlin" && language !== "scala";
   const isDoc = /^\/\*\*(?![*/])/.test(text) || (slashes && /^\/\/\/(?!\/)/.test(text));
   if (!isDoc) return null;
-  const next = declarationAfter(comment, lines, /^(?:@\w|\[\w)/);
+  const next = declarationAfter(comment, lines, /^(?:@\w|\[\w|\/\/)/);
   if (next == null) return null;
   const trimmed = next.trim();
   const name =
@@ -179,11 +179,13 @@ function cFamilyDoc(comment: Comment, lines: string[], language: Language): DocC
 function pythonDoc(comment: Comment, lines: string[]): DocComment | null {
   if (comment.kind !== "docstring") return null;
   let significant = false;
-  // Walks up past a multi-line signature to its `def` or `class` line.
+  let depth = 0;
+  // Walks up a multi-line signature, across blank lines inside its parentheses, to its `def` or `class` line.
   for (let i = comment.startLine - 2; i >= 0; i--) {
     const trimmed = (lines[i] ?? "").trim();
-    if (trimmed === "" && significant) break;
+    if (trimmed === "" && significant && depth <= 0) break;
     if (trimmed === "" || trimmed.startsWith("#")) continue;
+    depth += (trimmed.match(/[)\]]/g)?.length ?? 0) - (trimmed.match(/[([]/g)?.length ?? 0);
     significant = true;
     const name = PYTHON_DEF.exec(trimmed)?.[1];
     if (name == null) continue;

@@ -155,7 +155,9 @@ const FixtureInput = z
 function validateFixture(value: unknown, file: string): Fixture {
   const parsed = FixtureInput.safeParse(value);
   if (!parsed.success) {
-    throw new Error(`Fixture ${file} ${parsed.error.issues[0]?.message}`);
+    const issue = parsed.error.issues[0];
+    const field = issue != null && issue.path.length > 0 ? ` at ${issue.path.join(".")}:` : "";
+    throw new Error(`Fixture ${file}${field} ${issue?.message}`);
   }
   const decoded = parsed.data;
 

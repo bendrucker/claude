@@ -1,4 +1,4 @@
-import type { DocComment } from "../detection/doc";
+import { type DocComment, goDocLead } from "../detection/doc";
 import type { CommentKind, Language } from "../detection/types";
 import type { Verdict } from "../judge/schema";
 import {
@@ -19,8 +19,6 @@ export interface EditItem {
   verdict: Verdict;
   /** The doc-comment classification, which refuses a delete of a required doc comment. */
   doc?: DocComment | null | undefined;
-  /** The lead a doc comment's replacement must keep when the original opens with it (Go's `Name ...`). */
-  lead?: RegExp | null | undefined;
 }
 
 /** A comment the applier refused to touch, left for a human to handle. */
@@ -144,8 +142,14 @@ function proseOf(text: string): string {
     .join(" ");
 }
 
-function docRefusal(item: EditItem, original: string, text: string): string | null {
-  const { lead } = item;
+function docRefusal(
+  item: EditItem,
+  original: string,
+  text: string,
+  language: Language | undefined,
+): string | null {
+  // Go is the one language whose tooling checks that a doc comment opens with the name it documents.
+  const lead = language === "go" && item.doc != null ? goDocLead(item.doc) : null;
   if (lead?.test(proseOf(original)) === true && !lead.test(proseOf(text))) {
     return `replacement drops the doc comment's lead naming ${item.doc?.subject}; keep the lead sentence`;
   }
@@ -170,16 +174,17 @@ function replaceSpan(
   deletions: Set<number>,
   spanInserts: Map<number, string[]>,
   skips: EditSkip[],
-  maxWidth: number | undefined,
+  options: FileEditOptions,
   eol: string,
 ): void {
+  const { maxWidth, language } = options;
   const before = (lines[item.startLine - 1] ?? "").slice(0, item.startColumn);
   const after = (lines[item.endLine - 1] ?? "").slice(item.endColumn);
   const wsBefore = before.trim().length === 0;
   const wsAfter = after.trim().length === 0;
 
   const original = spanLines(lines, item).join("\n");
-  const refusal = docRefusal(item, original, text);
+  const refusal = docRefusal(item, original, text, language);
   if (refusal != null) {
     skips.push({ startLine: item.startLine, reason: "manual", detail: refusal });
     return;
@@ -249,7 +254,7 @@ function applyRewrite(
   deletions: Set<number>,
   spanInserts: Map<number, string[]>,
   skips: EditSkip[],
-  maxWidth: number | undefined,
+  options: FileEditOptions,
   eol: string,
 ): void {
   const rewrite = item.verdict.rewrite;
@@ -261,7 +266,7 @@ function applyRewrite(
     });
     return;
   }
-  replaceSpan(item, rewrite, lines, deletions, spanInserts, skips, maxWidth, eol);
+  replaceSpan(item, rewrite, lines, deletions, spanInserts, skips, options, eol);
 }
 
 /** Line `n` as it reads after the edits (an insert by its `edge` line), or null when deleted. */
@@ -329,7 +334,7 @@ export function computeFileEdits(
   items: EditItem[],
   options: FileEditOptions = {},
 ): FileEditResult {
-  const { maxWidth, language } = options;
+  const { language } = options;
   const lines = source.split("\n");
   const eol = source.includes("\r\n") ? "\r" : "";
   const deletions = new Set<number>();
@@ -351,7 +356,7 @@ export function computeFileEdits(
             deletions,
             spanInserts,
             skips,
-            maxWidth,
+            options,
             eol,
           );
         } else {
@@ -360,7 +365,7 @@ export function computeFileEdits(
         break;
       }
       case "rewrite":
-        applyRewrite(item, lines, deletions, spanInserts, skips, maxWidth, eol);
+        applyRewrite(item, lines, deletions, spanInserts, skips, options, eol);
         break;
       default:
         item.verdict.action satisfies never;

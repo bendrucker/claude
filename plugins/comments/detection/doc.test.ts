@@ -44,6 +44,11 @@ describe("docCommentOf", () => {
       "\tmodeSlow = 2",
       ")",
       "",
+      "var ( // defaults",
+      "\t// Timeout bounds each request.",
+      "\tTimeout = 5",
+      ")",
+      "",
       "// detached from what follows",
       "",
       "func other() {",
@@ -86,6 +91,10 @@ describe("docCommentOf", () => {
       "  run(): void {}",
       "}",
       "",
+      "/** Subtracts. */",
+      "// eslint-disable-next-line no-unused-vars",
+      "export function sub(a: number) {}",
+      "",
       "/* plain block */",
       "const x = 1;",
     ].join("\n");
@@ -93,7 +102,14 @@ describe("docCommentOf", () => {
   });
 
   test("Java and Kotlin", async () => {
-    const java = ["/**", " * Adds.", " */", "@Override", "public int add() {}"].join("\n");
+    const java = [
+      "/**",
+      " * Adds.",
+      " */",
+      "@Override",
+      "// see also sum",
+      "public int add() {}",
+    ].join("\n");
     const kotlin = ["/** Adds. */", "internal fun add() {}"].join("\n");
     expect({
       java: await classify(java, "java"),
@@ -109,6 +125,13 @@ describe("docCommentOf", () => {
       "    a: int,",
       ") -> int:",
       '    """Private helper."""',
+      "",
+      "def spaced(",
+      "    a: int,",
+      "",
+      "    b: int,",
+      "):",
+      '    """Blank line in the signature."""',
       "",
       "class Public:",
       '    """Public class."""',

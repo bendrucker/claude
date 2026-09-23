@@ -38,7 +38,14 @@ exports[`docCommentOf Go 1`] = `
     "subject": "Prompt",
     "target": "declaration",
   },
+  "// Timeout bounds each request.": {
+    "exported": true,
+    "required": true,
+    "subject": "Timeout",
+    "target": "declaration",
+  },
   "// a statement comment": null,
+  "// defaults": null,
   "// detached from what follows": null,
   "// knownMethod reports whether s is known.": {
     "exported": false,
@@ -100,6 +107,13 @@ exports[`docCommentOf TypeScript 1`] = `
     "subject": "run",
     "target": "declaration",
   },
+  "/** Subtracts. */": {
+    "exported": true,
+    "required": false,
+    "subject": "sub",
+    "target": "declaration",
+  },
+  "// eslint-disable-next-line no-unused-vars": null,
 }
 `;
 
@@ -112,6 +126,7 @@ exports[`docCommentOf Java and Kotlin 1`] = `
       "subject": "add",
       "target": "declaration",
     },
+    "// see also sum": null,
   },
   "kotlin": {
     "/** Adds. */": {
@@ -126,6 +141,12 @@ exports[`docCommentOf Java and Kotlin 1`] = `
 
 exports[`docCommentOf Python 1`] = `
 {
+  "\\"\\"\\"Blank line in the signature.\\"\\"\\"": {
+    "exported": true,
+    "required": false,
+    "subject": "spaced",
+    "target": "declaration",
+  },
   "\\"\\"\\"Dunder.\\"\\"\\"": {
     "exported": true,
     "required": false,

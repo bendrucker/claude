@@ -14,3 +14,4 @@ execution:
     Co-Authored-By trailer and no Generated with Claude Code footer.
 context:
   scaffold_script: fixture.sh
+  history_file: history.jsonl

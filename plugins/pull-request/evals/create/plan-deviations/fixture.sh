@@ -6,6 +6,13 @@ git config user.email bvdrucker@gmail.com
 git config commit.gpgsign false
 git remote add origin https://github.com/bendrucker/agent-skills.git
 mkdir -p skills/deploy
+cat > fly.toml <<'TOML'
+app = "agent-skills-staging"
+primary_region = "sjc"
+
+[http_service]
+  internal_port = 8080
+TOML
 cat > skills/deploy/SKILL.md <<'MD'
 ---
 name: deploy

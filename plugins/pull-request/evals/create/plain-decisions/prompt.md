@@ -1,1 +1,1 @@
-Open a PR for this config change on my personal repo. In the session we decided against a shared config package on purpose, because plugins install independently and a shared package would force them to version together. We cut the verbose flag since nothing read it, and left the legacy config path alone because an external script still reads it.
+Looks good, open a PR.

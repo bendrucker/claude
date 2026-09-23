@@ -1,4 +1,4 @@
 ---
 type: llm
 ---
-The body states the overturned exit-code theory in about a sentence, without a paragraph-length narrative of the wrong turn.
+The body mentions the disproved theory (that the wrapper was swallowing the exit code) in one sentence or one bullet. A sentence that names the theory and pivots to the real cause ("the wrapper was suspected of swallowing the code, but that didn't hold up: the cause was ...") passes, as does a single bullet under an investigation heading whose other bullets cover the cause and the test. Fail if the theory is absent, or if the body spends more than one sentence or bullet on the wrong turn itself (what was checked, in what order, why it seemed plausible).

@@ -1,1 +1,1 @@
-Open a PR for this fix. Earlier in this session we traced the bug to a wrong theory first (we thought the wrapper was swallowing the exit code) before finding the real cause: awaiting exit before stdout drained meant the exit event fired against a closed handle. We dropped a unit test for it because the test runner couldn't make the race fail.
+Open a PR for this.

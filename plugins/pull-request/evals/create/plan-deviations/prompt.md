@@ -1,1 +1,1 @@
-Create a PR for this skill change. We deviated from the plan: I added the `fly status` allowed-tools entry beyond what the plan listed, because reporting the machine count needs it, and at my request you renamed the two modes from quick/careful to fast/verified mid-session.
+Create a PR for this.

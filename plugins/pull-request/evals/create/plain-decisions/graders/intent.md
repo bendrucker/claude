@@ -1,4 +1,4 @@
 ---
 type: llm
 ---
-The reply contains a PR body that states each decision in plain prose about the change, without echoing instruction vocabulary or describing its own selection process.
+The reply contains a PR body for a personal repo written as one to three prose paragraphs with no section headings or bulleted change list, stating each decision (per-plugin config over a shared package, the dropped verbose flag, the kept legacy path) as a claim about the code. It does not use instruction vocabulary ("on purpose", "deliberately", "worth noting") or describe which points it chose to include.

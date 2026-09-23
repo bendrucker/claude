@@ -74,6 +74,8 @@ The rest are tool caches and state directories holding no credential material:
 
 A new host needs its secret kept outside the sandbox, and never add an upload-capable one casually. A new escaped command must fit a group above. If it reaches the network without its own auth, keep it sandboxed.
 
+`plugins/pull-request/evals/create/run.sh` stays sandboxed, and each run passes `dangerouslyDisableSandbox`. Its `claude plugin eval` fails `EPERM` inside the sandbox, and `claude:*` does not reach it through the script. An entry would have to match the script by path. The path differs per worktree, so the pattern needs a leading `*`. That `*` also matches spaces, so any command whose last argument ends in that path would escape. The script and the fixture scripts `--scaffold` runs are files a session can edit, so exempting them exempts whatever a session writes there. The entry would also miss the usual invocations. CLI 2.1.280 requires every pipeline segment to match, so `run.sh ... | tail` stays sandboxed, and a `bash run.sh` wrapper is never exempt. A per-call bypass in auto mode goes to the classifier, which approves it without a prompt, and workflow agents already run the script that way. **Revisit** if the classifier starts denying those bypasses. That shows up as `run.sh` entries in `auto-mode-denials.jsonl`.
+
 Go CLIs need no entry. `sandbox.network.allowMachLookup` lets Go's `crypto/x509` reach the system `trustd` daemon for TLS verification profile-wide.
 
 ## Environment

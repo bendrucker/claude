@@ -6,7 +6,24 @@ git config user.email bvdrucker@gmail.com
 git config commit.gpgsign false
 git remote add origin https://github.com/bendrucker/sheet-sync.git
 mkdir -p src
+cat > src/sheet.ts <<'TS'
+export interface Row {
+  id: string;
+  values: string[];
+}
+
+export interface Sheet {
+  find(id: string): Promise<Row | undefined>;
+  update(id: string, row: Row): Promise<void>;
+  append(row: Row): Promise<void>;
+  index(): Promise<Map<string, number>>;
+  batchUpdate(rows: Row[]): Promise<void>;
+  batchAppend(rows: Row[]): Promise<void>;
+}
+TS
 cat > src/sync.ts <<'TS'
+import type { Row, Sheet } from "./sheet";
+
 export async function sync(rows: Row[], sheet: Sheet): Promise<void> {
   for (const row of rows) {
     const existing = await sheet.find(row.id);
@@ -18,6 +35,8 @@ TS
 git add -A && git commit -qm "sync: add sheet sync"
 git switch -qc batch-sync
 cat > src/sync.ts <<'TS'
+import type { Row, Sheet } from "./sheet";
+
 export async function sync(rows: Row[], sheet: Sheet): Promise<void> {
   const index = await sheet.index();
   const updates = rows.filter((row) => index.has(row.id));

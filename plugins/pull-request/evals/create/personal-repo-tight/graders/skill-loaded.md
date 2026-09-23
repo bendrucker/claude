@@ -1,8 +1,8 @@
 ---
 type: regex
 target: trace
-pattern: 'Shell command failed for pattern'
-match: not_contains
+pattern: '^(?![\s\S]*Shell command failed for pattern)[\s\S]*Base directory for this skill: \S*pull-request/skills/create'
+match: contains
 arm: with-only
 ---
-Every `!` context command in the skill ran, so the skill body reached the session.
+The create skill's body reached the session with every `!` context command succeeding. It fails when the skill never fired.

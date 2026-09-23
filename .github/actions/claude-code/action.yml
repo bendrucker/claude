@@ -5,14 +5,17 @@ runs:
   steps:
     # Claude Code confines each agent's shell tools with bubblewrap, and
     # Ubuntu 24.04's AppArmor policy blocks the unprivileged user namespaces
-    # it needs.
+    # it needs. The sandbox also makes ~/.bashrc unreadable, and bash reads it
+    # on every command because Node's piped stdin is a socket, so each output
+    # would open with a permission error. zsh -c skips rc files.
     - name: Install sandbox dependencies
       shell: bash
       run: |
         set -euo pipefail
         sudo apt-get update -q
-        sudo apt-get install -y -q bubblewrap socat
+        sudo apt-get install -y -q bubblewrap socat zsh
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        echo "SHELL=$(command -v zsh)" >> "$GITHUB_ENV"
     - name: Install Claude Code
       shell: bash
       run: |

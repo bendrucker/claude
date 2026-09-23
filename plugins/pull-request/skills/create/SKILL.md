@@ -1,8 +1,8 @@
 ---
 name: pull-request:create
 description: |
-  Create a pull request, merge request, or change request (PR, MR, CR).
-  Use when the user asks to open one, including right after committing changes.
+  Create a pull request, merge request, or change request (PR, MR, CR), or draft its title and body.
+  Use when the user asks to open one, including right after committing changes, or to write or draft a PR description.
 
 argument-hint: "[--draft] [--no-auto] [--base <ref>] [--label <name>] [--no-review] [--[no-]review-body]"
 allowed-tools:

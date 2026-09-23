@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { docCommentOf } from "../detection/doc";
+import { docCommentOf, goDocLead } from "../detection/doc";
 import { extractComments } from "../detection/extract";
 import type { Verdict } from "../judge/schema";
 import { computeFileEdits, type EditItem } from "./edits";
@@ -76,7 +76,8 @@ async function editItems(): Promise<EditItem[]> {
     const lead = /^\/\/ (\w+)/.exec(comment.text)?.[1] ?? "";
     const verdict = verdicts[lead];
     if (verdict == null) throw new Error(`no verdict for ${lead}`);
-    return Object.assign(comment, { verdict, doc: docCommentOf(comment, lines, "go") });
+    const doc = docCommentOf(comment, lines, "go");
+    return Object.assign(comment, { verdict, doc, lead: doc && goDocLead(doc) });
   });
 }
 

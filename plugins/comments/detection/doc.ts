@@ -220,11 +220,11 @@ function escapeRegExp(text: string): string {
 }
 
 /**
- * The lead a Go-style doc comment opens with: `Package name` for a package
- * clause, the declared name (optionally after an article) for a declaration.
- * Null when there is no subject to anchor on.
+ * The lead a Go doc comment opens with: `Package name` for a package clause,
+ * the declared name (optionally after an article) for a declaration. Null when
+ * there is no subject to anchor on.
  */
-export function docLead(doc: DocComment): RegExp | null {
+export function goDocLead(doc: DocComment): RegExp | null {
   if (doc.subject == null) return null;
   const name = escapeRegExp(doc.subject);
   return doc.target === "module"

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type DocComment, docCommentOf, docLead } from "./doc";
+import { type DocComment, docCommentOf, goDocLead } from "./doc";
 import { extractComments } from "./extract";
 import type { Language } from "./types";
 
@@ -120,7 +120,7 @@ describe("docCommentOf", () => {
   });
 });
 
-describe("docLead", () => {
+describe("goDocLead", () => {
   const doc = (target: DocComment["target"], subject: string): DocComment => ({
     target,
     subject,
@@ -136,6 +136,6 @@ describe("docLead", () => {
     ["module", "command", "Package command holds helpers", true],
     ["module", "command", "Command holds helpers", false],
   ] as const)("%s %s: %s", (target, subject, prose, matches) => {
-    expect(docLead(doc(target, subject))?.test(prose)).toBe(matches);
+    expect(goDocLead(doc(target, subject))?.test(prose)).toBe(matches);
   });
 });

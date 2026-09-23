@@ -1,4 +1,4 @@
-import { type DocComment, docLead } from "../detection/doc";
+import type { DocComment } from "../detection/doc";
 import type { CommentKind, Language } from "../detection/types";
 import type { Verdict } from "../judge/schema";
 import {
@@ -17,8 +17,10 @@ export interface EditItem {
   endColumn: number;
   kind: CommentKind;
   verdict: Verdict;
-  /** The doc-comment classification, which gates deletes and lead-dropping replacements. */
+  /** The doc-comment classification, which refuses a delete of a required doc comment. */
   doc?: DocComment | null | undefined;
+  /** The lead a doc comment's replacement must keep when the original opens with it (Go's `Name ...`). */
+  lead?: RegExp | null | undefined;
 }
 
 /** A comment the applier refused to touch, left for a human to handle. */
@@ -143,7 +145,7 @@ function proseOf(text: string): string {
 }
 
 function docRefusal(item: EditItem, original: string, text: string): string | null {
-  const lead = item.doc == null ? null : docLead(item.doc);
+  const { lead } = item;
   if (lead?.test(proseOf(original)) === true && !lead.test(proseOf(text))) {
     return `replacement drops the doc comment's lead naming ${item.doc?.subject}; keep the lead sentence`;
   }

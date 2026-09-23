@@ -66,8 +66,10 @@ interface Cell {
 async function loadCell(path: string, name: string, arm: string, runs: z.output<typeof Run>[]) {
   const tally = new Map<string, boolean[]>();
   for (const run of runs) {
-    for (const grader of run.graders.filter((g) => g.scored)) {
-      tally.set(grader.name, [...(tally.get(grader.name) ?? []), grader.passed]);
+    // Under ablation the with-only graders are unscored indicators, which is where skill-fired lives.
+    for (const grader of run.graders) {
+      const key = grader.scored ? grader.name : `${grader.name} (indicator)`;
+      tally.set(key, [...(tally.get(key) ?? []), grader.passed]);
     }
   }
   const messages = await Promise.all(

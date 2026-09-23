@@ -7,6 +7,9 @@ git config user.name "Ben Drucker"
 git config user.email bvdrucker@gmail.com
 git config commit.gpgsign false
 git remote add origin https://github.com/bendrucker/agent-skills.git
+# The sandbox has no network, so pushes land in a local bare repo.
+git init -q --bare .git/origin.git
+git remote set-url --push origin "$PWD/.git/origin.git"
 mkdir -p skills/deploy
 cat > fly.toml <<'TOML'
 app = "agent-skills-staging"

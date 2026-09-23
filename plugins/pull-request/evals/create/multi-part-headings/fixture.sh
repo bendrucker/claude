@@ -7,6 +7,9 @@ git config user.name "Ben Drucker"
 git config user.email bvdrucker@gmail.com
 git config commit.gpgsign false
 git remote add origin https://github.com/bendrucker/mcp-gateway.git
+# The sandbox has no network, so pushes land in a local bare repo.
+git init -q --bare .git/origin.git
+git remote set-url --push origin "$PWD/.git/origin.git"
 mkdir -p src/auth
 cat > src/auth/callback.ts <<'TS'
 import { exchange, registerClient } from "./oauth";

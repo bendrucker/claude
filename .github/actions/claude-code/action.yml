@@ -1,11 +1,5 @@
 name: Claude Code
 description: Install the Claude Code CLI and the sandbox its agent runs need
-
-inputs:
-  version:
-    description: Claude Code version to install
-    default: 2.1.280
-
 runs:
   using: composite
   steps:
@@ -19,9 +13,8 @@ runs:
         sudo apt-get update -q
         sudo apt-get install -y -q bubblewrap socat
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-
     - name: Install Claude Code
       shell: bash
-      env:
-        VERSION: ${{ inputs.version }}
-      run: npm install -g "@anthropic-ai/claude-code@$VERSION"
+      run: |
+        curl -fsSL https://claude.ai/install.sh | bash
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"

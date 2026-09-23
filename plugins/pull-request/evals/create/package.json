@@ -1,0 +1,9 @@
+{
+  "name": "pr-create-eval",
+  "private": true,
+  "dependencies": {
+    "cleye": "^2.2.1",
+    "table": "^6.9.0",
+    "zod": "^4.4.3"
+  }
+}

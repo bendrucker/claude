@@ -267,6 +267,14 @@
         "fast-check": "^4.8.0",
       },
     },
+    "plugins/pull-request/evals/create": {
+      "name": "pr-create-eval",
+      "dependencies": {
+        "cleye": "^2.2.1",
+        "table": "^6.9.0",
+        "zod": "^4.4.3",
+      },
+    },
     "plugins/pull-request/evals/pr-body": {
       "name": "pr-body-eval",
       "dependencies": {
@@ -2329,6 +2337,8 @@
     "posthog-node": ["posthog-node@5.24.17", "", { "dependencies": { "@posthog/core": "1.23.1" } }, "sha512-mdb8TKt+YCRbGQdYar3AKNUPCyEiqcprScF4unYpGALF6HlBaEuO6wPuIqXXpCWkw4VclJYCKbb6lq6pH6bJeA=="],
 
     "pr-body-eval": ["pr-body-eval@workspace:plugins/pull-request/evals/pr-body"],
+
+    "pr-create-eval": ["pr-create-eval@workspace:plugins/pull-request/evals/create"],
 
     "prettier": ["prettier@1.19.1", "", { "bin": { "prettier": "./bin-prettier.js" } }, "sha512-s7PoyDv/II1ObgQunCbB9PdLmUcBZcnWOcxDh7O0N/UwDEsHyqkW+Qh28jW+mVuCdx7gLB0BotYI1Y6uI9iyew=="],
 

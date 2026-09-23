@@ -1,0 +1,1 @@
+Open a PR for this multi-part change. It refactors the auth callback handler, narrows the 401/403 error matching, and persists the DCR client ID. I deferred the token-refresh rework and left the existing retry behavior unchanged.

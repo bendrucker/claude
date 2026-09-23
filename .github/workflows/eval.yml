@@ -7,7 +7,20 @@ name: eval
 on:
   pull_request:
     types: [labeled, synchronize]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Suite directory, such as plugins/pull-request/evals/create
+        type: string
+        required: true
+      args:
+        description: Extra arguments for a native suite's run.sh, such as --runs 1 --case <name>
+        type: string
+        default: ""
+      baseline:
+        description: A run id of the same native suite to compare against in the job summary
+        type: string
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,40 +28,61 @@ concurrency:
 
 jobs:
   changes:
-    # Manual dispatch always runs every suite. A PR run additionally needs
+    # Manual dispatch runs the named suite. A PR run additionally needs
     # the `eval` label, since these are live model calls against a budget.
     if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'eval')
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
-      suites: ${{ steps.filter.outputs.changes || steps.all.outputs.suites }}
+      promptfoo: ${{ steps.select.outputs.promptfoo }}
+      native: ${{ steps.select.outputs.native }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      # Filter keys are suite names. Each needs an entry in the eval job's
-      # SUITE_DIR map, and the workflow_dispatch fallback list below must
-      # stay in sync with the filter keys here.
-      - name: Detect touched suites
-        if: github.event_name == 'pull_request'
-        id: filter
-        uses: dorny/paths-filter@v4
-        with:
-          filters: |
-            pr-body:
-              - 'plugins/pull-request/**'
-
-      - name: Run all suites
-        if: github.event_name == 'workflow_dispatch'
-        id: all
-        run: echo 'suites=["pr-body"]' >> "$GITHUB_OUTPUT"
+      # A suite's files name its runner: a promptfooconfig.yaml, or case
+      # directories for claude plugin eval. A labeled PR runs the promptfoo
+      # suites of every plugin it touches. Native suites run on dispatch only.
+      - name: Select suites
+        id: select
+        env:
+          EVENT: ${{ github.event_name }}
+          SUITE: ${{ inputs.suite }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          promptfoo=()
+          native=""
+          if [ "$EVENT" = workflow_dispatch ]; then
+            suite=${SUITE%/}
+            if [ -f "$suite/promptfooconfig.yaml" ]; then
+              promptfoo=("$suite")
+            elif compgen -G "$suite/*/case.yaml" > /dev/null; then
+              native=$suite
+            else
+              echo "::error::$suite holds neither a promptfooconfig.yaml nor */case.yaml."
+              exit 1
+            fi
+          else
+            for plugin in $(git diff --name-only "$BASE" HEAD | awk -F/ '$1 == "plugins" { print $2 }' | sort -u); do
+              for config in plugins/"$plugin"/evals/*/promptfooconfig.yaml; do
+                if [ -f "$config" ]; then
+                  promptfoo+=("$(dirname "$config")")
+                fi
+              done
+            done
+          fi
+          {
+            echo "promptfoo=$(jq -cn '$ARGS.positional' --args "${promptfoo[@]}")"
+            echo "native=$native"
+          } >> "$GITHUB_OUTPUT"
 
   eval:
     needs: changes
-    if: needs.changes.outputs.suites != '[]'
+    if: needs.changes.outputs.promptfoo != '[]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -56,22 +90,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: ${{ fromJson(needs.changes.outputs.suites) }}
+        suite: ${{ fromJson(needs.changes.outputs.promptfoo) }}
     env:
       PROMPTFOO_CONFIG_DIR: ${{ github.workspace }}/.promptfoo
-      SUITE_DIR: ${{ fromJson('{"pr-body":"plugins/pull-request/evals/pr-body"}')[matrix.suite] }}
+      SUITE_DIR: ${{ matrix.suite }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
       - uses: ./.github/actions/bun-install
 
-      - name: Resolve suite directory
+      - name: Name suite
         run: |
-          if [ -z "$SUITE_DIR" ]; then
-            echo "::error::No SUITE_DIR mapping for suite '${{ matrix.suite }}'. Add it to the eval job's env map."
-            exit 1
-          fi
+          name=${SUITE_DIR#plugins/}
+          echo "SUITE=${name//\//-}" >> "$GITHUB_ENV"
 
       # A suite with generated cases declares a `cases` script. Generated cases
       # drift silently, and the check costs nothing and runs ahead of the
@@ -97,7 +129,7 @@ jobs:
 
       - name: Skip notice
         if: steps.check.outputs.has_key == 'false'
-        run: echo "::notice::CLAUDE_CODE_OAUTH_TOKEN is not set, so the ${{ matrix.suite }} eval is skipped. Add the secret (from 'claude setup-token') to enable live runs."
+        run: echo "::notice::CLAUDE_CODE_OAUTH_TOKEN is not set, so the $SUITE eval is skipped. Add the secret (from 'claude setup-token') to enable live runs."
 
       # A suite whose providers point at a fixture tree declares a `fixtures`
       # script. The tree is git-ignored, so the run materializes it here,
@@ -139,7 +171,7 @@ jobs:
         if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/output.json', env.SUITE_DIR)) != ''
         uses: actions/upload-artifact@v7
         with:
-          name: promptfoo-${{ matrix.suite }}-${{ github.run_id }}
+          name: promptfoo-${{ env.SUITE }}-${{ github.run_id }}
           path: ${{ env.SUITE_DIR }}/output.json
 
       - name: Summarize results
@@ -159,7 +191,7 @@ jobs:
             echo "total_cost=$total_cost"
           } >> "$GITHUB_OUTPUT"
           {
-            echo "## promptfoo eval: ${{ matrix.suite }}"
+            echo "## promptfoo eval: $SUITE"
             echo ""
             echo "pass rate: ${pass_rate}% ($successes/$total) · total cost: \$${total_cost}"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -168,7 +200,6 @@ jobs:
         if: steps.summary.outcome == 'success' && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
-          SUITE: ${{ matrix.suite }}
           PASS_RATE: ${{ steps.summary.outputs.pass_rate }}
           TOTAL_COST: ${{ steps.summary.outputs.total_cost }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -196,6 +227,103 @@ jobs:
           else
             gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -X POST -f body="$body"
           fi
+
+      - name: Surface eval failure
+        if: steps.eval.outcome == 'failure'
+        run: exit 1
+
+  # One run of a native suite is cases x runs x arms agent sessions plus a
+  # judge vote per llm grader, so it runs on dispatch only.
+  native:
+    needs: changes
+    if: needs.changes.outputs.native != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read
+    env:
+      SUITE_DIR: ${{ needs.changes.outputs.native }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Check suite and credentials
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ ! -x "$SUITE_DIR/run.sh" ]; then
+            echo "::error::$SUITE_DIR has no executable run.sh, which a native suite provides to load its plugins."
+            exit 1
+          fi
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. Add the secret (from 'claude setup-token') to run native evals."
+            exit 1
+          fi
+          name=${SUITE_DIR#plugins/}
+          echo "SUITE=${name//\//-}" >> "$GITHUB_ENV"
+
+      # Skill context injection runs scripts with bun, and compare.ts needs
+      # the workspace dependencies.
+      - uses: ./.github/actions/bun-install
+
+      - uses: ./.github/actions/claude-code
+
+      # --threshold 0 leaves the exit code to runner errors. Scores are read
+      # from aggregate-result.json, where a case below 1.0 is the normal state.
+      - name: Run eval
+        id: eval
+        continue-on-error: true
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ARGS: ${{ inputs.args }}
+        run: |
+          # shellcheck disable=SC2086
+          "$SUITE_DIR/run.sh" --no-publish --threshold 0 --concurrency 4 $ARGS
+
+      - name: Upload results
+        if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-${{ env.SUITE }}-${{ github.run_id }}
+          path: ${{ env.SUITE_DIR }}/results/
+
+      - name: Summarize results
+        if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
+        run: |
+          set -euo pipefail
+          results=("$SUITE_DIR"/results/*/aggregate-result.json)
+          jq -r --arg suite "$SUITE" '
+            def pct: if . == null then "–" else (. * 100 | round | tostring) + "%" end;
+            "## claude plugin eval: \($suite)",
+            "",
+            "score \(.aggregates.overallScore | pct) · mean delta \(.aggregates.meanDelta | pct) · cost $\(.costUsd * 100 | round / 100)",
+            "",
+            "| case | with | without | delta |",
+            "| --- | --- | --- | --- |",
+            (.cases[] | "| \(.name) | \(.aggregates.score | pct) | \(.aggregates.scoreWithout | pct) | \(.aggregates.delta | pct) |")
+          ' "${results[-1]}" >> "$GITHUB_STEP_SUMMARY"
+
+      # A suite that ships compare.ts gets its tables against the baseline run.
+      - name: Compare with baseline
+        if: inputs.baseline != '' && steps.eval.outcome != 'skipped' && hashFiles(format('{0}/compare.ts', env.SUITE_DIR)) != '' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASELINE: ${{ inputs.baseline }}
+        run: |
+          set -euo pipefail
+          gh run download "$BASELINE" --dir "$RUNNER_TEMP/baseline"
+          baselines=("$RUNNER_TEMP"/baseline/*/*/aggregate-result.json)
+          results=("$SUITE_DIR"/results/*/aggregate-result.json)
+          {
+            echo ""
+            echo "### Compared with run $BASELINE"
+            echo ""
+            echo '```'
+            bun "$SUITE_DIR/compare.ts" "${baselines[-1]}" "${results[-1]}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Surface eval failure
         if: steps.eval.outcome == 'failure'

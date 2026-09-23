@@ -1,0 +1,1 @@
+Write the PR body. I verified this manually against the live Sheets API, since the fake sheet we test with has no rate limit and couldn't reproduce the per-row quota errors. On a 50k-row sync the slow path went from 14 minutes to 38 seconds, and the quota errors stopped.

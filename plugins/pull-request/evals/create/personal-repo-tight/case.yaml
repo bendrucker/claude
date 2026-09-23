@@ -1,0 +1,16 @@
+schema_version: "1.1"
+name: personal-repo-tight
+plugins: ["../../..", "../../../../writing"]
+execution:
+  model: claude-sonnet-5
+  max_turns: 20
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Skill]
+  append_system_prompt: >-
+    This sandbox has no network. When a push or the create command fails,
+    reply with the drafted PR in this form and nothing else: a line
+    `Title: <title>`, a blank line, then the body verbatim.
+    This user's settings blank commit and PR attribution, so add no
+    Co-Authored-By trailer and no Generated with Claude Code footer.
+context:
+  scaffold_script: fixture.sh

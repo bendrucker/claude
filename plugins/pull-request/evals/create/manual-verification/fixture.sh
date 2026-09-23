@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+git init -q -b main
+git config user.name "Ben Drucker"
+git config user.email bvdrucker@gmail.com
+git config commit.gpgsign false
+git remote add origin https://github.com/bendrucker/sheet-sync.git
+mkdir -p src
+cat > src/sync.ts <<'TS'
+export async function sync(rows: Row[], sheet: Sheet): Promise<void> {
+  for (const row of rows) {
+    const existing = await sheet.find(row.id);
+    if (existing) await sheet.update(row.id, row);
+    else await sheet.append(row);
+  }
+}
+TS
+git add -A && git commit -qm "sync: add sheet sync"
+git switch -qc batch-sync
+cat > src/sync.ts <<'TS'
+export async function sync(rows: Row[], sheet: Sheet): Promise<void> {
+  const index = await sheet.index();
+  const updates = rows.filter((row) => index.has(row.id));
+  const appends = rows.filter((row) => !index.has(row.id));
+  await sheet.batchUpdate(updates);
+  await sheet.batchAppend(appends);
+}
+TS
+git commit -qam "sync: batch updates and appends"

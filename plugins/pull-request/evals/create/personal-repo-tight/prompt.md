@@ -1,0 +1,1 @@
+Create the PR. This is my own repo. The change swaps the retry backoff to full jitter, because synchronized retries were piling onto the upstream after an outage, and raises the cap to 20s. I measured p99 at 410ms before and 230ms after. Original task: things:///show?id=Fk3aX2mQ

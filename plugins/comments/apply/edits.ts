@@ -142,7 +142,6 @@ function proseOf(text: string): string {
     .join(" ");
 }
 
-/** Why a doc comment's replacement text is refused, else null. */
 function docRefusal(item: EditItem, original: string, text: string): string | null {
   const lead = item.doc == null ? null : docLead(item.doc);
   if (lead?.test(proseOf(original)) === true && !lead.test(proseOf(text))) {

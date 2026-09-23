@@ -54,14 +54,12 @@ const PYTHON_DEF = /^(?:async\s+)?(?:def|class)\s+(\w+)/;
 
 const isBlank = (line: string | undefined): boolean => (line ?? "").trim() === "";
 
-/** True when the comment has its lines to itself: no code before or after its span. */
 function ownsLines(comment: Comment, lines: string[]): boolean {
   const before = (lines[comment.startLine - 1] ?? "").slice(0, comment.startColumn);
   const after = (lines[comment.endLine - 1] ?? "").slice(comment.endColumn);
   return before.trim() === "" && after.trim() === "";
 }
 
-/** The first line after the comment that is not an attribute or annotation, when none is blank on the way. */
 function declarationAfter(comment: Comment, lines: string[], skip: RegExp | null): string | null {
   for (let i = comment.endLine; i < lines.length; i++) {
     const line = lines[i] ?? "";
@@ -74,7 +72,6 @@ function declarationAfter(comment: Comment, lines: string[], skip: RegExp | null
 
 const indentOf = (line: string): number => line.length - line.trimStart().length;
 
-/** The line opening the block a spec line sits in: the nearest line above at a smaller indent. */
 function enclosingOpener(lines: string[], index: number, indent: number): string | null {
   for (let i = index - 1; i >= 0; i--) {
     const line = lines[i] ?? "";
@@ -199,10 +196,8 @@ function pythonDoc(comment: Comment, lines: string[]): DocComment | null {
 }
 
 /**
- * Classify a comment as a formal doc comment, or null. Reads only the comment's
- * delimiters and the declaration line after it, so `exported` is approximate
- * where the language's visibility needs a parser (a member of an unexported
- * class reads as exported).
+ * `exported` is approximate where the language's visibility needs a parser
+ * (a member of an unexported class reads as exported).
  */
 export function docCommentOf(
   comment: Comment,

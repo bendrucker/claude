@@ -3,7 +3,6 @@ import { type DocComment, docCommentOf, docLead } from "./doc";
 import { extractComments } from "./extract";
 import type { Language } from "./types";
 
-/** The doc classification of every comment in `source`, keyed by its first line. */
 async function classify(source: string, language: Language): Promise<Record<string, unknown>> {
   const lines = source.split("\n");
   const comments = await extractComments(source, language);

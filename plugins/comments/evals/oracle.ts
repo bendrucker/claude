@@ -43,7 +43,6 @@ export interface CommentJudgeInput {
   context: string;
   /** Who last touched the comment's lines, when known. */
   provenance?: Provenance | undefined;
-  /** Present when the comment is a formal doc comment. */
   doc?: DocComment | undefined;
 }
 

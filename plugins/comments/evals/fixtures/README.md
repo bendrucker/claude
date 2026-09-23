@@ -63,8 +63,9 @@ in less text belongs in `trim` with a gold `trimTo`, no matter how well
 justified, so a `keep` is already about as short as its fact allows. The keeps
 cover a canonical-API-name docstring, why-comments on guards and SQL, a test
 constant's rationale, and a plain factual doc that pins the over-rewrite guard.
-The `go-` fixtures pin formal doc comments: required godoc trims to its
-`Name` lead sentence at most, and exported godoc keeps its caller contract.
+The `go-` fixtures pin formal doc comments: every Go doc comment keeps its
+`Name` lead on a trim, required godoc trims to that lead sentence at most, and
+exported godoc keeps its caller contract.
 `trim` fixtures cover `restate-the-what`, `narration`, `docstring-scope`,
 `section-divider`, and a `voice` cut. `rewrite` fixtures carry a fact under AI
 voice (contrastive framing, marketing vocabulary), where the fix is to strip the

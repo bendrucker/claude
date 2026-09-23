@@ -85,9 +85,11 @@ When the facts left after the cut are shorter than the comment, the action is
 reads. `keep` means the cut removes
 nothing.
 
-A comment whose `doc` is `exported` follows Doc Comments below instead of
-this paragraph and the list after it. A docstring opens with the contract in one line. Each sentence after it
-stands on its own: it stays when it states a fact the signature and body
+A comment that carries `doc` follows Doc Comments below instead of the rest of
+this section.
+
+A docstring opens with the contract in one line. Each sentence after it stands
+on its own: it stays when it states a fact the signature and body
 cannot, such as which of two candidate sources is authoritative and why. When
 one sentence holds both that fact and a fallback list, keep the fact and cut
 the list. Trim:
@@ -116,7 +118,8 @@ or module can call it. `required` means the language's standard tooling
 expects the comment to exist: godoc on exported Go identifiers and `package`
 clauses.
 
-An exported doc comment is API documentation. pkg.go.dev, rustdoc, typedoc,
+The per-language rules below apply to every doc comment. An exported doc
+comment is also API documentation. pkg.go.dev, rustdoc, typedoc,
 and editor hovers render it without the body, so a caller reads it in place of
 the code. Test each sentence against the signature a caller sees, never the
 body. Keep every sentence that states behavior a caller relies on and the
@@ -139,8 +142,9 @@ Per language:
   that states caller-visible behavior, and keep a `Deprecated:` paragraph. An
   indented line is a code block and a `- ` line is a list item: keep each
   whole or cut it whole.
-- **JSDoc, TSDoc, Javadoc, KDoc**: keep the `/** */` form and the summary
-  sentence. A tag stays with the item it documents.
+- **JSDoc, TSDoc, Javadoc, KDoc, and the other C-family languages** (C#,
+  Swift, Scala, Dart, PHP, C, C++): keep the `/** */` or `///` form and the
+  summary sentence. A tag stays with the item it documents.
 - **Rust**: `///` documents the item below, and `//!` the enclosing module or
   crate. Keep the marker the comment uses.
 - **Python**: a docstring stays a docstring, and its first line is the
@@ -233,10 +237,10 @@ A single comment block can mix a genuine why with restatement. When only part
 carries a fact, set `action: "trim"` and put the kept comment in `trimTo`: the
 comment as it should read after the cut, rewritten to read as complete
 sentences, with its delimiters and no leading indentation (the same contract as
-`rewrite`). Wrap `trimTo` and `rewrite` text at the width of the comment's
-existing lines and keep its paragraph breaks. The applier refuses a line wider
-than the comment it replaces. The cut may land mid-line. A kept clause whose sentence started on a
-dropped line must be rewritten to stand alone; never ship a dangling fragment.
+`rewrite`). Wrap `trimTo` and `rewrite` text no wider than the comment's
+widest line, or 80 columns if that is wider, and keep its paragraph breaks.
+The cut may land mid-line. A kept clause whose sentence started on a dropped
+line must be rewritten to stand alone; never ship a dangling fragment.
 When the whole comment should go, omit `trimTo`.
 
 A genuine why elsewhere in the block does not excuse a clause that restates the
@@ -247,7 +251,8 @@ fact throughout.
 
 Each comment you judge carries its path, language, kind (line, block, or
 docstring), text, the surrounding line-numbered source, provenance when
-known, and `doc` when it is a formal doc comment. Return exactly one verdict per comment. Per verdict:
+known, and `doc` when it is a formal doc comment. Return exactly one verdict
+per comment. Per verdict:
 
 - `action`: `keep` | `trim` | `rewrite`.
 - `category`: the failing shape for `trim`/`rewrite`, else `null`. Use `voice`

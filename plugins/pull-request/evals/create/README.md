@@ -8,7 +8,7 @@ The runner rejects symlinks in a loaded plugin, so `run.sh` copies `pull-request
 
 Results, including every trace, land in the gitignored `results/<timestamp>/`.
 
-`gh workflow run eval.yml --ref <branch> -f suite=pr-create` runs the suite in CI on the `CLAUDE_CODE_OAUTH_TOKEN` secret, with `-f args='--runs 1 --case plan-deviations'` for a narrower run. The job summary tabulates each case's score with and without the plugins, and the results directory uploads as an artifact for `compare.ts`.
+`gh workflow run eval.yml --ref <branch> -f suite=pr-create` runs the suite in CI on the `CLAUDE_CODE_OAUTH_TOKEN` secret, with `-f args='--runs 1 --case plan-deviations'` for a narrower run. The job summary tabulates each case's score with and without the plugins, and `-f baseline=<run id>` appends the `compare.ts` tables against that run. The results directory uploads as an artifact.
 
 `bun compare.ts <baseline>/result.json <candidate>/result.json` prints each grader's pass rate, each case score, and body word counts side by side. At the default `--runs 3`, two runs of the same code routinely moved a grader by 1/3 and a case score by up to 0.19, so a delta counts only when `compare.ts` flags it (a grader moving 2/3 or more, a case score more than 0.2) and the flag repeats against a second candidate run.
 

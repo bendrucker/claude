@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { z } from "zod";
 import { decodeFile } from "../packages/decode/index";
 import { readTracked, runCheck, tracked } from "./check";
@@ -48,7 +48,21 @@ export function owningWorkspace(file: string, dirs: string[]): string {
 }
 
 /**
- * Directories holding a package.json that the root does not list as a workspace.
+ * Workspace directories the root's `workspaces` globs resolve to.
+ *
+ * Bun expands each pattern to the matching directories that hold a
+ * package.json and skips the rest, so a plugin without one is not a member.
+ */
+export function workspaceDirs(patterns: string[], manifests: string[]): string[] {
+  const globs = patterns.map((pattern) => new Bun.Glob(pattern));
+  return manifests
+    .filter((file) => basename(file) === "package.json")
+    .map((file) => dirname(file))
+    .filter((dir) => dir !== "." && globs.some((glob) => glob.match(dir)));
+}
+
+/**
+ * Directories holding a package.json that no root workspace pattern matches.
  *
  * Such a directory resolves through the root's hoisted node_modules, so every
  * import under it would be checked against the root's declarations and an
@@ -79,7 +93,7 @@ async function checkDeps(): Promise<string[]> {
     tracked("*.ts", cwd),
   ]);
 
-  const dirs = [".", ...(root.workspaces ?? [])];
+  const dirs = [".", ...workspaceDirs(root.workspaces ?? [], manifests)];
   const declared = new Map(
     await Promise.all(
       dirs.map(async (dir) => {
@@ -108,7 +122,7 @@ async function checkDeps(): Promise<string[]> {
   for (const dir of unlistedWorkspaces(manifests, dirs)) {
     violations.set(
       `${dir}\0`,
-      `${dir}: has a package.json but is not a root workspace; add to "workspaces" in package.json`,
+      `${dir}: has a package.json but no root "workspaces" pattern matches it`,
     );
   }
 

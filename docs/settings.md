@@ -8,11 +8,13 @@ Why each sandbox grant and hook in `settings.json` exists and what would retire 
 
 - Package registries: `registry.npmjs.org`, `www.npmjs.com`, `pypi.org`, `rubygems.org`, `proxy.golang.org`, `sum.golang.org`, `community-extensions.duckdb.org` (the DuckDB `markdown` and `yaml` extensions, fetched on first `INSTALL ... FROM community`).
 - Docs and source: `platform.claude.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.sh`, `bun.com`, `github.com`, `raw.githubusercontent.com`.
-- Credentialed APIs: `api.github.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`, `gitlab.com`, `*.greptile.com`, `*.coderabbit.ai`.
+- Credentialed APIs: `api.github.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`, `gitlab.com`, `*.greptile.com`, `*.coderabbit.ai`, `api.cloudflare.com`, `dash.cloudflare.com`.
 
 `api.anthropic.com` accepts uploads and is the known exfil-capable host. It stays because the agent needs the model API.
 
 `gitlab.com`, `*.greptile.com`, and `*.coderabbit.ai` are exceptions to the secrets-outside-the-sandbox rule. `glab`, `greptile`, and `coderabbit` each keep an OAuth token in a sandbox-readable file (`~/.config/glab-cli/config.yml`, `~/.greptile/auth.json`, `~/.coderabbit/auth.json`), and all three hosts accept uploads, so the token is exfiltrable through any allowlisted host. Granted so the CLIs run sandboxed rather than escaped, which was the alternative for every `glab` call.
+
+`api.cloudflare.com` and `dash.cloudflare.com` are the same exception for `wrangler`, whose OAuth login sits in `~/.config/.wrangler/config/default.toml`. `api.cloudflare.com` serves every API call and accepts uploads (deploys, D1 writes, R2). `dash.cloudflare.com` serves only the token refresh at `/oauth2/token`. The access token lasts an hour, so without the refresh host any sandboxed `wrangler` call past that hour fails as not logged in. `sparrow.cloudflare.com` is wrangler's telemetry and stays denied, which wrangler tolerates. **Drop both** when no repo in rotation deploys to Cloudflare.
 
 `docs.anthropic.com` is the legacy host that 301-redirects to `code.claude.com`. The grant buys only the first leg of the redirect. **Drop it** when this stops returning a 3xx to a host already listed:
 
@@ -42,6 +44,8 @@ Three grants are deliberate exceptions to the credential-store clause. Each hold
 - `~/.coderabbit`: `auth.json` beside local state. Without it `coderabbit doctor` reports `[fail] Storage` and a review hangs for many minutes before dying rather than failing fast. **Drop it** when `pull-request:follow-up --local` no longer runs the CLI.
 - `~/.local/share/atuin`: the sync encryption key and session tokens in `meta.db`, which atuin opens read-write on every command, including the history reads behind the `atuin:history` skill. SQLite writes journal and WAL files beside it, so a file-level grant fails intermittently. The sandbox grants no egress to atuin's sync hosts, so the risk is local tampering, reaching the network only through a later unsandboxed `atuin sync`.
 
+`~/.config/.wrangler/config` is a fourth exception: it holds `default.toml`, the `wrangler` OAuth access and refresh tokens, which wrangler rewrites on each hourly refresh. Cloudflare rotates the refresh token when it issues a new access token, and wrangler writes the pair back only after the exchange succeeds. A denied write-back therefore burns the only stored refresh token, and every later call fails as not logged in until an interactive `wrangler login`. The grant covers the directory because named auth profiles write their own files beside `default.toml`. The token is already exfiltrable through the Cloudflare hosts above. **Drop it** alongside those hosts.
+
 `~/.herdr/worktrees` covers deleting a worktree rather than working in one. The session's own worktree is already writable through the sandbox's `.` entry, and removing a *different* one is what fails. `git worktree remove` checks for uncommitted changes, deregisters the admin entry, and only then deletes the files. A denied delete then orphans the directory: absent from `git worktree list`, no admin entry, and beyond git's reach. That happened twice on 2026-09-05, once through `gh pr merge --delete-branch`, which left 2.6 GB behind. **Drop it** when herdr stops placing worktrees under `~/.herdr`.
 
 The rest are tool caches and state directories holding no credential material:
@@ -51,6 +55,7 @@ The rest are tool caches and state directories holding no credential material:
 - `~/.agent-browser`: the CLI's control socket. `agent-browser` sits in `excludedCommands`, but a match has to sit in the invocation's own chain, so a skill script that shells out to it runs sandboxed and fails with `Socket directory is not writable`. Another `excludedCommands` entry would not help. **Drop it** when the `agent-browser` skill stops invoking the CLI from a wrapper.
 - `~/Library/Caches/ms-playwright`: Playwright's unpacked browser builds. Without it an install fails at `mkdir` before reaching the download, which reads as a network problem. **Drop it** when no skill or work repo drives Playwright.
 - `~/.gradle` and `~/.config/jgit`: the Gradle wrapper's distribution lock and jgit's config lock, both written by Java builds in work repos. This fixes the filesystem half only, and a Gradle build that reaches the network still needs a full skip. **Drop both** when no Java repo is in rotation, and revisit if the egress half is ever granted, since the pair only pays off together.
+- `~/.config/.wrangler/logs` and `~/.config/.wrangler/registry`: per-run debug logs and the local dev registry for `wrangler dev` cross-worker bindings. Without the logs grant every invocation prints an `EPERM` error before running. **Drop both** alongside the Cloudflare hosts.
 - `~/.claude/plans`: saved plan files, which copying one in fails without. No injected deny shadows it, unlike the `~/.claude` paths below. Permanent unless plan files move out of `~/.claude`.
 
 ## Sockets and Local Binding

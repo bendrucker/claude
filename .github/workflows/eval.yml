@@ -243,6 +243,12 @@ jobs:
             exit 1
           fi
 
+      # The skill's context injection runs its scripts with bun.
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
       # The runner confines each agent's shell tools with bubblewrap, and
       # Ubuntu 24.04's AppArmor policy blocks the unprivileged user namespaces
       # it needs.

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 git init -q -b main
+# The Linux sandbox mounts placeholder dotfiles into the working tree.
+echo "/.*" >> .git/info/exclude
 git config user.name "Ben Drucker"
 git config user.email bvdrucker@gmail.com
 git config commit.gpgsign false

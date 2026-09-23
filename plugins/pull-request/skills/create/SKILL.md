@@ -68,6 +68,8 @@ Name the primary change. If the title needs a serial comma, it is naming several
 
 ## Body
 
+Load the `writing` skill before drafting a word of the title or body. Draft against the tropes it lists from the first sentence rather than cutting them afterward.
+
 Lead with intent: why the change exists, the decisions a reviewer cannot reconstruct from the diff, and how you know it works. Leave out what the diff, the git log, and the status checks already show.
 
 - Review the session for content that never reached the code: rejected alternatives, scope changes, test observations. State each as a decision that stands on its own, rather than as a delta from a plan the reviewer never saw.
@@ -77,8 +79,6 @@ Lead with intent: why the change exists, the decisions a reviewer cannot reconst
 - Wrap code identifiers in backticks. Leave bare anything the platform auto-links: commit SHAs and issue or MR refs (`#N`, `!N`, `owner/repo#N`). Backticked refs don't auto-link.
 - Default to prose. Write a small PR as one paragraph with no headings. Add `##` sections once the body carries enough substance to need them, judged by substance rather than by diff size.
 - Write one line per paragraph and one line per list item. The body soft-wraps when it renders.
-
-Load the `writing` skill and cut the tropes it lists.
 
 Past one paragraph, load [`references/sections.md`](references/sections.md) and apply every rule in it: audience tiers, session content, density, headings, evidence, optional sections, and slop.
 
@@ -92,7 +92,7 @@ When the context above shows a detected PR template, follow the template's struc
 1. **Local bot review**: the Review bot line above reports repo config, CLI presence, and any cooldown. On a config hit with no cooldown, apply the gate in follow-up's SKILL.md to decide whether the diff needs a metered review, and run `pull-request:follow-up --local` before pushing when it does. With no config, decide from the hosted signals in follow-up's `local.md`. Skip the review when a local bot pass already ran on this branch this session (`/ship` runs one), when the gate says skip, when the provider is paused, when detection finds nothing, or when the user declines.
 1. Push the branch: `git push -u origin HEAD`
 1. Resolve every label against the repo before creating: each `--label` value, plus the review label when the gate in the local bot review step warranted a metered review that no local pass already spent. Load [`references/labels.md`](references/labels.md) for the lookup commands and for what to do when a label doesn't resolve.
-1. Draft the title and body.
+1. Load the `writing` skill, then draft the title and body.
 1. When `--review-body` applies, write the body to `tmp/pr-body-<branch>.md`, run `review:human --doc tmp/pr-body-<branch>.md --summary "PR body for <repo>"`, and fold the feedback into the file before creating. Inside herdr that ends the turn, and the steps below resume when the review comes back. This step reviews the body alone. Under `/ship` the diff already had its review.
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`

@@ -4,6 +4,7 @@ import {
   owningWorkspace,
   protectedWorkspaces,
   unlistedWorkspaces,
+  workspaceDirs,
 } from "./check-workspace-deps";
 
 test.each<{ name: string; source: string; expected: string[] }>([
@@ -29,6 +30,27 @@ test.each<{ name: string; source: string; expected: string[] }>([
   { name: "bun test builtin", source: `import { test } from "bun:test";`, expected: [] },
 ])("importedPackages: $name", ({ source, expected }) => {
   expect([...importedPackages(source)].toSorted()).toEqual(expected.toSorted());
+});
+
+test.each<{ name: string; manifests: string[]; expected: string[] }>([
+  {
+    name: "a plugin and its eval harness each match their own pattern",
+    manifests: ["plugins/issue/package.json", "plugins/issue/evals/refine/package.json"],
+    expected: ["plugins/issue", "plugins/issue/evals/refine"],
+  },
+  {
+    name: "a manifest below a skill matches no pattern",
+    manifests: ["plugins/issue/skills/refine/package.json"],
+    expected: [],
+  },
+  { name: "the root is not a member", manifests: ["package.json"], expected: [] },
+  {
+    name: "a file only ending in package.json is not a manifest",
+    manifests: ["plugins/issue/dev-package.json"],
+    expected: [],
+  },
+])("workspaceDirs: $name", ({ manifests, expected }) => {
+  expect(workspaceDirs(["plugins/*", "plugins/*/evals/*"], manifests)).toEqual(expected);
 });
 
 const DIRS = [".", "plugins/pull-request", "plugins/pull-request/evals/pr-body", "plugins/issue"];

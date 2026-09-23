@@ -57,7 +57,7 @@ Per-skill harnesses live inside the plugin they measure, at `plugins/<plugin>/ev
 - `bun plugins/comments/evals/eval.ts build`, hand the printed `<preflight>` block to the Workflow tool, then `score --job <dir> --gate`. This is the comments judge's ship gate: it scores the labeled corpus through the workflow that ships, on subscription auth. `eval.ts --gate` scores the same corpus through the SDK oracle as a keyed cross-check
 - `bun plugins/prompting/evals/rule-precision/precision.ts --commit <sha>` scores the scan rules by per-line precision against commits where a human deleted prose, and `--rule 'name=/re/'` scores a candidate without editing the scanner
 
-`pull-request:create`, `pull-request:follow-up`, `review:follow-up`, and `writing:no-diary` each carry a `promptfooconfig.yaml` under their `evals/` dir: an in-repo promptfoo suite that loads the plugin and grades cases with `llm-rubric` asserts. `pull-request:create` is migrating to a native `claude plugin eval` suite at [`plugins/pull-request/evals/create`](plugins/pull-request/evals/create/), run through its `run.sh` on subscription auth, and its promptfoo suite retires once that suite's loop is settled. Those four run manually. `eval.yml` runs the pr-body suite on labeled pull requests and runs the native create suite only on dispatch. [`evals/scripts/`](evals/scripts/) files promptfoo runs into the durable corpus and reports what they cost.
+`pull-request:create`, `pull-request:follow-up`, `review:follow-up`, and `writing:no-diary` each carry a `promptfooconfig.yaml` under their `evals/` dir: an in-repo promptfoo suite that loads the plugin and grades cases with `llm-rubric` asserts. Those four run manually. A native `claude plugin eval` suite is a directory of `<case>/case.yaml` cases plus a `run.sh` that loads its plugins and runs on subscription auth, as in [`plugins/pull-request/evals/create`](plugins/pull-request/evals/create/). [`evals/scripts/`](evals/scripts/) files promptfoo runs into the durable corpus and reports what they cost.
 
 Every promptfoo suite runs unkeyed against the logged-in Claude Code CLI, so leave `ANTHROPIC_API_KEY` unset for a local run. The provider hands its whole environment to the spawned CLI, where an API key overrides the subscription login and bills the run. `ANTHROPIC_GRADER_API_KEY` is the optional override that grades through the API instead. CI spends subscription credits too, via a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`.
 
@@ -67,7 +67,7 @@ The older runners still read `ANTHROPIC_API_KEY` from the environment: the pr-bo
 op run --env-file=evals/op.env -- bun plugins/pull-request/evals/pr-body/scripts/judge.ts <run-dir>
 ```
 
-`.github/workflows/eval.yml` runs a promptfoo suite when a pull request touches that suite's paths and carries the `eval` label. `gh workflow run eval.yml --ref <branch> -f suite=<suite>` runs one suite on demand, and `-f args=...` passes extra flags to the native suite's `run.sh`.
+`.github/workflows/eval.yml` runs the promptfoo suites under `plugins/<plugin>/evals/` of every plugin a pull request touches, once it carries the `eval` label. `gh workflow run eval.yml --ref <branch> -f suite=<dir>` runs any suite on demand, telling promptfoo from native by its files. Native suites run on dispatch only.
 
 ## Workflow
 

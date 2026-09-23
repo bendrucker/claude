@@ -70,7 +70,7 @@ Name the primary change. If the title needs a serial comma, it is naming several
 
 Lead with intent: why the change exists, the decisions a reviewer cannot reconstruct from the diff, and how you know it works. Leave out what the diff, the git log, and the status checks already show.
 
-- Review the session for content that never reached the code: rejected alternatives, scope changes, test observations. State each as a decision that stands on its own, rather than as a delta from a plan the reviewer never saw.
+- Review the session for content that never reached the code: rejected alternatives, scope changes, test observations. Keep an alternative only when a reviewer would plausibly propose it, and a scope change only when the reviewer would otherwise ask about it. Leave the rest of the session out. State each item you keep as a decision that stands on its own, rather than as a delta from a plan the reviewer never saw.
 - Use the `Entities` block in the context above to judge what the change did, and write the intent behind those entries. Never reproduce the list.
 - Open with a bare verb ("Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when it needs justifying. Write an opening that adds to the title rather than restating it.
 - Reference the motivating issue at the end of the opening: `Closes #N`, `Fixes #N`, or a bare `#N` when the PR doesn't close it. Leave the issue itself untouched: no comments, labels, milestones, or assignees.

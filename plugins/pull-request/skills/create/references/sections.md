@@ -49,10 +49,10 @@ The PR-body hook re-cases every heading through `heading-case.ts`. When the body
 
 ## Session Content
 
-The best material happened in the session but never reached the code. Review the conversation and pick the two or three items that would change how someone reviews the change, one or two sentences each. In rough order of value:
+The best material happened in the session but never reached the code. Review the conversation and pick the two or three items that would change how someone reviews the change, one or two sentences each. Filter before picking: an item earns a place only when the reviewer would raise it themselves. Background the reviewer already has stays out. In rough order of value:
 
-- A decision with a rejected alternative: what lost and why.
-- Scope added or dropped.
+- A decision with a rejected alternative: what lost and why. Keep it only when a reviewer would plausibly propose that alternative.
+- Scope added or dropped. Keep it only when the reviewer would otherwise ask about it.
 - Test observations: the actual result or failure, with real output. Name what you couldn't test and the concrete blocker ("brew install failed locally", not "needs a real machine").
 - A follow-up, named concretely ("follow-up in #N to…").
 

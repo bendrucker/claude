@@ -103,7 +103,8 @@ const applyCmd = command(
       },
       maxWidth: {
         type: Number,
-        description: "Refuse a splice past this line width (unchecked when omitted)",
+        description:
+          "Refuse a splice past this line width (default: the replaced comment's width, at least 80)",
       },
     },
   },

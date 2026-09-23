@@ -85,8 +85,11 @@ When the facts left after the cut are shorter than the comment, the action is
 reads. `keep` means the cut removes
 nothing.
 
-A docstring opens with the contract in one line. Each sentence after it
-stands on its own: it stays when it states a fact the signature and body
+A comment that carries `doc` follows Doc Comments below instead of the rest of
+this section.
+
+A docstring opens with the contract in one line. Each sentence after it stands
+on its own: it stays when it states a fact the signature and body
 cannot, such as which of two candidate sources is authoritative and why. When
 one sentence holds both that fact and a fallback list, keep the fact and cut
 the list. Trim:
@@ -103,6 +106,49 @@ Class and module docstrings get one line, or go. A multi-line header on a SQL
 query that re-narrates what it selects, the columns it returns, or the steps
 it runs is restatement. Keep only the line that states a fact the code cannot,
 such as a non-obvious data shape or a filter's reason.
+
+## Doc Comments
+
+A comment may carry a `doc` object. It marks the language's formal doc
+comment for the declaration named in `subject`, or for the package or module
+when `target` is `module`: Go `//` directly above a declaration or `package`
+clause, JSDoc/TSDoc, Javadoc, and KDoc `/** */`, Rust `///` and `//!`, C# and
+Swift `///`, and Python docstrings. `exported` means code outside the package
+or module can call it. `required` means the language's standard tooling
+expects the comment to exist: godoc on exported Go identifiers and `package`
+clauses.
+
+The per-language rules below apply to every doc comment. An exported doc
+comment is also API documentation. pkg.go.dev, rustdoc, typedoc,
+and editor hovers render it without the body, so a caller reads it in place of
+the code. Test each sentence against the signature a caller sees, never the
+body. Keep every sentence that states behavior a caller relies on and the
+signature cannot show: what a flag or argument changes, how nil, empty, or
+zero input is handled, when a callback runs, which errors return and when,
+side effects, and a package comment's inventory of what the package holds.
+Cut what a caller does not need: implementation narration, the change's
+history, callers and cross-references, and parameter or return lists that
+repeat a typed signature. Keep `@param`, `@returns`, `@throws`, and Rust's
+`# Errors`, `# Panics`, and `# Safety` sections whenever they state more than
+the type.
+
+Per language:
+
+- **Go**: a doc comment opens with the declared name (`// Parse returns
+  ...`, `// Package config ...`, or a type's `// A Client ...`). Every
+  trim and rewrite keeps that lead sentence. Trim a `required` doc comment to
+  its lead sentence at most, always with `trimTo`, since the applier refuses
+  to delete one. A bare `//` line separates doc paragraphs. Keep a paragraph
+  that states caller-visible behavior, and keep a `Deprecated:` paragraph. An
+  indented line is a code block and a `- ` line is a list item: keep each
+  whole or cut it whole.
+- **JSDoc, TSDoc, Javadoc, KDoc, and the other C-family languages** (C#,
+  Swift, Scala, Dart, PHP, C, C++): keep the `/** */` or `///` form and the
+  summary sentence. A tag stays with the item it documents.
+- **Rust**: `///` documents the item below, and `//!` the enclosing module or
+  crate. Keep the marker the comment uses.
+- **Python**: a docstring stays a docstring, and its first line is the
+  contract.
 
 ## AI Voice
 
@@ -191,8 +237,10 @@ A single comment block can mix a genuine why with restatement. When only part
 carries a fact, set `action: "trim"` and put the kept comment in `trimTo`: the
 comment as it should read after the cut, rewritten to read as complete
 sentences, with its delimiters and no leading indentation (the same contract as
-`rewrite`). The cut may land mid-line. A kept clause whose sentence started on a
-dropped line must be rewritten to stand alone; never ship a dangling fragment.
+`rewrite`). Wrap `trimTo` and `rewrite` text no wider than the comment's
+widest line, or 80 columns if that is wider, and keep its paragraph breaks.
+The cut may land mid-line. A kept clause whose sentence started on a dropped
+line must be rewritten to stand alone; never ship a dangling fragment.
 When the whole comment should go, omit `trimTo`.
 
 A genuine why elsewhere in the block does not excuse a clause that restates the
@@ -202,8 +250,9 @@ fact throughout.
 ## Output
 
 Each comment you judge carries its path, language, kind (line, block, or
-docstring), text, the surrounding line-numbered source, and provenance when
-known. Return exactly one verdict per comment. Per verdict:
+docstring), text, the surrounding line-numbered source, provenance when
+known, and `doc` when it is a formal doc comment. Return exactly one verdict
+per comment. Per verdict:
 
 - `action`: `keep` | `trim` | `rewrite`.
 - `category`: the failing shape for `trim`/`rewrite`, else `null`. Use `voice`

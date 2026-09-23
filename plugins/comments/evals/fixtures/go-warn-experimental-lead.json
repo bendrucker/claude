@@ -1,0 +1,23 @@
+{
+  "id": "go-warn-experimental-lead",
+  "path": "cmd/mcp/mcp.go",
+  "language": "go",
+  "kind": "line",
+  "comment": "// warnExperimental prints a one-time stderr notice that the command is\n// experimental. It fires once per process so repeated calls in tests or\n// scripts do not spam the notice.",
+  "context": "33: \ttoken string\n34: }\n35: \n36: // clientFactory opens an initialized MCP client session.\n37: type clientFactory func(ctx context.Context, conn connectOptions) (*mcpclient.Client, error)\n38: \n39: var experimentalOnce sync.Once\n40: \n41: // warnExperimental prints a one-time stderr notice that the command is\n42: // experimental. It fires once per process so repeated calls in tests or\n43: // scripts do not spam the notice.\n44: func warnExperimental(opts *options.RootOptions) {\n45: \texperimentalOnce.Do(func() {\n46: \t\t_, _ = fmt.Fprintln(opts.IOStreams.Err, \"Warning: 'honeycomb mcp' is experimental and may change.\")\n47: \t})\n48: }\n49: \n50: func newInitializeRequest() mcp.InitializeRequest {\n51: \treturn mcp.InitializeRequest{",
+  "doc": {
+    "target": "declaration",
+    "subject": "warnExperimental",
+    "exported": false,
+    "required": false
+  },
+  "action": "trim",
+  "category": "restate-the-what",
+  "trimTo": "// warnExperimental prints the experimental notice once per process.",
+  "fact": [
+    "warnExperimental",
+    "once per process"
+  ],
+  "note": "Unexported doc. The once-per-process fact stays, and a trim keeps the Name lead the audit dropped.",
+  "source": "honeycomb-cli comments/audit-2b210c41a01d8404 cmd/mcp/mcp.go:41"
+}

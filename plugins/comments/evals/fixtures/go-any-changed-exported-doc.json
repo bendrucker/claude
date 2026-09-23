@@ -1,0 +1,20 @@
+{
+  "id": "go-any-changed-exported-doc",
+  "path": "cmd/command/flags.go",
+  "language": "go",
+  "kind": "line",
+  "comment": "// AnyChanged reports whether the user set any of the named flags on cmd. It\n// backs the \"provide --file or at least one of ...\" guards that several update\n// commands share, reading cobra's own change tracking instead of a parallel\n// set of has-X booleans.",
+  "context": "1: package command\n2: \n3: import \"github.com/spf13/cobra\"\n4: \n5: // AnyChanged reports whether the user set any of the named flags on cmd. It\n6: // backs the \"provide --file or at least one of ...\" guards that several update\n7: // commands share, reading cobra's own change tracking instead of a parallel\n8: // set of has-X booleans.\n9: func AnyChanged(cmd *cobra.Command, names ...string) bool {\n10: \tfor _, n := range names {\n11: \t\tif cmd.Flags().Changed(n) {\n12: \t\t\treturn true\n13: \t\t}\n14: \t}\n15: \treturn false\n16: }",
+  "doc": {
+    "target": "declaration",
+    "subject": "AnyChanged",
+    "exported": true,
+    "required": true
+  },
+  "action": "trim",
+  "category": "docstring-scope",
+  "trimTo": "// AnyChanged reports whether the user set any of the named flags on cmd.",
+  "fact": "AnyChanged reports whether the user set any of the named flags",
+  "note": "Required godoc. The callers and the rejected has-X alternative go; the lead sentence stays.",
+  "source": "honeycomb-cli comments/audit-2b210c41a01d8404 cmd/command/flags.go:5"
+}

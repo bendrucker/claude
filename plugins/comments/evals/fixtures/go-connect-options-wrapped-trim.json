@@ -1,0 +1,23 @@
+{
+  "id": "go-connect-options-wrapped-trim",
+  "path": "cmd/mcp/mcp.go",
+  "language": "go",
+  "kind": "line",
+  "comment": "// connectOptions carries everything the client factory needs to authenticate\n// and open an MCP session. This is the OAuth path that options.AuthMCPOAuth\n// names: it deliberately excludes the Honeycomb config API key, which the\n// OAuth-protected MCP server does not accept, and reaches the server through the\n// OAuth transport below rather than opts.Client / opts.ClientFor.",
+  "context": "16: \t\"github.com/bendrucker/honeycomb-cli/cmd/options\"\n17: \t\"github.com/spf13/cobra\"\n18: )\n19: \n20: // tokenEnvVar holds a pre-issued MCP access token for headless (CI) use,\n21: // bypassing the interactive browser flow.\n22: const tokenEnvVar = \"HONEYCOMB_MCP_TOKEN\"\n23: \n24: // connectOptions carries everything the client factory needs to authenticate\n25: // and open an MCP session. This is the OAuth path that options.AuthMCPOAuth\n26: // names: it deliberately excludes the Honeycomb config API key, which the\n27: // OAuth-protected MCP server does not accept, and reaches the server through the\n28: // OAuth transport below rather than opts.Client / opts.ClientFor.\n29: type connectOptions struct {\n30: \troot   *options.RootOptions\n31: \tmcpURL string\n32: \t// token, when set, is a pre-issued bearer token used for headless auth.\n33: \ttoken string\n34: }\n35: \n36: // clientFactory opens an initialized MCP client session.",
+  "doc": {
+    "target": "declaration",
+    "subject": "connectOptions",
+    "exported": false,
+    "required": false
+  },
+  "action": "trim",
+  "category": "voice",
+  "trimTo": "// connectOptions carries everything the client factory needs to authenticate\n// and open an MCP session. It excludes the Honeycomb config API key, which the\n// OAuth-protected MCP server does not accept.",
+  "fact": [
+    "connectOptions carries",
+    "excludes the Honeycomb config API key"
+  ],
+  "note": "Unexported, so trimmable, but the trim keeps the Name lead and the original wrap width. The audit joined it into one ~300-column line.",
+  "source": "honeycomb-cli comments/audit-2b210c41a01d8404 cmd/mcp/mcp.go:24"
+}

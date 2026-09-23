@@ -156,7 +156,9 @@ describe("computeFileEdits", () => {
           startColumn: 12,
           endColumn: "count += 1; // note".length,
           verdict: verdict({
-            trimTo: "// a kept clause long enough to overflow the configured width limit",
+            action: "rewrite",
+            category: "voice",
+            rewrite: "// a kept clause long enough to overflow the configured width",
           }),
         }),
       ],
@@ -175,11 +177,13 @@ describe("computeFileEdits", () => {
           startColumn: 12,
           endColumn: "count += 1; // note".length,
           verdict: verdict({
-            trimTo: "// a kept clause long enough to overflow the configured width limit",
+            action: "rewrite",
+            category: "voice",
+            rewrite: "// a kept clause long enough to overflow the configured width",
           }),
         }),
       ],
-      expected: "count += 1; // a kept clause long enough to overflow the configured width limit",
+      expected: "count += 1; // a kept clause long enough to overflow the configured width",
       skipsEmpty: true,
     },
     {

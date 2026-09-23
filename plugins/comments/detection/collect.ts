@@ -3,6 +3,7 @@ import { z } from "zod";
 import { contextWindow } from "./context";
 import { measureAddedLines, type ScoredFile } from "./density";
 import { type DiffOptions, resolveDiff } from "./diff";
+import { type DocComment, docCommentOf } from "./doc";
 import { isExemptComment } from "./exempt";
 import { extractComments, languageForPath } from "./extract";
 import { type CommentFeatures, commentFeatures } from "./features";
@@ -25,6 +26,8 @@ export interface CollectedComment extends IntroducedComment {
   features: CommentFeatures;
   /** Who last touched the comment's lines. Absent when the content came from a remote MR ref. */
   provenance?: Provenance | undefined;
+  /** Present when the comment sits in the language's formal doc-comment position. */
+  doc?: DocComment | undefined;
 }
 
 /** A header marker that announces a file is machine-written. */
@@ -100,6 +103,7 @@ function toCollected(
     score: scoreComment(comment),
     features: commentFeatures(comment, lines),
     provenance,
+    doc: docCommentOf(comment, lines, language) ?? undefined,
   };
 }
 

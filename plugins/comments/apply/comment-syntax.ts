@@ -34,7 +34,7 @@ const BLOCK_OPENERS: BlockOpener[] = [
 const LINE_PREFIXES = ["///", "//!", "//", "#", "--"];
 
 /** The comment's own text, with the code before and after its span removed. */
-function spanLines(lines: string[], item: EditItem): string[] {
+export function spanLines(lines: string[], item: EditItem): string[] {
   const first = lines[item.startLine - 1] ?? "";
   if (item.startLine === item.endLine) return [first.slice(item.startColumn, item.endColumn)];
   const out = [first.slice(item.startColumn)];

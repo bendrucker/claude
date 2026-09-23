@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
+import { type DocComment, DocCommentSchema } from "../detection/doc";
 import { type Provenance, ProvenanceSchema } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
 import { BATCH_SIZE, loadPrompt, sha256 } from "./judge";
@@ -16,6 +17,8 @@ export interface ShardComment {
   context: string;
   /** Who last touched the comment's lines, when the local blame describes them. */
   provenance?: Provenance | undefined;
+  /** Present when the comment is the language's formal doc comment for a declaration or module. */
+  doc?: DocComment | undefined;
 }
 
 export interface JobShard {
@@ -34,6 +37,7 @@ const ShardFile = z.object({
       text: z.string(),
       context: z.string(),
       provenance: ProvenanceSchema.optional(),
+      doc: DocCommentSchema.optional(),
     }),
   ),
 }) satisfies z.ZodType<JobShard>;
@@ -67,6 +71,7 @@ function toShardComment(comment: ShardComment): ShardComment {
     text: comment.text,
     context: comment.context,
     provenance: comment.provenance,
+    doc: comment.doc,
   };
 }
 

@@ -1,0 +1,20 @@
+{
+  "id": "go-enum-usage-exported-doc",
+  "path": "cmd/command/enum.go",
+  "language": "go",
+  "kind": "line",
+  "comment": "// EnumUsage renders allowed values for a flag's usage string, matching how\n// ValidateEnum lists them when it rejects a value.",
+  "context": "15: \tfor _, a := range allowed {\n16: \t\tif value == a {\n17: \t\t\treturn nil\n18: \t\t}\n19: \t}\n20: \treturn fmt.Errorf(\"invalid --%s %q: must be one of %s\", flag, value, EnumUsage(allowed))\n21: }\n22: \n23: // EnumUsage renders allowed values for a flag's usage string, matching how\n24: // ValidateEnum lists them when it rejects a value.\n25: func EnumUsage(allowed []string) string {\n26: \treturn strings.Join(allowed, \", \")\n27: }\n28: ",
+  "doc": {
+    "target": "declaration",
+    "subject": "EnumUsage",
+    "exported": true,
+    "required": true
+  },
+  "action": "trim",
+  "category": "narration",
+  "trimTo": "// EnumUsage renders allowed values for a flag's usage string.",
+  "fact": "EnumUsage renders allowed values",
+  "note": "Required godoc on an exported func. The ValidateEnum cross-reference can go, but the doc comment cannot: trim to the Name lead sentence, never delete.",
+  "source": "honeycomb-cli comments/audit-2b210c41a01d8404 cmd/command/enum.go:23"
+}

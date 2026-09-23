@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { CollectedComment } from "../detection/collect";
 import { commentFeatures } from "../detection/features";
 import { scoreComment } from "../detection/rank";
-import { buildJob, writeJob } from "./job";
+import { buildJob, readShard, writeJob } from "./job";
 import { loadPrompt } from "./judge";
 
 const ShardFile = z.looseObject({ comments: z.array(z.unknown()) });
@@ -109,6 +109,26 @@ describe("writeJob", () => {
 
       expect(args.promptText).toBeUndefined();
       expect(await Bun.file(args.promptPath).text()).toBe(descriptor.promptText);
+    } finally {
+      await rm(base, { recursive: true, force: true });
+    }
+  });
+
+  test("round-trips a comment's doc classification through the shard file", async () => {
+    const base = join(tmpdir(), `comments-job-test-doc-${process.pid}`);
+    const doc = {
+      target: "declaration" as const,
+      subject: "Parse",
+      exported: true,
+      required: true,
+    };
+    try {
+      const written = await writeJob(
+        await buildJob([{ ...collected(0), doc }], { fix: false }),
+        base,
+      );
+      const shard = await readShard(written.shards[0]?.path ?? "");
+      expect(shard.comments[0]?.doc).toEqual(doc);
     } finally {
       await rm(base, { recursive: true, force: true });
     }

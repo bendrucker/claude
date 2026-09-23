@@ -1,6 +1,13 @@
+import { type DocComment, docLead } from "../detection/doc";
 import type { CommentKind, Language } from "../detection/types";
 import type { Verdict } from "../judge/schema";
-import { type CommentStyle, conformToStyle, detectStyle, hasDelimiters } from "./comment-syntax";
+import {
+  type CommentStyle,
+  conformToStyle,
+  detectStyle,
+  hasDelimiters,
+  spanLines,
+} from "./comment-syntax";
 
 /** One comment's range plus the verdict that decides how it is trimmed. */
 export interface EditItem {
@@ -10,6 +17,8 @@ export interface EditItem {
   endColumn: number;
   kind: CommentKind;
   verdict: Verdict;
+  /** The doc-comment classification, which gates deletes and lead-dropping replacements. */
+  doc?: DocComment | null | undefined;
 }
 
 /** A comment the applier refused to touch, left for a human to handle. */
@@ -26,9 +35,9 @@ export interface FileEditResult {
 
 export interface FileEditOptions {
   /**
-   * Refuse a splice that would produce a line longer than this. Opt-in: with no
-   * value, width is not checked, because a limit guessed below the target
-   * repo's own would refuse edits that are in fact fine.
+   * Refuse a splice that would produce a line longer than this. Without it, the
+   * limit is the widest line the splice replaces or `WRAP_FLOOR`, whichever is
+   * wider, so a multi-line comment joined onto one line is refused.
    */
   maxWidth?: number | undefined;
   /** Gates the empty-block guard, whose openers are Python's and shell's syntax. */
@@ -71,6 +80,14 @@ function applyFull(
   const wsAfter = after.trim().length === 0;
 
   if (wsBefore && wsAfter) {
+    if (item.doc?.required === true) {
+      skips.push({
+        startLine: item.startLine,
+        reason: "manual",
+        detail: `doc comment on ${item.doc.subject ?? "this declaration"} is required by the language's tooling; trim it to its lead sentence by hand`,
+      });
+      return;
+    }
     for (let n = item.startLine; n <= item.endLine; n++) deletions.add(n);
     removed.push(item);
     return;
@@ -98,12 +115,40 @@ function conformRefusal(style: CommentStyle): string {
   return `replacement text does not match the ${markers} comment it replaces; rewrite by hand`;
 }
 
-/** The refusal detail for a splice that would exceed `maxWidth`, else null. */
-function widthRefusal(produced: string[], maxWidth: number | undefined): string | null {
-  if (maxWidth === undefined) return null;
-  const over = produced.find((line) => line.length > maxWidth);
+/** A short comment's widest line says nothing about the file's wrap width, so the implicit limit never drops below this. */
+const WRAP_FLOOR = 80;
+
+/** The refusal detail for a splice wider than `maxWidth`, or than the implicit limit. */
+function widthRefusal(
+  produced: string[],
+  lines: string[],
+  item: EditItem,
+  maxWidth: number | undefined,
+): string | null {
+  const replaced = lines.slice(item.startLine - 1, item.endLine).map((line) => line.trimEnd());
+  const limit = maxWidth ?? Math.max(WRAP_FLOOR, ...replaced.map((line) => line.length));
+  const over = produced.find((line) => line.length > limit);
   if (over == null || over === "") return null;
-  return `replacement would produce a ${over.length}-character line (over ${maxWidth}); re-wrap by hand`;
+  const bound = maxWidth === undefined ? "the comment's wrap width" : "--max-width";
+  return `replacement would produce a ${over.length}-character line (over ${limit}, ${bound}); re-wrap by hand`;
+}
+
+/** The comment's prose with markers stripped and whitespace collapsed, for comparing lengths and leads. */
+function proseOf(text: string): string {
+  return text
+    .split("\n")
+    .map(stripCommentMarkers)
+    .filter((line) => line.length > 0)
+    .join(" ");
+}
+
+/** Why a doc comment's replacement text is refused, else null. */
+function docRefusal(item: EditItem, original: string, text: string): string | null {
+  const lead = item.doc == null ? null : docLead(item.doc);
+  if (lead?.test(proseOf(original)) === true && !lead.test(proseOf(text))) {
+    return `replacement drops the doc comment's lead naming ${item.doc?.subject}; keep the lead sentence`;
+  }
+  return null;
 }
 
 /**
@@ -132,6 +177,21 @@ function replaceSpan(
   const wsBefore = before.trim().length === 0;
   const wsAfter = after.trim().length === 0;
 
+  const original = spanLines(lines, item).join("\n");
+  const refusal = docRefusal(item, original, text);
+  if (refusal != null) {
+    skips.push({ startLine: item.startLine, reason: "manual", detail: refusal });
+    return;
+  }
+  if (item.verdict.action === "trim" && proseOf(text).length > proseOf(original).length) {
+    skips.push({
+      startLine: item.startLine,
+      reason: "manual",
+      detail: "trimTo is longer than the comment it trims; trim by hand",
+    });
+    return;
+  }
+
   const style = detectStyle(lines, item);
   const conformed = conformToStyle(text, style);
   if (conformed == null) {
@@ -152,7 +212,7 @@ function replaceSpan(
   if (wsBefore && wsAfter) {
     const indent = before;
     const produced = textLines.map((line) => `${indent}${line}`.replace(/\s+$/, ""));
-    const tooWide = widthRefusal(produced, maxWidth);
+    const tooWide = widthRefusal(produced, lines, item, maxWidth);
     if (tooWide != null && tooWide !== "") {
       skips.push({ startLine: item.startLine, reason: "manual", detail: tooWide });
       return;
@@ -165,7 +225,7 @@ function replaceSpan(
   if (!wsBefore && wsAfter && item.kind === "line" && item.startLine === item.endLine) {
     const code = before.replace(/\s+$/, "");
     const produced = [`${code} ${textLines.join(" ")}`.replace(/\s+$/, "")];
-    const tooWide = widthRefusal(produced, maxWidth);
+    const tooWide = widthRefusal(produced, lines, item, maxWidth);
     if (tooWide != null && tooWide !== "") {
       skips.push({ startLine: item.startLine, reason: "manual", detail: tooWide });
       return;

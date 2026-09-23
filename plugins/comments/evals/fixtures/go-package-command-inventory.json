@@ -1,0 +1,23 @@
+{
+  "id": "go-package-command-inventory",
+  "path": "cmd/command/confirm.go",
+  "language": "go",
+  "kind": "line",
+  "comment": "// Package command holds helpers shared by the resource CRUD commands: delete\n// confirmation, definition-file intake, flag-override merging, and resolving a\n// missing flag value through an interactive prompt.",
+  "context": "1: // Package command holds helpers shared by the resource CRUD commands: delete\n2: // confirmation, definition-file intake, flag-override merging, and resolving a\n3: // missing flag value through an interactive prompt.\n4: package command\n5: \n6: import (\n7: \t\"fmt\"\n8: \t\"strings\"\n9: \n10: \t\"github.com/bendrucker/honeycomb-cli/internal/iostreams\"\n11: \t\"github.com/bendrucker/honeycomb-cli/internal/prompt\"",
+  "doc": {
+    "target": "module",
+    "subject": "command",
+    "exported": true,
+    "required": true
+  },
+  "action": "keep",
+  "category": null,
+  "fact": [
+    "Package command",
+    "definition-file intake",
+    "flag-override merging"
+  ],
+  "note": "A package comment's inventory is what pkg.go.dev shows for the package. Trimming it to the first clause removes the only index of what the package holds.",
+  "source": "honeycomb-cli comments/audit-2b210c41a01d8404 cmd/command/confirm.go:1"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "go-test-leaf-commands-examples-doc",
+  "path": "cmd/example_test.go",
+  "language": "go",
+  "kind": "line",
+  "comment": "// TestLeafCommandsHaveExamples walks the command tree and asserts that every\n// leaf command (one with RunE set and no subcommands) under a covered resource\n// has a non-empty Example.",
+  "context": "15: \t\"auth\":    true,\n16: \t\"query\":   true,\n17: \t\"dataset\": true,\n18: \t\"board\":   true,\n19: \t\"trigger\": true,\n20: \t\"key\":     true,\n21: }\n22: \n23: // TestLeafCommandsHaveExamples walks the command tree and asserts that every\n24: // leaf command (one with RunE set and no subcommands) under a covered resource\n25: // has a non-empty Example.\n26: func TestLeafCommandsHaveExamples(t *testing.T) {\n27: \troot := NewRootCmd(iostreams.Test(t).IOStreams)\n28: \n29: \tfor _, resource := range root.Commands() {\n30: \t\tif !coveredResources[resource.Name()] {\n31: \t\t\tcontinue\n32: \t\t}\n33: ",
+  "doc": {
+    "target": "declaration",
+    "subject": "TestLeafCommandsHaveExamples",
+    "exported": true,
+    "required": true
+  },
+  "action": "keep",
+  "category": null,
+  "fact": [
+    "TestLeafCommandsHaveExamples",
+    "RunE set and no subcommands"
+  ],
+  "note": "Exported test func godoc. It defines what a leaf command is for the assertion, which the walker encodes two functions away.",
+  "source": "honeycomb-cli comments/audit-2b210c41a01d8404 cmd/example_test.go:23"
+}

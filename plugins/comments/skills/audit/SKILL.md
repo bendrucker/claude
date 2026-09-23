@@ -31,7 +31,7 @@ The pipeline is three steps, run in order: `preflight` (extract, rank, build the
 - `--fix`: ask the judge for a concrete suggestion per finding.
 - `--report`: at apply time, print findings instead of writing a branch.
 - `--format <template>`: at apply time, pipe each edited file through a formatter before committing.
-- `--max-width <n>`: at apply time, refuse a splice that would exceed `n` columns.
+- `--max-width <n>`: at apply time, refuse a splice that would exceed `n` columns. Without it, the limit is the widest line of the comment being replaced, or 80 columns if that is wider.
 
 ## Preflight
 
@@ -95,4 +95,4 @@ The applier splices lines without running a formatter. `--format` takes a shell 
 
 Pass only a formatter the target repo configures. When the repo configures none, omit the flag.
 
-Without `--format`, `--max-width` is the only guard on wrapping. Set it to the width the target repo already enforces (its formatter config, `.editorconfig`, or a linter rule). When the repo enforces none, omit the flag.
+Without `--format`, the width limit is the only guard on wrapping. Set `--max-width` to the width the target repo already enforces (its formatter config, `.editorconfig`, or a linter rule). When the repo enforces none, omit the flag.

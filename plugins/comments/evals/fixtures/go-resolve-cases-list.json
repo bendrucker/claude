@@ -1,0 +1,23 @@
+{
+  "id": "go-resolve-cases-list",
+  "path": "cmd/command/resolve.go",
+  "language": "go",
+  "kind": "line",
+  "comment": "// Resolve returns value when it is already set, otherwise prompts for it.\n//\n//   - value already set: returned as-is, no prompt.\n//   - value empty, required, cannot prompt: returns field.NonInteractiveErr.\n//   - value empty, can prompt: prompts (prompt.Choice when Choices is set,\n//     otherwise prompt.Line) and returns the answer.\n//   - value empty, required, prompted but still empty: returns field.EmptyErr.\n//   - value empty, optional, cannot prompt: returns \"\" with no error.",
+  "context": "37: // value is StreamErr, matching the majority of call sites.\n38: type Stream int\n39: \n40: const (\n41: \tStreamErr Stream = iota\n42: \tStreamOut\n43: )\n44: \n45: // Resolve returns value when it is already set, otherwise prompts for it.\n46: //\n47: //   - value already set: returned as-is, no prompt.\n48: //   - value empty, required, cannot prompt: returns field.NonInteractiveErr.\n49: //   - value empty, can prompt: prompts (prompt.Choice when Choices is set,\n50: //     otherwise prompt.Line) and returns the answer.\n51: //   - value empty, required, prompted but still empty: returns field.EmptyErr.\n52: //   - value empty, optional, cannot prompt: returns \"\" with no error.\n53: func Resolve(ios *iostreams.IOStreams, value string, field Field) (string, error) {\n54: \tif value != \"\" {\n55: \t\treturn value, nil\n56: \t}\n57: \n58: \tif !ios.CanPrompt() {\n59: \t\tif field.Required {\n60: \t\t\treturn \"\", field.NonInteractiveErr",
+  "doc": {
+    "target": "declaration",
+    "subject": "Resolve",
+    "exported": true,
+    "required": true
+  },
+  "action": "keep",
+  "category": null,
+  "fact": [
+    "Resolve returns value when it is already set",
+    "NonInteractiveErr",
+    "EmptyErr"
+  ],
+  "note": "The case list is the error contract of an exported func: which error returns when. A caller reads it in place of the body.",
+  "source": "honeycomb-cli comments/audit-2b210c41a01d8404 cmd/command/resolve.go:45"
+}

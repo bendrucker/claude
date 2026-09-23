@@ -21,6 +21,7 @@ the voice/rewrite cases.
   "trimTo": "# the kept comment, rewritten to stand alone",
   "fact": "the phrase the surviving text must carry",
   "quoted": null,
+  "doc": null,
   "source": "jacob/!680 get_records.py:1116",
   "note": "Ben's review note or the rationale for the label"
 }
@@ -48,6 +49,9 @@ the voice/rewrite cases.
   fixture's precision and recall report as a separate bucket, outside the
   headline numbers and the recall floor. The must-keep check still covers it,
   and a test fails when the rubric stops quoting the phrase.
+- `doc`: the `DocComment` extraction attaches to a formal doc comment
+  (`target`, `subject`, `exported`, `required`), or `null`. Copy it from
+  `docCommentOf` over the full source file, since the judge reads it.
 - `context`: real source, line-numbered, so the judge can answer the
   what-on-dense question.
 
@@ -59,6 +63,8 @@ in less text belongs in `trim` with a gold `trimTo`, no matter how well
 justified, so a `keep` is already about as short as its fact allows. The keeps
 cover a canonical-API-name docstring, why-comments on guards and SQL, a test
 constant's rationale, and a plain factual doc that pins the over-rewrite guard.
+The `go-` fixtures pin formal doc comments: required godoc trims to its
+`Name` lead sentence at most, and exported godoc keeps its caller contract.
 `trim` fixtures cover `restate-the-what`, `narration`, `docstring-scope`,
 `section-divider`, and a `voice` cut. `rewrite` fixtures carry a fact under AI
 voice (contrastive framing, marketing vocabulary), where the fix is to strip the

@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import Builder from "fast-xml-builder";
 import { z } from "zod";
+import type { DocComment } from "../detection/doc";
 import type { Provenance } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
 import { type JudgeAdapter, shardJudge } from "../judge/adapter";
@@ -42,6 +43,8 @@ export interface CommentJudgeInput {
   context: string;
   /** Who last touched the comment's lines, when known. */
   provenance?: Provenance | undefined;
+  /** Present when the comment is a formal doc comment. */
+  doc?: DocComment | undefined;
 }
 
 /** Judges a batch of comments. The eval tests mock this. The SDK call implements it. */
@@ -71,6 +74,7 @@ export function formatBatch(inputs: CommentJudgeInput[]): string {
         text: input.text,
         context: input.context,
         provenance: input.provenance,
+        doc: input.doc,
       })),
     },
   });

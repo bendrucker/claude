@@ -5,8 +5,9 @@ import { computeFileEdits, type EditItem } from "../../../apply/edits";
 import { formatContent } from "../../../apply/format";
 import { collectVerdicts, matchVerdicts } from "../../../apply/join";
 import { color, type ReportItem, renderReport, summarize } from "../../../apply/report";
+import { docCommentOf } from "../../../detection/doc";
 import { extractComments, languageForPath } from "../../../detection/extract";
-import type { Comment } from "../../../detection/types";
+import type { Comment, Language } from "../../../detection/types";
 import { verdictPath } from "../../../judge/adapter";
 import { type JobShard, readShard, type ShardRef } from "../../../judge/job";
 import type { Verdict } from "../../../judge/schema";
@@ -21,7 +22,7 @@ export interface ApplyOptions {
   fix: boolean;
   /** Shell template to format each edited file through (`{}` = path, content on stdin). */
   format?: string | undefined;
-  /** Refuse a splice past this line width. Unchecked when omitted. */
+  /** Refuse a splice past this line width. Defaults to the width of the comment it replaces. */
   maxWidth?: number | undefined;
 }
 
@@ -37,7 +38,12 @@ export interface ApplyResult {
   manual: string[];
 }
 
-function toEditItem(comment: Comment, verdict: Verdict): EditItem {
+function toEditItem(
+  comment: Comment,
+  verdict: Verdict,
+  lines: string[],
+  language: Language,
+): EditItem {
   return {
     startLine: comment.startLine,
     endLine: comment.endLine,
@@ -45,6 +51,7 @@ function toEditItem(comment: Comment, verdict: Verdict): EditItem {
     endColumn: comment.endColumn,
     kind: comment.kind,
     verdict,
+    doc: docCommentOf(comment, lines, language),
   };
 }
 
@@ -146,6 +153,7 @@ export async function apply(options: ApplyOptions, io: AuditIo): Promise<ApplyRe
     if (language == null || language === "" || !(await file.exists())) continue;
     // oxlint-disable-next-line no-await-in-loop -- the report lists findings in judged-path order and the body threads shared accumulators.
     const source = await file.text();
+    const lines = source.split("\n");
     const editItems: EditItem[] = [];
     // oxlint-disable-next-line no-await-in-loop -- the report lists findings in judged-path order and the body threads shared accumulators.
     for (const match of matchVerdicts(path, await extractComments(source, language), verdicts)) {
@@ -156,7 +164,9 @@ export async function apply(options: ApplyOptions, io: AuditIo): Promise<ApplyRe
         verdict: match.verdict,
         text: match.comment.text,
       });
-      if (match.verdict.action !== "keep") editItems.push(toEditItem(match.comment, match.verdict));
+      if (match.verdict.action !== "keep") {
+        editItems.push(toEditItem(match.comment, match.verdict, lines, language));
+      }
     }
     if (editItems.length > 0) {
       const result = computeFileEdits(source, editItems, { maxWidth: options.maxWidth, language });

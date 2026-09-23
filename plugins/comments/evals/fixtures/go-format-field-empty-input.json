@@ -1,0 +1,22 @@
+{
+  "id": "go-format-field-empty-input",
+  "path": "cmd/board/board.go",
+  "language": "go",
+  "kind": "line",
+  "comment": "// FormatField summarizes a board's panels as one line per panel, pairing each\n// panel's type with the query, SLO, or text it references. An empty raw message\n// (no panels) renders as an em-dash.",
+  "context": "68: func (p panels) MarshalJSON() ([]byte, error) {\n69: \treturn json.RawMessage(p).MarshalJSON()\n70: }\n71: \n72: func (p *panels) UnmarshalJSON(data []byte) error {\n73: \treturn (*json.RawMessage)(p).UnmarshalJSON(data)\n74: }\n75: \n76: // FormatField summarizes a board's panels as one line per panel, pairing each\n77: // panel's type with the query, SLO, or text it references. An empty raw message\n78: // (no panels) renders as an em-dash.\n79: func (p panels) FormatField() string {\n80: \traw := json.RawMessage(p)\n81: \tif len(raw) == 0 {\n82: \t\treturn \"—\"\n83: \t}\n84: \n85: \tvar parsed []struct {\n86: \t\tType       string `json:\"type\"`",
+  "doc": {
+    "target": "declaration",
+    "subject": "FormatField",
+    "exported": true,
+    "required": true
+  },
+  "action": "keep",
+  "category": null,
+  "fact": [
+    "FormatField summarizes",
+    "renders as an em-dash"
+  ],
+  "note": "Exported method godoc. The empty-input behavior is caller-visible output the signature cannot show.",
+  "source": "honeycomb-cli comments/audit-2b210c41a01d8404 cmd/board/board.go:76"
+}

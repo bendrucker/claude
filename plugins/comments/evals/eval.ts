@@ -9,6 +9,7 @@ import { table } from "table";
 import { z } from "zod";
 import { stripCommentMarkers } from "../apply/edits";
 import { collectVerdicts } from "../apply/join";
+import { type DocComment, DocCommentSchema } from "../detection/doc";
 import { type Provenance, ProvenanceSchema } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
 import { workflowJudge } from "../judge/adapter";
@@ -53,6 +54,8 @@ export interface Fixture {
   quoted?: string;
   /** Absent fixtures are judged as agent-written, the rubric's default. */
   provenance?: Provenance;
+  /** The doc-comment classification extraction would attach. */
+  doc?: DocComment;
   source?: string;
   note?: string;
 }
@@ -110,6 +113,7 @@ const FixtureInput = z
       fact: z.union([nonEmpty("fact"), z.array(nonEmpty("fact")).min(1)]).nullish(),
       quoted: nonEmpty("quoted").nullish(),
       provenance: ProvenanceSchema.nullish(),
+      doc: DocCommentSchema.nullish(),
       source: z.string().nullish(),
       note: z.string().nullish(),
     },
@@ -170,6 +174,7 @@ function validateFixture(value: unknown, file: string): Fixture {
   if (decoded.fact != null) fixture.fact = [decoded.fact].flat();
   if (decoded.quoted != null) fixture.quoted = decoded.quoted;
   if (decoded.provenance != null) fixture.provenance = decoded.provenance;
+  if (decoded.doc != null) fixture.doc = decoded.doc;
   if (decoded.source != null) fixture.source = decoded.source;
   if (decoded.note != null) fixture.note = decoded.note;
   return fixture;
@@ -185,6 +190,7 @@ export function fixtureToShardComment(fixture: Fixture): ShardComment {
     text: fixture.comment,
     context: fixture.context,
     provenance: fixture.provenance,
+    doc: fixture.doc,
   };
 }
 
@@ -196,6 +202,7 @@ export function fixtureToInput(fixture: Fixture): CommentJudgeInput {
     text: fixture.comment,
     context: fixture.context,
     provenance: fixture.provenance,
+    doc: fixture.doc,
   };
 }
 

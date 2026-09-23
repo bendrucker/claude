@@ -1,0 +1,154 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`docCommentOf Go 1`] = `
+{
+  "// ConfirmDelete reports whether a delete should proceed.": {
+    "exported": true,
+    "required": true,
+    "subject": "ConfirmDelete",
+    "target": "declaration",
+  },
+  "// EnumUsage renders allowed values.": {
+    "exported": true,
+    "required": true,
+    "subject": "EnumUsage",
+    "target": "declaration",
+  },
+  "// Field describes one input.": {
+    "exported": true,
+    "required": true,
+    "subject": "Field",
+    "target": "declaration",
+  },
+  "// ModeFast skips checks.": {
+    "exported": true,
+    "required": true,
+    "subject": "ModeFast",
+    "target": "declaration",
+  },
+  "// Package command holds shared helpers.": {
+    "exported": true,
+    "required": true,
+    "subject": "command",
+    "target": "module",
+  },
+  "// Prompt is shown when prompting.": {
+    "exported": true,
+    "required": false,
+    "subject": "Prompt",
+    "target": "declaration",
+  },
+  "// a statement comment": null,
+  "// detached from what follows": null,
+  "// knownMethod reports whether s is known.": {
+    "exported": false,
+    "required": false,
+    "subject": "knownMethod",
+    "target": "declaration",
+  },
+  "// modeSlow runs them.": {
+    "exported": false,
+    "required": false,
+    "subject": "modeSlow",
+    "target": "declaration",
+  },
+}
+`;
+
+exports[`docCommentOf Rust 1`] = `
+{
+  "// plain": null,
+  "//! Crate docs.": {
+    "exported": true,
+    "required": false,
+    "subject": null,
+    "target": "module",
+  },
+  "/// Adds two numbers.": {
+    "exported": true,
+    "required": false,
+    "subject": "add",
+    "target": "declaration",
+  },
+  "/// Private helper.": {
+    "exported": false,
+    "required": false,
+    "subject": "helper",
+    "target": "declaration",
+  },
+}
+`;
+
+exports[`docCommentOf TypeScript 1`] = `
+{
+  "/* plain block */": null,
+  "/**": {
+    "exported": true,
+    "required": false,
+    "subject": "add",
+    "target": "declaration",
+  },
+  "/** Private state. */": {
+    "exported": false,
+    "required": false,
+    "subject": "count",
+    "target": "declaration",
+  },
+  "/** Public method. */": {
+    "exported": true,
+    "required": false,
+    "subject": "run",
+    "target": "declaration",
+  },
+}
+`;
+
+exports[`docCommentOf Java and Kotlin 1`] = `
+{
+  "java": {
+    "/**": {
+      "exported": true,
+      "required": false,
+      "subject": "add",
+      "target": "declaration",
+    },
+  },
+  "kotlin": {
+    "/** Adds. */": {
+      "exported": false,
+      "required": false,
+      "subject": "add",
+      "target": "declaration",
+    },
+  },
+}
+`;
+
+exports[`docCommentOf Python 1`] = `
+{
+  "\\"\\"\\"Dunder.\\"\\"\\"": {
+    "exported": true,
+    "required": false,
+    "subject": "__init__",
+    "target": "declaration",
+  },
+  "\\"\\"\\"Module docs.\\"\\"\\"": {
+    "exported": true,
+    "required": false,
+    "subject": null,
+    "target": "module",
+  },
+  "\\"\\"\\"Private helper.\\"\\"\\"": {
+    "exported": false,
+    "required": false,
+    "subject": "_private",
+    "target": "declaration",
+  },
+  "\\"\\"\\"Public class.\\"\\"\\"": {
+    "exported": true,
+    "required": false,
+    "subject": "Public",
+    "target": "declaration",
+  },
+}
+`;

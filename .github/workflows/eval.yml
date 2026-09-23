@@ -271,7 +271,7 @@ jobs:
       - uses: ./.github/actions/claude-code
 
       # --threshold 0 leaves the exit code to runner errors. Scores are read
-      # from result.json, where a case below 1.0 is the normal state.
+      # from aggregate-result.json, where a case below 1.0 is the normal state.
       - name: Run eval
         id: eval
         continue-on-error: true
@@ -283,17 +283,17 @@ jobs:
           "$SUITE_DIR/run.sh" --no-publish --threshold 0 --concurrency 4 $ARGS
 
       - name: Upload results
-        if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/result.json', env.SUITE_DIR)) != ''
+        if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
         uses: actions/upload-artifact@v7
         with:
           name: eval-${{ env.SUITE }}-${{ github.run_id }}
           path: ${{ env.SUITE_DIR }}/results/
 
       - name: Summarize results
-        if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/result.json', env.SUITE_DIR)) != ''
+        if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
         run: |
           set -euo pipefail
-          results=("$SUITE_DIR"/results/*/result.json)
+          results=("$SUITE_DIR"/results/*/aggregate-result.json)
           jq -r --arg suite "$SUITE" '
             def pct: if . == null then "–" else (. * 100 | round | tostring) + "%" end;
             "## claude plugin eval: \($suite)",
@@ -307,15 +307,15 @@ jobs:
 
       # A suite that ships compare.ts gets its tables against the baseline run.
       - name: Compare with baseline
-        if: inputs.baseline != '' && steps.eval.outcome != 'skipped' && hashFiles(format('{0}/compare.ts', env.SUITE_DIR)) != '' && hashFiles(format('{0}/results/*/result.json', env.SUITE_DIR)) != ''
+        if: inputs.baseline != '' && steps.eval.outcome != 'skipped' && hashFiles(format('{0}/compare.ts', env.SUITE_DIR)) != '' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
         env:
           GH_TOKEN: ${{ github.token }}
           BASELINE: ${{ inputs.baseline }}
         run: |
           set -euo pipefail
           gh run download "$BASELINE" --dir "$RUNNER_TEMP/baseline"
-          baselines=("$RUNNER_TEMP"/baseline/*/*/result.json)
-          results=("$SUITE_DIR"/results/*/result.json)
+          baselines=("$RUNNER_TEMP"/baseline/*/*/aggregate-result.json)
+          results=("$SUITE_DIR"/results/*/aggregate-result.json)
           {
             echo ""
             echo "### Compared with run $BASELINE"

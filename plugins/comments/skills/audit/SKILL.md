@@ -23,7 +23,7 @@ The pipeline is three steps, run in order: `preflight` (extract, rank, build the
 
 ## Scope and Flags
 
-- Default, `--base <ref>`, `--mr <iid>`: diff scope. Judges the comments a change introduced. Default is the working tree (staged plus unstaged). `--base main` is the merge-base with a ref. `--mr <iid>` is a GitLab merge request over `glab`.
+- Default, `--base <ref>`, `--mr <iid>`: diff scope. Judges the comments a change introduced. Default is the working tree (staged, unstaged, and untracked). `--base main` diffs the same working tree against the merge-base with a ref. `--mr <iid>` is a GitLab merge request over `glab`.
 - `--all`: repo scope. Judges every tracked code file's comments.
 - `--path <glob>`: narrow either scope to matching paths. Repeatable. Use it on a first `--all` run on a large repo to cap the agent count.
 - `--sort lines|chars|score` (default `score`): rank by comment complexity so the longest, densest comments judge first.
@@ -86,7 +86,7 @@ Apply re-extracts the judged files, matches verdicts to comments by id, and comm
 
 ### Formatting
 
-The applier splices lines without running a formatter. `--format` takes a shell command template: `{}` is replaced with the repo-relative path, the file's new content is piped on stdin, stdout is taken as the formatted content, and the command runs from the repo root:
+The applier splices lines without running a formatter. `--format` takes a shell command template: `{}` is replaced with the repo-relative path, the file's new content is piped on stdin, stdout is taken as the formatted content, and the command runs from the repo root. A non-zero exit, output with under half the input's lines, or output that keeps none of the input's comments warns and keeps the unformatted content:
 
 ```bash
 --format 'ruff format --stdin-filename {} -'

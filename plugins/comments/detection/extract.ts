@@ -64,10 +64,11 @@ function mergeKind(a: CommentKind, b: CommentKind): CommentKind {
 }
 
 /**
- * Merge a contiguous run of line comments at the same column into one comment,
- * so multi-line prose written as a `//`/`--` run is judged and trimmed as a
- * paragraph rather than line by line. A blank gap or a column change ends the
- * run, keeping standalone comments over distinct code separate. Block and
+ * Merge a contiguous run of full-line comments at the same column into one
+ * comment, so multi-line prose written as a `//`/`--` run is judged and trimmed
+ * as a paragraph rather than line by line. A blank gap or a column change ends
+ * the run, keeping standalone comments over distinct code separate. Trailing
+ * comments after code never merge, since the merged span would take in the code. Block and
  * docstring comments already coalesce via their open scope, so only `line` runs
  * are merged here.
  *
@@ -77,6 +78,8 @@ function mergeKind(a: CommentKind, b: CommentKind): CommentKind {
  */
 function coalesceLineRuns(comments: Comment[], lines: string[]): Comment[] {
   const shebang = isShebangLine(lines[0] ?? "");
+  const ownsLine = (comment: Comment): boolean =>
+    (lines[comment.startLine - 1] ?? "").slice(0, comment.startColumn).trim() === "";
   const merged: Comment[] = [];
   for (const comment of comments) {
     const prev = merged.at(-1);
@@ -85,6 +88,8 @@ function coalesceLineRuns(comments: Comment[], lines: string[]): Comment[] {
       comment.kind === "line" &&
       comment.startLine === prev.endLine + 1 &&
       comment.startColumn === prev.startColumn &&
+      ownsLine(prev) &&
+      ownsLine(comment) &&
       !(shebang && prev.startLine === 1)
     ) {
       prev.endLine = comment.endLine;

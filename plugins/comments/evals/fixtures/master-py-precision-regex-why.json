@@ -8,7 +8,6 @@
   "action": "trim",
   "category": "restate-the-what",
   "trimTo": "# FieldDefinition's integer precision/scale columns are 0 for ~55% of numeric\n# fields, so precision and scale come from the DataType label, e.g. \"Currency(16, 2)\".",
-  "trimToLines": null,
   "fact": "0 for ~55% of numeric fields",
   "quoted": "(see _duckdb_type)",
   "source": "main master.py:55",

@@ -110,7 +110,6 @@ describe("scoreResults", () => {
     ],
     ["a trim that drops the fact", verdict({ trimTo: "# Retries share a backoff." }), false],
     ["a whole-comment trim", verdict({}), false],
-    ["a line-range trim that keeps the fact", verdict({ trimToLines: [2] }), true],
   ] as const)("a keep fixture judged %s passes: %p", (_name, v, passed) => {
     const m = scoreResults([keepWithFact], [v]);
     expect(m.keepViolations).toEqual(passed ? [] : ["keep"]);

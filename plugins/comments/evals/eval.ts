@@ -47,7 +47,6 @@ export interface Fixture {
   rewrite?: string | null;
   /** For a partial `trim`: the owner's gold kept-comment text, for hand spot-checks. */
   trimTo?: string;
-  trimToLines?: number[];
   /** Phrases the surviving text must carry. Required on `keep` and on a `trim` with `trimTo`. */
   fact?: string[];
   /** The phrase `judge/prompt.md` quotes from this fixture, which keeps it out of the headline numbers. */
@@ -97,7 +96,6 @@ const FixtureInput = z
         .nullish(),
       rewrite: z.string().nullish(),
       trimTo: z.string().nullish(),
-      trimToLines: z.array(z.number()).nullish(),
       fact: z.union([nonEmpty("fact"), z.array(nonEmpty("fact")).min(1)]).nullish(),
       quoted: nonEmpty("quoted").nullish(),
       provenance: ProvenanceSchema.nullish(),
@@ -155,7 +153,6 @@ function validateFixture(value: unknown, file: string): Fixture {
   };
   if (decoded.trimTo != null) fixture.trimTo = decoded.trimTo;
   if (decoded.rewrite != null) fixture.rewrite = decoded.rewrite;
-  if (decoded.trimToLines != null) fixture.trimToLines = decoded.trimToLines;
   if (decoded.fact != null) fixture.fact = [decoded.fact].flat();
   if (decoded.quoted != null) fixture.quoted = decoded.quoted;
   if (decoded.provenance != null) fixture.provenance = decoded.provenance;
@@ -214,9 +211,7 @@ export function carriesFact(text: string, facts: string[]): boolean {
 function survivingText(fixture: Fixture, verdict: Verdict): string {
   if (verdict.action === "keep") return fixture.comment;
   if (verdict.action === "rewrite") return verdict.rewrite ?? "";
-  if (verdict.trimTo != null) return verdict.trimTo;
-  const lines = fixture.comment.split("\n");
-  return (verdict.trimToLines ?? []).map((n) => lines[n - 1] ?? "").join("\n");
+  return verdict.trimTo ?? "";
 }
 
 export interface ActionMismatch {

@@ -8,7 +8,6 @@
   "action": "trim",
   "category": "docstring-scope",
   "trimTo": "\"\"\"Regression for ENG-1886: scope allowlist must come from the catalog.\n\n``information_schema.tables`` lists only the views bound on the current\nconnection, so it misses every config view ``search`` has not preloaded.\n\"\"\"",
-  "trimToLines": null,
   "fact": [
     "allowlist must come from the catalog",
     "information_schema.tables"

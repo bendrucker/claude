@@ -1,4 +1,4 @@
-import type { CommentKind } from "../detection/types";
+import type { CommentKind, Language } from "../detection/types";
 import type { Verdict } from "../judge/schema";
 import { type CommentStyle, conformToStyle, detectStyle, hasDelimiters } from "./comment-syntax";
 
@@ -31,42 +31,14 @@ export interface FileEditOptions {
    * repo's own would refuse edits that are in fact fine.
    */
   maxWidth?: number | undefined;
+  /** Gates the empty-block guard, whose openers are Python's and shell's syntax. */
+  language?: Language | undefined;
 }
 
-/**
- * Words that continue a sentence rather than start one. A kept line opening
- * with one of these, right after a dropped line that lacks terminal
- * punctuation, is almost certainly a mid-sentence fragment. Sentence-opening
- * prepositions (for, to, from, of, as) are excluded: they routinely start
- * complete sentences ("For each entry, retry once.") and over-fire the guard.
- */
-export const SENTENCE_CONNECTIVES = new Set([
-  "and",
-  "or",
-  "but",
-  "so",
-  "which",
-  "that",
-  "the",
-  "this",
-  "these",
-  "those",
-  "other",
-  "others",
-  "its",
-  "their",
-  "instead",
-  "rather",
-  "with",
-  "without",
-  "because",
-  "since",
-  "while",
-  "when",
-  "where",
-]);
-
 const isBlank = (line: string): boolean => line.trim().length === 0;
+
+/** The `\r` a CRLF line keeps after `split("\n")`, re-appended to any line rebuilt from it. */
+const lineEnding = (line: string | undefined): string => (line?.endsWith("\r") ? "\r" : "");
 
 /** A line's prose: leading/trailing comment markers and whitespace stripped. */
 export function stripCommentMarkers(line: string): string {
@@ -77,81 +49,20 @@ export function stripCommentMarkers(line: string): string {
     .trim();
 }
 
-/**
- * The source lines a `trimToLines` verdict keeps, expressed as 1-based source
- * line numbers. `trimToLines` is comment-relative (line 1 is the comment's first
- * line). Returns null when the comment should be removed whole: no trim, an empty
- * trim, or a trim that lands entirely outside the comment span.
- */
-function keepLines(item: EditItem): number[] | null {
-  const trim = item.verdict.trimToLines;
-  if (!trim || trim.length === 0) return null;
-  const span = item.endLine - item.startLine + 1;
-  const keep = trim
-    .filter((k) => Number.isInteger(k) && k >= 1 && k <= span)
-    .map((k) => item.startLine + k - 1);
-  return keep.length === 0 ? null : keep;
-}
+const indentOf = (line: string): number => line.length - line.trimStart().length;
 
-/**
- * True when a line-range trim would keep a line that continues a sentence begun
- * on a dropped line: the dropped boundary line does not end a sentence and the
- * kept line opens with a connective word. `trimToLines` cannot express the
- * needed mid-line cut, so the trim must go to a human (or a `trimTo` verdict).
- */
-function strandsFragment(item: EditItem, kept: Set<number>, lines: string[]): boolean {
-  for (const n of kept) {
-    if (n <= item.startLine || kept.has(n - 1)) continue;
-    const dropped = stripCommentMarkers(lines[n - 2] ?? "");
-    if (/[.!?:]$/.test(dropped)) continue;
-    // Match letters only, so a connective with trailing punctuation ("that,")
-    // still resolves to its word.
-    const firstWord = stripCommentMarkers(lines[n - 1] ?? "")
-      .match(/^[A-Za-z']+/)?.[0]
-      ?.toLowerCase();
-    if (firstWord != null && firstWord !== "" && SENTENCE_CONNECTIVES.has(firstWord)) return true;
-  }
-  return false;
-}
+/** A code line: neither blank nor a `#` comment, the forms a Python or shell block cannot live on alone. */
+const isCode = (line: string): boolean => !isBlank(line) && !line.trimStart().startsWith("#");
 
-function applyTrim(
-  item: EditItem,
-  keep: number[],
-  lines: string[],
-  deletions: Set<number>,
-  skips: EditSkip[],
-): void {
-  const kept = new Set(keep);
-  if (
-    (item.kind === "block" || item.kind === "docstring") &&
-    (!kept.has(item.startLine) || !kept.has(item.endLine))
-  ) {
-    skips.push({
-      startLine: item.startLine,
-      reason: "manual",
-      detail: "trim would drop the opening or closing delimiter of a block comment",
-    });
-    return;
-  }
-  if (strandsFragment(item, kept, lines)) {
-    skips.push({
-      startLine: item.startLine,
-      reason: "manual",
-      detail:
-        "partial trim would keep a mid-sentence fragment (sentence starts mid-line on a dropped line); rewrite by hand",
-    });
-    return;
-  }
-  for (let n = item.startLine; n <= item.endLine; n++) {
-    if (!kept.has(n)) deletions.add(n);
-  }
-}
+/** A line opening a block whose body cannot be empty: Python's `:`, shell's `then`, `do`, `else`. */
+const BODY_OPENER = /(?::|\b(?:then|do|else))$/;
 
 function applyFull(
   item: EditItem,
   lines: string[],
   deletions: Set<number>,
   replacements: Map<number, string>,
+  removed: EditItem[],
   skips: EditSkip[],
 ): void {
   const before = (lines[item.startLine - 1] ?? "").slice(0, item.startColumn);
@@ -161,11 +72,13 @@ function applyFull(
 
   if (wsBefore && wsAfter) {
     for (let n = item.startLine; n <= item.endLine; n++) deletions.add(n);
+    removed.push(item);
     return;
   }
 
   if (!wsBefore && wsAfter && item.kind === "line" && item.startLine === item.endLine) {
-    replacements.set(item.startLine, before.replace(/\s+$/, ""));
+    const cr = lineEnding(lines[item.startLine - 1]);
+    replacements.set(item.startLine, `${before.replace(/\s+$/, "")}${cr}`);
     return;
   }
 
@@ -212,6 +125,7 @@ function replaceSpan(
   spanInserts: Map<number, string[]>,
   skips: EditSkip[],
   maxWidth: number | undefined,
+  eol: string,
 ): void {
   const before = (lines[item.startLine - 1] ?? "").slice(0, item.startColumn);
   const after = (lines[item.endLine - 1] ?? "").slice(item.endColumn);
@@ -229,6 +143,11 @@ function replaceSpan(
     return;
   }
   const textLines = conformed.split("\n");
+  const spanEnding = lineEnding(lines[item.endLine - 1]);
+  // An unterminated last line carries no ending of its own, so interior lines fall back to the file's.
+  const interior = item.endLine < lines.length ? spanEnding : eol;
+  const withEndings = (produced: string[]): string[] =>
+    produced.map((line, i) => `${line}${i === produced.length - 1 ? spanEnding : interior}`);
 
   if (wsBefore && wsAfter) {
     const indent = before;
@@ -238,7 +157,7 @@ function replaceSpan(
       skips.push({ startLine: item.startLine, reason: "manual", detail: tooWide });
       return;
     }
-    spanInserts.set(item.startLine, produced);
+    spanInserts.set(item.startLine, withEndings(produced));
     for (let n = item.startLine; n <= item.endLine; n++) deletions.add(n);
     return;
   }
@@ -251,7 +170,7 @@ function replaceSpan(
       skips.push({ startLine: item.startLine, reason: "manual", detail: tooWide });
       return;
     }
-    spanInserts.set(item.startLine, produced);
+    spanInserts.set(item.startLine, withEndings(produced));
     deletions.add(item.startLine);
     return;
   }
@@ -270,6 +189,7 @@ function applyRewrite(
   spanInserts: Map<number, string[]>,
   skips: EditSkip[],
   maxWidth: number | undefined,
+  eol: string,
 ): void {
   const rewrite = item.verdict.rewrite;
   if (rewrite == null || rewrite === "") {
@@ -280,37 +200,82 @@ function applyRewrite(
     });
     return;
   }
-  replaceSpan(item, rewrite, lines, deletions, spanInserts, skips, maxWidth);
+  replaceSpan(item, rewrite, lines, deletions, spanInserts, skips, maxWidth, eol);
+}
+
+/** Line `n` as it reads after the edits (an insert by its `edge` line), or null when deleted. */
+function survivingLine(
+  n: number,
+  edge: "first" | "last",
+  lines: string[],
+  deletions: Set<number>,
+  spanInserts: Map<number, string[]>,
+): string | null {
+  const insert = spanInserts.get(n);
+  if (insert) return (edge === "first" ? insert[0] : insert.at(-1)) ?? "";
+  return deletions.has(n) ? null : (lines[n - 1] ?? "");
 }
 
 /**
- * Rewrite a file by acting on each comment's verdict. Builds a deletion mask,
- * per-line replacements, and span inserts over `source.split("\n")`, then applies
- * them once, never mutating line indices mid-loop. By action:
- *
- * - `keep` → left untouched;
- * - `trim` with `trimTo` → replace the comment span with the kept, rewritten text;
- * - `trim` with `trimToLines` → keep those comment-relative lines, drop the rest,
- *   unless the cut would strand a mid-sentence fragment (skipped for a human);
- * - `trim` whole, full-line comment → delete its lines;
- * - `trim` whole, trailing line comment after code → strip it, keep the code;
- * - `rewrite` → replace the comment span with the indented de-voiced text;
- * - anything that would risk broken syntax → skip and flag for manual handling.
- *
- * Overlapping verdicts on one line resolve with deletion winning over a replace.
- * A span insert at a line takes precedence over its own span's deletions.
+ * True when deleting the comment leaves the block above it with no statement:
+ * the nearest surviving code line above opens a body, and the next one below
+ * sits at or left of the opener's indentation (or the file ends).
+ */
+function emptiesBlock(
+  item: EditItem,
+  lines: string[],
+  deletions: Set<number>,
+  spanInserts: Map<number, string[]>,
+): boolean {
+  let opener: string | null = null;
+  for (let n = item.startLine - 1; n >= 1 && opener == null; n--) {
+    const line = survivingLine(n, "last", lines, deletions, spanInserts);
+    if (line != null && isCode(line)) opener = line;
+  }
+  if (opener == null || !BODY_OPENER.test(opener.trimEnd())) return false;
+  for (let n = item.endLine + 1; n <= lines.length; n++) {
+    const line = survivingLine(n, "first", lines, deletions, spanInserts);
+    if (line != null && isCode(line)) return indentOf(line) <= indentOf(opener);
+  }
+  return true;
+}
+
+function restoreEmptiedBlocks(
+  removed: EditItem[],
+  lines: string[],
+  deletions: Set<number>,
+  spanInserts: Map<number, string[]>,
+  skips: EditSkip[],
+): void {
+  for (const item of removed) {
+    if (!emptiesBlock(item, lines, deletions, spanInserts)) continue;
+    for (let n = item.startLine; n <= item.endLine; n++) deletions.delete(n);
+    skips.push({
+      startLine: item.startLine,
+      reason: "manual",
+      detail: "deleting the comment would leave its block with no body; remove it by hand",
+    });
+  }
+}
+
+/**
+ * Rewrite a file by acting on each comment's verdict. Overlapping verdicts on
+ * one line resolve with deletion winning over a replace. A span insert at a
+ * line takes precedence over its own span's deletions.
  */
 export function computeFileEdits(
   source: string,
   items: EditItem[],
   options: FileEditOptions = {},
 ): FileEditResult {
-  const { maxWidth } = options;
+  const { maxWidth, language } = options;
   const lines = source.split("\n");
+  const eol = source.includes("\r\n") ? "\r" : "";
   const deletions = new Set<number>();
   const replacements = new Map<number, string>();
   const spanInserts = new Map<number, string[]>();
   const skips: EditSkip[] = [];
+  const removed: EditItem[] = [];
 
   for (const item of items) {
     switch (item.verdict.action) {
@@ -318,23 +283,30 @@ export function computeFileEdits(
         break;
       case "trim": {
         if (item.verdict.trimTo != null && item.verdict.trimTo !== "") {
-          replaceSpan(item, item.verdict.trimTo, lines, deletions, spanInserts, skips, maxWidth);
-          break;
-        }
-        const keep = keepLines(item);
-        if (keep != null) {
-          applyTrim(item, keep, lines, deletions, skips);
+          replaceSpan(
+            item,
+            item.verdict.trimTo,
+            lines,
+            deletions,
+            spanInserts,
+            skips,
+            maxWidth,
+            eol,
+          );
         } else {
-          applyFull(item, lines, deletions, replacements, skips);
+          applyFull(item, lines, deletions, replacements, removed, skips);
         }
         break;
       }
       case "rewrite":
-        applyRewrite(item, lines, deletions, spanInserts, skips, maxWidth);
+        applyRewrite(item, lines, deletions, spanInserts, skips, maxWidth, eol);
         break;
       default:
         item.verdict.action satisfies never;
     }
+  }
+  if (language === "python" || language === "shellscript") {
+    restoreEmptiedBlocks(removed, lines, deletions, spanInserts, skips);
   }
 
   const out: string[] = [];

@@ -19,7 +19,6 @@ the voice/rewrite cases.
   "category": "restate-the-what",
   "rewrite": null,
   "trimTo": "# the kept comment, rewritten to stand alone",
-  "trimToLines": [1],
   "fact": "the phrase the surviving text must carry",
   "quoted": null,
   "source": "jacob/!680 get_records.py:1116",
@@ -48,9 +47,6 @@ the voice/rewrite cases.
   fixture's precision and recall report as a separate bucket, outside the
   headline numbers and the recall floor. The must-keep check still covers it,
   and a test fails when the rubric stops quoting the phrase.
-- `trimToLines`: the deprecated line-range form of a partial trim, kept where a
-  fixture also exercises the applier's compat path. The lines worth keeping
-  (relative to the comment).
 - `context`: real source, line-numbered, so the judge can answer the
   what-on-dense question.
 

@@ -107,8 +107,18 @@ function wrapBlock(
   return [open, ...body, continuation === undefined ? close : ` ${close}`];
 }
 
+/** Prefix every line that lacks the marker, so no line of the text splices in as code. */
 function wrapLine(prose: string[], linePrefix: string): string[] {
-  return prose.map((line) => (line.length === 0 ? linePrefix : `${linePrefix} ${line}`));
+  return prose.map((line) => {
+    if (line.trimStart().startsWith(linePrefix)) return line;
+    return line.length === 0 ? linePrefix : `${linePrefix} ${line}`;
+  });
+}
+
+/** True when the block's first close is its last characters, so nothing trails it as code. */
+function closesAtEnd(text: string, open: string, close: string): boolean {
+  const body = text.trimEnd();
+  return body.indexOf(close, text.indexOf(open) + open.length) === body.length - close.length;
 }
 
 /** True when the site's markers were recognized, so text can be conformed. */
@@ -119,20 +129,24 @@ export function hasDelimiters(style: CommentStyle): boolean {
 /**
  * Make judge-authored text splice-ready for a site in `style`: strip the text's
  * own common indentation (the applier owns indentation) and give it the site's
- * delimiters, re-emitting them when the text is bare prose. Returns null when
- * the text carries a comment form the site cannot host, or when the site's own
- * markers went unrecognized and there is nothing to re-emit. Both become a
- * refusal rather than a splice that breaks the file.
+ * delimiters, re-emitting them when the text is bare prose. Every line of a line
+ * comment carries the prefix. Returns null, a refusal rather than a splice that
+ * breaks the file, when the text carries a comment form the site cannot host,
+ * when text would trail a block's close, or when the site's markers went
+ * unrecognized.
  */
 export function conformToStyle(text: string, style: CommentStyle): string | null {
   const lines = stripCommonIndent(text);
   const textStyle = readStyle(lines);
-  if (textStyle) {
-    return hasDelimiters(style) && compatible(textStyle, style) ? lines.join("\n") : null;
-  }
+  if (textStyle && !(hasDelimiters(style) && compatible(textStyle, style))) return null;
   if (style.form === "block") {
     const { open, close } = style;
     if (open === undefined || close === undefined) return null;
+    if (textStyle?.open !== undefined && textStyle.close !== undefined) {
+      const joined = lines.join("\n");
+      return closesAtEnd(joined, textStyle.open, textStyle.close) ? joined : null;
+    }
+    if (lines.some((line) => line.includes(close))) return null;
     return wrapBlock(lines, open, close, style.continuation).join("\n");
   }
   const { linePrefix } = style;

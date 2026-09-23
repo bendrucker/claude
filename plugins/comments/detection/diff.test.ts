@@ -1,5 +1,9 @@
-import { describe, expect, test } from "bun:test";
-import { parseUnifiedDiff, resolveDiff } from "./diff";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { $ } from "bun";
+import { type DiffOptions, parseUnifiedDiff, resolveDiff } from "./diff";
 
 describe("parseUnifiedDiff", () => {
   test.each<[string, string, ReturnType<typeof parseUnifiedDiff>]>([
@@ -184,6 +188,64 @@ new file mode 100644
   });
 });
 
-test("resolveDiff is a function", () => {
-  expect(typeof resolveDiff).toBe("function");
+describe("resolveDiff", () => {
+  let dir: string;
+
+  const git = (...args: string[]) =>
+    $`git ${args}`
+      .cwd(dir)
+      .env({ ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" })
+      .quiet();
+
+  async function commit(files: Record<string, string>): Promise<void> {
+    await Promise.all(
+      Object.entries(files).map(([path, text]) => Bun.write(join(dir, path), text)),
+    );
+    await git("add", "-A");
+    await git("commit", "-m", "commit");
+  }
+
+  beforeEach(async () => {
+    dir = await mkdtemp(join(tmpdir(), "comments-diff-"));
+    await git("init", "-b", "main");
+    await git("config", "user.email", "test@example.com");
+    await git("config", "user.name", "Test");
+    await commit({ "a.ts": "one\n" });
+    await git("checkout", "-b", "topic");
+    await commit({ "a.ts": "one\ntwo\n" });
+    await Bun.write(join(dir, "a.ts"), "zero\none\ntwo\n");
+    await Bun.write(join(dir, "new.ts"), "x\ny\n");
+    await $`ln -s /etc/hosts outside.ts`.cwd(dir).quiet();
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test.each<{ name: string; options: DiffOptions; expected: ReturnType<typeof parseUnifiedDiff> }>([
+    {
+      name: "default scope includes untracked files whole, skipping links out of the repo",
+      options: {},
+      expected: [
+        { path: "a.ts", added: [{ start: 1, end: 1 }] },
+        { path: "new.ts", added: [{ start: 1, end: 2 }] },
+      ],
+    },
+    {
+      name: "--base diffs the merge base against the working tree",
+      options: { base: "main" },
+      expected: [
+        {
+          path: "a.ts",
+          added: [
+            { start: 1, end: 1 },
+            { start: 3, end: 3 },
+          ],
+        },
+        { path: "new.ts", added: [{ start: 1, end: 2 }] },
+      ],
+    },
+  ])("$name", async ({ options, expected }) => {
+    expect(await resolveDiff(options, dir)).toEqual(expected);
+  });
 });

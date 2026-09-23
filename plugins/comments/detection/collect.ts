@@ -147,7 +147,7 @@ async function collectDiffFile(
     });
   }
   const introduced = scopeIntroduced(comments, file.added).filter(
-    (comment) => !isExemptComment(comment),
+    (comment) => !isExemptComment(comment, lines),
   );
   return withProvenance(file.path, language, introduced, lines, index);
 }
@@ -201,7 +201,7 @@ async function collectRepoFile(
       stats: await measureAddedLines(source, added, language, comments),
     });
   }
-  const judged = comments.filter((comment) => !isExemptComment(comment));
+  const judged = comments.filter((comment) => !isExemptComment(comment, lines));
   return withProvenance(path, language, judged, lines, index);
 }
 

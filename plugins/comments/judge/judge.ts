@@ -49,7 +49,6 @@ const VerdictInput = z
       rewrite: z.string({ error: `"rewrite" must be a string` }).nullish(),
       suggestedFix: z.string({ error: `"suggestedFix" must be a string` }).nullish(),
       trimTo: z.string({ error: TRIM_TO_ERROR }).min(1, { error: TRIM_TO_ERROR }).nullish(),
-      trimToLines: z.array(z.unknown(), { error: `"trimToLines" must be an array` }).nullish(),
     },
     { error: "must be an object" },
   )
@@ -91,8 +90,5 @@ export function parseVerdict(value: unknown, label: string | number): Verdict {
   };
   if (decoded.suggestedFix != null) verdict.suggestedFix = decoded.suggestedFix;
   if (decoded.trimTo != null) verdict.trimTo = decoded.trimTo;
-  if (decoded.trimToLines != null) {
-    verdict.trimToLines = decoded.trimToLines.filter((line) => typeof line === "number");
-  }
   return verdict;
 }

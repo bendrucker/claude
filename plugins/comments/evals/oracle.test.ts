@@ -46,8 +46,8 @@ describe("parseBatchVerdicts", () => {
     expect(result).toEqual([a, b]);
   });
 
-  test("preserves optional suggestedFix and trimToLines", () => {
-    const v = verdict({ suggestedFix: "delete it", trimToLines: [2, 3] });
+  test("preserves optional suggestedFix and trimTo", () => {
+    const v = verdict({ suggestedFix: "delete it", trimTo: "# kept" });
     const result = parseBatchVerdicts(batchJson([v], [0]), 1);
     expect(result[0]).toEqual(v);
   });

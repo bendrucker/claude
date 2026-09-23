@@ -149,6 +149,24 @@ describe("conformToStyle", () => {
       expected: "# Rate-limited per key.",
     },
     {
+      name: "a bare line after a prefixed first line gains the prefix",
+      text: "# first line\nsecond line bare",
+      style: hash,
+      expected: "# first line\n# second line bare",
+    },
+    {
+      name: "text trailing a block's close is refused",
+      text: "/** Returns the path. */\nreturn path;",
+      style: javadoc,
+      expected: null,
+    },
+    {
+      name: "bare prose carrying the site's close is refused",
+      text: "Ends early */ here.",
+      style: javadoc,
+      expected: null,
+    },
+    {
       name: "over-indented javadoc text loses its common prefix",
       text: "    /**\n     * Returns the path.\n     */",
       style: javadoc,

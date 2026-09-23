@@ -8,7 +8,6 @@
   "action": "trim",
   "category": "voice",
   "trimTo": "# A parseable example per scalar type family, so a conversion retry shows the\n# agent a value shaped like the column that failed.",
-  "trimToLines": null,
   "fact": "shaped like the column",
   "quoted": "rather than a blanket TIMESTAMP hint",
   "source": "jacob/!680 get_records.py:961",

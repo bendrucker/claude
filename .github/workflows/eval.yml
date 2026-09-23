@@ -7,7 +7,17 @@ name: eval
 on:
   pull_request:
     types: [labeled, synchronize]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Suite to run
+        type: choice
+        options: [pr-body, pr-create]
+        default: pr-body
+      args:
+        description: Extra claude plugin eval arguments for pr-create, such as --runs 1 --case plan-deviations
+        type: string
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,7 +25,7 @@ concurrency:
 
 jobs:
   changes:
-    # Manual dispatch always runs every suite. A PR run additionally needs
+    # Manual dispatch runs the chosen suite. A PR run additionally needs
     # the `eval` label, since these are live model calls against a budget.
     if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'eval')
     runs-on: ubuntu-latest
@@ -29,9 +39,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Filter keys are suite names. Each needs an entry in the eval job's
-      # SUITE_DIR map, and the workflow_dispatch fallback list below must
-      # stay in sync with the filter keys here.
+      # Filter keys are promptfoo suite names. Each needs an entry in the eval
+      # job's SUITE_DIR map and in the workflow_dispatch options.
       - name: Detect touched suites
         if: github.event_name == 'pull_request'
         id: filter
@@ -41,10 +50,19 @@ jobs:
             pr-body:
               - 'plugins/pull-request/**'
 
-      - name: Run all suites
+      # The native pr-create suite runs in its own job, so it never joins the
+      # promptfoo matrix.
+      - name: Select dispatched suite
         if: github.event_name == 'workflow_dispatch'
         id: all
-        run: echo 'suites=["pr-body"]' >> "$GITHUB_OUTPUT"
+        env:
+          SUITE: ${{ inputs.suite }}
+        run: |
+          if [ "$SUITE" = pr-create ]; then
+            echo 'suites=[]' >> "$GITHUB_OUTPUT"
+          else
+            jq -cn --arg suite "$SUITE" '"suites=\([$suite])"' -r >> "$GITHUB_OUTPUT"
+          fi
 
   eval:
     needs: changes
@@ -196,6 +214,90 @@ jobs:
           else
             gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" -X POST -f body="$body"
           fi
+
+      - name: Surface eval failure
+        if: steps.eval.outcome == 'failure'
+        run: exit 1
+
+  # The native claude plugin eval suite for pull-request:create. Dispatch
+  # only while its loop settles, since one run is 6 cases x 3 runs x 2 arms
+  # plus a 3-vote judge per llm grader.
+  native:
+    if: github.event_name == 'workflow_dispatch' && inputs.suite == 'pr-create'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      SUITE_DIR: plugins/pull-request/evals/create
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Check for eval credentials
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. Add the secret (from 'claude setup-token') to run the pr-create eval."
+            exit 1
+          fi
+
+      # The runner confines each agent's shell tools with bubblewrap, and
+      # Ubuntu 24.04's AppArmor policy blocks the unprivileged user namespaces
+      # it needs.
+      - name: Install Claude Code
+        run: |
+          set -euo pipefail
+          sudo apt-get update -q
+          sudo apt-get install -y -q bubblewrap socat
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          npm install -g @anthropic-ai/claude-code@2.1.280
+
+      - name: Write credentials
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.claude"
+          jq -n --arg token "$CLAUDE_CODE_OAUTH_TOKEN" '{claudeAiOauth: {accessToken: $token}}' > "$HOME/.claude/.credentials.json"
+          chmod 600 "$HOME/.claude/.credentials.json"
+
+      # --threshold 0 leaves the exit code to runner errors. Scores are read
+      # from result.json, where a case below 1.0 is the normal state.
+      - name: Run eval
+        id: eval
+        continue-on-error: true
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ARGS: ${{ inputs.args }}
+        run: |
+          # shellcheck disable=SC2086
+          "$SUITE_DIR/run.sh" --no-publish --threshold 0 --concurrency 4 $ARGS
+
+      - name: Upload results
+        if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/result.json', env.SUITE_DIR)) != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-create-${{ github.run_id }}
+          path: ${{ env.SUITE_DIR }}/results/
+
+      - name: Summarize results
+        if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/result.json', env.SUITE_DIR)) != ''
+        run: |
+          set -euo pipefail
+          results=("$SUITE_DIR"/results/*/result.json)
+          result=${results[-1]}
+          jq -r '
+            def pct: if . == null then "–" else (. * 100 | round | tostring) + "%" end;
+            "## claude plugin eval: pr-create",
+            "",
+            "score \(.aggregates.overallScore | pct) · mean delta \(.aggregates.meanDelta | pct) · cost $\(.costUsd * 100 | round / 100)",
+            "",
+            "| case | with | without | delta |",
+            "| --- | --- | --- | --- |",
+            (.cases[] | "| \(.name) | \(.aggregates.score | pct) | \(.aggregates.scoreWithout | pct) | \(.aggregates.delta | pct) |")
+          ' "$result" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Surface eval failure
         if: steps.eval.outcome == 'failure'

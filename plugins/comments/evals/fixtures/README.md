@@ -37,7 +37,8 @@ the voice/rewrite cases.
 - `trimTo`: optional, only for blocks where part carries a fact and the rest is
   slop: the owner's gold kept-comment text. It is the minimum a reader needs,
   with its delimiters kept and no leading indentation. The report shows the
-  judge's surviving length against it.
+  judge's surviving length against it. The gate fails a trim that keeps more
+  than `RETENTION_CEILING` of the comment, so the gold must fit under it.
 - `fact`: a phrase, or a list of phrases that must all appear in the surviving
   text. Required on every `keep` and on every `trim` with `trimTo`. Each phrase
   must appear in `comment`, and in `trimTo` when one is given. Matching ignores

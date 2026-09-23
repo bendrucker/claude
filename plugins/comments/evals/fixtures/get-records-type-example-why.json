@@ -9,7 +9,7 @@
   "category": "voice",
   "trimTo": "# A parseable example per scalar type family, so a conversion retry shows the\n# agent a value shaped like the column that failed.",
   "fact": "shaped like the column",
-  "quoted": "rather than a blanket TIMESTAMP hint",
+  "quoted": null,
   "source": "jacob/!680 get_records.py:961",
   "note": "The intent behind the lookup table (a retry sees a value shaped like the failing column) is the fact. The \"rather than a blanket TIMESTAMP hint\" contrast frames it against a path the code does not take."
 }

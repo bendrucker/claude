@@ -14,6 +14,7 @@ import {
   gateFailures,
   loadFixtures,
   RECALL_FLOOR,
+  RETENTION_CEILING,
   scoreResults,
 } from "./eval";
 import { anthropicCommentJudge, judgeComments } from "./oracle";
@@ -130,11 +131,16 @@ describe("scoreResults", () => {
       verdict({
         action: "rewrite",
         category: "voice",
-        rewrite: "# Walk and retry; the broker rate-limits per key.",
+        rewrite: "# Broker rate-limits per key.",
       }),
       true,
     ],
     ["a whole-comment trim", verdict({}), false],
+    [
+      "a trim that echoes the comment",
+      verdict({ trimTo: "# Walk the queue and retry. The broker rate-limits per key." }),
+      false,
+    ],
     ["keep", verdict({ action: "keep", category: null }), false],
   ] as const)("a trimTo fixture judged %s passes: %p", (_name, v, passed) => {
     expect(scoreResults([trimWithGold], [v]).correct).toBe(passed ? 1 : 0);
@@ -151,6 +157,9 @@ describe("scoreResults", () => {
     expect(m.retention.gold).toBe(1);
     expect(m.retention["gold-2"]).toBeCloseTo(59 / 33);
     expect(m.meanRetention).toBeCloseTo((1 + 59 / 33) / 2);
+    expect(m.mismatches).toEqual([
+      { id: "gold-2", expected: "trim", predicted: "trim", reason: "retention" },
+    ]);
   });
 
   test("splits keep precision and slop recall between headline and quoted fixtures", () => {
@@ -241,6 +250,23 @@ describe("gateFailures", () => {
     const destructive = scoreResults([keep], [verdict({})]);
     expect(gateFailures(destructive)).toEqual([
       "judge dropped the fact from 1 must-keep comment(s): k",
+    ]);
+  });
+
+  test("fails a trim whose surviving text passes the retention ceiling", () => {
+    const trim = fixture({
+      id: "t",
+      comment: "# Walk the queue and retry. The broker rate-limits per key.",
+      trimTo: "# The broker rate-limits per key.",
+      fact: ["rate-limits per key"],
+    });
+    const within = verdict({ trimTo: "# Retry: the broker rate-limits per key." });
+    expect(40 / 59).toBeLessThan(RETENTION_CEILING);
+    expect(gateFailures(scoreResults([trim], [within]))).toEqual([]);
+    const barely = verdict({ trimTo: "# Walk the queue, retry. The broker rate-limits per key." });
+    expect(56 / 59).toBeGreaterThan(RETENTION_CEILING);
+    expect(gateFailures(scoreResults([trim], [barely]))).toEqual([
+      `judge's trim kept over ${RETENTION_CEILING.toFixed(2)} of the comment on 1 comment(s): t`,
     ]);
   });
 });
@@ -341,6 +367,16 @@ describe("fixture validation", () => {
       "a fact missing from the comment",
       { action: "keep", fact: "backoff" },
       /does not appear in its comment/,
+    ],
+    [
+      "a gold trimTo over the retention ceiling",
+      {
+        action: "trim",
+        category: "restate-the-what",
+        trimTo: "# The broker rate-limits per key",
+        fact: "rate-limits",
+      },
+      /over the retention ceiling itself/,
     ],
     [
       "a fact missing from the gold trimTo",

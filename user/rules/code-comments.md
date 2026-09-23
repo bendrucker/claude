@@ -35,5 +35,5 @@ Default to no comment. Most comments an agent writes fail the test above. A comm
 - Genuine why and design rationale the code cannot express.
 - Docstrings that surface canonical upstream API names for discoverability, even when they restate the identifier. `"""Return the Aembit OAuth 2.0 + PKCE authorization URL."""` introduces searchable proper nouns the name abbreviates.
 - What-comments on genuinely dense lines.
-- Verbose rationale in a regression test about the bug it defends against.
+- A regression test's statement of the bug it defends against: the ticket, the invariant, and the mechanism that broke it. Leave out the incident story and a walkthrough of the test body.
 - A guard or TODO anchored to a ticket that resolves a present code condition: `# TODO(ENG-4102): drop once the backfill lands`.

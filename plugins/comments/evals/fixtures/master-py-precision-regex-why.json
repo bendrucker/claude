@@ -9,7 +9,7 @@
   "category": "restate-the-what",
   "trimTo": "# FieldDefinition's integer precision/scale columns are 0 for ~55% of numeric\n# fields, so precision and scale come from the DataType label, e.g. \"Currency(16, 2)\".",
   "fact": "0 for ~55% of numeric fields",
-  "quoted": "(see _duckdb_type)",
+  "quoted": null,
   "source": "main master.py:55",
   "note": "The unreliable-columns measurement is the fact the regex cannot show. The digit-sum width belongs to _duckdb_type, and the pointer to it is a cross-reference."
 }

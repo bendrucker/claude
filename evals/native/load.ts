@@ -20,17 +20,21 @@ export interface Cell {
 
 export type Column = Map<string, Cell>;
 
+/** The final reply in a trace: its last `result` line. */
+export function traceReply(trace: string): string | undefined {
+  for (const line of trace.trim().split("\n").toReversed()) {
+    const entry = TraceLine.parse(JSON.parse(line));
+    if (entry.type === "result" && entry.result !== undefined) return entry.result;
+  }
+  return undefined;
+}
+
 async function replyWords(path: string): Promise<number | undefined> {
   const file = Bun.file(path);
   if (!(await file.exists())) return undefined;
-  const lines = (await file.text()).trim().split("\n");
-  for (const line of lines.toReversed()) {
-    const entry = TraceLine.parse(JSON.parse(line));
-    if (entry.type === "result" && entry.result !== undefined) {
-      return entry.result.split(/\s+/).filter(Boolean).length;
-    }
-  }
-  return undefined;
+  return traceReply(await file.text())
+    ?.split(/\s+/)
+    .filter(Boolean).length;
 }
 
 interface Loaded {

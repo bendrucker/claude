@@ -6,6 +6,7 @@
     "**/*.yml",
     "**/*.yaml",
     "**/fixtures/**",
+    "**/evals/**/examples/**",
     ".claude/workflows/**"
   ]
 }

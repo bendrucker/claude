@@ -1,0 +1,1 @@
+Test-first: `sendReminders` should skip invoices that are already paid, so only unpaid overdue invoices get an email. `sendReminders` is the seam to test. There are no tests yet, so put them in `src/reminders.test.ts` and run them with `bun test`.

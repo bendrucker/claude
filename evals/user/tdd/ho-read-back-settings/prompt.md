@@ -1,0 +1,1 @@
+Test-first, add `remove(key)` to the settings store in `src/settings.ts`. It deletes the key from the saved file and returns whether the key existed. The seam is the store `openSettings` returns. Tests go in `src/settings.test.ts`; run them with `bun test`.

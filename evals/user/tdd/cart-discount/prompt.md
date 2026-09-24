@@ -1,0 +1,1 @@
+Add discount codes to the cart, test-first. `applyDiscount(code)` on `Cart` should take 10% off `total()` for `SAVE10`, and throw for a code it doesn't know. The seam is `Cart`'s public methods, so test through those only. Run the tests with `bun test`.

@@ -1,0 +1,13 @@
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t115","name":"Write","input":{"file_path":"/tmp/claude-eval-x/home/cwd/src/duration.test.ts","content":"x"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t116","name":"Bash","input":{"command":"bun test","description":"Run tests"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t116","content":"Exit code 1\n 1 pass\n 1 fail\n"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t117","name":"Edit","input":{"replace_all":false,"file_path":"/tmp/claude-eval-x/home/cwd/src/duration.ts","old_string":"a","new_string":"b"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t118","name":"Bash","input":{"command":"bun test","description":"Run tests"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t118","content":" 2 pass\n 0 fail\n"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t119","name":"Edit","input":{"replace_all":false,"file_path":"/tmp/claude-eval-x/home/cwd/src/duration.test.ts","old_string":"a","new_string":"b"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t120","name":"Bash","input":{"command":"bun test","description":"Run tests"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t120","content":"Exit code 1\n 1 pass\n 1 fail\n"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t121","name":"Edit","input":{"replace_all":false,"file_path":"/tmp/claude-eval-x/home/cwd/src/duration.ts","old_string":"a","new_string":"b"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t122","name":"Bash","input":{"command":"bun test","description":"Run tests"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t122","content":" 2 pass\n 0 fail\n"}]}}
+{"type":"result","subtype":"success","result":"Done."}

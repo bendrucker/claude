@@ -1,0 +1,1 @@
+Add `parseMoney` to `src/money.ts`, test-first. It turns strings like `"$1,234.50"` or `"$7"` into cents and throws on anything it can't read. Test through `parseMoney` and `formatMoney`, the module's public functions. Run the tests with `bun test`.

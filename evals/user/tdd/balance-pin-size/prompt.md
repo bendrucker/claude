@@ -1,0 +1,1 @@
+I'm about to rework `parseSize` test-first. Before I touch it, pin down how it behaves today with tests at `parseSize`, the only seam. Don't change `src/size.ts`. Tests go in `src/size.test.ts`; run them with `bun test`.

@@ -1,0 +1,1 @@
+Test-first: `isExpired` should treat a token as expired 30 seconds before its `expiresAt`, so we refresh before the server rejects it. `isExpired` is the seam. There are no tests yet, so put them in `src/token.test.ts` and run them with `bun test`.

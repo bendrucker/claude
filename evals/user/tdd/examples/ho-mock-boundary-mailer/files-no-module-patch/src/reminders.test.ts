@@ -1,0 +1,1 @@
+mock.module("./smtp", () => ({ sendEmail }));

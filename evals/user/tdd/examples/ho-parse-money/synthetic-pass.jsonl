@@ -1,0 +1,13 @@
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t191","name":"Write","input":{"file_path":"/tmp/claude-eval-x/home/cwd/src/money.test.ts","content":"x"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t192","name":"Bash","input":{"command":"bun test","description":"Run tests"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t192","content":"Exit code 1\n 1 pass\n 1 fail\n"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t193","name":"Edit","input":{"replace_all":false,"file_path":"/tmp/claude-eval-x/home/cwd/src/money.ts","old_string":"a","new_string":"b"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t194","name":"Bash","input":{"command":"bun test","description":"Run tests"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t194","content":" 2 pass\n 0 fail\n"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t195","name":"Edit","input":{"replace_all":false,"file_path":"/tmp/claude-eval-x/home/cwd/src/money.test.ts","old_string":"a","new_string":"b"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t196","name":"Bash","input":{"command":"bun test","description":"Run tests"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t196","content":"Exit code 1\n 1 pass\n 1 fail\n"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t197","name":"Edit","input":{"replace_all":false,"file_path":"/tmp/claude-eval-x/home/cwd/src/money.ts","old_string":"a","new_string":"b"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t198","name":"Bash","input":{"command":"bun test","description":"Run tests"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t198","content":" 2 pass\n 0 fail\n"}]}}
+{"type":"result","subtype":"success","result":"Done."}

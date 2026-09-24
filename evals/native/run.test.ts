@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import { casePlugins, prepare } from "./run";
+import { casePlugins, collectTraces, prepare } from "./run";
 
 let repo: string;
 
@@ -60,4 +60,20 @@ describe("prepare", () => {
     expect(await read(join(target, "hooks/hooks.json"))).toContain("SessionStart");
     expect(await Bun.file(join(target, "evals/one/case.yaml")).exists()).toBe(true);
   });
+});
+
+test("collectTraces copies kept traces beside the results and removes the runner's temp dirs", async () => {
+  const output = mkdtempSync(join(tmpdir(), "run-output-"));
+  const kept = mkdtempSync(join(tmpdir(), "e-"));
+  const trace = join(kept, "out/trace.jsonl");
+  await Bun.write(trace, '{"type":"result","result":"reply"}');
+  const runs = [{ tracePath: trace }, { tracePath: join(kept, "gone/trace.jsonl") }, {}];
+  await Bun.write(
+    join(output, "aggregate-result.json"),
+    JSON.stringify({ cases: [{ name: "one", arms: { with: runs } }] }),
+  );
+  await collectTraces(output);
+  expect(await read(join(output, "traces/one-with-0.jsonl"))).toContain("reply");
+  expect(await Bun.file(join(output, "traces/one-with-1.jsonl")).exists()).toBe(false);
+  expect(await Bun.file(trace).exists()).toBe(false);
 });

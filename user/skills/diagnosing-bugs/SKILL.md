@@ -18,6 +18,8 @@ For a failing CI or pipeline job, that command already ran. Use `github:actions-
 
 When nothing you try reaches the bug, say so and stop. Name what you tried and what each attempt could not reach, then ask for an environment where it reproduces, a captured artifact, or permission to add instrumentation.
 
+A failure you caused by choosing the input yourself has not reached the bug. Before calling a command a reproduction, check that the report or an artifact from the real failure shows its triggering condition. When neither does, report the bug as not reproduced, mention that failure as one thing an artifact could confirm or rule out, and ask for that artifact.
+
 ## Find the Cause
 
 Change one thing per run and let the command settle it. A cause the command has not responded to is a guess, and saying which line is at fault is not the same as showing the command go green when you change it.

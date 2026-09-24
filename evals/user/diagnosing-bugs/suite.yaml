@@ -1,0 +1,4 @@
+allow_tools: [Bash, Edit, Write]
+judge_model: claude-sonnet-5
+wrap:
+  skills: [user/skills/diagnosing-bugs]

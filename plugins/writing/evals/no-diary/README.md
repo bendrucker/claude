@@ -6,4 +6,6 @@ Every case asks for the rewrite between `<rewrite>` and `</rewrite>` lines, and 
 
 Cases are tagged `dev` or `holdout`. Tune against `dev` and run `holdout` only to check a finished climb.
 
-`gh workflow run eval.yml --ref <branch> -f suite=plugins/writing/evals/no-diary -f args='--tag dev'` runs it in CI. `run.sh` runs it locally with the Bash sandbox disabled, passing its arguments through to `claude plugin eval`. Results land in the gitignored `results/<timestamp>/`.
+`gh workflow run eval.yml --ref <branch> -f suite=plugins/writing/evals/no-diary -f args='--tag dev'` runs it in CI. `bun evals/native/run.ts plugins/writing/evals/no-diary -- <args>` runs it locally with the Bash sandbox disabled. Results land in the gitignored `results/`.
+
+`examples/<case>/` holds a passing reply, the untouched fixture, and an empty block per case. `bun evals/native/check.ts plugins/writing/evals/no-diary` tests every regex grader against them.

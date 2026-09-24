@@ -1,0 +1,1 @@
+`inRange` is correct. The report was dropping Sept 7 because `loadVisits` skips the first line as a header, and `visits.csv` has no header row. I changed the loader to keep every row, and `bun run report` now shows 7 days.

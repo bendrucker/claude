@@ -1,0 +1,1 @@
+Since Tuesday's deploy, about 5% of webhooks in production get rejected with 401 "invalid signature". Only some customers, and it never happens when I send test webhooks locally. Can you figure out what's going on?

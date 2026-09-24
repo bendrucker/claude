@@ -1,0 +1,1 @@
+The weekly report (`bun run report`) only shows 6 days for the week of Sept 7. I'm pretty sure `inRange` is off by one at the end of the range, it should probably be `<=`. Can you get it showing all 7 days?

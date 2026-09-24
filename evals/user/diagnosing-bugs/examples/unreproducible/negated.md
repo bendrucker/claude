@@ -1,0 +1,1 @@
+I haven't reproduced it. Driving `verify()` directly, I found it rejects uppercase hex digests, but your report doesn't mention a sender doing that, so it stays a guess. Could you capture one rejected delivery with its raw body and headers?

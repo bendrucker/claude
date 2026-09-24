@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: config-move
-tags: [holdout]
+tags: [dev]
 plugins: ["../.."]
 execution:
   model: claude-sonnet-5

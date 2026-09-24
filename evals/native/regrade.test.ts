@@ -13,7 +13,7 @@ const grader = (name: string, passed: boolean, withOnly = false) => ({
   explanation: "recorded",
 });
 
-test("re-grades regex graders from traces and rescores each run", async () => {
+test("re-grades against the current grader set and rescores each run", async () => {
   const dir = mkdtempSync(join(tmpdir(), "regrade-"));
   const results = join(dir, "results/run");
   const trace = [
@@ -31,6 +31,10 @@ test("re-grades regex graders from traces and rescores each run", async () => {
     ),
     Bun.write(join(dir, "one/graders/judge.md"), "---\ntype: llm\n---\nIs it good?\n"),
     Bun.write(
+      join(dir, "one/graders/brief.md"),
+      "---\ntype: regex\npattern: 'Fixed'\nweight: 2\n---\n",
+    ),
+    Bun.write(
       join(results, "traces/one-with-0.jsonl"),
       trace.map((l) => JSON.stringify(l)).join("\n"),
     ),
@@ -45,7 +49,12 @@ test("re-grades regex graders from traces and rescores each run", async () => {
               with: [
                 {
                   score: 1 / 3,
-                  graders: [grader("fact", false), grader("ran", false), grader("judge", true)],
+                  graders: [
+                    grader("fact", false),
+                    grader("ran", false),
+                    grader("judge", true),
+                    grader("gone", false),
+                  ],
                 },
               ],
               without: [{ score: 0, graders: [grader("fact", false)] }],
@@ -60,10 +69,19 @@ test("re-grades regex graders from traces and rescores each run", async () => {
   expect(flips).toEqual([
     { grader: "one/fact", run: "one-with-0", passed: true },
     { grader: "one/ran", run: "one-with-0", passed: true },
+    { grader: "one/gone", run: "one-with-0", passed: undefined },
+    { grader: "one/brief", run: "one-with-0", passed: true },
   ]);
   const written = Result.parse(await Bun.file(join(out, "aggregate-result.json")).json());
   expect(written.aggregates).toBeUndefined();
-  expect(written.cases[0]?.arms.with?.[0]?.score).toBe(1);
+  const run = written.cases[0]?.arms.with?.[0];
+  expect(run?.score).toBe(1);
+  expect(run?.graders.map((g) => [g.name, g.weight])).toEqual([
+    ["fact", 1],
+    ["ran", 1],
+    ["judge", 1],
+    ["brief", 2],
+  ]);
   expect(written.cases[0]?.arms.without?.[0]?.score).toBe(0);
   expect(await Bun.file(join(out, "traces/one-with-0.jsonl")).exists()).toBe(true);
 });

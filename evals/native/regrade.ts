@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import { z } from "zod";
-import { type Graders, loadGraders, verdict } from "./check";
+import { type Graders, loadGraders, RegexGrader, verdict } from "./check";
 import { traceReply } from "./load";
 
 const Grader = z.looseObject({
@@ -32,22 +32,48 @@ export function score(run: Run, arm: string): number | null {
 export interface Flip {
   grader: string;
   run: string;
-  passed: boolean;
+  /** The new verdict, or undefined when the grader file is gone and its verdict dropped. */
+  passed: boolean | undefined;
 }
 
 /**
- * Re-grades one run's regex graders against its trace. A grader the trace cannot reach, such as
- * an `llm` grader or a file target, keeps its recorded verdict.
+ * Re-grades one run against the case's current graders and its trace. A regex grader the trace
+ * reaches gets a fresh verdict, including one added since the run. A grader whose file is gone
+ * drops out. Any other grader, such as an `llm` grader or a file target, keeps its recorded
+ * verdict.
  */
 export function regradeRun(run: Run, arm: string, graders: Graders, trace: string): Run {
   const recorded = { reply: traceReply(trace) ?? "", trace };
-  const regraded = run.graders.map((g) => {
+  const kept = run.graders.flatMap((g) => {
     const grader = graders.get(g.name);
-    const passed = grader === undefined ? undefined : verdict(grader, recorded);
-    return passed === undefined ? g : { ...g, passed, explanation: "regraded from the trace" };
+    if (grader === undefined) return [];
+    const passed = verdict(grader, recorded);
+    return passed === undefined ? [g] : [{ ...g, passed, explanation: "regraded from the trace" }];
   });
-  const next = { ...run, graders: regraded };
+  const known = new Set(run.graders.map((g) => g.name));
+  const added = [...graders].flatMap(([name, grader]) => {
+    const parsed = RegexGrader.safeParse(grader);
+    if (known.has(name) || !parsed.success) return [];
+    const withOnly = parsed.data.arm === "with-only";
+    if (withOnly && arm !== "with") return [];
+    const passed = verdict(grader, recorded);
+    if (passed === undefined) return [];
+    const { weight } = parsed.data;
+    return [
+      { name, passed, weight, scored: !withOnly, withOnly, explanation: "graded from the trace" },
+    ];
+  });
+  const next = { ...run, graders: [...kept, ...added] };
   return run.score === null ? next : { ...next, score: score(next, arm) };
+}
+
+/** The verdicts that differ between two versions of a run, by grader name. */
+function diff(before: Run, after: Run): [string, boolean | undefined][] {
+  const was = new Map(before.graders.map((g) => [g.name, g.passed]));
+  const now = new Map(after.graders.map((g) => [g.name, g.passed]));
+  return [...new Set([...was.keys(), ...now.keys()])]
+    .filter((name) => was.get(name) !== now.get(name))
+    .map((name) => [name, now.get(name)]);
 }
 
 /**
@@ -60,6 +86,8 @@ export async function regrade(suite: string, results: string, out: string): Prom
   const cases = await Promise.all(
     result.cases.map(async (c) => {
       const graders = await loadGraders(join(suite, c.name));
+      // A case missing from the suite would otherwise drop every grader.
+      if (graders.size === 0) return c;
       const arms = await Promise.all(
         Object.entries(c.arms).map(async ([arm, runs]) => {
           const next = await Promise.all(
@@ -68,10 +96,8 @@ export async function regrade(suite: string, results: string, out: string): Prom
               const file = Bun.file(join(results, "traces", `${id}.jsonl`));
               if (!(await file.exists())) return run;
               const regraded = regradeRun(run, arm, graders, await file.text());
-              for (const [j, g] of regraded.graders.entries()) {
-                if (g.passed !== run.graders[j]?.passed)
-                  flips.push({ grader: `${c.name}/${g.name}`, run: id, passed: g.passed });
-              }
+              for (const [name, passed] of diff(run, regraded))
+                flips.push({ grader: `${c.name}/${name}`, run: id, passed });
               return regraded;
             }),
           );
@@ -88,6 +114,11 @@ export async function regrade(suite: string, results: string, out: string): Prom
   return flips;
 }
 
+function verb(passed: boolean | undefined): string {
+  if (passed === undefined) return "dropped";
+  return passed ? "now passes" : "now fails";
+}
+
 if (import.meta.main) {
   const argv = cli({
     name: "regrade.ts",
@@ -102,8 +133,7 @@ if (import.meta.main) {
     argv._.results.map((r, i) => regrade(argv._.suite, r, outs[i] ?? "")),
   );
   for (const [i, flips] of all.entries()) {
-    for (const f of flips)
-      console.log(`${f.run}: ${f.grader} now ${f.passed ? "passes" : "fails"}`);
+    for (const f of flips) console.log(`${f.run}: ${f.grader} ${verb(f.passed)}`);
     console.log(`${outs[i]}: ${flips.length} verdicts changed`);
   }
 }

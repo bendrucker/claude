@@ -1,7 +1,7 @@
 ---
 type: regex
-pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:originally|fixed interval|reason this rule|well-known)'
+pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:originally|one-second|april|outage|reason this rule|anyone who)'
 flags: i
 match: not_contains
 ---
-The rejected alternative and the argument for the rule are gone.
+The rejected alternative, the outage, and the argument for the rule are gone.

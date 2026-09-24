@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:function read\(input: string\))'
+pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:function refresh\(cache: Cache, key: string\))'
 flags: i
 match: contains
 ---

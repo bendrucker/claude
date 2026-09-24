@@ -1,0 +1,11 @@
+schema_version: "1.1"
+name: plan-revision-log
+tags: [dev]
+plugins: ["../../.."]
+execution:
+  model: claude-sonnet-5
+  max_turns: 15
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Skill]
+  append_system_prompt: >-
+    Reply with the complete rewritten artifact between a line holding only <rewrite> and a line holding only </rewrite>, including any code it contains. When the whole artifact should go, leave the tags empty. Anything else you say goes outside the tags.

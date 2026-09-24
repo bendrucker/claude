@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { globSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, normalize, relative, resolve } from "node:path";
+import { basename, dirname, join, normalize, relative, resolve } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import { parse } from "yaml";
@@ -26,6 +26,15 @@ export const SuiteFile = z.object({
 });
 
 const CaseFile = z.object({ plugins: z.array(z.string()).default([]) });
+
+const Result = z.object({
+  cases: z.array(
+    z.object({
+      name: z.string(),
+      arms: z.record(z.string(), z.array(z.object({ tracePath: z.string().nullish() }))),
+    }),
+  ),
+});
 
 export async function readSuite(dir: string): Promise<z.output<typeof SuiteFile>> {
   const file = Bun.file(join(dir, "suite.yaml"));
@@ -85,6 +94,31 @@ export async function prepare(
   return { target: out, evalDir: "evals" };
 }
 
+/**
+ * Copies each run's trace into `<output>/traces/<case>-<arm>-<n>.jsonl`. The runner writes
+ * traces inside its temp directories and deletes them unless run with `--keep-temp`, so this
+ * copies them out and then removes those directories.
+ */
+export async function collectTraces(output: string): Promise<void> {
+  const file = Bun.file(join(output, "aggregate-result.json"));
+  if (!(await file.exists())) return;
+  const { cases } = Result.parse(await file.json());
+  const copies = cases.flatMap((c) =>
+    Object.entries(c.arms).flatMap(([arm, runs]) =>
+      runs.map(async ({ tracePath }, i) => {
+        if (tracePath == null || !(await Bun.file(tracePath).exists())) return;
+        await Bun.write(join(output, "traces", `${c.name}-${arm}-${i}.jsonl`), Bun.file(tracePath));
+        const out = dirname(tracePath);
+        if (basename(out) !== "out") return;
+        // The runner leaves a write-only `sealed` directory that blocks a plain rm.
+        const kept = dirname(out);
+        await $`chmod -R u+rwx ${kept}/sealed ${kept}; rm -rf ${kept}`.nothrow().quiet();
+      }),
+    ),
+  );
+  await Promise.all(copies);
+}
+
 if (import.meta.main) {
   const argv = cli({
     name: "run.ts",
@@ -131,10 +165,14 @@ if (import.meta.main) {
       config.judge_model,
       "--output-dir",
       output,
+      "--keep-temp",
       ...allow,
       ...argv._.args,
     ],
     { env, stdio: ["inherit", "inherit", "inherit"] },
   );
-  process.exit(await proc.exited);
+  const code = await proc.exited;
+  await collectTraces(output);
+  await $`rm -rf ${dirname(target)}`.quiet();
+  process.exit(code);
 }

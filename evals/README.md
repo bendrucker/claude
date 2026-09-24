@@ -8,7 +8,7 @@ This directory is the generic layer: the results corpus and the scripts that fil
 
 [`native/`](native/) runs and compares `claude plugin eval` suites.
 
-- `run.ts <suite> [--ref <ref>] -- <args>` stages the plugins the cases load, as they stand at `--ref` (the working tree by default), next to the suite from the working tree, so every ref is graded by the same cases. It runs on subscription auth with any API key removed from the environment, and results land in `<suite>/results/<timestamp>[-label]/`.
+- `run.ts <suite> [--ref <ref>] -- <args>` stages the plugins the cases load, as they stand at `--ref` (the working tree by default), next to the suite from the working tree, so every ref is graded by the same cases. It runs on subscription auth with any API key removed from the environment, and results land in `<suite>/results/<timestamp>[-label]/`, with each run's trace copied to `traces/<case>-<arm>-<n>.jsonl`.
 - `compare.ts <column>...` compares result files column by column, each column a comma-joined pool of `aggregate-result.json` paths, the first the baseline. A `*` marks p < `--alpha` (0.1) under a two-sided permutation test. `--suite` adds per-tag scores from each case's `tags`. `--markdown` puts starred rows first for a job summary.
 - `wrap.ts` builds a throwaway plugin from skills, agents, and context documents that are not in a plugin. A suite opts in through `suite.yaml`:
 

@@ -242,6 +242,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      checks: write
     env:
       SUITE_DIR: ${{ needs.changes.outputs.native }}
     steps:
@@ -289,41 +290,60 @@ jobs:
           name: eval-${{ env.SUITE }}-${{ github.run_id }}
           path: ${{ env.SUITE_DIR }}/results/
 
-      - name: Summarize results
+      # The report lands in the job summary and in a check on the commit that
+      # ran, so a pull request links to results instead of pasting them. A
+      # suite that ships compare.ts adds its tables against the baseline run.
+      - name: Write report
+        id: report
         if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASELINE: ${{ inputs.baseline }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
           results=("$SUITE_DIR"/results/*/aggregate-result.json)
-          jq -r --arg suite "$SUITE" '
+          result=${results[-1]}
+          report="$RUNNER_TEMP/report.md"
+          title=$(jq -r '
+            def pct: (. * 100 | round | tostring) + "%";
+            "score \(.aggregates.overallScore | pct), \(.aggregates.meanDelta | pct) over no plugin"
+          ' "$result")
+          jq -r --arg run "$RUN_URL" '
             def pct: if . == null then "–" else (. * 100 | round | tostring) + "%" end;
-            "## claude plugin eval: \($suite)",
-            "",
-            "score \(.aggregates.overallScore | pct) · mean delta \(.aggregates.meanDelta | pct) · cost $\(.costUsd * 100 | round / 100)",
+            "\(.aggregates.casesTotal) cases · cost $\(.costUsd * 100 | round / 100) · [run](\($run))",
             "",
             "| case | with | without | delta |",
             "| --- | --- | --- | --- |",
             (.cases[] | "| \(.name) | \(.aggregates.score | pct) | \(.aggregates.scoreWithout | pct) | \(.aggregates.delta | pct) |")
-          ' "${results[-1]}" >> "$GITHUB_STEP_SUMMARY"
+          ' "$result" > "$report"
+          if [ -n "$BASELINE" ] && [ -f "$SUITE_DIR/compare.ts" ]; then
+            gh run download "$BASELINE" --dir "$RUNNER_TEMP/baseline"
+            baselines=("$RUNNER_TEMP"/baseline/*/*/aggregate-result.json)
+            compared=$(bun "$SUITE_DIR/compare.ts" --markdown --label "run $BASELINE" --label "this run" "${baselines[-1]}" "$result")
+            flagged=$(grep -c '| \* |$' <<< "$compared" || true)
+            title="$title, $flagged flagged against run $BASELINE"
+            printf '\n%s\n' "$compared" >> "$report"
+          fi
+          {
+            echo "## $SUITE: $title"
+            echo ""
+            cat "$report"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
 
-      # A suite that ships compare.ts gets its tables against the baseline run.
-      - name: Compare with baseline
-        if: inputs.baseline != '' && steps.eval.outcome != 'skipped' && hashFiles(format('{0}/compare.ts', env.SUITE_DIR)) != '' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
+      - name: Publish check
+        if: steps.report.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
-          BASELINE: ${{ inputs.baseline }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          TITLE: ${{ steps.report.outputs.title }}
         run: |
-          set -euo pipefail
-          gh run download "$BASELINE" --dir "$RUNNER_TEMP/baseline"
-          baselines=("$RUNNER_TEMP"/baseline/*/*/aggregate-result.json)
-          results=("$SUITE_DIR"/results/*/aggregate-result.json)
-          {
-            echo ""
-            echo "### Compared with run $BASELINE"
-            echo ""
-            echo '```'
-            bun "$SUITE_DIR/compare.ts" "${baselines[-1]}" "${results[-1]}"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          gh api "repos/$REPO/check-runs" --silent \
+            -f name="eval / $SUITE" -f head_sha="$SHA" \
+            -f status=completed -f conclusion=neutral \
+            -f "output[title]=$TITLE" -F "output[summary]=@$RUNNER_TEMP/report.md"
 
       - name: Surface eval failure
         if: steps.eval.outcome == 'failure'

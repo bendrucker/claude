@@ -19,6 +19,14 @@ const argv = cli({
       default: 0.2,
       description: "Flag a case score that moves by more than this",
     },
+    label: {
+      type: [String],
+      description: "Column label for each result in order, defaulting to its directory name",
+    },
+    markdown: {
+      type: Boolean,
+      description: "Print markdown with the flagged rows first and the full tables collapsed",
+    },
   },
   help: {
     description:
@@ -67,7 +75,7 @@ async function load(path: string): Promise<Map<string, Cell>> {
 
 const paths = argv._.results;
 const results = await Promise.all(paths.map(load));
-const labels = paths.map((p) => basename(dirname(p)));
+const labels = paths.map((p, i) => argv.flags.label[i] ?? basename(dirname(p)));
 const keys = [...new Set(results.flatMap((r) => [...r.keys()]))].toSorted();
 
 function row(prefix: string[], values: number[], noise: number): string[] {
@@ -77,8 +85,15 @@ function row(prefix: string[], values: number[], noise: number): string[] {
   return [...prefix, ...values.map(fmt), fmt(delta), spread > noise + 1e-9 ? "*" : ""];
 }
 
-const header = (first: string[]) => [...first, ...labels, "delta", ""];
+const head = ["case/arm", "measure", ...labels, "delta", ""];
 
+const scoreRows = keys.map((key) =>
+  row(
+    [key, "score"],
+    results.map((r) => r.get(key)?.score ?? NaN),
+    argv.flags.scoreNoise,
+  ),
+);
 const graderRows = keys.flatMap((key) => {
   const names = [...new Set(results.flatMap((r) => [...(r.get(key)?.graders.keys() ?? [])]))];
   return names.toSorted().map((g) =>
@@ -89,15 +104,27 @@ const graderRows = keys.flatMap((key) => {
     ),
   );
 });
-console.log(`Grader pass rate (* spread > ${argv.flags.graderNoise})`);
-console.log(table([header(["case/arm", "grader"]), ...graderRows]));
+const sections = [
+  [`Case score (* spread > ${argv.flags.scoreNoise})`, scoreRows],
+  [`Grader pass rate (* spread > ${argv.flags.graderNoise})`, graderRows],
+] as const;
 
-const scoreRows = keys.map((key) =>
-  row(
-    [key],
-    results.map((r) => r.get(key)?.score ?? NaN),
-    argv.flags.scoreNoise,
-  ),
-);
-console.log(`Case score (* spread > ${argv.flags.scoreNoise})`);
-console.log(table([header(["case/arm"]), ...scoreRows]));
+const line = (cells: string[]) => `| ${cells.join(" | ")} |`;
+
+function markdown(rows: string[][]): string {
+  return [line(head), line(head.map(() => "---")), ...rows.map(line)].join("\n");
+}
+
+if (argv.flags.markdown) {
+  const flagged = [...scoreRows, ...graderRows].filter((r) => r.at(-1) === "*");
+  console.log(`### Flagged against ${labels[0]}\n`);
+  console.log(flagged.length > 0 ? markdown(flagged) : "No row moved past the noise rule.");
+  for (const [title, rows] of sections) {
+    console.log(`\n<details><summary>${title}</summary>\n\n${markdown(rows)}\n\n</details>`);
+  }
+} else {
+  for (const [title, rows] of sections) {
+    console.log(title);
+    console.log(table([head, ...rows]));
+  }
+}

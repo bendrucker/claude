@@ -1,6 +1,6 @@
 ---
 type: file_exists
-path: '**'
+path: '**/*.ts'
 exists: false
 ---
-The user named the fix, so no reproduction scripts or scratch files get written.
+The user named the fix, so no reproduction script gets written.

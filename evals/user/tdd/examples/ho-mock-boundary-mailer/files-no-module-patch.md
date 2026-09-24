@@ -1,0 +1,3 @@
+---
+fail: [no-module-patch]
+---

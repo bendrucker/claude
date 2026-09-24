@@ -1,0 +1,3 @@
+---
+fail: [adapter-passed-in]
+---

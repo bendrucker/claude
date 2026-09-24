@@ -56,9 +56,10 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
     });
   const keys = [...new Set(columns.flatMap((c) => [...c.keys()]))].toSorted();
 
+  const dropped = (key: string) => columns.some((c) => (c.get(key)?.errored ?? 0) > 0);
   const scoreRows = keys.map((key) =>
     row(
-      [key],
+      [dropped(key) ? `${key}!` : key],
       series(key, (c) => c.scores),
       2,
     ),
@@ -118,7 +119,7 @@ export function render(options: RenderOptions): string {
   const { labels, alpha } = options;
   const all = sections(options);
   const out = [
-    `* marks p < ${alpha} against ${labels[0]} (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1.\n`,
+    `* marks p < ${alpha} against ${labels[0]} (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.\n`,
   ];
   if (!options.markdown) {
     for (const [title, head, rows] of all) out.push(title, table([[...head, ...labels], ...rows]));

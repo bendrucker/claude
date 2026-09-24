@@ -3,8 +3,17 @@ import { dirname, join } from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
 
-const Grader = z.object({ name: z.string(), passed: z.boolean(), scored: z.boolean() });
-const Run = z.object({ score: z.number().nullable(), graders: z.array(Grader) });
+const Grader = z.object({
+  name: z.string(),
+  passed: z.boolean(),
+  scored: z.boolean(),
+  explanation: z.string().optional(),
+});
+const Run = z.object({
+  score: z.number().nullable(),
+  graders: z.array(Grader),
+  error: z.string().optional(),
+});
 const Result = z.object({
   cases: z.array(z.object({ name: z.string(), arms: z.record(z.string(), z.array(Run)) })),
 });
@@ -16,9 +25,35 @@ export interface Cell {
   graders: Map<string, boolean[]>;
   scores: number[];
   words: number[];
+  /** Runs left out of the pool because they errored. */
+  errored: number;
 }
 
 export type Column = Map<string, Cell>;
+
+/**
+ * Why a run failed outside the artifact under test, such as a session limit or a judge call
+ * that threw, or undefined for a clean run. The runner scores an errored run like any other,
+ * and an empty reply passes every `not_contains` grader.
+ */
+export function runError(run: z.output<typeof Run>): string | undefined {
+  return (
+    run.error ?? run.graders.find((g) => g.explanation?.startsWith("grader threw"))?.explanation
+  );
+}
+
+/** The errored runs in an aggregate-result.json, as `<case>/<arm>/<n>: <error>`. */
+export async function erroredRuns(path: string): Promise<string[]> {
+  const result = Result.parse(await Bun.file(path).json());
+  return result.cases.flatMap((c) =>
+    Object.entries(c.arms).flatMap(([arm, runs]) =>
+      runs.flatMap((run, i) => {
+        const error = runError(run);
+        return error === undefined ? [] : [`${c.name}/${arm}/${i}: ${error}`];
+      }),
+    ),
+  );
+}
 
 /** The final reply in a trace: its last `result` line. */
 export function traceReply(trace: string): string | undefined {
@@ -60,8 +95,17 @@ function merge(column: Column, { result, words }: Loaded) {
   for (const c of result.cases) {
     for (const [arm, runs] of Object.entries(c.arms)) {
       const key = `${c.name}/${arm}`;
-      const cell: Cell = column.get(key) ?? { graders: new Map(), scores: [], words: [] };
+      const cell: Cell = column.get(key) ?? {
+        graders: new Map(),
+        scores: [],
+        words: [],
+        errored: 0,
+      };
       for (const [i, run] of runs.entries()) {
+        if (runError(run) !== undefined) {
+          cell.errored += 1;
+          continue;
+        }
         if (run.score !== null) cell.scores.push(run.score);
         const count = words.get(key)?.[i];
         if (count !== undefined) cell.words.push(count);

@@ -24,18 +24,20 @@ The suite's `README.md` names how to run it and any suite-specific rules. Follow
 
 Check the suite before the first baseline. A climb on an unready suite measures the harness.
 
-- **Split.** Tag every case `dev` or `holdout` in its `case.yaml`. Candidates run on `dev`. `holdout` runs only at the baseline and at the end, so no edit is tuned against it. Aim for about a third of the cases in `holdout`, covering the same surfaces as `dev`.
+- **Split.** Tag every case `dev` or `holdout` in its `case.yaml`. Candidates run on `dev`. `holdout` runs once, at the end, so no edit is tuned against it. Aim for about a third of the cases in `holdout`, covering the same surfaces as `dev`.
 - **Reach.** A case moves only when the skill fires on it. Add a `tool_used` grader on `Skill` with `input_match` naming the skill: under ablation it reports as an unscored indicator. A case where the skill never fires measures the trigger, and its prompt belongs in a trigger case.
 - **Balance.** Include cases where the skill should change little, so a climb that over-applies the skill loses score.
 - **Graders.** Grade the output with `regex` wherever a pattern decides it, and keep `llm` graders to one criterion each. Pair each removal grader with a survival grader for the fact that must stay, so deleting everything fails.
+- **Scope.** When the reply wraps an artifact in commentary, have `append_system_prompt` ask for the artifact inside `<out>` tags and anchor each regex to that block, or a report that quotes a cut phrase fails its own grader. `<out>(?:(?!</out>)[\s\S])*?PATTERN` finds a pattern inside the block, and `<out>(?:(?!</out>)[\s\S]){N}` holds when the block runs past N characters, a floor under `contains` and a ceiling under `not_contains`.
 - **Isolation.** Stub every external service in the fixture: a bare repo for pushes, pasted text for API bodies, an `append_system_prompt` fallback telling the session what to reply when a network call fails. A run that dies on the network scores the sandbox.
+- **Wrap.** An artifact outside a plugin (a user skill, an agent, a rule or `CLAUDE.md`) loads through the `wrap` key in the suite's `suite.yaml`, which the runner builds into a throwaway plugin. Context files reach the session through a `SessionStart` hook, whatever their `paths:` frontmatter says.
 - **Noise.** Run the unchanged suite twice. Compare the two with `compare.ts`. Stars there are noise at that run count, and they set how many runs a candidate needs.
 
 ## Loop
 
 #### Baseline
 
-Run the suite on the base commit at least twice and pool the runs. Replicate the baseline as many times as each candidate: a single low baseline draw stars every candidate against it.
+Run the suite on the base commit at least twice and pool the runs. Replicate the baseline as many times as each candidate: a single low baseline draw stars every candidate against it. Get replicates from separate runs, each a local run or a CI dispatch. `--runs N` in one run shares that run's drift.
 
 #### Error Analysis
 
@@ -63,7 +65,7 @@ Run the candidate on the `dev` tag as many times as the baseline.
 #### Compare
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/compare.ts --suite <suite> <base1>,<base2> <cand1>,<cand2>
+bun evals/native/compare.ts --suite <suite> <base1>,<base2> <cand1>,<cand2>
 ```
 
 Each positional column is one or more `aggregate-result.json` paths joined by commas, pooled into one column. A star marks a cell whose permutation p-value against the first column falls below `--alpha` (0.1). `--markdown` prints the starred rows first. The tables cover case score, reply words from the traces, every grader's pass rate, and with `--suite`, score per tag.
@@ -98,4 +100,10 @@ Stop when any of these holds, and say which:
 
 ## Running
 
-The suite's `run.sh` or `README.md` gives the local and CI commands. `claude plugin eval` takes `--tag dev`, `--case <glob>`, `--runs <n>`, and `--concurrency <n>`, and writes `aggregate-result.json` plus `traces/` under its output directory. A run costs roughly cases × runs × 2 arms agent sessions plus three judge calls per `llm` grader per run. Price a candidate before launching it.
+`bun evals/native/run.ts <suite> --ref <ref> -- <args>` runs a suite locally against the artifacts as they stand at `<ref>`, with the cases read from the working tree, so the base and every candidate face the same suite. Arguments after `--` go to `claude plugin eval`: `--tag dev`, `--case <glob>`, `--runs <n>`, `--concurrency <n>`. Results land in `<suite>/results/`, with `aggregate-result.json` and `traces/`. Local runs need the Bash sandbox disabled.
+
+On CI, `gh workflow run eval.yml --ref <branch> -f suite=<suite> -f args='--tag dev'` runs one replicate. `-f ref=<sha>` tests another commit against the branch's cases, and `-f baseline=<run id>,<run id>` adds the pooled comparison to the job summary. `gh run download <id>` fetches a run's results for pooling locally.
+
+A run costs roughly cases × runs × 2 arms agent sessions, plus three judge calls per `llm` grader per run. Price a candidate before launching it.
+
+For a suite in another harness, see [references/harnesses.md](references/harnesses.md).

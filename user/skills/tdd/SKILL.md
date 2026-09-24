@@ -30,6 +30,8 @@ The work is done when every confirmed seam has a test that failed before its imp
 
 Verify behavior through the interface. Name the test as a specification: "user can checkout with valid cart" names a capability. Use the domain language the surrounding code uses.
 
+Substitute only what the process doesn't own, such as the network, the clock, and randomness, and hand the substitute in as a parameter. When the code reaches that dependency directly, as a global `fetch` or `Date.now()`, first reshape it to take the dependency as a parameter with the real one as its default, then test through that parameter.
+
 See [references/tests.md](references/tests.md) for good and bad pairs, and [references/mocking.md](references/mocking.md) for which seams get a substitute adapter.
 
 ## Anti-Patterns

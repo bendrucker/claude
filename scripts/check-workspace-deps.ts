@@ -105,7 +105,7 @@ async function checkDeps(): Promise<string[]> {
   );
 
   const files = sources.filter(
-    (file) => !file.endsWith(".d.ts") && !file.split("/").includes("fixtures"),
+    (file) => !file.endsWith(".d.ts") && !/(^|\/)(fixtures\/|evals\/.*\/examples\/)/.test(file),
   );
   const scanned = await Promise.all(
     files.map(async (file) => {

@@ -6,6 +6,7 @@ import { $ } from "bun";
 import { cli } from "cleye";
 import { parse } from "yaml";
 import { z } from "zod";
+import { erroredRuns } from "./load";
 import { stage } from "./stage";
 import { wrap } from "./wrap";
 
@@ -213,6 +214,13 @@ if (import.meta.main) {
   // A --case or --tag that matches nothing otherwise exits clean with nothing graded.
   if (code === 0 && (await caseCount(output)) === 0) {
     console.error(`No case ran. Check the case filters in: ${argv._.args.join(" ")}`);
+    process.exit(1);
+  }
+  const result = join(output, "aggregate-result.json");
+  const errors = (await Bun.file(result).exists()) ? await erroredRuns(result) : [];
+  if (errors.length > 0) {
+    console.error(`${errors.length} runs errored, and compare.ts leaves them out:`);
+    for (const e of errors) console.error(`  ${e}`);
     process.exit(1);
   }
   process.exit(code);

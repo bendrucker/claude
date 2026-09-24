@@ -1,7 +1,7 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`render stars rows that moved and leads the markdown with them 1`] = `
-"* marks p < 0.1 against base (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1.
+"* marks p < 0.1 against base (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.
 
 | measure | row | base | next |
 | --- | --- | --- | --- |
@@ -45,7 +45,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 `;
 
 exports[`render rolls case scores up by tag 1`] = `
-"* marks p < 0.1 against base (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1.
+"* marks p < 0.1 against base (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.
 
 Tag score
 ╔═════════════════╤══════╗

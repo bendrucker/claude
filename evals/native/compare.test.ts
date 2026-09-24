@@ -3,12 +3,13 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pFloor, pValue, render } from "./compare";
-import { loadColumn, loadTags } from "./load";
+import { erroredRuns, loadColumn, loadTags } from "./load";
 
 interface RunSpec {
   score: number;
-  graders: [name: string, passed: boolean, scored?: boolean][];
+  graders: [name: string, passed: boolean, scored?: boolean, explanation?: string][];
   reply?: string | undefined;
+  error?: string | undefined;
 }
 
 /** Writes an aggregate-result.json with one case per entry, and a trace for each run with a reply. */
@@ -32,7 +33,13 @@ async function result(cases: Record<string, Record<string, RunSpec[]>>): Promise
           }
           return {
             score: run.score,
-            graders: run.graders.map(([g, passed, scored = true]) => ({ name: g, passed, scored })),
+            graders: run.graders.map(([g, passed, scored = true, explanation]) => ({
+              name: g,
+              passed,
+              scored,
+              explanation,
+            })),
+            error: run.error,
           };
         }),
       ]),
@@ -85,11 +92,30 @@ describe("loadColumn", () => {
     expect(column.get("c/with")).toEqual({
       scores: [1, 0],
       words: [3, 6],
+      errored: 0,
       graders: new Map([
         ["fact", [true, false]],
         ["fired (indicator)", [true, false]],
       ]),
     });
+  });
+
+  test("leaves errored runs out of the pool and counts them", async () => {
+    const path = await result({
+      c: {
+        with: [
+          pass(),
+          { ...pass(), error: "exit 1: You've hit your session limit" },
+          { ...fail(), graders: [["judge", false, true, "grader threw: judge call failed"]] },
+        ],
+      },
+    });
+    const cell = (await loadColumn([path])).get("c/with");
+    expect([cell?.scores, cell?.errored]).toEqual([[1], 2]);
+    expect(await erroredRuns(path)).toEqual([
+      "c/with/1: exit 1: You've hit your session limit",
+      "c/with/2: grader threw: judge call failed",
+    ]);
   });
 
   test("skips word counts for runs without a trace", async () => {
@@ -140,4 +166,11 @@ test("marks cells too small to star", async () => {
   const next = await result({ c: { with: [pass(), pass()] } });
   const columns = await Promise.all([loadColumn([base]), loadColumn([next])]);
   expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain("1.00†");
+});
+
+test("marks a case whose errored runs left the pool", async () => {
+  const base = await result({ c: { with: [fail()] } });
+  const next = await result({ c: { with: [{ ...pass(), error: "exit 1: session limit" }] } });
+  const columns = await Promise.all([loadColumn([base]), loadColumn([next])]);
+  expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain("c/with!");
 });

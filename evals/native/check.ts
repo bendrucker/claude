@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { globSync } from "node:fs";
-import { basename, dirname, extname, join } from "node:path";
+import { basename, dirname, extname, join, relative } from "node:path";
 import { cli } from "cleye";
 import { parse } from "yaml";
 import { z } from "zod";
@@ -26,7 +26,11 @@ export type Graders = Map<string, z.output<typeof Grader>>;
 export interface Recorded {
   reply: string;
   trace?: string | undefined;
+  /** File contents by path, standing in for the session's working directory after the run. */
+  files?: Map<string, string> | undefined;
 }
+
+const FileTarget = z.object({ source: z.literal("file"), path: z.string() });
 
 /** Splits a markdown file into its YAML frontmatter and body. */
 function frontmatter(text: string): [unknown, string] {
@@ -53,13 +57,14 @@ export function passes(grader: z.output<typeof RegexGrader>, text: string): bool
 function recordedText(target: unknown, run: Recorded): string | undefined {
   if (target === undefined || target === "last_message") return run.reply;
   if (target === "trace") return run.trace;
-  return undefined;
+  const file = FileTarget.safeParse(target);
+  return file.success ? run.files?.get(file.data.path) : undefined;
 }
 
 /**
  * Grades a recorded run with a regex grader, matching a trace grader against the raw trace
  * JSONL as the runner does. Returns undefined for a grader that is not a regex, or whose
- * target the run does not record, such as a file in the session's working directory.
+ * target the run does not record, such as a file with no example directory holding it.
  */
 export function verdict(grader: z.output<typeof Grader>, run: Recorded): boolean | undefined {
   const parsed = RegexGrader.safeParse(grader);
@@ -80,16 +85,28 @@ export async function loadGraders(caseDir: string): Promise<Graders> {
   return new Map(graders);
 }
 
+/** Reads every file under a directory by relative path, or undefined when there is none. */
+async function readFiles(dir: string): Promise<Map<string, string> | undefined> {
+  const entries = globSync("**/*", { cwd: dir, withFileTypes: true }).filter((e) => e.isFile());
+  if (entries.length === 0) return undefined;
+  const read = entries.map(async (e) => {
+    const path = join(e.parentPath, e.name);
+    return [relative(dir, path), await Bun.file(path).text()] as const;
+  });
+  return new Map(await Promise.all(read));
+}
+
 /** Reads an example as a recorded run with the graders it must fail. */
 async function readExample(path: string): Promise<[Recorded, string[]]> {
   const text = await Bun.file(path).text();
+  const files = await readFiles(path.slice(0, -extname(path).length));
   if (extname(path) === ".md") {
     const [meta, reply] = frontmatter(text);
-    return [{ reply }, Example.parse(meta).fail];
+    return [{ reply, files }, Example.parse(meta).fail];
   }
   const sidecar = Bun.file(path.replace(/\.jsonl$/, ".yaml"));
   const meta: unknown = (await sidecar.exists()) ? parse(await sidecar.text()) : {};
-  return [{ reply: traceReply(text) ?? "", trace: text }, Example.parse(meta ?? {}).fail];
+  return [{ reply: traceReply(text) ?? "", trace: text, files }, Example.parse(meta ?? {}).fail];
 }
 
 export interface Checked {
@@ -102,7 +119,8 @@ export interface Checked {
  * Runs every case's regex graders against the examples in `<suite>/examples/<case>/`. A `.md`
  * example is a hand-written reply whose frontmatter `fail:` lists the graders it must fail. A
  * `.jsonl` example is a trace, such as one copied from a run's `traces/`, graded on its raw
- * text and its last `result` line, with `fail:` in a sibling `.yaml`. Every other grader the
+ * text and its last `result` line, with `fail:` in a sibling `.yaml`. A directory beside an
+ * example with its name holds the files a file-target grader reads. Every other grader the
  * example can reach must pass it.
  */
 export async function check(suite: string): Promise<Checked> {
@@ -145,7 +163,7 @@ if (import.meta.main) {
     parameters: ["<suite>"],
     help: {
       description:
-        "Test a suite's regex graders against the examples in <suite>/examples/<case>/ before spending runs on them: hand-written replies as .md with a frontmatter `fail:` list, and traces as .jsonl with `fail:` in a sibling .yaml. Every grader an example can reach must pass it unless listed.",
+        "Test a suite's regex graders against the examples in <suite>/examples/<case>/ before spending runs on them: hand-written replies as .md with a frontmatter `fail:` list, and traces as .jsonl with `fail:` in a sibling .yaml. A directory named after an example holds the files its file-target graders read. Every grader an example can reach must pass it unless listed.",
     },
   });
   const { mismatches, unchecked } = await check(argv._.suite);

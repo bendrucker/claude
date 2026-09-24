@@ -99,6 +99,13 @@ export async function prepare(
  * traces inside its temp directories and deletes them unless run with `--keep-temp`, so this
  * copies them out and then removes those directories.
  */
+/** Rejects arguments the runner would silently narrow, such as a repeated `--case`. */
+export function checkArgs(args: string[]): void {
+  const cases = args.filter((a) => a === "--case" || a.startsWith("--case="));
+  if (cases.length > 1)
+    throw new Error("claude plugin eval keeps only the last --case. Pass one plain * glob.");
+}
+
 /** How many cases a run graded, zero when it wrote no result. */
 export async function caseCount(output: string): Promise<number> {
   const file = Bun.file(join(output, "aggregate-result.json"));
@@ -142,6 +149,7 @@ if (import.meta.main) {
         "Run a claude plugin eval suite against the artifacts it tests as they stand at a ref. Arguments after -- pass through to claude plugin eval.",
     },
   });
+  checkArgs(argv._.args);
   const repo = (await $`git rev-parse --show-toplevel`.text()).trim();
   const suite = relative(repo, resolve(argv._.suite));
   const config = await readSuite(join(repo, suite));

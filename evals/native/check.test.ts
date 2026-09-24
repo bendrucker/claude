@@ -76,6 +76,24 @@ test.each<{ name: string; files: Record<string, string>; expected: Mismatch[] }>
   expect((await check(dir)).mismatches).toEqual(expected);
 });
 
+test.each<{ name: string; file: string; expected: Mismatch[] }>([
+  { name: "passes a file grader on a matching file", file: "export const x = 1;", expected: [] },
+  {
+    name: "fails a file grader on a file without the pattern",
+    file: "export const y = 1;",
+    expected: [{ example: "examples/one/good.md", grader: "file", expected: "pass" }],
+  },
+])("an example directory $name", async ({ file, expected }) => {
+  const dir = await suite({
+    ...graders,
+    "one/graders/file.md":
+      "---\ntype: regex\npattern: 'const x'\ntarget:\n  source: file\n  path: src/a.ts\n---\n",
+    "examples/one/good.md": "p99 230ms",
+    "examples/one/good/src/a.ts": file,
+  });
+  expect((await check(dir)).mismatches).toEqual(expected);
+});
+
 test("names the regex graders no example reaches", async () => {
   const dir = await suite({
     ...graders,

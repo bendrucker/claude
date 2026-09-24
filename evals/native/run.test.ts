@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import { caseCount, casePlugins, collectTraces, prepare } from "./run";
+import { caseCount, casePlugins, checkArgs, collectTraces, prepare } from "./run";
 import { openInvocation, siblingLinks } from "./wrap";
 
 let repo: string;
@@ -115,4 +115,16 @@ test.each<{ url: string; expected: string[] }>([
 ])("siblingLinks resolves $url", ({ url, expected }) => {
   const text = `See [it](${url}).`;
   expect(siblingLinks("user/skills/tdd", "user/skills/tdd/SKILL.md", text)).toEqual(expected);
+});
+
+test.each<{ args: string[]; throws: boolean }>([
+  { args: ["--case", "a", "--case", "b"], throws: true },
+  { args: ["--case=a", "--case", "b"], throws: true },
+  { args: ["--case", "quiet-*", "--runs", "2"], throws: false },
+])("checkArgs($args)", ({ args, throws }) => {
+  const run = () => {
+    checkArgs(args);
+  };
+  if (throws) expect(run).toThrow("keeps only the last --case");
+  else expect(run).not.toThrow();
 });

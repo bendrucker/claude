@@ -170,3 +170,5 @@ When the topic is work not yet done, show the proposed shape rather than describ
 Place each visual next to the short text it supports.
 
 Keep only the calls, files, props, states, and seams that answer the question on the table.
+
+End the reply once the question is answered, on the last visual or one sentence after it. Observations the user did not ask about, such as stubs, latent bugs, open decisions, or an offer to build it, wait for the user to ask.

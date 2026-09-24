@@ -74,10 +74,10 @@ Each positional column is one or more `aggregate-result.json` paths joined by co
 
 Read the stars in this order:
 
-1. **Without arm.** The candidate cannot touch it. A star there is drift or a lucky draw, and a with-arm star of the same size is no evidence. Add runs to both columns.
+1. **Without arm.** The candidate cannot touch it. A star there is drift or a lucky draw, and a with-arm star of the same size is no evidence. Add runs to both columns, scoped with `--case` to the cases in doubt. Tag rows then pool unequal run counts per case, so read those cases' own rows.
 2. **Indicators.** A with-arm gain on a case where the skill fired no more often than at baseline did not come from the skill's instructions.
 3. **Targets.** Accept only when a target grader is starred in the predicted direction.
-4. **Guards.** A starred regression on the with arm blocks the change until it is explained from traces or fixed.
+4. **Guards.** A starred regression on the with arm blocks the change until it is explained from traces or fixed. When several guards on one case drop together, check the case minimum first: one collapsed run fails every survival grader at once, and its trace shows whether the candidate caused it.
 
 About one row in ten stars by chance at the default alpha. Treat a starred row outside the pre-registered targets and guards as a lead for error analysis. It is not a result.
 
@@ -102,7 +102,7 @@ Stop when any of these holds, and say which:
 
 ## Running
 
-`bun evals/native/run.ts <suite> --ref <ref> -- <args>` runs a suite locally against the artifacts as they stand at `<ref>`, with the cases read from the working tree, so the base and every candidate face the same suite. Arguments after `--` go to `claude plugin eval`: `--tag dev`, `--case <glob>`, `--runs <n>`, `--concurrency <n>`. Results land in `<suite>/results/`, with `aggregate-result.json` and `traces/`. Local runs need the Bash sandbox disabled.
+`bun evals/native/run.ts <suite> --ref <ref> -- <args>` runs a suite locally against the artifacts as they stand at `<ref>`, with the cases read from the working tree, so the base and every candidate face the same suite. Arguments after `--` go to `claude plugin eval`: `--tag dev`, `--case <glob>`, `--runs <n>`, `--concurrency <n>`. Results land in `<suite>/results/`, with `aggregate-result.json` and `traces/`. Local runs need the Bash sandbox disabled, and a fresh worktree needs `bun install` before `compare.ts` resolves its dependencies.
 
 On CI, `gh workflow run eval.yml --ref <branch> -f suite=<suite> -f args='--tag dev'` runs one replicate. `-f ref=<sha>` tests another commit against the branch's cases, and `-f baseline=<run id>,<run id>` adds the pooled comparison to the job summary. `gh run download <id>` fetches a run's results for pooling locally.
 

@@ -63,6 +63,8 @@ Make one change per candidate, on its own branch off the base. Before running it
 
 Writing the target first keeps the decision from being fitted to whichever row happened to move.
 
+Check every example the change names against the `holdout` fixtures, and swap out any a `holdout` case uses. A gain on that case would then measure the example rather than the rule.
+
 Run the candidate on the `dev` tag as many times as the baseline. When the budget is tight, run one full `dev` replicate for the guards and top up the target cases with scoped `--case` replicates to 4 runs a side. Guards at that count cannot star, so read their case minimums and open the trace behind any drop.
 
 #### Compare

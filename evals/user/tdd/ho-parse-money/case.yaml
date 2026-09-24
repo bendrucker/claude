@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: ho-parse-money
+tags: [holdout]
+plugins: [../..]
+runs: 1
+execution:
+  model: claude-sonnet-5
+  max_turns: 30
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Write, Edit, Bash]
+  append_system_prompt: >-
+    Nobody is available to answer questions while you work. If you need a
+    decision from the user before going further, stop and ask it in your reply.
+context:
+  scaffold_script: fixture.sh

@@ -1,0 +1,5 @@
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t199","name":"Write","input":{"file_path":"/tmp/claude-eval-x/home/cwd/src/money.test.ts","content":"x"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t200","name":"Edit","input":{"replace_all":false,"file_path":"/tmp/claude-eval-x/home/cwd/src/money.ts","old_string":"a","new_string":"b"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t201","name":"Bash","input":{"command":"bun test","description":"Run tests"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t201","content":" 2 pass\n 0 fail\n"}]}}
+{"type":"result","subtype":"success","result":"Done."}

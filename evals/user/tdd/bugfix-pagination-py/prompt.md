@@ -1,1 +1,1 @@
-`paginate(items, 1)` skips the first ten items, but pages are 1-based. Fix it test-first: get a failing test before changing the code. `paginate` and `page_count` are the public API. Run the tests with `python3 -m unittest`.
+`paginate(items, 1)` skips the first ten items, but pages are 1-based. Fix it test-first. `paginate` and `page_count` are the public API, and tests run with `python3 -m unittest`.

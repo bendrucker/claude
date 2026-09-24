@@ -2,7 +2,7 @@
 import { basename, dirname } from "node:path";
 import { cli } from "cleye";
 import seedrandom from "seedrandom";
-import { mean, permutationTest } from "simple-statistics";
+import { mean, min, permutationTest } from "simple-statistics";
 import { table } from "table";
 import { type Cell, type Column, loadColumn, loadTags } from "./load";
 
@@ -46,6 +46,11 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
       2,
     ),
   );
+  // A lone collapsed run drags a mean without starring it. The minimum shows it.
+  const minRows = keys.map((key) => [
+    key,
+    ...series(key, (c) => c.scores).map((xs) => (xs.length > 0 ? min(xs).toFixed(2) : "-")),
+  ]);
   const wordRows = keys.map((key) =>
     row(
       [key],
@@ -66,6 +71,7 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
 
   const result: Section[] = [
     ["Case score", ["case/arm"], scoreRows],
+    ["Case minimum", ["case/arm"], minRows],
     ["Reply words", ["case/arm"], wordRows],
     ["Grader pass rate", ["case/arm", "grader"], graderRows],
   ];

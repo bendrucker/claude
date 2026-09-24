@@ -1,0 +1,1 @@
+`time bun run tags` takes about 9 seconds. Commit "treat underscores and hyphens alike" replaced the `Set` with `out.includes(key)`, a linear scan per tag, so the loop went quadratic. Restoring a `Set` for the seen check brings it back to instant.

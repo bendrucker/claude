@@ -6,4 +6,6 @@ no-diary this comment.
 // out during review of #412, so now it delegates to parseToken. See ENG-1183
 // and the Acme Corp incident for background.
 function read(input: string) {
+  return parseToken(input);
+}
 ```

@@ -110,6 +110,6 @@ Stop when any of these holds, and say which:
 
 On CI, `gh workflow run eval.yml --ref <branch> -f suite=<suite> -f args='--tag dev'` runs one replicate. `-f ref=<sha>` tests another commit against the branch's cases, and `-f baseline=<run id>,<run id>` adds the pooled comparison to the job summary. `gh run download <id>` fetches a run's results for pooling locally.
 
-`--case` takes one glob of plain `*` wildcards (character classes and braces match nothing), and a repeated flag keeps only the last, so scope replicates with a glob that covers the cases in doubt or one dispatch per case. A run costs roughly cases × runs × 2 arms agent sessions, about $0.10 each for Sonnet on a small fixture, plus three judge calls per `llm` grader per run. Price a candidate before launching it.
+`run.ts` takes `--case` repeatedly and ORs the globs, with braces and character classes, so scope replicates to exactly the cases in doubt. A run costs roughly cases × runs × 2 arms agent sessions, about $0.10 each for Sonnet on a small fixture, plus three judge calls per `llm` grader per run. Price a candidate before launching it.
 
 For a suite in another harness, see [references/harnesses.md](references/harnesses.md).

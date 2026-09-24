@@ -1,4 +1,4 @@
 ---
 type: llm
 ---
-The reply contains a PR body of one to three prose paragraphs with no section headings (a trailing link line does not count as a paragraph), carrying the jitter decision with its reason and the 410ms and 230ms p99 numbers, and keeping the `things:///show?id=Fk3aX2mQ` link.
+Judge only the PR body. Ignore any text before the `Title:` line, the title line itself, and a final line that holds only a link (such as `Original Task: <url>`). Pass when what remains is prose of three or fewer paragraphs, with no headings and no bulleted list, that leads with why the backoff changed. Fail when the body is a list of changes or split into sections.

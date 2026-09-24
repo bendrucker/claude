@@ -1,0 +1,1 @@
+Add `parseDuration` to `src/duration.ts`, test-first. It takes strings like `"1h30m"` or `"45m"` and returns milliseconds, and throws on anything it can't parse. Test it through `parseDuration` and `formatDuration`, the module's public functions. Run the tests with `bun test`.

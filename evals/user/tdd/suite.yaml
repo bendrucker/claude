@@ -1,0 +1,4 @@
+allow_tools: ["Bash(bun:*)", "Bash(python3:*)", Write, Edit]
+judge_model: claude-sonnet-5
+wrap:
+  skills: [user/skills/tdd]

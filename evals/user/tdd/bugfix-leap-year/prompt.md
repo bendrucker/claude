@@ -1,0 +1,1 @@
+`daysInMonth(1900, 2)` returns 29, but 1900 wasn't a leap year. Fix it test-first: reproduce it with a failing test before touching the code. `daysInMonth` is the public API here. Tests run with `bun test`.

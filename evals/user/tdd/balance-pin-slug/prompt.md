@@ -1,0 +1,1 @@
+Next I'm changing `slugify` test-first, so first lock in what it does today. Write tests at `slugify`, the only seam, and leave `src/slug.ts` alone. Tests go in `src/slug.test.ts`; run them with `bun test`.

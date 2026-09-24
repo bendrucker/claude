@@ -1,0 +1,1 @@
+Test-first: when the weather API responds with an error status, `summary` should return `"<city>: forecast unavailable"` instead of throwing. `summary` is the seam to test. There are no tests yet, so put them in `src/weather.test.ts` and run them with `bun test`.

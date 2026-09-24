@@ -1,0 +1,3 @@
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01", "name": "Skill", "input": {"skill": "pull-request:create"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": "Base directory for this skill: /tmp/hill-climb-x/plugins/pull-request/skills/create\n\n# Create Pull Request\n\n- Remote URL: https://github.com/bendrucker/proc-runner.git"}]}}
+{"type": "result", "result": "Title: run: drain stdout before resolving exit\n\nFixes truncated output from `run()`, which resolved on `exit` before stdout drained. It now waits for `close`."}

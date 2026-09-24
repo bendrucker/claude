@@ -1,0 +1,3 @@
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01", "name": "Bash", "input": {"description": "Check status", "command": "git status"}}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_02", "name": "Bash", "input": {"description": "Commit the change", "command": "git add src/export.ts && git commit -m \"export: quote csv fields\""}}]}}
+{"type": "result", "result": "Committed as `a814acc`."}

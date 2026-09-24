@@ -38,31 +38,32 @@ export interface Flip {
 
 /**
  * Re-grades one run against the case's current graders and its trace. A regex grader the trace
- * reaches gets a fresh verdict, including one added since the run. A grader whose file is gone
- * drops out. Any other grader, such as an `llm` grader or a file target, keeps its recorded
- * verdict.
+ * reaches gets a fresh verdict, weight, and arm from its current file, including one added
+ * since the run or swapped in from another type. A grader whose file is gone drops out. Any
+ * other grader, such as an `llm` grader or a file target, keeps its recorded verdict.
  */
 export function regradeRun(run: Run, arm: string, graders: Graders, trace: string): Run {
   const recorded = { reply: traceReply(trace) ?? "", trace };
-  const kept = run.graders.flatMap((g) => {
-    const grader = graders.get(g.name);
-    if (grader === undefined) return [];
-    const passed = verdict(grader, recorded);
-    return passed === undefined ? [g] : [{ ...g, passed, explanation: "regraded from the trace" }];
-  });
   const known = new Set(run.graders.map((g) => g.name));
-  const added = [...graders].flatMap(([name, grader]) => {
+  const regraded = (name: string, explanation: string) => {
+    const grader = graders.get(name);
     const parsed = RegexGrader.safeParse(grader);
-    if (known.has(name) || !parsed.success) return [];
+    if (grader === undefined || !parsed.success) return undefined;
     const withOnly = parsed.data.arm === "with-only";
-    if (withOnly && arm !== "with") return [];
     const passed = verdict(grader, recorded);
-    if (passed === undefined) return [];
+    if (passed === undefined) return undefined;
+    if (withOnly && arm !== "with") return [];
     const { weight } = parsed.data;
-    return [
-      { name, passed, weight, scored: !withOnly, withOnly, explanation: "graded from the trace" },
-    ];
+    return [{ name, passed, weight, scored: !withOnly, withOnly, explanation }];
+  };
+  const kept = run.graders.flatMap((g) => {
+    if (!graders.has(g.name)) return [];
+    const fresh = regraded(g.name, "regraded from the trace");
+    return fresh === undefined ? [g] : fresh.flatMap((r) => [{ ...g, ...r }]);
   });
+  const added = [...graders.keys()]
+    .filter((name) => !known.has(name))
+    .flatMap((name) => regraded(name, "graded from the trace") ?? []);
   const next = { ...run, graders: [...kept, ...added] };
   return run.score === null ? next : { ...next, score: score(next, arm) };
 }

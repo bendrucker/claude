@@ -9,6 +9,8 @@ disable-model-invocation: true
 
 Explain $ARGUMENTS visually. Pick the smallest view that makes the point, and keep the prose around it short.
 
+When showing how existing code works, read it first and draw its real names. Follow a flow from where it enters, such as the route or command, to where the caller sees the result.
+
 ## Arguments
 
 With no argument, show the current topic of conversation.

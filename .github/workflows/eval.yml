@@ -14,16 +14,22 @@ on:
         type: string
         required: true
       args:
-        description: Extra arguments for a native suite's run.sh, such as --runs 1 --case <name>
+        description: Extra arguments for claude plugin eval on a native suite, such as --runs 1 --case <name>
+        type: string
+        default: ""
+      ref:
+        description: Git ref to read a native suite's skills and plugins at, while the cases come from the dispatched branch
         type: string
         default: ""
       baseline:
-        description: A run id of the same native suite to compare against in the job summary
+        description: Comma-separated run ids of the same native suite, pooled and compared against in the job summary
         type: string
         default: ""
 
+# Each dispatch is its own group, so replicate runs on one branch do not
+# cancel each other.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -254,10 +260,6 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           set -euo pipefail
-          if [ ! -x "$SUITE_DIR/run.sh" ]; then
-            echo "::error::$SUITE_DIR has no executable run.sh, which a native suite provides to load its plugins."
-            exit 1
-          fi
           if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
             echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. Add the secret (from 'claude setup-token') to run native evals."
             exit 1
@@ -265,8 +267,8 @@ jobs:
           name=${SUITE_DIR#plugins/}
           echo "SUITE=${name//\//-}" >> "$GITHUB_ENV"
 
-      # Skill context injection runs scripts with bun, and compare.ts needs
-      # the workspace dependencies.
+      # Skill context injection runs scripts with bun, and the runner and
+      # compare.ts need the workspace dependencies.
       - uses: ./.github/actions/bun-install
 
       - uses: ./.github/actions/claude-code
@@ -279,9 +281,15 @@ jobs:
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           ARGS: ${{ inputs.args }}
+          REF: ${{ inputs.ref }}
         run: |
+          ref=()
+          if [ -n "$REF" ]; then
+            git fetch --no-tags origin "$REF"
+            ref=(--ref FETCH_HEAD --label "${REF//\//-}")
+          fi
           # shellcheck disable=SC2086
-          "$SUITE_DIR/run.sh" --no-publish --threshold 0 --concurrency 4 $ARGS
+          bun evals/native/run.ts "$SUITE_DIR" "${ref[@]}" -- --no-publish --threshold 0 --concurrency 4 $ARGS
 
       - name: Upload results
         if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
@@ -292,7 +300,7 @@ jobs:
 
       # The report lands in the job summary and in a check on the commit that
       # ran, so a pull request links to results instead of pasting them. A
-      # suite that ships compare.ts adds its tables against the baseline run.
+      # baseline adds compare.ts tables against the pooled baseline runs.
       - name: Write report
         id: report
         if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
@@ -317,11 +325,14 @@ jobs:
             "| --- | --- | --- | --- |",
             (.cases[] | "| \(.name) | \(.aggregates.score | pct) | \(.aggregates.scoreWithout | pct) | \(.aggregates.delta | pct) |")
           ' "$result" > "$report"
-          if [ -n "$BASELINE" ] && [ -f "$SUITE_DIR/compare.ts" ]; then
-            gh run download "$BASELINE" --dir "$RUNNER_TEMP/baseline"
-            baselines=("$RUNNER_TEMP"/baseline/*/*/aggregate-result.json)
-            compared=$(bun "$SUITE_DIR/compare.ts" --markdown --label "run $BASELINE" --label "this run" "${baselines[-1]}" "$result")
-            flagged=$(sed '/<details>/q' <<< "$compared" | grep -c '| \* |$' || true)
+          if [ -n "$BASELINE" ]; then
+            IFS=, read -ra ids <<< "$BASELINE"
+            for id in "${ids[@]}"; do
+              gh run download "$id" --dir "$RUNNER_TEMP/baseline/$id"
+            done
+            pooled=$(printf '%s,' "$RUNNER_TEMP"/baseline/*/*/*/aggregate-result.json)
+            compared=$(bun evals/native/compare.ts --markdown --suite "$SUITE_DIR" --label "run $BASELINE" --label "this run" "${pooled%,}" "$result")
+            flagged=$(sed '/<details>/q' <<< "$compared" | grep -c '^|.*\* |' || true)
             title="$title, $flagged flagged against run $BASELINE"
             printf '\n%s\n' "$compared" >> "$report"
           fi

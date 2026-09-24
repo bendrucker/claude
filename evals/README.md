@@ -4,6 +4,24 @@ This directory is the generic layer: the results corpus and the scripts that fil
 
 [`scripts/`](scripts/) is shared across them. It moves promptfoo runs out of promptfoo's SQLite database into a durable corpus and reports what the runs cost.
 
+## Native Suites
+
+[`native/`](native/) runs and compares `claude plugin eval` suites.
+
+- `run.ts <suite> [--ref <ref>] -- <args>` stages the plugins the cases load, as they stand at `--ref` (the working tree by default), next to the suite from the working tree, so every ref is graded by the same cases. It runs on subscription auth with any API key removed from the environment, and results land in `<suite>/results/<timestamp>[-label]/`.
+- `compare.ts <column>...` compares result files column by column, each column a comma-joined pool of `aggregate-result.json` paths, the first the baseline. A `*` marks p < `--alpha` (0.1) under a two-sided permutation test. `--suite` adds per-tag scores from each case's `tags`. `--markdown` puts starred rows first for a job summary.
+- `wrap.ts` builds a throwaway plugin from skills, agents, and context documents that are not in a plugin. A suite opts in through `suite.yaml`:
+
+```yaml
+allow_tools: ["Bash(git:*)"]    # gated tools passed to --allow-tools
+judge_model: claude-sonnet-5
+wrap:                           # omit when the cases load a plugin
+  skills: [user/skills/tdd]
+  context: [user/rules/typescript.md]
+```
+
+The runner ignores a `CLAUDE.md` or `.claude/rules` in the scaffolded working directory, so wrapped context reaches the session through a `SessionStart` hook instead. It injects every context file whatever its `paths:` frontmatter says.
+
 ## Results Corpus
 
 promptfoo keeps its own database under `~/.cache/promptfoo`, set through `PROMPTFOO_CONFIG_DIR` because the default `~/.promptfoo` is not writable under the repo sandbox. That database is the browse layer. It is machine-local, so the canonical durable record is one `promptfoo export` JSON per run under `evals/results/<suite>/<date>-<id>.json`, mirrored to `s3://ben-drucker-agents-eval-corpus/eval-results/`.

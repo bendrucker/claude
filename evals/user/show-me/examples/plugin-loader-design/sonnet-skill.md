@@ -27,7 +27,7 @@ export interface CliPlugin {
 
 A third-party package's entry point default-exports a `CliPlugin`:
 
-```ts
+```ts fragment
 // my-cli-plugin-deploy/src/index.ts
 const plugin: CliPlugin = {
   name: "deploy",

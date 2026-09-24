@@ -1,0 +1,24 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`openInvocation drops the key and keeps the rest 1`] = `
+"---
+name: tdd
+---
+
+# TDD
+"
+`;
+
+exports[`openInvocation leaves a model-invocable skill alone 1`] = `
+"---
+name: tdd
+---
+
+# TDD
+"
+`;
+
+exports[`openInvocation leaves a file without frontmatter alone 1`] = `
+"# TDD
+"
+`;

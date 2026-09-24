@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
 import { casePlugins, collectTraces, prepare } from "./run";
+import { openInvocation } from "./wrap";
 
 let repo: string;
 
@@ -13,7 +14,7 @@ const files: Record<string, string> = {
   "plugins/q/.claude-plugin/plugin.json": '{"name":"q"}',
   "plugins/p/evals/suite/one/case.yaml": "plugins: [../../.., ../../../../q]\n",
   "plugins/p/evals/suite/one/prompt.md": "committed prompt",
-  "user/skills/tdd/SKILL.md": "committed user skill",
+  "user/skills/tdd/SKILL.md": "---\ndisable-model-invocation: true\n---\ncommitted user skill",
   "user/rules/ts.md": "committed rule",
   "evals/user/tdd/suite.yaml":
     "wrap:\n  skills: [user/skills/tdd]\n  context: [user/rules/ts.md]\n",
@@ -55,7 +56,7 @@ describe("prepare", () => {
     const { target, evalDir } = await prepare(repo, "evals/user/tdd", "HEAD");
     expect(evalDir).toBe("evals");
     expect(await read(join(target, ".claude-plugin/plugin.json"))).toContain('"name": "user"');
-    expect(await read(join(target, "skills/tdd/SKILL.md"))).toBe("committed user skill");
+    expect(await read(join(target, "skills/tdd/SKILL.md"))).toBe("---\n---\ncommitted user skill");
     expect(await read(join(target, "context/ts.md"))).toBe("committed rule");
     expect(await read(join(target, "hooks/hooks.json"))).toContain("SessionStart");
     expect(await Bun.file(join(target, "evals/one/case.yaml")).exists()).toBe(true);
@@ -76,4 +77,15 @@ test("collectTraces copies kept traces beside the results and removes the runner
   expect(await read(join(output, "traces/one-with-0.jsonl"))).toContain("reply");
   expect(await Bun.file(join(output, "traces/one-with-1.jsonl")).exists()).toBe(false);
   expect(await Bun.file(trace).exists()).toBe(false);
+});
+
+test.each([
+  {
+    name: "drops the key and keeps the rest",
+    skill: "---\nname: tdd\ndisable-model-invocation: true\n---\n\n# TDD\n",
+  },
+  { name: "leaves a model-invocable skill alone", skill: "---\nname: tdd\n---\n\n# TDD\n" },
+  { name: "leaves a file without frontmatter alone", skill: "# TDD\n" },
+])("openInvocation $name", ({ skill }) => {
+  expect(openInvocation(skill)).toMatchSnapshot();
 });

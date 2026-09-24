@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import { caseCount, casePlugins, collectTraces, prepare } from "./run";
+import { caseCount, casePlugins, collectTraces, keepCases, prepare, splitCases } from "./run";
 import { openInvocation, siblingLinks } from "./wrap";
 
 let repo: string;
@@ -115,4 +115,25 @@ test.each<{ url: string; expected: string[] }>([
 ])("siblingLinks resolves $url", ({ url, expected }) => {
   const text = `See [it](${url}).`;
   expect(siblingLinks("user/skills/tdd", "user/skills/tdd/SKILL.md", text)).toEqual(expected);
+});
+
+test.each<{ args: string[]; cases: string[]; rest: string[] }>([
+  { args: ["--case", "a", "--case=b*", "--runs", "2"], cases: ["a", "b*"], rest: ["--runs", "2"] },
+  { args: ["--tag", "dev"], cases: [], rest: ["--tag", "dev"] },
+])("splitCases($args)", ({ args, cases, rest }) => {
+  expect(splitCases(args)).toEqual([cases, rest]);
+});
+
+test("keepCases prunes staged cases to those any glob matches", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "cases-"));
+  await Promise.all(
+    ["quiet-a", "quiet-b", "loud", "examples", "results"].map((d) =>
+      Bun.write(join(dir, d, "case.yaml"), ""),
+    ),
+  );
+  expect(await keepCases(dir, ["quiet-*", "{loud,none}"])).toEqual(["loud", "quiet-a", "quiet-b"]);
+  expect(await keepCases(dir, ["quiet-[a]"])).toEqual(["quiet-a"]);
+  expect(await Bun.file(join(dir, "quiet-b/case.yaml")).exists()).toBe(false);
+  expect(await Bun.file(join(dir, "examples/case.yaml")).exists()).toBe(true);
+  expect(keepCases(dir, ["nope"])).rejects.toThrow("No case matches");
 });

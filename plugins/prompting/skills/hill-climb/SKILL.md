@@ -1,10 +1,8 @@
 ---
 name: prompting:hill-climb
 description: >-
-  Hill-climb a skill against its `claude plugin eval` suite: baseline, error
-  analysis, one change per candidate, pooled comparison against run-to-run
-  noise, and a holdout check. Use when improving a skill with evals, deciding
-  whether a skill change helped, or making a suite ready to climb on.
+  Hill-climb a skill, rule, or prompt against its eval suite. Use when changing
+  one to raise an eval score, or judging whether a score change beat noise.
 argument-hint: "<skill> [<suite dir>]"
 allowed-tools:
   - Read

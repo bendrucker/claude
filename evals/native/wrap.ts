@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
+import { isMap, parseDocument } from "yaml";
 import { stage } from "./stage";
 
 export interface WrapOptions {
@@ -39,6 +40,21 @@ const hooks = {
   },
 };
 
+/**
+ * Drops `disable-model-invocation` from a skill's frontmatter. A user-invoked skill otherwise
+ * never loads from a natural-language prompt, and a slash command fails on the ablation arm,
+ * so the suite measures the skill's body with the trigger held open.
+ */
+export function openInvocation(skill: string): string {
+  const match = /^---\n([\s\S]*?)\n---\n/.exec(skill);
+  if (match === null) return skill;
+  const doc = parseDocument(match[1] ?? "");
+  if (!doc.has("disable-model-invocation")) return skill;
+  doc.delete("disable-model-invocation");
+  const rest = isMap(doc.contents) && doc.contents.items.length === 0 ? "" : doc.toString();
+  return `---\n${rest}---\n${skill.slice(match[0].length)}`;
+}
+
 /** Materializes a throwaway plugin holding the named artifacts as they stand at a ref. */
 export async function wrap(options: WrapOptions): Promise<string> {
   const { out, name } = options;
@@ -57,6 +73,12 @@ export async function wrap(options: WrapOptions): Promise<string> {
     await Promise.all(paths.map((p) => $`cp -R ${join(staged, p)} ${join(out, dir, basename(p))}`));
   };
   await copy(options.skills, "skills");
+  await Promise.all(
+    options.skills.map(async (p) => {
+      const file = Bun.file(join(out, "skills", basename(p), "SKILL.md"));
+      if (await file.exists()) await Bun.write(file, openInvocation(await file.text()));
+    }),
+  );
   await copy(options.agents, "agents");
   await copy(options.context, "context");
   if (options.context.length > 0) {

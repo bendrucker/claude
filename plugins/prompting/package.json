@@ -7,15 +7,10 @@
     "mdast-util-from-markdown": "^2.0.2",
     "mdast-util-frontmatter": "^2.0.1",
     "micromark-extension-frontmatter": "^2.0.0",
-    "seedrandom": "^3.0.5",
-    "simple-statistics": "^7.12.0",
     "table": "^6.9.0",
-    "unist-util-visit": "^5.1.0",
-    "yaml": "^2.7.1",
-    "zod": "^4.4.3"
+    "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
-    "@types/mdast": "^4.0.4",
-    "@types/seedrandom": "^3.0.8"
+    "@types/mdast": "^4.0.4"
   }
 }

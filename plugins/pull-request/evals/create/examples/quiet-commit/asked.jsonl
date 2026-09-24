@@ -1,2 +1,2 @@
-{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_01", "name": "Bash", "input": {"description": "Check status", "command": "git status"}}]}}
-{"type": "result", "result": "The change quotes CSV fields. Want me to commit it?"}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"Bash","input":{"description":"Check status","command":"git status"}}]}}
+{"type":"result","result":"The change quotes CSV fields. Want me to commit it?"}

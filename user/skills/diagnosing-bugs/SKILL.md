@@ -14,6 +14,8 @@ Build one command that fails on this bug. Reading and grepping to work out how t
 
 A command that shows only that nothing crashed does not count. It has to drive the real code path and produce the symptom that was reported.
 
+The conditions have to come from the report too. When a failure appears only after you invent the triggering input (a header, payload, or setting the user never mentioned), you have a hypothesis about the cause. Treat it as not reproduced: say what you tried, and ask for an artifact from the real failure that would confirm or rule it out.
+
 For a failing CI or pipeline job, that command already ran. Use `github:actions-monitor` or `gitlab:ci-monitor` to get the logs rather than reconstructing the job locally.
 
 When nothing you try reaches the bug, say so and stop. Name what you tried and what each attempt could not reach, then ask for an environment where it reproduces, a captured artifact, or permission to add instrumentation.

@@ -321,7 +321,7 @@ jobs:
             gh run download "$BASELINE" --dir "$RUNNER_TEMP/baseline"
             baselines=("$RUNNER_TEMP"/baseline/*/*/aggregate-result.json)
             compared=$(bun "$SUITE_DIR/compare.ts" --markdown --label "run $BASELINE" --label "this run" "${baselines[-1]}" "$result")
-            flagged=$(grep -c '| \* |$' <<< "$compared" || true)
+            flagged=$(sed '/<details>/q' <<< "$compared" | grep -c '| \* |$' || true)
             title="$title, $flagged flagged against run $BASELINE"
             printf '\n%s\n' "$compared" >> "$report"
           fi

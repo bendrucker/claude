@@ -10,7 +10,7 @@ export interface WrapOptions {
   /** Repository to read from. */
   repo: string;
   /** Git ref to read the artifacts at, or the working tree when absent. */
-  ref?: string;
+  ref?: string | undefined;
   out: string;
   name: string;
   skills: string[];
@@ -18,7 +18,7 @@ export interface WrapOptions {
   /** Documents injected at session start, standing in for CLAUDE.md or a rule file. */
   context: string[];
   /** Suite directory copied to `evals/` so `claude plugin eval` finds it below the plugin. */
-  evals?: string;
+  evals?: string | undefined;
 }
 
 // The runner ignores a CLAUDE.md or .claude/rules in the scaffolded working directory,

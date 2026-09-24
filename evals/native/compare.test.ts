@@ -8,7 +8,7 @@ import { loadColumn, loadTags } from "./load";
 interface RunSpec {
   score: number;
   graders: [name: string, passed: boolean, scored?: boolean][];
-  reply?: string;
+  reply?: string | undefined;
 }
 
 /** Writes an aggregate-result.json with one case per entry, and a trace for each run with a reply. */
@@ -61,7 +61,7 @@ const fail = (): RunSpec => ({
 });
 
 describe("pValue", () => {
-  test.each([
+  test.each<{ name: string; base: number[]; other: number[]; expected: number }>([
     { name: "identical constant samples", base: [1, 1, 1], other: [1, 1], expected: 1 },
     { name: "an empty side", base: [], other: [1], expected: NaN },
   ])("returns $expected for $name", ({ base, other, expected }) => {

@@ -11,8 +11,8 @@ export interface RenderOptions {
   labels: string[];
   alpha: number;
   /** Case name to tags, which adds a per-tag score section. */
-  tags?: Map<string, string[]>;
-  markdown?: boolean;
+  tags?: Map<string, string[]> | undefined;
+  markdown?: boolean | undefined;
 }
 
 type Section = [title: string, head: string[], rows: string[][]];

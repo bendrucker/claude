@@ -85,3 +85,38 @@ test("re-grades against the current grader set and rescores each run", async () 
   expect(written.cases[0]?.arms.without?.[0]?.score).toBe(0);
   expect(await Bun.file(join(out, "traces/one-with-0.jsonl")).exists()).toBe(true);
 });
+
+test("takes a swapped-in regex grader's arm from its file", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "regrade-"));
+  const results = join(dir, "results/run");
+  const trace = [{ type: "result", result: "Done." }];
+  await Promise.all([
+    Bun.write(
+      join(dir, "quiet/graders/no-skill.md"),
+      '---\ntype: regex\npattern: \'"skill":"create"\'\nmatch: not_contains\ntarget: trace\n---\n',
+    ),
+    Bun.write(
+      join(results, "traces/quiet-with-0.jsonl"),
+      trace.map((l) => JSON.stringify(l)).join("\n"),
+    ),
+    Bun.write(
+      join(results, "aggregate-result.json"),
+      JSON.stringify({
+        cases: [
+          {
+            name: "quiet",
+            arms: { with: [{ score: 1, graders: [grader("no-skill", true, true)] }] },
+          },
+        ],
+      }),
+    ),
+  ]);
+  const out = join(dir, "results/run-regraded");
+  await regrade(dir, results, out);
+  const written = Result.parse(await Bun.file(join(out, "aggregate-result.json")).json());
+  const run = written.cases[0]?.arms.with?.[0];
+  expect(run?.graders.map((g) => [g.name, g.scored, g.withOnly])).toEqual([
+    ["no-skill", true, false],
+  ]);
+  expect(run?.score).toBe(1);
+});

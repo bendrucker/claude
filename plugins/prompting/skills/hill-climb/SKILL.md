@@ -31,8 +31,8 @@ Check the suite before the first baseline. A climb on an unready suite measures 
 - **Scope.** When the reply wraps an artifact in commentary, have `append_system_prompt` ask for the artifact inside `<out>` tags and anchor each regex to that block, or a report that quotes a cut phrase fails its own grader. `<out>(?:(?!</out>)[\s\S])*?PATTERN` finds a pattern inside the block, and `<out>(?:(?!</out>)[\s\S]){N}` holds when the block runs past N characters, a floor under `contains` and a ceiling under `not_contains`.
 - **Isolation.** Stub every external service in the fixture: a bare repo for pushes, pasted text for API bodies, an `append_system_prompt` fallback telling the session what to reply when a network call fails. A run that dies on the network scores the sandbox.
 - **Wrap.** An artifact outside a plugin (a user skill, an agent, a rule or `CLAUDE.md`) loads through the `wrap` key in the suite's `suite.yaml`, which the runner builds into a throwaway plugin. Context files reach the session through a `SessionStart` hook, whatever their `paths:` frontmatter says.
-- **Lint.** Run the repo's own checks over the suite files. A fix after the baseline edits a case mid-climb.
-- **Noise.** Run the unchanged suite twice. Compare the two with `compare.ts`. Stars there are noise at that run count, and they set how many runs a candidate needs.
+- **Lint.** Run the repo's own checks over the suite files, and test each regex grader against hand-written replies with `bun evals/native/check.ts <suite>`: one reply that should pass every grader, and one per grader that should fail it. A fix after the baseline edits a case mid-climb.
+- **Noise.** Run the unchanged suite twice with an explicit `--runs` (the runner defaults to 3), priced first per `Running`. Compare the two with `compare.ts`. Stars there are noise at that run count, and they set how many runs a candidate needs.
 - **Headroom.** A case at 1.00 on both arms in the noise runs discriminates nothing. Harden or replace it until the with arm has room to rise and the without arm sits below it. A suite ported from rubric asserts saturates this way.
 
 ## Loop

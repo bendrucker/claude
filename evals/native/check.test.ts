@@ -15,7 +15,7 @@ const graders = {
   "one/graders/fact.md": "---\ntype: regex\npattern: '230 ?ms'\nflags: i\n---\n",
   "one/graders/judge.md": "---\ntype: llm\n---\nIs it good?\n",
   "one/graders/twice.md": "---\ntype: regex\npattern: 'p99'\nmatch: count:1\n---\n",
-  "one/graders/trace.md": "---\ntype: regex\npattern: 'x'\ntarget: trace\n---\n",
+  "one/graders/trace.md": "---\ntype: regex\npattern: 'echo x'\ntarget: trace\n---\n",
 };
 
 test.each<{ name: string; example: string; expected: Mismatch[] }>([
@@ -38,7 +38,52 @@ test.each<{ name: string; example: string; expected: Mismatch[] }>([
   },
 ])("$name", async ({ example, expected }) => {
   const dir = await suite({ ...graders, "examples/one/good.md": example });
-  expect(await check(dir)).toEqual(expected);
+  expect((await check(dir)).mismatches).toEqual(expected);
+});
+
+const trace = (reply: string, command: string) =>
+  [
+    {
+      type: "assistant",
+      message: { content: [{ type: "tool_use", name: "Bash", input: { command } }] },
+    },
+    { type: "result", result: reply },
+  ]
+    .map((l) => JSON.stringify(l))
+    .join("\n");
+
+test.each<{ name: string; files: Record<string, string>; expected: Mismatch[] }>([
+  {
+    name: "a trace example grades trace and reply graders",
+    files: { "examples/one/run.jsonl": trace("p99 230ms", "echo x") },
+    expected: [],
+  },
+  {
+    name: "a trace example fails a trace grader its sidecar does not list",
+    files: { "examples/one/run.jsonl": trace("p99 230ms", "echo y") },
+    expected: [{ example: "examples/one/run.jsonl", grader: "trace", expected: "pass" }],
+  },
+  {
+    name: "a sidecar declares a trace failure",
+    files: {
+      "examples/one/run.jsonl": trace("p99 230ms", "echo y"),
+      "examples/one/run.yaml": "fail: [trace]\n",
+    },
+    expected: [],
+  },
+])("$name", async ({ files, expected }) => {
+  const dir = await suite({ ...graders, ...files });
+  expect((await check(dir)).mismatches).toEqual(expected);
+});
+
+test("names the regex graders no example reaches", async () => {
+  const dir = await suite({
+    ...graders,
+    "one/graders/file.md":
+      "---\ntype: regex\npattern: 'x'\ntarget:\n  source: file\n  path: a.ts\n---\n",
+    "examples/one/good.md": "p99 230ms",
+  });
+  expect((await check(dir)).unchecked).toEqual(["one/file", "one/trace"]);
 });
 
 test("rejects an example naming a grader the case lacks", async () => {

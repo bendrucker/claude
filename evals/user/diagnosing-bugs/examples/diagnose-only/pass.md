@@ -1,0 +1,1 @@
+`loadConfig` merges `{ ...user, ...fromEnv(), ...defaults }`. Spread order means the last object wins, so `defaults` overrides your `retries: 5`. `bun run show-config` prints `retries: 3`. Putting `defaults` first would fix it.

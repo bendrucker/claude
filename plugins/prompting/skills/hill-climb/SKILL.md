@@ -16,7 +16,7 @@ allowed-tools:
 
 # Hill Climb
 
-The goal is a skill that scores higher on its eval suite, where every accepted change carries evidence that it beat run-to-run noise and that the gain holds on cases the climb never tuned against. A change without that evidence stays out, however plausible it reads.
+Goal: a skill that scores higher on its eval suite, where every accepted change carries evidence that it beat run-to-run noise and that the gain holds on cases the climb never tuned against. A change without that evidence stays out, however plausible it reads.
 
 The suite's `README.md` names how to run it and any suite-specific rules. Follow it where it differs from this document.
 

@@ -1,6 +1,6 @@
 # Other Harnesses
 
-The loop needs five things from any harness:
+The loop needs these from any harness:
 
 - A pass or fail per grader per run, kept per run rather than averaged, so runs can pool across invocations.
 - A tag per case, for the `dev` and `holdout` split.

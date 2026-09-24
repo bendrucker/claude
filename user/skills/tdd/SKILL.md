@@ -30,7 +30,7 @@ The work is done when every confirmed seam has a test that failed before its imp
 
 Verify behavior through the interface. When the behavior changes stored state, read the state back through another public function, since a write's return value doesn't show what was stored. Name the test as a specification: "user can checkout with valid cart" names a capability. Use the domain language the surrounding code uses.
 
-Substitute only what the process doesn't own, such as the network, the clock, and randomness, and hand the substitute in as a parameter. When the code reaches that dependency directly, as a global `fetch` or `Date.now()`, first reshape it to take the dependency as a parameter with the real one as its default, then test through that parameter.
+Substitute only what the process doesn't own, such as the network, the clock, and randomness, and hand the substitute in as a parameter. When the code reaches that dependency directly, the parameter becomes part of the seam: propose it when you ask about the interface, and once the seam is confirmed, reshape the code to take the dependency as a parameter with the real one as its default and test through that parameter.
 
 See [references/tests.md](references/tests.md) for good and bad pairs, and [references/mocking.md](references/mocking.md) for which seams get a substitute adapter.
 

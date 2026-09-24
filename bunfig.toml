@@ -1,4 +1,6 @@
 [test]
+# Eval examples hold snippets a grader reads, not tests to run.
+pathIgnorePatterns = ["**/evals/**/examples/**"]
 # Coverage stays opt-in via the --coverage flag so plain `bun test` runs fast.
 # These only pin the shape of the report when coverage is requested.
 coverageReporter = ["text", "lcov"]

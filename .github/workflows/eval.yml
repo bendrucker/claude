@@ -320,8 +320,10 @@ jobs:
           result=${results[-1]}
           report="$RUNNER_TEMP/report.md"
           title=$(jq -r '
+            # A suite whose cases all lack a without arm has no delta.
             def pct: (. * 100 | round | tostring) + "%";
-            "score \(.aggregates.overallScore | pct), \(.aggregates.meanDelta | pct) over no plugin"
+            "score \(.aggregates.overallScore | pct)"
+              + if .aggregates.meanDelta == null then "" else ", \(.aggregates.meanDelta | pct) over no plugin" end
           ' "$result")
           jq -r --arg run "$RUN_URL" '
             def pct: if . == null then "–" else (. * 100 | round | tostring) + "%" end;

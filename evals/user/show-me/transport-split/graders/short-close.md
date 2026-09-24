@@ -1,7 +1,7 @@
 ---
 type: regex
-pattern: '^```[ \t]*$(?![\s\S]*^```)[\s\S]{500,}'
+pattern: '^```[ \t]*$(?![\s\S]*^```)[\s\S]{800,}'
 flags: m
 match: not_contains
 ---
-The prose after the last visual stays under 500 characters.
+The prose after the last visual stays under 800 characters, room for one caveat on the seam or the race.

@@ -1,5 +1,5 @@
 ---
-fail: [diff-block, diff-shows-split, short-close]
+fail: [diff-block, diff-shows-split]
 ---
 Only one consumer (`src/commands/send.ts`), so this is a low-risk split. Here's the shape I'd propose:
 

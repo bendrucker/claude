@@ -1,6 +1,6 @@
 schema_version: "1.1"
-name: flow-change-diff
-tags: [dev]
+name: product-update
+tags: [holdout]
 plugins: ["../.."]
 execution:
   model: claude-sonnet-5

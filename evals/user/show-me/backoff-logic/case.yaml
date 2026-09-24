@@ -1,0 +1,14 @@
+schema_version: "1.1"
+name: backoff-logic
+tags: [holdout]
+plugins: ["../.."]
+execution:
+  model: claude-sonnet-5
+  max_turns: 20
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Skill]
+  append_system_prompt: >-
+    The user invoked this request through the show-me skill. When a skill
+    named show-me is available, load it before answering.
+context:
+  scaffold_script: fixture.sh

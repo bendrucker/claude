@@ -1,0 +1,1 @@
+Price lookups hit the catalog and the FX service on every call. We want a cache in front of both, with its own expiry per source and a way to invalidate one SKU. Nothing is built yet. Show me the design you'd propose.

@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: 'awardPoints|scheduleShipment|sendReceipt'
+pattern: '^(?:(?:(?!```)[\s\S])*```[^\n]*\n(?:(?!```)[\s\S])*```)*?(?:(?!```)[\s\S])*```[^\n]*\n(?:(?!```)[\s\S])*?(?:awardPoints|scheduleShipment|sendReceipt)'
 match: not_contains
 ---
-The reply leaves out the success-path steps a declined card never reaches.
+The visual leaves out the success-path steps a declined card never reaches. Prose may say they never run.

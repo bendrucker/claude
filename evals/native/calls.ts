@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { globSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
 import { z } from "zod";
@@ -47,13 +47,21 @@ export function calls(trace: string): string[] {
     });
 }
 
-/** For each `<case>/<arm>`, how many runs made each call at least once, and the run total. */
+/**
+ * For each `<case>/<arm>`, how many runs made each call at least once, and the run total.
+ * Each result is a results directory or the `aggregate-result.json` inside one, as
+ * `compare.ts` takes it. Throws when a result holds no traces, which would otherwise read as
+ * no session making the call.
+ */
 export async function tally(
   results: string[],
 ): Promise<Map<string, { runs: number; calls: Map<string, number> }>> {
-  const traces = results.flatMap((r) =>
-    globSync("traces/*.jsonl", { cwd: r }).map((t) => join(r, t)),
-  );
+  const traces = results.flatMap((result) => {
+    const dir = result.endsWith(".json") ? dirname(result) : result;
+    const found = globSync("traces/*.jsonl", { cwd: dir }).map((t) => join(dir, t));
+    if (found.length === 0) throw new Error(`No traces/*.jsonl in ${dir}`);
+    return found;
+  });
   const out = new Map<string, { runs: number; calls: Map<string, number> }>();
   const read = await Promise.all(traces.map(async (t) => [t, await Bun.file(t).text()] as const));
   for (const [path, text] of read) {

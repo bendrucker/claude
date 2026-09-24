@@ -64,4 +64,10 @@ test("counts runs per case and arm that made each call once or more", async () =
   const cells = await tally([dir]);
   expect(cells.get("c/with")).toEqual({ runs: 2, calls: new Map([["Skill tdd", 1]]) });
   expect(cells.get("c/without")).toEqual({ runs: 1, calls: new Map() });
+  expect(await tally([join(dir, "aggregate-result.json")])).toEqual(cells);
+});
+
+test("rejects a result with no traces", () => {
+  const dir = mkdtempSync(join(tmpdir(), "calls-"));
+  expect(tally([dir])).rejects.toThrow("No traces/*.jsonl");
 });

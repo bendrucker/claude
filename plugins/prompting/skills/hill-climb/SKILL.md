@@ -29,7 +29,7 @@ Check the suite before the first baseline. A climb on an unready suite measures 
 - **Balance.** Include cases where the skill should change little, so a climb that over-applies the skill loses score.
 - **Graders.** Grade the output with `regex` wherever a pattern decides it, and keep `llm` graders to one criterion each. Pair each removal grader with a survival grader for the fact that must stay, so deleting everything fails.
 - **Scope.** When the reply wraps an artifact in commentary, have `append_system_prompt` ask for the artifact inside `<out>` tags and anchor each regex to that block, or a report that quotes a cut phrase fails its own grader. `<out>(?:(?!</out>)[\s\S])*?PATTERN` finds a pattern inside the block, and `<out>(?:(?!</out>)[\s\S]){N}` holds when the block runs past N characters, a floor under `contains` and a ceiling under `not_contains`.
-- **Isolation.** Stub every external service in the fixture: a bare repo for pushes, pasted text for API bodies, an `append_system_prompt` fallback telling the session what to reply when a network call fails. A run that dies on the network scores the sandbox.
+- **Isolation.** Stub every external service in the fixture: a bare repo for pushes, pasted text for API bodies, an `append_system_prompt` fallback telling the session what to reply when a network call fails. A run that dies on the network scores the sandbox. A headless session lacks interactive tools such as `EnterPlanMode` even when granted, so grade a step that uses one by its observable effect.
 - **Wrap.** An artifact outside a plugin (a user skill, an agent, a rule or `CLAUDE.md`) loads through the `wrap` key in the suite's `suite.yaml`, which the runner builds into a throwaway plugin. Context files reach the session through a `SessionStart` hook, whatever their `paths:` frontmatter says.
 - **Lint.** Run the repo's own checks over the suite files, and test each regex grader against hand-written replies with `bun evals/native/check.ts <suite>`: one reply that should pass every grader, and one per grader that should fail it. A fix after the baseline edits a case mid-climb.
 - **Noise.** Run the unchanged suite twice with an explicit `--runs` (the runner defaults to 3), priced first per `Running`. Compare the two with `compare.ts`. Stars there are noise at that run count, and they set how many runs a candidate needs.
@@ -106,6 +106,6 @@ Stop when any of these holds, and say which:
 
 On CI, `gh workflow run eval.yml --ref <branch> -f suite=<suite> -f args='--tag dev'` runs one replicate. `-f ref=<sha>` tests another commit against the branch's cases, and `-f baseline=<run id>,<run id>` adds the pooled comparison to the job summary. `gh run download <id>` fetches a run's results for pooling locally.
 
-A run costs roughly cases × runs × 2 arms agent sessions, plus three judge calls per `llm` grader per run. Price a candidate before launching it.
+`--case` takes one glob, and a repeated flag keeps only the last, so scope replicates with a glob that covers the cases in doubt or one dispatch per case. A run costs roughly cases × runs × 2 arms agent sessions, about $0.10 each for Sonnet on a small fixture, plus three judge calls per `llm` grader per run. Price a candidate before launching it.
 
 For a suite in another harness, see [references/harnesses.md](references/harnesses.md).

@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '^```(?!mermaid)[^\n]*\n(?:(?!```)[\s\S])*?^[ │├└─]{4,}[A-Za-z_][\w.]*(?:\([^)\n]*\))?[ \t]*(?:(?:#|//|--|→|—).*)?$'
+pattern: '^```(?:text|txt|plaintext)?[ \t]*\n(?:(?!```)[\s\S])*?^[ │├└─]{4,}[A-Za-z_][\w.]*(?:\([^)\n]*\))?(?:\s.*)?$'
 flags: m
 match: contains
 ---

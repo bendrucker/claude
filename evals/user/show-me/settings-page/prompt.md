@@ -1,1 +1,1 @@
-Show me how the settings page is put together, component by component.
+Show me how the billing section of the settings page is wired up.

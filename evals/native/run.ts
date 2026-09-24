@@ -99,6 +99,13 @@ export async function prepare(
  * traces inside its temp directories and deletes them unless run with `--keep-temp`, so this
  * copies them out and then removes those directories.
  */
+/** How many cases a run graded, zero when it wrote no result. */
+export async function caseCount(output: string): Promise<number> {
+  const file = Bun.file(join(output, "aggregate-result.json"));
+  if (!(await file.exists())) return 0;
+  return Result.parse(await file.json()).cases.length;
+}
+
 export async function collectTraces(output: string): Promise<void> {
   const file = Bun.file(join(output, "aggregate-result.json"));
   if (!(await file.exists())) return;
@@ -174,5 +181,10 @@ if (import.meta.main) {
   const code = await proc.exited;
   await collectTraces(output);
   await $`rm -rf ${dirname(target)}`.quiet();
+  // A --case or --tag that matches nothing otherwise exits clean with nothing graded.
+  if (code === 0 && (await caseCount(output)) === 0) {
+    console.error(`No case ran. Check the case filters in: ${argv._.args.join(" ")}`);
+    process.exit(1);
+  }
   process.exit(code);
 }

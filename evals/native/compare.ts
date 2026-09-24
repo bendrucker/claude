@@ -25,11 +25,28 @@ export function pValue(base: number[], other: number[]): number {
   return permutationTest(base, other, "two_side", 10_000, seedrandom("compare"));
 }
 
+/**
+ * The smallest p-value a permutation test can return for these sample sizes: one or two of the
+ * C(n1 + n2, n1) splits, since equal sizes put the two extremes at the same distance.
+ */
+export function pFloor(n1: number, n2: number): number {
+  let splits = 1;
+  for (let i = 1; i <= Math.min(n1, n2); i++) splits = (splits * (n1 + n2 - i + 1)) / i;
+  return (n1 === n2 ? 2 : 1) / splits;
+}
+
+/** A cell's mark: `*` when it moved, `†` when too few runs could ever star it. */
+function mark(base: number[], xs: number[], alpha: number): string {
+  if (base.length === 0 || xs.length === 0) return "";
+  if (pFloor(base.length, xs.length) >= alpha) return "†";
+  return pValue(base, xs) < alpha ? "*" : "";
+}
+
 function sections({ columns, alpha, tags }: RenderOptions): Section[] {
   /** The baseline mean, then each column's mean starred when it differs from the baseline. */
   const row = (prefix: string[], series: number[][], digits: number): string[] => {
     const [base = [], ...rest] = series;
-    const cells = rest.map((xs) => `${fmt(xs, digits)}${pValue(base, xs) < alpha ? "*" : ""}`);
+    const cells = rest.map((xs) => `${fmt(xs, digits)}${mark(base, xs, alpha)}`);
     return [...prefix, fmt(base, digits), ...cells];
   };
   const series = (key: string, pick: (cell: Cell) => number[]) =>
@@ -100,7 +117,9 @@ const markdown = (head: string[], rows: string[][]) =>
 export function render(options: RenderOptions): string {
   const { labels, alpha } = options;
   const all = sections(options);
-  const out = [`* marks p < ${alpha} against ${labels[0]} (permutation test, pooled runs)\n`];
+  const out = [
+    `* marks p < ${alpha} against ${labels[0]} (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1.\n`,
+  ];
   if (!options.markdown) {
     for (const [title, head, rows] of all) out.push(title, table([[...head, ...labels], ...rows]));
     return out.join("\n");

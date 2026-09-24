@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pValue, render } from "./compare";
+import { pFloor, pValue, render } from "./compare";
 import { loadColumn, loadTags } from "./load";
 
 interface RunSpec {
@@ -122,4 +122,22 @@ describe("render", () => {
     const tags = await loadTags(suite);
     expect(render({ columns: [column], labels: ["base"], alpha: 0.1, tags })).toMatchSnapshot();
   });
+});
+
+describe("pFloor", () => {
+  test.each<{ n1: number; n2: number; floor: number }>([
+    { n1: 2, n2: 2, floor: 1 / 3 },
+    { n1: 3, n2: 3, floor: 0.1 },
+    { n1: 4, n2: 4, floor: 2 / 70 },
+    { n1: 2, n2: 4, floor: 1 / 15 },
+  ])("is $floor for $n1 against $n2", ({ n1, n2, floor }) => {
+    expect(pFloor(n1, n2)).toBeCloseTo(floor);
+  });
+});
+
+test("marks cells too small to star", async () => {
+  const base = await result({ c: { with: [fail(), fail()] } });
+  const next = await result({ c: { with: [pass(), pass()] } });
+  const columns = await Promise.all([loadColumn([base]), loadColumn([next])]);
+  expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain("1.00†");
 });

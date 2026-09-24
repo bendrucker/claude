@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import { casePlugins, collectTraces, prepare } from "./run";
+import { caseCount, casePlugins, collectTraces, prepare } from "./run";
 import { openInvocation, siblingLinks } from "./wrap";
 
 let repo: string;
@@ -82,6 +82,16 @@ test("collectTraces copies kept traces beside the results and removes the runner
   expect(await read(join(output, "traces/one-with-0.jsonl"))).toContain("reply");
   expect(await Bun.file(join(output, "traces/one-with-1.jsonl")).exists()).toBe(false);
   expect(await Bun.file(trace).exists()).toBe(false);
+});
+
+test.each<{ name: string; result: string | undefined; count: number }>([
+  { name: "no result file", result: undefined, count: 0 },
+  { name: "a filter that matched nothing", result: '{"cases":[]}', count: 0 },
+  { name: "one graded case", result: '{"cases":[{"name":"one","arms":{}}]}', count: 1 },
+])("caseCount is $count for $name", async ({ result, count }) => {
+  const output = mkdtempSync(join(tmpdir(), "run-output-"));
+  if (result !== undefined) await Bun.write(join(output, "aggregate-result.json"), result);
+  expect(await caseCount(output)).toBe(count);
 });
 
 test.each([

@@ -18,6 +18,14 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 </details>
 
+<details><summary>Case minimum</summary>
+
+| case/arm | base | next |
+| --- | --- | --- |
+| c/with | 1.00 | 0.00 |
+
+</details>
+
 <details><summary>Reply words</summary>
 
 | case/arm | base | next |
@@ -57,6 +65,19 @@ Case score
 ║ case/arm  │ base ║
 ╟───────────┼──────╢
 ║ a/with    │ 0.75 ║
+╟───────────┼──────╢
+║ a/without │ 0.00 ║
+╟───────────┼──────╢
+║ b/with    │ 0.00 ║
+╟───────────┼──────╢
+║ b/without │ 0.00 ║
+╚═══════════╧══════╝
+
+Case minimum
+╔═══════════╤══════╗
+║ case/arm  │ base ║
+╟───────────┼──────╢
+║ a/with    │ 0.50 ║
 ╟───────────┼──────╢
 ║ a/without │ 0.00 ║
 ╟───────────┼──────╢

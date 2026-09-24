@@ -14,6 +14,8 @@ export const RegexGrader = z.object({
     .union([z.enum(["contains", "not_contains"]), z.string().regex(/^count:\d+$/)])
     .default("contains"),
   target: z.unknown().optional(),
+  weight: z.number().default(1),
+  arm: z.enum(["both", "with-only"]).default("both"),
 });
 const Grader = z.union([RegexGrader, z.object({ type: z.string() })]);
 const Example = z.object({ fail: z.array(z.string()).default([]) });

@@ -13,7 +13,7 @@ if (amount > 1000) throw new CardDeclinedError("insufficient_funds");
 ```
 
 **4. Checkout catches the failure and cleans up** — `checkout.ts:12-14`:
-```ts
+```ts fragment
 } catch (err) {
   await releaseInventory(hold);   // undo the reservation
   throw err;                      // propagate, no retry

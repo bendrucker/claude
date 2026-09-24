@@ -1,0 +1,1 @@
+Test-first, add `renameUser(db, id, name)` to `src/users.ts`. It should change the stored user's name and return the updated user, or return `undefined` when no user has that id. The seam is the module's exported functions. Tests go in `src/users.test.ts`; run them with `bun test`.

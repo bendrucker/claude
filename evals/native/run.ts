@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { globSync, mkdtempSync } from "node:fs";
+import { globSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, normalize, relative, resolve } from "node:path";
 import { $ } from "bun";
@@ -99,11 +99,31 @@ export async function prepare(
  * traces inside its temp directories and deletes them unless run with `--keep-temp`, so this
  * copies them out and then removes those directories.
  */
-/** Rejects arguments the runner would silently narrow, such as a repeated `--case`. */
-export function checkArgs(args: string[]): void {
-  const cases = args.filter((a) => a === "--case" || a.startsWith("--case="));
-  if (cases.length > 1)
-    throw new Error("claude plugin eval keeps only the last --case. Pass one plain * glob.");
+/** Splits `--case` globs off the runner's arguments, which would keep only the last one. */
+export function splitCases(args: string[]): [cases: string[], rest: string[]] {
+  const cases: string[] = [];
+  const rest: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? "";
+    if (arg.startsWith("--case=")) cases.push(arg.slice("--case=".length));
+    else if (arg === "--case") cases.push(args[++i] ?? "");
+    else rest.push(arg);
+  }
+  return [cases, rest];
+}
+
+/** Deletes the staged case directories that match none of the globs, and returns the rest. */
+export async function keepCases(dir: string, globs: string[]): Promise<string[]> {
+  const patterns = globs.map((g) => new Bun.Glob(g));
+  const cases = readdirSync(dir, { withFileTypes: true }).filter(
+    (e) => e.isDirectory() && e.name !== "examples" && e.name !== "results",
+  );
+  const kept = cases.filter((e) => patterns.some((p) => p.match(e.name))).map((e) => e.name);
+  if (kept.length === 0) throw new Error(`No case matches --case ${globs.join(", ")}`);
+  await Promise.all(
+    cases.filter((e) => !kept.includes(e.name)).map(async (e) => $`rm -rf ${join(dir, e.name)}`),
+  );
+  return kept.toSorted();
 }
 
 /** How many cases a run graded, zero when it wrote no result. */
@@ -149,11 +169,12 @@ if (import.meta.main) {
         "Run a claude plugin eval suite against the artifacts it tests as they stand at a ref. Arguments after -- pass through to claude plugin eval.",
     },
   });
-  checkArgs(argv._.args);
   const repo = (await $`git rev-parse --show-toplevel`.text()).trim();
   const suite = relative(repo, resolve(argv._.suite));
   const config = await readSuite(join(repo, suite));
+  const [globs, args] = splitCases(argv._.args);
   const { target, evalDir } = await prepare(repo, suite, argv.flags.ref);
+  if (globs.length > 0) await keepCases(join(target, evalDir), globs);
   const stamp = new Date()
     .toISOString()
     .replaceAll(":", "-")
@@ -182,7 +203,7 @@ if (import.meta.main) {
       output,
       "--keep-temp",
       ...allow,
-      ...argv._.args,
+      ...args,
     ],
     { env, stdio: ["inherit", "inherit", "inherit"] },
   );

@@ -55,7 +55,7 @@ Judge the text as a reader who was not in the session. For a whole artifact rath
 - **Change evolution.** The shapes the work passed through. Any sentence needing an earlier draft to parse, and sequencing words such as "originally", "initially", "then", "turned out", "along the way", "ended up".
 - **Session leakage.** The conversation inside the artifact: feedback echoed as commentary, a reviewer's question answered in a code comment, the user's own phrasing quoted back.
 - **Past states.** What the code or doc used to be, and how bad it was. Remove the thing rather than commenting on its removal.
-- **Provenance and deliberation.** Where an idea came from, what it beat, why a rule is correct. Alternatives belong in the commit or the PR body.
+- **Provenance and deliberation.** Where an idea came from, what it beat, why a rule is correct. Alternatives belong in the commit or the PR body, so when the artifact is a PR body, keep a decision's reason in one clause.
 - **Restatement.** Prose that re-describes the diff: file inventories, structural tours, a paragraph per function. Naming the function is enough.
 - **Self-reference.** The artifact describing itself, its own sections, or harness behavior the harness already provides.
 

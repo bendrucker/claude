@@ -50,7 +50,7 @@ A line earns its place by changing what the model does when it reads the file.
 Plain technical English, from someone who understood the problem rather than someone answering a list.
 
 - No counting. "Four minor issues" is not a finding.
-- No line paths recited in prose. It reads as robotic.
+- Name the code by its function or behavior, and drop `file:line` locations from the text, including one that opens a sentence. An inline comment already sits on its line.
 - Show what was investigated and what came of it rather than mirroring the reviewer's comments back point by point.
 
 ## Issues

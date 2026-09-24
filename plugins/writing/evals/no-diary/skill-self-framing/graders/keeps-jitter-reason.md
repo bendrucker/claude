@@ -1,7 +1,7 @@
 ---
 type: regex
-pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:together)'
+pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:together|in sync|in lockstep|at once|same time)'
 flags: i
 match: contains
 ---
-The clause saying workers that fail together retry together survives, since it lets a reader apply jitter to delays the rule does not list.
+The reason that workers failing together retry together survives, in any wording, since it lets a reader apply jitter to delays the rule does not list.

@@ -21,7 +21,7 @@ wrap:                           # omit when the cases load a plugin
   context: [user/rules/typescript.md]
 ```
 
-The runner ignores a `CLAUDE.md` or `.claude/rules` in the scaffolded working directory, so wrapped context reaches the session through a `SessionStart` hook instead. It injects every context file whatever its `paths:` frontmatter says. A wrapped skill loses `disable-model-invocation`, so a user-invoked skill can load from a natural-language prompt on the with arm.
+The runner ignores a `CLAUDE.md` or `.claude/rules` in the scaffolded working directory, so wrapped context reaches the session through a `SessionStart` hook instead. It injects every context file whatever its `paths:` frontmatter says. A wrapped skill keeps the files it links to beside it, such as a sibling skill's reference, and loses `disable-model-invocation`, so a user-invoked skill can load from a natural-language prompt on the with arm.
 
 ## Results Corpus
 

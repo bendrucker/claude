@@ -1,5 +1,6 @@
 schema_version: "1.1"
 name: manual-verification
+tags: [dev]
 plugins: ["../../..", "../../../../writing"]
 execution:
   model: claude-sonnet-5

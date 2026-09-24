@@ -33,7 +33,7 @@ Check the suite before the first baseline. A climb on an unready suite measures 
 - **Isolation.** Stub every external service in the fixture: a bare repo for pushes, pasted text for API bodies, an `append_system_prompt` fallback telling the session what to reply when a network call fails. A run that dies on the network scores the sandbox. A case whose right answer is "no cause found" needs a fixture with no latent cause: have a strong model hunt it before the baseline. A headless session lacks interactive tools such as `EnterPlanMode` and `AskUserQuestion` even when granted. Grade a step that uses one by its observable effect, and tell the session through `append_system_prompt` that nobody answers mid-task.
 - **Wrap.** An artifact outside a plugin (a user skill, an agent, a rule or `CLAUDE.md`) loads through the `wrap` key in the suite's `suite.yaml`, which the runner builds into a throwaway plugin. Context files reach the session through a `SessionStart` hook, whatever their `paths:` frontmatter says.
 - **Lint.** Run `shellcheck` on the scaffold scripts, and test each regex grader with `bun evals/native/check.ts <suite>` against examples: one that should pass every grader, and one per grader that should fail it. Copy a smoke run's traces in as `.jsonl` examples, since those reach trace graders, and hand-write replies for the `holdout` cases. A fix after the baseline edits a case mid-climb.
-- **Noise.** Run the unchanged suite twice with an explicit `--runs` (the runner defaults to 3), priced first per `Running`. Compare the two with `compare.ts`. Stars there are noise at that run count, and they set how many runs a candidate needs. A grader that fails on both arms in every run is a harness artifact until a trace shows otherwise, such as a `file_exists` glob matching the sandbox's own dotfiles. Scope file globs to what a session would write.
+- **Noise.** Run the unchanged suite twice with an explicit `--runs` (the runner defaults to 3), priced first per `Running`. Compare the two with `compare.ts`. Stars there are noise at that run count, and they set how many runs a candidate needs. A star takes at least 4 runs a side at the default alpha, and `compare.ts` marks a cell below that `†`, so zero stars at fewer runs says nothing about noise. A case whose without arm swings across its range between noise columns needs more pooled runs than the rest. A grader that fails on both arms in every run is a harness artifact until a trace shows otherwise, such as a `file_exists` glob matching the sandbox's own dotfiles. Scope file globs to what a session would write.
 - **Headroom.** A case at 1.00 on both arms in the noise runs discriminates nothing. Harden or replace it until the with arm has room to rise and the without arm sits below it, aiming the new graders at what the without arm's traces still get wrong. Balance cases are exempt. A suite ported from rubric asserts saturates this way. The noise runs may cover `holdout` and serve as its base replicates at the end. Read only their scores, never their traces.
 
 ## Loop
@@ -99,6 +99,7 @@ Stop when any of these holds, and say which:
 
 - The `dev` score has no room left above the noise from `Ready the Suite`.
 - Three candidates in a row came back null. Add harder cases, then resume.
+- The budget cannot cover another candidate at the baseline's replicate count. Skip `holdout` when nothing was accepted, since the final commit is the base.
 - Every remaining failure buckets as reach or floor. Fix grader-bucket failures and regrade first, and resume if a skill failure surfaces.
 
 ## Running
@@ -107,6 +108,6 @@ Stop when any of these holds, and say which:
 
 On CI, `gh workflow run eval.yml --ref <branch> -f suite=<suite> -f args='--tag dev'` runs one replicate. `-f ref=<sha>` tests another commit against the branch's cases, and `-f baseline=<run id>,<run id>` adds the pooled comparison to the job summary. `gh run download <id>` fetches a run's results for pooling locally.
 
-`--case` takes one glob, and a repeated flag keeps only the last, so scope replicates with a glob that covers the cases in doubt or one dispatch per case. A run costs roughly cases × runs × 2 arms agent sessions, about $0.10 each for Sonnet on a small fixture, plus three judge calls per `llm` grader per run. Price a candidate before launching it.
+`--case` takes one glob of plain `*` wildcards (character classes and braces match nothing), and a repeated flag keeps only the last, so scope replicates with a glob that covers the cases in doubt or one dispatch per case. A run costs roughly cases × runs × 2 arms agent sessions, about $0.10 each for Sonnet on a small fixture, plus three judge calls per `llm` grader per run. Price a candidate before launching it.
 
 For a suite in another harness, see [references/harnesses.md](references/harnesses.md).

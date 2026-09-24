@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:\bBen\b|review|asked me)'
+pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:priya|review|suggested)'
 flags: i
 match: not_contains
 ---

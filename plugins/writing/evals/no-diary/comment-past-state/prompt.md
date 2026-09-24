@@ -1,11 +1,12 @@
 no-diary this comment.
 
 ```ts
-// This used to be a giant switch statement that duplicated the parser logic in
-// three places, which was a nightmare to keep in sync. Ben asked me to pull it
-// out during review of #412, so now it delegates to parseToken. See ENG-1183
-// and the Acme Corp incident for background.
-function read(input: string) {
-  return parseToken(input);
+// Callers must hold cacheLock. We added the lock after the March deadlock
+// (INC-221), when two workers refreshed the same entry at once. Priya suggested
+// in review that we serialize here rather than in each caller, which was the old
+// approach and kept getting missed. Acme's nightly import was the worst hit.
+function refresh(cache: Cache, key: string) {
+  const entry = cache.load(key);
+  cache.store(key, rebuild(entry));
 }
 ```

@@ -3,7 +3,7 @@ cut the diary out of this skill file
 ---
 ## Retry Policy
 
-This section explains how retries work. We originally used exponential backoff with jitter, but that was chosen over a fixed interval because fixed intervals synchronize across workers, which is a well-known problem in distributed systems. The reason this rule is correct is that thundering herds are expensive.
+This section explains how retries work. Retry three times with exponential backoff, starting at 200 ms. We originally used a fixed one-second interval, but moved off it after fixed intervals synchronized across workers during the April outage. Jitter every delay, since workers that fail together otherwise retry together. The reason this rule is correct is that thundering herds are expensive, as anyone who has run a queue knows.
 
-Retry three times with exponential backoff. Give up after the third failure and report the error.
+Give up after the third failure and report the error.
 ---

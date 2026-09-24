@@ -1,7 +1,7 @@
 ---
 type: regex
-pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:#412|ENG-1183)'
+pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:INC-221)'
 flags: i
 match: not_contains
 ---
-No issue or ticket identifiers.
+No incident identifier.

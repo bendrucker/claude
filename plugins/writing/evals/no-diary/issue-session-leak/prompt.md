@@ -3,7 +3,7 @@ no-diary this issue
 ---
 ## Loader drops rows
 
-While pairing with Claude on the DuckDB migration I noticed something odd. At first I thought the loader was fine, but then I checked the row counts and they didn't line up. I went back and forth on whether this was a join problem or a streaming problem. After digging through the transcript I realized the LEFT JOIN fans out whenever `external_id` repeats.
+Following up on our conversation earlier: per your suggestion I reran the loader against the staging snapshot, and Claude's analysis confirmed the LEFT JOIN fans out whenever `external_id` repeats, which matches what you saw on the dashboard. To reproduce, load `fixtures/dupes.csv`, where 3 rows share `external_id` `a1`: the output has 9.
 
-Anyway, the loader should probably dedupe on `external_id` before the join.
+Dedupe on `external_id` before the join.
 ---

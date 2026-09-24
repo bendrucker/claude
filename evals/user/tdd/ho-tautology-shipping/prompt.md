@@ -1,0 +1,1 @@
+Test-first: an order whose subtotal is $75 or more ships free, so `shippingCost` needs the subtotal as a second argument. `shippingCost` is the seam. Put the tests in `src/shipping.test.ts` and run them with `bun test`.

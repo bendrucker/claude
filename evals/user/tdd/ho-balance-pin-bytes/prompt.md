@@ -1,0 +1,1 @@
+I'm changing `formatBytes` test-first soon. Before that, capture what it does today in tests at `formatBytes`, the only seam, without editing `src/bytes.ts`. Tests go in `src/bytes.test.ts`; run them with `bun test`.

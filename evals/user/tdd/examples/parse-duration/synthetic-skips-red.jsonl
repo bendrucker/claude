@@ -1,0 +1,5 @@
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t123","name":"Write","input":{"file_path":"/tmp/claude-eval-x/home/cwd/src/duration.test.ts","content":"x"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t124","name":"Edit","input":{"replace_all":false,"file_path":"/tmp/claude-eval-x/home/cwd/src/duration.ts","old_string":"a","new_string":"b"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t125","name":"Bash","input":{"command":"bun test","description":"Run tests"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t125","content":" 2 pass\n 0 fail\n"}]}}
+{"type":"result","subtype":"success","result":"Done."}

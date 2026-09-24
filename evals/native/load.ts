@@ -7,12 +7,12 @@ const Grader = z.object({
   name: z.string(),
   passed: z.boolean(),
   scored: z.boolean(),
-  explanation: z.string().optional(),
+  explanation: z.string().nullish(),
 });
 const Run = z.object({
   score: z.number().nullable(),
   graders: z.array(Grader),
-  error: z.string().optional(),
+  error: z.string().nullish(),
 });
 const Result = z.object({
   cases: z.array(z.object({ name: z.string(), arms: z.record(z.string(), z.array(Run)) })),
@@ -37,9 +37,8 @@ export type Column = Map<string, Cell>;
  * and an empty reply passes every `not_contains` grader.
  */
 export function runError(run: z.output<typeof Run>): string | undefined {
-  return (
-    run.error ?? run.graders.find((g) => g.explanation?.startsWith("grader threw"))?.explanation
-  );
+  const threw = run.graders.find((g) => g.explanation?.startsWith("grader threw") === true);
+  return run.error ?? threw?.explanation ?? undefined;
 }
 
 /** The errored runs in an aggregate-result.json, as `<case>/<arm>/<n>: <error>`. */

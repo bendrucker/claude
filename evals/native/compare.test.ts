@@ -9,7 +9,7 @@ interface RunSpec {
   score: number;
   graders: [name: string, passed: boolean, scored?: boolean, explanation?: string][];
   reply?: string | undefined;
-  error?: string | undefined;
+  error?: string | null | undefined;
 }
 
 /** Writes an aggregate-result.json with one case per entry, and a trace for each run with a reply. */
@@ -116,6 +116,11 @@ describe("loadColumn", () => {
       "c/with/1: exit 1: You've hit your session limit",
       "c/with/2: grader threw: judge call failed",
     ]);
+  });
+
+  test("reads a clean run's null error", async () => {
+    const path = await result({ c: { with: [{ ...pass(), error: null }] } });
+    expect((await loadColumn([path])).get("c/with")?.errored).toBe(0);
   });
 
   test("skips word counts for runs without a trace", async () => {

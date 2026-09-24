@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:Acme)'
+pattern: '<rewrite>(?:(?!</rewrite>)[\s\S])*?(?:acme)'
 flags: i
 match: not_contains
 ---

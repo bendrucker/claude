@@ -282,10 +282,14 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           ARGS: ${{ inputs.args }}
           REF: ${{ inputs.ref }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           ref=()
           if [ -n "$REF" ]; then
-            git fetch --no-tags origin "$REF"
+            # git fetch takes a full SHA only, so resolve a short one, or a
+            # branch or tag, through the API first.
+            sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$REF" --jq .sha)
+            git fetch --no-tags origin "$sha"
             ref=(--ref FETCH_HEAD --label "${REF//\//-}")
           fi
           # xargs splits the input the way a shell would, removing quotes

@@ -75,6 +75,7 @@ Most diary sentences sit where a useful sentence belongs. Put one of these there
 - Verification results resemble narration. Keep the result and cut the framing: a row count proving a join assumption is a finding, and "I ran it and found" is not. A passing-test tally is not a result: cut "all tests pass" and test counts.
 - Cutting a rationale can strand the rule it supported. Keep one clause when the reason is what lets a reader handle an unlisted case.
 - Rewriting a user's own prose is out of scope. When the invocation frames the text as theirs ("my review comment", "my draft") or the artifact attributes it to them, cut the diary and leave the voice.
+- A review comment names the code by function or behavior. Drop `file:line` paths and finding counts ("three nits") from it, the user's own comment included, since they read as robotic rather than as voice.
 
 ## Surfaces
 

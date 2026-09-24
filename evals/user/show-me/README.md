@@ -1,0 +1,7 @@
+# `show-me` Eval
+
+A native `claude plugin eval` suite for the `show-me` user skill, wrapped into a throwaway plugin through [`suite.yaml`](suite.yaml). Each case scaffolds a small TypeScript project with `fixture.sh`, asks in plain language to be shown something about it, and grades the reply with regexes over its code blocks, with and without the skill.
+
+The cases cover each text format the skill names (call tree, component tree, file tree, diff, types first for a design, Mermaid across processes) plus two lookups where one small block is the right answer. The Artifact format is out of scope, since the eval session has no Artifact tool. `dev` cases drive a climb and `holdout` cases run once at the end.
+
+`gh workflow run eval.yml --ref <branch> -f suite=evals/user/show-me -f args='--tag dev'` runs one replicate in CI. `bun evals/native/run.ts evals/user/show-me -- --tag dev` runs it locally with the Bash sandbox disabled. Results land in the gitignored `results/<timestamp>/`.

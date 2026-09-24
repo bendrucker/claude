@@ -1,0 +1,1 @@
+src/config.ts mixes server and job settings. I'd like each area to own its config: server settings next to the server, job settings next to the jobs. Show me what that reorganization looks like. Don't change files yet.

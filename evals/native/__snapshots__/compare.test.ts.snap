@@ -1,0 +1,102 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`render stars rows that moved and leads the markdown with them 1`] = `
+"* marks p < 0.1 against base (permutation test, pooled runs)
+
+| measure | row | base | next |
+| --- | --- | --- | --- |
+| Case score | c/with | 1.00 | 0.00* |
+| Reply words | c/with | 3 | 6* |
+| Grader pass rate | c/with · fact | 1.00 | 0.00* |
+| Grader pass rate | c/with · fired (indicator) | 1.00 | 0.00* |
+
+<details><summary>Case score</summary>
+
+| case/arm | base | next |
+| --- | --- | --- |
+| c/with | 1.00 | 0.00* |
+
+</details>
+
+<details><summary>Reply words</summary>
+
+| case/arm | base | next |
+| --- | --- | --- |
+| c/with | 3 | 6* |
+
+</details>
+
+<details><summary>Grader pass rate</summary>
+
+| case/arm | grader | base | next |
+| --- | --- | --- | --- |
+| c/with | fact | 1.00 | 0.00* |
+| c/with | fired (indicator) | 1.00 | 0.00* |
+
+</details>"
+`;
+
+exports[`render rolls case scores up by tag 1`] = `
+"* marks p < 0.1 against base (permutation test, pooled runs)
+
+Tag score
+╔═════════════════╤══════╗
+║ tag/arm         │ base ║
+╟─────────────────┼──────╢
+║ dev/with        │ 0.75 ║
+╟─────────────────┼──────╢
+║ holdout/with    │ 0.00 ║
+╟─────────────────┼──────╢
+║ dev/without     │ 0.00 ║
+╟─────────────────┼──────╢
+║ holdout/without │ 0.00 ║
+╚═════════════════╧══════╝
+
+Case score
+╔═══════════╤══════╗
+║ case/arm  │ base ║
+╟───────────┼──────╢
+║ a/with    │ 0.75 ║
+╟───────────┼──────╢
+║ a/without │ 0.00 ║
+╟───────────┼──────╢
+║ b/with    │ 0.00 ║
+╟───────────┼──────╢
+║ b/without │ 0.00 ║
+╚═══════════╧══════╝
+
+Reply words
+╔═══════════╤══════╗
+║ case/arm  │ base ║
+╟───────────┼──────╢
+║ a/with    │ 3    ║
+╟───────────┼──────╢
+║ a/without │ 6    ║
+╟───────────┼──────╢
+║ b/with    │ 6    ║
+╟───────────┼──────╢
+║ b/without │ 6    ║
+╚═══════════╧══════╝
+
+Grader pass rate
+╔═══════════╤═══════════════════╤══════╗
+║ case/arm  │ grader            │ base ║
+╟───────────┼───────────────────┼──────╢
+║ a/with    │ fact              │ 1.00 ║
+╟───────────┼───────────────────┼──────╢
+║ a/with    │ fired (indicator) │ 1.00 ║
+╟───────────┼───────────────────┼──────╢
+║ a/without │ fact              │ 0.00 ║
+╟───────────┼───────────────────┼──────╢
+║ a/without │ fired (indicator) │ 0.00 ║
+╟───────────┼───────────────────┼──────╢
+║ b/with    │ fact              │ 0.00 ║
+╟───────────┼───────────────────┼──────╢
+║ b/with    │ fired (indicator) │ 0.00 ║
+╟───────────┼───────────────────┼──────╢
+║ b/without │ fact              │ 0.00 ║
+╟───────────┼───────────────────┼──────╢
+║ b/without │ fired (indicator) │ 0.00 ║
+╚═══════════╧═══════════════════╧══════╝
+"
+`;

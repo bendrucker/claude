@@ -288,8 +288,10 @@ jobs:
             git fetch --no-tags origin "$REF"
             ref=(--ref FETCH_HEAD --label "${REF//\//-}")
           fi
-          # shellcheck disable=SC2086
-          bun evals/native/run.ts "$SUITE_DIR" "${ref[@]}" -- --no-publish --threshold 0 --concurrency 4 $ARGS
+          # xargs splits the input the way a shell would, removing quotes
+          # without expanding globs, so --case 'quiet-*' reaches the runner.
+          mapfile -d '' -t args < <(xargs -r printf '%s\0' <<<"$ARGS")
+          bun evals/native/run.ts "$SUITE_DIR" "${ref[@]}" -- --no-publish --threshold 0 --concurrency 4 "${args[@]}"
 
       - name: Upload results
         if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''

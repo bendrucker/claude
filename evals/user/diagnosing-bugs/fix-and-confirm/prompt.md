@@ -1,0 +1,1 @@
+Checkout blows up with `TypeError: undefined is not an object (evaluating 'product.price')` for a customer whose cart still has a poster we pulled from the catalog. Their cart is saved in data/cart.json and `bun run checkout` reproduces it. We want discontinued items skipped from the total, not an error. Please fix it.

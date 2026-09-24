@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: 'parseDuration\(input: string'
+pattern: 'parseDuration\(\s*input: string'
 match: contains
 ---
 The reply shows the real signature.

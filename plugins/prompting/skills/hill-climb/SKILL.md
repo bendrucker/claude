@@ -46,7 +46,7 @@ Run the suite on the base commit at least twice and pool the runs. Replicate the
 
 Read the failing grader explanations, then the traces behind them (`traces/<case>-<arm>-<n>.jsonl`, whose last `result` line is the reply). Sort each failure into one bucket:
 
-- **Skill.** The output is wrong and the skill caused it or failed to prevent it. A candidate targets these.
+- **Skill.** The output is wrong and the skill caused it or failed to prevent it. A candidate targets these. When the rule sits in a reference the trace never opened, the candidate either inlines it or sharpens the pointer to it.
 - **Grader.** The output meets the intent and the grader failed it, or the reverse. Fix the grader in its own change, then re-score every stored run with `bun evals/native/regrade.ts <suite> <results>...` and compare the `-regraded` copies. Only a changed `llm` or file-target grader needs a re-baseline. Leave graders fixed during a climb, since a grader edit moves the baseline.
 - **Reach.** The skill never fired, so the output is the model's default. A description-only candidate targets these. Its target is the skill-fired indicator on the cases that missed, and its guards are the quiet cases and the case scores. Fix skill failures on cases that fire first, since widening reach spreads them.
 - **Floor.** The model cannot do it at this tier. Leave it.

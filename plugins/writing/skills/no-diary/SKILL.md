@@ -42,6 +42,10 @@ Where the rewrite goes depends on how the target resolved:
 
 Then report what you cut, grouped by the `Removals` headings, in a few lines.
 
+## Surfaces
+
+Before rewriting, Read the section of [`references/surfaces.md`](references/surfaces.md) for the artifact's surface: PR and MR bodies, code comments, docs and specs, skill prose, review comments, issues, or plans. Each section holds rules the lists below leave out.
+
 ## The Test
 
 Every sentence must change what the reader does. A sentence explaining why a decision was right, what it replaced, or where it came from fails.
@@ -75,10 +79,6 @@ Most diary sentences sit where a useful sentence belongs. Put one of these there
 - Verification results resemble narration. Keep the result and cut the framing: a row count proving a join assumption is a finding, and "I ran it and found" is not. A passing-test tally is not a result: cut "all tests pass" and test counts.
 - Cutting a rationale can strand the rule it supported. Keep one clause when the reason is what lets a reader handle an unlisted case.
 - Rewriting a user's own prose is out of scope. When the invocation frames the text as theirs ("my review comment", "my draft") or the artifact attributes it to them, cut the diary and leave the voice.
-
-## Surfaces
-
-[`references/surfaces.md`](references/surfaces.md) has rules per surface. Read the section for the surface you are editing.
 
 ## Voice
 

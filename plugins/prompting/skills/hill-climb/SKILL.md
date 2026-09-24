@@ -27,9 +27,9 @@ Check the suite before the first baseline. A climb on an unready suite measures 
 - **Split.** Tag every case `dev` or `holdout` in its `case.yaml`. Candidates run on `dev`. `holdout` runs once, at the end, so no edit is tuned against it. Aim for about a third of the cases in `holdout`, covering the same surfaces as `dev`.
 - **Reach.** A case moves only when the skill fires on it. Add a `tool_used` grader on `Skill` with `input_match` naming the skill: under ablation it reports as an unscored indicator. A case where the skill never fires scores the model's default. Include cases where the skill should stay quiet, so a trigger change has a guard. For a skill users invoke by name, simulate the invocation in `append_system_prompt` on every case, since there is no trigger to test.
 - **Balance.** Include cases where the skill should change little, so a climb that over-applies the skill loses score.
-- **Graders.** Grade the output with `regex` wherever a pattern decides it, and keep `llm` graders to one criterion each. Pair each removal grader with a survival grader for the fact that must stay, so deleting everything fails.
+- **Graders.** Grade the output with `regex` wherever a pattern decides it, and keep `llm` graders to one criterion each. Pair each removal grader with a survival grader for the fact that must stay, so deleting everything fails. Where a case invites invention, add a `not_contains` grader for the likeliest plausible mechanism the fixture lacks.
 - **Trace.** Match a tool call's input by its key and value alone. Key order in the serialized input varies by tool (`Edit` writes `replace_all` before `file_path`), so an anchored pattern can silently match nothing.
-- **Scope.** When the reply wraps an artifact in commentary, have `append_system_prompt` ask for the artifact inside `<out>` tags and anchor each regex to that block, or a report that quotes a cut phrase fails its own grader. `<out>(?:(?!</out>)[\s\S])*?PATTERN` finds a pattern inside the block, and `<out>(?:(?!</out>)[\s\S]){N}` holds when the block runs past N characters, a floor under `contains` and a ceiling under `not_contains`.
+- **Scope.** When the reply wraps an artifact in commentary, have `append_system_prompt` ask for the artifact inside `<out>` tags and anchor each regex to that block, or a report that quotes a cut phrase fails its own grader. `<out>(?:(?!</out>)[\s\S])*?PATTERN` finds a pattern inside the block, and `<out>(?:(?!</out>)[\s\S]){N}` holds when the block runs past N characters, a floor under `contains` and a ceiling under `not_contains`. Size N per case, since a case with more moving parts earns a longer on-topic caveat.
 - **Isolation.** Stub every external service in the fixture: a bare repo for pushes, pasted text for API bodies, an `append_system_prompt` fallback telling the session what to reply when a network call fails. A run that dies on the network scores the sandbox. A case whose right answer is "no cause found" needs a fixture with no latent cause: have a strong model hunt it before the baseline. A headless session lacks interactive tools such as `EnterPlanMode` and `AskUserQuestion` even when granted. Grade a step that uses one by its observable effect, and tell the session through `append_system_prompt` that nobody answers mid-task.
 - **Wrap.** An artifact outside a plugin (a user skill, an agent, a rule or `CLAUDE.md`) loads through the `wrap` key in the suite's `suite.yaml`, which the runner builds into a throwaway plugin. Context files reach the session through a `SessionStart` hook, whatever their `paths:` frontmatter says.
 - **Lint.** Run `shellcheck` on the scaffold scripts, and test each regex grader with `bun evals/native/check.ts <suite>` against examples: one that should pass every grader, and one per grader that should fail it. Copy a smoke run's traces in as `.jsonl` examples, since those reach trace graders, and hand-write replies for the `holdout` cases. A fix after the baseline edits a case mid-climb.
@@ -91,7 +91,7 @@ The next candidate branches off the accepted change and re-baselines on it. Cand
 
 #### Holdout
 
-After the last accepted change, run `holdout` on the original base and on the final commit, pooled to the same run count. The climb holds when the holdout score does not fall. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it.
+After the last accepted change, run `holdout` on the original base and on the final commit, pooled to the same run count. On CI, dispatch the final branch for both, adding `-f ref=<base sha>` for the base side so both read the same cases. The climb holds when the holdout score does not fall. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it.
 
 ## Stopping
 
@@ -99,7 +99,7 @@ Stop when any of these holds, and say which:
 
 - The `dev` score has no room left above the noise from `Ready the Suite`.
 - Three candidates in a row came back null. Add harder cases, then resume.
-- Every remaining failure buckets as grader, reach, or floor.
+- Every remaining failure buckets as reach or floor. Fix grader-bucket failures and regrade first, and resume if a skill failure surfaces.
 
 ## Running
 

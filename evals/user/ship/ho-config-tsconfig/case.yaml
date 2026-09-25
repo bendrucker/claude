@@ -1,0 +1,27 @@
+schema_version: "1.1"
+name: ho-config-tsconfig
+tags: [holdout]
+plugins: ["../.."]
+execution:
+  model: claude-sonnet-5
+  max_turns: 20
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Skill, Bash]
+  append_system_prompt: >-
+    The user typed `/ship` to finish this branch. When a skill named ship is
+    available, load it and follow it. This is a dry run of ship's gating only:
+    inspect the branch as ship would, decide which review passes it warrants, and
+    stop before running any of them. Do not invoke a pass, commit, push, or open a
+    pull request. Nobody answers while you work, so settle any toss-up yourself. The
+    origin remote is a local bare repository, so fetching from it works. A supported
+    review bot is available for this repository: its local CLI runs and no cooldown
+    is active. The Copilot CLI is not installed, and no plan file is in context.
+    Reply with the plan between a line holding only <out> and a line holding only
+    </out>. Inside, write the one-line plan first, then a line starting `in:` with
+    the passes gated in, comma-separated, then a line starting `out:` with the
+    passes gated out, comma-separated. Name passes only as plan:review, review:code,
+    simplify, comments:audit, pull-request:follow-up, github:copilot,
+    writing:review, run, review:human, writing review:code with its effort as
+    `review:code <effort>`. Anything else you say goes outside the tags.
+context:
+  scaffold_script: fixture.sh

@@ -251,6 +251,14 @@ async function baseRemote(run: Runner, root: string, base: string): Promise<stri
   return remotes.has(candidate) ? candidate : null;
 }
 
+// GitHub over SSH signs with a key that may need a touch nobody is there to give, so
+// fetch the same repository over HTTPS into the remote's own tracking refs.
+export function fetchArgs(remote: string, url: string): string[] {
+  const ssh = /^(?:git@github\.com:|ssh:\/\/git@github\.com\/)(.+?)(?:\.git)?\/?$/.exec(url.trim());
+  if (ssh?.[1] == null) return [remote];
+  return [`https://github.com/${ssh[1]}.git`, `+refs/heads/*:refs/remotes/${remote}/*`];
+}
+
 function agentNames(listed: z.infer<typeof AgentList>): ReadonlySet<string> {
   return new Set(listed.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])));
 }
@@ -397,13 +405,15 @@ export async function dispatch(
 
   try {
     const remote = await baseRemote(run, root, options.base);
-    if (remote != null)
-      await required(run, ["git", "-C", root, "fetch", remote], null, {
+    if (remote != null) {
+      const url = await required(run, ["git", "-C", root, "remote", "get-url", remote], null);
+      await required(run, ["git", "-C", root, "fetch", ...fetchArgs(remote, url.stdout)], null, {
         timeoutMs: FETCH_TIMEOUT_MS,
         // Unattended, a credential prompt would wait for input nobody is there
         // to give. The timeout covers an SSH agent that waits on a hardware key.
         env: { GIT_TERMINAL_PROMPT: "0" },
       });
+    }
 
     // herdr rejects an unknown base too, after paying for the worktree attempt.
     const verified = await run([

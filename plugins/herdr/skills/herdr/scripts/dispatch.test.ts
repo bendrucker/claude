@@ -9,6 +9,7 @@ import {
   dispatch,
   DispatchError,
   envelopeCode,
+  fetchArgs,
   formatRecord,
   type Runner,
   spawnRunner,
@@ -74,12 +75,13 @@ const options = {
 };
 
 const GIT_COMMON = ok("worktree /repo\nHEAD abc123\nbranch refs/heads/main\n\n");
-const REMOTES = ok("origin\nupstream\n");
+// A remote list, then the URL of the remote the base names.
+const REMOTES = [ok("origin\nupstream\n"), ok("git@github.com:owner/repo.git\n")];
 
 const HAPPY_PATH = [
   AGENT_LIST,
   GIT_COMMON,
-  REMOTES,
+  ...REMOTES,
   ok(""),
   BASE_OK,
   WORKTREE,
@@ -87,6 +89,27 @@ const HAPPY_PATH = [
   ok(""),
   AGENT_GET,
 ];
+
+describe("fetchArgs", () => {
+  test.each([
+    [
+      "git@github.com:owner/repo.git",
+      ["https://github.com/owner/repo.git", "+refs/heads/*:refs/remotes/origin/*"],
+    ],
+    [
+      "git@github.com:owner/repo",
+      ["https://github.com/owner/repo.git", "+refs/heads/*:refs/remotes/origin/*"],
+    ],
+    [
+      "ssh://git@github.com/owner/repo.git\n",
+      ["https://github.com/owner/repo.git", "+refs/heads/*:refs/remotes/origin/*"],
+    ],
+    ["https://github.com/owner/repo.git", ["origin"]],
+    ["git@gitlab.com:owner/repo.git", ["origin"]],
+  ])("fetches %j with %j", (url, expected) => {
+    expect(fetchArgs("origin", url)).toEqual(expected);
+  });
+});
 
 describe("deriveName", () => {
   test.each([
@@ -163,7 +186,15 @@ describe("dispatch", () => {
       ["herdr", "agent", "list"],
       ["git", "-C", "/repo", "worktree", "list", "--porcelain"],
       ["git", "-C", "/repo", "remote"],
-      ["git", "-C", "/repo", "fetch", "origin"],
+      ["git", "-C", "/repo", "remote", "get-url", "origin"],
+      [
+        "git",
+        "-C",
+        "/repo",
+        "fetch",
+        "https://github.com/owner/repo.git",
+        "+refs/heads/*:refs/remotes/origin/*",
+      ],
       ["git", "-C", "/repo", "rev-parse", "--verify", "--quiet", "origin/main"],
       [
         "herdr",
@@ -227,7 +258,14 @@ describe("dispatch", () => {
   test("fetches the remote the base names", async () => {
     const { run, calls } = fakeRunner(HAPPY_PATH);
     await dispatch({ ...options, base: "upstream/main" }, run);
-    expect(calls).toContainEqual(["git", "-C", "/repo", "fetch", "upstream"]);
+    expect(calls).toContainEqual([
+      "git",
+      "-C",
+      "/repo",
+      "fetch",
+      "https://github.com/owner/repo.git",
+      "+refs/heads/*:refs/remotes/upstream/*",
+    ]);
   });
 
   test("uses an explicit name that no live agent holds", async () => {
@@ -250,7 +288,7 @@ describe("dispatch", () => {
       "linked_worktree_source",
       "New and open worktree actions start from the repo parent workspace.",
     );
-    const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, REMOTES, ok(""), BASE_OK, fail(stderr)]);
+    const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, ...REMOTES, ok(""), BASE_OK, fail(stderr)]);
 
     const failure = await failureOf(dispatch(options, run));
     expect(failure.message).toBe(stderr);
@@ -262,7 +300,7 @@ describe("dispatch", () => {
     const { run } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
-      REMOTES,
+      ...REMOTES,
       ok(""),
       BASE_OK,
       WORKTREE,
@@ -290,7 +328,7 @@ describe("dispatch", () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
-      REMOTES,
+      ...REMOTES,
       ok(""),
       BASE_OK,
       WORKTREE,
@@ -317,7 +355,7 @@ describe("dispatch", () => {
       const { run } = fakeRunner([
         AGENT_LIST,
         GIT_COMMON,
-        REMOTES,
+        ...REMOTES,
         ok(""),
         BASE_OK,
         WORKTREE,
@@ -355,7 +393,7 @@ describe("dispatch", () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
-      REMOTES,
+      ...REMOTES,
       ok(""),
       BASE_OK,
       WORKTREE,
@@ -377,7 +415,7 @@ describe("dispatch", () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
-      REMOTES,
+      ...REMOTES,
       ok(""),
       BASE_OK,
       WORKTREE,
@@ -401,7 +439,7 @@ describe("dispatch", () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
-      REMOTES,
+      ...REMOTES,
       ok(""),
       BASE_OK,
       WORKTREE,
@@ -422,7 +460,7 @@ describe("dispatch", () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
-      REMOTES,
+      ...REMOTES,
       ok(""),
       BASE_OK,
       WORKTREE,
@@ -450,7 +488,7 @@ describe("dispatch", () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
-      REMOTES,
+      ...REMOTES,
       ok(""),
       BASE_OK,
       WORKTREE,
@@ -469,7 +507,7 @@ describe("dispatch", () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
-      REMOTES,
+      ...REMOTES,
       ok(""),
       BASE_OK,
       WORKTREE,
@@ -488,7 +526,7 @@ describe("dispatch", () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
-      REMOTES,
+      ...REMOTES,
       ok(""),
       BASE_OK,
       WORKTREE,
@@ -505,7 +543,7 @@ describe("dispatch", () => {
     const { run } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
-      REMOTES,
+      ...REMOTES,
       ok(""),
       ok(JSON.stringify({ result: {} })),
       AGENT_LIST,

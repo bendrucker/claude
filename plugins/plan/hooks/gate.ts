@@ -48,15 +48,16 @@ export const APPEND_ONLY_REASON =
   "This plan keeps nearly every line of the one that was just rejected. Rework it: " +
   "delete the text the feedback superseded rather than adding new text around it.";
 
+export const SIDECAR_GUIDANCE =
+  "Move supporting detail into <plan>-<topic>.md files the plan links " +
+  "(<plan>-decisions.md is the common one), or split the work into smaller plans.";
+
 export function sizeReason(priorFires: number): string {
   const opening =
     priorFires > 0
       ? "This rework is still over 10k characters. Cut it further. "
       : "This plan exceeds 10k characters. ";
-  return (
-    `${opening}Move supporting detail into <plan>-<topic>.md files the plan links ` +
-    "(<plan>-decisions.md is the common one), or split the work into smaller plans."
-  );
+  return `${opening}${SIDECAR_GUIDANCE}`;
 }
 
 export class StateUnavailableError extends Error {

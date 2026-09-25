@@ -8,6 +8,7 @@ Planning mode guidelines and context injection for Claude Code.
 - **Hooks**:
   - `scripts/context.sh` and `scripts/plan-inject.sh`: inject planning guidelines the first time a session reaches plan mode, whether that first signal is the `EnterPlanMode` call, a prompt, or a tool call, and append delegation guidance when the orchestrator runs on an expensive model
   - `hooks/gate.ts`: gates `ExitPlanMode`, denying an unchanged plan resubmission, a resubmission that keeps the prior plan nearly intact, and a plan over 10k characters, re-arming while a rework stays over the threshold up to two fires per session
+  - `hooks/write-warn.ts`: on `Write`/`Edit` to a plan file, warns via `additionalContext` when its content is already over the gate's 10k-character limit, so a draft can be trimmed before it reaches `ExitPlanMode`
 - **Evals** `evals/gate/`: offline replay of every recorded presentation through the gate, plus headless rework runs that compare deny texts
 
 ## How It Works

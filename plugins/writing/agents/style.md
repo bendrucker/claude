@@ -2,7 +2,7 @@
 name: style
 description: |
   Reviews document presentation: voice consistency, audience fit, AI trope detection, readability, and formatting.
-disallowedTools: Edit, Write, NotebookEdit, Agent
+tools: Read, Grep, Glob
 model: sonnet
 ---
 

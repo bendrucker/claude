@@ -4,7 +4,7 @@ description: >-
   Drive the herdr terminal workspace manager: inspect workspaces, tabs, and panes, hand work to sibling coding agents in other panes (distinct from in-session `Agent` subagents), split panes for collaborative file viewing or long-running processes, and correlate panes to Claude sessions. Load this when the decision to hand a task to another pane's agent arrives mid-task, and when opening a file alongside the user, starting a dev server or log tail the user should watch, capturing another pane's output, or asking what else is running. Pane, tab, workspace, and split are herdr's terms. A request naming one is a herdr request even when it never says herdr.
 argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
-  - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/orient.ts)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh)
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
   - Bash(herdr api snapshot:*)
@@ -35,6 +35,7 @@ allowed-tools:
   - Bash(herdr plugin action list:*)
   - Bash(herdr plugin log list:*)
   - Bash(herdr plugin config-dir:*)
+  - Bash(herdr machine list:*)
 ---
 
 # Herdr
@@ -53,9 +54,9 @@ Bare `herdr` launches or attaches the TUI in this pane. A mutating command in ba
 
 ## Current Workspace
 
-!`bash ${CLAUDE_SKILL_DIR}/scripts/orient.sh`
+!`bun ${CLAUDE_SKILL_DIR}/scripts/orient.ts`
 
-Columns are workspace, then `pane  agent/status  session  cwd  title`, with `cwd` shown only when it differs from the workspace checkout. That view projects `herdr api snapshot`, which returns workspaces, tabs, panes, layouts, and agents in one call. Prefer it to a sequence of `list` calls, and read it raw when the projection is wrong: `herdr api snapshot | jq .`
+Columns are workspace, then `pane  agent/status  session  cwd  title`, with `cwd` shown only when it differs from the workspace checkout. That view projects `herdr api snapshot`, which returns this machine's workspaces, tabs, panes, layouts, and agents in one call. Prefer it to a sequence of `list` calls, and read it raw when the projection is wrong: `herdr api snapshot | jq .`
 
 If the block reports a failure instead of a workspace listing, stop here and use ordinary tools. Nothing below reaches a server.
 
@@ -69,7 +70,7 @@ Most commands answer with a single-line JSON envelope. Pipe them through `jq -r 
 
 Others print plain text, and `jq` on those fails with `Invalid numeric literal`. Terminal content and human explanations are one kind: `pane read`, `agent read`, `agent explain`. Anything reporting local installation instead of live session state is the other: `plugin list`, `plugin config-dir`, `config check`, `integration status`, `server agent-manifests`.
 
-Exit 1 is a server error with JSON on stderr: parse it. Exit 2 is a syntax error, wrong before it reached the server.
+Exit 2 is a syntax error, wrong before it reached a server. Exit 1 is a failure at one: JSON on stderr from the local server, and plain text from a `--machine` command that could not reach the remote.
 
 ## Addressing
 
@@ -82,6 +83,14 @@ Your own identity comes from the environment, never from inference: `HERDR_ENV`,
 Name a target on every command that takes one. Use `--current` for the calling pane, an explicit ID otherwise. A pane command with no target may resolve to the UI-focused pane, which can belong to the user or another client.
 
 IDs are opaque handles shaped `w1` for a workspace, `w1:t1` for a tab, and `w1:p1` for a pane. Read them out of responses rather than composing them: `pane split` returns `.result.pane`, `tab create` returns `.result.tab` and `.result.root_pane`, `workspace create` returns all three. Closed IDs are never reused. `pane move` mints a new workspace-qualified pane ID, so take the pane forward as `.result.move_result.pane.pane_id` and drop `.result.move_result.previous_pane_id`. The moved process keeps the stale ID in its inherited `HERDR_PANE_ID`, so never take a target from there.
+
+## Machines
+
+`herdr machine list` names the SSH machines saved here. `herdr --machine <label> <command>` forwards a single API command to one of them, from the `api`, `agent`, `pane`, `workspace`, `worktree`, `tab`, and `notification` groups. Everything else is local management, rejected with exit 2 before the network. Nothing forwarded runs git or writes a file, so a machine answers for its panes and agents and for nothing in its checkouts.
+
+IDs repeat across machines and carry no machine of their own. The orientation block above and your own `HERDR_*` variables both describe this machine, so their IDs take a bare command. An ID from another machine's listing takes `--machine <label>` on every command touching it.
+
+A saved machine is not a reachable one: the listing reports what the config holds rather than what answers, and probing to find out costs seconds per sleeping machine. Report a connection failure as "machine `<label>` is unreachable" rather than quoting herdr's error, which names the SSH target. That failure is the result, and herdr runs nothing here in its place.
 
 ## Splits
 

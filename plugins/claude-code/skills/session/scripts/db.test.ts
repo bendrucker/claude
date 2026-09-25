@@ -1031,6 +1031,16 @@ describe("hook-blocks query", () => {
     expect(Number(denied?.subagent_blocks)).toBe(3);
   });
 
+  it("recovers a deny whose reason carries the harness's PreToolUse:<Tool> hook error: prefix", async () => {
+    const rows = await db.query(
+      "SELECT hook_name, reason FROM hook_denies WHERE tool_use_id = 'hk-deny-3'",
+      z.object({ hook_name: z.string(), reason: z.string() }),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.hook_name).toBe("pull-request:validate-body");
+    expect(rows[0]?.reason).toStartWith("Fix the PR body before retrying");
+  });
+
   it("names the subagent that was denied and leaves the parent's own deny unlabelled", async () => {
     const rows = await db.query(
       "SELECT tool_use_id, agent_id FROM hook_denies WHERE tool_use_id LIKE 'hk-%deny-1'",
@@ -2455,9 +2465,11 @@ describe("index-health query", () => {
     );
     const deny = rows.find((r) => r.check_name === "hook-deny-invisible");
     expect(deny?.status).toBe("alert");
-    expect(deny?.subject).toBe("6 denies recovered");
+    expect(deny?.subject).toBe("7 denies recovered");
     expect(deny?.detail).toContain("git:block-default-branch-commit (5)");
     expect(deny?.detail).toContain("user:worktree (1)");
+    // Recovered via the harness's PreToolUse:<Tool> hook error: prefix (hk-deny-3).
+    expect(deny?.detail).toContain("pull-request:validate-body (1)");
     // Subagent denies stay in the count (hook_events misses them too) but are broken
     // out, so a reader knows the total is not all main-thread friction.
     expect(deny?.detail).toContain("3 of the recovered denies were a subagent");

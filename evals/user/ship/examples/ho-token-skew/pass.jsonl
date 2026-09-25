@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","model":"claude-sonnet-5"}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Skill","input":{"skill":"user:ship"}}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"git fetch origin && git diff --stat origin/main...HEAD","description":"Diff the branch against its base"}}]}}
+{"type":"result","subtype":"success","result":"Diffed the branch against its base and gated the passes.\n\n<out>\nPlan: review:code → pull-request:follow-up → review:human, then create and babysit.\n- in: review:code high, pull-request:follow-up, review:human\n- out: simplify, writing:review, comments:audit, plan:review, github:copilot, run\n</out>\n\nStopping here as asked.\n"}

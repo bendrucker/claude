@@ -12,6 +12,7 @@ import sh, {
   type Redirect,
   type SglQuoted,
   type Stmt,
+  type Subshell,
   type Word as SyntaxWord,
   type WordPart,
 } from "mvdan-sh";
@@ -37,6 +38,10 @@ export interface Heredoc {
   content: string;
   /** Sources of expansions the shell rewrites before the command sees the body. */
   expansions: string[];
+  /** Byte range of the raw body (before `<<-` stripping) in the command text. */
+  span: Span;
+  /** `<<-`: its tab-stripped `content` no longer matches `span`, so it cannot be spliced back verbatim. */
+  dash: boolean;
 }
 
 export interface ShellCommand {
@@ -73,6 +78,7 @@ const isDoubleQuoted = (node: Node): node is DblQuoted => syntax.NodeType(node) 
 const isParameter = (node: Node): node is ParamExp => syntax.NodeType(node) === "ParamExp";
 const isSubstitution = (node: Node): node is CmdSubst => syntax.NodeType(node) === "CmdSubst";
 const isBinary = (node: Node): node is BinaryCmd => syntax.NodeType(node) === "BinaryCmd";
+const isSubshell = (node: Node): node is Subshell => syntax.NodeType(node) === "Subshell";
 
 // The parser exposes its operators as compile-time constants only, so each is
 // read back from a command whose operator is known.
@@ -95,12 +101,23 @@ function binaryOperatorOf(source: string): BinaryCmd["Op"] | undefined {
 const OR_OPERATOR = binaryOperatorOf("x || y");
 const PIPE_OPERATORS = new Set([binaryOperatorOf("x | y"), binaryOperatorOf("x |& y")]);
 
+// The parser reports positions as byte offsets into the UTF-8 encoding of the
+// command, which run ahead of the matching JS string index once any character
+// before the offset is multi-byte. Every offset that indexes into `command`
+// with `.slice()` goes through this first.
+function byteOffsetToIndex(command: string, byteOffset: number): number {
+  if (Buffer.byteLength(command) === command.length) return byteOffset;
+  return Buffer.from(command, "utf8").subarray(0, byteOffset).toString("utf8").length;
+}
+
 function sourceOf(node: Node, command: string): string {
-  return command.slice(node.Pos().Offset(), node.End().Offset());
+  const start = byteOffsetToIndex(command, node.Pos().Offset());
+  const end = byteOffsetToIndex(command, node.End().Offset());
+  return command.slice(start, end);
 }
 
 /** Half-open byte range a node covers in the command text. */
-type Span = [number, number];
+export type Span = [number, number];
 
 function spanOf(node: Node): Span {
   return [node.Pos().Offset(), node.End().Offset()];
@@ -108,6 +125,11 @@ function spanOf(node: Node): Span {
 
 function holds([start, end]: Span, offset: number): boolean {
   return offset >= start && offset < end;
+}
+
+/** `text` with the byte range `span` replaced by `replacement`. */
+export function splice(text: string, [start, end]: Span, replacement: string): string {
+  return text.slice(0, start) + replacement + text.slice(end);
 }
 
 interface Context {
@@ -185,15 +207,23 @@ function evaluateWord(word: SyntaxWord, context: Context): Word {
 
 // A heredoc body reaches the CLI as written, so literal runs are taken
 // verbatim. Any other part is an expansion the shell rewrites first.
+//
+// The node's own `.End()` (on the `Hdoc` word and on each part) reaches past
+// the body to cover the closing delimiter, so the span is built from `.Pos()`
+// plus the raw content's length instead.
 function heredocOf(redirect: Redirect, context: Context): Heredoc | null {
   if (redirect.Op !== OPERATORS.heredoc && redirect.Op !== OPERATORS.dashHeredoc) return null;
   const parts = redirect.Hdoc?.Parts ?? [];
-  const content = parts
+  const raw = parts
     .map((part) => (isLit(part) ? part.Value : sourceOf(part, context.command)))
     .join("");
+  const start = byteOffsetToIndex(context.command, redirect.Hdoc?.Pos().Offset() ?? 0);
+  const dash = redirect.Op === OPERATORS.dashHeredoc;
   return {
-    content: redirect.Op === OPERATORS.dashHeredoc ? stripLeadingTabs(content) : content,
+    content: dash ? stripLeadingTabs(raw) : raw,
     expansions: parts.filter((part) => !isLit(part)).map((part) => sourceOf(part, context.command)),
+    span: [start, start + raw.length],
+    dash,
   };
 }
 
@@ -215,6 +245,22 @@ function outputOf(redirects: Redirect[], context: Context): Word | null {
   );
   const target = write?.Word;
   return target == null ? null : evaluateWord(target, context);
+}
+
+// A bare assignment statement (`P=foo`, no command) sets a shell variable that
+// later statements in the same call see, unlike an assignment prefixing a
+// command (`GH_PAGER=cat gh pr view`), which is scoped to that command alone.
+// Only a literal value is threaded forward; one the hook cannot evaluate
+// leaves the name as the caller already had it, rather than clearing it.
+function applyBareAssignments(call: CallExpr, context: Context): void {
+  if (call.Args.some((arg) => arg !== null)) return;
+  for (const assign of call.Assigns) {
+    if (assign === null) continue;
+    const name = assign.Name?.Value;
+    if (name === undefined || name === "") continue;
+    const value = assign.Value === null ? "" : literal(evaluateWord(assign.Value, context));
+    if (value !== null) context.env[name] = value;
+  }
 }
 
 /** Where a command sits among the others, which the statement itself does not say. */
@@ -246,17 +292,24 @@ function statementCommand(
  * it.
  */
 export function parseShell(command: string, env: NodeJS.ProcessEnv = process.env): ShellCommand[] {
-  const context: Context = { command, env };
+  // Copied so a bare assignment's forwarding (below) never writes into the
+  // caller's environment, which defaults to the real `process.env`.
+  const context: Context = { command, env: { ...env } };
   const commands: ShellCommand[] = [];
   // A binary is visited before the statements inside it, so a statement's spans
   // are already here, outermost first.
   const fallbacks: Span[] = [];
   const pipelines: Span[] = [];
+  // A subshell runs in a copy of the shell, so an assignment inside `(...)`
+  // never reaches a sibling statement outside it. Visited outermost first,
+  // same as the pipeline/fallback spans above.
+  const subshells: Span[] = [];
   try {
     const file = syntax.NewParser().Parse(command, "command.sh");
     syntax.Walk(file, (node) => {
       // The word holding it evaluates it, so it is no step in this sequence.
       if (isSubstitution(node)) return false;
+      if (isSubshell(node)) subshells.push(spanOf(node));
       if (isBinary(node)) {
         if (PIPE_OPERATORS.has(node.Op)) pipelines.push(spanOf(node));
         else if (node.Op === OR_OPERATOR && node.Y != null) fallbacks.push(spanOf(node.Y));
@@ -268,6 +321,9 @@ export function parseShell(command: string, env: NodeJS.ProcessEnv = process.env
           pipeline: pipelines.find((span) => holds(span, at))?.[0] ?? at,
         });
         if (found !== null) commands.push(found);
+        if (isCall(node.Cmd) && !subshells.some((span) => holds(span, at))) {
+          applyBareAssignments(node.Cmd, context);
+        }
       }
       return true;
     });

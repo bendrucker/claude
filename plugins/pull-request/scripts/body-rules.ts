@@ -394,9 +394,14 @@ export function headingCaseCorrection(
 // A deny reason carries an exact fix, so the whole set is worth reporting at
 // once: the model would otherwise rewrite the body, retry, and be blocked again
 // by the next one. Warnings ride along on a deny for the same reason.
+//
+// `updatedInput` never accompanies a deny: it is only set once a caller has
+// already corrected the one deny that would have stood (heading case), which
+// leaves `matches` holding nothing but warns.
 export function decide(
   matches: RuleMatch[],
   note: string | null = null,
+  updatedInput: Record<string, unknown> | null = null,
 ): SyncHookJSONOutput | null {
   const denies = matches.filter((match) => match.tier === "deny");
   const warns = matches.filter((match) => match.tier === "warn");
@@ -420,13 +425,14 @@ export function decide(
         : "This PR has structural-slop patterns:";
     sections.push(`${intro}\n${bullets(warns)}`);
   }
-  if (sections.length === 0) {
+  if (sections.length === 0 && updatedInput === null) {
     return null;
   }
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      additionalContext: sections.join("\n\n"),
+      ...(sections.length > 0 && { additionalContext: sections.join("\n\n") }),
+      ...(updatedInput !== null && { updatedInput }),
     },
   };
 }

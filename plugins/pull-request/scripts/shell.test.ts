@@ -6,7 +6,7 @@ function summarize(command: string, env: NodeJS.ProcessEnv = {}) {
   return parseShell(command, env).map((entry: ShellCommand) => ({
     argv: entry.argv.map((word) => literal(word)),
     output: literal(entry.output ?? undefined),
-    heredocs: entry.heredocs,
+    heredocs: entry.heredocs.map(({ content, expansions }) => ({ content, expansions })),
   }));
 }
 
@@ -135,6 +135,95 @@ describe("parseShell", () => {
       "--body-file",
       null,
     ]);
+  });
+
+  // A bare `NAME=value` statement is a real shell variable assignment, so it
+  // reaches every statement after it in the same call.
+  test("carries a bare assignment forward to a later statement", () => {
+    expect(summarize('P=/scratch/b.md; gh pr create --body-file "$P"')[1]?.argv).toEqual([
+      "gh",
+      "pr",
+      "create",
+      "--body-file",
+      "/scratch/b.md",
+    ]);
+  });
+
+  test("does not carry an assignment prefixing a command into a later statement", () => {
+    expect(
+      summarize('P=/scratch/b.md gh pr view 1; gh pr create --body-file "$P"')[1]?.argv,
+    ).toEqual(["gh", "pr", "create", "--body-file", null]);
+  });
+
+  test("leaves a name unresolved when its bare assignment cannot be evaluated", () => {
+    expect(summarize('P=$(git rev-parse HEAD); gh pr create --body-file "$P"')[1]?.argv).toEqual([
+      "gh",
+      "pr",
+      "create",
+      "--body-file",
+      null,
+    ]);
+  });
+
+  // A subshell runs in a copy of the shell, so its assignments never reach a
+  // sibling statement once it closes.
+  test("does not carry a subshell's bare assignment past the subshell", () => {
+    expect(summarize('(P=/scratch/x.md); gh pr create --body-file "$P"')[1]?.argv).toEqual([
+      "gh",
+      "pr",
+      "create",
+      "--body-file",
+      null,
+    ]);
+  });
+
+  test("resolves a heredoc's own byte span, distinct from the node's End()", () => {
+    const command = "cat > body.md <<'EOF'\n## Heading\nProse.\nEOF\n";
+    const heredoc = parseShell(command)[0]?.heredocs[0];
+    expect(heredoc?.span).toBeDefined();
+    const [start, end] = heredoc?.span ?? [0, 0];
+    expect(command.slice(start, end)).toBe(heredoc?.content ?? "");
+  });
+
+  // The parser reports byte offsets, which run ahead of a JS string index once
+  // a multi-byte character precedes the heredoc. The span has to land on the
+  // string's own index, not the parser's byte count.
+  test.each<[string, string]>([
+    ["ascii prefix", "echo 'hello' > /dev/null\ncat > body.md <<'EOF'\nProse.\nEOF\n"],
+    [
+      "multi-byte prefix outside the heredoc",
+      "echo '日本語' > /dev/null\ncat > body.md <<'EOF'\nProse.\nEOF\n",
+    ],
+    ["multi-byte prefix in the same statement", "cat > 日本語.md <<'EOF'\nProse.\nEOF\n"],
+    [
+      "astral (surrogate-pair) prefix",
+      'gh pr create --title "🎉" --body-file - <<EOF\nProse.\nEOF\n',
+    ],
+  ])("keeps the heredoc span aligned with %s", (_label, command) => {
+    const commands = parseShell(command);
+    const heredoc = commands.at(-1)?.heredocs[0];
+    const [start, end] = heredoc?.span ?? [0, 0];
+    expect(command.slice(start, end)).toBe(heredoc?.content ?? "");
+  });
+
+  test("marks a <<- heredoc so its span cannot be spliced back verbatim", () => {
+    const command = "cat > body.md <<-'EOF'\n\tProse.\n\tEOF";
+    const heredoc = parseShell(command)[0]?.heredocs[0];
+    expect(heredoc?.dash).toBe(true);
+    const [start, end] = heredoc?.span ?? [0, 0];
+    // The raw span still holds the tabs the stripped `content` lost.
+    expect(command.slice(start, end)).not.toBe(heredoc?.content);
+  });
+
+  test("marks a plain heredoc as splice-safe", () => {
+    const command = "cat > body.md <<'EOF'\nProse.\nEOF";
+    expect(parseShell(command)[0]?.heredocs[0]?.dash).toBe(false);
+  });
+
+  test("does not write a bare assignment back into the caller's env object", () => {
+    const env = { EXISTING: "1" };
+    parseShell('P=set; gh pr create --body-file "$P"', env);
+    expect(env).toEqual({ EXISTING: "1" });
   });
 
   // No shell would run it either, so there is nothing for a caller to act on.

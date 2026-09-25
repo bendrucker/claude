@@ -39,6 +39,36 @@ function stripQuotes(token: string): string {
   return token.replaceAll(/^['"]+|['"]+$/g, "");
 }
 
+const SHELL_VAR_PATTERN = /\$\{?(\w+)\}?/g;
+
+// The hook inherits TMPDIR from settings while a sandboxed shell gets /tmp/claude-<uid>,
+// so a `$TMPDIR` path could name either directory.
+export function pathCandidates(
+  path: string,
+  env: Record<string, string | undefined>,
+  uid: number,
+): string[] {
+  if (!/\$\{?\w+\}?/.test(path)) return [path];
+  const sandboxed: Record<string, string | undefined> = { ...env, TMPDIR: `/tmp/claude-${uid}` };
+  const expand = (vars: Record<string, string | undefined>): string =>
+    path.replaceAll(SHELL_VAR_PATTERN, (_match: string, name: string): string => vars[name] ?? "");
+  return [...new Set([expand(env), expand(sandboxed)])];
+}
+
+async function readNewest(paths: string[]): Promise<string | null> {
+  const found = await Promise.all(
+    paths.map(async (path) => {
+      const file = Bun.file(path);
+      return (await file.exists()) ? { file, mtime: (await file.stat()).mtimeMs } : null;
+    }),
+  );
+  const newest = found
+    .filter((entry) => entry !== null)
+    .toSorted((a, b) => b.mtime - a.mtime)
+    .at(0);
+  return newest == null ? null : newest.file.text();
+}
+
 function extractBodyFilePath(command: string): string | null {
   const match = command.match(BODY_FILE_PATTERN);
   const captured = match?.at(1);
@@ -125,11 +155,9 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
       bodyFile != null && bodyFile !== ""
         ? [bodyFile, ...extractFieldFilePaths(command)]
         : extractFieldFilePaths(command);
+    const uid = process.getuid?.() ?? 0;
     const bodies = await Promise.all(
-      files.map(async (path) => {
-        const file = Bun.file(path);
-        return (await file.exists()) ? file.text() : null;
-      }),
+      files.map((path) => readNewest(pathCandidates(path, process.env, uid))),
     );
     texts.push(...bodies.filter((body) => body !== null));
     for (const flag of PROSE_FLAGS) {

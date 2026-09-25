@@ -4,7 +4,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { check, collectText } from "./check-tropes";
+import { check, collectText, pathCandidates } from "./check-tropes";
 
 async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   return (await check(input))?.output ?? null;
@@ -300,6 +300,17 @@ describe("MultiEdit", () => {
     expect(await processInput(input)).toBeNull();
   });
 });
+describe("pathCandidates", () => {
+  test.each([
+    ["tmp/body.md", ["tmp/body.md"]],
+    ["$TMPDIR/body.md", ["/tmp/body.md", "/tmp/claude-501/body.md"]],
+    ["${TMPDIR}/body.md", ["/tmp/body.md", "/tmp/claude-501/body.md"]],
+    ["$HOME/body.md", ["/home/me/body.md"]],
+  ])("expands %s", (path, expected) => {
+    expect(pathCandidates(path, { TMPDIR: "/tmp", HOME: "/home/me" }, 501)).toEqual(expected);
+  });
+});
+
 describe("collectText", () => {
   describe("Bash commands", () => {
     let dir: string;
@@ -324,6 +335,19 @@ describe("collectText", () => {
       await Bun.write(tmpFile, "Body content");
       const texts = await collectText(mockBash(`gh pr create --body-file=${tmpFile}`));
       expect(texts).toContain("Body content");
+    });
+
+    it("expands a shell variable in the --body-file path", async () => {
+      await Bun.write(tmpFile, "Expanded body");
+      process.env.TROPE_TEST_DIR = dir;
+      try {
+        const texts = await collectText(
+          mockBash('gh pr create --body-file "$TROPE_TEST_DIR/body.md"'),
+        );
+        expect(texts).toContain("Expanded body");
+      } finally {
+        delete process.env.TROPE_TEST_DIR;
+      }
     });
 
     it("extracts inline --body", async () => {

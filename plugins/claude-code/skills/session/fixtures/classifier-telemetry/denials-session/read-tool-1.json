@@ -1,0 +1,1 @@
+{"session_id":"denials-session","tool_use_id":"read-tool-1","agent_id":"a1","tool":"Read","decision":"allow","rule":"Read","reason":"Matched allow rule","started_at":1705741245000,"check_ms":0,"duration_ms":12,"outcome":"ok"}

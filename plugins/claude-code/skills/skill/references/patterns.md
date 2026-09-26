@@ -63,15 +63,21 @@ A forked skill is a regular subagent. It never receives `AskUserQuestion`. `back
 
 ## Reasoning Effort
 
-Pinning `effort` in frontmatter switches reasoning effort for the skill's duration and reverts when it finishes. On a deployment that applies effort as a top-level request parameter, entering the pinned level invalidates the conversation's cached prefix: everything before that turn is rewritten at cache-creation rates instead of read from cache. Reverting is cheap, because the pre-switch cache entry is usually still live.
+Pinning `effort` in frontmatter switches reasoning effort for the skill's duration and reverts when it finishes. Pin it to the level the skill's work needs, not the level the conversation happens to run at:
 
-A separate mid-conversation mechanism changes effort without a cache reset. As of the current beta it covers Claude Opus 5, Claude Fable 5.1, and Claude Mythos 5.1 through the Claude API. Support on Bedrock, Vertex, and Foundry is unspecified. Assume the rewrite cost applies unless the running model and harness are both confirmed to take that path.
+- `low`: mechanical work with little judgment, such as monitoring, polling, executing a fixed script, or formatting.
+- `medium`: routine implementation.
+- `high`: work where verification or edge cases decide the outcome, such as debugging existing code.
+- `xhigh`: hard problems short of a fully autonomous run.
+- `max`: long autonomous runs on hard problems.
 
-A skill running under `context: fork` starts a subagent with no inherited conversation, so its effort switch has no cached prefix to rewrite. Pin `effort` there freely.
+The pin applies only when the user types the skill as a slash command. A skill invoked through the Skill tool runs at the conversation's effort.
 
-An inline skill pays the rewrite on entry, every time it fires. Low effort saves output tokens during the run by consolidating tool calls and cutting preamble. Once a conversation carries more than a few thousand tokens of prefix, one rewrite costs more than a run of the skill saves. A skill that polls in a loop is worse still: each cycle that alternates effort pays the rewrite again.
+On Claude Fable 5.1, Claude Mythos 5.1, Claude Opus 5.5, and Claude Opus 5, Claude Code sends the switch as a per-message effort change, which keeps the conversation's cached prefix. Pin freely on these models. This is confirmed on the Claude API. Bedrock, Vertex, and Foundry are unconfirmed.
 
-A skill cannot detect its model or platform at author time, so the rule stays blanket: do not pin `effort` on an inline skill.
+Other models take effort as a top-level request parameter, so switching to the pinned level rewrites the whole cached prefix at cache-creation rates. Reverting is cheap while the pre-switch cache entry is still live, which holds only if the skill finishes within the cache TTL. On those models one rewrite outweighs what a low-effort run saves once the prefix passes a few thousand tokens. A skill re-invoked on every polling cycle pays the rewrite each time.
+
+A skill running under `context: fork` starts a subagent with no inherited prefix, so when its pin applies it costs nothing on any model.
 
 ## Skill-Scoped Hooks
 

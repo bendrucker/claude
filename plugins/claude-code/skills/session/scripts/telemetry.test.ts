@@ -4,8 +4,8 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { type Database, ensureIndex, getDb, runQuery } from "./db";
-import { parseDebugLog } from "./telemetry";
+import { type Database, ensureIndex, ensureSchema, getDb, runQuery } from "./db";
+import { type Source, parseDebugLog, syncSource } from "./telemetry";
 
 const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 
@@ -177,5 +177,41 @@ describe("telemetry ingest", () => {
     await rm(debugDir, { recursive: true });
     await reindex();
     expect(await count("SELECT COUNT(*) AS n FROM debug_events")).toBe(1);
+  });
+});
+
+describe("syncSource", () => {
+  function sourceOf(root: string, beforeFailing: (path: string) => Promise<void>): Source {
+    return {
+      name: "stub",
+      root,
+      scan: (entries) =>
+        entries.map((entry) => ({ path: join(root, entry.name), mtime: 1, size: 1 })),
+      async import(_db, file) {
+        await beforeFailing(file.path);
+        throw new Error("import failed");
+      },
+      remove: () => Promise.resolve(),
+    };
+  }
+
+  it.each([
+    { name: "skips a file deleted after the scan", vanishes: true, outcome: "1 changed" },
+    { name: "rethrows when the file is still there", vanishes: false, outcome: "import failed" },
+  ])("$name", async ({ vanishes, outcome }) => {
+    await ensureSchema(db);
+    const root = join(tmpDir, "stub");
+    mkdirSync(root);
+    await Bun.write(join(root, "a.txt"), "x");
+    const source = sourceOf(root, (path) => (vanishes ? rm(path) : Promise.resolve()));
+
+    const settled = await syncSource(db, source).then(
+      (changed) => `${changed} changed`,
+      (error: unknown) => (error instanceof Error ? error.message : String(error)),
+    );
+    expect(settled).toBe(outcome);
+    const Count = z.object({ n: z.bigint() });
+    const [row] = await db.query("SELECT COUNT(*) AS n FROM telemetry_files", Count);
+    expect(Number(row?.n)).toBe(0);
   });
 });

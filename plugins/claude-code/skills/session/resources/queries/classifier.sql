@@ -14,9 +14,10 @@
 --   `dropped-allow-rule` lists each allow rule auto mode ignored because it bypasses the
 --   classifier. `dim1` is the rule, `dim2` is the settings file, and `calls` counts the
 --   sessions that loaded it. `verdict` reads the classifier-telemetry mod's records. `dim1` is
---   the engine's verdict, where `ask` in auto mode is a classified call. `dim2` is the
---   `tool_errors` denial kind, or else the call's outcome. Its latencies are the call's wall
---   time.
+--   the engine's verdict. An `ask` goes to the mode's decider, which is the classifier only in
+--   auto mode, and the records carry no mode. `dim2` is the `tool_errors` denial kind, or else
+--   the call's outcome. Its latencies are the call's wall time, the decider and the tool
+--   together, so the classifier's own latency comes from `classifier-request`.
 --
 --   Every section but `verdict` exists only for sessions run with debug logging on, and
 --   `verdict` only where the mod was enabled. Both sources are this machine's, so every row

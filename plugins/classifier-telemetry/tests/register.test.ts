@@ -20,20 +20,24 @@ function worldOf(
     ms = 0,
     result = { result: "ok" },
     writeFails = false,
+    failCalls = 0,
   }: {
     decision?: "allow" | "ask" | "deny";
     ms?: number;
     result?: ToolCallResult;
     writeFails?: boolean;
+    failCalls?: number;
   } = {},
 ): World {
   const writes: Record<string, unknown> = {};
+  let failures = failCalls;
   const clock = mock.clock(on, { now: 1_000 });
   mock.env(on, { HOME: "/Users/u" });
   on("session.id", () => ({ value: "s1" }));
   on("tool.check", () => (decision === "allow" ? { decision, rule: "Bash(ls)" } : { decision }));
   on("tool.call", async () => {
     await clock.sleep(ms);
+    if (failures-- > 0) throw new Error("tool crashed");
     return result;
   });
   on("fs.write", ($, e) => {
@@ -119,6 +123,20 @@ describe("register", () => {
     const world = worldOf(on, { writeFails: true });
 
     expect(await run($, world, 0)).toEqual({ result: "ok" });
+  });
+
+  test("a tool call that throws leaves no verdict for a later call", async ($, on) => {
+    const world = worldOf(on, { failCalls: 1 });
+    await $.tool.check({ tool: CALL.tool, input: {}, tool_use_id: CALL.tool_use_id });
+    const failed = expect($.tool.call(CALL)).rejects.toThrow("no implementation for tool.call");
+    await world.clock.settle();
+    await failed;
+
+    const pending = $.tool.call(CALL);
+    await world.clock.settle();
+    await pending;
+
+    expect(Object.values(world.writes)).toEqual([expect.objectContaining({ decision: null })]);
   });
 
   test("a call the check never saw records no verdict", async ($, on) => {

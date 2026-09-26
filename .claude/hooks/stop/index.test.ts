@@ -1,11 +1,13 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { StopHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { parseTranscript, processStop, scopePaths } from ".";
+import { parseTranscript, processStop, scopePaths, statePath } from ".";
 
 let tempDir: string;
+let sessionCounter = 0;
+const stopSessions = new Set<string>();
 
 beforeAll(async () => {
   tempDir = await mkdtemp(join(tmpdir(), "stop-hook-test-"));
@@ -13,12 +15,24 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await rm(tempDir, { recursive: true, force: true });
+  await Promise.all(
+    [...stopSessions].map((session) => rm(statePath(session), { recursive: true, force: true })),
+  );
 });
+
+// Each test gets its own session id, since the recorded position is keyed by
+// session and would otherwise leak between tests sharing one.
+function uniqueSession(): string {
+  sessionCounter += 1;
+  const session = `stop-hook-test-${sessionCounter}`;
+  stopSessions.add(session);
+  return session;
+}
 
 function stopInput(overrides?: Partial<StopHookInput>): StopHookInput {
   return {
     hook_event_name: "Stop",
-    session_id: "test",
+    session_id: uniqueSession(),
     transcript_path: "/dev/null",
     cwd: tempDir,
     stop_hook_active: false,
@@ -47,8 +61,8 @@ function createTranscriptContent(files: { path: string; tool: string }[]): strin
 }
 
 describe("parseTranscript", () => {
-  it("returns empty array for non-existent transcript", async () => {
-    expect(await parseTranscript("/nonexistent/path.jsonl")).toEqual([]);
+  it("returns empty files for non-existent transcript", async () => {
+    expect(await parseTranscript("/nonexistent/path.jsonl")).toEqual({ files: [], lineCount: 0 });
   });
 
   it("extracts file paths from Edit and Write tool uses", async () => {
@@ -66,9 +80,22 @@ describe("parseTranscript", () => {
       ]),
     );
 
-    const files = await parseTranscript(transcriptPath);
+    const { files } = await parseTranscript(transcriptPath);
     expect(files).toContain(filePath);
     expect(files).toContain(mdPath);
+  });
+
+  it("extracts file paths from MultiEdit tool uses", async () => {
+    const filePath = join(tempDir, "multi-edit.ts");
+    await Bun.write(filePath, "export {}");
+
+    const transcriptPath = join(tempDir, "transcript-multi-edit.jsonl");
+    await Bun.write(
+      transcriptPath,
+      createTranscriptContent([{ path: filePath, tool: "MultiEdit" }]),
+    );
+
+    expect((await parseTranscript(transcriptPath)).files).toContain(filePath);
   });
 
   it("ignores non-Edit/Write tools", async () => {
@@ -78,7 +105,7 @@ describe("parseTranscript", () => {
     const transcriptPath = join(tempDir, "transcript-read.jsonl");
     await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Read" }]));
 
-    expect(await parseTranscript(transcriptPath)).toEqual([]);
+    expect((await parseTranscript(transcriptPath)).files).toEqual([]);
   });
 
   it("deduplicates file paths", async () => {
@@ -94,7 +121,7 @@ describe("parseTranscript", () => {
       ]),
     );
 
-    expect(await parseTranscript(transcriptPath)).toHaveLength(1);
+    expect((await parseTranscript(transcriptPath)).files).toHaveLength(1);
   });
 
   it("filters out deleted files", async () => {
@@ -104,7 +131,41 @@ describe("parseTranscript", () => {
       createTranscriptContent([{ path: "/nonexistent/deleted.ts", tool: "Write" }]),
     );
 
-    expect(await parseTranscript(transcriptPath)).toEqual([]);
+    expect((await parseTranscript(transcriptPath)).files).toEqual([]);
+  });
+
+  it("only scans lines at or after the given offset", async () => {
+    const firstPath = join(tempDir, "since-first.ts");
+    const secondPath = join(tempDir, "since-second.ts");
+    await Bun.write(firstPath, "export {}");
+    await Bun.write(secondPath, "export {}");
+
+    const transcriptPath = join(tempDir, "transcript-since.jsonl");
+    await Bun.write(
+      transcriptPath,
+      createTranscriptContent([
+        { path: firstPath, tool: "Edit" },
+        { path: secondPath, tool: "Edit" },
+      ]),
+    );
+
+    const full = await parseTranscript(transcriptPath);
+    expect(full.files).toEqual([firstPath, secondPath]);
+    expect(full.lineCount).toBe(2);
+
+    const since = await parseTranscript(transcriptPath, 1);
+    expect(since.files).toEqual([secondPath]);
+    expect(since.lineCount).toBe(2);
+  });
+
+  it("reports the transcript's actual length when the offset runs past it", async () => {
+    const filePath = join(tempDir, "past-end.ts");
+    await Bun.write(filePath, "export {}");
+
+    const transcriptPath = join(tempDir, "transcript-past-end.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+    expect(await parseTranscript(transcriptPath, 5)).toEqual({ files: [], lineCount: 1 });
   });
 });
 
@@ -146,10 +207,10 @@ describe("processStop", () => {
 
   // The hook spawns `bun` and `prek` by name, so a stub earlier on PATH records
   // the calls without running either for real.
-  async function recordedCalls(
-    cwd: string,
-    exitCodes: Record<string, number> = {},
-  ): Promise<string[]> {
+  async function withStubbedCommands<T>(
+    exitCodes: Record<string, number>,
+    run: (bin: string, readCalls: () => Promise<string[]>) => Promise<T>,
+  ): Promise<T> {
     const stubDir = await mkdtemp(join(tmpdir(), "stop-hook-stub-"));
     const bin = join(stubDir, "bin");
     const log = join(stubDir, "calls.log");
@@ -164,23 +225,20 @@ describe("processStop", () => {
       }),
     );
 
-    const filePath = join(cwd, "touched.ts");
-    await Bun.write(filePath, "export {}");
-    const transcriptPath = join(cwd, "transcript.jsonl");
-    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+    const readCalls = async (): Promise<string[]> => {
+      const file = Bun.file(log);
+      const text = (await file.exists()) ? await file.text() : "";
+      return text.split("\n").filter((line) => line !== "");
+    };
 
     const originalPath = process.env.PATH;
     process.env.PATH = `${bin}:${originalPath ?? ""}`;
     try {
-      expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toBeNull();
+      return await run(bin, readCalls);
     } finally {
       process.env.PATH = originalPath;
+      await rm(stubDir, { recursive: true, force: true });
     }
-
-    const file = Bun.file(log);
-    const text = (await file.exists()) ? await file.text() : "";
-    await rm(stubDir, { recursive: true, force: true });
-    return text.split("\n").filter((line) => line !== "");
   }
 
   test.each<{
@@ -210,7 +268,59 @@ describe("processStop", () => {
     if (manifest) {
       await Bun.write(join(cwd, "package.json"), "{}");
     }
-    expect(await recordedCalls(cwd, exitCodes)).toEqual(expected(cwd));
+
+    await withStubbedCommands(exitCodes ?? {}, async (_bin, readCalls) => {
+      const filePath = join(cwd, "touched.ts");
+      await Bun.write(filePath, "export {}");
+      const transcriptPath = join(cwd, "transcript.jsonl");
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+      expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toBeNull();
+      expect(await readCalls()).toEqual(expected(cwd));
+    });
+
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("skips install when node_modules is newer than the manifest", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+    await Bun.write(join(cwd, "package.json"), "{}");
+    await mkdir(join(cwd, "node_modules"));
+
+    await withStubbedCommands({}, async (_bin, readCalls) => {
+      const filePath = join(cwd, "touched.ts");
+      await Bun.write(filePath, "export {}");
+      const transcriptPath = join(cwd, "transcript.jsonl");
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+      expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toBeNull();
+      expect(await readCalls()).toEqual(["prek run --files touched.ts"]);
+    });
+
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("reinstalls when the manifest changes after node_modules exists", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+    await mkdir(join(cwd, "node_modules"));
+    // node_modules must predate the manifest write below for this to exercise
+    // the "manifest changed" branch rather than the "no node_modules" one.
+    await Bun.sleep(10);
+    await Bun.write(join(cwd, "package.json"), "{}");
+
+    await withStubbedCommands({}, async (_bin, readCalls) => {
+      const filePath = join(cwd, "touched.ts");
+      await Bun.write(filePath, "export {}");
+      const transcriptPath = join(cwd, "transcript.jsonl");
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+      expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toBeNull();
+      expect(await readCalls()).toEqual([
+        `bun install --cwd ${cwd}`,
+        "prek run --files touched.ts",
+      ]);
+    });
+
     await rm(cwd, { recursive: true, force: true });
   });
 
@@ -226,5 +336,82 @@ describe("processStop", () => {
     await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
 
     expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toBeNull();
+  });
+
+  it("skips prek on a Stop with no edits since the previous non-blocking Stop", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+    const filePath = join(cwd, "touched.ts");
+    await Bun.write(filePath, "export {}");
+    const transcriptPath = join(cwd, "transcript.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+    const session = stopInput({ transcript_path: transcriptPath, cwd });
+
+    await withStubbedCommands({}, async (_bin, readCalls) => {
+      expect(await processStop(session)).toBeNull();
+      expect(await readCalls()).toEqual(["prek run --files touched.ts"]);
+
+      // Same transcript, same session: nothing new to check.
+      expect(await processStop(session)).toBeNull();
+      expect(await readCalls()).toEqual(["prek run --files touched.ts"]);
+    });
+
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("scopes prek to only the files edited since the last processed Stop", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+    const firstPath = join(cwd, "first.ts");
+    const secondPath = join(cwd, "second.ts");
+    await Bun.write(firstPath, "export {}");
+    await Bun.write(secondPath, "export {}");
+    const transcriptPath = join(cwd, "transcript.jsonl");
+    const session = stopInput({ transcript_path: transcriptPath, cwd });
+
+    await withStubbedCommands({}, async (_bin, readCalls) => {
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: firstPath, tool: "Edit" }]));
+      expect(await processStop(session)).toBeNull();
+      expect(await readCalls()).toEqual(["prek run --files first.ts"]);
+
+      await Bun.write(
+        transcriptPath,
+        createTranscriptContent([
+          { path: firstPath, tool: "Edit" },
+          { path: secondPath, tool: "Edit" },
+        ]),
+      );
+      expect(await processStop(session)).toBeNull();
+      expect(await readCalls()).toEqual([
+        "prek run --files first.ts",
+        "prek run --files second.ts",
+      ]);
+    });
+
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("does not advance the recorded position past a Stop that blocked", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+    const filePath = join(cwd, "touched.ts");
+    await Bun.write(filePath, "export {}");
+    const transcriptPath = join(cwd, "transcript.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+    const session = stopInput({ transcript_path: transcriptPath, cwd });
+
+    await withStubbedCommands({ prek: 1 }, async (_bin, readCalls) => {
+      const first = await processStop(session);
+      expect(first?.decision).toBe("block");
+
+      // No new edits landed, but the first Stop never cleared the block, so the
+      // same file is still checked rather than skipped as a no-op.
+      const second = await processStop(session);
+      expect(second?.decision).toBe("block");
+
+      expect(await readCalls()).toEqual([
+        "prek run --files touched.ts",
+        "prek run --files touched.ts",
+      ]);
+    });
+
+    await rm(cwd, { recursive: true, force: true });
   });
 });

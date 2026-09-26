@@ -35,6 +35,8 @@ The per-file delete-then-insert (instead of the previous whole-table `CREATE OR 
 
 `views.sql` (which also rebuilds the `content_items` table) runs after the host loop whenever `raw` changed, and additionally whenever its SHA-256 differs from `index_meta.views_hash`, so editing a view definition takes effect on the next refresh even with no changed files. Cross-host joins key on `(host, session_id)`; the `content_items`/`messages` join keys on `(source_file, source_line)`, which is host-unique because imported files have distinct absolute paths.
 
+Two local-only sources sit beside the projects directory and are read by `telemetry.ts` after the host loop: debug logs (`debug/*.txt`, parsed in TypeScript into `debug_events`) and the classifier-telemetry mod's per-call records (`classifier-telemetry/<session>/*.json`, into `tool_verdicts`). Their catalog is `telemetry_files`, keyed per file for debug logs and per session directory for records, whose mtime moves when the mod adds a file. Neither table derives from `raw`, so they never touch `views_hash`.
+
 ### Refresh Entry Point
 
 `refresh.ts` prints the DB path to stdout (everything else goes to stderr). A `last-refresh` stamp file makes runs within `--max-age` (default 300s) print the path and exit before opening the database, so the fast path never takes a lock. `--refresh` bypasses the stamp. On a lock conflict it retries briefly, then defers to the concurrent refresher and exits 0 with the path. It also sweeps the pre-plugin-data stray indexes under `$TMPDIR/claude-session` and `/tmp/claude-session`, only when running against the derived production data dir.

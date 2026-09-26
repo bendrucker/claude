@@ -5,6 +5,7 @@ import { DuckDBInstance } from "@duckdb/node-api";
 import { $ } from "bun";
 import { z } from "zod";
 import { nodeAdapter, runQuery as runOnAdapter } from "./query";
+import { ensureTelemetry } from "./telemetry";
 
 const RESOURCES_DIR = join(import.meta.dirname, "..", "resources");
 const SCHEMA_DIR = join(RESOURCES_DIR, "schema");
@@ -532,6 +533,8 @@ export async function ensureIndex(
     removedFiles += removed.length;
   }
 
+  const telemetryChanged = await ensureTelemetry(db, getLocalRoot(options.projectsDir), LOCAL_HOST);
+
   // views_hash answers both "was views.sql edited" and "did raw change", because every
   // mutation clears it before writing. So it also covers a run that died partway: the
   // fingerprint it finds is null and the rebuild happens now.
@@ -557,7 +560,7 @@ export async function ensureIndex(
 
   // Without an explicit CHECKPOINT the blocks freed by DELETE+INSERT and the
   // content_items rebuild are never reused and the file grows on every import.
-  if (wrote || viewsChanged || derivedMissing) {
+  if (wrote || viewsChanged || derivedMissing || telemetryChanged > 0) {
     await db.run("CHECKPOINT");
   }
 

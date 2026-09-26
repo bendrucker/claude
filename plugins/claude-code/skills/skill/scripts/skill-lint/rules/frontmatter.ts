@@ -230,40 +230,6 @@ export const allowedToolsFormat: Rule = {
   },
 };
 
-export const effortRequiresFork: Rule = {
-  name: "effort-requires-fork",
-  severity: "warn",
-  check(content: SkillContent): RuleResult {
-    const effort = content.frontmatter.effort;
-
-    if (effort === undefined) {
-      return {
-        rule: "effort-requires-fork",
-        severity: "warn",
-        passed: true,
-        message: "effort not set",
-      };
-    }
-
-    if (content.frontmatter.context !== "fork") {
-      return {
-        rule: "effort-requires-fork",
-        severity: "warn",
-        passed: false,
-        message:
-          "`effort` on an inline skill rewrites the conversation's cached prefix on every invocation. Pin it only under `context: fork`.",
-      };
-    }
-
-    return {
-      rule: "effort-requires-fork",
-      severity: "warn",
-      passed: true,
-      message: "effort pinned under context: fork",
-    };
-  },
-};
-
 export const frontmatterRules: Rule[] = [
   nameFormat,
   nameLength,
@@ -272,5 +238,4 @@ export const frontmatterRules: Rule[] = [
   descriptionRequired,
   descriptionLength,
   allowedToolsFormat,
-  effortRequiresFork,
 ];

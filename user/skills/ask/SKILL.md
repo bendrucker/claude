@@ -2,6 +2,7 @@
 name: ask
 description: Shorthand to make Claude convert a wall of prose into structured questions via the AskUserQuestion tool. Invoke with /ask.
 disable-model-invocation: true
+effort: low
 ---
 
 # Ask

@@ -2,6 +2,7 @@
 name: pull-request:babysit
 description: Monitor a PR's CI, fix trivial failures, and self-cancel when green; --merge drives to merged, --reviews hands off to AI-review triage.
 argument-hint: "[pr-url] [--merge] [--reviews]"
+effort: low
 allowed-tools:
   - Monitor
   - TaskStop

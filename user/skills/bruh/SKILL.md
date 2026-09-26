@@ -3,6 +3,7 @@ name: bruh
 description: Say the last message again in plain language and shorter, like one person talking to another.
 argument-hint: "[<what lost me>]"
 disable-model-invocation: true
+effort: low
 ---
 
 # Bruh

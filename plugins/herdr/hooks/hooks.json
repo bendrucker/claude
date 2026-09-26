@@ -1,0 +1,4 @@
+{
+  "description": "Reports the session's lifecycle to the herdr pane hosting it (HERDR_ENV=1): idle at start and after each main-loop turn, working from turn.start, blocked while AskUserQuestion waits, released at session.end",
+  "modules": ["../mod/register.ts"]
+}

@@ -108,7 +108,7 @@ Close only what you opened. A pane you split for the user to read counts as thei
 
 Read another agent's approval dialog and hand it to the user. The user answers it. `agent prompt` refuses a `blocked` agent on its own, and `send-keys` does not check.
 
-Leave lifecycle reporting to the scraper. `pane report-agent` overrides the detection manifest for a Claude pane and leaves herdr's view wrong.
+Leave lifecycle reporting to herdr and this plugin's hooks module. A `pane report-agent` that herdr accepts never decays. A stray `blocked` sent by hand holds the pane until the next report, and `agent prompt` refuses the pane meanwhile.
 
 ## Sibling Agents
 
@@ -166,7 +166,7 @@ An agent that comes up into a permission or trust dialog returns `agent_not_read
 
 ### Agent Status
 
-For Claude, herdr's integration hook reports only session identity. The `idle`, `working`, `blocked`, and `done` states come from matching the pane's screen against a detection manifest, so an unusual or suppressed terminal title reads as `unknown`.
+For Claude, the integration hook herdr installs reports only session identity. herdr then refuses lifecycle reports from any other source for that pane, this plugin's hooks module included. The `idle`, `working`, `blocked`, and `done` states come from matching the pane's screen against a detection manifest, so an unusual or suppressed terminal title reads as `unknown`.
 
 `idle` and `done` are one resting state, split by whether the pane's tab has been seen. A seen tab rests at `idle`. Work that finished in a tab nobody looked at rests at `done`. The user focusing that tab marks it seen, and so does a `focus` command you issue. Plain reads never do, so an agent followed entirely through `agent read` stays `done`.
 

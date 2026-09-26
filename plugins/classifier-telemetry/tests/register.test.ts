@@ -11,8 +11,7 @@ interface World {
 }
 
 /**
- * Stands in for the engine beneath the mod: a verdict for `tool.check`, a tool that
- * takes `ms` to answer `result`, and a file system that keeps what the mod writes.
+ * Stands in for the engine beneath the mod.
  */
 function worldOf(
   on: On,

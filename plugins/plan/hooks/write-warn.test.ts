@@ -8,7 +8,7 @@ import type {
   PostToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { SIDECAR_GUIDANCE, SIZE_THRESHOLD } from "./gate";
-import { isPlanFile, processInput, resolvePlansDirectory } from "./write-warn";
+import { isPlanFile, processInput } from "./write-warn";
 
 let home: string;
 let cwd: string;
@@ -26,12 +26,17 @@ afterEach(async () => {
   await rm(cwd, { recursive: true, force: true });
 });
 
-function mockInput(toolName: string, filePath: string): PostToolUseHookInput {
+function mockInput(
+  toolName: string,
+  filePath: string,
+  permissionMode = "plan",
+): PostToolUseHookInput {
   return {
     hook_event_name: "PostToolUse",
     session_id: "test-session",
     transcript_path: "/tmp/transcript.json",
     cwd,
+    permission_mode: permissionMode,
     tool_name: toolName,
     tool_input: { file_path: filePath },
     tool_response: {},
@@ -42,49 +47,12 @@ function mockInput(toolName: string, filePath: string): PostToolUseHookInput {
 async function warn(
   toolName: string,
   filePath: string,
+  permissionMode = "plan",
 ): Promise<PostToolUseHookSpecificOutput | null> {
-  const result = await processInput(mockInput(toolName, filePath), home);
+  const result = await processInput(mockInput(toolName, filePath, permissionMode), home);
   const specific = result?.hookSpecificOutput;
   return specific?.hookEventName === "PostToolUse" ? specific : null;
 }
-
-describe("resolvePlansDirectory", () => {
-  it("defaults to ~/.claude/plans with no settings", async () => {
-    expect(await resolvePlansDirectory(cwd, home)).toBe(plansDir);
-  });
-
-  it("honors a project plansDirectory setting, relative to cwd", async () => {
-    mkdirSync(join(cwd, ".claude"), { recursive: true });
-    await Bun.write(
-      join(cwd, ".claude", "settings.json"),
-      JSON.stringify({ plansDirectory: "docs/plans" }),
-    );
-    expect(await resolvePlansDirectory(cwd, home)).toBe(join(cwd, "docs/plans"));
-  });
-
-  it("falls back to a user plansDirectory setting when the project has none", async () => {
-    mkdirSync(join(home, ".claude"), { recursive: true });
-    await Bun.write(
-      join(home, ".claude", "settings.json"),
-      JSON.stringify({ plansDirectory: "plans-custom" }),
-    );
-    expect(await resolvePlansDirectory(cwd, home)).toBe(join(cwd, "plans-custom"));
-  });
-
-  it("prefers the project setting over the user one", async () => {
-    mkdirSync(join(cwd, ".claude"), { recursive: true });
-    mkdirSync(join(home, ".claude"), { recursive: true });
-    await Bun.write(
-      join(cwd, ".claude", "settings.json"),
-      JSON.stringify({ plansDirectory: "project-plans" }),
-    );
-    await Bun.write(
-      join(home, ".claude", "settings.json"),
-      JSON.stringify({ plansDirectory: "user-plans" }),
-    );
-    expect(await resolvePlansDirectory(cwd, home)).toBe(join(cwd, "project-plans"));
-  });
-});
 
 describe("isPlanFile", () => {
   it("matches a markdown file directly under the plans directory", () => {
@@ -109,6 +77,12 @@ describe("processInput", () => {
     const filePath = join(plansDir, "big.md");
     await Bun.write(filePath, "x".repeat(SIZE_THRESHOLD + 1));
     expect(await warn("Bash", filePath)).toBeNull();
+  });
+
+  it("stays silent outside plan mode, even on an oversized plan file", async () => {
+    const filePath = join(plansDir, "big.md");
+    await Bun.write(filePath, "x".repeat(SIZE_THRESHOLD + 1));
+    expect(await warn("Write", filePath, "default")).toBeNull();
   });
 
   it("stays silent for a plan file at or under the threshold", async () => {

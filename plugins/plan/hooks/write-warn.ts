@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { SIDECAR_GUIDANCE, SIZE_THRESHOLD } from "./gate";
@@ -13,32 +13,15 @@ const HookInput = z.looseObject({
   session_id: z.string().catch(""),
   transcript_path: z.string().catch(""),
   cwd: z.string().catch(""),
+  permission_mode: z.string().optional().catch(undefined),
   tool_name: z.string().catch(""),
   tool_input: z.unknown().catch(undefined),
   tool_response: z.unknown().catch(undefined),
   tool_use_id: z.string().catch(""),
 }) satisfies z.ZodType<PostToolUseHookInput>;
 
-const Settings = z.looseObject({ plansDirectory: z.string().optional().catch(undefined) });
-
-async function readPlansDirectorySetting(path: string): Promise<string | undefined> {
-  try {
-    return Settings.parse(JSON.parse(await Bun.file(path).text())).plansDirectory;
-  } catch {
-    // No settings file, unreadable, or malformed: fall through to the next source.
-    return undefined;
-  }
-}
-
-// Mirrors the native `plansDirectory` setting: a project path takes precedence
-// over a user one, and an unset value falls back to `~/.claude/plans`.
-export async function resolvePlansDirectory(cwd: string, home = homedir()): Promise<string> {
-  const configured =
-    (await readPlansDirectorySetting(join(cwd, ".claude", "settings.json"))) ??
-    (await readPlansDirectorySetting(join(home, ".claude", "settings.json")));
-  return configured !== undefined ? resolve(cwd, configured) : join(home, ".claude", "plans");
-}
-
+// The hooks.json "if" scoping only spawns this for a path under the default
+// plans directory, so that is the only one this hook can warn about.
 export function isPlanFile(filePath: string, plansDirectory: string): boolean {
   return filePath.endsWith(".md") && dirname(filePath) === plansDirectory;
 }
@@ -58,11 +41,12 @@ export async function processInput(
   input: PostToolUseHookInput,
   home = homedir(),
 ): Promise<SyncHookJSONOutput | null> {
+  if (input.permission_mode !== "plan") return null;
   if (input.tool_name !== "Write" && input.tool_name !== "Edit") return null;
 
   const filePath = ToolInput.safeParse(input.tool_input).data?.file_path;
   if (filePath === undefined) return null;
-  if (!isPlanFile(filePath, await resolvePlansDirectory(input.cwd, home))) return null;
+  if (!isPlanFile(filePath, join(home, ".claude", "plans"))) return null;
 
   let content: string;
   try {

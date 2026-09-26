@@ -94,14 +94,6 @@
       "source": "./plugins/type-ignore"
     },
     {
-      "name": "agents-md",
-      "description": "Loads AGENTS.md files automatically into Claude Code sessions",
-      "source": {
-        "source": "github",
-        "repo": "bendrucker/claude-code-agents-md"
-      }
-    },
-    {
       "name": "x-callback-url",
       "description": "Call x-callback-url schemes from the CLI and receive responses",
       "source": "./plugins/x-callback-url"

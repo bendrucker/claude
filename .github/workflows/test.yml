@@ -30,8 +30,9 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
+      # Mods type-check against the gitignored .claude/types/, which CI lacks.
       - name: Type check
-        run: bun run build
+        run: bun run build --ignore-pattern 'plugins/*/mod/**'
 
   hooks:
     runs-on: ubuntu-latest

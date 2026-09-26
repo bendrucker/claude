@@ -36,7 +36,7 @@ Every tool keys on that directory. The root tsconfig and `bun test` skip it, and
 { "extends": "../../../tsconfig.mod.json", "include": ["../../../.claude/types", "."] }
 ```
 
-The declarations define the engine's own web globals, which would override Bun's `TextEncoder` and related types in the root program, so mod files stay out of it. In CI, where `.claude/types/` is absent, `claude-code` types resolve to `any`. CI checks a mod through `claude plugin validate` and its tests instead.
+The declarations define the engine's own web globals, which would override Bun's `TextEncoder` and related types in the root program, so mod files stay out of it. Without them, `claude-code` types resolve to `any` for lint, and `bun run build` fails its type check on the missing module. CI lacks them, so its type check skips `plugins/*/mod/**`, and it checks a mod through lint, `claude plugin validate`, and its tests.
 
 ## Engine Constraints
 

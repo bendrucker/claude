@@ -74,6 +74,7 @@ Additional queries in `resources/queries/`, aimed at the self-improvement loop r
 <!-- generated:tier-2 -->
 - `already-allowed-still-prompting`: Bash permission prompts whose command matches a `permissions.allow` pattern you pass as `allow_glob`.
 - `catalog-reinjection-thrash-sessions`: Sessions re-injecting the full skill catalog and deferred-tools delta, cumulatively re-billing the same context.
+- `classifier`: Auto-mode classifier volume and latency, the permission stall on every dispatched call, the allow rules auto mode dropped, and which calls the engine routed to the classifier.
 - `hook-origin-split`: Hook wall-clock split between portable shared config and arbitrary per-repo project hooks.
 - `hook-self-timing`: Hook latency from the hooks' own clocks, read off `~/.claude/hook-metrics/*.jsonl` rather than the index.
 - `sandbox-path-deny-recurrence`: `Operation not permitted` and adjacent Bash failures bucketed into concrete sandbox config gaps, with recurrence and date span.

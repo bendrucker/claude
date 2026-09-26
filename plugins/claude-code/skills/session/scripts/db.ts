@@ -5,6 +5,8 @@ import { DuckDBInstance } from "@duckdb/node-api";
 import { $ } from "bun";
 import { z } from "zod";
 import { nodeAdapter, runQuery as runOnAdapter } from "./query";
+import { CatalogRow, diffCatalog } from "./file-catalog";
+import { ensureTelemetry } from "./telemetry";
 
 const RESOURCES_DIR = join(import.meta.dirname, "..", "resources");
 const SCHEMA_DIR = join(RESOURCES_DIR, "schema");
@@ -487,17 +489,10 @@ export async function ensureIndex(
     // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
     const indexed = await db.query(
       "SELECT path, mtime, size FROM indexed_files WHERE host = $host",
-      z.object({ path: z.string(), mtime: z.bigint(), size: z.bigint() }),
+      CatalogRow,
       { host: entry.host },
     );
-    const indexedByPath = new Map(indexed.map((r) => [r.path, r]));
-    const scannedPaths = new Set(scanned.map((f) => f.path));
-
-    const changed = scanned.filter((f) => {
-      const prev = indexedByPath.get(f.path);
-      return !prev || Number(prev.mtime) !== f.mtime || Number(prev.size) !== f.size;
-    });
-    const removed = indexed.filter((r) => !scannedPaths.has(r.path));
+    const { changed, removed } = diffCatalog(scanned, indexed);
 
     if (!derivedInvalidated && (changed.length > 0 || removed.length > 0)) {
       // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
@@ -532,6 +527,8 @@ export async function ensureIndex(
     removedFiles += removed.length;
   }
 
+  const telemetryChanged = await ensureTelemetry(db, getLocalRoot(options.projectsDir), LOCAL_HOST);
+
   // views_hash answers both "was views.sql edited" and "did raw change", because every
   // mutation clears it before writing. So it also covers a run that died partway: the
   // fingerprint it finds is null and the rebuild happens now.
@@ -557,7 +554,7 @@ export async function ensureIndex(
 
   // Without an explicit CHECKPOINT the blocks freed by DELETE+INSERT and the
   // content_items rebuild are never reused and the file grows on every import.
-  if (wrote || viewsChanged || derivedMissing) {
+  if (wrote || viewsChanged || derivedMissing || telemetryChanged > 0) {
     await db.run("CHECKPOINT");
   }
 

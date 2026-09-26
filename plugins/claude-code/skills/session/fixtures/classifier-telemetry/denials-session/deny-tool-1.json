@@ -1,0 +1,1 @@
+{"session_id":"denials-session","tool_use_id":"deny-tool-1","agent_id":null,"tool":"Bash","decision":"ask","rule":null,"reason":null,"started_at":1705741201000,"check_ms":2,"duration_ms":1600,"outcome":"ok"}

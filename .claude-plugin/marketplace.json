@@ -64,6 +64,11 @@
       "source": "./plugins/github"
     },
     {
+      "name": "classifier-telemetry",
+      "description": "Records each tool call's permission verdict and wall time so auto-mode classifier cost is measurable from the session index",
+      "source": "./plugins/classifier-telemetry"
+    },
+    {
       "name": "claude-code",
       "description": "Meta-tools for Claude Code configuration and customization",
       "source": "./plugins/claude-code"

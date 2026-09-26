@@ -165,3 +165,11 @@ The `/dev/fd` entry is inert, and no path-based rule can replace it. `diff <(ech
 `useAutoModeDuringPlan` needs no entry. It defaults on as of v2.1.218 and routes plan-mode shell commands through the classifier instead of prompting them. The gate is that auto mode is *available* to the account, so it is not a reason to set `defaultMode`. The settings schema muddies this by saying the key "has no effect unless `permissions.defaultMode` allows auto", which reads as a requirement that the active mode be `auto`.
 
 Every classifier denial lands in the transcript as a tool result error, so the session index measures the `autoMode` rules directly: `tool_errors.denial_kind` is `automode-blocked` or `automode-unavailable`, and `error_content` carries the `[Category]` reason.
+
+#### Git Discard Denials
+
+Git working-tree discards were the largest denial cluster common to every machine from August to September 2026: `git reset --hard <upstream>`, tree-wide `git checkout -- .` and `git restore`, `git clean`, `git stash drop`, and `git checkout --ours`. The built-in Irreversible Local Destruction rule presumes a dirty tree and clears only for a worktree the session visibly created, which a worktree created before the session starts never is.
+
+Two `allow` entries narrow it where nothing can be lost. Conflict Side Selection covers `--ours`/`--theirs` during an in-progress operation. Own Stash Drop covers the tagged push, apply, and drop sequence the harness itself prescribes for shared stashes. The global CLAUDE.md line on `git merge --ff-only` and per-path `git restore` handles the resets, which have no safe classifier-side exception.
+
+Retire each entry when the session index shows it inert. Count `automode-blocked` rows whose command starts with the matching verb, before and after the merge. If `reset --hard` denials hold steady three weeks out, the CLAUDE.md line is not steering and comes out.

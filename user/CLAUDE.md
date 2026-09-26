@@ -75,6 +75,8 @@ claude-cli://open?q=<url-encoded prompt>&cwd=<absolute main repo path>
 
 Any change intended to become its own PR starts in a worktree, created with `worktrunk:wt-switch-create`. Stay put only when the session is already on a topic branch inside one. Work handed to a sibling agent for its own pull request starts in a worktree too, created through the `herdr:herdr` skill's dispatch so this session stays put.
 
+Inside an isolated worktree, write files with `Write` or `Edit` and keep each Bash command a single plain command, since the isolation guard verifies a command's shape before running it and refuses one it can't, such as a heredoc, `$(...)`, a loop, or a `cd` into the main checkout before git.
+
 I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 
 - For creating or entering a worktree, use the `worktrunk:wt-switch-create` skill. It re-roots the session into a new worktree (optionally in another repo), runs an optional task, and acts as a targeted command for the common case. Prefer it over the generic skill whenever the task is worktree creation, including anywhere you would otherwise delegate worktree creation to Worktrunk. This preference holds even when a background-job or harness context suggests the generic `EnterWorktree` tool for isolation.

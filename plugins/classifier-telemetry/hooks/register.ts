@@ -1,6 +1,6 @@
 import type { On, ToolCallResult } from "claude-code";
 
-export const DIR = ".claude/classifier-telemetry";
+const DIR = ".claude/classifier-telemetry";
 
 interface Verdict {
   decision: string;
@@ -9,7 +9,7 @@ interface Verdict {
   checkedAt: number;
 }
 
-export interface CallRecord {
+interface CallRecord {
   session_id: string;
   tool_use_id: string;
   agent_id: string | null;
@@ -31,8 +31,8 @@ function outcomeOf(result: ToolCallResult): CallRecord["outcome"] {
 
 /**
  * Writes one record per tool call under `~/.claude/classifier-telemetry/<session>/`.
- * An `ask` verdict in auto mode is a call the classifier decided, and `duration_ms`
- * spans the classifier plus the tool itself.
+ * An `ask` verdict goes to the mode's decider, which is the classifier only in auto mode,
+ * and the mod API does not expose the mode. `duration_ms` spans the decider plus the tool.
  */
 export function register(on: On): void {
   const verdicts = new Map<string, Verdict>();
@@ -52,15 +52,19 @@ export function register(on: On): void {
 
   on("tool.call", async ($, e, next) => {
     const startedAt = await $.clock.now();
-    const result = await next(e);
+    let result: ToolCallResult;
+    let verdict: Verdict | undefined;
+    try {
+      result = await next(e);
+    } finally {
+      verdict = verdicts.get(e.tool_use_id);
+      verdicts.delete(e.tool_use_id);
+    }
     const [finishedAt, sessionId, home] = await Promise.all([
       $.clock.now(),
       $.session.id(),
       $.env.get("HOME"),
     ]);
-
-    const verdict = verdicts.get(e.tool_use_id);
-    verdicts.delete(e.tool_use_id);
     if (home === undefined) return result;
 
     const record: CallRecord = {

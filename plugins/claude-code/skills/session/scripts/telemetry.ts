@@ -1,7 +1,7 @@
 import { readdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { z } from "zod";
 import type { Database, ScannedFile } from "./db";
+import { CatalogRow, diffCatalog } from "./file-catalog";
 
 interface Entry {
   name: string;
@@ -59,7 +59,7 @@ export function parseDebugLog(text: string): DebugEvent[] {
   return events;
 }
 
-interface Source {
+export interface Source {
   name: string;
   root: string;
   scan(entries: Entry[], root: string): ScannedFile[] | Promise<ScannedFile[]>;
@@ -89,7 +89,7 @@ function scanRecordDirs(entries: Entry[], root: string): ScannedFile[] {
       const path = join(root, entry.name);
       let mtime = 0;
       let size = 0;
-      for (const name of readdirSync(path)) {
+      for (const { name } of listRoot(path) ?? []) {
         if (!name.endsWith(".json")) continue;
         const file = Bun.file(join(path, name));
         mtime = Math.max(mtime, file.lastModified);
@@ -155,8 +155,6 @@ const callRecords = (root: string, host: string): Source => ({
   },
 });
 
-const Indexed = z.object({ path: z.string(), mtime: z.bigint(), size: z.bigint() });
-
 async function reimport(db: Database, source: Source, file: ScannedFile): Promise<void> {
   await db.run("BEGIN");
   await source.import(db, file);
@@ -193,26 +191,33 @@ function listRoot(root: string): Entry[] | undefined {
   }
 }
 
-async function syncSource(db: Database, source: Source): Promise<number> {
+async function stillScans(source: Source, path: string): Promise<boolean> {
+  const scanned = await source.scan(listRoot(source.root) ?? [], source.root);
+  return scanned.some((file) => file.path === path);
+}
+
+export async function syncSource(db: Database, source: Source): Promise<number> {
   const entries = listRoot(source.root);
   if (entries === undefined) return 0;
   const scanned = await source.scan(entries, source.root);
   const indexed = await db.query(
     "SELECT path, mtime, size FROM telemetry_files WHERE source = $source",
-    Indexed,
+    CatalogRow,
     { source: source.name },
   );
-  const indexedByPath = new Map(indexed.map((r) => [r.path, r]));
-  const scannedPaths = new Set(scanned.map((f) => f.path));
-  const changed = scanned.filter((f) => {
-    const prev = indexedByPath.get(f.path);
-    return !prev || Number(prev.mtime) !== f.mtime || Number(prev.size) !== f.size;
-  });
-  const removed = indexed.filter((r) => !scannedPaths.has(r.path));
+  const { changed, removed } = diffCatalog(scanned, indexed);
 
   for (const file of changed) {
-    // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh, and each file commits as its own transaction.
-    await reimport(db, source, file);
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh, and each file commits as its own transaction.
+      await reimport(db, source, file);
+    } catch (error) {
+      // oxlint-disable-next-line no-await-in-loop -- the rollback must land before the next file's BEGIN.
+      await db.run("ROLLBACK");
+      // A file deleted since the scan is reaped on the next pass.
+      // oxlint-disable-next-line no-await-in-loop -- a rare path, rescanned only on failure.
+      if (await stillScans(source, file.path)) throw error;
+    }
   }
   for (const file of removed) {
     // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh, and each file commits as its own transaction.

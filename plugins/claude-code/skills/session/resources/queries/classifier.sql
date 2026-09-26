@@ -5,15 +5,18 @@
 --   Auto-mode classifier volume and latency, the permission stall on every dispatched call,
 --   the allow rules auto mode dropped, and which calls the engine routed to the classifier.
 -- description: >-
---   One row per (`section`, `week`, `dim1`, `dim2`). `classifier-request` reads the debug
---   log's `classifier_request_finished` lines, `dim1` the stage and `dim2` the outcome.
---   `permission-decision` reads `tool_dispatch_start`'s `permissionDecisionMs`, the wait
---   between a call and its dispatch on allowed calls as well as classified ones, `dim1` the
---   tool. `dropped-allow-rule` lists each allow rule auto mode ignored as one that bypasses
---   the classifier, `dim2` the settings file, `calls` the sessions that loaded it.
---   `verdict` reads the classifier-telemetry mod's records, `dim1` the engine's verdict
---   (`ask` in auto mode is a classified call) and `dim2` the `tool_errors` denial kind or
---   else the call's outcome, the latencies being the call's wall time.
+--   One row per (`section`, `week`, `dim1`, `dim2`).
+--
+--   `classifier-request` reads the debug log's `classifier_request_finished` lines. `dim1` is
+--   the stage, `dim2` is the outcome, and the latencies come from `durationMs`.
+--   `permission-decision` reads `permissionDecisionMs` from `tool_dispatch_start`, the wait
+--   between a call and its dispatch on allowed and classified calls alike. `dim1` is the tool.
+--   `dropped-allow-rule` lists each allow rule auto mode ignored because it bypasses the
+--   classifier. `dim1` is the rule, `dim2` is the settings file, and `calls` counts the
+--   sessions that loaded it. `verdict` reads the classifier-telemetry mod's records. `dim1` is
+--   the engine's verdict, where `ask` in auto mode is a classified call. `dim2` is the
+--   `tool_errors` denial kind, or else the call's outcome. Its latencies are the call's wall
+--   time.
 --
 --   Every section but `verdict` exists only for sessions run with debug logging on, and
 --   `verdict` only where the mod was enabled. Both sources are this machine's, so every row
@@ -75,7 +78,7 @@ GROUP BY ALL
 UNION ALL
 SELECT
   'dropped-allow-rule',
-  date_trunc('week', MIN(ts))::DATE,
+  date_trunc('week', ts)::DATE,
   fields->>'rule',
   fields->>'source',
   COUNT(DISTINCT session_id),
@@ -85,5 +88,5 @@ SELECT
   NULL
 FROM debug
 WHERE event = 'dangerous_rule_ignored'
-GROUP BY fields->>'rule', fields->>'source'
+GROUP BY ALL
 ORDER BY section, week, calls DESC, dim1, dim2;

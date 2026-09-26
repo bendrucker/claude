@@ -35,7 +35,7 @@ The per-file delete-then-insert (instead of the previous whole-table `CREATE OR 
 
 `views.sql` (which also rebuilds the `content_items` table) runs after the host loop whenever `raw` changed, and additionally whenever its SHA-256 differs from `index_meta.views_hash`, so editing a view definition takes effect on the next refresh even with no changed files. Cross-host joins key on `(host, session_id)`; the `content_items`/`messages` join keys on `(source_file, source_line)`, which is host-unique because imported files have distinct absolute paths.
 
-Two local-only sources sit beside the projects directory and are read by `telemetry.ts` after the host loop: debug logs (`debug/*.txt`, parsed in TypeScript into `debug_events`) and the classifier-telemetry mod's per-call records (`classifier-telemetry/<session>/*.json`, into `tool_verdicts`). Their catalog is `telemetry_files`, keyed per file for debug logs and per session directory for records, whose mtime moves when the mod adds a file. Neither table derives from `raw`, so they never touch `views_hash`.
+Two local-only sources sit beside the projects directory and are read by `telemetry.ts` after the host loop: debug logs (`debug/*.txt`, parsed in TypeScript into `debug_events`) and the classifier-telemetry mod's per-call records (`classifier-telemetry/<session>/*.json`, into `tool_verdicts`). Their catalog is `telemetry_files`, keyed per file for debug logs and per session directory for records. A session directory's key is its newest record's mtime and its records' total bytes, so an added or rewritten record changes it. Neither table derives from `raw`, so they never touch `views_hash`.
 
 ### Refresh Entry Point
 

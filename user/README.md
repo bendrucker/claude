@@ -12,7 +12,6 @@ The [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in d
   - `worktree/` - Validates bash commands in worktrunk worktrees
   - `webfetch-block/` - Steers WebFetch calls toward better tools
   - `session-limit/` - Warns when a session approaches its limit
-  - `permission-denied/` - Logs auto mode classifier denials so the `autoMode` rules stay measurable
   - `agent-model/` - Warns when an `Agent` spawn would silently inherit an expensive model
   - `herdr-agent-state.sh` - Reports session identity to herdr
 

@@ -70,6 +70,7 @@ claude-cli://open?q=<url-encoded prompt>&cwd=<absolute main repo path>
 - Always work on a topic branch with a short hyphenated name.
 - For commit messages, use multiple `-m` flags for a simple subject and body. Each `-m` is a separate paragraph. For complex messages, pass the message through a heredoc.
 - Wrap commit message bodies at the conventional ~72 columns.
+- Bring a checkout up to a newer ref with `git merge --ff-only <ref>`, which stops before overwriting uncommitted work. Revert your own edits with `git restore <path>` on just the paths you changed. A tree-wide reset, checkout, or clean needs me to name it.
 
 ## Worktrees
 

@@ -6,27 +6,37 @@ paths:
 
 # Mods
 
-A mod is a plugin's function-hooks module: TypeScript the engine loads from `hooks/hooks.json` `modules` and runs against engine events through `$`. Function hooks are early access and load only under `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
+A mod is a plugin's function-hooks module: TypeScript that the engine loads from the `modules` list in `hooks/hooks.json` and runs against engine events through `$`. Function hooks are early access and load only under `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
 
 ## Layout
 
-A mod's code and tests live in `plugins/<name>/mod/`, and `hooks/hooks.json` names the entry point relative to itself:
+A mod's code and tests live in `plugins/<name>/mod/`, and `hooks/hooks.json` names the entry point relative to its own directory:
 
 ```json
 { "description": "...", "modules": ["../mod/register.ts"] }
 ```
 
-Every tool keys on that directory. The root tsconfig and `bun test` skip it, lint relaxes the rules that fire on `any` there, and CI runs its tests under `claude plugin test`. A mod imports only files inside its plugin, since the engine environment has no Node, filesystem, or npm resolution.
+The entry point exports `register`, which subscribes handlers through `on`, optionally with a filter such as `{ tool: "AskUserQuestion" }` before the handler:
+
+```ts
+import type { On } from "claude-code";
+
+export function register(on: On): void {
+  on("session.start", ($, e, next) => next(e));
+}
+```
+
+Every tool keys on that directory. The root tsconfig and `bun test` skip it, and lint relaxes the rules that fire on `any` there. CI and the `plugin-test` pre-commit hook run its tests. A mod imports only its own plugin's files and `claude-code`. The engine has no Node, filesystem, or npm resolution.
 
 ## Types
 
-`import type { On } from "claude-code"` resolves against the declarations `/plugin-types` writes to `.claude/types/`, which is gitignored. Run it from an interactive session, since a `-p` run omits interactive-only tools such as `AskUserQuestion`, and again after a Claude Code update. Each mod carries a `mod/tsconfig.json`:
+`import type { On } from "claude-code"` resolves against the declarations `/plugin-types` writes to `.claude/types/`, which is gitignored. Run `/plugin-types` from an interactive session and again after a Claude Code update. A `-p` run omits interactive-only tools such as `AskUserQuestion`. Each mod carries a `mod/tsconfig.json`:
 
 ```json
 { "extends": "../../../tsconfig.mod.json", "include": ["../../../.claude/types", "."] }
 ```
 
-The declarations define the engine's own web globals, so mod files stay out of the root program, where they would change Bun's `TextEncoder` and its kin. Where they are absent, as in CI, `claude-code` types resolve to `any`. CI checks a mod through `claude plugin validate` and its tests instead.
+The declarations define the engine's own web globals, which would override Bun's `TextEncoder` and related types in the root program, so mod files stay out of it. In CI, where `.claude/types/` is absent, `claude-code` types resolve to `any`. CI checks a mod through `claude plugin validate` and its tests instead.
 
 ## Engine Constraints
 

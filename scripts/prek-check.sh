@@ -19,8 +19,11 @@ case "${1:-}" in
   plugin-test)
     shift
     for dir in $(extract_dirs 2 "$@"); do
-      if find "$dir" -name '*.test.ts' -print -quit | grep -q .; then
+      if find "$dir" -name '*.test.ts' -not -path "$dir/mod/*" -print -quit | grep -q .; then
         bun test "$dir/"
+      fi
+      if find "$dir/mod" -name '*.test.ts' -print -quit 2>/dev/null | grep -q .; then
+        bun scripts/mod-test.ts "$(basename "$dir")"
       fi
     done
     ;;

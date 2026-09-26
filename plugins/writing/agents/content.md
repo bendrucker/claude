@@ -2,7 +2,7 @@
 name: content
 description: |
   Reviews document substance: technical accuracy, factual claims, logical flow, section structure, code examples, and internal consistency.
-disallowedTools: Edit, Write, NotebookEdit, Agent, Skill
+tools: Read, Grep, Glob
 model: sonnet
 ---
 

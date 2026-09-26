@@ -2,7 +2,7 @@
 name: artifacts
 description: |
   Reviews document artifacts: URL validity, citations, Mermaid diagram syntax, and markdown table formatting. Only dispatched when the document contains links, diagrams, or tables.
-disallowedTools: Edit, Write, NotebookEdit, Agent, Skill
+tools: Read, Grep, Glob, WebFetch
 model: sonnet
 ---
 

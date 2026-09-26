@@ -5,6 +5,7 @@ description: |
 argument-hint: "<doc-path> [--lens content|style|artifacts]"
 context: fork
 agent: general-purpose
+model: sonnet
 allowed-tools:
   - Read
   - Grep

@@ -14,5 +14,11 @@
     "skipLibCheck": true
   },
   "include": ["./**/*.ts", ".claude/**/*.ts"],
-  "exclude": ["**/fixtures/**", "**/evals/**/examples/**", ".claude/workflows/**"]
+  "exclude": [
+    "**/fixtures/**",
+    "**/evals/**/examples/**",
+    ".claude/workflows/**",
+    ".claude/types/**",
+    "plugins/*/mod/**"
+  ]
 }

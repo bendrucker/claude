@@ -1,6 +1,7 @@
 [test]
 # Eval examples hold snippets a grader reads, not tests to run.
-pathIgnorePatterns = ["**/evals/**/examples/**"]
+# Mod tests import claude-code/testing and run under `claude plugin test`.
+pathIgnorePatterns = ["**/evals/**/examples/**", "plugins/*/mod/**"]
 # Coverage stays opt-in via the --coverage flag so plain `bun test` runs fast.
 # These only pin the shape of the report when coverage is requested.
 coverageReporter = ["text", "lcov"]

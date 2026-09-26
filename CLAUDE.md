@@ -34,6 +34,7 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 - [`testing.md`](.claude/rules/testing.md) (test and workflow files): testing conventions, CI structure
 - [`lockfile.md`](.claude/rules/lockfile.md) (`bun.lock`, `**/package.json`): lockfile conflict resolution
 - [`schemas.md`](.claude/rules/schemas.md) (`schemas/**`): schema overlays, generated vs hand-authored artifacts
+- [`mods.md`](.claude/rules/mods.md) (`plugins/*/mod/**`, `plugins/*/hooks/hooks.json`): function-hooks module layout, types, engine constraints, tests
 
 `user/rules/` (note: under `user/`, not `.claude/`) holds rules that apply across all repos and get symlinked to `~/.claude/rules/`. Use those for language/file-type guidance Claude should always have. Use skills for workflow-specific knowledge that requires explicit activation.
 

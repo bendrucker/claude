@@ -49,3 +49,8 @@ node_modules/
 voice-baseline/
 contrast-baseline/
 similarity.json
+
+# /plugin-types writes the function-hooks API declarations for the Claude Code
+# version that ran it. Regenerate them locally rather than track a copy bound
+# to one release.
+/.claude/types/

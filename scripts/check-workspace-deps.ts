@@ -104,8 +104,12 @@ async function checkDeps(): Promise<string[]> {
     ),
   );
 
+  // A mod imports only its own files and the engine-supplied `claude-code`.
   const files = sources.filter(
-    (file) => !file.endsWith(".d.ts") && !/(^|\/)(fixtures\/|evals\/.*\/examples\/)/.test(file),
+    (file) =>
+      !file.endsWith(".d.ts") &&
+      !/(^|\/)(fixtures\/|evals\/.*\/examples\/)/.test(file) &&
+      !/^plugins\/[^/]+\/mod\//.test(file),
   );
   const scanned = await Promise.all(
     files.map(async (file) => {

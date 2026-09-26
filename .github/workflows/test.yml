@@ -188,7 +188,8 @@ jobs:
           echo "has_plugin_json=$([[ -f "plugins/$plugin/.claude-plugin/plugin.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_skills=$([[ -d "plugins/$plugin/skills" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_package=$([[ -f "plugins/$plugin/package.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "has_tests=$(find "plugins/$plugin" -name '*.test.ts' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_tests=$(find "plugins/$plugin" -name '*.test.ts' -not -path "plugins/$plugin/mod/*" | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_mod_tests=$(find "plugins/$plugin/mod" -name '*.test.ts' 2>/dev/null | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_integration_tests=$(find "plugins/$plugin" -name '*.integration.ts' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_swift=$(find "plugins/$plugin" -name '*.swift' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_playwright=$(find "plugins/$plugin" -name package.json -not -path '*/node_modules/*' -print0 | xargs -0 grep -lF '"playwright"' 2>/dev/null | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -204,6 +205,8 @@ jobs:
         wait: cli
 
       - name: Validate plugin
+        env:
+          CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1"
         run: claude plugin validate "plugins/${{ matrix.plugin.name }}"
 
       - name: Check for hardcoded version
@@ -255,6 +258,10 @@ jobs:
       - name: Run tests
         if: steps.inspect.outputs.has_tests == 'true'
         run: bun test "plugins/${{ matrix.plugin.name }}/"
+
+      - name: Run mod tests
+        if: steps.inspect.outputs.has_mod_tests == 'true'
+        run: bun scripts/mod-test.ts "${{ matrix.plugin.name }}"
 
       - name: Run integration tests
         if: steps.inspect.outputs.has_integration_tests == 'true'

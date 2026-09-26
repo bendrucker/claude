@@ -17,7 +17,16 @@ export const MatcherEntry = z.looseObject({
 });
 export type MatcherEntry = z.infer<typeof MatcherEntry>;
 
-export const HooksFile = z.looseObject({ hooks: z.record(z.string(), z.array(MatcherEntry)) });
+/** A function-hooks plugin names `modules` and may declare no command hooks. */
+export const HooksFile = z
+  .looseObject({
+    hooks: z.record(z.string(), z.array(MatcherEntry)).optional(),
+    modules: z.array(z.string()).optional(),
+  })
+  .refine((file) => file.hooks !== undefined || file.modules !== undefined, {
+    message: "names neither hooks nor modules",
+  })
+  .transform((file) => ({ ...file, hooks: file.hooks ?? {} }));
 export type HooksFile = z.infer<typeof HooksFile>;
 
 export const PluginManifest = z.looseObject({ name: z.string() });

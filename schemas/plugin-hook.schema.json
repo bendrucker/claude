@@ -11,8 +11,13 @@
     },
     "hooks": {
       "$ref": "hook.schema.json"
+    },
+    "modules": {
+      "type": "array",
+      "description": "Function-hooks modules, relative to the hooks directory, each exporting register(on, options)",
+      "items": { "type": "string" }
     }
   },
-  "required": ["hooks"],
+  "anyOf": [{ "required": ["hooks"] }, { "required": ["modules"] }],
   "additionalProperties": false
 }

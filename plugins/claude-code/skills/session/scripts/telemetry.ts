@@ -80,20 +80,24 @@ function scanDebugLogs(entries: Entry[], root: string): ScannedFile[] {
     });
 }
 
-// A session's records are one file each, so the directory is the unit of change: adding a
-// file moves its mtime, and the entry count stands in for size.
-async function scanRecordDirs(entries: Entry[], root: string): Promise<ScannedFile[]> {
-  const dirs = await Promise.all(
-    entries
-      .filter((entry) => entry.isDirectory())
-      .map(async (entry) => {
-        const path = join(root, entry.name);
-        const size = readdirSync(path).filter((name) => name.endsWith(".json")).length;
-        const { mtimeMs } = await Bun.file(path).stat();
-        return { path, mtime: Math.trunc(mtimeMs), size };
-      }),
-  );
-  return dirs.filter((dir) => dir.size > 0);
+// A session's records are one file each, so the directory is the unit of change. Its newest
+// record and total bytes also catch a record rewritten after a partial read.
+function scanRecordDirs(entries: Entry[], root: string): ScannedFile[] {
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      const path = join(root, entry.name);
+      let mtime = 0;
+      let size = 0;
+      for (const name of readdirSync(path)) {
+        if (!name.endsWith(".json")) continue;
+        const file = Bun.file(join(path, name));
+        mtime = Math.max(mtime, file.lastModified);
+        size += file.size;
+      }
+      return { path, mtime: Math.trunc(mtime), size };
+    })
+    .filter((dir) => dir.size > 0);
 }
 
 const debugLogs = (root: string, host: string): Source => ({
@@ -139,8 +143,10 @@ const callRecords = (root: string, host: string): Source => ({
            tool: 'VARCHAR', decision: 'VARCHAR', rule: 'VARCHAR', reason: 'VARCHAR',
            started_at: 'BIGINT', check_ms: 'BIGINT', duration_ms: 'BIGINT', outcome: 'VARCHAR'
          },
+         format = 'newline_delimited',
          ignore_errors = true
-       )`,
+       )
+       WHERE tool_use_id IS NOT NULL`,
       { host, path: file.path, glob: join(file.path, "*.json") },
     );
   },

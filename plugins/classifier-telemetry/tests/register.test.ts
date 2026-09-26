@@ -19,7 +19,13 @@ function worldOf(
     decision = "ask",
     ms = 0,
     result = { result: "ok" },
-  }: { decision?: "allow" | "ask" | "deny"; ms?: number; result?: ToolCallResult } = {},
+    writeFails = false,
+  }: {
+    decision?: "allow" | "ask" | "deny";
+    ms?: number;
+    result?: ToolCallResult;
+    writeFails?: boolean;
+  } = {},
 ): World {
   const writes: Record<string, unknown> = {};
   const clock = mock.clock(on, { now: 1_000 });
@@ -31,6 +37,7 @@ function worldOf(
     return result;
   });
   on("fs.write", ($, e) => {
+    if (writeFails) throw new Error("disk full");
     writes[e.path] = JSON.parse(e.text);
     return { value: undefined };
   });
@@ -107,6 +114,12 @@ describe("register", () => {
       expect(Object.values(world.writes)).toEqual([expect.objectContaining(want)]);
     });
   }
+
+  test("a failed write still returns the call's result", async ($, on) => {
+    const world = worldOf(on, { writeFails: true });
+
+    expect(await run($, world, 0)).toEqual({ result: "ok" });
+  });
 
   test("a call the check never saw records no verdict", async ($, on) => {
     const world = worldOf(on);

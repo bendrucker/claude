@@ -156,6 +156,19 @@ describe("telemetry ingest", () => {
     ]);
   });
 
+  it("rereads a record first indexed mid-write", async () => {
+    const { recordsDir, reindex } = layout();
+    const path = join(recordsDir, "t1.json");
+
+    await Bun.write(path, record("t1").slice(0, 10));
+    await reindex();
+    expect(await count("SELECT COUNT(*) AS n FROM tool_verdicts")).toBe(0);
+
+    await Bun.write(path, record("t1"));
+    await reindex();
+    expect(await count("SELECT COUNT(*) AS n FROM tool_verdicts")).toBe(1);
+  });
+
   it("keeps rows when the telemetry directories are missing", async () => {
     const { debugDir, reindex } = layout();
     await Bun.write(join(debugDir, "s1.txt"), stall(1));

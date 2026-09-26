@@ -76,10 +76,14 @@ export function register(on: On): void {
       duration_ms: finishedAt - startedAt,
       outcome: outcomeOf(result),
     };
-    await $.fs.write(
-      `${home}/${DIR}/${sessionId}/${e.tool_use_id}.json`,
-      `${JSON.stringify(record)}\n`,
-    );
+    try {
+      await $.fs.write(
+        `${home}/${DIR}/${sessionId}/${e.tool_use_id}.json`,
+        `${JSON.stringify(record)}\n`,
+      );
+    } catch {
+      // A lost record must not fail a call that already ran.
+    }
     return result;
   });
 }

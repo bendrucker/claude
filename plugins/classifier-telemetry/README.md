@@ -10,5 +10,5 @@ Records each tool call's permission verdict and wall time, so auto-mode classifi
 ## Testing
 
 ```bash
-CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test plugins/classifier-telemetry
+bun scripts/mod-test.ts classifier-telemetry
 ```

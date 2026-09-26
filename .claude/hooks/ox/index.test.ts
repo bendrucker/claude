@@ -34,6 +34,7 @@ import {
   runOxlintAgent,
   STOP_BLOCK_LIMIT,
   TYPE_CHECK_ARGS,
+  typeCheckArgs,
 } from ".";
 
 // Every check here spawns oxlint and oxfmt over a real fixture, and the
@@ -488,6 +489,12 @@ describe("ox hook", () => {
 
   it("disables nested config discovery for the type-check pass", () => {
     expect(TYPE_CHECK_ARGS).toContain("--disable-nested-config");
+  });
+
+  it("type-checks mods only where the generated engine types exist", async () => {
+    expect(await typeCheckArgs(tempDir)).toContain("plugins/*/mod/**");
+    await Bun.write(join(tempDir, ".claude/types/claude-code.d.ts"), "");
+    expect(await typeCheckArgs(tempDir)).toEqual(TYPE_CHECK_ARGS);
   });
 
   describe("processStop", () => {

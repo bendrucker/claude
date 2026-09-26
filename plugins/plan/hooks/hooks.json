@@ -20,6 +20,21 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-inject.sh\""
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/write-warn.ts\"",
+            "if": "Edit(~/.claude/plans/**)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/write-warn.ts\"",
+            "if": "Write(~/.claude/plans/**)"
+          }
+        ]
       }
     ],
     "PreToolUse": [

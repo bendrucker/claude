@@ -164,4 +164,4 @@ The `/dev/fd` entry is inert, and no path-based rule can replace it. `diff <(ech
 
 `useAutoModeDuringPlan` needs no entry. It defaults on as of v2.1.218 and routes plan-mode shell commands through the classifier instead of prompting them. The gate is that auto mode is *available* to the account, so it is not a reason to set `defaultMode`. The settings schema muddies this by saying the key "has no effect unless `permissions.defaultMode` allows auto", which reads as a requirement that the active mode be `auto`.
 
-Classifier denials reach no durable surface on their own. The [`permission-denied`](../user/hooks/permission-denied) hook logs them so the `autoMode` rules stay measurable.
+Every classifier denial lands in the transcript as a tool result error, so the session index measures the `autoMode` rules directly: `tool_errors.denial_kind` is `automode-blocked` or `automode-unavailable`, and `error_content` carries the `[Category]` reason.

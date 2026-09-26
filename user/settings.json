@@ -130,17 +130,6 @@
         ]
       }
     ],
-    "PermissionDenied": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun ~/.claude/hooks/permission-denied"
-          }
-        ]
-      }
-    ],
     "PermissionRequest": [
       {
         "matcher": "*",

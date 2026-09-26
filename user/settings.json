@@ -235,15 +235,6 @@
         ]
       },
       {
-        "matcher": "Agent",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun ~/.claude/hooks/agent-model"
-          }
-        ]
-      },
-      {
         "matcher": "*",
         "hooks": [
           {

@@ -1,4 +1,4 @@
-// Model family resolution shared by the status lines and the agent-model hook.
+// Model family resolution shared by the status lines.
 // The family token in the model id is authoritative. display_name is the
 // fallback for ids whose family we don't recognize, so a future model still
 // gets a letter.

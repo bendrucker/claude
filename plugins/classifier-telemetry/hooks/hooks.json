@@ -1,0 +1,4 @@
+{
+  "description": "Writes one JSON record per tool call: the engine's permission verdict and the wall time of the call",
+  "modules": ["./register.ts"]
+}

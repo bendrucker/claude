@@ -93,6 +93,12 @@ Load the `prompting` skill before writing a skill body or a reference file. It c
 
 The `description` field is the pointer Claude scans to decide whether to activate the skill. Write it for the model and make it slightly pushy, since under-triggering is the common failure. The wording rules are in the `prompting` skill.
 
+Fill the description with triggers: the requests and situations that call for the skill. When a request could land on a sibling skill, end with the boundary that routes it there. Put the tools, techniques, and capabilities the skill uses in the body, since the model activates on the request rather than the method.
+
+```yaml
+description: Use when timing a program or command, asking whether a change or version made it faster, or building a benchmark harness. For repeated optimization toward a target, use performance:hill-climb.
+```
+
 #### Gotchas
 
 The highest-signal content in any skill is a `## Gotchas` section documenting failure modes hit in practice. Grow it as edge cases surface.

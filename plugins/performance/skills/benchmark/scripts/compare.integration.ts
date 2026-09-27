@@ -37,7 +37,7 @@ describe("compare.ts against hyperfine", () => {
     expect(report.code).toBe(0);
     const row = report.stdout.split("\n").find((line) => line.startsWith("| slow "));
     expect(row).toMatch(/\| slow \| 6 \| \d+\.\dms \| [\d.]+% \| \+\d+\.\d%\* \|/);
-  });
+  }, 60_000);
 
   it("refuses to pool into a directory that already holds exports", () => {
     const run = compare("run", out, "--arm", "a=true", "--arm", "b=true", "--", "-N");

@@ -490,6 +490,15 @@ export const TYPE_CHECK_ARGS = [
   "agent",
 ];
 
+// Mods type-check against the gitignored declarations /plugin-types writes, so
+// a tree without them skips mods rather than failing on the missing module.
+export async function typeCheckArgs(cwd: string | undefined): Promise<string[]> {
+  const types = join(cwd ?? process.cwd(), ".claude/types/claude-code.d.ts");
+  return (await Bun.file(types).exists())
+    ? TYPE_CHECK_ARGS
+    : [...TYPE_CHECK_ARGS, "--ignore-pattern", "plugins/*/mod/**"];
+}
+
 async function runTypeCheck(files: string[]): Promise<TypeCheckResult> {
   const command = await oxlintCommand();
   if (!command || files.length === 0) {
@@ -501,7 +510,7 @@ async function runTypeCheck(files: string[]): Promise<TypeCheckResult> {
       if (!(await installed(cwd))) {
         return { output: null, needsInstall: true };
       }
-      const output = await runOx(command, TYPE_CHECK_ARGS, cwd);
+      const output = await runOx(command, await typeCheckArgs(cwd), cwd);
       return output?.includes("Failed to find tsgolint executable")
         ? { output: null, needsInstall: true }
         : { output, needsInstall: false };

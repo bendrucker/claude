@@ -52,3 +52,12 @@ similarity.json
 
 # Hegel's example database, written to the working directory of a property test run.
 .hegel/
+
+# /plugin-types writes the function-hooks API declarations for the Claude Code
+# version that ran it. Regenerate them locally rather than track a copy bound
+# to one release.
+/.claude/types/
+
+# Loading a plugin with --plugin-dir writes a root tsconfig.json extending its
+# generated .claude-plugin/types. Mods keep their tsconfig in mod/ instead.
+/plugins/*/tsconfig.json

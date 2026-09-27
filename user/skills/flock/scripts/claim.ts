@@ -447,6 +447,11 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
   return { rows: scanned.map((entry) => entry.row), warnings };
 }
 
+/**
+ * Pane and workspace IDs are unique only within a machine. Keying on a bare
+ * `pane_id` is sound because this reads one local snapshot. A second machine's
+ * snapshot would have to be namespaced before it could be merged in.
+ */
 function readPanes(snapshot: z.infer<typeof Snapshot>): {
   panes: Pane[];
   repoRoots: string[];
@@ -618,27 +623,29 @@ async function gitlabHostname(run: Run): Promise<string | null> {
   return result.ok && host !== "" ? host : null;
 }
 
+function noHerdr(reason: string): string {
+  return `NO HERDR (${reason})`;
+}
+
 async function board(json: boolean): Promise<string> {
   const self = process.env.HERDR_PANE_ID ?? "";
-  if (self === "") {
-    return "NO HERDR (HERDR_PANE_ID unset). flock coordinates a herdr server and there is none here. Stop and say so.";
-  }
+  if (self === "") return noHerdr("HERDR_PANE_ID unset");
 
   const missing = ["herdr", "git"].find((tool) => Bun.which(tool) === null);
-  if (missing !== undefined) return `NO HERDR (${missing} is not on PATH). Stop and say so.`;
+  if (missing !== undefined) return noHerdr(`${missing} is not on PATH`);
 
   const raw = await spawnRun(["herdr", "api", "snapshot"]);
   if (!raw.ok || !raw.stdout.startsWith("{")) {
-    const first = raw.stderr.split("\n")[0]?.trim() ?? "";
-    const reason = first === "" ? "no output" : first;
-    return `NO HERDR (snapshot failed: ${reason}). Stop and say so.`;
+    // herdr's errors can name an SSH target, and this string becomes prompt
+    // text, so the reason stays fixed rather than quoting stderr.
+    return noHerdr("herdr api snapshot failed");
   }
 
   let snapshot;
   try {
     snapshot = decodeJson(Snapshot, raw.stdout, "herdr api snapshot");
   } catch {
-    return "NO HERDR (snapshot was not the expected shape). Stop and say so.";
+    return noHerdr("snapshot was not the expected shape");
   }
 
   const { panes, repoRoots, flockWorkspace } = readPanes(snapshot);
@@ -734,7 +741,7 @@ if (import.meta.main) {
     console.log(await board(argv.flags.json === true));
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    console.log(`NO HERDR (${reason}). Stop and say so.`);
+    console.log(noHerdr(reason));
   }
   process.exit(0);
 }

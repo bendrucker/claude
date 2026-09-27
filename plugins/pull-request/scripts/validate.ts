@@ -8,6 +8,7 @@ import { type BodyContext, decide, headingCaseCorrection, scanBody } from "./bod
 import type { HeadingCaseViolation } from "./heading-case";
 import { gitRepo } from "./repo";
 import { effectiveCwd, extractTitle, isPrBodyCommand, resolveBody } from "./resolve-body";
+import { splice } from "./shell";
 
 const BashInput = z.looseObject({ command: z.string() });
 
@@ -17,11 +18,16 @@ export const HookInput = z.looseObject({
 });
 export type HookInput = z.infer<typeof HookInput>;
 
+function headingChanges(headings: HeadingCaseViolation[]): string {
+  return headings.map((heading) => `"${heading.text}" → "${heading.suggested}"`).join("; ");
+}
+
 function correctionNote(file: string, headings: HeadingCaseViolation[]): string {
-  const changes = headings
-    .map((heading) => `"${heading.text}" → "${heading.suggested}"`)
-    .join("; ");
-  return `Section headings in \`${file}\` were re-cased to AP title case in place before this command ran: ${changes}. Only letter case changed. The pairs above are display text, so any emphasis, link, or image the heading carries is missing from them and still in the file. Re-read the file before editing it.`;
+  return `Section headings in \`${file}\` were re-cased to AP title case in place before this command ran: ${headingChanges(headings)}. Only letter case changed. The pairs above are display text, so any emphasis, link, or image the heading carries is missing from them and still in the file. Re-read the file before editing it.`;
+}
+
+function heredocCorrectionNote(headings: HeadingCaseViolation[]): string {
+  return `Section headings in the same-call heredoc were re-cased to AP title case before this command ran: ${headingChanges(headings)}. Only letter case changed. No file backs this body, so the correction is already in the command that is about to run.`;
 }
 
 /**
@@ -46,7 +52,8 @@ async function replaceFile(file: string, text: string): Promise<boolean> {
 }
 
 export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {
-  const command = BashInput.safeParse(input.tool_input).data?.command;
+  const toolInput = BashInput.safeParse(input.tool_input).data;
+  const command = toolInput?.command;
   if (command === undefined || !isPrBodyCommand(command)) {
     return null;
   }
@@ -61,14 +68,33 @@ export async function processInput(input: HookInput): Promise<SyncHookJSONOutput
   const matches = await scanBody(body, context);
 
   const file = resolved.kind === "text" ? resolved.file : null;
-  if (file === null) return decide(matches);
-  const correction = headingCaseCorrection(body, matches);
-  if (correction === null) return decide(matches);
-  if (!(await replaceFile(file, correction.body))) return decide(matches);
-  return decide(
-    matches.filter((match) => match.id !== "heading-case"),
-    correctionNote(file, correction.headings),
-  );
+  if (file !== null) {
+    const correction = headingCaseCorrection(body, matches);
+    if (correction === null) return decide(matches);
+    if (!(await replaceFile(file, correction.body))) return decide(matches);
+    return decide(
+      matches.filter((match) => match.id !== "heading-case"),
+      correctionNote(file, correction.headings),
+    );
+  }
+
+  // No file backs the body: the command's own heredoc is the sole source, and
+  // no `gh`/`glab` call has read it yet, so a correction can only reach the PR
+  // by rewriting the command that is about to run.
+  const heredoc = resolved.kind === "text" ? resolved.heredoc : null;
+  if (heredoc !== null) {
+    const correction = headingCaseCorrection(body, matches);
+    if (correction !== null) {
+      return decide(
+        matches.filter((match) => match.id !== "heading-case"),
+        heredocCorrectionNote(correction.headings),
+        // updatedInput replaces the whole tool_input object, so every field
+        // Claude sent rides along and only `command` changes.
+        { ...toolInput, command: splice(command, heredoc.span, correction.body) },
+      );
+    }
+  }
+  return decide(matches);
 }
 
 function denyWithError(reason: string): void {

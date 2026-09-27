@@ -18,6 +18,7 @@ export const DIMENSIONS = [
     label: "Permissions and sandbox",
     surfaces: ["permissions", "sandbox"],
   },
+  { slug: "tool-failures", label: "Tool failures", surfaces: ["errors"] },
   {
     slug: "context-tax",
     label: "Context tax",

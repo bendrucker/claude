@@ -5,6 +5,7 @@ import { join } from "node:path";
 import {
   enabledPluginNames,
   hookCommands,
+  HooksFile,
   loadPlugins,
   type MatcherEntryContext,
   matcherEntries,
@@ -31,8 +32,12 @@ beforeAll(async () => {
     JSON.stringify({ mcpServers: { "alpha-server": { command: "x" } } }),
   );
 
-  // Listed local plugin that is disabled.
+  // Listed local plugin that is disabled, with a function-hooks module and no command hooks.
   await Bun.write(join(root, "plugins/beta/.claude-plugin/plugin.json"), '{ "name": "beta" }');
+  await Bun.write(
+    join(root, "plugins/beta/hooks/hooks.json"),
+    JSON.stringify({ modules: ["./register.ts"] }),
+  );
 
   // On disk but missing from the marketplace.
   await Bun.write(join(root, "plugins/orphan/.claude-plugin/plugin.json"), '{ "name": "orphan" }');
@@ -133,10 +138,22 @@ describe.each<{ name: string; fn: (plugin: Plugin) => Generator<MatcherEntryCont
     expect(items[0]?.entry.matcher).toBe("Bash");
   });
 
-  test("yields nothing for plugin without hooks", async () => {
-    const beta = (await catalog()).get("beta")!;
-    expect([...fn(beta)]).toHaveLength(0);
-  });
+  test.each(["beta", "orphan"])(
+    "yields nothing for %s, which has no command hooks",
+    async (name) => {
+      const plugin = (await catalog()).get(name)!;
+      expect([...fn(plugin)]).toHaveLength(0);
+    },
+  );
+});
+
+test("a function-hooks file decodes with its modules", async () => {
+  const beta = (await catalog()).get("beta")!;
+  expect(beta.hooks?.modules).toEqual(["./register.ts"]);
+});
+
+test("a hooks file naming neither hooks nor modules is rejected", () => {
+  expect(HooksFile.safeParse({ Hooks: {} }).success).toBe(false);
 });
 
 test("hookCommands includes the matched hook command", async () => {

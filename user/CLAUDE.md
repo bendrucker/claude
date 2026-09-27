@@ -30,7 +30,7 @@ Prefer accommodating Claude Code's native defaults over overriding them, since a
 - The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.
 - A skill that instructs a subagent fan-out or a background dispatch already carries the user's authorization for `Agent`. Run the dispatch as the skill writes it, and degrade to an inline pass only when `Agent` is absent from the tool set, saying in the output that it ran inline.
 - For questions about Claude Code features or usage, use the `Agent` tool with `subagent_type='claude-code-guide'` to consult official documentation.
-- Pick an `Agent` spawn's `subagent_type` before its `model`, preferring `analyst` (read-only research, search, judging) over `general-purpose`, which is the fallback for editing files or needing the skill catalog. A type whose `bun run inventory agents` row names a model carries its own rate. Pass an explicit cheap `model` (`haiku` or `sonnet`) for a type without one (`general-purpose`, `Explore`, `review:angle`) or for an `analyst` task that is pure lookup. A spawn with neither runs on the `CLAUDE_CODE_SUBAGENT_MODEL` default.
+- Pick an `Agent` spawn's `subagent_type` before its `model`, preferring `analyst` (read-only research, search, judging) over `general-purpose`, which is the fallback for editing files or needing the skill catalog. Pass `model: haiku` for a spawn that is pure lookup.
 - Delegating a whole task to a separate Claude process in another terminal pane goes through the `herdr:herdr` skill. That is distinct from the `Agent` tool above, which runs a subagent inside this session.
 - A scripted cross-model or GPT review runs through the `github:copilot` skill, which sizes the call against the Copilot credit meter before it spends. `herdr:herdr` stays the path for an interactive GPT or Codex deep-dive, dispatched into the `copilot-gpt` worktree in the claude workspace. Launch those sessions with `copilot --max-ai-credits 120` so one cannot run away. "Consult fable" asks for the same adversarial second opinion from a Fable session.
 - Prefer the `agent-browser` skill over `WebFetch`/`WebSearch` when a task needs a real browser — interacting with a page, screenshots, scraping JS-rendered content, or web-app QA/dogfooding. It loads the CLI's version-matched `skills get` workflows. Plain `WebFetch` stays fine for static page fetches.
@@ -70,10 +70,13 @@ claude-cli://open?q=<url-encoded prompt>&cwd=<absolute main repo path>
 - Always work on a topic branch with a short hyphenated name.
 - For commit messages, use multiple `-m` flags for a simple subject and body. Each `-m` is a separate paragraph. For complex messages, pass the message through a heredoc.
 - Wrap commit message bodies at the conventional ~72 columns.
+- Bring a checkout up to a newer ref with `git merge --ff-only <ref>`, which stops before overwriting uncommitted work. Revert your own edits with `git restore <path>` on just the paths you changed. A tree-wide reset, checkout, or clean needs me to name it.
 
 ## Worktrees
 
 Any change intended to become its own PR starts in a worktree, created with `worktrunk:wt-switch-create`. Stay put only when the session is already on a topic branch inside one. Work handed to a sibling agent for its own pull request starts in a worktree too, created through the `herdr:herdr` skill's dispatch so this session stays put.
+
+Inside an isolated worktree, write files with `Write` or `Edit` and keep each Bash command a single plain command, since the isolation guard verifies a command's shape before running it and refuses one it can't, such as a heredoc, `$(...)`, a loop, or a `cd` into the main checkout before git.
 
 I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 

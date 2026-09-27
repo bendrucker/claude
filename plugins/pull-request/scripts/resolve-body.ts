@@ -3,7 +3,7 @@
 
 import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
-import { literal, parseShell, type ShellCommand, type Word } from "./shell";
+import { literal, parseShell, type ShellCommand, type Span, type Word } from "./shell";
 
 type PrCli = "gh" | "glab";
 
@@ -83,7 +83,11 @@ function flagValue(argv: Word[], flags: string[]): Word | undefined {
   return undefined;
 }
 
-export type BodyPart = { kind: "literal"; text: string } | { kind: "file"; path: string };
+export type BodyPart =
+  | { kind: "literal"; text: string }
+  | { kind: "file"; path: string }
+  /** A same-call heredoc: no file backs it yet, but its span in the command can be spliced. */
+  | { kind: "heredoc"; text: string; span: Span; dash: boolean };
 
 /** Where a command's body comes from, before any file is read. */
 export type BodySpec =
@@ -137,7 +141,10 @@ function heredocSpec(command: ShellCommand): BodySpec {
       detail: `an unquoted heredoc holding a shell expansion the hook cannot evaluate (\`${expansion.trim()}\`)`,
     };
   }
-  return { kind: "parts", parts: [{ kind: "literal", text: heredoc.content }] };
+  return {
+    kind: "parts",
+    parts: [{ kind: "heredoc", text: heredoc.content, span: heredoc.span, dash: heredoc.dash }],
+  };
 }
 
 // A PR number, URL, or branch. Null when the command leaves it off and the CLI
@@ -220,16 +227,52 @@ export type BodyResolution =
       text: string;
       /** Absolute path the whole body was read from, when a caller may rewrite it. */
       file: string | null;
+      /** Span the whole body was read from, when a caller may splice a correction in. */
+      heredoc: { span: Span } | null;
     }
   | { kind: "unreadable"; detail: string };
 
-async function readBodyFile(path: string): Promise<string | null> {
+// The hook's own TMPDIR differs from the sandbox a `gh`/`glab` call actually
+// runs under, which writes to `/tmp/claude-<uid>` instead.
+function tmpdirCandidates(path: string): string[] {
+  const hookTmpdir = process.env.TMPDIR;
+  if (hookTmpdir === undefined || hookTmpdir === "" || !path.startsWith(hookTmpdir)) return [path];
+  const uid = process.getuid?.() ?? 0;
+  const sandboxed = `/tmp/claude-${uid}${path.slice(hookTmpdir.length)}`;
+  return [...new Set([path, sandboxed])];
+}
+
+interface ReadCandidate {
+  path: string;
+  text: string;
+  mtimeMs: number;
+}
+
+// A read failure of any kind leaves this candidate with nothing to offer. The
+// other candidate may still be readable, and `Promise.all` in the caller would
+// otherwise let one candidate's rejection deny a command over a body the other
+// candidate held fine.
+async function readCandidate(path: string): Promise<ReadCandidate | null> {
   try {
-    return await Bun.file(path).text();
-  } catch (error) {
-    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
+    const file = Bun.file(path);
+    const [text, stat] = await Promise.all([file.text(), file.stat()]);
+    return { path, text, mtimeMs: stat.mtimeMs };
+  } catch {
+    // Missing, unreadable, or a directory: every case means this path holds
+    // nothing usable, which the caller treats the same as no candidate here.
     return null;
   }
+}
+
+// A `$TMPDIR`-relative body may resolve to an empty guess while the real file
+// sits under a second, sandboxed guess, so every candidate is tried and the
+// newest hit wins.
+async function readBodyFile(path: string): Promise<{ path: string; text: string } | null> {
+  const found = (await Promise.all(tmpdirCandidates(path).map(readCandidate))).filter(
+    (candidate): candidate is ReadCandidate => candidate !== null,
+  );
+  const newest = found.toSorted((a, b) => b.mtimeMs - a.mtimeMs).at(0);
+  return newest === undefined ? null : { path: newest.path, text: newest.text };
 }
 
 // A `cd` ahead of the PR command moves where the CLI resolves a relative body
@@ -276,6 +319,15 @@ function rewritableFile(
   return named ? null : (files[0] ?? null);
 }
 
+// The whole body has to come from one non-dash heredoc: the span is only
+// meaningful to splice back when nothing else contributed to the body around
+// it.
+function rewritableHeredoc(parts: BodyPart[]): { span: Span } | null {
+  const part = parts[0];
+  if (parts.length !== 1 || part?.kind !== "heredoc" || part.dash) return null;
+  return { span: part.span };
+}
+
 export async function resolveBody(command: string, cwd: string): Promise<BodyResolution> {
   const invocation = findPrCommand(command);
   if (invocation === null) return { kind: "none" };
@@ -285,26 +337,27 @@ export async function resolveBody(command: string, cwd: string): Promise<BodyRes
   const chunks: string[] = [];
   const files: string[] = [];
   for (const part of spec.parts) {
-    if (part.kind === "literal") {
+    if (part.kind === "literal" || part.kind === "heredoc") {
       chunks.push(part.text);
       continue;
     }
     const path = isAbsolute(part.path) ? part.path : join(base, part.path);
     // oxlint-disable-next-line no-await-in-loop -- returns on the first unreadable part, and a command carries at most a few.
-    const text = await readBodyFile(path);
-    if (text === null) {
+    const read = await readBodyFile(path);
+    if (read === null) {
       return {
         kind: "unreadable",
         detail: `body file \`${part.path}\`, which does not exist yet or could not be read`,
       };
     }
-    files.push(path);
-    chunks.push(text);
+    files.push(read.path);
+    chunks.push(read.text);
   }
   return {
     kind: "text",
     text: chunks.join(""),
     file: rewritableFile(invocation, spec.parts, files),
+    heredoc: rewritableHeredoc(spec.parts),
   };
 }
 

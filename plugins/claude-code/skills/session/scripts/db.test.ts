@@ -258,6 +258,62 @@ describe("errors", () => {
   });
 });
 
+describe("tool-failure-rates query", () => {
+  const FailureRow = z.object({
+    tool_name: z.string(),
+    calls: z.bigint(),
+    failures: z.bigint(),
+    failure_pct: z.number(),
+    signature: z.string(),
+    errors: z.bigint(),
+    sessions: z.bigint(),
+    agent_threads: z.bigint(),
+    first_seen: z.date(),
+    last_seen: z.date(),
+  });
+
+  async function rates(tool: string, overrides: Record<string, string | null> = {}) {
+    const rows = await runQuery(
+      db,
+      "tool-failure-rates",
+      FailureRow,
+      filterParams({ min_calls: "1", limit: null, ...overrides }),
+    );
+    return rows.filter((r) => r.tool_name === tool);
+  }
+
+  it("rates failures over calls that ran, leaving denials out of both", async () => {
+    const [row] = await rates("EnterWorktree");
+    expect(row).toMatchObject({ calls: 5n, failures: 4n });
+    expect(row?.failure_pct).toBe(80);
+  });
+
+  it("leaves out a plan redirect whose rejection carries no denial kind", async () => {
+    expect(await rates("ExitPlanMode")).toEqual([]);
+  });
+
+  it("collapses paths, ids, and the tool_use_error wrapper into one signature", async () => {
+    const rows = await rates("EnterWorktree");
+    expect(rows.map((r) => r.signature)).toEqual([
+      "Cannot enter worktree: <path> does not exist (agent <id>)",
+      "Already in a worktree session.",
+    ]);
+  });
+
+  it("counts a subagent as its own thread and dates each signature", async () => {
+    const [row] = await rates("EnterWorktree");
+    expect(row).toMatchObject({ errors: 3n, sessions: 1n, agent_threads: 2n });
+    expect(row?.first_seen.toISOString()).toBe("2024-01-22T10:03:00.000Z");
+    expect(row?.last_seen.toISOString()).toBe("2024-01-22T10:10:01.000Z");
+  });
+
+  it("drops a tool below the call floor and caps signatures per tool", async () => {
+    expect(await rates("Glob")).toHaveLength(1);
+    expect(await rates("Glob", { min_calls: "2" })).toEqual([]);
+    expect(await rates("EnterWorktree", { limit: "1" })).toHaveLength(1);
+  });
+});
+
 describe("permission_requests", () => {
   it("reports every denial kind, not just the ones the result string names", async () => {
     const rows = await db.query(
@@ -1031,6 +1087,16 @@ describe("hook-blocks query", () => {
     expect(Number(denied?.subagent_blocks)).toBe(3);
   });
 
+  it("recovers a deny whose reason carries the harness's PreToolUse:<Tool> hook error: prefix", async () => {
+    const rows = await db.query(
+      "SELECT hook_name, reason FROM hook_denies WHERE tool_use_id = 'hk-deny-3'",
+      z.object({ hook_name: z.string(), reason: z.string() }),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.hook_name).toBe("pull-request:validate-body");
+    expect(rows[0]?.reason).toStartWith("Fix the PR body before retrying");
+  });
+
   it("names the subagent that was denied and leaves the parent's own deny unlabelled", async () => {
     const rows = await db.query(
       "SELECT tool_use_id, agent_id FROM hook_denies WHERE tool_use_id LIKE 'hk-%deny-1'",
@@ -1212,7 +1278,7 @@ describe("outcomes query", () => {
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
       "sessions: ongoing": 1,
-      "sessions: handed-off": 1,
+      "sessions: handed-off": 2,
       "sessions: abandoned-with-edits": 3,
       "sessions: no-artifact": 18,
       "prs opened (distinct urls)": 1,
@@ -1231,7 +1297,7 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 23,
+      "sessions: ongoing": 24,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -2455,9 +2521,11 @@ describe("index-health query", () => {
     );
     const deny = rows.find((r) => r.check_name === "hook-deny-invisible");
     expect(deny?.status).toBe("alert");
-    expect(deny?.subject).toBe("6 denies recovered");
+    expect(deny?.subject).toBe("7 denies recovered");
     expect(deny?.detail).toContain("git:block-default-branch-commit (5)");
     expect(deny?.detail).toContain("user:worktree (1)");
+    // Recovered via the harness's PreToolUse:<Tool> hook error: prefix (hk-deny-3).
+    expect(deny?.detail).toContain("pull-request:validate-body (1)");
     // Subagent denies stay in the count (hook_events misses them too) but are broken
     // out, so a reader knows the total is not all main-thread friction.
     expect(deny?.detail).toContain("3 of the recovered denies were a subagent");
@@ -2836,7 +2904,7 @@ describe("field-drift query", () => {
     const rows = await runQuery(db, "field-drift", DriftRow, driftParams());
     const denial = rows.find((r) => r.field === "user:$.toolDenialKind");
     expect(denial).toBeDefined();
-    expect(Number(denial?.recent_rows)).toBe(4);
+    expect(Number(denial?.recent_rows)).toBe(5);
     expect(denial?.first_seen).toBe("2024-01-20");
   });
 

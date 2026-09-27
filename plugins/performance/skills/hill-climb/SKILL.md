@@ -33,23 +33,20 @@ Interview the user in rounds with `AskUserQuestion`, one question per open decis
 
 ## Workspace
 
-Under herdr (`HERDR_ENV=1`), run the whole climb in one herdr workspace, so the user can watch every run in its panes. On a cloud VM, create the workspace on the VM's herdr machine and add `--machine <label>` to the same commands. Load `herdr:herdr` for them.
-
-`tee` every long run into a log beside the notes file. `compare.ts run` prints each round's per-arm medians. Read progress from the log, and relay the latest round to the user at the cadence the Budget set.
+- **herdr.** Under `HERDR_ENV=1`, run the whole climb in one herdr workspace so the user can watch every run. On a cloud VM, create it on the VM's herdr machine and add `--machine <label>` to the same commands. Load `herdr:herdr` for them.
+- **Progress.** `tee` every long run into a log beside the notes file. `compare.ts run` prints each round's per-arm medians. Relay the latest round to the user at the cadence the Budget set.
 
 ## Harness
 
-Build the benchmark per `performance:benchmark`, or adopt the project's existing one when it meets that skill's requirements, then audit it against the Frame's scenario before the baseline: debug or profiling builds, a cache warmer than the scenario's, and a loaded machine each measure the harness instead of the program. When runs or resets write many files, look for processes watching the filesystem (backup, indexing, sync clients) and ask the user to exclude the harness directory.
+Build the benchmark per `performance:benchmark`, or adopt the project's own when it meets that skill's requirements. Then, before the baseline:
 
-Run the program twice from a fresh reset and diff the end states. A difference is state the reset misses or a side effect still reaching outside the harness.
-
-Keep the loop tight, since each run's cost repeats across every A/A, candidate, and re-baseline. Reset per run only the state the scenario depends on. Hoist work that feeds every run identically into `--setup`: fixture builds, toolchain installs, downloads and inputs the metric does not cover. Repeat the end-state diff after each hoist, and move a hoisted step back into the reset when the diff or the A/A shifts.
-
-Time one run with its reset, and multiply by the A/A's run count. When the A/A alone would take a large share of the budget, tighten the reset or cut runs before starting it.
-
-Record the baseline twice with the unchanged program (an A/A comparison). Its spread is the noise floor, and it sets the run count a candidate needs.
-
-Profile the baseline per `performance:profile` and rank where the time goes.
+- **Audit.** Check the harness against the Frame's scenario. Debug or profiling builds, a cache warmer than the scenario's, and a loaded machine measure the harness instead of the program.
+- **Watchers.** When runs or resets write many files, look for processes watching the filesystem (backup, indexing, sync clients). Ask the user to exclude the harness directory.
+- **Isolation.** Run the program twice from a fresh reset and diff the end states. A difference is state the reset misses or a side effect leaking out.
+- **Tight loop.** Each run's cost repeats across every A/A, candidate, and re-baseline. Reset per run only the state the scenario depends on. Hoist work that feeds every run identically into `--setup`: fixture builds, toolchain installs, downloads and inputs the metric does not cover. Repeat the end-state diff after each hoist, and return a step to the reset when the diff or the A/A shifts.
+- **Cost.** Time one run with its reset and multiply by the A/A's run count. When that takes a large share of the budget, tighten the reset or cut runs first.
+- **Baseline.** Record the unchanged program twice (an A/A comparison). Its spread is the noise floor and sets the run count a candidate needs.
+- **Profile.** Profile the baseline per `performance:profile` and rank where the time goes.
 
 #### Checkpoint
 
@@ -78,11 +75,13 @@ Screen with the fast signal or a microbenchmark of the changed path. Confirm a c
 - **Accept** when the target moves in the predicted direction past the acceptance rule in the notes file (default: permutation p < 0.1 and a median gain of at least 3%) and no guard regresses. Commit the change alone, with the evidence in the commit body.
 - **Reject** otherwise. Record the hypothesis, pseudocode of the change, and the numbers in the notes file, and save the diff as a patch beside it, so the null result stays findable. A rejected hypothesis stays rejected until a new profile argues for it.
 
-Bound an accepted gain by its target's time in the profile. Re-measure a gain past that bound before committing, or report the excess as unexplained.
+- **Bound** an accepted gain by its target's time in the profile. Re-measure a gain past that bound before committing, or report the excess as unexplained.
 
-Re-profile after each accept, since the ranking shifts. After the first decision, report it to the user in one line and continue unless the user redirects.
+After each decision:
 
-A harness change mid-climb moves the baseline. Commit it separately, re-run the baseline, and note it in the notes file.
+- Re-profile after an accept, since the ranking shifts.
+- Report the first decision to the user in one line, and continue unless the user redirects.
+- Commit a mid-climb harness change separately, re-run the baseline, and note it in the notes file.
 
 ## Stopping
 

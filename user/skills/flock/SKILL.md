@@ -6,6 +6,7 @@ argument-hint: "[focus hint]"
 disable-model-invocation: true
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/claim.ts)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/claim.ts --json)
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/defer.ts:*)
   - AskUserQuestion
   - Bash(herdr agent get:*)
@@ -81,9 +82,9 @@ Below the bar, the row is a report. Name the failing job, the reviewer's finding
 
 Check the rendered rows against the deferred keys first. A deferred row is held unless the state block re-raised it as stale.
 
-**Clean up.** Merged with nothing left in the tree beyond ignored files. Confirm the pane first, because a removal takes the tree out from under whoever is in it. `herdr agent get` settles an empty one. An `occupied` row needs `herdr agent read`, because `idle` and `done` are one resting status whether the agent finished or is sitting between the turns of a running workflow, and only the pane's last output separates the two. Hold the row if it reads mid-workflow. Otherwise close its workspace and panes, then run `git -C <clone> worktree remove <worktree>` and `git -C <clone> branch -D <branch>`. The row's WS column is the workspace to close. The removal deletes the paths on the `carries` line without `--force`, which only overrides modified or untracked files, and a cleanup row has neither. Name those paths in the cleanup question so the user approves their deletion. A removal that refuses means the tree changed since the board loaded, so report it and leave it.
+**Clean up.** Merged with nothing left in the tree beyond ignored files. Confirm the pane first, because a removal takes the tree out from under whoever is in it. `herdr agent get` settles an empty one. An `occupied` row needs `herdr agent read`, because `idle` and `done` are one resting status whether the agent finished or is sitting between the turns of a running workflow, and only the pane's last output separates the two. Hold the row if it reads mid-workflow. Otherwise close its workspace and panes, then run `git -C <clone> worktree remove <worktree>` and `git -C <clone> branch -D <branch>`. The row's WS column is the workspace to close. The removal deletes the paths on the `carries` line without `--force`, which only overrides modified or untracked files, and a cleanup row has neither. Name those paths in the cleanup question so the user approves their deletion. A `carries` line ending in `+N` is truncated, and `claim.ts --json` lists every path. A removal that refuses means the tree changed since the board loaded, so report it and leave it.
 
-**Merge.** Checks green, merge state clean, your repo. Re-read the bar immediately before merging, because both the board and your first lookup predate the user's answer. `gh pr merge --squash --delete-branch`, and stop there. The worktree becomes a cleanup row on a later sweep, once a fresh board shows it carrying nothing.
+**Merge.** Checks green, merge state clean, your repo. Re-read the bar immediately before merging, because both the board and your first lookup predate the user's answer. `gh pr merge --squash --delete-branch`, and stop there. The worktree becomes a cleanup row on a later sweep, once a fresh board shows it merged with a clean tree.
 
 **Report.** A `needs you` row is a report unless the user asks for something else. Its flags say why: a named failing job, a conflict, a review holding it, or commits beside a `merged#N` that the merge did not take, which need a fresh branch rather than a removal. A blocked agent is a prompt to answer, so `herdr agent focus` its pane and say what it is asking.
 

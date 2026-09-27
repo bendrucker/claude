@@ -172,7 +172,7 @@ async function descend(run: Run, root: string, dirs: string[], depth: number): P
  * the same way, for a fraction of the work.
  */
 export async function carriedIgnoredPaths(run: Run, worktree: string): Promise<string[]> {
-  return filterCarried(await descend(run, worktree, [""], CARRY_DEPTH));
+  return filterCarried(await descend(run, worktree, [""], CARRY_DEPTH)).toSorted();
 }
 
 function toCount(result: CommandResult): number | null {

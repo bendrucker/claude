@@ -106,6 +106,9 @@ async function generate(plugin: PluginPackage): Promise<void> {
   const scratch = await mkdtemp(join(tmpdir(), "plugin-lockfile-"));
   try {
     await Bun.write(join(scratch, "package.json"), Bun.file(join(plugin.dir, "package.json")));
+    // Seeding the current lockfile keeps every unchanged dependency at its pinned version.
+    const current = Bun.file(join(plugin.dir, GENERATED));
+    if (await current.exists()) await Bun.write(join(scratch, GENERATED), current);
     await $`npm install --package-lock-only --ignore-scripts`.cwd(scratch).quiet();
     await Bun.write(join(plugin.dir, GENERATED), Bun.file(join(scratch, GENERATED)));
   } finally {
@@ -165,6 +168,31 @@ export function violation(
   return null;
 }
 
+/**
+ * How a plugin's install would pull in its devDependencies, or null when it omits them.
+ *
+ * Claude Code runs a bare `npm ci`, which installs devDependencies unless the
+ * payload's own `.npmrc` omits them. Type-only packages such as
+ * `@anthropic-ai/claude-agent-sdk` belong there, and without the omit each
+ * cached plugin unpacks its own copy of the SDK's native binary.
+ */
+export function devInstalled(
+  name: string,
+  manifest: Manifest,
+  npmrc: string | null,
+): string | null {
+  if (Object.keys(manifest.devDependencies ?? {}).length === 0) return null;
+  const omitted = (npmrc ?? "").split("\n").some((line) => /^\s*omit\s*=\s*dev\s*$/.test(line));
+  return omitted
+    ? null
+    : `${name}: declares devDependencies without omit=dev in .npmrc, so npm ci installs them`;
+}
+
+async function readNpmrc(dir: string): Promise<string | null> {
+  const file = Bun.file(join(dir, ".npmrc"));
+  return (await file.exists()) ? file.text() : null;
+}
+
 const check = command({ name: "check" }, async () => {
   await runCheck(
     async () => {
@@ -176,7 +204,10 @@ const check = command({ name: "check" }, async () => {
         plugins.map(async (plugin) => {
           const lockfile = await existingLockfile(plugin.dir);
           const root = lockfile === null ? null : await pinned(plugin.dir, lockfile);
-          return violation(plugin.name, lockfile, root, plugin.manifest);
+          return [
+            violation(plugin.name, lockfile, root, plugin.manifest),
+            devInstalled(plugin.name, plugin.manifest, await readNpmrc(plugin.dir)),
+          ];
         }),
       );
 
@@ -184,11 +215,12 @@ const check = command({ name: "check" }, async () => {
         header: [
           "Claude Code installs a plugin's dependencies when it caches the plugin, but only",
           "from a package.json at the plugin root with a lockfile beside it. Hoist a nested",
-          "manifest into its plugin root, then run `bun run plugin-lockfiles generate`:",
+          "manifest into its plugin root, then run `bun run plugin-lockfiles generate`. A plugin",
+          "with devDependencies also ships a `.npmrc` holding `omit=dev`:",
           "",
         ],
         violations: [
-          ...violations.filter((entry) => entry !== null),
+          ...violations.flat().filter((entry) => entry !== null),
           ...nestedManifests(manifests),
         ],
       };

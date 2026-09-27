@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { nestedManifests, ranges, violation } from "./plugin-lockfiles";
+import { devInstalled, nestedManifests, ranges, violation } from "./plugin-lockfiles";
 
 test.each<{
   name: string;
@@ -52,6 +52,40 @@ test.each<{
   },
 ])("$name", ({ lockfile, pinned, manifest, expected }) => {
   expect(violation("git", lockfile, pinned, manifest)).toBe(expected);
+});
+
+test.each<{
+  name: string;
+  manifest: Parameters<typeof devInstalled>[1];
+  npmrc: string | null;
+  expected: string | null;
+}>([
+  {
+    name: "no devDependencies",
+    manifest: { dependencies: { zod: "^4.4.3" } },
+    npmrc: null,
+    expected: null,
+  },
+  {
+    name: "devDependencies with no .npmrc",
+    manifest: { devDependencies: { "@anthropic-ai/claude-agent-sdk": "^0.3.0" } },
+    npmrc: null,
+    expected: "git: declares devDependencies without omit=dev in .npmrc, so npm ci installs them",
+  },
+  {
+    name: "devDependencies with an .npmrc lacking the omit",
+    manifest: { devDependencies: { "@anthropic-ai/claude-agent-sdk": "^0.3.0" } },
+    npmrc: "fund=false\n",
+    expected: "git: declares devDependencies without omit=dev in .npmrc, so npm ci installs them",
+  },
+  {
+    name: "devDependencies omitted",
+    manifest: { devDependencies: { "@anthropic-ai/claude-agent-sdk": "^0.3.0" } },
+    npmrc: "fund=false\nomit = dev\n",
+    expected: null,
+  },
+])("devInstalled: $name", ({ manifest, npmrc, expected }) => {
+  expect(devInstalled("git", manifest, npmrc)).toBe(expected);
 });
 
 test("ranges ignores declaration order", () => {

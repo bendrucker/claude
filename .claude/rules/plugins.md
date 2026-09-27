@@ -61,4 +61,6 @@ Generate the lockfiles with `bun run plugin-lockfiles generate`, which resolves 
 
 The install passes `--ignore-scripts` and gives up after 60 seconds. A dependency that compiles in a lifecycle script has no `node_modules` to load at runtime, so it needs its own bootstrap into `${CLAUDE_PLUGIN_DATA}`. Prebuilt platform packages, which is how `sharp`, `@napi-rs/canvas`, and `@duckdb/node-api` ship, install and load fine.
 
+Declare a package that plugin code imports only with `import type` in `devDependencies`. `@anthropic-ai/claude-agent-sdk` is the common case, and as a runtime dependency it pulls in a 193 MB native binary per plugin. The install runs a bare `npm ci`, so a plugin with `devDependencies` also ships a `.npmrc` holding `omit=dev`, which `bun run plugin-lockfiles check` enforces.
+
 Prefer npm's lockfile over `bun.lock`. Claude Code runs the matched lockfile's package manager from the user's PATH with no fallback, so an npm lockfile reaches installers without bun.

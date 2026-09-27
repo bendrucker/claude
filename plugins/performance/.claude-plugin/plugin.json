@@ -1,0 +1,8 @@
+{
+  "name": "performance",
+  "description": "Profile, benchmark, and hill-climb software performance with noise-aware measurement",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

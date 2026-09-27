@@ -185,6 +185,11 @@
       "name": "prompting",
       "description": "Writing documents a model executes: prompts, skills, tool descriptions, CLAUDE.md",
       "source": "./plugins/prompting"
+    },
+    {
+      "name": "performance",
+      "description": "Profile, benchmark, and hill-climb software performance with noise-aware measurement",
+      "source": "./plugins/performance"
     }
   ]
 }

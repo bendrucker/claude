@@ -1,0 +1,10 @@
+{
+  "name": "performance",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "cleye": "^2.2.1",
+    "table": "^6.9.0",
+    "zod": "^4.4.3"
+  }
+}

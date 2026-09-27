@@ -43,7 +43,7 @@ Keep everything for one watch in `tmp/watch-session/` under your working directo
 
 ## Watching a Session
 
-Start `Monitor` with `persistent: true` on:
+Start `Monitor` with the maximum `timeout_ms` on the command below. A monitor expires after that timeout, so re-arm it with the same command on each expiry. The state file resumes the read where the last one stopped.
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts watch <target> --state-dir tmp/watch-session [--every <seconds>]

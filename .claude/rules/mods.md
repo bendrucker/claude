@@ -36,9 +36,9 @@ Every tool keys on that directory. The root tsconfig and `bun test` skip it, and
 { "extends": "../../../tsconfig.mod.json", "include": ["../../../.claude/types", "."] }
 ```
 
-A mod that draws UI through `ui.render` is written in `.tsx`, and its tsconfig adds `"jsx": "react"`, `"jsxFactory": "h"`, and `"jsxFragmentFactory": "Fragment"` to match the engine's JSX globals, plus `"allowImportingTsExtensions": true` so its tests can import `./register.tsx`. [`run-command`](../../plugins/run-command/mod/tsconfig.json) is the example.
-
 The declarations define the engine's own web globals, which would override Bun's `TextEncoder` and related types in the root program, so mod files stay out of it. Without them, `claude-code` types resolve to `any` for lint, and `bun run build` fails its type check on the missing module. CI lacks them, so its type check skips `plugins/*/mod/**`, and it checks a mod through lint, `claude plugin validate`, and its tests.
+
+A mod that draws UI through `ui.render` is written in `.tsx`, and its tsconfig adds `"jsx": "react"`, `"jsxFactory": "h"`, and `"jsxFragmentFactory": "Fragment"` to match the engine's JSX globals. It also adds `"allowImportingTsExtensions": true` so its tests can import `./register.tsx`. [`plugins/run-command/mod/tsconfig.json`](../../plugins/run-command/mod/tsconfig.json) is the example.
 
 ## Engine Constraints
 

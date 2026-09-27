@@ -1,6 +1,6 @@
 {
   "name": "run-command",
-  "description": "Click a `! <command>` suggestion in a reply to fill it into the prompt",
+  "description": "Pick a reply's `! <command>` suggestion by click or digit to fill it into the shell prompt",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

@@ -16,6 +16,13 @@ test.each<{
     expected: "git: declares dependencies with no lockfile, so the install is skipped",
   },
   {
+    name: "no lockfile and only devDependencies, which nothing installs",
+    lockfile: null,
+    pinned: null,
+    manifest: { devDependencies: { "@anthropic-ai/claude-agent-sdk": "^0.3.0" } },
+    expected: null,
+  },
+  {
     name: "lockfile pinning the declared ranges",
     lockfile: "package-lock.json",
     pinned: { dependencies: { zod: "^4.4.3" } },
@@ -82,6 +89,12 @@ test.each<{
     name: "devDependencies omitted",
     manifest: { devDependencies: { "@anthropic-ai/claude-agent-sdk": "^0.3.0" } },
     npmrc: "fund=false\nomit = dev\n",
+    expected: null,
+  },
+  {
+    name: "devDependencies omitted through the array form",
+    manifest: { devDependencies: { "@anthropic-ai/claude-agent-sdk": "^0.3.0" } },
+    npmrc: "omit[]=dev\n",
     expected: null,
   },
 ])("devInstalled: $name", ({ manifest, npmrc, expected }) => {

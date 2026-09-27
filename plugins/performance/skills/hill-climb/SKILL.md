@@ -35,6 +35,8 @@ Interview the user in rounds with `AskUserQuestion`, one question per open decis
 
 Build the benchmark per `performance:benchmark`, or adopt the project's existing one when it meets that skill's requirements, then audit it before the baseline. A harness built with debug or profiling builds, a warm cache the real scenario never has, or a loaded machine measures the harness. Check each against the Frame's scenario. When runs or resets write many files, check the load for processes that watch the filesystem (backup, indexing, sync clients), and ask the user to exclude the harness directory from them.
 
+Run the program twice from a fresh reset and diff the end states. A difference is state the reset misses or a side effect still reaching outside the harness.
+
 Time one run with its `--prepare` reset before launching the A/A, and multiply by the planned run count. When the A/A alone would take a large share of the budget, shrink the reset (restore only what a run changes) or the run count first.
 
 Record the baseline twice with the unchanged program (an A/A comparison). Its spread is the noise floor, and it sets the run count a candidate needs.

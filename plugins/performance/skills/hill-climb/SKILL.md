@@ -33,19 +33,19 @@ Interview the user in rounds with `AskUserQuestion`, one question per open decis
 
 ## Workspace
 
-Under herdr (`HERDR_ENV=1`), keep the climb in one herdr workspace and run the harness, the A/A, and every measurement in its panes, so the user can watch them. On a cloud VM the launcher registers the VM as a herdr machine. Create the workspace there, and drive it with the same pane commands plus `--machine <label>`. Load `herdr:herdr` for the commands.
+Under herdr (`HERDR_ENV=1`), run the whole climb in one herdr workspace, so the user can watch every run in its panes. On a cloud VM, create the workspace on the VM's herdr machine and add `--machine <label>` to the same commands. Load `herdr:herdr` for them.
 
-Send every long run's output through `tee` into a log beside the notes file. `compare.ts run` prints each round's per-arm medians as it goes. Read progress from the log, and pass the latest round to the user at the cadence the Budget set, so an hours-long run never goes quiet.
+`tee` every long run into a log beside the notes file. `compare.ts run` prints each round's per-arm medians. Read progress from the log, and relay the latest round to the user at the cadence the Budget set.
 
 ## Harness
 
-Build the benchmark per `performance:benchmark`, or adopt the project's existing one when it meets that skill's requirements, then audit it before the baseline. A harness built with debug or profiling builds, a warm cache the real scenario never has, or a loaded machine measures the harness. Check each against the Frame's scenario. When runs or resets write many files, check the load for processes that watch the filesystem (backup, indexing, sync clients), and ask the user to exclude the harness directory from them.
+Build the benchmark per `performance:benchmark`, or adopt the project's existing one when it meets that skill's requirements, then audit it against the Frame's scenario before the baseline: debug or profiling builds, a cache warmer than the scenario's, and a loaded machine each measure the harness instead of the program. When runs or resets write many files, look for processes watching the filesystem (backup, indexing, sync clients) and ask the user to exclude the harness directory.
 
 Run the program twice from a fresh reset and diff the end states. A difference is state the reset misses or a side effect still reaching outside the harness.
 
-Keep the loop tight: every minute a run or reset costs is paid on each A/A run, candidate, and re-baseline. Reset per run only the state the scenario depends on. Move work that feeds every run identically out of the per-run reset: build fixtures and install toolchains once with `--setup`, and cache downloads and inputs the metric does not cover. Each hoisted step is a contamination risk, so run the end-state diff above after each one. A hoisted step that makes the diff differ, or moves the A/A, goes back into the reset.
+Keep the loop tight, since each run's cost repeats across every A/A, candidate, and re-baseline. Reset per run only the state the scenario depends on. Hoist work that feeds every run identically into `--setup`: fixture builds, toolchain installs, downloads and inputs the metric does not cover. Repeat the end-state diff after each hoist, and move a hoisted step back into the reset when the diff or the A/A shifts.
 
-Time one run with its `--prepare` reset before launching the A/A, and multiply by the planned run count. When the A/A alone would take a large share of the budget, tighten the reset or cut the run count before starting it.
+Time one run with its reset, and multiply by the A/A's run count. When the A/A alone would take a large share of the budget, tighten the reset or cut runs before starting it.
 
 Record the baseline twice with the unchanged program (an A/A comparison). Its spread is the noise floor, and it sets the run count a candidate needs.
 
@@ -78,7 +78,7 @@ Screen with the fast signal or a microbenchmark of the changed path. Confirm a c
 - **Accept** when the target moves in the predicted direction past the acceptance rule in the notes file (default: permutation p < 0.1 and a median gain of at least 3%) and no guard regresses. Commit the change alone, with the evidence in the commit body.
 - **Reject** otherwise. Record the hypothesis, pseudocode of the change, and the numbers in the notes file, and save the diff as a patch beside it, so the null result stays findable. A rejected hypothesis stays rejected until a new profile argues for it.
 
-Check an accepted gain against the profile: a change cannot save more than the time its target took. A gain past that bound is partly noise or a harness shift, so re-measure before committing, or report the excess as unexplained.
+Bound an accepted gain by its target's time in the profile. Re-measure a gain past that bound before committing, or report the excess as unexplained.
 
 Re-profile after each accept, since the ranking shifts. After the first decision, report it to the user in one line and continue unless the user redirects.
 

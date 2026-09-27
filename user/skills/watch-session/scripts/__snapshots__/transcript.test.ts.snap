@@ -3,9 +3,21 @@
 exports[`TurnTracker digests completed and interrupted turns 1`] = `
 [
   {
-    "at": 688,
+    "at": 736,
     "event": "blocked",
-    "question": "Keep the regression?",
+    "questions": [
+      {
+        "options": [
+          {
+            "label": "Keep",
+          },
+          {
+            "label": "Revert",
+          },
+        ],
+        "question": "Keep the regression?",
+      },
+    ],
   },
   {
     "durationMs": 4200,
@@ -22,7 +34,7 @@ exports[`TurnTracker digests completed and interrupted turns 1`] = `
       "hill-climb",
     ],
     "source": "typed",
-    "to": 940,
+    "to": 988,
     "tools": {
       "AskUserQuestion": 1,
       "Bash": 1,
@@ -34,12 +46,12 @@ exports[`TurnTracker digests completed and interrupted turns 1`] = `
     "errors": 0,
     "event": "turn",
     "final": "",
-    "from": 973,
+    "from": 1021,
     "prompt": "try again",
     "skillDirs": [],
     "skills": [],
     "source": "typed",
-    "to": 1244,
+    "to": 1292,
     "tools": {
       "Bash": 1,
     },

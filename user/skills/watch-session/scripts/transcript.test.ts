@@ -34,7 +34,13 @@ const session = [
   },
   assistant(toolUse("Bash", { command: "bench" })),
   result("exit 1", true),
-  assistant(toolUse("AskUserQuestion", { questions: [{ question: "Keep the regression?" }] })),
+  assistant(
+    toolUse("AskUserQuestion", {
+      questions: [
+        { question: "Keep the regression?", options: [{ label: "Keep" }, { label: "Revert" }] },
+      ],
+    }),
+  ),
   result("yes"),
   assistant({ type: "text", text: "Benchmark regressed 4%." }),
   turnEnd,
@@ -90,6 +96,17 @@ describe("TurnTracker", () => {
       turnEnd,
     ];
     expect(events(jsonl(bundled))[0]).toMatchObject({ prompt: "/simplify", skills: ["simplify"] });
+  });
+
+  test("describes a finished background task by its summary", () => {
+    const notified = [
+      prompt(
+        "<task-notification><task-id>b1</task-id><summary>Build finished</summary></task-notification>",
+        "system",
+      ),
+      turnEnd,
+    ];
+    expect(events(jsonl(notified))[0]).toMatchObject({ prompt: "task: Build finished" });
   });
 
   test("a turn stays open until its end marker arrives", () => {

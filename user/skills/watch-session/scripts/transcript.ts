@@ -48,10 +48,19 @@ export interface Turn {
   durationMs?: number;
 }
 
+const Questions = z.object({
+  questions: z.array(
+    z.object({
+      question: z.string(),
+      options: z.array(z.object({ label: z.string(), description: z.string().optional() })),
+    }),
+  ),
+});
+
 export interface Blocked {
   event: "blocked";
   at: number;
-  question: string;
+  questions: z.output<typeof Questions>["questions"];
 }
 
 const SKILL_DIR = /^Base directory for this skill: (\S+)/;
@@ -62,6 +71,8 @@ const COMMAND_MESSAGE = "<command-message>";
 // Output Claude Code records around a local command such as /add-dir, rather than anything the user typed.
 const LOCAL_OUTPUT = "<local-command-";
 const INTERRUPTED = "[Request interrupted by user";
+const TASK_NOTIFICATION = "<task-notification>";
+const TASK_SUMMARY = /<summary>([^<]*)<\/summary>/;
 
 function clip(text: string, max: number): string {
   const flat = text.replaceAll(/\s+/g, " ").trim();
@@ -72,13 +83,6 @@ function inputField(input: unknown, key: string): string | undefined {
   if (typeof input !== "object" || input === null || !(key in input)) return undefined;
   const value: unknown = Reflect.get(input, key);
   return typeof value === "string" ? value : undefined;
-}
-
-function firstQuestion(input: unknown): string {
-  if (typeof input !== "object" || input === null) return "";
-  const questions: unknown = Reflect.get(input, "questions");
-  if (!Array.isArray(questions)) return "";
-  return inputField(questions[0], "question") ?? "";
 }
 
 /** A typed slash command as `/name args`, or undefined for ordinary prompt text. */
@@ -93,10 +97,16 @@ export class TurnTracker {
   private turn: Turn | undefined;
   // Local commands like /add-dir never end a turn, so the prompt is the last one before the agent answers.
   private answered = false;
+  private pendingQuestion = false;
 
   /** Where the turn still in progress began, which a resumed read must start from to digest it whole. */
   get openFrom(): number | undefined {
     return this.turn?.from;
+  }
+
+  /** Whether the agent is waiting on an AskUserQuestion the transcript already recorded. */
+  get asking(): boolean {
+    return this.pendingQuestion;
   }
 
   feed({ entry, from, to }: Line): (Turn | Blocked)[] {
@@ -122,6 +132,7 @@ export class TurnTracker {
 
     for (const block of Array.isArray(content) ? content : []) {
       if (entry.type === "user") {
+        if (block.type === "tool_result") this.pendingQuestion = false;
         if (block.type === "tool_result" && block.is_error) turn.errors++;
         if (block.type !== "text" || block.text === undefined) continue;
         const dir = SKILL_DIR.exec(block.text)?.[1];
@@ -138,8 +149,10 @@ export class TurnTracker {
       turn.tools[block.name] = (turn.tools[block.name] ?? 0) + 1;
       const skill = block.name === "Skill" ? inputField(block.input, "skill") : undefined;
       if (skill !== undefined) turn.skills.push(skill);
-      if (block.name === "AskUserQuestion") {
-        events.push({ event: "blocked", at: to, question: clip(firstQuestion(block.input), 200) });
+      const asked = block.name === "AskUserQuestion" ? Questions.safeParse(block.input) : undefined;
+      if (asked?.success === true) {
+        this.pendingQuestion = true;
+        events.push({ event: "blocked", at: to, questions: asked.data.questions });
       }
     }
     return events;
@@ -150,7 +163,11 @@ export class TurnTracker {
     // A typed /skill loads without a Skill tool call, so its name comes from the command.
     const name = command?.split(" ")[0]?.replace(/^\//, "");
     turn.skills = name !== undefined && content.includes(COMMAND_MESSAGE) ? [name] : [];
-    turn.prompt = clip(command ?? content, 200);
+    // A finished background task re-enters the session as a prompt, which its summary line describes.
+    const task = content.startsWith(TASK_NOTIFICATION)
+      ? TASK_SUMMARY.exec(content)?.[1]
+      : undefined;
+    turn.prompt = clip(command ?? (task === undefined ? content : `task: ${task}`), 200);
     if (source === undefined) delete turn.source;
     else turn.source = source;
   }
@@ -175,6 +192,7 @@ export class TurnTracker {
     const turn = this.turn;
     this.turn = undefined;
     this.answered = false;
+    this.pendingQuestion = false;
     if (!turn) return undefined;
     const done: Turn = { ...turn, end, to };
     if (durationMs !== undefined) done.durationMs = durationMs;

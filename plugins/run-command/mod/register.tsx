@@ -15,7 +15,6 @@ export function commands(text: string): string[] {
   return found;
 }
 
-/** The command a digit typed into the empty shell prompt picks from the list. */
 export function pick(inputText: string, found: readonly string[]): string | undefined {
   return DIGIT.test(inputText) ? found[Number(inputText) - 1] : undefined;
 }

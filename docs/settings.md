@@ -120,9 +120,15 @@ diff "$TMPDIR/before.json" "$TMPDIR/after.json"
 
 ## Plugins
 
-`1password@1password` moves project secrets out of plaintext `.env` files into 1Password Environments, mounted back as FIFOs the desktop app feeds on read. It ships the `1password-environments` skill, the `1password-mcp` server (which returns variable names, never values), and a `PreToolUse` Bash hook that denies every command in a workspace whose expected mount is missing or disabled. The hook exits silently when no mount is registered, so it costs a sqlite lookup per Bash call everywhere else. The marketplace tracks `main`: the repo has no release tags, and `ref` goes to `git clone --branch`, which rejects a commit SHA. Pin it once 1Password tags a release. The four allowed MCP tools are the read-only ones. Creating, appending, mounting, and renaming still go through auto mode and the desktop app's per-environment approval.
+`1password@1password` moves project secrets out of plaintext `.env` files into 1Password Environments, which the desktop app serves back into the workspace as FIFOs it feeds on read. It ships the `1password-environments` skill, the plugin's `1password` MCP server (which returns variable names, never values), and a `PreToolUse` Bash hook that denies every command in a workspace whose expected mount is missing or disabled. The hook exits silently when no mount is registered, so it costs a SQLite lookup per Bash call everywhere else. `authenticate`, `list_environments`, `list_variables`, and `list_local_env_files` are allowed because none of them mutates anything. Creating, appending, mounting, and renaming still go through auto mode and the desktop app's per-environment approval.
 
-**Remove it** if Environments don't stick. Around 2026-10-27, query the session index for `mcp__plugin_1password_1password__` calls and for the hook's denies since the day this shipped. If no mount besides the first is in use, or the denies are mostly stale mounts rather than a missing secret file, drop the plugin, its marketplace, and the allows.
+The marketplace tracks `main` because the repo has no release tags. A commit SHA in `ref` fails, since Claude Code passes it to `git clone --branch`. **Pin it** once this lists a tag:
+
+```
+git ls-remote --tags https://github.com/1Password/1password-claude-plugin
+```
+
+**Drop it** if Environments do not stick. Around 2026-10-27, count `mcp__plugin_1password_1password__` calls in the session index since the day this shipped, and read the hook's denies with the `claude-code:session` skill's [`hook-blocks`](../plugins/claude-code/skills/session/resources/queries/hook-blocks.sql) query. If no mount besides the first is in use, or the denies are mostly stale mounts rather than a missing secret file, remove the plugin, its marketplace, and the allows.
 
 ## Sandbox Findings
 

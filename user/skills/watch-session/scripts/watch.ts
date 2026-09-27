@@ -55,6 +55,29 @@ async function resolve(target: string): Promise<Target & { pane?: string }> {
   return { session, path: await transcriptPath(session), pane: target };
 }
 
+/** Streams the transcript until the first entry that records the session's working directory. */
+async function firstCwd(path: string): Promise<string | undefined> {
+  let pending = new Uint8Array();
+  for await (const chunk of Bun.file(path).stream()) {
+    const bytes = new Uint8Array(pending.length + chunk.length);
+    bytes.set(pending);
+    bytes.set(chunk, pending.length);
+    const { lines, consumed } = splitLines(bytes, 0);
+    const cwd = lines.find((line) => line.entry.cwd !== undefined)?.entry.cwd;
+    if (cwd !== undefined) return cwd;
+    pending = bytes.subarray(consumed);
+  }
+  return undefined;
+}
+
+/** The watched session's working directory and the commit checked out there, where a trial starts. */
+async function workspace(path: string): Promise<{ cwd?: string; head?: string }> {
+  const cwd = await firstCwd(path);
+  if (cwd === undefined) return {};
+  const git = await $`git -C ${cwd} rev-parse HEAD`.quiet().nothrow();
+  return git.exitCode === 0 ? { cwd, head: git.text().trim() } : { cwd };
+}
+
 function statePath(dir: string, session: string): string {
   return join(dir, `${session}.json`);
 }
@@ -207,7 +230,7 @@ async function watch(options: WatchOptions): Promise<void> {
   );
   const watcher = new Watcher(options, target, pane, offset);
   await watcher.persist();
-  emit({ event: "watching", ...target, offset, pane });
+  emit({ event: "watching", ...target, ...(await workspace(target.path)), offset, pane });
 
   // Monitor needs one long-lived process that sleeps internally, not a shell loop.
   // oxlint-disable-next-line no-await-in-loop -- each poll must finish before the next begins.

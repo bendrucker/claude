@@ -15,6 +15,7 @@ export const Entry = z.looseObject({
   isSidechain: z.boolean().optional(),
   isMeta: z.boolean().optional(),
   promptSource: z.string().optional(),
+  cwd: z.string().optional(),
   durationMs: z.number().optional(),
   message: z
     .looseObject({

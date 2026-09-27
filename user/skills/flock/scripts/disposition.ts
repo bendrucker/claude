@@ -182,9 +182,8 @@ function tilde(path: string, home: string): string {
 }
 
 /**
- * A repository can have more than one clone on the machine, and a removal run
- * from the wrong one fails, so a cleanup row names its worktree and the clone
- * that owns it, plus the ignored paths a removal would delete.
+ * A repository can have more than one clone on the machine, and a removal
+ * run from the wrong one fails.
  */
 export function locationLines(row: BoardRow, home: string): string[] {
   if (row.worktree === null) return [];

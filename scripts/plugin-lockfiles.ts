@@ -170,11 +170,6 @@ export function violation(
 
 /**
  * How a plugin's install would pull in its devDependencies, or null when it omits them.
- *
- * Claude Code runs a bare `npm ci`, which installs devDependencies unless the
- * payload's own `.npmrc` omits them. Type-only packages such as
- * `@anthropic-ai/claude-agent-sdk` belong there, and without the omit each
- * cached plugin unpacks its own copy of the SDK's native binary.
  */
 export function devInstalled(
   name: string,

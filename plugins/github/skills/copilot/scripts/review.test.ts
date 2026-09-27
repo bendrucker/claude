@@ -6,6 +6,7 @@ import {
   ANGLES,
   buildPrompt,
   copilotArgs,
+  copilotAuth,
   type Diff,
   daysUntilReset,
   deriveUsage,
@@ -210,13 +211,24 @@ describe("copilotArgs", () => {
 
 describe("runCopilot", () => {
   const angle: Angle = { id: "all", title: "All defect classes", focus: "FOCUS" };
-  const options = { model: "gpt-5.6-terra", cap: 30, cwd: "/", agentic: false };
+  const options = {
+    model: "gpt-5.6-terra",
+    cap: 30,
+    cwd: "/",
+    agentic: false,
+    env: { COPILOT_GITHUB_TOKEN: "gho_resolved" },
+  };
 
   const record = (output: string, exitCode = 0) => {
-    const seen: { args: string[]; stdin: string } = { args: [], stdin: "" };
-    const spawn: Spawn = (args, stdin) => {
+    const seen: { args: string[]; stdin: string; env: Record<string, string> } = {
+      args: [],
+      stdin: "",
+      env: {},
+    };
+    const spawn: Spawn = (args, stdin, _cwd, env) => {
       seen.args = args;
       seen.stdin = new TextDecoder().decode(stdin);
+      seen.env = env;
       return {
         stdout: new Blob([output]).stream(),
         stderr: new Blob([]).stream(),
@@ -250,9 +262,41 @@ describe("runCopilot", () => {
     expect((await runCopilot("p", angle, options, spawn)).credits).toBe(credits);
   });
 
+  test("hands the resolved token to the spawn", async () => {
+    const { seen, spawn } = record("no defects");
+
+    await runCopilot("p", angle, options, spawn);
+
+    expect(seen.env).toEqual({ COPILOT_GITHUB_TOKEN: "gho_resolved" });
+  });
+
   test("carries the child's failure back so a broken run is not read as a clean review", async () => {
     const { spawn } = record("boom", 1);
 
     expect((await runCopilot("p", angle, options, spawn)).exitCode).toBe(1);
+  });
+});
+
+// The HOME redirect hides every stored login, so without a token in the environment Copilot
+// fails before inference.
+describe("copilotAuth", () => {
+  test.each(["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"])(
+    "defers to %s without asking gh",
+    (name) => {
+      const ghToken = () => {
+        throw new Error("gh should not run");
+      };
+      expect(copilotAuth({ [name]: "set" }, ghToken)).toEqual({});
+    },
+  );
+
+  test("resolves a token from gh when the environment has none", () => {
+    expect(copilotAuth({ GH_TOKEN: "" }, () => "gho_gh")).toEqual({
+      COPILOT_GITHUB_TOKEN: "gho_gh",
+    });
+  });
+
+  test("returns null when gh has no token either", () => {
+    expect(copilotAuth({}, () => null)).toBeNull();
   });
 });

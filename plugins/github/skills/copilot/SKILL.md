@@ -119,9 +119,11 @@ Rates come from the CLI's own usage ledger, in credits per million tokens:
 
 Two terra spawns sharing an identical 20k-token prefix both wrote the full prompt and read nothing from cache. Caching works inside one session and not between them. Ordering the prompt to share a prefix across angles therefore buys nothing. Do not build for it without re-probing.
 
-#### The Sandbox and `HOME`
+#### The Sandbox, `HOME`, and Auth
 
 The sandbox blocks Copilot writing to `~/.copilot`, which kills the run with `I/O error: Operation not permitted (os error 1)`. The script points `HOME` at `~/.cache/claude/copilot-home`, which the sandbox allows. Do not solve this by disabling the sandbox. That home persists on purpose. This path's spend lands in a ledger you can read afterward, and `--resume` picks a session back up. `--no-custom-instructions` keeps the repo's own instructions out of the review.
+
+The redirect also hides every login Copilot knows how to find: its own under the real home and in the keychain, and `gh`'s in `~/.config/gh`. Without a token in the environment, every run fails before inference with `No authentication information found`, even right after `/login`. So when none of `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` is set, the script runs `gh auth token` under the real `HOME` and passes the result to Copilot as `COPILOT_GITHUB_TOKEN`. `gh` reads its keychain token from inside the sandbox, so this runs sandboxed like the rest of the script. Under the redirected `HOME` it finds no `hosts.yml` and reports no token. When no token resolves, the script refuses before spending anything. Fix that with `gh auth login` or by exporting one of the three variables.
 
 #### Prompt Size
 

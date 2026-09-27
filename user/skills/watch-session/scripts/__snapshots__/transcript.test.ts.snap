@@ -1,0 +1,65 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`TurnTracker digests completed and interrupted turns 1`] = `
+[
+  {
+    "at": 688,
+    "event": "blocked",
+    "question": "Keep the regression?",
+  },
+  {
+    "durationMs": 4200,
+    "end": "complete",
+    "errors": 1,
+    "event": "turn",
+    "final": "Benchmark regressed 4%.",
+    "from": 0,
+    "prompt": "/hill-climb claude-sync-perf",
+    "skillDirs": [
+      "/repo/skills/hill-climb",
+    ],
+    "skills": [
+      "hill-climb",
+    ],
+    "source": "typed",
+    "to": 940,
+    "tools": {
+      "AskUserQuestion": 1,
+      "Bash": 1,
+      "Skill": 1,
+    },
+  },
+  {
+    "end": "interrupted",
+    "errors": 0,
+    "event": "turn",
+    "final": "",
+    "from": 973,
+    "prompt": "try again",
+    "skillDirs": [],
+    "skills": [],
+    "source": "typed",
+    "to": 1244,
+    "tools": {
+      "Bash": 1,
+    },
+  },
+]
+`;
+
+exports[`render prints one line per block 1`] = `
+[
+  "user: /hill-climb claude-sync-perf",
+  "tool Skill: {"skill":"hill-climb"}",
+  "user: Base directory for this skill: /repo/sk…",
+  "tool Bash: {"command":"bench"}",
+  "result ERROR: exit 1",
+  "tool AskUserQuestion: {"questions":[{"question":"Keep the reg…",
+  "result: yes",
+  "assistant: Benchmark regressed 4%.",
+  "-- turn end (4s)",
+  "user: try again",
+  "tool Bash: {}",
+  "user: [Request interrupted by user for tool u…",
+]
+`;

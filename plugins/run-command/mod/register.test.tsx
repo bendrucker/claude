@@ -25,7 +25,7 @@ function core(on: On): string[] {
   return fills;
 }
 
-async function reply($: Engine) {
+function reply($: Engine) {
   return $.ui.mount({
     plugin: PLUGIN,
     surface: "terminal",
@@ -35,11 +35,11 @@ async function reply($: Engine) {
   });
 }
 
-async function hint($: Engine, props: typeof SHELL) {
+function hint($: Engine, props: typeof SHELL) {
   return $.ui.mount({ plugin: PLUGIN, surface: "terminal", component: "PromptHint", props });
 }
 
-async function band($: Engine) {
+function band($: Engine) {
   return $.ui.mount({
     plugin: PLUGIN,
     surface: "terminal",

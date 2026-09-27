@@ -33,7 +33,7 @@ Interview the user in rounds with `AskUserQuestion`, one question per open decis
 
 ## Harness
 
-Build the benchmark per `performance:benchmark`, or adopt the project's existing one when it meets that skill's requirements, then audit it before the baseline. A harness built with debug or profiling builds, a warm cache the real scenario never has, or a loaded machine measures the harness. Check each against the Frame's scenario.
+Build the benchmark per `performance:benchmark`, or adopt the project's existing one when it meets that skill's requirements, then audit it before the baseline. A harness built with debug or profiling builds, a warm cache the real scenario never has, or a loaded machine measures the harness. Check each against the Frame's scenario. When runs or resets write many files, check the load for processes that watch the filesystem (backup, indexing, sync clients), and ask the user to exclude the harness directory from them.
 
 Time one run with its `--prepare` reset before launching the A/A, and multiply by the planned run count. When the A/A alone would take a large share of the budget, shrink the reset (restore only what a run changes) or the run count first.
 

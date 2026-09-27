@@ -39,7 +39,7 @@ test.each<{
   {
     name: "devDependencies drift, which npm ci also refuses",
     lockfile: "package-lock.json",
-    pinned: { dependencies: { zod: "^4.4.3" }, devDependencies: { "fast-check": "^4.8.0" } },
+    pinned: { dependencies: { zod: "^4.4.3" }, devDependencies: { "@hegeldev/hegel": "^0.4.7" } },
     manifest: { dependencies: { zod: "^4.4.3" } },
     expected: "git: package-lock.json disagrees with package.json, so the install fails",
   },

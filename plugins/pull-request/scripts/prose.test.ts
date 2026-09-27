@@ -1,5 +1,6 @@
 import { describe, expect, it, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { hardWrappedParagraphs, unwrapBody, WRAP_MAX_LINE, WRAP_MIN_LINE } from "./prose";
 
@@ -32,22 +33,20 @@ const LIST_INDENT = 2;
 const MIN_COLUMN = WRAP_MIN_LINE + MAX_WORD + 1 + LIST_INDENT;
 const MAX_COLUMN = WRAP_MAX_LINE;
 
-// oxlint-disable-next-line unicorn/prefer-spread -- spreading this ASCII string directly would trip typescript/no-misused-spread's code-point warning.
-const LOWERCASE = "abcdefghijklmnopqrstuvwxyz".split("");
-const word = fc.string({
-  minLength: 3,
-  maxLength: MAX_WORD,
-  unit: fc.constantFrom(...LOWERCASE),
+const word = gs.text({
+  minSize: 3,
+  maxSize: MAX_WORD,
+  alphabet: "abcdefghijklmnopqrstuvwxyz",
 });
 
 /** A block long enough to wrap at any column in range: at least 25 words. */
-const block = fc.array(word, { minLength: 25, maxLength: 60 }).map((words) => words.join(" "));
+const block = gs.arrays(word, { minSize: 25, maxSize: 60 }).map((words) => words.join(" "));
 
-const wrapColumn = fc.integer({ min: MIN_COLUMN, max: MAX_COLUMN });
+const wrapColumn = gs.integers({ minValue: MIN_COLUMN, maxValue: MAX_COLUMN });
 
 /** A document of one-line paragraphs and one-line list items. */
-const proseDocument = fc
-  .array(fc.record({ text: block, bullet: fc.boolean() }), { minLength: 1, maxLength: 4 })
+const proseDocument = gs
+  .arrays(gs.record({ text: block, bullet: gs.booleans() }), { minSize: 1, maxSize: 4 })
   .map((blocks) => blocks.map(({ text, bullet }) => (bullet ? `- ${text}` : text)).join("\n\n"));
 
 function wrapDocument(doc: string, column: number): string {
@@ -74,39 +73,36 @@ function renderedShape(body: string): string {
 
 describe("hardWrappedParagraphs", () => {
   it("flags a document wrapped at any column in range", () => {
-    fc.assert(
-      fc.property(proseDocument, wrapColumn, (doc, column) => {
-        expect(hardWrappedParagraphs(wrapDocument(doc, column)).length).toBeGreaterThan(0);
-      }),
-    );
+    hegel.test((tc) => {
+      const doc = tc.draw(proseDocument);
+      const column = tc.draw(wrapColumn);
+      expect(hardWrappedParagraphs(wrapDocument(doc, column)).length).toBeGreaterThan(0);
+    });
   });
 
   it("leaves a document alone when every block is on one line", () => {
-    fc.assert(
-      fc.property(proseDocument, (doc) => {
-        expect(hardWrappedParagraphs(doc)).toEqual([]);
-      }),
-    );
+    hegel.test((tc) => {
+      const doc = tc.draw(proseDocument);
+      expect(hardWrappedParagraphs(doc)).toEqual([]);
+    });
   });
 
   it("recovers the original document when unwrapping a wrapped one", () => {
-    fc.assert(
-      fc.property(proseDocument, wrapColumn, (doc, column) => {
-        const unwrapped = unwrapBody(wrapDocument(doc, column));
-        expect(unwrapped).toBe(doc);
-        // Converging in one pass is what makes a single retry clear the deny.
-        expect(hardWrappedParagraphs(unwrapped)).toEqual([]);
-      }),
-    );
+    hegel.test((tc) => {
+      const doc = tc.draw(proseDocument);
+      const column = tc.draw(wrapColumn);
+      const unwrapped = unwrapBody(wrapDocument(doc, column));
+      expect(unwrapped).toBe(doc);
+      // Converging in one pass is what makes a single retry clear the deny.
+      expect(hardWrappedParagraphs(unwrapped)).toEqual([]);
+    });
   });
 
   it("never changes what the body renders to", () => {
-    fc.assert(
-      fc.property(proseDocument, wrapColumn, (doc, column) => {
-        const wrapped = wrapDocument(doc, column);
-        expect(renderedShape(unwrapBody(wrapped))).toBe(renderedShape(wrapped));
-      }),
-    );
+    hegel.test((tc) => {
+      const wrapped = wrapDocument(tc.draw(proseDocument), tc.draw(wrapColumn));
+      expect(renderedShape(unwrapBody(wrapped))).toBe(renderedShape(wrapped));
+    });
   });
 
   const LONG = "The resolver caches every lookup it performs and evicts on a timer";

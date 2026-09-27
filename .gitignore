@@ -49,3 +49,6 @@ node_modules/
 voice-baseline/
 contrast-baseline/
 similarity.json
+
+# Hegel's example database, written to the working directory of a property test run.
+.hegel/

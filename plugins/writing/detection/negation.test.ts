@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { NO_NEGATION_PATTERN, noNegationHits, noNegationSpans, notNegationHits } from "./negation";
 import { scanAll } from "./scan";
 import { WORDLISTS } from "./wordlists";
@@ -106,16 +107,14 @@ describe("noNegationHits", () => {
   });
 
   it("never flags an excluded governing word", () => {
-    fc.assert(
-      fc.property(
-        fc.constantFrom(...EXCLUDED_GOVERNORS),
-        fc.constantFrom("no", "none", "nothing", "nobody", "nowhere", "neither", "no one"),
-        fc.constantFrom("controls", "trace", "flag", "entry", "call"),
-        (governor, indefinite, head) => {
-          expect(noNegationHits(`The router ${governor} ${indefinite} ${head}.`).count).toBe(0);
-        },
-      ),
-    );
+    hegel.test((tc) => {
+      const governor = tc.draw(gs.sampledFrom([...EXCLUDED_GOVERNORS]));
+      const indefinite = tc.draw(
+        gs.sampledFrom(["no", "none", "nothing", "nobody", "nowhere", "neither", "no one"]),
+      );
+      const head = tc.draw(gs.sampledFrom(["controls", "trace", "flag", "entry", "call"]));
+      expect(noNegationHits(`The router ${governor} ${indefinite} ${head}.`).count).toBe(0);
+    });
   });
 });
 

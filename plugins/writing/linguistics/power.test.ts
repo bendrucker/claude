@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { powerFromCurrentSample, requiredPositiveCount } from "./power";
 
 describe("requiredPositiveCount", () => {
@@ -39,26 +40,27 @@ describe("requiredPositiveCount", () => {
   });
 
   it("is non-increasing in lift, non-decreasing in z, and maximal at precision 0.5", () => {
-    const lift = fc.double({ min: 0.1, max: 100, noNaN: true });
-    const zScore = fc.double({ min: 0.1, max: 5, noNaN: true });
-    const prec = fc.double({ min: 0, max: 1, noNaN: true });
+    const lift = gs.floats({ minValue: 0.1, maxValue: 100, allowNan: false });
+    const zScore = gs.floats({ minValue: 0.1, maxValue: 5, allowNan: false });
+    const prec = gs.floats({ minValue: 0, maxValue: 1, allowNan: false });
     const count = (inputs: Parameters<typeof requiredPositiveCount>[0]) =>
       requiredPositiveCount(inputs).requiredPositives;
-    fc.assert(
-      fc.property(lift, lift, zScore, zScore, prec, (lA, lB, zA, zB, precision) => {
-        const [loLift, hiLift] = lA <= lB ? [lA, lB] : [lB, lA];
-        const [loZ, hiZ] = zA <= zB ? [zA, zB] : [zB, zA];
-        expect(count({ targetLiftPP: hiLift })).toBeLessThanOrEqual(
-          count({ targetLiftPP: loLift }),
-        );
-        expect(count({ targetLiftPP: loLift, z: hiZ })).toBeGreaterThanOrEqual(
-          count({ targetLiftPP: loLift, z: loZ }),
-        );
-        expect(count({ targetLiftPP: loLift, precision })).toBeLessThanOrEqual(
-          count({ targetLiftPP: loLift, precision: 0.5 }),
-        );
-      }),
-    );
+    hegel.test((tc) => {
+      const lA = tc.draw(lift);
+      const lB = tc.draw(lift);
+      const zA = tc.draw(zScore);
+      const zB = tc.draw(zScore);
+      const precision = tc.draw(prec);
+      const [loLift, hiLift] = lA <= lB ? [lA, lB] : [lB, lA];
+      const [loZ, hiZ] = zA <= zB ? [zA, zB] : [zB, zA];
+      expect(count({ targetLiftPP: hiLift })).toBeLessThanOrEqual(count({ targetLiftPP: loLift }));
+      expect(count({ targetLiftPP: loLift, z: hiZ })).toBeGreaterThanOrEqual(
+        count({ targetLiftPP: loLift, z: loZ }),
+      );
+      expect(count({ targetLiftPP: loLift, precision })).toBeLessThanOrEqual(
+        count({ targetLiftPP: loLift, precision: 0.5 }),
+      );
+    });
   });
 });
 

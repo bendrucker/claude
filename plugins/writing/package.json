@@ -16,8 +16,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@hegeldev/hegel": "^0.4.7",
     "@types/mdast": "^4.0.4",
-    "fast-check": "^4.8.0",
     "natural": "^8.1.1"
   }
 }

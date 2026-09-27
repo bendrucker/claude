@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { type Item, type RewriteDraft, selectSample, toItem, weave } from "./mine";
 
 function makeItem(overrides: Partial<Item>): Item {
@@ -21,12 +22,11 @@ test("weave interleaves longest and shortest", () => {
 });
 
 test("weave preserves the multiset", () => {
-  fc.assert(
-    fc.property(fc.array(fc.integer({ min: 0, max: 100 })), (lengths) => {
-      const woven = weave(lengths, (n) => n);
-      expect(woven.toSorted((a, b) => a - b)).toEqual(lengths.toSorted((a, b) => a - b));
-    }),
-  );
+  hegel.test((tc) => {
+    const lengths = tc.draw(gs.arrays(gs.integers({ minValue: 0, maxValue: 100 })));
+    const woven = weave(lengths, (n) => n);
+    expect(woven.toSorted((a, b) => a - b)).toEqual(lengths.toSorted((a, b) => a - b));
+  });
 });
 
 test.each<{ name: string; counts: Record<string, number>; limit: number; expected: string[] }>([

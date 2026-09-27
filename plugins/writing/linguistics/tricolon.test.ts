@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import type { CoarseTag } from "./tags";
 import { normalizedDistance, tagShape, tricolonHits } from "./tricolon";
 
-const tagShapeArb = fc.array(
-  fc.constantFrom<CoarseTag>("NOUN", "VERB", "ADJ", "ADV", "PRON", "ADP", "CONJ", "AUX"),
+const tagShapeArb = gs.arrays(
+  gs.sampledFrom<CoarseTag>(["NOUN", "VERB", "ADJ", "ADV", "PRON", "ADP", "CONJ", "AUX"]),
 );
 
 const PARALLEL_TRIPLE =
@@ -31,15 +32,15 @@ describe("normalizedDistance", () => {
   });
 
   it("is bounded in [0,1], symmetric, and zero on the diagonal", () => {
-    fc.assert(
-      fc.property(tagShapeArb, tagShapeArb, (a, b) => {
-        const d = normalizedDistance(a, b);
-        expect(d).toBeGreaterThanOrEqual(0);
-        expect(d).toBeLessThanOrEqual(1);
-        expect(normalizedDistance(b, a)).toBe(d);
-        expect(normalizedDistance(a, a)).toBe(0);
-      }),
-    );
+    hegel.test((tc) => {
+      const a = tc.draw(tagShapeArb);
+      const b = tc.draw(tagShapeArb);
+      const d = normalizedDistance(a, b);
+      expect(d).toBeGreaterThanOrEqual(0);
+      expect(d).toBeLessThanOrEqual(1);
+      expect(normalizedDistance(b, a)).toBe(d);
+      expect(normalizedDistance(a, a)).toBe(0);
+    });
   });
 });
 

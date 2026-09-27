@@ -1,5 +1,6 @@
 import { describe, expect, it, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import {
   clearApiErrors,
   computeInterval,
@@ -307,30 +308,28 @@ describe("pipelineDurations", () => {
   });
 
   test("never yields a duration the clamped interval cannot consume", () => {
-    fc.assert(
-      fc.property(
-        fc.array(
-          fc.record({
-            status: fc.constantFrom("success", "failed", "canceled", "skipped", "running"),
-            createdMs: fc.integer({ min: 0, max: 4e12 }),
-            elapsedMs: fc.integer({ min: -5000, max: 3_600_000 }),
+    hegel.test((tc) => {
+      const entries = tc.draw(
+        gs.arrays(
+          gs.record({
+            status: gs.sampledFrom(["success", "failed", "canceled", "skipped", "running"]),
+            createdMs: gs.integers({ minValue: 0, maxValue: 4e12 }),
+            elapsedMs: gs.integers({ minValue: -5000, maxValue: 3_600_000 }),
           }),
         ),
-        (entries) => {
-          const raw = entries.map(({ status, createdMs, elapsedMs }) => ({
-            status,
-            created_at: new Date(createdMs).toISOString(),
-            updated_at: new Date(createdMs + elapsedMs).toISOString(),
-          }));
-          const durations = pipelineDurations(raw);
-          expect(durations.every((seconds) => seconds > 0)).toBe(true);
-          expect(durations.length).toBeLessThanOrEqual(raw.length);
-          const interval = computeInterval(durations);
-          expect(interval).toBeGreaterThanOrEqual(30);
-          expect(interval).toBeLessThanOrEqual(600);
-        },
-      ),
-    );
+      );
+      const raw = entries.map(({ status, createdMs, elapsedMs }) => ({
+        status,
+        created_at: new Date(createdMs).toISOString(),
+        updated_at: new Date(createdMs + elapsedMs).toISOString(),
+      }));
+      const durations = pipelineDurations(raw);
+      expect(durations.every((seconds) => seconds > 0)).toBe(true);
+      expect(durations.length).toBeLessThanOrEqual(raw.length);
+      const interval = computeInterval(durations);
+      expect(interval).toBeGreaterThanOrEqual(30);
+      expect(interval).toBeLessThanOrEqual(600);
+    });
   });
 });
 
@@ -353,24 +352,23 @@ describe("computeInterval", () => {
   });
 
   test("stays within [30, 600] and agrees with a clamped-average oracle", () => {
-    fc.assert(
-      fc.property(fc.array(fc.integer({ min: 0 })), (durations) => {
-        const result = computeInterval(durations);
-        expect(result).toBeGreaterThanOrEqual(30);
-        expect(result).toBeLessThanOrEqual(600);
-        const oracle =
-          durations.length === 0
-            ? 30
-            : Math.min(
-                600,
-                Math.max(
-                  30,
-                  Math.round(durations.reduce((a, b) => a + b, 0) / durations.length + 30),
-                ),
-              );
-        expect(result).toBe(oracle);
-      }),
-    );
+    hegel.test((tc) => {
+      const durations = tc.draw(gs.arrays(gs.integers({ minValue: 0 })));
+      const result = computeInterval(durations);
+      expect(result).toBeGreaterThanOrEqual(30);
+      expect(result).toBeLessThanOrEqual(600);
+      const oracle =
+        durations.length === 0
+          ? 30
+          : Math.min(
+              600,
+              Math.max(
+                30,
+                Math.round(durations.reduce((a, b) => a + b, 0) / durations.length + 30),
+              ),
+            );
+      expect(result).toBe(oracle);
+    });
   });
 });
 
@@ -907,52 +905,49 @@ describe("selectPipeline", () => {
     expect(selectPipeline(records, prefer)?.id ?? null).toBe(expectedId);
   });
 
-  const pipelineRecord = fc.record<PipelineRecord>({
-    id: fc.integer({ min: 1, max: 3_000_000_000 }),
-    status: fc.constantFrom<InternalState>("running", "queued", "failing", "success"),
-    sha: fc.string(),
-    source: fc.constantFrom(
+  const pipelineRecord: gs.Generator<PipelineRecord> = gs.record({
+    id: gs.integers({ minValue: 1, maxValue: 3_000_000_000 }),
+    status: gs.sampledFrom<InternalState>(["running", "queued", "failing", "success"]),
+    sha: gs.text(),
+    source: gs.sampledFrom([
       "push",
       "merge_request_event",
       "external",
       "parent_pipeline",
       "web",
       "schedule",
-    ),
+    ]),
   });
 
   test("picks an input record that is eligible and highest-id within its partition", () => {
-    fc.assert(
-      fc.property(
-        fc.array(pipelineRecord),
-        fc.constantFrom<"merge-request" | "branch">("merge-request", "branch"),
-        (records, prefer) => {
-          const selected = selectPipeline(records, prefer);
-          const eligible = records.filter(
-            (record) => record.source !== "external" && record.source !== "parent_pipeline",
-          );
-          if (eligible.length === 0) {
-            expect(selected).toBeNull();
-            return;
-          }
-          expect(selected).not.toBeNull();
-          if (!selected) return;
-          expect(records).toContain(selected);
-          const isMergeRequest = (record: PipelineRecord) =>
-            record.source === "merge_request_event";
-          const preferred = eligible.filter((record) =>
-            prefer === "merge-request" ? isMergeRequest(record) : !isMergeRequest(record),
-          );
-          if (preferred.length > 0) {
-            expect(preferred).toContain(selected);
-          }
-          const partition = eligible.filter(
-            (record) => isMergeRequest(record) === isMergeRequest(selected),
-          );
-          expect(selected.id).toBe(Math.max(...partition.map((record) => record.id)));
-        },
-      ),
-    );
+    hegel.test((tc) => {
+      const records = tc.draw(gs.arrays(pipelineRecord));
+      const prefer = tc.draw(
+        gs.sampledFrom<"merge-request" | "branch">(["merge-request", "branch"]),
+      );
+      const selected = selectPipeline(records, prefer);
+      const eligible = records.filter(
+        (record) => record.source !== "external" && record.source !== "parent_pipeline",
+      );
+      if (eligible.length === 0) {
+        expect(selected).toBeNull();
+        return;
+      }
+      expect(selected).not.toBeNull();
+      if (!selected) return;
+      expect(records).toContain(selected);
+      const isMergeRequest = (record: PipelineRecord) => record.source === "merge_request_event";
+      const preferred = eligible.filter((record) =>
+        prefer === "merge-request" ? isMergeRequest(record) : !isMergeRequest(record),
+      );
+      if (preferred.length > 0) {
+        expect(preferred).toContain(selected);
+      }
+      const partition = eligible.filter(
+        (record) => isMergeRequest(record) === isMergeRequest(selected),
+      );
+      expect(selected.id).toBe(Math.max(...partition.map((record) => record.id)));
+    });
   });
 });
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { overlaps, scopeIntroduced } from "./scope";
 import type { Comment, LineRange } from "./types";
 
@@ -18,11 +19,11 @@ function range(start: number, end: number): LineRange {
   return { start, end };
 }
 
-const commentArb: fc.Arbitrary<Comment> = fc
+const commentGen: gs.Generator<Comment> = gs
   .record({
-    startLine: fc.integer({ min: 1, max: 30 }),
-    span: fc.integer({ min: 0, max: 8 }),
-    text: fc.string(),
+    startLine: gs.integers({ minValue: 1, maxValue: 30 }),
+    span: gs.integers({ minValue: 0, maxValue: 8 }),
+    text: gs.text(),
   })
   .map(({ startLine, span, text }) => ({
     kind: "line",
@@ -33,8 +34,11 @@ const commentArb: fc.Arbitrary<Comment> = fc
     endColumn: text.length,
   }));
 
-const rangeArb: fc.Arbitrary<LineRange> = fc
-  .record({ start: fc.integer({ min: 1, max: 30 }), span: fc.integer({ min: 0, max: 8 }) })
+const rangeGen: gs.Generator<LineRange> = gs
+  .record({
+    start: gs.integers({ minValue: 1, maxValue: 30 }),
+    span: gs.integers({ minValue: 0, maxValue: 8 }),
+  })
   .map(({ start, span }) => ({ start, end: start + span }));
 
 /** Independent oracle: enumerate the comment's lines and test membership in the range. */
@@ -79,11 +83,11 @@ describe("overlaps", () => {
   });
 
   test("agrees with per-line interval intersection", () => {
-    fc.assert(
-      fc.property(commentArb, rangeArb, (c, r) => {
-        expect(overlaps(c, r)).toBe(sharesLine(c, r));
-      }),
-    );
+    hegel.test((tc) => {
+      const c = tc.draw(commentGen);
+      const r = tc.draw(rangeGen);
+      expect(overlaps(c, r)).toBe(sharesLine(c, r));
+    });
   });
 });
 
@@ -130,17 +134,17 @@ describe("scopeIntroduced", () => {
   });
 
   test("is the order-preserving filter of overlapping comments, leaving inputs untouched", () => {
-    fc.assert(
-      fc.property(fc.array(commentArb), fc.array(rangeArb), (comments, added) => {
-        const commentsBefore = structuredClone(comments);
-        const addedBefore = structuredClone(added);
-        const result = scopeIntroduced(comments, added);
-        const expected = comments.filter((c) => added.some((r) => sharesLine(c, r)));
-        expect(result).toEqual(expected);
-        expect(result).not.toBe(comments);
-        expect(comments).toEqual(commentsBefore);
-        expect(added).toEqual(addedBefore);
-      }),
-    );
+    hegel.test((tc) => {
+      const comments = tc.draw(gs.arrays(commentGen));
+      const added = tc.draw(gs.arrays(rangeGen));
+      const commentsBefore = structuredClone(comments);
+      const addedBefore = structuredClone(added);
+      const result = scopeIntroduced(comments, added);
+      const expected = comments.filter((c) => added.some((r) => sharesLine(c, r)));
+      expect(result).toEqual(expected);
+      expect(result).not.toBe(comments);
+      expect(comments).toEqual(commentsBefore);
+      expect(added).toEqual(addedBefore);
+    });
   });
 });

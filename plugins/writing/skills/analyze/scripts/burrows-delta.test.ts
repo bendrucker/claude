@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import {
   type Bin,
   binDocuments,
@@ -59,18 +60,16 @@ describe("binDocuments", () => {
   });
 
   test("every emitted bin reaches the target size", () => {
-    fc.assert(
-      fc.property(
-        fc.array(fc.integer({ min: 1, max: 40 }), { maxLength: 30 }),
-        fc.integer({ min: 1, max: 50 }),
-        (lengths, binWords) => {
-          const docs = lengths.map((length, index) => makeDoc(`w${index}`, length));
-          for (const bin of binDocuments(docs, binWords)) {
-            expect(bin.tokens).toBeGreaterThanOrEqual(binWords);
-          }
-        },
-      ),
-    );
+    hegel.test((tc) => {
+      const lengths = tc.draw(
+        gs.arrays(gs.integers({ minValue: 1, maxValue: 40 }), { maxSize: 30 }),
+      );
+      const binWords = tc.draw(gs.integers({ minValue: 1, maxValue: 50 }));
+      const docs = lengths.map((length, index) => makeDoc(`w${index}`, length));
+      for (const bin of binDocuments(docs, binWords)) {
+        expect(bin.tokens).toBeGreaterThanOrEqual(binWords);
+      }
+    });
   });
 });
 

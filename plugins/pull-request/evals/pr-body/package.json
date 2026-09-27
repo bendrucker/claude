@@ -15,7 +15,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "fast-check": "^4.8.0",
+    "@hegeldev/hegel": "^0.4.7",
     "promptfoo": "0.122.2"
   }
 }

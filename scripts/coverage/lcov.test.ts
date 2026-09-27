@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import {
   coveredLines,
   type FileCoverage,
@@ -11,20 +12,12 @@ import {
   uncoveredLines,
 } from "./lcov";
 
-const pathChar = fc.constantFrom(
-  // oxlint-disable-next-line unicorn/prefer-spread -- spreading this ASCII string directly would trip typescript/no-misused-spread's code-point warning.
-  ..."abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/._-".split(""),
-);
-
-const fileCoverage = fc.record<FileCoverage>({
-  file: fc.array(pathChar, { minLength: 1 }).map((chars) => chars.join("")),
-  lineHits: fc
-    .uniqueArray(fc.tuple(fc.integer({ min: 1 }), fc.nat()), {
-      selector: ([line]) => line,
-    })
-    .map((entries) => new Map(entries)),
-  functionsFound: fc.nat(),
-  functionsHit: fc.nat(),
+// A trailing `\r` is indistinguishable from a CRLF line ending.
+const fileCoverage: gs.Generator<FileCoverage> = gs.record({
+  file: gs.text({ minSize: 1, excludeCharacters: "\n" }).filter((f) => !f.endsWith("\r")),
+  lineHits: gs.maps(gs.integers({ minValue: 1 }), gs.integers({ minValue: 0 })),
+  functionsFound: gs.integers({ minValue: 0 }),
+  functionsHit: gs.integers({ minValue: 0 }),
 });
 
 function defined<T>(value: T | undefined): T {
@@ -83,6 +76,36 @@ describe("parseLcov", () => {
 
   test("ignores text outside records and blank lines", () => {
     expect(parseLcov("\n\nnot a record\n")).toEqual([]);
+  });
+
+  test.each<{ name: string; text: string; files: string[] }>([
+    {
+      name: "CRLF line endings",
+      text: "SF:src/a.ts\r\nDA:1,1\r\nend_of_record\r\n",
+      files: ["src/a.ts"],
+    },
+    {
+      name: "a doubled carriage return",
+      text: "SF:src/a.ts\r\r\nend_of_record\n",
+      files: ["src/a.ts"],
+    },
+    {
+      name: "a byte order mark",
+      text: "﻿SF:src/a.ts\nend_of_record\n",
+      files: ["src/a.ts"],
+    },
+    {
+      name: "edge whitespace in the path",
+      text: "SF: src/a.ts \nend_of_record\n",
+      files: [" src/a.ts "],
+    },
+    {
+      name: "padded directive lines",
+      text: "  SF:src/a.ts\n DA:1,1 \n end_of_record \nSF:src/b.ts\nend_of_record\n",
+      files: ["src/a.ts", "src/b.ts"],
+    },
+  ])("reads paths with $name", ({ text, files }) => {
+    expect(parseLcov(text).map((r) => r.file)).toEqual(files);
   });
 
   test.each([
@@ -147,11 +170,10 @@ describe("formatLcov", () => {
   });
 
   test("round-trips any records through the parser", () => {
-    fc.assert(
-      fc.property(fc.array(fileCoverage), (records) => {
-        expect(parseLcov(formatLcov(records))).toEqual(records);
-      }),
-    );
+    hegel.test((tc) => {
+      const records = tc.draw(gs.arrays(fileCoverage));
+      expect(parseLcov(formatLcov(records))).toEqual(records);
+    });
   });
 
   test("emits empty string for no records", () => {

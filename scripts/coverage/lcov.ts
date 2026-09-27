@@ -52,8 +52,10 @@ export function parseLcov(text: string): FileCoverage[] {
     if (line === "") continue;
 
     if (line.startsWith("SF:")) {
+      // The path keeps its edge whitespace. Only line-ending `\r`s are stripped.
+      const untrimmed = raw.replace(/\r+$/, "");
       current = {
-        file: line.slice(3),
+        file: untrimmed.slice(untrimmed.indexOf("SF:") + 3),
         lineHits: new Map(),
         functionsFound: 0,
         functionsHit: 0,

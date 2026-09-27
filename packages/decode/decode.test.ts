@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -161,29 +162,26 @@ describe("roundtrip", () => {
       note: z.string().nullable(),
     });
 
-    fc.assert(
-      fc.property(
-        fc.record({
-          name: fc.string(),
-          count: fc.integer(),
-          active: fc.boolean(),
-          tags: fc.array(fc.string()),
-          note: fc.option(fc.string(), { nil: null }),
+    hegel.test((tc) => {
+      const value = tc.draw(
+        gs.record({
+          name: gs.text(),
+          count: gs.integers(),
+          active: gs.booleans(),
+          tags: gs.arrays(gs.text()),
+          note: gs.optional(gs.text()),
         }),
-        (value) => {
-          expect(decodeJson(schema, JSON.stringify(value), "roundtrip")).toEqual(value);
-        },
-      ),
-    );
+      );
+      expect(decodeJson(schema, JSON.stringify(value), "roundtrip")).toEqual(value);
+    });
   });
 
   test("any record list survives stringify then line decode", () => {
-    fc.assert(
-      fc.property(fc.array(fc.record({ name: fc.string() })), (records) => {
-        const text = records.map((record) => JSON.stringify(record)).join("\n");
-        expect(decodeJsonLines(Tag, text, "roundtrip")).toEqual(records);
-      }),
-    );
+    hegel.test((tc) => {
+      const records = tc.draw(gs.arrays(gs.record({ name: gs.text() })));
+      const text = records.map((record) => JSON.stringify(record)).join("\n");
+      expect(decodeJsonLines(Tag, text, "roundtrip")).toEqual(records);
+    });
   });
 });
 

@@ -65,7 +65,10 @@
     // A circular import loads with a partially-initialized binding, and
     // which side resolves first depends on import order.
     "import/no-cycle": "error",
-    "import/no-namespace": ["error", { "ignore": ["fast-check"] }],
+    "import/no-namespace": [
+      "error",
+      { "ignore": ["@hegeldev/hegel", "@hegeldev/hegel/generators"] }
+    ],
     // Branches that repeat the same statement hide which lines are the actual difference between them.
     "oxc/branches-sharing-code": "error",
     // Spreading an accumulator inside a loop copies the whole thing on every

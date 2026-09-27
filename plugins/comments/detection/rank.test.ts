@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { rankComments, rankCommentsWeighted, type SortKey, scoreComment } from "./rank";
 import type { Comment } from "./types";
 
@@ -15,11 +16,11 @@ function comment(over: Partial<Comment> = {}): Comment {
   };
 }
 
-const commentArb: fc.Arbitrary<Comment> = fc
+const commentGen: gs.Generator<Comment> = gs
   .record({
-    text: fc.string({ maxLength: 40 }),
-    startLine: fc.integer({ min: 1, max: 100 }),
-    span: fc.integer({ min: 0, max: 20 }),
+    text: gs.text({ maxSize: 40 }),
+    startLine: gs.integers({ minValue: 1, maxValue: 100 }),
+    span: gs.integers({ minValue: 0, maxValue: 20 }),
   })
   .map(({ text, startLine, span }) => ({
     kind: "line",
@@ -29,6 +30,8 @@ const commentArb: fc.Arbitrary<Comment> = fc
     startColumn: 0,
     endColumn: text.length,
   }));
+
+const sortGen = gs.sampledFrom<SortKey>(["score", "lines", "chars"]);
 
 /** Independent stable sort: descending metric, original index breaks ties. */
 function rankOracle<T extends Comment>(comments: T[], sort: SortKey): T[] {
@@ -96,42 +99,32 @@ describe("rankComments", () => {
   });
 
   test("is a stable non-ascending sort by the chosen metric that leaves the input untouched", () => {
-    fc.assert(
-      fc.property(
-        fc.array(commentArb),
-        fc.constantFrom<SortKey>("score", "lines", "chars"),
-        (comments, sort) => {
-          const before = [...comments];
-          const result = rankComments(comments, sort);
-          expect(result).toEqual(rankOracle(comments, sort));
-          expect(result).not.toBe(comments);
-          expect(comments).toEqual(before);
-        },
-      ),
-    );
+    hegel.test((tc) => {
+      const comments = tc.draw(gs.arrays(commentGen));
+      const sort = tc.draw(sortGen);
+      const before = [...comments];
+      const result = rankComments(comments, sort);
+      expect(result).toEqual(rankOracle(comments, sort));
+      expect(result).not.toBe(comments);
+      expect(comments).toEqual(before);
+    });
   });
 });
 
 describe("rankCommentsWeighted", () => {
   const pathed = (text: string, path: string) => ({ ...comment({ text }), path });
 
-  const pathedArb = fc
-    .tuple(commentArb, fc.constantFrom("a.ts", "b.ts", "c.ts"))
-    // oxlint-disable-next-line oxc/no-map-spread -- this .map is fast-check's Arbitrary.map, not Array#map; the spread must copy so the generated comment isn't mutated in place.
+  const pathedGen = gs
+    .tuples(commentGen, gs.sampledFrom(["a.ts", "b.ts", "c.ts"]))
+    // oxlint-disable-next-line oxc/no-map-spread -- this .map is Hegel's Generator.map, not Array#map; the spread must copy so the generated comment isn't mutated in place.
     .map(([c, path]) => ({ ...c, path }));
 
   test("matches rankComments when no path has a weight", () => {
-    fc.assert(
-      fc.property(
-        fc.array(pathedArb),
-        fc.constantFrom<SortKey>("score", "lines", "chars"),
-        (comments, sort) => {
-          expect(rankCommentsWeighted(comments, new Map(), sort)).toEqual(
-            rankComments(comments, sort),
-          );
-        },
-      ),
-    );
+    hegel.test((tc) => {
+      const comments = tc.draw(gs.arrays(pathedGen));
+      const sort = tc.draw(sortGen);
+      expect(rankCommentsWeighted(comments, new Map(), sort)).toEqual(rankComments(comments, sort));
+    });
   });
 
   test("a heavy file's comment outranks a longer comment in an unweighted file", () => {

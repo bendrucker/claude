@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import {
   addNgrams,
   cleanText,
@@ -195,16 +196,14 @@ describe("processRows", () => {
   });
 
   test("single-session stats agree with processCorpus for any text and sizes", () => {
-    fc.assert(
-      fc.property(
-        fc.string(),
-        fc.uniqueArray(fc.integer({ min: 1, max: 5 }), { minLength: 1 }),
-        (text, sizes) => {
-          const fromRows = processRows([{ session_id: "s1", text }], sizes).stats;
-          expect(fromRows).toEqual(processCorpus(text, sizes));
-        },
-      ),
-    );
+    hegel.test((tc) => {
+      const text = tc.draw(gs.text());
+      const sizes = tc.draw(
+        gs.arrays(gs.integers({ minValue: 1, maxValue: 5 }), { minSize: 1, unique: true }),
+      );
+      const fromRows = processRows([{ session_id: "s1", text }], sizes).stats;
+      expect(fromRows).toEqual(processCorpus(text, sizes));
+    });
   });
 });
 

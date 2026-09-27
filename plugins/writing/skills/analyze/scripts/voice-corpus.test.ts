@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import {
   documentKind,
   type DocumentKind,
@@ -16,14 +17,14 @@ import {
 // token (the delimiter captures \S+), meta carries no ")" or newline (it sits
 // inside the (...) group on the single-line delimiter), and body lines never
 // open with "=" so none masquerade as a delimiter after trimming.
-const voiceDocument = fc.record<VoiceDocument>({
-  source: fc.string({ minLength: 1 }).map((s) => {
+const voiceDocument: gs.Generator<VoiceDocument> = gs.record({
+  source: gs.text({ minSize: 1 }).map((s) => {
     const stripped = s.replaceAll(/\s/g, "");
     return stripped !== "" ? stripped : "x";
   }),
-  meta: fc.string().map((s) => s.replaceAll(/[)\r\n]/g, "")),
-  body: fc
-    .array(fc.string().map((s) => s.replaceAll(/[\r\n]/g, " ").replace(/^[\s=]+/, "")))
+  meta: gs.text().map((s) => s.replaceAll(/[)\r\n]/g, "")),
+  body: gs
+    .arrays(gs.text().map((s) => s.replaceAll(/[\r\n]/g, " ").replace(/^[\s=]+/, "")))
     .map((lines) => lines.join("\n").trim()),
 });
 
@@ -60,14 +61,13 @@ describe("serializeCorpus", () => {
   });
 
   test("round-trip preserves source and body for any documents", () => {
-    fc.assert(
-      fc.property(fc.array(voiceDocument), (docs) => {
-        const reparsed = parseCorpus(serializeCorpus(docs));
-        const project = (list: VoiceDocument[]) =>
-          list.map((d) => ({ source: d.source, body: d.body }));
-        expect(project(reparsed)).toEqual(project(docs));
-      }),
-    );
+    hegel.test((tc) => {
+      const docs = tc.draw(gs.arrays(voiceDocument));
+      const reparsed = parseCorpus(serializeCorpus(docs));
+      const project = (list: VoiceDocument[]) =>
+        list.map((d) => ({ source: d.source, body: d.body }));
+      expect(project(reparsed)).toEqual(project(docs));
+    });
   });
 });
 
@@ -129,13 +129,12 @@ describe("splitHalves", () => {
   });
 
   test("both halves together are the whole corpus", () => {
-    fc.assert(
-      fc.property(fc.array(fc.integer()), (items) => {
-        const [left, right] = splitHalves(items);
-        const byValue = (x: number, y: number) => x - y;
-        expect([...left, ...right].toSorted(byValue)).toEqual(items.toSorted(byValue));
-      }),
-    );
+    hegel.test((tc) => {
+      const items = tc.draw(gs.arrays(gs.integers()));
+      const [left, right] = splitHalves(items);
+      const byValue = (x: number, y: number) => x - y;
+      expect([...left, ...right].toSorted(byValue)).toEqual(items.toSorted(byValue));
+    });
   });
 });
 

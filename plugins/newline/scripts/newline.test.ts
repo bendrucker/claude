@@ -4,7 +4,8 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PostToolUseHookInput, PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { processInput as checkInput, hasTrailingNewline } from "./check";
 import { processInput as ensureInput, ensureTrailingNewline } from "./ensure";
 import { processInput as preserveInput, preserveNewlineState } from "./preserve";
@@ -230,9 +231,9 @@ interface FileContent {
   newline: boolean;
 }
 
-const fileContent = fc.record<FileContent>({
-  body: fc.string({ minLength: 1 }),
-  newline: fc.boolean(),
+const fileContent: gs.Generator<FileContent> = gs.record({
+  body: gs.text({ minSize: 1 }),
+  newline: gs.booleans(),
 });
 
 function render({ body, newline }: FileContent): string {
@@ -242,22 +243,22 @@ function render({ body, newline }: FileContent): string {
 describe("integration", () => {
   it("restores the original trailing-newline state through the check/preserve cycle", async () => {
     const filePath = join(testDir, "prop.txt");
-    await fc.assert(
-      fc.asyncProperty(fileContent, fileContent, async (original, edited) => {
-        const originalContent = render(original);
-        await Bun.write(filePath, originalContent);
-        const originalHadNewline = originalContent.endsWith("\n");
+    await hegel.testAsync(async (tc) => {
+      const original = tc.draw(fileContent);
+      const edited = tc.draw(fileContent);
+      const originalContent = render(original);
+      await Bun.write(filePath, originalContent);
+      const originalHadNewline = originalContent.endsWith("\n");
 
-        await checkInput(mockPreToolInput(filePath));
+      await checkInput(mockPreToolInput(filePath));
 
-        await Bun.write(filePath, render(edited));
+      await Bun.write(filePath, render(edited));
 
-        await preserveInput(mockPostToolInput(filePath));
+      await preserveInput(mockPostToolInput(filePath));
 
-        expect(await hasNewline(filePath)).toBe(originalHadNewline);
-        expect(await getState("newline", filePath)).toBe("");
-      }),
-    );
+      expect(await hasNewline(filePath)).toBe(originalHadNewline);
+      expect(await getState("newline", filePath)).toBe("");
+    });
   });
 
   it("preserves trailing newline through check and preserve cycle", async () => {

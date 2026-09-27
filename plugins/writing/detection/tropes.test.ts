@@ -1,5 +1,6 @@
 import { describe, expect, it, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import {
   firstByTier,
   type PatternMatch,
@@ -46,28 +47,27 @@ describe("stripCode", () => {
   // fenced blocks. That is stripCode's intended domain: inline code that spans
   // a newline is replaced by equal-width spaces, which drops the newline and
   // collapses the line count.
-  const plainSegment = fc.string().map((s) => s.replaceAll(/[`\n]/g, ""));
-  const inlineCodeLine = fc
-    .tuple(
+  const plainSegment = gs.text().map((s) => s.replaceAll(/[`\n]/g, ""));
+  const inlineCodeLine = gs
+    .tuples(
       plainSegment,
-      fc.string().map((s) => {
+      gs.text().map((s) => {
         const stripped = s.replaceAll(/[`\n]/g, "");
         return stripped !== "" ? stripped : "x";
       }),
       plainSegment,
     )
     .map(([pre, code, post]) => `${pre}\`${code}\`${post}`);
-  const fencedBlock = fc.array(plainSegment).map((lines) => `\`\`\`\n${lines.join("\n")}\n\`\`\``);
-  const codeSafeText = fc
-    .array(fc.oneof(plainSegment, inlineCodeLine, fencedBlock))
+  const fencedBlock = gs.arrays(plainSegment).map((lines) => `\`\`\`\n${lines.join("\n")}\n\`\`\``);
+  const codeSafeText = gs
+    .arrays(gs.oneOf(plainSegment, inlineCodeLine, fencedBlock))
     .map((blocks) => blocks.join("\n"));
 
   it("preserves line count for well-formed code spans", () => {
-    fc.assert(
-      fc.property(codeSafeText, (text) => {
-        expect(stripCode(text).split("\n")).toHaveLength(text.split("\n").length);
-      }),
-    );
+    hegel.test((tc) => {
+      const text = tc.draw(codeSafeText);
+      expect(stripCode(text).split("\n")).toHaveLength(text.split("\n").length);
+    });
   });
 });
 

@@ -160,7 +160,7 @@ describe("angles", () => {
 
 describe("copilotArgs", () => {
   const args = (agentic: boolean) =>
-    copilotArgs({ model: "gpt-5.6-terra", cap: 30, cwd: ".", agentic });
+    copilotArgs({ model: "gpt-5.6-terra", cap: 30, cwd: ".", agentic, env: {} });
 
   // The cap is the only per-session ceiling, and the preflight guard reserves exactly this
   // number before the spawn. A shape that omits it can bill past what was reserved.

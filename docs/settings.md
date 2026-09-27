@@ -120,7 +120,7 @@ diff "$TMPDIR/before.json" "$TMPDIR/after.json"
 
 ## Plugins
 
-`1password@1password` moves project secrets out of plaintext `.env` files into 1Password Environments, which the desktop app serves back into the workspace as FIFOs it feeds on read. It ships the `1password-environments` skill, the plugin's `1password` MCP server (which returns variable names, never values), and a `PreToolUse` Bash hook that denies every command in a workspace whose expected mount is missing or disabled. The hook exits silently when no mount is registered, so it costs a SQLite lookup per Bash call everywhere else. `authenticate`, `list_environments`, `list_variables`, and `list_local_env_files` are allowed because none of them mutates anything. Creating, appending, mounting, and renaming still go through auto mode and the desktop app's per-environment approval.
+`1password@1password` replaces plaintext `.env` files with mounted 1Password Environments. Its read-only MCP tools are allowed. Writes still need the desktop app's approval.
 
 The marketplace tracks `main` because the repo has no release tags. A commit SHA in `ref` fails, since Claude Code passes it to `git clone --branch`. **Pin it** once this lists a tag:
 

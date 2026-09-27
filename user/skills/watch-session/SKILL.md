@@ -3,6 +3,7 @@ name: watch-session
 description: >-
   Watch another Claude session and develop a skill from its turns: fix a skill under test as its runs expose defects, or draft a skill from a task done there by hand. Use when the user asks you to watch a herdr pane or session while they test a skill or demonstrate a task.
 argument-hint: "<pane-id | session-uuid> [--skill <dir>] [--learn [<name>]] [--control] [--prompt <text>] [--every <duration>]"
+disable-model-invocation: true
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts:*)
   - Bash(herdr agent read:*)

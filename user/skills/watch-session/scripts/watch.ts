@@ -7,7 +7,7 @@ import { $ } from "bun";
 import { cli, command } from "cleye";
 import { z } from "zod";
 import { decodeJson } from "../../../../packages/decode/index";
-import { type Blocked, render, splitLines, type Turn, TurnTracker } from "./transcript";
+import { type Blocked, Entry, render, splitLines, type Turn, TurnTracker } from "./transcript";
 
 const PANE_CHECK_MS = 10_000;
 
@@ -59,13 +59,13 @@ async function resolve(target: string): Promise<Target & { pane?: string }> {
 async function firstCwd(path: string): Promise<string | undefined> {
   let pending = new Uint8Array();
   for await (const chunk of Bun.file(path).stream()) {
-    const bytes = new Uint8Array(pending.length + chunk.length);
-    bytes.set(pending);
-    bytes.set(chunk, pending.length);
-    const { lines, consumed } = splitLines(bytes, 0);
-    const cwd = lines.find((line) => line.entry.cwd !== undefined)?.entry.cwd;
-    if (cwd !== undefined) return cwd;
-    pending = bytes.subarray(consumed);
+    const input = Buffer.concat([pending, chunk]);
+    const { values, read } = Bun.JSONL.parseChunk(input);
+    for (const value of values) {
+      const cwd = Entry.safeParse(value).data?.cwd;
+      if (cwd !== undefined) return cwd;
+    }
+    pending = input.subarray(read);
   }
   return undefined;
 }

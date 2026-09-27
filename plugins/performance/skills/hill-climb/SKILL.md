@@ -78,6 +78,8 @@ Screen with the fast signal or a microbenchmark of the changed path. Confirm a c
 - **Accept** when the target moves in the predicted direction past the acceptance rule in the notes file (default: permutation p < 0.1 and a median gain of at least 3%) and no guard regresses. Commit the change alone, with the evidence in the commit body.
 - **Reject** otherwise. Record the hypothesis, pseudocode of the change, and the numbers in the notes file, and save the diff as a patch beside it, so the null result stays findable. A rejected hypothesis stays rejected until a new profile argues for it.
 
+Check an accepted gain against the profile: a change cannot save more than the time its target took. A gain past that bound is partly noise or a harness shift, so re-measure before committing, or report the excess as unexplained.
+
 Re-profile after each accept, since the ranking shifts. After the first decision, report it to the user in one line and continue unless the user redirects.
 
 A harness change mid-climb moves the baseline. Commit it separately, re-run the baseline, and note it in the notes file.

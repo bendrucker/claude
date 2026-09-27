@@ -152,6 +152,11 @@
       "source": "./plugins/raycast"
     },
     {
+      "name": "run-command",
+      "description": "Pick a reply's `! <command>` suggestion by click or digit to fill it into the shell prompt",
+      "source": "./plugins/run-command"
+    },
+    {
       "name": "herdr",
       "description": "Drive the herdr terminal workspace manager: panes, tabs, workspaces, and sibling coding agents",
       "source": "./plugins/herdr"

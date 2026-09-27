@@ -1,4 +1,8 @@
-const transpiler = new Bun.Transpiler({ loader: "ts" });
+const transpilers = {
+  ts: new Bun.Transpiler({ loader: "ts" }),
+  // JSX makes this one also report the React runtime Bun injects.
+  tsx: new Bun.Transpiler({ loader: "tsx" }),
+};
 
 /**
  * Module specifiers imported by a TypeScript source, relative and bare alike.
@@ -10,13 +14,13 @@ const transpiler = new Bun.Transpiler({ loader: "ts" });
  * module specifier are rewritten, because a bare `export type Name =` declares
  * a local alias and must survive intact for the source to still parse.
  */
-export function scanImports(source: string): string[] {
+export function scanImports(source: string, loader: keyof typeof transpilers = "ts"): string[] {
   const body = source.startsWith("#!") ? source.slice(source.indexOf("\n") + 1) : source;
   const values = body
     .replaceAll(/\bimport\s+type\s+/g, "import ")
     .replaceAll(/\bexport\s+type\s+(?=[{*])/g, "export ");
 
-  return transpiler.scanImports(values).map(({ path }) => path);
+  return transpilers[loader].scanImports(values).map(({ path }) => path);
 }
 
 export function isBuiltin(specifier: string): boolean {

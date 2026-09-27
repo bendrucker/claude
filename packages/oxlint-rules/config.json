@@ -11,7 +11,7 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts"],
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
       "rules": {
         "local/no-chained-type-assertions": "off",
         "local/no-silent-catch": "off"

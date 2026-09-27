@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import { cli, command } from "cleye";
+import { defineCommand, runMain } from "citty";
 import { z } from "zod";
 import { decodeFile } from "../../../../packages/decode/index";
 import { paneAgent } from "./herdr";
@@ -251,144 +251,115 @@ async function show(target: string, from: number, to: number | undefined, trunca
   for (const line of render(splitLines(bytes, from).lines, truncate)) console.log(line);
 }
 
-const watchCmd = command(
-  {
+const watchCmd = defineCommand({
+  meta: {
     name: "watch",
-    parameters: ["<target>"],
-    help: {
-      description:
-        "Tail a Claude session's transcript and print one JSON event per line: turn, blocked, dialog, batch, session, ended.",
-    },
-    flags: {
-      stateDir: {
-        type: String,
-        description:
-          "Directory holding <session>.json, which persists the read offset across restarts",
-      },
-      fromStart: {
-        type: Boolean,
-        description: "Read from the start of the transcript instead of its end",
-      },
-      every: {
-        type: Number,
-        default: 0,
-        description:
-          "Batch completed turns into one event per interval in seconds (0 emits per turn)",
-      },
-      poll: { type: Number, default: 1000, description: "Poll interval in milliseconds" },
-    },
+    description:
+      "Tail a Claude session's transcript and print one JSON event per line: turn, blocked, dialog, batch, session, ended.",
   },
-  async (parsed) => {
+  args: {
+    target: { type: "positional", required: true, description: "herdr pane id or session UUID" },
+    stateDir: {
+      type: "string",
+      description:
+        "Directory holding <session>.json, which persists the read offset across restarts",
+    },
+    fromStart: {
+      type: "boolean",
+      description: "Read from the start of the transcript instead of its end",
+    },
+    every: {
+      type: "string",
+      default: "0",
+      description:
+        "Batch completed turns into one event per interval in seconds (0 emits per turn)",
+    },
+    poll: { type: "string", default: "1000", description: "Poll interval in milliseconds" },
+  },
+  async run({ args }) {
     await watch({
-      target: parsed._.target,
-      ...parsed.flags,
-      fromStart: parsed.flags.fromStart ?? false,
+      target: args.target,
+      stateDir: args.stateDir,
+      fromStart: args.fromStart ?? false,
+      every: Number(args.every),
+      poll: Number(args.poll),
     });
   },
-);
+});
 
-const showCmd = command(
-  {
+const showCmd = defineCommand({
+  meta: {
     name: "show",
-    parameters: ["<target>", "<from>", "[to]"],
-    help: {
-      description: "Print a byte range of a Claude session's transcript, one line per block.",
-    },
-    flags: {
-      truncate: { type: Number, default: 500, description: "Maximum characters per line" },
-    },
+    description: "Print a byte range of a Claude session's transcript, one line per block.",
   },
-  async (parsed) => {
-    const to = parsed._.to === undefined ? undefined : Number(parsed._.to);
-    await show(parsed._.target, Number(parsed._.from), to, parsed.flags.truncate);
+  args: {
+    target: { type: "positional", required: true, description: "herdr pane id or session UUID" },
+    from: { type: "positional", required: true, description: "Start byte offset" },
+    to: { type: "positional", required: false, description: "End byte offset" },
+    truncate: { type: "string", default: "500", description: "Maximum characters per line" },
   },
-);
+  async run({ args }) {
+    const to = args.to === undefined ? undefined : Number(args.to);
+    await show(args.target, Number(args.from), to, Number(args.truncate));
+  },
+});
 
-const trialFlags = {
+const trialArgs = {
   name: {
-    type: String,
+    type: "string",
     default: "trial",
     description: "Trial name, used for its branch, agent, and state file",
   },
   stateDir: {
-    type: String,
+    type: "string",
     default: "tmp/watch-session",
     description: "Directory holding trial-<name>.json",
   },
 } as const;
 
-const trialStartCmd = command(
-  {
+const trialStartCmd = defineCommand({
+  meta: {
     name: "start",
-    parameters: ["--", "[load...]"],
-    help: {
-      description:
-        "Start a fresh trial session with the skill loaded and send it the prompt. The first start creates the worktree, later starts reset it. Arguments after -- go to claude.",
-    },
-    flags: {
-      ...trialFlags,
-      cwd: { type: String, description: "The watched session's cwd" },
-      base: { type: String, description: "The commit each trial starts from" },
-      prompt: { type: String, description: "The prompt the trial sends" },
-    },
+    description:
+      "Start a fresh trial session with the skill loaded and send it the prompt. The first start creates the worktree, later starts reset it. Arguments after -- go to claude.",
   },
-  async (parsed) => {
-    const { cwd, base, prompt } = parsed.flags;
-    if (cwd === undefined || base === undefined || prompt === undefined) {
-      throw new Error("trial start needs --cwd, --base, and --prompt");
-    }
-    await mkdir(parsed.flags.stateDir, { recursive: true });
+  args: {
+    ...trialArgs,
+    cwd: { type: "string", required: true, description: "The watched session's cwd" },
+    base: { type: "string", required: true, description: "The commit each trial starts from" },
+    prompt: { type: "string", required: true, description: "The prompt the trial sends" },
+  },
+  async run({ args, rawArgs }) {
+    await mkdir(args.stateDir, { recursive: true });
     const trial = await startTrial({
-      name: parsed.flags.name,
-      stateDir: parsed.flags.stateDir,
-      cwd,
-      base,
-      prompt,
-      load: parsed._.load,
+      name: args.name,
+      stateDir: args.stateDir,
+      cwd: args.cwd,
+      base: args.base,
+      prompt: args.prompt,
+      // citty has no variadic positional, so the claude args come from rawArgs.
+      load: rawArgs.includes("--") ? rawArgs.slice(rawArgs.indexOf("--") + 1) : [],
     });
     emit({ event: "trial", ...trial });
   },
-);
+});
 
-const trialEndCmd = command(
-  {
-    name: "end",
-    help: { description: "Exit the trial session and remove its worktree and branch." },
-    flags: trialFlags,
+const trialEndCmd = defineCommand({
+  meta: { name: "end", description: "Exit the trial session and remove its worktree and branch." },
+  args: trialArgs,
+  async run({ args }) {
+    emit({ event: "trial-ended", ...(await endTrial(args.stateDir, args.name)) });
   },
-  async (parsed) => {
-    emit({ event: "trial-ended", ...(await endTrial(parsed.flags.stateDir, parsed.flags.name)) });
-  },
-);
+});
 
-// cleye nests commands only under cli() until privatenumber/cleye#21, so trial hands argv to its own.
-const trialCmd = command(
-  {
-    name: "trial",
-    parameters: ["[args...]"],
-    help: { description: "Start or end a trial session in a disposable worktree." },
-    ignoreArgv: () => true,
-  },
-  async () => {
-    const argv = process.argv.slice(process.argv.indexOf("trial") + 1);
-    const commands = [trialStartCmd, trialEndCmd];
-    await cli(
-      { name: "watch-session trial", commands },
-      (parsed) => {
-        if (parsed._.length > 0) {
-          console.error(`Unknown trial command: ${parsed._[0]}`);
-          process.exitCode = 1;
-        }
-        parsed.showHelp();
-      },
-      argv,
-    );
-  },
-);
+const trialCmd = defineCommand({
+  meta: { name: "trial", description: "Start or end a trial session in a disposable worktree." },
+  subCommands: { start: trialStartCmd, end: trialEndCmd },
+});
 
-if (import.meta.main) {
-  const commands = [watchCmd, showCmd, trialCmd];
-  await cli({ name: "watch-session", commands }, (parsed) => {
-    parsed.showHelp();
-  });
-}
+const main = defineCommand({
+  meta: { name: "watch-session" },
+  subCommands: { watch: watchCmd, show: showCmd, trial: trialCmd },
+});
+
+if (import.meta.main) await runMain(main);

@@ -8,7 +8,7 @@ import { cli, command } from "cleye";
 import { z } from "zod";
 import { decodeFile } from "../packages/decode/index";
 import { loadPlugins } from "../packages/marketplace/index";
-import { runCheck, tracked } from "./check";
+import { readTracked, runCheck, tracked } from "./check";
 
 /**
  * Lockfile names Claude Code accepts, in the order it checks them.
@@ -44,7 +44,7 @@ interface PluginPackage {
   manifest: Manifest;
 }
 
-/** Local plugins that declare runtime dependencies, so a cached copy needs them installed. */
+/** Local plugins with a manifest at their root, whether or not it declares runtime dependencies. */
 async function pluginPackages(): Promise<PluginPackage[]> {
   const plugins = await loadPlugins();
   const packages = await Promise.all(
@@ -52,14 +52,16 @@ async function pluginPackages(): Promise<PluginPackage[]> {
       if (dir === undefined) return null;
       const path = join(dir, "package.json");
       if (!(await Bun.file(path).exists())) return null;
-      const manifest = await decodeFile(Manifest, path);
-      if (Object.keys(manifest.dependencies ?? {}).length === 0) return null;
-      return { name, dir, manifest };
+      return { name, dir, manifest: await decodeFile(Manifest, path) };
     }),
   );
   return packages
     .filter((entry) => entry !== null)
     .toSorted((a, b) => a.name.localeCompare(b.name));
+}
+
+function hasRuntimeDependencies(manifest: Manifest): boolean {
+  return Object.keys(manifest.dependencies ?? {}).length > 0;
 }
 
 /**
@@ -106,6 +108,9 @@ async function generate(plugin: PluginPackage): Promise<void> {
   const scratch = await mkdtemp(join(tmpdir(), "plugin-lockfile-"));
   try {
     await Bun.write(join(scratch, "package.json"), Bun.file(join(plugin.dir, "package.json")));
+    // Seeding the current lockfile keeps every unchanged dependency at its pinned version.
+    const current = await readTracked(GENERATED, plugin.dir);
+    if (current !== null) await Bun.write(join(scratch, GENERATED), current);
     await $`npm install --package-lock-only --ignore-scripts`.cwd(scratch).quiet();
     await Bun.write(join(plugin.dir, GENERATED), Bun.file(join(scratch, GENERATED)));
   } finally {
@@ -157,12 +162,31 @@ export function violation(
   manifest: Manifest,
 ): string | null {
   if (lockfile === null) {
-    return `${name}: declares dependencies with no lockfile, so the install is skipped`;
+    return hasRuntimeDependencies(manifest)
+      ? `${name}: declares dependencies with no lockfile, so the install is skipped`
+      : null;
   }
   if (pinnedRanges !== null && ranges(pinnedRanges) !== ranges(manifest)) {
     return `${name}: ${lockfile} disagrees with package.json, so the install fails`;
   }
   return null;
+}
+
+/**
+ * How a plugin's install would pull in its devDependencies, or null when it omits them.
+ */
+export function devInstalled(
+  name: string,
+  manifest: Manifest,
+  npmrc: string | null,
+): string | null {
+  if (Object.keys(manifest.devDependencies ?? {}).length === 0) return null;
+  const omitted = (npmrc ?? "")
+    .split("\n")
+    .some((line) => /^\s*omit(\[\])?\s*=\s*dev\s*$/.test(line));
+  return omitted
+    ? null
+    : `${name}: declares devDependencies without omit=dev in .npmrc, so npm ci installs them`;
 }
 
 const check = command({ name: "check" }, async () => {
@@ -176,7 +200,12 @@ const check = command({ name: "check" }, async () => {
         plugins.map(async (plugin) => {
           const lockfile = await existingLockfile(plugin.dir);
           const root = lockfile === null ? null : await pinned(plugin.dir, lockfile);
-          return violation(plugin.name, lockfile, root, plugin.manifest);
+          return [
+            violation(plugin.name, lockfile, root, plugin.manifest),
+            lockfile === null
+              ? null
+              : devInstalled(plugin.name, plugin.manifest, await readTracked(".npmrc", plugin.dir)),
+          ];
         }),
       );
 
@@ -184,11 +213,12 @@ const check = command({ name: "check" }, async () => {
         header: [
           "Claude Code installs a plugin's dependencies when it caches the plugin, but only",
           "from a package.json at the plugin root with a lockfile beside it. Hoist a nested",
-          "manifest into its plugin root, then run `bun run plugin-lockfiles generate`:",
+          "manifest into its plugin root, then run `bun run plugin-lockfiles generate`. A plugin",
+          "with devDependencies also ships a `.npmrc` holding `omit=dev`:",
           "",
         ],
         violations: [
-          ...violations.filter((entry) => entry !== null),
+          ...violations.flat().filter((entry) => entry !== null),
           ...nestedManifests(manifests),
         ],
       };
@@ -212,7 +242,9 @@ const generateCommand = command(
   async (argv) => {
     const selected = new Set(argv._.plugins);
     const plugins = (await pluginPackages()).filter(
-      (plugin) => selected.size === 0 || selected.has(plugin.name),
+      (plugin) =>
+        hasRuntimeDependencies(plugin.manifest) &&
+        (selected.size === 0 || selected.has(plugin.name)),
     );
 
     for (const plugin of plugins) {

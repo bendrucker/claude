@@ -1,5 +1,5 @@
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-export { type SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+export type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 
 // Every field any writing hook reads off `tool_input`, across the Write, Edit,

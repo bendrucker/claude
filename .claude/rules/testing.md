@@ -48,3 +48,5 @@ test("encode/decode roundtrip", () => {
 `.github/workflows/test.yml` runs one matrix job per plugin, a `hooks` job over `./.claude ./user scripts/`, and a `validate` job over `packages/`. New plugin tests join the existing matrix instead of getting their own job.
 
 A pull request runs only the plugins its changed files name. A plugin whose tests cover something outside its own directory, such as a checked copy of another plugin's file, declares those paths in `plugins/<name>/.ci.json` under `paths` so a change there selects it too.
+
+A plugin whose tests drive an external CLI pins it in `plugins/<name>/mise.toml`, which the job installs through `mise-action` and Renovate keeps current. Exercise the real binary from a `*.integration.ts`. Give `runner` in `.ci.json` a list to run the job on each runner, for a plugin that behaves differently per platform.

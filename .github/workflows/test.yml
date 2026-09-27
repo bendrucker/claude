@@ -256,6 +256,17 @@ jobs:
             echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
           fi
 
+      - name: Install plugin tools
+        if: hashFiles(format('plugins/{0}/mise.toml', matrix.plugin.name)) != ''
+        uses: jdx/mise-action@v4
+        with:
+          working_directory: plugins/${{ matrix.plugin.name }}
+
+      # Profilers record through perf events, which the runner's default paranoia level blocks.
+      - name: Allow perf events
+        if: runner.os == 'Linux'
+        run: sudo sysctl -w kernel.perf_event_paranoid=1
+
       - name: Run tests
         if: steps.inspect.outputs.has_tests == 'true'
         run: bun test "plugins/${{ matrix.plugin.name }}/"

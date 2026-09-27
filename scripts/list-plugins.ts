@@ -4,7 +4,8 @@ import { decodeFile } from "../packages/decode/index";
 import { loadPlugins } from "../packages/marketplace/index";
 
 const CiConfig = z.looseObject({
-  runner: z.string().optional(),
+  /** One runner, or several to run the plugin's job on each. */
+  runner: z.union([z.string(), z.array(z.string())]).optional(),
   /**
    * Paths outside the plugin whose change also selects it, such as the source
    * of a file the plugin keeps a checked copy of.
@@ -40,8 +41,9 @@ async function getLocalPlugins(): Promise<{ plugins: Plugin[]; configs: Map<stri
   return { plugins, configs };
 }
 
-function toMatrixEntry(name: string, config: CiConfig | undefined): PluginMatrix {
-  return { name, runner: config?.runner ?? "ubuntu-latest" };
+export function toMatrixEntries(name: string, config: CiConfig | undefined): PluginMatrix[] {
+  const runners = config?.runner ?? "ubuntu-latest";
+  return (typeof runners === "string" ? [runners] : runners).map((runner) => ({ name, runner }));
 }
 
 function pluginNames(files: string[]): Set<string> {
@@ -83,7 +85,7 @@ async function main(): Promise<void> {
   const { plugins, configs } = await getLocalPlugins();
   const selected = select(plugins, positionals, values.always);
 
-  console.log(JSON.stringify(selected.map((name) => toMatrixEntry(name, configs.get(name)))));
+  console.log(JSON.stringify(selected.flatMap((name) => toMatrixEntries(name, configs.get(name)))));
 }
 
 if (import.meta.main) await main();

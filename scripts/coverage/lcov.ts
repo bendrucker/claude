@@ -48,13 +48,14 @@ export function parseLcov(text: string): FileCoverage[] {
   let current: FileCoverage | null = null;
 
   for (const raw of text.split("\n")) {
-    // Strip only a CRLF's `\r`: a full trim would eat edge whitespace in `SF:` paths.
-    const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
-    if (line.trim() === "") continue;
+    const line = raw.trim();
+    if (line === "") continue;
 
     if (line.startsWith("SF:")) {
+      // The path keeps its edge whitespace. Only line-ending `\r`s are stripped.
+      const untrimmed = raw.replace(/\r+$/, "");
       current = {
-        file: line.slice(3),
+        file: untrimmed.slice(untrimmed.indexOf("SF:") + 3),
         lineHits: new Map(),
         functionsFound: 0,
         functionsHit: 0,

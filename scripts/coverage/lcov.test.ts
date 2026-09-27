@@ -78,19 +78,34 @@ describe("parseLcov", () => {
     expect(parseLcov("\n\nnot a record\n")).toEqual([]);
   });
 
-  test.each<{ name: string; text: string; file: string }>([
+  test.each<{ name: string; text: string; files: string[] }>([
     {
       name: "CRLF line endings",
       text: "SF:src/a.ts\r\nDA:1,1\r\nend_of_record\r\n",
-      file: "src/a.ts",
+      files: ["src/a.ts"],
+    },
+    {
+      name: "a doubled carriage return",
+      text: "SF:src/a.ts\r\r\nend_of_record\n",
+      files: ["src/a.ts"],
+    },
+    {
+      name: "a byte order mark",
+      text: "﻿SF:src/a.ts\nend_of_record\n",
+      files: ["src/a.ts"],
     },
     {
       name: "edge whitespace in the path",
       text: "SF: src/a.ts \nend_of_record\n",
-      file: " src/a.ts ",
+      files: [" src/a.ts "],
     },
-  ])("reads the path with $name", ({ text, file }) => {
-    expect(parseLcov(text).map((r) => r.file)).toEqual([file]);
+    {
+      name: "padded directive lines",
+      text: "  SF:src/a.ts\n DA:1,1 \n end_of_record \nSF:src/b.ts\nend_of_record\n",
+      files: ["src/a.ts", "src/b.ts"],
+    },
+  ])("reads paths with $name", ({ text, files }) => {
+    expect(parseLcov(text).map((r) => r.file)).toEqual(files);
   });
 
   test.each([

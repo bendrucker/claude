@@ -101,4 +101,18 @@ describe("register", () => {
     await list.press({ key: "run-command:0:git status --short" });
     expect(fills).toEqual(["git status --short"]);
   });
+
+  test("a newer reply without commands clears the list", async ($, on) => {
+    core(on);
+    await reply($);
+    await $.ui.mount({
+      plugin: PLUGIN,
+      surface: "terminal",
+      component: "AssistantMessage",
+      props: { text: "Done.", isFirstOfReply: true },
+      requestId: "m2",
+    });
+    await hint($, SHELL);
+    expect(await (await band($)).findAll({ type: "Button" })).toHaveLength(0);
+  });
 });

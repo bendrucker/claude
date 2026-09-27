@@ -70,12 +70,15 @@ export function register(on: On): void {
   on("ui.render", { component: "AssistantMessage" }, async ($, e, next) => {
     const drawing = await next(e);
     const found = commands(e.props.text);
-    if (found.length === 0) return drawing;
-    if (!seen.has(e.requestId) || e.requestId === latest.requestId) {
+    // A reply with no commands still clears the list, but a later block of the
+    // latest reply without any keeps the ones an earlier block offered.
+    if (!seen.has(e.requestId)) {
       seen.add(e.requestId);
       latest = { requestId: e.requestId, found };
+    } else if (e.requestId === latest.requestId && found.length > 0) {
+      latest = { requestId: e.requestId, found };
     }
-    if (!shell) return drawing;
+    if (!shell || found.length === 0) return drawing;
     const { Box, Button } = $.ui.resolve(e);
     return (
       <Box flexDirection="column">
@@ -87,12 +90,14 @@ export function register(on: On): void {
     );
   });
 
-  on("ui.render", { component: "AbovePrompt" }, ($, e, next) => {
+  on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
+    const drawing = await next(e);
     const found = latest.found.slice(0, 9);
-    if (!shell || e.props.hasSurvey || found.length === 0) return next(e);
+    if (!shell || e.props.hasSurvey || found.length === 0) return drawing;
     const { Box, Button } = $.ui.resolve(e);
     return (
       <Box flexDirection="column">
+        {drawing}
         {commandButtons(Button, found, (command, index) => ({ hotkey: String(index + 1) }))}
       </Box>
     );

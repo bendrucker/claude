@@ -14,7 +14,7 @@ allowed-tools:
 
 Develop a skill by watching the user work in another Claude session, then proving each revision in a trial. The goal is a skill that lets a fresh session reach the user's result without the user steering it. What you see the user do tells you what to try, and a trial tells you whether the skill works. Settle a question with a trial rather than a guess.
 
-The user's session belongs to the user. You read its transcript, and type into it only when the user asks, such as to start the run they want watched: `herdr agent prompt <pane> "<prompt>"` once `herdr agent wait` reports it idle. Trials run in a pane you open and own.
+The user's session belongs to the user. You read its transcript, and type into it only when the user asks, such as to start the run they want watched: `herdr agent prompt <pane> "<prompt>"` once `herdr agent wait <pane>` returns. Leave off `--until`: its default matches both resting states, and a pane in an unseen tab rests at `done` rather than `idle`. Trials run in a pane you open and own.
 
 ## Arguments
 

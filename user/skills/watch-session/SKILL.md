@@ -90,6 +90,8 @@ For each trial:
 3. Arm a second monitor on the trial pane with `--from-start`, then send the trial prompt with `herdr agent prompt`.
 4. Check the first `skillDirs` the trial reports. A path other than the copy you edit means the trial ran another copy, so the result does not count.
 
+A permission dialog never reaches the transcript, so a trial that goes quiet for a monitor window may be waiting on one. Read its pane with `herdr agent read` before reporting it as still running.
+
 Answer a `blocked` trial yourself when the user's run shows the answer. Otherwise relay the question to the user. End each trial by prompting `/exit`, which also ends its monitor with `ended`.
 
 ## Ending

@@ -50,6 +50,9 @@ let sibling: string;
 let managed: string;
 let other: string;
 let plain: string;
+let linkedRepo: string;
+let linkedSibling: string;
+let linkedManaged: string;
 const transcripts: Record<string, string> = {};
 
 beforeAll(async () => {
@@ -64,6 +67,21 @@ beforeAll(async () => {
   initRepo(other);
   plain = join(root, "plain");
   mkdirSync(plain);
+
+  linkedRepo = join(root, "linked");
+  initRepo(linkedRepo);
+  mkdirSync(join(root, "linked-claude", "worktrees"), { recursive: true });
+  const link = Bun.spawnSync([
+    "ln",
+    "-s",
+    join(root, "linked-claude"),
+    join(linkedRepo, ".claude"),
+  ]);
+  if (link.exitCode !== 0) throw new Error(link.stderr.toString());
+  linkedSibling = join(linkedRepo, ".worktrees", "sibling");
+  addWorktree(linkedRepo, linkedSibling, "sibling");
+  linkedManaged = join(root, "linked-claude", "worktrees", "managed");
+  addWorktree(linkedRepo, join(linkedRepo, ".claude", "worktrees", "managed"), "managed");
 
   const lines = {
     entered: [
@@ -162,6 +180,13 @@ describe("processInput", () => {
       reason: null,
     },
     {
+      name: "managed target through a symlinked .claude after switching",
+      cwd: () => linkedSibling,
+      path: () => linkedManaged,
+      transcript: "entered",
+      reason: null,
+    },
+    {
       name: "managed target after switching",
       cwd: () => sibling,
       path: () => managed,
@@ -181,7 +206,7 @@ describe("processInput", () => {
       cwd: () => repo,
       path: () => "../other",
       transcript: "unknown",
-      reason: () => crossRepoReason("../other"),
+      reason: () => crossRepoReason(other),
     },
     {
       name: "missing target passes",

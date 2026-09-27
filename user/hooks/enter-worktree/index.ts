@@ -108,22 +108,22 @@ export async function processInput(input: Envelope): Promise<SyncHookJSONOutput 
   const current = realpath(cwd);
   if (target == null || current == null) return null;
 
-  if (target === current) return deny(sameDirectoryReason(rawTarget));
+  if (target === current) return deny(sameDirectoryReason(target));
 
   const targetCommon = gitCommonDir(target);
   const currentCommon = gitCommonDir(current);
   if (targetCommon == null || currentCommon == null) return null;
-  if (targetCommon !== currentCommon) return deny(crossRepoReason(rawTarget));
+  if (targetCommon !== currentCommon) return deny(crossRepoReason(target));
 
   // Subagents keep their own worktree state, which the session transcript does
   // not record.
   if (input.agent_id != null || input.transcript_path == null) return null;
   if (basename(currentCommon) !== ".git") return null;
   const managedDir = join(dirname(currentCommon), ".claude", "worktrees");
-  if (isUnder(target, managedDir)) return null;
+  if (isUnder(target, realpath(managedDir) ?? managedDir)) return null;
   if ((await worktreeSessionActive(input.transcript_path)) !== true) return null;
 
-  return deny(unmanagedReason(rawTarget, managedDir));
+  return deny(unmanagedReason(target, managedDir));
 }
 
 async function main(): Promise<void> {

@@ -2,84 +2,58 @@
 
 ## Style
 
-- Prefer concise, direct responses.
-- Minimize unnecessary explanations unless requested.
-- Don't join independent clauses with semicolons or em dashes. End the clause with a period. Swapping one connector for another is not a fix. Semicolons only at rare, normal-English cadence.
+- Don't join independent clauses with semicolons or em dashes. End the clause with a period. Swapping one connector for another is not a fix.
 - Wrap filenames and code identifiers with `backticks` in any markdown context.
-- Don't hard-wrap markdown prose you author: one line per paragraph, one line per list item. In an existing file, follow the wrapping it already uses.
+- Don't hard-wrap markdown prose you author. In an existing file, follow its wrapping.
 - Include a trailing newline in all new files.
-- Prefer meaningful anchor text over raw URLs.
-- Use bullet points for lists, checklists if I ask for tasks.
-- When you want to explain code you're writing, put the explanation in a message before the edit.
-- Load the `writing:writing` skill before the first long-form prose you write for others in a context (PR comments, review feedback, documents, issue descriptions, Slack messages). Its tone and style rules must be followed, and they stay in effect for the rest of the session, so one load covers every later piece.
+- Put explanation of code you're writing in a message before the edit.
+- Load the `writing:writing` skill before the first long-form prose you write for others (PR comments, reviews, documents, issues, Slack). One load covers the rest of the session.
 
 ## Organization
 
-- Avoid creating or adding to catch-all packages/modules like `utils` or similar. Provide meaningful names for packages and keep them well-scoped, but not overly small.
-- Break code into multiple files where appropriate first before splitting across directories.
-- Do not number steps or phases in code (e.g., "Phase 1:", "Step 2:"). Use descriptive function names and call them in sequence. Numbering creates tight coupling, obscures whether order matters, and impedes inserting new steps.
+- Don't create or extend catch-all modules like `utils`. Name modules for what they hold.
+- Split code into files before splitting it across directories.
+- Don't number steps or phases in code ("Phase 1:", "Step 2:"). Use descriptive function names called in sequence.
 
 ## Curation
 
-Every customization costs tokens on every session. Before adding one, define how it gets removed: what shows it's working, what shows it isn't, and where that signal surfaces.
-
-Prefer accommodating Claude Code's native defaults over overriding them, since a changed default encodes usage and eval data you lack. Add a customization that fights one only as a light-touch experiment with evaluation and removal criteria.
+Every customization costs tokens on every session. Before adding one, define what shows it's working, what shows it isn't, and where that signal surfaces. Accommodate Claude Code's native defaults. Override one only as an experiment with removal criteria.
 
 ## Workflow
 
-- The user has carefully curated skills for their common workflows. Load skills when possible to adhere to the user's preferences and navigate their projects efficiently.
-- A skill that instructs a subagent fan-out or a background dispatch already carries the user's authorization for `Agent`. Run the dispatch as the skill writes it, and degrade to an inline pass only when `Agent` is absent from the tool set, saying in the output that it ran inline.
-- For questions about Claude Code features or usage, use the `Agent` tool with `subagent_type='claude-code-guide'` to consult official documentation.
-- Pick an `Agent` spawn's `subagent_type` before its `model`, preferring `analyst` (read-only research, search, judging) over `general-purpose`, which is the fallback for editing files or needing the skill catalog. A type whose `bun run inventory agents` row names a model carries its own rate. Pass an explicit cheap `model` (`haiku` or `sonnet`) for a type without one (`general-purpose`, `Explore`, `review:angle`) or for an `analyst` task that is pure lookup. A spawn with neither runs on the `CLAUDE_CODE_SUBAGENT_MODEL` default.
-- Delegating a whole task to a separate Claude process in another terminal pane goes through the `herdr:herdr` skill. That is distinct from the `Agent` tool above, which runs a subagent inside this session.
-- A scripted cross-model or GPT review runs through the `github:copilot` skill, which sizes the call against the Copilot credit meter before it spends. `herdr:herdr` stays the path for an interactive GPT or Codex deep-dive, dispatched into the `copilot-gpt` worktree in the claude workspace. Launch those sessions with `copilot --max-ai-credits 120` so one cannot run away. "Consult fable" asks for the same adversarial second opinion from a Fable session.
-- Prefer the `agent-browser` skill over `WebFetch`/`WebSearch` when a task needs a real browser — interacting with a page, screenshots, scraping JS-rendered content, or web-app QA/dogfooding. It loads the CLI's version-matched `skills get` workflows. Plain `WebFetch` stays fine for static page fetches.
-- Finish a branch with `/ship`: it runs the warranted review passes, opens the PR, babysits CI to green, triages bot comments, and refreshes the body. Don't hand-chain `EnterWorktree` + `pull-request:create` for a branch finish.
-- `pull-request:create` remains the skill for opening a PR directly (it is what `/ship` calls). If it's unavailable, create the PR with an empty body.
-- Open PRs ready for review by default. Reserve `--draft` for speculative changes that need deep human review before merge. Draft status can suppress bot review.
-- Root every `find` at a directory that can plausibly hold the target. `find /` and `find ~` walk the whole disk. They run for a minute or more, and often hit the Bash timeout before returning anything. A hook denies them unless they carry `-maxdepth`. When the root has to stay broad, `fd -HI <pattern> <root>` walks the same tree in seconds.
-- When executing build commands, output to `/dev/null` to avoid creating binaries.
-- Store temporary files in `tmp/` directory.
-- The sandbox can write `/tmp`, `$TMPDIR`, and the repo. Never disable the sandbox for file writes; only bypass after a sandboxed run of that command actually failed.
-- Use `pbcopy` and `pbpaste` for clipboard interaction.
+- A skill that instructs a subagent fan-out or background dispatch carries my authorization for `Agent`. Run it as written. Degrade to inline only when `Agent` is absent, and say so.
+- Prefer `analyst` over `general-purpose` for read-only spawns. Pass `model: haiku` or `sonnet` for a type without its own model (`general-purpose`, `Explore`, `review:angle`) or for pure lookup.
+- Delegate a whole task to a separate Claude process in another pane with `herdr:herdr`.
+- Run scripted cross-model or GPT review through `github:copilot`. An interactive GPT or Codex deep-dive goes through `herdr:herdr` into the `copilot-gpt` worktree, launched with `copilot --max-ai-credits 120`. "Consult fable" means the same second opinion from a Fable session.
+- Use the `agent-browser` skill when a task needs a real browser. `WebFetch` is fine for static pages.
+- Finish a branch with `/ship`. Use `pull-request:create` to open a PR directly, or an empty body if it's unavailable. Open PRs ready for review, draft only for speculative changes.
+- Root every `find` at a directory that can hold the target. Use `fd -HI <pattern> <root>` when the root must stay broad.
+- Send build output to `/dev/null`. Store temporary files in `tmp/`.
+- Never disable the sandbox for file writes. Bypass only after a sandboxed run of that command failed.
 
 ## Planning
 
-Sessions default to auto mode, so investigating is cheap and plan mode is not needed to explore safely. Plan mode is where a settled approach gets written down. The research belongs before it.
-
-- Investigate in auto mode until the approach is settled, then enter plan mode to transcribe it. A plan that takes many tool calls to write was entered too early.
-- When I ask for a plan and something is still open, finish resolving it first and tell me what you are resolving. Do not enter plan mode and research from inside it.
+Investigate in auto mode until the approach is settled, then enter plan mode to write it down. When I ask for a plan and something is still open, tell me what you're resolving and resolve it first.
 
 ## Check-ins
 
-Schedule `⏰` plan check-ins in Things with `things:url add`, which unlike inbox capture can set `when=<yyyy-mm-dd>`. Tag them `claude-code`. Things is the only tracker that can raise work on a future date, so work-tracked check-ins go there too, linking their Linear issue in the notes.
-
-Notes carry what to check, the plan path, the repo, and a launch URL:
+Schedule `⏰` plan check-ins in Things with `things:url add` and `when=<yyyy-mm-dd>`, tagged `claude-code`. Work-tracked check-ins go there too, linking their Linear issue. Notes carry what to check, the plan path, the repo, and a launch URL:
 
 ```
 claude-cli://open?q=<url-encoded prompt>&cwd=<absolute main repo path>
 ```
 
-- `open` is the only action. Use `q` for the prompt and `cwd` for the working directory. Both are ordinary percent-encoded query params. The handler base64-encodes them itself when it builds the session's argv.
-- The URL prefills a new session's prompt without submitting it, and cannot resume the original session.
-- Point `cwd` at the main repo, never a worktree. Worktrees get pruned.
+The URL prefills a new session without submitting it. Point `cwd` at the main repo, never a worktree.
 
 ## Git
 
-- Never `git push` to the default branch (usually `main` or `master`) unless I explicitly instruct you.
-- Always work on a topic branch with a short hyphenated name.
-- For commit messages, use multiple `-m` flags for a simple subject and body. Each `-m` is a separate paragraph. For complex messages, pass the message through a heredoc.
-- Wrap commit message bodies at the conventional ~72 columns.
+- Never `git push` to the default branch unless I say so.
+- Work on a topic branch with a short hyphenated name.
+- Write commit messages with one `-m` per paragraph, or a heredoc for complex ones. Wrap bodies at ~72 columns.
 
 ## Worktrees
 
-Any change intended to become its own PR starts in a worktree, created with `worktrunk:wt-switch-create`. Stay put only when the session is already on a topic branch inside one. Work handed to a sibling agent for its own pull request starts in a worktree too, created through the `herdr:herdr` skill's dispatch so this session stays put.
-
-I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
-
-- For creating or entering a worktree, use the `worktrunk:wt-switch-create` skill. It re-roots the session into a new worktree (optionally in another repo), runs an optional task, and acts as a targeted command for the common case. Prefer it over the generic skill whenever the task is worktree creation, including anywhere you would otherwise delegate worktree creation to Worktrunk. This preference holds even when a background-job or harness context suggests the generic `EnterWorktree` tool for isolation.
-- For everything else (pruning, listing, removing, running hooks, editing config, and general `wt` questions), use the generic `worktrunk:worktrunk` skill.
-- Disposable verification worktrees may be created with `git worktree add tmp/<name>`; everything persistent goes through the worktrunk skills.
+Any change meant to become its own PR starts in a worktree created with `worktrunk:wt-switch-create`, even where a harness suggests `EnterWorktree`. Stay put when already on a topic branch in one. Work handed to a sibling agent gets its worktree through `herdr:herdr`. Use `worktrunk:worktrunk` for every other `wt` task. Disposable verification worktrees may use `git worktree add tmp/<name>`.
 
 ## Claude Configuration
 
@@ -87,26 +61,19 @@ My Claude Code setup lives in [`bendrucker/claude`](https://github.com/bendrucke
 
 ## Dotfiles
 
-Machine setup lives in [`bendrucker/dotfiles`](https://github.com/bendrucker/dotfiles) at `~/.dotfiles`, organized into topic directories, including a [`claude/`](https://github.com/bendrucker/dotfiles/tree/main/claude) topic. The Claude repo installs nothing. A change that assumes something the machine or the shell provides needs a merged dotfiles PR first:
+Machine setup lives in [`bendrucker/dotfiles`](https://github.com/bendrucker/dotfiles) at `~/.dotfiles`, in topic directories. The Claude repo installs nothing. Anything the machine or shell must provide needs a merged dotfiles PR first: binaries (topic `Brewfile` or `mise.toml`), `$PATH` entries, shell aliases and functions, exported env vars (Claude-only vars go in `settings.json`), install steps, symlinks, launchd agents, macOS permission grants, and recurring jobs.
 
-- A binary a skill, hook, or MCP server invokes. Declare it in a topic `Brewfile`, or in `mise.toml` for pinned language tooling.
-- Anything on `$PATH`: a `bin/` executable, or a directory added by `path.zsh`.
-- Shell aliases, functions, wrappers, and completions, which live in a topic's `*.zsh` files.
-- Environment variables the shell must export. Variables only Claude reads belong in `settings.json` instead.
-- Setup beyond dropping a file in place: `install.sh` steps, `symlinks.conf` entries, launchd agents, and macOS permission grants like Screen Recording and Accessibility.
-- Recurring jobs, including work the nightly `claude-upgrade` should carry.
-
-Work in another repo that turns out to need a change in either repo goes to a sibling agent through the `herdr:herdr` skill, which leaves this session on its own task. Report the PR back to me, or tell me what the change is where herdr is unavailable.
+Work in another repo that needs a change in either repo goes to a sibling agent through `herdr:herdr`. Report the PR back to me, or tell me the change where herdr is unavailable.
 
 ## Stacked PRs
 
-I work in stacks routinely, in one of two layouts, chosen per stack. Load `github:stack` before any `gh stack` command. `gitlab:merge-request` is the GitLab equivalent.
+Load `github:stack` before any `gh stack` command (`gitlab:merge-request` on GitLab). Pick one layout per stack and don't mix them:
 
-- A worktree per branch (see Worktrees above) suits layers I work on in parallel or over a long stretch. `wt sync` rebases each branch onto its parent in dependency order: `--fetch` to pull the base first, `--push` to update remotes, `--prune` to remove integrated worktrees, `--dry-run` to preview the plan. Publish with `gh stack link`, after `wt sync --push`, because `link` pushes without force.
-- One worktree holding the whole stack suits a stack I'm actively reshaping, where reordering and folding layers matters more than working two layers at once. `gh stack` owns it end to end, and `gh stack sync` covers what `wt sync` and `gh stack link` do together in the other layout.
+- Worktree per branch, for layers worked in parallel. `wt sync` rebases in dependency order (`--fetch`, `--push`, `--prune`, `--dry-run`). Publish with `gh stack link` after `wt sync --push`.
+- One worktree for the whole stack, for active reshaping. `gh stack sync` owns it end to end.
 
-Don't mix the two within one stack. The local-tracking commands silently do nothing to a branch checked out in another worktree. `gh stack merge` merges either layout. Pull the surviving layers afterward, since GitHub rebases everything left open above the merge.
+After `gh stack merge`, pull the surviving layers.
 
 ## Personal Details
 
-- Standard username: `@bendrucker`. Refer to any actions performed by this user as "you."
+- My username is `@bendrucker`. Refer to actions by that user as "you."

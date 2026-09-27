@@ -482,7 +482,12 @@ export function copilotAuth(
 
 function ghAuthToken(): string | null {
   if (Bun.which("gh") === null) return null;
-  const result = Bun.spawnSync(["gh", "auth", "token"], { stdout: "pipe", stderr: "pipe" });
+  // A keychain prompt in a headless session never answers, and a timeout reads as no token.
+  const result = Bun.spawnSync(["gh", "auth", "token"], {
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: 10_000,
+  });
   const token = result.stdout.toString().trim();
   return result.exitCode === 0 && token !== "" ? token : null;
 }

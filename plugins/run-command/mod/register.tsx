@@ -57,6 +57,7 @@ export function register(on: On): void {
   // time, or the latest one again, moves the list.
   const seen = new Set<string>();
   let latest = { requestId: "", found: [] as string[] };
+  let listed = false;
 
   on("ui.render", { component: "PromptHint" }, ($, e, next) => {
     const now = e.props.hint.includes("shell mode") && !e.props.isDraft;
@@ -93,7 +94,8 @@ export function register(on: On): void {
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
     const drawing = await next(e);
     const found = latest.found.slice(0, 9);
-    if (!shell || e.props.hasSurvey || found.length === 0) return drawing;
+    listed = shell && !e.props.hasSurvey && found.length > 0;
+    if (!listed) return drawing;
     const { Box, Button } = $.ui.resolve(e);
     return (
       <Box flexDirection="column">
@@ -105,7 +107,7 @@ export function register(on: On): void {
 
   // The list's hotkeys stay inert while the shell prompt holds the keys.
   on("prompt.edit", ($, e, next) => {
-    const command = shell && e.text === "" ? pick(e.inputText, latest.found) : undefined;
+    const command = listed && e.text === "" ? pick(e.inputText, latest.found) : undefined;
     return next(command === undefined ? e : { ...e, inputText: command });
   });
 

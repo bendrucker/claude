@@ -94,6 +94,11 @@ export class TurnTracker {
   // Local commands like /add-dir never end a turn, so the prompt is the last one before the agent answers.
   private answered = false;
 
+  /** Where the turn still in progress began, which a resumed read must start from to digest it whole. */
+  get openFrom(): number | undefined {
+    return this.turn?.from;
+  }
+
   feed({ entry, from, to }: Line): (Turn | Blocked)[] {
     if (entry.isSidechain) return [];
     const events: (Turn | Blocked)[] = [];

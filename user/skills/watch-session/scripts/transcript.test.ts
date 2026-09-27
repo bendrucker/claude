@@ -93,8 +93,10 @@ describe("TurnTracker", () => {
   });
 
   test("a turn stays open until its end marker arrives", () => {
-    const open = events(jsonl(session.slice(0, 8)));
+    const tracker = new TurnTracker();
+    const open = splitLines(jsonl(session.slice(0, 8)), 0).lines.flatMap((l) => tracker.feed(l));
     expect(open.map((e) => e.event)).toEqual(["blocked"]);
+    expect(tracker.openFrom).toBe(0);
   });
 });
 

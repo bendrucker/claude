@@ -224,7 +224,7 @@ class Watcher {
     // Formatted the way oxfmt and prettier leave JSON, since a repo's format check can reach tmp/.
     await Bun.write(
       statePath(this.options.stateDir, this.target.session),
-      `${JSON.stringify({ offset: this.offset }, null, 2)}\n`,
+      `${JSON.stringify({ offset: this.tracker.openFrom ?? this.offset }, null, 2)}\n`,
     );
   }
 }

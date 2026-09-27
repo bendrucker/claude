@@ -225,9 +225,10 @@ class Watcher {
   async persist(): Promise<void> {
     if (this.options.stateDir === undefined) return;
     await mkdir(this.options.stateDir, { recursive: true });
+    // Formatted the way oxfmt and prettier leave JSON, since a repo's format check can reach tmp/.
     await Bun.write(
       statePath(this.options.stateDir, this.target.session),
-      JSON.stringify({ offset: this.offset }),
+      `${JSON.stringify({ offset: this.offset }, null, 2)}\n`,
     );
   }
 }

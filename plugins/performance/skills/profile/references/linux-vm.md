@@ -35,9 +35,13 @@ When `limactl` is not installed, tell the user it is missing.
 
 ## Cloud VM
 
-An EC2 Graviton instance (`c8g`) gives stable timing: fixed clock frequency and one physical core per vCPU. Sizes below `c8g.16xlarge` expose a reduced set of hardware counters. `c8g.16xlarge` and `c8g.metal` sizes expose the full set. Pick the smaller size for timing and the larger one when the fast signal is a counter the smaller one lacks.
+An EC2 Graviton instance (`c8g`) gives stable timing: fixed clock frequency and one physical core per vCPU. Sizes below `c8g.16xlarge` expose a reduced set of hardware counters. `c8g.16xlarge` and `c8g.metal-24xl` expose the full set. Pick the smaller size for timing and the larger one when the fast signal is a counter the smaller one lacks.
 
-Reach it through the user's launcher: a CLI that creates an instance, connects to it over SSM, and destroys it. The user's environment supplies the launcher, its account, and its profile. When no launcher exists, tell the user and stop at the local VM.
+Reach it through the user's launcher: a CLI that creates an instance, connects to it, extends its time limit, and destroys it. The user's environment supplies the launcher, its account, and its profile, so read its `--help` before the first launch. When no launcher exists, tell the user and stop at the local VM.
+
+Set the time limit at launch from the climb's expected duration: the A/A run plus each candidate's measurement, at the per-run cost the harness measured, with half again as margin. A run cut off by the limit repeats its setup and measurements, which costs more than the idle margin. Extend the limit when the climb outgrows it rather than letting a measurement run into shutdown. Tell the user the limit and the instance type when you launch.
+
+When the launcher registers the VM with the user's terminal multiplexer, run long measurements in a pane there, so the user can watch them.
 
 ## Getting the Code In
 
@@ -60,4 +64,4 @@ Run these before the first measurement, and record the results in the notes file
 
 ## Cleanup
 
-Destroy the VM when the climb ends: `limactl delete -f perf` locally, or the launcher's destroy command in the cloud. A forgotten cloud instance bills by the hour. Record the teardown in the notes file.
+Destroy the VM when the climb ends: `limactl delete -f perf` locally, or the launcher's destroy command in the cloud. The time limit is a backstop, and the instance bills until it fires. Record the teardown in the notes file.

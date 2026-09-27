@@ -277,8 +277,6 @@ describe("runCopilot", () => {
   });
 });
 
-// The HOME redirect hides every stored login, so without a token in the environment Copilot
-// fails before inference.
 describe("copilotAuth", () => {
   test.each(["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"])(
     "defers to %s without asking gh",

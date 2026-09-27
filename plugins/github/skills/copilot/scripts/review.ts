@@ -468,10 +468,8 @@ interface RunOptions {
 const TOKEN_VARS = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"];
 
 /**
- * Pointing HOME at COPILOT_HOME also hides both logins Copilot would otherwise find: its own
- * under the real home and in the keychain, and gh's in ~/.config/gh. So a token that is not
- * already in the environment comes from `gh auth token`, run here under the real HOME. Null
- * means no token resolved, and Copilot would fail before inference.
+ * A token that is not already in the environment comes from `gh auth token`, run here under
+ * the real HOME. Null means no token resolved, and Copilot would fail before inference.
  */
 export function copilotAuth(
   env: Record<string, string | undefined>,

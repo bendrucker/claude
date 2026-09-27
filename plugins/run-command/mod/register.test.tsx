@@ -58,7 +58,7 @@ async function band($: Engine) {
 describe("commands", () => {
   test("takes lines holding only a command", () => {
     expect(commands(REPLY.text)).toEqual(["git status --short", "wt list"]);
-    expect(commands("!echo nospace\n* ! ls -la  ")).toEqual(["ls -la"]);
+    expect(commands("!echo nospace\n* ! ls -la  \n`! wt list `")).toEqual(["ls -la", "wt list"]);
   });
 });
 

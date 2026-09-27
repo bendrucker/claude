@@ -4,7 +4,7 @@ const KEY = "run-command:";
 const DIGIT = /^[1-9]$/;
 
 // A line that is only `! <command>`, optionally bulleted or in backticks.
-const COMMAND = /^\s*(?:[-*]\s+)?`?!\s+([^`]+?)`?\s*$/;
+const COMMAND = /^\s*(?:[-*]\s+)?`?!\s+([^`]+?)\s*`?\s*$/;
 
 export function commands(text: string): string[] {
   const found: string[] = [];
@@ -109,7 +109,7 @@ export function register(on: On): void {
     return next(command === undefined ? e : { ...e, inputText: command });
   });
 
-  on("ui.press", async ($, e, next) => {
+  on("ui.press", { plugin: "run-command" }, async ($, e, next) => {
     const command = pressed(e.element);
     if (command === undefined) return next(e);
     await $.prompt.fill({ text: command, mode: "insert" });

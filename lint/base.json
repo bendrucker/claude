@@ -170,7 +170,7 @@
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts"],
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
       "rules": {
         "unicorn/consistent-function-scoping": "off",
         "vitest/no-commented-out-tests": "error",

@@ -28,7 +28,7 @@ async function getPluginDirs(): Promise<string[]> {
 async function checkPlugin(pluginDir: string): Promise<string[]> {
   const violations: string[] = [];
   const pluginName = relative(pluginsDir, pluginDir);
-  const glob = new Glob("**/*.ts");
+  const glob = new Glob("**/*.{ts,tsx}");
 
   for await (const path of glob.scan({ cwd: pluginDir })) {
     if (path.includes("node_modules") || path.includes(".bun-cache")) continue;
@@ -38,7 +38,10 @@ async function checkPlugin(pluginDir: string): Promise<string[]> {
 
     const filePath = join(pluginDir, path);
 
-    for (const specifier of scanImports(await Bun.file(filePath).text())) {
+    for (const specifier of scanImports(
+      await Bun.file(filePath).text(),
+      path.endsWith(".tsx") ? "tsx" : "ts",
+    )) {
       if (!specifier.startsWith(".")) continue;
 
       const resolved = resolve(dirname(filePath), specifier);

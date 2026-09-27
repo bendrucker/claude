@@ -23,7 +23,7 @@ After changing a plugin script, run it directly with real arguments as well as i
 
 ## Property Tests
 
-This repo writes properties with [Hegel](https://hegel.dev) (`@hegeldev/hegel`) instead of `fast-check`. The shape from the global testing rule carries over: one property plus a small example table, `expect` inside the body.
+This repo writes properties with [Hegel](https://hegel.dev) (`@hegeldev/hegel`): one property plus a small example table, `expect` inside the body.
 
 ```ts
 import * as hegel from "@hegeldev/hegel";

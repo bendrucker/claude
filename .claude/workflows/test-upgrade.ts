@@ -81,7 +81,7 @@ const ground = await agent(
   [
     "Return, verbatim, the '## Technique Selection' and '## Refactor Bar' sections of user/rules/testing.md in the current repo,",
     "followed by the whole body of user/rules/testing-typescript.md,",
-    "followed by the '## Property Tests' section of .claude/rules/testing.md, which overrides fast-check with Hegel in this repo.",
+    "followed by the '## Property Tests' section of .claude/rules/testing.md, which names this repo's property-test library.",
     "No commentary.",
   ].join("\n"),
   { label: "ground:rule-text", phase: "Ground", effort: "low" },

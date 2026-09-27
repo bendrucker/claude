@@ -363,7 +363,7 @@ const trialEndCmd = command(
   },
 );
 
-// cleye nests commands only under cli(), so trial hands the rest of argv to its own.
+// cleye nests commands only under cli() until privatenumber/cleye#21, so trial hands argv to its own.
 const trialCmd = command(
   {
     name: "trial",
@@ -377,6 +377,10 @@ const trialCmd = command(
     await cli(
       { name: "watch-session trial", commands },
       (parsed) => {
+        if (parsed._.length > 0) {
+          console.error(`Unknown trial command: ${parsed._[0]}`);
+          process.exitCode = 1;
+        }
         parsed.showHelp();
       },
       argv,

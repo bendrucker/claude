@@ -12,8 +12,7 @@ import { readTranscriptTail } from "../../scripts/transcript";
 // Claude Code refuses an EnterWorktree it can already see will fail: a target
 // outside the session's repository, the current directory itself, or, once
 // the session has switched into a worktree, anything outside the repository's
-// `.claude/worktrees/`. Worktrunk never places worktrees there. Denying early
-// swaps the harness error for a reason that names what works instead.
+// `.claude/worktrees/`. Worktrunk never places worktrees there.
 
 const TRANSCRIPT_TAIL_BYTES = 2 * 1024 * 1024;
 
@@ -60,7 +59,7 @@ function isUnder(path: string, dir: string): boolean {
 
 // The newest `worktree-state` record is the harness's own record of whether
 // this session has switched into a worktree. Null means it has not, or has
-// exited. Undefined means the tail lacks a record, so the state is unknown.
+// exited.
 export async function worktreeSessionActive(transcriptPath: string): Promise<boolean | undefined> {
   const entries = await readTranscriptTail(transcriptPath, TRANSCRIPT_TAIL_BYTES);
   for (let i = entries.length - 1; i >= 0; i--) {

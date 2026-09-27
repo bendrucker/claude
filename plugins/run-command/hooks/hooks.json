@@ -1,0 +1,4 @@
+{
+  "description": "Draws a button under each `! <command>` line in a reply that fills the command into the prompt box",
+  "modules": ["../mod/register.tsx"]
+}

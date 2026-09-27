@@ -104,7 +104,8 @@
     {
       "files": ["plugins/*/mod/**"],
       "rules": {
-        "typescript/strict-boolean-expressions": "off"
+        "typescript/strict-boolean-expressions": "off",
+        "unicorn/no-array-fill-with-reference-type": "off"
       }
     }
   ]

@@ -190,7 +190,7 @@ jobs:
           echo "has_skills=$([[ -d "plugins/$plugin/skills" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_package=$([[ -f "plugins/$plugin/package.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_tests=$(find "plugins/$plugin" -name '*.test.ts' -not -path "plugins/$plugin/mod/*" | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "has_mod_tests=$(find "plugins/$plugin/mod" -name '*.test.ts' 2>/dev/null | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_mod_tests=$(find "plugins/$plugin/mod" -name '*.test.ts*' 2>/dev/null | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_integration_tests=$(find "plugins/$plugin" -name '*.integration.ts' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_swift=$(find "plugins/$plugin" -name '*.swift' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_playwright=$(find "plugins/$plugin" -name package.json -not -path '*/node_modules/*' -print0 | xargs -0 grep -lF '"playwright"' 2>/dev/null | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"

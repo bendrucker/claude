@@ -1,0 +1,8 @@
+{
+  "name": "run-command",
+  "description": "Click a `! <command>` suggestion in a reply to fill it into the prompt",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

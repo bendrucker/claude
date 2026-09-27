@@ -13,11 +13,12 @@ Most passes gate on the diff against the resolved base (the upstream tracking re
 | New code comments | `comments:audit` | See [Comment Trims](#comment-trims) |
 | A supported review bot is available for the repo and the diff clears the [Bot Review Gate](#bot-review-gate) | `pull-request:follow-up --local` | Reviews committed work, commits its fixes. Runs before the fix passes dirty the tree |
 | Code changes on a repo whose remote owner is `bendrucker`, clearing the [Cross-Model Gate](#cross-model-gate) | `github:copilot` | Same slot as the local bot pass. Findings fix in-branch |
-| Prose (`.md`, `.mdx`, `.rst`, docs) | `writing:review` | |
+| A document a model executes (`CLAUDE.md`, `AGENTS.md`, `SKILL.md`, skill `references/`, `.claude/agents`, `.claude/commands`, `.claude/rules`, `prompt/` or `prompts/` dirs) | `prompting:scan` | Fix confirmed findings with the `prompting` skill |
+| Prose people read (READMEs, docs, `.mdx`, `.rst`), excluding prompt files | `writing:review` | A diff with both kinds runs both passes, each over its own files |
 | A runtime surface | `run` | Ship declines docs-only and tests-only |
 | Always, unless `--skip human` | `review:human` | Last pre-PR pass. Ends the turn until the review comes back |
 
-Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `copilot`, `writing`, `run`, `human`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
+Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `copilot`, `prompting`, `writing`, `run`, `human`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
 
 ## Bot Review Gate
 
@@ -69,11 +70,11 @@ It is read-only and writes nothing, so it runs as a background dispatch rather t
 ```mermaid
 flowchart TD
     S([ship start]) --> G{plan:review gated in?}
-    G -->|no| F1[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, writing, run]
+    G -->|no| F1[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, prompting, writing, run]
     F1 --> H[review:human, ends the turn until the review returns]
     H --> C([create PR])
     G -->|yes| D[dispatch plan:review in background]
-    D --> F2[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, writing, run]
+    D --> F2[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, prompting, writing, run]
     D -. concurrent .-> R[plan:review reasons over plan + diff]
     F2 --> J{join: findings?}
     R -.-> J

@@ -22,7 +22,7 @@ Every customization costs tokens on every session. Before adding one, define wha
 ## Workflow
 
 - A skill that instructs a subagent fan-out or background dispatch carries my authorization for `Agent`. Run it as written. Degrade to inline only when `Agent` is absent, and say so.
-- Prefer `analyst` over `general-purpose` for read-only spawns. Pass `model: haiku` or `sonnet` for a type without its own model (`general-purpose`, `Explore`, `review:angle`) or for pure lookup.
+- Prefer `analyst` over `general-purpose` for read-only spawns. Pass `model: haiku` for pure lookup.
 - Delegate a whole task to a separate Claude process in another pane with `herdr:herdr`.
 - Run scripted cross-model or GPT review through `github:copilot`. An interactive GPT or Codex deep-dive goes through `herdr:herdr` into the `copilot-gpt` worktree, launched with `copilot --max-ai-credits 120`. "Consult fable" means the same second opinion from a Fable session.
 - Use the `agent-browser` skill when a task needs a real browser. `WebFetch` is fine for static pages.
@@ -50,10 +50,13 @@ The URL prefills a new session without submitting it. Point `cwd` at the main re
 - Never `git push` to the default branch unless I say so.
 - Work on a topic branch with a short hyphenated name.
 - Write commit messages with one `-m` per paragraph, or a heredoc for complex ones. Wrap bodies at ~72 columns.
+- Update a checkout with `git merge --ff-only <ref>`. Revert your own edits with `git restore <path>`. A tree-wide reset, checkout, or clean needs me to name it.
 
 ## Worktrees
 
 Any change meant to become its own PR starts in a worktree created with `worktrunk:wt-switch-create`, even where a harness suggests `EnterWorktree`. Stay put when already on a topic branch in one. Work handed to a sibling agent gets its worktree through `herdr:herdr`. Use `worktrunk:worktrunk` for every other `wt` task. Disposable verification worktrees may use `git worktree add tmp/<name>`.
+
+Inside an isolated worktree, write files with `Write` or `Edit` and keep each Bash command a single plain command. The isolation guard refuses heredocs, `$(...)`, loops, and a `cd` into the main checkout before git.
 
 ## Claude Configuration
 

@@ -5,6 +5,7 @@ import type { Nodes } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import { linesOutsideFences } from "./markdown";
+import { splice } from "./shell";
 
 // Prose density thresholds. A paragraph past MAX_SENTENCES_PER_PARAGRAPH runs
 // more than one thread. A sentence past RUN_ON_CHARS is a wall. A sentence with
@@ -131,7 +132,7 @@ export function hardWrappedParagraphs(body: string): WrappedParagraph[] {
 export function unwrapBody(body: string): string {
   let out = body;
   for (const { unwrapped, start, end } of hardWrappedParagraphs(body).toReversed()) {
-    out = out.slice(0, start) + unwrapped + out.slice(end);
+    out = splice(out, [start, end], unwrapped);
   }
   return out;
 }

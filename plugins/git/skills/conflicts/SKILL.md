@@ -2,6 +2,7 @@
 name: git:conflicts
 description: Resolve git merge conflicts from a rebase, merge, or cherry-pick. Use also for a request to finish the operation and push, such as "fix conflicts and push".
 argument-hint: "[--push]"
+effort: high
 allowed-tools:
   - Read
   - Edit

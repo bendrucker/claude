@@ -1,0 +1,4 @@
+{
+  "description": "Once the prompt enters bash mode, offers the `! <command>` lines of a reply as buttons and a numbered list that fill the command",
+  "modules": ["../mod/register.tsx"]
+}

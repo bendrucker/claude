@@ -16,6 +16,8 @@ allowed-tools:
   - Skill(run)
   - Skill(comments:audit)
   - Skill(github:copilot)
+  - Skill(prompting:scan)
+  - Skill(prompting:prompting)
   - Skill(writing:review)
   - Skill(review:human)
   - Skill(pull-request:create)
@@ -42,7 +44,8 @@ Resolve the base to a **remote** ref so ship's view matches what the PR merges a
 - **`comments:audit`**: diff adds code comments.
 - **`pull-request:follow-up --local`**: a supported review bot is available for the repo *and* the diff clears the [Bot Review Gate](references/passes.md#bot-review-gate). Runs the hosted reviewer locally before the PR exists.
 - **`github:copilot`**: code changed on a repo I own *and* the diff clears the [Cross-Model Gate](references/passes.md#cross-model-gate). A second model reads the diff before the PR exists.
-- **`writing:review`**: diff touches prose (`.md`, `.mdx`, `.rst`, docs).
+- **`prompting:scan`**: diff touches a document a model executes: `CLAUDE.md`, `AGENTS.md`, `SKILL.md`, a skill's `references/`, `.claude/agents`, `.claude/commands`, `.claude/rules`, or a `prompt/` or `prompts/` dir. Fix confirmed findings with the `prompting` skill.
+- **`writing:review`**: diff touches prose people read (READMEs, docs, `.mdx`, `.rst`), excluding the prompt files above. A diff with both runs both passes, each over its own files.
 - **`run`**: diff has a runtime surface. Drive the change in the real app, not just tests. Skip on docs-only and tests-only.
 - **`review:human`**: always on. Ben reads the cleaned diff last, for architecture and slop. `--skip human` drops it, and passes `--no-review-body` through to create.
 
@@ -53,7 +56,7 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 - `--merge`: drive to merged (babysit `--merge`). Default: green and ready.
 - `--effort <low|medium|high|xhigh>`: override inferred `review:code` effort.
 - `--simplify`: force `simplify` over `review:code`.
-- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code` (the old `code-review` is accepted as an alias), `simplify`, `comments`, `bot`, `copilot`, `writing`, `run` (the old `verify` is accepted as an alias), `human`.
+- `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code` (the old `code-review` is accepted as an alias), `simplify`, `comments`, `bot`, `copilot`, `prompting`, `writing`, `run` (the old `verify` is accepted as an alias), `human`.
 - `--base <ref>`: base branch for gating. Default `main`; on a stack, the parent branch. Resolved to its upstream tracking ref (e.g. `origin/...`) before diffing.
 
 ## Pre-PR Reviews
@@ -64,10 +67,11 @@ Serialized before create: `review:code --fix`, `simplify`, and comment trims all
 2. **`pull-request:follow-up --local`**: reviews committed work only and commits its own fixes, so it runs while the tree is still clean, before the fix passes. Pass the resolved base.
 3. **`github:copilot`**: the cross-model pass, in the same slot and for the same reason. Findings triage and fix in-branch. It spends a metered credit allotment. [`references/passes.md`](references/passes.md) gates it.
 4. **Correctness and quality**: `review:code <effort> --fix` or `simplify`.
-5. **`writing:review`** over touched prose. Address salient findings before the body is written.
-6. **`run`** to drive the change end to end.
-7. **Join `plan:review`** when it was gated in, and act on fix-worthy drift before the human review sees the diff. Carry deferred follow-ups into the report.
-8. **`review:human`**: after every fix pass and the join, so the cleaned diff is what gets seen ([Human Review](references/passes.md#human-review)). Terminal mode by default: it ends the turn, and Create runs only when the review resumes with approval.
+5. **`prompting:scan`** over touched prompt files. Fix confirmed findings with the `prompting` skill.
+6. **`writing:review`** over touched human prose. Address salient findings before the body is written.
+7. **`run`** to drive the change end to end.
+8. **Join `plan:review`** when it was gated in, and act on fix-worthy drift before the human review sees the diff. Carry deferred follow-ups into the report.
+9. **`review:human`**: after every fix pass and the join, so the cleaned diff is what gets seen ([Human Review](references/passes.md#human-review)). Terminal mode by default: it ends the turn, and Create runs only when the review resumes with approval.
 
 Dirty tree at the comment pass: ask whether to commit first. `comments:audit` operates on `HEAD` and needs a clean tree.
 

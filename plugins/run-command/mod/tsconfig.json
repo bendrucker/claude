@@ -1,0 +1,10 @@
+{
+  "extends": "../../../tsconfig.mod.json",
+  "compilerOptions": {
+    "jsx": "react",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment",
+    "allowImportingTsExtensions": true
+  },
+  "include": ["../../../.claude/types", "."]
+}

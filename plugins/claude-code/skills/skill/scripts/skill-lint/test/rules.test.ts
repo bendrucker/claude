@@ -7,7 +7,6 @@ import {
   allowedToolsFormat,
   descriptionLength,
   descriptionRequired,
-  effortRequiresFork,
   nameConsecutiveHyphens,
   nameEdgeHyphens,
   nameFormat,
@@ -195,33 +194,6 @@ describe("frontmatter rules", () => {
   ])("allowedToolsFormat: $name", ({ frontmatter, passed }) => {
     const content = parseSkill(frontmatter);
     const result = single(allowedToolsFormat.check(content, ""));
-    expect(result.passed).toBe(passed);
-  });
-
-  test.each<{ name: string; frontmatter: string; passed: boolean }>([
-    {
-      name: "passes when effort is not set",
-      frontmatter: "---\nname: test\n---\n",
-      passed: true,
-    },
-    {
-      name: "passes when effort is paired with context: fork",
-      frontmatter: "---\neffort: low\ncontext: fork\n---\n",
-      passed: true,
-    },
-    {
-      name: "fails when effort is set on an inline skill",
-      frontmatter: "---\neffort: low\n---\n",
-      passed: false,
-    },
-    {
-      name: "fails when effort is set with a non-fork context",
-      frontmatter: "---\neffort: low\ncontext: inline\n---\n",
-      passed: false,
-    },
-  ])("effortRequiresFork: $name", ({ frontmatter, passed }) => {
-    const content = parseSkill(frontmatter);
-    const result = single(effortRequiresFork.check(content, ""));
     expect(result.passed).toBe(passed);
   });
 });

@@ -2,6 +2,7 @@
 name: prompting:scan
 description: "Report prompt defects a lexical scan finds in documents a model executes. Use to audit a repository's skills, CLAUDE.md, agent definitions, or a product's prompt files, or to gate them in CI or a pre-commit hook."
 argument-hint: "[<path>] [--all] [--quiet]"
+effort: low
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts:*)
   - Read

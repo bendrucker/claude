@@ -645,10 +645,13 @@ WHERE blocked OR decision IN ('ask', 'deny');
 -- output (a genuine failure carries an `Exit code N` or `<tool_use_error>` prefix), then
 -- confirm the string against the hook script that emits it. Patterns anchor at the start
 -- of the message, so a scanner printing the same phrase inside its own output does not
--- register as a deny. Rows whose tool_use_id already appears in hook_blocks are dropped:
--- an `ask` the user declined leaves both a hook record and an error, and counting both
--- would inflate every hook that asks. `hook_name` is the map's label rather than a command
--- string, since the deny path records no command.
+-- register as a deny. Since 2026-09-19 the harness prepends `PreToolUse:<Tool> hook error: `
+-- to the reason before it reaches the tool_result, so `stripped` peels that off before
+-- matching and before exposing the text as `reason`, keeping both formats on one pattern
+-- and one grouping signature. Rows whose tool_use_id already appears in hook_blocks are
+-- dropped: an `ask` the user declined leaves both a hook record and an error, and counting
+-- both would inflate every hook that asks. `hook_name` is the map's label rather than a
+-- command string, since the deny path records no command.
 --
 -- Denies recovered this way are the one blocking channel a subagent contributes to,
 -- because a subagent's tool_results land in its own transcript while carrying the parent
@@ -664,21 +667,27 @@ WITH patterns(hook_name, pattern) AS (
     ('gitlab:lint',                     'This repository''s origin remote is GitLab%'),
     ('pull-request:validate-body',      'Fix the PR body before retrying%'),
     ('linear:cli-create',               '`linear issue create` without%')
+),
+stripped AS (
+  SELECT
+    te.*,
+    regexp_replace(te.error_content, '^\s*PreToolUse:\w+ hook error:\s*', '') AS stripped_content
+  FROM tool_errors te
 )
 SELECT
   te.host,
   te.session_id,
   te.project_path,
   te.timestamp,
-  'PreToolUse'     AS hook_event,
+  'PreToolUse'          AS hook_event,
   p.hook_name,
-  te.tool_id       AS tool_use_id,
-  tc.tool_name     AS denied_tool,
-  tc.command       AS denied_command,
-  te.error_content AS reason,
+  te.tool_id            AS tool_use_id,
+  tc.tool_name          AS denied_tool,
+  tc.command            AS denied_command,
+  te.stripped_content   AS reason,
   te.agent_id
-FROM tool_errors te
-JOIN patterns p ON te.error_content LIKE p.pattern
+FROM stripped te
+JOIN patterns p ON te.stripped_content LIKE p.pattern
 JOIN tool_calls tc ON tc.host = te.host AND tc.tool_id = te.tool_id
 WHERE te.error_type = 'failure'
   AND NOT EXISTS (

@@ -1,5 +1,6 @@
 import { describe, expect, it, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -42,6 +43,16 @@ describe("isPrBodyCommand", () => {
 const literal = (text: string): BodyPart => ({ kind: "literal", text });
 const file = (filePath: string): BodyPart => ({ kind: "file", path: filePath });
 const parts = (...items: BodyPart[]): BodySpec => ({ kind: "parts", parts: items });
+
+// A same-call heredoc's `text` is what these cases assert on. Its `span` and
+// `dash` get their own tests below.
+function ignoringHeredocMechanics(spec: BodySpec): BodySpec {
+  if (spec.kind !== "parts") return spec;
+  return {
+    kind: "parts",
+    parts: spec.parts.map((part) => (part.kind === "heredoc" ? literal(part.text) : part)),
+  };
+}
 
 describe("extractBodySpec", () => {
   test.each<[string, BodySpec]>([
@@ -150,7 +161,7 @@ describe("extractBodySpec", () => {
       parts(literal("Prose.\n")),
     ],
   ])("extractBodySpec(%p) -> %p", (command, expected) => {
-    expect(extractBodySpec(command)).toEqual(expected);
+    expect(ignoringHeredocMechanics(extractBodySpec(command))).toEqual(expected);
   });
 
   test.each<[string, string]>([
@@ -171,6 +182,28 @@ describe("extractBodySpec", () => {
     const spec = extractBodySpec(command);
     expect(spec.kind).toBe("unreadable");
     expect(spec.kind === "unreadable" ? spec.detail : "").toContain(fragment);
+  });
+
+  // The span is what a caller splices a heading-case correction back into, so
+  // it has to point at exactly the heredoc's raw content in the command text.
+  test.each<[string]>([
+    ["gh pr create --body-file - <<'EOF'\n## A Heading\n\nProse.\nEOF"],
+    ["cat > body.md <<'EOF'\n## A Heading\n\nProse.\nEOF\ngh pr create --body-file body.md"],
+  ])("extractBodySpec(%p) spans exactly the heredoc content", (command) => {
+    const spec = extractBodySpec(command);
+    const part = spec.kind === "parts" ? spec.parts[0] : undefined;
+    if (part?.kind !== "heredoc") throw new Error("expected a heredoc part");
+    expect(command.slice(...part.span)).toBe(part.text);
+    expect(part.dash).toBe(false);
+  });
+
+  test("extractBodySpec marks a <<- heredoc as unsafe to splice back", () => {
+    const command =
+      "cat > body.md <<-'EOF'\n\t## A Heading\n\n\tProse.\n\tEOF\ngh pr create --body-file body.md";
+    const spec = extractBodySpec(command);
+    const part = spec.kind === "parts" ? spec.parts[0] : undefined;
+    if (part?.kind !== "heredoc") throw new Error("expected a heredoc part");
+    expect(part.dash).toBe(true);
   });
 });
 
@@ -242,6 +275,91 @@ describe("command forms the skills document", () => {
     // Doc paths are placeholders (`tmp/pr-body-<branch>.md`, `file.md`).
     const command = documentedCommand(snippet).replaceAll(/\S*\.md/g, bodyPath);
     expect(await resolveBody(command, REPO_ROOT)).toMatchObject({ kind: "text", text: body });
+  });
+});
+
+// A hook process and the sandboxed shell it validates commands for disagree
+// about TMPDIR, so a body under `$TMPDIR` is tried against both.
+describe("resolveBody $TMPDIR candidates", () => {
+  it("falls back to the sandboxed TMPDIR guess when the hook's own TMPDIR has nothing", async () => {
+    const uid = process.getuid?.() ?? 0;
+    const subdir = `resolve-body-test-${process.pid}`;
+    const sandboxDir = join("/tmp", `claude-${uid}`, subdir);
+    const body = "## Summary\n\nFrom the sandboxed guess.\n";
+    await Bun.write(join(sandboxDir, "body.md"), body);
+    const originalTmpdir = process.env.TMPDIR;
+    try {
+      process.env.TMPDIR = "/nonexistent-hook-tmpdir";
+      const command = `gh pr create --body-file "$TMPDIR/${subdir}/body.md"`;
+      expect(await resolveBody(command, "/repo")).toMatchObject({ kind: "text", text: body });
+    } finally {
+      if (originalTmpdir === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmpdir;
+      await rm(sandboxDir, { recursive: true, force: true });
+    }
+  });
+
+  it("reads the hook's own TMPDIR when the file is there", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "resolve-body-tmpdir-"));
+    const body = "## Summary\n\nFrom the hook's own TMPDIR.\n";
+    await Bun.write(join(dir, "body.md"), body);
+    const originalTmpdir = process.env.TMPDIR;
+    try {
+      process.env.TMPDIR = dir;
+      expect(
+        await resolveBody('gh pr create --body-file "$TMPDIR/body.md"', "/repo"),
+      ).toMatchObject({ kind: "text", text: body });
+    } finally {
+      if (originalTmpdir === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmpdir;
+    }
+  });
+
+  it("does not let a non-ENOENT read failure on one candidate block the other", async () => {
+    const uid = process.getuid?.() ?? 0;
+    const subdir = `resolve-body-test-nonenoent-${process.pid}`;
+    const sandboxDir = join("/tmp", `claude-${uid}`, subdir);
+    const body = "## Summary\n\nFrom the sandboxed guess.\n";
+    await Bun.write(join(sandboxDir, "body.md"), body);
+    const hookDir = mkdtempSync(join(tmpdir(), "resolve-body-nonenoent-"));
+    // A directory at the hook's own guessed path throws EISDIR on read, not
+    // ENOENT.
+    await Bun.write(join(hookDir, subdir, "body.md", ".keep"), "");
+    const originalTmpdir = process.env.TMPDIR;
+    try {
+      process.env.TMPDIR = hookDir;
+      const command = `gh pr create --body-file "$TMPDIR/${subdir}/body.md"`;
+      expect(await resolveBody(command, "/repo")).toMatchObject({ kind: "text", text: body });
+    } finally {
+      if (originalTmpdir === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmpdir;
+      await rm(sandboxDir, { recursive: true, force: true });
+      await rm(hookDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// The span/dash pair a caller uses to correct a heading in place, threaded
+// through from `extractBodySpec`'s heredoc part.
+describe("resolveBody heredoc span", () => {
+  it("carries a splice-safe span for a same-call heredoc", async () => {
+    const command = "gh pr create --body-file - <<'EOF'\n## A Heading\n\nProse.\nEOF";
+    const resolved = await resolveBody(command, "/repo");
+    if (resolved.kind !== "text") throw new Error("expected a text resolution");
+    expect(resolved.file).toBeNull();
+    expect(resolved.heredoc).not.toBeNull();
+    const [start, end] = resolved.heredoc?.span ?? [0, 0];
+    expect(command.slice(start, end)).toBe(resolved.text);
+  });
+
+  it("carries no heredoc span for a body read from a file", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "resolve-body-file-"));
+    const bodyFile = join(dir, "body.md");
+    await Bun.write(bodyFile, "## Summary\n\nProse.\n");
+    const resolved = await resolveBody(`gh pr create --body-file ${bodyFile}`, "/repo");
+    if (resolved.kind !== "text") throw new Error("expected a text resolution");
+    expect(resolved.file).toBe(bodyFile);
+    expect(resolved.heredoc).toBeNull();
   });
 });
 

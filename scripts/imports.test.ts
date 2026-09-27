@@ -32,6 +32,11 @@ test.each<{ name: string; source: string; expected: string[] }>([
   expect(scanImports(source).toSorted()).toEqual(expected.toSorted());
 });
 
+test("scanImports: parses JSX under the tsx loader", () => {
+  const source = `import { a } from "./a.tsx";\nexport const b = <Box flexDirection="column" />;`;
+  expect(scanImports(source, "tsx")).toContain("./a.tsx");
+});
+
 test.each([
   { specifier: "node:path", expected: true },
   { specifier: "bun", expected: true },

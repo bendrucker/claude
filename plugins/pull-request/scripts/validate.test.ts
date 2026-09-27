@@ -30,6 +30,12 @@ function getDenyReason(result: Awaited<ReturnType<typeof processInput>>) {
   return undefined;
 }
 
+function getUpdatedCommand(result: Awaited<ReturnType<typeof processInput>>) {
+  const output = result?.hookSpecificOutput;
+  const updatedInput = output && "updatedInput" in output ? output.updatedInput : undefined;
+  return typeof updatedInput?.command === "string" ? updatedInput.command : undefined;
+}
+
 describe("processInput", () => {
   let tempDir: string;
 
@@ -153,10 +159,10 @@ describe("processInput", () => {
   // it. The heredoc is the body.
   it("validates a body written by a heredoc in the same command", async () => {
     const bodyFile = join(tempDir, "body.md");
-    const command = `mkdir -p tmp && cat > ${bodyFile} <<'EOF'\n## Two fixes found while testing\n\nReshapes the resolver.\nEOF\ngh pr create --title T --body-file ${bodyFile}`;
+    const command = `mkdir -p tmp && cat > ${bodyFile} <<'EOF'\nReshapes the resolver. Added 5 tests.\nEOF\ngh pr create --title T --body-file ${bodyFile}`;
     const result = await processInput(createInput(command, repoRoot));
     expect(getPermissionDecision(result)).toBe("deny");
-    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+    expect(getDenyReason(result)).toContain("test counts");
   });
 
   it("passes a clean body written by a heredoc in the same command", async () => {
@@ -251,14 +257,67 @@ describe("processInput", () => {
   });
 
   // The file the command names does not exist yet: the command's own heredoc
-  // writes it, and would overwrite anything the hook put there.
-  it("denies a heading in a heredoc body instead of correcting it", async () => {
+  // would write it. There is nothing on disk to correct, so the fix goes into
+  // the command's heredoc text instead of a deny.
+  it("re-cases a heading inside a same-call heredoc instead of denying", async () => {
     const bodyFile = join(tempDir, "body.md");
     const command = `cat > ${bodyFile} <<'EOF'\n## Two fixes found while testing\n\nReshapes it.\nEOF\ngh pr create --title T --body-file ${bodyFile}`;
     const result = await processInput(createInput(command, repoRoot));
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getAdditionalContext(result)).toContain(
+      '"Two fixes found while testing" → "Two Fixes Found While Testing"',
+    );
+    expect(getUpdatedCommand(result)).toBe(
+      `cat > ${bodyFile} <<'EOF'\n## Two Fixes Found While Testing\n\nReshapes it.\nEOF\ngh pr create --title T --body-file ${bodyFile}`,
+    );
+    expect(await Bun.file(bodyFile).exists()).toBe(false);
+  });
+
+  // `updatedInput` replaces the whole tool_input object, so a field the splice
+  // never touches has to ride along or Claude loses it off the corrected call.
+  it("keeps other tool_input fields when splicing a heredoc correction", async () => {
+    const command = `gh pr create --title T --body-file /dev/stdin <<'EOF'\n## Two fixes found while testing\n\nReshapes it.\nEOF`;
+    const result = await processInput({
+      tool_input: { command, description: "Open the PR", timeout: 5000 },
+      cwd: repoRoot,
+    });
+    const output = result?.hookSpecificOutput;
+    const updatedInput = output && "updatedInput" in output ? output.updatedInput : undefined;
+    expect(updatedInput).toMatchObject({ description: "Open the PR", timeout: 5000 });
+  });
+
+  // A heredoc directly on the PR command's own stdin is the other shape the
+  // hook's own "cat > <path> <<'EOF'" suggestion produces.
+  it("re-cases a heading inside a heredoc fed directly to the PR command", async () => {
+    const command = `gh pr create --title T --body-file /dev/stdin <<'EOF'\n## Two fixes found while testing\n\nReshapes it.\nEOF`;
+    const result = await processInput(createInput(command, repoRoot));
+    expect(getPermissionDecision(result)).toBeUndefined();
+    expect(getUpdatedCommand(result)).toBe(
+      `gh pr create --title T --body-file /dev/stdin <<'EOF'\n## Two Fixes Found While Testing\n\nReshapes it.\nEOF`,
+    );
+  });
+
+  // `<<-` strips each line's leading tabs before the CLI sees the body, so the
+  // stripped content no longer matches the command's own bytes at that span.
+  // Splicing a correction back there would corrupt the command, so this shape
+  // keeps denying.
+  it("keeps denying a heading-case violation in a <<- heredoc", async () => {
+    const bodyFile = join(tempDir, "body.md");
+    const command = `cat > ${bodyFile} <<-'EOF'\n\t## Two fixes found while testing\n\n\tReshapes it.\n\tEOF\ngh pr create --title T --body-file ${bodyFile}`;
+    const result = await processInput(createInput(command, repoRoot));
     expect(getPermissionDecision(result)).toBe("deny");
     expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
-    expect(await Bun.file(bodyFile).exists()).toBe(false);
+  });
+
+  // A heredoc splice only fires when heading case is the only deny, matching
+  // the file-based correction's own rule.
+  it("keeps denying a heredoc body when another deny stands with the heading", async () => {
+    const bodyFile = join(tempDir, "body.md");
+    const command = `cat > ${bodyFile} <<'EOF'\n## Two fixes found while testing\n\nAdded 5 tests.\nEOF\ngh pr create --title T --body-file ${bodyFile}`;
+    const result = await processInput(createInput(command, repoRoot));
+    expect(getPermissionDecision(result)).toBe("deny");
+    expect(getDenyReason(result)).toContain("Two Fixes Found While Testing");
+    expect(getDenyReason(result)).toContain("test counts");
   });
 
   it("denies a heading in an inline body instead of correcting it", async () => {

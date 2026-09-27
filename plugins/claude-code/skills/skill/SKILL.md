@@ -1,6 +1,6 @@
 ---
 name: claude-code:skill
-description: Creating and optimizing Claude Code Skills including activation patterns, content structure, and development workflows. Use when creating new skills, converting memory files to skills, debugging skill activation, or understanding skill architecture and best practices.
+description: Use when creating a skill, converting a memory file into one, debugging skill activation, or structuring skill content. For prompt wording, pair with prompting:prompting.
 argument-hint: "[--validate] [--structure]"
 allowed-tools:
   - Read
@@ -69,7 +69,7 @@ hooks:
 - `argument-hint`: Arguments the skill accepts, shown in the slash menu after the skill name. See [Argument Hints](#argument-hints).
 - `allowed-tools`: Tools Claude can use without permission when skill is active
 - `model`: Override the conversation's model. Prefer a tier alias (`haiku`, `sonnet`, `opus`, `fable`) or `inherit` over a dated model ID.
-- `effort`: Reasoning effort while the skill is active. Pin it only under `context: fork`. See [Reasoning Effort](references/patterns.md#reasoning-effort) for why. Defaults to the conversation's effort.
+- `effort`: Reasoning effort while the skill is active, applied only when typed as a slash command. Model invocation ignores it. Defaults to the conversation's effort. See [Reasoning Effort](references/patterns.md#reasoning-effort) for levels and cache cost by model.
 - `context`: Set to `fork` to run in isolated subagent context
 - `agent`: Agent type when `context: fork` (`Explore`, `Plan`, `general-purpose`, or custom)
 - `background`: Only with `context: fork`. `false` waits for the fork's result in the invoking turn instead of backgrounding it. Default `true`.
@@ -92,6 +92,12 @@ Load the `prompting` skill before writing a skill body or a reference file. It c
 #### Descriptions
 
 The `description` field is the pointer Claude scans to decide whether to activate the skill. Write it for the model and make it slightly pushy, since under-triggering is the common failure. The wording rules are in the `prompting` skill.
+
+List triggers: the requests that call for the skill. End with the boundary to any sibling skill a request could land on. Tools, techniques, and capabilities go in the body.
+
+```yaml
+description: Use when timing a program or command, asking whether a change or version made it faster, or building a benchmark harness. For repeated optimization toward a target, use performance:hill-climb.
+```
 
 #### Gotchas
 

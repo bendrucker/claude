@@ -43,7 +43,9 @@ Build the benchmark per `performance:benchmark`, or adopt the project's existing
 
 Run the program twice from a fresh reset and diff the end states. A difference is state the reset misses or a side effect still reaching outside the harness.
 
-Time one run with its `--prepare` reset before launching the A/A, and multiply by the planned run count. When the A/A alone would take a large share of the budget, shrink the reset (restore only what a run changes) or the run count first.
+Keep the loop tight: every minute a run or reset costs is paid on each A/A run, candidate, and re-baseline. Reset per run only the state the scenario depends on. Move work that feeds every run identically out of the per-run reset: build fixtures and install toolchains once with `--setup`, and cache downloads and inputs the metric does not cover. Each hoisted step is a contamination risk, so run the end-state diff above after each one. A hoisted step that makes the diff differ, or moves the A/A, goes back into the reset.
+
+Time one run with its `--prepare` reset before launching the A/A, and multiply by the planned run count. When the A/A alone would take a large share of the budget, tighten the reset or cut the run count before starting it.
 
 Record the baseline twice with the unchanged program (an A/A comparison). Its spread is the noise floor, and it sets the run count a candidate needs.
 

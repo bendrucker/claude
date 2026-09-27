@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { $ } from "bun";
 import { cli, command } from "cleye";
 import { z } from "zod";
-import { decodeJson } from "../../../../packages/decode/index";
+import { decodeFile, decodeJson } from "../../../../packages/decode/index";
 import { type Blocked, Entry, render, splitLines, type Turn, TurnTracker } from "./transcript";
 
 const PANE_CHECK_MS = 10_000;
@@ -96,9 +96,7 @@ async function readState(
 ): Promise<z.output<typeof State> | undefined> {
   if (dir === undefined) return undefined;
   const path = statePath(dir, session);
-  const file = Bun.file(path);
-  if (!(await file.exists())) return undefined;
-  return decodeJson(State, await file.text(), path);
+  return (await Bun.file(path).exists()) ? decodeFile(State, path) : undefined;
 }
 
 function emit(event: object): void {
@@ -133,7 +131,7 @@ function addToBatch(batch: Batch | undefined, turn: Turn): Batch {
   for (const [name, count] of Object.entries(turn.tools)) {
     next.tools[name] = (next.tools[name] ?? 0) + count;
   }
-  next.skills.push(...turn.skills.filter((s) => !next.skills.includes(s)));
+  next.skills = [...new Set([...next.skills, ...turn.skills])];
   next.errors += turn.errors;
   return next;
 }
@@ -146,20 +144,13 @@ interface WatchOptions {
   poll: number;
 }
 
-function startOffset(
-  saved: z.output<typeof State> | undefined,
-  target: Target,
-  fromStart: boolean,
-): number {
-  if (saved) return saved.offset;
-  return fromStart ? 0 : Bun.file(target.path).size;
-}
-
 class Watcher {
   private tracker = new TurnTracker();
   private batch: Batch | undefined;
   private lastPaneCheck = Date.now();
   private lastFlush = Date.now();
+  // A session the pane switched to whose transcript has not appeared yet.
+  private pending: string | undefined;
 
   constructor(
     private readonly options: WatchOptions,
@@ -182,6 +173,7 @@ class Watcher {
       await Bun.file(this.target.path).slice(this.offset, size).arrayBuffer(),
     );
     const { lines, consumed } = splitLines(bytes, this.offset);
+    if (consumed === 0) return;
     this.offset += consumed;
     for (const event of lines.flatMap((line) => this.tracker.feed(line))) this.dispatch(event);
     await this.persist();
@@ -201,6 +193,7 @@ class Watcher {
   }
 
   private async checkPane(): Promise<boolean> {
+    if (this.pending !== undefined) await this.follow(this.pending);
     if (this.pane === undefined || Date.now() - this.lastPaneCheck < PANE_CHECK_MS) return true;
     this.lastPaneCheck = Date.now();
     const current = await paneSession(this.pane);
@@ -209,22 +202,25 @@ class Watcher {
       emit({ event: "ended", reason: "pane has no Claude session" });
       return false;
     }
-    if (current === this.target.session) return true;
-    // A /clear or /resume in the watched pane starts a new transcript, so follow it from its first line
-    // once it exists. Until then, keep checking on the pane-check interval.
-    const path = await findTranscript(current);
-    if (path === undefined) return true;
-    this.target = { session: current, path };
+    // A /clear or /resume starts a new transcript, which appears at the session's first message.
+    // Poll for it on every tick until then.
+    this.pending = current === this.target.session ? undefined : current;
+    return true;
+  }
+
+  private async follow(session: string): Promise<void> {
+    const path = await findTranscript(session);
+    if (path === undefined) return;
+    this.pending = undefined;
+    this.target = { session, path };
     this.offset = 0;
     this.tracker = new TurnTracker();
     await this.persist();
     emit({ event: "session", ...this.target });
-    return true;
   }
 
   async persist(): Promise<void> {
     if (this.options.stateDir === undefined) return;
-    await mkdir(this.options.stateDir, { recursive: true });
     // Formatted the way oxfmt and prettier leave JSON, since a repo's format check can reach tmp/.
     await Bun.write(
       statePath(this.options.stateDir, this.target.session),
@@ -243,11 +239,9 @@ async function watch(options: WatchOptions): Promise<void> {
     path = await awaitTranscript(session, options.poll);
   }
   const target = { session, path };
-  const offset = startOffset(
-    await readState(options.stateDir, target.session),
-    target,
-    options.fromStart || fresh,
-  );
+  const saved = await readState(options.stateDir, session);
+  const offset = saved?.offset ?? (options.fromStart || fresh ? 0 : Bun.file(path).size);
+  if (options.stateDir !== undefined) await mkdir(options.stateDir, { recursive: true });
   const watcher = new Watcher(options, target, pane, offset);
   await watcher.persist();
   emit({ event: "watching", ...target, ...(await workspace(target.path)), offset, pane });

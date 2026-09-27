@@ -83,6 +83,15 @@ describe("TurnTracker", () => {
     expect(turn).toMatchObject({ prompt: "/hill-climb bin/sync", skills: ["hill-climb"] });
   });
 
+  test("records a bundled command as a skill without a skill directory", () => {
+    const bundled = [
+      prompt("<command-message>simplify</command-message><command-name>/simplify</command-name>"),
+      assistant({ type: "text", text: "Reviewing." }),
+      turnEnd,
+    ];
+    expect(events(jsonl(bundled))[0]).toMatchObject({ prompt: "/simplify", skills: ["simplify"] });
+  });
+
   test("a turn stays open until its end marker arrives", () => {
     const open = events(jsonl(session.slice(0, 8)));
     expect(open.map((e) => e.event)).toEqual(["blocked"]);

@@ -27,7 +27,7 @@ export const Entry = z.looseObject({
 export type Entry = z.output<typeof Entry>;
 
 /** One decoded transcript line and the byte range it occupies. */
-export interface Line {
+interface Line {
   entry: Entry;
   from: number;
   to: number;
@@ -57,11 +57,13 @@ export interface Blocked {
 const SKILL_DIR = /^Base directory for this skill: (\S+)/;
 const COMMAND_NAME = /<command-name>([^<]*)<\/command-name>/;
 const COMMAND_ARGS = /<command-args>([^<]*)<\/command-args>/;
+// Only commands that expand into a prompt, skills and bundled commands alike, carry a command message.
+const COMMAND_MESSAGE = "<command-message>";
 // Output Claude Code records around a local command such as /add-dir, rather than anything the user typed.
-const LOCAL_OUTPUT = /^<local-command-(caveat|stdout|stderr)>/;
+const LOCAL_OUTPUT = "<local-command-";
 const INTERRUPTED = "[Request interrupted by user";
 
-export function clip(text: string, max: number): string {
+function clip(text: string, max: number): string {
   const flat = text.replaceAll(/\s+/g, " ").trim();
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
@@ -91,7 +93,6 @@ export class TurnTracker {
   private turn: Turn | undefined;
   // Local commands like /add-dir never end a turn, so the prompt is the last one before the agent answers.
   private answered = false;
-  private command: string | undefined;
 
   feed({ entry, from, to }: Line): (Turn | Blocked)[] {
     if (entry.isSidechain) return [];
@@ -108,7 +109,7 @@ export class TurnTracker {
     const content = entry.message?.content;
 
     if (entry.type === "user" && typeof content === "string") {
-      if (!this.answered && !LOCAL_OUTPUT.test(content))
+      if (!this.answered && !content.startsWith(LOCAL_OUTPUT))
         this.prompt(turn, content, entry.promptSource);
       return events;
     }
@@ -120,9 +121,6 @@ export class TurnTracker {
         if (block.type !== "text" || block.text === undefined) continue;
         const dir = SKILL_DIR.exec(block.text)?.[1];
         if (dir !== undefined) turn.skillDirs.push(dir);
-        // A typed /skill loads without a Skill tool call, so its name comes from the command.
-        if (dir !== undefined && this.command !== undefined) turn.skills.push(this.command);
-        if (dir !== undefined) this.command = undefined;
         if (block.text.startsWith(INTERRUPTED)) {
           const done = this.close("interrupted", to);
           if (done) events.push(done);
@@ -144,7 +142,9 @@ export class TurnTracker {
 
   private prompt(turn: Turn, content: string, source: string | undefined): void {
     const command = slashCommand(content);
-    this.command = command?.split(" ")[0]?.replace(/^\//, "");
+    // A typed /skill loads without a Skill tool call, so its name comes from the command.
+    const name = command?.split(" ")[0]?.replace(/^\//, "");
+    turn.skills = name !== undefined && content.includes(COMMAND_MESSAGE) ? [name] : [];
     turn.prompt = clip(command ?? content, 200);
     if (source === undefined) delete turn.source;
     else turn.source = source;
@@ -170,7 +170,6 @@ export class TurnTracker {
     const turn = this.turn;
     this.turn = undefined;
     this.answered = false;
-    this.command = undefined;
     if (!turn) return undefined;
     const done: Turn = { ...turn, end, to };
     if (durationMs !== undefined) done.durationMs = durationMs;

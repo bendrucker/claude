@@ -24,7 +24,8 @@ export interface RowState {
   /** What `git status` reported, so a checkout it could not read stays distinct. */
   readonly status: StatusRead;
   readonly unpushed: number | null;
-  readonly carried: number;
+  /** Gitignored paths a removal would delete, which the sweep names before asking. */
+  readonly carried: readonly string[];
   readonly mergedBranch: boolean;
   readonly reused: boolean;
 }
@@ -55,6 +56,8 @@ export interface BoardRow {
   readonly branch: string | null;
   readonly detached: boolean;
   readonly worktree: string | null;
+  /** The main checkout that owns the worktree, which is where a removal runs. */
+  readonly clone: string | null;
   readonly pull: BoardPull | null;
   readonly prColumn: string;
   readonly age: number | null;
@@ -175,6 +178,7 @@ export function jsonRow(row: BoardRow): Record<string, unknown> {
     branch: row.branch,
     detached: row.detached,
     worktree: row.worktree,
+    clone: row.clone,
     pr: row.pull,
     prColumn: row.prColumn,
     age: row.age,

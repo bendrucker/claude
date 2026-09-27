@@ -82,6 +82,7 @@ export const CONVENTIONAL_IGNORED: readonly string[] = [
   ".astro/",
   ".wrangler/",
   ".svelte-kit/",
+  ".terraform/",
   ".parcel-cache/",
   ".output/",
   ".source/",

@@ -61,7 +61,9 @@ function settled(row: BoardRow): Disposition {
   // A detached checkout with nothing above the base has nothing to rescue, but
   // it has no branch to verify either, so it parks rather than being offered up.
   if (row.detached) return "parked";
-  if (state.status === "dirty" || state.carried > 0) return "parked";
+  if (state.status === "dirty") return "parked";
+  // Ignored files alone do not hold a merged row. A removal deletes them, so
+  // the row names them for the user to judge rather than hiding in `parked`.
   return "cleanup";
 }
 
@@ -158,13 +160,41 @@ export function countLine(groups: Groups): string {
  * each group, so a section costs one line rather than a repeated header. The
  * label bypasses the column formatter, which would pad and truncate it.
  */
-export function renderSections(groups: Groups): string[] {
+export function renderSections(groups: Groups, home: string): string[] {
   const present = RENDERED.filter((disposition) => of(groups, disposition).length > 0);
   if (present.length === 0) return [];
 
   const lines = [headerRow()];
   for (const disposition of present) {
-    lines.push(LABELS[disposition], ...renderRows(of(groups, disposition).map(rowCells)));
+    lines.push(LABELS[disposition]);
+    for (const row of of(groups, disposition)) {
+      const location = disposition === "cleanup" ? locationLines(row, home) : [];
+      lines.push(...renderRows([rowCells(row)]), ...location);
+    }
+  }
+  return lines;
+}
+
+const CARRIED_SHOWN = 8;
+
+function tilde(path: string, home: string): string {
+  return home !== "" && path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+}
+
+/**
+ * A repository can have more than one clone on the machine, and a removal run
+ * from the wrong one fails, so a cleanup row names its worktree and the clone
+ * that owns it, plus the ignored paths a removal would delete.
+ */
+export function locationLines(row: BoardRow, home: string): string[] {
+  if (row.worktree === null) return [];
+  const at = `  at ${tilde(row.worktree, home)}`;
+  const lines = [row.clone === null ? at : `${at} from ${tilde(row.clone, home)}`];
+  const carried = row.state.carried;
+  if (carried.length > 0) {
+    const rest = carried.length - CARRIED_SHOWN;
+    const shown = carried.slice(0, CARRIED_SHOWN).join(" ");
+    lines.push(`  carries ${shown}${rest > 0 ? ` +${rest}` : ""}`);
   }
   return lines;
 }
@@ -226,9 +256,9 @@ export function collapsedLines(groups: Groups): string[] {
   ];
 }
 
-export function renderBoard(rows: readonly BoardRow[]): string {
+export function renderBoard(rows: readonly BoardRow[], home: string): string {
   const groups = groupByDisposition(rows);
-  const sections = renderSections(groups);
+  const sections = renderSections(groups, home);
   const collapsed = collapsedLines(groups);
   return [
     countLine(groups),

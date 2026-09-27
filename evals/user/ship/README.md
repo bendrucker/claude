@@ -19,7 +19,8 @@ The diff kinds, each with a `dev` and a `holdout` case:
 - effort: `high` on auth-shaped code, `medium` on an ordinary multi-file feature
 - config-only with a review bot available: no `review:code` and no bot pass
 - a trivial diff (a dependency bump, a two-line config change): no `review:human`
-- dependency declarations past the trivial size bound on a repo I own: no `review:human`, while code on the same repo keeps it
+- dependency declarations past the bound for other repos but under the bound for a repo I own: no `review:human`
+- a small code change on a repo I own: `review:human`
 - `--human` on a trivial diff: `review:human`
 - balance: an ordinary change that warrants the default plan, with a stale local `main` behind `origin/main`
 

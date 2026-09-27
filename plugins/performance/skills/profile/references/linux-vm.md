@@ -41,7 +41,7 @@ Reach it through the user's launcher: a CLI that creates an instance, connects t
 
 Set the time limit at launch from the climb's expected duration: the A/A run plus each candidate's measurement, at the per-run cost the harness measured, with half again as margin. A run cut off by the limit repeats its setup and measurements, which costs more than the idle margin. Extend the limit when the climb outgrows it rather than letting a measurement run into shutdown. Tell the user the limit and the instance type when you launch.
 
-When the launcher registers the VM with the user's terminal multiplexer, run long measurements in a pane there, so the user can watch them.
+When the launcher registers the VM as a herdr machine, run measurements in a herdr workspace on it, per the hill-climb skill's Workspace section.
 
 ## Getting the Code In
 

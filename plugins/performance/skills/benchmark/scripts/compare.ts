@@ -140,6 +140,15 @@ function formatSeconds(seconds: number): string {
   return seconds >= 1 ? `${seconds.toFixed(2)}s` : `${(seconds * 1000).toFixed(1)}ms`;
 }
 
+export function progress(arms: Arm[]): string {
+  return arms
+    .map(
+      (a) =>
+        `${a.name} ${formatSeconds(median(a.times))}${a.failures > 0 ? ` (${a.failures} failed)` : ""}`,
+    )
+    .join(", ");
+}
+
 function markdownRow(cells: string[]): string {
   return `| ${cells.join(" | ")} |`;
 }
@@ -208,7 +217,7 @@ const runCmd = command(
         "Run interleaved hyperfine rounds into <out>. Arguments after -- go to every hyperfine call",
     },
   },
-  (argv) => {
+  async (argv) => {
     const arms = argv.flags.arm.map((spec) => {
       const eq = spec.indexOf("=");
       if (eq < 1) throw new Error(`--arm expects name=command, got ${spec}`);
@@ -240,6 +249,8 @@ const runCmd = command(
       const proc = Bun.spawnSync(args, { stdio: ["inherit", "ignore", "inherit"] });
       if (proc.exitCode !== 0)
         throw new Error(`hyperfine exited ${proc.exitCode} in round ${round + 1}`);
+      // oxlint-disable-next-line no-await-in-loop -- rounds run one after another, and each reports before the next starts.
+      console.error(`  ${progress(pool([Export.parse(await Bun.file(out).json())]))}`);
     }
     console.error(
       `results in ${argv._.out}; next: compare.ts report ${argv._.out} --base ${arms[0]?.name}`,

@@ -31,6 +31,12 @@ Interview the user in rounds with `AskUserQuestion`, one question per open decis
 - **Inputs.** Which scenarios are `dev` (tuned against) and which are `holdout` (scored once at the end). Prefer real inputs over synthetic ones for `holdout`.
 - **Budget.** How long the climb may run and how the user wants progress between checkpoints.
 
+## Workspace
+
+Under herdr (`HERDR_ENV=1`), keep the climb in one herdr workspace and run the harness, the A/A, and every measurement in its panes, so the user can watch them. On a cloud VM the launcher registers the VM as a herdr machine. Create the workspace there, and drive it with the same pane commands plus `--machine <label>`. Load `herdr:herdr` for the commands.
+
+Send every long run's output through `tee` into a log beside the notes file. `compare.ts run` prints each round's per-arm medians as it goes. Read progress from the log, and pass the latest round to the user at the cadence the Budget set, so an hours-long run never goes quiet.
+
 ## Harness
 
 Build the benchmark per `performance:benchmark`, or adopt the project's existing one when it meets that skill's requirements, then audit it before the baseline. A harness built with debug or profiling builds, a warm cache the real scenario never has, or a loaded machine measures the harness. Check each against the Frame's scenario. When runs or resets write many files, check the load for processes that watch the filesystem (backup, indexing, sync clients), and ask the user to exclude the harness directory from them.

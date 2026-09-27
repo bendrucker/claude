@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { compare, median, permutationP, pool, relativeMad, render } from "./compare";
+import { compare, median, permutationP, pool, progress, relativeMad, render } from "./compare";
 
 function seeded(seed: number): () => number {
   let state = seed;
@@ -89,6 +89,17 @@ describe("compare", () => {
 
   it("rejects an unknown base", () => {
     expect(() => compare([base], "missing", 0.1, 0.03)).toThrow("no arm named missing");
+  });
+});
+
+describe("progress", () => {
+  it("prints each arm's median and failures", () => {
+    expect(
+      progress([
+        { name: "base", times: [0.08, 0.1, 0.09], memory: [], failures: 0 },
+        { name: "cand", times: [2.5], memory: [], failures: 2 },
+      ]),
+    ).toBe("base 90.0ms, cand 2.50s (2 failed)");
   });
 });
 

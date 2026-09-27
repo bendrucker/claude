@@ -321,7 +321,7 @@ const trialFlags = {
 
 const trialStartCmd = command(
   {
-    name: "trial-start",
+    name: "start",
     parameters: ["--", "[load...]"],
     help: {
       description:
@@ -337,7 +337,7 @@ const trialStartCmd = command(
   async (parsed) => {
     const { cwd, base, prompt } = parsed.flags;
     if (cwd === undefined || base === undefined || prompt === undefined) {
-      throw new Error("trial-start needs --cwd, --base, and --prompt");
+      throw new Error("trial start needs --cwd, --base, and --prompt");
     }
     await mkdir(parsed.flags.stateDir, { recursive: true });
     const trial = await startTrial({
@@ -354,7 +354,7 @@ const trialStartCmd = command(
 
 const trialEndCmd = command(
   {
-    name: "trial-end",
+    name: "end",
     help: { description: "Exit the trial session and remove its worktree and branch." },
     flags: trialFlags,
   },
@@ -363,8 +363,29 @@ const trialEndCmd = command(
   },
 );
 
+// cleye nests commands only under cli(), so trial hands the rest of argv to its own.
+const trialCmd = command(
+  {
+    name: "trial",
+    parameters: ["[args...]"],
+    help: { description: "Start or end a trial session in a disposable worktree." },
+    ignoreArgv: () => true,
+  },
+  async () => {
+    const argv = process.argv.slice(process.argv.indexOf("trial") + 1);
+    const commands = [trialStartCmd, trialEndCmd];
+    await cli(
+      { name: "watch-session trial", commands },
+      (parsed) => {
+        parsed.showHelp();
+      },
+      argv,
+    );
+  },
+);
+
 if (import.meta.main) {
-  const commands = [watchCmd, showCmd, trialStartCmd, trialEndCmd];
+  const commands = [watchCmd, showCmd, trialCmd];
   await cli({ name: "watch-session", commands }, (parsed) => {
     parsed.showHelp();
   });

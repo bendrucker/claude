@@ -83,7 +83,7 @@ A trial is clean when it reaches the user's end state and shows no defect you wo
 A trial runs the skill in a fresh session, in a disposable worktree of `cwd` reset to `base`, so it starts from the user's starting state:
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts trial-start --cwd <cwd> --base <base> --prompt "<prompt>" --state-dir tmp/watch-session -- <load args>
+bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts trial start --cwd <cwd> --base <base> --prompt "<prompt>" --state-dir tmp/watch-session -- <load args>
 ```
 
 The first start creates the worktree and its pane. Each later start ends the previous trial session and resets the worktree. It prints the trial's `pane` and `session`. A `--learn` draft loads with `--add-dir tmp/watch-session/<uuid>` (absolute) and runs as `/<name>` in the prompt. A plugin skill loads with `--plugin-dir <plugin root>`.
@@ -94,4 +94,4 @@ Answer a `blocked` trial yourself with `herdr agent send-keys` when the user's r
 
 ## Ending
 
-The watch ends when the user says stop or the user's monitor reads `ended`. Stop both monitors with `TaskStop` and remove the trial with `trial-end --state-dir tmp/watch-session`. Summarize from the log: revisions made, trials run and their outcomes, and open questions. With `--learn`, ask where the skill belongs and move it there.
+The watch ends when the user says stop or the user's monitor reads `ended`. Stop both monitors with `TaskStop` and remove the trial with `trial end --state-dir tmp/watch-session`. Summarize from the log: revisions made, trials run and their outcomes, and open questions. With `--learn`, ask where the skill belongs and move it there.

@@ -58,6 +58,31 @@ describe("TurnTracker", () => {
     expect(events(jsonl(session))).toMatchSnapshot();
   });
 
+  test("takes the last typed command before the answer as the prompt", () => {
+    const typed = [
+      {
+        type: "user",
+        isMeta: true,
+        message: { content: "<local-command-caveat>Caveat</local-command-caveat>" },
+      },
+      prompt("<command-name>/add-dir</command-name><command-args>/tmp/dev</command-args>"),
+      prompt("<local-command-stdout>Added /tmp/dev</local-command-stdout>"),
+      prompt(
+        "<command-message>hill-climb</command-message><command-name>/hill-climb</command-name><command-args>bin/sync</command-args>",
+      ),
+      {
+        type: "user",
+        message: {
+          content: [{ type: "text", text: "Base directory for this skill: /repo/hill-climb" }],
+        },
+      },
+      assistant({ type: "text", text: "Climbing." }),
+      turnEnd,
+    ];
+    const [turn] = events(jsonl(typed));
+    expect(turn).toMatchObject({ prompt: "/hill-climb bin/sync", skills: ["hill-climb"] });
+  });
+
   test("a turn stays open until its end marker arrives", () => {
     const open = events(jsonl(session.slice(0, 8)));
     expect(open.map((e) => e.event)).toEqual(["blocked"]);

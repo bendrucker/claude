@@ -51,6 +51,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts watch <target> --state-dir tmp/watch-se
 
 A new watch starts at the end of the transcript, so arm it before the user starts. Pass `--from-start` to include turns already taken. Each stdout line is one JSON event:
 
+- `waiting`: the session has not written a transcript yet, which happens at its first message. The watch starts on its own once it does.
 - `watching`: the session, transcript path, `cwd`, and `head` (the commit checked out there). Record `head` as the trial base.
 - `turn`: one finished turn, with `from`/`to` byte offsets, `prompt` and its `source` (`typed`, `system`, `queued`), `tools` counts, `errors` (failed tool results), `skills` invoked, `skillDirs` (the directories those skills loaded from), `final` (the last assistant text), and `end` (`complete` or `interrupted`).
 - `blocked`: the watched agent asked a question. It is the user's to answer.

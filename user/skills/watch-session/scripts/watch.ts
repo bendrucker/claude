@@ -38,21 +38,29 @@ async function paneSession(pane: string): Promise<string | undefined> {
   return agents.find((a) => a.pane_id === pane)?.agent_session?.value;
 }
 
-async function transcriptPath(session: string): Promise<string> {
-  const root = join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
-  for await (const path of new Bun.Glob(`*/${session}.jsonl`).scan({ cwd: root, absolute: true })) {
-    return path;
-  }
-  throw new Error(`no transcript for session ${session} under ${root}`);
+const PROJECTS = join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
+
+async function findTranscript(session: string): Promise<string | undefined> {
+  const glob = new Bun.Glob(`*/${session}.jsonl`);
+  for await (const path of glob.scan({ cwd: PROJECTS, absolute: true })) return path;
+  return undefined;
+}
+
+// Claude Code writes a session's transcript only after its first message.
+async function awaitTranscript(session: string, poll: number): Promise<string> {
+  const path = await findTranscript(session);
+  if (path !== undefined) return path;
+  await Bun.sleep(poll);
+  return awaitTranscript(session, poll);
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-async function resolve(target: string): Promise<Target & { pane?: string }> {
-  if (UUID.test(target)) return { session: target, path: await transcriptPath(target) };
+async function resolve(target: string): Promise<{ session: string; pane?: string }> {
+  if (UUID.test(target)) return { session: target };
   const session = await paneSession(target);
   if (session === undefined) throw new Error(`herdr pane ${target} has no Claude session`);
-  return { session, path: await transcriptPath(session), pane: target };
+  return { session, pane: target };
 }
 
 /** Streams the transcript until the first entry that records the session's working directory. */
@@ -202,8 +210,11 @@ class Watcher {
       return false;
     }
     if (current === this.target.session) return true;
-    // A /clear or /resume in the watched pane starts a new transcript, so follow it from its first line.
-    this.target = { session: current, path: await transcriptPath(current) };
+    // A /clear or /resume in the watched pane starts a new transcript, so follow it from its first line
+    // once it exists. Until then, keep checking on the pane-check interval.
+    const path = await findTranscript(current);
+    if (path === undefined) return true;
+    this.target = { session: current, path };
     this.offset = 0;
     this.tracker = new TurnTracker();
     await this.persist();
@@ -222,11 +233,19 @@ class Watcher {
 }
 
 async function watch(options: WatchOptions): Promise<void> {
-  const { pane, ...target } = await resolve(options.target);
+  const { session, pane } = await resolve(options.target);
+  let path = await findTranscript(session);
+  // A transcript that appears after arming holds only new turns, so it is read from its first byte.
+  const fresh = path === undefined;
+  if (path === undefined) {
+    emit({ event: "waiting", session, pane, reason: "no transcript until the first message" });
+    path = await awaitTranscript(session, options.poll);
+  }
+  const target = { session, path };
   const offset = startOffset(
     await readState(options.stateDir, target.session),
     target,
-    options.fromStart,
+    options.fromStart || fresh,
   );
   const watcher = new Watcher(options, target, pane, offset);
   await watcher.persist();
@@ -238,7 +257,9 @@ async function watch(options: WatchOptions): Promise<void> {
 }
 
 async function show(target: string, from: number, to: number | undefined, truncate: number) {
-  const { path } = await resolve(target);
+  const { session } = await resolve(target);
+  const path = await findTranscript(session);
+  if (path === undefined) throw new Error(`no transcript for session ${session} under ${PROJECTS}`);
   const file = Bun.file(path);
   const bytes = new Uint8Array(await file.slice(from, to ?? file.size).arrayBuffer());
   for (const line of render(splitLines(bytes, from).lines, truncate)) console.log(line);

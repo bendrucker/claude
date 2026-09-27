@@ -118,6 +118,18 @@ diff "$TMPDIR/before.json" "$TMPDIR/after.json"
 
 **Delete them** when a permission prompt no longer needs answering off the machine, which `moshi-hook unpair` and `moshi-hook uninstall --target claude` would follow. Re-run the regeneration above when a `moshi-hook` release changes the hook set, and take the generator's output for the entries it owns. Verified against 0.3.22.
 
+## Plugins
+
+`1password@1password` replaces plaintext `.env` files with mounted 1Password Environments. Its read-only MCP tools are allowed. Writes still need the desktop app's approval.
+
+The marketplace tracks `main` because the repo has no release tags. A commit SHA in `ref` fails, since Claude Code passes it to `git clone --branch`. **Pin it** once this lists a tag:
+
+```
+git ls-remote --tags https://github.com/1Password/1password-claude-plugin
+```
+
+**Drop it** if Environments do not stick. Around 2026-10-27, count `mcp__plugin_1password_1password__` calls in the session index since the day this shipped, and read the hook's denies with the `claude-code:session` skill's [`hook-blocks`](../plugins/claude-code/skills/session/resources/queries/hook-blocks.sql) query. If no mount besides the first is in use, or the denies are mostly stale mounts rather than a missing secret file, remove the plugin, its marketplace, and the allows.
+
 ## Sandbox Findings
 
 Mechanism behind the rules in [`settings.md`](../.claude/rules/settings.md), and the cases no setting can fix.

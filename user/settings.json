@@ -95,7 +95,11 @@
       "Bash(glab ci trace:*)",
       "Bash(glab mr view:*)",
       "Bash(bun:*)",
-      "Bash(jq:*)"
+      "Bash(jq:*)",
+      "mcp__plugin_1password_1password__authenticate",
+      "mcp__plugin_1password_1password__list_environments",
+      "mcp__plugin_1password_1password__list_variables",
+      "mcp__plugin_1password_1password__list_local_env_files"
     ],
     "deny": []
   },
@@ -443,7 +447,8 @@
     "comments@bendrucker": true,
     "agent-browser@agent-browser": true,
     "plannotator@plannotator": true,
-    "herdr@bendrucker": true
+    "herdr@bendrucker": true,
+    "1password@1password": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -484,6 +489,12 @@
         "source": "github",
         "repo": "backnotprop/plannotator",
         "ref": "v0.27.14"
+      }
+    },
+    "1password": {
+      "source": {
+        "source": "github",
+        "repo": "1Password/1password-claude-plugin"
       }
     }
   },

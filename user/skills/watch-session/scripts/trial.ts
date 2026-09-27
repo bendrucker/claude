@@ -129,7 +129,7 @@ async function startAgent(trial: Trial, name: string, load: string[]): Promise<v
   await $`herdr agent wait ${trial.pane} --until idle --until done --timeout ${START_TIMEOUT_MS}`.quiet();
 }
 
-/** Starts a fresh trial session with the skill loaded and sends it the prompt, creating the worktree on first use. */
+/** The trial's worktree is created only on first use. */
 export async function startTrial(options: TrialOptions): Promise<Trial & { session?: string }> {
   const existing = await readTrial(options.stateDir, options.name);
   const trial = existing ?? (await createTrial(options));

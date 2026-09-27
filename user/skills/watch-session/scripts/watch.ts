@@ -60,7 +60,6 @@ async function firstCwd(path: string): Promise<string | undefined> {
   return undefined;
 }
 
-/** The watched session's working directory and the commit checked out there, where a trial starts. */
 async function workspace(path: string): Promise<{ cwd?: string; head?: string }> {
   const cwd = await firstCwd(path);
   if (cwd === undefined) return {};
@@ -143,7 +142,7 @@ class Watcher {
     private readonly base: string | undefined,
   ) {}
 
-  /** Runs one poll. Returns false once the watched pane no longer hosts a Claude session. */
+  /** Returns false once the watched pane no longer hosts a Claude session. */
   async tick(): Promise<boolean> {
     await this.read();
     this.flush(false);
@@ -188,7 +187,6 @@ class Watcher {
       return false;
     }
     // A /clear or /resume starts a new transcript, which appears at the session's first message.
-    // Poll for it on every tick until then.
     this.pending = current === this.target.session ? undefined : current;
     // A permission or trust dialog holds the agent without writing anything to the transcript.
     if (agent.status === "blocked" && this.status !== "blocked" && !this.tracker.asking) {

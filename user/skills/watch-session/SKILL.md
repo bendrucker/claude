@@ -52,9 +52,10 @@ bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts watch <target> --state-dir tmp/watch-se
 A new watch starts at the end of the transcript, so arm it before the user starts. Pass `--from-start` to include turns already taken. Each stdout line is one JSON event:
 
 - `waiting`: the session has not written a transcript yet, which happens at its first message. The watch starts on its own once it does.
-- `watching`: the session, transcript path, `cwd`, and `head` (the commit checked out there). Record `head` from the first `watching` event as the trial base, since a re-armed watch reports the current commit.
+- `watching`: the session, transcript path, `cwd`, and `base`: the commit checked out when the watch began, where trials start.
 - `turn`: one finished turn, with `from`/`to` byte offsets, `prompt` and its `source` (`typed`, `system`, `queued`), `tools` counts, `errors` (failed tool results), `skills` invoked, `skillDirs` (the directories those skills loaded from), `final` (the last assistant text), and `end` (`complete` or `interrupted`).
-- `blocked`: the watched agent asked a question. It is the user's to answer.
+- `blocked`: the watched agent asked `questions`, each with its `options`. In the user's session it is the user's to answer.
+- `dialog`: the pane shows a permission or trust dialog, which never reaches the transcript. Read it with `herdr agent read <pane>`.
 - `batch`: the `--every` roll-up of turns since the last batch.
 - `session`: the pane started a new session, which the script now follows.
 - `ended`: the pane no longer hosts a Claude session.
@@ -79,21 +80,18 @@ A trial is clean when it reaches the user's end state and shows no defect you wo
 
 ## Trials
 
-Load `herdr:herdr` for the pane mechanics. A trial needs the user's starting state, the skill copy you edit, and a fresh session each time.
+A trial runs the skill in a fresh session, in a disposable worktree of `cwd` reset to `base`, so it starts from the user's starting state:
 
-Once per watch, create a disposable worktree of `cwd` at the recorded `head`, with its own pane, without taking focus: `herdr worktree create --cwd <main checkout> --branch watch-trial-<name> --base <head> --no-focus`.
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts trial-start --cwd <cwd> --base <base> --prompt "<prompt>" --state-dir tmp/watch-session -- <load args>
+```
 
-For each trial:
+The first start creates the worktree and its pane. Each later start ends the previous trial session and resets the worktree. It prints the trial's `pane` and `session`. A `--learn` draft loads with `--add-dir tmp/watch-session/<uuid>` (absolute) and runs as `/<name>` in the prompt. A plugin skill loads with `--plugin-dir <plugin root>`.
 
-1. Reset the worktree to `head` and clean it, so every trial starts from the user's starting state.
-2. Start a fresh Claude session in the trial pane with the skill loaded: `herdr agent start trial-<name> --kind claude --pane <pane> -- <load args>`. A `--learn` draft loads with `--add-dir tmp/watch-session/<uuid>` (absolute) and runs as `/<name>`. A plugin skill loads with `--plugin-dir <plugin root>`. Answer the trust dialog a new worktree raises, since the pane is yours.
-3. Arm a second monitor on the trial pane with `--from-start`, then send the trial prompt with `herdr agent prompt`.
-4. Check the first `skillDirs` the trial reports. A path other than the copy you edit means the trial ran another copy, so the result does not count.
+Arm a second monitor on the trial `pane` with `--from-start`. It ends with `ended` when the next trial starts. Check the first `skillDirs` the trial reports. A path other than the copy you edit means the trial ran another copy, so the result does not count.
 
-A permission dialog never reaches the transcript, so a trial that goes quiet for a monitor window may be waiting on one. Read its pane with `herdr agent read` before reporting it as still running.
-
-Answer a `blocked` trial yourself when the user's run shows the answer. Otherwise relay the question to the user. End each trial by prompting `/exit`, which also ends its monitor with `ended`.
+Answer a `blocked` trial yourself with `herdr agent send-keys` when the user's run shows the answer, and a `dialog` the same way when it asks for a permission the user's run used. Otherwise relay it to the user.
 
 ## Ending
 
-The watch ends when the user says stop or the user's monitor reads `ended`. Stop both monitors with `TaskStop`. Close the trial pane, remove the trial worktree with `herdr worktree remove`, and delete its branch. Summarize from the log: revisions made, trials run and their outcomes, and open questions. With `--learn`, ask where the skill belongs and move it there.
+The watch ends when the user says stop or the user's monitor reads `ended`. Stop both monitors with `TaskStop` and remove the trial with `trial-end --state-dir tmp/watch-session`. Summarize from the log: revisions made, trials run and their outcomes, and open questions. With `--learn`, ask where the skill belongs and move it there.

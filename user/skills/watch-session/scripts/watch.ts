@@ -6,36 +6,18 @@ import { join } from "node:path";
 import { $ } from "bun";
 import { cli, command } from "cleye";
 import { z } from "zod";
-import { decodeFile, decodeJson } from "../../../../packages/decode/index";
+import { decodeFile } from "../../../../packages/decode/index";
+import { paneAgent } from "./herdr";
 import { type Blocked, Entry, render, splitLines, type Turn, TurnTracker } from "./transcript";
+import { endTrial, startTrial } from "./trial";
 
 const PANE_CHECK_MS = 10_000;
 
-const Snapshot = z.object({
-  result: z.object({
-    snapshot: z.object({
-      agents: z.array(
-        z.object({
-          pane_id: z.string(),
-          agent_session: z.object({ value: z.string() }).nullish(),
-        }),
-      ),
-    }),
-  }),
-});
-
-const State = z.object({ offset: z.number() });
+const State = z.object({ offset: z.number(), base: z.string().optional() });
 
 interface Target {
   session: string;
   path: string;
-}
-
-/** Returns the pane's current Claude session UUID, or undefined when the pane or its agent is gone. */
-async function paneSession(pane: string): Promise<string | undefined> {
-  const text = await $`herdr api snapshot`.text();
-  const agents = decodeJson(Snapshot, text, "herdr api snapshot").result.snapshot.agents;
-  return agents.find((a) => a.pane_id === pane)?.agent_session?.value;
 }
 
 const PROJECTS = join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
@@ -58,7 +40,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 async function resolve(target: string): Promise<{ session: string; pane?: string }> {
   if (UUID.test(target)) return { session: target };
-  const session = await paneSession(target);
+  const session = (await paneAgent(target))?.session;
   if (session === undefined) throw new Error(`herdr pane ${target} has no Claude session`);
   return { session, pane: target };
 }
@@ -151,12 +133,14 @@ class Watcher {
   private lastFlush = Date.now();
   // A session the pane switched to whose transcript has not appeared yet.
   private pending: string | undefined;
+  private status: string | undefined;
 
   constructor(
     private readonly options: WatchOptions,
     private target: Target,
     private readonly pane: string | undefined,
     private offset: number,
+    private readonly base: string | undefined,
   ) {}
 
   /** Runs one poll. Returns false once the watched pane no longer hosts a Claude session. */
@@ -196,8 +180,9 @@ class Watcher {
     if (this.pending !== undefined) await this.follow(this.pending);
     if (this.pane === undefined || Date.now() - this.lastPaneCheck < PANE_CHECK_MS) return true;
     this.lastPaneCheck = Date.now();
-    const current = await paneSession(this.pane);
-    if (current === undefined) {
+    const agent = await paneAgent(this.pane);
+    const current = agent?.session;
+    if (agent === undefined || current === undefined) {
       this.flush(true);
       emit({ event: "ended", reason: "pane has no Claude session" });
       return false;
@@ -205,6 +190,11 @@ class Watcher {
     // A /clear or /resume starts a new transcript, which appears at the session's first message.
     // Poll for it on every tick until then.
     this.pending = current === this.target.session ? undefined : current;
+    // A permission or trust dialog holds the agent without writing anything to the transcript.
+    if (agent.status === "blocked" && this.status !== "blocked" && !this.tracker.asking) {
+      emit({ event: "dialog", pane: this.pane });
+    }
+    this.status = agent.status;
     return true;
   }
 
@@ -224,7 +214,7 @@ class Watcher {
     // Formatted the way oxfmt and prettier leave JSON, since a repo's format check can reach tmp/.
     await Bun.write(
       statePath(this.options.stateDir, this.target.session),
-      `${JSON.stringify({ offset: this.tracker.openFrom ?? this.offset }, null, 2)}\n`,
+      `${JSON.stringify({ offset: this.tracker.openFrom ?? this.offset, base: this.base }, null, 2)}\n`,
     );
   }
 }
@@ -242,9 +232,12 @@ async function watch(options: WatchOptions): Promise<void> {
   const saved = await readState(options.stateDir, session);
   const offset = saved?.offset ?? (options.fromStart || fresh ? 0 : Bun.file(path).size);
   if (options.stateDir !== undefined) await mkdir(options.stateDir, { recursive: true });
-  const watcher = new Watcher(options, target, pane, offset);
+  const { cwd, head } = await workspace(target.path);
+  // The first watch records the commit a trial starts from, since the session keeps committing.
+  const base = saved?.base ?? head;
+  const watcher = new Watcher(options, target, pane, offset, base);
   await watcher.persist();
-  emit({ event: "watching", ...target, ...(await workspace(target.path)), offset, pane });
+  emit({ event: "watching", ...target, cwd, base, offset, pane });
 
   // Monitor needs one long-lived process that sleeps internally, not a shell loop.
   // oxlint-disable-next-line no-await-in-loop -- each poll must finish before the next begins.
@@ -266,7 +259,7 @@ const watchCmd = command(
     parameters: ["<target>"],
     help: {
       description:
-        "Tail a Claude session's transcript and print one JSON event per line: turn, blocked, batch, session, ended.",
+        "Tail a Claude session's transcript and print one JSON event per line: turn, blocked, dialog, batch, session, ended.",
     },
     flags: {
       stateDir: {
@@ -313,8 +306,66 @@ const showCmd = command(
   },
 );
 
+const trialFlags = {
+  name: {
+    type: String,
+    default: "trial",
+    description: "Trial name, used for its branch, agent, and state file",
+  },
+  stateDir: {
+    type: String,
+    default: "tmp/watch-session",
+    description: "Directory holding trial-<name>.json",
+  },
+} as const;
+
+const trialStartCmd = command(
+  {
+    name: "trial-start",
+    parameters: ["--", "[load...]"],
+    help: {
+      description:
+        "Start a fresh trial session with the skill loaded and send it the prompt. The first start creates the worktree, later starts reset it. Arguments after -- go to claude.",
+    },
+    flags: {
+      ...trialFlags,
+      cwd: { type: String, description: "The watched session's cwd" },
+      base: { type: String, description: "The commit each trial starts from" },
+      prompt: { type: String, description: "The prompt the trial sends" },
+    },
+  },
+  async (parsed) => {
+    const { cwd, base, prompt } = parsed.flags;
+    if (cwd === undefined || base === undefined || prompt === undefined) {
+      throw new Error("trial-start needs --cwd, --base, and --prompt");
+    }
+    await mkdir(parsed.flags.stateDir, { recursive: true });
+    const trial = await startTrial({
+      name: parsed.flags.name,
+      stateDir: parsed.flags.stateDir,
+      cwd,
+      base,
+      prompt,
+      load: parsed._.load,
+    });
+    emit({ event: "trial", ...trial });
+  },
+);
+
+const trialEndCmd = command(
+  {
+    name: "trial-end",
+    help: { description: "Exit the trial session and remove its worktree and branch." },
+    flags: trialFlags,
+  },
+  async (parsed) => {
+    emit({ event: "trial-ended", ...(await endTrial(parsed.flags.stateDir, parsed.flags.name)) });
+  },
+);
+
 if (import.meta.main) {
-  await cli({ name: "watch-session", commands: [watchCmd, showCmd] }, (parsed) => {
+  const commands = [watchCmd, showCmd, trialStartCmd, trialEndCmd];
+  await cli({ name: "watch-session", commands }, (parsed) => {
     parsed.showHelp();
   });
 }

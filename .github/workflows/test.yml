@@ -264,7 +264,7 @@ jobs:
 
       # Profilers record through perf events, which the runner's default paranoia level blocks.
       - name: Allow perf events
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && hashFiles(format('plugins/{0}/mise.toml', matrix.plugin.name)) != ''
         run: sudo sysctl -w kernel.perf_event_paranoid=1
 
       - name: Run tests

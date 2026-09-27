@@ -12,7 +12,6 @@ const Thread = z.object({
   processName: z.string(),
   pid: z.string(),
   isMainThread: z.boolean(),
-  name: z.string(),
   processStartupTime: z.number(),
   processShutdownTime: z.number().nullable(),
   stringArray: z.array(z.string()),

@@ -5,7 +5,6 @@ const thread = {
   processName: "demo",
   pid: "1",
   isMainThread: true,
-  name: "main",
   processStartupTime: 0,
   processShutdownTime: 10,
   stringArray: ["0x10", "0x20", "0x30"],

@@ -288,6 +288,10 @@ describe("tool-failure-rates query", () => {
     expect(row?.failure_pct).toBe(80);
   });
 
+  it("leaves out a plan redirect whose rejection carries no denial kind", async () => {
+    expect(await rates("ExitPlanMode")).toEqual([]);
+  });
+
   it("collapses paths, ids, and the tool_use_error wrapper into one signature", async () => {
     const rows = await rates("EnterWorktree");
     expect(rows.map((r) => r.signature)).toEqual([
@@ -1274,9 +1278,9 @@ describe("outcomes query", () => {
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
       "sessions: ongoing": 1,
-      "sessions: handed-off": 1,
+      "sessions: handed-off": 2,
       "sessions: abandoned-with-edits": 3,
-      "sessions: no-artifact": 19,
+      "sessions: no-artifact": 18,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });

@@ -8,7 +8,9 @@
 -- description: >-
 --   `calls`, `failures`, and `failure_pct` are per tool and repeat on each of its signature
 --   rows. Denied calls never ran, so they leave both the numerator and the denominator, and
---   `permissions` reports them. The signature strips the `<tool_use_error>` wrapper,
+--   `permissions` reports them. `ExitPlanMode` and `AskUserQuestion`
+--   are left out too, since a rejection there is the user redirecting and older rows lack
+--   the field that marks it a denial. The signature strips the `<tool_use_error>` wrapper,
 --   absolute paths, lowercase tokens mixing letters and digits (task, agent, and commit
 --   ids), and digit runs, so one failure across many targets collapses to one row.
 --
@@ -38,6 +40,7 @@ WITH calls AS (
     AND project_filter(s.project_path, getvariable('project'))
     AND host_filter(s.host, getvariable('host'))
     AND te.denial_kind IS NULL
+    AND tc.tool_name NOT IN ('ExitPlanMode', 'AskUserQuestion')
 ),
 per_tool AS (
   SELECT host, tool_name, COUNT(*) AS calls, COUNT(*) FILTER (WHERE failed) AS failures

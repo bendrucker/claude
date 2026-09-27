@@ -41,7 +41,7 @@ test("an always path runs every plugin", () => {
   ]);
 });
 
-test.each([
+test.each<{ name: string; config: Parameters<typeof toMatrixEntries>[1]; runners: string[] }>([
   { name: "default", config: undefined, runners: ["ubuntu-latest"] },
   { name: "one", config: { runner: "macos-latest" }, runners: ["macos-latest"] },
   {

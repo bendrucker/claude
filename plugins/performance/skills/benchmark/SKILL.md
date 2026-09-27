@@ -56,6 +56,8 @@ The first `--arm` is the base. Arguments after `--` go to every `hyperfine` call
 
 Before comparing versions, run the unchanged program as two arms (an A/A comparison). The pair must come back as a tie. When it stars, the harness is noisier than the effect it would measure: raise `--runs` or `--rounds`, quiet the machine, or find the state that leaks between runs, then repeat until the pair ties. The A/A spread (`±MAD`) is the smallest change the harness can resolve.
 
+When the Mac's A/A will not tie or the fast signal needs `perf` or hardware counters, read [../profile/references/linux-vm.md](../profile/references/linux-vm.md).
+
 ## Reading the Report
 
 - `*` marks a change with permutation p below `--alpha` (0.1) and a size of at least `--min-effect` (3%). An unstarred change is a tie, however large it looks.

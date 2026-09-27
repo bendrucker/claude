@@ -6,7 +6,7 @@ Benchmark `target/release/<bin>`, built once per arm into its own target directo
 
 ## Microbenchmarks
 
-Use [`criterion`](https://github.com/bheisler/criterion.rs) or [`divan`](https://github.com/nvzqz/divan). Pass inputs and results through `std::hint::black_box`, or the optimizer removes the measured work.
+Use the harness the project already has. For a new one, use [`criterion`](https://github.com/bheisler/criterion.rs): a benchmark group runs both arms in one process and reports whether their difference exceeds noise. When the metric is allocations, add [`divan`](https://github.com/nvzqz/divan) for its `AllocProfiler`, whose counts are deterministic. Pass inputs and results through `std::hint::black_box`, or the optimizer removes the measured work.
 
 ```rust
 fn bench(c: &mut Criterion) {

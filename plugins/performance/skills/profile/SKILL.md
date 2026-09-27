@@ -50,6 +50,8 @@ Profile the same scenario the benchmark measures, from the same starting state. 
 - A shell script: [references/shell.md](references/shell.md).
 - Python: [references/python.md](references/python.md).
 
+When macOS blocks the profiler or the metric needs hardware counters, read [references/linux-vm.md](references/linux-vm.md).
+
 ## Report
 
 Write the ranking as a table: entry (function, process, or phase), its time, and its share of the scenario's total. Name the tool and the scenario that produced it. Keep the raw profile file beside the table so the user can open it in its viewer.
@@ -60,4 +62,4 @@ A profile ranks candidates. It does not show that fixing one moves the metric. H
 
 - A profiler adds overhead that falls unevenly across code. Rank with the profile, and measure changes without it.
 - A profile of a debug build, a warm cache the real scenario lacks, or a tiny input ranks the wrong hot spots. Match the scenario.
-- On macOS, profilers cannot attach to SIP-protected system binaries (`/bin/sh`, `/usr/bin/*`). Run the program through an interpreter or binary outside those directories.
+- On macOS, profilers cannot attach to SIP-protected system binaries (`/bin/sh`, `/usr/bin/*`). Run the program through an interpreter or binary outside those directories, or move the run into a Linux VM ([references/linux-vm.md](references/linux-vm.md)).

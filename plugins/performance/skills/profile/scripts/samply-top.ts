@@ -138,54 +138,118 @@ export function tally(
   return result;
 }
 
-function processes(profile: Profile): string {
-  const rows = new Map<
+export interface ProcessRow {
+  name: string;
+  pid: string;
+  atMs: number;
+  wallMs: number;
+  cpuMs: number;
+  threads: number;
+}
+
+export function processRows(profile: Profile): ProcessRow[] {
+  const spans = new Map<
     string,
     { name: string; start: number; end: number; cpu: number; threads: number }
   >();
   for (const t of profile.threads) {
-    const row = rows.get(t.pid) ?? {
+    const span = spans.get(t.pid) ?? {
       name: t.processName,
       start: t.processStartupTime,
       end: 0,
       cpu: 0,
       threads: 0,
     };
-    row.end = Math.max(row.end, t.processShutdownTime ?? t.samples.time.at(-1) ?? 0);
-    row.cpu += (t.samples.threadCPUDelta ?? []).reduce<number>((a, b) => a + (b ?? 0), 0) / 1000;
-    row.threads++;
-    rows.set(t.pid, row);
+    span.end = Math.max(span.end, t.processShutdownTime ?? t.samples.time.at(-1) ?? 0);
+    span.cpu += (t.samples.threadCPUDelta ?? []).reduce<number>((a, b) => a + (b ?? 0), 0) / 1000;
+    span.threads++;
+    spans.set(t.pid, span);
   }
-  const t0 = Math.min(...[...rows.values()].map((r) => r.start));
-  const body = [...rows.entries()]
+  const t0 = Math.min(...[...spans.values()].map((r) => r.start));
+  return [...spans.entries()]
     .toSorted((a, b) => a[1].start - b[1].start)
-    .map(([pid, r]) => [
-      r.name,
+    .map(([pid, r]) => ({
+      name: r.name,
       pid,
-      (r.start - t0).toFixed(1),
-      (r.end - r.start).toFixed(1),
-      r.cpu.toFixed(1),
-      r.threads,
-    ]);
-  return table([["process", "pid", "at ms", "wall ms", "cpu ms", "threads"], ...body]);
+      atMs: r.start - t0,
+      wallMs: r.end - r.start,
+      cpuMs: r.cpu,
+      threads: r.threads,
+    }));
 }
 
-function ranking(
-  t: Tally,
-  by: "self" | "total",
-  top: number,
-  truncate: number,
-  unit: string,
-): string {
-  const body = [...t[by].entries()]
+export interface Ranked {
+  function: string;
+  ms: number;
+  percent: number;
+}
+
+export function rank(t: Tally, by: "self" | "total", top: number, truncate: number): Ranked[] {
+  return [...t[by].entries()]
     .toSorted((a, b) => b[1] - a[1])
     .slice(0, top)
-    .map(([fn, cost]) => [
-      fn.length > truncate ? `${fn.slice(0, truncate - 1)}…` : fn,
-      cost.toFixed(1),
-      `${((cost / t.sum) * 100).toFixed(1)}%`,
+    .map(([fn, ms]) => ({
+      function: fn.length > truncate ? `${fn.slice(0, truncate - 1)}…` : fn,
+      ms,
+      percent: (ms / t.sum) * 100,
+    }));
+}
+
+export interface Summary {
+  weight: "cpu" | "wall";
+  totalMs: number;
+  processes: ProcessRow[];
+  self: Ranked[];
+  inclusive: Ranked[];
+}
+
+export function summarize(
+  profile: Profile,
+  t: Tally,
+  wall: boolean,
+  top: number,
+  truncate: number,
+): Summary {
+  return {
+    weight: wall ? "wall" : "cpu",
+    totalMs: t.sum,
+    processes: processRows(profile),
+    self: rank(t, "self", top, truncate),
+    inclusive: rank(t, "total", top, truncate),
+  };
+}
+
+export function renderText(s: Summary): string {
+  const unit = `${s.weight} ms`;
+  const ranking = (rows: Ranked[], label: string) =>
+    table([
+      ["function", `${label} ${unit}`, "share"],
+      ...rows.map((r) => [r.function, r.ms.toFixed(1), `${r.percent.toFixed(1)}%`]),
     ]);
-  return table([["function", `${by} ${unit}`, "share"], ...body]);
+  return [
+    table([
+      ["process", "pid", "at ms", "wall ms", "cpu ms", "threads"],
+      ...s.processes.map((p) => [
+        p.name,
+        p.pid,
+        p.atMs.toFixed(1),
+        p.wallMs.toFixed(1),
+        p.cpuMs.toFixed(1),
+        p.threads,
+      ]),
+    ]),
+    `Self time (${unit}, ${s.totalMs.toFixed(1)} total):`,
+    ranking(s.self, "self"),
+    `Inclusive time (${unit}):`,
+    ranking(s.inclusive, "total"),
+  ].join("\n");
+}
+
+// Compact, one decimal everywhere, matching the table's precision.
+export function renderJson(s: Summary): string {
+  return JSON.stringify(s, (_, v: unknown) =>
+    typeof v === "number" ? Math.round(v * 10) / 10 : v,
+  );
 }
 
 async function main(): Promise<void> {
@@ -204,6 +268,7 @@ async function main(): Promise<void> {
         default: 100,
         description: "Truncate function names to this width",
       },
+      json: { type: Boolean, description: "Print the summary as compact JSON" },
     },
     help: {
       description:
@@ -218,7 +283,7 @@ async function main(): Promise<void> {
   const symsFile = Bun.file(`${path.replace(/\.gz$/, "")}.syms.json`);
   const syms = (await symsFile.exists()) ? Syms.parse(await symsFile.json()) : undefined;
   if (syms === undefined)
-    console.log("No .syms.json sidecar: re-record with --unstable-presymbolicate for names.\n");
+    console.error("No .syms.json sidecar: re-record with --unstable-presymbolicate for names.\n");
 
   const filter = argv.flags.process;
   const threads = profile.threads.filter(
@@ -226,14 +291,10 @@ async function main(): Promise<void> {
       (filter === undefined || t.processName === filter || t.pid === filter) &&
       (argv.flags.wall !== true || t.isMainThread),
   );
-  const unit = argv.flags.wall === true ? "wall ms" : "cpu ms";
-  const t = tally(profile, threads, symbolicator(profile, syms), argv.flags.wall === true);
-
-  console.log(processes(profile));
-  console.log(`Self time (${unit}, ${t.sum.toFixed(1)} total):`);
-  console.log(ranking(t, "self", argv.flags.top, argv.flags.truncate, unit));
-  console.log(`Inclusive time (${unit}):`);
-  console.log(ranking(t, "total", argv.flags.top, argv.flags.truncate, unit));
+  const wall = argv.flags.wall === true;
+  const t = tally(profile, threads, symbolicator(profile, syms), wall);
+  const summary = summarize(profile, t, wall, argv.flags.top, argv.flags.truncate);
+  console.log(argv.flags.json === true ? renderJson(summary) : renderText(summary));
 }
 
 if (import.meta.main) await main();

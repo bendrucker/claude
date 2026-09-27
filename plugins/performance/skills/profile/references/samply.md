@@ -15,13 +15,13 @@ samply record --save-only --unstable-presymbolicate -o tmp/profile/<name>.json.g
 
 ## Summarize
 
-Run the bundled script for a text ranking:
+Run the bundled script for a ranking:
 
 ```bash
-bun <skill-dir>/scripts/samply-top.ts tmp/profile/<name>.json.gz
+bun <skill-dir>/scripts/samply-top.ts tmp/profile/<name>.json.gz --json
 ```
 
-It prints a table per process (start offset, wall, CPU, threads), then the top functions by self and inclusive CPU time, each labeled with its library or executable.
+It reports each process (start offset, wall, CPU, threads), then the top functions by self and inclusive CPU time with their share, each labeled with its library or executable. `--json` prints it as compact JSON, a sixth the size of the default box tables. Drop the flag when showing the output to the user as is.
 
 - `--process <name|pid>` limits the rankings to one process.
 - `--wall` weights main-thread samples by wall time, which ranks where a waiting program blocks: `read`, `waitpid`, `kevent`, and the callers above them.

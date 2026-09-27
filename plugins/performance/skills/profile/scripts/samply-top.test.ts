@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { symbolicator, tally } from "./samply-top";
+import { rank, renderJson, renderText, summarize, symbolicator, tally } from "./samply-top";
 
 const thread = {
   processName: "demo",
@@ -64,5 +64,39 @@ describe("tally", () => {
   it("falls back to raw addresses without a sidecar", () => {
     const t = tally(profile, [thread], symbolicator(profile, undefined), false);
     expect([...t.self.keys()]).toEqual(["0x30 (demo)", "0x20 (demo)"]);
+  });
+});
+
+describe("rank", () => {
+  const t = tally(profile, [thread], symbolicator(profile, syms), false);
+
+  it.each([
+    [10, 100, ["work (demo)", "main (demo)", "hash (demo)"]],
+    [1, 100, ["work (demo)"]],
+    [3, 5, ["work…", "main…", "hash…"]],
+  ])("top %p, truncate %p", (top, truncate, names) => {
+    expect(rank(t, "total", top, truncate).map((r) => r.function)).toEqual(names);
+  });
+});
+
+describe("summary", () => {
+  const t = tally(profile, [thread], symbolicator(profile, syms), false);
+  const summary = summarize(profile, t, false, 25, 100);
+
+  it("renders tables", () => {
+    expect(renderText(summary)).toMatchSnapshot();
+  });
+
+  it("renders JSON", () => {
+    expect(renderJson(summary)).toMatchSnapshot();
+  });
+
+  it("rounds JSON numbers to one decimal", () => {
+    const self = [{ function: "f", ms: 1 / 3, percent: 200 / 3 }];
+    const json = renderJson({ ...summary, totalMs: 0.5, self, inclusive: [] });
+    expect(JSON.parse(json)).toMatchObject({
+      totalMs: 0.5,
+      self: [{ ms: 0.3, percent: 66.7 }],
+    });
   });
 });

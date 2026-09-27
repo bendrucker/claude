@@ -47,6 +47,11 @@ describe("samply-top against a samply recording", () => {
     expect(first).toContain("spin (spin)");
   });
 
+  it("ranks the hot function first in JSON", () => {
+    const summary = JSON.parse(run(["bun", script, profile, "--json", "--top", "1"])) as unknown;
+    expect(summary).toMatchObject({ weight: "cpu", self: [{ function: "spin (spin)" }] });
+  });
+
   it("lists the recorded process", () => {
     const out = run(["bun", script, profile, "--process", "spin", "--top", "1"]);
     expect(out).toMatch(/║ spin +│ \d+/);

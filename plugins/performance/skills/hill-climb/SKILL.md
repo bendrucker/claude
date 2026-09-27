@@ -35,6 +35,8 @@ Interview the user in rounds with `AskUserQuestion`, one question per open decis
 
 Build the benchmark per `performance:benchmark`, or adopt the project's existing one when it meets that skill's requirements, then audit it before the baseline. A harness built with debug or profiling builds, a warm cache the real scenario never has, or a loaded machine measures the harness. Check each against the Frame's scenario.
 
+Time one run with its `--prepare` reset before launching the A/A, and multiply by the planned run count. When the A/A alone would take a large share of the budget, shrink the reset (restore only what a run changes) or the run count first.
+
 Record the baseline twice with the unchanged program (an A/A comparison). Its spread is the noise floor, and it sets the run count a candidate needs.
 
 Profile the baseline per `performance:profile` and rank where the time goes.

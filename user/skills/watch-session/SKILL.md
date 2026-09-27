@@ -12,9 +12,9 @@ allowed-tools:
 
 # Watch Session
 
-Develop a skill by watching the user work in another Claude session, then proving each revision in a trial. The goal is a skill that lets a fresh session reach the user's result without the user steering it. What you see the user do tells you what to try, and a trial tells you whether the skill works. Settle a question with a trial rather than a guess.
+Develop a skill by watching the user work in another Claude session, then proving each revision in a trial. The goal is a skill that lets a fresh session reach the user's result without the user steering it. Watching tells you what to try. A trial settles whether it works.
 
-The user's session belongs to the user. You read its transcript, and type into it only when the user asks, such as to start the run they want watched: `herdr agent prompt <pane> "<prompt>"` once `herdr agent wait <pane>` returns. Leave off `--until`: its default matches both resting states, and a pane in an unseen tab rests at `done` rather than `idle`. Trials run in a pane you open and own.
+The user's session belongs to the user. You read its transcript, and type into it only when the user asks, such as to start the run they want watched: `herdr agent prompt <pane> "<prompt>"` once `herdr agent wait <pane>` returns. Omit `--until`, because a pane in an unseen tab rests at `done` and the default matches it. Trials run in a pane you open and own.
 
 ## Arguments
 
@@ -43,7 +43,7 @@ Keep everything for one watch in `tmp/watch-session/` under your working directo
 
 ## Watching a Session
 
-Start `Monitor` with the maximum `timeout_ms` on the command below. A monitor expires after that timeout, so re-arm it with the same command on each expiry. The state file resumes the read where the last one stopped.
+Start `Monitor` with the maximum `timeout_ms` on the command below, converting `--every` to seconds. A monitor expires after that timeout, so re-arm it with the same command on each expiry. The state file resumes the read where the last one stopped.
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts watch <target> --state-dir tmp/watch-session [--every <seconds>]
@@ -52,7 +52,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts watch <target> --state-dir tmp/watch-se
 A new watch starts at the end of the transcript, so arm it before the user starts. Pass `--from-start` to include turns already taken. Each stdout line is one JSON event:
 
 - `waiting`: the session has not written a transcript yet, which happens at its first message. The watch starts on its own once it does.
-- `watching`: the session, transcript path, `cwd`, and `head` (the commit checked out there). Record `head` as the trial base.
+- `watching`: the session, transcript path, `cwd`, and `head` (the commit checked out there). Record `head` from the first `watching` event as the trial base, since a re-armed watch reports the current commit.
 - `turn`: one finished turn, with `from`/`to` byte offsets, `prompt` and its `source` (`typed`, `system`, `queued`), `tools` counts, `errors` (failed tool results), `skills` invoked, `skillDirs` (the directories those skills loaded from), `final` (the last assistant text), and `end` (`complete` or `interrupted`).
 - `blocked`: the watched agent asked a question. It is the user's to answer.
 - `batch`: the `--every` roll-up of turns since the last batch.
@@ -71,7 +71,7 @@ Cycle through these until a trial comes back clean:
 
 1. **Observe.** On each `turn` or `batch` from the user's session, find what the skill should capture or fix: a decision the user made and why, a command or file that mattered, a correction the user gave, or a skill instruction the agent skipped, misread, or wasted calls on. A correction from the user is the strongest signal. Stay silent on any other turn.
 2. **Revise.** Edit the skill and log the change. Put what you cannot infer in `questions.md` instead of guessing.
-3. **Propose a trial** when the skill covers the task end to end, or when an open question is one a trial can answer. Say what the trial will test and start it when the user agrees. Start one whenever the user says "try it".
+3. **Propose a trial** when the skill covers the task end to end, or when an open question is one a trial can answer. Say what the trial will test and start it when the user agrees, or when the user asks for one.
 4. **Trial.** Run the skill in the trial pane (see [Trials](#trials)) and watch it with a second monitor.
 5. **Compare.** Hold the trial against the user's run: the same end state, the same decisions, no step the user had to correct. Each gap is an observation for the next revision. Log the trial's outcome.
 
@@ -90,7 +90,7 @@ For each trial:
 3. Arm a second monitor on the trial pane with `--from-start`, then send the trial prompt with `herdr agent prompt`.
 4. Check the first `skillDirs` the trial reports. A path other than the copy you edit means the trial ran another copy, so the result does not count.
 
-Answer a `blocked` trial yourself when the user's run shows the answer. Otherwise relay the question to the user. Close the trial session before starting the next.
+Answer a `blocked` trial yourself when the user's run shows the answer. Otherwise relay the question to the user. End each trial by prompting `/exit`, which also ends its monitor with `ended`.
 
 ## Ending
 

@@ -85,6 +85,10 @@ I use Worktrunk (the `wt` CLI) for git worktrees, exposed through two skills:
 
 My Claude Code setup lives in [`bendrucker/claude`](https://github.com/bendrucker/claude), worked on at `~/src/bendrucker/claude`. The `~/.claude` symlinks point into a deployed clone at `~/.claude-repo` that `claude-upgrade` syncs from `main`. A merged change is not live until that sync runs, and editing through the symlinks writes into that clone instead of a branch. Project-scoped `.claude/` directories stay with their repo.
 
+## Tools
+
+@tools.md
+
 ## Dotfiles
 
 Machine setup lives in [`bendrucker/dotfiles`](https://github.com/bendrucker/dotfiles) at `~/.dotfiles`, organized into topic directories, including a [`claude/`](https://github.com/bendrucker/dotfiles/tree/main/claude) topic. The Claude repo installs nothing. A change that assumes something the machine or the shell provides needs a merged dotfiles PR first:

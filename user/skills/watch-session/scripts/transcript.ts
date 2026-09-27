@@ -95,7 +95,7 @@ export class TurnTracker {
     if (entry.type === "user" && typeof content === "string") {
       if (turn.prompt === "") {
         turn.prompt = clip(content, 200);
-        turn.source = entry.promptSource;
+        if (entry.promptSource !== undefined) turn.source = entry.promptSource;
       }
       return events;
     }

@@ -109,7 +109,7 @@ function addToBatch(batch: Batch | undefined, turn: Turn): Batch {
 
 interface WatchOptions {
   target: string;
-  stateDir?: string;
+  stateDir: string | undefined;
   fromStart: boolean;
   every: number;
   poll: number;

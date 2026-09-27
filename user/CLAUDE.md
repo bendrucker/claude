@@ -62,6 +62,10 @@ Inside an isolated worktree, write files with `Write` or `Edit` and keep each Ba
 
 My Claude Code setup lives in [`bendrucker/claude`](https://github.com/bendrucker/claude), worked on at `~/src/bendrucker/claude`. The `~/.claude` symlinks point into a deployed clone at `~/.claude-repo` that `claude-upgrade` syncs from `main`. A merged change is not live until that sync runs, and editing through the symlinks writes into that clone instead of a branch. Project-scoped `.claude/` directories stay with their repo.
 
+## Tools
+
+@tools.md
+
 ## Dotfiles
 
 Machine setup lives in [`bendrucker/dotfiles`](https://github.com/bendrucker/dotfiles) at `~/.dotfiles`, in topic directories. The Claude repo installs nothing. Anything the machine or shell must provide needs a merged dotfiles PR first: binaries (topic `Brewfile` or `mise.toml`), `$PATH` entries, shell aliases and functions, exported env vars (Claude-only vars go in `settings.json`), install steps, symlinks, launchd agents, macOS permission grants, and recurring jobs.

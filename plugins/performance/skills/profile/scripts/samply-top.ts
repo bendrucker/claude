@@ -55,21 +55,24 @@ export function symbolicator(
   syms: z.infer<typeof Syms> | undefined,
 ): Symbolicate {
   if (syms === undefined) return () => undefined;
+  // samply can write one sidecar entry per load path of the same binary, each holding a
+  // disjoint slice of its addresses, so a lib takes the union of every matching entry.
   const byLib = profile.libs.map((lib) => {
-    const entry = syms.data.find((d) =>
+    const names = new Map<number, string>();
+    const entries = syms.data.filter((d) =>
       lib.codeId === undefined || lib.codeId === null
         ? d.debug_name === lib.debugName
         : d.code_id === lib.codeId,
     );
-    return entry === undefined ? undefined : new Map(entry.known_addresses);
+    for (const entry of entries)
+      for (const [address, index] of entry.known_addresses) {
+        const symbol = entry.symbol_table[index]?.symbol;
+        const name = symbol === undefined ? undefined : syms.string_table[symbol];
+        if (name !== undefined) names.set(address, name);
+      }
+    return names;
   });
-  return (lib, address) => {
-    const index = byLib[lib]?.get(address);
-    if (index === undefined) return undefined;
-    const entry = syms.data.find((d) => d.debug_name === profile.libs[lib]?.debugName);
-    const symbol = entry?.symbol_table[index]?.symbol;
-    return symbol === undefined ? undefined : syms.string_table[symbol];
-  };
+  return (lib, address) => byLib[lib]?.get(address);
 }
 
 function frameName(

@@ -45,12 +45,12 @@ Build every arm so it exists on disk at once: a `git worktree add tmp/base <ref>
 Compare with the bundled script, which runs short `hyperfine` rounds in rotating order and pools them:
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/compare.ts run tmp/bench/<name> \
+bun ${CLAUDE_SKILL_DIR}/scripts/compare.ts run tmp/bench/<comparison> \
   --arm 'base=<command>' --arm 'candidate=<command>' --rounds 6 --runs 3 -- -N --prepare '<reset>'
-bun ${CLAUDE_SKILL_DIR}/scripts/compare.ts report tmp/bench/<name> --markdown
+bun ${CLAUDE_SKILL_DIR}/scripts/compare.ts report tmp/bench/<comparison> --markdown
 ```
 
-The first `--arm` is the base. Arguments after `--` go to every `hyperfine` call. `report` also reads `--export-json` files from a plain `hyperfine` run, and pools every file and directory it is given per arm name.
+The first `--arm` is the base. Arguments after `--` go to every `hyperfine` call. Give each comparison its own directory, since `run` refuses one that already holds exports. `report` also reads `--export-json` files from a plain `hyperfine` run, and pools every file and directory it is given per arm name.
 
 ## Noise Floor
 

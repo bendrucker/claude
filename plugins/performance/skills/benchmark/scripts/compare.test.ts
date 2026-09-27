@@ -50,7 +50,7 @@ describe("pool", () => {
     ]);
     expect(arms).toEqual([
       { name: "base", times: [1, 2, 6], memory: [50e6, 50e6, 50e6], failures: 0 },
-      { name: "cand", times: [3, 5], memory: [50e6, 50e6, 50e6], failures: 1 },
+      { name: "cand", times: [3, 5], memory: [50e6, 50e6], failures: 1 },
     ]);
   });
 });
@@ -74,6 +74,17 @@ describe("compare", () => {
   it("flags low sample counts", () => {
     const [row] = compare([{ ...base, times: [1, 1, 1] }], "base", 0.1, 0.03);
     expect(row?.lowN).toBe(true);
+  });
+
+  it("does not star a low-n arm", () => {
+    const [, row] = compare(
+      [base, { ...base, name: "cand", times: [0.5, 0.5, 0.5] }],
+      "base",
+      0.1,
+      0.03,
+      seeded(3),
+    );
+    expect(row).toMatchObject({ lowN: true, significant: false });
   });
 
   it("rejects an unknown base", () => {
@@ -100,7 +111,7 @@ describe("render", () => {
       spread: 0.05,
       change: -0.25,
       p: 0.012,
-      significant: true,
+      significant: false,
       lowN: true,
       failures: 2,
     },

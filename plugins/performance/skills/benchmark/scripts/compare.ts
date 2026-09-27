@@ -79,10 +79,14 @@ export function pool(exports: z.infer<typeof Export>[]): Arm[] {
         failures: 0,
       };
       for (const [i, time] of result.times.entries()) {
-        if (result.exit_codes[i] === 0) arm.times.push(time);
-        else arm.failures++;
+        if (result.exit_codes[i] !== 0) {
+          arm.failures++;
+          continue;
+        }
+        arm.times.push(time);
+        const memory = result.memory_usage_byte?.[i];
+        if (memory !== undefined) arm.memory.push(memory);
       }
-      arm.memory.push(...(result.memory_usage_byte ?? []));
       arms.set(result.command, arm);
     }
   }
@@ -112,6 +116,7 @@ export function compare(
   const baseArm = arms.find((a) => a.name === base);
   if (baseArm === undefined)
     throw new Error(`no arm named ${base}; arms: ${arms.map((a) => a.name).join(", ")}`);
+  const baseMedian = median(baseArm.times);
   return arms.map((arm) => {
     const row: Row = {
       arm: arm.name,
@@ -124,9 +129,10 @@ export function compare(
       ...(arm.memory.length > 0 && { memory: median(arm.memory) }),
     };
     if (arm === baseArm) return row;
-    const change = row.median / median(baseArm.times) - 1;
+    const change = row.median / baseMedian - 1;
     const p = permutationP(baseArm.times, arm.times, 10_000, random);
-    return { ...row, change, p, significant: p < alpha && Math.abs(change) >= minEffect };
+    const significant = !row.lowN && p < alpha && Math.abs(change) >= minEffect;
+    return { ...row, change, p, significant };
   });
 }
 
@@ -169,7 +175,15 @@ async function readExports(paths: string[]): Promise<z.infer<typeof Export>[]> {
           .toSorted()
           .map((f) => join(path, f)),
   );
-  return Promise.all(files.map(async (file) => Export.parse(await Bun.file(file).json())));
+  return Promise.all(
+    files.map(async (file) => {
+      try {
+        return Export.parse(await Bun.file(file).json());
+      } catch (error) {
+        throw new Error(`${file} is not a hyperfine export`, { cause: error });
+      }
+    }),
+  );
 }
 
 const runCmd = command(
@@ -201,11 +215,14 @@ const runCmd = command(
       return { name: spec.slice(0, eq), command: spec.slice(eq + 1) };
     });
     if (arms.length < 2) throw new Error("give at least two --arm flags");
+    if (Bun.which("hyperfine") === null) throw new Error("hyperfine not found on PATH");
     mkdirSync(argv._.out, { recursive: true });
+    if (readdirSync(argv._.out).some((f) => f.endsWith(".json")))
+      throw new Error(`${argv._.out} already holds exports; report would pool them with this run`);
     for (let round = 0; round < argv.flags.rounds; round++) {
       const shift = round % arms.length;
       const ordered = [...arms.slice(shift), ...arms.slice(0, shift)];
-      const out = join(argv._.out, `round-${String(round).padStart(2, "0")}.json`);
+      const out = join(argv._.out, `round-${String(round).padStart(3, "0")}.json`);
       const args = [
         "hyperfine",
         "--runs",

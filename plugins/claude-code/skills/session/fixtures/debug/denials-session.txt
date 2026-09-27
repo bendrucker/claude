@@ -1,0 +1,15 @@
+2024-01-20T08:59:58.000Z [DEBUG] MDM settings load completed in 0ms
+2024-01-20T08:59:58.100Z [DEBUG] Ignoring dangerous permission Bash(python3 *) from .claude/settings.local.json (bypasses classifier)
+2024-01-20T08:59:58.100Z [DEBUG] Ignoring dangerous permission Bash(env) from .claude/settings.local.json (bypasses classifier)
+2024-01-20T09:00:01.000Z [INFO] [Stall] classifier_request_started reqId=req-1 tool=Bash model=claude-sonnet-5[1m] stage=xml_s1 promptTokensEst=[REDACTED]
+2024-01-20T09:00:02.500Z [INFO] [Stall] classifier_request_finished reqId=req-1 tool=Bash stage=xml_s1 outcome=ok durationMs=1500
+2024-01-20T09:00:02.510Z [INFO] [Stall] tool_dispatch_start tool=Bash toolUseId=deny-tool-1 permissionDecisionMs=1510
+2024-01-20T09:00:02.600Z [INFO] [Stall] tool_dispatch_end tool=Bash toolUseId=deny-tool-1 outcome=ok durationMs=90
+2024-01-20T09:00:03.000Z [INFO] [Stall] classifier_request_started reqId=req-2 tool=Write model=claude-sonnet-5[1m] stage=xml_s1 promptTokensEst=[REDACTED]
+2024-01-20T09:00:07.000Z [INFO] [Stall] classifier_request_finished reqId=req-2 tool=Write stage=xml_s1 outcome=ok durationMs=4000
+2024-01-20T09:00:07.100Z [INFO] [Stall] classifier_request_started reqId=req-3 tool=Write model=claude-sonnet-5[1m] stage=xml_s2 promptTokensEst=[REDACTED]
+2024-01-20T09:00:13.100Z [INFO] [Stall] classifier_request_finished reqId=req-3 tool=Write stage=xml_s2 outcome=ok durationMs=6000
+2024-01-20T09:00:14.000Z [INFO] [Stall] classifier_request_started reqId=req-4 tool=Write model=claude-sonnet-5[1m] stage=xml_s1 promptTokensEst=[REDACTED]
+2024-01-20T09:00:44.000Z [INFO] [Stall] classifier_request_finished reqId=req-4 tool=Write stage=xml_s1 outcome=error durationMs=30000
+2024-01-20T09:00:45.000Z [INFO] [Stall] tool_dispatch_start tool=Read toolUseId=read-tool-1 permissionDecisionMs=0
+2024-01-20T09:00:45.010Z [INFO] [Stall] tool_dispatch_end tool=Read toolUseId=read-tool-1 outcome=ok durationMs=10

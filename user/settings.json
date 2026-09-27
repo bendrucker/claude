@@ -415,6 +415,7 @@
     "review@bendrucker": true,
     "newline@bendrucker": true,
     "github@bendrucker": true,
+    "classifier-telemetry@bendrucker": true,
     "claude-code@bendrucker": true,
     "prompting@bendrucker": true,
     "pull-request@bendrucker": true,

@@ -1,6 +1,6 @@
 ---
 name: claude-code:skill
-description: Creating and optimizing Claude Code Skills including activation patterns, content structure, and development workflows. Use when creating new skills, converting memory files to skills, debugging skill activation, or understanding skill architecture and best practices.
+description: Use when creating a skill, converting a memory file into one, debugging skill activation, or structuring skill content. For prompt wording, pair with prompting:prompting.
 argument-hint: "[--validate] [--structure]"
 allowed-tools:
   - Read
@@ -92,6 +92,12 @@ Load the `prompting` skill before writing a skill body or a reference file. It c
 #### Descriptions
 
 The `description` field is the pointer Claude scans to decide whether to activate the skill. Write it for the model and make it slightly pushy, since under-triggering is the common failure. The wording rules are in the `prompting` skill.
+
+List triggers: the requests that call for the skill. End with the boundary to any sibling skill a request could land on. Tools, techniques, and capabilities go in the body.
+
+```yaml
+description: Use when timing a program or command, asking whether a change or version made it faster, or building a benchmark harness. For repeated optimization toward a target, use performance:hill-climb.
+```
 
 #### Gotchas
 

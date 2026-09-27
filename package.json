@@ -23,6 +23,7 @@
     "test:unit": "bun test"
   },
   "dependencies": {
+    "citty": "^0.2.2",
     "cleye": "^2.2.1",
     "table": "^6.9.0",
     "typescript": "^7.0.0",

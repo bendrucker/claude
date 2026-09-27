@@ -2,7 +2,7 @@
 name: ship
 description: >-
   Finish a branch: infer which review passes the change warrants, run them, open the PR, babysit CI to green, triage bot comments, and refresh the body from a clean context.
-argument-hint: "[--merge] [--effort <level>] [--simplify] [--skip <pass>] [--base <ref>]"
+argument-hint: "[--merge] [--effort <level>] [--simplify] [--human] [--skip <pass>] [--base <ref>]"
 allowed-tools:
   - Agent
   - AskUserQuestion
@@ -47,7 +47,7 @@ Resolve the base to a **remote** ref so ship's view matches what the PR merges a
 - **`prompting:scan`**: diff touches a document a model executes: `CLAUDE.md`, `AGENTS.md`, `SKILL.md`, a skill's `references/`, `.claude/agents`, `.claude/commands`, `.claude/rules`, or a `prompt/` or `prompts/` dir. Fix confirmed findings with the `prompting` skill.
 - **`writing:review`**: diff touches prose people read (READMEs, docs, `.mdx`, `.rst`), excluding the prompt files above. A diff with both runs both passes, each over its own files.
 - **`run`**: diff has a runtime surface. Drive the change in the real app, not just tests. Skip on docs-only and tests-only.
-- **`review:human`**: always on. Ben reads the cleaned diff last, for architecture and slop. `--skip human` drops it, and passes `--no-review-body` through to create.
+- **`review:human`**: the diff clears the [Human Review Gate](references/passes.md#human-review-gate), which skips trivial diffs. Ben reads the cleaned diff last, for architecture and slop.
 
 Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQuestion` only on a real toss-up: refactor versus behavior change, or `medium` versus `high` effort.
 
@@ -56,6 +56,7 @@ Infer, don't interrogate. Present the plan in one line, then proceed. `AskUserQu
 - `--merge`: drive to merged (babysit `--merge`). Default: green and ready.
 - `--effort <low|medium|high|xhigh>`: override inferred `review:code` effort.
 - `--simplify`: force `simplify` over `review:code`.
+- `--human`: force `review:human` on a diff the gate skips.
 - `--skip <pass>` (repeatable): drop a gated pass. Names: `plan`, `review:code` (the old `code-review` is accepted as an alias), `simplify`, `comments`, `bot`, `copilot`, `prompting`, `writing`, `run` (the old `verify` is accepted as an alias), `human`.
 - `--base <ref>`: base branch for gating. Default `main`; on a stack, the parent branch. Resolved to its upstream tracking ref (e.g. `origin/...`) before diffing.
 
@@ -71,7 +72,7 @@ Serialized before create: `review:code --fix`, `simplify`, and comment trims all
 6. **`writing:review`** over touched human prose. Address salient findings before the body is written.
 7. **`run`** to drive the change end to end.
 8. **Join `plan:review`** when it was gated in, and act on fix-worthy drift before the human review sees the diff. Carry deferred follow-ups into the report.
-9. **`review:human`**: after every fix pass and the join, so the cleaned diff is what gets seen ([Human Review](references/passes.md#human-review)). Terminal mode by default: it ends the turn, and Create runs only when the review resumes with approval.
+9. **`review:human`** when gated in: after every fix pass and the join, so the cleaned diff is what gets seen ([Human Review Gate](references/passes.md#human-review-gate)). Terminal mode by default: it ends the turn, and Create runs only when the review resumes with approval.
 
 Dirty tree at the comment pass: ask whether to commit first. `comments:audit` operates on `HEAD` and needs a clean tree.
 
@@ -86,9 +87,9 @@ git branch -d comments/audit-<hash>
 
 ## Create
 
-The plan-review join and the human review are behind you. `pull-request:create` commits the working-tree fixes, pushes, opens the PR. Capture the URL: babysit and body-refresh need it.
+The plan-review join and any human review are behind you. `pull-request:create` commits the working-tree fixes, pushes, opens the PR. Capture the URL: babysit and body-refresh need it.
 
-Pass `--no-review-body` through when `/ship --skip human` was given, so create's own body review honors the skip.
+Pass `--no-review-body` through whenever `review:human` did not run, gated out or dropped by `--skip human`, so create's own body review honors the skip.
 
 Pass `--base <parent>` through when `/ship --base` named a stack parent. Create needs it to target the PR at the parent and to link the layer into the stack on GitHub. Without it the PR opens against the default branch and carries every lower layer's diff.
 

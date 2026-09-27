@@ -1,7 +1,7 @@
 ---
-fail: [format, in-review-human]
+fail: [format]
 ---
-Plan: review:human.
+Plan: no review passes.
 
-in: review:human
-out: review:code, simplify, pull-request:follow-up, run, comments:audit
+in: none
+out: review:human, review:code, simplify, pull-request:follow-up, run, comments:audit

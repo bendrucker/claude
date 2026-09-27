@@ -4,7 +4,7 @@ Gating decisions for ship's pre-PR reviews: which pass runs, `review:code` effor
 
 ## Gating Matrix
 
-Most passes gate on the diff against the resolved base (the upstream tracking ref, resolved per `SKILL.md`) plus the working tree. `plan:review` gates on the plan and the session (see [Plan Review](#plan-review)), and `review:human` is always on (see [Human Review](#human-review)).
+Most passes gate on the diff against the resolved base (the upstream tracking ref, resolved per `SKILL.md`) plus the working tree. `plan:review` gates on the plan and the session (see [Plan Review](#plan-review)), and `review:human` gates on the diff and the repo owner (see [Human Review Gate](#human-review-gate)).
 
 | Trigger | Pass | Notes |
 |---|---|---|
@@ -16,7 +16,7 @@ Most passes gate on the diff against the resolved base (the upstream tracking re
 | A document a model executes (`CLAUDE.md`, `AGENTS.md`, `SKILL.md`, skill `references/`, `.claude/agents`, `.claude/commands`, `.claude/rules`, `prompt/` or `prompts/` dirs) | `prompting:scan` | Fix confirmed findings with the `prompting` skill |
 | Prose people read (READMEs, docs, `.mdx`, `.rst`), excluding prompt files | `writing:review` | A diff with both kinds runs both passes, each over its own files |
 | A runtime surface | `run` | Ship declines docs-only and tests-only |
-| Always, unless `--skip human` | `review:human` | Last pre-PR pass. Ends the turn until the review comes back |
+| A diff that is not trivial, or `--human` | `review:human` | Last pre-PR pass. Ends the turn until the review comes back. See [Human Review Gate](#human-review-gate) |
 
 Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `copilot`, `prompting`, `writing`, `run`, `human`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
 
@@ -71,7 +71,7 @@ It is read-only and writes nothing, so it runs as a background dispatch rather t
 flowchart TD
     S([ship start]) --> G{plan:review gated in?}
     G -->|no| F1[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, prompting, writing, run]
-    F1 --> H[review:human, ends the turn until the review returns]
+    F1 --> H[review:human when gated in, ends the turn until the review returns]
     H --> C([create PR])
     G -->|yes| D[dispatch plan:review in background]
     D --> F2[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, prompting, writing, run]
@@ -100,9 +100,23 @@ Infer `review:code` effort from the diff unless `--effort` overrides. `high` is 
 
 Alternatives, not a pair. Pick `simplify` for a pure refactor or cleanup with no new behavior: extraction, renaming, dedup, dead-code removal, moving code. It covers reuse, simplification, efficiency, and altitude, and does not hunt bugs. Pick `review:code` for anything with new behavior, a bug fix, or a feature, which need the correctness coverage `simplify` skips. `--simplify` forces the `simplify` path.
 
-## Human Review
+## Human Review Gate
 
-`review:human` runs last so Ben sees the diff the fix passes left, with nothing in it a later pass would rewrite. Terminal mode is the default. The DAG's create node waits on it: the turn ends at the request, and Create runs when the review resumes with approval.
+`review:human` spends Ben's attention and ends the turn until he answers. It earns that stop only on a diff where a design decision or slop could hide.
+
+Skip it when the diff is **trivial**: it adds no behavior, stays clear of the risk surfaces in the [Bot Review Gate](#bot-review-gate)'s first bullet, fits the size bound, and every changed line is one of:
+
+- a dependency declaration or version: a manifest entry, a `Brewfile` line, a tool pin, and the lockfile churn behind it
+- a config value
+- a typo or wording fix in existing prose
+
+The size bound excludes lockfiles. On a repo whose remote owner is `bendrucker`, it is roughly 30 changed lines, because Ben reviews the PR on the web before anyone else reads it. Elsewhere it is a handful of lines, roughly 5, because the pre-PR read is the last look before colleagues see the change.
+
+Everything else runs the pass: code, tests, new prose, and any prompt file, since prompts are where slop lands. `--human` forces it on a trivial diff. `--skip human` drops it on any diff. Whenever it does not run, create gets `--no-review-body`.
+
+It runs last so Ben sees the diff the fix passes left, with nothing in it a later pass would rewrite. Terminal mode is the default. The DAG's create node waits on it: the turn ends at the request, and Create runs when the review resumes with approval.
+
+Calibration: too loose shows up as `/ship --human` in the session index. Tighten the size bound. Too tight shows up as human reviews approved with no comments on config and dependency diffs. Loosen it.
 
 ## Babysit and Reviews
 

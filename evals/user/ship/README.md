@@ -18,6 +18,9 @@ The diff kinds, each with a `dev` and a `holdout` case:
 - prose edited but not committed, which only the plain `git diff` shows: `writing:review`
 - effort: `high` on auth-shaped code, `medium` on an ordinary multi-file feature
 - config-only with a review bot available: no `review:code` and no bot pass
+- a trivial diff (a dependency bump, a two-line config change): no `review:human`
+- dependency declarations past the trivial size bound on a repo I own: no `review:human`, while code on the same repo keeps it
+- `--human` on a trivial diff: `review:human`
 - balance: an ordinary change that warrants the default plan, with a stale local `main` behind `origin/main`
 
 `gh workflow run eval.yml --ref <branch> -f suite=evals/user/ship -f args='--tag dev'` runs one replicate in CI. `bun evals/native/run.ts evals/user/ship -- --tag dev` runs it locally with the Bash sandbox disabled. Results land in the gitignored `results/<timestamp>/`.

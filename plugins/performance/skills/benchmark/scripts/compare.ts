@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 
-// Interleaved hyperfine rounds and a pooled significance report. hyperfine
-// times each command's runs back to back, so drift over a comparison lands on
-// one side. Running several short rounds in rotating order spreads it over
-// both, and the report pools every round's samples per arm.
+// hyperfine times each command's runs back to back, so drift over a
+// comparison lands on one side. Running several short rounds in rotating
+// order spreads it over both, and the report pools every round's samples
+// per arm.
 
 import { mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";

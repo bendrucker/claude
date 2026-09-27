@@ -1,8 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { symbolicator, tally } from "./samply-top";
 
-// Stacks: 0 = main, 1 = main > work, 2 = main > work > hash.
-// Samples: two in hash (3ms CPU), one in work (1ms), one idle in main (0ms).
 const thread = {
   processName: "demo",
   pid: "1",

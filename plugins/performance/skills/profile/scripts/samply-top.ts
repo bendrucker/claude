@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 
 // Text summary of a samply profile: per-process time and the functions that
-// dominate it, symbolicated from the `--unstable-presymbolicate` sidecar. The
-// Firefox Profiler UI reads the same file for the full call tree.
+// dominate it, symbolicated from the `--unstable-presymbolicate` sidecar.
 
 import { gunzipSync } from "node:zlib";
 import { cli } from "cleye";

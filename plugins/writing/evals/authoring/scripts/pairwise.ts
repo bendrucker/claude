@@ -162,30 +162,45 @@ export function surfaceFor(
 }
 
 /**
- * The span of `after` that differs from `before`, between their common leading and trailing
- * lines, with `context` unchanged lines on each side. Elided text is marked with a `…` line.
+ * The lines of `after` that a line diff against `before` marks as added, each hunk with
+ * `context` unchanged lines on either side. Elided text between and around hunks is a `…` line.
  */
 export function changedRegion(before: string, after: string, context = 3): string {
   const a = before.split("\n");
   const b = after.split("\n");
-  let head = 0;
-  while (head < a.length && head < b.length && a[head] === b[head]) head++;
-  let tail = 0;
-  while (
-    tail < a.length - head &&
-    tail < b.length - head &&
-    a[a.length - 1 - tail] === b[b.length - 1 - tail]
-  ) {
-    tail++;
+  const width = b.length + 1;
+  const lcs = new Int32Array((a.length + 1) * width);
+  const at = (i: number, j: number) => lcs[i * width + j] ?? 0;
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      lcs[i * width + j] =
+        a[i] === b[j] ? at(i + 1, j + 1) + 1 : Math.max(at(i + 1, j), at(i, j + 1));
+    }
   }
-  if (head + tail >= b.length) return "";
-  const start = Math.max(0, head - context);
-  const end = Math.min(b.length, b.length - tail + context);
-  return [
-    ...(start > 0 ? ["…"] : []),
-    ...b.slice(start, end),
-    ...(end < b.length ? ["…"] : []),
-  ].join("\n");
+  const added = Array.from({ length: b.length }, () => false);
+  let i = 0;
+  let j = 0;
+  while (j < b.length) {
+    if (i < a.length && a[i] === b[j]) {
+      i++;
+      j++;
+    } else if (i < a.length && at(i + 1, j) >= at(i, j + 1)) {
+      i++;
+    } else {
+      added[j++] = true;
+    }
+  }
+  const keep = added.map((_, k) =>
+    added.slice(Math.max(0, k - context), k + context + 1).some(Boolean),
+  );
+  const out: string[] = [];
+  for (const [k, line] of b.entries()) {
+    if (keep[k]) out.push(line);
+    else if (out.length > 0 && out.at(-1) !== "…") out.push("…");
+    else if (out.length === 0 && k === 0) out.push("…");
+  }
+  if (!keep.some(Boolean)) return "";
+  return out.join("\n");
 }
 
 async function trimToChange(beforeDir: string | undefined, caseName: string, texts: string[]) {

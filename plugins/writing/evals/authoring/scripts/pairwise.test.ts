@@ -194,6 +194,11 @@ describe("changedRegion", () => {
       expected: "…\nd\ne\nNEW\nf\ng\n…",
     },
     { name: "an edit at the top", after: before.replace("a", "A"), expected: "A\nb\nc\n…" },
+    {
+      name: "two distant edits become two hunks",
+      after: before.replace("a", "A").replace("i", "I"),
+      expected: "A\nb\nc\n…\ng\nh\nI",
+    },
   ])("$name", ({ after, expected }) => {
     expect(changedRegion(before, after, 2)).toBe(expected);
   });

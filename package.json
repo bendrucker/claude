@@ -23,8 +23,9 @@
     "test:unit": "bun test"
   },
   "dependencies": {
-    "citty": "^0.2.2",
+    "@commander-js/extra-typings": "~15.0.0",
     "cleye": "^2.2.1",
+    "commander": "~15.0.0",
     "table": "^6.9.0",
     "typescript": "^7.0.0",
     "url-pattern": "^1.0.3",

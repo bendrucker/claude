@@ -45,7 +45,7 @@ A regex is fine inside a single node's text, where the grammar is already resolv
 
 # Script Conventions
 
-- **Argument parsing**: use [citty](https://github.com/unjs/citty). Load the `cli` skill for arguments, subcommands, and nested subcommands instead of reading existing scripts.
+- **Argument parsing**: use [commander](https://github.com/tj/commander.js) through `@commander-js/extra-typings`. Load the `cli` skill for arguments, subcommands, and nested subcommands instead of reading existing scripts. Scripts still on cleye migrate over time.
 - **Table output**: use the `table` package, not `markdown-table` or another GFM-oriented package. Script output lands in a terminal.
 - **Output width**: use a fixed default with a flag override (`--truncate <n>`). Do not read `process.stdout.columns` or gate on `process.stdout.isTTY`, both undefined when piped. The `local/no-terminal-width` lint rule enforces this.
 - **Ancestor paths**: use `join(import.meta.dirname, "..")` rather than chained `dirname()` calls.

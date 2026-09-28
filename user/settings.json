@@ -508,6 +508,7 @@
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
         "~/.config/herdr/herdr.sock",
+        "~/.local/state/vm",
         "/tmp/claude"
       ]
     },
@@ -534,6 +535,7 @@
         "~/.local/share/graphite",
         "~/.local/share/plannotator",
         "~/.local/share/atuin",
+        "~/.local/state/vm",
         "~/.greptile",
         "~/.coderabbit",
         "~/.agent-browser",

@@ -56,11 +56,12 @@ The rest are tool caches and state directories holding no credential material:
 - `~/Library/Caches/ms-playwright`: Playwright's unpacked browser builds. Without it an install fails at `mkdir` before reaching the download, which reads as a network problem. **Drop it** when no skill or work repo drives Playwright.
 - `~/.gradle` and `~/.config/jgit`: the Gradle wrapper's distribution lock and jgit's config lock, both written by Java builds in work repos. This fixes the filesystem half only, and a Gradle build that reaches the network still needs a full skip. **Drop both** when no Java repo is in rotation, and revisit if the egress half is ever granted, since the pair only pays off together.
 - `~/.config/.wrangler/logs` and `~/.config/.wrangler/registry`: per-run debug logs and the local dev registry for `wrangler dev` cross-worker bindings. Without the logs grant every invocation prints an `EPERM` error before running. **Drop both** alongside the Cloudflare hosts.
+- `~/.local/state/vm`: the `vm` launcher's per-VM SSH config entry, `known_hosts`, JSON record, and ControlMaster sockets, kept apart from `~/.ssh` so a sandboxed session can launch and reach VMs without a grant there. It holds no private keys, which stay in Secretive. The directory is also in `allowUnixSockets`, below. **Drop both** when `vm` moves its state or no session launches VMs.
 - `~/.claude/plans`: saved plan files, which copying one in fails without. No injected deny shadows it, unlike the `~/.claude` paths below. Permanent unless plan files move out of `~/.claude`.
 
 ## Sockets and Local Binding
 
-`allowUnixSockets` takes local IPC endpoints where secret material never leaves a dedicated agent: signing daemons, and the herdr socket. The herdr socket can inject keys into other panes, so it is command execution by another name. Accepted so layout and agent commands run sandboxed rather than escaped.
+`allowUnixSockets` takes local IPC endpoints where secret material never leaves a dedicated agent: signing daemons, and the herdr socket. The herdr socket can inject keys into other panes, so it is command execution by another name. Accepted so layout and agent commands run sandboxed rather than escaped. `~/.local/state/vm` holds `vm`'s ControlMaster sockets, named by `%C` hash, so the entry names the directory: each entry becomes a `subpath` rule. Without it ssh fails `Control socket connect(...): Operation not permitted`. An open master runs commands on its VM without re-authenticating, the same reach as the herdr socket but confined to VMs this session could already launch.
 
 `allowLocalBinding` stays loopback-only.
 

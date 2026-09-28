@@ -128,6 +128,7 @@ export class TurnTracker {
     const turn = this.current(from);
     turn.to = to;
     const content = entry.message?.content;
+    const questions: Blocked["questions"] = [];
 
     if (entry.type === "user" && typeof content === "string") {
       if (!this.answered && !content.startsWith(LOCAL_OUTPUT))
@@ -157,10 +158,12 @@ export class TurnTracker {
       const skill = block.name === "Skill" ? inputField(block.input, "skill") : undefined;
       if (skill !== undefined) turn.skills.push(skill);
       const asked = block.name === "AskUserQuestion" ? Questions.safeParse(block.input) : undefined;
-      if (asked?.success === true) {
-        this.pendingQuestion = true;
-        events.push({ event: "blocked", at: to, questions: asked.data.questions });
-      }
+      if (asked?.success === true) questions.push(...asked.data.questions);
+    }
+    // The watcher dedups questions by entry offset, so one entry reports all its questions at once.
+    if (questions.length > 0) {
+      this.pendingQuestion = true;
+      events.push({ event: "blocked", at: to, questions });
     }
     return events;
   }

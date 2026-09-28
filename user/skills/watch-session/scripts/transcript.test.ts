@@ -110,6 +110,17 @@ describe("TurnTracker", () => {
     expect(events(jsonl(notified))[0]).toMatchObject({ prompt: "task: Build finished" });
   });
 
+  test("reports every question in one entry as one event", () => {
+    const ask = (question: string) =>
+      toolUse("AskUserQuestion", { questions: [{ question, options: [{ label: "Yes" }] }] });
+    const blocked = events(jsonl([prompt("go"), assistant(ask("First?"), ask("Second?"))]));
+    expect(blocked).toHaveLength(1);
+    expect(blocked[0]).toMatchObject({
+      event: "blocked",
+      questions: [{ question: "First?" }, { question: "Second?" }],
+    });
+  });
+
   test("a turn stays open until its end marker arrives", () => {
     const tracker = new TurnTracker();
     const open = splitLines(jsonl(session.slice(0, 8)), 0).lines.flatMap((l) => tracker.feed(l));

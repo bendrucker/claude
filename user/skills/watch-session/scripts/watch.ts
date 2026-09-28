@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { $ } from "bun";
 import { defineCommand, runMain } from "citty";
 import { z } from "zod";
-import { decodeFile } from "../../../../packages/decode/index";
+import { DecodeError, decodeFile } from "../../../../packages/decode/index";
 import { paneAgent } from "./herdr";
 import { type Blocked, Entry, render, splitLines, type Turn, TurnTracker } from "./transcript";
 import { endTrial, startTrial } from "./trial";
@@ -83,7 +83,14 @@ async function readState(
 ): Promise<z.output<typeof State> | undefined> {
   if (dir === undefined) return undefined;
   const path = statePath(dir, session);
-  return (await Bun.file(path).exists()) ? decodeFile(State, path) : undefined;
+  if (!(await Bun.file(path).exists())) return undefined;
+  try {
+    return await decodeFile(State, path);
+  } catch (error) {
+    // A Monitor expiry can kill a write midway, and a fresh watch beats one that never re-arms.
+    if (error instanceof DecodeError) return undefined;
+    throw error;
+  }
 }
 
 function emit(event: object): void {
@@ -175,8 +182,9 @@ class Watcher {
       if (this.blockedAt !== undefined && event.at <= this.blockedAt) return;
       this.blockedAt = event.at;
     }
-    if (this.options.every === 0) emit(event);
-    else if (event.event === "turn") this.batch = addToBatch(this.batch, event);
+    // A question waits on an answer, so it skips the batch.
+    if (this.options.every === 0 || event.event === "blocked") emit(event);
+    else this.batch = addToBatch(this.batch, event);
   }
 
   private flush(force: boolean): void {
@@ -192,6 +200,8 @@ class Watcher {
     if (this.pane === undefined || Date.now() - this.lastPaneCheck < PANE_CHECK_MS) return true;
     this.lastPaneCheck = Date.now();
     const agent = await paneAgent(this.pane);
+    // A transient herdr failure retries at the next check instead of ending the watch.
+    if (agent === null) return true;
     const current = agent?.session;
     if (agent === undefined || current === undefined) {
       this.flush(true);
@@ -223,9 +233,11 @@ class Watcher {
   async persist(): Promise<void> {
     if (this.options.stateDir === undefined) return;
     // Formatted the way oxfmt and prettier leave JSON, since a repo's format check can reach tmp/.
+    // An unflushed batch resumes from its first turn, so an expiry before the flush re-reads it.
+    const offset = this.batch?.from ?? this.tracker.openFrom ?? this.offset;
     await Bun.write(
       statePath(this.options.stateDir, this.target.session),
-      `${JSON.stringify({ offset: this.tracker.openFrom ?? this.offset, base: this.base, blockedAt: this.blockedAt }, null, 2)}\n`,
+      `${JSON.stringify({ offset, base: this.base, blockedAt: this.blockedAt }, null, 2)}\n`,
     );
   }
 }

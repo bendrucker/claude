@@ -30,9 +30,9 @@ const openTurn = [
 ];
 
 /** Runs one watch until it has had time to read the transcript, then stops it like a Monitor expiry. */
-async function watchOnce(config: string, stateDir: string): Promise<string[]> {
+async function watchOnce(config: string, stateDir: string, every = "0"): Promise<string[]> {
   const proc = Bun.spawn(
-    ["bun", SCRIPT, "watch", SESSION, "--from-start", "--state-dir", stateDir],
+    ["bun", SCRIPT, "watch", SESSION, "--from-start", "--state-dir", stateDir, "--every", every],
     {
       env: { ...process.env, CLAUDE_CONFIG_DIR: config },
       stdout: "pipe",
@@ -56,13 +56,22 @@ async function watchOnce(config: string, stateDir: string): Promise<string[]> {
     .map((line) => Event.parse(JSON.parse(line)).event);
 }
 
-test("a re-armed watch does not replay a question it already reported", async () => {
+/** A config dir holding the open-turn transcript, returned with a state dir inside it. */
+async function fixture(): Promise<{ config: string; stateDir: string }> {
   const config = await mkdtemp(join(tmpdir(), "watch-session-"));
   await mkdir(join(config, "projects", "repo"), { recursive: true });
   const transcript = openTurn.map((entry) => `${JSON.stringify(entry)}\n`).join("");
   await Bun.write(join(config, "projects", "repo", `${SESSION}.jsonl`), transcript);
-  const stateDir = join(config, "state");
+  return { config, stateDir: join(config, "state") };
+}
 
+test("a re-armed watch does not replay a question it already reported", async () => {
+  const { config, stateDir } = await fixture();
   expect(await watchOnce(config, stateDir)).toEqual(["watching", "blocked"]);
   expect(await watchOnce(config, stateDir)).toEqual(["watching"]);
+});
+
+test("a batched watch reports a question without waiting for the batch", async () => {
+  const { config, stateDir } = await fixture();
+  expect(await watchOnce(config, stateDir, "600")).toEqual(["watching", "blocked"]);
 });

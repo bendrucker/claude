@@ -4,6 +4,10 @@ import { dirname, join } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
 import { decodeJson } from "../../../../../packages/decode/index";
+import { mapPool } from "./pool";
+
+// GitHub's secondary rate limit penalizes concurrent requests from one token.
+const GITHUB_CONCURRENCY = 1;
 
 // Candidate briefs from public repos, restricted to hand-written deliverables: created before
 // 2025-02-24, or after 2026-06-30 with no indexed session touching them. The index probe is
@@ -610,11 +614,13 @@ async function minePrs(
     return true;
   });
 
+  const fetched = await mapPool(eligible, GITHUB_CONCURRENCY, async (item) => ({
+    item,
+    ...(await fetchPrDiff(item.repository.nameWithOwner, item.number)),
+  }));
   const candidates: RawCandidate[] = [];
-  for (const item of eligible) {
+  for (const { item, detail, diff } of fetched) {
     const repo = item.repository.nameWithOwner;
-    // oxlint-disable-next-line no-await-in-loop -- GitHub rate limit.
-    const { detail, diff } = await fetchPrDiff(repo, item.number);
     if (!fitsDiffBudget(diff)) continue;
     candidates.push({
       surface: "pr",
@@ -680,21 +686,23 @@ async function mineDocCommits(
   surface: Surface,
   maxPerRepo: number,
 ): Promise<RawCandidate[]> {
-  const commits = new Map<string, { repo: string; sha: string }>();
-  for (const repo of repos) {
-    for (const path of paths) {
-      // oxlint-disable-next-line no-await-in-loop -- sequential to stay under the GitHub core rate limit.
+  const listings = await mapPool(
+    repos.flatMap((repo) => paths.map((path) => ({ repo, path }))),
+    GITHUB_CONCURRENCY,
+    async ({ repo, path }) => {
       const oldShas = await listAuthoredCommits(repo, path, EARLIEST_MINING_DATE, PRE_CLAUDE_CODE);
-      // oxlint-disable-next-line no-await-in-loop -- see above.
       const newShas = await listAuthoredCommits(repo, path, POST_WINDOW);
-      for (const sha of [...oldShas, ...newShas]) commits.set(`${repo}@${sha}`, { repo, sha });
-    }
-  }
+      return [...oldShas, ...newShas].map((sha) => ({ repo, sha }));
+    },
+  );
+  const commits = new Map(listings.flat().map((c) => [`${c.repo}@${c.sha}`, c]));
+  const fetched = await mapPool([...commits.values()], GITHUB_CONCURRENCY, async (c) => ({
+    ...c,
+    commit: await fetchCommit(c.repo, c.sha),
+  }));
 
   const candidates: RawCandidate[] = [];
-  for (const { repo, sha } of commits.values()) {
-    // oxlint-disable-next-line no-await-in-loop -- sequential to stay under the GitHub core rate limit.
-    const commit = await fetchCommit(repo, sha);
+  for (const { repo, sha, commit } of fetched) {
     const when = commit.commit.author.date;
     if (!isEligibleDate(when)) continue;
     const subject = commit.commit.message.split("\n")[0] ?? "";

@@ -11,6 +11,7 @@ import { table } from "table";
 import { z } from "zod";
 import { decode, decodeFile, decodeJson } from "../../../../../packages/decode/index";
 import { loadTags, traceReply } from "../../../../../evals/native/load";
+import { mapPool } from "./pool";
 import { Judgment, Key, Label, Pair, Pick, SURFACES, Surface } from "./pairs";
 
 const OUT_TAG = /<out>([\s\S]*?)<\/out>/;
@@ -108,14 +109,16 @@ export async function collectDrafts(
   fileFor: (caseName: string) => string | undefined,
   arm = "with",
 ): Promise<Map<string, string[]>> {
+  const perPath = await Promise.all(
+    paths.map((path) => {
+      const dir = path.endsWith(".json") ? dirname(path) : path;
+      return Promise.all(
+        traceFiles(dir, arm).map(async (f) => [f.case, await Bun.file(f.path).text()] as const),
+      );
+    }),
+  );
   const byCase = new Map<string, string[]>();
-  for (const path of paths) {
-    const dir = path.endsWith(".json") ? dirname(path) : path;
-    const files = traceFiles(dir, arm);
-    // oxlint-disable-next-line no-await-in-loop -- one result directory's traces at a time, in the pooling order the caller gave.
-    const read = await Promise.all(
-      files.map(async (f) => [f.case, await Bun.file(f.path).text()] as const),
-    );
+  for (const read of perPath) {
     for (const [caseName, trace] of read) {
       const text = extractDeliverable(trace, fileFor(caseName));
       if (text === undefined) continue;
@@ -211,6 +214,19 @@ async function trimToChange(beforeDir: string | undefined, caseName: string, tex
   return texts.map((t) => changedRegion(before, t));
 }
 
+async function trimAll(
+  beforeDir: string | undefined,
+  drafts: Map<string, string[]>,
+): Promise<Map<string, string[]>> {
+  const entries = await Promise.all(
+    [...drafts].map(
+      async ([caseName, texts]) =>
+        [caseName, await trimToChange(beforeDir, caseName, texts)] as const,
+    ),
+  );
+  return new Map(entries);
+}
+
 async function briefFor(suite: string, caseName: string): Promise<string> {
   return (await Bun.file(join(suite, caseName, "prompt.md")).text()).trim();
 }
@@ -234,7 +250,8 @@ interface PairsFlags {
 }
 
 export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
-  if (flags.suite === undefined) throw new Error("--suite is required");
+  const suite = flags.suite;
+  if (suite === undefined) throw new Error("--suite is required");
   if (flags.candidate === undefined) throw new Error("--candidate is required");
   if (flags.original !== undefined && flags.base !== undefined) {
     throw new Error("--original and --base are mutually exclusive");
@@ -245,39 +262,33 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
 
   const fileOverrides = parseMap(flags.file);
   const surfaceOverrides = parseMap(flags.surface);
-  const tags = await loadTags(flags.suite);
+  const tags = await loadTags(suite);
   const candidateArm = flags.candidateArm ?? "with";
   const baseArm = flags.baseArm ?? "with";
-  const candidateDrafts = await collectDrafts(
-    flags.candidate.split(","),
-    (c) => fileOverrides.get(c),
-    candidateArm,
+  const candidateDrafts = await trimAll(
+    flags.before,
+    await collectDrafts(flags.candidate.split(","), (c) => fileOverrides.get(c), candidateArm),
   );
-  for (const [caseName, texts] of candidateDrafts) {
-    // oxlint-disable-next-line no-await-in-loop -- one case's before file read at a time.
-    candidateDrafts.set(caseName, await trimToChange(flags.before, caseName, texts));
-  }
 
-  const pairs: Pair[] = [];
   if (flags.original !== undefined) {
     const originalDir = flags.original;
-    for (const [caseName, texts] of candidateDrafts) {
-      const recordPath = join(originalDir, `${caseName}.json`);
-      // oxlint-disable-next-line no-await-in-loop -- one case's original checked at a time, in case order.
-      if (!(await Bun.file(recordPath).exists())) {
-        console.error(`skip ${caseName}: no original`);
-        continue;
-      }
-      // oxlint-disable-next-line no-await-in-loop -- one case's original text read at a time, in case order.
-      const record = await decodeFile(OriginalRecord, recordPath);
-      const raw = decode(z.string(), record[flags.field], `${caseName}.json field ${flags.field}`);
-      // oxlint-disable-next-line no-await-in-loop -- one case's before file read at a time.
-      const [text = raw] = await trimToChange(flags.before, caseName, [raw]);
-      const surface = surfaceFor(caseName, tags, surfaceOverrides);
-      // oxlint-disable-next-line no-await-in-loop -- one case's prompt.md read at a time, in case order.
-      const brief = await briefFor(flags.suite, caseName);
-      for (const [run, candidateText] of texts.entries()) {
-        pairs.push({
+    const perCase = await Promise.all(
+      [...candidateDrafts].map(async ([caseName, texts]): Promise<Pair[]> => {
+        const recordPath = join(originalDir, `${caseName}.json`);
+        if (!(await Bun.file(recordPath).exists())) {
+          console.error(`skip ${caseName}: no original`);
+          return [];
+        }
+        const record = await decodeFile(OriginalRecord, recordPath);
+        const raw = decode(
+          z.string(),
+          record[flags.field],
+          `${caseName}.json field ${flags.field}`,
+        );
+        const [text = raw] = await trimToChange(flags.before, caseName, [raw]);
+        const surface = surfaceFor(caseName, tags, surfaceOverrides);
+        const brief = await briefFor(suite, caseName);
+        return texts.map((candidateText, run) => ({
           id: `${caseName}-original-${flags.candidateLabel}-${run}`,
           case: caseName,
           surface,
@@ -287,41 +298,33 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
             source: { kind: "run", column: flags.candidateLabel, arm: candidateArm, run },
             text: candidateText,
           },
-        });
-      }
-    }
-    return pairs;
+        }));
+      }),
+    );
+    return perCase.flat();
   }
 
   if (flags.base === undefined) throw new Error("one of --base or --original is required");
-  const baseDrafts = await collectDrafts(
-    flags.base.split(","),
-    (c) => fileOverrides.get(c),
-    baseArm,
+  const baseDrafts = await trimAll(
+    flags.before,
+    await collectDrafts(flags.base.split(","), (c) => fileOverrides.get(c), baseArm),
   );
-  for (const [caseName, texts] of baseDrafts) {
-    // oxlint-disable-next-line no-await-in-loop -- one case's before file read at a time.
-    baseDrafts.set(caseName, await trimToChange(flags.before, caseName, texts));
-  }
-  for (const [caseName, candidateTexts] of candidateDrafts) {
-    const baseTexts = baseDrafts.get(caseName);
-    if (baseTexts === undefined) {
-      console.error(`skip ${caseName}: no base drafts`);
-      continue;
-    }
-    const surface = surfaceFor(caseName, tags, surfaceOverrides);
-    // oxlint-disable-next-line no-await-in-loop -- one case's prompt.md read at a time, in case order.
-    const brief = await briefFor(flags.suite, caseName);
-    if (baseTexts.length !== candidateTexts.length) {
-      console.error(
-        `${caseName}: pairing ${Math.min(baseTexts.length, candidateTexts.length)} of ` +
-          `${baseTexts.length} ${flags.baseLabel} / ${candidateTexts.length} ${flags.candidateLabel} runs`,
-      );
-    }
-    for (const [run, base] of baseTexts.entries()) {
-      const candidate = candidateTexts[run];
-      if (candidate === undefined) break;
-      pairs.push({
+  const perCase = await Promise.all(
+    [...candidateDrafts].map(async ([caseName, candidateTexts]): Promise<Pair[]> => {
+      const baseTexts = baseDrafts.get(caseName);
+      if (baseTexts === undefined) {
+        console.error(`skip ${caseName}: no base drafts`);
+        return [];
+      }
+      const surface = surfaceFor(caseName, tags, surfaceOverrides);
+      const brief = await briefFor(suite, caseName);
+      if (baseTexts.length !== candidateTexts.length) {
+        console.error(
+          `${caseName}: pairing ${Math.min(baseTexts.length, candidateTexts.length)} of ` +
+            `${baseTexts.length} ${flags.baseLabel} / ${candidateTexts.length} ${flags.candidateLabel} runs`,
+        );
+      }
+      return baseTexts.slice(0, candidateTexts.length).map((base, run) => ({
         id: `${caseName}-${flags.baseLabel}-${flags.candidateLabel}-${run}`,
         case: caseName,
         surface,
@@ -329,12 +332,12 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
         a: { source: { kind: "run", column: flags.baseLabel, arm: baseArm, run }, text: base },
         b: {
           source: { kind: "run", column: flags.candidateLabel, arm: candidateArm, run },
-          text: candidate,
+          text: candidateTexts[run] ?? "",
         },
-      });
-    }
-  }
-  return pairs;
+      }));
+    }),
+  );
+  return perCase.flat();
 }
 
 async function writePairs(pairs: Pair[], out: string): Promise<void> {
@@ -440,23 +443,6 @@ export async function judgePair(
 /** A Judgment on disk from a previous run of the same prompt is worth keeping as-is. */
 export function isFresh(existing: Judgment | undefined, promptHash: string): existing is Judgment {
   return existing?.prompt === promptHash;
-}
-
-/** Runs `fn` over `items` in batches of `concurrency`, each batch fully parallel. */
-export async function mapPool<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const size = Math.max(1, concurrency);
-  const results: R[] = [];
-  for (let start = 0; start < items.length; start += size) {
-    const batch = items.slice(start, start + size);
-    // oxlint-disable-next-line no-await-in-loop -- batches run sequentially; each batch itself runs in parallel, bounding concurrency to `size`.
-    const batchResults = await Promise.all(batch.map((item, i) => fn(item, start + i)));
-    results.push(...batchResults);
-  }
-  return results;
 }
 
 function listJson(dir: string): string[] {

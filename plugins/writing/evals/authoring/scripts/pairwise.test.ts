@@ -23,7 +23,6 @@ import {
   isFresh,
   judgePair,
   leftPickShare,
-  mapPool,
   parseMap,
   renderJudgePrompt,
   scoreJudgments,
@@ -465,26 +464,6 @@ describe("isFresh", () => {
     },
   ])("isFresh -> $expected", ({ existing, hash, expected }) => {
     expect(isFresh(existing, hash)).toBe(expected);
-  });
-});
-
-describe("mapPool", () => {
-  test("runs every item and preserves result order regardless of concurrency", async () => {
-    const results = await mapPool([1, 2, 3, 4, 5], 2, (n) => Promise.resolve(n * 10));
-    expect(results).toEqual([10, 20, 30, 40, 50]);
-  });
-
-  test("never exceeds the requested concurrency", async () => {
-    let inFlight = 0;
-    let maxInFlight = 0;
-    await mapPool([1, 2, 3, 4, 5, 6], 2, async (n) => {
-      inFlight++;
-      maxInFlight = Math.max(maxInFlight, inFlight);
-      await Bun.sleep(1);
-      inFlight--;
-      return n;
-    });
-    expect(maxInFlight).toBeLessThanOrEqual(2);
   });
 });
 

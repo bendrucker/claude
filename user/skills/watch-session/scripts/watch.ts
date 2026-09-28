@@ -13,7 +13,11 @@ import { endTrial, startTrial } from "./trial";
 
 const PANE_CHECK_MS = 10_000;
 
-const State = z.object({ offset: z.number(), base: z.string().optional() });
+const State = z.object({
+  offset: z.number(),
+  base: z.string().optional(),
+  blockedAt: z.number().optional(),
+});
 
 interface Target {
   session: string;
@@ -140,6 +144,8 @@ class Watcher {
     private readonly pane: string | undefined,
     private offset: number,
     private readonly base: string | undefined,
+    // Resuming re-reads the open turn, so a question it already reported must not fire again.
+    private blockedAt: number | undefined,
   ) {}
 
   /** Returns false once the watched pane no longer hosts a Claude session. */
@@ -163,6 +169,10 @@ class Watcher {
   }
 
   private dispatch(event: Turn | Blocked): void {
+    if (event.event === "blocked") {
+      if (event.at <= (this.blockedAt ?? -1)) return;
+      this.blockedAt = event.at;
+    }
     if (this.options.every === 0) emit(event);
     else if (event.event === "turn") this.batch = addToBatch(this.batch, event);
   }
@@ -203,6 +213,7 @@ class Watcher {
     this.target = { session, path };
     this.offset = 0;
     this.tracker = new TurnTracker();
+    this.blockedAt = undefined;
     await this.persist();
     emit({ event: "session", ...this.target });
   }
@@ -212,7 +223,7 @@ class Watcher {
     // Formatted the way oxfmt and prettier leave JSON, since a repo's format check can reach tmp/.
     await Bun.write(
       statePath(this.options.stateDir, this.target.session),
-      `${JSON.stringify({ offset: this.tracker.openFrom ?? this.offset, base: this.base }, null, 2)}\n`,
+      `${JSON.stringify({ offset: this.tracker.openFrom ?? this.offset, base: this.base, blockedAt: this.blockedAt }, null, 2)}\n`,
     );
   }
 }
@@ -233,7 +244,7 @@ async function watch(options: WatchOptions): Promise<void> {
   const { cwd, head } = await workspace(target.path);
   // The first watch records the commit a trial starts from, since the session keeps committing.
   const base = saved?.base ?? head;
-  const watcher = new Watcher(options, target, pane, offset, base);
+  const watcher = new Watcher(options, target, pane, offset, base, saved?.blockedAt);
   await watcher.persist();
   emit({ event: "watching", ...target, cwd, base, offset, pane });
 

@@ -3,8 +3,11 @@ import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 import {
   assignSplit,
+  candidateBody,
   type Candidate,
+  countProseWordsAdded,
   countWordsAdded,
+  extractAddedProse,
   fitsDiffBudget,
   hasAiMarkers,
   hasMatchingCommand,
@@ -167,6 +170,93 @@ test.each<{ name: string; patch: string; expected: number }>([
   { name: "skips a blank added line", patch: "+\n+real content here", expected: 3 },
 ])("countWordsAdded: $name", ({ patch, expected }) => {
   expect(countWordsAdded(patch)).toBe(expected);
+});
+
+test.each<{ name: string; patch: string; expected: string }>([
+  {
+    name: "plain prose passes through",
+    patch: "+Replace your directive.",
+    expected: "Replace your directive.",
+  },
+  {
+    name: "drops a fenced code block",
+    patch: "+Usage:\n+```js\n+var x = require('x')\n+```\n+That's it.",
+    expected: "Usage:\nThat's it.",
+  },
+  {
+    name: "drops a standalone badge image",
+    patch:
+      "+# my-module\n+[![build](https://ci.example/badge.svg)](https://ci.example)\n+A real description.",
+    expected: "# my-module\nA real description.",
+  },
+  {
+    name: "drops table rows",
+    patch:
+      "+| Name | Description |\n+| --- | --- |\n+| path | The module path |\n+Prose after the table.",
+    expected: "Prose after the table.",
+  },
+  { name: "empty patch", patch: "", expected: "" },
+  {
+    name: "collapses blank lines left behind by a dropped code block",
+    patch: "+Before.\n+\n+```js\n+var x = 1\n+```\n+\n+After.",
+    expected: "Before.\n\nAfter.",
+  },
+])("extractAddedProse: $name", ({ patch, expected }) => {
+  expect(extractAddedProse(patch)).toBe(expected);
+});
+
+test.each<{ name: string; patch: string; expected: number }>([
+  { name: "no patch", patch: "", expected: 0 },
+  { name: "counts prose words", patch: "+one two three", expected: 3 },
+  {
+    name: "excludes fenced code from the count",
+    patch: "+intro words here\n+```js\n+var a = 1 + 2 + 3\n+```",
+    expected: 3,
+  },
+  {
+    name: "excludes badge and table lines from the count",
+    patch:
+      "+[![build](https://ci.example/badge.svg)](https://ci.example)\n" +
+      "+| a | b |\n" +
+      "+real prose words here",
+    expected: 4,
+  },
+])("countProseWordsAdded: $name", ({ patch, expected }) => {
+  expect(countProseWordsAdded(patch)).toBe(expected);
+});
+
+test.each<{
+  name: string;
+  message: string;
+  targetFiles: { filename: string; patch?: string }[];
+  minWords: number;
+  expected: string;
+}>([
+  {
+    name: "uses the commit message when it carries enough prose",
+    message: "explain the design in detail with several sentences of rationale",
+    targetFiles: [{ filename: "README.md", patch: "+short readme line" }],
+    minWords: 5,
+    expected: "explain the design in detail with several sentences of rationale",
+  },
+  {
+    name: "falls back to the diff's added prose when the message is terse",
+    message: "docs(README): add documentation",
+    targetFiles: [
+      { filename: "README.md", patch: "+## Usage\n+Call the function with an object." },
+    ],
+    minWords: 5,
+    expected: "## Usage\nCall the function with an object.",
+  },
+  {
+    name: "falls back to the message when neither carries enough prose",
+    message: "readme",
+    targetFiles: [{ filename: "README.md", patch: "+```js\n+var x = 1\n+```" }],
+    minWords: 5,
+    expected: "readme",
+  },
+])("candidateBody: $name", ({ message, targetFiles, minWords, expected }) => {
+  expect(candidateBody(message, targetFiles, minWords)).toBe(expected);
 });
 
 // ---------------------------------------------------------------------------

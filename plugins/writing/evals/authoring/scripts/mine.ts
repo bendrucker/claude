@@ -23,6 +23,9 @@ import { decodeJson } from "../../../../../packages/decode/index";
 
 export const PRE_CLAUDE_CODE = "2025-02-24T00:00:00Z";
 export const POST_WINDOW = "2026-06-30T00:00:00Z";
+// Floor for the "old" side of a commit search: earlier than any of Ben's
+// GitHub activity, so it doesn't clip a repo's early history.
+export const EARLIEST_MINING_DATE = "2005-01-01T00:00:00Z";
 
 const AI_MARKER_PATTERNS = [/\bclaude\b/i, /generated with/i, /co-authored-by/i];
 
@@ -129,6 +132,61 @@ export function countWordsAdded(patch: string): number {
     words += text.split(/\s+/).filter(Boolean).length;
   }
   return words;
+}
+
+// A standalone badge image, optionally link-wrapped: "[![alt](img)](url)" or "![alt](img)".
+const BADGE_LINE = /^\[?!\[[^\]]*\]\([^)]*\)\]?(\([^)]*\))?$/;
+const TABLE_ROW = /^\|.*\|$/;
+
+// Prose among a unified-diff patch's added lines: code fences, standalone
+// badge images, and table rows are dropped, so a boilerplate-heavy README
+// commit (a template, a badge row, an API table) doesn't read as prose.
+export function extractAddedProse(patch: string): string {
+  const lines: string[] = [];
+  let inFence = false;
+  for (const line of patch.split("\n")) {
+    if (line.startsWith("+++") || !line.startsWith("+")) continue;
+    const text = line.slice(1);
+    const trimmed = text.trim();
+    if (trimmed.startsWith("```")) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence || BADGE_LINE.test(trimmed) || TABLE_ROW.test(trimmed)) continue;
+    lines.push(text);
+  }
+  // A dropped fence, badge, or table row can leave the blank lines around it
+  // behind, so collapse runs of blank lines the removal created.
+  return lines
+    .join("\n")
+    .replaceAll(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function countProseWordsAdded(patch: string): number {
+  const prose = extractAddedProse(patch);
+  return prose === "" ? 0 : prose.split(/\s+/).filter(Boolean).length;
+}
+
+function countPlainWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
+}
+
+// Ben's commit messages carry the hand-written prose when he wrote real
+// explanation there. An older README-only commit often has just a terse
+// subject with no body, so the prose to replay is the diff's added text.
+export function candidateBody(
+  message: string,
+  targetFiles: { filename: string; patch?: string | undefined }[],
+  minWords: number,
+): string {
+  if (countPlainWords(message) >= minWords) return message;
+  const extracted = targetFiles
+    .map((f) => extractAddedProse(f.patch ?? ""))
+    .filter((text) => text.length > 0)
+    .join("\n\n");
+  return extracted.length > 0 ? extracted : message;
 }
 
 export function repoShortName(repo: string): string {
@@ -507,6 +565,13 @@ const DOC_REPOS = [
   "bendrucker/creditcards-types",
   "bendrucker/azure-blob-to-s3",
   "bendrucker/anthropic-text-editor-inspector",
+  "bendrucker/convex-firebase",
+  "bendrucker/packhorse",
+  "bendrucker/node-ziptastic",
+  "bendrucker/git-log-parser",
+  "bendrucker/angularjs-stripe",
+  "bendrucker/terraform-apply-timeout",
+  "bendrucker/terraform-configuration-aliases-action",
 ];
 
 const DOC_PATHS = ["README.md", "docs"];
@@ -643,17 +708,13 @@ async function mineDocCommits(
   filterFile: (filename: string) => boolean,
   minWords: number,
   surface: Surface,
+  maxPerRepo: number,
 ): Promise<RawCandidate[]> {
   const commits = new Map<string, { repo: string; sha: string }>();
   for (const repo of repos) {
     for (const path of paths) {
       // oxlint-disable-next-line no-await-in-loop -- sequential to stay under the GitHub core rate limit.
-      const oldShas = await listAuthoredCommits(
-        repo,
-        path,
-        "2020-01-01T00:00:00Z",
-        PRE_CLAUDE_CODE,
-      );
+      const oldShas = await listAuthoredCommits(repo, path, EARLIEST_MINING_DATE, PRE_CLAUDE_CODE);
       // oxlint-disable-next-line no-await-in-loop -- see above.
       const newShas = await listAuthoredCommits(repo, path, POST_WINDOW);
       for (const sha of [...oldShas, ...newShas]) commits.set(`${repo}@${sha}`, { repo, sha });
@@ -679,7 +740,7 @@ async function mineDocCommits(
     ) {
       continue;
     }
-    const wordsAdded = targetFiles.reduce((sum, f) => sum + countWordsAdded(f.patch ?? ""), 0);
+    const wordsAdded = targetFiles.reduce((sum, f) => sum + countProseWordsAdded(f.patch ?? ""), 0);
     if (wordsAdded < minWords) continue;
 
     const diff: DiffStats = {
@@ -698,10 +759,10 @@ async function mineDocCommits(
       summary: subject,
       diff,
       notes: `${wordsAdded} words added to ${targetFiles.map((f) => f.filename).join(", ")}`,
-      body: commit.commit.message,
+      body: candidateBody(commit.commit.message, targetFiles, minWords),
     });
   }
-  return selectSample(candidates, targetCount * 2, 3);
+  return selectSample(candidates, targetCount * 2, maxPerRepo);
 }
 
 function buildSplitSection(
@@ -781,7 +842,7 @@ async function main() {
       },
       prTarget: { type: Number, default: 15 },
       issueTarget: { type: Number, default: 9 },
-      docTarget: { type: Number, default: 7 },
+      docTarget: { type: Number, default: 8 },
       skillTarget: { type: Number, default: 4 },
     },
   });
@@ -819,6 +880,7 @@ async function main() {
     (filename: string) => filename === "README.md" || filename.startsWith("docs/"),
     150,
     "doc",
+    1,
   );
   console.log(`  ${docs.length} doc candidates after filters`);
 
@@ -832,6 +894,7 @@ async function main() {
     isSkillPath,
     80,
     "skill",
+    3,
   );
   console.log(`  ${skills.length} skill candidates after filters`);
 

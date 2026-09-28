@@ -14,7 +14,7 @@ A Linux result stands in for macOS when the hot path is platform-neutral code: p
 It does not transfer when the time goes to what differs between the platforms:
 
 - Code behind a platform switch (`#[cfg(target_os = "macos")]`, `runtime.GOOS`, `process.platform`, `sys.platform`).
-- Process spawn and dynamic linking, which cost more on macOS.
+- Process spawn and dynamic linking, which cost more on macOS. macOS also checks each executable the first time it sees that content, so a test that writes fresh stub scripts pays the check on every run.
 - Filesystem behavior: APFS against ext4, `fsync` (macOS needs `F_FULLFSYNC` to reach the disk), case-insensitive lookups, `clonefile`, FSEvents against inotify.
 - Event and syscall layers: kqueue against epoll, and the system allocator.
 
@@ -40,6 +40,8 @@ An EC2 Graviton instance (`c8g`) gives stable timing: fixed clock frequency and 
 Reach it through the user's launcher: a CLI that creates an instance, connects to it, extends its time limit, and destroys it. The user's environment supplies the launcher, its account, and its profile, so read its `--help` before the first launch. When no launcher exists, tell the user and stop at the local VM.
 
 Set the time limit at launch from the climb's expected duration: the A/A run plus each candidate's measurement, at the per-run cost the harness measured, with half again as margin. A run cut off by the limit repeats its setup and measurements, which costs more than the idle margin. Extend the limit when the climb outgrows it rather than letting a measurement run into shutdown. Tell the user the limit and the instance type when you launch.
+
+When two climbs share one VM, pin each to its own cores with `taskset -c <range>`, and have each ask the other before extending or destroying it.
 
 When the launcher registers the VM as a herdr machine, run measurements in a herdr workspace on it, per the hill-climb skill's Workspace section.
 

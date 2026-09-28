@@ -35,12 +35,13 @@ Pin the scenario before timing it. A run that changes its own input measures a d
 - Reset state per run with `--prepare` (restore a fixture, clear or warm a cache), and one-time setup with `--setup`. Match the cache state to the scenario the user cares about. A cold-start metric needs a cold cache on every run.
 - Stub or hold fixed everything outside the program: network, remote state, other processes' files. When the program syncs with a remote, point it at a local copy that stays unchanged.
 - Pass `-N` when the command is a single executable with arguments, which removes the shell's startup from every sample.
-- Check the machine before a baseline: on AC power, idle (`uptime` load near zero), no power-saving mode. Record the load beside the baseline.
+- Check the machine before a baseline: on AC power, no power-saving mode, and as quiet as it gets. `compare.ts run` prints the load average each round. When the machine cannot go idle, interleaving keeps the comparison fair, and the per-round load explains a round that stands out.
+- When the program is a test suite, raise the runner's timeout in every arm's command (`bun test --timeout`, `pytest --timeout`), so a load spike slows a run instead of failing it. Read the first timeout before raising it, since it can be a real cost worth a candidate.
 - For a shell script or shell startup (`.zshrc`, `.bashrc`), read [references/shell.md](references/shell.md).
 
 ## Arms
 
-Build every arm so it exists on disk at once: a `git worktree add <dir> <ref>` per version, or a separate build output per arm. Put each worktree outside the repo, since a test runner, linter, or watcher walking the tree picks up a nested checkout as part of the program. When the program writes state outside its tree (`~/.cache`, a config directory), point each arm at its own copy, since a candidate that changes a cache format makes both arms miss on every run. Interleaving needs both arms runnable in the same round, so switching branches between runs is out.
+Build every arm so it exists on disk at once: a `git worktree add <dir> <ref>` per version, or a separate build output per arm. Put each worktree outside the repo, since a test runner, linter, or watcher walking the tree picks up a nested checkout as part of the program. When the program writes state outside its tree (`~/.cache`, a config directory), point each arm at its own copy, since a candidate that changes a cache format makes both arms miss on every run. Check that each arm runs only its own copy: a test runner reads a bare path argument as a filter that can match another arm's tree, so pass paths with a leading `./`. Before a long comparison, run each arm once with its output visible and confirm it passes. Interleaving needs both arms runnable in the same round, so switching branches between runs is out.
 
 Compare with the bundled script, which runs short `hyperfine` rounds in rotating order and pools them:
 
@@ -61,7 +62,7 @@ When the Mac's A/A will not tie or the fast signal needs `perf` or hardware coun
 ## Reading the Report
 
 - `*` marks a change with permutation p below `--alpha` (0.1) and a size of at least `--min-effect` (3%). An unstarred change is a tie, however large it looks.
-- `†` marks fewer than 4 runs on a side, too few to star.
+- `†` marks fewer than 4 runs on a side, too few to star. With 3 a side, the permutation test cannot reach p < 0.1 however far apart the arms are, so plan `--rounds` and `--runs` for at least 4 per arm, even when each run is expensive.
 - A nonzero `failed` count means some runs exited nonzero and left the pool. `compare.ts run` stops after the round where a run fails. Run that arm once with its output visible and fix the cause before starting a new comparison.
 - About one comparison in ten stars by chance at the default alpha. Re-run a star on a metric nobody predicted would move before treating it as a result.
 

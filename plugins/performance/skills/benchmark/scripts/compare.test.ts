@@ -50,7 +50,7 @@ describe("pool", () => {
     ]);
     expect(arms).toEqual([
       { name: "base", times: [1, 2, 6], memory: [50e6, 50e6, 50e6], failures: 0 },
-      { name: "cand", times: [3, 5], memory: [50e6, 50e6], failures: 1 },
+      { name: "cand", times: [3, 5], memory: [50e6, 50e6], failures: 1, failedTimes: [4] },
     ]);
   });
 });
@@ -97,9 +97,10 @@ describe("progress", () => {
     expect(
       progress([
         { name: "base", times: [0.08, 0.1, 0.09], memory: [], failures: 0 },
-        { name: "cand", times: [2.5], memory: [], failures: 2 },
+        { name: "cand", times: [2.5], memory: [], failures: 2, failedTimes: [336, 5.2] },
+        { name: "none", times: [], memory: [], failures: 1 },
       ]),
-    ).toBe("base 90.0ms, cand 2.50s (2 failed)");
+    ).toBe("base 90.0ms, cand 2.50s (2 failed at 336.00s, 5.20s), none - (1 failed)");
   });
 });
 

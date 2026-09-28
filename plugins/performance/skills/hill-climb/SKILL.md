@@ -46,7 +46,7 @@ Build the benchmark per `performance:benchmark`, or adopt the project's own when
 - **Tight loop.** Each run's cost repeats across every A/A, candidate, and re-baseline. Reset per run only the state the scenario depends on. Hoist work that feeds every run identically into `--setup`: fixture builds, toolchain installs, downloads and inputs the metric does not cover. Repeat the end-state diff after each hoist, and return a step to the reset when the diff or the A/A shifts.
 - **Cost.** Time one run with its reset and multiply by the A/A's run count. When that takes a large share of the budget, tighten the reset or cut runs first.
 - **Baseline.** Record the unchanged program twice (an A/A comparison). Its spread is the noise floor and sets the run count a candidate needs.
-- **Profile.** Profile the baseline per `performance:profile` and rank where the time goes.
+- **Profile.** Profile the baseline per `performance:profile` and rank where the time goes. Size runner and config options (parallelism, caching flags) against the profile too, so the candidate list ranks them beside code changes. Before measuring a config option, confirm the program reads it, since some tools ignore an unknown key without a warning.
 
 #### Checkpoint
 

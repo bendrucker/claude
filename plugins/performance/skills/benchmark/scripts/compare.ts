@@ -6,6 +6,7 @@
 // per arm.
 
 import { mkdirSync, readdirSync } from "node:fs";
+import { loadavg } from "node:os";
 import { join } from "node:path";
 import { cli, command } from "cleye";
 import { table } from "table";
@@ -27,6 +28,7 @@ export interface Arm {
   times: number[];
   memory: number[];
   failures: number;
+  failedTimes?: number[];
 }
 
 export function median(values: number[]): number {
@@ -81,6 +83,7 @@ export function pool(exports: z.infer<typeof Export>[]): Arm[] {
       for (const [i, time] of result.times.entries()) {
         if (result.exit_codes[i] !== 0) {
           arm.failures++;
+          (arm.failedTimes ??= []).push(time);
           continue;
         }
         arm.times.push(time);
@@ -144,7 +147,7 @@ export function progress(arms: Arm[]): string {
   return arms
     .map(
       (a) =>
-        `${a.name} ${formatSeconds(median(a.times))}${a.failures > 0 ? ` (${a.failures} failed)` : ""}`,
+        `${a.name} ${a.times.length > 0 ? formatSeconds(median(a.times)) : "-"}${a.failures > 0 ? ` (${a.failures} failed${a.failedTimes ? ` at ${a.failedTimes.map(formatSeconds).join(", ")}` : ""})` : ""}`,
     )
     .join(", ");
 }
@@ -244,11 +247,13 @@ const runCmd = command(
         ...ordered.flatMap((a) => ["-n", a.name, a.command]),
       ];
       console.error(
-        `round ${round + 1}/${argv.flags.rounds}: ${ordered.map((a) => a.name).join(", ")}`,
+        `round ${round + 1}/${argv.flags.rounds}: ${ordered.map((a) => a.name).join(", ")} (load ${loadavg()[0]?.toFixed(1)})`,
       );
       const proc = Bun.spawnSync(args, { stdio: ["inherit", "ignore", "inherit"] });
       if (proc.exitCode !== 0)
-        throw new Error(`hyperfine exited ${proc.exitCode} in round ${round + 1}`);
+        throw new Error(
+          `hyperfine exited ${proc.exitCode} in round ${round + 1}, which it does when a run exits nonzero. Pass -i after -- to record the failed run instead`,
+        );
       // oxlint-disable-next-line no-await-in-loop -- rounds run one after another, and each reports before the next starts.
       const pooled = pool([Export.parse(await Bun.file(out).json())]);
       console.error(`  ${progress(pooled)}`);

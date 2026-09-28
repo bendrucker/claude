@@ -40,7 +40,7 @@ Pin the scenario before timing it. A run that changes its own input measures a d
 
 ## Arms
 
-Build every arm so it exists on disk at once: a `git worktree add tmp/base <ref>` per version, or a separate build output per arm. Interleaving needs both arms runnable in the same round, so switching branches between runs is out.
+Build every arm so it exists on disk at once: a `git worktree add <dir> <ref>` per version, or a separate build output per arm. Put each worktree outside the repo, since a test runner, linter, or watcher walking the tree picks up a nested checkout as part of the program. Interleaving needs both arms runnable in the same round, so switching branches between runs is out.
 
 Compare with the bundled script, which runs short `hyperfine` rounds in rotating order and pools them:
 

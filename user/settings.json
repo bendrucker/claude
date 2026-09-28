@@ -448,6 +448,7 @@
     "agent-browser@agent-browser": true,
     "plannotator@plannotator": true,
     "herdr@bendrucker": true,
+    "run-command@bendrucker": true,
     "1password@1password": true
   },
   "extraKnownMarketplaces": {
@@ -601,6 +602,7 @@
     "WORKTRUNK_WORKTREE_PATH": ".worktrees/{{ branch | sanitize }}",
     "CLAUDE_CODE_NO_FLICKER": "1",
     "NODE_USE_ENV_PROXY": "1",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "opus"
+    "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
+    "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1"
   }
 }

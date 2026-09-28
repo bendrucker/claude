@@ -357,6 +357,22 @@
         "natural": "^8.1.1",
       },
     },
+    "plugins/writing/evals/authoring": {
+      "name": "writing-authoring-eval",
+      "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
+        "cleye": "^2.2.1",
+        "simple-statistics": "^7.12.0",
+        "stemmer": "^2.0.1",
+        "table": "^6.9.0",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@hegeldev/hegel": "^0.4.7",
+        "@types/seedrandom": "^3.0.8",
+        "seedrandom": "^3.0.5",
+      },
+    },
     "plugins/x-callback-url": {
       "name": "x-callback-url",
       "dependencies": {
@@ -2781,6 +2797,8 @@
     "wrap-ansi-cjs": ["wrap-ansi@7.0.0", "", { "dependencies": { "ansi-styles": "^4.0.0", "string-width": "^4.1.0", "strip-ansi": "^6.0.0" } }, "sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q=="],
 
     "wrappy": ["wrappy@1.0.2", "", {}, "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ=="],
+
+    "writing-authoring-eval": ["writing-authoring-eval@workspace:plugins/writing/evals/authoring"],
 
     "ws": ["ws@8.21.3", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw=="],
 

@@ -251,6 +251,12 @@ async function show(target: string, from: number, to: number | undefined, trunca
   for (const line of render(splitLines(bytes, from).lines, truncate)) console.log(line);
 }
 
+function parseNumber(value: string, name: string): number {
+  const number = Number(value);
+  if (Number.isNaN(number)) throw new Error(`${name} must be a number, got ${value}`);
+  return number;
+}
+
 const watchCmd = defineCommand({
   meta: {
     name: "watch",
@@ -281,8 +287,8 @@ const watchCmd = defineCommand({
       target: args.target,
       stateDir: args.stateDir,
       fromStart: args.fromStart ?? false,
-      every: Number(args.every),
-      poll: Number(args.poll),
+      every: parseNumber(args.every, "--every"),
+      poll: parseNumber(args.poll, "--poll"),
     });
   },
 });
@@ -299,8 +305,9 @@ const showCmd = defineCommand({
     truncate: { type: "string", default: "500", description: "Maximum characters per line" },
   },
   async run({ args }) {
-    const to = args.to === undefined ? undefined : Number(args.to);
-    await show(args.target, Number(args.from), to, Number(args.truncate));
+    const to = args.to === undefined ? undefined : parseNumber(args.to, "to");
+    const from = parseNumber(args.from, "from");
+    await show(args.target, from, to, parseNumber(args.truncate, "--truncate"));
   },
 });
 
@@ -357,7 +364,7 @@ const trialCmd = defineCommand({
   subCommands: { start: trialStartCmd, end: trialEndCmd },
 });
 
-const main = defineCommand({
+export const main = defineCommand({
   meta: { name: "watch-session" },
   subCommands: { watch: watchCmd, show: showCmd, trial: trialCmd },
 });

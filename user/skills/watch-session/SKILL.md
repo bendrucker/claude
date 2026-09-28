@@ -1,7 +1,7 @@
 ---
 name: watch-session
 description: >-
-  Watch another Claude session and develop a skill from its turns: fix a skill under test as its runs expose defects, or draft a skill from a task done there by hand. Use when the user asks you to watch a herdr pane or session while they test a skill or demonstrate a task.
+  Use when the user asks you to watch a herdr pane or Claude session while they test a skill or do a task by hand, to fix that skill or draft a new one from what the session does. For writing a skill without a session to watch, use claude-code:skill.
 argument-hint: "<pane-id | session-uuid> [--skill <dir> | --learn <name>] [--prompt <text>] [--every <duration>]"
 disable-model-invocation: true
 allowed-tools:

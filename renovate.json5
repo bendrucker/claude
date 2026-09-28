@@ -39,6 +39,11 @@
       groupName: "oxlint",
     },
     {
+      // extra-typings pins its commander peer to one minor line (~15.0.0).
+      matchPackageNames: ["commander", "@commander-js/extra-typings"],
+      groupName: "commander",
+    },
+    {
       matchManagers: ["custom.regex"],
       matchFileNames: ["user/settings.json"],
       commitMessagePrefix: "chore(plugins):",

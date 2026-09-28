@@ -379,9 +379,12 @@ async function callModel(prompt: string, model: string): Promise<JudgeReply> {
     prompt,
     options: {
       model,
-      maxTurns: 1,
-      allowedTools: [],
+      // Structured output lands through a tool call, which takes a second turn.
+      maxTurns: 3,
+      tools: [],
       settingSources: [],
+      mcpServers: {},
+      strictMcpConfig: true,
       outputFormat: { type: "json_schema", schema: judgeReplySchema() },
     },
   })) {
@@ -841,7 +844,7 @@ if (import.meta.main) {
         model: { type: String, default: "claude-sonnet-5", description: "Judge model" },
         prompt: {
           type: String,
-          default: join(import.meta.dirname, "..", "judge-prompt.md"),
+          default: join(import.meta.dirname, "judge-prompt.md"),
           description: "Judge prompt template",
         },
         concurrency: { type: Number, default: 4, description: "Judge calls in flight" },

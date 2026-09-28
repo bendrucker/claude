@@ -1,1 +1,1 @@
-Create the PR. This is my own repo. Switch to `go install` for terraform-config-inspect and pin the version. Upstream commit 81db043a requires go@1.18, only for the Go API not CLI use, so pin the last version before that break. Closes #7, #6.
+Create the PR. This is my own repo. Switch to `go install` for terraform-config-inspect and pin the version. Upstream commit 81db043a requires go@1.18, only for the Go API not CLI use, so pin the last version before that break. Moving back to latest later would break anyone below 1.18. Closes #7, #6.

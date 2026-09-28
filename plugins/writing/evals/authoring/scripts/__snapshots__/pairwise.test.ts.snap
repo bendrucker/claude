@@ -1,0 +1,28 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`scoreJudgments / formatScore formatScore snapshot 1`] = `
+"* marks p < 0.1 against a 0.5 win rate for the candidate (sign-flip permutation test)
+╔══════════╤═══╤══════════════╤═══════╗
+║ case     │ n │ win rate (b) │ p     ║
+╟──────────┼───┼──────────────┼───────╢
+║ pr-quiet │ 2 │ 100%         │ 0.498 ║
+╟──────────┼───┼──────────────┼───────╢
+║ overall  │ 2 │ 100%         │ 0.494 ║
+╚══════════╧═══╧══════════════╧═══════╝
+
+left-slot pick share (position bias): 50%"
+`;
+
+exports[`compareLabels / agreementOf / calibrate / formatCalibration formatCalibration snapshot 1`] = `
+"agreement excludes pairs either side called a tie (reported as ties); pass requires >= 75%
+╔═════════╤═════════╤══════╤═══════════╤══════════════╤═════════╗
+║ surface │ decided │ ties │ agreement │ 95% interval │ verdict ║
+╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
+║ doc     │ 0       │ 1    │ -         │ 0% - 100%    │ fail    ║
+╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
+║ pr      │ 2       │ 0    │ 50%       │ 9% - 91%     │ fail    ║
+╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
+║ overall │ 2       │ 1    │ 50%       │ 9% - 91%     │ fail    ║
+╚═════════╧═════════╧══════╧═══════════╧══════════════╧═════════╝
+"
+`;

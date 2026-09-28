@@ -81,6 +81,41 @@ Everything autosaves to `feedback/<id>.json`.
 
 The UI is a single-file labeling server serving the paired view.
 
+### Pairwise mode
+
+The same server also runs blind A/B/tie review over `Pair` records (the
+`plugins/writing/evals/authoring/scripts/pairs.ts` schema), for judging one
+draft against another rather than an input against its rewrite:
+
+```bash
+bun plugins/writing/evals/writing/label/server.ts \
+  --pairs plugins/writing/evals/authoring/data/pairs \
+  --feedback plugins/writing/evals/authoring/feedback
+```
+
+`--pairs` points at a directory of `Pair` json files and switches the server
+into pairwise mode; `--data` (single-draft mode) is ignored when `--pairs` is
+set. One pair is shown at a time, brief collapsed by default, both drafts
+rendered as raw markdown source in a monospace view (Ben judges the raw
+deliverable, not a rendered one). Which key sits on the left is randomized
+per pair, deterministically from the pair id, so a reload keeps the same
+layout. The UI never shows which system produced which draft: `source` is
+stripped from both drafts before the server sends them to the browser.
+
+Per pair you can:
+
+- Pick Left, Right, or Tie (keys `1`/`2`/`3`), or move between pairs with the
+  arrow keys or `j`/`k`.
+- Select any span in either draft to mark a severity (critical / minor /
+  praise) with an optional note.
+- Write freeform notes.
+
+A progress counter shows labeled / total, and "next unlabeled" jumps to the
+next pair without a pick. Everything autosaves to `feedback/<id>.json` as a
+`Label` record (validated against the same `pairs.ts` schema) once a pick is
+made; spans and notes update in memory immediately but only persist once
+there's a pick to attach them to.
+
 ### 3. Derive the rubric (after labeling)
 
 Once a batch is labeled, the recurring critical spans and tags become
@@ -118,5 +153,6 @@ committed revision so both outputs are judged by the same detector.
 - `scripts/mine.ts`: probes the index, builds `data/samples.json` from `drafts/`
 - `scripts/mine.test.ts`: property and table tests over the pure helpers
 - `drafts/`: synthetic `(input, output)` pairs, seeded with both failure modes (tracked)
-- `label/server.ts`, `label/index.html`: the paired review UI (inline span comments, verdict, tags, notes)
+- `label/server.ts`, `label/index.html`: the review UI, single-draft mode (inline span comments, verdict, tags, notes) and pairwise mode (blind A/B/tie, span comments, notes)
+- `label/server.test.ts`: server tests for pairwise mode (Label validation, source stripped from the browser payload, deterministic left assignment)
 - `data/`, `feedback/`: generated or local-only (gitignored)

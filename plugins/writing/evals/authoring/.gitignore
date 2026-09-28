@@ -1,0 +1,4 @@
+# Mined originals and run artifacts: local-only, rebuilt by scripts/mine.ts.
+data/
+feedback/
+results/

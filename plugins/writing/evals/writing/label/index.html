@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>writing:rewrite review</title>
+    <title>writing eval labeler</title>
     <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
     <style>
       :root {
@@ -99,6 +99,16 @@
       .saved { font-size: 11px; color: var(--praise); }
       .topbar { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; }
       .topbar .spacer { flex: 1; }
+      .kbd { font-size: 11px; color: var(--muted); }
+      /* Pairwise mode */
+      .brief { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px; margin: 12px 0 18px; }
+      .brief summary { cursor: pointer; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+      .brief pre { white-space: pre-wrap; margin: 10px 0 4px; font: 13px/1.6 -apple-system, sans-serif; }
+      .pairwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+      .pairdoc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 0; font: 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+      .pickrow { display: flex; gap: 8px; }
+      .pickrow button { flex: 1; }
+      .pickrow button.on { background: var(--accent); color: #06121f; border-color: var(--accent); }
     </style>
   </head>
   <body>
@@ -134,6 +144,12 @@
       let pending = null; // pending new annotation {field, start, end, quote}
       let pendingSev = "critical";
 
+      // Pairwise mode: blind A/B/tie review over Pair records.
+      let pairs = [];
+      let labels = {}; // id -> Label {pick, left, spans[], notes}
+      let currentIdx = 0;
+      let pendingPair = null; // pending new span {key, start, end, text}
+
       const $ = (s, r = document) => r.querySelector(s);
       const $$ = (s, r = document) => [...r.querySelectorAll(s)];
       const el = (t, props = {}, kids = []) => {
@@ -142,7 +158,7 @@
         return n;
       };
 
-      async function boot() {
+      async function bootDraft() {
         samples = await (await fetch("/api/samples")).json();
         feedback = await (await fetch("/api/feedback")).json();
         for (const s of samples) feedback[s.id] ??= { verdict: null, tags: [], notes: "", annotations: [] };
@@ -388,7 +404,238 @@
         a.click();
       }
 
-      boot();
+      // ---- pairwise mode ----
+      function lbl(id) { return labels[id]; }
+      function rightKeyOf(p) { return p.left === "a" ? "b" : "a"; }
+      function pickKeyFor(p, choice) {
+        if (choice === "tie") return "tie";
+        return choice === "left" ? p.left : rightKeyOf(p);
+      }
+
+      async function bootPairs() {
+        pairs = await (await fetch("/api/pairs")).json();
+        const saved = await (await fetch("/api/labels")).json();
+        for (const p of pairs) {
+          labels[p.id] = saved[p.id] ?? { id: p.id, pick: null, left: p.left, spans: [], notes: "" };
+        }
+        renderPairsNav();
+        selectPair(0);
+        wirePairsPopover();
+        wirePairsKeys();
+      }
+
+      function selectPair(i) {
+        currentIdx = ((i % pairs.length) + pairs.length) % pairs.length;
+        renderPairsNav();
+        renderPairMain();
+      }
+
+      function jumpToUnlabeled() {
+        for (let step = 1; step <= pairs.length; step++) {
+          const i = (currentIdx + step) % pairs.length;
+          if (!lbl(pairs[i].id).pick) return selectPair(i);
+        }
+      }
+
+      function renderPairsNav() {
+        const done = pairs.filter((p) => lbl(p.id).pick).length;
+        $("#progress").innerHTML = `<b>${done}</b> / ${pairs.length} labeled &nbsp;·&nbsp; <a href="#" id="nextUnlabeled">next unlabeled</a>`;
+        $("#nextUnlabeled").onclick = (e) => { e.preventDefault(); jumpToUnlabeled(); };
+        const nav = $("#nav");
+        nav.innerHTML = "";
+        pairs.forEach((p, i) => {
+          const f = lbl(p.id);
+          const item = el("div", { className: "navitem" + (i === currentIdx ? " active" : "") });
+          item.onclick = () => selectPair(i);
+          const dot = el("span", { className: "verdict-dot" + (f.pick ? " good" : "") });
+          item.append(
+            el("div", { className: "row1" }, [
+              el("span", { className: "badge", textContent: p.surface }),
+              el("span", { textContent: p.id }),
+              dot,
+            ]),
+            el("div", { className: "title", textContent: p.brief.slice(0, 70) }),
+          );
+          nav.append(item);
+        });
+      }
+
+      function renderPairDoc(side, text) {
+        const wrap = el("div");
+        wrap.append(el("div", { className: "section-label", textContent: side === "left" ? "Left" : "Right" }));
+        const doc = el("pre", { className: "pairdoc", id: `doc-${side}`, textContent: text });
+        doc.dataset.side = side;
+        wrap.append(doc);
+        return wrap;
+      }
+
+      function renderPairMain() {
+        const p = pairs[currentIdx];
+        const f = lbl(p.id);
+        const main = $("#main");
+        main.innerHTML = "";
+
+        main.append(el("div", { className: "topbar" }, [
+          el("span", { className: "badge", textContent: p.surface }),
+          el("span", { className: "meta", textContent: `${p.id} · ${p.case}` }),
+          el("span", { className: "spacer" }),
+          el("span", { className: "kbd", textContent: "1 left · 2 right · 3 tie · j/k prev/next" }),
+          el("span", { className: "saved", id: "savedFlag" }),
+        ]));
+
+        const brief = el("details", { className: "brief" });
+        brief.append(el("summary", { textContent: "Brief" }), el("pre", { textContent: p.brief }));
+        main.append(brief);
+
+        const wrap = el("div", { className: "pairwrap" });
+        wrap.append(renderPairDoc("left", p[p.left].text), renderPairDoc("right", p[rightKeyOf(p)].text));
+        main.append(wrap);
+
+        main.append(renderPairRail(p, f));
+        requestAnimationFrame(applyPairHighlights);
+      }
+
+      function renderPairRail(p, f) {
+        const rail = el("div", { className: "rail" });
+
+        const pCard = el("div", { className: "card" });
+        pCard.append(el("h3", { textContent: "Pick" }));
+        const prow = el("div", { className: "pickrow" });
+        for (const choice of ["left", "right", "tie"]) {
+          const key = pickKeyFor(p, choice);
+          const b = el("button", { className: "btn" + (f.pick === key ? " on" : ""), textContent: choice });
+          b.onclick = () => setPick(p, choice);
+          prow.append(b);
+        }
+        pCard.append(prow);
+
+        const nCard = el("div", { className: "card", style: "grid-column: 1 / -1" });
+        nCard.append(el("h3", { textContent: "Notes" }));
+        const ta = el("textarea", { id: "notes", value: f.notes, placeholder: "Freeform notes on this pair." });
+        ta.oninput = () => { f.notes = ta.value; savePair(p.id); };
+        nCard.append(ta);
+
+        const sCard = el("div", { className: "card annlist" });
+        sCard.append(el("h3", { textContent: `Spans (${f.spans.length})` }));
+        if (!f.spans.length) sCard.append(el("div", { className: "meta", textContent: "Select text in either draft to mark a span." }));
+        f.spans.forEach((s, i) => {
+          const row = el("div", { className: "ann " + s.severity });
+          const del = el("span", { className: "del", textContent: "✕" });
+          del.onclick = () => { f.spans.splice(i, 1); savePair(p.id); renderPairMain(); renderPairsNav(); };
+          row.append(del, el("div", { className: "q", textContent: `“${s.text}”` }));
+          if (s.note) row.append(el("div", { className: "c", textContent: s.note }));
+          sCard.append(row);
+        });
+
+        rail.append(pCard, nCard, sCard);
+        return rail;
+      }
+
+      function setPick(p, choice) {
+        const f = lbl(p.id);
+        f.pick = pickKeyFor(p, choice);
+        savePair(p.id);
+        renderPairMain();
+        renderPairsNav();
+      }
+
+      function applyPairHighlights() {
+        if (!window.Highlight || !CSS.highlights) return;
+        CSS.highlights.clear();
+        const p = pairs[currentIdx];
+        const sideForKey = { [p.left]: "left", [rightKeyOf(p)]: "right" };
+        const buckets = { critical: [], minor: [], praise: [] };
+        for (const s of lbl(p.id).spans) {
+          const doc = $(`#doc-${sideForKey[s.key]}`);
+          if (!doc) continue;
+          const r = rangeFor(doc, s.start, s.end);
+          if (r) buckets[s.severity]?.push(r);
+        }
+        for (const sev of Object.keys(buckets)) {
+          if (buckets[sev].length) CSS.highlights.set(sev, new Highlight(...buckets[sev]));
+        }
+      }
+
+      function wirePairsPopover() {
+        const pop = $("#pop");
+        document.addEventListener("mouseup", (ev) => {
+          if (pop.contains(ev.target)) return;
+          const sel = window.getSelection();
+          if (!sel.rangeCount || sel.isCollapsed) return;
+          const r = sel.getRangeAt(0);
+          const doc = [$("#doc-left"), $("#doc-right")].find((d) => d && d.contains(r.commonAncestorContainer));
+          if (!doc) { pop.style.display = "none"; return; }
+          const nodes = textNodes(doc);
+          const start = globalOffset(nodes, r.startContainer, r.startOffset);
+          const end = globalOffset(nodes, r.endContainer, r.endOffset);
+          if (start == null || end == null || end <= start) return;
+          const p = pairs[currentIdx];
+          const key = doc.dataset.side === "left" ? p.left : rightKeyOf(p);
+          pendingPair = { key, start, end, text: sel.toString().trim() };
+          pendingSev = "critical";
+          $("#popQuote").textContent = `“${pendingPair.text.slice(0, 140)}”`;
+          $("#popText").value = "";
+          setSev("critical");
+          const rect = r.getBoundingClientRect();
+          pop.style.display = "block";
+          pop.style.top = window.scrollY + rect.bottom + 8 + "px";
+          pop.style.left = Math.min(window.scrollX + rect.left, window.innerWidth - 300) + "px";
+          $("#popText").focus();
+        });
+        $$(".sevbtn").forEach((b) => (b.onclick = () => setSev(b.dataset.sev)));
+        $("#popCancel").onclick = () => { pop.style.display = "none"; window.getSelection().removeAllRanges(); };
+        $("#popSave").onclick = commitPairPending;
+        $("#popText").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) commitPairPending(); });
+      }
+
+      function commitPairPending() {
+        if (!pendingPair) return;
+        const p = pairs[currentIdx];
+        const f = lbl(p.id);
+        f.spans.push({ ...pendingPair, severity: pendingSev, note: $("#popText").value.trim() });
+        f.spans.sort((a, b) => a.key.localeCompare(b.key) || a.start - b.start);
+        pendingPair = null;
+        $("#pop").style.display = "none";
+        window.getSelection().removeAllRanges();
+        savePair(p.id);
+        renderPairMain();
+        renderPairsNav();
+      }
+
+      function wirePairsKeys() {
+        document.addEventListener("keydown", (e) => {
+          if (["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
+          if ($("#pop").style.display === "block") return;
+          const p = pairs[currentIdx];
+          if (e.key === "1") setPick(p, "left");
+          else if (e.key === "2") setPick(p, "right");
+          else if (e.key === "3") setPick(p, "tie");
+          else if (e.key === "ArrowRight" || e.key === "j") selectPair(currentIdx + 1);
+          else if (e.key === "ArrowLeft" || e.key === "k") selectPair(currentIdx - 1);
+        });
+      }
+
+      let pairSaveTimer = null;
+      function savePair(id) {
+        const f = lbl(id);
+        const flag = $("#savedFlag");
+        if (!f.pick) { if (flag) flag.textContent = "pick to save"; return; }
+        if (flag) flag.textContent = "saving…";
+        clearTimeout(pairSaveTimer);
+        pairSaveTimer = setTimeout(async () => {
+          await fetch("/api/labels", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(f),
+          });
+          const f2 = $("#savedFlag");
+          if (f2) { f2.textContent = "saved ✓"; setTimeout(() => { if ($("#savedFlag") === f2) f2.textContent = ""; }, 1200); }
+        }, 350);
+      }
+
+      fetch("/api/mode")
+        .then((r) => r.json())
+        .then(({ mode }) => (mode === "pairs" ? bootPairs() : bootDraft()));
     </script>
   </body>
 </html>

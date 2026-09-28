@@ -1,0 +1,1 @@
+Create the PR. This is a TakeScoop repo. CircleCI's default machine image can no longer pull from GitHub: old OpenSSH, GitHub rejects the RSA/SHA-1 host key. https://discuss.circleci.com/t/discussion-and-resolution-for-error-youre-using-an-rsa-key-with-sha-1-which-is-no-longer-allowed/42572

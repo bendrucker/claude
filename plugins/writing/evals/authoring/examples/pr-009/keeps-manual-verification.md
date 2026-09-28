@@ -1,0 +1,33 @@
+---
+fail: [keeps-manual-verification]
+---
+<out>
+Title: `user`: handle unknown superuser passwords
+
+Currently, it's not possible to define configuration like this:
+
+```tf
+resource "redshift_user" "terraform" {
+  name      = "terraform"
+  superuser = true
+  password  = random_password.terraform.result
+}
+
+resource "random_password" "terraform" {
+  length      = 64
+  min_lower   = 1
+  min_upper   = 1
+  min_numeric = 1
+}
+```
+
+Given this configuration, the provider returns an error:
+
+```
+Users that are superusers must define a password.
+```
+
+Upon further investigation, this error is returned from `CustomizeDiff`. This hook runs before a plan is rendered. This means that on first run, before the `Create` method for `random_password` has run, the value for `result` is not yet known.
+
+`GetOk` will still return `_, true`, because it is known that some value is set. When the value is unknown, `Get` will return the zero value. Any plan time inspection can only occur when the new value is known at plan time.
+</out>

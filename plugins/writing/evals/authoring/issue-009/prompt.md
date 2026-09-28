@@ -1,0 +1,1 @@
+File an issue on TakeScoop/terraform-cloud-outputs-action, not my repo. Argue for renaming the module to something like `terraform-cloud-outputs-action`: "remote state" names the mechanism (fetch a whole TFC state, then pull outputs), not what this action returns, which is just outputs, closer to Terraform's `data.tfe_outputs` than `data.terraform_remote_state`.

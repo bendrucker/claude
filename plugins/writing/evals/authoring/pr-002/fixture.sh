@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+set -euo pipefail
+git init -q -b master
+# The Linux sandbox mounts placeholder dotfiles into the working tree.
+echo "/.*" >> .git/info/exclude
+echo "!/.circleci" >> .git/info/exclude
+git config user.name "Ben Drucker"
+git config user.email bvdrucker@gmail.com
+git config commit.gpgsign false
+git remote add origin https://github.com/TakeScoop/artifactory-orb.git
+# The sandbox has no network, so pushes land in a local bare repo.
+git init -q --bare .git/origin.git
+git remote set-url --push origin "$PWD/.git/origin.git"
+mkdir -p .circleci src/executors
+cat > .circleci/config.yml <<'YAML'
+version: 2.1
+
+orbs:
+  # Replace this with your own!
+  npm: takescoop/artifactory@<<pipeline.parameters.dev-orb-version>>
+  orb-tools: circleci/orb-tools@10.0
+  bats: circleci/bats@1.0
+  shellcheck: circleci/shellcheck@2.0
+
+# Pipeline Parameters
+## These parameters are used internally by orb-tools. Skip to the Jobs section.
+parameters:
+  run-integration-tests:
+    description: An internal flag to prevent integration test from running before a development version has been created.
+    type: boolean
+    default: false
+  dev-orb-version:
+    description: >
+      The development version of the orb to test.
+      This value is automatically adjusted by the "trigger-integration-tests-workflow" job to correspond with the specific version created by the commit and should not be edited.
+      A "dev:alpha" version must exist for the initial pipeline run.
+    type: string
+    default: "dev:alpha"
+
+jobs:
+  # Define one or more jobs which will utilize your orb's commands and parameters to validate your changes.
+  integration-test-1:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+
+workflows:
+  # Prior to producing a development orb (which requires credentials) basic validation, linting, and even unit testing can be performed.
+  # This workflow will run on every commit
+  test-pack:
+    unless: << pipeline.parameters.run-integration-tests >>
+    jobs:
+      - orb-tools/lint # Lint Yaml files
+      - orb-tools/pack # Pack orb source
+      # Publish development version(s) of the orb.
+      - orb-tools/publish-dev:
+          orb-name: takescoop/artifactory
+          context: orb-publish # A restricted context containing your private publishing credentials. Will only execute if approved by an authorized user.
+          requires:
+            - orb-tools/lint
+            - orb-tools/pack
+      # Trigger an integration workflow to test the
+      # dev:${CIRCLE_SHA1:0:7} version of your orb
+      - orb-tools/trigger-integration-tests-workflow:
+          name: trigger-integration-dev
+          context: orb-publish
+          requires:
+            - orb-tools/publish-dev
+
+  # This `integration-test_deploy` workflow will only run
+  # when the run-integration-tests pipeline parameter is set to true.
+  # It is meant to be triggered by the "trigger-integration-tests-workflow"
+  # job, and run tests on <your orb>@dev:${CIRCLE_SHA1:0:7}.
+  integration-test_deploy:
+    when: << pipeline.parameters.run-integration-tests >>
+    jobs:
+      # Run any integration tests defined within the `jobs` key.
+      - integration-test-1
+      # Publish a semver version of the orb. relies on
+      # the commit subject containing the text "[semver:patch|minor|major|skip]"
+      # as that will determine whether a patch, minor or major
+      # version will be published or if publishing should
+      # be skipped.
+      # e.g. [semver:patch] will cause a patch version to be published.
+      - orb-tools/dev-promote-prod-from-commit-subject:
+          orb-name: takescoop/artifactory
+          context: orb-publish
+          add-pr-comment: false
+          fail-if-semver-not-indicated: true
+          publish-version-tag: false
+          requires:
+            - integration-test-1
+          filters:
+            branches:
+              only:
+                - master
+                - main
+YAML
+cat > src/executors/machine.yml <<'YAML'
+description: >
+  A machine executor that can run Docker commands:
+  https://circleci.com/docs/2.0/executor-types/#using-machine
+
+machine: true
+YAML
+git add -A && git commit -qm "Initial state"
+git switch -qc machine-image
+cat > .circleci/config.yml <<'YAML'
+version: 2.1
+
+orbs:
+  orb-tools: circleci/orb-tools@10.0
+  bats: circleci/bats@1.0
+  shellcheck: circleci/shellcheck@2.0
+
+# Pipeline Parameters
+## These parameters are used internally by orb-tools. Skip to the Jobs section.
+parameters:
+  run-integration-tests:
+    description: An internal flag to prevent integration test from running before a development version has been created.
+    type: boolean
+    default: false
+  dev-orb-version:
+    description: >
+      The development version of the orb to test.
+      This value is automatically adjusted by the "trigger-integration-tests-workflow" job to correspond with the specific version created by the commit and should not be edited.
+      A "dev:alpha" version must exist for the initial pipeline run.
+    type: string
+    default: "dev:alpha"
+
+jobs:
+  # Define one or more jobs which will utilize your orb's commands and parameters to validate your changes.
+  integration-test-1:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+
+workflows:
+  # Prior to producing a development orb (which requires credentials) basic validation, linting, and even unit testing can be performed.
+  # This workflow will run on every commit
+  test-pack:
+    unless: << pipeline.parameters.run-integration-tests >>
+    jobs:
+      - orb-tools/lint # Lint Yaml files
+      - orb-tools/pack # Pack orb source
+      # Publish development version(s) of the orb.
+      - orb-tools/publish-dev:
+          orb-name: takescoop/artifactory
+          context: orb-publish # A restricted context containing your private publishing credentials. Will only execute if approved by an authorized user.
+          requires:
+            - orb-tools/lint
+            - orb-tools/pack
+      # Trigger an integration workflow to test the
+      # dev:${CIRCLE_SHA1:0:7} version of your orb
+      - orb-tools/trigger-integration-tests-workflow:
+          name: trigger-integration-dev
+          context: orb-publish
+          requires:
+            - orb-tools/publish-dev
+
+  # This `integration-test_deploy` workflow will only run
+  # when the run-integration-tests pipeline parameter is set to true.
+  # It is meant to be triggered by the "trigger-integration-tests-workflow"
+  # job, and run tests on <your orb>@dev:${CIRCLE_SHA1:0:7}.
+  integration-test_deploy:
+    when: << pipeline.parameters.run-integration-tests >>
+    jobs:
+      # Run any integration tests defined within the `jobs` key.
+      - integration-test-1
+      # Publish a semver version of the orb. relies on
+      # the commit subject containing the text "[semver:patch|minor|major|skip]"
+      # as that will determine whether a patch, minor or major
+      # version will be published or if publishing should
+      # be skipped.
+      # e.g. [semver:patch] will cause a patch version to be published.
+      - orb-tools/dev-promote-prod-from-commit-subject:
+          orb-name: takescoop/artifactory
+          context: orb-publish
+          add-pr-comment: false
+          fail-if-semver-not-indicated: true
+          publish-version-tag: false
+          requires:
+            - integration-test-1
+          filters:
+            branches:
+              only:
+                - master
+                - main
+YAML
+cat > src/executors/machine.yml <<'YAML'
+description: >
+  A machine executor that can run Docker commands:
+  https://circleci.com/docs/2.0/executor-types/#using-machine
+
+machine:
+  image: ubuntu-2004:202111-02
+YAML
+git commit -qam "executor: set machine image [semver:patch]"

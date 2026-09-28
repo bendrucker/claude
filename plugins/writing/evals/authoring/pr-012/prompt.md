@@ -1,0 +1,1 @@
+Create the PR. This is an upstream PR to cloudposse/terraform-aws-datadog-integration. #42 already needs the datadog provider version this bumps to, without pinning it, so pin it explicitly. Without the pin, an older provider fails at runtime with an unexpected attribute error instead of stopping cleanly at terraform init.

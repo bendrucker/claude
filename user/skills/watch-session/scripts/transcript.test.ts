@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import * as fc from "fast-check";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { render, splitLines, TurnTracker } from "./transcript";
 
 const encoder = new TextEncoder();
@@ -121,13 +122,12 @@ describe("splitLines", () => {
   test("reads cut at any byte yield the same lines as one read", () => {
     const bytes = jsonl(session);
     const whole = splitLines(bytes, 0).lines;
-    fc.assert(
-      fc.property(fc.integer({ min: 0, max: bytes.length }), (cut) => {
-        const head = splitLines(bytes.subarray(0, cut), 0);
-        const tail = splitLines(bytes.subarray(head.consumed), head.consumed);
-        expect([...head.lines, ...tail.lines]).toEqual(whole);
-      }),
-    );
+    hegel.test((tc) => {
+      const cut = tc.draw(gs.integers({ minValue: 0, maxValue: bytes.length }));
+      const head = splitLines(bytes.subarray(0, cut), 0);
+      const tail = splitLines(bytes.subarray(head.consumed), head.consumed);
+      expect([...head.lines, ...tail.lines]).toEqual(whole);
+    });
   });
 
   test("skips lines that are not JSON", () => {

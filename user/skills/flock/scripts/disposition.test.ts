@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import type { BoardPull, BoardRow, Disposition, RowState } from "./board";
-import { classify, collapsedLines, countLine, groupByDisposition, pullFlags } from "./disposition";
+import {
+  classify,
+  collapsedLines,
+  countLine,
+  groupByDisposition,
+  locationLines,
+  pullFlags,
+  renderSections,
+} from "./disposition";
 import type { PullState } from "./forge";
 
 function pull(overrides: Partial<BoardPull> = {}): BoardPull {
@@ -24,7 +32,7 @@ function state(overrides: Partial<RowState> = {}): RowState {
     pullUnknown: false,
     status: "clean",
     unpushed: 0,
-    carried: 0,
+    carried: [],
     mergedBranch: false,
     reused: false,
     ...overrides,
@@ -46,6 +54,7 @@ function row(overrides: Partial<BoardRow> = {}): BoardRow {
     branch: "topic",
     detached: false,
     worktree: "/wt/topic",
+    clone: "/src/claude",
     pull: null,
     prColumn: "-",
     age: 0,
@@ -158,8 +167,16 @@ describe("a merged pull request", () => {
       expected: "parked",
     },
     {
-      name: "leaving only carried files is parked",
-      row: row({ pull: merged, state: state({ carried: 10 }) }),
+      name: "leaving only ignored files is a cleanup that names them",
+      row: row({
+        pull: merged,
+        state: state({ carried: ["tmp/", "bootstrap/terraform.tfstate.backup"] }),
+      }),
+      expected: "cleanup",
+    },
+    {
+      name: "leaving an uncommitted tree beside ignored files is parked",
+      row: row({ pull: merged, state: state({ status: "dirty", carried: ["tmp/"] }) }),
       expected: "parked",
     },
     {
@@ -204,7 +221,7 @@ describe("a detached worktree", () => {
     { name: "with nothing above the base parks", row: detached(), expected: "parked" },
     {
       name: "is never offered for cleanup",
-      row: detached({ carried: 1 }),
+      row: detached({ carried: ["tmp/"] }),
       expected: "parked",
     },
   ])("$name", ({ row: subject, expected }) => {
@@ -480,5 +497,55 @@ describe("the report", () => {
   test("an empty board says so rather than printing a bare header", () => {
     expect(countLine(groupByDisposition([]))).toBe("nothing on the board");
     expect(collapsedLines(groupByDisposition([]))).toEqual([]);
+  });
+});
+
+describe("a rendered row's location", () => {
+  const home = "/Users/me";
+  const located = (overrides: Partial<BoardRow> = {}, carried: string[] = []): BoardRow =>
+    row({
+      worktree: "/Users/me/.herdr/worktrees/dotfiles/topic",
+      clone: "/Users/me/src/bendrucker/dotfiles",
+      state: state({ carried }),
+      ...overrides,
+    });
+
+  test("names the worktree and the clone a removal runs from", () => {
+    expect(locationLines(located(), home)).toEqual([
+      "  at ~/.herdr/worktrees/dotfiles/topic from ~/src/bendrucker/dotfiles",
+    ]);
+  });
+
+  test("lists what a removal would delete, capped with a count", () => {
+    const carried = Array.from({ length: 10 }, (_, index) => `f${index}`);
+    expect(locationLines(located({}, carried), home)[1]).toBe(
+      "  carries f0 f1 f2 f3 f4 f5 f6 f7 +2",
+    );
+  });
+
+  test("a pane row has no location", () => {
+    expect(locationLines(row({ kind: "pane", worktree: null, clone: null }), home)).toEqual([]);
+  });
+
+  test("follows a cleanup row, and only a cleanup row", () => {
+    const rendered = renderSections(
+      groupByDisposition([
+        located({ branch: "rebase-me", flags: ["conflicting"], disposition: "needs-you" }),
+        located({ branch: "tfstate", flags: ["merged", "carries:1"], disposition: "cleanup" }, [
+          "bootstrap/terraform.tfstate.backup",
+        ]),
+      ]),
+      home,
+    );
+    expect(rendered.slice(1)).toMatchInlineSnapshot(`
+      [
+        "needs you",
+        "-         -      -              claude                   rebase-me                  -             0    conflicting",
+        "clean up",
+        "-         -      -              claude                   tfstate                    -             0    merged,carries:1",
+        "  at ~/.herdr/worktrees/dotfiles/topic from ~/src/bendrucker/dotfiles",
+        "  carries bootstrap/terraform.tfstate.backup",
+      ]
+    `);
   });
 });

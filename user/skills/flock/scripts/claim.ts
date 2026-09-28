@@ -281,7 +281,7 @@ async function scanWorktree(
 ): Promise<{
   status: ReturnType<typeof readStatus>;
   ahead: number | null;
-  carried: number;
+  carried: string[];
   commit: number | null;
   merged: boolean;
 }> {
@@ -302,7 +302,7 @@ async function scanWorktree(
   return {
     status: readStatus(status),
     ahead,
-    carried: carried.length,
+    carried,
     commit,
     merged: cherry !== null && isMergedBranch(cherry),
   };
@@ -365,7 +365,7 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
         detached: record.branch === null,
         status: scan.status,
         ahead: scan.ahead,
-        carried: scan.carried,
+        carried: scan.carried.length,
         merged: scan.merged,
         reused,
         pull: pull === undefined ? [] : pullFlags(pull),
@@ -392,6 +392,7 @@ async function scanRepository(ctx: Context, repository: Repository): Promise<Rep
         branch: record.branch,
         detached: record.branch === null,
         worktree: record.path,
+        clone: root,
         pull:
           pull === undefined
             ? null
@@ -562,6 +563,7 @@ function idlePaneRows(
       branch: null,
       detached: false,
       worktree: null,
+      clone: null,
       pull: null,
       prColumn: "-",
       age: null,
@@ -573,7 +575,7 @@ function idlePaneRows(
         pullUnknown: false,
         status: "clean",
         unpushed: 0,
-        carried: 0,
+        carried: [],
         mergedBranch: false,
         reused: false,
       },
@@ -716,7 +718,7 @@ async function board(json: boolean): Promise<string> {
     ...statusLines(flockWorkspace, self, selfWorkspace),
     "",
     ...(warnings.length === 0 ? [] : [...warnings.map((warning) => `incomplete: ${warning}`), ""]),
-    renderBoard(allRows),
+    renderBoard(allRows, home),
     ...(deferrals.length === 0 ? [] : ["", ...deferrals]),
   ].join("\n");
 }

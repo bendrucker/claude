@@ -275,7 +275,7 @@ describe("carriedIgnoredPaths", () => {
       await Bun.write(join(root, "src/main.ts"), "");
       await spawnRun(["git", "init", "-q"], { cwd: root });
 
-      expect((await carriedIgnoredPaths(spawnRun, root)).toSorted()).toEqual([".env", "data/"]);
+      expect(await carriedIgnoredPaths(spawnRun, root)).toEqual([".env", "data/"]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }

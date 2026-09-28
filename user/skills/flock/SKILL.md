@@ -6,6 +6,7 @@ argument-hint: "[focus hint]"
 disable-model-invocation: true
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/claim.ts)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/claim.ts --json)
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/defer.ts:*)
   - AskUserQuestion
   - Bash(herdr agent get:*)
@@ -43,7 +44,9 @@ The PR column reads `#N`, `draft#N`, `merged#N`, `-`, or `?`. The REPO column re
 
 FLAGS reads `clean` or a comma-joined list, forge state first. `failing:lint,build` names the jobs that went red, capped at three plus a count. `running` means CI has not finished, `conflicting` and `behind` come from the merge state, `blocked` marks a green pull request some other gate holds, `approved` and `changes-requested` come from the review, `checks:none` means the pull request runs no checks at all, and `checks:?` means the forge would not say.
 
-The checkout flags follow. `merged` and `occupied` leave a row clear for cleanup, and every other flag holds it. Not self-evident: `carries:N` counts gitignored files a recursive removal would take, `occupied` means an agent is sitting in the pane, `reused` means the `merged#N` beside it belongs to different work under a recycled branch name, and `unreadable` or `unpushed:?` mean git would not report the state at all, which raises the row rather than parking it.
+The checkout flags follow. `merged`, `occupied`, and `carries:N` leave a row clear for cleanup, and every other flag holds it. Not self-evident: `carries:N` counts gitignored files a removal would delete, regenerable caches like `node_modules/` and `.terraform/` excluded, `occupied` means an agent is sitting in the pane, `reused` means the `merged#N` beside it belongs to different work under a recycled branch name, and `unreadable` or `unpushed:?` mean git would not report the state at all, which raises the row rather than parking it.
+
+Each `clean up` row is followed by an `at <worktree> from <clone>` line naming the checkout that owns it, and a `carries` line listing the ignored paths when there are any. A repository can have more than one clone, so run the removal from the clone the row names. `claim.ts --json` carries `worktree`, `clone`, and `branch` for every row.
 
 `unpushed:N` counts commits the forge does not have. A row with a pull request is counted against the commit that pull request carries, so a branch whose merge deleted its remote still reads as fully pushed.
 
@@ -79,9 +82,11 @@ Below the bar, the row is a report. Name the failing job, the reviewer's finding
 
 Check the rendered rows against the deferred keys first. A deferred row is held unless the state block re-raised it as stale.
 
-**Clean up.** Merged with nothing left in the tree. Confirm the pane first, because a removal takes the tree out from under whoever is in it. `herdr agent get` settles an empty one. An `occupied` row needs `herdr agent read`, because `idle` and `done` are one resting status whether the agent finished or is sitting between the turns of a running workflow, and only the pane's last output separates the two. Hold the row if it reads mid-workflow. Otherwise remove the worktree, close its workspace and panes, prune the branch. The row's WS column is the workspace to close.
+**Clean up.** Merged with nothing left in the tree beyond ignored files. Confirm the pane first, because a removal takes the tree out from under whoever is in it. `herdr agent get` settles an empty one. An `occupied` row needs `herdr agent read`, because `idle` and `done` are one resting status whether the agent finished or is sitting between the turns of a running workflow, and only the pane's last output separates the two. Hold the row if it reads mid-workflow. Otherwise close its workspace and panes, then run `git -C <clone> worktree remove <worktree>` and `git -C <clone> branch -D <branch>`. The row's WS column is the workspace to close.
 
-**Merge.** Checks green, merge state clean, your repo. Re-read the bar immediately before merging, because both the board and your first lookup predate the user's answer. `gh pr merge --squash --delete-branch`, and stop there. The worktree becomes a cleanup row on a later sweep, once a fresh board shows it carrying nothing.
+The removal runs without `--force`, which only overrides modified or untracked files, and a cleanup row has neither. It deletes the paths on the `carries` line. Name those paths in the cleanup question so the user approves their deletion. A `carries` line ending in `+N` is truncated, and `claim.ts --json` lists every path. A removal that refuses means the tree changed since the board loaded, so report it and leave it.
+
+**Merge.** Checks green, merge state clean, your repo. Re-read the bar immediately before merging, because both the board and your first lookup predate the user's answer. `gh pr merge --squash --delete-branch`, and stop there. The worktree becomes a cleanup row on a later sweep, once a fresh board shows it as a `clean up` row.
 
 **Report.** A `needs you` row is a report unless the user asks for something else. Its flags say why: a named failing job, a conflict, a review holding it, or commits beside a `merged#N` that the merge did not take, which need a fresh branch rather than a removal. A blocked agent is a prompt to answer, so `herdr agent focus` its pane and say what it is asking.
 

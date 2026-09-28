@@ -390,8 +390,8 @@ async function callModel(prompt: string, model: string): Promise<JudgeReply> {
     prompt,
     options: {
       model,
-      // Structured output lands through a tool call, which takes a second turn.
-      maxTurns: 3,
+      // Structured output lands through a tool call, plus a retry turn when the schema rejects it.
+      maxTurns: 5,
       tools: [],
       settingSources: [],
       mcpServers: {},

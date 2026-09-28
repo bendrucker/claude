@@ -56,11 +56,11 @@ When macOS blocks the profiler or the metric needs hardware counters, read [refe
 
 Write the ranking as a table: entry (function, process, or phase), its time, and its share of the scenario's total. Name the tool and the scenario that produced it. Keep the raw profile file beside the table so the user can open it in its viewer.
 
-A profile ranks candidates. It does not show that fixing one moves the metric. Hand the ranking to `performance:benchmark` or `performance:hill-climb` to measure a change.
+A profile finds candidates. It does not show that fixing one moves the metric. Hand the list to `performance:benchmark` or `performance:hill-climb` to measure a change.
 
 ## Gotchas
 
-- A profiler adds overhead that falls unevenly across code. A per-command trace inflates many cheap commands far more than a few expensive ones. Use the profile to find candidates, then time each suspect alone without the profiler to rank and bound it.
+- A profiler's overhead falls unevenly: a per-command trace inflates many cheap commands far more than a few expensive ones. Time each suspect alone without the profiler to rank and bound it.
 - Compare the profile's total span with the metric. A span well short of the metric means the profile missed part of the scenario, such as a config file that never loaded.
 - A profile of a debug build, a warm cache the real scenario lacks, or a tiny input ranks the wrong hot spots. Match the scenario.
 - On macOS, profilers cannot attach to SIP-protected system binaries (`/bin/sh`, `/usr/bin/*`). Run the program through an interpreter or binary outside those directories, or move the run into a Linux VM ([references/linux-vm.md](references/linux-vm.md)).

@@ -29,7 +29,11 @@ limactl start --name=perf --vm-type=vz --cpus=4 --memory=8 template:default
 limactl shell perf
 ```
 
-Inside it, `perf` software events, `ptrace`, `strace`, `bpftrace`, and `samply` work. Apple Virtualization exposes no PMU, so `perf stat` reports cycles and instructions as `<not supported>`. Its timing inherits host noise: vCPUs land on efficiency cores, and the host throttles under thermal load. Use it to profile and to count work. Trust its wall time only after an A/A run ties.
+Use it to profile and to count work:
+
+- `perf` software events, `ptrace`, `strace`, `bpftrace`, and `samply` work inside it.
+- Apple Virtualization exposes no PMU, so `perf stat` reports cycles and instructions as `<not supported>`.
+- Its timing inherits host noise: vCPUs land on efficiency cores, and the host throttles under thermal load. Trust its wall time only after an A/A run ties.
 
 When `limactl` is not installed, tell the user it is missing.
 
@@ -39,7 +43,11 @@ An EC2 Graviton instance (`c8g`) gives stable timing: fixed clock frequency and 
 
 Reach it through the user's launcher: a CLI that creates an instance, connects to it, extends its time limit, and destroys it. The user's environment supplies the launcher, its account, and its profile, so read its `--help` before the first launch. When no launcher exists, tell the user and stop at the local VM.
 
-Set the time limit at launch from the climb's expected duration: the A/A run plus each candidate's measurement, at the per-run cost the harness measured, with half again as margin. A run cut off by the limit repeats its setup and measurements, which costs more than the idle margin. Extend the limit when the climb outgrows it rather than letting a measurement run into shutdown. Tell the user the limit and the instance type when you launch.
+Set the time limit at launch:
+
+- Size it from the climb's expected duration: the A/A run plus each candidate's measurement at the harness's per-run cost, plus half again. A run cut off by the limit repeats its setup and measurements, which costs more than idle margin.
+- Extend it when the climb outgrows it, before a measurement runs into shutdown.
+- Tell the user the limit and the instance type.
 
 When two climbs share one VM, pin each to its own cores with `taskset -c <range>`, and have each ask the other before extending or destroying it.
 
@@ -54,7 +62,9 @@ Copy the working tree into the VM's own disk and build there. A shared host moun
 
 Keep `.git` so each arm builds from its ref with `git worktree add`, as on the Mac. Build every arm inside the VM for its architecture, since a binary built on the host for macOS does not run there.
 
-Copy the benchmark skill's `scripts/compare.ts` into the VM outside any `node_modules` tree, and run it with the same arms and flags as on the Mac. Bun resolves its imports on first run, which needs network access. When `bun`, `hyperfine`, or `perf` is missing in the VM, tell the user. Copy `tmp/bench/<comparison>` back to the host to keep the exports beside the notes file.
+- Copy the benchmark skill's `scripts/compare.ts` into the VM outside any `node_modules` tree, and run it with the same arms and flags as on the Mac. Bun resolves its imports on first run, which needs network access.
+- When `bun`, `hyperfine`, or `perf` is missing in the VM, tell the user.
+- Copy `tmp/bench/<comparison>` back to the host to keep the exports beside the notes file.
 
 ## Checks on Arrival
 

@@ -19,7 +19,7 @@
     "plugin-lockfiles": "bun scripts/plugin-lockfiles.ts",
     "schemas": "bun scripts/schemas/index.ts",
     "skill-lint": "bun ./packages/skill-lint/cli.ts",
-    "test": "bun test",
+    "test": "bun test --parallel=8 --timeout=15000",
     "test:unit": "bun test"
   },
   "dependencies": {

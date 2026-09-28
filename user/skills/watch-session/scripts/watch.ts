@@ -1,0 +1,359 @@
+#!/usr/bin/env bun
+
+import { mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { $ } from "bun";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
+import { z } from "zod";
+import { DecodeError, decodeFile } from "../../../../packages/decode/index";
+import { paneAgent } from "./herdr";
+import { type Blocked, Entry, render, splitLines, type Turn, TurnTracker } from "./transcript";
+import { endTrial, startTrial } from "./trial";
+
+/** How often a pane watch asks herdr whether the pane's session changed, ended, or blocked on a dialog. */
+const PANE_CHECK_MS = 10_000;
+const MS_PER_SECOND = 1000;
+
+const State = z.object({
+  offset: z.number(),
+  base: z.string().optional(),
+  blockedAt: z.number().optional(),
+});
+
+interface Target {
+  session: string;
+  path: string;
+}
+
+const PROJECTS = join(process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), "projects");
+
+async function findTranscript(session: string): Promise<string | undefined> {
+  const glob = new Bun.Glob(`*/${session}.jsonl`);
+  for await (const path of glob.scan({ cwd: PROJECTS, absolute: true })) return path;
+  return undefined;
+}
+
+// Claude Code writes a session's transcript only after its first message.
+async function awaitTranscript(session: string, poll: number): Promise<string> {
+  const path = await findTranscript(session);
+  if (path !== undefined) return path;
+  await Bun.sleep(poll);
+  return awaitTranscript(session, poll);
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+async function resolve(target: string): Promise<{ session: string; pane?: string }> {
+  if (UUID.test(target)) return { session: target };
+  const session = (await paneAgent(target))?.session;
+  if (session === undefined) throw new Error(`herdr pane ${target} has no Claude session`);
+  return { session, pane: target };
+}
+
+/** Streams the transcript until the first entry that records the session's working directory. */
+async function firstCwd(path: string): Promise<string | undefined> {
+  let pending = new Uint8Array();
+  for await (const chunk of Bun.file(path).stream()) {
+    const input = Buffer.concat([pending, chunk]);
+    const { values, read } = Bun.JSONL.parseChunk(input);
+    for (const value of values) {
+      const cwd = Entry.safeParse(value).data?.cwd;
+      if (cwd !== undefined) return cwd;
+    }
+    pending = input.subarray(read);
+  }
+  return undefined;
+}
+
+async function workspace(path: string): Promise<{ cwd?: string; head?: string }> {
+  const cwd = await firstCwd(path);
+  if (cwd === undefined) return {};
+  const git = await $`git -C ${cwd} rev-parse HEAD`.quiet().nothrow();
+  return git.exitCode === 0 ? { cwd, head: git.text().trim() } : { cwd };
+}
+
+function statePath(dir: string, session: string): string {
+  return join(dir, `${session}.json`);
+}
+
+async function readState(
+  dir: string | undefined,
+  session: string,
+): Promise<z.output<typeof State> | undefined> {
+  if (dir === undefined) return undefined;
+  const path = statePath(dir, session);
+  if (!(await Bun.file(path).exists())) return undefined;
+  try {
+    return await decodeFile(State, path);
+  } catch (error) {
+    // A Monitor expiry can kill a write midway, and a fresh watch beats one that never re-arms.
+    if (error instanceof DecodeError) return undefined;
+    throw error;
+  }
+}
+
+function emit(event: object): void {
+  console.log(JSON.stringify(event));
+}
+
+interface Batch {
+  event: "batch";
+  turns: number;
+  from: number;
+  to: number;
+  prompts: string[];
+  tools: Record<string, number>;
+  skills: string[];
+  errors: number;
+}
+
+function addToBatch(batch: Batch | undefined, turn: Turn): Batch {
+  const next = batch ?? {
+    event: "batch",
+    turns: 0,
+    from: turn.from,
+    to: turn.to,
+    prompts: [],
+    tools: {},
+    skills: [],
+    errors: 0,
+  };
+  next.turns++;
+  next.to = turn.to;
+  if (turn.prompt !== "") next.prompts.push(turn.prompt);
+  for (const [name, count] of Object.entries(turn.tools)) {
+    next.tools[name] = (next.tools[name] ?? 0) + count;
+  }
+  next.skills = [...new Set([...next.skills, ...turn.skills])];
+  next.errors += turn.errors;
+  return next;
+}
+
+interface WatchOptions {
+  target: string;
+  stateDir: string | undefined;
+  fromStart: boolean;
+  every: number;
+  poll: number;
+}
+
+class Watcher {
+  private tracker = new TurnTracker();
+  private batch: Batch | undefined;
+  private lastPaneCheck = Date.now();
+  private lastFlush = Date.now();
+  // A session the pane switched to whose transcript has not appeared yet.
+  private pending: string | undefined;
+  private status: string | undefined;
+
+  constructor(
+    private readonly options: WatchOptions,
+    private target: Target,
+    private readonly pane: string | undefined,
+    private offset: number,
+    private readonly base: string | undefined,
+    // Resuming re-reads the open turn, so a question it already reported must not fire again.
+    private blockedAt: number | undefined,
+  ) {}
+
+  /** Returns false once the watched pane no longer hosts a Claude session. */
+  async tick(): Promise<boolean> {
+    await this.read();
+    this.flush(false);
+    return this.checkPane();
+  }
+
+  private async read(): Promise<void> {
+    const size = Bun.file(this.target.path).size;
+    if (size <= this.offset) return;
+    const bytes = new Uint8Array(
+      await Bun.file(this.target.path).slice(this.offset, size).arrayBuffer(),
+    );
+    const { lines, consumed } = splitLines(bytes, this.offset);
+    if (consumed === 0) return;
+    this.offset += consumed;
+    for (const event of lines.flatMap((line) => this.tracker.feed(line))) this.dispatch(event);
+    await this.persist();
+  }
+
+  private dispatch(event: Turn | Blocked): void {
+    if (event.event === "blocked") {
+      if (this.blockedAt !== undefined && event.at <= this.blockedAt) return;
+      this.blockedAt = event.at;
+    }
+    // A question waits on an answer, so it skips the batch.
+    if (this.options.every === 0 || event.event === "blocked") emit(event);
+    else this.batch = addToBatch(this.batch, event);
+  }
+
+  private flush(force: boolean): void {
+    if (!this.batch) return;
+    if (!force && Date.now() - this.lastFlush < this.options.every * MS_PER_SECOND) return;
+    emit(this.batch);
+    this.batch = undefined;
+    this.lastFlush = Date.now();
+  }
+
+  private async checkPane(): Promise<boolean> {
+    if (this.pending !== undefined) await this.follow(this.pending);
+    if (this.pane === undefined || Date.now() - this.lastPaneCheck < PANE_CHECK_MS) return true;
+    this.lastPaneCheck = Date.now();
+    const agent = await paneAgent(this.pane);
+    // A transient herdr failure retries at the next check instead of ending the watch.
+    if (agent === null) return true;
+    const current = agent?.session;
+    if (agent === undefined || current === undefined) {
+      this.flush(true);
+      emit({ event: "ended", reason: "pane has no Claude session" });
+      return false;
+    }
+    // A /clear or /resume starts a new transcript, which appears at the session's first message.
+    this.pending = current === this.target.session ? undefined : current;
+    // A permission or trust dialog holds the agent without writing anything to the transcript.
+    if (agent.status === "blocked" && this.status !== "blocked" && !this.tracker.asking) {
+      emit({ event: "dialog", pane: this.pane });
+    }
+    this.status = agent.status;
+    return true;
+  }
+
+  private async follow(session: string): Promise<void> {
+    const path = await findTranscript(session);
+    if (path === undefined) return;
+    this.pending = undefined;
+    this.target = { session, path };
+    this.offset = 0;
+    this.tracker = new TurnTracker();
+    this.blockedAt = undefined;
+    await this.persist();
+    emit({ event: "session", ...this.target });
+  }
+
+  async persist(): Promise<void> {
+    if (this.options.stateDir === undefined) return;
+    // Formatted the way oxfmt and prettier leave JSON, since a repo's format check can reach tmp/.
+    // An unflushed batch resumes from its first turn, so an expiry before the flush re-reads it.
+    const offset = this.batch?.from ?? this.tracker.openFrom ?? this.offset;
+    await Bun.write(
+      statePath(this.options.stateDir, this.target.session),
+      `${JSON.stringify({ offset, base: this.base, blockedAt: this.blockedAt }, null, 2)}\n`,
+    );
+  }
+}
+
+async function watch(options: WatchOptions): Promise<void> {
+  const { session, pane } = await resolve(options.target);
+  let path = await findTranscript(session);
+  // A transcript that appears after arming holds only new turns, so it is read from its first byte.
+  const fresh = path === undefined;
+  if (path === undefined) {
+    emit({ event: "waiting", session, pane, reason: "no transcript until the first message" });
+    path = await awaitTranscript(session, options.poll);
+  }
+  const target = { session, path };
+  const saved = await readState(options.stateDir, session);
+  const offset = saved?.offset ?? (options.fromStart || fresh ? 0 : Bun.file(path).size);
+  if (options.stateDir !== undefined) await mkdir(options.stateDir, { recursive: true });
+  const { cwd, head } = await workspace(target.path);
+  // The first watch records the commit a trial starts from, since the session keeps committing.
+  const base = saved?.base ?? head;
+  const watcher = new Watcher(options, target, pane, offset, base, saved?.blockedAt);
+  await watcher.persist();
+  emit({ event: "watching", ...target, cwd, base, offset, pane });
+
+  // Monitor needs one long-lived process that sleeps internally, not a shell loop.
+  // oxlint-disable-next-line no-await-in-loop -- each poll must finish before the next begins.
+  while (await watcher.tick()) await Bun.sleep(options.poll);
+}
+
+async function show(target: string, from: number, to: number | undefined, truncate: number) {
+  const { session } = await resolve(target);
+  const path = await findTranscript(session);
+  if (path === undefined) throw new Error(`no transcript for session ${session} under ${PROJECTS}`);
+  const file = Bun.file(path);
+  const bytes = new Uint8Array(await file.slice(from, to ?? file.size).arrayBuffer());
+  for (const line of render(splitLines(bytes, from).lines, truncate)) console.log(line);
+}
+
+function int(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n)) throw new InvalidArgumentError("Not an integer.");
+  return n;
+}
+
+const watchCommand = new Command("watch")
+  .description(
+    "Tail a Claude session's transcript and print one JSON event per line: turn, blocked, dialog, batch, session, ended.",
+  )
+  .argument("<target>", "herdr pane id or session UUID")
+  .option(
+    "--state-dir <dir>",
+    "directory holding <session>.json, which persists the read offset across restarts",
+  )
+  .option("--from-start", "read from the start of the transcript instead of its end")
+  .option(
+    "--every <seconds>",
+    "batch completed turns into one event per interval in seconds (0 emits per turn)",
+    int,
+    0,
+  )
+  .option("--poll <ms>", "poll interval in milliseconds", int, 1000)
+  .action(async (target, options) => {
+    await watch({
+      target,
+      stateDir: options.stateDir,
+      fromStart: options.fromStart ?? false,
+      every: options.every,
+      poll: options.poll,
+    });
+  });
+
+const showCommand = new Command("show")
+  .description("Print a byte range of a Claude session's transcript, one line per block.")
+  .argument("<target>", "herdr pane id or session UUID")
+  .argument("<from>", "start byte offset", int)
+  .argument("[to]", "end byte offset", int)
+  .option("--truncate <n>", "maximum characters per line", int, 500)
+  .action(async (target, from, to, options) => {
+    await show(target, from, to, options.truncate);
+  });
+
+const trialStartCommand = new Command("start")
+  .description(
+    "Start a fresh trial session with the skill loaded and send it the prompt. The first start creates the worktree, later starts reset it. Arguments after -- go to claude.",
+  )
+  .requiredOption("--cwd <dir>", "the watched session's cwd")
+  .requiredOption("--base <commit>", "the commit each trial starts from")
+  .requiredOption("--prompt <text>", "the prompt the trial sends")
+  .option("--name <name>", "trial name, used for its branch, agent, and state file", "trial")
+  .option("--state-dir <dir>", "directory holding trial-<name>.json", "tmp/watch-session")
+  .argument("[load...]", "arguments for claude")
+  .passThroughOptions()
+  .action(async (load, options) => {
+    await mkdir(options.stateDir, { recursive: true });
+    const trial = await startTrial({ ...options, load });
+    emit({ event: "trial", ...trial });
+  });
+
+const trialEndCommand = new Command("end")
+  .description("Exit the trial session and remove its worktree and branch.")
+  .option("--name <name>", "trial name, used for its branch, agent, and state file", "trial")
+  .option("--state-dir <dir>", "directory holding trial-<name>.json", "tmp/watch-session")
+  .action(async (options) => {
+    emit({ event: "trial-ended", ...(await endTrial(options.stateDir, options.name)) });
+  });
+
+const trialCommand = new Command("trial")
+  .description("Start or end a trial session in a disposable worktree.")
+  .enablePositionalOptions()
+  .addCommand(trialStartCommand)
+  .addCommand(trialEndCommand);
+
+export const program = new Command("watch-session")
+  .enablePositionalOptions()
+  .addCommand(watchCommand)
+  .addCommand(showCommand)
+  .addCommand(trialCommand);
+
+if (import.meta.main) await program.parseAsync();

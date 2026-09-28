@@ -99,18 +99,19 @@ function traceFiles(dir: string, arm: string): TraceFile[] {
 }
 
 /**
- * Every "with"-arm run's deliverable text, pooled across result paths in the order given and
+ * Every run's deliverable text on one arm, pooled across result paths in the order given and
  * grouped by case. `fileFor` names the file a case's deliverable is written to, or undefined to
  * extract the `<out>` block from the final reply instead.
  */
 export async function collectDrafts(
   paths: string[],
   fileFor: (caseName: string) => string | undefined,
+  arm = "with",
 ): Promise<Map<string, string[]>> {
   const byCase = new Map<string, string[]>();
   for (const path of paths) {
     const dir = path.endsWith(".json") ? dirname(path) : path;
-    const files = traceFiles(dir, "with");
+    const files = traceFiles(dir, arm);
     // oxlint-disable-next-line no-await-in-loop -- one result directory's traces at a time, in the pooling order the caller gave.
     const read = await Promise.all(
       files.map(async (f) => [f.case, await Bun.file(f.path).text()] as const),
@@ -147,6 +148,10 @@ export function surfaceFor(
   const found = (tags.get(caseName) ?? []).filter((t) =>
     (SURFACES as readonly string[]).includes(t),
   );
+  const prefix = /^([a-z]+)-\d+$/.exec(caseName)?.[1];
+  if (found.length === 0 && prefix !== undefined && Surface.safeParse(prefix).success) {
+    return Surface.parse(prefix);
+  }
   if (found.length !== 1) {
     throw new Error(
       `${caseName}: expected exactly one of ${SURFACES.join("/")} among its case.yaml tags, ` +
@@ -154,6 +159,41 @@ export function surfaceFor(
     );
   }
   return Surface.parse(found[0]);
+}
+
+/**
+ * The span of `after` that differs from `before`, between their common leading and trailing
+ * lines, with `context` unchanged lines on each side. Elided text is marked with a `…` line.
+ */
+export function changedRegion(before: string, after: string, context = 3): string {
+  const a = before.split("\n");
+  const b = after.split("\n");
+  let head = 0;
+  while (head < a.length && head < b.length && a[head] === b[head]) head++;
+  let tail = 0;
+  while (
+    tail < a.length - head &&
+    tail < b.length - head &&
+    a[a.length - 1 - tail] === b[b.length - 1 - tail]
+  ) {
+    tail++;
+  }
+  if (head + tail >= b.length) return "";
+  const start = Math.max(0, head - context);
+  const end = Math.min(b.length, b.length - tail + context);
+  return [
+    ...(start > 0 ? ["…"] : []),
+    ...b.slice(start, end),
+    ...(end < b.length ? ["…"] : []),
+  ].join("\n");
+}
+
+async function trimToChange(beforeDir: string | undefined, caseName: string, texts: string[]) {
+  if (beforeDir === undefined) return texts;
+  const file = Bun.file(join(beforeDir, `${caseName}.md`));
+  if (!(await file.exists())) return texts;
+  const before = await file.text();
+  return texts.map((t) => changedRegion(before, t));
 }
 
 async function briefFor(suite: string, caseName: string): Promise<string> {
@@ -171,6 +211,9 @@ interface PairsFlags {
   out: string | undefined;
   file: string[];
   surface: string[];
+  before?: string | undefined;
+  baseArm?: string | undefined;
+  candidateArm?: string | undefined;
   baseLabel: string;
   candidateLabel: string;
 }
@@ -188,9 +231,17 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
   const fileOverrides = parseMap(flags.file);
   const surfaceOverrides = parseMap(flags.surface);
   const tags = await loadTags(flags.suite);
-  const candidateDrafts = await collectDrafts(flags.candidate.split(","), (c) =>
-    fileOverrides.get(c),
+  const candidateArm = flags.candidateArm ?? "with";
+  const baseArm = flags.baseArm ?? "with";
+  const candidateDrafts = await collectDrafts(
+    flags.candidate.split(","),
+    (c) => fileOverrides.get(c),
+    candidateArm,
   );
+  for (const [caseName, texts] of candidateDrafts) {
+    // oxlint-disable-next-line no-await-in-loop -- one case's before file read at a time.
+    candidateDrafts.set(caseName, await trimToChange(flags.before, caseName, texts));
+  }
 
   const pairs: Pair[] = [];
   if (flags.original !== undefined) {
@@ -210,7 +261,7 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
           brief,
           a: { source: { kind: "original", url: record.url }, text },
           b: {
-            source: { kind: "run", column: flags.candidateLabel, arm: "with", run },
+            source: { kind: "run", column: flags.candidateLabel, arm: candidateArm, run },
             text: candidateText,
           },
         });
@@ -220,7 +271,15 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
   }
 
   if (flags.base === undefined) throw new Error("one of --base or --original is required");
-  const baseDrafts = await collectDrafts(flags.base.split(","), (c) => fileOverrides.get(c));
+  const baseDrafts = await collectDrafts(
+    flags.base.split(","),
+    (c) => fileOverrides.get(c),
+    baseArm,
+  );
+  for (const [caseName, texts] of baseDrafts) {
+    // oxlint-disable-next-line no-await-in-loop -- one case's before file read at a time.
+    baseDrafts.set(caseName, await trimToChange(flags.before, caseName, texts));
+  }
   for (const [caseName, candidateTexts] of candidateDrafts) {
     const baseTexts = baseDrafts.get(caseName);
     if (baseTexts === undefined) {
@@ -244,9 +303,9 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
         case: caseName,
         surface,
         brief,
-        a: { source: { kind: "run", column: flags.baseLabel, arm: "with", run }, text: base },
+        a: { source: { kind: "run", column: flags.baseLabel, arm: baseArm, run }, text: base },
         b: {
-          source: { kind: "run", column: flags.candidateLabel, arm: "with", run },
+          source: { kind: "run", column: flags.candidateLabel, arm: candidateArm, run },
           text: candidate,
         },
       });
@@ -717,6 +776,17 @@ if (import.meta.main) {
           type: [String],
           default: [],
           description: "case=surface override when the suite's case.yaml tags do not name one",
+        },
+        before: {
+          type: String,
+          description:
+            "Directory of <case>.md files holding a deliverable file's pre-change contents; drafts for those cases are trimmed to the changed region",
+        },
+        baseArm: { type: String, default: "with", description: "Arm the base drafts come from" },
+        candidateArm: {
+          type: String,
+          default: "with",
+          description: "Arm the candidate drafts come from",
         },
         baseLabel: {
           type: String,

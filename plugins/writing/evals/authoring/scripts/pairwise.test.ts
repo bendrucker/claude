@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import seedrandom from "seedrandom";
 import type { Judgment, Key, Label, Pair, Pick } from "./pairs";
 import {
@@ -9,6 +11,7 @@ import {
   blind,
   buildPairs,
   calibrate,
+  changedRegion,
   collectDrafts,
   compareLabels,
   deblindPick,
@@ -180,6 +183,32 @@ describe("parseMap", () => {
   });
 });
 
+describe("changedRegion", () => {
+  const before = ["a", "b", "c", "d", "e", "f", "g", "h", "i"].join("\n");
+
+  test.each<{ name: string; after: string; expected: string }>([
+    { name: "unchanged file", after: before, expected: "" },
+    {
+      name: "one inserted line keeps one line of context",
+      after: before.replace("e", "e\nNEW"),
+      expected: "…\nd\ne\nNEW\nf\ng\n…",
+    },
+    { name: "an edit at the top", after: before.replace("a", "A"), expected: "A\nb\nc\n…" },
+  ])("$name", ({ after, expected }) => {
+    expect(changedRegion(before, after, 2)).toBe(expected);
+  });
+
+  test("the region holds every inserted line", () => {
+    hegel.test((tc) => {
+      const lines = tc.draw(gs.arrays(gs.text({ alphabet: "abc" }), { maxSize: 12 }));
+      const at = tc.draw(gs.integers({ minValue: 0, maxValue: lines.length }));
+      const inserted = tc.draw(gs.text({ alphabet: "XYZ", minSize: 1 }));
+      const after = [...lines.slice(0, at), inserted, ...lines.slice(at)].join("\n");
+      expect(changedRegion(lines.join("\n"), after, 0)).toContain(inserted);
+    });
+  });
+});
+
 describe("surfaceFor", () => {
   const tags = new Map([
     ["pr-quiet", ["dev", "pr"]],
@@ -189,6 +218,10 @@ describe("surfaceFor", () => {
 
   test("reads the one SURFACES tag a case carries", () => {
     expect(surfaceFor("pr-quiet", tags, new Map())).toBe("pr");
+  });
+
+  test("falls back to the case id's surface prefix when no tag names one", () => {
+    expect(surfaceFor("doc-001", new Map([["doc-001", ["dev"]]]), new Map())).toBe("doc");
   });
 
   test("an override wins over the tags", () => {

@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -17,6 +17,7 @@ import {
   invalidateDerived,
   rebuildViews,
   runQuery,
+  sessionDbPath,
 } from "./db";
 import { FALLBACK_PATH, renderMap, schemaMap, SurfaceColumns, SURFACES } from "./schema";
 
@@ -44,6 +45,7 @@ function queryParams(overrides: Record<string, string | null> = {}) {
 let db: Database;
 let tmpDir: string;
 let importsDir: string;
+let templateDir: string;
 
 // The first `INSTALL ... FROM community` downloads the markdown/yaml extensions over
 // the network, which can exceed the default per-test timeout on a cold CI runner.
@@ -57,7 +59,23 @@ beforeAll(async () => {
     warm.close();
     await rm(warmDir, { recursive: true, force: true });
   }
+
+  // Indexing the fixtures from empty dominates each test's setup, so index them once
+  // and give every test a copy. The per-test reindex then finds nothing changed.
+  templateDir = mkdtempSync(join(tmpdir(), "session-template-"));
+  const templateImports = join(templateDir, "imports");
+  mkdirSync(templateImports, { recursive: true });
+  const template = await getDb(templateDir);
+  try {
+    await ensureIndex(template, { projectsDir: fixturesDir, importsDir: templateImports });
+  } finally {
+    template.close();
+  }
 }, 120_000);
+
+afterAll(async () => {
+  await rm(templateDir, { recursive: true, force: true });
+});
 
 async function importFixtureHost(label: string, opts: { source?: string } = {}) {
   const projects = join(importsDir, label, "projects");
@@ -82,6 +100,7 @@ beforeEach(async () => {
   tmpDir = mkdtempSync(join(tmpdir(), "session-test-"));
   importsDir = join(tmpDir, "imports");
   mkdirSync(importsDir, { recursive: true });
+  await Bun.write(sessionDbPath(tmpDir), Bun.file(sessionDbPath(templateDir)));
   db = await getDb(tmpDir);
   await reindex();
 });

@@ -1,1 +1,1 @@
-allow_tools: ["Bash(git:*)", "Bash(gh:*)", "Bash(bun:*)", Write, Edit]
+allow_tools: ["Bash(git:*)", "Bash(gh:*)", "Bash(bun:*)", "Bash(mkdir:*)", "Bash(cat:*)", Write, Edit]

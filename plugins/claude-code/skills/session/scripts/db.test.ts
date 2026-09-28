@@ -61,7 +61,7 @@ beforeAll(async () => {
   }
 
   // Indexing the fixtures from empty dominates each test's setup, so index them once
-  // and give every test a copy. The per-test reindex then finds nothing changed.
+  // and give every test a copy of the finished index.
   templateDir = mkdtempSync(join(tmpdir(), "session-template-"));
   const templateImports = join(templateDir, "imports");
   mkdirSync(templateImports, { recursive: true });
@@ -102,7 +102,6 @@ beforeEach(async () => {
   mkdirSync(importsDir, { recursive: true });
   await Bun.write(sessionDbPath(tmpDir), Bun.file(sessionDbPath(templateDir)));
   db = await getDb(tmpDir);
-  await reindex();
 });
 
 afterEach(async () => {

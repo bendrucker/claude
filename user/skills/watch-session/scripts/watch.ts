@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import { defineCommand, runMain } from "citty";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { z } from "zod";
 import { DecodeError, decodeFile } from "../../../../packages/decode/index";
 import { paneAgent } from "./herdr";
@@ -276,122 +276,84 @@ async function show(target: string, from: number, to: number | undefined, trunca
   for (const line of render(splitLines(bytes, from).lines, truncate)) console.log(line);
 }
 
-function parseNumber(value: string, name: string): number {
-  const number = Number(value);
-  if (Number.isNaN(number)) throw new Error(`${name} must be a number, got ${value}`);
-  return number;
+function int(value: string): number {
+  const n = Number(value);
+  if (!Number.isInteger(n)) throw new InvalidArgumentError("Not an integer.");
+  return n;
 }
 
-const watchCmd = defineCommand({
-  meta: {
-    name: "watch",
-    description:
-      "Tail a Claude session's transcript and print one JSON event per line: turn, blocked, dialog, batch, session, ended.",
-  },
-  args: {
-    target: { type: "positional", required: true, description: "herdr pane id or session UUID" },
-    stateDir: {
-      type: "string",
-      description:
-        "Directory holding <session>.json, which persists the read offset across restarts",
-    },
-    fromStart: {
-      type: "boolean",
-      description: "Read from the start of the transcript instead of its end",
-    },
-    every: {
-      type: "string",
-      default: "0",
-      description:
-        "Batch completed turns into one event per interval in seconds (0 emits per turn)",
-    },
-    poll: { type: "string", default: "1000", description: "Poll interval in milliseconds" },
-  },
-  async run({ args }) {
+const watchCommand = new Command("watch")
+  .description(
+    "Tail a Claude session's transcript and print one JSON event per line: turn, blocked, dialog, batch, session, ended.",
+  )
+  .argument("<target>", "herdr pane id or session UUID")
+  .option(
+    "--state-dir <dir>",
+    "directory holding <session>.json, which persists the read offset across restarts",
+  )
+  .option("--from-start", "read from the start of the transcript instead of its end")
+  .option(
+    "--every <seconds>",
+    "batch completed turns into one event per interval in seconds (0 emits per turn)",
+    int,
+    0,
+  )
+  .option("--poll <ms>", "poll interval in milliseconds", int, 1000)
+  .action(async (target, options) => {
     await watch({
-      target: args.target,
-      stateDir: args.stateDir,
-      fromStart: args.fromStart ?? false,
-      every: parseNumber(args.every, "--every"),
-      poll: parseNumber(args.poll, "--poll"),
+      target,
+      stateDir: options.stateDir,
+      fromStart: options.fromStart ?? false,
+      every: options.every,
+      poll: options.poll,
     });
-  },
-});
+  });
 
-const showCmd = defineCommand({
-  meta: {
-    name: "show",
-    description: "Print a byte range of a Claude session's transcript, one line per block.",
-  },
-  args: {
-    target: { type: "positional", required: true, description: "herdr pane id or session UUID" },
-    from: { type: "positional", required: true, description: "Start byte offset" },
-    to: { type: "positional", required: false, description: "End byte offset" },
-    truncate: { type: "string", default: "500", description: "Maximum characters per line" },
-  },
-  async run({ args }) {
-    const to = args.to === undefined ? undefined : parseNumber(args.to, "to");
-    const from = parseNumber(args.from, "from");
-    await show(args.target, from, to, parseNumber(args.truncate, "--truncate"));
-  },
-});
+const showCommand = new Command("show")
+  .description("Print a byte range of a Claude session's transcript, one line per block.")
+  .argument("<target>", "herdr pane id or session UUID")
+  .argument("<from>", "start byte offset", int)
+  .argument("[to]", "end byte offset", int)
+  .option("--truncate <n>", "maximum characters per line", int, 500)
+  .action(async (target, from, to, options) => {
+    await show(target, from, to, options.truncate);
+  });
 
-const trialArgs = {
-  name: {
-    type: "string",
-    default: "trial",
-    description: "Trial name, used for its branch, agent, and state file",
-  },
-  stateDir: {
-    type: "string",
-    default: "tmp/watch-session",
-    description: "Directory holding trial-<name>.json",
-  },
-} as const;
-
-const trialStartCmd = defineCommand({
-  meta: {
-    name: "start",
-    description:
-      "Start a fresh trial session with the skill loaded and send it the prompt. The first start creates the worktree, later starts reset it. Arguments after -- go to claude.",
-  },
-  args: {
-    ...trialArgs,
-    cwd: { type: "string", required: true, description: "The watched session's cwd" },
-    base: { type: "string", required: true, description: "The commit each trial starts from" },
-    prompt: { type: "string", required: true, description: "The prompt the trial sends" },
-  },
-  async run({ args, rawArgs }) {
-    await mkdir(args.stateDir, { recursive: true });
-    const trial = await startTrial({
-      name: args.name,
-      stateDir: args.stateDir,
-      cwd: args.cwd,
-      base: args.base,
-      prompt: args.prompt,
-      // citty has no variadic positional, so the claude args come from rawArgs.
-      load: rawArgs.includes("--") ? rawArgs.slice(rawArgs.indexOf("--") + 1) : [],
-    });
+const trialStartCommand = new Command("start")
+  .description(
+    "Start a fresh trial session with the skill loaded and send it the prompt. The first start creates the worktree, later starts reset it. Arguments after -- go to claude.",
+  )
+  .requiredOption("--cwd <dir>", "the watched session's cwd")
+  .requiredOption("--base <commit>", "the commit each trial starts from")
+  .requiredOption("--prompt <text>", "the prompt the trial sends")
+  .option("--name <name>", "trial name, used for its branch, agent, and state file", "trial")
+  .option("--state-dir <dir>", "directory holding trial-<name>.json", "tmp/watch-session")
+  .argument("[load...]", "arguments for claude")
+  .passThroughOptions()
+  .action(async (load, options) => {
+    await mkdir(options.stateDir, { recursive: true });
+    const trial = await startTrial({ ...options, load });
     emit({ event: "trial", ...trial });
-  },
-});
+  });
 
-const trialEndCmd = defineCommand({
-  meta: { name: "end", description: "Exit the trial session and remove its worktree and branch." },
-  args: trialArgs,
-  async run({ args }) {
-    emit({ event: "trial-ended", ...(await endTrial(args.stateDir, args.name)) });
-  },
-});
+const trialEndCommand = new Command("end")
+  .description("Exit the trial session and remove its worktree and branch.")
+  .option("--name <name>", "trial name, used for its branch, agent, and state file", "trial")
+  .option("--state-dir <dir>", "directory holding trial-<name>.json", "tmp/watch-session")
+  .action(async (options) => {
+    emit({ event: "trial-ended", ...(await endTrial(options.stateDir, options.name)) });
+  });
 
-const trialCmd = defineCommand({
-  meta: { name: "trial", description: "Start or end a trial session in a disposable worktree." },
-  subCommands: { start: trialStartCmd, end: trialEndCmd },
-});
+const trialCommand = new Command("trial")
+  .description("Start or end a trial session in a disposable worktree.")
+  .enablePositionalOptions()
+  .addCommand(trialStartCommand)
+  .addCommand(trialEndCommand);
 
-export const main = defineCommand({
-  meta: { name: "watch-session" },
-  subCommands: { watch: watchCmd, show: showCmd, trial: trialCmd },
-});
+export const program = new Command("watch-session")
+  .enablePositionalOptions()
+  .addCommand(watchCommand)
+  .addCommand(showCommand)
+  .addCommand(trialCommand);
 
-if (import.meta.main) await runMain(main);
+if (import.meta.main) await program.parseAsync();

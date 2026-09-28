@@ -5,11 +5,16 @@ import { z } from "zod";
 import { decodeFile, decodeJson } from "../../../../packages/decode/index";
 import { errorCode, paneAgent } from "./herdr";
 
+/** How often to check whether the trial agent has exited after `/exit`. */
 const EXIT_POLL_MS = 500;
+/** How long the trial agent gets to exit before the reset or teardown fails. */
 const EXIT_TIMEOUT_MS = 30_000;
+/** How long a new trial session gets to reach its prompt after the trust dialog. */
 const START_TIMEOUT_MS = 60_000;
 const TRUST_DIALOG = /trust (this|the files in this) folder/i;
+/** The dialog's cursor line when it sits on the "Yes" option. */
 const TRUST_CURSOR = /❯\s+Yes/;
+/** Most `down` presses to try before concluding the dialog has no "Yes" option. */
 const TRUST_OPTIONS = 5;
 
 const WorktreeCreated = z.object({

@@ -63,6 +63,12 @@ export interface Blocked {
   questions: z.output<typeof Questions>["questions"];
 }
 
+/** Longest `final` text a turn digest carries, enough for the closing summary's first lines. */
+const FINAL_CHARS = 300;
+/** Longest prompt a turn digest carries. */
+const PROMPT_CHARS = 200;
+const MS_PER_SECOND = 1000;
+
 const SKILL_DIR = /^Base directory for this skill: (\S+)/;
 const COMMAND_NAME = /<command-name>([^<]*)<\/command-name>/;
 const COMMAND_ARGS = /<command-args>([^<]*)<\/command-args>/;
@@ -144,7 +150,8 @@ export class TurnTracker {
         }
         continue;
       }
-      if (block.type === "text" && block.text !== undefined) turn.final = clip(block.text, 300);
+      if (block.type === "text" && block.text !== undefined)
+        turn.final = clip(block.text, FINAL_CHARS);
       if (block.type !== "tool_use" || block.name === undefined) continue;
       turn.tools[block.name] = (turn.tools[block.name] ?? 0) + 1;
       const skill = block.name === "Skill" ? inputField(block.input, "skill") : undefined;
@@ -167,7 +174,7 @@ export class TurnTracker {
     const task = content.startsWith(TASK_NOTIFICATION)
       ? TASK_SUMMARY.exec(content)?.[1]
       : undefined;
-    turn.prompt = clip(command ?? (task === undefined ? content : `task: ${task}`), 200);
+    turn.prompt = clip(command ?? (task === undefined ? content : `task: ${task}`), PROMPT_CHARS);
     if (source === undefined) delete turn.source;
     else turn.source = source;
   }
@@ -245,7 +252,7 @@ export function render(lines: Line[], max: number): string[] {
     if (entry.isSidechain) continue;
     const content = entry.message?.content;
     if (entry.type === "system" && entry.subtype === "turn_duration") {
-      out.push(`-- turn end (${Math.round((entry.durationMs ?? 0) / 1000)}s)`);
+      out.push(`-- turn end (${Math.round((entry.durationMs ?? 0) / MS_PER_SECOND)}s)`);
     }
     if (entry.type !== "user" && entry.type !== "assistant") continue;
     if (typeof content === "string") {

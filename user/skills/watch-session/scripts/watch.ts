@@ -11,7 +11,9 @@ import { paneAgent } from "./herdr";
 import { type Blocked, Entry, render, splitLines, type Turn, TurnTracker } from "./transcript";
 import { endTrial, startTrial } from "./trial";
 
+/** How often a pane watch asks herdr whether the pane's session changed, ended, or blocked on a dialog. */
 const PANE_CHECK_MS = 10_000;
+const MS_PER_SECOND = 1000;
 
 const State = z.object({
   offset: z.number(),
@@ -170,7 +172,7 @@ class Watcher {
 
   private dispatch(event: Turn | Blocked): void {
     if (event.event === "blocked") {
-      if (event.at <= (this.blockedAt ?? -1)) return;
+      if (this.blockedAt !== undefined && event.at <= this.blockedAt) return;
       this.blockedAt = event.at;
     }
     if (this.options.every === 0) emit(event);
@@ -179,7 +181,7 @@ class Watcher {
 
   private flush(force: boolean): void {
     if (!this.batch) return;
-    if (!force && Date.now() - this.lastFlush < this.options.every * 1000) return;
+    if (!force && Date.now() - this.lastFlush < this.options.every * MS_PER_SECOND) return;
     emit(this.batch);
     this.batch = undefined;
     this.lastFlush = Date.now();

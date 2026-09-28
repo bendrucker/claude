@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<out>(?:(?!</out>)[\s\S])*?(?:author|writing a module).{0,60}(aware|know|worry|understand|think about).{0,40}(quirk|this|it\b)'
+pattern: '<out>(?:(?!</out>)[\s\S])*?(?:(?:author|writing (?:a module|modules))[\s\S]{0,100}(?:quirk|this|it\b)|(?:quirk|this|it\b)[\s\S]{0,100}(?:author|writing (?:a module|modules)))'
 flags: i
 match: contains
 ---

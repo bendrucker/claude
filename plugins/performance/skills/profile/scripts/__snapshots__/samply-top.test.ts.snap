@@ -1,0 +1,32 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`summary renders tables 1`] = `
+"╔═════════╤═════╤═══════╤═════════╤════════╤═════════╗
+║ process │ pid │ at ms │ wall ms │ cpu ms │ threads ║
+╟─────────┼─────┼───────┼─────────┼────────┼─────────╢
+║ demo    │ 1   │ 0.0   │ 10.0    │ 4.0    │ 1       ║
+╚═════════╧═════╧═══════╧═════════╧════════╧═════════╝
+
+Self time (cpu ms, 4.0 total):
+╔═════════════╤═════════════╤═══════╗
+║ function    │ self cpu ms │ share ║
+╟─────────────┼─────────────┼───────╢
+║ hash (demo) │ 3.0         │ 75.0% ║
+╟─────────────┼─────────────┼───────╢
+║ work (demo) │ 1.0         │ 25.0% ║
+╚═════════════╧═════════════╧═══════╝
+
+Inclusive time (cpu ms):
+╔═════════════╤══════════════╤════════╗
+║ function    │ total cpu ms │ share  ║
+╟─────────────┼──────────────┼────────╢
+║ work (demo) │ 4.0          │ 100.0% ║
+╟─────────────┼──────────────┼────────╢
+║ main (demo) │ 4.0          │ 100.0% ║
+╟─────────────┼──────────────┼────────╢
+║ hash (demo) │ 3.0          │ 75.0%  ║
+╚═════════════╧══════════════╧════════╝
+"
+`;
+
+exports[`summary renders JSON 1`] = `"{"weight":"cpu","totalMs":4,"processes":[{"name":"demo","pid":"1","atMs":0,"wallMs":10,"cpuMs":4,"threads":1}],"self":[{"function":"hash (demo)","ms":3,"percent":75},{"function":"work (demo)","ms":1,"percent":25}],"inclusive":[{"function":"work (demo)","ms":4,"percent":100},{"function":"main (demo)","ms":4,"percent":100},{"function":"hash (demo)","ms":3,"percent":75}]}"`;

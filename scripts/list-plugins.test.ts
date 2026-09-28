@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { type Plugin, select } from "./list-plugins";
+import { type Plugin, select, toMatrixEntries } from "./list-plugins";
 
 const plugins: Plugin[] = [
   { name: "writing", paths: [] },
@@ -39,4 +39,18 @@ test("an always path runs every plugin", () => {
     "pull-request",
     "review",
   ]);
+});
+
+test.each<{ name: string; config: Parameters<typeof toMatrixEntries>[1]; runners: string[] }>([
+  { name: "default", config: undefined, runners: ["ubuntu-latest"] },
+  { name: "one", config: { runner: "macos-latest" }, runners: ["macos-latest"] },
+  {
+    name: "several",
+    config: { runner: ["ubuntu-latest", "macos-latest"] },
+    runners: ["ubuntu-latest", "macos-latest"],
+  },
+])("matrix entries for $name runner", ({ config, runners }) => {
+  expect(toMatrixEntries("performance", config)).toEqual(
+    runners.map((runner) => ({ name: "performance", runner })),
+  );
 });

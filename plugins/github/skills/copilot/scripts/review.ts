@@ -462,6 +462,34 @@ interface RunOptions {
   cap: number;
   cwd: string;
   agentic: boolean;
+  env: Record<string, string>;
+}
+
+const TOKEN_VARS = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"];
+
+/**
+ * A token that is not already in the environment comes from `gh auth token`, run here under
+ * the real HOME. Null means no token resolved, and Copilot would fail before inference.
+ */
+export function copilotAuth(
+  env: Record<string, string | undefined>,
+  ghToken: () => string | null,
+): Record<string, string> | null {
+  if (TOKEN_VARS.some((name) => (env[name] ?? "") !== "")) return {};
+  const token = ghToken();
+  return token === null ? null : { COPILOT_GITHUB_TOKEN: token };
+}
+
+function ghAuthToken(): string | null {
+  if (Bun.which("gh") === null) return null;
+  // A keychain prompt in a headless session never answers, and a timeout reads as no token.
+  const result = Bun.spawnSync(["gh", "auth", "token"], {
+    stdout: "pipe",
+    stderr: "pipe",
+    timeout: 10_000,
+  });
+  const token = result.stdout.toString().trim();
+  return result.exitCode === 0 && token !== "" ? token : null;
 }
 
 /**
@@ -499,12 +527,17 @@ export interface Spawned {
   exited: Promise<number>;
 }
 
-export type Spawn = (args: string[], stdin: Uint8Array, cwd: string) => Spawned;
+export type Spawn = (
+  args: string[],
+  stdin: Uint8Array,
+  cwd: string,
+  env: Record<string, string>,
+) => Spawned;
 
-const spawnCopilot: Spawn = (args, stdin, cwd) =>
+const spawnCopilot: Spawn = (args, stdin, cwd, env) =>
   Bun.spawn(args, {
     cwd,
-    env: { ...process.env, HOME: COPILOT_HOME },
+    env: { ...process.env, ...env, HOME: COPILOT_HOME },
     stdin,
     stdout: "pipe",
     stderr: "pipe",
@@ -516,7 +549,7 @@ export async function runCopilot(
   options: RunOptions,
   spawn: Spawn = spawnCopilot,
 ): Promise<Result> {
-  const child = spawn(copilotArgs(options), Buffer.from(prompt, "utf8"), options.cwd);
+  const child = spawn(copilotArgs(options), Buffer.from(prompt, "utf8"), options.cwd, options.env);
 
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(child.stdout).text(),
@@ -701,9 +734,20 @@ async function main(): Promise<void> {
   let model = argv.flags.model;
   let plannedAngles = angleCount;
   let meter: Meter | null = null;
+  let auth: Record<string, string> = {};
 
   // A dry run spends nothing, so it neither needs the meter nor should fail without one.
   if (!argv.flags.dryRun) {
+    const resolved = copilotAuth(process.env, ghAuthToken);
+    if (!resolved) {
+      console.error(`${RED}No GitHub token for Copilot, so refusing to run.${RESET}`);
+      console.error(
+        `${YELLOW}Run \`gh auth login\`, or set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN.${RESET}`,
+      );
+      process.exit(1);
+    }
+    auth = resolved;
+
     try {
       meter = readMeter(new Date());
     } catch (error) {
@@ -821,7 +865,13 @@ async function main(): Promise<void> {
     for (const { angle, prompt } of prompts) {
       results.push(
         // oxlint-disable-next-line no-await-in-loop -- every spawn shares COPILOT_HOME and the session ledger written there.
-        await runCopilot(prompt, angle, { model, cap, cwd: workdir, agentic: argv.flags.agentic }),
+        await runCopilot(prompt, angle, {
+          model,
+          cap,
+          cwd: workdir,
+          agentic: argv.flags.agentic,
+          env: auth,
+        }),
       );
     }
     return results;

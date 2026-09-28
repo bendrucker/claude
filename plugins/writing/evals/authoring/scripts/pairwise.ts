@@ -262,9 +262,17 @@ export async function buildPairs(flags: PairsFlags): Promise<Pair[]> {
   if (flags.original !== undefined) {
     const originalDir = flags.original;
     for (const [caseName, texts] of candidateDrafts) {
+      const recordPath = join(originalDir, `${caseName}.json`);
+      // oxlint-disable-next-line no-await-in-loop -- one case's original checked at a time, in case order.
+      if (!(await Bun.file(recordPath).exists())) {
+        console.error(`skip ${caseName}: no original`);
+        continue;
+      }
       // oxlint-disable-next-line no-await-in-loop -- one case's original text read at a time, in case order.
-      const record = await decodeFile(OriginalRecord, join(originalDir, `${caseName}.json`));
-      const text = decode(z.string(), record[flags.field], `${caseName}.json field ${flags.field}`);
+      const record = await decodeFile(OriginalRecord, recordPath);
+      const raw = decode(z.string(), record[flags.field], `${caseName}.json field ${flags.field}`);
+      // oxlint-disable-next-line no-await-in-loop -- one case's before file read at a time.
+      const [text = raw] = await trimToChange(flags.before, caseName, [raw]);
       const surface = surfaceFor(caseName, tags, surfaceOverrides);
       // oxlint-disable-next-line no-await-in-loop -- one case's prompt.md read at a time, in case order.
       const brief = await briefFor(flags.suite, caseName);

@@ -13,7 +13,7 @@ const HookInput = z.looseObject({
   session_id: z.string().catch(""),
   transcript_path: z.string().catch(""),
   cwd: z.string().catch(""),
-  permission_mode: z.string().optional().catch(undefined),
+  permission_mode: z.string().catch(""),
   tool_name: z.string().catch(""),
   tool_input: z.unknown().catch(undefined),
   tool_response: z.unknown().catch(undefined),

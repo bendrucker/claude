@@ -62,7 +62,7 @@ When the Mac's A/A will not tie or the fast signal needs `perf` or hardware coun
 
 - `*` marks a change with permutation p below `--alpha` (0.1) and a size of at least `--min-effect` (3%). An unstarred change is a tie, however large it looks.
 - `†` marks fewer than 4 runs on a side, too few to star.
-- A nonzero `failed` count means some runs exited nonzero and left the pool. Find out why before reading the row.
+- A nonzero `failed` count means some runs exited nonzero and left the pool. `compare.ts run` stops after the round where a run fails. Run that arm once with its output visible and fix the cause before starting a new comparison.
 - About one comparison in ten stars by chance at the default alpha. Re-run a star on a metric nobody predicted would move before treating it as a result.
 
 ## Fast Signals

@@ -250,7 +250,13 @@ const runCmd = command(
       if (proc.exitCode !== 0)
         throw new Error(`hyperfine exited ${proc.exitCode} in round ${round + 1}`);
       // oxlint-disable-next-line no-await-in-loop -- rounds run one after another, and each reports before the next starts.
-      console.error(`  ${progress(pool([Export.parse(await Bun.file(out).json())]))}`);
+      const pooled = pool([Export.parse(await Bun.file(out).json())]);
+      console.error(`  ${progress(pooled)}`);
+      const failed = pooled.filter((a) => a.failures > 0).map((a) => a.name);
+      if (failed.length > 0)
+        throw new Error(
+          `${failed.join(", ")} failed in round ${round + 1}. Run each once with its output visible to find the cause before measuring`,
+        );
     }
     console.error(
       `results in ${argv._.out}; next: compare.ts report ${argv._.out} --base ${arms[0]?.name}`,

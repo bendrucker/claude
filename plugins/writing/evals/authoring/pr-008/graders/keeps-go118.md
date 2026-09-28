@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<out>(?:(?!</out>)[\s\S])*?go\W{0,3}1\.18'
+pattern: '<out>(?:(?!</out>)[\s\S])*?go[\s\S]{0,40}1\.18'
 flags: i
 match: contains
 ---

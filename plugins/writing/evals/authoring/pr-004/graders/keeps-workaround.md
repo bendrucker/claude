@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<out>(?:(?!</out>)[\s\S])*?(other|existing|already|handled|various|several).{0,40}repo'
+pattern: '<out>(?:(?!</out>)[\s\S])*?(other|existing|already|handled|various|several|few|handful|some|number of|couple).{0,40}repo'
 flags: i
 match: contains
 ---

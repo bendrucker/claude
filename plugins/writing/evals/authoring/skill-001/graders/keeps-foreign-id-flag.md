@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<out>(?:(?!</out>)[\s\S])*?(?:repeat[\s\S]{0,400}--machine[\s\S]{0,150}(?:every|each)|(?:every|each)[\s\S]{0,150}--machine[\s\S]{0,400}repeat)'
+pattern: '<out>(?:(?!</out>)[\s\S])*?(?:(?:repeat|the same id|shares (?:that|an) id)[\s\S]{0,400}--machine[\s\S]{0,150}(?:every|each)|(?:every|each)[\s\S]{0,150}--machine[\s\S]{0,400}(?:repeat|the same id|shares (?:that|an) id)|--machine[\s\S]{0,150}(?:every|each)[\s\S]{0,400}(?:repeat|the same id|shares (?:that|an) id))'
 flags: i
 match: contains
 ---

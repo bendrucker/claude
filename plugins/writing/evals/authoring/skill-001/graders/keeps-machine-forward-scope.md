@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<out>(?:(?!</out>)[\s\S])*?(?:--machine[\s\S]{0,400}notification[\s\S]{0,300}exit 2|exit 2[\s\S]{0,300}notification[\s\S]{0,400}--machine)'
+pattern: '<out>(?:(?!</out>)[\s\S])*?(?:--machine[\s\S]{0,400}notification[\s\S]{0,300}exits? 2|exits? 2[\s\S]{0,300}notification[\s\S]{0,400}--machine)'
 flags: i
 match: contains
 ---

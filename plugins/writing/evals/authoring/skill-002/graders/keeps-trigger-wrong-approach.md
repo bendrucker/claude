@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<out>(?:(?!</out>)[\s\S])*?run to run(?:(?!</out>)[\s\S]){0,150}wrong approach'
+pattern: '<out>(?:(?!</out>)[\s\S])*?run to run(?:(?!</out>)[\s\S]){0,150}(?:wrong approach|bad (?:solution )?(?:path|approach))'
 flags: i
 match: contains
 ---

@@ -25,9 +25,9 @@ Interview the user in rounds with `AskUserQuestion`, one question per open decis
 - **Metric.** The number the user cares about, on an exact scenario: the command, its input state, and the machine state. Start from who waits on the result and when: a person running it by hand after a change, a CI job, a scheduled background run. The scenario the user waits through is the one to measure, and it can differ from the run the code handles most often. A scheduled run nobody waits on can take on extra work that speeds the waited-on one. "Wall time of a sync run by hand right after one upstream commit" is a metric. "Make it faster" is not.
 - **Ceiling.** The value past which further gains stop mattering to the user. The climb stops there.
 - **Fast signal.** A cheaper or lower-noise number that moves with the metric: CPU time, instructions retired, work per tick, bytes. Accept on it only after the baseline shows it tracks the metric.
-- **Guard.** What must stay identical: output, final state, exit code. Name the check that proves it.
+- **Guard.** What must stay identical: output, final state, exit code. Name the check that proves it. When a candidate can change lookup order (`PATH`, module or library search paths), the guard compares what each name resolves to. Only the user relaxes a guard.
 - **Side effects.** Everything a run touches outside itself: network, remote state, installed files, caches. Decide per item whether to stub it, hold it fixed, or reset it before each run. A run that changes its own input state measures a different scenario each time.
-- **Scope.** Which changes are allowed: code, config, dependencies, external tools, public API.
+- **Scope.** Which changes are allowed: code, config, dependencies, external tools, public API. When caching is in scope, ask where a cache may live and how it invalidates.
 - **Inputs.** Which scenarios are `dev` (tuned against) and which are `holdout` (scored once at the end). Prefer real inputs over synthetic ones for `holdout`.
 - **Budget.** How long the climb may run and how the user wants progress between checkpoints.
 
@@ -40,7 +40,7 @@ Interview the user in rounds with `AskUserQuestion`, one question per open decis
 
 Build the benchmark per `performance:benchmark`, or adopt the project's own when it meets that skill's requirements. Then, before the baseline:
 
-- **Audit.** Check the harness against the Frame's scenario. Debug or profiling builds, a cache warmer than the scenario's, and a loaded machine measure the harness instead of the program.
+- **Audit.** Check the harness against the Frame's scenario. Confirm its command runs to the end point the user waits for: a shell benchmark that exits before the first prompt skips everything deferred to it. Debug or profiling builds, a cache warmer than the scenario's, and a loaded machine measure the harness instead of the program.
 - **Watchers.** When runs or resets write many files, look for processes watching the filesystem (backup, indexing, sync clients). Ask the user to exclude the harness directory.
 - **Isolation.** Run the program twice from a fresh reset and diff the end states. A difference is state the reset misses or a side effect leaking out.
 - **Tight loop.** Each run's cost repeats across every A/A, candidate, and re-baseline. Reset per run only the state the scenario depends on. Hoist work that feeds every run identically into `--setup`: fixture builds, toolchain installs, downloads and inputs the metric does not cover. Repeat the end-state diff after each hoist, and return a step to the reset when the diff or the A/A shifts.
@@ -90,7 +90,7 @@ Stop when any of these holds, and say which:
 - The metric reached the ceiling.
 - Three candidates in a row were rejected.
 - The profile's remaining entries are outside the Frame's scope.
-- The budget cannot cover another candidate at the baseline's run count.
+- The budget cannot cover another candidate at the baseline's run count while leaving time for the holdout and the report.
 
 When an ETA was given, re-estimate it after each decision, counting the validation runs still ahead. Tell the user as soon as the estimate slips.
 

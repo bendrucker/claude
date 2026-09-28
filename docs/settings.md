@@ -84,6 +84,10 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 **Drop it** when a later CLI caps `general-purpose` under Fable natively.
 
+`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` loads the mods in `plugins/*/mod/`, which the engine skips without it while function hooks are early access. See [`mods.md`](../.claude/rules/mods.md).
+
+**Drop it** when function hooks load by default.
+
 ## Hooks
 
 Why a hook entry in `user/settings.json` earns its place, and what would retire it, for the entries that ship no `README.md` of their own. The hook scripts live in [`user/hooks/`](../user/hooks).

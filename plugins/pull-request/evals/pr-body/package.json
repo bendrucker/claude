@@ -16,6 +16,6 @@
   },
   "devDependencies": {
     "@hegeldev/hegel": "^0.4.7",
-    "promptfoo": "0.122.2"
+    "promptfoo": "0.123.1"
   }
 }

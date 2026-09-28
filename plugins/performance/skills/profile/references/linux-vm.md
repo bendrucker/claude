@@ -18,7 +18,7 @@ It does not transfer when the time goes to what differs between the platforms:
 - Filesystem behavior: APFS against ext4, `fsync` (macOS needs `F_FULLFSYNC` to reach the disk), case-insensitive lookups, `clonefile`, FSEvents against inotify.
 - Event and syscall layers: kqueue against epoll, and the system allocator.
 
-When the metric is a macOS number, confirm the final base-against-final comparison on the Mac, even when every candidate was screened in the VM.
+Split a climb whose profile has both kinds: measure candidates that target a platform-specific cost on the Mac, and move the platform-neutral ones to the VM. When the metric is a macOS number, confirm the final base-against-final comparison on the Mac, even when every candidate was screened in the VM.
 
 ## Local VM
 

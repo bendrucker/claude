@@ -60,10 +60,6 @@ function makeRow(overrides: Partial<ToolCallRow> = {}): ToolCallRow {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Eligibility (the hand-written rule's date windows)
-// ---------------------------------------------------------------------------
-
 test.each<{ name: string; createdAt: string; expected: boolean }>([
   { name: "well before the cutoff", createdAt: "2024-01-01T00:00:00Z", expected: true },
   { name: "one second before the cutoff", createdAt: "2025-02-23T23:59:59Z", expected: true },
@@ -89,10 +85,6 @@ test.each<{ name: string; createdAt: string; expected: boolean }>([
   expect(isEligibleDate(createdAt)).toBe(expected);
 });
 
-// ---------------------------------------------------------------------------
-// AI-authorship markers and prose length
-// ---------------------------------------------------------------------------
-
 test.each<{ name: string; text: string; expected: boolean }>([
   { name: "mentions Claude", text: "Drafted with Claude's help", expected: true },
   { name: "case-insensitive Claude", text: "used claude for this", expected: true },
@@ -114,10 +106,6 @@ test.each<{ name: string; body: string; expected: number }>([
 ])("proseLength: $name", ({ body, expected }) => {
   expect(proseLength(body)).toBe(expected);
 });
-
-// ---------------------------------------------------------------------------
-// Diff size and content filters
-// ---------------------------------------------------------------------------
 
 test.each<{ name: string; path: string; expected: boolean }>([
   { name: "markdown", path: "docs/README.md", expected: false },
@@ -258,10 +246,6 @@ test.each<{
 ])("candidateBody: $name", ({ message, targetFiles, minWords, expected }) => {
   expect(candidateBody(message, targetFiles, minWords)).toBe(expected);
 });
-
-// ---------------------------------------------------------------------------
-// Session-link exclusion
-// ---------------------------------------------------------------------------
 
 test.each<{ name: string; repo: string; expected: string }>([
   { name: "owner/repo", repo: "bendrucker/claude", expected: "claude" },
@@ -421,10 +405,6 @@ test("hasTouchedFile requires repo, time, and a matching file path suffix", () =
   );
 });
 
-// ---------------------------------------------------------------------------
-// Selection: weave, selectSample, assignSplit, markBalance
-// ---------------------------------------------------------------------------
-
 test("weave interleaves longest and shortest", () => {
   const lengths = [1, 2, 3, 4, 5];
   expect(weave(lengths, (n) => n)).toEqual([5, 1, 4, 2, 3]);
@@ -503,15 +483,9 @@ test("markBalance marks the smallest-weight dev items and leaves holdout untouch
   const balanced = markBalance(items, 1, (item) => item.diff.changedLines);
   expect(balanced.find((i) => i.ref === "small-dev")?.balance).toBe(true);
   expect(balanced.find((i) => i.ref === "big-dev")?.balance).toBe(false);
-  // The third item lands in the holdout split (index 2, per assignSplit) and
-  // is never eligible for balance marking even though its weight is smallest.
   expect(balanced.find((i) => i.ref === "holdout-small")?.split).toBe("holdout");
   expect(balanced.find((i) => i.ref === "holdout-small")?.balance).toBe(false);
 });
-
-// ---------------------------------------------------------------------------
-// Rendering
-// ---------------------------------------------------------------------------
 
 test("renderBriefsMarkdown formats a table per surface plus a Gaps section", () => {
   const pr = makeSplitCandidate({ id: "pr-001", repo: "bendrucker/claude", ref: "42" });

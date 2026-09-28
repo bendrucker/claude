@@ -137,8 +137,6 @@ describe("parseRule", () => {
 });
 
 describe("scoreRules and scoreCatalog", () => {
-  // "delve" sits at chars 3-8 of "We delve often."; p1's winner ("b") has no defect and no hit,
-  // p2's winner ("b") carries an unmarked hit, so precision has a denominator without a numerator.
   const pairs = new Map([
     ["p1", pair("p1", "We delve often.", "A plain and clear line.")],
     ["p2", pair("p2", "Another plain phrase.", "We delve daily.")],
@@ -153,7 +151,6 @@ describe("scoreRules and scoreCatalog", () => {
 
   test("precision is scored only on the drafts Ben preferred", () => {
     const score = scoreRules([rule], pairs, labels);
-    // p1's winner "b" has no "delve"; p2's winner "b" has an unmarked "delve": one flagged, zero confirmed.
     expect(score).toMatchObject({ flagged: 1, confirmed: 0, precision: 0 });
   });
 

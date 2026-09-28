@@ -137,7 +137,6 @@ export function parseMap(entries: string[]): Map<string, string> {
   return map;
 }
 
-/** A case's surface from an override, falling back to the one SURFACES tag its case.yaml carries. */
 export function surfaceFor(
   caseName: string,
   tags: Map<string, string[]>,
@@ -278,7 +277,6 @@ export function renderJudgePrompt(template: string, pair: Pair, left: Key): stri
     .replaceAll("{{right}}", pair[right].text);
 }
 
-/** Converts the judge's blinded "1"/"2"/"tie" pick back to a/b/tie, given which key was left. */
 export function deblindPick(raw: "1" | "2" | "tie", left: Key): Pick {
   if (raw === "tie") return "tie";
   const right: Key = left === "a" ? "b" : "a";
@@ -359,11 +357,7 @@ export function isFresh(existing: Judgment | undefined, promptHash: string): exi
   return existing?.prompt === promptHash;
 }
 
-/**
- * Runs `fn` over `items` in batches of `concurrency`, each batch fully parallel. A judge script
- * only needs to bound how many API calls are in flight, so this is simpler than a continuous
- * worker pool.
- */
+/** Runs `fn` over `items` in batches of `concurrency`, each batch fully parallel. */
 export async function mapPool<T, R>(
   items: readonly T[],
   concurrency: number,
@@ -442,7 +436,7 @@ export function winValue(pick: Pick): number {
 /**
  * Two-sided sign-flip permutation p-value for a win rate against the no-preference null of 0.5.
  * Ties always flip to themselves, so they carry no evidence either way. Deterministic under a
- * seeded `rng`, matching how `evals/native/compare.ts` seeds its own permutation test.
+ * seeded `rng`.
  */
 export function signFlipPValue(
   wins: readonly number[],
@@ -558,7 +552,7 @@ async function scoreMain(flags: ScoreFlags): Promise<void> {
   console.log(formatScore(scoreJudgments(pairs, judgments), flags.alpha));
 }
 
-/** Wilson score interval for a proportion, mirrored from `plugins/prompting/evals/rule-precision/precision.ts`. */
+/** Wilson score interval for a proportion. */
 export function wilson(hits: number, total: number, zScore = 1.96): [number, number] {
   if (total === 0) return [0, 1];
   const p = hits / total;
@@ -577,7 +571,7 @@ export interface Comparison {
   agree: boolean;
 }
 
-/** Pairs each Label with the Judgment sharing its id. Ties on either side never count as agreement. */
+/** Ties on either side never count as agreement. */
 export function compareLabels(
   labels: Label[],
   judgments: Judgment[],

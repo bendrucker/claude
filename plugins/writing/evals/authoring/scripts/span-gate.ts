@@ -16,12 +16,10 @@ import { wilson } from "../../../../prompting/evals/rule-precision/precision";
 import { type Key, Label, Pair } from "./pairs";
 
 /**
- * A scoreable detector, unified over the shapes `detection/tropes.ts` and a candidate carry. A
- * plain regex and a function `test` mirror `PatternDef`; `weighted` mirrors `WeightedPatternGroup`
- * (`weightedStemHits` returns an aggregate, not per-hit positions, so it still reports at most
- * one location per draft, same as the shipped scan surfaces); `wordlist` is a candidate wordlist
- * scored word-by-word, since `compileStemmedWordlist` (`detection/wordlists.ts`) reports only an
- * aggregate count and sample, never per-hit positions.
+ * A scoreable detector: a plain regex, a function `test`, or a candidate wordlist scored
+ * word-by-word. The `weighted` and `wordlist` variants report at most one location per draft,
+ * since their underlying scorers (`weightedStemHits`, `compileStemmedWordlist`) return only an
+ * aggregate count, never per-hit positions.
  */
 export type Rule =
   | { kind: "regex"; category: string; test: RegExp }
@@ -72,8 +70,7 @@ function blankCode(text: string): string {
   return text.replace(FENCED_CODE_BLOCK, blank).replace(INLINE_CODE, blank);
 }
 
-// Mirrors `plugins/writing/detection/scan.ts`'s `regexResults`/`weightedResults`, but reports a
-// char offset instead of a line/column, since a labeled `Span` is offset-keyed.
+// Reports a char offset instead of a line/column, since a labeled `Span` is offset-keyed.
 export function indexedScan(text: string, rule: Rule): IndexedMatch[] {
   const stripped = blankCode(text);
   if (rule.kind === "regex") {
@@ -117,7 +114,7 @@ function unionScan(text: string, rules: Rule[]): IndexedMatch[] {
   return rules.flatMap((rule) => indexedScan(text, rule));
 }
 
-/** Every regex- and function-backed pattern plus every weighted group, as `writing:scan` reports them. */
+/** Every regex- and function-backed pattern plus every weighted group. */
 export function catalogRules(): Rule[] {
   const plain: Rule[] = [...PATTERNS, ...BATCH_PATTERNS].map((def) =>
     typeof def.test === "function"
@@ -133,7 +130,7 @@ export function catalogRules(): Rule[] {
   return [...plain, ...weighted];
 }
 
-/** A candidate given on the command line as `name=/pattern/flags`, mirroring rule-precision.ts's format. */
+/** A candidate given on the command line as `name=/pattern/flags`. */
 export function parseRule(spec: string): Rule {
   const split = spec.indexOf("=");
   if (split < 1) throw new Error(`rule must be name=/pattern/flags, got: ${spec}`);
@@ -150,7 +147,7 @@ export function parseRule(spec: string): Rule {
   };
 }
 
-/** A candidate wordlist scored as one rule, stemmed the same way `compileStemmedWordlist` does. */
+/** A candidate wordlist scored as one rule. */
 export function wordlistRule(name: string, content: string): Rule {
   const stems = new Set<string>();
   for (const entry of parseLines(content)) {

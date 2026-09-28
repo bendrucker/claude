@@ -39,10 +39,8 @@ export interface TokenUsage {
  * every call the query pipeline made: main loop, Task subagents, and internal calls) is
  * preferred over `usage` (main agent loop only), per the Agent SDK's own field docs
  * (`@anthropic-ai/claude-agent-sdk` `sdk.d.ts`, `SDKResultSuccess`/`SDKResultError`). Both
- * fields are cumulative across turns, so only the trace's last `result` line is read, mirroring
- * `traceReply`. Returns undefined when neither field is present, which a caller must treat as
- * "unmeasured," not zero: no fixture trace with real usage was available to confirm the field
- * actually ships on a `claude plugin eval` trace, only its SDK type declaration.
+ * fields are cumulative across turns, so only the trace's last `result` line is read. Returns
+ * undefined when neither field is present, which a caller must treat as "unmeasured," not zero.
  */
 export function tokenUsage(trace: string): TokenUsage | undefined {
   for (const raw of trace.trim().split("\n").toReversed()) {
@@ -104,10 +102,8 @@ function blockText(content: unknown): string {
 // `check-tropes.ts`'s `processSideEffect` requires to block a Bash call (PR/issue body prose);
 // every other deny-tier category there only ever reaches `formatContext`, a reminder that lets
 // the call through. `plugins/writing/hooks/numbering.ts` denies only a Write/Edit to a
-// non-markdown file. Hand-maintained the same way, and for the same reason, as
-// `plugins/claude-code/skills/session/resources/views.sql`'s `hook_denies` patterns: a hook
-// builds its reason at runtime, so the string cannot be read off source, and it drifts as hooks
-// are reworded.
+// non-markdown file. The list is hand-maintained because a hook builds its reason at runtime, so
+// the string cannot be read off source, and it drifts as hooks are reworded.
 export const WRITING_DENY_MARKERS = [
   "are an AI writing tell",
   "opens the comment with a salutation",
@@ -115,18 +111,17 @@ export const WRITING_DENY_MARKERS = [
 ];
 
 // Since 2026-09-19 the harness prepends this before a PreToolUse deny's reason reaches the
-// denied call's tool_result (see the `hook_denies` view comment cited above). Stripping it is
-// not required for the substring match above, but keeps `reason` comparable to the hook's own
-// source text.
+// denied call's tool_result. Stripping it is not required for the substring match above, but
+// keeps `reason` comparable to the hook's own source text.
 const HARNESS_PREFIX = /^\s*PreToolUse:\w+ hook error:\s*/;
 
 /**
  * Count of writing-hook denies in a trace. A PreToolUse hook returning `permissionDecision:
  * "deny"` writes no separate hook record: the surviving trace is a `tool_result` with
- * `is_error: true` whose content is the hook's `permissionDecisionReason` (see
- * `plugins/writing/hooks/io.ts`'s `formatDecision`). Matching is scoped to the known writing-hook
- * reason text rather than "any error," so a stubbed network failure (this suite's fixtures fail
- * every `gh`/`glab` create call on purpose) or a `pull-request:validate-body` deny never counts.
+ * `is_error: true` whose content is the hook's `permissionDecisionReason`. Matching is scoped to
+ * the known writing-hook reason text rather than "any error," so a stubbed network failure
+ * (this suite's fixtures fail every `gh`/`glab` create call on purpose) or a
+ * `pull-request:validate-body` deny never counts.
  */
 export function hookDenies(trace: string): number {
   let count = 0;
@@ -144,7 +139,7 @@ export function hookDenies(trace: string): number {
   return count;
 }
 
-/** Trope density per 1000 words, summed across every category `writing:scan` reports. */
+/** Trope density per 1000 words. */
 export function tropeDensity(text: string): number {
   const report = scoreText(text, undefined);
   if (report.wordCount === 0) return 0;
@@ -224,8 +219,6 @@ export interface JsonReport {
 const fmt = (xs: number[], digits: number): string =>
   xs.length > 0 ? mean(xs).toFixed(digits) : "-";
 
-// Mirrors compare.ts's own `mark`/`row` helpers (not exported) over `pValue`/`pFloor`, which
-// are exported and reused here rather than re-implemented.
 function mark(base: number[], xs: number[], alpha: number): string {
   if (base.length === 0 || xs.length === 0) return "";
   if (pFloor(base.length, xs.length) >= alpha) return "†";

@@ -5,26 +5,12 @@ import { cli } from "cleye";
 import { z } from "zod";
 import { decodeJson } from "../../../../../packages/decode/index";
 
-// Mine candidate briefs: deliverables Ben (@bendrucker) wrote by hand in public
-// repos, for a new end-to-end eval to replay ("open a PR for this branch" ->
-// compare the session's draft against Ben's original). Four surfaces: PR
-// bodies, issues, docs/README sections, and skill/CLAUDE.md prose.
-//
-// Hand-written rule (strict): a deliverable qualifies only if it was created
-// before 2025-02-24 (pre-Claude-Code), or created on/after 2026-06-30 with no
-// session in the index touching it (no pr_links row for a PR; no gh issue
-// create / git commit tool call in that repo around that time for an issue or
-// commit). Everything in between is excluded outright. So is any body
-// containing an AI-authorship marker.
-//
-// Egress rule: the duckdb probe is hardcoded to host = 'local'. GitHub search
-// and content come from the public API (api.github.com) via `gh`, scoped to
-// --author bendrucker; no work-host content is read.
+// Candidate briefs from public repos, restricted to hand-written deliverables: created before
+// 2025-02-24, or after 2026-06-30 with no indexed session touching them. The index probe is
+// scoped to host = 'local'.
 
 export const PRE_CLAUDE_CODE = "2025-02-24T00:00:00Z";
 export const POST_WINDOW = "2026-06-30T00:00:00Z";
-// Floor for the "old" side of a commit search: earlier than any of Ben's
-// GitHub activity, so it doesn't clip a repo's early history.
 export const EARLIEST_MINING_DATE = "2005-01-01T00:00:00Z";
 
 const AI_MARKER_PATTERNS = [/\bclaude\b/i, /generated with/i, /co-authored-by/i];
@@ -122,7 +108,6 @@ export function fitsDiffBudget(
   );
 }
 
-// Words added by a unified-diff patch (added lines only, "+++" header excluded).
 export function countWordsAdded(patch: string): number {
   let words = 0;
   for (const line of patch.split("\n")) {
@@ -134,13 +119,10 @@ export function countWordsAdded(patch: string): number {
   return words;
 }
 
-// A standalone badge image, optionally link-wrapped: "[![alt](img)](url)" or "![alt](img)".
 const BADGE_LINE = /^\[?!\[[^\]]*\]\([^)]*\)\]?(\([^)]*\))?$/;
 const TABLE_ROW = /^\|.*\|$/;
 
-// Prose among a unified-diff patch's added lines: code fences, standalone
-// badge images, and table rows are dropped, so a boilerplate-heavy README
-// commit (a template, a badge row, an API table) doesn't read as prose.
+// Added prose in a patch, minus code fences, badge images, and table rows.
 export function extractAddedProse(patch: string): string {
   const lines: string[] = [];
   let inFence = false;
@@ -155,8 +137,6 @@ export function extractAddedProse(patch: string): string {
     if (inFence || BADGE_LINE.test(trimmed) || TABLE_ROW.test(trimmed)) continue;
     lines.push(text);
   }
-  // A dropped fence, badge, or table row can leave the blank lines around it
-  // behind, so collapse runs of blank lines the removal created.
   return lines
     .join("\n")
     .replaceAll(/\n{3,}/g, "\n\n")
@@ -173,9 +153,7 @@ function countPlainWords(text: string): number {
   return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
 }
 
-// Ben's commit messages carry the hand-written prose when he wrote real
-// explanation there. An older README-only commit often has just a terse
-// subject with no body, so the prose to replay is the diff's added text.
+// Older README commits often have a terse message, so fall back to the diff's added prose.
 export function candidateBody(
   message: string,
   targetFiles: { filename: string; patch?: string | undefined }[],
@@ -193,9 +171,7 @@ export function repoShortName(repo: string): string {
   return repo.split("/").pop() ?? repo;
 }
 
-// A project_path is a local checkout/worktree path; the repo's own directory
-// name always appears as one of its segments, with or without the owner
-// prefix ("/Users/ben/src/bendrucker/claude" or ".../src/claude").
+// The repo's directory name appears as a path segment, with or without the owner prefix.
 export function projectPathMatchesRepo(projectPath: string, repo: string): boolean {
   return projectPath.split("/").includes(repoShortName(repo));
 }
@@ -208,9 +184,7 @@ function normalizeForMatch(text: string): string {
   return text.toLowerCase().replaceAll(/[`'"]/g, "").replaceAll(/\s+/g, " ").trim();
 }
 
-// Whether `needle` (an issue title or a commit subject) appears in a shell
-// command string, quoting differences aside. Short needles are rejected as an
-// unreliable signal rather than risking a false exclusion.
+// Short needles are rejected rather than risking a false exclusion.
 export function textAppearsInCommand(command: string, needle: string): boolean {
   const normalized = normalizeForMatch(needle);
   if (normalized.length < 8) return false;
@@ -314,14 +288,11 @@ export function selectSample<T extends { repo: string; body: string }>(
   return selected;
 }
 
-// Deterministic ~1/3 holdout, stratified per surface: every third item (by
-// the surface's already repo-balanced order) is held out.
 export function assignSplit<T>(items: T[]): (T & { split: SplitTag })[] {
   return items.map((item, i) => ({ ...item, split: i % 3 === 2 ? "holdout" : "dev" }));
 }
 
-// Marks the `count` smallest-weight dev items (by diff size or body length)
-// as balance candidates: routine, low-slop-risk changes.
+// Balance candidates are routine, low-slop-risk changes.
 export function markBalance<T extends { split: SplitTag }>(
   items: T[],
   count: number,
@@ -586,8 +557,7 @@ const SKILL_PATHS = [
   ".claude/rules",
 ];
 
-// Fixture SKILL.md/CLAUDE.md files under a test's fixtures/ tree are synthetic
-// test data, not hand-written skill prose, even though the filename matches.
+// SKILL.md files under a test fixtures/ tree are synthetic.
 function isSkillPath(filename: string): boolean {
   if (filename.includes("/fixtures/")) return false;
   return (
@@ -643,7 +613,7 @@ async function minePrs(
   const candidates: RawCandidate[] = [];
   for (const item of eligible) {
     const repo = item.repository.nameWithOwner;
-    // oxlint-disable-next-line no-await-in-loop -- one PR's files at a time keeps this under the GitHub core rate limit's per-second burst tolerance.
+    // oxlint-disable-next-line no-await-in-loop -- GitHub rate limit.
     const { detail, diff } = await fetchPrDiff(repo, item.number);
     if (!fitsDiffBudget(diff)) continue;
     candidates.push({

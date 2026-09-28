@@ -59,7 +59,6 @@ export const Label = z.object({
 });
 export type Label = z.infer<typeof Label>;
 
-/** A judge verdict on one pair, in the same shape as a Label's pick. */
 export const Judgment = z.object({
   id: Id,
   pick: Pick,

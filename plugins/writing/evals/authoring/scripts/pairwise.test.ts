@@ -396,8 +396,6 @@ describe("judgePair", () => {
         pick: n === 1 ? ("2" as const) : ("1" as const),
       });
     };
-    // rng() < 0.5 -> left "a" on the first call; the swapped call flips left to "b".
-    // pick "2" with left "a" -> "b"; pick "1" with left "b" -> "b". Agreement.
     const judgment = await judgePair(pair, "{{left}}", "hash", "model", true, call, () => 1);
     expect(judgment.pick).toBe("b");
   });
@@ -408,7 +406,6 @@ describe("judgePair", () => {
       n++;
       return Promise.resolve({ reason: `call ${n}`, pick: "1" as const });
     };
-    // First call: left "a", pick "1" -> "a". Swapped call: left "b", pick "1" -> "b". Disagree.
     const judgment = await judgePair(pair, "{{left}}", "hash", "model", true, call, () => 1);
     expect(judgment.pick).toBe("tie");
     expect(judgment.reason).toContain("swap disagreement");

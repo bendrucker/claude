@@ -1,0 +1,20 @@
+---
+fail: []
+---
+Title: gitlab:ci-monitor: stop reporting false greens
+
+The watcher resolved every pipeline with `projects/:id/pipelines?ref=<branch>&per_page=1` and took whatever GitLab listed first. That query does not express the intent in either mode. It matches on the pipeline's stored ref, so it returns merge-request pipelines belonging to other MRs on the same branch, child pipelines that share their parent's ref, and `external` pipelines. An `external` pipeline is a commit status posted by another tool: it carries no CI jobs and is green the moment it is created. Any of those can hold the highest id and win, and `isTerminal` ends the watch on any `status: success`, so a green belonging to something else exited the watch on a red MR.
+
+MR mode now reads `projects/:id/merge_requests/:iid/pipelines` and branch mode keeps the branch-ref query. Both funnel through `selectPipeline`, which drops `external` and `parent_pipeline` sources, prefers the caller's own pipeline kind, falls back to the other kind only when the preferred one is absent (so a project that runs just one kind still works), and takes the highest id numerically. Source filtering alone would not have been enough: a `skipped` push pipeline normalizes to `success` and can outrank a `running` merge-request pipeline, which is why the preference exists rather than plain newest-by-id. When nothing is eligible the state stays `running`, so an all-excluded page keeps polling rather than degrading to a green.
+
+A claimed `success` is then confirmed against the pipeline's jobs, in all three modes. A failed job with `allow_failure: false` downgrades the state to `failing`. The check can only ever downgrade, never confirm: the jobs endpoint omits bridge (trigger) jobs, so a parent whose work lives in child pipelines legitimately reports zero jobs, as does a `skipped` pipeline. Requiring that jobs exist would break both. `canceled` jobs are deliberately out of scope, since a cancellation already turns the pipeline `canceled` and widening the rule risks rejecting healthy greens. An unreadable jobs response fails closed as a probe failure and re-polls, so an unverifiable success is never emitted, and the wall clock plus the `api-error` event bound the downside.
+
+Two alternatives were rejected. `head_pipeline` on the MR detail response looks like a one-call replacement, but GitLab derives it from the pipelines on the head sha ordered by id, so an `external` pipeline can become `head_pipeline` and reproduce the bug. The pipeline `sha` looked usable as a staleness check, but a merged-results pipeline reports the ephemeral merge commit rather than the MR head, so MR mode still sources `Probe.sha` from the MR metadata, which is what keys event dedup and the per-sha conflict suppression.
+
+MR mode no longer needs the source branch to find its pipeline, so the cached-branch plumbing is gone and the poll-interval query follows the same target.
+
+Found while verifying and left alone: neither pipeline list endpoint returns `finished_at` or `started_at`, so `fetchInterval`'s duration filter has always produced an empty array and the computed interval has always been the 30s floor. That predates this change and wants its own fix.
+
+Unit tests cover the selection and job-gate logic, including a property that the selected pipeline is always an eligible input record holding the highest id in its partition, plus scripted-`exec` tests over each probe path. End to end, the CLI ran in all three modes against a stub `glab` on `PATH`, which exercises the real shell and `jq` pipeline: an `external` success is ignored in favor of the failing merge-request pipeline, a green pipeline whose required job failed reports `failing`, and a genuinely green one emits `status: success` and exits. `glab` auth is unavailable on this machine, so no live watch against a real project ran. The API response shapes this depends on were re-confirmed with unauthenticated `curl` against a public project.
+
+Original Task: [Bug: gitlab ci-monitor reports a false green from external-source pipelines](https://things.bendrucker.me/show?id=ADogEAGGbiKqzAK2zuSLub)

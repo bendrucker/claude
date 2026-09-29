@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-09-25T17:45:00.000Z",
+  "durationSeconds": 200,
+  "costUsd": 1.25,
+  "partial": true,
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1.0,
+    "overallPassRate": 0,
+    "meanDelta": null
+  },
+  "cases": [
+    {
+      "name": "quiet-fix",
+      "aggregates": {
+        "score": 1,
+        "passRate": 1.0,
+        "scoreWithout": null,
+        "passRateWithout": null,
+        "delta": null
+      },
+      "arms": {}
+    }
+  ]
+}

@@ -8,7 +8,7 @@ Every `regex` grader is scoped to the `<rewrite>` block. The reply can then quot
 
 Cases are tagged `dev` or `holdout`. Tune against `dev`. Run `holdout` once, after tuning is done.
 
-In CI, `gh workflow run eval.yml --ref <branch> -f suite=plugins/writing/evals/rewrite -f args='--tag dev'` runs it on dispatch only. `bun evals/native/run.ts plugins/writing/evals/rewrite -- <args>` runs it locally with the Bash sandbox disabled. Results land in the gitignored `results/`.
+In CI, `gh workflow run eval.yml --ref <branch> -f suite=plugins/writing/evals/rewrite -f args='--tag dev'` runs it on dispatch, and a pull request carrying the `eval` label runs it when the PR touches the `writing` plugin. `bun evals/native/run.ts plugins/writing/evals/rewrite -- <args>` runs it locally with the Bash sandbox disabled. Results land in the gitignored `results/`.
 
 `bun evals/native/check.ts plugins/writing/evals/rewrite` tests every regex grader against `examples/<case>/`:
 

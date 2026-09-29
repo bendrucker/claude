@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-09-27T08:00:00.000Z",
+  "durationSeconds": 120,
+  "costUsd": 0.75,
+  "partial": false,
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 0,
+    "overallScore": 0.5,
+    "overallPassRate": 0,
+    "meanDelta": -0.5
+  },
+  "cases": [
+    {
+      "name": "open-pr",
+      "aggregates": {
+        "score": 0.5,
+        "passRate": 0.5,
+        "scoreWithout": 1,
+        "passRateWithout": 1.0,
+        "delta": -0.5
+      },
+      "arms": {}
+    }
+  ]
+}

@@ -71,13 +71,14 @@ function lowerBound(map: Int32Array, value: number, length: number): number {
   return lo;
 }
 
-interface Token {
+export interface Token {
   key: string;
   start: number;
   end: number;
 }
 
-function tokenize(text: string): Token[] {
+/** Words of `text`, keyed lowercase with punctuation stripped. */
+export function tokenize(text: string): Token[] {
   return [...text.matchAll(/\S+/g)]
     .map((m) => ({
       key: m[0].toLowerCase().replaceAll(/[^\p{L}\p{N}]/gu, ""),

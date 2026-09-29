@@ -1,0 +1,11 @@
+# `pull-request:follow-up` Eval
+
+A native `claude plugin eval` suite for `pull-request:follow-up` in its gated default, with and without the plugins. `github-threads` asks which review threads on a GitHub PR still need replies and grades the triage: the four thread states, their counts, the unanswered threads by file and line, and the silently resolved ones. `gitlab-drafts` asks for replies to a GitLab MR's outstanding feedback and grades the delegation to `gitlab:merge-request` and the drafts against the tone rules in `replies.md`.
+
+Each `fixture.sh` checks out the PR's branch with dated commits, so a thread can be checked against the commits made after it, and puts a stub `gh` or `glab` ahead of the real one through `$HOME/.zshenv`. The stub, `gh.ts` or `glab.ts` in the case directory, answers the reads the skills make with canned threads (unresolved, replied, resolved with a reply, resolved silently, one from a review bot) and refuses every write. The `no-*` graders fail a session that tries to commit, push, post, resolve, or merge, so the read-only gate holds even though the stub would refuse the call.
+
+Each case's `append_system_prompt` says the user typed `/pull-request:follow-up`, so the with arm grades the skill's workflow rather than its trigger. From the bare GitHub request, `github:pr-comments` takes the trigger instead and fetches without resolved threads, so no silent resolve can surface. `skill-fired` and `gitlab-delegated` report the trigger and the delegation without scoring them.
+
+`gh workflow run eval.yml --ref <branch> -f suite=plugins/pull-request/evals/follow-up` runs it in CI, and a pull request carrying the `eval` label runs it when the PR touches the `pull-request` plugin. `bun evals/native/run.ts plugins/pull-request/evals/follow-up -- <args>` runs it locally with the Bash sandbox disabled, passing arguments after `--` through to `claude plugin eval`. [`suite.yaml`](suite.yaml) grants the Bash tool the cases need. Results land in the gitignored `results/<timestamp>/`.
+
+`bun evals/native/check.ts plugins/pull-request/evals/follow-up` tests the regex graders against the replies in [`examples/`](examples/): each example's frontmatter names the graders it must fail, such as a reply that only reports the repository as unreachable, and every other grader must pass it.

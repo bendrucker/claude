@@ -505,7 +505,11 @@
     "allowAppleEvents": true,
     "network": {
       "allowLocalBinding": true,
-      "allowMachLookup": ["com.apple.trustd.agent"],
+      "allowMachLookup": [
+        "com.apple.trustd.agent",
+        "com.apple.nehelper",
+        "com.apple.nesessionmanager"
+      ],
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
         "~/.config/herdr/herdr.sock",
@@ -534,7 +538,7 @@
         "~/.npm",
         "~/.local/share/uv",
         "~/.local/share/graphite",
-        "~/.local/share/plannotator",
+        "~/.plannotator",
         "~/.local/share/atuin",
         "~/.local/state/vm",
         "~/.greptile",

@@ -51,7 +51,7 @@ Three grants are deliberate exceptions to the credential-store clause. Each hold
 The rest are tool caches and state directories holding no credential material:
 
 - `~/.duckdb`: extensions installed on first `INSTALL ... FROM community`. Without it the `claude-code:session` skill dies on `IO Error: Failed to create directory`, having already been granted the egress to fetch them. The version in the path changes with each DuckDB release, so a fresh install re-denies. **Drop it** when no skill queries DuckDB with a community extension.
-- `~/.local/share/plannotator`: annotation history, drafts, and the feedback archive, rewritten on every run. Without it each save fails `EPERM`, and a review runs with no version diffs and no recovery copy. **Drop it** when no skill drives the `plannotator` CLI.
+- `~/.plannotator`: annotation history, drafts, config, and the feedback archive, rewritten on every run. plannotator uses `PLANNOTATOR_DATA_DIR` when set, then `~/.plannotator` if it exists, and only then `$XDG_DATA_HOME/plannotator`, so the legacy directory wins on this machine. Without it each save fails `EPERM`, and a review runs with no version diffs and no recovery copy. **Drop it** when no skill drives the `plannotator` CLI, and move it if the data directory moves.
 - `~/.agent-browser`: the CLI's control socket. `agent-browser` sits in `excludedCommands`, but a match has to sit in the invocation's own chain, so a skill script that shells out to it runs sandboxed and fails with `Socket directory is not writable`. Another `excludedCommands` entry would not help. **Drop it** when the `agent-browser` skill stops invoking the CLI from a wrapper.
 - `~/Library/Caches/ms-playwright`: Playwright's unpacked browser builds. Without it an install fails at `mkdir` before reaching the download, which reads as a network problem. **Drop it** when no skill or work repo drives Playwright.
 - `~/.gradle` and `~/.config/jgit`: the Gradle wrapper's distribution lock and jgit's config lock, both written by Java builds in work repos. This fixes the filesystem half only, and a Gradle build that reaches the network still needs a full skip. **Drop both** when no Java repo is in rotation, and revisit if the egress half is ever granted, since the pair only pays off together.
@@ -76,6 +76,8 @@ The rest are tool caches and state directories holding no credential material:
 A new host needs its secret kept outside the sandbox, and never add an upload-capable one casually. A new escaped command must fit a group above. If it reaches the network without its own auth, keep it sandboxed.
 
 Go CLIs need no entry. `sandbox.network.allowMachLookup` lets Go's `crypto/x509` reach the system `trustd` daemon for TLS verification profile-wide.
+
+`com.apple.nehelper` and `com.apple.nesessionmanager` let the standalone Tailscale app's CLI load its NetworkExtension configuration. Without them every `tailscale` command exits `Failed to load preferences`, which breaks `plannotator --tailscale`. Past that, the CLI reaches the daemon's local API over loopback TCP at the port `/Library/Tailscale/ipnport` names, authenticated by the `sameuserproof-<port>` token beside it. `allowLocalBinding` and default reads cover both. `nesessionmanager` can start and stop VPN sessions, the same reach `tailscale up` and `down` already have through the local API. **Drop both** when no skill drives `tailscale` sandboxed.
 
 ## Environment
 

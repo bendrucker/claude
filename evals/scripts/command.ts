@@ -19,9 +19,7 @@ export function formatCommand(command: readonly string[]): string {
 }
 
 // A missing binary surfaces as a spawn throw rather than an exit code. Reporting it
-// as 127 lets callers that probe for an optional tool (the AWS CLI) treat "absent"
-// and "unauthorized" the same way, while callers that require the tool still fail
-// with its message in stderr.
+// as 127 routes it through expectSuccess, which fails with its message in stderr.
 export const runCommand: RunCommand = async (command, options = {}) => {
   const [bin, ...args] = command;
   if (bin === undefined) throw new Error("runCommand needs a command to run");

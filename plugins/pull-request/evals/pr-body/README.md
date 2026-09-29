@@ -1,8 +1,8 @@
 # PR Body Eval
 
-A local harness for measuring the PR bodies that `pull-request:create` produces, so edits to `plugins/pull-request/skills/create/` are gated on output quality instead of lint alone. It follows the structure of [`plugins/issue/evals/issue-refine`](../../../issue/evals/issue-refine) for mining and labeling, and the structure of the retired `evals/pr-headings` harness for scoring and the A/B runner.
+A local harness for measuring the PR bodies that `pull-request:create` produces, so edits to `plugins/pull-request/skills/create/` are gated on output quality instead of lint alone. It follows the structure of [`plugins/issue/evals/issue-refine`](../../../issue/evals/issue-refine) for mining and labeling, and the structure of the retired `evals/pr-headings` harness for scoring.
 
-The loop: mine real bodies, label them, turn the labels into a mechanical score, then A/B two versions of the guidance text against curated scenarios and compare scores.
+The loop: mine real bodies, label them, turn the labels into a mechanical score, then run the curated scenarios as native cases against two refs of the guidance and compare scores.
 
 ## Privacy
 
@@ -40,73 +40,32 @@ The UI is copied from `plugins/issue/evals/issue-refine/label/` and adapted. Cop
 
 `scripts/score.ts` is the rubric as code: the recurring critical spans and tags from a labeling session become mechanical checks. The CLI scores one file and prints a readable report, or a machine row with `--json`. `run-eval.ts` calls the same scorer as a library to emit one JSON row per body, so a run is greppable, diffable, and joinable across arms without a second format.
 
-## Promptfoo A/B
+## Scenario Cases
 
-`promptfooconfig.yaml` runs the real skill. Both arms are `anthropic:claude-agent-sdk` providers, which spawn a Claude Code subprocess against a fixture directory, so what is measured is the skill plus the harness rather than a bare model call.
-
-```bash
-bun run --cwd plugins/pull-request/evals/pr-body eval:smoke     # first 2 scenarios, both arms
-bun run --cwd plugins/pull-request/evals/pr-body eval           # all 8
-bun run --cwd plugins/pull-request/evals/pr-body eval:view      # browse the run
-```
-
-The first two entries rebuild the fixtures first and set `PROMPTFOO_CONFIG_DIR=$HOME/.cache/promptfoo`, because the default `~/.promptfoo` is not writable under the repo sandbox. Arms and graders both carry `apiKeyRequired: false` and authenticate through the logged-in CLI, so a local run needs no key. Set `ANTHROPIC_GRADER_API_KEY` to grade the rubric metrics against the API instead. The override does not reach the `preference` metric, whose provider omits `apiKey` for the reason the version pin below covers and authenticates through the CLI credential everywhere.
-
-`ANTHROPIC_API_KEY` must stay unset locally. The provider hands its whole environment to the Claude Code subprocess and re-injects that variable even under `apiKeyRequired: false`, and the CLI takes an API key over the claude.ai login, so exporting it bills both arms to the API instead of the subscription. CI spends subscription credits too, through a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`. The spawned CLI reads the token from the environment. The workflow also writes it into `~/.claude/.credentials.json` for the graders, whose unkeyed path reads that file on Linux.
-
-`promptfoo` is pinned to an exact `0.122.2` rather than a range. Two workarounds in `promptfooconfig.yaml` are shaped around bugs in that release: the comparison assert's provider omits `apiKey` because promptfoo sends any configured value as a literal header, and `SELECT_BEST_PROMPT` is restated as a user turn because the built-in is a lone system message the Messages API rejects. A version bump has to re-validate both before the caret goes back.
-
-### Arms
-
-`scripts/fixtures.ts` writes `fixtures/current/` and `fixtures/revised/`, each a `pull-request/` plugin tree holding only the `create` skill plus a `project/` scratch directory the session runs in. The two differ in one file. With no `--variant`, the revised arm gets a generated bullet appended to the skill's `## Body` guidance, enough of a delta to prove the wiring moves.
+The eight `scenarios/` run as native cases in the [`create`](../create/) suite, named `scenario-<id>` and tagged `scenario`. Each `prompt.md` carries the scenario's repository, audience tier, diff summary, and session notes, and asks for the PR through `pull-request:create`. `originalBody` never reaches a case, so the session cannot copy the shipped text. Each `fixture.sh` builds a git repo on the scenario's branch with the scenario's remote and one empty commit named for the change, so every `!` context command in the skill succeeds while the diff itself reaches the model through the summary.
 
 ```bash
-bun plugins/pull-request/evals/pr-body/scripts/fixtures.ts --variant <revised-SKILL.md>
-bun plugins/pull-request/evals/pr-body/scripts/fixtures.ts --variant <revised-sections.md> --variant-path references/sections.md
+bun evals/native/run.ts plugins/pull-request/evals/create -- --runs 2 --case 'scenario-*'
+bun evals/native/run.ts plugins/pull-request/evals/create --ref main -- --runs 2 --case 'scenario-*'
 ```
 
-`EVAL_VARIANT` and `EVAL_VARIANT_PATH` set the same two values. Use them to carry a variant through the `bun run eval` chain, which rebuilds the fixtures itself:
+The second line grades the skill as it stands at `main` with the same cases. [`compare.ts`](../../../../evals/native/compare.ts) then compares the two results directories row by row, which replaces the old two-arm A/B: the base ref is the current arm and the working tree is the revision. No preference grader picks between arms, since `compare.ts` across refs answers the same question per grader.
 
-```bash
-EVAL_VARIANT=drafts/sections.md EVAL_VARIANT_PATH=references/sections.md bun run --cwd plugins/pull-request/evals/pr-body eval
-```
+Each scenario case grades:
 
-The fixture copy of `SKILL.md` drops the skill's `## Context` block, whose `!` lines shell out for the repo's remote, template, and git state. That context reaches the model through test vars instead. The materializer fails instead of writing a fixture if a `!` line appears anywhere else in the skill.
+- `reply-shape`: the reply holds a `Title:` line, a blank line, then the body
+- `skill-fired`, `skill-loaded`: the plugin arm invoked `pull-request:create` and its context commands succeeded
+- `heading-sentence-case`, `heading-question`, `heading-clause`: regex approximations of `classifyPrHeading`
+- `generic-heading`: no heading that would fit any PR, such as `Summary` or `Test Plan`
+- `narration-leak`, `verbosity`, `self-contained`, `substance-retention`: `llm` graders ported from the retired promptfoo rubrics, scoped to the body after the `Title:` line. `verbosity` embeds the diff summary and `substance-retention` the session notes, so the judge grades against the scenario
 
-### Cases
+The judge sees only the final reply, one criterion at a time, and answers with one word. `narration-leak` judges sentences only, since `generic-heading` settles the heading half of the old rubric deterministically. The rubrics this suite replaced scored an isolated slip near the middle of a scale. A native verdict is binary, so `narration-leak` and `self-contained` pass a single slip in an otherwise clean body and fail on a pattern.
 
-`scripts/cases.ts` renders `scenarios/` into `cases.json`, the file promptfoo reads. Vars carry the repo, tier, branch, base, diff summary, and session notes. `originalBody` never reaches a case, so neither arm can copy the shipped text. `bun run --cwd plugins/pull-request/evals/pr-body cases --check` fails when the two have drifted, and a test asserts the same thing.
-
-The prompt those vars fill lives in the `prompts:` block of `promptfooconfig.yaml`. It names `pull-request:create` outright, matching how a session invokes the skill. An opener that only described the task left the model answering from its own judgment in two of sixteen validated scenario/arm cells, and a body written without the skill has no guidance to attribute a score to.
-
-### Grading
-
-Grading is split by whether the dimension has ground truth behind it.
-
-`headingTells` is a `javascript` assert running `scripts/assert-headings.ts`, which pulls the draft's headings through the same `classifyPrHeading` the shipped hook enforces. That classifier is calibrated against `labels.json` at 96.8% precision. The one dimension with hand-labeled truth behind it is therefore decided deterministically, and costs nothing to grade. A body fails the metric when any heading is flagged, and the reason names each heading and the signals that fired.
-
-The four `llm-rubric` asserts (`narrationLeak`, `verbosity`, `selfContained`, `substanceRetention`), ported from `judge-prompt.md`, plus the `select-best` assert that picks the arm a reviewer would rather receive, cover what no labels exist for. Their absolute scores are uncalibrated, so what they support is a comparison between the two arms of one run. A `skill-used` assert proves the create skill actually ran. The grader provider is pinned to Anthropic so promptfoo never falls back to its default OpenAI grader.
-
-`scripts/judge.ts` and `judge-prompt.md` stay as the audited fallback. They run blinded on Opus-generated bodies with the whole rubric in one prompt, which is the reference the promptfoo rubrics are checked against when a verdict looks wrong.
-
-Sonnet 5 rejects `temperature`. The grader therefore carries no sampling parameters. Clear promptfoo's response cache with `promptfoo cache clear` when a rubric edit needs regrading.
-
-Caching does not pin the arms. It covers grader calls only: the agent-sdk provider disables its own caching under subscription auth (`externalCredentialProviderBypassesCache`), so both arms regenerate on every local run and a repeat run measures sampling noise as well as the guidance delta.
-
-### Cost
-
-Each arm caps at `max_budget_usd: 0.75` and `max_turns: 12`, and `setting_sources: []` keeps user and project config out of the session, which is the main lever on per-session tokens. A measured draft costs $0.12 to $0.43 at list price over two to five turns, so an 8-case A/B reports somewhere near $3 to $5. Local and CI runs alike spend subscription credits, and `evals/scripts/report.ts` files them as subscription-notional. A run counts against the monthly API budget only when its export is stamped `metadata.billing: "api"`.
-
-Export a run into the durable corpus with the `results` entry, which pins the suite name so the slug promptfoo would derive from the config description never gets used:
-
-```bash
-bun run --cwd plugins/pull-request/evals/pr-body results          # the latest run
-bun run --cwd plugins/pull-request/evals/pr-body results --sync   # then mirror to S3
-```
+The three heading regexes split the classifier's signals into sentence case, question-shaped or sentence-terminated headings, and comma or parenthetical clauses. Against `labels.json` they reach 100% precision and 76.8% recall together (sentence case alone 55.1% recall, the other two 21.7% each). The classifier itself reaches 87.0% recall, so the regexes trade recall on predicate verbs and short parentheticals for zero false positives. `bun evals/native/check.ts plugins/pull-request/evals/create` checks each case's regex graders against `examples/scenario-<id>/`, where `shipped.md` is the PR body that actually merged.
 
 ## Calibration
 
-`classifier.ts` is the lexical sentence-heading screen ported from the `pr-headings` harness. `classifyPrHeading(heading)` returns `{ flagged, signals }`, where each signal names the tell that fired (trailing punctuation, interrogative opener, predicate verb, sentence case, length). `score.ts` uses it for the headings dimension.
+`classifier.ts` is the lexical sentence-heading screen ported from the `pr-headings` harness. `classifyPrHeading(heading)` returns `{ flagged, signals }`, where each signal names the tell that fired (trailing punctuation, interrogative opener, predicate verb, sentence case, length). `score.ts` uses it for the headings dimension, and the scenario cases' heading regexes approximate it.
 
 `calibrate.ts` scores the classifier against `labels.json`, 102 headings hand-labeled good or bad:
 
@@ -118,7 +77,7 @@ Current numbers: 96.8% precision, 87.0% recall, F1 0.92. Precision is the one to
 
 ## Legacy A/B Eval
 
-`scripts/run-eval.ts` measures whether a guidance revision changes what the model writes. It predates the promptfoo suite and cannot load skills, so both arms are plain markdown files inlined into the generation prompt. It stays as the audit reference the promptfoo rubric graders are checked against.
+`scripts/run-eval.ts` measures whether a guidance revision changes what the model writes. It predates the native scenario cases and cannot load skills, so both arms are plain markdown files inlined into the generation prompt. It stays as the audit reference the scenario cases' `llm` graders are checked against.
 
 ```bash
 bun plugins/pull-request/evals/pr-body/scripts/run-eval.ts --arm-a <current-guidance.md> --arm-b <revised-guidance.md>
@@ -146,17 +105,12 @@ Scenarios live in `scenarios/<id>.json`, one file per real PR, with the shipped 
 Hand-made artifacts stay tracked. Everything bulky regenerates.
 
 - `labels.json`: 102 labeled headings, the calibration target
-- `scenarios/`: curated generation scenarios with the shipped body for reference
+- `scenarios/`: curated generation scenarios with the shipped body for reference, the source of the `scenario-*` cases in `../create/`
 - `judge-prompt.md`: the judge rubric
-- `cases.json`: generated from `scenarios/`, tracked so the suite runs on a fresh clone
-- `data/`, `feedback/`, `results/`, `fixtures/`: gitignored, rebuilt by the miner, the labeler, and the runners
+- `data/`, `feedback/`, `results/`: gitignored, rebuilt by the miner, the labeler, and the runners
 
 ## Layout
 
-- `promptfooconfig.yaml`: the two-arm suite, its rubrics, and the pinned grader
-- `scripts/fixtures.ts`: materializes `fixtures/current/` and `fixtures/revised/`
-- `scripts/cases.ts`: renders `scenarios/` into `cases.json`
-- `scripts/assert-headings.ts`: the `headingTells` assert, the classifier behind promptfoo's `javascript` hook
 - `scripts/mine.ts`: builds `data/samples.json` from `pr_links` plus `gh pr list`
 - `scripts/score.ts`: mechanical rubric, one JSON row per body
 - `scripts/run-eval.ts`: legacy two-arm generation over `scenarios/`

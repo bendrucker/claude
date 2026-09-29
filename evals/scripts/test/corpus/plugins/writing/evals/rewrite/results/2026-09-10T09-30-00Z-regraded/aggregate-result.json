@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-09-10T09:30:00.000Z",
+  "durationSeconds": 300,
+  "costUsd": 2.5,
+  "partial": false,
+  "cases": [
+    {
+      "name": "memo",
+      "aggregates": {
+        "score": 1,
+        "passRate": 1.0,
+        "scoreWithout": 0.5,
+        "passRateWithout": 0.5,
+        "delta": 0.5
+      },
+      "arms": {}
+    },
+    {
+      "name": "slack",
+      "aggregates": {
+        "score": 1,
+        "passRate": 1.0,
+        "scoreWithout": 0.5,
+        "passRateWithout": 0.5,
+        "delta": 0.5
+      },
+      "arms": {}
+    }
+  ]
+}

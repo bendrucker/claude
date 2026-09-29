@@ -1,0 +1,16 @@
+schema_version: "1.1"
+name: gitlab-drafts
+tags: [dev]
+plugins: ["../../..", "../../../../gitlab"]
+execution:
+  model: claude-sonnet-5
+  max_turns: 20
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Skill, Bash]
+  append_system_prompt: >-
+    The user typed `/pull-request:follow-up` with the request below. When a
+    skill by that name is available, load it and follow it.
+    The current directory is a checkout of the merge request's source branch.
+    Nobody answers while you work, so put your full answer in the final reply.
+context:
+  scaffold_script: fixture.sh

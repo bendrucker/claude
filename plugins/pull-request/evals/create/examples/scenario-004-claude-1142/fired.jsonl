@@ -1,0 +1,3 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"Skill","input":{"skill":"pull-request:create"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Base directory for this skill: /tmp/eval-x/plugins/pull-request/skills/create\n\n# Create Pull Request\n\n- Remote URL: https://github.com/bendrucker/claude.git"}]}}
+{"type":"result","result":"Title: pull-request,ship: spend bot reviews deliberately\n\nGreptile's 100 free OSS review credits were exhausted; free_reviews_limit_reached appeared in 15 sessions, each spending a turn to rediscover it because detect-bot only reported CLI presence, not availability."}

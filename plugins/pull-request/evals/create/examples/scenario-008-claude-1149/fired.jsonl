@@ -1,0 +1,3 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"Skill","input":{"skill":"pull-request:create"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Base directory for this skill: /tmp/eval-x/plugins/pull-request/skills/create\n\n# Create Pull Request\n\n- Remote URL: https://github.com/bendrucker/claude.git"}]}}
+{"type":"result","result":"Title: user,review: treat a skill's fan-out as requested\n\nThe user reported that /ship's reviewer pass ran inline instead of fanning out to subagents, even though the ship skill's own instruction said to fan out."}

@@ -62,6 +62,7 @@
       ::highlight(critical) { background: rgba(255,93,93,.30); text-decoration: underline wavy var(--critical); }
       ::highlight(minor) { background: rgba(255,180,84,.26); text-decoration: underline wavy var(--minor); }
       ::highlight(praise) { background: rgba(78,200,138,.24); }
+      ::highlight(same) { color: #5d6675; }
       /* Selection popover */
       #pop { position: absolute; z-index: 50; display: none; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.5); width: 280px; }
       #pop textarea { width: 100%; height: 54px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px; font: inherit; resize: vertical; }
@@ -104,8 +105,12 @@
       .brief { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 16px; margin: 12px 0 18px; }
       .brief summary { cursor: pointer; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
       .brief pre { white-space: pre-wrap; margin: 10px 0 4px; font: 13px/1.6 -apple-system, sans-serif; }
-      .pairwrap { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+      .pairwrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
       .pairdoc { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 0; font: 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+      .pairdoc.doc { font: inherit; white-space: normal; padding: 6px 22px; }
+      .brief .doc { background: none; border: 0; padding: 0; }
+      .toggle { cursor: pointer; }
+      .toggle.on { color: var(--accent); }
       .pickrow { display: flex; gap: 8px; }
       .pickrow button { flex: 1; }
       .pickrow button.on { background: var(--accent); color: #06121f; border-color: var(--accent); }
@@ -131,7 +136,12 @@
       </div>
     </div>
 
-    <script>
+    <script type="module">
+      import { sharedRuns, sourceOffsets, toRendered, toSource } from "/align.js";
+
+      const escapeHtml = (s) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+      // Drafts are model output: show raw HTML in them as text rather than running it.
+      marked.use({ renderer: { html: (raw) => escapeHtml(raw) } });
       // Two failure axes the rewrite transform can hit: over-stripping (meaning
       // lost vs the input) and residual slop (trope survived into the output).
       const TAGS = [
@@ -149,6 +159,9 @@
       let labels = {}; // id -> Label {pick, left, spans[], notes}
       let currentIdx = 0;
       let pendingPair = null; // pending new span {key, start, end, text}
+      let pairView = { rendered: true, diff: true };
+      try { pairView = { ...pairView, ...JSON.parse(localStorage.getItem("pairView") ?? "{}") }; } catch {}
+      const docMaps = {}; // side -> source offset per rendered character
 
       const $ = (s, r = document) => r.querySelector(s);
       const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -463,10 +476,31 @@
       function renderPairDoc(side, text) {
         const wrap = el("div");
         wrap.append(el("div", { className: "section-label", textContent: side === "left" ? "Left" : "Right" }));
-        const doc = el("pre", { className: "pairdoc", id: `doc-${side}`, textContent: text });
+        const doc = pairView.rendered
+          ? el("div", { className: "pairdoc doc", id: `doc-${side}`, innerHTML: marked.parse(text) })
+          : el("pre", { className: "pairdoc", id: `doc-${side}`, textContent: text });
         doc.dataset.side = side;
+        const shown = doc.textContent;
+        docMaps[side] = pairView.rendered
+          ? sourceOffsets(shown, text)
+          : Int32Array.from({ length: shown.length + 1 }, (_, i) => i);
         wrap.append(doc);
         return wrap;
+      }
+
+      function toggleView(key) {
+        pairView[key] = !pairView[key];
+        try { localStorage.setItem("pairView", JSON.stringify(pairView)); } catch {}
+        renderPairMain();
+      }
+
+      function sharedShare() {
+        const left = $("#doc-left")?.textContent ?? "";
+        const right = $("#doc-right")?.textContent ?? "";
+        const runs = sharedRuns(left, right);
+        const words = (text, ranges) => ranges.reduce((n, [s, e]) => n + (text.slice(s, e).match(/\S+/g)?.length ?? 0), 0);
+        const total = (left.match(/\S+/g)?.length ?? 0) + (right.match(/\S+/g)?.length ?? 0);
+        return { runs, pct: total ? Math.round((100 * (words(left, runs.a) + words(right, runs.b))) / total) : 0 };
       }
 
       function renderPairMain() {
@@ -479,12 +513,15 @@
           el("span", { className: "badge", textContent: p.surface }),
           el("span", { className: "meta", textContent: `${p.id} · ${p.case}` }),
           el("span", { className: "spacer" }),
+          el("span", { className: "kbd", id: "sharedStat" }),
           el("span", { className: "kbd", textContent: "1 left · 2 right · 3 tie · j/k prev/next" }),
+          toggleChip("diff", "d dim shared"),
+          toggleChip("rendered", "r rendered"),
           el("span", { className: "saved", id: "savedFlag" }),
         ]));
 
         const brief = el("details", { className: "brief" });
-        brief.append(el("summary", { textContent: "Brief" }), el("pre", { textContent: p.brief }));
+        brief.append(el("summary", { textContent: "Brief" }), el("div", { className: "doc", innerHTML: marked.parse(p.brief) }));
         main.append(brief);
 
         const wrap = el("div", { className: "pairwrap" });
@@ -493,6 +530,12 @@
 
         main.append(renderPairRail(p, f));
         requestAnimationFrame(applyPairHighlights);
+      }
+
+      function toggleChip(key, label) {
+        const chip = el("span", { className: "kbd toggle" + (pairView[key] ? " on" : ""), textContent: label });
+        chip.onclick = () => toggleView(key);
+        return chip;
       }
 
       function renderPairRail(p, f) {
@@ -544,15 +587,29 @@
         CSS.highlights.clear();
         const p = pairs[currentIdx];
         const sideForKey = { [p.left]: "left", [rightKeyOf(p)]: "right" };
-        const buckets = { critical: [], minor: [], praise: [] };
+        const buckets = { critical: [], minor: [], praise: [], same: [] };
         for (const s of lbl(p.id).spans) {
-          const doc = $(`#doc-${sideForKey[s.key]}`);
-          if (!doc) continue;
-          const r = rangeFor(doc, s.start, s.end);
+          const side = sideForKey[s.key];
+          const doc = $(`#doc-${side}`);
+          const shown = doc && toRendered(docMaps[side], s.start, s.end);
+          const r = shown && rangeFor(doc, ...shown);
           if (r) buckets[s.severity]?.push(r);
         }
+        const { runs, pct } = sharedShare();
+        $("#sharedStat").textContent = `${pct}% shared`;
+        if (pairView.diff) {
+          for (const [side, ranges] of [["left", runs.a], ["right", runs.b]]) {
+            for (const [s, e] of ranges) {
+              const r = rangeFor($(`#doc-${side}`), s, e);
+              if (r) buckets.same.push(r);
+            }
+          }
+        }
         for (const sev of Object.keys(buckets)) {
-          if (buckets[sev].length) CSS.highlights.set(sev, new Highlight(...buckets[sev]));
+          if (!buckets[sev].length) continue;
+          const hl = new Highlight(...buckets[sev]);
+          hl.priority = sev === "same" ? 0 : 1;
+          CSS.highlights.set(sev, hl);
         }
       }
 
@@ -570,8 +627,10 @@
           const end = globalOffset(nodes, r.endContainer, r.endOffset);
           if (start == null || end == null || end <= start) return;
           const p = pairs[currentIdx];
-          const key = doc.dataset.side === "left" ? p.left : rightKeyOf(p);
-          pendingPair = { key, start, end, text: sel.toString().trim() };
+          const side = doc.dataset.side;
+          const key = side === "left" ? p.left : rightKeyOf(p);
+          const [srcStart, srcEnd] = toSource(docMaps[side], start, end);
+          pendingPair = { key, start: srcStart, end: srcEnd, text: sel.toString().trim() };
           pendingSev = "critical";
           $("#popQuote").textContent = `“${pendingPair.text.slice(0, 140)}”`;
           $("#popText").value = "";
@@ -604,7 +663,7 @@
 
       function wirePairsKeys() {
         document.addEventListener("keydown", (e) => {
-          if (["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
+          if (e.repeat || ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return;
           if ($("#pop").style.display === "block") return;
           const p = pairs[currentIdx];
           if (e.key === "1") setPick(p, "left");
@@ -612,6 +671,8 @@
           else if (e.key === "3") setPick(p, "tie");
           else if (e.key === "ArrowRight" || e.key === "j") selectPair(currentIdx + 1);
           else if (e.key === "ArrowLeft" || e.key === "k") selectPair(currentIdx - 1);
+          else if (e.key === "d") toggleView("diff");
+          else if (e.key === "r") toggleView("rendered");
         });
       }
 

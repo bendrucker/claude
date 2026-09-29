@@ -82,3 +82,11 @@ test("POST /api/labels rejects an invalid Label", async () => {
   );
   expect(res.status).toBe(400);
 });
+
+test("GET /align.js serves the alignment module as plain JavaScript", async () => {
+  const res = await handler(new Request("http://local/align.js"));
+  expect(res.headers.get("content-type")).toStartWith("text/javascript");
+  const js = await res.text();
+  expect(js).toContain("export function sourceOffsets");
+  expect(js).not.toContain(": Int32Array");
+});

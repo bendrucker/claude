@@ -14,6 +14,8 @@ const Feedback = z.looseObject({ id: z.string().regex(/^[\w-]+$/), feedback: z.u
 //   - pairs mode (--pairs): blind pairwise A/B/tie review over Pair records.
 
 const html = join(import.meta.dir, "index.html");
+const align = join(import.meta.dir, "align.ts");
+const transpiler = new Bun.Transpiler({ loader: "ts" });
 
 async function readAllJson(dir: string): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
@@ -99,6 +101,12 @@ export function createHandler(opts: ServerOptions) {
     if (url.pathname === "/" || url.pathname === "/index.html") {
       return new Response(Bun.file(html), {
         headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+
+    if (url.pathname === "/align.js") {
+      return new Response(transpiler.transformSync(await Bun.file(align).text()), {
+        headers: { "content-type": "text/javascript; charset=utf-8" },
       });
     }
 

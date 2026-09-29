@@ -21,7 +21,7 @@ Accepts a `config` object mapping to the [options accepted by `git log`]. `confi
 
 A commit is structured as follows:
 
-```js
+```js fragment
 {
   commit: {
     'long': '4bba6092ecb2571301ca0daa2c55336ea2c74ea2',

@@ -62,7 +62,7 @@ app
 
 Example: Custom Path
 
-```js
+```js fragment
 app
   .factory('Author', function (ConvexModel) {
     return ConvexModel.extend({

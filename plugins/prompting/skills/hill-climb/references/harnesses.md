@@ -1,5 +1,7 @@
 # Other Harnesses
 
+For a Claude API application with no suite yet, `/claude-api build-eval` builds one and `/claude-api hillclimb` climbs it. This file adapts a suite that already exists to `compare.ts`.
+
 The loop needs these from any harness:
 
 - A pass or fail per grader per run, kept per run rather than averaged, so runs can pool across invocations.

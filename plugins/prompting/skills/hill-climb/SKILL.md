@@ -1,8 +1,9 @@
 ---
 name: prompting:hill-climb
 description: >-
-  Hill-climb a skill, rule, or prompt against its eval suite. Use when changing
-  one to raise an eval score, or judging whether a score change beat noise.
+  Hill-climb a skill, agent, rule, or CLAUDE.md against its eval suite. Use
+  when changing one to raise an eval score, when judging whether a score change
+  beat noise, or when testing whether an instruction still earns its tokens.
 argument-hint: "<skill> [<suite dir>]"
 allowed-tools:
   - Read
@@ -20,27 +21,19 @@ Goal: a skill that scores higher on its eval suite, where every accepted change 
 
 The suite's `README.md` names how to run it and any suite-specific rules. Follow it where it differs from this document.
 
+When the target is a prompt an application sends through the Claude API or the Agent SDK, run `/claude-api build-eval` to build its eval and `/claude-api hillclimb` to climb it. Those guides carry the per-model API behavior this document leaves out.
+
 ## Ready the Suite
 
-Check the suite before the first baseline. A climb on an unready suite measures the harness.
-
-- **Split.** Tag every case `dev` or `holdout` in its `case.yaml`. Candidates run on `dev`. `holdout` runs once, at the end, so no edit is tuned against it, and a climb that reads it again needs fresh `holdout` cases first. Aim for about a third of the cases in `holdout`. Give both splits a case for every kind of request the skill handles, so a `dev` guard catches a rule that bleeds from one kind into another.
-- **Reach.** A case moves only when the skill fires on it. Add a `tool_used` grader on `Skill` with `input_match` naming the skill: under ablation it reports as an unscored indicator. A case where the skill never fires scores the model's default. Include cases where the skill should stay quiet, so a trigger change has a guard. The `Skill` indicator never scores, so guard a quiet case with a `trace` regex, `not_contains` on `"skill":"<name>"`. For a skill users invoke by name, simulate the invocation in `append_system_prompt` on every case, since there is no trigger to test.
-- **Balance.** Include cases where the skill should change little, so a climb that over-applies the skill loses score.
-- **Graders.** Grade the output with `regex` wherever a pattern decides it, and keep `llm` graders to one criterion each, with an example of a passing reply phrased differently from the obvious one, since the judge reads a bare criterion narrowly. Pair each removal grader with a survival grader for the fact that must stay, so deleting everything fails. Where a case invites invention, grade the claim of the likeliest plausible mechanism the fixture lacks, since a reply may rightly name it as ruled out. Test a claim pattern against negated forms ("haven't reproduced it").
-- **Trace.** Match a tool call's input by its key and value alone. Key order in the serialized input varies by tool (`Edit` writes `replace_all` before `file_path`), so an anchored pattern can silently match nothing. Match a string value with `(?:[^"\\]|\\.)*`, since commands carry escaped quotes.
-- **Scope.** When the reply wraps an artifact in commentary, have `append_system_prompt` ask for the artifact inside `<out>` tags and anchor each regex to that block, or a report that quotes a cut phrase fails its own grader. Scope a positional `llm` grader ("the first sentence") the same way, or tell the judge which part of the reply to read. `<out>(?:(?!</out>)[\s\S])*?PATTERN` finds a pattern inside the block, and `<out>(?:(?!</out>)[\s\S]){N}` holds when the block runs past N characters, a floor under `contains` and a ceiling under `not_contains`. Size N per case, since a case with more moving parts earns a longer on-topic caveat.
-- **Isolation.** Stub every external service in the fixture: a bare repo for pushes, pasted text for API bodies, an `append_system_prompt` fallback telling the session what to reply when a network call fails. A run that dies on the network scores the sandbox. A case whose right answer is "no cause found" needs a fixture with no latent cause: have a strong model hunt it before the baseline. A headless session lacks interactive tools such as `EnterPlanMode` and `AskUserQuestion` even when granted. Grade a step that uses one by its observable effect, and tell the session through `append_system_prompt` that nobody answers mid-task.
-- **Wrap.** An artifact outside a plugin (a user skill, an agent, a rule or `CLAUDE.md`) loads through the `wrap` key in the suite's `suite.yaml`, which the runner builds into a throwaway plugin. Context files reach the session through a `SessionStart` hook, whatever their `paths:` frontmatter says.
-- **Lint.** Run `shellcheck` on the scaffold scripts, and test each regex grader with `bun evals/native/check.ts <suite>` against examples: one that should pass every grader, and one per grader that should fail it. Trace graders need `.jsonl` examples: hand-write them on the model of a smoke run's `tool_use` lines, serialized as compact JSON (`"key":"value"`, as `JSON.stringify` writes it), since trace patterns match that form. Hand-write replies for the `holdout` cases. A fix after the baseline edits a case mid-climb.
-- **Noise.** Run the unchanged `dev` cases twice with an explicit `--runs` (the runner defaults to 3), priced first per `Running` at 2 × runs × the per-run cost. Compare the two with `compare.ts`. Stars there are noise at that run count, and they set how many runs a candidate needs. A star takes at least 4 runs a side at the default alpha, and `compare.ts` marks a cell below that `†`, so zero stars at fewer runs says nothing about noise. A case whose without arm swings across its range between noise columns needs more pooled runs than the rest. A grader that fails on both arms in every run is a harness artifact until a trace shows otherwise, such as a `file_exists` glob matching the sandbox's own dotfiles. Scope file globs to what a session would write. A stray `Agent` call can leave a trailing message after the reply, and a `last_message` grader grades that message, so open the trace behind a lone with-arm drop before counting it. `allowed_tools` does not remove `Agent`.
-- **Headroom.** A case at 1.00 on both arms in the noise runs discriminates nothing. Harden or replace it until the with arm has room to rise and the without arm sits below it, aiming the new graders at what the without arm's traces still get wrong. Balance cases are exempt. A suite ported from rubric asserts saturates this way. When a hardening round aimed at the without arm's failures leaves the with arm at 1.00 again, stop hardening: the skill already handles those cases, and the suite ships as a regression guard.
+Before the first baseline, check the suite against every item in [references/suite.md](references/suite.md): case sources, the split, reach, graders, isolation, scaling, noise, and headroom. Re-check it whenever a case or grader changes.
 
 ## Loop
 
 #### Baseline
 
 Run the suite on the base commit at least twice and pool the runs. Replicate the baseline as many times as each candidate: a single low baseline draw stars every candidate against it. Get replicates from separate runs, each a local run or a CI dispatch. `--runs N` in one run shares that run's drift.
+
+Record the `claude --version` and the model each arm ran on beside the baseline. Re-baseline when either changes mid-climb.
 
 #### Error Analysis
 
@@ -63,7 +56,11 @@ Make one change per candidate, on its own branch off the base. Before running it
 
 Writing the target first keeps the decision from being fitted to whichever row happened to move.
 
-Check every example the change names against the `holdout` fixtures, and swap out any a `holdout` case uses. A gain on that case would then measure the example rather than the rule.
+Write the instruction as the failing behavior in general terms, never with a `dev` case's nouns, phrases, or fixture details. Write the requirement a grader checks, never the grader or the suite. Check every example the change names against the `holdout` fixtures, and swap out any a `holdout` case uses. A gain on that case would then measure the example rather than the rule.
+
+Count the tokens the change adds to the body. A skill body re-injects at every compaction, so an added sentence needs a starred target to stay.
+
+A removal is a candidate too: delete an instruction, target the graders it was written for, and accept when no guard stars down. `/claude-api prompt-audit` proposes removals of text written for an older model's failures.
 
 Run the candidate on the `dev` tag as many times as the baseline. When the budget is tight, run one full `dev` replicate for the guards and top up the target cases with scoped `--case` replicates to 4 runs a side. Guards at that count cannot star, so read their case minimums and open the trace behind any drop.
 
@@ -79,7 +76,7 @@ Read the stars in this order:
 
 1. **Without arm.** The candidate cannot touch it. A star there is drift or a lucky draw, and a with-arm star of the same size is no evidence. Add runs to both columns, scoped with `--case` to the cases in doubt. Tag rows then pool unequal run counts per case, so read those cases' own rows. A case with `context.history_file` has no without arm and scores its `with-only` graders. Check its drift against the with-arm spread between the two baseline replicates instead.
 2. **Indicators.** A with-arm gain on a case where the skill fired no more often than at baseline did not come from the skill's instructions.
-3. **Targets.** Accept only when a target grader is starred in the predicted direction.
+3. **Targets.** Accept only when a target grader is starred in the predicted direction. When the diff cannot explain the size of a gain, or an `llm` grader rises while the `regex` graders on the same case stay flat, read five traces before accepting.
 4. **Guards.** A starred regression on the with arm blocks the change until it is explained from traces or fixed. When several guards on one case drop together, check the case minimum first: one collapsed run fails every survival grader at once, and its trace shows whether the candidate caused it.
 
 About one row in ten stars by chance at the default alpha. Treat a starred row outside the pre-registered targets and guards as a lead for error analysis. It is not a result.
@@ -93,7 +90,7 @@ The next candidate branches off the accepted change and re-baselines on it. Cand
 
 #### Holdout
 
-After the last accepted change, run `holdout` on the original base and on the final commit, pooled to the same run count. On CI, dispatch the final branch for both, adding `-f ref=<base sha>` for the base side so both read the same cases. The climb holds when the holdout score does not fall. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it.
+After the last accepted change, run `holdout` on the original base and on the final commit, pooled to the same run count. On CI, dispatch the final branch for both, adding `-f ref=<base sha>` for the base side so both read the same cases. The climb holds when the holdout score does not fall. Compare the two with `compare.ts` and report a gain only where `holdout` stars. Otherwise report the result as a `dev` gain with no demonstrated holdout gain. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it.
 
 ## Stopping
 
@@ -103,6 +100,8 @@ Stop when any of these holds, and say which:
 - Three candidates in a row came back null. Add harder cases, then resume.
 - The budget cannot cover another candidate at the baseline's replicate count. Skip `holdout` when nothing was accepted, since the final commit is the base.
 - Every remaining failure buckets as reach or floor. Fix grader-bucket failures and regrade first, and resume if a skill failure surfaces.
+
+After a model upgrade, re-run the baseline before climbing. When the with arm no longer stars above the without arm, the model now does what the skill asked: propose retiring the skill or cutting it to the instructions that still star.
 
 ## Running
 

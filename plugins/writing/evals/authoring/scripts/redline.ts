@@ -38,24 +38,47 @@ export function wordDistance(from: string, to: string): WordDistance {
   return { words: a.length, deleted, inserted, distance };
 }
 
-export type EditCall = (prompt: string) => Promise<string>;
+export const Edit = z.object({ find: z.string(), replace: z.string() });
+export type Edit = z.infer<typeof Edit>;
+
+export type EditCall = (prompt: string) => Promise<Edit[]>;
+
+/** Applies, in order, each edit whose `find` occurs exactly once in the running text. */
+export function applyEdits(
+  text: string,
+  edits: readonly Edit[],
+): { text: string; applied: number } {
+  let current = text;
+  let applied = 0;
+  for (const edit of edits) {
+    const at = current.indexOf(edit.find);
+    if (edit.find === "" || at === -1 || current.includes(edit.find, at + 1)) continue;
+    current = current.slice(0, at) + edit.replace + current.slice(at + edit.find.length);
+    applied++;
+  }
+  return { text: current, applied };
+}
 
 /**
- * Edits `draft` repeatedly until a pass changes less than `settle` of the words it was given,
- * or `maxPasses` passes have run. Returns the text after each pass.
+ * Redlines `draft` pass after pass until a pass leaves the text unchanged or `maxPasses` passes have run.
+ * Returns the text after each pass that changed it.
  */
 export async function settleEdits(
   draft: string,
   render: (text: string) => string,
   call: EditCall,
   maxPasses: number,
-  settle: number,
-): Promise<string[]> {
-  const pass = async (text: string, remaining: number): Promise<string[]> => {
-    if (remaining === 0) return [];
-    const next = await call(render(text));
-    if (wordDistance(text, next).distance < settle) return [next];
-    return [next, ...(await pass(next, remaining - 1))];
+): Promise<{ passes: string[]; exhausted: boolean }> {
+  interface Settled {
+    passes: string[];
+    exhausted: boolean;
+  }
+  const pass = async (text: string, remaining: number): Promise<Settled> => {
+    if (remaining === 0) return { passes: [], exhausted: false };
+    const { text: next, applied } = applyEdits(text, await call(render(text)));
+    if (applied === 0) return { passes: [], exhausted: true };
+    const rest = await pass(next, remaining - 1);
+    return { passes: [next, ...rest.passes], exhausted: rest.exhausted };
   };
   return pass(draft, maxPasses);
 }
@@ -65,6 +88,9 @@ export const Redline = z.object({
   prompt: z.string(),
   model: z.string(),
   passes: z.array(z.string()),
+  exhausted: z.boolean(),
+  /** Words deleted plus words inserted between the draft and its settled text. */
+  edits: z.number(),
   distance: z.number(),
 });
 export type Redline = z.infer<typeof Redline>;
@@ -87,7 +113,7 @@ export function pickByDistance(a: number, b: number, margin: number): Pick {
   return a < b ? "a" : "b";
 }
 
-const EditReply = z.object({ text: z.string() });
+const EditReply = z.object({ edits: z.array(Edit) });
 
 function callEditor(model: string): EditCall {
   return async (prompt) => {
@@ -105,8 +131,18 @@ function callEditor(model: string): EditCall {
           type: "json_schema",
           schema: {
             type: "object",
-            properties: { text: { type: "string" } },
-            required: ["text"],
+            properties: {
+              edits: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: { find: { type: "string" }, replace: { type: "string" } },
+                  required: ["find", "replace"],
+                  additionalProperties: false,
+                },
+              },
+            },
+            required: ["edits"],
             additionalProperties: false,
           },
         },
@@ -118,7 +154,7 @@ function callEditor(model: string): EditCall {
         message.structured_output !== undefined
           ? decode(EditReply, message.structured_output, "editor reply")
           : decodeJson(EditReply, message.result, "editor reply");
-      return reply.text;
+      return reply.edits;
     }
     throw new Error("editor call produced no result message");
   };
@@ -137,9 +173,10 @@ interface JudgeFlags {
   model: string;
   prompt: string;
   maxPasses: number;
-  settle: number;
   margin: number;
+  metric: "edits" | "distance";
   concurrency: number;
+  replicate: number;
 }
 
 async function judgeMain(flags: JudgeFlags): Promise<void> {
@@ -148,7 +185,7 @@ async function judgeMain(flags: JudgeFlags): Promise<void> {
     throw new Error("--pairs, --out, and --cache are required");
   }
   const template = await Bun.file(flags.prompt).text();
-  const promptHash = hash(template, String(flags.maxPasses), String(flags.settle)).slice(0, 12);
+  const promptHash = hash(template, String(flags.maxPasses)).slice(0, 12);
   const pairs = await Promise.all(
     globSync("*.json", { cwd: pairsDir })
       .toSorted()
@@ -157,8 +194,9 @@ async function judgeMain(flags: JudgeFlags): Promise<void> {
   await Promise.all([mkdir(out, { recursive: true }), mkdir(cache, { recursive: true })]);
 
   const drafts = new Map<string, { surface: string; brief: string; text: string }>();
+  const salt = flags.replicate === 0 ? [] : [`replicate ${flags.replicate}`];
   const keyOf = (pair: Pair, text: string) =>
-    hash(promptHash, flags.model, pair.surface, pair.brief, text);
+    hash(promptHash, flags.model, pair.surface, pair.brief, text, ...salt);
   for (const pair of pairs) {
     for (const side of [pair.a, pair.b]) {
       drafts.set(keyOf(pair, side.text), {
@@ -178,25 +216,27 @@ async function judgeMain(flags: JudgeFlags): Promise<void> {
       redlines.set(key, await decodeFile(Redline, path));
       return;
     }
-    const passes = await settleEdits(
+    const { passes, exhausted } = await settleEdits(
       draft.text,
       (text) => renderEditorPrompt(template, draft.surface, draft.brief, text),
       call,
       flags.maxPasses,
-      flags.settle,
     );
+    const moved = wordDistance(draft.text, passes.at(-1) ?? draft.text);
     const redline: Redline = {
       key,
       prompt: promptHash,
       model: flags.model,
       passes,
-      distance: wordDistance(draft.text, passes.at(-1) ?? draft.text).distance,
+      exhausted,
+      edits: moved.deleted + moved.inserted,
+      distance: moved.distance,
     };
     await Bun.write(path, `${JSON.stringify(redline, null, 2)}\n`);
     redlines.set(key, redline);
     fresh++;
     console.error(
-      `[${fresh}/${drafts.size}] ${key}: ${redline.distance.toFixed(2)} in ${passes.length} passes`,
+      `[${fresh}/${drafts.size}] ${key}: ${redline.edits} words in ${passes.length} passes${exhausted ? "" : " (cap)"}`,
     );
   });
 
@@ -207,9 +247,9 @@ async function judgeMain(flags: JudgeFlags): Promise<void> {
       if (a === undefined || b === undefined) throw new Error(`${pair.id}: missing redline`);
       const judgment: Judgment = {
         id: pair.id,
-        pick: pickByDistance(a.distance, b.distance, flags.margin),
+        pick: pickByDistance(a[flags.metric], b[flags.metric], flags.margin),
         left: "a",
-        reason: `a ${a.distance.toFixed(3)} (${a.passes.length} passes), b ${b.distance.toFixed(3)} (${b.passes.length} passes)`,
+        reason: `a ${a.edits} words (${a.distance.toFixed(2)}), b ${b.edits} words (${b.distance.toFixed(2)})`,
         prompt: promptHash,
         model: flags.model,
       };
@@ -227,7 +267,7 @@ if (import.meta.main) {
       name: "redline",
       help: {
         description:
-          "Edit each draft in a pairs directory to a fixed point, pick the draft needing less editing, and write Judgment files that pairwise.ts calibrate and score read",
+          "Redline each draft in a pairs directory until the editor has no edits left, pick the draft needing less editing, and write Judgment files that pairwise.ts calibrate and score read",
       },
       flags: {
         pairs: { type: String, description: "Directory of Pair JSON files" },
@@ -240,17 +280,24 @@ if (import.meta.main) {
           description: "Editor prompt template",
         },
         maxPasses: { type: Number, default: 4, description: "Most edit passes per draft" },
-        settle: {
-          type: Number,
-          default: 0.02,
-          description: "Stop once a pass changes less than this share of words",
-        },
         margin: {
           type: Number,
           default: 0,
           description: "Call a tie when the two distances are within this of each other",
         },
+        metric: {
+          type: (value: string) => z.enum(["edits", "distance"]).parse(value),
+          default: "edits" as const,
+          description:
+            "Pick by words edited (edits) or by that count over the draft's length (distance)",
+        },
         concurrency: { type: Number, default: 4, description: "Drafts edited in parallel" },
+        replicate: {
+          type: Number,
+          default: 0,
+          description:
+            "Redline again under a separate cache entry, to measure the editor's own noise",
+        },
       },
     },
     async (parsed) => {

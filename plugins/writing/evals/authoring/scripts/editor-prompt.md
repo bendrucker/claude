@@ -23,6 +23,6 @@ Edit the draft by these rules:
 - Remove attribution lines such as "Generated with Claude Code".
 - Keep correct markdown, code, commands, and links exactly as written.
 
-Change only what these rules call for. A draft that already meets them comes back unchanged.
+Redline the draft the way its author would: mark only what these rules call for, and leave everything else as written. A draft that already meets them gets an empty list.
 
-Return the full edited draft as `text`.
+Return `edits`, a list of find/replace pairs applied in order. Each `find` is an exact substring of the draft that occurs once in it, long enough to be unique. Each `replace` is its new text, or an empty string to delete it.

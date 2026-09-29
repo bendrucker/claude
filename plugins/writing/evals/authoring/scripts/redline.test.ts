@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 import type { Pick } from "./pairs";
-import { pickByDistance, settleEdits, wordDistance } from "./redline";
+import { applyEdits, type Edit, pickByDistance, settleEdits, wordDistance } from "./redline";
 
 describe("wordDistance", () => {
   test.each<{ name: string; from: string; to: string; deleted: number; inserted: number }>([
@@ -45,25 +45,83 @@ describe("wordDistance", () => {
   });
 });
 
-describe("settleEdits", () => {
-  test.each<{ name: string; replies: string[]; maxPasses: number; passes: number }>([
+describe("applyEdits", () => {
+  test.each<{ name: string; edits: Edit[]; text: string; applied: number }>([
     {
-      name: "stops at the first unchanged pass",
-      replies: ["b c", "b c", "x"],
-      maxPasses: 4,
-      passes: 2,
+      name: "replace",
+      edits: [{ find: "serves as", replace: "is" }],
+      text: "It is a cache.",
+      applied: 1,
     },
-    { name: "stops at the pass cap", replies: ["b", "c d", "e f g"], maxPasses: 2, passes: 2 },
-  ])("$name", async ({ replies, maxPasses, passes }) => {
+    {
+      name: "delete",
+      edits: [{ find: " a cache", replace: " cache" }],
+      text: "It serves as cache.",
+      applied: 1,
+    },
+    {
+      name: "missing find",
+      edits: [{ find: "absent", replace: "x" }],
+      text: "It serves as a cache.",
+      applied: 0,
+    },
+    {
+      name: "ambiguous find",
+      edits: [{ find: "a", replace: "x" }],
+      text: "It serves as a cache.",
+      applied: 0,
+    },
+    {
+      name: "empty find",
+      edits: [{ find: "", replace: "x" }],
+      text: "It serves as a cache.",
+      applied: 0,
+    },
+    {
+      name: "later edit sees earlier one",
+      edits: [
+        { find: "serves as", replace: "is" },
+        { find: "is a", replace: "caches" },
+      ],
+      text: "It caches cache.",
+      applied: 2,
+    },
+  ])("$name", ({ edits, text, applied }) => {
+    expect(applyEdits("It serves as a cache.", edits)).toEqual({ text, applied });
+  });
+});
+
+describe("settleEdits", () => {
+  test.each<{
+    name: string;
+    replies: Edit[][];
+    maxPasses: number;
+    passes: string[];
+    exhausted: boolean;
+  }>([
+    {
+      name: "stops once a pass leaves the text unchanged",
+      replies: [[{ find: "b", replace: "x" }], [], [{ find: "x", replace: "y" }]],
+      maxPasses: 4,
+      passes: ["a x c"],
+      exhausted: true,
+    },
+    {
+      name: "keeps every pass when it hits the cap",
+      replies: [[{ find: "b", replace: "x" }], [{ find: "x", replace: "y" }], []],
+      maxPasses: 2,
+      passes: ["a x c", "a y c"],
+      exhausted: false,
+    },
+  ])("$name", async ({ replies, maxPasses, passes, exhausted }) => {
     const queue = [...replies];
     const result = await settleEdits(
       "a b c",
       (text) => text,
-      () => Promise.resolve(queue.shift() ?? ""),
+      () => Promise.resolve(queue.shift() ?? []),
       maxPasses,
-      0.02,
     );
-    expect(result).toEqual(replies.slice(0, passes));
+    expect(result).toEqual({ passes, exhausted });
   });
 });
 

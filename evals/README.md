@@ -1,6 +1,6 @@
 # Evals
 
-This directory is the generic layer: the results corpus and the scripts that file and price runs from any suite. Per-skill harnesses live with the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, each with its own README: [`pr-body`](../plugins/pull-request/evals/pr-body/), [`issue-refine`](../plugins/issue/evals/issue-refine/), [`review-voice`](../plugins/review/evals/review-voice/), [`writing`](../plugins/writing/evals/writing/), [`comment-density`](../plugins/comments/evals/comment-density/).
+This directory is the generic layer: the results corpus and the scripts that file and price runs from any suite. Per-skill harnesses live with the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, each with its own README: [`pr-body`](../plugins/pull-request/evals/pr-body/), [`issue-refine`](../plugins/issue/evals/issue-refine/), [`review-voice`](../plugins/review/evals/review-voice/), [`comment-density`](../plugins/comments/evals/comment-density/).
 
 [`scripts/`](scripts/) is shared across them. It moves promptfoo runs out of promptfoo's SQLite database into a durable corpus and reports what the runs cost.
 

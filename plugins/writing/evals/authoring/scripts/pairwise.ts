@@ -357,6 +357,7 @@ export function blind(flip: boolean): Key {
 export function renderJudgePrompt(template: string, pair: Pair, left: Key): string {
   const right: Key = left === "a" ? "b" : "a";
   return template
+    .replaceAll("{{surface}}", pair.surface)
     .replaceAll("{{brief}}", pair.brief)
     .replaceAll("{{left}}", pair[left].text)
     .replaceAll("{{right}}", pair[right].text);

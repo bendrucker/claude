@@ -382,9 +382,9 @@ describe("renderJudgePrompt", () => {
     b: { source: { kind: "run", column: "candidate", arm: "with", run: 0 }, text: "draft B" },
   };
 
-  test("substitutes brief/left/right for the given left key", () => {
-    expect(renderJudgePrompt("{{brief}} | {{left}} | {{right}}", pair, "a")).toBe(
-      "the brief | draft A | draft B",
+  test("substitutes surface/brief/left/right for the given left key", () => {
+    expect(renderJudgePrompt("{{surface}} | {{brief}} | {{left}} | {{right}}", pair, "a")).toBe(
+      `${pair.surface} | the brief | draft A | draft B`,
     );
   });
 

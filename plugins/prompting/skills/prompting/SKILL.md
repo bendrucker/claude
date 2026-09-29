@@ -114,7 +114,11 @@ Cache what the model cannot find by looking: the unwritten convention, the reaso
 
 #### No-ops
 
-Delete instructions the model already follows by default. Test each sentence against the model's default: does this line change behavior? Settle a disagreement by running the document. When a sentence fails, delete the whole sentence.
+Delete instructions the model already follows by default. Test each sentence against the model's default: does this line change behavior? Settle a disagreement by running the document, through `prompting:hill-climb` when it has an eval suite. When a sentence fails, delete the whole sentence.
+
+Prune instructions, and keep context: the audience, the quality bar, a tool's contract, and the reason behind a constraint are what only the author knows.
+
+For text written against an older model's failures, run `/claude-api prompt-audit`. It holds the per-model behavior that dates an instruction.
 
 Replace a leading word too weak to beat the default ("be thorough" when the model is already thorough) with a stronger word.
 

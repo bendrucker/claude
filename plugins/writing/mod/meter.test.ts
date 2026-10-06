@@ -81,12 +81,15 @@ describe("record", () => {
     const meter = createMeter();
 
     expect(record(meter, 0, "row-1", score(50, { "AI vocabulary": 2 })).event).toEqual({
-      event: "score",
-      uuid: "row-1",
-      density: 40,
-      words: 50,
-      hits: 2,
-      categories: [{ category: "AI vocabulary", hits: 2 }],
+      event: "voice.score",
+      ok: true,
+      detail: {
+        uuid: "row-1",
+        density: 40,
+        words: 50,
+        hits: 2,
+        categories: [{ category: "AI vocabulary", hits: 2 }],
+      },
     });
   });
 
@@ -97,7 +100,10 @@ describe("record", () => {
 
     const outcome = record(meter, started, "late", score(10, { "AI vocabulary": 1 }));
 
-    expect(outcome).toEqual({ event: expect.objectContaining({ uuid: "late" }), status: null });
+    expect(outcome).toEqual({
+      event: expect.objectContaining({ detail: expect.objectContaining({ uuid: "late" }) }),
+      status: null,
+    });
     expect(meter.turn).toEqual(score(0));
   });
 
@@ -105,7 +111,7 @@ describe("record", () => {
     const meter = createMeter();
 
     expect(record(meter, 0, "x", "bun: not found")).toEqual({
-      event: { event: "unavailable", reason: "bun: not found" },
+      event: { event: "voice.unavailable", ok: false, detail: { reason: "bun: not found" } },
       status: undefined,
     });
     expect(meter.unavailable).toBe(true);

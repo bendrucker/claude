@@ -9,7 +9,8 @@ import { cli } from "cleye";
 
 // `claude plugin test` runs every *.test.ts under the plugin, bun tests
 // included, so it runs against a copy holding only what a mod loads.
-const PARTS = [".claude-plugin", "hooks", "mod"];
+// A plugin's hooks/ may also hold command hooks and their bun tests.
+const PARTS = [".claude-plugin", "mod"];
 
 const argv = cli({
   name: "mod-test",
@@ -23,8 +24,9 @@ const stage = await mkdtemp(join(tmpdir(), "mod-test-"));
 const dir = join(stage, plugin);
 
 try {
-  await mkdir(dir);
+  await mkdir(join(dir, "hooks"), { recursive: true });
   await $`cp -R ${PARTS.map((part) => join(source, part))} ${dir}`;
+  await $`cp ${join(source, "hooks", "hooks.json")} ${join(dir, "hooks")}`;
   const proc = Bun.spawn(["claude", "plugin", "test", dir], {
     stdio: ["inherit", "inherit", "inherit"],
     env: { ...process.env, CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1" },

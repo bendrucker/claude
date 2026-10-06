@@ -1,7 +1,6 @@
 import type { EngineInterface, On } from "claude-code";
 import {
   type Meter,
-  type MeterEvent,
   type Score,
   createMeter,
   parseReport,
@@ -10,13 +9,9 @@ import {
   startTurn,
 } from "./meter.ts";
 
+const MOD = "writing";
 const SCAN = "skills/scan/scripts/scan.ts";
 const TIMEOUT_MS = 8_000;
-
-// Placeholder until the mods-observability event writer lands.
-function emit($: EngineInterface, event: MeterEvent): void {
-  $.ui.log(JSON.stringify(event), { to: "debug" });
-}
 
 async function scan($: EngineInterface, text: string): Promise<Score | string> {
   try {
@@ -33,8 +28,11 @@ async function scan($: EngineInterface, text: string): Promise<Score | string> {
 
 async function measure($: EngineInterface, meter: Meter, uuid: string, text: string) {
   const generation = meter.generation;
-  const { event, status } = record(meter, generation, uuid, await scan($, text));
-  emit($, event);
+  const started = await $.clock.now();
+  const result = await scan($, text);
+  const ms = (await $.clock.now()) - started;
+  const { event, status } = record(meter, generation, uuid, result);
+  void $.modEvents.emit({ mod: MOD, ms, ...event });
   if (status !== null) $.ui.status(status);
 }
 
@@ -44,6 +42,12 @@ async function measure($: EngineInterface, meter: Meter, uuid: string, text: str
  */
 export function register(on: On): void {
   const meter = createMeter();
+
+  on("session.start", async ($, e, next) => {
+    const started = await next(e);
+    void $.modEvents.emit({ mod: MOD, event: "session.start" });
+    return started;
+  });
 
   on("turn.start", ($, e, next) => {
     startTurn(meter);

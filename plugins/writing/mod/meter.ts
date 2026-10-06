@@ -17,9 +17,11 @@ export interface Meter {
   unavailable: boolean;
 }
 
-export type MeterEvent =
-  | ({ event: "score"; uuid: string; density: number } & Score)
-  | { event: "unavailable"; reason: string };
+export interface MeterEvent {
+  event: "voice.score" | "voice.unavailable";
+  ok: boolean;
+  detail: Record<string, unknown>;
+}
 
 /**
  * `status` is the line to show, `undefined` to clear it, or `null` to leave it as it is.
@@ -115,9 +117,16 @@ export function record(
 ): Outcome {
   if (typeof scan === "string") {
     meter.unavailable = true;
-    return { event: { event: "unavailable", reason: scan }, status: undefined };
+    return {
+      event: { event: "voice.unavailable", ok: false, detail: { reason: scan } },
+      status: undefined,
+    };
   }
-  const event: MeterEvent = { event: "score", uuid, density: density(scan), ...scan };
+  const event: MeterEvent = {
+    event: "voice.score",
+    ok: true,
+    detail: { uuid, density: density(scan), ...scan },
+  };
   if (generation !== meter.generation) return { event, status: null };
   meter.turn = combine(meter.turn, scan);
   return { event, status: statusLine(meter.turn) };

@@ -43,19 +43,19 @@ WITH scoped AS (
     AND host_filter(host, getvariable('host'))
   GROUP BY host, session_id, source_file, source_line
 ),
+delinked AS (
+  SELECT
+    *,
+    regexp_extract_all(text, '\[[^\]\n]*\]\((https?://[^)\s]+)\)', 1) AS md_urls,
+    regexp_replace(text, '\[[^\]\n]*\]\([^)\s]+\)', ' ', 'g') AS without_md
+  FROM scoped
+),
 unlinked AS (
   SELECT
     *,
-    regexp_extract_all(text, '\[[^\]\n]*\]\((https?://[^)\s]+)\)', 1)
-      || regexp_extract_all(
-        regexp_replace(text, '\[[^\]\n]*\]\([^)\s]+\)', ' ', 'g'),
-        'https?://[^\s)>\]]+'
-      ) AS urls,
-    regexp_replace(
-      regexp_replace(text, '\[[^\]\n]*\]\([^)\s]+\)', ' ', 'g'),
-      'https?://[^\s)>\]]+', ' ', 'g'
-    ) AS prose
-  FROM scoped
+    md_urls || regexp_extract_all(without_md, 'https?://[^\s)>\]]+') AS urls,
+    regexp_replace(without_md, 'https?://[^\s)>\]]+', ' ', 'g') AS prose
+  FROM delinked
 ),
 extracted AS (
   SELECT

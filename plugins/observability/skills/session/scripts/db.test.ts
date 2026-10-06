@@ -734,7 +734,7 @@ describe("bare-refs query", () => {
     // the fixture's fourth message (a list number, a standards ID, inline code, a plan
     // label) and the user's own #77 both fall outside the count
     expect(rows).toEqual([
-      { bucket, ref_messages: 4n, bare_messages: 3n, linked_messages: 2n, bare_pct: 75 },
+      { bucket, ref_messages: 6n, bare_messages: 4n, linked_messages: 3n, bare_pct: 66.7 },
     ]);
   });
 });

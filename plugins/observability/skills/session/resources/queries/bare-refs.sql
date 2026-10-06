@@ -46,8 +46,8 @@ WITH scoped AS (
 delinked AS (
   SELECT
     *,
-    regexp_extract_all(text, '\[[^\]\n]*\]\((https?://[^)\s]+)\)', 1) AS md_urls,
-    regexp_replace(text, '\[[^\]\n]*\]\([^)\s]+\)', ' ', 'g') AS without_md
+    regexp_extract_all(text, '\[[^\]\n]*\]\((https?://[^)\s]+)(?:\s+"[^"\n]*")?\)', 1) AS md_urls,
+    regexp_replace(text, '\[[^\]\n]*\]\([^)\s]+(?:\s+"[^"\n]*")?\)', ' ', 'g') AS without_md
   FROM scoped
 ),
 unlinked AS (
@@ -70,7 +70,7 @@ extracted AS (
     )
       || regexp_extract_all(prose, '(?i)\b(?:PRs?|pull requests?|issues?|MRs?)\s+(#\d)\b', 1)
       || list_filter(
-        regexp_extract_all(prose, '(?:^|\s)(!\d{1,6})\b', 1),
+        regexp_extract_all(prose, '(?:^|[^\w/&#!])((?:[\w.-]+/)?[\w.-]*!\d{1,6})\b', 1),
         lambda r: NOT regexp_matches(r, '^!\d$')
       )
       || regexp_extract_all(prose, '\bMRs?\s+(!\d)\b', 1)

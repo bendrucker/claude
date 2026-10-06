@@ -31,8 +31,6 @@ export interface Outcome {
   status: string | undefined | null;
 }
 
-const EMPTY: Score = { words: 0, hits: 0, categories: [] };
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -96,12 +94,16 @@ function statusLine(score: Score): string {
   return top === undefined ? rate : `${rate} · ${top.category}`;
 }
 
+function empty(): Score {
+  return { words: 0, hits: 0, categories: [] };
+}
+
 export function createMeter(): Meter {
-  return { turn: EMPTY, generation: 0, unavailable: false };
+  return { turn: empty(), generation: 0, unavailable: false };
 }
 
 export function startTurn(meter: Meter): void {
-  meter.turn = EMPTY;
+  meter.turn = empty();
   meter.generation++;
 }
 
@@ -116,10 +118,11 @@ export function record(
   scan: Score | string,
 ): Outcome {
   if (typeof scan === "string") {
+    const status = meter.unavailable ? null : undefined;
     meter.unavailable = true;
     return {
       event: { event: "voice.unavailable", ok: false, detail: { reason: scan } },
-      status: undefined,
+      status,
     };
   }
   const event: MeterEvent = {

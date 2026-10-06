@@ -42,9 +42,9 @@ Every dispatcher run appends one JSONL line to `~/.claude/writing-hooks/log.json
 
 ## Chat Voice Meter
 
-Chat replies never pass through a tool call, so the PreToolUse dispatcher never sees them. The mod in [`mod/`](mod/) hooks `session.append` on the model's response rows in the main conversation, scores each text block with `scan.ts score --json`, and shows the turn's running density and top category in the status line (`voice 33/1k · AI vocabulary`). It only displays. Nothing it computes reaches the model.
+The PreToolUse dispatcher never sees a chat reply, because a reply is no tool call. The mod in [`mod/`](mod/) hooks `session.append` on the model's response rows in the main conversation, scores each text block with `scan.ts score --json`, and shows the turn's running density and top category in the status line (`voice 33/1k · AI vocabulary`). It only displays. Nothing it computes reaches the model.
 
-It loads only where `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set. It runs the scan CLI through `bun` from the plugin root, so it needs `bun` on `PATH` and the plugin's installed dependencies. When the scan can't run, the meter clears its line and stays off for the rest of the session. Every score and every outage is logged as an event.
+It loads only where `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set. It needs `bun` on `PATH` and the plugin's installed dependencies to run the scan CLI. When the scan can't run, the meter clears its line and stays off for the rest of the session. Every score and every outage is logged through the `mod-events` plugin, which the writing plugin depends on.
 
 ## Testing
 

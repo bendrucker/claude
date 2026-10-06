@@ -123,4 +123,11 @@ describe("record", () => {
 
     expect(record(meter, 0, "y", score(10, { "AI vocabulary": 1 })).status).toBeNull();
   });
+
+  test("logs a second failure without clearing the line again", () => {
+    const meter = createMeter();
+    record(meter, 0, "x", "timed out");
+
+    expect(record(meter, 0, "y", "timed out").status).toBeNull();
+  });
 });

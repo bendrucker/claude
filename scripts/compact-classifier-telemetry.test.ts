@@ -46,25 +46,31 @@ test("compacts a session's records into one mod-events file", async () => {
   const out = await Bun.file(join(dir, "out", "s1", "classifier-telemetry.legacy.0.jsonl")).text();
   expect(JSON.parse(out)).toMatchInlineSnapshot(`
     {
-      "detail": {
+      "attributes": {
         "agent_id": null,
         "check_ms": 5,
         "decision": "ask",
+        "duration_ms": 60000,
         "hook": null,
         "interactive": true,
         "outcome": "ok",
         "reason": "Answer questions?",
         "rule": null,
+        "session.id": "s1",
         "started_at": 1000,
         "tool": "AskUserQuestion",
         "tool_use_id": "toolu_1",
       },
-      "event": "tool.verdict",
-      "mod": "classifier-telemetry",
-      "ms": 60000,
-      "ok": true,
-      "session": "s1",
-      "ts": 61000,
+      "event_name": "classifier-telemetry.tool.verdict",
+      "resource": {
+        "service.name": "claude-code",
+      },
+      "scope": {
+        "name": "classifier-telemetry",
+      },
+      "severity_number": 9,
+      "severity_text": "INFO",
+      "timestamp": "1970-01-01T00:01:01.000Z",
     }
   `);
 });

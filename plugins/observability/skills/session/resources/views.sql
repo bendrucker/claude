@@ -851,20 +851,20 @@ WITH events AS (
   SELECT
     host,
     session_id,
-    detail->>'tool_use_id'                          AS tool_use_id,
-    detail->>'agent_id'                             AS agent_id,
-    detail->>'tool'                                 AS tool,
-    TRY_CAST(detail->>'interactive' AS BOOLEAN)     AS interactive,
-    detail->>'decision'                             AS decision,
-    detail->>'rule'                                 AS rule,
-    detail->>'hook'                                 AS hook,
-    detail->>'reason'                               AS reason,
-    epoch_ms(TRY_CAST(detail->>'started_at' AS BIGINT)) AS started_at,
-    TRY_CAST(detail->>'check_ms' AS BIGINT)         AS check_ms,
-    ms                                              AS duration_ms,
-    detail->>'outcome'                              AS outcome
+    attributes->>'tool_use_id'                              AS tool_use_id,
+    attributes->>'agent_id'                                 AS agent_id,
+    attributes->>'tool'                                     AS tool,
+    TRY_CAST(attributes->>'interactive' AS BOOLEAN)         AS interactive,
+    attributes->>'decision'                                 AS decision,
+    attributes->>'rule'                                     AS rule,
+    attributes->>'hook'                                     AS hook,
+    attributes->>'reason'                                   AS reason,
+    epoch_ms(TRY_CAST(attributes->>'started_at' AS BIGINT)) AS started_at,
+    TRY_CAST(attributes->>'check_ms' AS BIGINT)             AS check_ms,
+    duration_ms,
+    attributes->>'outcome'                                  AS outcome
   FROM mod_events
-  WHERE mod = 'classifier-telemetry' AND event = 'tool.verdict'
+  WHERE event_name = 'classifier-telemetry.tool.verdict'
 )
 SELECT * FROM events
 UNION ALL BY NAME

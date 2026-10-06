@@ -24,14 +24,15 @@ const LegacyRecord = z.object({
 
 type LegacyRecord = z.infer<typeof LegacyRecord>;
 
-interface ModEvent {
-  ts: number;
-  session: string;
-  mod: string;
-  event: string;
-  ok: boolean;
-  ms: number;
-  detail: Record<string, unknown>;
+/** The OTel log record the mod-events writer emits, one per line. */
+interface ModEventRecord {
+  timestamp: string;
+  severity_text: "INFO" | "WARN";
+  severity_number: 9 | 13;
+  event_name: string;
+  attributes: Record<string, unknown>;
+  resource: Record<string, string>;
+  scope: { name: string };
 }
 
 interface Totals {
@@ -41,15 +42,14 @@ interface Totals {
   unreadable: number;
 }
 
-export function toEvent(record: LegacyRecord): ModEvent {
+export function toEvent(record: LegacyRecord): ModEventRecord {
+  const isOk = record.outcome === "ok";
   return {
-    ts: record.started_at + record.duration_ms,
-    session: record.session_id,
-    mod: "classifier-telemetry",
-    event: "tool.verdict",
-    ok: record.outcome === "ok",
-    ms: record.duration_ms,
-    detail: {
+    timestamp: new Date(record.started_at + record.duration_ms).toISOString(),
+    severity_text: isOk ? "INFO" : "WARN",
+    severity_number: isOk ? 9 : 13,
+    event_name: "classifier-telemetry.tool.verdict",
+    attributes: {
       tool_use_id: record.tool_use_id,
       agent_id: record.agent_id,
       tool: record.tool,
@@ -61,7 +61,11 @@ export function toEvent(record: LegacyRecord): ModEvent {
       started_at: record.started_at,
       check_ms: record.check_ms,
       outcome: record.outcome,
+      duration_ms: record.duration_ms,
+      "session.id": record.session_id,
     },
+    resource: { "service.name": "claude-code" },
+    scope: { name: "classifier-telemetry" },
   };
 }
 

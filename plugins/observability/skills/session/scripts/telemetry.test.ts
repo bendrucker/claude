@@ -255,6 +255,48 @@ describe("telemetry ingest", () => {
     await reindex();
     expect(await count("SELECT COUNT(*) AS n FROM debug_events")).toBe(1);
   });
+
+  it("reads verdict events and falls back to legacy records they lack", async () => {
+    const { recordsDir, modEventsDir, reindex } = layout();
+    const base = makeModRecord({
+      mod: "classifier-telemetry",
+      event_name: "classifier-telemetry.tool.verdict",
+      ok: false,
+      durationMs: 40,
+    });
+    const verdict = {
+      ...base,
+      attributes: {
+        ...base.attributes,
+        tool_use_id: "t1",
+        tool: "Bash",
+        decision: "ask",
+        hook: "PreToolUse",
+        outcome: "deny",
+      },
+    };
+    await Bun.write(
+      join(modEventsDir, "s1", "classifier-telemetry.1.0.jsonl"),
+      `${JSON.stringify(verdict)}\n`,
+    );
+    await Bun.write(join(recordsDir, "t1.json"), record("t1"));
+    await Bun.write(join(recordsDir, "t2.json"), record("t2"));
+    await reindex();
+
+    const rows = await db.query(
+      "SELECT tool_use_id, hook, duration_ms, outcome FROM classifier_verdicts ORDER BY tool_use_id",
+      z.object({
+        tool_use_id: z.string(),
+        hook: z.string().nullable(),
+        duration_ms: z.bigint().nullable(),
+        outcome: z.string().nullable(),
+      }),
+    );
+    expect(rows).toEqual([
+      { tool_use_id: "t1", hook: "PreToolUse", duration_ms: 40n, outcome: "deny" },
+      { tool_use_id: "t2", hook: null, duration_ms: null, outcome: null },
+    ]);
+  });
 });
 
 describe("syncSource", () => {

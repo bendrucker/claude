@@ -10,8 +10,12 @@ import { loadPlugins, type Plugin } from "../packages/marketplace/index";
 const Dependencies = z.looseObject({ dependencies: z.array(z.string()).optional() });
 
 /** Where the engine writes a plugin's function-hooks declarations when it loads the plugin from a folder. */
-export function typesEntry(dir: string): string {
-  return join(dir, ".claude-plugin", "types", "claude-code", "index.d.ts");
+export function typesDir(dir: string): string {
+  return join(dir, ".claude-plugin", "types");
+}
+
+function typesEntry(dir: string): string {
+  return join(typesDir(dir), "claude-code", "index.d.ts");
 }
 
 /**
@@ -38,8 +42,16 @@ export function modPlugins(plugins: Plugin[]): { mods: Plugin[]; load: Plugin[] 
 }
 
 if (import.meta.main) {
+  if (Bun.which("claude") === null) {
+    console.error("claude is not on PATH. Install Claude Code to generate mod engine types.");
+    process.exit(1);
+  }
   const { mods, load } = modPlugins(await loadPlugins());
+  await Promise.all(
+    mods.map((plugin) => rm(typesDir(plugin.dir ?? ""), { recursive: true, force: true })),
+  );
   const scratch = await mkdtemp(join(tmpdir(), "mod-types-"));
+  let exitCode: number;
   try {
     // `/cost` answers locally, so the load writes the types without auth or a model call.
     const proc = Bun.spawn(
@@ -51,10 +63,11 @@ if (import.meta.main) {
         stderr: "inherit",
       },
     );
-    if ((await proc.exited) !== 0) process.exit(1);
+    exitCode = await proc.exited;
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
+  if (exitCode !== 0) process.exit(1);
 
   const present = await Promise.all(
     mods.map((plugin) => Bun.file(typesEntry(plugin.dir ?? "")).exists()),

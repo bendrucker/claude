@@ -153,6 +153,14 @@ describe("register", () => {
     expect(world.events.at(-1)).toMatchObject({ event: "present", ok: false });
   });
 
+  test("clears the count when a denied plan cannot be read", async ($, on) => {
+    const world = worldOf(on, { result: { result: "too long", isError: true } });
+    await planMode($);
+    await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
+    expect(world.status).toEqual([undefined]);
+    expect(world.events).toEqual([]);
+  });
+
   test("records that it was live at session start", async ($, on) => {
     const world = worldOf(on);
     on("session.start", (_, e) => ({ cwd: e.cwd }));

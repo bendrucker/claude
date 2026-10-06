@@ -76,6 +76,7 @@ export function register(on: On): void {
     try {
       chars = (await $.fs.read(planFile)).length;
     } catch {
+      $.ui.status(undefined);
       return result;
     }
     await $.modEvents.emit({

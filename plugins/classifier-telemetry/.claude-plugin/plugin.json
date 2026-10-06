@@ -5,5 +5,5 @@
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
   },
-  "dependencies": ["claude-code", "mod-events"]
+  "dependencies": ["mod-events", "observability"]
 }

@@ -15,7 +15,7 @@ Turn a week of permission asks into settings changes that stop the asks worth st
 
 ## Gather
 
-Load `claude-code:session` and run its refresh, which prints the index path. Run both queries read-only with `after_date` set:
+Load `observability:session` and run its refresh, which prints the index path. Run both queries read-only with `after_date` set:
 
 ```bash
 duckdb -readonly -json <db> -c "SET VARIABLE after_date = DATE '<date>'" -c ".read ${CLAUDE_SKILL_DIR}/assets/share.sql"

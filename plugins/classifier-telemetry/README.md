@@ -11,7 +11,7 @@ A function-hooks mod, so it loads only where `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=
 - `session.start`: emits a `session.start` event.
 - `turn.step`: emits a `server.tool` event for each tool the API ran inside a request.
 
-The `claude-code:session` index ingests the events as `mod_events` and reads them through the `classifier_verdicts` view. The engine does not expose the permission mode to `tool.check`, so the records cannot tell an auto-mode classifier ask from a dialog ask.
+The `observability:session` index ingests the events as `mod_events` and reads them through the `classifier_verdicts` view. The engine does not expose the permission mode to `tool.check`, so the records cannot tell an auto-mode classifier ask from a dialog ask.
 
 ## Skills
 

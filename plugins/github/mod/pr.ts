@@ -131,19 +131,23 @@ function outcomeOf(node: CheckNode): Outcome {
 const LABEL_MAX = 80;
 
 // Any app with checks access names its checks, and the label reaches the model.
-function clean(text: string): string {
+function flatten(text: string): string {
   const flat = text
     .replaceAll(/[\p{Cc}\u2028\u2029]/gu, " ")
     .replaceAll(/\s+/g, " ")
     .trim();
-  if (flat === "") return "check";
-  return flat.length > LABEL_MAX ? `${flat.slice(0, LABEL_MAX - 1)}…` : flat;
+  return flat === "" ? "check" : flat;
 }
 
+// The full label identifies a check. Only what is shown is shortened.
 function labelOf(node: CheckNode): string {
-  if (node.__typename === "StatusContext") return clean(node.context ?? "status");
+  if (node.__typename === "StatusContext") return flatten(node.context ?? "status");
   const name = node.name ?? "check";
-  return clean(node.workflowName ? `${node.workflowName} / ${name}` : name);
+  return flatten(node.workflowName ? `${node.workflowName} / ${name}` : name);
+}
+
+function shown(label: string): string {
+  return label.length > LABEL_MAX ? `${label.slice(0, LABEL_MAX - 1)}…` : label;
 }
 
 // A rerun lists beside the run it replaces, so keep the latest start per label.
@@ -228,15 +232,15 @@ export function decide(prev: Snapshot, next: Snapshot): Decision[] {
 const short = (sha: string) => sha.slice(0, 7);
 
 function listed(labels: string[], max = 3): string {
-  const shown = labels.slice(0, max).join(", ");
-  return labels.length > max ? `${shown} (+${labels.length - max})` : shown;
+  const head = labels.slice(0, max).map(shown).join(", ");
+  return labels.length > max ? `${head} (+${labels.length - max})` : head;
 }
 
 function paragraphOf(snapshot: Snapshot, decision: Promoted): string {
   const pr = `PR #${snapshot.pr}`;
   if (decision.kind === "ci.failed") {
     return [
-      `CI failed on ${pr} at ${short(snapshot.head)}: ${decision.failed.join(", ")}.`,
+      `CI failed on ${pr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
       `Read the failure with \`gh pr checks ${snapshot.pr}\` and \`gh run view <run> --log-failed\`.`,
     ].join("\n");
   }

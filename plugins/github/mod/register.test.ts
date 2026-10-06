@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { describe, expect, mock, test } from "claude-code/testing";
-import { POLL_MS } from "./register.ts";
+import { MAX_ATTEMPTS, POLL_MS } from "./register.ts";
 
 interface Recorded {
   event: string;
@@ -31,6 +31,7 @@ const pr = (conclusion: string, reviews: unknown[] = []) => ({
 
 interface World {
   branch: string;
+  originHead?: string;
   gh: { exitCode: number; stdout: string; stderr: string } | Error;
   view: unknown;
   slowMs?: number;
@@ -64,6 +65,17 @@ function worldOf(on: On, world: World) {
   });
   on("process.run", async ($, e) => {
     const argv = e.argv.join(" ");
+    if (argv.startsWith("git symbolic-ref")) {
+      return {
+        value: {
+          exitCode: world.originHead === undefined ? 1 : 0,
+          stdout: world.originHead === undefined ? "" : `${world.originHead}\n`,
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
     if (argv.startsWith("git ")) {
       return {
         value: {
@@ -199,6 +211,20 @@ describe("register", () => {
     expect(w.named("poll.error")).toEqual([]);
   });
 
+  test("origin/HEAD names the default branch, so a PR from master is still watched", async ($, on) => {
+    const world: World = { branch: "main", originHead: "origin/main", gh: GH_OK, view: pr("") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.views).toEqual([]);
+
+    world.branch = "master";
+    await w.clock.advance(POLL_MS.idle);
+    expect(w.views.length).toBe(1);
+    expect(w.statuses.at(-1)).toBe("PR #7 · CI 0/1");
+  });
+
   test("a repeated gh failure is logged once and backs off", async ($, on) => {
     const world: World = { branch: "topic", gh: GH_OK, view: "HTTP 502: Bad Gateway" };
     const w = worldOf(on, world);
@@ -262,6 +288,54 @@ describe("register", () => {
       expect.objectContaining({ ok: false, detail: expect.objectContaining({ dropped: "busy" }) }),
     );
     expect(w.statuses.at(-1)).toBe("PR #7 · CI ✗ ci / test");
+  });
+
+  test("a dropped injection is retried until the engine takes it", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr(""), drop: "busy" };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = pr("FAILURE");
+    await w.clock.advance(POLL_MS.pending);
+    world.drop = undefined;
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits.length).toBe(2);
+    expect(w.submits[1]).toContain("CI failed on PR #7 at aaaaaaa: ci / test.");
+    expect(w.named("inject").map((e) => [e.ok, e.detail?.attempt])).toEqual([
+      [false, 1],
+      [true, 2],
+    ]);
+    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✗ ci / test → Claude");
+
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits.length).toBe(2);
+  });
+
+  test("a dropped injection stops retrying at the cap", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr(""), drop: "busy" };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = pr("FAILURE");
+    await w.clock.advance(POLL_MS.pending);
+    await w.clock.advance(POLL_MS.settled * (MAX_ATTEMPTS + 2));
+    expect(w.submits.length).toBe(MAX_ATTEMPTS);
+  });
+
+  test("a dropped failure is not retried once the check passes", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr(""), drop: "busy" };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = pr("FAILURE");
+    await w.clock.advance(POLL_MS.pending);
+    world.view = pr("SUCCESS");
+    await w.clock.advance(POLL_MS.settled * 2);
+    expect(w.submits.length).toBe(1);
   });
 
   test("a failing poll marks the last status stale", async ($, on) => {

@@ -2,20 +2,19 @@ import type { EngineInterface, On, ToolCallResult } from "claude-code";
 
 type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 import { type Engine, describe, expect, mock, test, tier } from "claude-code/testing";
+import type { ModEventsInput } from "../../mod-events/types";
 
 tier("user");
 
 const CALL = { tool: "Bash", command: "ls", tool_use_id: "toolu_1" } as const;
 
 interface World {
-  writes: Record<string, unknown>;
   events: ModEventsInput[];
-  calls: () => number;
   clock: ReturnType<typeof mock.clock>;
 }
 
 /**
- * Stands in for the engine beneath the mod.
+ * Stands in for the engine and the mod-events floor beneath the mod.
  */
 function worldOf(
   on: On,
@@ -23,37 +22,25 @@ function worldOf(
     decision = "ask",
     ms = 0,
     result = { result: "ok" },
-    writeFails = false,
     failCalls = 0,
     idFails = false,
   }: {
     decision?: "allow" | "ask" | "deny";
     ms?: number;
     result?: ToolCallResult;
-    writeFails?: boolean;
     failCalls?: number;
     idFails?: boolean;
   } = {},
 ): World {
-  const writes: Record<string, unknown> = {};
   const events: ModEventsInput[] = [];
   let failures = failCalls;
   let calls = 0;
   const clock = mock.clock(on, { now: 1_000 });
-  mock.env(on, { HOME: "/Users/u" });
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
   }));
-  on("modEvents.emit", ($, e) => {
-    events.push(e);
-    return { value: undefined };
-  });
-  on("session.start", ($, e) => ({ cwd: e.cwd }));
-  on("session.id", () => {
-    if (idFails) throw new Error("no session");
-    return { value: "s1" };
-  });
+  on("modEvents.emit", ($, e) => (events.push(e), { value: undefined }));
   on("tool.check", () => (decision === "allow" ? { decision, rule: "Bash(ls)" } : { decision }));
   on("tool.call", async () => {
     calls += 1;
@@ -61,12 +48,7 @@ function worldOf(
     if (failures-- > 0) throw new Error("tool crashed");
     return result;
   });
-  on("fs.write", ($, e) => {
-    if (writeFails) throw new Error("disk full");
-    writes[e.path] = JSON.parse(e.text);
-    return { value: undefined };
-  });
-  return { writes, events, calls: () => calls, clock };
+  return { events, clock };
 }
 
 async function run($: Engine, world: World, ms: number) {
@@ -80,55 +62,63 @@ async function run($: Engine, world: World, ms: number) {
   return pending;
 }
 
+async function settle(world: World, pending: Promise<unknown>) {
+  await world.clock.settle();
+  await pending;
+}
+
 describe("register", () => {
-  test("records an auto-mode ask with its wall time", async ($, on) => {
+  test("records an ask with its wall time", async ($, on) => {
     const world = worldOf(on, { ms: 2_500 });
 
     expect(await run($, world, 2_500)).toEqual({ result: "ok" });
 
-    expect(world.writes).toEqual({
-      "/Users/u/.claude/classifier-telemetry/s1/toolu_1.json": {
-        kind: "verdict",
-        session_id: "s1",
-        tool_use_id: "toolu_1",
-        agent_id: null,
-        tool: "Bash",
-        interactive: false,
-        decision: "ask",
-        rule: null,
-        hook: null,
-        reason: null,
-        started_at: 1_000,
-        check_ms: 0,
-        duration_ms: 2_500,
-        outcome: "ok",
+    expect(world.events).toEqual([
+      {
+        mod: "classifier-telemetry",
+        event: "tool.verdict",
+        ok: true,
+        ms: 2_500,
+        detail: {
+          tool_use_id: "toolu_1",
+          agent_id: null,
+          tool: "Bash",
+          interactive: false,
+          decision: "ask",
+          rule: null,
+          hook: null,
+          reason: null,
+          started_at: 1_000,
+          check_ms: 0,
+          outcome: "ok",
+        },
       },
-    });
+    ]);
   });
 
   const OUTCOMES: {
     name: string;
     decision: "allow" | "ask";
     result: ToolCallResult;
-    want: { decision: string; rule: string | null; outcome: string };
+    want: { ok: boolean; detail: unknown };
   }[] = [
     {
       name: "a rule allow",
       decision: "allow",
       result: { result: "ok" },
-      want: { decision: "allow", rule: "Bash(ls)", outcome: "ok" },
+      want: { ok: true, detail: expect.objectContaining({ decision: "allow", rule: "Bash(ls)" }) },
     },
     {
       name: "a tool error",
       decision: "ask",
       result: { isError: true, result: "boom" },
-      want: { decision: "ask", rule: null, outcome: "error" },
+      want: { ok: false, detail: expect.objectContaining({ outcome: "error" }) },
     },
     {
       name: "a hook deny",
       decision: "ask",
       result: { deny: "no" },
-      want: { decision: "ask", rule: null, outcome: "deny" },
+      want: { ok: false, detail: expect.objectContaining({ outcome: "deny" }) },
     },
   ];
 
@@ -139,15 +129,9 @@ describe("register", () => {
 
       await run($, world, 0);
 
-      expect(Object.values(world.writes)).toEqual([expect.objectContaining(want)]);
+      expect(world.events).toEqual([expect.objectContaining(want)]);
     });
   }
-
-  test("a failed write still returns the call's result", async ($, on) => {
-    const world = worldOf(on, { writeFails: true });
-
-    expect(await run($, world, 0)).toEqual({ result: "ok" });
-  });
 
   test("a tool call that throws leaves no verdict for a later call", async ($, on) => {
     const world = worldOf(on, { failCalls: 1 });
@@ -156,22 +140,20 @@ describe("register", () => {
     await world.clock.settle();
     await failed;
 
-    const pending = $.tool.call(CALL);
-    await world.clock.settle();
-    await pending;
+    await settle(world, $.tool.call(CALL));
 
-    expect(Object.values(world.writes)).toEqual([expect.objectContaining({ decision: null })]);
+    expect(world.events.map((e) => e.detail?.decision)).toEqual([null]);
   });
 
   test("a call the check never saw records no verdict", async ($, on) => {
     const world = worldOf(on);
 
-    const pending = $.tool.call(CALL);
-    await world.clock.settle();
-    await pending;
+    await settle(world, $.tool.call(CALL));
 
-    expect(Object.values(world.writes)).toEqual([
-      expect.objectContaining({ decision: null, check_ms: null }),
+    expect(world.events).toEqual([
+      expect.objectContaining({
+        detail: expect.objectContaining({ decision: null, check_ms: null }),
+      }),
     ]);
   });
 
@@ -179,18 +161,12 @@ describe("register", () => {
     const world = worldOf(on, { decision: "allow" });
     await $.tool.check({ tool: "Bash", input: {}, tool_use_id: "toolu_1", agentId: "a1" });
 
-    const main = $.tool.call(CALL);
-    await world.clock.settle();
-    await main;
-    expect(Object.values(world.writes)).toEqual([
-      expect.objectContaining({ agent_id: null, decision: null }),
-    ]);
-
+    await settle(world, $.tool.call(CALL));
     // The engine sets agentId from the loop; the kit's call type leaves it out.
-    const sub = $.tool.call({ ...CALL, agentId: "a1" } as typeof CALL);
-    await world.clock.settle();
-    await sub;
-    expect(Object.values(world.writes)).toEqual([
+    await settle(world, $.tool.call({ ...CALL, agentId: "a1" } as typeof CALL));
+
+    expect(world.events.map((e) => e.detail)).toEqual([
+      expect.objectContaining({ agent_id: null, decision: null }),
       expect.objectContaining({ agent_id: "a1", decision: "allow", rule: "Bash(ls)" }),
     ]);
   });
@@ -198,12 +174,15 @@ describe("register", () => {
   test("marks a tool that waits on the person as interactive", async ($, on) => {
     const world = worldOf(on);
 
-    const pending = $.tool.call({ tool: "AskUserQuestion", questions: [], tool_use_id: "toolu_2" });
-    await world.clock.settle();
-    await pending;
+    await settle(
+      world,
+      $.tool.call({ tool: "AskUserQuestion", questions: [], tool_use_id: "toolu_2" }),
+    );
 
-    expect(Object.values(world.writes)).toEqual([
-      expect.objectContaining({ tool: "AskUserQuestion", interactive: true }),
+    expect(world.events).toEqual([
+      expect.objectContaining({
+        detail: expect.objectContaining({ tool: "AskUserQuestion", interactive: true }),
+      }),
     ]);
   });
 
@@ -233,21 +212,34 @@ describe("register", () => {
     await world.clock.advance(750);
     await drained;
 
-    expect(world.writes).toEqual({
-      "/Users/u/.claude/classifier-telemetry/s1/srv_1.json": {
-        kind: "server_tool",
-        session_id: "s1",
-        tool_use_id: "srv_1",
-        agent_id: null,
-        tool: "advisor",
-        turn_id: "t1",
-        step: 2,
-        started_at: 5_000,
-        duration_ms: 750,
+    expect(world.events).toEqual([
+      {
+        mod: "classifier-telemetry",
+        event: "server.tool",
+        ms: 750,
+        detail: {
+          tool_use_id: "srv_1",
+          agent_id: null,
+          tool: "advisor",
+          turn_id: "t1",
+          step: 2,
+          started_at: 5_000,
+        },
       },
-      "/Users/u/.claude/classifier-telemetry/s1/srv_2.json": expect.objectContaining({
-        duration_ms: null,
-      }),
-    });
+      {
+        mod: "classifier-telemetry",
+        event: "server.tool",
+        detail: expect.objectContaining({ tool_use_id: "srv_2" }),
+      },
+    ]);
+  });
+
+  test("marks the session live", async ($, on) => {
+    const world = worldOf(on);
+    on("session.start", ($, e) => ({ cwd: e.cwd }));
+
+    await $.session.start({ cwd: "/repo", surface: null, isInteractive: true });
+
+    expect(world.events).toEqual([{ mod: "classifier-telemetry", event: "session.start" }]);
   });
 });

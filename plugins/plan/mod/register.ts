@@ -64,7 +64,7 @@ export function register(on: On): void {
     }
     wasOver = over;
     return result;
-  });
+  }).catch(($, e, next) => next(e));
 
   on("tool.call", { tool: "ExitPlanMode" }, async ($, e, next) => {
     const result = await next(e);
@@ -85,5 +85,5 @@ export function register(on: On): void {
       detail: { file: basename(planFile), chars, limit: LIMIT, over: chars > LIMIT },
     });
     return result;
-  });
+  }).catch(($, e, next) => next(e));
 }

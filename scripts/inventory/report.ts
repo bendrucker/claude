@@ -47,8 +47,7 @@ function invocation(skill: { modelInvocable: boolean; userInvocable: boolean }):
   return joined !== "" ? joined : "none";
 }
 
-// Plugins, mods, and MCP servers exist only in the plugin scope, so their row skips
-// the per-scope split the others break down by.
+// Plugins, mods, and MCP servers exist only in the plugin scope.
 function pluginOnly(kind: string, total: number, note: string): string[] {
   return [kind, String(total), "-", "-", String(total), note];
 }

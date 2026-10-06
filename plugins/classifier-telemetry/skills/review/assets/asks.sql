@@ -4,7 +4,7 @@
 -- Params: after_date, before_date, host, limit.
 WITH v AS (
   SELECT v.*, c.command
-  FROM tool_verdicts v
+  FROM classifier_verdicts v
   LEFT JOIN tool_calls c ON c.host = v.host AND c.tool_id = v.tool_use_id
   WHERE v.decision = 'ask'
     AND NOT v.interactive

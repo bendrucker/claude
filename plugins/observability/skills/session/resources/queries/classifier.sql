@@ -37,7 +37,7 @@ verdicts AS (
   SELECT
     v.*,
     COALESCE(e.denial_kind, v.outcome) AS result
-  FROM tool_verdicts v
+  FROM classifier_verdicts v
   LEFT JOIN tool_errors e ON e.host = v.host AND e.tool_id = v.tool_use_id
   WHERE date_filter(v.started_at, getvariable('after_date'), getvariable('before_date'))
     AND host_filter(v.host, getvariable('host'))

@@ -7,7 +7,7 @@ SELECT
   round(100.0 * COUNT(*) FILTER (WHERE decision = 'ask') / COUNT(*), 1) AS ask_pct,
   COUNT(*) FILTER (WHERE decision = 'allow') AS allowed,
   quantile_cont(check_ms, 0.5) FILTER (WHERE decision = 'ask') AS p50_check_ms
-FROM tool_verdicts
+FROM classifier_verdicts
 WHERE NOT interactive
   AND date_filter(started_at, getvariable('after_date'), getvariable('before_date'))
   AND host_filter(host, getvariable('host'))

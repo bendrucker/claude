@@ -841,3 +841,38 @@ SELECT
   MAX(timestamp)                                         AS last_plan_ts
 FROM plan_calls
 GROUP BY host, session_id;
+
+-- One row per tool call the classifier-telemetry mod recorded: its `tool.verdict`
+-- events, plus legacy `tool_verdicts` records not yet compacted into `mod_events`.
+-- `duration_ms` spans the decider and the tool. `interactive` marks a tool that waits
+-- on the person, whose wall time is the person's.
+CREATE OR REPLACE VIEW classifier_verdicts AS
+WITH events AS (
+  SELECT
+    host,
+    session_id,
+    detail->>'tool_use_id'                          AS tool_use_id,
+    detail->>'agent_id'                             AS agent_id,
+    detail->>'tool'                                 AS tool,
+    TRY_CAST(detail->>'interactive' AS BOOLEAN)     AS interactive,
+    detail->>'decision'                             AS decision,
+    detail->>'rule'                                 AS rule,
+    detail->>'hook'                                 AS hook,
+    detail->>'reason'                               AS reason,
+    epoch_ms(TRY_CAST(detail->>'started_at' AS BIGINT)) AS started_at,
+    TRY_CAST(detail->>'check_ms' AS BIGINT)         AS check_ms,
+    ms                                              AS duration_ms,
+    detail->>'outcome'                              AS outcome
+  FROM mod_events
+  WHERE mod = 'classifier-telemetry' AND event = 'tool.verdict'
+)
+SELECT * FROM events
+UNION ALL BY NAME
+SELECT
+  host, session_id, tool_use_id, agent_id, tool,
+  tool IN ('AskUserQuestion', 'EnterPlanMode', 'ExitPlanMode') AS interactive,
+  decision, rule, NULL::VARCHAR AS hook, reason, started_at, check_ms, duration_ms, outcome
+FROM tool_verdicts v
+WHERE NOT EXISTS (
+  SELECT 1 FROM events e WHERE e.host = v.host AND e.tool_use_id = v.tool_use_id
+);

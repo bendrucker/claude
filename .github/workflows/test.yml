@@ -190,6 +190,7 @@ jobs:
           echo "has_skills=$([[ -d "plugins/$plugin/skills" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_package=$([[ -f "plugins/$plugin/package.json" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_tests=$(find "plugins/$plugin" -name '*.test.ts' -not -path "plugins/$plugin/mod/*" | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_mod=$([[ -d "plugins/$plugin/mod" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_mod_tests=$(find "plugins/$plugin/mod" -name '*.test.ts*' 2>/dev/null | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_integration_tests=$(find "plugins/$plugin" -name '*.integration.ts' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_swift=$(find "plugins/$plugin" -name '*.swift' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -209,6 +210,10 @@ jobs:
         env:
           CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1"
         run: claude plugin validate "plugins/${{ matrix.plugin.name }}"
+
+      - name: Check gating hooks
+        if: steps.inspect.outputs.has_mod == 'true'
+        run: bun scripts/check-gating-catch.ts "plugins/${{ matrix.plugin.name }}"
 
       - name: Check for hardcoded version
         if: steps.inspect.outputs.has_plugin_json == 'true'

@@ -1,6 +1,7 @@
 {
   "name": "run-command",
   "description": "Pick a reply's `! <command>` suggestion by click or digit to fill it into the shell prompt",
+  "dependencies": ["mod-events"],
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

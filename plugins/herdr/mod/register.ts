@@ -1,5 +1,6 @@
 import type { EngineInterface, On } from "claude-code";
 
+const MOD = "herdr";
 const SOURCE = "bendrucker:herdr";
 const AGENT = "claude";
 
@@ -25,6 +26,10 @@ async function send($: EngineInterface, beacon: Beacon, args: string[]): Promise
   const pane = beacon.pane;
   if (pane === undefined) return;
   const seq = nextSeq(beacon);
+  const command = args[0];
+  const started = await $.clock.now();
+  let detail: Record<string, unknown>;
+  let ok = false;
   try {
     const argv = [
       pane.bin,
@@ -39,10 +44,15 @@ async function send($: EngineInterface, beacon: Beacon, args: string[]): Promise
       pane.id,
     ];
     const { exitCode, stderr } = await $.process.run(argv);
-    if (exitCode !== 0) $.ui.log(`herdr ${args[0]} failed: ${stderr.trim()}`, { to: "debug" });
+    if (exitCode !== 0) $.ui.log(`herdr ${command} failed: ${stderr.trim()}`, { to: "debug" });
+    ok = exitCode === 0;
+    detail = { command, args: args.slice(1), exitCode, stderr: stderr.trim() };
   } catch (error) {
-    $.ui.log(`herdr ${args[0]} failed: ${String(error)}`, { to: "debug" });
+    $.ui.log(`herdr ${command} failed: ${String(error)}`, { to: "debug" });
+    detail = { command, args: args.slice(1), error: String(error) };
   }
+  const ms = (await $.clock.now()) - started;
+  void $.modEvents.emit({ mod: MOD, event: "herdr.call", ok, ms, detail });
 }
 
 function report($: EngineInterface, beacon: Beacon, state: State): void {
@@ -70,6 +80,7 @@ export function register(on: On): void {
     beacon.pane = isHosted
       ? { bin: bin === undefined || bin === "" ? "herdr" : bin, id }
       : undefined;
+    void $.modEvents.emit({ mod: MOD, event: "session.start", detail: { isHosted } });
     report($, beacon, "idle");
     return next(e);
   });
@@ -91,7 +102,7 @@ export function register(on: On): void {
     } finally {
       report($, beacon, "working");
     }
-  });
+  }).catch(($, e, next) => next(e));
 
   on("session.end", async ($, e, next) => {
     if (CONTINUING.has(e.reason)) {

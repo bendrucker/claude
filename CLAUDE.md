@@ -23,6 +23,10 @@ An invoked skill's body is re-injected in full at every compaction, so `SKILL.md
 
 A customization must also stay harmonious with Claude Code's native behavior. When the harness changes a default or an application-level behavior, assume the change encodes aggregate usage data and evaluation knowledge you do not have, and default to accommodating that direction rather than overriding it. So before adding a customization that touches native behavior, apply the harmony test: ask whether it works with the harness's intent or against it, and prefer accommodation. Add a customization that pushes back on a native behavior only as a light-touch experiment, carrying explicit forward evaluation criteria and a removal trigger. When Claude Code v2.1.198 made the built-in `Explore` agent inherit the conversation model (capped at Opus) instead of running on Haiku, hard-pinning it back to Haiku would contravene that intent, so any Explore steering stays a soft default and gets removed if it proves inert after a couple of weeks.
 
+## Observability
+
+Tooling here must be observable on my machines. Ship each mod, hook, or script with telemetry Claude can query and something that reads it. A mod emits through `mod-events`, which the session index reads into `mod_events` for its `mods` query ([`mods.md`](.claude/rules/mods.md)). A visibility gap outranks any new feature, so see before acting.
+
 ## Rules
 
 Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-injects when you touch matching files (via `paths` frontmatter), so it stays out of this always-on file:
@@ -45,6 +49,7 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 - `bun run plugin-lockfiles check`: verifies every plugin declaring dependencies ships a lockfile that agrees with its `package.json`, which is what Claude Code requires before it will install those dependencies into the plugin cache. `generate` writes them. Runs in CI.
 - `bun run schemas check`: fetches current upstream and verifies the upstream-backed schema overlays still apply, flagging overlay edits that upstream has absorbed and warning on edits that overwrite an upstream definition. Runs in CI.
 - `bun run skill-lint "plugins/<name>/skills/*"`: validates SKILL.md frontmatter and reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
+- `bun scripts/check-gating-catch.ts plugins/<name>`: fails on a mod's gating hook registered without `.catch`. Runs in CI and the `plugin-test` pre-commit hook.
 - `bun run check`: runs `oxlint --type-aware` then `oxfmt --check`. Runs in CI.
 
 ## Evals

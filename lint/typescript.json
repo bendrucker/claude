@@ -105,7 +105,9 @@
       "files": ["plugins/*/mod/**"],
       "rules": {
         "typescript/strict-boolean-expressions": "off",
-        "unicorn/no-array-fill-with-reference-type": "off"
+        "unicorn/no-array-fill-with-reference-type": "off",
+        "unicorn/catch-error-name": "off",
+        "promise/no-callback-in-promise": "off"
       }
     }
   ]

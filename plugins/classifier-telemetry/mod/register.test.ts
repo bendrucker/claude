@@ -1,4 +1,6 @@
-import type { On, ToolCallResult } from "claude-code";
+import type { EngineInterface, On, ToolCallResult } from "claude-code";
+
+type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 import { type Engine, describe, expect, mock, test, tier } from "claude-code/testing";
 
 tier("user");
@@ -7,6 +9,8 @@ const CALL = { tool: "Bash", command: "ls", tool_use_id: "toolu_1" } as const;
 
 interface World {
   writes: Record<string, unknown>;
+  events: ModEventsInput[];
+  calls: () => number;
   clock: ReturnType<typeof mock.clock>;
 }
 
@@ -21,21 +25,38 @@ function worldOf(
     result = { result: "ok" },
     writeFails = false,
     failCalls = 0,
+    idFails = false,
   }: {
     decision?: "allow" | "ask" | "deny";
     ms?: number;
     result?: ToolCallResult;
     writeFails?: boolean;
     failCalls?: number;
+    idFails?: boolean;
   } = {},
 ): World {
   const writes: Record<string, unknown> = {};
+  const events: ModEventsInput[] = [];
   let failures = failCalls;
+  let calls = 0;
   const clock = mock.clock(on, { now: 1_000 });
   mock.env(on, { HOME: "/Users/u" });
-  on("session.id", () => ({ value: "s1" }));
+  on("engine.create", async ($, e, next) => ({
+    ...(await next(e)),
+    modEvents: { emit: () => Promise.resolve() },
+  }));
+  on("modEvents.emit", ($, e) => {
+    events.push(e);
+    return { value: undefined };
+  });
+  on("session.start", ($, e) => ({ cwd: e.cwd }));
+  on("session.id", () => {
+    if (idFails) throw new Error("no session");
+    return { value: "s1" };
+  });
   on("tool.check", () => (decision === "allow" ? { decision, rule: "Bash(ls)" } : { decision }));
   on("tool.call", async () => {
+    calls += 1;
     await clock.sleep(ms);
     if (failures-- > 0) throw new Error("tool crashed");
     return result;
@@ -45,7 +66,7 @@ function worldOf(
     writes[e.path] = JSON.parse(e.text);
     return { value: undefined };
   });
-  return { writes, clock };
+  return { writes, events, calls: () => calls, clock };
 }
 
 async function run($: Engine, world: World, ms: number) {
@@ -149,5 +170,17 @@ describe("register", () => {
     expect(Object.values(world.writes)).toEqual([
       expect.objectContaining({ decision: null, check_ms: null }),
     ]);
+  });
+
+  test("records a heartbeat when the session starts", async ($, on) => {
+    const world = worldOf(on);
+    await $.session.start({ surface: "terminal", isInteractive: true, cwd: "/work" });
+    expect(world.events).toEqual([{ mod: "classifier-telemetry", event: "session.start" }]);
+  });
+
+  test("a failure after the call returns its result without running it again", async ($, on) => {
+    const world = worldOf(on, { idFails: true });
+    expect(await run($, world, 0)).toEqual({ result: "ok" });
+    expect(world.calls()).toBe(1);
   });
 });

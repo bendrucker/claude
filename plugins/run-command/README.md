@@ -4,7 +4,7 @@ Fill a reply's `! <command>` suggestions into the shell prompt instead of copyin
 
 ## Contents
 
-- **Mod**: Once you type `!`, [`register.tsx`](mod/register.tsx) offers a reply's `! <command>` lines as a button under the reply and a numbered list above the prompt. A digit or a click fills the command. Requires `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
+- **Mod**: Once you type `!`, [`register.tsx`](mod/register.tsx) offers a reply's `! <command>` lines as a button under the reply and a numbered list above the prompt. A digit or a click fills the command. It records `list.shown` with the count and `pick` with its source (`digit` or `click`) through [`mod-events`](../mod-events). Requires `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
 
 ## Tests
 

@@ -22,6 +22,9 @@ case "${1:-}" in
       if find "$dir" -name '*.test.ts' -not -path "$dir/mod/*" -print -quit | grep -q .; then
         bun test "$dir/"
       fi
+      if [ -d "$dir/mod" ]; then
+        bun scripts/check-gating-catch.ts "$dir"
+      fi
       if find "$dir/mod" -name '*.test.ts*' -print -quit 2>/dev/null | grep -q .; then
         bun scripts/mod-test.ts "$(basename "$dir")"
       fi

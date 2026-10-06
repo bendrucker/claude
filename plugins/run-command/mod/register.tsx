@@ -1,5 +1,6 @@
 import type { ButtonProps, On, RenderElement } from "claude-code";
 
+const MOD = "run-command";
 const KEY = "run-command:";
 const DIGIT = /^[1-9]$/;
 
@@ -58,6 +59,14 @@ export function register(on: On): void {
   const seen = new Set<string>();
   let latest = { requestId: "", found: [] as string[] };
   let listed = false;
+  // The band redraws often, so each reply's list counts as shown once.
+  let shownFor: string | undefined;
+
+  on("session.start", async ($, e, next) => {
+    const started = await next(e);
+    void $.modEvents.emit({ mod: MOD, event: "session.start" });
+    return started;
+  });
 
   on("ui.render", { component: "PromptHint" }, ($, e, next) => {
     const now = e.props.hint.includes("shell mode") && !e.props.isDraft;
@@ -95,7 +104,14 @@ export function register(on: On): void {
     const drawing = await next(e);
     const found = latest.found.slice(0, 9);
     listed = shell && !e.props.hasSurvey && found.length > 0;
-    if (!listed) return drawing;
+    if (!listed) {
+      shownFor = undefined;
+      return drawing;
+    }
+    if (shownFor !== latest.requestId) {
+      shownFor = latest.requestId;
+      void $.modEvents.emit({ mod: MOD, event: "list.shown", detail: { count: found.length } });
+    }
     const { Box, Button } = $.ui.resolve(e);
     return (
       <Box flexDirection="column">
@@ -108,12 +124,15 @@ export function register(on: On): void {
   // The list's hotkeys stay inert while the shell prompt holds the keys.
   on("prompt.edit", ($, e, next) => {
     const command = listed && e.text === "" ? pick(e.inputText, latest.found) : undefined;
-    return next(command === undefined ? e : { ...e, inputText: command });
+    if (command === undefined) return next(e);
+    void $.modEvents.emit({ mod: MOD, event: "pick", detail: { command, source: "digit" } });
+    return next({ ...e, inputText: command });
   });
 
   on("ui.press", { plugin: "run-command" }, async ($, e, next) => {
     const command = pressed(e.element);
     if (command === undefined) return next(e);
+    void $.modEvents.emit({ mod: MOD, event: "pick", detail: { command, source: "click" } });
     await $.prompt.fill({ text: command, mode: "insert" });
     return { element: e.element };
   });

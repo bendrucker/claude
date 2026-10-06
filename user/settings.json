@@ -451,6 +451,7 @@
     "plannotator@plannotator": true,
     "herdr@bendrucker": true,
     "run-command@bendrucker": true,
+    "mod-events@bendrucker": true,
     "1password@1password": true
   },
   "extraKnownMarketplaces": {

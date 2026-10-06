@@ -102,9 +102,9 @@ async function compactSession(source: string, target: string, dryRun: boolean): 
  * skipping sessions already compacted. The legacy files stay in place.
  */
 export async function compact(source: string, target: string, dryRun = false): Promise<Totals> {
-  const sessions = await readdir(source);
+  const sessions = (await readdir(source, { withFileTypes: true })).filter((d) => d.isDirectory());
   const results = await Promise.all(
-    sessions.map((s) => compactSession(join(source, s), join(target, s), dryRun)),
+    sessions.map((d) => compactSession(join(source, d.name), join(target, d.name), dryRun)),
   );
   const totals: Totals = { sessions: 0, skipped: 0, records: 0, unreadable: 0 };
   for (const r of results) {

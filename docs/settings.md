@@ -141,9 +141,9 @@ git ls-remote --tags https://github.com/1Password/1password-claude-plugin
 
 **Drop it** if Environments do not stick. Around 2026-10-27, count `mcp__plugin_1password_1password__` calls in the session index since the day this shipped, and read the hook's denies with the `observability:session` skill's [`hook-blocks`](../plugins/observability/skills/session/resources/queries/hook-blocks.sql) query. If no mount besides the first is in use, or the denies are mostly stale mounts rather than a missing secret file, remove the plugin, its marketplace, and the allows.
 
-`classifier-telemetry@bendrucker` records every tool call's permission verdict, and its `classifier-telemetry:review` skill turns a week of asks into a settings PR labeled `classifier-review`. A weekly Things check-in runs the review. The removal window was around 2026-10-11, when the records had no reader. It moves to around 2026-11-09, after four reviews.
+`classifier-telemetry@bendrucker` records every tool call's permission verdict, and its `classifier-telemetry:review` skill turns a week of asks into a settings PR labeled `classifier-review`. A weekly Things check-in launches the review. Revisit it around 2026-11-09, after four reviews.
 
-**Keep it** if at least one `classifier-review` PR has merged with an allow rule, autoMode entry, or command-style change by then: `gh pr list --label classifier-review --state merged`. **Retire it** otherwise: remove the plugin, its `enabledPlugins` entry, and the check-in, and leave the recorded events to the `mod-events` retention.
+**Keep it** if at least one `classifier-review` PR has merged with an allow rule, autoMode entry, or command-style change by then: `gh pr list --label classifier-review --state merged`. **Drop it** otherwise: remove the plugin, its `enabledPlugins` entry, and the check-in, and let `mod-events` retention expire the recorded events.
 
 ## Sandbox Findings
 

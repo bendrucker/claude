@@ -38,6 +38,7 @@ async function seed(files: Record<string, string>) {
 
 test("compacts a session's records into one mod-events file", async () => {
   await seed({ "toolu_1.json": `${JSON.stringify(RECORD)}\n`, "toolu_2.json": "" });
+  await Bun.write(join(dir, "src", ".DS_Store"), "");
 
   const totals = await compact(join(dir, "src"), join(dir, "out"));
 

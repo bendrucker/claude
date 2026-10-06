@@ -61,5 +61,5 @@ export function register(on: On): void {
     // Detached so a scan never holds up the rows after this one.
     if (text !== "") void measure($, meter, e.uuid, text);
     return stored;
-  });
+  }).catch(($, e, next) => next(e));
 }

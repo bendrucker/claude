@@ -162,8 +162,9 @@ describe("register", () => {
     await $.tool.check({ tool: "Bash", input: {}, tool_use_id: "toolu_1", agentId: "a1" });
 
     await settle(world, $.tool.call(CALL));
-    // The engine sets agentId from the loop; the kit's call type leaves it out.
-    await settle(world, $.tool.call({ ...CALL, agentId: "a1" } as typeof CALL));
+    // The engine sets agentId from the loop. The kit's call type leaves it out.
+    const subagentCall = { ...CALL, agentId: "a1" };
+    await settle(world, $.tool.call(subagentCall));
 
     expect(world.events.map((e) => e.detail)).toEqual([
       expect.objectContaining({ agent_id: null, decision: null }),

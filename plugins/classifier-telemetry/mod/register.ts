@@ -34,7 +34,7 @@ function outcomeOf(result: ToolCallResult): "ok" | "error" | "deny" {
 export function register(on: On): void {
   const verdicts = new Map<string, Verdict>();
 
-  on("session.start", async ($, e, next) => {
+  on("session.start", ($, e, next) => {
     void $.modEvents.emit({ mod: MOD, event: "session.start" });
     return next(e);
   });
@@ -56,17 +56,14 @@ export function register(on: On): void {
   on("tool.call", async ($, e, next) => {
     const key = keyOf(e.agentId, e.tool_use_id);
     const startedAt = await $.clock.now();
-    let result: ToolCallResult | undefined;
-    let thrown: unknown;
-    try {
-      result = await next(e);
-    } catch (error) {
-      thrown = error;
-    }
+    const settled: { result: ToolCallResult } | { thrown: unknown } = await next(e).then(
+      (result: ToolCallResult) => ({ result }),
+      (thrown: unknown) => ({ thrown }),
+    );
     const verdict = verdicts.get(key);
     verdicts.delete(key);
     const finishedAt = await $.clock.now();
-    const outcome = result === undefined ? "throw" : outcomeOf(result);
+    const outcome = "result" in settled ? outcomeOf(settled.result) : "throw";
     void $.modEvents.emit({
       mod: MOD,
       event: "tool.verdict",
@@ -86,12 +83,13 @@ export function register(on: On): void {
         outcome,
       },
     });
-    if (result === undefined) throw thrown;
-    return result;
+    if ("thrown" in settled) throw settled.thrown;
+    return settled.result;
   });
 
   on("turn.step", async function* ($, e, next) {
     const response = yield* next(e);
+    const events: ModEventsInput[] = [];
     for (const use of response.serverToolUses ?? []) {
       const event: ModEventsInput = {
         mod: MOD,
@@ -106,8 +104,9 @@ export function register(on: On): void {
         },
       };
       if (use.endedAt !== undefined) event.ms = use.endedAt - use.startedAt;
-      void $.modEvents.emit(event);
+      events.push(event);
     }
+    await Promise.all(events.map((event) => $.modEvents.emit(event)));
     return response;
   });
 }

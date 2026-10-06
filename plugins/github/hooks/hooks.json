@@ -1,5 +1,5 @@
 {
-  "description": "Transforms GitHub URLs into API requests for better content fetching",
+  "description": "Transforms GitHub URLs into API requests for better content fetching, and watches the current branch's pull request, showing its CI and review state as a status line (function hooks)",
   "hooks": {
     "PreToolUse": [
       {
@@ -13,5 +13,6 @@
         ]
       }
     ]
-  }
+  },
+  "modules": ["../mod/register.ts"]
 }

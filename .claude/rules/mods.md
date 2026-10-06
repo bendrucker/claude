@@ -30,13 +30,13 @@ Every tool keys on that directory. The root tsconfig and `bun test` skip it, and
 
 ## Types
 
-`import type { On } from "claude-code"` resolves against the declarations `/plugin-types` writes to `.claude/types/`, which is gitignored. Run `/plugin-types` from an interactive session and again after a Claude Code update. A `-p` run omits interactive-only tools such as `AskUserQuestion`. Each mod carries a `mod/tsconfig.json`:
+`import type { On } from "claude-code"` resolves against declarations the engine writes to `plugins/<name>/.claude-plugin/types/` whenever it loads the plugin from a folder: `--plugin-dir`, `CLAUDE_CODE_PLUGIN_DIRS`, or the hot-reload mods folder. A marketplace install loads from the plugin cache, so the checkout never receives them. `bun run mod-types` loads every mod plugin and its dependencies in one `claude -p` run that makes no model call, and fails if any mod plugin is left without types. The worktree `post-start` hook and CI's lint and build jobs run it. Run it again after a Claude Code update. The engine marks the directory ignored itself, and the root `tsconfig.json` it writes beside `.claude-plugin/` is gitignored. Each mod carries a `mod/tsconfig.json`:
 
 ```json
-{ "extends": "../../../tsconfig.mod.json", "include": ["../../../.claude/types", "../../mod-events/types", "."] }
+{ "extends": "../../../tsconfig.mod.json", "include": ["../.claude-plugin/types", "../../mod-events/types", "."] }
 ```
 
-The declarations define the engine's own web globals, which would override Bun's `TextEncoder` and related types in the root program, so mod files stay out of it. Without them, `claude-code` types resolve to `any` for lint, and `bun run build` fails its type check on the missing module. CI lacks them, so its type check skips `plugins/*/mod/**`, and it checks a mod through lint, `claude plugin validate`, and its tests.
+The declarations define the engine's own web globals, which would override Bun's `TextEncoder` and related types in the root program, so mod files stay out of it. Without them, `claude-code` types resolve to `any` for lint and `bun run build` fails on the missing module, so the `ox` hook skips a mod whose plugin lacks them.
 
 A mod that draws UI through `ui.render` is written in `.tsx`, and its tsconfig adds `"jsx": "react"`, `"jsxFactory": "h"`, and `"jsxFragmentFactory": "Fragment"` to match the engine's JSX globals. It also adds `"allowImportingTsExtensions": true` so its tests can import `./register.tsx`. [`plugins/run-command/mod/tsconfig.json`](../../plugins/run-command/mod/tsconfig.json) is the example.
 

@@ -136,6 +136,7 @@ describe("register", () => {
     await hint($, SHELL);
     await band($);
     await band($);
+    // @ts-expect-error -- the kit raises prompt.edit, but its `$.prompt` type omits `edit`.
     await $.prompt.edit({
       origin: { kind: "composer" },
       text: "",

@@ -490,13 +490,21 @@ export const TYPE_CHECK_ARGS = [
   "agent",
 ];
 
-// Mods type-check against the gitignored declarations /plugin-types writes, so
-// a tree without them skips mods rather than failing on the missing module.
+// A mod type-checks against the engine declarations `bun run mod-types` writes
+// into its plugin, so a mod whose plugin lacks them is skipped rather than
+// failing on the missing module.
 export async function typeCheckArgs(cwd: string | undefined): Promise<string[]> {
-  const types = join(cwd ?? process.cwd(), ".claude/types/claude-code.d.ts");
-  return (await Bun.file(types).exists())
-    ? TYPE_CHECK_ARGS
-    : [...TYPE_CHECK_ARGS, "--ignore-pattern", "plugins/*/mod/**"];
+  const root = cwd ?? process.cwd();
+  const mods = await Array.fromAsync(
+    new Bun.Glob("plugins/*/mod").scan({ cwd: root, onlyFiles: false }),
+  );
+  const typed = await Promise.all(
+    mods.map((mod) =>
+      Bun.file(join(root, dirname(mod), ".claude-plugin/types/claude-code/index.d.ts")).exists(),
+    ),
+  );
+  const untyped = mods.filter((_, index) => !typed[index]).toSorted();
+  return [...TYPE_CHECK_ARGS, ...untyped.flatMap((mod) => ["--ignore-pattern", `${mod}/**`])];
 }
 
 async function runTypeCheck(files: string[]): Promise<TypeCheckResult> {

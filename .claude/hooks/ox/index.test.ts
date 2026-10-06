@@ -492,9 +492,14 @@ describe("ox hook", () => {
   });
 
   it("type-checks mods only where the generated engine types exist", async () => {
-    expect(await typeCheckArgs(tempDir)).toContain("plugins/*/mod/**");
-    await Bun.write(join(tempDir, ".claude/types/claude-code.d.ts"), "");
-    expect(await typeCheckArgs(tempDir)).toEqual(TYPE_CHECK_ARGS);
+    await Bun.write(join(tempDir, "plugins/typed/mod/register.ts"), "");
+    await Bun.write(join(tempDir, "plugins/typed/.claude-plugin/types/claude-code/index.d.ts"), "");
+    await Bun.write(join(tempDir, "plugins/untyped/mod/register.ts"), "");
+    expect(await typeCheckArgs(tempDir)).toEqual([
+      ...TYPE_CHECK_ARGS,
+      "--ignore-pattern",
+      "plugins/untyped/mod/**",
+    ]);
   });
 
   describe("processStop", () => {

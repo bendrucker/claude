@@ -18,7 +18,6 @@
     "**/fixtures/**",
     "**/evals/**/examples/**",
     ".claude/workflows/**",
-    ".claude/types/**",
     "plugins/*/mod/**"
   ]
 }

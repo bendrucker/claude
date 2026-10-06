@@ -1,4 +1,4 @@
-import type { AgentInfo, On } from "claude-code";
+import type { AgentInfo, On, ProcessRunResult } from "claude-code";
 import { describe, expect, mock, test, type Engine } from "claude-code/testing";
 
 const HERDR = { HERDR_ENV: "1", HERDR_PANE_ID: "w1:p1" };
@@ -21,7 +21,17 @@ const CLEAR_ALL = ["subagents", "teammates", "agents_waiting", "agents_idle", "b
   .join(" ");
 
 function agent(status: AgentInfo["status"], teammateId?: string): AgentInfo {
-  return { id: `a-${status}`, description: "", type: "Explore", status, teammateId };
+  return {
+    id: `a-${status}`,
+    description: "",
+    type: "Explore",
+    status,
+    ...(teammateId !== undefined && { teammateId }),
+  };
+}
+
+function ran(exitCode: number, stdout: string, stderr: string): ProcessRunResult {
+  return { exitCode, stdout, stderr, isStdoutTruncated: false, isStderrTruncated: false };
 }
 
 interface World {
@@ -33,7 +43,11 @@ interface World {
 function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}) {
   const state: World = { agents: [], branch: "main", herdrExit: 0, ...world };
   const calls: string[] = [];
-  const events: { event: string; ok?: boolean; detail?: Record<string, unknown> }[] = [];
+  const events: {
+    event: string;
+    ok?: boolean | undefined;
+    detail?: Readonly<Record<string, unknown>> | undefined;
+  }[] = [];
   const clock = mock.clock(on);
   mock.env(on, env);
   on("session.start", ($, e) => ({ cwd: e.cwd }));
@@ -51,12 +65,12 @@ function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}
   });
   on("process.run", ($, e) => {
     if (e.argv[0] === "git") {
-      return { value: { exitCode: 0, stdout: `${state.branch}\n`, stderr: "" } };
+      return { value: ran(0, `${state.branch}\n`, "") };
     }
     calls.push(e.argv.join(" "));
     const exit = state.herdrExit;
     if (exit instanceof Error) throw exit;
-    return { value: { exitCode: exit, stdout: "", stderr: exit === 0 ? "" : "pane_not_found\n" } };
+    return { value: ran(exit, "", exit === 0 ? "" : "pane_not_found\n") };
   });
   const failures = () => events.filter((event) => event.ok === false);
   return { calls, events, failures, clock, state };

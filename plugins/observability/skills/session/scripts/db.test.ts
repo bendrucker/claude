@@ -717,6 +717,28 @@ describe("model-summary query", () => {
   });
 });
 
+describe("bare-refs query", () => {
+  const Row = z.object({
+    bucket: z.string(),
+    ref_messages: z.bigint(),
+    bare_messages: z.bigint(),
+    linked_messages: z.bigint(),
+    bare_pct: z.number(),
+  });
+
+  it.each([
+    ["week", "2024-01-15"],
+    ["model", "claude-opus-4-7-20260101"],
+  ])("splits bare from linked refs per %s", async (per, bucket) => {
+    const rows = await runQuery(db, "bare-refs", Row, filterParams({ per, project: "refs" }));
+    // the fixture's fourth message (a list number, a standards ID, inline code, a plan
+    // label) and the user's own #77 both fall outside the count
+    expect(rows).toEqual([
+      { bucket, ref_messages: 4n, bare_messages: 3n, linked_messages: 2n, bare_pct: 75 },
+    ]);
+  });
+});
+
 describe("cross-machine history", () => {
   it("tags imported rows with the host across sessions, messages, and content_items", async () => {
     await importFixtureHost("work");
@@ -1298,7 +1320,7 @@ describe("outcomes query", () => {
       "sessions: ongoing": 1,
       "sessions: handed-off": 2,
       "sessions: abandoned-with-edits": 3,
-      "sessions: no-artifact": 18,
+      "sessions: no-artifact": 19,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1315,7 +1337,7 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 24,
+      "sessions: ongoing": 25,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });

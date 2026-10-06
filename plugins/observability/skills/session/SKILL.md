@@ -78,7 +78,7 @@ The eleven that carry most of the measured usage:
 
 The rest, by name, described in [`references/catalog.md`](references/catalog.md):
 
-- Sessions and prose: `search`, `text-export`, `model-summary`
+- Sessions and prose: `search`, `text-export`, `model-summary`, `bare-refs`
 - Tool use and friction: `stats`, `errors`, `permissions`, `sandbox`, `sandbox-bypass-justification`
 - Hooks: `hook-block-then-retry-success`, `hook-config-vs-observed`
 - Skills: `skills`, `skill-activity`

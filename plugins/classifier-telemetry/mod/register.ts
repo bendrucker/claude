@@ -1,5 +1,6 @@
-import type { On, ToolCallResult } from "claude-code";
-import type { ModEventsInput } from "../../mod-events/types";
+import type { EngineInterface, On, ToolCallResult } from "claude-code";
+
+type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 
 const MOD = "classifier-telemetry";
 

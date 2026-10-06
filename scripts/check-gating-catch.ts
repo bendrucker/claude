@@ -27,10 +27,16 @@ export function uncaught(report: z.infer<typeof Report>): string[] {
 if (import.meta.main) {
   const dir = argv[2];
   if (dir === undefined) throw new Error("usage: check-gating-catch.ts <plugin dir>");
-  const output = await $`claude plugin validate ${dir} --json`
+  const { exitCode, stdout, stderr } = await $`claude plugin validate ${dir} --json`
     .env({ ...process.env, CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1" })
-    .text();
-  const report = decodeJson(Report, output, "claude plugin validate --json");
+    .nothrow()
+    .quiet();
+  if (exitCode !== 0) {
+    console.error(`${dir}: claude plugin validate exited ${exitCode}`);
+    console.error(`${stderr.toString()}${stdout.toString()}`.trim());
+    process.exit(1);
+  }
+  const report = decodeJson(Report, stdout.toString(), "claude plugin validate --json");
   await runCheck(() => ({
     header: `${dir}: gating hooks without .catch`,
     violations: uncaught(report),

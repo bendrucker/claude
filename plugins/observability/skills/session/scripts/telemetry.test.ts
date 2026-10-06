@@ -151,7 +151,11 @@ describe("telemetry ingest", () => {
 
     await Bun.write(chunk, line("session.start", true));
     await reindex();
-    await Bun.write(chunk, `${line("session.start", true)}${line("herdr.call", false)}{"ts":1,`);
+    const farFuture = `{"ts":9000000000000000000,"session":"s1","mod":"herdr","event":"far"}\n`;
+    await Bun.write(
+      chunk,
+      `${line("session.start", true)}${line("herdr.call", false)}${farFuture}{"ts":1,`,
+    );
     await reindex();
 
     const rows = await db.query(

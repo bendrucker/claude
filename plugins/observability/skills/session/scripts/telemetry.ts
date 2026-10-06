@@ -139,6 +139,9 @@ const debugLogs = (root: string, host: string): Source => ({
   remove: keepRows,
 });
 
+// `make_timestamp_ms` throws past year 9999, and one bad line would fail every refresh.
+const MAX_TS_MS = 253_402_300_799_999;
+
 const modEvents = (root: string, host: string): Source => ({
   name: "mod-events",
   root,
@@ -158,7 +161,7 @@ const modEvents = (root: string, host: string): Source => ({
          format = 'newline_delimited',
          ignore_errors = true
        )
-       WHERE event IS NOT NULL`,
+       WHERE event IS NOT NULL AND ts BETWEEN 0 AND ${MAX_TS_MS}`,
       { host, path: file.path },
     );
   },
@@ -283,19 +286,26 @@ export async function prune(db: Database, source: Source): Promise<number> {
   const doomed = overCap(scanned, source.cap, (file) =>
     current.has(`${file.path}\0${file.mtime}\0${file.size}`),
   );
+  let pruned = 0;
   for (const file of doomed) {
-    // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh, and each reap commits as its own transaction.
-    await rm(file.path, { force: true });
-    // oxlint-disable-next-line no-await-in-loop -- see above.
-    await reap(db, source, file.path);
+    try {
+      // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh, and each reap commits as its own transaction.
+      await rm(file.path, { force: true });
+      // oxlint-disable-next-line no-await-in-loop -- see above.
+      await reap(db, source, file.path);
+      pruned += 1;
+    } catch {
+      // A file that cannot be deleted stays indexed and is retried on the next refresh.
+    }
   }
   const dirs = new Set(doomed.map((file) => dirname(file.path)).filter((d) => d !== source.root));
   await Promise.all([...dirs].map(removeIfEmpty));
-  return doomed.length;
+  return pruned;
 }
 
 async function removeIfEmpty(dir: string): Promise<void> {
-  if ((await readdir(dir)).length === 0) await rm(dir, { recursive: true });
+  const entries = await readdir(dir).catch(() => undefined);
+  if (entries?.length === 0) await rm(dir, { recursive: true, force: true });
 }
 
 /**

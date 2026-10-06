@@ -66,7 +66,8 @@ export function surfaceOf(
       if (p.name === "herdr" && p.ppid > 1) clients.push(reachOf(table, p.pid));
     }
   }
-  const isSsh = sshConnection !== undefined && sshConnection !== "";
+  // Panes inherit the herdr server's env, so `SSH_CONNECTION` speaks for the session only without clients.
+  const isSsh = clients.length === 0 && sshConnection !== undefined && sshConnection !== "";
   return { surface: summarize(clients, isSsh), clients: clients.toSorted() };
 }
 

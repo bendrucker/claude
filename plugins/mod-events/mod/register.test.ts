@@ -159,6 +159,14 @@ describe("surfaceOf", () => {
     expect(surfaceOf("", "10.0.0.2 5000 10.0.0.1 22")).toEqual({ surface: "ssh", clients: [] });
   });
 
+  test("herdr's clients outrank an SSH_CONNECTION the server passed its panes", () => {
+    const ps = ["    1     0 /sbin/launchd", " 1816     1 herdr", "16774  1405 herdr"].join("\n");
+    expect(surfaceOf(ps, "10.0.0.2 5000 10.0.0.1 22")).toEqual({
+      surface: "local",
+      clients: ["local"],
+    });
+  });
+
   test("an sshd-launched herdr client is ssh", () => {
     const ps = [
       "1816 1 herdr",

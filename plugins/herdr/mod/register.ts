@@ -28,6 +28,8 @@ async function send($: EngineInterface, beacon: Beacon, args: string[]): Promise
   const seq = nextSeq(beacon);
   const command = args[0];
   const started = await $.clock.now();
+  let detail: Record<string, unknown>;
+  let ok = false;
   try {
     const argv = [
       pane.bin,
@@ -42,24 +44,15 @@ async function send($: EngineInterface, beacon: Beacon, args: string[]): Promise
       pane.id,
     ];
     const { exitCode, stderr } = await $.process.run(argv);
-    const ms = (await $.clock.now()) - started;
     if (exitCode !== 0) $.ui.log(`herdr ${command} failed: ${stderr.trim()}`, { to: "debug" });
-    void $.modEvents.emit({
-      mod: MOD,
-      event: "herdr.call",
-      ok: exitCode === 0,
-      ms,
-      detail: { command, args: args.slice(1), exitCode, stderr: stderr.trim() },
-    });
+    ok = exitCode === 0;
+    detail = { command, args: args.slice(1), exitCode, stderr: stderr.trim() };
   } catch (error) {
     $.ui.log(`herdr ${command} failed: ${String(error)}`, { to: "debug" });
-    void $.modEvents.emit({
-      mod: MOD,
-      event: "herdr.call",
-      ok: false,
-      detail: { command, args: args.slice(1), error: String(error) },
-    });
+    detail = { command, args: args.slice(1), error: String(error) };
   }
+  const ms = (await $.clock.now()) - started;
+  void $.modEvents.emit({ mod: MOD, event: "herdr.call", ok, ms, detail });
 }
 
 function report($: EngineInterface, beacon: Beacon, state: State): void {

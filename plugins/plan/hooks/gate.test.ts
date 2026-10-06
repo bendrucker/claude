@@ -8,11 +8,13 @@ import type {
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { LIMIT } from "../mod/register";
 import recorded from "./fixtures/re-presents.json";
 import {
   APPEND_ONLY_REASON,
   DENY_REASON,
   processInput,
+  SIZE_THRESHOLD,
   sizeReason,
   StateUnavailableError,
 } from "./gate";
@@ -398,4 +400,8 @@ describe("fail open", () => {
       StateUnavailableError,
     );
   });
+});
+
+it("shares its size threshold with the size-counter mod", () => {
+  expect(LIMIT).toBe(SIZE_THRESHOLD);
 });

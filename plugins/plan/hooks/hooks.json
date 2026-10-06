@@ -1,5 +1,6 @@
 {
-  "description": "Inject planning guidelines when a session reaches plan mode and gate plan re-presents",
+  "description": "Inject planning guidelines when a session reaches plan mode, gate plan re-presents, and show a plan's size against the gate's limit",
+  "modules": ["../mod/register.ts"],
   "hooks": {
     "UserPromptSubmit": [
       {

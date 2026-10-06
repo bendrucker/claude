@@ -236,7 +236,7 @@ describe("register", () => {
 
   test("marks the session live", async ($, on) => {
     const world = worldOf(on);
-    on("session.start", ($, e) => ({ cwd: e.cwd }));
+    on("session.start", (_, e) => ({ cwd: e.cwd }));
 
     await $.session.start({ cwd: "/repo", surface: null, isInteractive: true });
 

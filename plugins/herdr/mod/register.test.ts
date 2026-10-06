@@ -28,7 +28,7 @@ interface World {
 function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}) {
   const state: World = { agents: [], branch: "main", herdrExit: 0, ...world };
   const calls: string[] = [];
-  const logs: string[] = [];
+  const events: { event: string; ok?: boolean; detail?: Record<string, unknown> }[] = [];
   const clock = mock.clock(on);
   mock.env(on, env);
   on("session.start", ($, e) => ({ cwd: e.cwd }));
@@ -36,8 +36,12 @@ function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}
   on("turn.complete", () => ({ text: "" }));
   on("session.end", ($, e) => ({ sessionId: e.sessionId }));
   on("agent.list", () => ({ value: state.agents }));
-  on("ui.log", ($, e) => {
-    logs.push(e.text);
+  on("engine.create", async ($, e, next) => ({
+    ...(await next(e)),
+    modEvents: { emit: () => Promise.resolve() },
+  }));
+  on("modEvents.emit", ($, e) => {
+    events.push({ event: e.event, ok: e.ok, detail: e.detail });
     return { value: undefined };
   });
   on("process.run", ($, e) => {
@@ -49,7 +53,8 @@ function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}
     if (exit instanceof Error) throw exit;
     return { value: { exitCode: exit, stdout: "", stderr: exit === 0 ? "" : "pane_not_found\n" } };
   });
-  return { calls, logs, clock, state };
+  const failures = () => events.filter((event) => event.ok === false);
+  return { calls, events, failures, clock, state };
 }
 
 const end = ($: Engine) =>
@@ -67,6 +72,11 @@ describe("register", () => {
     expect(herdr.calls).toEqual([
       `${REPORT} --token branch=main`,
       `${REPORT} --clear-token branch`,
+    ]);
+    expect(herdr.events.map(({ event, ok }) => [event, ok])).toEqual([
+      ["session.start", undefined],
+      ["herdr.call", true],
+      ["herdr.call", true],
     ]);
   });
 
@@ -118,7 +128,7 @@ describe("register", () => {
     expect(herdr.calls).toEqual([`${REPORT} --token branch=main`]);
   });
 
-  test("a failed report goes to the debug log and is retried on the next event", async ($, on) => {
+  test("a failed report emits an event and is retried on the next event", async ($, on) => {
     const herdr = herdrOf(on, HERDR, { herdrExit: 1 });
 
     await $.session.start(START);
@@ -127,17 +137,25 @@ describe("register", () => {
     await $.turn.start({ text: "hi", turnId: "t1" });
     await herdr.clock.settle();
 
-    expect(herdr.logs).toEqual(["herdr report-metadata failed: pane_not_found"]);
+    expect(herdr.failures()).toEqual([
+      {
+        event: "herdr.call",
+        ok: false,
+        detail: { op: "report-metadata", exitCode: 1, stderr: "pane_not_found" },
+      },
+    ]);
     expect(herdr.calls).toEqual([`${REPORT} --token branch=main`, `${REPORT} --token branch=main`]);
   });
 
-  test("a herdr that cannot start goes to the debug log", async ($, on) => {
+  test("a herdr that cannot start emits a failed call", async ($, on) => {
     const herdr = herdrOf(on, HERDR, { herdrExit: new Error("ENOENT") });
 
     await $.session.start(START);
     await herdr.clock.settle();
 
-    expect(herdr.logs.map((line) => line.split(":")[0])).toEqual(["herdr report-metadata failed"]);
+    expect(herdr.failures().map(({ event, detail }) => [event, detail?.exitCode])).toEqual([
+      ["herdr.call", -1],
+    ]);
   });
 
   // oxlint-disable-next-line vitest/prefer-each -- claude-code/testing has no test.each
@@ -156,6 +174,9 @@ describe("register", () => {
       await herdr.clock.settle();
 
       expect(herdr.calls).toEqual([]);
+      expect(herdr.events).toEqual([
+        { event: "session.start", ok: undefined, detail: { isHosted: false } },
+      ]);
     });
   }
 });

@@ -1,5 +1,6 @@
 import type { AgentInfo, EngineInterface, On } from "claude-code";
 
+const MOD = "herdr";
 const SOURCE = "bendrucker:herdr";
 
 // A /clear or /resume ends the conversation, not the process, and no
@@ -39,18 +40,18 @@ async function herdr($: EngineInterface, beacon: Beacon, args: string[]): Promis
   const argv = [pane.bin, "pane", args[0], pane.id, "--source", SOURCE, ...args.slice(1)];
   const startedAt = await $.clock.now();
   const { exitCode, stderr } = await $.process
-    .run(argv, { timeoutMs: 1000 })
+    .run(argv, { timeoutMs: 3000 })
     .catch((error: unknown) => ({ exitCode: -1, stderr: String(error) }));
-  const durationMs = (await $.clock.now()) - startedAt;
-  record($, { op: args[0], exitCode, stderr: stderr.trim(), durationMs });
-  return exitCode === 0;
-}
-
-function record(
-  $: EngineInterface,
-  event: { op: string; exitCode: number; stderr: string; durationMs: number },
-): void {
-  if (event.exitCode !== 0) $.ui.log(`herdr ${event.op} failed: ${event.stderr}`, { to: "debug" });
+  const ms = (await $.clock.now()) - startedAt;
+  const ok = exitCode === 0;
+  void $.modEvents.emit({
+    mod: MOD,
+    event: "herdr.call",
+    ok,
+    ms,
+    detail: { op: args[0], exitCode, stderr: stderr.trim() },
+  });
+  return ok;
 }
 
 async function branchOf($: EngineInterface): Promise<string> {
@@ -85,7 +86,12 @@ async function drain($: EngineInterface, beacon: Beacon): Promise<void> {
     const [agents, branch] = await Promise.all([$.agent.list(), branchOf($)]);
     await publish($, beacon, tokensOf(agents, branch));
   } catch (error) {
-    $.ui.log(`herdr refresh failed: ${String(error)}`, { to: "debug" });
+    void $.modEvents.emit({
+      mod: MOD,
+      event: "refresh",
+      ok: false,
+      detail: { error: String(error) },
+    });
   }
   if (beacon.requests !== seen && beacon.pane !== undefined) return drain($, beacon);
   beacon.inFlight = undefined;
@@ -117,6 +123,7 @@ export function register(on: On): void {
     beacon.pane = isHosted
       ? { bin: bin === undefined || bin === "" ? "herdr" : bin, id }
       : undefined;
+    void $.modEvents.emit({ mod: MOD, event: "session.start", detail: { isHosted } });
     refresh($, beacon);
     return next(e);
   });

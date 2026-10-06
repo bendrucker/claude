@@ -9,7 +9,7 @@ Drive the [herdr](https://herdr.dev) terminal workspace manager from a session r
 
 ## Mod Setup
 
-The mod loads only when function hooks are enabled with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, and acts only in an interactive session inside a herdr pane (`HERDR_ENV=1`). Elsewhere it does nothing. herdr's own integration (`herdr integration install`) keeps reporting the agent's identity and lifecycle. The mod adds what herdr cannot see from outside the session, as tokens from source `bendrucker:herdr`:
+The mod loads only when function hooks are enabled with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, and acts only in an interactive session inside a herdr pane (`HERDR_ENV=1`). Elsewhere it does nothing. It depends on the [`mod-events`](../mod-events) plugin, which logs each herdr call's exit code, stderr, and duration as a `herdr.call` event. herdr's own integration (`herdr integration install`) keeps reporting the agent's identity and lifecycle. The mod adds what herdr cannot see from outside the session, as tokens from source `bendrucker:herdr`:
 
 | Token | Value |
 | --- | --- |

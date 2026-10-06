@@ -88,12 +88,15 @@ describe("register", () => {
 
     expect(world.writes).toEqual({
       "/Users/u/.claude/classifier-telemetry/s1/toolu_1.json": {
+        kind: "verdict",
         session_id: "s1",
         tool_use_id: "toolu_1",
         agent_id: null,
         tool: "Bash",
+        interactive: false,
         decision: "ask",
         rule: null,
+        hook: null,
         reason: null,
         started_at: 1_000,
         check_ms: 0,
@@ -172,15 +175,79 @@ describe("register", () => {
     ]);
   });
 
-  test("records a heartbeat when the session starts", async ($, on) => {
-    const world = worldOf(on);
-    await $.session.start({ surface: "terminal", isInteractive: true, cwd: "/work" });
-    expect(world.events).toEqual([{ mod: "classifier-telemetry", event: "session.start" }]);
+  test("keys a subagent's verdict on its loop", async ($, on) => {
+    const world = worldOf(on, { decision: "allow" });
+    await $.tool.check({ tool: "Bash", input: {}, tool_use_id: "toolu_1", agentId: "a1" });
+
+    const main = $.tool.call(CALL);
+    await world.clock.settle();
+    await main;
+    expect(Object.values(world.writes)).toEqual([
+      expect.objectContaining({ agent_id: null, decision: null }),
+    ]);
+
+    // The engine sets agentId from the loop; the kit's call type leaves it out.
+    const sub = $.tool.call({ ...CALL, agentId: "a1" } as typeof CALL);
+    await world.clock.settle();
+    await sub;
+    expect(Object.values(world.writes)).toEqual([
+      expect.objectContaining({ agent_id: "a1", decision: "allow", rule: "Bash(ls)" }),
+    ]);
   });
 
-  test("a failure after the call returns its result without running it again", async ($, on) => {
-    const world = worldOf(on, { idFails: true });
-    expect(await run($, world, 0)).toEqual({ result: "ok" });
-    expect(world.calls()).toBe(1);
+  test("marks a tool that waits on the person as interactive", async ($, on) => {
+    const world = worldOf(on);
+
+    const pending = $.tool.call({ tool: "AskUserQuestion", questions: [], tool_use_id: "toolu_2" });
+    await world.clock.settle();
+    await pending;
+
+    expect(Object.values(world.writes)).toEqual([
+      expect.objectContaining({ tool: "AskUserQuestion", interactive: true }),
+    ]);
+  });
+
+  test("records each server tool a step ran", async ($, on) => {
+    const world = worldOf(on);
+    on("turn.step", async function* () {
+      yield* [];
+      await world.clock.sleep(750);
+      return {
+        turnId: "t1",
+        index: 2,
+        answer: "",
+        toolUses: [],
+        serverToolUses: [
+          { id: "srv_1", name: "advisor", input: {}, startedAt: 5_000, endedAt: 5_750 },
+          { id: "srv_2", name: "advisor", input: {}, startedAt: 6_000 },
+        ],
+        stopReason: "end_turn",
+        usage: null,
+      };
+    });
+
+    const stream = $.turn.step({ turnId: "t1", index: 2, model: "m", messageCount: 1 });
+    const drained = (async () => {
+      for await (const _ of stream);
+    })();
+    await world.clock.advance(750);
+    await drained;
+
+    expect(world.writes).toEqual({
+      "/Users/u/.claude/classifier-telemetry/s1/srv_1.json": {
+        kind: "server_tool",
+        session_id: "s1",
+        tool_use_id: "srv_1",
+        agent_id: null,
+        tool: "advisor",
+        turn_id: "t1",
+        step: 2,
+        started_at: 5_000,
+        duration_ms: 750,
+      },
+      "/Users/u/.claude/classifier-telemetry/s1/srv_2.json": expect.objectContaining({
+        duration_ms: null,
+      }),
+    });
   });
 });

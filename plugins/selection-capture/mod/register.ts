@@ -26,12 +26,17 @@ const COMMANDS = {
 
 const NAMES: Record<Target, string> = { things: "Things to-do", linear: "Linear draft" };
 
+const THINGS_BUNDLE = "com.culturedcode.ThingsMac";
+
 async function hasThings($: EngineInterface): Promise<boolean> {
   try {
-    const { exitCode } = await $.process.run(["open", "-Ra", "Things3"]);
-    return exitCode === 0;
+    const { exitCode, stdout } = await $.process.run([
+      "mdfind",
+      `kMDItemCFBundleIdentifier == '${THINGS_BUNDLE}'`,
+    ]);
+    return exitCode === 0 && stdout.trim() !== "";
   } catch {
-    // `open` cannot start off macOS or off the CLI, where Things is absent anyway.
+    // `mdfind` cannot start off macOS or off the CLI, where Things is absent anyway.
     return false;
   }
 }
@@ -51,7 +56,7 @@ async function repoOf($: EngineInterface): Promise<string> {
 
 const MOD = "selection-capture";
 
-type Outcome = "opened" | "no-selection" | "open-failed";
+type Outcome = "opened" | "no-selection" | "open-failed" | "error";
 
 async function capture(
   $: EngineInterface,
@@ -67,11 +72,16 @@ async function capture(
     };
   }
   const quoted = quote(selected.text);
+  const [messages, sessionId, repo] = await Promise.all([
+    $.session.messages(),
+    $.session.id(),
+    repoOf($),
+  ]);
   const draft: Capture = {
     title: title(args, selected.text),
     quote: quoted,
-    row: row(selected, await $.session.messages()),
-    launch: launchUrl(await $.session.id(), quoted, await repoOf($)),
+    row: row(selected, messages),
+    launch: launchUrl(sessionId, quoted, repo),
   };
   const detail = {
     chars: selected.text.length,
@@ -80,12 +90,16 @@ async function capture(
   };
   const url = targetUrl(target, draft);
   const argv = target === "things" ? ["open", "-g", url] : ["open", url];
+  let failure: string | undefined;
   try {
     const { exitCode, stderr } = await $.process.run(argv);
-    if (exitCode !== 0) throw new Error(stderr.trim());
+    if (exitCode !== 0) failure = `open exited ${exitCode}: ${stderr.trim()}`;
   } catch (error) {
-    $.ui.log(`${target} capture failed to open: ${String(error)}`, { to: "debug" });
-    record($, target, "open-failed", started, { ...detail, error: String(error) });
+    failure = `open did not start: ${String(error)}`;
+  }
+  if (failure !== undefined) {
+    $.ui.log(`${target} capture failed: ${failure}`, { to: "debug" });
+    record($, target, "open-failed", started, { ...detail, error: failure });
     return {
       text: `Could not open the ${NAMES[target]}. Its contents:\n\n# ${draft.title}\n\n${body(draft)}`,
     };
@@ -93,6 +107,20 @@ async function capture(
   record($, target, "opened", started, detail);
   $.ui.toast(`${NAMES[target]}: ${draft.title}`);
   return { text: `${NAMES[target]}: ${draft.title}` };
+}
+
+async function guarded(
+  $: EngineInterface,
+  target: Target,
+  args: string,
+): Promise<CommandRunResult> {
+  const started = Date.now();
+  try {
+    return await capture($, target, args);
+  } catch (error) {
+    record($, target, "error", started, { error: String(error) });
+    return { text: `Could not capture the ${NAMES[target]}: ${String(error)}` };
+  }
 }
 
 function record(
@@ -132,6 +160,6 @@ export function register(on: On): void {
 
   on("command.run", ($, e, next) => {
     const target = served.get(e.command);
-    return target === undefined ? next(e) : capture($, target, e.args);
+    return target === undefined ? next(e) : guarded($, target, e.args);
   });
 }

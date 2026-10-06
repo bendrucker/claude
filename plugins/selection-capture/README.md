@@ -8,7 +8,7 @@ Capture text you selected in the transcript as a Things to-do or a Linear issue 
   - `/things` opens `things:///add` in the background, tagged `claude`. It is registered only when Things 3 is installed.
   - `/linear` opens a prefilled `linear.new` issue in the browser for you to finish and submit.
   - Without a title argument, the selection's first line becomes the title. When `open` fails, the command prints the capture instead.
-- **Events**: through [`mod-events`](../mod-events/README.md), a `session.start` event noting whether `/things` registered, and one `capture` event per run with its target, outcome (`opened`, `no-selection`, `open-failed`), the row it found, and the selection's length. The selected text is never logged.
+- **Events**: through [`mod-events`](../mod-events/README.md), a `session.start` event noting whether `/things` registered, and one `capture` event per run with its target, outcome (`opened`, `no-selection`, `open-failed`, `error`), the row it found, and the selection's length. The selected text is never logged.
 
 ## Setup
 

@@ -32,6 +32,10 @@ describe("quote", () => {
   test("prefixes every line, keeping blank ones in the quote", () => {
     expect(quote("one\n\ntwo\n")).toBe("> one\n>\n> two");
   });
+
+  test("caps a long selection", () => {
+    expect(quote("x".repeat(10_000)).length).toBeLessThan(4100);
+  });
 });
 
 describe("title", () => {
@@ -42,6 +46,11 @@ describe("title", () => {
   test("falls back to the selection's first line, clipped", () => {
     expect(title("", "first line\nsecond")).toBe("first line");
     expect(title("", "x".repeat(100))).toHaveLength(80);
+  });
+
+  test("never splits a surrogate pair at the cut", () => {
+    const clipped = title("", `${"x".repeat(78)}😀😀`);
+    expect(() => encodeURIComponent(clipped)).not.toThrow();
   });
 });
 
@@ -82,6 +91,10 @@ describe("urls", () => {
     expect(url).toContain("cwd=%2Fsrc%2Frepo");
     expect(decodeURIComponent(url)).toContain("claude --resume s1");
     expect(decodeURIComponent(url)).toContain("> hi");
+  });
+
+  test("launch URL bounds the quote it carries", () => {
+    expect(launchUrl("s1", "x".repeat(5000), "/src/repo").length).toBeLessThan(1500);
   });
 
   test("Things to-do carries the quote, row, and launch link in its notes", () => {

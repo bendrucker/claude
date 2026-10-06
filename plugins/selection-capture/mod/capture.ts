@@ -2,6 +2,9 @@ import type { SessionMessage, UiSelection } from "claude-code";
 
 const TITLE_LIMIT = 80;
 const ROW_LIMIT = 2000;
+// Things caps notes at 10,000 characters, and the launch URL repeats the quote encoded.
+const QUOTE_LIMIT = 4000;
+const PROMPT_QUOTE_LIMIT = 1000;
 
 export type Target = "things" | "linear";
 
@@ -18,7 +21,10 @@ export interface Capture {
 }
 
 function clip(text: string, limit: number): string {
-  return text.length <= limit ? text : `${text.slice(0, limit - 1)}…`;
+  if (text.length <= limit) return text;
+  const cut = text.slice(0, limit - 1);
+  // A lone high surrogate makes encodeURIComponent throw.
+  return `${/[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut}…`;
 }
 
 function squash(text: string): string {
@@ -32,8 +38,7 @@ function encode(params: Record<string, string>): string {
 }
 
 export function quote(text: string): string {
-  return text
-    .trim()
+  return clip(text.trim(), QUOTE_LIMIT)
     .split("\n")
     .map((line) => (line === "" ? ">" : `> ${line}`))
     .join("\n");
@@ -86,7 +91,7 @@ export function mainRepo(commonDir: string, root: string): string {
 }
 
 export function launchUrl(sessionId: string, quoted: string, cwd: string): string {
-  const prompt = `Pick up this capture from Claude Code session ${sessionId} (\`claude --resume ${sessionId}\` has the full transcript):\n\n${quoted}`;
+  const prompt = `Pick up this capture from Claude Code session ${sessionId} (\`claude --resume ${sessionId}\` has the full transcript):\n\n${clip(quoted, PROMPT_QUOTE_LIMIT)}`;
   return `claude-cli://open?${encode({ q: prompt, cwd })}`;
 }
 

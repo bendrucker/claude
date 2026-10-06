@@ -4,7 +4,7 @@
 
 - Don't join independent clauses with semicolons or em dashes. End the clause with a period. Swapping one connector for another is not a fix.
 - Wrap filenames and code identifiers with `backticks` in any markdown context.
-- Write PR, issue, and ticket references in chat replies as links, like `[dotfiles#827](https://github.com/bendrucker/dotfiles/pull/827)`. The terminal doesn't autolink bare IDs.
+- Write PR, issue, MR, and tracker-key (`ABC-123`) references in chat replies as links, like `[dotfiles#827](https://github.com/bendrucker/dotfiles/pull/827)`. The terminal doesn't autolink bare IDs. Take the URL that `gh`, `glab`, or the tracker tool printed, or build it from the repo's remote. With no known URL, keep the bare ID rather than guess one.
 - Don't hard-wrap markdown prose you author. In an existing file, follow its wrapping.
 - Include a trailing newline in all new files.
 - Put explanation of code you're writing in a message before the edit.

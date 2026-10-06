@@ -11,7 +11,6 @@ The [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in d
 - `hooks/` - User-level hooks that run across all projects
   - `worktree/` - Validates bash commands in worktrunk worktrees
   - `webfetch-block/` - Steers WebFetch calls toward better tools
-  - `session-limit/` - Warns when a session approaches its limit
   - `herdr-agent-state.sh` - Reports session identity to herdr
 
 ## Vendored Hook

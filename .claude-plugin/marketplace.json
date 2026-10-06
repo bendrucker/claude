@@ -172,6 +172,11 @@
       "source": "./plugins/run-command"
     },
     {
+      "name": "session-limit",
+      "description": "Show rate-limit usage in the status line and warn the model mid-turn as the 5-hour or 7-day limit nears",
+      "source": "./plugins/session-limit"
+    },
+    {
       "name": "herdr",
       "description": "Drive the herdr terminal workspace manager: panes, tabs, workspaces, and sibling coding agents",
       "source": "./plugins/herdr"

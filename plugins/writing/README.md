@@ -9,6 +9,7 @@ Documents a model executes belong to the [prompting](../prompting) plugin. [`.cl
 - **Hooks**: Step, phase, and part numbering detection, heading style enforcement, AI writing trope detection (em dashes, vocabulary, copula avoidance, promotional language, parallelism, connector density)
 - **Skills**: `writing:writing` system reminder for prose writing guidelines, `writing:analyze` session-history-based trope ruleset curation, `writing:rewrite` user-invoked text rewriter, `writing:scan` user-invoked trope detector (`audit` gates a directory, `score` measures one input's density), `writing:review` multi-agent document review, `writing:no-diary` cuts process narration out of a deliverable
 - **Agents**: `content`, `style`, `artifacts` (conditional review lenses)
+- **Mod**: chat voice meter, a function-hooks module that shows each turn's trope density in the status line
 - **Scripts**: [`scripts/similarity.ts`](scripts/similarity.ts), the CLI over the [`similarity/`](similarity/) style-similarity engine
 
 ## Wordlists
@@ -39,8 +40,15 @@ Context-tier findings are suppressed when the same rule category already fired i
 
 Every dispatcher run appends one JSONL line to `~/.claude/writing-hooks/log.jsonl` (rotated past 5 MB): timestamp, session, tool, extension, duration, outcome (`silent | context | ask | deny | skipped-scratch`), the winning category and whether it was suppressed, a hash of the file path, and every category the checkers found. This is the evidence surface for auditing the hooks' cost and precision. `WRITING_HOOKS_LOG=0` disables it, and a path value redirects it. The `writing:analyze` skill reads it through [`skills/analyze/scripts/hook-health.ts`](skills/analyze/scripts/hook-health.ts), which summarizes volume, latency, per-rule fire/suppress counts, and how often each rule was acted on, then raises fix opportunities. Once two consecutive health checks come back stable, flip the default off.
 
+## Chat Voice Meter
+
+Chat replies never pass through a tool call, so the PreToolUse dispatcher never sees them. The mod in [`mod/`](mod/) hooks `session.append` on the model's response rows in the main conversation, scores each text block with `scan.ts score --json`, and shows the turn's running density and top category in the status line (`voice 33/1k · AI vocabulary`). It only displays. Nothing it computes reaches the model.
+
+It loads only where `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set. It runs the scan CLI through `bun` from the plugin root, so it needs `bun` on `PATH` and the plugin's installed dependencies. When the scan can't run, the meter clears its line and stays off for the rest of the session. Every score and every outage is logged as an event.
+
 ## Testing
 
 ```sh
 bun test plugins/writing
+claude plugin test plugins/writing/mod
 ```

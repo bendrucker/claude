@@ -1,5 +1,6 @@
 {
-  "description": "Detects writing style violations and AI tropes",
+  "description": "Detects writing style violations and AI tropes; meters trope density of chat replies in the status line",
+  "modules": ["../mod/register.ts"],
   "hooks": {
     "PreToolUse": [
       {

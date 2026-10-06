@@ -127,7 +127,7 @@ export function record(
     ok: true,
     detail: { uuid, density: density(scan), ...scan },
   };
-  if (generation !== meter.generation) return { event, status: null };
+  if (meter.unavailable || generation !== meter.generation) return { event, status: null };
   meter.turn = combine(meter.turn, scan);
   return { event, status: statusLine(meter.turn) };
 }

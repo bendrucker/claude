@@ -9,6 +9,8 @@ import {
   startTurn,
 } from "./meter.ts";
 
+type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
+
 const MOD = "writing";
 const SCAN = "skills/scan/scripts/scan.ts";
 const TIMEOUT_MS = 8_000;
@@ -28,11 +30,19 @@ async function scan($: EngineInterface, text: string): Promise<Score | string> {
 
 async function measure($: EngineInterface, meter: Meter, uuid: string, text: string) {
   const generation = meter.generation;
-  const started = await $.clock.now();
-  const result = await scan($, text);
-  const ms = (await $.clock.now()) - started;
+  let result: Score | string;
+  let ms: number | undefined;
+  try {
+    const started = await $.clock.now();
+    result = await scan($, text);
+    ms = (await $.clock.now()) - started;
+  } catch (error) {
+    result = error instanceof Error ? error.message : String(error);
+  }
   const { event, status } = record(meter, generation, uuid, result);
-  void $.modEvents.emit({ mod: MOD, ms, ...event });
+  const input: ModEventsInput = { mod: MOD, ...event };
+  if (ms !== undefined) input.ms = ms;
+  void $.modEvents.emit(input);
   if (status !== null) $.ui.status(status);
 }
 

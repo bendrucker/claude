@@ -116,4 +116,11 @@ describe("record", () => {
     });
     expect(meter.unavailable).toBe(true);
   });
+
+  test("logs a scan that lands after the meter turned off without redrawing", () => {
+    const meter = createMeter();
+    record(meter, 0, "x", "timed out");
+
+    expect(record(meter, 0, "y", score(10, { "AI vocabulary": 1 })).status).toBeNull();
+  });
 });

@@ -1,11 +1,12 @@
 import type { SessionRateLimit } from "claude-code";
+import type { SessionLimitAnnounced } from "../types";
 
 export interface Band {
   threshold: number;
   message: (resetsAt: string | undefined, nowMs: number) => string;
 }
 
-export type Announced = Record<string, { band: number; resetsAt: string }>;
+export type Announced = SessionLimitAnnounced;
 
 export interface Crossing {
   kind: string;

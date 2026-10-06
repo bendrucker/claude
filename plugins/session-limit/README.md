@@ -27,4 +27,4 @@ Off a subscription the session's rate-limit list is empty, so the mod stays idle
 
 ## Tests
 
-`claude plugin test plugins/session-limit/mod` runs the mod's tests.
+`bun scripts/mod-test.ts session-limit`

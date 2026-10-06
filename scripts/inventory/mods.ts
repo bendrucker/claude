@@ -43,7 +43,7 @@ async function scanFile(path: string, acc: Accumulator): Promise<void> {
   acc.seen.add(path);
 
   const file = Bun.file(join(root, path));
-  if (!(await file.exists())) return;
+  if (!(await file.exists())) throw new Error(`mod module not found: ${path}`);
   const tree = parse(path.endsWith(".tsx") ? Lang.Tsx : Lang.TypeScript, await file.text()).root();
 
   for (const call of tree.findAll("on($EVENT, $$$ARGS)")) {
@@ -62,7 +62,7 @@ async function scanFile(path: string, acc: Accumulator): Promise<void> {
   }
 
   const relative = tree
-    .findAll({ rule: { kind: "import_statement" } })
+    .findAll({ rule: { any: [{ kind: "import_statement" }, { kind: "export_statement" }] } })
     .map((statement) => literal(statement.field("source")))
     .filter((source): source is string => source?.startsWith(".") === true);
   const resolved = await Promise.all(relative.map((source) => resolveImport(path, source)));

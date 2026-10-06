@@ -325,6 +325,7 @@ test("scanMod follows relative imports and names what the module draws", async (
     join(scratch, "mod/register.tsx"),
     `import type { On } from "claude-code";
 import { band } from "./band";
+export { pane } from "./pane";
 
 const dynamic = "turn.start";
 
@@ -347,10 +348,27 @@ export function band(on: On): void {
 `,
   );
 
+  await Bun.write(
+    join(scratch, "mod/pane.ts"),
+    `export function pane(on: On): void {
+  on("command.run", ($, e, next) => next(e));
+}
+`,
+  );
+
   expect(await scanMod(relative(root, join(scratch, "mod/register.tsx")))).toEqual({
-    events: ["session.start", "ui.render"],
+    events: ["command.run", "session.start", "ui.render"],
     surfaces: ["Pane", "status", "toast", "ui.render"],
   });
+});
+
+test("scanMod rejects a module path that names no file", async () => {
+  const failure = await scanMod(relative(root, join(scratch, "missing.ts"))).catch(
+    (error: unknown) => error,
+  );
+
+  expect(failure).toBeInstanceOf(Error);
+  expect(String(failure)).toContain("mod module not found");
 });
 
 test("collect lists the mods this repo's plugins name", async () => {

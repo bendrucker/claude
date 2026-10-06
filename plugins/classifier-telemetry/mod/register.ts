@@ -40,6 +40,7 @@ export function register(on: On): void {
     return next(e);
   });
 
+  // Both hooks only observe, so a failure lets the call go on as the engine settled it.
   on("tool.check", async ($, e, next) => {
     const verdict = await next(e);
     if (e.tool_use_id !== undefined) {
@@ -86,7 +87,7 @@ export function register(on: On): void {
     });
     if ("thrown" in settled) throw settled.thrown;
     return settled.result;
-  });
+  }).catch(($, e, next) => next(e));
 
   on("turn.step", async function* ($, e, next) {
     const response = yield* next(e);

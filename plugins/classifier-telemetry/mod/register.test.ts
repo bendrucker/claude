@@ -1,7 +1,8 @@
 import type { EngineInterface, On, ToolCallResult } from "claude-code";
 
-type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 import { type Engine, describe, expect, mock, test, tier } from "claude-code/testing";
+
+type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 
 tier("user");
 
@@ -9,6 +10,7 @@ const CALL = { tool: "Bash", command: "ls", tool_use_id: "toolu_1" } as const;
 
 interface World {
   events: ModEventsInput[];
+  calls: () => number;
   clock: ReturnType<typeof mock.clock>;
 }
 
@@ -19,13 +21,11 @@ function worldOf(
     ms = 0,
     result = { result: "ok" },
     failCalls = 0,
-    idFails = false,
   }: {
     decision?: "allow" | "ask" | "deny";
     ms?: number;
     result?: ToolCallResult;
     failCalls?: number;
-    idFails?: boolean;
   } = {},
 ): World {
   const events: ModEventsInput[] = [];
@@ -44,7 +44,7 @@ function worldOf(
     if (failures-- > 0) throw new Error("tool crashed");
     return result;
   });
-  return { events, clock };
+  return { events, calls: () => calls, clock };
 }
 
 async function run($: Engine, world: World, ms: number) {
@@ -135,6 +135,7 @@ describe("register", () => {
     const failed = expect($.tool.call(CALL)).rejects.toThrow("no implementation for tool.call");
     await world.clock.settle();
     await failed;
+    expect(world.calls()).toBe(1);
 
     await settle(world, $.tool.call(CALL));
 

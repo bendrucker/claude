@@ -9,7 +9,7 @@ Each plugin has `.claude-plugin/plugin.json` plus optional `skills/`, `hooks/`, 
 
 Creating or renaming a plugin directory requires adding or updating its entry in `.claude-plugin/marketplace.json`, verified by `bun scripts/check-marketplace.ts`.
 
-Load the `claude-code:skill` skill when creating or modifying skills.
+Load the `plugin:skill` skill when creating or modifying skills.
 
 ## Audience
 

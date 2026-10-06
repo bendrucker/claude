@@ -10,10 +10,10 @@ The session index includes an imported `work` host marked block-egress, and work
 
 ## Mining
 
-Build the session index first if it is stale (the `claude-code` plugin's session skill owns it):
+Build the session index first if it is stale (the `observability:session` skill owns it):
 
 ```bash
-bun plugins/claude-code/skills/session/scripts/refresh.ts
+bun plugins/observability/skills/session/scripts/refresh.ts
 ```
 
 Then mine PR bodies:
@@ -21,7 +21,7 @@ Then mine PR bodies:
 ```bash
 bun plugins/pull-request/evals/pr-body/scripts/mine.ts                      # writes data/samples.json
 bun plugins/pull-request/evals/pr-body/scripts/mine.ts --limit 80
-bun plugins/pull-request/evals/pr-body/scripts/mine.ts --db ~/.claude/plugins/data/claude-code-bendrucker/session.duckdb
+bun plugins/pull-request/evals/pr-body/scripts/mine.ts --db ~/.claude/plugins/data/observability-bendrucker/session.duckdb
 ```
 
 `mine.ts` enumerates PRs opened from local sessions via the index's `pr_links` view, fetches their bodies with `gh pr list`, drops bodies below `--min-chars`, and selects a repo-balanced sample that interleaves long sectioned bodies with tight one-paragraph ones. Each item records repo, PR number, URL, date, state, and the originating session id. Without `--db` it resolves the index from `CLAUDE_PLUGIN_DATA`, matching the other `evals/` miners.

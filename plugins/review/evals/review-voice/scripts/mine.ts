@@ -173,7 +173,7 @@ async function main() {
   const dbPath = resolveDbPath();
   if (!(await Bun.file(dbPath).exists())) {
     console.error(`No session index at ${dbPath}.`);
-    console.error("Build it first: bun plugins/claude-code/skills/session/scripts/refresh.ts");
+    console.error("Build it first: bun plugins/observability/skills/session/scripts/refresh.ts");
     process.exit(1);
   }
 

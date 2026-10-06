@@ -6,7 +6,7 @@ import { type AnalysisConfig, runAnalysis } from "./analyze";
 import { type Database, openSessionDb } from "./db";
 
 // The queries reference macros and tables supplied by the external session
-// index (built by the claude-code:session skill), not defined in this repo. The
+// index (built by the observability:session skill), not defined in this repo. The
 // fixture recreates the minimal seam each query touches: the date/project
 // filter macros and the sessions/text_content/content_items tables. The macros
 // cast their variable arguments because getvariable() yields untyped NULLs.

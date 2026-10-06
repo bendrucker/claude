@@ -1,0 +1,11 @@
+{
+  "name": "observability",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@duckdb/node-api": "1.5.0-r.1",
+    "cleye": "^2.2.1",
+    "table": "^6.9.0",
+    "zod": "^4.4.3"
+  }
+}

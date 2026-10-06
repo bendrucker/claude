@@ -20,4 +20,4 @@ Two things deliberately left out. There is no section on preventing "you should 
 
 ## Removal
 
-Model-invocable as an experiment, against the usual preference for `disable-model-invocation` on personal skills. The evidence is the split between slash entry and Skill-tool entry for `grilling` in the session index, which `plugins/claude-code/skills/session/resources/queries/skill-auto-vs-explicit.sql` already computes per skill. No Skill-tool entries after roughly four weeks means the natural-language triggers are inert and the recurring catalog cost buys nothing, so the skill goes to `disable-model-invocation: true`.
+Model-invocable as an experiment, against the usual preference for `disable-model-invocation` on personal skills. The evidence is the split between slash entry and Skill-tool entry for `grilling` in the session index, which `plugins/observability/skills/session/resources/queries/skill-auto-vs-explicit.sql` already computes per skill. No Skill-tool entries after roughly four weeks means the natural-language triggers are inert and the recurring catalog cost buys nothing, so the skill goes to `disable-model-invocation: true`.

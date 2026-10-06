@@ -2,7 +2,7 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { lintSkill } from "../../plugins/claude-code/skills/skill/scripts/skill-lint/index";
+import { lintSkill } from "../../plugins/plugin/skills/skill/scripts/skill-lint/index";
 import { formatJson, formatText } from "./format";
 
 const { values, positionals } = parseArgs({

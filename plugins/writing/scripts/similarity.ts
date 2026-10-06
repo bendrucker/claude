@@ -173,7 +173,7 @@ const mineContrastCommand = command(
   async (parsed) => {
     const sessionDb = parsed.flags.sessionDb;
     if (sessionDb === undefined || sessionDb === "") {
-      throw new Error("--session-db is required (the claude-code:session skill prints its path)");
+      throw new Error("--session-db is required (the observability:session skill prints its path)");
     }
     const dataDir = resolveDataDir(parsed.flags.dataDir);
 

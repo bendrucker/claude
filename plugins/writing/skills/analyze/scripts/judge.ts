@@ -319,7 +319,7 @@ const HAIKU_PRICING: ModelPricing = { input: 1, output: 5 };
  * Per-MTok USD rates matched by family substring, so a new model id in a known
  * family needs no edit here. The family rows mirror `model_input_rate` and
  * `model_output_rate` in
- * `plugins/claude-code/skills/session/resources/schema/03_macros.sql`. Plugins
+ * `plugins/observability/skills/session/resources/schema/03_macros.sql`. Plugins
  * cannot import across plugin boundaries, so a rate change has to touch both.
  * Sonnet is held at the 3/15 standard rate rather than a promotional rate, since
  * an estimate for a known family must not come in under the real bill.

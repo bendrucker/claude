@@ -1,0 +1,9 @@
+{
+  "name": "plugin",
+  "description": "Author Claude Code skills and hooks, whether they live in a plugin, a project's .claude/, or ~/.claude",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  },
+  "dependencies": ["prompting"]
+}

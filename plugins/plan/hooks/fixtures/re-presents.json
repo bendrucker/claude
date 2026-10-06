@@ -1,5 +1,5 @@
 {
-  "source": "ExitPlanMode presentations recorded under ~/.claude/projects, read through the claude-code:session index: json_extract_string(ci.data, '$.input.plan') over content_items joined to plan_calls on tool_use_id, ordered by plan_seq. Sessions are named by the first eight characters of their id.",
+  "source": "ExitPlanMode presentations recorded under ~/.claude/projects, read through the observability:session index: json_extract_string(ci.data, '$.input.plan') over content_items joined to plan_calls on tool_use_id, ordered by plan_seq. Sessions are named by the first eight characters of their id.",
   "sessions": [
     {
       "session": "a4b38156",

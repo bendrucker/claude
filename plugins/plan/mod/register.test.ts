@@ -1,6 +1,5 @@
 import type { On, ToolCallResult } from "claude-code";
 import { type Engine, describe, expect, test } from "claude-code/testing";
-import type { ModEventsInput } from "../../mod-events/types";
 import { LIMIT, statusText } from "./register.ts";
 
 const PLAN = "/Users/u/.claude/plans/quiet-otter.md";
@@ -8,7 +7,7 @@ const PLAN = "/Users/u/.claude/plans/quiet-otter.md";
 interface World {
   files: Record<string, string>;
   status: (string | undefined)[];
-  events: ModEventsInput[];
+  events: Parameters<Engine["modEvents"]["emit"]>[0][];
 }
 
 function worldOf(on: On, { result = { result: "ok" } }: { result?: ToolCallResult } = {}): World {

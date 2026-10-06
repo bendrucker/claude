@@ -28,6 +28,7 @@ interface World {
   branch: string;
   gh: { exitCode: number; stdout: string; stderr: string } | Error;
   view: unknown;
+  slowMs?: number;
 }
 
 function worldOf(on: On, world: World) {
@@ -55,7 +56,7 @@ function worldOf(on: On, world: World) {
     submits.push(e.text);
     return { text: e.text };
   });
-  on("process.run", ($, e) => {
+  on("process.run", async ($, e) => {
     const argv = e.argv.join(" ");
     if (argv.startsWith("git ")) {
       return {
@@ -73,6 +74,7 @@ function worldOf(on: On, world: World) {
       return { value: { ...world.gh, isStdoutTruncated: false, isStderrTruncated: false } };
     }
     views.push(argv);
+    if (world.slowMs !== undefined) await clock.sleep(world.slowMs);
     const stdout = typeof world.view === "string" ? "" : JSON.stringify(world.view);
     const stderr = typeof world.view === "string" ? world.view : "";
     return {
@@ -215,5 +217,17 @@ describe("register", () => {
 
     expect(w.views.length).toBe(1);
     expect(w.statuses.at(-1)).toBe(undefined);
+  });
+
+  test("a poll still in flight at session end leaves the status cleared", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr(""), slowMs: 10_000 });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.session.end({ reason: "prompt_input_exit", sessionId: "s1", resume: { id: "s1" } });
+    await w.clock.advance(10_000 + POLL_MS.pending * 3);
+
+    expect(w.views.length).toBe(1);
+    expect(w.statuses).toEqual([undefined]);
   });
 });

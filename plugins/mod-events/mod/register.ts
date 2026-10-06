@@ -14,6 +14,7 @@ interface Chunk {
 interface Log {
   root: string | undefined;
   instance: number | undefined;
+  resource: Record<string, string> | undefined;
   chunks: Map<string, { chunk: Chunk; n: number }>;
 }
 
@@ -96,19 +97,46 @@ async function rootOf($: EngineInterface, log: Log): Promise<string | undefined>
 
 const fileSafe = (name: string) => name.replaceAll(/[^\w.-]/g, "_");
 
+async function resourceOf($: EngineInterface, log: Log): Promise<Record<string, string>> {
+  log.resource ??= {
+    "service.name": "claude-code",
+    "service.version": (await $.session.version()).version,
+  };
+  return log.resource;
+}
+
+function toRecord(
+  input: ModEventsInput,
+  ts: number,
+  session: string,
+  resource: Record<string, string>,
+): ModEventsRecord {
+  const isOk = input.ok ?? true;
+  return {
+    timestamp: new Date(ts).toISOString(),
+    severity_text: isOk ? "INFO" : "WARN",
+    severity_number: isOk ? 9 : 13,
+    event_name: `${input.mod}.${input.event}`,
+    attributes: {
+      ...input.detail,
+      ...(input.ms !== undefined && { duration_ms: input.ms }),
+      "session.id": session,
+    },
+    resource,
+    scope: { name: input.mod },
+  };
+}
+
 async function record($: EngineInterface, log: Log, input: ModEventsInput): Promise<void> {
-  const [root, ts, session] = await Promise.all([rootOf($, log), $.clock.now(), $.session.id()]);
+  const [root, ts, session, resource] = await Promise.all([
+    rootOf($, log),
+    $.clock.now(),
+    $.session.id(),
+    resourceOf($, log),
+  ]);
   if (root === undefined) return;
   log.instance ??= ts;
-  const line: ModEventsRecord = {
-    ts,
-    session,
-    mod: input.mod,
-    event: input.event,
-    ok: input.ok ?? true,
-    ms: input.ms ?? null,
-    detail: input.detail ?? {},
-  };
+  const line = toRecord(input, ts, session, resource);
   const text = `${JSON.stringify(line)}\n`;
   const key = `${session}/${fileSafe(input.mod)}`;
   let slot = log.chunks.get(key);
@@ -156,12 +184,14 @@ async function readSurface($: EngineInterface): Promise<ReturnType<typeof surfac
 
 /**
  * Seats `$.modEvents` for every mod that depends on this plugin and writes
- * what they emit to `<config>/mod-events/<session>/<mod>.<instance>.<n>.jsonl`.
- * A chunk is rewritten whole on each event, since `$.fs` has no append, so
- * chunks roll at 64 KB and a reload starts a new instance.
+ * what they emit as OTel log records to
+ * `<config>/mod-events/<session>/<mod>.<instance>.<n>.jsonl`. A chunk is
+ * rewritten whole on each event, since `$.fs` has no append, so chunks roll at
+ * 64 KB and a reload starts a new instance. Each rewrite only appends, and a
+ * rolled chunk is never written again, so a tailer's offset stays valid.
  */
 export function register(on: On): void {
-  const log: Log = { root: undefined, instance: undefined, chunks: new Map() };
+  const log: Log = { root: undefined, instance: undefined, resource: undefined, chunks: new Map() };
 
   on("engine.create", async ($, e, next) => {
     const built = await next(e);
@@ -175,11 +205,12 @@ export function register(on: On): void {
 
   on("session.start", async ($, e, next) => {
     const started = await next(e);
-    const reach = await readSurface($);
+    const { surface, clients } = await readSurface($);
+    log.resource = { ...(await resourceOf($, log)), "claude_code.surface": surface };
     await emit($, log, {
       mod: MOD,
       event: "session.start",
-      detail: { ...reach, surfaceKind: e.surface, isInteractive: e.isInteractive },
+      detail: { clients, surfaceKind: e.surface, isInteractive: e.isInteractive },
     });
     return started;
   });

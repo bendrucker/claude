@@ -1,6 +1,6 @@
 {
   "name": "mod-events",
-  "description": "Structured event log for mods: `$.modEvents.emit` writes per-session JSONL that the session index ingests as `mod_events`",
+  "description": "Structured event log for mods: `$.modEvents.emit` writes per-session OTel log records as JSONL, which the session index ingests as `mod_events`",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

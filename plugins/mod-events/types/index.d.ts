@@ -15,17 +15,22 @@ export interface ModEventsInput {
 }
 
 /**
- * One line of `<config>/mod-events/<session>/<mod>.<instance>.<n>.jsonl`, the
- * shape the session index ingests as `mod_events`.
+ * One line of `<config>/mod-events/<session>/<mod>.<instance>.<n>.jsonl`: an
+ * OTel log record with its fields flat, the shape the session index ingests as
+ * `mod_events`.
  */
 export interface ModEventsRecord {
-  ts: number;
-  session: string;
-  mod: string;
-  event: string;
-  ok: boolean;
-  ms: number | null;
-  detail: Record<string, unknown>;
+  /** ISO 8601, as Claude Code's own `event.timestamp`. */
+  timestamp: string;
+  severity_text: "INFO" | "WARN";
+  severity_number: 9 | 13;
+  /** `<mod>.<event>`. */
+  event_name: string;
+  /** The event's detail, plus `duration_ms` and `session.id`. */
+  attributes: Record<string, unknown>;
+  /** `service.name`, `service.version`, and `claude_code.surface` once known. */
+  resource: Record<string, string>;
+  scope: { name: string };
 }
 
 export interface ModEvents {

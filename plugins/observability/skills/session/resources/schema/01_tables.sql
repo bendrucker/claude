@@ -73,8 +73,8 @@ CREATE TABLE IF NOT EXISTS mod_events (
   source_file     VARCHAR
 );
 
--- The change catalog for those three, as `indexed_files` is for JSONL: a debug log or
--- mod-events chunk per file, the classifier mod's records per session directory.
+-- Change catalog for debug logs, mod-events chunks, and classifier records: one row
+-- per file, or per session directory for the classifier mod.
 CREATE TABLE IF NOT EXISTS telemetry_files (
   source          VARCHAR,
   path            VARCHAR,

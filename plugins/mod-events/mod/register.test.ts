@@ -17,7 +17,6 @@ const PS_MOSH = [
 
 const HOME = { HOME: "/home/me" };
 
-// Each turn.start's text is one emit input, so a test drives emit through the noun as a dependent mod would.
 const CALLER: Plugin = {
   name: "caller",
   register(on) {

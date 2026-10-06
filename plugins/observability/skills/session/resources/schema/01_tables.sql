@@ -58,8 +58,23 @@ CREATE TABLE IF NOT EXISTS tool_verdicts (
   source_dir      VARCHAR
 );
 
--- The change catalog for those two, as `indexed_files` is for JSONL: a debug log per
--- file, the mod's records per session directory.
+-- What mods emit through the mod-events plugin, out of
+-- `mod-events/<session>/<mod>.<instance>.<n>.jsonl`. Its rows and `debug_events`'
+-- outlive their files, which retention prunes by size.
+CREATE TABLE IF NOT EXISTS mod_events (
+  host            VARCHAR,
+  session_id      VARCHAR,
+  mod             VARCHAR,
+  event           VARCHAR,
+  ts              TIMESTAMP,
+  ok              BOOLEAN,
+  ms              BIGINT,
+  detail          JSON,
+  source_file     VARCHAR
+);
+
+-- The change catalog for those three, as `indexed_files` is for JSONL: a debug log or
+-- mod-events chunk per file, the classifier mod's records per session directory.
 CREATE TABLE IF NOT EXISTS telemetry_files (
   source          VARCHAR,
   path            VARCHAR,

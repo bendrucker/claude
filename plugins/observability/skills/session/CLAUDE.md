@@ -35,7 +35,9 @@ The per-file delete-then-insert (instead of the previous whole-table `CREATE OR 
 
 `views.sql` (which also rebuilds the `content_items` table) runs after the host loop whenever `raw` changed, and additionally whenever its SHA-256 differs from `index_meta.views_hash`, so editing a view definition takes effect on the next refresh even with no changed files. Cross-host joins key on `(host, session_id)`; the `content_items`/`messages` join keys on `(source_file, source_line)`, which is host-unique because imported files have distinct absolute paths.
 
-Two local-only sources sit beside the projects directory and are read by `telemetry.ts` after the host loop: debug logs (`debug/*.txt`, parsed in TypeScript into `debug_events`) and the classifier-telemetry mod's per-call records (`classifier-telemetry/<session>/*.json`, into `tool_verdicts`). Their catalog is `telemetry_files`, keyed per file for debug logs and per session directory for records. A session directory's key is its newest record's mtime and its records' total bytes, so an added or rewritten record changes it. Neither table derives from `raw`, so they never touch `views_hash`.
+Three local-only sources sit beside the projects directory and are read by `telemetry.ts` after the host loop: debug logs (`debug/*.txt`, parsed in TypeScript into `debug_events`), mod events (`mod-events/<session>/*.jsonl`, written by the mod-events plugin, into `mod_events`), and the classifier-telemetry mod's per-call records (`classifier-telemetry/<session>/*.json`, into `tool_verdicts`). Their catalog is `telemetry_files`, keyed per file for debug logs and mod events and per session directory for records. A session directory's key is its newest record's mtime and its records' total bytes, so an added or rewritten record changes it. None of the tables derives from `raw`, so they never touch `views_hash`.
+
+Debug logs and mod events carry a size cap (2 GB and 500 MB). After each sync, `prune` deletes the oldest files past the cap, choosing only among files whose catalog row matches the disk, so nothing is deleted before its rows land. Those two sources keep their rows when a file disappears, so their tables archive what the disk no longer holds. `tool_verdicts` still mirrors its directory.
 
 ### Refresh Entry Point
 
@@ -51,7 +53,7 @@ Only `raw` is durable, and within it only `data` plus the `(host, source_file, s
 
 The one case that still drops everything is a `raw` predating the `host`/`data` columns: its rows carry nothing the projection could be applied to.
 
-The index mirrors the disk rather than archiving it. Rows for a file deleted from disk are dropped on the next refresh, so `index-health`'s `indexed-not-on-disk` counts files awaiting that reap, not a surviving copy of anything.
+The transcript index mirrors the disk rather than archiving it. Rows for a JSONL file deleted from disk are dropped on the next refresh, so `index-health`'s `indexed-not-on-disk` counts files awaiting that reap, not a surviving copy of anything.
 
 ### JSON Path Gotcha
 

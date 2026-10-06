@@ -1,7 +1,9 @@
 import { readdirSync } from "node:fs";
+import { readdir, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { Database, ScannedFile } from "./db";
 import { CatalogRow, diffCatalog } from "./file-catalog";
+import { MiB, overCap } from "./retention";
 
 interface Entry {
   name: string;
@@ -65,19 +67,31 @@ export interface Source {
   scan(entries: Entry[], root: string): ScannedFile[] | Promise<ScannedFile[]>;
   import(db: Database, file: ScannedFile): Promise<void>;
   remove(db: Database, path: string): Promise<void>;
+  /** Bytes the source's files may total before the oldest indexed ones are deleted. */
+  cap?: number;
 }
+
+const keepRows = () => Promise.resolve();
+
+const fileOf = (path: string): ScannedFile => {
+  const file = Bun.file(path);
+  return { path, mtime: Math.trunc(file.lastModified), size: file.size };
+};
 
 function scanDebugLogs(entries: Entry[], root: string): ScannedFile[] {
   return entries
     .filter((entry) => entry.isFile() && entry.name.endsWith(".txt"))
-    .map((entry) => {
-      const file = Bun.file(join(root, entry.name));
-      return {
-        path: join(root, entry.name),
-        mtime: Math.trunc(file.lastModified),
-        size: file.size,
-      };
-    });
+    .map((entry) => fileOf(join(root, entry.name)));
+}
+
+function scanModEvents(entries: Entry[], root: string): ScannedFile[] {
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .flatMap((dir) =>
+      (listRoot(join(root, dir.name)) ?? [])
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))
+        .map((entry) => fileOf(join(root, dir.name, entry.name))),
+    );
 }
 
 // A session's records are one file each, so the directory is the unit of change. Its newest
@@ -103,6 +117,7 @@ function scanRecordDirs(entries: Entry[], root: string): ScannedFile[] {
 const debugLogs = (root: string, host: string): Source => ({
   name: "debug",
   root,
+  cap: 2048 * MiB,
   scan: scanDebugLogs,
   async import(db, file) {
     const events = parseDebugLog(await Bun.file(file.path).text());
@@ -121,9 +136,33 @@ const debugLogs = (root: string, host: string): Source => ({
       },
     );
   },
-  async remove(db, path) {
-    await db.run("DELETE FROM debug_events WHERE source_file = $path", { path });
+  remove: keepRows,
+});
+
+const modEvents = (root: string, host: string): Source => ({
+  name: "mod-events",
+  root,
+  cap: 500 * MiB,
+  scan: scanModEvents,
+  async import(db, file) {
+    await db.run("DELETE FROM mod_events WHERE source_file = $path", { path: file.path });
+    await db.run(
+      `INSERT INTO mod_events
+       SELECT $host, session, mod, event, make_timestamp_ms(ts), ok, ms, detail, $path
+       FROM read_json(
+         $path,
+         columns = {
+           ts: 'BIGINT', session: 'VARCHAR', mod: 'VARCHAR', event: 'VARCHAR',
+           ok: 'BOOLEAN', ms: 'BIGINT', detail: 'JSON'
+         },
+         format = 'newline_delimited',
+         ignore_errors = true
+       )
+       WHERE event IS NOT NULL`,
+      { host, path: file.path },
+    );
   },
+  remove: keepRows,
 });
 
 const callRecords = (root: string, host: string): Source => ({
@@ -227,8 +266,42 @@ export async function syncSource(db: Database, source: Source): Promise<number> 
 }
 
 /**
- * Indexes this machine's debug logs and classifier-telemetry records, which live beside
- * its projects directory. Returns how many files or record directories changed.
+ * Deletes the oldest files past the source's cap, among those indexed as they stand, and
+ * drops their catalog rows. The source's `remove` decides whether their rows stay.
+ */
+export async function prune(db: Database, source: Source): Promise<number> {
+  if (source.cap === undefined) return 0;
+  const entries = listRoot(source.root);
+  if (entries === undefined) return 0;
+  const scanned = await source.scan(entries, source.root);
+  const indexed = await db.query(
+    "SELECT path, mtime, size FROM telemetry_files WHERE source = $source",
+    CatalogRow,
+    { source: source.name },
+  );
+  const current = new Set(indexed.map((row) => `${row.path}\0${row.mtime}\0${row.size}`));
+  const doomed = overCap(scanned, source.cap, (file) =>
+    current.has(`${file.path}\0${file.mtime}\0${file.size}`),
+  );
+  for (const file of doomed) {
+    // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh, and each reap commits as its own transaction.
+    await rm(file.path, { force: true });
+    // oxlint-disable-next-line no-await-in-loop -- see above.
+    await reap(db, source, file.path);
+  }
+  const dirs = new Set(doomed.map((file) => dirname(file.path)).filter((d) => d !== source.root));
+  await Promise.all([...dirs].map(removeIfEmpty));
+  return doomed.length;
+}
+
+async function removeIfEmpty(dir: string): Promise<void> {
+  if ((await readdir(dir)).length === 0) await rm(dir, { recursive: true });
+}
+
+/**
+ * Indexes this machine's debug logs, mod events, and classifier-telemetry records, which
+ * live beside its projects directory, then prunes past each source's cap. Returns how many
+ * files or record directories changed.
  */
 export async function ensureTelemetry(
   db: Database,
@@ -239,10 +312,13 @@ export async function ensureTelemetry(
   let changed = 0;
   for (const source of [
     debugLogs(join(configDir, "debug"), host),
+    modEvents(join(configDir, "mod-events"), host),
     callRecords(join(configDir, "classifier-telemetry"), host),
   ]) {
     // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh.
     changed += await syncSource(db, source);
+    // oxlint-disable-next-line no-await-in-loop -- pruning reads the catalog the sync just wrote.
+    changed += await prune(db, source);
   }
   return changed;
 }

@@ -79,6 +79,7 @@ Additional queries in `resources/queries/`, aimed at the self-improvement loop r
 - `classifier`: Auto-mode classifier volume and latency, the permission stall on every dispatched call, the allow rules auto mode dropped, and which calls the engine routed to the classifier.
 - `hook-origin-split`: Hook wall-clock split between portable shared config and arbitrary per-repo project hooks.
 - `hook-self-timing`: Hook latency from the hooks' own clocks, read off `~/.claude/hook-metrics/*.jsonl` rather than the index.
+- `mods`: Whether each mod was live and healthy: the sessions it started in, the events it emitted, how many failed, and where the sessions were reached from.
 - `sandbox-path-deny-recurrence`: `Operation not permitted` and adjacent Bash failures bucketed into concrete sandbox config gaps, with recurrence and date span.
 - `stop-hook-noop-detector`: Stop hooks that cost wall-clock and produce nothing, ranked as removal candidates.
 - `tool-failure-rates`: Per-tool failure rates over calls that ran, with the failures grouped by normalized signature and dated so a fixed failure reads as stopped.

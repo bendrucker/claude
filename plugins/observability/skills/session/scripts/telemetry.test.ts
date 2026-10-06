@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 import { type Database, ensureIndex, ensureSchema, getDb, runQuery } from "./db";
-import { type Source, parseDebugLog, syncSource } from "./telemetry";
+import { MiB, overCap } from "./retention";
+import { type Source, parseDebugLog, prune, syncSource } from "./telemetry";
 
 const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 
@@ -111,9 +112,12 @@ describe("telemetry ingest", () => {
     const projectsDir = join(tmpDir, "claude", "projects");
     const debugDir = join(tmpDir, "claude", "debug");
     const recordsDir = join(tmpDir, "claude", "classifier-telemetry", "s1");
-    for (const dir of [projectsDir, debugDir, recordsDir]) mkdirSync(dir, { recursive: true });
+    const modEventsDir = join(tmpDir, "claude", "mod-events");
+    for (const dir of [projectsDir, debugDir, recordsDir, join(modEventsDir, "s1")]) {
+      mkdirSync(dir, { recursive: true });
+    }
     const reindex = () => ensureIndex(db, { projectsDir, importsDir: join(tmpDir, "imports") });
-    return { debugDir, recordsDir, reindex };
+    return { debugDir, recordsDir, modEventsDir, reindex };
   }
 
   const stall = (ms: number) =>
@@ -121,7 +125,7 @@ describe("telemetry ingest", () => {
   const record = (id: string) =>
     JSON.stringify({ session_id: "s1", tool_use_id: id, tool: "Bash", decision: "ask" });
 
-  it("follows a debug log as it grows and is deleted", async () => {
+  it("follows a debug log as it grows, and keeps its rows once it is deleted", async () => {
     const { debugDir, reindex } = layout();
     const log = join(debugDir, "s1.txt");
 
@@ -135,7 +139,53 @@ describe("telemetry ingest", () => {
 
     await rm(log);
     await reindex();
-    expect(await count("SELECT COUNT(*) AS n FROM debug_events")).toBe(0);
+    expect(await count("SELECT COUNT(*) AS n FROM debug_events")).toBe(2);
+    expect(await count("SELECT COUNT(*) AS n FROM telemetry_files WHERE source = 'debug'")).toBe(0);
+  });
+
+  it("indexes each mod-events chunk as it grows", async () => {
+    const { modEventsDir, reindex } = layout();
+    const chunk = join(modEventsDir, "s1", "herdr.1000.0.jsonl");
+    const line = (event: string, ok: boolean) =>
+      `${JSON.stringify({ ts: 1_791_304_406_845, session: "s1", mod: "herdr", event, ok, ms: 12, detail: { exitCode: ok ? 0 : 1 } })}\n`;
+
+    await Bun.write(chunk, line("session.start", true));
+    await reindex();
+    await Bun.write(chunk, `${line("session.start", true)}${line("herdr.call", false)}{"ts":1,`);
+    await reindex();
+
+    const rows = await db.query(
+      "SELECT session_id, mod, event, ok, ms, detail->>'exitCode' AS exit_code, source_file FROM mod_events ORDER BY event",
+      z.object({
+        session_id: z.string(),
+        mod: z.string(),
+        event: z.string(),
+        ok: z.boolean(),
+        ms: z.bigint(),
+        exit_code: z.string(),
+        source_file: z.string(),
+      }),
+    );
+    expect(rows).toEqual([
+      {
+        session_id: "s1",
+        mod: "herdr",
+        event: "herdr.call",
+        ok: false,
+        ms: 12n,
+        exit_code: "1",
+        source_file: chunk,
+      },
+      {
+        session_id: "s1",
+        mod: "herdr",
+        event: "session.start",
+        ok: true,
+        ms: 12n,
+        exit_code: "0",
+        source_file: chunk,
+      },
+    ]);
   });
 
   it("picks up records added to a session directory", async () => {
@@ -213,5 +263,140 @@ describe("syncSource", () => {
     const Count = z.object({ n: z.bigint() });
     const [row] = await db.query("SELECT COUNT(*) AS n FROM telemetry_files", Count);
     expect(Number(row?.n)).toBe(0);
+  });
+});
+
+describe("mods query", () => {
+  it("reports each mod's events with the surface on the heartbeat", async () => {
+    const projectsDir = join(tmpDir, "claude", "projects");
+    const sessionDir = join(tmpDir, "claude", "mod-events", "s1");
+    for (const dir of [projectsDir, sessionDir]) mkdirSync(dir, { recursive: true });
+    const jsonl = (...events: object[]) => events.map((e) => `${JSON.stringify(e)}\n`).join("");
+    const at = { ts: 1_791_304_406_845, session: "s1" };
+    await Bun.write(
+      join(sessionDir, "mod-events.1.0.jsonl"),
+      jsonl({
+        ...at,
+        mod: "mod-events",
+        event: "session.start",
+        ok: true,
+        ms: null,
+        detail: { surface: "mosh" },
+      }),
+    );
+    await Bun.write(
+      join(sessionDir, "herdr.1.0.jsonl"),
+      jsonl(
+        { ...at, mod: "herdr", event: "session.start", ok: true, ms: null, detail: {} },
+        { ...at, mod: "herdr", event: "herdr.call", ok: true, ms: 10, detail: {} },
+        { ...at, mod: "herdr", event: "herdr.call", ok: false, ms: 30, detail: {} },
+      ),
+    );
+    await ensureIndex(db, { projectsDir, importsDir: join(tmpDir, "imports") });
+
+    const rows = await runQuery(
+      db,
+      "mods",
+      z.object({
+        mod: z.string(),
+        event: z.string(),
+        sessions: z.bigint(),
+        events: z.bigint(),
+        failed: z.bigint(),
+        p50_ms: z.number().nullable(),
+        surfaces: z.string().nullable(),
+      }),
+      { after_date: null, before_date: null, host: null },
+    );
+    expect(
+      rows.map((r) =>
+        [r.mod, r.event, r.sessions, r.events, r.failed, r.p50_ms, r.surfaces].join(" | "),
+      ),
+    ).toMatchInlineSnapshot(`
+      [
+        "herdr | herdr.call | 1 | 2 | 1 | 20 | ",
+        "herdr | session.start | 1 | 1 | 0 |  | ",
+        "mod-events | session.start | 1 | 1 | 0 |  | {"mosh":1}",
+      ]
+    `);
+  });
+});
+
+describe("overCap", () => {
+  const file = (name: string, mtime: number, size: number) => ({ path: name, mtime, size });
+
+  it.each([
+    {
+      name: "nothing under the cap",
+      files: [file("a", 1, 4), file("b", 2, 4)],
+      cap: 8,
+      doomed: [],
+    },
+    {
+      name: "the oldest first",
+      files: [file("new", 3, 4), file("old", 1, 4), file("mid", 2, 4)],
+      cap: 8,
+      doomed: ["old"],
+    },
+    {
+      name: "as many as it takes",
+      files: [file("a", 1, 4), file("b", 2, 4), file("c", 3, 4)],
+      cap: 3,
+      doomed: ["a", "b", "c"],
+    },
+    {
+      name: "a big old file alone",
+      files: [file("big", 1, 10), file("small", 2, 1)],
+      cap: 5,
+      doomed: ["big"],
+    },
+    {
+      name: "past one it may not delete",
+      files: [file("pinned", 1, 4), file("a", 2, 4), file("b", 3, 4)],
+      cap: 4,
+      doomed: ["a", "b"],
+    },
+  ])("deletes $name", ({ files, cap, doomed }) => {
+    expect(overCap(files, cap, (f) => f.path !== "pinned").map((f) => f.path)).toEqual(doomed);
+  });
+});
+
+describe("prune", () => {
+  const AGES: Record<string, number> = { unindexed: 0, old: 1, mid: 2, new: 3 };
+
+  function sourceOf(root: string, cap: number): Source {
+    return {
+      name: "capped",
+      root,
+      cap,
+      scan: (entries) =>
+        entries.map((entry) => ({
+          path: join(root, entry.name),
+          mtime: AGES[entry.name] ?? 0,
+          size: Bun.file(join(root, entry.name)).size,
+        })),
+      import: () => Promise.resolve(),
+      remove: () => Promise.resolve(),
+    };
+  }
+
+  it("deletes the oldest indexed files past the cap and leaves unindexed ones", async () => {
+    await ensureSchema(db);
+    const root = join(tmpDir, "capped");
+    mkdirSync(root);
+    const source = sourceOf(root, 2 * MiB + 1);
+    await Promise.all(
+      ["old", "mid", "new"].map((name) => Bun.write(join(root, name), "x".repeat(MiB))),
+    );
+    await syncSource(db, source);
+    await Bun.write(join(root, "unindexed"), "y");
+
+    expect(await prune(db, source)).toBe(1);
+    expect(readdirSync(root).toSorted()).toEqual(["mid", "new", "unindexed"]);
+    const Path = z.object({ path: z.string() });
+    expect(await db.query("SELECT path FROM telemetry_files ORDER BY path", Path)).toEqual([
+      { path: join(root, "mid") },
+      { path: join(root, "new") },
+    ]);
   });
 });

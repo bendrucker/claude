@@ -124,6 +124,11 @@
       "source": "./plugins/mermaid"
     },
     {
+      "name": "mod-events",
+      "description": "Structured event log for mods: `$.modEvents.emit` writes per-session JSONL that the session index ingests as `mod_events`",
+      "source": "./plugins/mod-events"
+    },
+    {
       "name": "tech-spec",
       "description": "Create and review technical specifications",
       "source": "./plugins/tech-spec"

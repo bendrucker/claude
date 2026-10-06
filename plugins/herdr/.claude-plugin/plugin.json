@@ -1,6 +1,7 @@
 {
   "name": "herdr",
   "description": "Drive the herdr terminal workspace manager: panes, tabs, workspaces, and sibling coding agents",
+  "dependencies": ["mod-events"],
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

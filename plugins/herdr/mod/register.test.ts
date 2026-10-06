@@ -1,5 +1,6 @@
 import type { On } from "claude-code";
 import { describe, expect, mock, test, type Engine } from "claude-code/testing";
+import type { ModEventsInput } from "../../mod-events/types";
 
 const HERDR = { HERDR_ENV: "1", HERDR_PANE_ID: "w1:p1" };
 
@@ -16,7 +17,16 @@ const COMPLETE = {
 function herdrOf(on: On, env: Record<string, string>, exitCode: number | Error = 0) {
   const calls: string[] = [];
   const logs: string[] = [];
+  const events: ModEventsInput[] = [];
   const clock = mock.clock(on);
+  on("engine.create", async ($, e, next) => ({
+    ...(await next(e)),
+    modEvents: { emit: () => Promise.resolve() },
+  }));
+  on("modEvents.emit", ($, e) => {
+    events.push(e);
+    return { value: undefined };
+  });
   mock.env(on, env);
   on("session.start", ($, e) => ({ cwd: e.cwd }));
   on("turn.start", ($, e) => ({ turnId: e.turnId }));
@@ -32,7 +42,7 @@ function herdrOf(on: On, env: Record<string, string>, exitCode: number | Error =
     if (exitCode instanceof Error) throw exitCode;
     return { value: { exitCode, stdout: "", stderr: exitCode === 0 ? "" : "pane_not_found\n" } };
   });
-  return { calls, logs, clock };
+  return { calls, logs, events, clock };
 }
 
 const end = ($: Engine) =>
@@ -86,16 +96,48 @@ describe("register", () => {
     ]);
   });
 
-  test("a failed report goes to the debug log", async ($, on) => {
+  test("records the heartbeat and each call's result", async ($, on) => {
+    const herdr = herdrOf(on, HERDR);
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+
+    expect(herdr.events).toEqual([
+      { mod: "herdr", event: "session.start", detail: { isHosted: true } },
+      {
+        mod: "herdr",
+        event: "herdr.call",
+        ok: true,
+        ms: 0,
+        detail: { command: "report-agent", args: ["--state", "idle"], exitCode: 0, stderr: "" },
+      },
+    ]);
+  });
+
+  test("a failed report records herdr's exit code and stderr", async ($, on) => {
     const herdr = herdrOf(on, HERDR, 1);
 
     await $.session.start(START);
     await herdr.clock.settle();
 
     expect(herdr.logs).toEqual(["herdr report-agent failed: pane_not_found"]);
+    expect(herdr.events.filter((e) => e.event === "herdr.call")).toEqual([
+      {
+        mod: "herdr",
+        event: "herdr.call",
+        ok: false,
+        ms: 0,
+        detail: {
+          command: "report-agent",
+          args: ["--state", "idle"],
+          exitCode: 1,
+          stderr: "pane_not_found",
+        },
+      },
+    ]);
   });
 
-  test("a herdr that cannot start goes to the debug log", async ($, on) => {
+  test("a herdr that cannot start records the error", async ($, on) => {
     const herdr = herdrOf(on, HERDR, new Error("ENOENT"));
 
     await $.session.start(START);
@@ -105,6 +147,14 @@ describe("register", () => {
     expect(herdr.logs.map((line) => line.split(":")[0])).toEqual([
       "herdr report-agent failed",
       "herdr release-agent failed",
+    ]);
+    expect(
+      herdr.events
+        .filter((e) => e.event === "herdr.call")
+        .map((e) => [e.ok, e.detail?.command, typeof e.detail?.error]),
+    ).toEqual([
+      [false, "report-agent", "string"],
+      [false, "release-agent", "string"],
     ]);
   });
 

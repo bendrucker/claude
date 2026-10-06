@@ -1,5 +1,6 @@
 import type { On } from "claude-code";
 import { describe, expect, test, type Engine } from "claude-code/testing";
+import type { ModEventsInput } from "../../mod-events/types";
 import { commands, pick } from "./register.tsx";
 
 const PLUGIN = "run-command";
@@ -12,8 +13,18 @@ const REPLY = {
 const SHELL = { isDraft: false, isWorking: false, hint: "! for shell mode" };
 const IDLE = { isDraft: false, isWorking: false, hint: "? for shortcuts" };
 
-function core(on: On): string[] {
+function core(on: On, events: ModEventsInput[] = []): string[] {
   const fills: string[] = [];
+  on("engine.create", async ($, e, next) => ({
+    ...(await next(e)),
+    modEvents: { emit: () => Promise.resolve() },
+  }));
+  on("modEvents.emit", ($, e) => {
+    events.push(e);
+    return { value: undefined };
+  });
+  on("session.start", ($, e) => ({ cwd: e.cwd }));
+  on("prompt.edit", ($, e) => ({ text: e.inputText, cursor: e.inputText.length }));
   on("ui.render", ($, e) => {
     const { Text } = $.ui.resolve(e);
     return <Text>{e.component}</Text>;
@@ -114,5 +125,35 @@ describe("register", () => {
     });
     await hint($, SHELL);
     expect(await (await band($)).findAll({ type: "Button" })).toHaveLength(0);
+  });
+
+  test("records the heartbeat, each list shown, and each pick with its source", async ($, on) => {
+    const events: ModEventsInput[] = [];
+    core(on, events);
+    await $.session.start({ surface: "terminal", isInteractive: true, cwd: "/work" });
+    const message = await reply($);
+    await hint($, SHELL);
+    await band($);
+    await band($);
+    await $.prompt.edit({
+      origin: { kind: "composer" },
+      text: "",
+      cursor: 0,
+      start: 0,
+      end: 0,
+      inputText: "2",
+    });
+    await message.press({ key: "run-command:0:git status --short" });
+
+    expect(events).toEqual([
+      { mod: "run-command", event: "session.start" },
+      { mod: "run-command", event: "list.shown", detail: { count: 2 } },
+      { mod: "run-command", event: "pick", detail: { command: "wt list", source: "digit" } },
+      {
+        mod: "run-command",
+        event: "pick",
+        detail: { command: "git status --short", source: "click" },
+      },
+    ]);
   });
 });

@@ -4,6 +4,7 @@ Records each tool call's permission verdict and wall time, so auto-mode classifi
 
 ## Hooks
 
+- `session.start`: emits a heartbeat through [`mod-events`](../mod-events), which it depends on.
 - `tool.check`: keeps the engine's verdict (`allow`, `ask`, `deny`) and the deciding rule for the call.
 - `tool.call`: times the call and writes one record to `~/.claude/classifier-telemetry/<session>/<tool_use_id>.json`, which the `observability:session` index reads into `tool_verdicts`.
 

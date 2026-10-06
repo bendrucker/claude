@@ -5,7 +5,7 @@ Drive the [herdr](https://herdr.dev) terminal workspace manager from a session r
 ## Contents
 
 - **Skill**: [`herdr`](skills/herdr) drives workspaces, tabs, and panes, and hands whole tasks to coding agents running in other panes
-- **Mod**: [`register.ts`](mod/register.ts) reports the session's lifecycle to its herdr pane from engine events, when function hooks are enabled (`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`)
+- **Mod**: [`register.ts`](mod/register.ts) reports the session's lifecycle to its herdr pane from engine events and records each herdr call's exit code and stderr through [`mod-events`](../mod-events), when function hooks are enabled (`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`)
 
 ## Tests
 

@@ -1,5 +1,6 @@
 import type { On, ToolCallResult } from "claude-code";
 
+const MOD = "classifier-telemetry";
 const DIR = ".claude/classifier-telemetry";
 
 interface Verdict {
@@ -37,6 +38,13 @@ function outcomeOf(result: ToolCallResult): CallRecord["outcome"] {
 export function register(on: On): void {
   const verdicts = new Map<string, Verdict>();
 
+  on("session.start", async ($, e, next) => {
+    const started = await next(e);
+    void $.modEvents.emit({ mod: MOD, event: "session.start" });
+    return started;
+  });
+
+  // Both hooks only observe, so a failure lets the call go on as the engine settled it.
   on("tool.check", async ($, e, next) => {
     const verdict = await next(e);
     if (e.tool_use_id !== undefined) {
@@ -48,7 +56,7 @@ export function register(on: On): void {
       });
     }
     return verdict;
-  });
+  }).catch(($, e, next) => next(e));
 
   on("tool.call", async ($, e, next) => {
     const startedAt = await $.clock.now();
@@ -89,5 +97,5 @@ export function register(on: On): void {
       // A lost record must not fail a call that already ran.
     }
     return result;
-  });
+  }).catch(($, e, next) => next(e));
 }

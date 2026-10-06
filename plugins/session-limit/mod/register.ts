@@ -17,9 +17,10 @@ export function register(on: On): void {
 
     const { value: prev = {} } = await $.state.get(ANNOUNCED);
     const { announced, crossings } = evaluate(e.rateLimits, prev, await $.clock.now());
-    await $.state.set(ANNOUNCED, announced);
 
-    if (crossings.length > 0) {
+    if (crossings.length === 0) {
+      await $.state.set(ANNOUNCED, announced);
+    } else {
       const text = crossings.map((crossing) => crossing.message).join("\n\n");
       const outcome = await $.session
         .append({ message: { type: "user", content: [{ type: "text", text }] } })
@@ -31,6 +32,8 @@ export function register(on: On): void {
           }),
           (error: unknown) => ({ ok: false, uuid: null, error: String(error) }),
         );
+      // A refused append leaves the bands unannounced so the next measurement retries.
+      if (outcome.ok) await $.state.set(ANNOUNCED, announced);
       void $.modEvents.emit({
         mod: MOD,
         event: "inject",

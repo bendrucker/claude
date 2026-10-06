@@ -112,28 +112,15 @@ describe("register", () => {
     ]);
   });
 
-  test("records each band once as it is crossed", async ($, on) => {
-    const world = worldOf(on);
-    await measure($, limits(90));
-    await measure($, limits(91));
-    await measure($, limits(95, 95));
-    const bands = (five: number, seven: number) => ({
-      five_hour: { band: five, resetsAt: FIVE_RESETS },
-      seven_day: { band: seven, resetsAt: SEVEN_RESETS },
-    });
-    expect(world.announced).toEqual([bands(90, 0), bands(90, 0), bands(95, 95)]);
-  });
-
   test("emits session.start", async ($, on) => {
     const world = worldOf(on);
     await $.session.start({ surface: "terminal", isInteractive: true, cwd: "/work" });
     expect(world.events).toEqual([{ mod: "session-limit", event: "session.start" }]);
   });
 
-  // The kit cannot answer a plugin's own $.session.append, so this covers the rejected path.
-  test("logs each injection with the bands it carried", async ($, on) => {
+  // The kit cannot answer a plugin's own $.session.append, so these cover the refused path.
+  test("logs a refused injection with the bands it carried", async ($, on) => {
     const world = worldOf(on);
-    await measure($, limits(42));
     await measure($, limits(95, 95));
     expect(world.events).toEqual([
       {
@@ -149,6 +136,18 @@ describe("register", () => {
           error: "HooksError: no implementation for session.append",
         },
       },
+    ]);
+  });
+
+  test("leaves a refused band unannounced so the next measurement retries", async ($, on) => {
+    const world = worldOf(on);
+    await measure($, limits(42));
+    await measure($, limits(90));
+    await measure($, limits(91));
+    expect(world.announced).toHaveLength(1);
+    expect(world.events.map((event) => JSON.stringify(event))).toEqual([
+      expect.stringContaining('"percentUsed":90'),
+      expect.stringContaining('"percentUsed":91'),
     ]);
   });
 

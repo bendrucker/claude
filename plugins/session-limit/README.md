@@ -23,7 +23,7 @@ Function hooks are early access. Set `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` in th
 /plugin install session-limit --marketplace bendrucker/claude
 ```
 
-Off a subscription the session's rate-limit list is empty, so the mod stays idle.
+Off a subscription the session's rate-limit list is empty. The mod stays idle there.
 
 ## Tests
 

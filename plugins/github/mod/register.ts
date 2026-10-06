@@ -1,6 +1,6 @@
 import type { EngineInterface, On, Timer } from "claude-code";
 import {
-  type Decision,
+  type Promoted,
   type Snapshot,
   VIEW_FIELDS,
   decide,
@@ -29,6 +29,7 @@ interface Watch {
   flagged: boolean;
   error: string | undefined;
   timer: Timer | undefined;
+  generation: number;
   isStopped: boolean;
 }
 
@@ -58,17 +59,25 @@ async function readPr($: EngineInterface): Promise<Read> {
   return { kind: "pr", snapshot: snapshotOf(parsed) };
 }
 
-async function inject($: EngineInterface, snapshot: Snapshot, promoted: Decision[]): Promise<void> {
+async function inject(
+  $: EngineInterface,
+  snapshot: Snapshot,
+  promoted: Promoted[],
+): Promise<boolean> {
   const text = messageOf(snapshot, promoted);
   const kinds = promoted.map((d) => d.kind);
   const detail = { pr: snapshot.pr, head: snapshot.head, kinds, chars: text.length };
   try {
     const result = await $.prompt.submit({ text });
-    if ("drop" in result && result.drop !== undefined) {
+    if (result.drop !== undefined) {
       emit($, "inject", { ...detail, dropped: result.drop }, false);
-    } else emit($, "inject", detail);
+      return false;
+    }
+    emit($, "inject", detail);
+    return true;
   } catch (error) {
     emit($, "inject", { ...detail, error: String(error) }, false);
+    return false;
   }
 }
 
@@ -78,8 +87,6 @@ function delayOf(snapshot: Snapshot): number {
 }
 
 async function apply($: EngineInterface, watch: Watch, read: Read): Promise<number> {
-  // A session.end that landed while gh ran has already cleared the status.
-  if (watch.isStopped) return POLL_MS.idle;
   if (read.kind === "none") {
     if (watch.snapshot !== undefined) $.ui.status(undefined);
     watch.snapshot = undefined;
@@ -96,33 +103,36 @@ async function apply($: EngineInterface, watch: Watch, read: Read): Promise<numb
     for (const { action, ...detail } of decisions) {
       emit($, action, { pr: next.pr, head: next.head, ...detail });
     }
-    const promoted = decisions.filter((d) => d.action === "promote");
-    if (decisions.length > 0) watch.flagged = promoted.length > 0;
-    if (promoted.length > 0) await inject($, next, promoted);
+    const promoted = decisions.filter((d): d is Promoted => d.action === "promote");
+    if (promoted.length > 0) watch.flagged = await inject($, next, promoted);
+    else if (decisions.length > 0) watch.flagged = false;
   }
   watch.snapshot = next;
   $.ui.status(statusOf(next, watch.flagged));
   return delayOf(next);
 }
 
-async function poll($: EngineInterface, watch: Watch): Promise<void> {
-  if (watch.isStopped) return;
+async function poll($: EngineInterface, watch: Watch, generation: number): Promise<void> {
+  const isCurrent = () => !watch.isStopped && watch.generation === generation;
+  if (!isCurrent()) return;
   let delay: number;
   try {
-    delay = await apply($, watch, await readPr($));
+    const read = await readPr($);
+    // A session.end that landed while gh ran has already cleared the status.
+    if (!isCurrent()) return;
+    delay = await apply($, watch, read);
     watch.error = undefined;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message !== watch.error) emit($, "poll.error", { error: message }, false);
     watch.error = message;
     delay = POLL_MS.error;
+    if (watch.snapshot !== undefined && isCurrent()) {
+      $.ui.status(`${statusOf(watch.snapshot, watch.flagged)} · stale`);
+    }
   }
-  schedule($, watch, delay);
-}
-
-function schedule($: EngineInterface, watch: Watch, delay: number): void {
-  if (watch.isStopped) return;
-  watch.timer = $.clock.after(delay, () => void poll($, watch));
+  if (!isCurrent()) return;
+  watch.timer = $.clock.after(delay, () => void poll($, watch, generation));
 }
 
 async function hasGh($: EngineInterface): Promise<boolean> {
@@ -145,6 +155,7 @@ export function register(on: On): void {
     flagged: false,
     error: undefined,
     timer: undefined,
+    generation: 0,
     isStopped: true,
   };
 
@@ -161,7 +172,8 @@ export function register(on: On): void {
     emit($, "session.start", { active: true });
     if (watch.isStopped) {
       watch.isStopped = false;
-      void poll($, watch);
+      watch.generation += 1;
+      void poll($, watch, watch.generation);
     }
     return started;
   });

@@ -1,7 +1,12 @@
 import type { On } from "claude-code";
 import { describe, expect, mock, test } from "claude-code/testing";
-import type { ModEventsInput } from "../../mod-events/types";
 import { POLL_MS } from "./register.ts";
+
+interface Recorded {
+  event: string;
+  ok?: boolean;
+  detail?: Readonly<Record<string, unknown>>;
+}
 
 const START = { surface: "terminal", isInteractive: true, cwd: "/work" } as const;
 
@@ -29,10 +34,11 @@ interface World {
   gh: { exitCode: number; stdout: string; stderr: string } | Error;
   view: unknown;
   slowMs?: number;
+  drop?: string;
 }
 
 function worldOf(on: On, world: World) {
-  const events: ModEventsInput[] = [];
+  const events: Recorded[] = [];
   const statuses: (string | undefined)[] = [];
   const submits: string[] = [];
   const views: string[] = [];
@@ -54,7 +60,7 @@ function worldOf(on: On, world: World) {
   });
   on("prompt.submit", ($, e) => {
     submits.push(e.text);
-    return { text: e.text };
+    return world.drop === undefined ? { text: e.text } : { drop: world.drop };
   });
   on("process.run", async ($, e) => {
     const argv = e.argv.join(" ");
@@ -229,5 +235,44 @@ describe("register", () => {
 
     expect(w.views.length).toBe(1);
     expect(w.statuses).toEqual([undefined]);
+  });
+
+  test("a restart while a poll is in flight leaves one poll chain", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr(""), slowMs: 10_000 });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.session.end({ reason: "other", sessionId: "s1", resume: { id: "s1" } });
+    await $.session.start(START);
+    await w.clock.advance(10_000 + POLL_MS.pending);
+
+    expect(w.views.length).toBe(3);
+  });
+
+  test("an injection the engine drops is logged and not shown as sent", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr(""), drop: "busy" };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = pr("FAILURE");
+    await w.clock.advance(POLL_MS.pending);
+
+    expect(w.named("inject")[0]).toEqual(
+      expect.objectContaining({ ok: false, detail: expect.objectContaining({ dropped: "busy" }) }),
+    );
+    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✗ ci / test");
+  });
+
+  test("a failing poll marks the last status stale", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = "HTTP 401: Bad credentials";
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✓ · stale");
   });
 });

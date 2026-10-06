@@ -13,6 +13,8 @@ Show rate-limit usage in the status line, and steer the model to wind down befor
 | 5-hour | 100% | Stop after in-flight work. Schedule a wake-up if the reset is under an hour out, otherwise tell the user when to return |
 | 7-day | 95% | Minimize spend until the weekly reset |
 
+Every append is logged through [`mod-events`](../mod-events/README.md) as an `inject` event carrying the bands crossed and the stored row's id, or the error when the append was refused.
+
 ## Setup
 
 Function hooks are early access. Set `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` in the environment or the `env` block of `~/.claude/settings.json`, then install the plugin:

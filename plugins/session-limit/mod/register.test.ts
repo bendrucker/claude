@@ -14,18 +14,28 @@ function limits(fivePct: number, sevenPct = 0, fiveResets = FIVE_RESETS): Sessio
 }
 
 interface World {
+  events: unknown[];
   announced: unknown[];
   statuses: (string | undefined)[];
 }
 
 function worldOf(on: On, now = NOW): World {
-  const world: World = { announced: [], statuses: [] };
+  const world: World = { events: [], announced: [], statuses: [] };
   mock.clock(on, { now });
+  on("engine.create", async ($, e, next) => ({
+    ...(await next(e)),
+    modEvents: { emit: () => Promise.resolve() },
+  }));
+  on("modEvents.emit", ($, e) => {
+    world.events.push(e);
+    return { value: undefined };
+  });
   on("ui.status", ($, e) => {
     world.statuses.push(e.text);
     return { value: undefined };
   });
   on("session.measure", ($, e) => ({ changed: e.changed }));
+  on("session.start", ($, e) => ({ cwd: e.cwd }));
   on("state.set", ($, e, next) => {
     world.announced.push(e.value);
     return next(e);
@@ -112,6 +122,34 @@ describe("register", () => {
       seven_day: { band: seven, resetsAt: SEVEN_RESETS },
     });
     expect(world.announced).toEqual([bands(90, 0), bands(90, 0), bands(95, 95)]);
+  });
+
+  test("emits session.start", async ($, on) => {
+    const world = worldOf(on);
+    await $.session.start({ surface: "terminal", isInteractive: true, cwd: "/work" });
+    expect(world.events).toEqual([{ mod: "session-limit", event: "session.start" }]);
+  });
+
+  // The kit cannot answer a plugin's own $.session.append, so this covers the rejected path.
+  test("logs each injection with the bands it carried", async ($, on) => {
+    const world = worldOf(on);
+    await measure($, limits(42));
+    await measure($, limits(95, 95));
+    expect(world.events).toEqual([
+      {
+        mod: "session-limit",
+        event: "inject",
+        ok: false,
+        detail: {
+          crossings: [
+            { kind: "five_hour", threshold: 95, percentUsed: 95, resetsAt: FIVE_RESETS },
+            { kind: "seven_day", threshold: 95, percentUsed: 95, resetsAt: SEVEN_RESETS },
+          ],
+          uuid: null,
+          error: "HooksError: no implementation for session.append",
+        },
+      },
+    ]);
   });
 
   test("ignores measurements where rate limits did not move", async ($, on) => {

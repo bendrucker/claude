@@ -1,0 +1,219 @@
+import type { On } from "claude-code";
+import { describe, expect, mock, test } from "claude-code/testing";
+import type { ModEventsInput } from "../../mod-events/types";
+import { POLL_MS } from "./register.ts";
+
+const START = { surface: "terminal", isInteractive: true, cwd: "/work" } as const;
+
+const check = (conclusion: string) => ({
+  __typename: "CheckRun",
+  workflowName: "ci",
+  name: "test",
+  status: conclusion === "" ? "IN_PROGRESS" : "COMPLETED",
+  conclusion,
+  startedAt: "2026-10-06T10:00:00Z",
+});
+
+const pr = (conclusion: string, reviews: unknown[] = []) => ({
+  number: 7,
+  url: "https://github.com/o/r/pull/7",
+  state: "OPEN",
+  headRefOid: "aaaaaaa1111",
+  reviewDecision: "",
+  statusCheckRollup: [check(conclusion)],
+  reviews,
+});
+
+interface World {
+  branch: string;
+  gh: { exitCode: number; stdout: string; stderr: string } | Error;
+  view: unknown;
+}
+
+function worldOf(on: On, world: World) {
+  const events: ModEventsInput[] = [];
+  const statuses: (string | undefined)[] = [];
+  const submits: string[] = [];
+  const views: string[] = [];
+  const clock = mock.clock(on);
+  on("engine.create", async ($, e, next) => ({
+    ...(await next(e)),
+    modEvents: { emit: () => Promise.resolve() },
+  }));
+  on("modEvents.emit", ($, e) => {
+    events.push(e);
+    return { value: undefined };
+  });
+  on("session.start", ($, e) => ({ cwd: e.cwd }));
+  on("session.end", ($, e) => ({ sessionId: e.sessionId }));
+  on("session.cwd", () => ({ value: "/work" }));
+  on("ui.status", ($, e) => {
+    statuses.push(e.text);
+    return { value: undefined };
+  });
+  on("prompt.submit", ($, e) => {
+    submits.push(e.text);
+    return { text: e.text };
+  });
+  on("process.run", ($, e) => {
+    const argv = e.argv.join(" ");
+    if (argv.startsWith("git ")) {
+      return {
+        value: {
+          exitCode: 0,
+          stdout: `${world.branch}\n`,
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
+    if (argv === "gh --version") {
+      if (world.gh instanceof Error) throw world.gh;
+      return { value: { ...world.gh, isStdoutTruncated: false, isStderrTruncated: false } };
+    }
+    views.push(argv);
+    const stdout = typeof world.view === "string" ? "" : JSON.stringify(world.view);
+    const stderr = typeof world.view === "string" ? world.view : "";
+    return {
+      value: {
+        exitCode: stderr === "" ? 0 : 1,
+        stdout,
+        stderr,
+        isStdoutTruncated: false,
+        isStderrTruncated: false,
+      },
+    };
+  });
+  const named = (event: string) => events.filter((e) => e.event === event);
+  return { events, named, statuses, submits, views, clock };
+}
+
+const GH_OK = { exitCode: 0, stdout: "gh version 2.80.0\n", stderr: "" };
+
+describe("register", () => {
+  test("a new failure wakes the model once; the baseline and green stay quiet", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.named("pr.tracked")[0]?.detail).toEqual({
+      pr: 7,
+      head: "aaaaaaa1111",
+      phase: "pending",
+      state: "OPEN",
+    });
+    expect(w.statuses.at(-1)).toBe("PR #7 · CI 0/1");
+
+    world.view = pr("FAILURE");
+    await w.clock.advance(POLL_MS.pending);
+    expect(w.submits.length).toBe(1);
+    expect(w.submits[0]).toContain("CI failed on PR #7 at aaaaaaa: ci / test.");
+    expect(w.named("promote").map((e) => e.detail?.kind)).toEqual(["ci.failed"]);
+    expect(w.named("inject")[0]).toEqual(
+      expect.objectContaining({
+        ok: true,
+        detail: expect.objectContaining({ kinds: ["ci.failed"] }),
+      }),
+    );
+    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✗ ci / test → Claude");
+
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits.length).toBe(1);
+
+    world.view = pr("SUCCESS");
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits.length).toBe(1);
+    expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
+    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✓");
+  });
+
+  test("requested changes wake the model and a comment review does not", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = pr("SUCCESS", [
+      { id: "r1", state: "COMMENTED", author: { login: "greptile" } },
+      { id: "r2", state: "CHANGES_REQUESTED", author: { login: "alice" } },
+    ]);
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits.length).toBe(1);
+    expect(w.submits[0]).toContain("@alice requested changes on PR #7");
+    expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["review"]);
+  });
+
+  test("stays idle without gh", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: new Error("ENOENT"), view: pr("") });
+
+    await $.session.start(START);
+    await w.clock.advance(POLL_MS.idle * 3);
+
+    expect(w.named("session.start")[0]?.detail).toEqual({
+      active: false,
+      reason: "gh unavailable",
+    });
+    expect(w.views).toEqual([]);
+  });
+
+  test("a non-interactive session never polls", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("") });
+
+    await $.session.start({ ...START, isInteractive: false });
+    await w.clock.advance(POLL_MS.idle * 3);
+
+    expect(w.named("session.start")[0]?.detail).toEqual({
+      active: false,
+      reason: "non-interactive",
+    });
+    expect(w.views).toEqual([]);
+  });
+
+  test("the default branch skips gh, and a branch with no PR shows nothing", async ($, on) => {
+    const world: World = {
+      branch: "main",
+      gh: GH_OK,
+      view: 'no pull requests found for branch "topic"',
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.views).toEqual([]);
+
+    world.branch = "topic";
+    await w.clock.advance(POLL_MS.idle);
+    expect(w.views.length).toBe(1);
+    expect(w.statuses).toEqual([]);
+    expect(w.named("poll.error")).toEqual([]);
+  });
+
+  test("a repeated gh failure is logged once and backs off", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: "HTTP 502: Bad Gateway" };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.error);
+
+    expect(w.views.length).toBe(2);
+    expect(w.named("poll.error")).toEqual([
+      expect.objectContaining({ ok: false, detail: { error: "HTTP 502: Bad Gateway" } }),
+    ]);
+  });
+
+  test("session end stops the watch and clears the status", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.session.end({ reason: "prompt_input_exit", sessionId: "s1", resume: { id: "s1" } });
+    await w.clock.advance(POLL_MS.pending * 3);
+
+    expect(w.views.length).toBe(1);
+    expect(w.statuses.at(-1)).toBe(undefined);
+  });
+});

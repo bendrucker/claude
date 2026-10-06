@@ -55,6 +55,7 @@ export function register(on: On): void {
     try {
       chars = (await $.fs.read(e.file_path)).length;
     } catch {
+      $.ui.status(undefined);
       return result;
     }
 
@@ -62,7 +63,7 @@ export function register(on: On): void {
     const file = e.file_path.slice(e.file_path.lastIndexOf("/") + 1);
     $.ui.status(statusText(chars));
     const count: PlanCount = { file, chars, limit: LIMIT, over, tool: e.tool };
-    void $.modEvents.emit({ mod: "plan", event: "plan.count", detail: { ...count } });
+    await $.modEvents.emit({ mod: "plan", event: "plan.count", detail: { ...count } });
 
     const previous = wasOver.get(e.file_path) ?? false;
     wasOver.set(e.file_path, over);
@@ -73,7 +74,7 @@ export function register(on: On): void {
         limit: LIMIT,
         direction: over ? "over" : "under",
       };
-      void $.modEvents.emit({ mod: "plan", event: "plan.crossed", detail: { ...crossed } });
+      await $.modEvents.emit({ mod: "plan", event: "plan.crossed", detail: { ...crossed } });
     }
     return result;
   });

@@ -88,7 +88,7 @@ describe("register", () => {
     expect(world.status).toEqual([]);
   });
 
-  test("passes the result through when the file cannot be read", async ($, on) => {
+  test("clears the count when the file cannot be read", async ($, on) => {
     const world = worldOf(on);
     const result = await $.tool.call({
       tool: "Write",
@@ -97,7 +97,7 @@ describe("register", () => {
       tool_use_id: "t1",
     });
     expect(result.isError).not.toBe(true);
-    expect(world.status).toEqual([]);
+    expect(world.status).toEqual([undefined]);
   });
 
   test("clears the count once a plan is approved", async ($, on) => {

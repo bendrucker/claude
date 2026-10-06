@@ -13,9 +13,6 @@ interface World {
   clock: ReturnType<typeof mock.clock>;
 }
 
-/**
- * Stands in for the engine and the mod-events floor beneath the mod.
- */
 function worldOf(
   on: On,
   {

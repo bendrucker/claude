@@ -54,8 +54,6 @@ export const BANDS: Record<string, Band[]> = {
   ],
 };
 
-const LABELS: Record<string, string> = { five_hour: "5h", seven_day: "7d" };
-
 export function formatResetTime(resetsAt: string | undefined): string {
   if (resetsAt == null) return "at an unknown time";
   return new Date(resetsAt).toLocaleString([], {
@@ -63,13 +61,6 @@ export function formatResetTime(resetsAt: string | undefined): string {
     hour: "numeric",
     minute: "2-digit",
   });
-}
-
-export function statusText(limits: readonly SessionRateLimit[]): string | undefined {
-  const parts = limits
-    .filter((limit) => limit.kind in LABELS)
-    .map((limit) => `${LABELS[limit.kind]} ${Math.round(limit.percentUsed)}%`);
-  return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
 export function crossedBand(percentUsed: number, bands: readonly Band[]): Band | undefined {

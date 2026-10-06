@@ -1,5 +1,5 @@
 import type { On } from "claude-code";
-import { evaluate, statusText } from "./bands";
+import { evaluate } from "./bands";
 
 const MOD = "session-limit";
 const ANNOUNCED = { plugin: "session-limit", key: "announced" } as const;
@@ -12,8 +12,6 @@ export function register(on: On): void {
 
   on("session.measure", async ($, e, next) => {
     if (!e.changed.includes("rateLimits")) return next(e);
-
-    $.ui.status(statusText(e.rateLimits));
 
     const { value: prev = {} } = await $.state.get(ANNOUNCED);
     const { announced, crossings } = evaluate(e.rateLimits, prev, await $.clock.now());

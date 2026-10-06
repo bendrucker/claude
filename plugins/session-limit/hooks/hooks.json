@@ -1,4 +1,4 @@
 {
-  "description": "Mirrors rate-limit usage to the status line and appends usage guidance as a band is crossed",
+  "description": "Appends usage guidance as a rate-limit band is crossed",
   "modules": ["../mod/register.ts"]
 }

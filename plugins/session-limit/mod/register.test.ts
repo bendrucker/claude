@@ -1,6 +1,6 @@
 import type { On, SessionRateLimit, UsageUnit } from "claude-code";
 import { type Engine, describe, expect, mock, test } from "claude-code/testing";
-import { BANDS, crossedBand, evaluate, statusText } from "./bands";
+import { BANDS, crossedBand, evaluate } from "./bands";
 
 const FIVE_RESETS = "2026-10-06T21:00:00.000Z";
 const SEVEN_RESETS = "2026-10-12T06:00:00.000Z";
@@ -16,11 +16,10 @@ function limits(fivePct: number, sevenPct = 0, fiveResets = FIVE_RESETS): Sessio
 interface World {
   events: unknown[];
   announced: unknown[];
-  statuses: (string | undefined)[];
 }
 
 function worldOf(on: On, now = NOW): World {
-  const world: World = { events: [], announced: [], statuses: [] };
+  const world: World = { events: [], announced: [] };
   mock.clock(on, { now });
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
@@ -28,10 +27,6 @@ function worldOf(on: On, now = NOW): World {
   }));
   on("modEvents.emit", ($, e) => {
     world.events.push(e);
-    return { value: undefined };
-  });
-  on("ui.status", ($, e) => {
-    world.statuses.push(e.text);
     return { value: undefined };
   });
   on("session.measure", ($, e) => ({ changed: e.changed }));
@@ -57,12 +52,6 @@ describe("bands", () => {
     expect([94, 95, 100].map((pct) => crossedBand(pct, seven)?.threshold ?? 0)).toEqual([
       0, 95, 95,
     ]);
-  });
-
-  test("status line shows each known window, rounded", () => {
-    expect(statusText(limits(41.6, 13))).toBe("5h 42% · 7d 13%");
-    expect(statusText([{ kind: "spend_limit", percentUsed: 50 }])).toBeUndefined();
-    expect(statusText([])).toBeUndefined();
   });
 
   test("announces only the highest newly crossed band", () => {
@@ -100,10 +89,9 @@ describe("bands", () => {
 });
 
 describe("register", () => {
-  test("shows usage in the status line without announcing below the bands", async ($, on) => {
+  test("records the windows without announcing below the bands", async ($, on) => {
     const world = worldOf(on);
     await measure($, limits(42, 13));
-    expect(world.statuses).toEqual(["5h 42% · 7d 13%"]);
     expect(world.announced).toEqual([
       {
         five_hour: { band: 0, resetsAt: FIVE_RESETS },
@@ -154,13 +142,14 @@ describe("register", () => {
   test("ignores measurements where rate limits did not move", async ($, on) => {
     const world = worldOf(on);
     await measure($, limits(99), ["context"]);
-    expect(world.statuses).toEqual([]);
     expect(world.announced).toEqual([]);
+    expect(world.events).toEqual([]);
   });
 
-  test("clears the status line off a subscription", async ($, on) => {
+  test("stays idle off a subscription", async ($, on) => {
     const world = worldOf(on);
     await measure($, []);
-    expect(world.statuses).toEqual([undefined]);
+    expect(world.announced).toEqual([{}]);
+    expect(world.events).toEqual([]);
   });
 });

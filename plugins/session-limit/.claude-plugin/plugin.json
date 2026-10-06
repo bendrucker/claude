@@ -1,6 +1,6 @@
 {
   "name": "session-limit",
-  "description": "Show rate-limit usage in the status line and warn the model mid-turn as the 5-hour or 7-day limit nears",
+  "description": "Warn the model mid-turn as the 5-hour or 7-day limit nears",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

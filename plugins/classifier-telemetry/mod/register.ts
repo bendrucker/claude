@@ -56,16 +56,17 @@ export function register(on: On): void {
   on("tool.call", async ($, e, next) => {
     const key = keyOf(e.agentId, e.tool_use_id);
     const startedAt = await $.clock.now();
-    let result: ToolCallResult;
-    let verdict: Verdict | undefined;
+    let result: ToolCallResult | undefined;
+    let thrown: unknown;
     try {
       result = await next(e);
-    } finally {
-      verdict = verdicts.get(key);
-      verdicts.delete(key);
+    } catch (error) {
+      thrown = error;
     }
+    const verdict = verdicts.get(key);
+    verdicts.delete(key);
     const finishedAt = await $.clock.now();
-    const outcome = outcomeOf(result);
+    const outcome = result === undefined ? "throw" : outcomeOf(result);
     void $.modEvents.emit({
       mod: MOD,
       event: "tool.verdict",
@@ -85,6 +86,7 @@ export function register(on: On): void {
         outcome,
       },
     });
+    if (result === undefined) throw thrown;
     return result;
   });
 

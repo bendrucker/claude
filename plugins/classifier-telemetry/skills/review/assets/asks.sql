@@ -23,7 +23,7 @@ SELECT
   tool,
   reason_key,
   CASE WHEN tool = 'Bash' THEN split_part(bare, ' ', 1) END AS verb,
-  CASE WHEN tool = 'Bash' THEN regexp_matches(bare, '[|;&\n]|\$\(|<<') END AS compound,
+  CASE WHEN tool = 'Bash' THEN regexp_matches(command, '[|;&\n]|\$\(|<<') END AS compound,
   COUNT(*) AS asks,
   COUNT(DISTINCT session_id) AS sessions,
   list(DISTINCT left(command, 160)) FILTER (WHERE command IS NOT NULL)[1:3] AS samples

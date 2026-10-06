@@ -130,7 +130,7 @@ describe("register", () => {
     });
   }
 
-  test("a tool call that throws leaves no verdict for a later call", async ($, on) => {
+  test("records a tool call that throws, leaving no verdict for a later call", async ($, on) => {
     const world = worldOf(on, { failCalls: 1 });
     await $.tool.check({ tool: CALL.tool, input: {}, tool_use_id: CALL.tool_use_id });
     const failed = expect($.tool.call(CALL)).rejects.toThrow("no implementation for tool.call");
@@ -139,7 +139,10 @@ describe("register", () => {
 
     await settle(world, $.tool.call(CALL));
 
-    expect(world.events.map((e) => e.detail?.decision)).toEqual([null]);
+    expect(world.events.map((e) => [e.detail?.decision, e.detail?.outcome])).toEqual([
+      ["ask", "throw"],
+      [null, "ok"],
+    ]);
   });
 
   test("a call the check never saw records no verdict", async ($, on) => {

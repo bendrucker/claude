@@ -20,13 +20,23 @@ export const POLL_MS = {
   error: 300_000,
 } as const;
 
-const UNTRACKED_BRANCHES = new Set(["HEAD", "main", "master"]);
+// A dropped injection is retried on later polls, up to this many attempts.
+export const MAX_ATTEMPTS = 3;
+// Skipped when origin/HEAD is unset and the real default branch is unknown.
+const DEFAULT_BRANCHES = new Set(["main", "master"]);
 // /clear and /resume keep the process running, so the watch continues.
 const CONTINUING = new Set(["clear", "resume"]);
+
+interface Undelivered {
+  head: string;
+  decisions: Promoted[];
+  attempts: number;
+}
 
 interface Watch {
   snapshot: Snapshot | undefined;
   flagged: boolean;
+  undelivered: Undelivered | undefined;
   error: string | undefined;
   timer: { cancel(): void } | undefined;
   generation: number;
@@ -39,10 +49,20 @@ function emit($: EngineInterface, event: string, detail: Record<string, unknown>
   void $.modEvents.emit({ mod: MOD, event, ok, detail });
 }
 
+async function isDefaultBranch($: EngineInterface, cwd: string, branch: string): Promise<boolean> {
+  const origin = await $.process.run(
+    ["git", "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+    { cwd },
+  );
+  if (origin.exitCode !== 0) return DEFAULT_BRANCHES.has(branch);
+  return origin.stdout.trim() === `origin/${branch}`;
+}
+
 async function readPr($: EngineInterface): Promise<Read> {
   const cwd = await $.session.cwd();
-  const branch = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
-  if (branch.exitCode !== 0 || UNTRACKED_BRANCHES.has(branch.stdout.trim())) {
+  const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
+  const branch = head.stdout.trim();
+  if (head.exitCode !== 0 || branch === "HEAD" || (await isDefaultBranch($, cwd, branch))) {
     return { kind: "none" };
   }
   const view = await $.process.run(["gh", "pr", "view", "--json", VIEW_FIELDS], {
@@ -63,10 +83,11 @@ async function inject(
   $: EngineInterface,
   snapshot: Snapshot,
   promoted: Promoted[],
+  attempt: number,
 ): Promise<boolean> {
   const text = messageOf(snapshot, promoted);
   const kinds = promoted.map((d) => d.kind);
-  const detail = { pr: snapshot.pr, head: snapshot.head, kinds, chars: text.length };
+  const detail = { pr: snapshot.pr, head: snapshot.head, kinds, chars: text.length, attempt };
   try {
     const result = await $.prompt.submit({ text });
     if (result.drop !== undefined) {
@@ -81,6 +102,28 @@ async function inject(
   }
 }
 
+// What a dropped injection still has to say: failures only on the same head
+// and only for checks still failing, reviews only while the PR is open.
+function stillDue(undelivered: Undelivered | undefined, next: Snapshot): Promoted[] {
+  if (undelivered === undefined || next.state !== "OPEN") return [];
+  return undelivered.decisions.flatMap((decision): Promoted[] => {
+    if (decision.kind !== "ci.failed") return [decision];
+    if (undelivered.head !== next.head) return [];
+    const failed = decision.failed.filter((label) => next.failed.includes(label));
+    return failed.length > 0 ? [{ ...decision, failed }] : [];
+  });
+}
+
+function merge(carried: Promoted[], fresh: Promoted[]): Promoted[] {
+  const failed = [...carried, ...fresh].flatMap((d) => (d.kind === "ci.failed" ? d.failed : []));
+  const reviews = [...carried, ...fresh].filter((d) => d.kind !== "ci.failed");
+  if (failed.length === 0) return reviews;
+  return [
+    { action: "promote", kind: "ci.failed", failed: [...new Set(failed)].toSorted() },
+    ...reviews,
+  ];
+}
+
 function delayOf(snapshot: Snapshot): number {
   if (snapshot.state !== "OPEN") return POLL_MS.closed;
   return snapshot.phase === "pending" ? POLL_MS.pending : POLL_MS.settled;
@@ -91,6 +134,7 @@ async function apply($: EngineInterface, watch: Watch, read: Read): Promise<numb
     if (watch.snapshot !== undefined) $.ui.status(undefined);
     watch.snapshot = undefined;
     watch.flagged = false;
+    watch.undelivered = undefined;
     return POLL_MS.idle;
   }
   const next = read.snapshot;
@@ -98,14 +142,22 @@ async function apply($: EngineInterface, watch: Watch, read: Read): Promise<numb
   if (prev === undefined || prev.pr !== next.pr) {
     emit($, "pr.tracked", { pr: next.pr, head: next.head, phase: next.phase, state: next.state });
     watch.flagged = false;
+    watch.undelivered = undefined;
   } else {
     const decisions = decide(prev, next);
     for (const { action, ...detail } of decisions) {
       emit($, action, { pr: next.pr, head: next.head, ...detail });
     }
-    const promoted = decisions.filter((d): d is Promoted => d.action === "promote");
-    if (promoted.length > 0) watch.flagged = await inject($, next, promoted);
-    else if (decisions.length > 0) watch.flagged = false;
+    const fresh = decisions.filter((d): d is Promoted => d.action === "promote");
+    const due = merge(stillDue(watch.undelivered, next), fresh);
+    const attempt = fresh.length > 0 ? 1 : (watch.undelivered?.attempts ?? 0) + 1;
+    watch.undelivered = undefined;
+    if (due.length > 0) {
+      watch.flagged = await inject($, next, due, attempt);
+      if (!watch.flagged && attempt < MAX_ATTEMPTS) {
+        watch.undelivered = { head: next.head, decisions: due, attempts: attempt };
+      }
+    } else if (decisions.length > 0) watch.flagged = false;
   }
   watch.snapshot = next;
   $.ui.status(statusOf(next, watch.flagged));
@@ -153,6 +205,7 @@ export function register(on: On): void {
   const watch: Watch = {
     snapshot: undefined,
     flagged: false,
+    undelivered: undefined,
     error: undefined,
     timer: undefined,
     generation: 0,

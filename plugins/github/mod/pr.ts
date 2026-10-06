@@ -125,10 +125,21 @@ function outcomeOf(node: CheckNode): Outcome {
   return FAILED.has(node.conclusion ?? "") ? "failed" : "passed";
 }
 
+const LABEL_MAX = 80;
+
+// Any app with checks access names its checks, and the label reaches the model.
+function clean(text: string): string {
+  const flat = text
+    .replaceAll(/[\p{Cc}\u2028\u2029]/gu, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+  return flat.length > LABEL_MAX ? `${flat.slice(0, LABEL_MAX - 1)}…` : flat;
+}
+
 function labelOf(node: CheckNode): string {
-  if (node.__typename === "StatusContext") return node.context ?? "status";
+  if (node.__typename === "StatusContext") return clean(node.context ?? "status");
   const name = node.name ?? "check";
-  return node.workflowName ? `${node.workflowName} / ${name}` : name;
+  return clean(node.workflowName ? `${node.workflowName} / ${name}` : name);
 }
 
 // A rerun lists beside the run it replaces, so keep the latest start per label.
@@ -138,7 +149,7 @@ function latest(nodes: CheckNode[]): CheckNode[] {
   for (const node of nodes) {
     const label = labelOf(node);
     const held = byLabel.get(label);
-    if (held === undefined || (held.startedAt ?? "￿") <= (node.startedAt ?? "￿")) {
+    if (held === undefined || (held.startedAt ?? "\uFFFF") <= (node.startedAt ?? "\uFFFF")) {
       byLabel.set(label, node);
     }
   }

@@ -78,6 +78,8 @@ function delayOf(snapshot: Snapshot): number {
 }
 
 async function apply($: EngineInterface, watch: Watch, read: Read): Promise<number> {
+  // A session.end that landed while gh ran has already cleared the status.
+  if (watch.isStopped) return POLL_MS.idle;
   if (read.kind === "none") {
     if (watch.snapshot !== undefined) $.ui.status(undefined);
     watch.snapshot = undefined;
@@ -115,6 +117,11 @@ async function poll($: EngineInterface, watch: Watch): Promise<void> {
     watch.error = message;
     delay = POLL_MS.error;
   }
+  schedule($, watch, delay);
+}
+
+function schedule($: EngineInterface, watch: Watch, delay: number): void {
+  if (watch.isStopped) return;
   watch.timer = $.clock.after(delay, () => void poll($, watch));
 }
 
@@ -122,7 +129,7 @@ async function hasGh($: EngineInterface): Promise<boolean> {
   try {
     return (await $.process.run(["gh", "--version"], { timeoutMs: 5000 })).exitCode === 0;
   } catch {
-    // The run rejects when gh is not on PATH, which is the absence this probe tests for.
+    // run() rejects when gh is not on PATH.
     return false;
   }
 }

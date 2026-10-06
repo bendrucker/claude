@@ -3,13 +3,11 @@ import type { On } from "claude-code";
 // The plan gate denies a plan whose `plan.length`, in UTF-16 code units, exceeds this.
 export const LIMIT = 10_000;
 
-function grouped(n: number): string {
-  return String(n).replaceAll(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
+const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 
 export function statusText(chars: number): string {
-  const base = `plan ${grouped(chars)} / ${grouped(LIMIT)}`;
-  return chars > LIMIT ? `${base} (over by ${grouped(chars - LIMIT)})` : base;
+  const base = `plan ${compact.format(chars)} / ${compact.format(LIMIT)}`;
+  return chars > LIMIT ? `${base} (over by ${compact.format(chars - LIMIT)})` : base;
 }
 
 function basename(path: string): string {

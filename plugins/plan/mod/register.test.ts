@@ -50,9 +50,9 @@ function write($: Engine, world: World, chars: number, filePath = PLAN) {
 
 describe("statusText", () => {
   test("shows the count against the limit and the overage", () => {
-    expect(statusText(8_412)).toBe("plan 8,412 / 10,000");
-    expect(statusText(LIMIT)).toBe("plan 10,000 / 10,000");
-    expect(statusText(12_034)).toBe("plan 12,034 / 10,000 (over by 2,034)");
+    expect(statusText(8_412)).toBe("plan 8.4K / 10K");
+    expect(statusText(LIMIT)).toBe("plan 10K / 10K");
+    expect(statusText(12_034)).toBe("plan 12K / 10K (over by 2K)");
   });
 });
 
@@ -62,7 +62,7 @@ describe("register", () => {
     await planMode($);
     world.files[PLAN] = "é".repeat(6_000);
     await $.tool.call({ tool: "Write", file_path: PLAN, content: "", tool_use_id: "t1" });
-    expect(world.status).toEqual(["plan 6,000 / 10,000"]);
+    expect(world.status).toEqual(["plan 6K / 10K"]);
   });
 
   test("updates after an edit", async ($, on) => {
@@ -76,7 +76,7 @@ describe("register", () => {
       new_string: "b",
       tool_use_id: "t1",
     });
-    expect(world.status).toEqual(["plan 10,001 / 10,000 (over by 1)"]);
+    expect(world.status).toEqual(["plan 10K / 10K (over by 1)"]);
   });
 
   test("counts only the plan file the plan-mode reminder names", async ($, on) => {
@@ -85,7 +85,7 @@ describe("register", () => {
     await planMode($);
     await write($, world, 200, "/Users/u/.claude/plans/quiet-otter-decisions.md");
     await write($, world, 800);
-    expect(world.status).toEqual(["plan 800 / 10,000"]);
+    expect(world.status).toEqual(["plan 800 / 10K"]);
   });
 
   test("ignores a failed write", async ($, on) => {
@@ -135,7 +135,7 @@ describe("register", () => {
     await planMode($);
     await write($, world, 1);
     await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
-    expect(world.status).toEqual(["plan 1 / 10,000", undefined]);
+    expect(world.status).toEqual(["plan 1 / 10K", undefined]);
     expect(world.events.at(-1)).toEqual({
       mod: "plan",
       event: "present",

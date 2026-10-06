@@ -7,7 +7,11 @@ const hook = (name: string, hasCatch: boolean) => ({
   hasCatch,
 });
 
-test.each([
+test.each<{
+  name: string;
+  contents: Parameters<typeof uncaught>[0]["contents"];
+  expected: string[];
+}>([
   { name: "no hooks module", contents: [{}], expected: [] },
   {
     name: "every hook caught",

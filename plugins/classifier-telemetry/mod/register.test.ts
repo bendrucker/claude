@@ -1,6 +1,7 @@
-import type { On, ToolCallResult } from "claude-code";
+import type { EngineInterface, On, ToolCallResult } from "claude-code";
+
+type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 import { type Engine, describe, expect, mock, test, tier } from "claude-code/testing";
-import type { ModEventsInput } from "../../mod-events/types";
 
 tier("user");
 

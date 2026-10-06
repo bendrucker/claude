@@ -4,7 +4,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
-import { type Database, ensureIndex, ensureSchema, getDb, runQuery } from "./db";
+import { type Database, type ScannedFile, ensureIndex, ensureSchema, getDb, runQuery } from "./db";
 import { MiB, overCap } from "./retention";
 import { type Source, parseDebugLog, prune, syncSource } from "./telemetry";
 
@@ -325,7 +325,7 @@ describe("mods query", () => {
 describe("overCap", () => {
   const file = (name: string, mtime: number, size: number) => ({ path: name, mtime, size });
 
-  it.each([
+  it.each<{ name: string; files: ScannedFile[]; cap: number; doomed: string[] }>([
     {
       name: "nothing under the cap",
       files: [file("a", 1, 4), file("b", 2, 4)],

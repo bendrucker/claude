@@ -1,6 +1,7 @@
-import type { On } from "claude-code";
+import type { EngineInterface, On } from "claude-code";
+
+type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 import { describe, expect, mock, test, type Engine } from "claude-code/testing";
-import type { ModEventsInput } from "../../mod-events/types";
 
 const HERDR = { HERDR_ENV: "1", HERDR_PANE_ID: "w1:p1" };
 

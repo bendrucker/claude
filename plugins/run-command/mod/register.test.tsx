@@ -1,6 +1,7 @@
-import type { On } from "claude-code";
+import type { EngineInterface, On } from "claude-code";
+
+type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 import { describe, expect, test, type Engine } from "claude-code/testing";
-import type { ModEventsInput } from "../../mod-events/types";
 import { commands, pick } from "./register.tsx";
 
 const PLUGIN = "run-command";

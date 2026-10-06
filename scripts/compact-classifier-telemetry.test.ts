@@ -82,3 +82,12 @@ test("skips a session already compacted and writes nothing on a dry run", async 
   await compact(join(dir, "src"), join(dir, "out"));
   expect(await compact(join(dir, "src"), join(dir, "out"))).toMatchObject({ skipped: 1 });
 });
+
+test("retries a session whose earlier write was interrupted", async () => {
+  await seed({ "toolu_1.json": JSON.stringify(RECORD) });
+  const out = join(dir, "out", "s1", "classifier-telemetry.legacy.0.jsonl");
+  await Bun.write(out, "{", { createPath: true });
+
+  expect(await compact(join(dir, "src"), join(dir, "out"))).toMatchObject({ records: 1 });
+  expect(await Bun.file(out).text()).toEndWith("}\n");
+});

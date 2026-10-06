@@ -5,5 +5,5 @@
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
   },
-  "dependencies": ["mod-events", "observability"]
+  "dependencies": ["mod-events", "observability", "pull-request"]
 }

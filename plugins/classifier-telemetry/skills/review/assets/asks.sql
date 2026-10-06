@@ -1,6 +1,7 @@
 -- Ranks the window's `ask` verdicts by tool, normalized reason, and Bash verb.
--- `compound` marks a Bash command chained, piped, or substituted, which no prefix
--- allow rule matches. Interactive tools wait on the person and are left out.
+-- `compound` marks a Bash command chained or piped outside its quotes, or substituted
+-- anywhere, which no prefix allow rule matches. Interactive tools wait on the person
+-- and are left out.
 -- Params: after_date, before_date, host, limit.
 WITH v AS (
   SELECT v.*, c.command
@@ -16,14 +17,16 @@ keyed AS (
     regexp_replace(
       regexp_replace(split_part(reason, ': ', 1), '(/[^\s,]+)+', '<path>', 'g'),
       '\s+', ' ', 'g') AS reason_key,
-    regexp_replace(trim(command), '^cd \S+ (&&|;) ', '') AS bare
+    regexp_replace(trim(command), '^cd \S+ (&&|;) ', '') AS bare,
+    regexp_replace(command, '''[^'']*''|"(\\.|[^"\\])*"', '', 'g') AS unquoted
   FROM v
 )
 SELECT
   tool,
   reason_key,
   CASE WHEN tool = 'Bash' THEN split_part(bare, ' ', 1) END AS verb,
-  CASE WHEN tool = 'Bash' THEN regexp_matches(command, '[|;&\n]|\$\(|<<') END AS compound,
+  CASE WHEN tool = 'Bash'
+    THEN regexp_matches(unquoted, '[|;&\n]|<<') OR regexp_matches(command, '\$\(|`') END AS compound,
   COUNT(*) AS asks,
   COUNT(DISTINCT session_id) AS sessions,
   list(DISTINCT left(command, 160)) FILTER (WHERE command IS NOT NULL)[1:3] AS samples

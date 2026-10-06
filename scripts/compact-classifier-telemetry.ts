@@ -83,7 +83,6 @@ function parse(text: string): LegacyRecord | undefined {
 
 async function compactSession(source: string, target: string, dryRun: boolean): Promise<Totals> {
   const out = Bun.file(join(target, OUT));
-  if (await out.exists()) return { sessions: 0, skipped: 1, records: 0, unreadable: 0 };
   const files = (await readdir(source)).filter((f) => f.endsWith(".json"));
   const records = await Promise.all(
     files.map(async (f) => parse(await Bun.file(join(source, f)).text())),
@@ -91,8 +90,12 @@ async function compactSession(source: string, target: string, dryRun: boolean): 
   const lines = records
     .flatMap((r) => (r === undefined ? [] : [JSON.stringify(toEvent(r))]))
     .toSorted();
-  if (!dryRun && lines.length > 0)
-    await Bun.write(out, `${lines.join("\n")}\n`, { createPath: true });
+  const text = `${lines.join("\n")}\n`;
+  // Done means the output matches, so a run cut off mid-write is redone on the next.
+  if ((await out.exists()) && (await out.text()) === text) {
+    return { sessions: 0, skipped: 1, records: 0, unreadable: 0 };
+  }
+  if (!dryRun && lines.length > 0) await Bun.write(out, text, { createPath: true });
   return {
     sessions: 1,
     skipped: 0,

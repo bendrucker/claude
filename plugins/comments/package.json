@@ -10,7 +10,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.124.0",
+    "@anthropic-ai/sdk": "^0.129.0",
     "@hegeldev/hegel": "^0.4.7",
     "fast-xml-builder": "^1.3.1"
   }

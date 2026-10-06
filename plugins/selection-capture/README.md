@@ -15,6 +15,7 @@ Capture text you selected in the transcript as a Things to-do or a Linear issue 
 - Requires the `mod-events` plugin. Function hooks are early access. Set `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` to load the mod.
 - `$.ui.selection()` sees a selection only in fullscreen mode. Select text with the mouse, then run the command.
 - macOS only, since captures open through `open`.
+- Create a `claude` tag in Things. Its URL scheme drops a tag that doesn't exist, which leaves the to-do untagged.
 
 ## Tests
 

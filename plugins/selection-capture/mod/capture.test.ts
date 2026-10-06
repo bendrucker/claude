@@ -1,6 +1,7 @@
 import { describe, expect, test } from "claude-code/testing";
 import {
   type Capture,
+  body,
   launchUrl,
   linearUrl,
   mainRepo,
@@ -95,6 +96,24 @@ describe("urls", () => {
 
   test("launch URL bounds the quote it carries", () => {
     expect(launchUrl("s1", "x".repeat(5000), "/src/repo").length).toBeLessThan(1500);
+  });
+
+  test("Things notes fit 10,000 characters for wide text and many short lines", () => {
+    for (const selected of ["漢".repeat(10_000), "x\n".repeat(5000)]) {
+      const quoted = quote(selected);
+      const notes = body({
+        title: "t",
+        quote: quoted,
+        row: { label: "Claude", text: "漢".repeat(2000) },
+        launch: launchUrl(
+          "0f8fad5b-d9cb-469f-a165-70867728950e",
+          quoted,
+          "/Users/someone/src/repo",
+        ),
+      });
+      expect(notes.length).toBeLessThanOrEqual(10_000);
+      expect(notes).toContain("Continue in Claude Code: claude-cli://open?q=");
+    }
   });
 
   test("Things to-do carries the quote, row, and launch link in its notes", () => {

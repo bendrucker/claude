@@ -1,5 +1,6 @@
 import type { On, UiSelection } from "claude-code";
 import { describe, expect, test } from "claude-code/testing";
+import type { ModEventsInput } from "../../mod-events/types";
 
 const START = { surface: "terminal", isInteractive: true, cwd: "/wt/topic" } as const;
 
@@ -15,6 +16,15 @@ function hostOf(on: On, host: Host = {}) {
   const runs: string[][] = [];
   const registered: string[] = [];
   const toasts: string[] = [];
+  const events: ModEventsInput[] = [];
+  on("engine.create", async ($, e, next) => ({
+    ...(await next(e)),
+    modEvents: { emit: () => Promise.resolve() },
+  }));
+  on("modEvents.emit", ($, e) => {
+    events.push(e);
+    return { value: undefined };
+  });
   on("session.start", ($, e) => ({ cwd: e.cwd }));
   on("session.id", () => ({ value: "s1" }));
   on("session.root", () => ({ value: "/wt/topic" }));
@@ -38,7 +48,7 @@ function hostOf(on: On, host: Host = {}) {
       return { value: { exitCode: host.things === false ? 1 : 0, stdout: "", stderr: "" } };
     return { value: { exitCode: host.opens === false ? 1 : 0, stdout: "", stderr: "no handler" } };
   });
-  return { runs, registered, toasts };
+  return { runs, registered, toasts, events };
 }
 
 function opened(runs: string[][]): string | undefined {
@@ -50,6 +60,9 @@ describe("register", () => {
     const host = hostOf(on, { things: false });
     await $.session.start(START);
     expect(host.registered).toEqual(["linear"]);
+    expect(host.events).toEqual([
+      { mod: "selection-capture", event: "session.start", detail: { things: false } },
+    ]);
   });
 
   test("/things opens a Things to-do in the background, launching from the main repo", async ($, on) => {
@@ -64,6 +77,11 @@ describe("register", () => {
     expect(url).toContain("things:///add?title=Pin the version");
     expect(url).toContain("From Claude:");
     expect(url).toContain("cwd=%2Fsrc%2Frepo");
+    expect(host.events.at(-1)).toMatchObject({
+      event: "capture",
+      ok: true,
+      detail: { target: "things", outcome: "opened", chars: 15, row: "Claude", titled: false },
+    });
   });
 
   test("/linear opens a prefilled issue titled by its argument", async ($, on) => {
@@ -82,15 +100,24 @@ describe("register", () => {
 
     expect(result.text).toContain("Nothing selected");
     expect(opened(host.runs)).toBeUndefined();
+    expect(host.events.at(-1)).toMatchObject({
+      event: "capture",
+      ok: false,
+      detail: { target: "things", outcome: "no-selection" },
+    });
   });
 
   test("when open fails, prints the capture instead", async ($, on) => {
-    hostOf(on, { selection: { text: "Pin the version" }, opens: false });
+    const host = hostOf(on, { selection: { text: "Pin the version" }, opens: false });
     await $.session.start(START);
     const result = await $.command.run({ command: "linear", args: "" });
 
     expect(result.text).toContain("Could not open the Linear draft");
     expect(result.text).toContain("> Pin the version");
+    expect(host.events.at(-1)).toMatchObject({
+      ok: false,
+      detail: { target: "linear", outcome: "open-failed", titled: false },
+    });
   });
 
   test("leaves other commands to the engine", async ($, on) => {

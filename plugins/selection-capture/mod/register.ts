@@ -49,13 +49,19 @@ async function repoOf($: EngineInterface): Promise<string> {
   }
 }
 
+const MOD = "selection-capture";
+
+type Outcome = "opened" | "no-selection" | "open-failed";
+
 async function capture(
   $: EngineInterface,
   target: Target,
   args: string,
 ): Promise<CommandRunResult> {
+  const started = Date.now();
   const selected = await $.ui.selection();
   if (selected === undefined || selected.text.trim() === "") {
+    record($, target, "no-selection", started, {});
     return {
       text: "Nothing selected. Select transcript text with the mouse (fullscreen mode), then run the command.",
     };
@@ -67,6 +73,11 @@ async function capture(
     row: row(selected, await $.session.messages()),
     launch: launchUrl(await $.session.id(), quoted, await repoOf($)),
   };
+  const detail = {
+    chars: selected.text.length,
+    row: draft.row?.label ?? null,
+    titled: args.trim() !== "",
+  };
   const url = targetUrl(target, draft);
   const argv = target === "things" ? ["open", "-g", url] : ["open", url];
   try {
@@ -74,12 +85,30 @@ async function capture(
     if (exitCode !== 0) throw new Error(stderr.trim());
   } catch (error) {
     $.ui.log(`${target} capture failed to open: ${String(error)}`, { to: "debug" });
+    record($, target, "open-failed", started, { ...detail, error: String(error) });
     return {
       text: `Could not open the ${NAMES[target]}. Its contents:\n\n# ${draft.title}\n\n${body(draft)}`,
     };
   }
+  record($, target, "opened", started, detail);
   $.ui.toast(`${NAMES[target]}: ${draft.title}`);
   return { text: `${NAMES[target]}: ${draft.title}` };
+}
+
+function record(
+  $: EngineInterface,
+  target: Target,
+  outcome: Outcome,
+  started: number,
+  detail: Record<string, unknown>,
+): void {
+  void $.modEvents.emit({
+    mod: MOD,
+    event: "capture",
+    ok: outcome === "opened",
+    ms: Date.now() - started,
+    detail: { target, outcome, ...detail },
+  });
 }
 
 /**
@@ -92,10 +121,12 @@ export function register(on: On): void {
 
   on("session.start", async ($, e, next) => {
     const result = await next(e);
-    if (await hasThings($)) {
+    const things = await hasThings($);
+    if (things) {
       served.set((await $.command.register(COMMANDS.things)).command, "things");
     }
     served.set((await $.command.register(COMMANDS.linear)).command, "linear");
+    void $.modEvents.emit({ mod: MOD, event: "session.start", detail: { things } });
     return result;
   });
 

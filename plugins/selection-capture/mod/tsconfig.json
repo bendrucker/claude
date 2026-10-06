@@ -1,1 +1,4 @@
-{ "extends": "../../../tsconfig.mod.json", "include": ["../../../.claude/types", "."] }
+{
+  "extends": "../../../tsconfig.mod.json",
+  "include": ["../../../.claude/types", "../../mod-events/types", "."]
+}

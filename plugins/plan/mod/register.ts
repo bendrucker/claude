@@ -3,30 +3,6 @@ import type { On } from "claude-code";
 // The plan gate denies a plan whose `plan.length`, in UTF-16 code units, exceeds this.
 export const LIMIT = 10_000;
 
-export interface PlanCount {
-  file: string;
-  chars: number;
-  limit: number;
-  over: boolean;
-  tool: string;
-}
-
-export interface PlanCrossed {
-  file: string;
-  chars: number;
-  limit: number;
-  direction: "over" | "under";
-}
-
-export function isPlanFile(filePath: string, home: string): boolean {
-  const dir = `${home}/.claude/plans/`;
-  return (
-    filePath.startsWith(dir) &&
-    filePath.endsWith(".md") &&
-    !filePath.slice(dir.length).includes("/")
-  );
-}
-
 function grouped(n: number): string {
   return String(n).replaceAll(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
@@ -36,20 +12,32 @@ export function statusText(chars: number): string {
   return chars > LIMIT ? `${base} (over by ${grouped(chars - LIMIT)})` : base;
 }
 
+function basename(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1);
+}
+
 export function register(on: On): void {
-  const wasOver = new Map<string, boolean>();
+  let planFile: string | undefined;
+  let wasOver = false;
 
   on("session.start", ($, e, next) => {
     void $.modEvents.emit({ mod: "plan", event: "session.start" });
     return next(e);
   });
 
+  // The plan-mode reminder names the session's plan file, so sidecars beside it don't count.
+  on("prompt.attachment", { type: "plan_mode" }, ($, e, next) => {
+    const path = e.detail?.planFilePath;
+    if (e.agentId === undefined && path !== undefined && path !== planFile) {
+      planFile = path;
+      wasOver = false;
+    }
+    return next(e);
+  });
+
   on("tool.call", { tool: ["Write", "Edit"] }, async ($, e, next) => {
     const result = await next(e);
-    if (result.deny !== undefined || result.isError) return result;
-
-    const home = await $.env.get("HOME");
-    if (home === undefined || !isPlanFile(e.file_path, home)) return result;
+    if (e.file_path !== planFile || result.deny !== undefined || result.isError) return result;
 
     let chars: number;
     try {
@@ -60,28 +48,42 @@ export function register(on: On): void {
     }
 
     const over = chars > LIMIT;
-    const file = e.file_path.slice(e.file_path.lastIndexOf("/") + 1);
+    const file = basename(e.file_path);
     $.ui.status(statusText(chars));
-    const count: PlanCount = { file, chars, limit: LIMIT, over, tool: e.tool };
-    await $.modEvents.emit({ mod: "plan", event: "plan.count", detail: { ...count } });
-
-    const previous = wasOver.get(e.file_path) ?? false;
-    wasOver.set(e.file_path, over);
-    if (previous !== over) {
-      const crossed: PlanCrossed = {
-        file,
-        chars,
-        limit: LIMIT,
-        direction: over ? "over" : "under",
-      };
-      await $.modEvents.emit({ mod: "plan", event: "plan.crossed", detail: { ...crossed } });
+    await $.modEvents.emit({
+      mod: "plan",
+      event: "plan.count",
+      detail: { file, chars, limit: LIMIT, over, tool: e.tool },
+    });
+    if (over !== wasOver) {
+      await $.modEvents.emit({
+        mod: "plan",
+        event: "plan.crossed",
+        detail: { file, chars, limit: LIMIT, direction: over ? "over" : "under" },
+      });
     }
+    wasOver = over;
     return result;
   });
 
   on("tool.call", { tool: "ExitPlanMode" }, async ($, e, next) => {
     const result = await next(e);
-    if (result.deny === undefined && !result.isError) $.ui.status(undefined);
+    const denied = result.deny !== undefined || result.isError === true;
+    if (!denied) $.ui.status(undefined);
+    if (planFile === undefined) return result;
+
+    let chars: number;
+    try {
+      chars = (await $.fs.read(planFile)).length;
+    } catch {
+      return result;
+    }
+    await $.modEvents.emit({
+      mod: "plan",
+      event: "plan.present",
+      ok: !denied,
+      detail: { file: basename(planFile), chars, limit: LIMIT, over: chars > LIMIT },
+    });
     return result;
   });
 }

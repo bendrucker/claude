@@ -52,7 +52,7 @@ Every mod emits through the `mod-events` plugin: list `"mod-events"` under `depe
 
 ## Tests
 
-`bun scripts/mod-test.ts <plugin>` runs a mod's tests. It copies `.claude-plugin/`, `hooks/`, and `mod/` to a scratch directory first, because `claude plugin test` takes only the plugin folder and runs every `*.test.ts` under it, the plugin's bun tests included. It writes under `/tmp`, so it runs outside the sandbox. The `claude-code/testing` kit has `describe`, `test`, `expect`, and `mock`, and no `test.each` or snapshots.
+`bun scripts/mod-test.ts <plugin>` runs a mod's tests. It copies `.claude-plugin/`, `hooks/hooks.json`, and `mod/` to a scratch directory first, because `claude plugin test` takes only the plugin folder and runs every `*.test.ts` under it, the plugin's bun tests included. It writes under `/tmp`, so it runs outside the sandbox. The `claude-code/testing` kit has `describe`, `test`, `expect`, and `mock`, and no `test.each` or snapshots.
 
 A test's `$` carries no other plugin's noun, so a mod's test seats `$.modEvents` itself and records what reaches it:
 

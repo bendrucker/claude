@@ -300,6 +300,15 @@
     ],
     "SessionStart": [
       {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ~/.claude/hooks/sandbox-ssh-proxy",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "startup|resume|clear",
         "hooks": [
           {

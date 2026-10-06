@@ -1,9 +1,9 @@
 {
   "name": "classifier-telemetry",
-  "description": "Records each tool call's permission verdict and wall time so auto-mode classifier cost is measurable from the session index",
-  "dependencies": ["mod-events"],
+  "description": "Records each tool call's permission verdict and reviews the asks weekly, proposing allow rules and command-style changes",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
-  }
+  },
+  "dependencies": ["claude-code"]
 }

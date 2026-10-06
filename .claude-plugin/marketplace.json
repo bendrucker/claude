@@ -65,7 +65,7 @@
     },
     {
       "name": "classifier-telemetry",
-      "description": "Records each tool call's permission verdict and wall time so auto-mode classifier cost is measurable from the session index",
+      "description": "Records each tool call's permission verdict and reviews the asks weekly, proposing allow rules and command-style changes",
       "source": "./plugins/classifier-telemetry"
     },
     {

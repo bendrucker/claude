@@ -50,5 +50,5 @@ It loads only where `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set. It needs `bun`
 
 ```sh
 bun test plugins/writing
-claude plugin test plugins/writing/mod
+bun scripts/mod-test.ts writing
 ```

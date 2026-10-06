@@ -116,16 +116,16 @@ describe("register", () => {
     await write($, world, 9_000);
     await write($, world, 9_500);
     expect(world.events.map((e) => [e.event, e.detail?.chars, e.detail?.direction])).toEqual([
-      ["plan.count", 12_000, undefined],
-      ["plan.crossed", 12_000, "over"],
-      ["plan.count", 11_000, undefined],
-      ["plan.count", 9_000, undefined],
-      ["plan.crossed", 9_000, "under"],
-      ["plan.count", 9_500, undefined],
+      ["count", 12_000, undefined],
+      ["crossed", 12_000, "over"],
+      ["count", 11_000, undefined],
+      ["count", 9_000, undefined],
+      ["crossed", 9_000, "under"],
+      ["count", 9_500, undefined],
     ]);
     expect(world.events[0]).toEqual({
       mod: "plan",
-      event: "plan.count",
+      event: "count",
       detail: { file: "quiet-otter.md", chars: 12_000, limit: LIMIT, over: true, tool: "Write" },
     });
   });
@@ -138,7 +138,7 @@ describe("register", () => {
     expect(world.status).toEqual(["plan 1 / 10,000", undefined]);
     expect(world.events.at(-1)).toEqual({
       mod: "plan",
-      event: "plan.present",
+      event: "present",
       ok: true,
       detail: { file: "quiet-otter.md", chars: 1, limit: LIMIT, over: false },
     });
@@ -150,7 +150,7 @@ describe("register", () => {
     world.files[PLAN] = "x".repeat(12_000);
     await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
     expect(world.status).toEqual([]);
-    expect(world.events.at(-1)).toMatchObject({ event: "plan.present", ok: false });
+    expect(world.events.at(-1)).toMatchObject({ event: "present", ok: false });
   });
 
   test("records that it was live at session start", async ($, on) => {

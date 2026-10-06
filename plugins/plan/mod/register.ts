@@ -52,13 +52,13 @@ export function register(on: On): void {
     $.ui.status(statusText(chars));
     await $.modEvents.emit({
       mod: "plan",
-      event: "plan.count",
+      event: "count",
       detail: { file, chars, limit: LIMIT, over, tool: e.tool },
     });
     if (over !== wasOver) {
       await $.modEvents.emit({
         mod: "plan",
-        event: "plan.crossed",
+        event: "crossed",
         detail: { file, chars, limit: LIMIT, direction: over ? "over" : "under" },
       });
     }
@@ -80,7 +80,7 @@ export function register(on: On): void {
     }
     await $.modEvents.emit({
       mod: "plan",
-      event: "plan.present",
+      event: "present",
       ok: !denied,
       detail: { file: basename(planFile), chars, limit: LIMIT, over: chars > LIMIT },
     });

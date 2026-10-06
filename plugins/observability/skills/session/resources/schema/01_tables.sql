@@ -65,11 +65,13 @@ CREATE TABLE IF NOT EXISTS mod_events (
   host            VARCHAR,
   session_id      VARCHAR,
   mod             VARCHAR,
-  event           VARCHAR,
+  event_name      VARCHAR,
   ts              TIMESTAMP,
+  severity        VARCHAR,
   ok              BOOLEAN,
-  ms              BIGINT,
-  detail          JSON,
+  duration_ms     BIGINT,
+  surface         VARCHAR,
+  attributes      JSON,
   source_file     VARCHAR
 );
 

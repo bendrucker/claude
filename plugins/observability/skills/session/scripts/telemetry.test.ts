@@ -23,6 +23,32 @@ afterEach(async () => {
   await rm(tmpDir, { recursive: true, force: true });
 });
 
+function makeModRecord({
+  mod = "herdr",
+  event_name = "herdr.session.start",
+  timestamp = "2026-10-06T17:00:00.000Z",
+  ok = true,
+  durationMs,
+  exitCode,
+}: {
+  mod?: string;
+  event_name?: string;
+  timestamp?: string;
+  ok?: boolean;
+  durationMs?: number;
+  exitCode?: number;
+} = {}) {
+  return {
+    timestamp,
+    severity_text: ok ? "INFO" : "WARN",
+    severity_number: ok ? 9 : 13,
+    event_name,
+    attributes: { exitCode, duration_ms: durationMs, "session.id": "s1" },
+    resource: { "service.name": "claude-code", "claude_code.surface": "mosh" },
+    scope: { name: mod },
+  };
+}
+
 describe("parseDebugLog", () => {
   it.each([
     [
@@ -146,49 +172,46 @@ describe("telemetry ingest", () => {
   it("indexes each mod-events chunk as it grows", async () => {
     const { modEventsDir, reindex } = layout();
     const chunk = join(modEventsDir, "s1", "herdr.1000.0.jsonl");
-    const line = (event: string, ok: boolean) =>
-      `${JSON.stringify({ ts: 1_791_304_406_845, session: "s1", mod: "herdr", event, ok, ms: 12, detail: { exitCode: ok ? 0 : 1 } })}\n`;
+    const line = (event: string, ok: boolean, timestamp = "2026-10-06T17:00:00.000Z") =>
+      `${JSON.stringify(makeModRecord({ timestamp, event_name: `herdr.${event}`, ok, durationMs: 12, exitCode: ok ? 0 : 1 }))}\n`;
 
     await Bun.write(chunk, line("session.start", true));
     await reindex();
-    const farFuture = `{"ts":9000000000000000000,"session":"s1","mod":"herdr","event":"far"}\n`;
+    const legacy = `{"ts":1,"session":"s1","mod":"herdr","event":"old"}\n`;
     await Bun.write(
       chunk,
-      `${line("session.start", true)}${line("herdr.call", false)}${farFuture}{"ts":1,`,
+      `${line("session.start", true)}${line("herdr.call", false)}${line("far", true, "+275760-09-13T00:00:00.000Z")}${legacy}{"timestamp":`,
     );
     await reindex();
 
     const rows = await db.query(
-      "SELECT session_id, mod, event, ok, ms, detail->>'exitCode' AS exit_code, source_file FROM mod_events ORDER BY event",
+      `SELECT session_id, mod, event_name, ts::VARCHAR AS ts, severity, ok, duration_ms, surface,
+         attributes->>'exitCode' AS exit_code, source_file
+       FROM mod_events ORDER BY event_name`,
       z.object({
         session_id: z.string(),
         mod: z.string(),
-        event: z.string(),
+        event_name: z.string(),
+        ts: z.string(),
+        severity: z.string(),
         ok: z.boolean(),
-        ms: z.bigint(),
+        duration_ms: z.bigint(),
+        surface: z.string(),
         exit_code: z.string(),
         source_file: z.string(),
       }),
     );
+    const row = {
+      session_id: "s1",
+      mod: "herdr",
+      ts: "2026-10-06 17:00:00",
+      duration_ms: 12n,
+      surface: "mosh",
+      source_file: chunk,
+    };
     expect(rows).toEqual([
-      {
-        session_id: "s1",
-        mod: "herdr",
-        event: "herdr.call",
-        ok: false,
-        ms: 12n,
-        exit_code: "1",
-        source_file: chunk,
-      },
-      {
-        session_id: "s1",
-        mod: "herdr",
-        event: "session.start",
-        ok: true,
-        ms: 12n,
-        exit_code: "0",
-        source_file: chunk,
-      },
+      { ...row, event_name: "herdr.herdr.call", severity: "WARN", ok: false, exit_code: "1" },
+      { ...row, event_name: "herdr.session.start", severity: "INFO", ok: true, exit_code: "0" },
     ]);
   });
 
@@ -276,24 +299,16 @@ describe("mods query", () => {
     const sessionDir = join(tmpDir, "claude", "mod-events", "s1");
     for (const dir of [projectsDir, sessionDir]) mkdirSync(dir, { recursive: true });
     const jsonl = (...events: object[]) => events.map((e) => `${JSON.stringify(e)}\n`).join("");
-    const at = { ts: 1_791_304_406_845, session: "s1" };
     await Bun.write(
       join(sessionDir, "mod-events.1.0.jsonl"),
-      jsonl({
-        ...at,
-        mod: "mod-events",
-        event: "session.start",
-        ok: true,
-        ms: null,
-        detail: { surface: "mosh" },
-      }),
+      jsonl(makeModRecord({ mod: "mod-events", event_name: "mod-events.session.start" })),
     );
     await Bun.write(
       join(sessionDir, "herdr.1.0.jsonl"),
       jsonl(
-        { ...at, mod: "herdr", event: "session.start", ok: true, ms: null, detail: {} },
-        { ...at, mod: "herdr", event: "herdr.call", ok: true, ms: 10, detail: {} },
-        { ...at, mod: "herdr", event: "herdr.call", ok: false, ms: 30, detail: {} },
+        makeModRecord({ event_name: "herdr.session.start" }),
+        makeModRecord({ event_name: "herdr.herdr.call", durationMs: 10 }),
+        makeModRecord({ event_name: "herdr.herdr.call", ok: false, durationMs: 30 }),
       ),
     );
     await ensureIndex(db, { projectsDir, importsDir: join(tmpDir, "imports") });
@@ -303,7 +318,7 @@ describe("mods query", () => {
       "mods",
       z.object({
         mod: z.string(),
-        event: z.string(),
+        event_name: z.string(),
         sessions: z.bigint(),
         events: z.bigint(),
         failed: z.bigint(),
@@ -314,13 +329,13 @@ describe("mods query", () => {
     );
     expect(
       rows.map((r) =>
-        [r.mod, r.event, r.sessions, r.events, r.failed, r.p50_ms, r.surfaces].join(" | "),
+        [r.mod, r.event_name, r.sessions, r.events, r.failed, r.p50_ms, r.surfaces].join(" | "),
       ),
     ).toMatchInlineSnapshot(`
       [
-        "herdr | herdr.call | 1 | 2 | 1 | 20 | ",
-        "herdr | session.start | 1 | 1 | 0 |  | ",
-        "mod-events | session.start | 1 | 1 | 0 |  | {"mosh":1}",
+        "herdr | herdr.herdr.call | 1 | 2 | 1 | 20 | ",
+        "herdr | herdr.session.start | 1 | 1 | 0 |  | ",
+        "mod-events | mod-events.session.start | 1 | 1 | 0 |  | {"mosh":1}",
       ]
     `);
   });

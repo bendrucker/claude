@@ -139,9 +139,6 @@ const debugLogs = (root: string, host: string): Source => ({
   remove: keepRows,
 });
 
-// `make_timestamp_ms` throws past year 9999, and one bad line would fail every refresh.
-const MAX_TS_MS = 253_402_300_799_999;
-
 const modEvents = (root: string, host: string): Source => ({
   name: "mod-events",
   root,
@@ -151,17 +148,28 @@ const modEvents = (root: string, host: string): Source => ({
     await db.run("DELETE FROM mod_events WHERE source_file = $path", { path: file.path });
     await db.run(
       `INSERT INTO mod_events
-       SELECT $host, session, mod, event, make_timestamp_ms(ts), ok, ms, detail, $path
+       SELECT
+         $host,
+         attributes->>'$."session.id"',
+         scope->>'$.name',
+         event_name,
+         try_strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%gZ') AS ts,
+         severity_text,
+         severity_number < 13,
+         TRY_CAST(attributes->>'$.duration_ms' AS BIGINT),
+         resource->>'$."claude_code.surface"',
+         attributes,
+         $path
        FROM read_json(
          $path,
          columns = {
-           ts: 'BIGINT', session: 'VARCHAR', mod: 'VARCHAR', event: 'VARCHAR',
-           ok: 'BOOLEAN', ms: 'BIGINT', detail: 'JSON'
+           timestamp: 'VARCHAR', severity_text: 'VARCHAR', severity_number: 'INTEGER',
+           event_name: 'VARCHAR', attributes: 'JSON', resource: 'JSON', scope: 'JSON'
          },
          format = 'newline_delimited',
          ignore_errors = true
        )
-       WHERE event IS NOT NULL AND ts BETWEEN 0 AND ${MAX_TS_MS}`,
+       WHERE event_name IS NOT NULL AND ts IS NOT NULL`,
       { host, path: file.path },
     );
   },

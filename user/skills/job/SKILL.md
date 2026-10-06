@@ -74,7 +74,7 @@ Join each record to a brief item in this order:
 
 `cwd` is the directory the session launched from. A session that entered a worktree mid-run still reports its launch directory, usually a main checkout, occasionally a path that has since been pruned. Use it to scope candidates by repo. Never derive a branch from it, and never report it as the work.
 
-When an item's session is still unresolved and the user asks about that specific item, fall back to the `claude-code:session` skill's `search` query with the identifier as `query` and the repo as `project`. Never during gather, since it costs a query per item.
+When an item's session is still unresolved and the user asks about that specific item, fall back to the `observability:session` skill's `search` query with the identifier as `query` and the repo as `project`. Never during gather, since it costs a query per item.
 
 Handle three record classes explicitly. Skip any record whose `sessionId` is the current session. Surface `blocked` records, which are waiting on the user and are the reason this source exists. Surface `failed` records, since abandoned work reads as done work otherwise.
 

@@ -1,9 +1,0 @@
-{
-  "name": "claude-code",
-  "description": "Meta-tools for Claude Code configuration and customization",
-  "author": {
-    "name": "Ben Drucker",
-    "email": "bvdrucker@gmail.com"
-  },
-  "dependencies": ["prompting"]
-}

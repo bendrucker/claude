@@ -12,7 +12,7 @@ import { findsUnboundedFromBroadRoot } from "./index";
 // lives, so an audit run against a copied corpus honors it too.
 const DATA_DIR =
   process.env.CLAUDE_PLUGIN_DATA ??
-  `${process.env.HOME}/.claude/plugins/data/claude-code-bendrucker`;
+  `${process.env.HOME}/.claude/plugins/data/observability-bendrucker`;
 const DB = `${DATA_DIR}/session.duckdb`;
 
 // The date reaches DuckDB inside a SQL literal, so it is checked before it is

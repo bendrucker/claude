@@ -1,6 +1,6 @@
 # Discover
 
-Mine session history for improvement candidates, ground them against the live config, write a digest, and file the keepers as `claude-code` todos. Interactive runs never auto-file: filing is an explicit user choice, and only [Scheduled](#scheduled) files without asking. Implementing is a separate run of the main loop unless the user opts into [Direct Implementation](#direct-implementation) for the run. The engine is the `claude-code:session` skill's fan-out, whose `references/discovery.md` carries the recipe (dimension cheat sheet, grounding mandate, host safety, Tier-2 catalog). Load that skill to read it.
+Mine session history for improvement candidates, ground them against the live config, write a digest, and file the keepers as `claude-code` todos. Interactive runs never auto-file: filing is an explicit user choice, and only [Scheduled](#scheduled) files without asking. Implementing is a separate run of the main loop unless the user opts into [Direct Implementation](#direct-implementation) for the run. The engine is the `observability:session` skill's fan-out, whose `references/discovery.md` carries the recipe (dimension cheat sheet, grounding mandate, host safety, Tier-2 catalog). Load that skill to read it.
 
 ## Refresh
 

@@ -93,8 +93,8 @@ function resolveDbPath(db: string | undefined): string {
   const pluginData = process.env.CLAUDE_PLUGIN_DATA;
   const dataDir =
     pluginData !== undefined && pluginData !== ""
-      ? join(dirname(pluginData), "claude-code-bendrucker")
-      : join(process.env.HOME ?? "", ".claude", "plugins", "data", "claude-code-bendrucker");
+      ? join(dirname(pluginData), "observability-bendrucker")
+      : join(process.env.HOME ?? "", ".claude", "plugins", "data", "observability-bendrucker");
   return join(dataDir, "session.duckdb");
 }
 
@@ -134,7 +134,7 @@ if (import.meta.main) {
 
   const dbPath = resolveDbPath(argv.flags.db);
   if (!(await Bun.file(dbPath).exists())) {
-    console.error(`No session index at ${dbPath}. Run the claude-code:session refresh first.`);
+    console.error(`No session index at ${dbPath}. Run the observability:session refresh first.`);
     process.exit(1);
   }
   const presents = await queryPresents(dbPath, argv.flags.since);

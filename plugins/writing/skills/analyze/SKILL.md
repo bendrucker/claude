@@ -10,7 +10,7 @@ disable-model-invocation: true
 allowed-tools:
   - Bash
   - Read
-  - Skill(claude-code:session)
+  - Skill(observability:session)
 ---
 
 # Writing Analyze
@@ -27,7 +27,7 @@ Forward these from `$ARGUMENTS` to `analyze.ts` (see [Run](#run)):
 
 ## Prerequisites
 
-Activate the `claude-code:session` skill first. Run its refresh script to update the index and capture the DB path:
+Activate the `observability:session` skill first. Run its refresh script to update the index and capture the DB path:
 
 ```bash
 DB_PATH=$(<session-skill-dir>/scripts/refresh.ts --refresh)

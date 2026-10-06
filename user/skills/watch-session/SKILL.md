@@ -1,7 +1,7 @@
 ---
 name: watch-session
 description: >-
-  Use when the user asks you to watch a herdr pane or Claude session while they test a skill or do a task by hand, to fix that skill or draft a new one from what the session does. For writing a skill without a session to watch, use claude-code:skill.
+  Use when the user asks you to watch a herdr pane or Claude session while they test a skill or do a task by hand, to fix that skill or draft a new one from what the session does. For writing a skill without a session to watch, use plugin:skill.
 argument-hint: "<pane-id | session-uuid> [--skill <dir> | --learn <name>] [--prompt <text>] [--every <duration>]"
 disable-model-invocation: true
 allowed-tools:
@@ -24,7 +24,7 @@ The user's session belongs to the user. You read its transcript, and type into i
 - `--prompt <text>`: the prompt a trial sends. Default: the user's first typed `prompt` of the task.
 - `--every <duration>`: batch interval while observing a hand-done task. Default `10m` with `--learn`, per turn otherwise.
 
-Load `claude-code:skill` and `prompting:prompting` before the first edit.
+Load `plugin:skill` and `prompting:prompting` before the first edit.
 
 ## State
 

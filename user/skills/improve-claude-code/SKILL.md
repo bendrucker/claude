@@ -9,7 +9,7 @@ allowed-tools:
   - Read(${CLAUDE_SKILL_DIR}/references/*)
   - Skill(things:jxa)
   - Skill(things:url)
-  - Skill(claude-code:session)
+  - Skill(observability:session)
   - Skill(pull-request:create)
   - Skill(review:code)
   - Skill(github:actions-monitor)
@@ -22,7 +22,7 @@ Work through the `claude-code` Things backlog: fetch todos, triage with the user
 
 The backlog has two sources. The user files todos tagged `claude-code` by hand (and `agent-ideas` files external-harvest ideas in the same shape). Discover mode mines session history for config-change candidates and files the keepers as `claude-code` todos. Both sources feed the one implement loop below.
 
-In every mode, the loop itself is in scope: this skill's own SKILL.md, the `claude-code:session` skill's queries and views, and the Things scripts the loop depends on. Findings in that class may be dispatched to background worktree agents immediately, even when everything else routes to planning or triage discussion.
+In every mode, the loop itself is in scope: this skill's own SKILL.md, the `observability:session` skill's queries and views, and the Things scripts the loop depends on. Findings in that class may be dispatched to background worktree agents immediately, even when everything else routes to planning or triage discussion.
 
 All Things interaction goes through the `things:jxa` and `things:url` skills (never inline JXA). PRs go through `pull-request:create` (never `gh pr create`).
 
@@ -45,13 +45,13 @@ Ask the user which items to work on (numbers, ranges like `1-3`, or `all`). The 
 
 ## Session Context
 
-Each todo's notes embed the originating session as `Session: <uuid>`. For every selected todo, use the `claude-code:session` skill to pull the original context (what you were doing, the commands that ran, the errors that prompted the todo) before planning: richer than the todo's prose summary and grounds each plan in the real failure. Session context informs local planning only: never paste session-derived content into PR bodies or any other output that leaves the machine. Index refresh, DuckDB lookup mechanics, host filtering, and the full egress rule: [references/session-context.md](references/session-context.md).
+Each todo's notes embed the originating session as `Session: <uuid>`. For every selected todo, use the `observability:session` skill to pull the original context (what you were doing, the commands that ran, the errors that prompted the todo) before planning: richer than the todo's prose summary and grounds each plan in the real failure. Session context informs local planning only: never paste session-derived content into PR bodies or any other output that leaves the machine. Index refresh, DuckDB lookup mechanics, host filtering, and the full egress rule: [references/session-context.md](references/session-context.md).
 
 ## Plan
 
 The mechanical fan-out runs as a **Workflow**. Instructing `Workflow` from inside this user-invoked skill is a sanctioned opt-in under the Workflow tool's own rules, so author and run the script rather than refusing mid-run.
 
-Run one Workflow (`parallel`) with one agent per selected todo. Give each agent its todo title, full notes, and the distilled session context, and have it explore the repo and produce an implementation plan. Point agents at the relevant domain skills: `claude-code:skill` for skill changes, `claude-code:hook` for hooks, `bun:bun` for scripts. Preserve the [egress rule](references/session-context.md) inside the workflow: session-derived context stays local and never enters agent output that leaves the machine.
+Run one Workflow (`parallel`) with one agent per selected todo. Give each agent its todo title, full notes, and the distilled session context, and have it explore the repo and produce an implementation plan. Point agents at the relevant domain skills: `plugin:skill` for skill changes, `plugin:hook` for hooks, `bun:bun` for scripts. Preserve the [egress rule](references/session-context.md) inside the workflow: session-derived context stays local and never enters agent output that leaves the machine.
 
 Each agent returns a structured plan:
 

@@ -6,7 +6,7 @@ paths:
 
 # Hooks
 
-See the `claude-code:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. An oxlint/oxfmt hook (`.claude/hooks/ox/`) reports lint errors after file edits, and gates Stop and `git commit` with formatting plus a type check.
+See the `plugin:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. An oxlint/oxfmt hook (`.claude/hooks/ox/`) reports lint errors after file edits, and gates Stop and `git commit` with formatting plus a type check.
 
 Raw `git worktree add` is denied in favor of the `worktrunk` skill, except under `tmp/`.
 
@@ -22,7 +22,7 @@ So every Bash-matched hook script must re-read `input.tool_input.command` and co
 
 ## Async
 
-The `claude-code:hook` skill covers `async` and `asyncRewake`. Read it before marking a hook async here.
+The `plugin:hook` skill covers `async` and `asyncRewake`. Read it before marking a hook async here.
 
 Only the vibe-island bridge and the herdr state export in `user/settings.json` qualify. Everything else gates a call or emits `hookSpecificOutput`, including every hook in `plugins/*/hooks/hooks.json`. Three bridge entries stay synchronous: `Stop` and `StopFailure`, whose backgrounded processes are killed before they finish, and `PermissionRequest`, which blocks to return a remote `permissionDecision`.
 

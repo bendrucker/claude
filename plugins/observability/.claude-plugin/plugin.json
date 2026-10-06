@@ -1,0 +1,8 @@
+{
+  "name": "observability",
+  "description": "Query Claude Code session history, tool calls, hooks, and token usage through a DuckDB index over local transcripts",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

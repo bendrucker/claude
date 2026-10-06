@@ -2,7 +2,7 @@ import type {
   ReferenceResult,
   RuleResult,
   SkillLintResult,
-} from "../../plugins/claude-code/skills/skill/scripts/skill-lint/types";
+} from "../../plugins/plugin/skills/skill/scripts/skill-lint/types";
 
 function statusIcon(result: RuleResult): string {
   if (result.severity === "info") return "info";

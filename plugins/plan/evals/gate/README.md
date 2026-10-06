@@ -10,7 +10,7 @@ A **case** is one recorded presentation, identified by the session's eight-chara
 
 ## Workflow
 
-`mine.ts` shells out to the `duckdb` CLI and reads the session index the `claude-code:session` skill maintains. Refresh that index through the skill first if it is stale.
+`mine.ts` shells out to the `duckdb` CLI and reads the session index the `observability:session` skill maintains. Refresh that index through the skill first if it is stale.
 
 Then, from this directory:
 

@@ -50,7 +50,7 @@ Three grants are deliberate exceptions to the credential-store clause. Each hold
 
 The rest are tool caches and state directories holding no credential material:
 
-- `~/.duckdb`: extensions installed on first `INSTALL ... FROM community`. Without it the `claude-code:session` skill dies on `IO Error: Failed to create directory`, having already been granted the egress to fetch them. The version in the path changes with each DuckDB release, so a fresh install re-denies. **Drop it** when no skill queries DuckDB with a community extension.
+- `~/.duckdb`: extensions installed on first `INSTALL ... FROM community`. Without it the `observability:session` skill dies on `IO Error: Failed to create directory`, having already been granted the egress to fetch them. The version in the path changes with each DuckDB release, so a fresh install re-denies. **Drop it** when no skill queries DuckDB with a community extension.
 - `~/.plannotator`: annotation history, drafts, config, and the feedback archive, rewritten on every run. plannotator uses `PLANNOTATOR_DATA_DIR` when set, then `~/.plannotator` if it exists, and only then `$XDG_DATA_HOME/plannotator`, so the legacy directory wins on this machine. Without it each save fails `EPERM`, and a review runs with no version diffs and no recovery copy. **Drop it** when no skill drives the `plannotator` CLI, and move it if the data directory moves.
 - `~/.agent-browser`: the CLI's control socket. `agent-browser` sits in `excludedCommands`, but a match has to sit in the invocation's own chain, so a skill script that shells out to it runs sandboxed and fails with `Socket directory is not writable`. Another `excludedCommands` entry would not help. **Drop it** when the `agent-browser` skill stops invoking the CLI from a wrapper.
 - `~/Library/Caches/ms-playwright`: Playwright's unpacked browser builds. Without it an install fails at `mkdir` before reaching the download, which reads as a network problem. **Drop it** when no skill or work repo drives Playwright.
@@ -135,7 +135,7 @@ The marketplace tracks `main` because the repo has no release tags. A commit SHA
 git ls-remote --tags https://github.com/1Password/1password-claude-plugin
 ```
 
-**Drop it** if Environments do not stick. Around 2026-10-27, count `mcp__plugin_1password_1password__` calls in the session index since the day this shipped, and read the hook's denies with the `claude-code:session` skill's [`hook-blocks`](../plugins/claude-code/skills/session/resources/queries/hook-blocks.sql) query. If no mount besides the first is in use, or the denies are mostly stale mounts rather than a missing secret file, remove the plugin, its marketplace, and the allows.
+**Drop it** if Environments do not stick. Around 2026-10-27, count `mcp__plugin_1password_1password__` calls in the session index since the day this shipped, and read the hook's denies with the `observability:session` skill's [`hook-blocks`](../plugins/observability/skills/session/resources/queries/hook-blocks.sql) query. If no mount besides the first is in use, or the denies are mostly stale mounts rather than a missing secret file, remove the plugin, its marketplace, and the allows.
 
 ## Sandbox Findings
 

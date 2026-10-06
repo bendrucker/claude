@@ -13,7 +13,7 @@ stay local (see `.gitignore`). Only the harness code is tracked.
 ### 1. Build the dataset
 
 Three exports in `raw/` come from the Claude Code session index (the
-`claude-code:session` skill), pulled from every session that invoked
+`observability:session` skill), pulled from every session that invoked
 `issue:refine`:
 
 - `save_issues.json`: every `Linear.save_issue` call (the refined bodies)

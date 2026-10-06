@@ -69,9 +69,19 @@
       "source": "./plugins/classifier-telemetry"
     },
     {
-      "name": "claude-code",
-      "description": "Meta-tools for Claude Code configuration and customization",
-      "source": "./plugins/claude-code"
+      "name": "observability",
+      "description": "Query Claude Code session history, tool calls, hooks, and token usage through a DuckDB index over local transcripts",
+      "source": "./plugins/observability"
+    },
+    {
+      "name": "plugin",
+      "description": "Author Claude Code skills and hooks, whether they live in a plugin, a project's .claude/, or ~/.claude",
+      "source": "./plugins/plugin"
+    },
+    {
+      "name": "agents",
+      "description": "Run work across multiple Claude Code sessions: agent teams and background handoffs",
+      "source": "./plugins/agents"
     },
     {
       "name": "pull-request",

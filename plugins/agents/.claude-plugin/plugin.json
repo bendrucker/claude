@@ -1,0 +1,8 @@
+{
+  "name": "agents",
+  "description": "Run work across multiple Claude Code sessions: agent teams and background handoffs",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

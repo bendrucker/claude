@@ -661,7 +661,7 @@ export const PATTERNS: PatternDef[] = [
     evidence:
       "2026-07 session-history analysis found semicolon clause-joins at high rate in assistant deliverables after the em dash ban. Substitution drift relocated the run-on habit instead of fixing sentence structure. Short texts (PR bodies, commit messages) sit below the connector-density gate (5+ sentences, 30% density), so a two-splice floor covers them. An occasional single semicolon never fires.",
     retire:
-      "Remove when the deliverable corpus shows the splice rate at or below the hand-written baseline for a 30-day window, or when a labeling pass shows precision below the hook bar. The claude-code:session semicolons-per-1000-words query is the evidence stream.",
+      "Remove when the deliverable corpus shows the splice rate at or below the hand-written baseline for a 30-day window, or when a labeling pass shows precision below the hook bar. The observability:session semicolons-per-1000-words query is the evidence stream.",
   },
   {
     tier: "context",

@@ -19,7 +19,7 @@ gitignored and must never be committed to this public repo.
 Build the session index first if it is stale (the session skill owns it):
 
 ```bash
-bun plugins/claude-code/skills/session/scripts/refresh.ts
+bun plugins/observability/skills/session/scripts/refresh.ts
 ```
 
 Then mine, label, and report:

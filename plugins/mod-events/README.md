@@ -21,10 +21,12 @@ Records land in `<config>/mod-events/<session>/<mod>.<instance>.<n>.jsonl`, `<co
 {"ts":1791304406845,"session":"…","mod":"herdr","event":"herdr.call","ok":true,"ms":12,"detail":{}}
 ```
 
+The session index keeps its rows after retention deletes the oldest files past 500 MB.
+
 A test seats a stub noun from its own `engine.create` and reads the events at `modEvents.emit`:
 
 ```ts
-on("engine.create", async ($, e, next) => ({ ...(await next(e)), modEvents: { emit: async () => undefined } }));
+on("engine.create", async ($, e, next) => ({ ...(await next(e)), modEvents: { emit: () => Promise.resolve() } }));
 on("modEvents.emit", ($, e) => (events.push(e), { value: undefined }));
 ```
 

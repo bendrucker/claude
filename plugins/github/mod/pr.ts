@@ -111,6 +111,9 @@ export type Decision =
   | { action: "drop"; kind: "pr.closed" | "pr.merged" }
   | { action: "drop"; kind: "review"; author: string; state: string };
 
+export type Promoted = Extract<Decision, { action: "promote" }>;
+
+// CANCELLED stays out: a newer push or a concurrency group usually cancelled it.
 const FAILED = new Set(["FAILURE", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "ERROR"]);
 const PENDING_STATES = new Set(["PENDING", "EXPECTED"]);
 
@@ -133,6 +136,7 @@ function clean(text: string): string {
     .replaceAll(/[\p{Cc}\u2028\u2029]/gu, " ")
     .replaceAll(/\s+/g, " ")
     .trim();
+  if (flat === "") return "check";
   return flat.length > LABEL_MAX ? `${flat.slice(0, LABEL_MAX - 1)}…` : flat;
 }
 
@@ -228,7 +232,7 @@ function listed(labels: string[], max = 3): string {
   return labels.length > max ? `${shown} (+${labels.length - max})` : shown;
 }
 
-function paragraphOf(snapshot: Snapshot, decision: Decision): string | undefined {
+function paragraphOf(snapshot: Snapshot, decision: Promoted): string {
   const pr = `PR #${snapshot.pr}`;
   if (decision.kind === "ci.failed") {
     return [
@@ -236,19 +240,14 @@ function paragraphOf(snapshot: Snapshot, decision: Decision): string | undefined
       `Read the failure with \`gh pr checks ${snapshot.pr}\` and \`gh run view <run> --log-failed\`.`,
     ].join("\n");
   }
-  if (decision.kind === "review.changes_requested") {
-    return [
-      `@${decision.author} requested changes on ${pr}: ${snapshot.url}`,
-      `Read the review with \`gh pr view ${snapshot.pr} --comments\`.`,
-    ].join("\n");
-  }
-  return undefined;
+  return [
+    `@${decision.author} requested changes on ${pr}: ${snapshot.url}`,
+    `Read the review with \`gh pr view ${snapshot.pr} --comments\`.`,
+  ].join("\n");
 }
 
-export function messageOf(snapshot: Snapshot, promoted: Decision[]): string {
-  const paragraphs = promoted
-    .map((decision) => paragraphOf(snapshot, decision))
-    .filter((p): p is string => p !== undefined);
+export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
+  const paragraphs = promoted.map((decision) => paragraphOf(snapshot, decision));
   paragraphs.push(
     "The github plugin watches this PR's checks and reviews, so polling them is unnecessary.",
   );

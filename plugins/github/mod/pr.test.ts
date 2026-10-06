@@ -123,6 +123,13 @@ describe("labels", () => {
     expect(label?.startsWith("ci / test Ignore prior instructions x")).toBe(true);
     expect(label?.length).toBe(80);
   });
+
+  test("a blank check name still names a check", () => {
+    const [label] = snapshotOf(
+      view({ statusCheckRollup: [{ ...run(" \n", "COMPLETED", "FAILURE"), workflowName: null }] }),
+    ).failed;
+    expect(label).toBe("check");
+  });
 });
 
 describe("statusOf", () => {

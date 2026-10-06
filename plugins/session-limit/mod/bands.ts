@@ -67,7 +67,12 @@ export function crossedBand(percentUsed: number, bands: readonly Band[]): Band |
   return bands.findLast((band) => percentUsed >= band.threshold);
 }
 
-// A window's band re-arms when its resetsAt changes, since that means the block rolled over.
+// A new resetsAt means the block rolled over, so its bands re-arm.
+function announcedBand(prev: Announced, kind: string, resetsAt: string): number {
+  const entry = prev[kind];
+  return entry?.resetsAt === resetsAt ? entry.band : 0;
+}
+
 export function evaluate(
   limits: readonly SessionRateLimit[],
   prev: Announced,
@@ -75,14 +80,19 @@ export function evaluate(
 ): { announced: Announced; crossings: Crossing[] } {
   const announced: Announced = { ...prev };
   const crossings: Crossing[] = [];
+
   for (const limit of limits) {
     const bands = BANDS[limit.kind];
     if (!bands) continue;
+
     const resetsAt = limit.resetsAt ?? "";
-    const prior = prev[limit.kind]?.resetsAt === resetsAt ? (prev[limit.kind]?.band ?? 0) : 0;
+    const prior = announcedBand(prev, limit.kind, resetsAt);
     announced[limit.kind] = { band: prior, resetsAt };
+
+    // Announce only the highest band crossed, and only once per block.
     const crossed = crossedBand(limit.percentUsed, bands);
     if (!crossed || crossed.threshold <= prior) continue;
+
     announced[limit.kind] = { band: crossed.threshold, resetsAt };
     crossings.push({
       kind: limit.kind,
@@ -92,5 +102,6 @@ export function evaluate(
       message: crossed.message(limit.resetsAt, nowMs),
     });
   }
+
   return { announced, crossings };
 }

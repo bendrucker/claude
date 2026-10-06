@@ -47,6 +47,10 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/) and auto-inje
 - `bun run skill-lint "plugins/<name>/skills/*"`: validates SKILL.md frontmatter and reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
 - `bun run check`: runs `oxlint --type-aware` then `oxfmt --check`. Runs in CI.
 
+## Inventory
+
+To answer what customizations exist, run `bun run inventory [kind]` instead of reading through `plugins/`, `user/`, and `.claude/`. The kinds are `summary` (the default), `plugins`, `skills`, `agents`, `commands`, `hooks`, `mods`, `rules`, and `mcp`. `--plugin <name>` narrows to one plugin, `--scope plugin|user|project` to one scope, and `--json` emits the records instead of a table. `mods` lists each function-hooks module with its plugin, entry file, subscribed events, the UI surfaces it draws, and its `hooks.json` description.
+
 ## Evals
 
 Per-skill harnesses live inside the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, with a README per harness covering its loop: `pull-request/evals/pr-body`, `issue/evals/issue-refine`, `review/evals/review-voice`, `comments/evals/comment-density`, and `prompting/evals/rule-precision`. They share a shape: mine a sample, label it in a browser, then score or A/B. Hand-made ground truth stays tracked (`scenarios/`, `labels.json`, `briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, as is the shared `evals/results/` corpus, and some hold work-repo content that must not land here. The generic layer stays in [`evals/`](evals/): the corpus, the export and cost scripts, and their tests.

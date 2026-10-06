@@ -9,6 +9,7 @@ export const KINDS = [
   "agents",
   "commands",
   "hooks",
+  "mods",
   "rules",
   "mcp",
 ] as const;
@@ -46,7 +47,7 @@ function invocation(skill: { modelInvocable: boolean; userInvocable: boolean }):
   return joined !== "" ? joined : "none";
 }
 
-// Plugins and MCP servers exist only in the plugin scope, so their row skips
+// Plugins, mods, and MCP servers exist only in the plugin scope, so their row skips
 // the per-scope split the others break down by.
 function pluginOnly(kind: string, total: number, note: string): string[] {
   return [kind, String(total), "-", "-", String(total), note];
@@ -77,6 +78,7 @@ function counts(inventory: Inventory): Columns {
         row.push(String(items.length), "");
         return row;
       }),
+      pluginOnly("mods", inventory.mods.length, ""),
       pluginOnly("mcp", inventory.mcpServers.length, ""),
     ],
   };
@@ -94,7 +96,18 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
       return counts(inventory);
     case "plugins":
       return {
-        head: ["plugin", "on", "listed", "skills", "agents", "cmds", "hooks", "mcp", "description"],
+        head: [
+          "plugin",
+          "on",
+          "listed",
+          "skills",
+          "agents",
+          "cmds",
+          "hooks",
+          "mods",
+          "mcp",
+          "description",
+        ],
         rows: inventory.plugins.map((p) => {
           // A plugin listed from a remote source has nothing to count here.
           const count = (value: number): string => (p.local ? String(value) : "-");
@@ -106,6 +119,7 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
             count(p.agents),
             count(p.commands),
             count(p.hooks),
+            count(p.mods),
             count(p.mcpServers),
             cut(p.description),
           ];
@@ -153,6 +167,17 @@ function columns(inventory: Inventory, kind: Kind, width: number): Columns {
             cut(h.command),
           ];
         }),
+      };
+    case "mods":
+      return {
+        head: ["plugin", "entry", "events", "surfaces", "description"],
+        rows: inventory.mods.map((m) => [
+          m.plugin,
+          m.path,
+          m.events.join(", "),
+          m.surfaces.length > 0 ? m.surfaces.join(", ") : "-",
+          cut(m.description),
+        ]),
       };
     case "rules":
       return {

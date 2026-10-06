@@ -1,7 +1,7 @@
 import { basename, join } from "node:path";
 import { z } from "zod";
 import { decodeFile } from "../../packages/decode/index";
-import { loadPlugins } from "../../packages/marketplace/index";
+import { loadPlugins, type Plugin } from "../../packages/marketplace/index";
 import {
   AGENT_GLOBS,
   COMMAND_GLOBS,
@@ -17,6 +17,7 @@ import {
   SKILL_GLOBS,
   skillName,
 } from "../assets";
+import { scanMod } from "./mods";
 
 export interface Skill extends Origin {
   name: string;
@@ -50,6 +51,14 @@ export interface Rule extends Origin {
   paths: string[];
 }
 
+/** One function-hooks module a plugin's `hooks.json` names under `modules`. */
+export interface Mod extends Origin {
+  plugin: string;
+  events: string[];
+  surfaces: string[];
+  description: string;
+}
+
 export interface McpServer {
   name: string;
   plugin: string;
@@ -67,6 +76,7 @@ export interface PluginSummary {
   agents: number;
   commands: number;
   hooks: number;
+  mods: number;
   mcpServers: number;
 }
 
@@ -76,6 +86,7 @@ export interface Inventory {
   agents: Agent[];
   commands: Command[];
   hooks: Hook[];
+  mods: Mod[];
   rules: Rule[];
   mcpServers: McpServer[];
 }
@@ -223,6 +234,18 @@ async function settingsHooks(path: string): Promise<Hook[]> {
   return [...hookEntries(path, settings.hooks)];
 }
 
+async function pluginMods(plugin: Plugin): Promise<Mod[]> {
+  const hooksDir = `plugins/${plugin.name}/hooks`;
+  const description = text(plugin.hooks?.description);
+  return Promise.all(
+    (plugin.hooks?.modules ?? []).map(async (module) => {
+      const path = join(hooksDir, module);
+      const { events, surfaces } = await scanMod(path);
+      return { scope: "plugin", path, plugin: plugin.name, events, surfaces, description };
+    }),
+  );
+}
+
 export interface Filters {
   plugin?: string;
   scope?: Scope;
@@ -243,6 +266,7 @@ export function filter(inventory: Inventory, { plugin, scope }: Filters): Invent
     commands: inventory.commands.filter(keep),
     rules: inventory.rules.filter(keep),
     hooks: inventory.hooks.filter(keep),
+    mods: inventory.mods.filter(keep),
     mcpServers: inventory.mcpServers.filter((item) => named(item.plugin)),
   };
 }
@@ -266,6 +290,9 @@ export async function collect(): Promise<Inventory> {
   ]);
 
   const skills = fromSkills.map(({ skill }) => skill);
+  const mods = (await Promise.all(plugins.map(pluginMods)))
+    .flat()
+    .toSorted((a, b) => a.path.localeCompare(b.path));
   const hooks = [
     ...plugins.flatMap((plugin) =>
       plugin.hooks
@@ -287,12 +314,14 @@ export async function collect(): Promise<Inventory> {
       agents: owned(agents, plugin.name),
       commands: owned(commands, plugin.name),
       hooks: owned(hooks, plugin.name),
+      mods: owned(mods, plugin.name),
       mcpServers: plugin.mcpServers.length,
     })),
     skills: byName(skills),
     agents: byName(agents),
     commands: byName(commands),
     hooks,
+    mods,
     rules: byName(rules),
     mcpServers: plugins.flatMap((plugin) =>
       plugin.mcpServers.map((name) => ({

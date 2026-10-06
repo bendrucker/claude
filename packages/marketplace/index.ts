@@ -22,6 +22,7 @@ export const HooksFile = z
   .looseObject({
     hooks: z.record(z.string(), z.array(MatcherEntry)).optional(),
     modules: z.array(z.string()).optional(),
+    description: z.string().optional(),
   })
   .refine((file) => file.hooks !== undefined || file.modules !== undefined, {
     message: "names neither hooks nor modules",

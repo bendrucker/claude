@@ -1,0 +1,8 @@
+{
+  "name": "selection-capture",
+  "description": "Capture the selected transcript text as a Things to-do or a Linear issue draft with /things and /linear",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

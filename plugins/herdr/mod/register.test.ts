@@ -13,7 +13,12 @@ const COMPLETE = {
   reason: "answer",
 } as const;
 
-const REPORT = "herdr pane report-metadata w1:p1 --source bendrucker:herdr";
+const report = (seq: number, args: string) =>
+  `herdr pane report-metadata w1:p1 --source bendrucker:herdr --seq ${seq} ${args}`;
+
+const CLEAR_ALL = ["subagents", "teammates", "agents_waiting", "agents_idle", "branch"]
+  .map((name) => `--clear-token ${name}`)
+  .join(" ");
 
 function agent(status: AgentInfo["status"], teammateId?: string): AgentInfo {
   return { id: `a-${status}`, description: "", type: "Explore", status, teammateId };
@@ -69,10 +74,7 @@ describe("register", () => {
     await end($);
     await herdr.clock.settle();
 
-    expect(herdr.calls).toEqual([
-      `${REPORT} --token branch=main`,
-      `${REPORT} --clear-token branch`,
-    ]);
+    expect(herdr.calls).toEqual([report(1, "--token branch=main"), report(2, CLEAR_ALL)]);
     expect(herdr.events.map(({ event, ok }) => [event, ok])).toEqual([
       ["session.start", undefined],
       ["herdr.call", true],
@@ -95,7 +97,10 @@ describe("register", () => {
     await herdr.clock.settle();
 
     expect(herdr.calls.at(-1)).toBe(
-      `${REPORT} --token subagents=↳2 --token teammates=⇄1 --token agents_waiting=?1 --token agents_idle=·1`,
+      report(
+        2,
+        "--token subagents=↳2 --token teammates=⇄1 --token agents_waiting=?1 --token agents_idle=·1",
+      ),
     );
   });
 
@@ -112,8 +117,23 @@ describe("register", () => {
     await herdr.clock.settle();
 
     expect(herdr.calls).toEqual([
-      `${REPORT} --token subagents=↳1 --token branch=main`,
-      `${REPORT} --clear-token subagents --token branch=topic`,
+      report(1, "--token subagents=↳1 --token branch=main"),
+      report(2, "--clear-token subagents --token branch=topic"),
+    ]);
+  });
+
+  test("re-reads the counts on a timer while an agent is counted", async ($, on) => {
+    const herdr = herdrOf(on, HERDR, { agents: [agent("running")] });
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    herdr.state.agents = [];
+    await herdr.clock.advance(10_000);
+    await herdr.clock.advance(30_000);
+
+    expect(herdr.calls).toEqual([
+      report(1, "--token subagents=↳1 --token branch=main"),
+      report(2, "--clear-token subagents"),
     ]);
   });
 
@@ -125,7 +145,7 @@ describe("register", () => {
     await $.session.end({ reason: "clear", sessionId: "s1", resume: { id: "s1" } });
     await herdr.clock.settle();
 
-    expect(herdr.calls).toEqual([`${REPORT} --token branch=main`]);
+    expect(herdr.calls).toEqual([report(1, "--token branch=main")]);
   });
 
   test("a failed report emits an event and is retried on the next event", async ($, on) => {
@@ -144,7 +164,10 @@ describe("register", () => {
         detail: { op: "report-metadata", exitCode: 1, stderr: "pane_not_found" },
       },
     ]);
-    expect(herdr.calls).toEqual([`${REPORT} --token branch=main`, `${REPORT} --token branch=main`]);
+    expect(herdr.calls).toEqual([
+      report(1, "--token branch=main"),
+      report(2, "--token branch=main"),
+    ]);
   });
 
   test("a herdr that cannot start emits a failed call", async ($, on) => {

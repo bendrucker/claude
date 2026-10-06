@@ -445,6 +445,7 @@
     "type-ignore@bendrucker": true,
     "worktrunk@worktrunk": true,
     "plan@bendrucker": true,
+    "mod-events@bendrucker": true,
     "linear-cli@linear-cli": true,
     "bun@bendrucker": true,
     "mermaid@bendrucker": true,

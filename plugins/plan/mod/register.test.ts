@@ -1,5 +1,6 @@
 import type { On, ToolCallResult } from "claude-code";
 import { describe, expect, mock, test } from "claude-code/testing";
+import type { ModEventsInput } from "../../mod-events/types";
 import { LIMIT, isPlanFile, statusText } from "./register.ts";
 
 const HOME = "/Users/u";
@@ -8,11 +9,20 @@ const PLAN = `${HOME}/.claude/plans/quiet-otter.md`;
 interface World {
   files: Record<string, string>;
   status: (string | undefined)[];
+  events: ModEventsInput[];
 }
 
 function worldOf(on: On, { result = { result: "ok" } }: { result?: ToolCallResult } = {}): World {
-  const world: World = { files: {}, status: [] };
+  const world: World = { files: {}, status: [], events: [] };
   mock.env(on, { HOME });
+  on("engine.create", async ($, e, next) => ({
+    ...(await next(e)),
+    modEvents: { emit: () => Promise.resolve() },
+  }));
+  on("modEvents.emit", ($, e) => {
+    world.events.push(e);
+    return { value: undefined };
+  });
   on("tool.call", () => result);
   on("fs.read", ($, e) => {
     const text = world.files[e.path];
@@ -96,5 +106,37 @@ describe("register", () => {
     await $.tool.call({ tool: "Write", file_path: PLAN, content: "x", tool_use_id: "t1" });
     await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
     expect(world.status).toEqual(["plan 1 / 10,000", undefined]);
+  });
+
+  test("logs each count and each crossing of the limit", async ($, on) => {
+    const world = worldOf(on);
+    const write = async (chars: number, id: string) => {
+      world.files[PLAN] = "x".repeat(chars);
+      await $.tool.call({ tool: "Write", file_path: PLAN, content: "", tool_use_id: id });
+    };
+    await write(12_000, "t1");
+    await write(11_000, "t2");
+    await write(9_000, "t3");
+    await write(9_500, "t4");
+    expect(world.events.map((e) => [e.event, e.detail?.chars, e.detail?.direction])).toEqual([
+      ["plan.count", 12_000, undefined],
+      ["plan.crossed", 12_000, "over"],
+      ["plan.count", 11_000, undefined],
+      ["plan.count", 9_000, undefined],
+      ["plan.crossed", 9_000, "under"],
+      ["plan.count", 9_500, undefined],
+    ]);
+    expect(world.events[0]).toEqual({
+      mod: "plan",
+      event: "plan.count",
+      detail: { file: "quiet-otter.md", chars: 12_000, limit: LIMIT, over: true, tool: "Write" },
+    });
+  });
+
+  test("records that it was live at session start", async ($, on) => {
+    const world = worldOf(on);
+    on("session.start", (_, e) => ({ cwd: e.cwd }));
+    await $.session.start({ surface: "terminal", isInteractive: true, cwd: "/work" });
+    expect(world.events).toEqual([{ mod: "plan", event: "session.start" }]);
   });
 });

@@ -39,6 +39,11 @@ export function statusText(chars: number): string {
 export function register(on: On): void {
   const wasOver = new Map<string, boolean>();
 
+  on("session.start", ($, e, next) => {
+    void $.modEvents.emit({ mod: "plan", event: "session.start" });
+    return next(e);
+  });
+
   on("tool.call", { tool: ["Write", "Edit"] }, async ($, e, next) => {
     const result = await next(e);
     if (result.deny !== undefined || result.isError) return result;
@@ -56,17 +61,19 @@ export function register(on: On): void {
     const over = chars > LIMIT;
     const file = e.file_path.slice(e.file_path.lastIndexOf("/") + 1);
     $.ui.status(statusText(chars));
-    await emit($, "plan.count", { file, chars, limit: LIMIT, over, tool: e.tool });
+    const count: PlanCount = { file, chars, limit: LIMIT, over, tool: e.tool };
+    void $.modEvents.emit({ mod: "plan", event: "plan.count", detail: { ...count } });
 
-    const previous = wasOver.get(e.file_path);
+    const previous = wasOver.get(e.file_path) ?? false;
     wasOver.set(e.file_path, over);
-    if (previous !== undefined && previous !== over) {
-      await emit($, "plan.crossed", {
+    if (previous !== over) {
+      const crossed: PlanCrossed = {
         file,
         chars,
         limit: LIMIT,
         direction: over ? "over" : "under",
-      });
+      };
+      void $.modEvents.emit({ mod: "plan", event: "plan.crossed", detail: { ...crossed } });
     }
     return result;
   });
@@ -77,6 +84,3 @@ export function register(on: On): void {
     return result;
   });
 }
-
-// Placeholder until the mods-observability event writer lands.
-async function emit(_$: unknown, _event: string, _data: PlanCount | PlanCrossed): Promise<void> {}

@@ -1,6 +1,4 @@
-# Link workspace deps (@bendrucker/*) so bun scripts and hooks resolve them
-# immediately. bun's auto-install only fetches registry packages, not
-# workspace:* specifiers, so a fresh worktree needs `bun install` to create the
-# node_modules symlinks. `mod-types` then writes the engine declarations mods
-# type-check against. Runs in the background to avoid blocking session start.
+# bun's auto-install skips workspace:* specifiers, so a fresh worktree needs
+# `bun install` to link them. `mod-types` then writes the engine declarations
+# mods type-check against.
 post-start = "bun install && bun run mod-types"

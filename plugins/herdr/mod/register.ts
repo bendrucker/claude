@@ -1,115 +1,147 @@
-import type { EngineInterface, On } from "claude-code";
+import type { AgentInfo, EngineInterface, On } from "claude-code";
 
-const MOD = "herdr";
 const SOURCE = "bendrucker:herdr";
-const AGENT = "claude";
-
-type State = "idle" | "working" | "blocked";
 
 // A /clear or /resume ends the conversation, not the process, and no
 // session.start follows it.
 const CONTINUING = new Set(["clear", "resume"]);
 
+const ACTIVE = new Set(["pending", "running", "waiting", "idle"]);
+
+type Tokens = Record<string, string>;
+
 interface Beacon {
   pane: { bin: string; id: string } | undefined;
-  seq: number;
+  reported: Tokens;
+  inFlight: Promise<void> | undefined;
+  requests: number;
 }
 
-// herdr drops a report whose seq is not above the last one, and the spawns land
-// in any order, so each report takes its seq synchronously when it is made.
-function nextSeq(beacon: Beacon): string {
-  beacon.seq += 1;
-  return String(beacon.seq);
+function count(agents: AgentInfo[], glyph: string, keep: (agent: AgentInfo) => boolean): string {
+  const n = agents.filter(keep).length;
+  return n === 0 ? "" : `${glyph}${n}`;
 }
 
-async function send($: EngineInterface, beacon: Beacon, args: string[]): Promise<void> {
+export function tokensOf(agents: AgentInfo[], branch: string): Tokens {
+  const active = agents.filter((agent) => ACTIVE.has(agent.status));
+  return {
+    subagents: count(active, "↳", (agent) => agent.teammateId === undefined),
+    teammates: count(active, "⇄", (agent) => agent.teammateId !== undefined),
+    agents_waiting: count(active, "?", (agent) => agent.status === "waiting"),
+    agents_idle: count(active, "·", (agent) => agent.status === "idle"),
+    branch,
+  };
+}
+
+async function herdr($: EngineInterface, beacon: Beacon, args: string[]): Promise<boolean> {
   const pane = beacon.pane;
-  if (pane === undefined) return;
-  const seq = nextSeq(beacon);
-  const command = args[0];
-  const started = await $.clock.now();
-  let detail: Record<string, unknown>;
-  let ok = false;
-  try {
-    const argv = [
-      pane.bin,
-      "pane",
-      ...args,
-      "--source",
-      SOURCE,
-      "--agent",
-      AGENT,
-      "--seq",
-      seq,
-      pane.id,
-    ];
-    const { exitCode, stderr } = await $.process.run(argv);
-    if (exitCode !== 0) $.ui.log(`herdr ${command} failed: ${stderr.trim()}`, { to: "debug" });
-    ok = exitCode === 0;
-    detail = { command, args: args.slice(1), exitCode, stderr: stderr.trim() };
-  } catch (error) {
-    $.ui.log(`herdr ${command} failed: ${String(error)}`, { to: "debug" });
-    detail = { command, args: args.slice(1), error: String(error) };
-  }
-  const ms = (await $.clock.now()) - started;
-  void $.modEvents.emit({ mod: MOD, event: "herdr.call", ok, ms, detail });
+  if (pane === undefined) return false;
+  const argv = [pane.bin, "pane", args[0], pane.id, "--source", SOURCE, ...args.slice(1)];
+  const startedAt = await $.clock.now();
+  const { exitCode, stderr } = await $.process
+    .run(argv, { timeoutMs: 1000 })
+    .catch((error: unknown) => ({ exitCode: -1, stderr: String(error) }));
+  const durationMs = (await $.clock.now()) - startedAt;
+  record($, { op: args[0], exitCode, stderr: stderr.trim(), durationMs });
+  return exitCode === 0;
 }
 
-function report($: EngineInterface, beacon: Beacon, state: State): void {
-  void send($, beacon, ["report-agent", "--state", state]);
+function record(
+  $: EngineInterface,
+  event: { op: string; exitCode: number; stderr: string; durationMs: number },
+): void {
+  if (event.exitCode !== 0) $.ui.log(`herdr ${event.op} failed: ${event.stderr}`, { to: "debug" });
+}
+
+async function branchOf($: EngineInterface): Promise<string> {
+  try {
+    const { exitCode, stdout } = await $.process.run(["git", "branch", "--show-current"], {
+      timeoutMs: 1000,
+    });
+    return exitCode === 0 ? stdout.trim() : "";
+  } catch {
+    // A session outside git, or without git installed, has no branch to show.
+    return "";
+  }
+}
+
+async function publish($: EngineInterface, beacon: Beacon, tokens: Tokens): Promise<void> {
+  const args: string[] = [];
+  for (const [name, value] of Object.entries(tokens)) {
+    if ((beacon.reported[name] ?? "") === value) continue;
+    args.push(...(value === "" ? ["--clear-token", name] : ["--token", `${name}=${value}`]));
+  }
+  if (args.length === 0) return;
+  if (await herdr($, beacon, ["report-metadata", ...args])) {
+    beacon.reported = Object.fromEntries(
+      Object.entries(tokens).filter(([, value]) => value !== ""),
+    );
+  }
+}
+
+async function drain($: EngineInterface, beacon: Beacon): Promise<void> {
+  const seen = beacon.requests;
+  try {
+    const [agents, branch] = await Promise.all([$.agent.list(), branchOf($)]);
+    await publish($, beacon, tokensOf(agents, branch));
+  } catch (error) {
+    $.ui.log(`herdr refresh failed: ${String(error)}`, { to: "debug" });
+  }
+  if (beacon.requests !== seen && beacon.pane !== undefined) return drain($, beacon);
+  beacon.inFlight = undefined;
+}
+
+// Events arrive in bursts, so a refresh that lands mid-flight is counted and
+// the running one reads again rather than racing it.
+function refresh($: EngineInterface, beacon: Beacon): void {
+  if (beacon.pane === undefined) return;
+  beacon.requests += 1;
+  beacon.inFlight ??= drain($, beacon);
 }
 
 /**
- * Reports this session's lifecycle to the herdr pane hosting it. Permission
- * dialogs are left to herdr's visible-blocker override, since no event marks
- * one closing.
+ * Publishes what herdr cannot see from outside the session as metadata tokens
+ * on the pane hosting it: its subagents and teammates, how many of them wait or
+ * sit idle, and the branch. Lifecycle stays with herdr's own integration.
  */
 export function register(on: On): void {
-  const beacon: Beacon = { pane: undefined, seq: 0 };
+  const beacon: Beacon = { pane: undefined, reported: {}, inFlight: undefined, requests: 0 };
 
   on("session.start", async ($, e, next) => {
-    const [env, id, bin, now] = await Promise.all([
+    const [env, id, bin] = await Promise.all([
       $.env.get("HERDR_ENV"),
       $.env.get("HERDR_PANE_ID"),
       $.env.get("HERDR_BIN_PATH"),
-      $.clock.now(),
     ]);
-    // Clock-based, so a restarted session's seqs stay above the last one's.
-    beacon.seq = Math.max(beacon.seq, now * 1000);
     const isHosted = env === "1" && id !== undefined && id !== "" && e.isInteractive;
     beacon.pane = isHosted
       ? { bin: bin === undefined || bin === "" ? "herdr" : bin, id }
       : undefined;
-    void $.modEvents.emit({ mod: MOD, event: "session.start", detail: { isHosted } });
-    report($, beacon, "idle");
+    refresh($, beacon);
     return next(e);
   });
 
   on("turn.start", ($, e, next) => {
-    report($, beacon, "working");
+    refresh($, beacon);
     return next(e);
   });
 
   on("turn.complete", ($, e, next) => {
-    if (e.agentId === undefined) report($, beacon, "idle");
+    refresh($, beacon);
     return next(e);
   });
 
-  on("tool.call", { tool: "AskUserQuestion" }, async ($, e, next) => {
-    report($, beacon, "blocked");
-    try {
-      return await next(e);
-    } finally {
-      report($, beacon, "working");
-    }
-  }).catch(($, e, next) => next(e));
-
   on("session.end", async ($, e, next) => {
     if (CONTINUING.has(e.reason)) {
-      report($, beacon, "idle");
+      refresh($, beacon);
       return next(e);
     }
-    await send($, beacon, ["release-agent"]);
+    await beacon.inFlight;
+    await publish(
+      $,
+      beacon,
+      Object.fromEntries(Object.keys(beacon.reported).map((name) => [name, ""])),
+    );
     beacon.pane = undefined;
     return next(e);
   });

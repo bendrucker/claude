@@ -16,7 +16,7 @@ export interface Crossing {
 }
 
 // Auto-scheduling a wake-up caps out around an hour. Past this horizon the model
-// defers to the user instead of scheduling.
+// defers to the user.
 const WAKEUP_HORIZON_MS = 55 * 60 * 1000;
 
 export const BANDS: Record<string, Band[]> = {

@@ -1,4 +1,6 @@
-import { expect, test } from "bun:test";
+import { afterAll, expect, test } from "bun:test";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { join, relative } from "node:path";
 import {
   AGENT_GLOBS,
   assetPaths,
@@ -6,10 +8,12 @@ import {
   namespaced,
   origin,
   RULE_GLOBS,
+  root,
   SKILL_GLOBS,
   scopeOf,
 } from "../assets";
 import { collect, filter, hookEntries, type Inventory } from "./collect";
+import { scanMod } from "./mods";
 import { isKind, KINDS, type Kind, render, section } from "./report";
 
 const fixture: Inventory = {
@@ -24,6 +28,7 @@ const fixture: Inventory = {
       agents: 0,
       commands: 0,
       hooks: 2,
+      mods: 0,
       mcpServers: 0,
     },
     {
@@ -36,6 +41,7 @@ const fixture: Inventory = {
       agents: 0,
       commands: 0,
       hooks: 0,
+      mods: 0,
       mcpServers: 0,
     },
   ],
@@ -78,6 +84,16 @@ const fixture: Inventory = {
       matcher: "Bash(git commit:*)",
       condition: "",
       command: "bun plugins/git/scripts/block-commit.ts",
+    },
+  ],
+  mods: [
+    {
+      scope: "plugin",
+      path: "plugins/git/mod/register.tsx",
+      plugin: "git",
+      events: ["session.start", "ui.render"],
+      surfaces: ["AbovePrompt", "status"],
+      description: "Shows the branch above the prompt",
     },
   ],
   rules: [
@@ -221,12 +237,14 @@ test("filter narrows every kind to one plugin", () => {
     skills: scoped.skills.map((s) => s.name),
     agents: scoped.agents.length,
     hooks: scoped.hooks.length,
+    mods: scoped.mods.length,
     mcpServers: scoped.mcpServers.length,
   }).toMatchInlineSnapshot(`
     {
       "agents": 0,
       "hooks": 1,
       "mcpServers": 0,
+      "mods": 1,
       "plugins": [
         "git",
       ],
@@ -243,6 +261,7 @@ test("filter narrows every kind to one scope", () => {
   expect(scoped.skills.map((s) => s.name)).toEqual(["afk"]);
   expect(scoped.plugins).toBeEmpty();
   expect(scoped.hooks).toBeEmpty();
+  expect(scoped.mods).toBeEmpty();
 });
 
 test.each<{ name: string; globs: string[] }>([
@@ -294,4 +313,68 @@ test("collect finds this repo's assets", async () => {
   expect(new Set(inventory.hooks.map((h) => h.scope))).toEqual(
     new Set(["plugin", "user", "project"]),
   );
+});
+
+await mkdir(join(root, "tmp"), { recursive: true });
+const scratch = await mkdtemp(join(root, "tmp", "inventory-mod-"));
+afterAll(() => rm(scratch, { recursive: true, force: true }));
+
+test("scanMod follows relative imports and names what the module draws", async () => {
+  await mkdir(join(scratch, "mod"), { recursive: true });
+  await Bun.write(
+    join(scratch, "mod/register.tsx"),
+    `import type { On } from "claude-code";
+import { band } from "./band";
+export { pane } from "./pane";
+
+const dynamic = "turn.start";
+
+export function register(on: On): void {
+  on("session.start", ($, e, next) => { $.ui.status("ready"); return next(e); });
+  on("ui.render", { component: "Pane", requestId: "x" }, ($, e, next) => next(e));
+  on(dynamic, ($, e, next) => next(e));
+  band(on);
+}
+`,
+  );
+  await Bun.write(
+    join(scratch, "mod/band.ts"),
+    `import type { On } from "claude-code";
+
+export function band(on: On): void {
+  on("ui.render", ($, e, next) => { $.ui.toast("hi"); return next(e); });
+  on("session.start", ($, e, next) => next(e));
+}
+`,
+  );
+
+  await Bun.write(
+    join(scratch, "mod/pane.ts"),
+    `export function pane(on: On): void {
+  on("command.run", ($, e, next) => next(e));
+}
+`,
+  );
+
+  expect(await scanMod(relative(root, join(scratch, "mod/register.tsx")))).toEqual({
+    events: ["command.run", "session.start", "ui.render"],
+    surfaces: ["Pane", "status", "toast", "ui.render"],
+  });
+});
+
+test("scanMod rejects a module path that names no file", async () => {
+  const failure = await scanMod(relative(root, join(scratch, "missing.ts"))).catch(
+    (error: unknown) => error,
+  );
+
+  expect(failure).toBeInstanceOf(Error);
+  expect(String(failure)).toContain("mod module not found");
+});
+
+test("collect lists the mods this repo's plugins name", async () => {
+  const { mods } = await collect();
+  const herdr = mods.find((mod) => mod.plugin === "herdr");
+
+  expect(herdr?.path).toBe("plugins/herdr/mod/register.ts");
+  expect(herdr?.events).toContain("session.start");
 });

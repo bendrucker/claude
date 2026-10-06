@@ -141,6 +141,6 @@ describe("register", () => {
   test("leaves other commands to the engine", async ($, on) => {
     hostOf(on);
     await $.session.start(START);
-    expect((await $.command.run({ command: "help" })).text).toBe("core");
+    expect((await $.command.run({ command: "help", args: "" })).text).toBe("core");
   });
 });

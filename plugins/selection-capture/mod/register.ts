@@ -161,5 +161,7 @@ export function register(on: On): void {
   on("command.run", ($, e, next) => {
     const target = served.get(e.command);
     return target === undefined ? next(e) : guarded($, target, e.args);
-  });
+  }).catch(($, e, next) =>
+    next.called ? next(e) : { text: `Could not capture the selection for /${e.command}.` },
+  );
 }

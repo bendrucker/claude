@@ -125,7 +125,7 @@
     },
     {
       "name": "mod-events",
-      "description": "Structured event log for mods: `$.modEvents.emit` writes per-session OTel log records as JSONL, which the session index ingests as `mod_events`",
+      "description": "Structured event log for mods: `$.modEvents.emit` writes per-session OTel log records as JSONL",
       "source": "./plugins/mod-events"
     },
     {

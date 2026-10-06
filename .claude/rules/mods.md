@@ -26,7 +26,7 @@ export function register(on: On): void {
 }
 ```
 
-Every tool keys on that directory. The root tsconfig and `bun test` skip it, and lint relaxes the rules that fire on `any` there. CI and the `plugin-test` pre-commit hook run its tests. A mod imports only its own plugin's files and `claude-code`. A dependency's contract reaches its types through the tsconfig `include`. The engine has no Node, filesystem, or npm resolution.
+Every tool keys on that directory. The root tsconfig and `bun test` skip it, and lint relaxes the rules that fire on `any` there. CI and the `plugin-test` pre-commit hook run its tests. A mod imports only its own plugin's files and `claude-code`. To use a dependency's types, add its `types` directory to the mod's tsconfig `include`. The engine has no Node, filesystem, or npm resolution.
 
 ## Types
 

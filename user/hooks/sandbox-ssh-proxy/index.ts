@@ -29,5 +29,9 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  main().catch(console.error);
+  try {
+    await main();
+  } catch (error) {
+    console.error(error);
+  }
 }

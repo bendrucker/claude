@@ -166,6 +166,21 @@ describe("register", () => {
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["review"]);
   });
 
+  test("a comment review keeps an alert shown as sent", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = pr("FAILURE");
+    await w.clock.advance(POLL_MS.pending);
+    world.view = pr("FAILURE", [{ id: "r1", state: "COMMENTED", author: { login: "bot" } }]);
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits.length).toBe(1);
+    expect(w.statuses.at(-1)).toBe("CI ✗ ci / test → Claude");
+  });
+
   test("stays idle without gh", async ($, on) => {
     const w = worldOf(on, { branch: "topic", gh: new Error("ENOENT"), view: pr("") });
 

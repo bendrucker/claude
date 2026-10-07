@@ -65,14 +65,12 @@ export function register(on: On): void {
     const drawing = await next(e);
     const grouped = blocks(e.props.text);
     const found = grouped.flat();
-    const parsed = { requestId: e.requestId, found, runs: runAlls(grouped) };
     // A reply with no commands still clears the list, but a later block of the
     // latest reply without any keeps the ones an earlier block offered.
-    if (!seen.has(e.requestId)) {
+    const first = !seen.has(e.requestId);
+    if (first || (e.requestId === latest.requestId && found.length > 0)) {
       seen.add(e.requestId);
-      latest = parsed;
-    } else if (e.requestId === latest.requestId && found.length > 0) {
-      latest = parsed;
+      latest = { requestId: e.requestId, found, runs: runAlls(grouped) };
     }
     if (!shell || found.length === 0) return drawing;
     const { Box, Button } = $.ui.resolve(e);
@@ -135,10 +133,11 @@ export function register(on: On): void {
     const command = pressed(e.element);
     if (command === undefined) return next(e);
     const index = RUN_ALL.exec(e.element)?.[1];
-    const run = index === undefined ? undefined : latest.runs[Number(index)];
-    if (run !== undefined) {
-      const detail = { count: run.count, source: "click" };
-      void $.modEvents.emit({ mod: MOD, event: "pick.all", detail });
+    if (index !== undefined) {
+      // The list may have moved on since the button drew, so only a matching run gives the count.
+      const run = latest.runs[Number(index)];
+      const count = run?.command === command ? run.count : undefined;
+      void $.modEvents.emit({ mod: MOD, event: "pick.all", detail: { count, source: "click" } });
     } else {
       void $.modEvents.emit({ mod: MOD, event: "pick", detail: { command, source: "click" } });
     }

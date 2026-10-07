@@ -17,7 +17,24 @@ function keepsBlock(line: string): boolean {
  * out the rest of the chain, and a lone `&` backgrounds.
  */
 function chainable(command: string): boolean {
-  return !command.includes("||") && !/[;#&]/.test(command.replace(CHAINING_AMPERSANDS, ""));
+  return (
+    complete(command) &&
+    !command.includes("||") &&
+    !/[;#&]/.test(command.replaceAll(CHAINING_AMPERSANDS, ""))
+  );
+}
+
+const count = (text: string, char: string): number => text.split(char).length - 1;
+
+/** A command that continues past its line would swallow the ` && ` after it. */
+function complete(command: string): boolean {
+  if (/(?:\\|\||&&)$/.test(command) || /(?<!<)<<(?!<)/.test(command)) return false;
+  const unescaped = command.replaceAll(/\\./g, "");
+  return (
+    count(unescaped, "'") % 2 === 0 &&
+    count(unescaped, '"') % 2 === 0 &&
+    count(unescaped, "(") === count(unescaped, ")")
+  );
 }
 
 /** A reply's commands, grouped into runs that only blank lines and fences separate. */
@@ -35,10 +52,6 @@ export function blocks(text: string): string[][] {
     }
   }
   return found;
-}
-
-export function commands(text: string): string[] {
-  return blocks(text).flat();
 }
 
 /** Joins a block with `&&` so it stops at the first failure, if each command chains safely. */

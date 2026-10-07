@@ -4,7 +4,7 @@ Fill a reply's `! <command>` suggestions into the shell prompt instead of copyin
 
 ## Contents
 
-- **Mod**: Once you type `!`, [`register.tsx`](mod/register.tsx) offers a reply's `! <command>` lines as a button under the reply and a numbered list above the prompt. A digit or a click fills the command. Commands that only blank lines separate form a block, and each block gets a "run all" entry (`0` for the first) that fills them joined with `&&`, so the run stops at the first failure. A block holding `;`, `||`, `#`, or a backgrounding `&` gets none, since chaining would misbehave. It records `list.shown` with the count, `pick` with its source (`digit` or `click`), and `pick.all` with the block's size and source through [`mod-events`](../mod-events). Requires `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
+- **Mod**: Once you type `!`, [`register.tsx`](mod/register.tsx) offers a reply's `! <command>` lines as a button under the reply and a numbered list above the prompt. A digit or a click fills the command. Commands that only blank lines separate form a block, and each block gets a "run all" entry (`0` for the first) that fills them joined with `&&`, so the run stops at the first failure. A block holding `;`, `||`, `#`, a backgrounding `&`, or a command left open (a trailing `\`, `|`, or `&&`, an unbalanced quote, a heredoc) gets none, since chaining would misbehave. It records `list.shown` with the count, `pick` with its source (`digit` or `click`), and `pick.all` with the block's size and source through [`mod-events`](../mod-events). Requires `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
 
 ## Tests
 

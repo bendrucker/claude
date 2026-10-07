@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
-import { blocks, chain, commands, LIMIT, pick, runAlls } from "../mod/commands";
+import { blocks, chain, LIMIT, pick, runAlls } from "../mod/commands";
 
 type Segment =
   | { kind: "command"; command: string; line: string }
@@ -88,7 +88,7 @@ describe("blocks", () => {
   test("returns trimmed single-line commands from arbitrary text", () => {
     hegel.test((tc) => {
       const text = tc.draw(gs.text({ alphabet: "!`-* \t\nab;&#" }));
-      for (const command of commands(text)) {
+      for (const command of blocks(text).flat()) {
         expect(command).not.toBe("");
         expect(command).toBe(command.trim());
         expect(command).not.toMatch(/[`\n]/);
@@ -98,7 +98,19 @@ describe("blocks", () => {
 });
 
 const SAFE_SUFFIXES = ["", " 2>&1", " &>/dev/null", " | cat", " && true"];
-const UNSAFE_SUFFIXES = ["; true", " # note", " &", " || true"];
+const UNSAFE_SUFFIXES = [
+  "; true",
+  " # note",
+  " &",
+  " || true",
+  " |",
+  " \\",
+  " &&",
+  " 'open",
+  ' "open',
+  " $(open",
+  " <<EOF",
+];
 
 const step = gs.record({
   fails: gs.booleans(),
@@ -124,6 +136,14 @@ describe("chain", () => {
       name: "an || that would run after a failure",
       block: ["false", "a || b"],
       expected: undefined,
+    },
+    { name: "a trailing pipe", block: ["cat log |", "wc -l"], expected: undefined },
+    { name: "an unbalanced quote", block: ['echo "a', "b"], expected: undefined },
+    { name: "a heredoc opener", block: ["cat <<EOF", "b"], expected: undefined },
+    {
+      name: "a here-string and an escaped quote",
+      block: ["cat <<<x", String.raw`echo \"`],
+      expected: String.raw`cat <<<x && echo \"`,
     },
     {
       name: "a quoted semicolon, refused conservatively",

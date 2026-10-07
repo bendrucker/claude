@@ -5,8 +5,8 @@ export const LIMIT = 9;
 const COMMAND = /^\s*(?:[-*]\s+)?`?!\s+([^`\s][^`]*?)\s*`?\s*$/;
 // Operators holding an `&` that still chain: `&&` and fd redirects.
 const CHAINING_AMPERSANDS = /&&|[<>]&|&>/g;
-// A sourced script runs in this shell, where a chain switches off its `set -e`.
-const SOURCES = /(?:^|&&|\|)\s*(?:source|\.)(?:\s|$)/;
+// Code sourced or eval'd runs in this shell, where a chain switches off its `set -e`.
+const IN_SHELL = /(?:^|&&|\|)\s*(?:source|\.|eval)(?:\s|$)/;
 
 /** Blank lines and code fences sit between commands without ending their block. */
 function keepsBlock(line: string): boolean {
@@ -25,7 +25,7 @@ function chainable(command: string): boolean {
     !/(?:\||&&)$/.test(bare) &&
     !/(?<!<)<<(?!<)/.test(bare) &&
     !bare.includes("||") &&
-    !SOURCES.test(bare) &&
+    !IN_SHELL.test(bare) &&
     !/[;#&]/.test(bare.replaceAll(CHAINING_AMPERSANDS, ""))
   );
 }

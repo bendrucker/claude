@@ -120,6 +120,7 @@ const UNSAFE_SUFFIXES = [
   " $(open",
   " <<EOF",
   " && source env",
+  " && eval x",
   String.raw` $'\'`,
   ' "$(open)"',
 ];
@@ -168,6 +169,16 @@ describe("chain", () => {
       expected: undefined,
     },
     { name: "a dot-sourced script", block: ["cd x && . ./env", "make"], expected: undefined },
+    {
+      name: "an eval",
+      block: ['eval "set -e; false; echo continued"', "next"],
+      expected: undefined,
+    },
+    {
+      name: "a child shell keeps its own set -e",
+      block: ['bash -c "set -e; false"', "next"],
+      expected: 'bash -c "set -e; false" && next',
+    },
     {
       name: "a quote opened inside the other kind",
       block: [`echo "a'" 'b"`, "c"],

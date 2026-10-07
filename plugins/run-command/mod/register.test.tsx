@@ -2,7 +2,6 @@ import type { EngineInterface, On } from "claude-code";
 
 type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 import { describe, expect, test, type Engine } from "claude-code/testing";
-import { commands, pick } from "./register.tsx";
 
 const PLUGIN = "run-command";
 
@@ -67,22 +66,10 @@ function band($: Engine) {
   });
 }
 
-describe("commands", () => {
-  test("takes lines holding only a command", () => {
-    expect(commands(REPLY.text)).toEqual(["git status --short", "wt list"]);
-    expect(commands("!echo nospace\n* ! ls -la  \n`! wt list `")).toEqual(["ls -la", "wt list"]);
-  });
-});
-
-describe("pick", () => {
-  test("maps a digit to its command", () => {
-    const found = ["git status --short", "wt list"];
-    expect(pick("2", found)).toBe("wt list");
-    expect(pick("3", found)).toBeUndefined();
-    expect(pick("0", found)).toBeUndefined();
-    expect(pick("ls", found)).toBeUndefined();
-  });
-});
+const SEQUENCE = {
+  text: "Run these:\n\n! git restore -- a\n\n! rm -r b\n```\n! git push --force-with-lease\n```\nThen:\n! pwd",
+  isFirstOfReply: true,
+};
 
 describe("register", () => {
   test("draws nothing outside bash mode", async ($, on) => {
@@ -109,9 +96,66 @@ describe("register", () => {
     await hint($, SHELL);
     const list = await band($);
     const buttons = await list.findAll({ type: "Button" });
-    expect(buttons.map((button) => button.text)).toEqual(["git status --short", "wt list"]);
+    expect(buttons.map((button) => button.text)).toEqual([
+      "git status --short",
+      "wt list",
+      "run all 1–2",
+    ]);
     await list.press({ key: "run-command:0:git status --short" });
     expect(fills).toEqual(["git status --short"]);
+  });
+
+  test("run all fills a block joined with && from a click or 0", async ($, on) => {
+    const events: ModEventsInput[] = [];
+    const fills = core(on, events);
+    await $.ui.mount({
+      plugin: PLUGIN,
+      surface: "terminal",
+      component: "AssistantMessage",
+      props: SEQUENCE,
+      requestId: "m1",
+    });
+    await hint($, SHELL);
+    const list = await band($);
+    const buttons = await list.findAll({ type: "Button" });
+    expect(buttons.map((button) => button.text).at(-1)).toBe("run all 1–3");
+    const joined = "git restore -- a && rm -r b && git push --force-with-lease";
+    await list.press({ key: `run-command:all0:${joined}` });
+    expect(fills).toEqual([joined]);
+    // @ts-expect-error -- the kit raises prompt.edit, but its `$.prompt` type omits `edit`.
+    const edited = await $.prompt.edit({
+      origin: { kind: "composer" },
+      text: "",
+      cursor: 0,
+      start: 0,
+      end: 0,
+      inputText: "0",
+    });
+    expect(edited.text).toBe(joined);
+    expect(events).toEqual([
+      { mod: "run-command", event: "list.shown", detail: { count: 4 } },
+      { mod: "run-command", event: "pick.all", detail: { count: 3, source: "click" } },
+      { mod: "run-command", event: "pick.all", detail: { count: 3, source: "digit" } },
+    ]);
+  });
+
+  test("run all records the clicked block when two join to the same text", async ($, on) => {
+    const events: ModEventsInput[] = [];
+    core(on, events);
+    await $.ui.mount({
+      plugin: PLUGIN,
+      surface: "terminal",
+      component: "AssistantMessage",
+      props: { text: "! a && b\n! c\n\nThen:\n! a\n! b\n! c", isFirstOfReply: true },
+      requestId: "m1",
+    });
+    await hint($, SHELL);
+    await (await band($)).press({ key: "run-command:all1:a && b && c" });
+    expect(events.at(-1)).toEqual({
+      mod: "run-command",
+      event: "pick.all",
+      detail: { count: 3, source: "click" },
+    });
   });
 
   test("a newer reply without commands clears the list", async ($, on) => {

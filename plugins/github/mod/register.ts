@@ -157,7 +157,7 @@ async function apply($: EngineInterface, watch: Watch, read: Read): Promise<numb
       if (!watch.flagged && attempt < MAX_ATTEMPTS) {
         watch.undelivered = { head: next.head, decisions: due, attempts: attempt };
       }
-    } else if (decisions.length > 0) watch.flagged = false;
+    } else if (decisions.some((d) => d.kind !== "review")) watch.flagged = false;
   }
   watch.snapshot = next;
   $.ui.status(statusOf(next, watch.flagged));

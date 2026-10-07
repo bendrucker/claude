@@ -313,7 +313,7 @@ describe("register", () => {
     await w.clock.settle();
     world.view = pr("FAILURE");
     await w.clock.advance(POLL_MS.pending);
-    world.drop = undefined;
+    delete world.drop;
     await w.clock.advance(POLL_MS.settled);
 
     expect(w.submits.length).toBe(2);

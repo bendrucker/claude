@@ -104,7 +104,7 @@ const step = gs.record({
   suffix: gs.sampledFrom([...SAFE_SUFFIXES, ...UNSAFE_SUFFIXES]),
 });
 
-// Defined ahead of the chain so the commands under test hold no `;`.
+// The helper body contains `;`, so it is defined outside the chained commands.
 const STEP = 'step() { echo "$1"; return "$2"; }';
 
 describe("chain", () => {

@@ -56,13 +56,13 @@ function write($: Engine, world: World, chars: number, filePath = PLAN) {
 }
 
 describe("statusText", () => {
-  test("rounds down so a plan under the limit never reads 100%, and marks one over it", () => {
-    expect([8_412, LIMIT - 1, LIMIT, LIMIT + 1, 12_034].map(statusText)).toEqual([
-      "plan 84%",
-      "plan 99%",
-      "plan 100%",
-      "plan 100% ✗",
-      "plan 120% ✗",
+  test("shows from 90%, rounding down so a plan under the limit never reads 10k or 100%", () => {
+    expect([8_999, 9_000, LIMIT - 1, 10_234, 12_034].map(statusText)).toEqual([
+      undefined,
+      "9k (90%)",
+      "9.9k (99%)",
+      "10.2k (102%)",
+      "12k (120%)",
     ]);
   });
 });
@@ -71,9 +71,9 @@ describe("register", () => {
   test("counts UTF-16 code units the way the gate does", async ($, on) => {
     const world = worldOf(on);
     await planMode($);
-    world.files[PLAN] = "é".repeat(6_000);
+    world.files[PLAN] = "é".repeat(9_500);
     await $.tool.call({ tool: "Write", file_path: PLAN, content: "", tool_use_id: "t1" });
-    expect(world.status).toEqual(["plan 60%"]);
+    expect(world.status).toEqual(["9.5k (95%)"]);
   });
 
   test("updates after an edit", async ($, on) => {
@@ -87,16 +87,25 @@ describe("register", () => {
       new_string: "b",
       tool_use_id: "t1",
     });
-    expect(world.status).toEqual(["plan 100% ✗"]);
+    expect(world.status).toEqual(["10k (100%)"]);
   });
 
   test("counts only the plan file the plan-mode reminder names", async ($, on) => {
     const world = worldOf(on);
-    await write($, world, 500);
+    await write($, world, 9_500);
     await planMode($);
-    await write($, world, 200, "/Users/u/.claude/plans/quiet-otter-decisions.md");
-    await write($, world, 800);
-    expect(world.status).toEqual(["plan 8%"]);
+    await write($, world, 9_900, "/Users/u/.claude/plans/quiet-otter-decisions.md");
+    await write($, world, 9_100);
+    expect(world.status).toEqual(["9.1k (91%)"]);
+  });
+
+  test("clears the count when the plan drops under 90%", async ($, on) => {
+    const world = worldOf(on);
+    await planMode($);
+    await write($, world, 9_500);
+    await write($, world, 8_000);
+    await write($, world, 7_000);
+    expect(world.status).toEqual(["9.5k (95%)", undefined]);
   });
 
   test("ignores a failed write", async ($, on) => {
@@ -109,7 +118,7 @@ describe("register", () => {
   test("clears the count when the file cannot be read", async ($, on) => {
     const world = worldOf(on);
     await planMode($);
-    await write($, world, 500);
+    await write($, world, 9_500);
     delete world.files[PLAN];
     const result = await $.tool.call({
       tool: "Write",
@@ -118,7 +127,7 @@ describe("register", () => {
       tool_use_id: "t1",
     });
     expect(result.isError).not.toBe(true);
-    expect(world.status).toEqual(["plan 5%", undefined]);
+    expect(world.status).toEqual(["9.5k (95%)", undefined]);
   });
 
   test("logs each count and each crossing of the limit", async ($, on) => {
@@ -146,14 +155,14 @@ describe("register", () => {
   test("logs each presentation and clears the count once a plan is approved", async ($, on) => {
     const world = worldOf(on);
     await planMode($);
-    await write($, world, 1);
+    await write($, world, 9_000);
     await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
-    expect(world.status).toEqual(["plan 0%", undefined]);
+    expect(world.status).toEqual(["9k (90%)", undefined]);
     expect(world.events.at(-1)).toEqual({
       mod: "plan",
       event: "present",
       ok: true,
-      detail: { file: "quiet-otter.md", chars: 1, limit: LIMIT, over: false },
+      detail: { file: "quiet-otter.md", chars: 9_000, limit: LIMIT, over: false },
     });
   });
 
@@ -162,7 +171,7 @@ describe("register", () => {
     await planMode($);
     await write($, world, 12_000);
     await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
-    expect(world.status).toEqual(["plan 120% ✗"]);
+    expect(world.status).toEqual(["12k (120%)"]);
     expect(world.events.at(-1)).toMatchObject({ event: "present", ok: false });
   });
 
@@ -172,7 +181,7 @@ describe("register", () => {
     await write($, world, 12_000);
     delete world.files[PLAN];
     await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
-    expect(world.status).toEqual(["plan 120% ✗", undefined]);
+    expect(world.status).toEqual(["12k (120%)", undefined]);
     expect(world.events.map((e) => e.event)).toEqual(["count", "crossed"]);
   });
 

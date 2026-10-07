@@ -2,13 +2,16 @@ import type { On } from "claude-code";
 
 // The plan gate denies a plan whose `plan.length`, in UTF-16 code units, exceeds this.
 export const LIMIT = 10_000;
+const SHOWN_FROM = LIMIT * 0.9;
 
-export function percent(chars: number): number {
+function percent(chars: number): number {
   return Math.floor((chars * 100) / LIMIT);
 }
 
-export function statusText(chars: number): string {
-  return `plan ${percent(chars)}%${chars > LIMIT ? " ✗" : ""}`;
+// Both figures round down so a plan under the limit never reads 10k or 100%.
+export function statusText(chars: number): string | undefined {
+  if (chars < SHOWN_FROM) return undefined;
+  return `${Math.floor(chars / 100) / 10}k (${percent(chars)}%)`;
 }
 
 function basename(path: string): string {
@@ -43,15 +46,18 @@ export function register(on: On): void {
     try {
       chars = (await $.fs.read(e.file_path)).length;
     } catch {
-      shown = false;
-      $.ui.status(undefined);
+      if (shown) {
+        shown = false;
+        $.ui.status(undefined);
+      }
       return result;
     }
 
     const over = chars > LIMIT;
     const file = basename(e.file_path);
-    shown = true;
-    $.ui.status(statusText(chars));
+    const text = statusText(chars);
+    if (text !== undefined || shown) $.ui.status(text);
+    shown = text !== undefined;
     await $.modEvents.emit({
       mod: "plan",
       event: "count",

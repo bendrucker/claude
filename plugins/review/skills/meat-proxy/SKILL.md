@@ -1,10 +1,6 @@
 ---
 name: review:meat-proxy
-description: >
-  Draft a short reply that hands an AI-relayed PR, MR, doc, or message back to its author with
-  motivation and scope questions only the author can answer. Use when the author piped the work
-  and each round of feedback through a model without reading it, and the reviewer is ending up
-  as the real author.
+description: Draft a reply that hands AI-relayed work back to its author.
 argument-hint: "<target> [reaction]"
 disable-model-invocation: true
 allowed-tools:
@@ -18,7 +14,7 @@ allowed-tools:
 
 Target and reaction: $ARGUMENTS
 
-The author of this artifact relayed model output without reading, checking, or owning it. Each round of review feedback goes back into the model, so the reviewer ends up doing the authoring. Your job is to hand the work back: draft a short reply in my voice that makes the author engage with their own change, and keep everything else private to me. A good reply asks things the author must think about to answer, and leaves the finding to them.
+The author of this artifact relayed model output without reading or checking it, and can't explain or defend it. Each round of review feedback goes back into the model, so the reviewer ends up doing the authoring. Your job is to hand the work back: draft a short reply in my voice that makes the author engage with their own change, and keep everything else private to me. A good reply asks things the author must think about to answer, and leaves the finding to them.
 
 You draft only. Never post, comment, approve, or react on any platform or chat. I copy the draft myself.
 
@@ -30,7 +26,7 @@ You draft only. Never post, comment, approve, or react on any platform or chat. 
 
 ## State
 
-Keep one state file per target at `tmp/meat-proxy/<slug>.md` under `git rev-parse --show-toplevel`. Build the slug from the target: `owner-repo-123` for a PR or MR, a short kebab-case name for a doc or pasted text.
+Keep one state file per target at `${CLAUDE_PLUGIN_DATA}/meat-proxy/<slug>.md`. Read and write it with the `Read`, `Write`, and `Edit` tools. Build the slug from the target: `owner-repo-123` for a PR or MR, a short kebab-case name for a doc or pasted text.
 
 When the file exists, this is a follow-up round. Read it first, then follow [Follow-Up Rounds](#follow-up-rounds).
 

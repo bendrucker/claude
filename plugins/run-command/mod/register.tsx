@@ -1,25 +1,8 @@
 import type { ButtonProps, On, RenderElement } from "claude-code";
+import { blocks, LIMIT, pick, runAlls, type RunAll } from "./commands.ts";
 
 const MOD = "run-command";
 const KEY = "run-command:";
-const DIGIT = /^[1-9]$/;
-
-// A line that is only `! <command>`, optionally bulleted or in backticks.
-const COMMAND = /^\s*(?:[-*]\s+)?`?!\s+([^`]+?)\s*`?\s*$/;
-
-export function commands(text: string): string[] {
-  const found: string[] = [];
-  for (const line of text.split("\n")) {
-    const command = COMMAND.exec(line)?.[1];
-    if (command !== undefined) found.push(command);
-  }
-  return found;
-}
-
-export function pick(inputText: string, found: readonly string[]): string | undefined {
-  return DIGIT.test(inputText) ? found[Number(inputText) - 1] : undefined;
-}
-
 /** The command a button's key carries, read back when it is pressed. */
 export function pressed(element: string): string | undefined {
   if (!element.startsWith(KEY)) return undefined;
@@ -57,7 +40,7 @@ export function register(on: On): void {
   // A redraw repaints older replies too, so only a reply drawn for the first
   // time, or the latest one again, moves the list.
   const seen = new Set<string>();
-  let latest = { requestId: "", found: [] as string[] };
+  let latest = { requestId: "", found: [] as string[], runs: [] as RunAll[] };
   let listed = false;
   // The band redraws often, so each reply's list counts as shown once.
   let shownFor: string | undefined;
@@ -79,14 +62,16 @@ export function register(on: On): void {
 
   on("ui.render", { component: "AssistantMessage" }, async ($, e, next) => {
     const drawing = await next(e);
-    const found = commands(e.props.text);
+    const grouped = blocks(e.props.text);
+    const found = grouped.flat();
+    const parsed = { requestId: e.requestId, found, runs: runAlls(grouped) };
     // A reply with no commands still clears the list, but a later block of the
     // latest reply without any keeps the ones an earlier block offered.
     if (!seen.has(e.requestId)) {
       seen.add(e.requestId);
-      latest = { requestId: e.requestId, found };
+      latest = parsed;
     } else if (e.requestId === latest.requestId && found.length > 0) {
-      latest = { requestId: e.requestId, found };
+      latest = parsed;
     }
     if (!shell || found.length === 0) return drawing;
     const { Box, Button } = $.ui.resolve(e);
@@ -102,7 +87,7 @@ export function register(on: On): void {
 
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
     const drawing = await next(e);
-    const found = latest.found.slice(0, 9);
+    const found = latest.found.slice(0, LIMIT);
     listed = shell && !e.props.hasSurvey && found.length > 0;
     if (!listed) {
       shownFor = undefined;
@@ -117,13 +102,29 @@ export function register(on: On): void {
       <Box flexDirection="column">
         {drawing}
         {commandButtons(Button, found, (command, index) => ({ hotkey: String(index + 1) }))}
+        {latest.runs.map((run, index) => (
+          <Button
+            key={`${KEY}all${index}:${run.command}`}
+            plain
+            label={`run all ${run.first}–${run.first + run.count - 1}`}
+            onPress={() => undefined}
+            {...(index === 0 ? { hotkey: "0" } : {})}
+          />
+        ))}
       </Box>
     );
   });
 
   // The list's hotkeys stay inert while the shell prompt holds the keys.
   on("prompt.edit", ($, e, next) => {
-    const command = listed && e.text === "" ? pick(e.inputText, latest.found) : undefined;
+    if (!listed || e.text !== "") return next(e);
+    const run = e.inputText === "0" ? latest.runs[0] : undefined;
+    if (run !== undefined) {
+      const detail = { count: run.count, source: "digit" };
+      void $.modEvents.emit({ mod: MOD, event: "pick.all", detail });
+      return next({ ...e, inputText: run.command });
+    }
+    const command = pick(e.inputText, latest.found);
     if (command === undefined) return next(e);
     void $.modEvents.emit({ mod: MOD, event: "pick", detail: { command, source: "digit" } });
     return next({ ...e, inputText: command });
@@ -132,7 +133,15 @@ export function register(on: On): void {
   on("ui.press", { plugin: "run-command" }, async ($, e, next) => {
     const command = pressed(e.element);
     if (command === undefined) return next(e);
-    void $.modEvents.emit({ mod: MOD, event: "pick", detail: { command, source: "click" } });
+    const run = e.element.startsWith(`${KEY}all`)
+      ? latest.runs.find((candidate) => candidate.command === command)
+      : undefined;
+    if (run !== undefined) {
+      const detail = { count: run.count, source: "click" };
+      void $.modEvents.emit({ mod: MOD, event: "pick.all", detail });
+    } else {
+      void $.modEvents.emit({ mod: MOD, event: "pick", detail: { command, source: "click" } });
+    }
     await $.prompt.fill({ text: command, mode: "insert" });
     return { element: e.element };
   });

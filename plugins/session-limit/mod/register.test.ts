@@ -18,9 +18,10 @@ interface World {
   announced: unknown[];
 }
 
-function worldOf(on: On, now = NOW): World {
+function worldOf(on: On, { refuseAppend = true } = {}): World {
   const world: World = { events: [], announced: [] };
-  mock.clock(on, { now });
+  mock.clock(on, { now: NOW });
+  if (refuseAppend) on("session.append", () => ({ deny: "refused" }));
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
@@ -106,7 +107,6 @@ describe("register", () => {
     expect(world.events).toEqual([{ mod: "session-limit", event: "session.start" }]);
   });
 
-  // The kit cannot answer a plugin's own $.session.append, so these cover the refused path.
   test("logs a refused injection with the bands it carried", async ($, on) => {
     const world = worldOf(on);
     await measure($, limits(95, 95));
@@ -121,7 +121,7 @@ describe("register", () => {
             { kind: "seven_day", threshold: 95, percentUsed: 95, resetsAt: SEVEN_RESETS },
           ],
           uuid: null,
-          error: "HooksError: no implementation for session.append",
+          error: "refused",
         },
       },
     ]);
@@ -137,6 +137,18 @@ describe("register", () => {
       expect.stringContaining('"percentUsed":90'),
       expect.stringContaining('"percentUsed":91'),
     ]);
+  });
+
+  test("announces a band once the injection lands", async ($, on) => {
+    const world = worldOf(on, { refuseAppend: false });
+    await measure($, limits(90));
+    await measure($, limits(91));
+    const announced = {
+      five_hour: { band: 90, resetsAt: FIVE_RESETS },
+      seven_day: { band: 0, resetsAt: SEVEN_RESETS },
+    };
+    expect(world.announced).toEqual([announced, announced]);
+    expect(world.events).toEqual([expect.objectContaining({ event: "inject", ok: true })]);
   });
 
   test("ignores measurements where rate limits did not move", async ($, on) => {

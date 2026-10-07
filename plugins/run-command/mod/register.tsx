@@ -3,6 +3,7 @@ import { blocks, LIMIT, pick, runAlls, type RunAll } from "./commands.ts";
 
 const MOD = "run-command";
 const KEY = "run-command:";
+const RUN_ALL = /^run-command:all(\d+):/;
 /** The command a button's key carries, read back when it is pressed. */
 export function pressed(element: string): string | undefined {
   if (!element.startsWith(KEY)) return undefined;
@@ -133,9 +134,8 @@ export function register(on: On): void {
   on("ui.press", { plugin: "run-command" }, async ($, e, next) => {
     const command = pressed(e.element);
     if (command === undefined) return next(e);
-    const run = e.element.startsWith(`${KEY}all`)
-      ? latest.runs.find((candidate) => candidate.command === command)
-      : undefined;
+    const index = RUN_ALL.exec(e.element)?.[1];
+    const run = index === undefined ? undefined : latest.runs[Number(index)];
     if (run !== undefined) {
       const detail = { count: run.count, source: "click" };
       void $.modEvents.emit({ mod: MOD, event: "pick.all", detail });

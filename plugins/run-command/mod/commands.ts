@@ -2,7 +2,7 @@ const DIGIT = /^[1-9]$/;
 export const LIMIT = 9;
 
 // A line that is only `! <command>`, optionally bulleted or in backticks.
-const COMMAND = /^\s*(?:[-*]\s+)?`?!\s+([^`]+?)\s*`?\s*$/;
+const COMMAND = /^\s*(?:[-*]\s+)?`?!\s+([^`\s][^`]*?)\s*`?\s*$/;
 // Operators holding an `&` that still chain: `&&` and fd redirects.
 const CHAINING_AMPERSANDS = /&&|[<>]&|&>/g;
 
@@ -13,11 +13,11 @@ function keepsBlock(line: string): boolean {
 }
 
 /**
- * `;` would mask an earlier failure, `#` comments out the rest of the chain,
- * and a lone `&` backgrounds.
+ * `;` would mask an earlier failure, `||` would run after one, `#` comments
+ * out the rest of the chain, and a lone `&` backgrounds.
  */
 function chainable(command: string): boolean {
-  return !/[;#&]/.test(command.replace(CHAINING_AMPERSANDS, ""));
+  return !command.includes("||") && !/[;#&]/.test(command.replace(CHAINING_AMPERSANDS, ""));
 }
 
 /** A reply's commands, grouped into runs that only blank lines and fences separate. */

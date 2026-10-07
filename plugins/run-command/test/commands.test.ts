@@ -72,6 +72,7 @@ describe("blocks", () => {
       expected: [["ls -la", "wt list"]],
     },
     { name: "an inline command is prose", text: "or run ! pwd inline", expected: [] },
+    { name: "a bang with only whitespace is no command", text: "!  \n` !  `", expected: [] },
   ])("$name", ({ text, expected }) => {
     expect(blocks(text)).toEqual(expected);
   });
@@ -96,8 +97,8 @@ describe("blocks", () => {
   });
 });
 
-const SAFE_SUFFIXES = ["", " 2>&1", " &>/dev/null", " | cat", " && true", " || false"];
-const UNSAFE_SUFFIXES = ["; true", " # note", " &"];
+const SAFE_SUFFIXES = ["", " 2>&1", " &>/dev/null", " | cat", " && true"];
+const UNSAFE_SUFFIXES = ["; true", " # note", " &", " || true"];
 
 const step = gs.record({
   fails: gs.booleans(),
@@ -119,6 +120,11 @@ describe("chain", () => {
     { name: "a semicolon", block: ["a; b", "c"], expected: undefined },
     { name: "a comment", block: ["a # note", "c"], expected: undefined },
     { name: "a backgrounding &", block: ["sleep 1 &", "c"], expected: undefined },
+    {
+      name: "an || that would run after a failure",
+      block: ["false", "a || b"],
+      expected: undefined,
+    },
     {
       name: "a quoted semicolon, refused conservatively",
       block: ['git commit -m "a; b"', "c"],

@@ -139,6 +139,25 @@ describe("register", () => {
     ]);
   });
 
+  test("run all records the clicked block when two join to the same text", async ($, on) => {
+    const events: ModEventsInput[] = [];
+    core(on, events);
+    await $.ui.mount({
+      plugin: PLUGIN,
+      surface: "terminal",
+      component: "AssistantMessage",
+      props: { text: "! a && b\n! c\n\nThen:\n! a\n! b\n! c", isFirstOfReply: true },
+      requestId: "m1",
+    });
+    await hint($, SHELL);
+    await (await band($)).press({ key: "run-command:all1:a && b && c" });
+    expect(events.at(-1)).toEqual({
+      mod: "run-command",
+      event: "pick.all",
+      detail: { count: 3, source: "click" },
+    });
+  });
+
   test("a newer reply without commands clears the list", async ($, on) => {
     core(on);
     await reply($);

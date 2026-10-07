@@ -1,144 +1,123 @@
 import { expect, test } from "bun:test";
-import { join } from "node:path";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative } from "node:path";
 import { z } from "zod";
 import { query } from "../duckdb";
 import {
-  hasResults,
   loadSuites,
   MIN_OBSERVED_DAYS,
   projectMonthly,
   render,
-  runsView,
   summarize,
   type SuiteRow,
+  views,
   WINDOW_DAYS,
 } from "../report";
+import { resultFiles } from "../results";
 
-const CORPUS = join(import.meta.dirname, "results");
-const NOW = new Date("2026-08-28T00:00:00.000Z");
+const CORPUS = join(import.meta.dirname, "corpus");
+const EMPTY = mkdtempSync(join(tmpdir(), "report-"));
+const NOW = new Date("2026-09-28T00:00:00.000Z");
 
 function epoch(iso: string): number {
   return new Date(iso).getTime() / 1000;
 }
 
-test.each<{ name: string; dir: string; expected: boolean }>([
-  { name: "a corpus with exports", dir: CORPUS, expected: true },
-  { name: "a directory that does not exist", dir: join(CORPUS, "missing"), expected: false },
-])("hasResults sees $name", ({ dir, expected }) => {
-  expect(hasResults(dir)).toBe(expected);
+test("resultFiles finds plugin and user suite runs, leaving out regraded copies", () => {
+  expect(resultFiles(CORPUS).map((path) => relative(CORPUS, path))).toEqual([
+    "evals/user/ship/results/2026-09-27T08-00-00Z/aggregate-result.json",
+    "plugins/pull-request/evals/create/results/2026-09-25T17-45-00Z-HEAD/aggregate-result.json",
+    "plugins/writing/evals/rewrite/results/2026-08-01T12-00-00Z/aggregate-result.json",
+    "plugins/writing/evals/rewrite/results/2026-09-10T09-30-00Z/aggregate-result.json",
+  ]);
+});
+
+test("resultFiles is empty for a root with no results", () => {
+  expect(resultFiles(EMPTY)).toEqual([]);
 });
 
 test.each<{ name: string; cost: number; start: string | null; expected: number }>([
-  { name: "nothing spent", cost: 0, start: "2026-08-01T12:00:00Z", expected: 0 },
+  { name: "nothing spent", cost: 0, start: "2026-09-01T12:00:00Z", expected: 0 },
   { name: "no runs in the window", cost: 5, start: null, expected: 0 },
-  {
-    name: "a full window scales one to one",
-    cost: 6,
-    start: "2026-07-29T00:00:00Z",
-    expected: 6,
-  },
+  { name: "a full window scales one to one", cost: 6, start: "2026-08-29T00:00:00Z", expected: 6 },
   {
     name: "a fresh run is held to the observation floor",
     cost: 7,
-    start: "2026-08-27T00:00:00Z",
+    start: "2026-09-27T00:00:00Z",
     expected: (7 / MIN_OBSERVED_DAYS) * WINDOW_DAYS,
   },
 ])("projectMonthly with $name", ({ cost, start, expected }) => {
   expect(projectMonthly(cost, start === null ? null : epoch(start), NOW)).toBeCloseTo(expected, 5);
 });
 
-// Two corpus fixtures carry a `metadata.billing: "api"` stamp marking keyed runs.
-// The rest, the pre-window run included, default to the subscription.
-test("loadSuites splits each suite's window by billing source", async () => {
-  const rows = await loadSuites(CORPUS, NOW);
-
-  expect(rows).toEqual([
+// The August rewrite run falls outside the window: it counts as a run but not as spend.
+test("loadSuites rolls each suite up from its runs", async () => {
+  expect(await loadSuites(CORPUS, NOW)).toEqual([
     {
-      suite: "issue-refine",
+      suite: "pull-request/create",
       runs: 1,
-      last_run_epoch: epoch("2026-08-25T17:45:00Z"),
-      last_cost: 0.25,
-      api_30d: 0.25,
-      subscription_30d: 0,
-      window_start_epoch: epoch("2026-08-25T17:45:00Z"),
+      partial: 1,
+      last_run_epoch: epoch("2026-09-25T17:45:00Z"),
+      last_score: 1,
+      last_cost: 1.25,
+      cost_30d: 1.25,
+      seconds_30d: 200,
+      window_start_epoch: epoch("2026-09-25T17:45:00Z"),
     },
     {
-      suite: "pr-body",
-      runs: 3,
-      last_run_epoch: epoch("2026-08-20T09:30:00Z"),
-      last_cost: 1.5,
-      api_30d: 1.5,
-      subscription_30d: 1,
-      window_start_epoch: epoch("2026-08-01T12:00:00Z"),
+      suite: "user/ship",
+      runs: 1,
+      partial: 0,
+      last_run_epoch: epoch("2026-09-27T08:00:00Z"),
+      last_score: 0.5,
+      last_cost: 0.75,
+      cost_30d: 0.75,
+      seconds_30d: 120,
+      window_start_epoch: epoch("2026-09-27T08:00:00Z"),
+    },
+    {
+      suite: "writing/rewrite",
+      runs: 2,
+      partial: 0,
+      last_run_epoch: epoch("2026-09-10T09:30:00Z"),
+      last_score: 0.875,
+      last_cost: 2.5,
+      cost_30d: 2.5,
+      seconds_30d: 300,
+      window_start_epoch: epoch("2026-09-10T09:30:00Z"),
     },
   ] satisfies SuiteRow[]);
 });
 
-// DuckDB emits an uncast list_sum as HUGEINT, which its JSON writer renders as a
-// string. The `--sql` escape hatch hands the view's rows straight to the caller,
-// so the casts that keep `passes` a number rather than "14" are pinned here.
-test("the runs view types every numeric column as a number", async () => {
+test("loadSuites returns nothing for an empty root", async () => {
+  expect(await loadSuites(EMPTY, NOW)).toEqual([]);
+});
+
+// A case without a without arm has a null delta, which the view keeps rather than zeroing.
+test("the cases view unnests each run's case scores", async () => {
   const rows = await query(
-    `${runsView(CORPUS)}\nSELECT billing, cost_usd, api_usd, subscription_usd, passes, failures FROM runs ORDER BY eval_id;`,
+    `${views(CORPUS, resultFiles(CORPUS))}\nSELECT suite, run, "case", score, score_without, delta FROM cases ORDER BY suite, run, "case";`,
     z.object({
-      billing: z.enum(["api", "subscription"]),
-      cost_usd: z.number(),
-      api_usd: z.number(),
-      subscription_usd: z.number(),
-      passes: z.number(),
-      failures: z.number(),
+      suite: z.string(),
+      run: z.string(),
+      case: z.string(),
+      score: z.number(),
+      score_without: z.number().nullable(),
+      delta: z.number().nullable(),
     }),
   );
 
-  expect(rows).toMatchInlineSnapshot(`
-    [
-      {
-        "api_usd": 0,
-        "billing": "subscription",
-        "cost_usd": 1,
-        "failures": 3,
-        "passes": 13,
-        "subscription_usd": 1,
-      },
-      {
-        "api_usd": 1.5,
-        "billing": "api",
-        "cost_usd": 1.5,
-        "failures": 1,
-        "passes": 15,
-        "subscription_usd": 0,
-      },
-      {
-        "api_usd": 0.25,
-        "billing": "api",
-        "cost_usd": 0.25,
-        "failures": 0,
-        "passes": 4,
-        "subscription_usd": 0,
-      },
-      {
-        "api_usd": 0,
-        "billing": "subscription",
-        "cost_usd": 5,
-        "failures": 5,
-        "passes": 11,
-        "subscription_usd": 5,
-      },
-    ]
-  `);
-});
-
-test("loadSuites returns nothing for an empty corpus", async () => {
-  expect(await loadSuites(join(CORPUS, "missing"), NOW)).toEqual([]);
+  expect(rows).toMatchSnapshot();
 });
 
 test("render lays out the rollup against the budget", async () => {
-  const summary = summarize(await loadSuites(CORPUS, NOW), { now: NOW, dir: CORPUS });
+  const summary = summarize(await loadSuites(CORPUS, NOW), { now: NOW, root: CORPUS });
   expect(render(summary)).toMatchSnapshot();
 });
 
-test("render explains an empty corpus", () => {
-  expect(render(summarize([], { now: NOW, dir: "/corpus" }))).toBe(
-    "No eval results in /corpus. Run an eval, then export it with evals/scripts/export-run.ts.",
+test("render explains an empty root", () => {
+  expect(render(summarize([], { now: NOW, root: "/repo" }))).toBe(
+    "No native eval results under /repo. Run a suite with evals/native/run.ts.",
   );
 });

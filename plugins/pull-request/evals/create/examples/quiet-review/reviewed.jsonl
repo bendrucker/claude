@@ -1,0 +1,2 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"Bash","input":{"description":"Show branch diff","command":"git diff main"}}]}}
+{"type":"result","result":"The loop in `paginate` runs `i <= items.length`, an off-by-one that reads past the end of `items` on the last page."}

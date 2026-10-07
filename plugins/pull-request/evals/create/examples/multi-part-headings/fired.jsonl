@@ -1,0 +1,3 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"Skill","input":{"skill":"pull-request:create"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"Base directory for this skill: /tmp/hill-climb-x/plugins/pull-request/skills/create\n\n# Create Pull Request\n\n- Remote URL: https://github.com/bendrucker/mcp-gateway.git"}]}}
+{"type":"result","result":"Title: auth: harden the OAuth callback\n\nRefactors the auth callback handler, narrows error matching to 401 and 403, and persists the DCR client ID across restarts.\n\n## Deferred Work\n\nThe token-refresh rework is deferred to a follow-up, and the retry behavior is unchanged."}

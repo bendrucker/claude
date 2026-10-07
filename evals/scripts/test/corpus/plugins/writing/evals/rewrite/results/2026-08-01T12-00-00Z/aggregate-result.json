@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-08-01T12:00:00.000Z",
+  "durationSeconds": 600,
+  "costUsd": 5,
+  "partial": false,
+  "aggregates": {
+    "casesTotal": 2,
+    "casesPassed": 1,
+    "overallScore": 0.75,
+    "overallPassRate": 0,
+    "meanDelta": 0.25
+  },
+  "cases": [
+    {
+      "name": "memo",
+      "aggregates": {
+        "score": 0.5,
+        "passRate": 0.5,
+        "scoreWithout": 0.5,
+        "passRateWithout": 0.5,
+        "delta": 0.0
+      },
+      "arms": {}
+    },
+    {
+      "name": "slack",
+      "aggregates": {
+        "score": 1,
+        "passRate": 1.0,
+        "scoreWithout": 0.5,
+        "passRateWithout": 0.5,
+        "delta": 0.5
+      },
+      "arms": {}
+    }
+  ]
+}

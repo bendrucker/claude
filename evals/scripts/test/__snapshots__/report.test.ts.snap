@@ -1,14 +1,68 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`render lays out the rollup against the budget 1`] = `
-"┌──────────────┬──────┬────────────┬───────────┬─────────┬─────────┬──────────────┐
-│ Suite        │ Runs │ Last run   │ Last cost │ 30d API │ 30d sub │ Projected/mo │
-├──────────────┼──────┼────────────┼───────────┼─────────┼─────────┼──────────────┤
-│ issue-refine │    1 │ 2026-08-25 │     $0.25 │   $0.25 │   $0.00 │        $1.07 │
-│ pr-body      │    3 │ 2026-08-20 │     $1.50 │   $1.50 │   $1.00 │        $1.70 │
-├──────────────┼──────┼────────────┼───────────┼─────────┼─────────┼──────────────┤
-│ all          │    4 │            │           │   $1.75 │   $1.00 │        $2.77 │
-└──────────────┴──────┴────────────┴───────────┴─────────┴─────────┴──────────────┘
+exports[`the cases view unnests each run's case scores 1`] = `
+[
+  {
+    "case": "quiet-fix",
+    "delta": null,
+    "run": "2026-09-25T17-45-00Z-HEAD",
+    "score": 1,
+    "score_without": null,
+    "suite": "pull-request/create",
+  },
+  {
+    "case": "open-pr",
+    "delta": -0.5,
+    "run": "2026-09-27T08-00-00Z",
+    "score": 0.5,
+    "score_without": 1,
+    "suite": "user/ship",
+  },
+  {
+    "case": "memo",
+    "delta": 0,
+    "run": "2026-08-01T12-00-00Z",
+    "score": 0.5,
+    "score_without": 0.5,
+    "suite": "writing/rewrite",
+  },
+  {
+    "case": "slack",
+    "delta": 0.5,
+    "run": "2026-08-01T12-00-00Z",
+    "score": 1,
+    "score_without": 0.5,
+    "suite": "writing/rewrite",
+  },
+  {
+    "case": "memo",
+    "delta": 0.5,
+    "run": "2026-09-10T09-30-00Z",
+    "score": 1,
+    "score_without": 0.5,
+    "suite": "writing/rewrite",
+  },
+  {
+    "case": "slack",
+    "delta": 0.25,
+    "run": "2026-09-10T09-30-00Z",
+    "score": 0.75,
+    "score_without": 0.5,
+    "suite": "writing/rewrite",
+  },
+]
+`;
 
-$2.77 projected, 14% of the API budget ($20.00). $1.00 of the last 30 days ran on the subscription and spends no budget."
+exports[`render lays out the rollup against the budget 1`] = `
+"┌─────────────────────┬──────┬─────────┬────────────┬────────────┬───────────┬──────────┬──────────┬──────────────┐
+│ Suite               │ Runs │ Partial │ Last run   │ Last score │ Last cost │ 30d cost │ 30d time │ Projected/mo │
+├─────────────────────┼──────┼─────────┼────────────┼────────────┼───────────┼──────────┼──────────┼──────────────┤
+│ pull-request/create │    1 │       1 │ 2026-09-25 │       100% │     $1.25 │    $1.25 │       3m │        $5.36 │
+│ user/ship           │    1 │       0 │ 2026-09-27 │        50% │     $0.75 │    $0.75 │       2m │        $3.21 │
+│ writing/rewrite     │    2 │       0 │ 2026-09-10 │        88% │     $2.50 │    $2.50 │       5m │        $4.26 │
+├─────────────────────┼──────┼─────────┼────────────┼────────────┼───────────┼──────────┼──────────┼──────────────┤
+│ all                 │    4 │         │            │            │           │    $4.50 │      10m │       $12.83 │
+└─────────────────────┴──────┴─────────┴────────────┴────────────┴───────────┴──────────┴──────────┴──────────────┘
+
+$12.83 projected at list price, 64% of the budget ($20.00)."
 `;

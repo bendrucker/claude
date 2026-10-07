@@ -1,2 +1,4 @@
-# Run artifacts: local-only.
+# Originals, judgments, and run artifacts: local-only.
+data/
+feedback/
 results/

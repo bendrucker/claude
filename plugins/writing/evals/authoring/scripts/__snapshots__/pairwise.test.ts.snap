@@ -1,0 +1,130 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`scoreJudgments / formatScore formatScore snapshot 1`] = `
+"* marks p < 0.1 against a 0.5 win rate for the candidate (sign-flip permutation test)
+╔══════════╤═══╤══════════════╤═══════╗
+║ case     │ n │ win rate (b) │ p     ║
+╟──────────┼───┼──────────────┼───────╢
+║ pr-quiet │ 2 │ 100%         │ 0.498 ║
+╟──────────┼───┼──────────────┼───────╢
+║ overall  │ 2 │ 100%         │ 0.494 ║
+╚══════════╧═══╧══════════════╧═══════╝
+
+left-slot pick share (position bias): 50%"
+`;
+
+exports[`compareLabels / agreementOf / calibrate / formatCalibration formatCalibration snapshot 1`] = `
+"agreement excludes pairs either side called a tie (reported as ties); pass requires >= 75%
+╔═════════╤═════════╤══════╤═══════════╤══════════════╤═════════╗
+║ surface │ decided │ ties │ agreement │ 95% interval │ verdict ║
+╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
+║ doc     │ 0       │ 1    │ -         │ 0% - 100%    │ fail    ║
+╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
+║ pr      │ 2       │ 0    │ 50%       │ 9% - 91%     │ fail    ║
+╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
+║ overall │ 2       │ 1    │ 50%       │ 9% - 91%     │ fail    ║
+╚═════════╧═════════╧══════╧═══════════╧══════════════╧═════════╝
+"
+`;
+
+exports[`pairwise CLI subcommands, flags, and defaults 1`] = `
+"Usage: pairwise [options] [command]
+
+Build, judge, and score blind pairwise comparisons for the authoring suite
+
+Options:
+  -h, --help           display help for command
+
+Commands:
+  pairs [options]      Pair a base column's drafts with a candidate column's
+                       drafts (or with Ben's originals), run-for-run, and write
+                       Pair JSON files
+  judge [options]      Blind-judge each pair with the Claude Agent SDK on
+                       subscription auth, de-blind the verdict, and write
+                       resumable Judgment files
+  score [options]      Report candidate win rate vs base (ties = 0.5) per case
+                       and overall, with a sign-flip permutation p-value and
+                       position bias. --judgments takes Judgment or Label files
+  calibrate [options]  Score agreement between Ben's Labels and the judge's
+                       Judgments, overall and per surface, and fail below
+                       --threshold
+  help [command]       display help for command
+
+Usage: pairwise pairs [options]
+
+Pair a base column's drafts with a candidate column's drafts (or with Ben's
+originals), run-for-run, and write Pair JSON files
+
+Options:
+  --suite <dir>              Suite directory holding each case's prompt.md and
+                             case.yaml tags
+  --base <paths>             Comma-separated aggregate-result.json paths for the
+                             base column
+  --candidate <paths>        Comma-separated aggregate-result.json paths for the
+                             candidate column
+  --original <dir>           Directory of <case>.json files holding Ben's
+                             original text, paired against --candidate instead
+                             of --base
+  --field <name>             Field in <case>.json holding the original text
+                             (default: "body")
+  --out <dir>                Directory to write Pair JSON files
+  --file <case=path>         case=path override: extract the deliverable from
+                             the last Write/Edit to this file instead of the
+                             reply's <out> block (default: [])
+  --surface <case=surface>   case=surface override when the suite's case.yaml
+                             tags do not name one (default: [])
+  --before <dir>             Directory of <case>.md files holding a deliverable
+                             file's pre-change contents; Edit-only drafts replay
+                             against them and drafts are trimmed to the changed
+                             region
+  --base-arm <arm>           Arm the base drafts come from (default: "with")
+  --candidate-arm <arm>      Arm the candidate drafts come from (default:
+                             "with")
+  --base-label <label>       Source.column label for the base drafts (default:
+                             "base")
+  --candidate-label <label>  Source.column label for the candidate drafts
+                             (default: "candidate")
+  -h, --help                 display help for command
+
+Usage: pairwise judge [options]
+
+Blind-judge each pair with the Claude Agent SDK on subscription auth, de-blind
+the verdict, and write resumable Judgment files
+
+Options:
+  --pairs <dir>      Directory of Pair JSON files
+  --out <dir>        Directory to write Judgment JSON files
+  --swap             Judge both slot orders; disagreement records a tie
+                     (default: false)
+  --model <model>    Judge model (default: "claude-sonnet-5")
+  --prompt <file>    Judge prompt template (default:
+                     "<scripts>/judge-prompt.md")
+  --concurrency <n>  Judge calls in flight (default: 4)
+  -h, --help         display help for command
+
+Usage: pairwise score [options]
+
+Report candidate win rate vs base (ties = 0.5) per case and overall, with a
+sign-flip permutation p-value and position bias. --judgments takes Judgment or
+Label files
+
+Options:
+  --judgments <dir>  Directory of Judgment or Label JSON files
+  --pairs <dir>      Directory of Pair JSON files
+  --alpha <p>        Star a p-value below this (default: 0.1)
+  -h, --help         display help for command
+
+Usage: pairwise calibrate [options]
+
+Score agreement between Ben's Labels and the judge's Judgments, overall and per
+surface, and fail below --threshold
+
+Options:
+  --labels <dir>      Directory of Label JSON files
+  --judgments <dir>   Directory of Judgment JSON files
+  --pairs <dir>       Directory of Pair JSON files, for the per-surface
+                      breakdown
+  --threshold <rate>  Minimum agreement rate to pass (default: 0.75)
+  -h, --help          display help for command
+"
+`;

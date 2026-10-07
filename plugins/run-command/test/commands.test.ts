@@ -273,15 +273,17 @@ describe("chain", () => {
         const joined = chain(block);
         if (joined === undefined) return;
         let expected = "";
-        let syntaxError = false;
         for (const command of block) {
           const alone = bash(command);
           expected += alone.stdout.toString();
-          syntaxError ||= alone.exitCode === 2;
           if (alone.exitCode !== 0) break;
         }
+        // A command that fails to parse alone fails the whole chain's parse, so nothing runs.
+        const parses = block.every(
+          (command) => Bun.spawnSync(["bash", "-n", "-c", command]).exitCode === 0,
+        );
         const output = bash(joined).stdout.toString();
-        expect(output === expected || (syntaxError && output === "")).toBe(true);
+        expect(output === expected || (!parses && output === "")).toBe(true);
       },
       { testCases: 100 },
     );
@@ -311,8 +313,7 @@ describe("runAlls", () => {
         const listed = block.slice(0, Math.max(0, LIMIT - first + 1));
         const start = first;
         first += block.length;
-        const chainable = listed.length >= 2 && listed.every((c) => !c.includes(";"));
-        return chainable ? [{ first: start, count: listed.length }] : [];
+        return chain(listed) === undefined ? [] : [{ first: start, count: listed.length }];
       });
       expect(runs.map((run) => ({ first: run.first, count: run.count }))).toEqual(expected);
     });

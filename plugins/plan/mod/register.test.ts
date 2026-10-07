@@ -1,4 +1,4 @@
-import type { On, ToolCallResult } from "claude-code";
+import type { EngineInterface, On, ToolCallResult } from "claude-code";
 import { type Engine, describe, expect, test } from "claude-code/testing";
 import { LIMIT, statusText } from "./register.ts";
 
@@ -8,7 +8,7 @@ const DENIED: ToolCallResult = { result: "too long", isError: true };
 interface World {
   files: Record<string, string>;
   status: (string | undefined)[];
-  events: Parameters<Engine["modEvents"]["emit"]>[0][];
+  events: Parameters<EngineInterface["modEvents"]["emit"]>[0][];
 }
 
 function worldOf(

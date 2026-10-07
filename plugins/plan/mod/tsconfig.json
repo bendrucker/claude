@@ -1,4 +1,5 @@
 {
   "extends": "../../../tsconfig.mod.json",
-  "include": ["../../../.claude/types", "../../mod-events/types", "."]
+  "compilerOptions": { "allowImportingTsExtensions": true },
+  "include": ["../.claude-plugin/types", "../../mod-events/types", "."]
 }

@@ -2,7 +2,7 @@
 
 import { basename, dirname, join } from "node:path";
 import { z } from "zod";
-import { decodeFile } from "../packages/decode/index";
+import { decodeFile, decodeJson } from "../packages/decode/index";
 import { readTracked, runCheck, tracked } from "./check";
 import { isBuiltin, packageName, scanImports } from "./imports";
 
@@ -87,21 +87,28 @@ export function protectedWorkspaces(dirs: string[]): string[] {
 
 async function checkDeps(): Promise<string[]> {
   const cwd = join(import.meta.dirname, "..");
-  const [root, manifests, sources] = await Promise.all([
+  const [root, trackedManifests, sources] = await Promise.all([
     decodeFile(PackageJson, join(cwd, "package.json")),
     tracked("*package.json", cwd),
     tracked("*.ts", cwd),
   ]);
 
+  // A manifest deleted locally but not yet staged no longer makes a workspace.
+  const read = await Promise.all(
+    trackedManifests.map(async (file) => ({ file, text: await readTracked(file, cwd) })),
+  );
+  const contents = new Map(
+    read.flatMap(({ file, text }) => (text === null ? [] : [[file, text] as const])),
+  );
+  const manifests = [...contents.keys()];
+
   const dirs = [".", ...workspaceDirs(root.workspaces ?? [], manifests)];
   const declared = new Map(
-    await Promise.all(
-      dirs.map(async (dir) => {
-        const pkg =
-          dir === "." ? root : await decodeFile(PackageJson, join(cwd, dir, "package.json"));
-        return [dir, declaredPackages(pkg)] as const;
-      }),
-    ),
+    dirs.map((dir) => {
+      const file = join(dir, "package.json");
+      const pkg = dir === "." ? root : decodeJson(PackageJson, contents.get(file) ?? "", file);
+      return [dir, declaredPackages(pkg)] as const;
+    }),
   );
 
   // A mod imports only its own files and the engine-supplied `claude-code`.

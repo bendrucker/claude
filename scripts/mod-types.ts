@@ -66,6 +66,10 @@ if (import.meta.main) {
     exitCode = await proc.exited;
   } finally {
     await rm(scratch, { recursive: true, force: true });
+    // The load also writes a root tsconfig.json extending the engine types, which would claim the plugin's Bun scripts.
+    await Promise.all(
+      load.map((plugin) => rm(join(plugin.dir ?? "", "tsconfig.json"), { force: true })),
+    );
   }
   if (exitCode !== 0) process.exit(1);
 

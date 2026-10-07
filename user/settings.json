@@ -408,10 +408,6 @@
             "type": "command",
             "command": "/bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
             "async": true
-          },
-          {
-            "type": "command",
-            "command": "bun ~/.claude/hooks/session-limit"
           }
         ]
       },
@@ -461,6 +457,7 @@
     "herdr@bendrucker": true,
     "run-command@bendrucker": true,
     "mod-events@bendrucker": true,
+    "session-limit@bendrucker": true,
     "1password@1password": true
   },
   "extraKnownMarketplaces": {

@@ -1,0 +1,10 @@
+{
+  "name": "session-limit",
+  "description": "Warn the model mid-turn as the 5-hour or 7-day limit nears",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  },
+  "types": "./types/index.d.ts",
+  "dependencies": ["mod-events"]
+}

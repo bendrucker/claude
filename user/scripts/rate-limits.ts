@@ -2,8 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
 
-// The rate-limit contract Claude Code pipes to the statusline. `statusline.ts`
-// mirrors it to `rl.json` (the writer); the session-limit hook reads it back.
+// The rate-limit contract Claude Code pipes to the statusline.
 export const RateLimitWindow = z.looseObject({
   used_percentage: z.number().optional().catch(undefined),
   resets_at: z.number().optional().catch(undefined),

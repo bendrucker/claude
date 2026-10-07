@@ -1,0 +1,4 @@
+{
+  "description": "Appends usage guidance as a rate-limit band is crossed",
+  "modules": ["../mod/register.ts"]
+}

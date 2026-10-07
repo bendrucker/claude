@@ -18,5 +18,7 @@ Scoring a candidate against a base column:
 
 - `bun plugins/writing/evals/authoring/scripts/metrics.ts <results>...`: tokens per deliverable, hook denies, and trope density.
 - `bun plugins/writing/evals/authoring/scripts/pairwise.ts pairs|judge|score`: blind pairs, judge picks, and the win rate with per-case permutation p-values. Pass `--before data/before` so doc and skill drafts are judged on their changed region. Each file there is the case's deliverable as its fixture leaves it.
+- `bun plugins/writing/evals/authoring/scripts/redline.ts`: editing distance from each draft to what an editor would ship, redlined with find/replace edits until none remain.
+- `bun plugins/writing/evals/authoring/scripts/span-gate.ts`: an offline gate for trope rule and wordlist changes against Ben's span labels.
 
-Judgments land in the gitignored `feedback/`, and originals in `data/`.
+Ben labels pairs and spans in [`label/server.ts`](label/server.ts). Labels and judgments land in the gitignored `feedback/`, and originals in `data/`.

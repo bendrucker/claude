@@ -35,6 +35,7 @@ interface World {
   gh: { exitCode: number; stdout: string; stderr: string } | Error;
   view: unknown;
   slowMs?: number;
+  submitMs?: number;
   drop?: string;
 }
 
@@ -59,8 +60,9 @@ function worldOf(on: On, world: World) {
     statuses.push(e.text);
     return { value: undefined };
   });
-  on("prompt.submit", ($, e) => {
+  on("prompt.submit", async ($, e) => {
     submits.push(e.text);
+    if (world.submitMs !== undefined) await clock.sleep(world.submitMs);
     return world.drop === undefined ? { text: e.text } : { drop: world.drop };
   });
   on("process.run", async ($, e) => {
@@ -276,6 +278,22 @@ describe("register", () => {
 
     expect(w.views.length).toBe(1);
     expect(w.statuses).toEqual([undefined]);
+  });
+
+  test("a send still in flight at session end leaves the status cleared", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr(""), submitMs: 10_000 };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = pr("FAILURE");
+    await w.clock.advance(POLL_MS.pending);
+    await $.session.end({ reason: "prompt_input_exit", sessionId: "s1", resume: { id: "s1" } });
+    await w.clock.advance(10_000 + POLL_MS.settled * 2);
+
+    expect(w.submits.length).toBe(1);
+    expect(w.statuses.at(-1)).toBe(undefined);
+    expect(w.views.length).toBe(2);
   });
 
   test("a restart while a poll is in flight leaves one poll chain", async ($, on) => {

@@ -201,10 +201,11 @@ export function snapshotOf(view: PrView): Snapshot {
  * a review requesting changes, is promoted. Every other change is dropped.
  */
 export function decide(prev: Snapshot, next: Snapshot): Decision[] {
-  const decisions: Decision[] = [];
-  if (prev.state === "OPEN" && next.state !== "OPEN") {
-    decisions.push({ action: "drop", kind: next.state === "MERGED" ? "pr.merged" : "pr.closed" });
+  if (next.state !== "OPEN") {
+    if (prev.state !== "OPEN") return [];
+    return [{ action: "drop", kind: next.state === "MERGED" ? "pr.merged" : "pr.closed" }];
   }
+  const decisions: Decision[] = [];
   const isSameHead = prev.head === next.head;
   if (!isSameHead) decisions.push({ action: "drop", kind: "push", from: prev.head });
 

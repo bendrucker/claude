@@ -129,7 +129,13 @@ function delayOf(snapshot: Snapshot): number {
   return snapshot.phase === "pending" ? POLL_MS.pending : POLL_MS.settled;
 }
 
-async function apply($: EngineInterface, watch: Watch, read: Read): Promise<number> {
+// Resolves undefined when the watch stopped or restarted during the send.
+async function apply(
+  $: EngineInterface,
+  watch: Watch,
+  read: Read,
+  isCurrent: () => boolean,
+): Promise<number | undefined> {
   if (read.kind === "none") {
     if (watch.snapshot !== undefined) $.ui.status(undefined);
     watch.snapshot = undefined;
@@ -153,8 +159,10 @@ async function apply($: EngineInterface, watch: Watch, read: Read): Promise<numb
     const attempt = fresh.length > 0 ? 1 : (watch.undelivered?.attempts ?? 0) + 1;
     watch.undelivered = undefined;
     if (due.length > 0) {
-      watch.flagged = await inject($, next, due, attempt);
-      if (!watch.flagged && attempt < MAX_ATTEMPTS) {
+      const isSent = await inject($, next, due, attempt);
+      if (!isCurrent()) return undefined;
+      watch.flagged = isSent;
+      if (!isSent && attempt < MAX_ATTEMPTS) {
         watch.undelivered = { head: next.head, decisions: due, attempts: attempt };
       }
     } else if (decisions.some((d) => d.kind !== "review")) watch.flagged = false;
@@ -172,7 +180,9 @@ async function poll($: EngineInterface, watch: Watch, generation: number): Promi
     const read = await readPr($);
     // A session.end that landed while gh ran has already cleared the status.
     if (!isCurrent()) return;
-    delay = await apply($, watch, read);
+    const applied = await apply($, watch, read, isCurrent);
+    if (applied === undefined) return;
+    delay = applied;
     watch.error = undefined;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

@@ -104,6 +104,12 @@ describe("decide", () => {
     ]);
   });
 
+  test("a closed PR logs its closure and nothing after", () => {
+    const merged = { ...failing, state: "MERGED" };
+    expect(decide(passing, merged)).toEqual([{ action: "drop", kind: "pr.merged" }]);
+    expect(decide(merged, { ...merged, failed: ["ci / other"] })).toEqual([]);
+  });
+
   test("promotes requested changes and drops other reviews", () => {
     const reviewed = {
       ...passing,

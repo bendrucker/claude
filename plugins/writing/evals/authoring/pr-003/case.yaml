@@ -1,0 +1,19 @@
+schema_version: "1.1"
+name: pr-003
+tags: [holdout]
+plugins: ["../../..", "../../../../pull-request", "../../../../issue"]
+execution:
+  model: claude-opus-5-5
+  max_turns: 30
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill, Write, Edit]
+  append_system_prompt: >-
+    This sandbox has no network and nobody answers mid-task. Pushes reach a
+    local remote, and a failed upstream-tracking config write after a push
+    is harmless. The gh create command fails for lack of network. When it
+    does, reply with the drafted PR inside <out> and </out> tags and nothing
+    else: a line Title: <title>, a blank line, then the body verbatim. This
+    user's settings blank commit and PR attribution, so add no
+    Co-Authored-By trailer and no Generated with Claude Code footer.
+context:
+  scaffold_script: fixture.sh

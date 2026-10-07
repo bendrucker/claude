@@ -1,0 +1,1 @@
+Create the PR. This is an upstream PR to brianc/node-pg-types. Fixes #152: PRs opened from the repo itself were double-triggering CI. The workflow's permissions are already read-only, so persist-credentials was moot.

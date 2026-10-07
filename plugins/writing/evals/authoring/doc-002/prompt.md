@@ -1,0 +1,1 @@
+Write the README as full API docs for this module. Top badges: Travis CI status pointing at bendrucker/angular-credit-cards, and an npm version badge from badge.fury.io/js/creditcards. Pitch line: light footprint, flexible API, runs the same in Node and the browser. Document `validate(card)` plus each submodule's exports (card, cvc, expiration) with signatures and return shapes.

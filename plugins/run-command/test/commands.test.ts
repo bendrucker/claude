@@ -97,7 +97,16 @@ describe("blocks", () => {
   });
 });
 
-const SAFE_SUFFIXES = ["", " 2>&1", " &>/dev/null", " | cat", " && true"];
+const SAFE_SUFFIXES = [
+  "",
+  " 2>&1",
+  " &>/dev/null",
+  " | cat",
+  " && true",
+  ' "a; b"',
+  " 'x || y'",
+  String.raw` a\;`,
+];
 const UNSAFE_SUFFIXES = [
   "; true",
   " # note",
@@ -110,6 +119,9 @@ const UNSAFE_SUFFIXES = [
   ' "open',
   " $(open",
   " <<EOF",
+  " && source env",
+  String.raw` $'\'`,
+  ' "$(open)"',
 ];
 
 const step = gs.record({
@@ -146,9 +158,36 @@ describe("chain", () => {
       expected: String.raw`cat <<<x && echo \"`,
     },
     {
-      name: "a quoted semicolon, refused conservatively",
-      block: ['git commit -m "a; b"', "c"],
+      name: "operators that are quoted or escaped",
+      block: ['git commit -m "a; b"', String.raw`echo 'x || y' a\; "it's"`],
+      expected: String.raw`git commit -m "a; b" && echo 'x || y' a\; "it's"`,
+    },
+    {
+      name: "a sourced script",
+      block: ["source .venv/bin/activate", "pytest"],
       expected: undefined,
+    },
+    { name: "a dot-sourced script", block: ["cd x && . ./env", "make"], expected: undefined },
+    {
+      name: "a quote opened inside the other kind",
+      block: [`echo "a'" 'b"`, "c"],
+      expected: undefined,
+    },
+    {
+      name: "an ANSI-C quote holding an escaped quote",
+      block: [String.raw`echo $'\''`, "c"],
+      expected: String.raw`echo $'\'' && c`,
+    },
+    { name: "an ANSI-C quote left open", block: [String.raw`echo $'\'`, "c"], expected: undefined },
+    {
+      name: "a substitution in double quotes",
+      block: ['echo "$(date)"', "c"],
+      expected: undefined,
+    },
+    {
+      name: "a trailing escaped backslash",
+      block: [String.raw`echo a\\`, "c"],
+      expected: String.raw`echo a\\ && c`,
     },
   ])("$name", ({ block, expected }) => {
     expect(chain(block)).toBe(expected);
@@ -190,6 +229,52 @@ describe("chain", () => {
       { testCases: 60 },
     );
   });
+
+  test("an accepted chain runs as the commands do one at a time in bash", () => {
+    // Most draws chain, so the bash comparison runs on most cases.
+    const quoted = gs.sampledFrom([
+      "x",
+      "'a b'",
+      '"c;d"',
+      `"it's"`,
+      String.raw`e\;`,
+      String.raw`\\`,
+      String.raw`$'\''`,
+      "|",
+      "&&",
+      "$(true)",
+    ]);
+    const open = gs.sampledFrom([String.raw`$'\'`, '"', "'", "(", ")", "#", ";", "&", '"$(true)"']);
+    const fragments = gs.oneOf(quoted, quoted, quoted, open);
+    const bash = (script: string) => Bun.spawnSync(["bash", "-c", `${STEP}\n${script}`]);
+    hegel.test(
+      (tc) => {
+        const steps = tc.draw(
+          gs.arrays(
+            gs.record({ fails: gs.booleans(), args: gs.arrays(fragments, { maxSize: 3 }) }),
+            {
+              minSize: 2,
+              maxSize: 3,
+            },
+          ),
+        );
+        const block = steps.map((s, i) => [`step ${i} ${s.fails ? 1 : 0}`, ...s.args].join(" "));
+        const joined = chain(block);
+        if (joined === undefined) return;
+        let expected = "";
+        let syntaxError = false;
+        for (const command of block) {
+          const alone = bash(command);
+          expected += alone.stdout.toString();
+          syntaxError ||= alone.exitCode === 2;
+          if (alone.exitCode !== 0) break;
+        }
+        const output = bash(joined).stdout.toString();
+        expect(output === expected || (syntaxError && output === "")).toBe(true);
+      },
+      { testCases: 100 },
+    );
+  }, 60_000);
 });
 
 describe("runAlls", () => {

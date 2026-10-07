@@ -5,6 +5,8 @@ export const LIMIT = 9;
 const COMMAND = /^\s*(?:[-*]\s+)?`?!\s+([^`\s][^`]*?)\s*`?\s*$/;
 // Operators holding an `&` that still chain: `&&` and fd redirects.
 const CHAINING_AMPERSANDS = /&&|[<>]&|&>/g;
+// A sourced script runs in this shell, where a chain switches off its `set -e`.
+const SOURCES = /(?:^|&&|\|)\s*(?:source|\.)(?:\s|$)/;
 
 /** Blank lines and code fences sit between commands without ending their block. */
 function keepsBlock(line: string): boolean {
@@ -17,24 +19,49 @@ function keepsBlock(line: string): boolean {
  * out the rest of the chain, and a lone `&` backgrounds.
  */
 function chainable(command: string): boolean {
+  const bare = unquoted(command);
   return (
-    complete(command) &&
-    !command.includes("||") &&
-    !/[;#&]/.test(command.replaceAll(CHAINING_AMPERSANDS, ""))
+    bare !== undefined &&
+    !/(?:\||&&)$/.test(bare) &&
+    !/(?<!<)<<(?!<)/.test(bare) &&
+    !bare.includes("||") &&
+    !SOURCES.test(bare) &&
+    !/[;#&]/.test(bare.replaceAll(CHAINING_AMPERSANDS, ""))
   );
 }
 
-const count = (text: string, char: string): number => text.split(char).length - 1;
-
-/** A command that continues past its line would swallow the ` && ` after it. */
-function complete(command: string): boolean {
-  if (/(?:\\|\||&&)$/.test(command) || /(?<!<)<<(?!<)/.test(command)) return false;
-  const unescaped = command.replaceAll(/\\./g, "");
-  return (
-    count(unescaped, "'") % 2 === 0 &&
-    count(unescaped, '"') % 2 === 0 &&
-    count(unescaped, "(") === count(unescaped, ")")
-  );
+/**
+ * The command with each quoted or escaped span replaced by `_`, or undefined
+ * when a quote, escape, or paren is left open and would swallow the ` && `
+ * after it. A substitution inside double quotes is refused, since tracking
+ * its own quotes would take a full parser.
+ */
+function unquoted(command: string): string | undefined {
+  let bare = "";
+  let quote: string | undefined;
+  let depth = 0;
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i];
+    if (quote === "'") {
+      if (char === "'") [quote, bare] = [undefined, `${bare}_`];
+    } else if (char === "\\") {
+      if (++i === command.length) return undefined;
+      if (quote === undefined) bare += "_";
+    } else if (quote !== undefined) {
+      if (char === quote.at(-1)) [quote, bare] = [undefined, `${bare}_`];
+      else if (quote === '"' && (char === "`" || (char === "$" && command[i + 1] === "(")))
+        return undefined;
+    } else if (char === "$" && command[i + 1] === "'") {
+      [quote, i] = ["$'", i + 1];
+    } else if (char === "'" || char === '"') {
+      quote = char;
+    } else {
+      if (char === "(") depth++;
+      if (char === ")" && --depth < 0) return undefined;
+      bare += char;
+    }
+  }
+  return quote === undefined && depth === 0 ? bare : undefined;
 }
 
 /** A reply's commands, grouped into runs that only blank lines and fences separate. */

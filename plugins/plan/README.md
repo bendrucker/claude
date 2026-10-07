@@ -9,6 +9,7 @@ Planning mode guidelines and context injection for Claude Code.
   - `scripts/context.sh` and `scripts/plan-inject.sh`: inject planning guidelines the first time a session reaches plan mode, whether that first signal is the `EnterPlanMode` call, a prompt, or a tool call, and append delegation guidance when the orchestrator runs on an expensive model
   - `hooks/gate.ts`: gates `ExitPlanMode`, denying an unchanged plan resubmission, a resubmission that keeps the prior plan nearly intact, and a plan over 10k characters, re-arming while a rework stays over the threshold up to two fires per session
   - `hooks/write-warn.ts`: on `Write`/`Edit` to a plan file under the default `~/.claude/plans/` directory, warns via `additionalContext` when its content is already over the gate's 10k-character limit, so a draft can be trimmed before it reaches `ExitPlanMode`. `hooks.json` scopes it to that directory with a per-hook `if`, so it never spawns for an unrelated write, which means it has no visibility into a custom `plansDirectory` setting
+- **Mod** `mod/register.ts`: after each `Write` or `Edit` to the plan file named in the plan-mode reminder, shows its size as a share of the gate's limit in the status line once it reaches 90% (`plan: 10.2k (102%)`, rounded down), counting `string.length` the way the gate does, and clears it when a plan is approved. Display only: it adds nothing to the model's context. Through `mod-events` it logs `plan.count` for each count, `plan.crossed` whenever the count moves over or back under the limit, and `plan.present` for each `ExitPlanMode` with its size and whether it went through, so the session index can measure whittle loops. It loads only where `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, and the command hooks work without it. `hooks/gate.test.ts` pins its limit to the gate's
 - **Evals** `evals/gate/`: offline replay of every recorded presentation through the gate, plus headless rework runs that compare deny texts
 
 ## How It Works
@@ -33,4 +34,5 @@ Each denial reason states the fix directly: rework against the feedback, delete 
 
 ```sh
 bun test plugins/plan
+bun scripts/mod-test.ts plan
 ```

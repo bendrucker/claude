@@ -124,7 +124,7 @@ describe("register", () => {
       phase: "pending",
       state: "OPEN",
     });
-    expect(w.statuses.at(-1)).toBe("PR #7 · CI 0/1");
+    expect(w.statuses.at(-1)).toBe("CI 0/1");
 
     world.view = pr("FAILURE");
     await w.clock.advance(POLL_MS.pending);
@@ -137,7 +137,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✗ ci / test → Claude");
+    expect(w.statuses.at(-1)).toBe("CI ✗ ci / test → Claude");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -146,7 +146,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✓");
+    expect(w.statuses.at(-1)).toBe(undefined);
   });
 
   test("requested changes wake the model and a comment review does not", async ($, on) => {
@@ -222,7 +222,7 @@ describe("register", () => {
     world.branch = "master";
     await w.clock.advance(POLL_MS.idle);
     expect(w.views.length).toBe(1);
-    expect(w.statuses.at(-1)).toBe("PR #7 · CI 0/1");
+    expect(w.statuses.at(-1)).toBe("CI 0/1");
   });
 
   test("a repeated gh failure is logged once and backs off", async ($, on) => {
@@ -287,7 +287,7 @@ describe("register", () => {
     expect(w.named("inject")[0]).toEqual(
       expect.objectContaining({ ok: false, detail: expect.objectContaining({ dropped: "busy" }) }),
     );
-    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✗ ci / test");
+    expect(w.statuses.at(-1)).toBe("CI ✗ ci / test");
   });
 
   test("a dropped injection is retried until the engine takes it", async ($, on) => {
@@ -307,7 +307,7 @@ describe("register", () => {
       [false, 1],
       [true, 2],
     ]);
-    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✗ ci / test → Claude");
+    expect(w.statuses.at(-1)).toBe("CI ✗ ci / test → Claude");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(2);
@@ -339,7 +339,7 @@ describe("register", () => {
   });
 
   test("a failing poll marks the last status stale", async ($, on) => {
-    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("FAILURE") };
     const w = worldOf(on, world);
 
     await $.session.start(START);
@@ -347,6 +347,6 @@ describe("register", () => {
     world.view = "HTTP 401: Bad credentials";
     await w.clock.advance(POLL_MS.settled);
 
-    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✓ · stale");
+    expect(w.statuses.at(-1)).toBe("CI ✗ ci / test · stale");
   });
 });

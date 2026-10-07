@@ -258,19 +258,17 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   return paragraphs.join("\n\n");
 }
 
-export function statusOf(snapshot: Snapshot, isFlagged: boolean): string {
-  const pr = `PR #${snapshot.pr}`;
-  if (snapshot.state === "MERGED") return `${pr} merged`;
-  if (snapshot.state === "CLOSED") return `${pr} closed`;
-  let ci: string;
-  if (snapshot.phase === "failing") ci = `CI ✗ ${listed(snapshot.failed)}`;
+// Claude Code's footer already links the PR, so the line shows only what
+// needs attention and clears otherwise.
+export function statusOf(snapshot: Snapshot, isFlagged: boolean): string | undefined {
+  if (snapshot.state !== "OPEN") return undefined;
+  const parts: string[] = [];
+  if (snapshot.phase === "failing") parts.push(`CI ✗ ${listed(snapshot.failed)}`);
   else if (snapshot.phase === "pending") {
-    ci = `CI ${snapshot.total - snapshot.pending}/${snapshot.total}`;
-  } else if (snapshot.phase === "passing") ci = "CI ✓";
-  else ci = "no checks";
-  const parts = [pr, ci];
+    parts.push(`CI ${snapshot.total - snapshot.pending}/${snapshot.total}`);
+  }
   if (snapshot.reviewDecision === "CHANGES_REQUESTED") parts.push("changes requested");
-  else if (snapshot.reviewDecision === "APPROVED") parts.push("approved");
+  if (parts.length === 0) return undefined;
   const line = parts.join(" · ");
   return isFlagged ? `${line} → Claude` : line;
 }

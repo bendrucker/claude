@@ -19,6 +19,14 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
+      - name: Install Claude Code
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Generate mod engine types
+        run: bun run mod-types
+
       - name: Check
         run: bun run check
 
@@ -30,9 +38,16 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
-      # Mods type-check against the gitignored .claude/types/, which CI lacks.
+      - name: Install Claude Code
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Generate mod engine types
+        run: bun run mod-types
+
       - name: Type check
-        run: bun run build --ignore-pattern 'plugins/*/mod/**'
+        run: bun run build
 
   hooks:
     runs-on: ubuntu-latest

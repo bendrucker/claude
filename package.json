@@ -14,6 +14,7 @@
     "format": "oxfmt --write",
     "format:check": "oxfmt --check",
     "inventory": "bun scripts/inventory/index.ts",
+    "mod-types": "bun scripts/mod-types.ts",
     "lint": "oxlint --type-aware",
     "lint:fix": "oxlint --type-aware --fix",
     "plugin-lockfiles": "bun scripts/plugin-lockfiles.ts",

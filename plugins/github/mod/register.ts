@@ -179,9 +179,8 @@ async function poll($: EngineInterface, watch: Watch, generation: number): Promi
     if (message !== watch.error) emit($, "poll.error", { error: message }, false);
     watch.error = message;
     delay = POLL_MS.error;
-    if (watch.snapshot !== undefined && isCurrent()) {
-      $.ui.status(`${statusOf(watch.snapshot, watch.flagged)} · stale`);
-    }
+    const line = watch.snapshot === undefined ? undefined : statusOf(watch.snapshot, watch.flagged);
+    if (line !== undefined && isCurrent()) $.ui.status(`${line} · stale`);
   }
   if (!isCurrent()) return;
   watch.timer = $.clock.after(delay, () => void poll($, watch, generation));

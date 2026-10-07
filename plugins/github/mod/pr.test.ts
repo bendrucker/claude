@@ -161,13 +161,19 @@ describe("statusOf", () => {
       statusOf(snapshotOf(view(over)), flagged);
     expect(
       of({ statusCheckRollup: [run("a", "IN_PROGRESS"), run("b", "COMPLETED", "SUCCESS")] }),
-    ).toBe("PR #7 · CI 1/2");
+    ).toBe("CI 1/2");
     expect(of({ statusCheckRollup: [run("a", "COMPLETED", "FAILURE")] }, true)).toBe(
-      "PR #7 · CI ✗ ci / a → Claude",
+      "CI ✗ ci / a → Claude",
     );
     expect(
       of({ statusCheckRollup: [run("a", "COMPLETED", "SUCCESS")], reviewDecision: "APPROVED" }),
-    ).toBe("PR #7 · CI ✓ · approved");
-    expect(of({ state: "MERGED" })).toBe("PR #7 merged");
+    ).toBe(undefined);
+    expect(
+      of({
+        statusCheckRollup: [run("a", "COMPLETED", "SUCCESS")],
+        reviewDecision: "CHANGES_REQUESTED",
+      }),
+    ).toBe("changes requested");
+    expect(of({ state: "MERGED", statusCheckRollup: [run("a", "IN_PROGRESS")] })).toBe(undefined);
   });
 });

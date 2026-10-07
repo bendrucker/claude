@@ -3,6 +3,7 @@ import { type Engine, describe, expect, test } from "claude-code/testing";
 import { LIMIT, statusText } from "./register.ts";
 
 const PLAN = "/Users/u/.claude/plans/quiet-otter.md";
+const DENIED: ToolCallResult = { result: "too long", isError: true };
 
 interface World {
   files: Record<string, string>;
@@ -10,7 +11,13 @@ interface World {
   events: Parameters<Engine["modEvents"]["emit"]>[0][];
 }
 
-function worldOf(on: On, { result = { result: "ok" } }: { result?: ToolCallResult } = {}): World {
+function worldOf(
+  on: On,
+  {
+    result = { result: "ok" },
+    exit = result,
+  }: { result?: ToolCallResult; exit?: ToolCallResult } = {},
+): World {
   const world: World = { files: {}, status: [], events: [] };
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
@@ -21,7 +28,7 @@ function worldOf(on: On, { result = { result: "ok" } }: { result?: ToolCallResul
     return { value: undefined };
   });
   on("prompt.attachment", (_, e) => ({ text: e.text }));
-  on("tool.call", () => result);
+  on("tool.call", (_, e) => (e.tool === "ExitPlanMode" ? exit : result));
   on("fs.read", (_, e) => {
     const text = world.files[e.path];
     if (text === undefined) throw new Error("ENOENT");
@@ -49,10 +56,14 @@ function write($: Engine, world: World, chars: number, filePath = PLAN) {
 }
 
 describe("statusText", () => {
-  test("shows the count against the limit and the overage", () => {
-    expect(statusText(8_412)).toBe("plan 8.4K / 10K");
-    expect(statusText(LIMIT)).toBe("plan 10K / 10K");
-    expect(statusText(12_034)).toBe("plan 12K / 10K (over by 2K)");
+  test("rounds down so a plan under the limit never reads 100%, and marks one over it", () => {
+    expect([8_412, LIMIT - 1, LIMIT, LIMIT + 1, 12_034].map(statusText)).toEqual([
+      "plan 84%",
+      "plan 99%",
+      "plan 100%",
+      "plan 100% ✗",
+      "plan 120% ✗",
+    ]);
   });
 });
 
@@ -62,7 +73,7 @@ describe("register", () => {
     await planMode($);
     world.files[PLAN] = "é".repeat(6_000);
     await $.tool.call({ tool: "Write", file_path: PLAN, content: "", tool_use_id: "t1" });
-    expect(world.status).toEqual(["plan 6K / 10K"]);
+    expect(world.status).toEqual(["plan 60%"]);
   });
 
   test("updates after an edit", async ($, on) => {
@@ -76,7 +87,7 @@ describe("register", () => {
       new_string: "b",
       tool_use_id: "t1",
     });
-    expect(world.status).toEqual(["plan 10K / 10K (over by 1)"]);
+    expect(world.status).toEqual(["plan 100% ✗"]);
   });
 
   test("counts only the plan file the plan-mode reminder names", async ($, on) => {
@@ -85,7 +96,7 @@ describe("register", () => {
     await planMode($);
     await write($, world, 200, "/Users/u/.claude/plans/quiet-otter-decisions.md");
     await write($, world, 800);
-    expect(world.status).toEqual(["plan 800 / 10K"]);
+    expect(world.status).toEqual(["plan 8%"]);
   });
 
   test("ignores a failed write", async ($, on) => {
@@ -98,6 +109,8 @@ describe("register", () => {
   test("clears the count when the file cannot be read", async ($, on) => {
     const world = worldOf(on);
     await planMode($);
+    await write($, world, 500);
+    delete world.files[PLAN];
     const result = await $.tool.call({
       tool: "Write",
       file_path: PLAN,
@@ -105,7 +118,7 @@ describe("register", () => {
       tool_use_id: "t1",
     });
     expect(result.isError).not.toBe(true);
-    expect(world.status).toEqual([undefined]);
+    expect(world.status).toEqual(["plan 5%", undefined]);
   });
 
   test("logs each count and each crossing of the limit", async ($, on) => {
@@ -135,7 +148,7 @@ describe("register", () => {
     await planMode($);
     await write($, world, 1);
     await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
-    expect(world.status).toEqual(["plan 1 / 10K", undefined]);
+    expect(world.status).toEqual(["plan 0%", undefined]);
     expect(world.events.at(-1)).toEqual({
       mod: "plan",
       event: "present",
@@ -145,20 +158,22 @@ describe("register", () => {
   });
 
   test("logs a denied presentation and keeps the count", async ($, on) => {
-    const world = worldOf(on, { result: { result: "too long", isError: true } });
+    const world = worldOf(on, { exit: DENIED });
     await planMode($);
-    world.files[PLAN] = "x".repeat(12_000);
+    await write($, world, 12_000);
     await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
-    expect(world.status).toEqual([]);
+    expect(world.status).toEqual(["plan 120% ✗"]);
     expect(world.events.at(-1)).toMatchObject({ event: "present", ok: false });
   });
 
   test("clears the count when a denied plan cannot be read", async ($, on) => {
-    const world = worldOf(on, { result: { result: "too long", isError: true } });
+    const world = worldOf(on, { exit: DENIED });
     await planMode($);
+    await write($, world, 12_000);
+    delete world.files[PLAN];
     await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
-    expect(world.status).toEqual([undefined]);
-    expect(world.events).toEqual([]);
+    expect(world.status).toEqual(["plan 120% ✗", undefined]);
+    expect(world.events.map((e) => e.event)).toEqual(["count", "crossed"]);
   });
 
   test("records that it was live at session start", async ($, on) => {

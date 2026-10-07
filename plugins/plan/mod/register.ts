@@ -3,11 +3,12 @@ import type { On } from "claude-code";
 // The plan gate denies a plan whose `plan.length`, in UTF-16 code units, exceeds this.
 export const LIMIT = 10_000;
 
-const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+export function percent(chars: number): number {
+  return Math.floor((chars * 100) / LIMIT);
+}
 
 export function statusText(chars: number): string {
-  const base = `plan ${compact.format(chars)} / ${compact.format(LIMIT)}`;
-  return chars > LIMIT ? `${base} (over by ${compact.format(chars - LIMIT)})` : base;
+  return `plan ${percent(chars)}%${chars > LIMIT ? " ✗" : ""}`;
 }
 
 function basename(path: string): string {
@@ -16,6 +17,7 @@ function basename(path: string): string {
 
 export function register(on: On): void {
   let planFile: string | undefined;
+  let shown = false;
   let wasOver = false;
 
   on("session.start", ($, e, next) => {
@@ -41,12 +43,14 @@ export function register(on: On): void {
     try {
       chars = (await $.fs.read(e.file_path)).length;
     } catch {
+      shown = false;
       $.ui.status(undefined);
       return result;
     }
 
     const over = chars > LIMIT;
     const file = basename(e.file_path);
+    shown = true;
     $.ui.status(statusText(chars));
     await $.modEvents.emit({
       mod: "plan",
@@ -67,14 +71,20 @@ export function register(on: On): void {
   on("tool.call", { tool: "ExitPlanMode" }, async ($, e, next) => {
     const result = await next(e);
     const denied = result.deny !== undefined || result.isError === true;
-    if (!denied) $.ui.status(undefined);
+    if (!denied && shown) {
+      shown = false;
+      $.ui.status(undefined);
+    }
     if (planFile === undefined) return result;
 
     let chars: number;
     try {
       chars = (await $.fs.read(planFile)).length;
     } catch {
-      $.ui.status(undefined);
+      if (shown) {
+        shown = false;
+        $.ui.status(undefined);
+      }
       return result;
     }
     await $.modEvents.emit({

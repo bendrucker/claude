@@ -1,0 +1,1 @@
+Create the PR. This is an upstream PR to PagerDuty/terraform-provider-pagerduty. Refresh currently fails outright when a Slack connection gets deleted outside Terraform, a 404 from the API. Every other error code should still abort the plan. `pagerduty_service` already handles removal this way, so I copied that pattern.

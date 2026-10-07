@@ -1,0 +1,6 @@
+allow_tools: [Bash, Write, Edit]
+graders:
+  out-present: "*"
+  writing-fired: "*"
+  no-attribution: ["pr-*", "issue-*"]
+  create-fired: "pr-*"

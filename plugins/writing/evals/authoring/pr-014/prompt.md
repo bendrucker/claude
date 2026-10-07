@@ -1,0 +1,1 @@
+Create the PR. This is an upstream PR to docker/build-push-action. Node throws a DEP0147 deprecation warning on cleanup: `fs.rmdir` with `recursive` is going away, `fs.rm` replaces it. Ref: https://nodejs.org/api/deprecations.html#DEP0147

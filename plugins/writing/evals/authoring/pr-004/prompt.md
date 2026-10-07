@@ -1,0 +1,1 @@
+Create the PR. This is a TakeScoop repo. A module with provider configuration aliases fails `terraform validate` unless something generates the matching provider block for the alias. A handful of repos already do this by hand, so build it into the workflow instead so nobody writing a module needs to know the quirk.

@@ -7,6 +7,7 @@ import { cli } from "cleye";
 import { parse } from "yaml";
 import { z } from "zod";
 import { erroredRuns } from "./load";
+import { shareGraders } from "./shared-graders";
 import { stage } from "./stage";
 import { wrap } from "./wrap";
 
@@ -24,6 +25,13 @@ export const SuiteFile = z.object({
       context: z.array(z.string()).default([]),
     })
     .optional(),
+  /** Graders in `<suite>/graders/`, each mapped to the case-name globs it joins. */
+  graders: z
+    .record(
+      z.string(),
+      z.union([z.string(), z.array(z.string())]).transform((v) => [v].flat()),
+    )
+    .default({}),
 });
 
 const CaseFile = z.object({ plugins: z.array(z.string()).default([]) });
@@ -59,7 +67,12 @@ interface Staged {
   evalDir: string;
 }
 
-async function stagePlugins(repo: string, suite: string, ref: string | undefined, root: string) {
+async function stagePlugins(
+  repo: string,
+  suite: string,
+  ref: string | undefined,
+  root: string,
+): Promise<Staged> {
   const plugins = await casePlugins(repo, suite);
   const owner = plugins.find((p) => !relative(p, suite).startsWith(".."));
   if (owner === undefined)
@@ -87,9 +100,23 @@ export async function prepare(
 ): Promise<Staged> {
   const root = mkdtempSync(join(tmpdir(), "hill-climb-"));
   const config = await readSuite(join(repo, suite));
-  if (config.wrap === undefined) return stagePlugins(repo, suite, ref, root);
-  const out = join(root, config.wrap.name);
-  await wrap({ repo, ref, out, ...config.wrap });
+  const staged =
+    config.wrap === undefined
+      ? await stagePlugins(repo, suite, ref, root)
+      : await stageWrapped(repo, suite, ref, root, config.wrap);
+  await shareGraders(join(staged.target, staged.evalDir), config.graders);
+  return staged;
+}
+
+async function stageWrapped(
+  repo: string,
+  suite: string,
+  ref: string | undefined,
+  root: string,
+  config: NonNullable<z.output<typeof SuiteFile>["wrap"]>,
+): Promise<Staged> {
+  const out = join(root, config.name);
+  await wrap({ repo, ref, out, ...config });
   await stage(repo, undefined, [suite], root);
   await $`mv ${join(root, suite)} ${join(out, "evals")}`.quiet();
   return { target: out, evalDir: "evals" };

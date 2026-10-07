@@ -21,7 +21,12 @@ judge_model: claude-sonnet-5
 wrap:                           # omit when the cases load a plugin
   skills: [user/skills/tdd]
   context: [user/rules/typescript.md]
+graders:                        # <suite>/graders/<name>.md to the case-name globs it joins
+  out-present: "*"
+  create-fired: ["pr-*"]
 ```
+
+A grader every case repeats lives once in `<suite>/graders/`. `run.ts` copies it into each matching case as it stages the suite, skipping a case that holds a grader by that name, and `check.ts` and `regrade.ts` read the same merged set.
 
 The runner ignores a `CLAUDE.md` or `.claude/rules` in the scaffolded working directory, so wrapped context reaches the session through a `SessionStart` hook instead. It injects every context file whatever its `paths:` frontmatter says. A wrapped skill keeps the files it links to beside it, such as a sibling skill's reference, and loses `disable-model-invocation`, so a user-invoked skill can load from a natural-language prompt on the with arm.
 

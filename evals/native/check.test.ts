@@ -108,3 +108,16 @@ test("rejects an example naming a grader the case lacks", async () => {
   const dir = await suite({ ...graders, "examples/one/bad.md": "---\nfail: [nope]\n---\n" });
   expect(check(dir)).rejects.toThrow("unknown graders: nope");
 });
+
+test("a case inherits the suite graders its globs match and overrides by name", async () => {
+  const dir = await suite({
+    ...graders,
+    "suite.yaml": "graders:\n  tagged: '*'\n  short: '*'\n",
+    "graders/tagged.md": "---\ntype: regex\npattern: '<out>'\n---\n",
+    "graders/short.md": "---\ntype: regex\npattern: 'never'\n---\n",
+    "examples/one/good.md": "p99 230ms",
+  });
+  expect((await check(dir)).mismatches).toEqual([
+    { example: "examples/one/good.md", grader: "tagged", expected: "pass" },
+  ]);
+});

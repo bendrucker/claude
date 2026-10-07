@@ -3,7 +3,7 @@ import { basename, join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import { z } from "zod";
-import { type Graders, loadGraders, RegexGrader, verdict } from "./check";
+import { caseGraders, type Graders, RegexGrader, verdict } from "./check";
 import { traceReply } from "./load";
 
 const Grader = z.looseObject({
@@ -86,7 +86,7 @@ export async function regrade(suite: string, results: string, out: string): Prom
   const flips: Flip[] = [];
   const cases = await Promise.all(
     result.cases.map(async (c) => {
-      const graders = await loadGraders(join(suite, c.name));
+      const graders = await caseGraders(suite, c.name);
       // A case missing from the suite would otherwise drop every grader.
       if (graders.size === 0) return c;
       const arms = await Promise.all(

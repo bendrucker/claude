@@ -5,6 +5,8 @@ import { cli } from "cleye";
 import { parse } from "yaml";
 import { z } from "zod";
 import { traceReply } from "./load";
+import { readSuite } from "./run";
+import { sharedFor } from "./shared-graders";
 
 export const RegexGrader = z.object({
   type: z.literal("regex"),
@@ -85,6 +87,13 @@ export async function loadGraders(caseDir: string): Promise<Graders> {
   return new Map(graders);
 }
 
+/** Loads a case's graders by name, with the suite-level graders `suite.yaml` shares into it. */
+export async function caseGraders(suite: string, name: string): Promise<Graders> {
+  const shared = sharedFor((await readSuite(suite)).graders, name);
+  const inherited = [...(await loadGraders(suite))].filter(([g]) => shared.includes(g));
+  return new Map([...inherited, ...(await loadGraders(join(suite, name)))]);
+}
+
 /** Reads every file under a directory by relative path, or undefined when there is none. */
 async function readFiles(dir: string): Promise<Map<string, string> | undefined> {
   const entries = globSync("**/*", { cwd: dir, withFileTypes: true }).filter((e) => e.isFile());
@@ -129,7 +138,7 @@ export async function check(suite: string): Promise<Checked> {
   );
   const cases = [...new Set(examples.map((e) => basename(dirname(e))))];
   const graders = new Map(
-    await Promise.all(cases.map(async (c) => [c, await loadGraders(join(suite, c))] as const)),
+    await Promise.all(cases.map(async (c) => [c, await caseGraders(suite, c)] as const)),
   );
   const reached = new Set<string>();
   const results = await Promise.all(

@@ -14,6 +14,8 @@ const files: Record<string, string> = {
   "plugins/q/.claude-plugin/plugin.json": '{"name":"q"}',
   "plugins/p/evals/suite/one/case.yaml": "plugins: [../../.., ../../../../q]\n",
   "plugins/p/evals/suite/one/prompt.md": "committed prompt",
+  "plugins/p/evals/suite/suite.yaml": "graders:\n  fired: '*'\n",
+  "plugins/p/evals/suite/graders/fired.md": "shared grader",
   "user/skills/tdd/SKILL.md":
     "---\ndisable-model-invocation: true\n---\ncommitted user skill [v](../other/LANGUAGE.md)",
   "user/rules/ts.md": "committed rule",
@@ -52,6 +54,8 @@ describe("prepare", () => {
     expect(await read(join(target, "p/skills/s/SKILL.md"))).toBe(skill);
     expect(await read(join(target, "q/.claude-plugin/plugin.json"))).toBe('{"name":"q"}');
     expect(await read(join(target, evalDir, "one/prompt.md"))).toBe("working prompt");
+    expect(await read(join(target, evalDir, "one/graders/fired.md"))).toBe("shared grader");
+    expect(await Bun.file(join(target, evalDir, "graders/fired.md")).exists()).toBe(false);
   });
 
   test("wraps skills and context that are not a plugin", async () => {

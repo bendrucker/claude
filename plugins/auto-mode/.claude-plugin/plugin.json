@@ -1,0 +1,9 @@
+{
+  "name": "auto-mode",
+  "description": "Enhancements for Claude Code auto mode",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  },
+  "dependencies": ["mod-events"]
+}

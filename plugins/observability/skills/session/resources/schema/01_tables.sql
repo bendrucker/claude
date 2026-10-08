@@ -28,10 +28,9 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 
 -- This machine's own telemetry, read from beside its projects directory rather than from
--- a transcript, so neither table is a projection of `raw`. `debug_events` holds the
+-- a transcript, so it is not a projection of `raw`. `debug_events` holds the
 -- `[Stall]` timing lines and the allow rules auto mode dropped, out of
--- `debug/<session>.txt`. `tool_verdicts` holds the classifier-telemetry mod's per-call
--- records, out of `classifier-telemetry/<session>/<tool_use_id>.json`.
+-- `debug/<session>.txt`.
 CREATE TABLE IF NOT EXISTS debug_events (
   host            VARCHAR,
   session_id      VARCHAR,
@@ -40,22 +39,6 @@ CREATE TABLE IF NOT EXISTS debug_events (
   ts              TIMESTAMP,
   event           VARCHAR,
   fields          JSON
-);
-
-CREATE TABLE IF NOT EXISTS tool_verdicts (
-  host            VARCHAR,
-  session_id      VARCHAR,
-  tool_use_id     VARCHAR,
-  agent_id        VARCHAR,
-  tool            VARCHAR,
-  decision        VARCHAR,
-  rule            VARCHAR,
-  reason          VARCHAR,
-  started_at      TIMESTAMP,
-  check_ms        BIGINT,
-  duration_ms     BIGINT,
-  outcome         VARCHAR,
-  source_dir      VARCHAR
 );
 
 -- What mods emit through the mod-events plugin, out of

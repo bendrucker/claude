@@ -433,7 +433,7 @@
     "review@bendrucker": true,
     "newline@bendrucker": true,
     "github@bendrucker": true,
-    "classifier-telemetry@bendrucker": true,
+    "auto-mode@bendrucker": true,
     "observability@bendrucker": true,
     "plugin@bendrucker": true,
     "agents@bendrucker": true,

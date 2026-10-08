@@ -55,8 +55,6 @@ Three grants are deliberate exceptions to the credential-store clause. Each hold
 
 `~/.herdr/worktrees` covers deleting a worktree rather than working in one. The session's own worktree is already writable through the sandbox's `.` entry, and removing a *different* one is what fails. `git worktree remove` checks for uncommitted changes, deregisters the admin entry, and only then deletes the files. A denied delete then orphans the directory: absent from `git worktree list`, no admin entry, and beyond git's reach. That happened twice on 2026-09-05, once through `gh pr merge --delete-branch`, which left 2.6 GB behind. **Drop it** when herdr stops placing worktrees under `~/.herdr`.
 
-The sandbox itself denies every `.git/config` and `.git/hooks` path, beyond reach of `allowWrite`. A linked worktree shares the main checkout's `.git/config`, so a sandboxed `git push -u` from one pushes and then fails `could not lock config file` recording the upstream. Keeping that file unwritable is the point: `core.hooksPath` and `core.fsmonitor` there run code in every worktree. Tracking is recorded at creation instead, outside the sandbox: the `herdr` plugin's dispatch sets `branch.<name>.remote` to `origin` and `branch.<name>.merge` to `refs/heads/<name>`. Worktrunk's `wt switch --create` needs the same from a `pre-start` hook in dotfiles.
-
 The rest are tool caches and state directories holding no credential material:
 
 - `~/.duckdb`: extensions installed on first `INSTALL ... FROM community`. Without it the `observability:session` skill dies on `IO Error: Failed to create directory`, having already been granted the egress to fetch them. The version in the path changes with each DuckDB release, so a fresh install re-denies. **Drop it** when no skill queries DuckDB with a community extension.
@@ -76,7 +74,7 @@ The rest are tool caches and state directories holding no credential material:
 
 ## Escaped Commands
 
-`excludedCommands` entries run outside the sandbox. An invocation escapes only when every command in its chain matches an entry, so `git push -u origin HEAD 2>&1 | tail` and `git config ... && echo` both run sandboxed. The exemption outranks the `filesystem` denies, so an entry grants far more than the one verb it names. `git:*` means any invocation made only of `git` commands writes anywhere on disk. Judge a candidate on that reach.
+`excludedCommands` entries run outside the sandbox. An invocation escapes only when every command in its chain matches an entry, pipeline members included, so `git push -u origin HEAD 2>&1 | tail` and `git config ... && echo` both run sandboxed because `tail` and `echo` match nothing. The escape outranks the `filesystem` denies, so an entry grants far more than the one verb it names. `git:*` means any invocation made only of `git` commands writes anywhere on disk. Judge a candidate on that reach.
 
 - Self-authenticating network tools: `git`, `linear`, `aws`, `gcloud`, `az`, `pulumi`, `ssh`, `scp`, `rsync`, `docker`. Each carries its own auth and already reaches the network.
 - macOS host integration (`mac` plugin): `open`, `osascript`, `shortcuts`, `pbcopy`, `pbpaste`, `security`, `defaults`, `screencapture`, `say`, `afplay`, `diskutil`, `networksetup`, `dscl`. Host APIs the sandbox cannot model.
@@ -175,6 +173,12 @@ touch ~/.claude/plugins/data/.sandbox-probe && rm ~/.claude/plugins/data/.sandbo
 ```
 
 Do not wait for an upstream announcement. [#41156](https://github.com/anthropics/claude-code/issues/41156) raised the same conflict at the permission-prompt layer and was closed `NOT_PLANNED` by a staleness bot. Related: [#51973](https://github.com/anthropics/claude-code/issues/51973), [#34900](https://github.com/anthropics/claude-code/issues/34900).
+
+#### Shared `.git/config`
+
+The sandbox denies writes to every `.git/config` and `.git/hooks` path, and `allowWrite` cannot override that. A linked worktree shares the main checkout's `.git/config`, so a sandboxed `git push -u` from one pushes and then fails with `could not lock config file` while recording the upstream. The denial is deliberate. `core.hooksPath` or `core.fsmonitor` set in that file would run code in every worktree.
+
+Tracking is recorded at creation instead, by tools that run unsandboxed. The `herdr` plugin's dispatch, which its sandbox marker runs outside the sandbox, sets `branch.<name>.remote` to `origin` and `branch.<name>.merge` to `refs/heads/<name>` when the repository has an `origin`, best-effort. Worktrunk's `wt switch --create` gets the same from a dotfiles `pre-start` hook. Worktrees from `EnterWorktree` or `Agent(isolation='worktree')` still track their base. **Drop both** when a sandboxed `git push -u origin HEAD 2>&1 | tail` from a linked worktree records its upstream.
 
 #### Path Globs
 

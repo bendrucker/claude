@@ -155,7 +155,7 @@ function shown(label: string): string {
 function latest(nodes: CheckNode[]): CheckNode[] {
   const byLabel = new Map<string, CheckNode>();
   for (const node of nodes) {
-    const label = labelOf(node);
+    const label = `${node.__typename}:${labelOf(node)}`;
     const held = byLabel.get(label);
     if (held === undefined || (held.startedAt ?? "\uFFFF") <= (node.startedAt ?? "\uFFFF")) {
       byLabel.set(label, node);

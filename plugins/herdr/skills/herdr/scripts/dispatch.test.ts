@@ -282,6 +282,24 @@ describe("dispatch", () => {
     expect(calls.filter((argv) => argv[3] === "config")).toEqual([]);
   });
 
+  test("starts the agent when recording tracking fails", async () => {
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      ...REMOTES,
+      ok(""),
+      BASE_OK,
+      WORKTREE,
+      fail("error: could not lock config file"),
+      STARTED,
+      ok(""),
+      AGENT_GET,
+    ]);
+    const { record } = await dispatch(options, run);
+    expect(calls.filter((argv) => argv[3] === "config")).toHaveLength(1);
+    expect(record.status).toBe("working");
+  });
+
   test("fetches the remote the base names", async () => {
     const { run, calls } = fakeRunner(HAPPY_PATH);
     await dispatch({ ...options, base: "upstream/main" }, run);

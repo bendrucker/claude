@@ -251,19 +251,18 @@ function baseRemote(remotes: ReadonlySet<string>, base: string): string | null {
 
 // The sandbox denies a session's writes to the shared .git/config, where `git
 // push -u` records tracking, so record it here instead. herdr tracks the base,
-// which would measure the session's branch against origin/main.
+// which would measure the session's branch against origin/main. Tracking is a
+// convenience, so a failed write leaves herdr's and still starts the agent.
 async function trackOrigin(
   run: Runner,
+  remotes: ReadonlySet<string>,
   path: string,
   branch: string,
-  partial: DispatchRecord,
 ): Promise<void> {
-  await required(run, ["git", "-C", path, "config", `branch.${branch}.remote`, "origin"], partial);
-  await required(
-    run,
-    ["git", "-C", path, "config", `branch.${branch}.merge`, `refs/heads/${branch}`],
-    partial,
-  );
+  if (!remotes.has("origin")) return;
+  const remote = await run(["git", "-C", path, "config", `branch.${branch}.remote`, "origin"]);
+  if (remote.code !== 0) return;
+  await run(["git", "-C", path, "config", `branch.${branch}.merge`, `refs/heads/${branch}`]);
 }
 
 // GitHub over SSH signs with a key that may need a touch nobody is there to give, so
@@ -481,7 +480,7 @@ export async function dispatch(
       prompted: false,
     };
 
-    if (remotes.has("origin")) await trackOrigin(run, partial.path, options.branch, partial);
+    await trackOrigin(run, remotes, partial.path, options.branch);
 
     const { name, started } = await startNamed(run, options, partial, wanted);
 

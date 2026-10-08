@@ -282,12 +282,12 @@ export interface AnthropicJudgeOptions {
  * Thinking stays off for these single-pass classifications. Haiku 5.5 rejects
  * any temperature but 1, so verdicts are sampled.
  */
-export const JUDGE_REQUEST = {
+const JUDGE_REQUEST = {
   max_tokens: 4096,
   thinking: { type: "disabled" },
 } as const satisfies Pick<MessageCreateParamsNonStreaming, "max_tokens" | "thinking">;
 
-export const JUDGE_OUTPUT = { effort: "low" } as const satisfies OutputConfig;
+const JUDGE_OUTPUT = { effort: "low" } as const satisfies OutputConfig;
 
 /** The verdict JSON, or an error naming why the model returned none. */
 export function responseText(response: Pick<Message, "content" | "stop_reason">): string {
@@ -302,20 +302,28 @@ export function responseText(response: Pick<Message, "content" | "stop_reason">)
   return block.text;
 }
 
-/** Real judge over the Messages API with structured JSON output. */
-export function anthropicChunkJudge(options: AnthropicJudgeOptions): ChunkJudge {
+/** One structured-output call with the prompt cached as a stable system prefix. */
+function structuredJudge(
+  options: AnthropicJudgeOptions,
+  schema: OutputSchema,
+): (input: string) => Promise<string> {
   const client = new Anthropic();
   const model = options.model ?? JUDGE_MODEL;
-  return async (chunkText: string) => {
+  return async (input: string) => {
     const response = await client.messages.create({
       model,
       ...JUDGE_REQUEST,
       system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
-      output_config: { ...JUDGE_OUTPUT, format: { type: "json_schema", schema: verdictSchema() } },
-      messages: [{ role: "user", content: chunkText }],
+      output_config: { ...JUDGE_OUTPUT, format: { type: "json_schema", schema } },
+      messages: [{ role: "user", content: input }],
     });
-    return parseVerdict(responseText(response));
+    return responseText(response);
   };
+}
+
+export function anthropicChunkJudge(options: AnthropicJudgeOptions): ChunkJudge {
+  const call = structuredJudge(options, verdictSchema());
+  return async (chunkText: string) => parseVerdict(await call(chunkText));
 }
 
 export async function judgeDocument(judge: ChunkJudge, text: string): Promise<JudgeVerdict> {
@@ -659,22 +667,9 @@ export function formatHeadingBatch(headings: string[]): string {
 }
 
 export function anthropicHeadingJudge(options: AnthropicJudgeOptions): HeadingJudge {
-  const client = new Anthropic();
-  const model = options.model ?? JUDGE_MODEL;
-  return async (headings: string[]) => {
-    const input = formatHeadingBatch(headings);
-    const response = await client.messages.create({
-      model,
-      ...JUDGE_REQUEST,
-      system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
-      output_config: {
-        ...JUDGE_OUTPUT,
-        format: { type: "json_schema", schema: headingBatchSchema() },
-      },
-      messages: [{ role: "user", content: input }],
-    });
-    return parseHeadingVerdicts(responseText(response), headings.length);
-  };
+  const call = structuredJudge(options, headingBatchSchema());
+  return async (headings: string[]) =>
+    parseHeadingVerdicts(await call(formatHeadingBatch(headings)), headings.length);
 }
 
 export async function judgeHeadings(judge: HeadingJudge, headings: string[]): Promise<boolean[]> {

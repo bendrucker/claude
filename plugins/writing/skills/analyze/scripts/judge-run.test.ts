@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { LabeledHeading } from "./headings-eval";
 import { byCriterion, type CriterionKey, JUDGE_CRITERIA, type JudgeVerdict } from "./judge";
 import { JUDGE_PROMPT_SHA256 } from "./judge-fixtures";
-import { runGate, scoreHeadingBaseline } from "./judge-run";
+import { formatPassRate, passRates, runGate, scoreHeadingBaseline } from "./judge-run";
 
 function verdictFor(flags: Partial<Record<CriterionKey, boolean>>): JudgeVerdict {
   return byCriterion((key) => {
@@ -52,6 +52,42 @@ describe("runGate", () => {
     const density = results.find((r) => r.id === "positive-information-density");
     expect(density?.pass).toBe(false);
     expect(density?.mismatches[0]?.criterion).toBe("information-density");
+  });
+});
+
+describe("runGate runs", () => {
+  test("replays every fixture once per run", async () => {
+    const judge = () => Promise.resolve(verdictFor({}));
+    const once = await runGate(judge, JUDGE_PROMPT_SHA256);
+    const thrice = await runGate(judge, JUDGE_PROMPT_SHA256, 3);
+    expect(thrice.length).toBe(once.length * 3);
+  });
+
+  test.each<[string, number]>([
+    ["zero", 0],
+    ["NaN", Number.NaN],
+    ["a fraction", 1.5],
+  ])("rejects %s runs", (_name, runs) => {
+    const judge = () => Promise.resolve(verdictFor({}));
+    expect(runGate(judge, JUDGE_PROMPT_SHA256, runs)).rejects.toThrow("positive integer");
+  });
+});
+
+describe("passRates", () => {
+  test("counts passes per fixture and collects missed criteria", () => {
+    const mismatch = { criterion: "sycophancy", expected: true, actual: false, span: null };
+    const rates = passRates([
+      { id: "a", kind: "invented-positive", pass: true, mismatches: [] },
+      { id: "b", kind: "invented-positive", pass: false, mismatches: [mismatch] },
+      { id: "a", kind: "invented-positive", pass: true, mismatches: [] },
+      { id: "b", kind: "invented-positive", pass: false, mismatches: [mismatch] },
+    ]);
+    expect(rates.map(formatPassRate)).toMatchInlineSnapshot(`
+      [
+        "a                                    2/2",
+        "b                                    0/2  missed: sycophancy",
+      ]
+    `);
   });
 });
 

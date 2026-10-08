@@ -153,13 +153,27 @@ describe("responseText", () => {
     ).toBe("{}");
   });
 
-  test.each<{ name: string; stop: "refusal" | "max_tokens" | "end_turn"; error: string }>([
-    { name: "a refusal", stop: "refusal", error: "Judge refused the input" },
-    { name: "a truncated verdict", stop: "max_tokens", error: "truncated at max_tokens" },
-    { name: "a response with no text block", stop: "end_turn", error: "no text block" },
-  ])("rejects $name", ({ stop, error }) => {
-    const content =
-      stop === "end_turn" ? [] : [{ type: "text" as const, text: "{", citations: null }];
+  const partial = [{ type: "text" as const, text: "{", citations: null }];
+  test.each<{
+    name: string;
+    stop: "refusal" | "max_tokens" | "end_turn";
+    content: typeof partial;
+    error: string;
+  }>([
+    { name: "a refusal", stop: "refusal", content: partial, error: "Judge refused the input" },
+    {
+      name: "a truncated verdict",
+      stop: "max_tokens",
+      content: partial,
+      error: "truncated at max_tokens",
+    },
+    {
+      name: "a response with no text block",
+      stop: "end_turn",
+      content: [],
+      error: "no text block",
+    },
+  ])("rejects $name", ({ stop, content, error }) => {
     expect(() => responseText({ stop_reason: stop, content })).toThrow(error);
   });
 });

@@ -1,9 +1,9 @@
 {
   "name": "classifier-telemetry",
-  "description": "Records each tool call's permission verdict and reviews the asks weekly, proposing allow rules and command-style changes",
+  "description": "Records each tool call's permission verdict",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
   },
-  "dependencies": ["mod-events", "observability", "pull-request"]
+  "dependencies": ["mod-events"]
 }

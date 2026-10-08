@@ -65,7 +65,7 @@
     },
     {
       "name": "classifier-telemetry",
-      "description": "Records each tool call's permission verdict and reviews the asks weekly, proposing allow rules and command-style changes",
+      "description": "Records each tool call's permission verdict",
       "source": "./plugins/classifier-telemetry"
     },
     {

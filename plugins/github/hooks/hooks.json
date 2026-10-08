@@ -1,5 +1,5 @@
 {
-  "description": "Transforms GitHub URLs into API requests for better content fetching, and watches the current branch's pull request, showing its CI and review state as a status line (function hooks)",
+  "description": "Transforms GitHub URLs into API requests for better content fetching, and watches the current branch's pull request, showing its CI and review state at the end of the prompt footer (function hooks)",
   "hooks": {
     "PreToolUse": [
       {

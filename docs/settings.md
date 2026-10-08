@@ -8,13 +8,19 @@ Why each sandbox grant and hook in `settings.json` exists and what would retire 
 
 - Package registries: `registry.npmjs.org`, `www.npmjs.com`, `pypi.org`, `rubygems.org`, `proxy.golang.org`, `sum.golang.org`, `community-extensions.duckdb.org` (the DuckDB `markdown` and `yaml` extensions, fetched on first `INSTALL ... FROM community`).
 - Docs and source: `platform.claude.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.sh`, `bun.com`, `github.com`, `raw.githubusercontent.com`.
-- Credentialed APIs: `api.github.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`, `gitlab.com`, `*.greptile.com`, `*.coderabbit.ai`, `api.cloudflare.com`, `dash.cloudflare.com`.
+- Credentialed APIs: `api.github.com`, `api.individual.githubcopilot.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`, `gitlab.com`, `*.greptile.com`, `*.coderabbit.ai`, `api.cloudflare.com`, `dash.cloudflare.com`.
 
 `api.anthropic.com` accepts uploads and is the known exfil-capable host. It stays because the agent needs the model API.
 
 `gitlab.com`, `*.greptile.com`, and `*.coderabbit.ai` are exceptions to the secrets-outside-the-sandbox rule. `glab`, `greptile`, and `coderabbit` each keep an OAuth token in a sandbox-readable file (`~/.config/glab-cli/config.yml`, `~/.greptile/auth.json`, `~/.coderabbit/auth.json`), and all three hosts accept uploads, so the token is exfiltrable through any allowlisted host. Granted so the CLIs run sandboxed rather than escaped, which was the alternative for every `glab` call.
 
 `api.cloudflare.com` and `dash.cloudflare.com` are the same exception for `wrangler`, whose OAuth login sits in `~/.config/.wrangler/config/default.toml`. `api.cloudflare.com` serves every API call and accepts uploads (deploys, D1 writes, R2). `dash.cloudflare.com` serves only the token refresh at `/oauth2/token`. The access token lasts an hour, so without the refresh host any sandboxed `wrangler` call past that hour fails as not logged in. `sparrow.cloudflare.com` is wrangler's telemetry and stays denied, which wrangler tolerates. The refresh host depends on the `~/.config/.wrangler/config` write grant below. **Drop both** when no repo in rotation deploys to Cloudflare.
+
+`api.individual.githubcopilot.com` is the Copilot CLI's model API, which the `github:copilot` skill's `review.ts` drives sandboxed. Without it every run dies at startup with `Failed to load models`. It receives the diff under review, so it accepts uploads, and the token it takes is the same `gh` login the sandbox can already read. `telemetry.individual.githubcopilot.com` stays denied, which Copilot tolerates. An `individual` host serves only Copilot Individual plans, so a Business or Enterprise login reaches a different subdomain. **Drop it** when no skill runs `copilot` sandboxed. This probe fails before inference at zero credits, and it passes when it prints `Model "no-such-model-probe" ... is not available`:
+
+```
+COPILOT_GITHUB_TOKEN=$(gh auth token) HOME=~/.cache/claude/copilot-home copilot --model no-such-model-probe -p ok
+```
 
 `docs.anthropic.com` is the legacy host that 301-redirects to `code.claude.com`. The grant buys only the first leg of the redirect. **Drop it** when this stops returning a 3xx to a host already listed:
 

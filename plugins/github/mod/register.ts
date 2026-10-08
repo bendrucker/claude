@@ -39,11 +39,18 @@ interface Watch {
   undelivered: Undelivered | undefined;
   error: string | undefined;
   timer: { cancel(): void } | undefined;
+  line: string | undefined;
   generation: number;
   isStopped: boolean;
 }
 
 type Read = { kind: "none" } | { kind: "pr"; snapshot: Snapshot };
+
+function show($: EngineInterface, watch: Watch, line: string | undefined) {
+  if (line === watch.line) return;
+  watch.line = line;
+  $.ui.invalidate("ui.render");
+}
 
 function emit($: EngineInterface, event: string, detail: Record<string, unknown>, ok = true) {
   void $.modEvents.emit({ mod: MOD, event, ok, detail });
@@ -137,7 +144,7 @@ async function apply(
   isCurrent: () => boolean,
 ): Promise<number | undefined> {
   if (read.kind === "none") {
-    if (watch.snapshot !== undefined) $.ui.status(undefined);
+    show($, watch, undefined);
     watch.snapshot = undefined;
     watch.flagged = false;
     watch.undelivered = undefined;
@@ -168,7 +175,7 @@ async function apply(
     } else if (decisions.some((d) => d.kind !== "review")) watch.flagged = false;
   }
   watch.snapshot = next;
-  $.ui.status(statusOf(next, watch.flagged));
+  show($, watch, statusOf(next, watch.flagged));
   return delayOf(next);
 }
 
@@ -189,8 +196,9 @@ async function poll($: EngineInterface, watch: Watch, generation: number): Promi
     if (message !== watch.error) emit($, "poll.error", { error: message }, false);
     watch.error = message;
     delay = POLL_MS.error;
-    const line = watch.snapshot === undefined ? undefined : statusOf(watch.snapshot, watch.flagged);
-    if (line !== undefined && isCurrent()) $.ui.status(`${line} · stale`);
+    if (watch.snapshot !== undefined && isCurrent()) {
+      show($, watch, `${statusOf(watch.snapshot, watch.flagged)} · stale`);
+    }
   }
   if (!isCurrent()) return;
   watch.timer = $.clock.after(delay, () => void poll($, watch, generation));
@@ -207,7 +215,7 @@ async function hasGh($: EngineInterface): Promise<boolean> {
 
 /**
  * Watches the current branch's pull request with `gh` and shows its CI and
- * review state as a status line. A newly failed check or a review requesting
+ * review state at the end of the prompt footer. A newly failed check or a review requesting
  * changes is sent to the model; every other change is only shown and logged.
  */
 export function register(on: On): void {
@@ -217,6 +225,7 @@ export function register(on: On): void {
     undelivered: undefined,
     error: undefined,
     timer: undefined,
+    line: undefined,
     generation: 0,
     isStopped: true,
   };
@@ -240,11 +249,17 @@ export function register(on: On): void {
     return started;
   });
 
+  on("ui.render", { component: "PromptHint" }, ($, e, next) => {
+    if (watch.line === undefined) return next(e);
+    const tail = e.props.tail === undefined ? watch.line : `${e.props.tail} · ${watch.line}`;
+    return next({ ...e, props: { ...e.props, tail } });
+  });
+
   on("session.end", ($, e, next) => {
     if (!CONTINUING.has(e.reason)) {
       watch.isStopped = true;
       watch.timer?.cancel();
-      $.ui.status(undefined);
+      show($, watch, undefined);
     }
     return next(e);
   });

@@ -1,5 +1,5 @@
 import type { On } from "claude-code";
-import { describe, expect, mock, test } from "claude-code/testing";
+import { describe, expect, mock, test, type Engine } from "claude-code/testing";
 import { MAX_ATTEMPTS, POLL_MS } from "./register.ts";
 
 interface Recorded {
@@ -41,7 +41,7 @@ interface World {
 
 function worldOf(on: On, world: World) {
   const events: Recorded[] = [];
-  const statuses: (string | undefined)[] = [];
+  const tails: (string | undefined)[] = [];
   const submits: string[] = [];
   const views: string[] = [];
   const clock = mock.clock(on);
@@ -56,9 +56,9 @@ function worldOf(on: On, world: World) {
   on("session.start", ($, e) => ({ cwd: e.cwd }));
   on("session.end", ($, e) => ({ sessionId: e.sessionId }));
   on("session.cwd", () => ({ value: "/work" }));
-  on("ui.status", ($, e) => {
-    statuses.push(e.text);
-    return { value: undefined };
+  on("ui.render", { component: "PromptHint" }, ($, e) => {
+    tails.push(e.props.tail);
+    return $.ui.resolve(e).Text({ children: e.props.hint });
   });
   on("prompt.submit", async ($, e) => {
     submits.push(e.text);
@@ -108,8 +108,20 @@ function worldOf(on: On, world: World) {
     };
   });
   const named = (event: string) => events.filter((e) => e.event === event);
-  return { events, named, statuses, submits, views, clock };
+  // The footer text the mod adds after the engine's hint, as last drawn.
+  const shown = async ($: Engine) => {
+    await $.ui.mount({
+      plugin: "github",
+      surface: "terminal",
+      component: "PromptHint",
+      props: HINT,
+    });
+    return tails.at(-1);
+  };
+  return { events, named, shown, submits, views, clock };
 }
+
+const HINT = { isDraft: false, isWorking: false, hint: "? for shortcuts" };
 
 const GH_OK = { exitCode: 0, stdout: "gh version 2.80.0\n", stderr: "" };
 
@@ -126,7 +138,7 @@ describe("register", () => {
       phase: "pending",
       state: "OPEN",
     });
-    expect(w.statuses.at(-1)).toBe("CI 0/1");
+    expect(await w.shown($)).toBe("CI 0/1");
 
     world.view = pr("FAILURE");
     await w.clock.advance(POLL_MS.pending);
@@ -139,7 +151,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(w.statuses.at(-1)).toBe("CI ✗ ci / test → Claude");
+    expect(await w.shown($)).toBe("CI ✗ ci / test → Claude");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -148,7 +160,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(w.statuses.at(-1)).toBe(undefined);
+    expect(await w.shown($)).toBe("CI ✓");
   });
 
   test("requested changes wake the model and a comment review does not", async ($, on) => {
@@ -180,7 +192,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
 
     expect(w.submits.length).toBe(1);
-    expect(w.statuses.at(-1)).toBe("CI ✗ ci / test → Claude");
+    expect(await w.shown($)).toBe("CI ✗ ci / test → Claude");
   });
 
   test("stays idle without gh", async ($, on) => {
@@ -224,7 +236,7 @@ describe("register", () => {
     world.branch = "topic";
     await w.clock.advance(POLL_MS.idle);
     expect(w.views.length).toBe(1);
-    expect(w.statuses).toEqual([]);
+    expect(await w.shown($)).toBe(undefined);
     expect(w.named("poll.error")).toEqual([]);
   });
 
@@ -239,7 +251,7 @@ describe("register", () => {
     world.branch = "master";
     await w.clock.advance(POLL_MS.idle);
     expect(w.views.length).toBe(1);
-    expect(w.statuses.at(-1)).toBe("CI 0/1");
+    expect(await w.shown($)).toBe("CI 0/1");
   });
 
   test("a repeated gh failure is logged once and backs off", async ($, on) => {
@@ -265,7 +277,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.pending * 3);
 
     expect(w.views.length).toBe(1);
-    expect(w.statuses.at(-1)).toBe(undefined);
+    expect(await w.shown($)).toBe(undefined);
   });
 
   test("a poll still in flight at session end leaves the status cleared", async ($, on) => {
@@ -277,7 +289,7 @@ describe("register", () => {
     await w.clock.advance(10_000 + POLL_MS.pending * 3);
 
     expect(w.views.length).toBe(1);
-    expect(w.statuses).toEqual([undefined]);
+    expect(await w.shown($)).toBe(undefined);
   });
 
   test("a send still in flight at session end leaves the status cleared", async ($, on) => {
@@ -292,7 +304,7 @@ describe("register", () => {
     await w.clock.advance(10_000 + POLL_MS.settled * 2);
 
     expect(w.submits.length).toBe(1);
-    expect(w.statuses.at(-1)).toBe(undefined);
+    expect(await w.shown($)).toBe(undefined);
     expect(w.views.length).toBe(2);
   });
 
@@ -320,7 +332,7 @@ describe("register", () => {
     expect(w.named("inject")[0]).toEqual(
       expect.objectContaining({ ok: false, detail: expect.objectContaining({ dropped: "busy" }) }),
     );
-    expect(w.statuses.at(-1)).toBe("CI ✗ ci / test");
+    expect(await w.shown($)).toBe("CI ✗ ci / test");
   });
 
   test("a dropped injection is retried until the engine takes it", async ($, on) => {
@@ -340,7 +352,7 @@ describe("register", () => {
       [false, 1],
       [true, 2],
     ]);
-    expect(w.statuses.at(-1)).toBe("CI ✗ ci / test → Claude");
+    expect(await w.shown($)).toBe("CI ✗ ci / test → Claude");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(2);
@@ -380,6 +392,6 @@ describe("register", () => {
     world.view = "HTTP 401: Bad credentials";
     await w.clock.advance(POLL_MS.settled);
 
-    expect(w.statuses.at(-1)).toBe("CI ✗ ci / test · stale");
+    expect(await w.shown($)).toBe("CI ✗ ci / test · stale");
   });
 });

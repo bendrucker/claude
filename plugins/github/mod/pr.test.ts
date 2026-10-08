@@ -173,13 +173,13 @@ describe("statusOf", () => {
     );
     expect(
       of({ statusCheckRollup: [run("a", "COMPLETED", "SUCCESS")], reviewDecision: "APPROVED" }),
-    ).toBe(undefined);
+    ).toBe("CI ✓ · approved");
     expect(
       of({
         statusCheckRollup: [run("a", "COMPLETED", "SUCCESS")],
         reviewDecision: "CHANGES_REQUESTED",
       }),
-    ).toBe("changes requested");
-    expect(of({ state: "MERGED", statusCheckRollup: [run("a", "IN_PROGRESS")] })).toBe(undefined);
+    ).toBe("CI ✓ · changes requested");
+    expect(of({ state: "MERGED", statusCheckRollup: [run("a", "IN_PROGRESS")] })).toBe("merged");
   });
 });

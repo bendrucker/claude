@@ -2,7 +2,7 @@ import type { EngineInterface, On, ToolCallResult } from "claude-code";
 
 type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 
-const MOD = "classifier-telemetry";
+const MOD = "auto-mode";
 
 /**
  * Tools whose run waits on the person by design, so their wall time measures the person.

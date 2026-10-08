@@ -1,10 +1,10 @@
-# classifier-telemetry
+# auto-mode
 
-Records each tool call's permission verdict.
+Enhancements for Claude Code auto mode.
 
 ## Mod
 
-A function-hooks mod, so it loads only where `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. It depends on the `mod-events` plugin, which writes its events.
+Records each tool call's permission verdict. A function-hooks mod, so it loads only where `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`. It depends on the `mod-events` plugin, which writes its events.
 
 - `tool.check`: keeps the engine's verdict (`allow`, `ask`, `deny`), the deciding rule or hook, and the loop's `agentId`.
 - `tool.call`: times the call and emits a `tool.verdict` event with the verdict. Tools that wait on the person (`AskUserQuestion`, the plan-mode tools) are marked `interactive`.
@@ -16,5 +16,5 @@ The `observability:session` index ingests the events as `mod_events` and reads t
 ## Testing
 
 ```bash
-bun scripts/mod-test.ts classifier-telemetry
+bun scripts/mod-test.ts auto-mode
 ```

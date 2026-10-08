@@ -141,9 +141,9 @@ git ls-remote --tags https://github.com/1Password/1password-claude-plugin
 
 **Drop it** if Environments do not stick. Around 2026-10-27, count `mcp__plugin_1password_1password__` calls in the session index since the day this shipped, and read the hook's denies with the `observability:session` skill's [`hook-blocks`](../plugins/observability/skills/session/resources/queries/hook-blocks.sql) query. If no mount besides the first is in use, or the denies are mostly stale mounts rather than a missing secret file, remove the plugin, its marketplace, and the allows.
 
-`classifier-telemetry@bendrucker` records every tool call's permission verdict, the only record of asks that end in approval. Revisit it around 2026-11-09.
+`auto-mode@bendrucker` collects enhancements for auto mode. Its first mod records every tool call's permission verdict, the only record of asks that end in approval. Revisit the verdict mod around 2026-11-09.
 
-**Keep it** if a change has drawn on the `classifier_verdicts` view by then, such as tuning which blocks the `automode-escalate` mod asks about, or a finding in a session review. **Drop it** otherwise: remove the plugin and its `enabledPlugins` entry, and let `mod-events` retention expire the recorded events.
+**Keep it** if a change has drawn on the `classifier_verdicts` view by then, such as tuning which blocks the escalation mod asks about, or a finding in a session review. **Drop it** otherwise: remove the mod, and the plugin with it if nothing else has joined, and let `mod-events` retention expire the recorded events.
 
 ## Sandbox Findings
 

@@ -13,7 +13,7 @@
 --   between a call and its dispatch on allowed and classified calls alike. `dim1` is the tool.
 --   `dropped-allow-rule` lists each allow rule auto mode ignored because it bypasses the
 --   classifier. `dim1` is the rule, `dim2` is the settings file, and `calls` counts the
---   sessions that loaded it. `verdict` reads the classifier-telemetry mod's records. `dim1` is
+--   sessions that loaded it. `verdict` reads the auto-mode mod's records. `dim1` is
 --   the engine's verdict. An `ask` goes to the mode's decider, which is the classifier only in
 --   auto mode, and the records carry no mode. `dim2` is the `tool_errors` denial kind, or else
 --   the call's outcome. Its latencies are the call's wall time, the decider and the tool

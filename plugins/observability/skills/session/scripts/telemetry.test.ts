@@ -137,19 +137,16 @@ describe("telemetry ingest", () => {
   function layout() {
     const projectsDir = join(tmpDir, "claude", "projects");
     const debugDir = join(tmpDir, "claude", "debug");
-    const recordsDir = join(tmpDir, "claude", "classifier-telemetry", "s1");
     const modEventsDir = join(tmpDir, "claude", "mod-events");
-    for (const dir of [projectsDir, debugDir, recordsDir, join(modEventsDir, "s1")]) {
+    for (const dir of [projectsDir, debugDir, join(modEventsDir, "s1")]) {
       mkdirSync(dir, { recursive: true });
     }
     const reindex = () => ensureIndex(db, { projectsDir, importsDir: join(tmpDir, "imports") });
-    return { debugDir, recordsDir, modEventsDir, reindex };
+    return { debugDir, modEventsDir, reindex };
   }
 
   const stall = (ms: number) =>
     `2026-09-02T01:52:13.631Z [INFO] [Stall] classifier_request_finished reqId=r${ms} tool=Bash stage=xml_s1 outcome=ok durationMs=${ms}\n`;
-  const record = (id: string) =>
-    JSON.stringify({ session_id: "s1", tool_use_id: id, tool: "Bash", decision: "ask" });
 
   it("follows a debug log as it grows, and keeps its rows once it is deleted", async () => {
     const { debugDir, reindex } = layout();
@@ -215,37 +212,6 @@ describe("telemetry ingest", () => {
     ]);
   });
 
-  it("picks up records added to a session directory", async () => {
-    const { recordsDir, reindex } = layout();
-
-    await Bun.write(join(recordsDir, "t1.json"), record("t1"));
-    await reindex();
-    await Bun.write(join(recordsDir, "t2.json"), record("t2"));
-    await reindex();
-
-    const rows = await db.query(
-      "SELECT tool_use_id, source_dir FROM tool_verdicts ORDER BY tool_use_id",
-      z.object({ tool_use_id: z.string(), source_dir: z.string() }),
-    );
-    expect(rows).toEqual([
-      { tool_use_id: "t1", source_dir: recordsDir },
-      { tool_use_id: "t2", source_dir: recordsDir },
-    ]);
-  });
-
-  it("rereads a record first indexed mid-write", async () => {
-    const { recordsDir, reindex } = layout();
-    const path = join(recordsDir, "t1.json");
-
-    await Bun.write(path, record("t1").slice(0, 10));
-    await reindex();
-    expect(await count("SELECT COUNT(*) AS n FROM tool_verdicts")).toBe(0);
-
-    await Bun.write(path, record("t1"));
-    await reindex();
-    expect(await count("SELECT COUNT(*) AS n FROM tool_verdicts")).toBe(1);
-  });
-
   it("keeps rows when the telemetry directories are missing", async () => {
     const { debugDir, reindex } = layout();
     await Bun.write(join(debugDir, "s1.txt"), stall(1));
@@ -256,11 +222,11 @@ describe("telemetry ingest", () => {
     expect(await count("SELECT COUNT(*) AS n FROM debug_events")).toBe(1);
   });
 
-  it("reads verdict events and falls back to legacy records they lack", async () => {
-    const { recordsDir, modEventsDir, reindex } = layout();
+  it("reads the mod's verdict events", async () => {
+    const { modEventsDir, reindex } = layout();
     const base = makeModRecord({
-      mod: "classifier-telemetry",
-      event_name: "classifier-telemetry.tool.verdict",
+      mod: "auto-mode",
+      event_name: "auto-mode.tool.verdict",
       ok: false,
       durationMs: 40,
     });
@@ -276,15 +242,13 @@ describe("telemetry ingest", () => {
       },
     };
     await Bun.write(
-      join(modEventsDir, "s1", "classifier-telemetry.1.0.jsonl"),
+      join(modEventsDir, "s1", "auto-mode.1.0.jsonl"),
       `${JSON.stringify(verdict)}\n`,
     );
-    await Bun.write(join(recordsDir, "t1.json"), record("t1"));
-    await Bun.write(join(recordsDir, "t2.json"), record("t2"));
     await reindex();
 
     const rows = await db.query(
-      "SELECT tool_use_id, hook, duration_ms, outcome FROM classifier_verdicts ORDER BY tool_use_id",
+      "SELECT tool_use_id, hook, duration_ms, outcome FROM classifier_verdicts",
       z.object({
         tool_use_id: z.string(),
         hook: z.string().nullable(),
@@ -294,7 +258,6 @@ describe("telemetry ingest", () => {
     );
     expect(rows).toEqual([
       { tool_use_id: "t1", hook: "PreToolUse", duration_ms: 40n, outcome: "deny" },
-      { tool_use_id: "t2", hook: null, duration_ms: null, outcome: null },
     ]);
   });
 });

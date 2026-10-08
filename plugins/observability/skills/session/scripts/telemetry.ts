@@ -94,26 +94,6 @@ function scanModEvents(entries: Entry[], root: string): ScannedFile[] {
     );
 }
 
-// A session's records are one file each, so the directory is the unit of change. Its newest
-// record and total bytes also catch a record rewritten after a partial read.
-function scanRecordDirs(entries: Entry[], root: string): ScannedFile[] {
-  return entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => {
-      const path = join(root, entry.name);
-      let mtime = 0;
-      let size = 0;
-      for (const { name } of listRoot(path) ?? []) {
-        if (!name.endsWith(".json")) continue;
-        const file = Bun.file(join(path, name));
-        mtime = Math.max(mtime, file.lastModified);
-        size += file.size;
-      }
-      return { path, mtime: Math.trunc(mtime), size };
-    })
-    .filter((dir) => dir.size > 0);
-}
-
 const debugLogs = (root: string, host: string): Source => ({
   name: "debug",
   root,
@@ -174,35 +154,6 @@ const modEvents = (root: string, host: string): Source => ({
     );
   },
   remove: keepRows,
-});
-
-const callRecords = (root: string, host: string): Source => ({
-  name: "calls",
-  root,
-  scan: scanRecordDirs,
-  async import(db, file) {
-    await db.run("DELETE FROM tool_verdicts WHERE source_dir = $path", { path: file.path });
-    await db.run(
-      `INSERT INTO tool_verdicts
-       SELECT $host, session_id, tool_use_id, agent_id, tool, decision, rule, reason,
-              make_timestamp_ms(started_at), check_ms, duration_ms, outcome, $path
-       FROM read_json(
-         $glob,
-         columns = {
-           session_id: 'VARCHAR', tool_use_id: 'VARCHAR', agent_id: 'VARCHAR',
-           tool: 'VARCHAR', decision: 'VARCHAR', rule: 'VARCHAR', reason: 'VARCHAR',
-           started_at: 'BIGINT', check_ms: 'BIGINT', duration_ms: 'BIGINT', outcome: 'VARCHAR'
-         },
-         format = 'newline_delimited',
-         ignore_errors = true
-       )
-       WHERE tool_use_id IS NOT NULL`,
-      { host, path: file.path, glob: join(file.path, "*.json") },
-    );
-  },
-  async remove(db, path) {
-    await db.run("DELETE FROM tool_verdicts WHERE source_dir = $path", { path });
-  },
 });
 
 async function reimport(db: Database, source: Source, file: ScannedFile): Promise<void> {
@@ -317,9 +268,8 @@ async function removeIfEmpty(dir: string): Promise<void> {
 }
 
 /**
- * Indexes this machine's debug logs, mod events, and classifier-telemetry records, which
- * live beside its projects directory, then prunes past each source's cap. Returns how many
- * files or record directories changed.
+ * Indexes this machine's debug logs and mod events, which live beside its projects
+ * directory, then prunes past each source's cap. Returns how many files changed.
  */
 export async function ensureTelemetry(
   db: Database,
@@ -331,7 +281,6 @@ export async function ensureTelemetry(
   for (const source of [
     debugLogs(join(configDir, "debug"), host),
     modEvents(join(configDir, "mod-events"), host),
-    callRecords(join(configDir, "classifier-telemetry"), host),
   ]) {
     // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh.
     changed += await syncSource(db, source);

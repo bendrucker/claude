@@ -71,7 +71,7 @@ describe("register", () => {
 
     expect(world.events).toEqual([
       {
-        mod: "classifier-telemetry",
+        mod: "auto-mode",
         event: "tool.verdict",
         ok: true,
         ms: 2_500,
@@ -215,7 +215,7 @@ describe("register", () => {
 
     expect(world.events).toEqual([
       {
-        mod: "classifier-telemetry",
+        mod: "auto-mode",
         event: "server.tool",
         ms: 750,
         detail: {
@@ -228,7 +228,7 @@ describe("register", () => {
         },
       },
       {
-        mod: "classifier-telemetry",
+        mod: "auto-mode",
         event: "server.tool",
         detail: expect.objectContaining({ tool_use_id: "srv_2" }),
       },
@@ -241,6 +241,6 @@ describe("register", () => {
 
     await $.session.start({ cwd: "/repo", surface: null, isInteractive: true });
 
-    expect(world.events).toEqual([{ mod: "classifier-telemetry", event: "session.start" }]);
+    expect(world.events).toEqual([{ mod: "auto-mode", event: "session.start" }]);
   });
 });

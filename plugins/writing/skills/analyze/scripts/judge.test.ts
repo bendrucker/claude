@@ -20,6 +20,7 @@ import {
   PROMPT_PATH,
   parseHeadingVerdicts,
   parseVerdict,
+  responseText,
   sha256,
   verdictSchema,
 } from "./judge";
@@ -139,6 +140,27 @@ describe("parseVerdict", () => {
         ? JSON.stringify(["not", "an", "object"])
         : JSON.stringify({ ...verdict(), sycophancy });
     expect(() => parseVerdict(json)).toThrow(error);
+  });
+});
+
+describe("responseText", () => {
+  test("returns the text block", () => {
+    expect(
+      responseText({
+        stop_reason: "end_turn",
+        content: [{ type: "text", text: "{}", citations: null }],
+      }),
+    ).toBe("{}");
+  });
+
+  test.each<{ name: string; stop: "refusal" | "max_tokens" | "end_turn"; error: string }>([
+    { name: "a refusal", stop: "refusal", error: "Judge refused the input" },
+    { name: "a truncated verdict", stop: "max_tokens", error: "truncated at max_tokens" },
+    { name: "a response with no text block", stop: "end_turn", error: "no text block" },
+  ])("rejects $name", ({ stop, error }) => {
+    const content =
+      stop === "end_turn" ? [] : [{ type: "text" as const, text: "{", citations: null }];
+    expect(() => responseText({ stop_reason: stop, content })).toThrow(error);
   });
 });
 

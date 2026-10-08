@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
+import type {
+  Message,
+  MessageCreateParamsNonStreaming,
+  OutputConfig,
+} from "@anthropic-ai/sdk/resources/messages";
 import { z } from "zod";
 import type { DeliverableRow } from "./dump";
 
@@ -16,7 +21,7 @@ import type { DeliverableRow } from "./dump";
  * fails CI until the tuples are re-validated).
  */
 
-export const JUDGE_MODEL = "claude-haiku-4-5";
+export const JUDGE_MODEL = "claude-haiku-5-5";
 export const CHUNK_WORD_LIMIT = 1500;
 export const MAX_SAMPLE_SPANS = 5;
 
@@ -274,27 +279,42 @@ export interface AnthropicJudgeOptions {
 }
 
 /**
- * Real judge over the Messages API: temperature 0, structured JSON output,
- * prompt cached as a stable system prefix so repeated calls share it.
+ * Thinking stays off for these single-pass classifications. Haiku 5.5 rejects
+ * any temperature but 1, so verdicts are sampled.
  */
+export const JUDGE_REQUEST = {
+  max_tokens: 4096,
+  thinking: { type: "disabled" },
+} as const satisfies Pick<MessageCreateParamsNonStreaming, "max_tokens" | "thinking">;
+
+export const JUDGE_OUTPUT = { effort: "low" } as const satisfies OutputConfig;
+
+/** The verdict JSON, or an error naming why the model returned none. */
+export function responseText(response: Pick<Message, "content" | "stop_reason">): string {
+  if (response.stop_reason === "refusal") throw new Error("Judge refused the input");
+  if (response.stop_reason === "max_tokens") {
+    throw new Error(`Judge verdict truncated at max_tokens (${JUDGE_REQUEST.max_tokens})`);
+  }
+  const block = response.content.find((b) => b.type === "text");
+  if (!block) {
+    throw new Error(`Judge response contained no text block (stop: ${response.stop_reason})`);
+  }
+  return block.text;
+}
+
+/** Real judge over the Messages API with structured JSON output. */
 export function anthropicChunkJudge(options: AnthropicJudgeOptions): ChunkJudge {
   const client = new Anthropic();
   const model = options.model ?? JUDGE_MODEL;
   return async (chunkText: string) => {
     const response = await client.messages.create({
       model,
-      max_tokens: 2048,
-      // oxlint-disable-next-line typescript/no-deprecated -- the pinned model still honors temperature, and dropping it costs the judge its determinism.
-      temperature: 0,
+      ...JUDGE_REQUEST,
       system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
-      output_config: { format: { type: "json_schema", schema: verdictSchema() } },
+      output_config: { ...JUDGE_OUTPUT, format: { type: "json_schema", schema: verdictSchema() } },
       messages: [{ role: "user", content: chunkText }],
     });
-    const block = response.content.find((b) => b.type === "text");
-    if (!block) {
-      throw new Error(`Judge response contained no text block (stop: ${response.stop_reason})`);
-    }
-    return parseVerdict(block.text);
+    return parseVerdict(responseText(response));
   };
 }
 
@@ -645,20 +665,15 @@ export function anthropicHeadingJudge(options: AnthropicJudgeOptions): HeadingJu
     const input = formatHeadingBatch(headings);
     const response = await client.messages.create({
       model,
-      max_tokens: 2048,
-      // oxlint-disable-next-line typescript/no-deprecated -- the pinned model still honors temperature, and dropping it costs the judge its determinism.
-      temperature: 0,
+      ...JUDGE_REQUEST,
       system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
       output_config: {
+        ...JUDGE_OUTPUT,
         format: { type: "json_schema", schema: headingBatchSchema() },
       },
       messages: [{ role: "user", content: input }],
     });
-    const block = response.content.find((b) => b.type === "text");
-    if (!block) {
-      throw new Error(`Judge response contained no text block (stop: ${response.stop_reason})`);
-    }
-    return parseHeadingVerdicts(block.text, headings.length);
+    return parseHeadingVerdicts(responseText(response), headings.length);
   };
 }
 

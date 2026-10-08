@@ -50,6 +50,15 @@ function planMode($: Engine, planFilePath = PLAN) {
   });
 }
 
+function planModeExit($: Engine, planFilePath = PLAN) {
+  return $.prompt.attachment({
+    type: "plan_mode_exit",
+    text: "plan mode exited",
+    origin: { kind: "engine" },
+    detail: { planFilePath, hasPlan: true },
+  });
+}
+
 function write($: Engine, world: World, chars: number, filePath = PLAN) {
   world.files[filePath] = "x".repeat(chars);
   return $.tool.call({ tool: "Write", file_path: filePath, content: "", tool_use_id: "t" });
@@ -74,6 +83,35 @@ describe("register", () => {
     world.files[PLAN] = "é".repeat(9_500);
     await $.tool.call({ tool: "Write", file_path: PLAN, content: "", tool_use_id: "t1" });
     expect(world.status).toEqual(["9.5k (95%)"]);
+  });
+
+  test("shows a plan over the limit only in plan mode", async ($, on) => {
+    const world = worldOf(on);
+    await write($, world, 11_700);
+    expect(world.status).toEqual([]);
+    expect(world.events).toEqual([]);
+
+    await planMode($);
+    await write($, world, 11_700);
+    expect(world.status).toEqual(["11.7k (117%)"]);
+  });
+
+  test("clears the count when plan mode ends without ExitPlanMode", async ($, on) => {
+    const world = worldOf(on);
+    await planMode($);
+    await write($, world, 11_700);
+    await planModeExit($);
+    await write($, world, 11_700);
+    expect(world.status).toEqual(["11.7k (117%)", undefined]);
+  });
+
+  test("ignores plan edits after the plan is approved", async ($, on) => {
+    const world = worldOf(on);
+    await planMode($);
+    await write($, world, 9_000);
+    await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
+    await write($, world, 11_700);
+    expect(world.status).toEqual(["9k (90%)", undefined]);
   });
 
   test("updates after an edit", async ($, on) => {

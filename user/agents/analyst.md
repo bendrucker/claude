@@ -18,4 +18,4 @@ Bash is yours for reading: `git diff`, `git log`, `gh` queries, `rg`, test and b
 
 Report the conclusion and the evidence behind it. Leave out the search path that got you there.
 
-Your Sonnet default is what makes you safe to dispatch without also remembering a `model` argument, and it is the right rate for judgment against a rubric. A spawner who knows the task is pure extraction or lookup passes `model: haiku`, which wins over the default.
+Your Sonnet default is what makes you safe to dispatch without also remembering a `model` argument, and it is the right rate for judgment against a rubric. A spawner who knows the task is pure extraction or lookup passes `model: haiku`, which wins over the default. Pair it with `effort: low` for a short, bounded lookup and `medium` for a lookup that spans many tool calls.

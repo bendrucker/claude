@@ -4,6 +4,7 @@ description: >-
   Given a GitHub Actions run ID and PR URL, fetches failing-job logs, writes full logs to a temp file, and returns a structured summary of failures. Invoked by the `github:actions-monitor` skill on failing-status events.
 tools: Bash(gh run view:*), Bash(gh run list:*), Bash(jq:*), Bash(mkdir:*), Write, Read, Grep
 model: haiku
+effort: low
 ---
 
 You extract failing-job diagnostics from a GitHub Actions run. You are invoked with a run ID and a PR URL. Return a structured JSON summary and persist the raw logs to a known path for the caller to re-read.

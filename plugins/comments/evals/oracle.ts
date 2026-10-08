@@ -20,7 +20,7 @@ import { batchVerdictSchema, type Verdict } from "../judge/schema";
  * rubric on the model that ships. Models after Opus 4.6 reject `temperature`, so
  * the batch pins `effort`, and repeated runs can differ.
  */
-export const JUDGE_MODEL = "claude-sonnet-5";
+export const JUDGE_MODEL = "claude-haiku-5-5";
 
 /** Pinned so a shift in the API's default effort cannot silently move the numbers. */
 const JUDGE_EFFORT = "high";

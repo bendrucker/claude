@@ -1,7 +1,7 @@
 export const meta = {
   name: "comments-judge",
   description: "Judge extracted code comments for AI slop, one agent per shard",
-  phases: [{ title: "Judge", model: "sonnet" }],
+  phases: [{ title: "Judge", model: "haiku" }],
 };
 
 // job = { shards: [{ id, path }], promptPath, promptSha, verdictsDir }
@@ -17,8 +17,10 @@ const job = typeof args === "string" ? JSON.parse(args) : args;
 
 // The eval gate judges the labeled fixture corpus through this workflow
 // (evals/eval.ts build, then score --gate), so the rubric is cleared on the
-// model pinned here. Re-clear the gate on a cheaper model before lowering this.
-const JUDGE_MODEL = "sonnet";
+// model and effort pinned here. Re-clear the gate before changing either.
+// Unpinned, effort follows the caller's session.
+const JUDGE_MODEL = "haiku";
+const JUDGE_EFFORT = "high";
 
 const SUMMARY_SCHEMA = {
   type: "object",
@@ -46,6 +48,7 @@ function judgeShard(shard) {
   return agent(prompt, {
     schema: SUMMARY_SCHEMA,
     model: JUDGE_MODEL,
+    effort: JUDGE_EFFORT,
     label: `judge:shard-${shard.id}`,
     phase: "Judge",
   });

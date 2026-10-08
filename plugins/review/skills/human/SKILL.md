@@ -2,7 +2,7 @@
 name: review:human
 description: >-
   Request Ben's own review of the working diff or a document before it leaves the machine, for architecture and slop rather than bugs. Runs after the mechanical passes (review:code or simplify, comments:audit). Use for "get my review", "let me look at this first", or as the last pre-PR pass.
-argument-hint: "[--doc <file>] [--browser] [--summary <text>]"
+argument-hint: "[--doc <file>] [--kind <kind>] [--browser] [--summary <text>]"
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts:*)"
   - Bash(plannotator review:*)
@@ -11,7 +11,7 @@ allowed-tools:
 
 # Human Review
 
-Put the change in front of Ben and act on what comes back. `attention.ts` labels the herdr pane `review`, sets its `$review` token, and raises a toast. Outside herdr, `raise` and `clear` are no-ops and `open` exits 1.
+Put the change in front of Ben and act on what comes back. `attention.ts` labels the herdr pane `review`, sets its `$review`, `$review_kind`, and `$review_summary` tokens, and raises a toast. Outside herdr, `raise` and `clear` are no-ops and `open` exits 1.
 
 ## Context
 
@@ -34,7 +34,7 @@ Request after the mechanical passes have run. `/ship` orders them. Standalone on
 
 ## Request
 
-1. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts raise --summary "<repo> <branch>: <what to review>"`. A caller's `--summary` passes through verbatim.
+1. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts raise --kind <kind> --summary "<repo> <branch>: <what to review>"`. The kind is `code` for the diff and `doc` for a document, unless the caller passes a more specific `--kind` (`plan`, `pr-body`). A caller's `--kind` and `--summary` pass through verbatim.
 2. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts open --diff`, or `open --doc <file>` for a document. `open --diff` re-uses a reviewr sidebar already up over this working tree.
 3. End the turn with exactly one line naming the surface and that Send resumes the work. The surface shows the change. The line carries no recap.
 
@@ -48,7 +48,7 @@ The review ends when Ben says approve, ship, or no further comments. Otherwise a
 
 With `--browser`:
 
-1. `attention.ts raise --summary "..."`
+1. `attention.ts raise --kind <kind> --summary "..."`
 2. `plannotator review --git --json`, adding `--base <ref>` when the caller resolved one, or `plannotator annotate <file> --gate --json --require-approval`
 3. `attention.ts clear`
 4. Act on the decision. `approved` ends the review. `annotated` means act on the annotations and run the gate again. `dismissed`, or exit 1 from the annotate gate, means not approved: fold the feedback in and run the gate again. Exit 2 is a startup error: report it and stop.

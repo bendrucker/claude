@@ -50,12 +50,16 @@ CREATE OR REPLACE MACRO denial_kind_source(kind, tool_use_result) AS
   END;
 
 -- Cost-rate table for token spend estimates, per-MTok USD from published API rates as of
--- 2026-07-24. Rates are keyed by family, so a family arm can drift from a specific model's
--- current rate. Kept here so every cost query shares one source. The per-tier weighting
+-- 2026-10-07. Model arms precede the family arms that would also match them, and a family
+-- arm can drift from a specific model's current rate. Haiku 5.5 is priced at its tier for
+-- prompts up to 100K tokens. Longer prompts bill $0.50 / $2.50. Kept here so every cost query shares one source. The per-tier weighting
 -- (cache read 0.1x input, cache write 1.25x for 5m / 2x for 1h) lives in the queries that
 -- call these.
 CREATE OR REPLACE MACRO model_input_rate(model) AS
   CASE
+    WHEN model ILIKE '%claude-haiku-5-5%'  THEN 0.10
+    WHEN model ILIKE '%claude-opus-5-5%'   THEN 4.0
+    WHEN model ILIKE '%claude-sonnet-5-5%' THEN 2.0
     WHEN model ILIKE '%fable%' OR model ILIKE '%mythos%' THEN 10.0
     WHEN model ILIKE '%opus%'   THEN 5.0
     WHEN model ILIKE '%sonnet%' THEN 3.0
@@ -65,6 +69,9 @@ CREATE OR REPLACE MACRO model_input_rate(model) AS
 
 CREATE OR REPLACE MACRO model_output_rate(model) AS
   CASE
+    WHEN model ILIKE '%claude-haiku-5-5%'  THEN 0.50
+    WHEN model ILIKE '%claude-opus-5-5%'   THEN 20.0
+    WHEN model ILIKE '%claude-sonnet-5-5%' THEN 10.0
     WHEN model ILIKE '%fable%' OR model ILIKE '%mythos%' THEN 50.0
     WHEN model ILIKE '%opus%'   THEN 25.0
     WHEN model ILIKE '%sonnet%' THEN 15.0

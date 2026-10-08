@@ -316,8 +316,10 @@ interface ModelPricing {
 const HAIKU_PRICING: ModelPricing = { input: 1, output: 5 };
 
 /**
- * Per-MTok USD rates matched by family substring, so a new model id in a known
- * family needs no edit here. The family rows mirror `model_input_rate` and
+ * Per-MTok USD rates matched by substring, first match wins. Model rows precede
+ * the family rows that would also match them, and a new model id in a known
+ * family needs no edit here. Haiku 5.5 is priced at its tier for prompts up to
+ * 100K tokens. Longer prompts bill $0.50 / $2.50. The rows mirror `model_input_rate` and
  * `model_output_rate` in
  * `plugins/observability/skills/session/resources/schema/03_macros.sql`. Plugins
  * cannot import across plugin boundaries, so a rate change has to touch both.
@@ -329,6 +331,9 @@ const HAIKU_PRICING: ModelPricing = { input: 1, output: 5 };
  * Haiku and warns. Raising that floor is a behavioral change, not a rate sync.
  */
 const FAMILY_PRICING: readonly (readonly [string, ModelPricing])[] = [
+  ["claude-haiku-5-5", { input: 0.1, output: 0.5 }],
+  ["claude-opus-5-5", { input: 4, output: 20 }],
+  ["claude-sonnet-5-5", { input: 2, output: 10 }],
   ["fable", { input: 10, output: 50 }],
   ["mythos", { input: 10, output: 50 }],
   ["opus", { input: 5, output: 25 }],

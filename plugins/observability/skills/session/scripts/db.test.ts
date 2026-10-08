@@ -2685,6 +2685,11 @@ describe("cost-rate macros", () => {
     ["claude-opus-4-8", 5, 25],
     ["claude-sonnet-5", 3, 15],
     ["claude-haiku-4", 1, 5],
+    ["claude-haiku-4-5", 1, 5],
+    ["claude-haiku-5-5", 0.1, 0.5],
+    ["claude-opus-5-5", 4, 20],
+    ["claude-opus-5-5[1m]", 4, 20],
+    ["claude-sonnet-5-5", 2, 10],
     ["some-unknown-model", 5, 25],
   ])("rates %s at input %d / output %d per MTok", async (model, input, output) => {
     const [row] = await db.query(
@@ -2707,6 +2712,9 @@ describe("model_family macro", () => {
     ["opus", "opus"],
     ["claude-sonnet-5", "sonnet"],
     ["claude-haiku-4", "haiku"],
+    ["claude-haiku-5-5", "haiku"],
+    ["claude-opus-5-5", "opus"],
+    ["claude-sonnet-5-5", "sonnet"],
     ["some-unknown-model", "other"],
   ])("collapses %s to %s", async (model, family) => {
     const [row] = await db.query("SELECT model_family($m) AS f", z.object({ f: z.string() }), {

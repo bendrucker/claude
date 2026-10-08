@@ -17,6 +17,6 @@
     "TestLeafCommandsHaveExamples",
     "RunE"
   ],
-  "note": "Exported test func godoc. It defines what a leaf command is for the assertion, which the walker encodes two functions away.",
+  "note": "Test func godoc. It defines what a leaf command is for the assertion, which the walker encodes two functions away.",
   "source": "honeycomb-cli comments/audit-2b210c41a01d8404 cmd/example_test.go:23"
 }

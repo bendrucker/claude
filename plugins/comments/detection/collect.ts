@@ -103,7 +103,7 @@ function toCollected(
     score: scoreComment(comment),
     features: commentFeatures(comment, lines),
     provenance,
-    doc: docCommentOf(comment, lines, language) ?? undefined,
+    doc: docCommentOf(comment, lines, language, path) ?? undefined,
   };
 }
 

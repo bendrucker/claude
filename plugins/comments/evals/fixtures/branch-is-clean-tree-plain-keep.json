@@ -5,6 +5,12 @@
   "kind": "docstring",
   "comment": "/** True when `git status --porcelain` reports nothing, the apply precondition. */",
   "context": "5: }\n6: \n7: /** True when `git status --porcelain` reports nothing, the apply precondition. */\n8: export async function isCleanTree(): Promise<boolean> {\n9:   const status = await $`git status --porcelain`.quiet().nothrow();\n10:   return status.text().trim().length === 0;\n11: }",
+  "doc": {
+    "target": "declaration",
+    "subject": "isCleanTree",
+    "exported": true,
+    "required": false
+  },
   "action": "keep",
   "category": null,
   "fact": "apply precondition",

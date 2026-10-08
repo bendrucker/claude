@@ -20,17 +20,18 @@ import { batchVerdictSchema, type Verdict } from "../judge/schema";
  * rubric on the model that ships. Models after Opus 4.6 reject `temperature`, so
  * the batch pins `effort`, and repeated runs can differ.
  */
-export const JUDGE_MODEL = "claude-haiku-5-5";
+export const JUDGE_MODEL = "claude-sonnet-5-5";
 
 /** Pinned so a shift in the API's default effort cannot silently move the numbers. */
 const JUDGE_EFFORT = "high";
 
 /**
  * Adaptive thinking is on by default from Sonnet 5, and its tokens come out of
- * this budget alongside the verdicts, so a batch needs far more room than the
- * verdict JSON alone. Too low truncates the JSON mid-string.
+ * this budget alongside the verdicts, so a full batch needs far more room than
+ * the verdict JSON. The budget is past the SDK's non-streaming limit, so the call
+ * streams.
  */
-const MAX_TOKENS = 16_000;
+const MAX_TOKENS = 64_000;
 
 /** One comment the oracle scores, with the context the rubric needs. */
 export interface CommentJudgeInput {
@@ -155,16 +156,18 @@ export function anthropicCommentJudge(options: AnthropicJudgeOptions): CommentJu
   const model = options.model ?? JUDGE_MODEL;
   return async (inputs: CommentJudgeInput[]) => {
     if (inputs.length === 0) return [];
-    const response = await client.messages.create({
-      model,
-      max_tokens: MAX_TOKENS,
-      system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
-      output_config: {
-        effort: JUDGE_EFFORT,
-        format: { type: "json_schema", schema: batchVerdictSchema() },
-      },
-      messages: [{ role: "user", content: formatBatch(inputs) }],
-    });
+    const response = await client.messages
+      .stream({
+        model,
+        max_tokens: MAX_TOKENS,
+        system: [{ type: "text", text: options.prompt, cache_control: { type: "ephemeral" } }],
+        output_config: {
+          effort: JUDGE_EFFORT,
+          format: { type: "json_schema", schema: batchVerdictSchema() },
+        },
+        messages: [{ role: "user", content: formatBatch(inputs) }],
+      })
+      .finalMessage();
     if (response.stop_reason === "max_tokens") {
       throw new Error(
         `Judge hit max_tokens (${MAX_TOKENS}) on a batch of ${inputs.length}, truncating its JSON. Raise the budget or lower BATCH_SIZE.`,

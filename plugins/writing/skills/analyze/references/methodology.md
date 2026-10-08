@@ -258,7 +258,7 @@ Each criterion in `JUDGE_CRITERIA` carries its layer label (`meaning`), the rubr
 
 #### Execution and Cost
 
-One call per document at temperature 0 with structured JSON output on a Haiku-class model, prompt sent as a cacheable system prefix. Documents over 1,500 words are chunked at paragraph boundaries and aggregated by per-criterion maxima. The runner prints an estimated cost before any call and accepts a document limit (default 100). A 200-document run of 1k-word bodies stays under a dollar.
+One call per document with structured JSON output on a Haiku-class model, thinking disabled at effort `low`, prompt sent as a cacheable system prefix. Haiku 5.5 accepts only temperature 1, so verdicts are sampled and the reproducibility gate replays each tuple several times. Documents over 1,500 words are chunked at paragraph boundaries and aggregated by per-criterion maxima. The runner prints an estimated cost before any call and accepts a document limit (default 100). A 200-document run of 1k-word bodies stays under a dollar.
 
 #### Reproducibility Gate
 
@@ -266,7 +266,7 @@ One call per document at temperature 0 with structured JSON output on a Haiku-cl
 
 #### Calibration (Pending)
 
-Judge criteria are unstable until anchored against real examples, so calibration follows the labeling protocol below. Size dev and test splits with `linguistics/power.ts` first, run two criteria-refinement rounds on the dev split, then freeze the prompt and measure once on the held-out test split with the Wilson protocol. Promotion bar for analyze/review: precision at or above ~50% on the random subset with interval width at or under ±20pp, plus a human spot-check of flagged examples. The labeling passes are a user checkpoint and have not run. Until then, treat judge flag rates as uncalibrated and the committed fixture expectations as design targets.
+Judge criteria are unstable until anchored against real examples, so calibration follows the labeling protocol below. Size dev and test splits with `linguistics/power.ts` first, run two criteria-refinement rounds on the dev split, then freeze the prompt and measure once on the held-out test split with the Wilson protocol. Promotion bar for analyze/review: precision at or above ~50% on the random subset with interval width at or under ±20pp, plus a human spot-check of flagged examples. The labeling passes are a user checkpoint and have not run. Until then, treat judge flag rates as uncalibrated.
 
 #### Privacy
 

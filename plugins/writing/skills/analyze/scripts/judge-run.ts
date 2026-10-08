@@ -49,19 +49,31 @@ export interface GateResult {
   mismatches: GateMismatch[];
 }
 
+/** The judge samples, so the gate replays every tuple this many times by default. */
+export const DEFAULT_GATE_RUNS = 5;
+
 /**
- * Replays each fixture tuple against `judge`. Throws when the committed
- * prompt no longer matches the pinned hash: expectations from a different
- * prompt version say nothing about this one.
+ * Replays each fixture tuple against `judge` `runs` times, one result per
+ * fixture per run. Throws when the committed prompt no longer matches the
+ * pinned hash: expectations from a different prompt version say nothing about
+ * this one.
  */
-export async function runGate(judge: ChunkJudge, promptSha256: string): Promise<GateResult[]> {
+export async function runGate(
+  judge: ChunkJudge,
+  promptSha256: string,
+  runs = 1,
+): Promise<GateResult[]> {
   if (promptSha256 !== JUDGE_PROMPT_SHA256) {
     throw new Error(
       `Prompt hash ${promptSha256.slice(0, 12)} does not match the pinned tuple hash ${JUDGE_PROMPT_SHA256.slice(0, 12)}. Re-validate the fixtures against the edited prompt and update JUDGE_PROMPT_SHA256.`,
     );
   }
+  if (!Number.isInteger(runs) || runs < 1) {
+    throw new Error(`Gate runs must be a positive integer, got ${runs}`);
+  }
+  const fixtures = Array.from({ length: runs }, () => JUDGE_FIXTURES).flat();
   const results: GateResult[] = [];
-  for (const fixture of JUDGE_FIXTURES) {
+  for (const fixture of fixtures) {
     // oxlint-disable-next-line no-await-in-loop -- one judge API call per fixture; serializing keeps the gate inside the rate limit.
     const verdict = await judgeDocument(judge, fixture.text);
     const mismatches: GateMismatch[] = [];
@@ -81,6 +93,33 @@ export async function runGate(judge: ChunkJudge, promptSha256: string): Promise<
     results.push({ id: fixture.id, kind: fixture.kind, pass: mismatches.length === 0, mismatches });
   }
   return results;
+}
+
+export interface GatePassRate {
+  id: string;
+  passes: number;
+  runs: number;
+  missed: string[];
+}
+
+/** Per-fixture pass counts across runs, in fixture order. */
+export function passRates(results: GateResult[]): GatePassRate[] {
+  const rates = new Map<string, GatePassRate>();
+  for (const result of results) {
+    const rate = rates.get(result.id) ?? { id: result.id, passes: 0, runs: 0, missed: [] };
+    rate.runs++;
+    if (result.pass) rate.passes++;
+    for (const { criterion } of result.mismatches) {
+      if (!rate.missed.includes(criterion)) rate.missed.push(criterion);
+    }
+    rates.set(result.id, rate);
+  }
+  return [...rates.values()];
+}
+
+export function formatPassRate({ id, passes, runs, missed }: GatePassRate): string {
+  const line = `${id.padEnd(36)} ${passes}/${runs}`;
+  return missed.length > 0 ? `${line}  missed: ${missed.join(", ")}` : line;
 }
 
 export interface HeadingBaselineScore {
@@ -181,7 +220,7 @@ async function filesMain(paths: string[], model: string, limit: number): Promise
   console.log(renderAudit(audit));
 }
 
-async function gateMain(model: string): Promise<void> {
+async function gateMain(model: string, runs: number): Promise<void> {
   requireApiKey();
   const prompt = await loadPrompt();
   const texts = JUDGE_FIXTURES.map((f) => f.text);
@@ -191,28 +230,16 @@ async function gateMain(model: string): Promise<void> {
     countTokens: anthropicTokenCounter({ prompt: prompt.text, model }),
   });
   console.error(
-    `Gating ${JUDGE_FIXTURES.length} fixtures: ${cost.calls} calls, est. $${cost.usd.toFixed(4)} on ${model}`,
+    `Gating ${JUDGE_FIXTURES.length} fixtures x ${runs} runs: ${cost.calls * runs} calls, est. $${(cost.usd * runs).toFixed(4)} on ${model}`,
   );
   const judge = anthropicChunkJudge({ prompt: prompt.text, model });
-  const results = await runGate(judge, prompt.sha256);
-  let failed = 0;
-  for (const result of results) {
-    if (result.pass) {
-      console.log(`PASS ${result.id}`);
-      continue;
-    }
-    failed++;
-    console.log(`FAIL ${result.id}`);
-    for (const mismatch of result.mismatches) {
-      console.log(
-        `  ${mismatch.criterion}: expected ${mismatch.expected}, got ${mismatch.actual}${mismatch.span != null && mismatch.span !== "" ? ` (span: "${mismatch.span}")` : ""}`,
-      );
-    }
-  }
+  const rates = passRates(await runGate(judge, prompt.sha256, runs));
+  for (const rate of rates) console.log(formatPassRate(rate));
+  const held = rates.filter((r) => r.passes === r.runs).length;
   console.log(
-    `\n${results.length - failed}/${results.length} tuples hold (prompt ${prompt.sha256.slice(0, 12)})`,
+    `\n${held}/${rates.length} tuples hold on every run (prompt ${prompt.sha256.slice(0, 12)})`,
   );
-  if (failed > 0) process.exit(1);
+  if (held < rates.length) process.exit(1);
 }
 
 async function headingsMain(labelsPath: string, model: string, limit: number): Promise<void> {
@@ -286,10 +313,11 @@ if (import.meta.main) {
       },
       flags: {
         model: { type: String, description: "Judge model", default: JUDGE_MODEL },
+        runs: { type: Number, description: "Replays per tuple", default: DEFAULT_GATE_RUNS },
       },
     },
     async (parsed) => {
-      await gateMain(parsed.flags.model);
+      await gateMain(parsed.flags.model, parsed.flags.runs);
     },
   );
 

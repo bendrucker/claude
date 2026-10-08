@@ -3,7 +3,7 @@ import type { CriterionKey } from "./judge";
 /**
  * Reproducibility tuples for the meaning-layer judge (issue #791): committed
  * (prompt hash, input hash, expected flags) over synthetic negatives and
- * invented positives at temperature 0. Every text is invented; none is quoted
+ * invented positives. Every text is invented; none is quoted
  * from any session corpus, so the file is safe to commit.
  *
  * Two consumers:
@@ -16,10 +16,6 @@ import type { CriterionKey } from "./judge";
  *   against the live judge and fails on any expectation mismatch. The gate is
  *   drift detection at measurement time, not a per-commit block, so it is not
  *   wired into default CI.
- *
- * GATE STATUS: the expectations below are design targets pending the first
- * live gate run, which is part of the #791 calibration checkpoint (a user
- * decision). Until that run, treat them as unvalidated.
  */
 
 /** Pinned hash of resources/judge/prompt.md. A prompt edit must update this. */

@@ -84,7 +84,7 @@ describe("clearArgs", () => {
   test("clears every token raise sets", () => {
     const raised = raiseArgs("wE5:p1", "doc", "x");
     const set = raised.flatMap((arg, i) =>
-      raised[i - 1] === "--token" ? [arg.split("=")[0]] : [],
+      raised[i - 1] === "--token" ? [arg.slice(0, arg.indexOf("="))] : [],
     );
     const cleared = clearArgs("wE5:p1");
     expect(cleared.flatMap((arg, i) => (cleared[i - 1] === "--clear-token" ? [arg] : []))).toEqual(
@@ -323,7 +323,7 @@ describe("hook marker path", () => {
     ["no marker", null, false],
   ])("Stop clears for %s: %p", async (_name, content, clears) => {
     const { command } = (await hooks()).Stop[0].hooks[0];
-    const [guard] = command.split(" && bun ");
+    const guard = command.slice(0, command.indexOf(" && bun "));
     const home = join(process.env.TMPDIR ?? "/tmp", `attention-${crypto.randomUUID()}`);
     if (content != null) await Bun.write(markerPath("wE5:p1", home), content);
     const shell = Bun.spawnSync(["sh", "-c", guard], {

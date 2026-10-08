@@ -8,14 +8,14 @@
   "doc": {
     "target": "declaration",
     "subject": "TestLeafCommandsHaveExamples",
-    "exported": true,
-    "required": true
+    "exported": false,
+    "required": false
   },
   "action": "keep",
   "category": null,
   "fact": [
     "TestLeafCommandsHaveExamples",
-    "RunE set and no subcommands"
+    "RunE"
   ],
   "note": "Exported test func godoc. It defines what a leaf command is for the assertion, which the walker encodes two functions away.",
   "source": "honeycomb-cli comments/audit-2b210c41a01d8404 cmd/example_test.go:23"

@@ -39,6 +39,7 @@ export interface ApplyResult {
 }
 
 function toEditItem(
+  path: string,
   comment: Comment,
   verdict: Verdict,
   lines: string[],
@@ -51,7 +52,7 @@ function toEditItem(
     endColumn: comment.endColumn,
     kind: comment.kind,
     verdict,
-    doc: docCommentOf(comment, lines, language),
+    doc: docCommentOf(comment, lines, language, path),
   };
 }
 
@@ -165,7 +166,7 @@ export async function apply(options: ApplyOptions, io: AuditIo): Promise<ApplyRe
         text: match.comment.text,
       });
       if (match.verdict.action !== "keep") {
-        editItems.push(toEditItem(match.comment, match.verdict, lines, language));
+        editItems.push(toEditItem(path, match.comment, match.verdict, lines, language));
       }
     }
     if (editItems.length > 0) {

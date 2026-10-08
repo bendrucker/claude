@@ -59,6 +59,17 @@ describe("docCommentOf", () => {
     expect(await classify(source, "go")).toMatchSnapshot();
   });
 
+  test("Go test file declarations are neither API nor required", async () => {
+    const source = "// TestParse checks Parse.\nfunc TestParse(t *testing.T) {}";
+    const [comment] = await extractComments(source, "go");
+    expect(docCommentOf(comment!, source.split("\n"), "go", "parse_test.go")).toEqual({
+      target: "declaration",
+      subject: "TestParse",
+      exported: false,
+      required: false,
+    });
+  });
+
   test("Rust", async () => {
     const source = [
       "//! Crate docs.",

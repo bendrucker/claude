@@ -82,21 +82,23 @@ function enclosingOpener(lines: string[], index: number, indent: number): string
 
 const goExported = (name: string): boolean => /^\p{Lu}/u.test(name);
 
-function goDoc(comment: Comment, lines: string[]): DocComment | null {
+function goDoc(comment: Comment, lines: string[], path: string | undefined): DocComment | null {
   const next = declarationAfter(comment, lines, null);
   if (next == null) return null;
+  // godoc and the doc linters skip `_test.go`, so nothing in it is API or required.
+  const api = !(path?.endsWith("_test.go") ?? false);
   const pkg = GO_PACKAGE.exec(next);
-  if (pkg) return { target: "module", subject: pkg[1] ?? null, exported: true, required: true };
+  if (pkg) return { target: "module", subject: pkg[1] ?? null, exported: api, required: api };
   const decl = GO_DECL.exec(next);
   if (decl?.[1] != null) {
-    const exported = goExported(decl[1]);
+    const exported = api && goExported(decl[1]);
     return { target: "declaration", subject: decl[1], exported, required: exported };
   }
   const spec = GO_SPEC.exec(next);
   if (spec?.[1] == null) return null;
   const opener = enclosingOpener(lines, comment.startLine - 1, indentOf(next));
   if (opener == null) return null;
-  const exported = goExported(spec[1]);
+  const exported = api && goExported(spec[1]);
   // A grouped const, var, or type spec is linted like a top-level one. A struct field or interface method is not.
   if (GO_GROUP.test(opener)) {
     return { target: "declaration", subject: spec[1], exported, required: exported };
@@ -205,10 +207,11 @@ export function docCommentOf(
   comment: Comment,
   lines: string[],
   language: Language,
+  path?: string,
 ): DocComment | null {
   if (language === "python") return pythonDoc(comment, lines);
   if (!ownsLines(comment, lines)) return null;
-  if (language === "go") return goDoc(comment, lines);
+  if (language === "go") return goDoc(comment, lines, path);
   if (language === "rust") return rustDoc(comment, lines);
   if (language === "typescript" || language === "tsx" || language === "javascript") {
     return jsDoc(comment, lines);

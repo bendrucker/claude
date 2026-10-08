@@ -870,7 +870,7 @@ export const judgeCommand = new Command("judge")
   .option("--pairs <dir>", "Directory of Pair JSON files")
   .option("--out <dir>", "Directory to write Judgment JSON files")
   .option("--swap", "Judge both slot orders; disagreement records a tie", false)
-  .option("--model <model>", "Judge model", "claude-sonnet-5")
+  .option("--model <model>", "Judge model", "claude-sonnet-5-5")
   .option("--prompt <file>", "Judge prompt template", join(import.meta.dirname, "judge-prompt.md"))
   .option("--concurrency <n>", "Judge calls in flight", number, 4)
   .action(async (options) => {

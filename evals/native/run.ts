@@ -15,7 +15,7 @@ import { wrap } from "./wrap";
 export const SuiteFile = z.object({
   /** Gated tools the cases need, passed to `--allow-tools`. */
   allow_tools: z.array(z.string()).default([]),
-  judge_model: z.string().default("claude-sonnet-5"),
+  judge_model: z.string().default("claude-sonnet-5-5"),
   /** Artifacts that are not a plugin, wrapped into one by `wrap.ts`. */
   wrap: z
     .object({

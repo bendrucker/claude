@@ -4,7 +4,7 @@ tags: [dev]
 plugins: [../..]
 runs: 1
 execution:
-  model: claude-sonnet-5
+  model: claude-sonnet-5-5
   max_turns: 30
   timeout_seconds: 600
   allowed_tools: [Read, Glob, Grep, Skill, Write, Edit, Bash]

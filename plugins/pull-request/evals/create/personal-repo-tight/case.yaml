@@ -3,7 +3,7 @@ name: personal-repo-tight
 tags: [dev]
 plugins: ["../../..", "../../../../writing"]
 execution:
-  model: claude-sonnet-5
+  model: claude-sonnet-5-5
   max_turns: 20
   timeout_seconds: 300
   allowed_tools: [Read, Glob, Grep, Skill]

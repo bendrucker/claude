@@ -17,7 +17,7 @@ This directory is the generic layer: the native suite runner and the report that
 
 ```yaml
 allow_tools: ["Bash(git:*)"]    # gated tools passed to --allow-tools
-judge_model: claude-sonnet-5
+judge_model: claude-sonnet-5-5
 wrap:                           # omit when the cases load a plugin
   skills: [user/skills/tdd]
   context: [user/rules/typescript.md]

@@ -3,7 +3,7 @@ name: scenario-004-claude-1142
 tags: [scenario]
 plugins: ["../../..", "../../../../writing"]
 execution:
-  model: claude-sonnet-5
+  model: claude-sonnet-5-5
   max_turns: 20
   timeout_seconds: 300
   allowed_tools: [Read, Glob, Grep, Skill]

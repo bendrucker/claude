@@ -63,6 +63,19 @@ describe("snapshotOf", () => {
     expect(snapshot.total).toBe(3);
   });
 
+  test("a status and a check run sharing a name stay separate", () => {
+    const snapshot = snapshotOf(
+      view({
+        statusCheckRollup: [
+          { ...run("deploy", "COMPLETED", "FAILURE"), workflowName: null },
+          { __typename: "StatusContext", context: "deploy", state: "SUCCESS" },
+        ],
+      }),
+    );
+    expect(snapshot.failed).toEqual(["deploy"]);
+    expect(snapshot.total).toBe(2);
+  });
+
   test("a queued rerun outranks the failure it replaces", () => {
     const snapshot = snapshotOf(
       view({

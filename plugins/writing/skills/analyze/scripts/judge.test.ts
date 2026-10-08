@@ -262,14 +262,16 @@ describe("estimateCost", () => {
 describe("modelPricing", () => {
   test.each<[string, number]>([
     ["claude-haiku-4-5", 0.0025],
-    ["claude-haiku-5-20260901", 0.0025],
+    ["claude-haiku-5-5", 0.00025],
+    ["claude-sonnet-5-5", 0.005],
+    ["claude-opus-5-5", 0.01],
     ["claude-sonnet-4-6", 0.0075],
     ["claude-sonnet-5", 0.0075],
     ["claude-opus-5", 0.0125],
     ["claude-opus-5[1m]", 0.0125],
     ["claude-fable-5", 0.025],
     ["claude-mythos-5", 0.025],
-  ])("prices %s from its family", async (model, usd) => {
+  ])("prices %s", async (model, usd) => {
     const estimate = await estimateCost(["doc"], {
       promptText: "prompt",
       model,

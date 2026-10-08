@@ -4,11 +4,12 @@ Why each sandbox grant and hook in `settings.json` exists and what would retire 
 
 ## Hosts
 
-`WebFetch(domain:...)` permissions, granted in `user/settings.json` unless noted.
+Granted in `user/settings.json` unless noted. `sandbox.network.allowedDomains` opens a host to sandboxed Bash. A `WebFetch(domain:...)` permission lets the `WebFetch` tool fetch it without a prompt, and the sandbox also admits it. A host gets a `WebFetch` entry only when the session index shows the tool fetching it, and an `allowedDomains` entry when a CLI reaches it.
 
-- Package registries: `registry.npmjs.org`, `www.npmjs.com`, `pypi.org`, `rubygems.org`, `proxy.golang.org`, `sum.golang.org`, `community-extensions.duckdb.org` (the DuckDB `markdown` and `yaml` extensions, fetched on first `INSTALL ... FROM community`).
-- Docs and source: `platform.claude.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.sh`, `bun.com`, `github.com`, `raw.githubusercontent.com`.
-- Credentialed APIs: `api.github.com`, `api.individual.githubcopilot.com`, `api.linear.app`, `api.anthropic.com`, `claude.ai`, `gitlab.com`, `*.greptile.com`, `*.coderabbit.ai`, `api.cloudflare.com`, `dash.cloudflare.com`.
+- Package registries: `registry.npmjs.org` and `pypi.org` (both), `www.npmjs.com` (`WebFetch`), `rubygems.org`, `proxy.golang.org`, `sum.golang.org`, `bun.sh` (`allowedDomains`), and `community-extensions.duckdb.org` (both, the DuckDB `markdown` and `yaml` extensions, fetched on first `INSTALL ... FROM community`).
+- Docs: `platform.claude.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.com` (`WebFetch`).
+- Source and credentialed APIs, `WebFetch` and `allowedDomains` both: `github.com`, `raw.githubusercontent.com`, `api.github.com`, `gitlab.com`, `claude.ai`, `*.greptile.com`, `*.coderabbit.ai`.
+- Credentialed APIs no tool fetches, `allowedDomains` only: `api.individual.githubcopilot.com`, `api.linear.app`, `api.anthropic.com`, `api.cloudflare.com`, `dash.cloudflare.com`.
 
 `api.anthropic.com` accepts uploads and is the known exfil-capable host. It stays because the agent needs the model API.
 
@@ -22,13 +23,13 @@ Why each sandbox grant and hook in `settings.json` exists and what would retire 
 COPILOT_GITHUB_TOKEN=$(gh auth token) HOME=~/.cache/claude/copilot-home copilot --model no-such-model-probe -p ok
 ```
 
-`docs.anthropic.com` is the legacy host that 301-redirects to `code.claude.com`. The grant buys only the first leg of the redirect. **Drop it** when this stops returning a 3xx to a host already listed:
+`docs.anthropic.com` (`WebFetch`) is the legacy host that 301-redirects to `code.claude.com`. The grant buys only the first leg of the redirect. **Drop it** when this stops returning a 3xx to a host already listed:
 
 ```
 curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://docs.anthropic.com/en/docs/claude-code/settings
 ```
 
-`www.schemastore.org` is granted in `.claude/settings.json` instead, because only this repo fetches it, through `schemas/overlays/sources.json`. It is unauthenticated and read-only. **Drop it** when no overlay resolves its base live, which happens only if the upstream-backed schemas become hand-authored or vendored. See [`schemas.md`](../.claude/rules/schemas.md).
+`www.schemastore.org` (both) is granted in `.claude/settings.json` instead, because only this repo fetches it, through `schemas/overlays/sources.json`. It is unauthenticated and read-only. **Drop it** when no overlay resolves its base live, which happens only if the upstream-backed schemas become hand-authored or vendored. See [`schemas.md`](../.claude/rules/schemas.md).
 
 ```
 jq -r '.schemas[].url' schemas/overlays/sources.json | grep schemastore.org

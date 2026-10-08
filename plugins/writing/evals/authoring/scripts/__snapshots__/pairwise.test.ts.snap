@@ -96,7 +96,7 @@ Options:
   --out <dir>        Directory to write Judgment JSON files
   --swap             Judge both slot orders; disagreement records a tie
                      (default: false)
-  --model <model>    Judge model (default: "claude-sonnet-5")
+  --model <model>    Judge model (default: "claude-sonnet-5-5")
   --prompt <file>    Judge prompt template (default:
                      "<scripts>/judge-prompt.md")
   --concurrency <n>  Judge calls in flight (default: 4)

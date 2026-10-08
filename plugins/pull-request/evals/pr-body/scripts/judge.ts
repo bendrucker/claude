@@ -27,10 +27,10 @@ import {
 // candidates 1 and 2. The judge never sees the arm labels; the slot-to-arm
 // mapping is recorded on every row so a verdict can be re-derived or audited.
 
-const JUDGE_MODEL = "claude-sonnet-5";
+const JUDGE_MODEL = "claude-sonnet-5-5";
 
-// claude-sonnet-5: $3/M input, $15/M output at list price.
-const JUDGE_RATES: TokenRates = { input: 3 / 1_000_000, output: 15 / 1_000_000 };
+// claude-sonnet-5-5: $2/M input, $10/M output at list price.
+const JUDGE_RATES: TokenRates = { input: 2 / 1_000_000, output: 10 / 1_000_000 };
 
 // The SDK's own retry budget covers 429s, 5xx, and connection failures with
 // exponential backoff, honoring retry-after when the API sends it.

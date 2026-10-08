@@ -25,6 +25,7 @@ Every customization costs tokens on every session. Before adding one, define wha
 - A skill that instructs a subagent fan-out or background dispatch carries my authorization for `Agent`. Run it as written. Degrade to inline only when `Agent` is absent, and say so.
 - Prefer `analyst` over `general-purpose` for read-only spawns. Pass `model: haiku` for pure lookup.
 - Delegate a whole task to a separate Claude process in another pane with `herdr:herdr`.
+- When debugging Claude Code itself (harness, classifier, hooks, plugins, startup), launch the session under observation with `DEBUG_SDK=1 claude`, which writes `~/.claude/debug/<session-id>.txt`. Claude Code reads `DEBUG_SDK` only from its launch environment, so `settings.json` `env` can't set it. `claude --debug=<categories>` is the flag form and the only way to filter categories. Read the log afterwards, or query its `debug_events` rows through `observability:session`.
 - Run scripted cross-model or GPT review through `github:copilot`. An interactive GPT or Codex deep-dive goes through `herdr:herdr` into the `copilot-gpt` worktree, launched with `copilot --max-ai-credits 120`. "Consult fable" means the same second opinion from a Fable session.
 - Use the `agent-browser` skill when a task needs a real browser. `WebFetch` is fine for static pages.
 - Finish a branch with `/ship`. Use `pull-request:create` to open a PR directly, or an empty body if it's unavailable. Open PRs ready for review, draft only for speculative changes.

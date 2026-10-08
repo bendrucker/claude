@@ -243,12 +243,27 @@ async function requiredJson<T>(
 
 // A base like origin/main needs its remote updated first. A local ref names no
 // remote, and fetching one the repository does not have would fail the dispatch.
-async function baseRemote(run: Runner, root: string, base: string): Promise<string | null> {
+function baseRemote(remotes: ReadonlySet<string>, base: string): string | null {
   const candidate = base.split("/")[0];
   if (candidate == null || candidate === base) return null;
-  const listed = await required(run, ["git", "-C", root, "remote"], null);
-  const remotes = new Set(listed.stdout.split("\n").map((line) => line.trim()));
   return remotes.has(candidate) ? candidate : null;
+}
+
+// The sandbox denies a session's writes to the shared .git/config, where `git
+// push -u` records tracking, so record it here instead. herdr tracks the base,
+// which would measure the session's branch against origin/main.
+async function trackOrigin(
+  run: Runner,
+  path: string,
+  branch: string,
+  partial: DispatchRecord,
+): Promise<void> {
+  await required(run, ["git", "-C", path, "config", `branch.${branch}.remote`, "origin"], partial);
+  await required(
+    run,
+    ["git", "-C", path, "config", `branch.${branch}.merge`, `refs/heads/${branch}`],
+    partial,
+  );
 }
 
 // GitHub over SSH signs with a key that may need a touch nobody is there to give, so
@@ -404,7 +419,9 @@ export async function dispatch(
     throw new DispatchError(`git named no worktree for ${options.repo}`, null);
 
   try {
-    const remote = await baseRemote(run, root, options.base);
+    const listedRemotes = await required(run, ["git", "-C", root, "remote"], null);
+    const remotes = new Set(listedRemotes.stdout.split("\n").map((line) => line.trim()));
+    const remote = baseRemote(remotes, options.base);
     if (remote != null) {
       const url = await required(run, ["git", "-C", root, "remote", "get-url", remote], null);
       await required(run, ["git", "-C", root, "fetch", ...fetchArgs(remote, url.stdout)], null, {
@@ -463,6 +480,8 @@ export async function dispatch(
       status: "unknown",
       prompted: false,
     };
+
+    if (remotes.has("origin")) await trackOrigin(run, partial.path, options.branch, partial);
 
     const { name, started } = await startNamed(run, options, partial, wanted);
 

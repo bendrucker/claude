@@ -55,6 +55,8 @@ Three grants are deliberate exceptions to the credential-store clause. Each hold
 
 `~/.herdr/worktrees` covers deleting a worktree rather than working in one. The session's own worktree is already writable through the sandbox's `.` entry, and removing a *different* one is what fails. `git worktree remove` checks for uncommitted changes, deregisters the admin entry, and only then deletes the files. A denied delete then orphans the directory: absent from `git worktree list`, no admin entry, and beyond git's reach. That happened twice on 2026-09-05, once through `gh pr merge --delete-branch`, which left 2.6 GB behind. **Drop it** when herdr stops placing worktrees under `~/.herdr`.
 
+The sandbox itself denies every `.git/config` and `.git/hooks` path, beyond reach of `allowWrite`. A linked worktree shares the main checkout's `.git/config`, so a sandboxed `git push -u` from one pushes and then fails `could not lock config file` recording the upstream. Keeping that file unwritable is the point: `core.hooksPath` and `core.fsmonitor` there run code in every worktree. Tracking is recorded at creation instead, outside the sandbox: the `herdr` plugin's dispatch points `branch.<name>.merge` at `origin/<name>`, and a worktrunk `pre-start` hook in dotfiles does the same for `wt switch --create`.
+
 The rest are tool caches and state directories holding no credential material:
 
 - `~/.duckdb`: extensions installed on first `INSTALL ... FROM community`. Without it the `observability:session` skill dies on `IO Error: Failed to create directory`, having already been granted the egress to fetch them. The version in the path changes with each DuckDB release, so a fresh install re-denies. **Drop it** when no skill queries DuckDB with a community extension.
@@ -74,7 +76,7 @@ The rest are tool caches and state directories holding no credential material:
 
 ## Escaped Commands
 
-`excludedCommands` entries run outside the sandbox. A match at any top-level position of the invocation's chain exempts every command in it, and that exemption outranks the `filesystem` denies, so an entry grants far more than the one verb it names. `git:*` means any invocation mentioning `git` at a chain position writes anywhere on disk. Judge a candidate on that reach.
+`excludedCommands` entries run outside the sandbox. An invocation escapes only when every command in its chain matches an entry, so `git push -u origin HEAD 2>&1 | tail` and `git config ... && echo` both run sandboxed. The exemption outranks the `filesystem` denies, so an entry grants far more than the one verb it names. `git:*` means any invocation made only of `git` commands writes anywhere on disk. Judge a candidate on that reach.
 
 - Self-authenticating network tools: `git`, `linear`, `aws`, `gcloud`, `az`, `pulumi`, `ssh`, `scp`, `rsync`, `docker`. Each carries its own auth and already reaches the network.
 - macOS host integration (`mac` plugin): `open`, `osascript`, `shortcuts`, `pbcopy`, `pbpaste`, `security`, `defaults`, `screencapture`, `say`, `afplay`, `diskutil`, `networksetup`, `dscl`. Host APIs the sandbox cannot model.

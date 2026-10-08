@@ -52,7 +52,8 @@ CREATE OR REPLACE MACRO denial_kind_source(kind, tool_use_result) AS
 -- Cost-rate table for token spend estimates, per-MTok USD from published API rates as of
 -- 2026-10-07. Model arms precede the family arms that would also match them, and a family
 -- arm can drift from a specific model's current rate. Haiku 5.5 is priced at its tier for
--- prompts up to 100K tokens. Longer prompts bill $0.50 / $2.50. Kept here so every cost query shares one source. The per-tier weighting
+-- prompts up to 100K tokens. Longer prompts bill $0.50 / $2.50. Kept here so every cost
+-- query shares one source. The per-tier weighting
 -- (cache read 0.1x input, cache write 1.25x for 5m / 2x for 1h) lives in the queries that
 -- call these.
 CREATE OR REPLACE MACRO model_input_rate(model) AS

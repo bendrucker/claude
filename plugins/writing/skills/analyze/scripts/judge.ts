@@ -319,8 +319,8 @@ const HAIKU_PRICING: ModelPricing = { input: 1, output: 5 };
  * Per-MTok USD rates matched by substring, first match wins. Model rows precede
  * the family rows that would also match them, and a new model id in a known
  * family needs no edit here. Haiku 5.5 is priced at its tier for prompts up to
- * 100K tokens. Longer prompts bill $0.50 / $2.50. The rows mirror `model_input_rate` and
- * `model_output_rate` in
+ * 100K tokens. Longer prompts bill $0.50 / $2.50. The rows mirror
+ * `model_input_rate` and `model_output_rate` in
  * `plugins/observability/skills/session/resources/schema/03_macros.sql`. Plugins
  * cannot import across plugin boundaries, so a rate change has to touch both.
  * Sonnet is held at the 3/15 standard rate rather than a promotional rate, since

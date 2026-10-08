@@ -36,6 +36,10 @@ Every customization costs tokens on every session. Before adding one, define wha
 
 Investigate in auto mode until the approach is settled, then enter plan mode to write it down. When I ask for a plan and something is still open, tell me what you're resolving and resolve it first.
 
+## Decisions
+
+Put every decision I have to confirm (a checkpoint, an approval, a choice between options) to me in Plannotator. It replaces asking in chat or with `AskUserQuestion`, including where a skill says to use `AskUserQuestion`. Write `tmp/<topic>.md` with one `:::question` block per decision, `- [ ]` choices, and a `Recommended:` line. The `plannotator` skill has the syntax. Open it with `plannotator annotate <file> --gate --json`, using `run_in_background` and a `7200000` timeout, then end the turn. Use the `plannotator` tool instead when one is loaded. Plan approval stays with the `ExitPlanMode` hook. Inside plan mode, where the file can't be written, keep `AskUserQuestion`.
+
 ## Check-ins
 
 Schedule `⏰` plan check-ins in Things with `things:url add` and `when=<yyyy-mm-dd>`, tagged `claude-code`. Work-tracked check-ins go there too, linking their Linear issue. Notes carry what to check, the plan path, the repo, and a launch URL:

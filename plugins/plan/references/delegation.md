@@ -12,7 +12,7 @@ When the orchestrator runs on an expensive model (Opus, Fable, Mythos), the plan
 
 Match the model to the work, not to the orchestrator:
 
-- Narrow, well-specified, high-token, low-reasoning work (reading logs, mechanical edits, grep sweeps) goes to **Haiku**.
+- Narrow, well-specified, high-token, low-reasoning work (reading logs, mechanical edits, grep sweeps) goes to **Haiku**, at `effort: low` for a bounded tool task and `medium` for agentic work.
 - General-purpose work (bounded implementation, research with a settled question) goes to **Sonnet**.
 - Coding under a Fable orchestrator goes to **Opus**.
 - Reserve the orchestrator's own model for genuine reasoning: design forks, cross-slice synthesis, judgment a subagent cannot hold.

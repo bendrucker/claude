@@ -72,7 +72,6 @@ On `status: failing`, invoke the `gitlab:logs` agent via the `Agent` tool with t
 ```
 Agent(
   subagent_type="gitlab:logs",
-  model="haiku",
   prompt="Fetch failing-job logs for pipeline <run_id>. Return the JSON summary described in the logs agent definition."
 )
 ```

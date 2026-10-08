@@ -65,6 +65,7 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:api.individual.githubcopilot.com)",
       "WebFetch(domain:gitlab.com)",
       "WebFetch(domain:proxy.golang.org)",
       "WebFetch(domain:sum.golang.org)",

@@ -125,6 +125,8 @@ The sandbox blocks Copilot writing to `~/.copilot`, which kills the run with `I/
 
 The redirect also hides every login Copilot knows how to find: its own under the real home and in the keychain, and `gh`'s in `~/.config/gh`. Without a token in the environment, every run fails before inference with `No authentication information found`, even right after `/login`. So when none of `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` is set, the script runs `gh auth token` under the real `HOME` and passes the result to Copilot as `COPILOT_GITHUB_TOKEN`. `gh` reads its keychain token from inside the sandbox, so this runs sandboxed like the rest of the script. Under the redirected `HOME` it finds no `hosts.yml` and reports no token. When no token resolves, the script refuses before spending anything. Fix that with `gh auth login` or by exporting one of the three variables.
 
+The sandbox allows `api.individual.githubcopilot.com` through `user/settings.json`, so a plain sandboxed call reaches it. If a run dies with `Failed to load models` and a `tunnel error`, the login reaches a different Copilot host, such as a Business plan's. Grant that host there instead of widening to `*.githubcopilot.com`.
+
 #### Prompt Size
 
 The prompt travels on stdin. Omitting `-p` is what selects that: Copilot reads stdin as the prompt and stays in the same non-interactive mode, so `ARG_MAX` does not bound it. The 120 KB cap is a spend guard rather than a size ceiling. `--max-bytes` moves it, and `--force` runs past it.

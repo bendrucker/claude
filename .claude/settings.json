@@ -76,5 +76,10 @@
         ]
       }
     ]
+  },
+  "sandbox": {
+    "network": {
+      "allowedDomains": ["www.schemastore.org"]
+    }
   }
 }

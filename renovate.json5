@@ -26,6 +26,14 @@
       datasourceTemplate: "git-refs",
       versioningTemplate: "git",
     },
+    {
+      customType: "regex",
+      description: "Claude Code version CI installs",
+      managerFilePatterns: [".github/actions/claude-code/install.sh"],
+      matchStrings: ["CLAUDE_CODE_VERSION=(?<currentValue>\\S+)"],
+      depNameTemplate: "@anthropic-ai/claude-code",
+      datasourceTemplate: "npm",
+    },
   ],
   packageRules: [
     {

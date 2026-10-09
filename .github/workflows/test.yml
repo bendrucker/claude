@@ -21,7 +21,7 @@ jobs:
 
       - name: Install Claude Code
         run: |
-          curl -fsSL https://claude.ai/install.sh | bash
+          .github/actions/claude-code/install.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Generate mod engine types
@@ -40,7 +40,7 @@ jobs:
 
       - name: Install Claude Code
         run: |
-          curl -fsSL https://claude.ai/install.sh | bash
+          .github/actions/claude-code/install.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Generate mod engine types
@@ -214,7 +214,7 @@ jobs:
       - name: Install Claude Code CLI
         id: cli
         background: true
-        run: curl -fsSL https://claude.ai/install.sh | bash
+        run: .github/actions/claude-code/install.sh
 
       - uses: ./.github/actions/bun-install
 
@@ -369,7 +369,7 @@ jobs:
       - name: Install Claude Code CLI
         id: cli
         background: true
-        run: curl -fsSL https://claude.ai/install.sh | bash
+        run: .github/actions/claude-code/install.sh
 
       - name: Setup Claude configuration
         run: |

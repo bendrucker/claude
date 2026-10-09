@@ -24,7 +24,7 @@ jobs:
 
       - name: Install Claude Code
         run: |
-          curl -fsSL https://claude.ai/install.sh | bash
+          .github/actions/claude-code/install.sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Check upstream code-review drift

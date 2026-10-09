@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Plugin } from "../packages/marketplace/index";
-import { modPlugins } from "./mod-types";
+import { modPlugins, typesRun } from "./mod-types";
 
 function makePlugin(name: string, overrides: Partial<Plugin> = {}): Plugin {
   return { name, dir: `/repo/plugins/${name}`, enabled: true, mcpServers: [], ...overrides };
@@ -33,5 +33,30 @@ describe("modPlugins", () => {
       "helper",
       "shared",
     ]);
+  });
+});
+
+describe("typesRun", () => {
+  test("loads every plugin dir into a watched, isolated -p run", () => {
+    const run = typesRun([makePlugin("events"), makePlugin("herdr")], "/scratch", { PATH: "/bin" });
+
+    expect(run).toMatchInlineSnapshot(`
+      {
+        "cmd": [
+          "claude",
+          "-p",
+          "--plugin-dir",
+          "/repo/plugins/events",
+          "--plugin-dir",
+          "/repo/plugins/herdr",
+          "/cost",
+        ],
+        "env": {
+          "CLAUDE_CODE_PLUGIN_DIR_WATCH": "1",
+          "CLAUDE_CONFIG_DIR": "/scratch",
+          "PATH": "/bin",
+        },
+      }
+    `);
   });
 });

@@ -1,0 +1,4 @@
+{
+  "description": "Caps agent-browser sessions per agent and machine-wide, closes an ended agent's sessions, and refuses parallel or overlapping heavy builds",
+  "modules": ["../mod/register.ts"]
+}

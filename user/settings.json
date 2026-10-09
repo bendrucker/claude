@@ -451,6 +451,7 @@
     "run-command@bendrucker": true,
     "mod-events@bendrucker": true,
     "session-limit@bendrucker": true,
+    "load@bendrucker": true,
     "1password@1password": true
   },
   "extraKnownMarketplaces": {

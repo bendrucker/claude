@@ -177,6 +177,11 @@
       "source": "./plugins/session-limit"
     },
     {
+      "name": "load",
+      "description": "Keep Claude-driven browsers and builds from saturating the machine",
+      "source": "./plugins/load"
+    },
+    {
       "name": "herdr",
       "description": "Drive the herdr terminal workspace manager: panes, tabs, workspaces, and sibling coding agents",
       "source": "./plugins/herdr"

@@ -175,24 +175,25 @@ describe("labels", () => {
 });
 
 describe("statusOf", () => {
-  test("formats each phase", () => {
-    const of = (over: Partial<PrView>, flagged = false) =>
-      statusOf(snapshotOf(view(over)), flagged);
-    expect(
-      of({ statusCheckRollup: [run("a", "IN_PROGRESS"), run("b", "COMPLETED", "SUCCESS")] }),
-    ).toBe("CI 1/2");
-    expect(of({ statusCheckRollup: [run("a", "COMPLETED", "FAILURE")] }, true)).toBe(
-      "CI ✗ ci / a → Claude",
+  const passed = [run("a", "COMPLETED", "SUCCESS")];
+  const cases: [string, Partial<PrView>, string][] = [
+    ["running", { statusCheckRollup: [run("b", "IN_PROGRESS"), ...passed] }, "🟡 CI 1/2"],
+    ["failing", { statusCheckRollup: [run("a", "COMPLETED", "FAILURE")] }, "🔴 ci / a"],
+    ["no checks and no review", {}, ""],
+    [
+      "review needed",
+      { statusCheckRollup: passed, reviewDecision: "REVIEW_REQUIRED" },
+      "🟢 CI · 👀 review needed",
+    ],
+    ["approved", { statusCheckRollup: passed, reviewDecision: "APPROVED" }, "🟢 CI · ✅ approved"],
+    ["changes requested", { reviewDecision: "CHANGES_REQUESTED" }, "❗ changes requested"],
+    ["merged", { state: "MERGED", statusCheckRollup: [run("a", "IN_PROGRESS")] }, "🟣 merged"],
+    ["closed", { state: "CLOSED" }, "⚫ closed"],
+  ];
+  test("formats each state", () => {
+    const shown = Object.fromEntries(
+      cases.map(([name, over]) => [name, statusOf(snapshotOf(view(over)))]),
     );
-    expect(
-      of({ statusCheckRollup: [run("a", "COMPLETED", "SUCCESS")], reviewDecision: "APPROVED" }),
-    ).toBe("CI ✓ · approved");
-    expect(
-      of({
-        statusCheckRollup: [run("a", "COMPLETED", "SUCCESS")],
-        reviewDecision: "CHANGES_REQUESTED",
-      }),
-    ).toBe("CI ✓ · changes requested");
-    expect(of({ state: "MERGED", statusCheckRollup: [run("a", "IN_PROGRESS")] })).toBe("merged");
+    expect(shown).toEqual(Object.fromEntries(cases.map(([name, , expected]) => [name, expected])));
   });
 });

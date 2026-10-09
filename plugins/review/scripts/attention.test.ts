@@ -6,9 +6,14 @@ import {
   currentPane,
   docOpenArgs,
   existingReviewr,
+  isKind,
+  kinds,
   markerPath,
   notificationArgs,
   openedPane,
+  planTitle,
+  PROMPT_MARKER,
+  promptAction,
   raiseArgs,
   reviewGlyph,
   reviewrOpenArgs,
@@ -16,7 +21,7 @@ import {
 
 describe("raiseArgs", () => {
   test("labels every resting state and sets the review token", () => {
-    const args = raiseArgs("wE5:p1");
+    const args = raiseArgs("wE5:p1", "plan", "dotfiles herdr-cleanup:\n approve the plan");
     // The glyph stands in as `<eye>`: a private-use codepoint inlined here is
     // one bad paste from snapshotting another icon. Its codepoint is asserted
     // below instead.
@@ -38,6 +43,10 @@ describe("raiseArgs", () => {
         "working=review",
         "--token",
         "review=<eye>",
+        "--token",
+        "review_kind=plan",
+        "--token",
+        "review_summary=dotfiles herdr-cleanup: approve the plan",
         "--ttl-ms",
         "28800000",
       ]
@@ -50,7 +59,7 @@ describe("raiseArgs", () => {
 });
 
 describe("clearArgs", () => {
-  test("clears the labels and token under the same source", () => {
+  test("clears the labels and all three tokens under the same source", () => {
     expect(clearArgs("wE5:p1")).toMatchInlineSnapshot(`
       [
         "pane",
@@ -63,9 +72,105 @@ describe("clearArgs", () => {
         "--clear-state-labels",
         "--clear-token",
         "review",
+        "--clear-token",
+        "review_kind",
+        "--clear-token",
+        "review_summary",
       ]
     `);
-    expect(clearArgs("wE5:p1")[4]).toBe(raiseArgs("wE5:p1")[4]);
+    expect(clearArgs("wE5:p1")[4]).toBe(raiseArgs("wE5:p1", "code", "x")[4]);
+  });
+
+  test("clears every token raise sets", () => {
+    const raised = raiseArgs("wE5:p1", "doc", "x");
+    const set = raised.flatMap((arg, i) =>
+      raised[i - 1] === "--token" ? [arg.slice(0, arg.indexOf("="))] : [],
+    );
+    const cleared = clearArgs("wE5:p1");
+    expect(cleared.flatMap((arg, i) => (cleared[i - 1] === "--clear-token" ? [arg] : []))).toEqual(
+      set,
+    );
+  });
+});
+
+describe("raise flags", () => {
+  test.each<[string, string[], number, string]>([
+    ["an unknown kind", ["--kind", "review", "--summary", "x"], 1, "--kind must be one of"],
+    ["no kind", ["--summary", "x"], 1, "--kind must be one of"],
+    ["no summary", ["--kind", "code"], 1, "--summary is required"],
+    ["a blank summary", ["--kind", "code", "--summary", " \n"], 1, "--summary is required"],
+    ["valid flags outside herdr", ["--kind", "pr-body", "--summary", "x"], 0, ""],
+  ])("%s", (_name, flags, exitCode, stderr) => {
+    const run = Bun.spawnSync(
+      ["bun", join(import.meta.dirname, "attention.ts"), "raise", ...flags],
+      { env: { PATH: process.env.PATH } },
+    );
+    expect(run.exitCode).toBe(exitCode);
+    expect(run.stderr.toString()).toContain(stderr);
+  });
+});
+
+describe("isKind", () => {
+  test("accepts exactly the board's five kinds", () => {
+    expect(kinds).toEqual(["plan", "code", "pr-body", "doc", "question"]);
+    expect(kinds.every(isKind)).toBe(true);
+    expect(["", "pr_body", "Plan", "review"].some(isKind)).toBe(false);
+  });
+});
+
+const hook = (event: string, tool: string, input: unknown) =>
+  JSON.stringify({ hook_event_name: event, tool_name: tool, tool_input: input });
+
+describe("promptAction", () => {
+  const plan = "# Worktrunk data\n\nSteps...";
+  const questions = [
+    { header: "Approach", question: "Which store?", options: [] },
+    { header: "Scope", question: "Both repos?", options: [] },
+  ];
+
+  test.each<[string, string, ReturnType<typeof promptAction>]>([
+    [
+      "a plan approval raises plan",
+      hook("PreToolUse", "ExitPlanMode", { plan }),
+      { clear: false, kind: "plan", summary: "dotfiles main: approve the Worktrunk data plan" },
+    ],
+    [
+      "a plan with no heading",
+      hook("PreToolUse", "ExitPlanMode", {}),
+      { clear: false, kind: "plan", summary: "dotfiles main: approve the plan" },
+    ],
+    [
+      "a question raises question",
+      hook("PreToolUse", "AskUserQuestion", { questions: questions.slice(0, 1) }),
+      { clear: false, kind: "question", summary: "dotfiles main: Approach: Which store?" },
+    ],
+    [
+      "several questions count the rest",
+      hook("PreToolUse", "AskUserQuestion", { questions }),
+      {
+        clear: false,
+        kind: "question",
+        summary: "dotfiles main: Approach: Which store? (+1 more)",
+      },
+    ],
+    ["an approved plan clears", hook("PostToolUse", "ExitPlanMode", { plan }), { clear: true }],
+    ["an answer clears", hook("PostToolUse", "AskUserQuestion", { questions }), { clear: true }],
+    ["another tool", hook("PreToolUse", "Bash", { command: "ls" }), null],
+    ["another event", hook("PermissionRequest", "ExitPlanMode", { plan }), null],
+    ["no questions", hook("PreToolUse", "AskUserQuestion", { questions: [] }), null],
+    ["not JSON", "", null],
+  ])("%s", (_name, stdin, expected) => {
+    expect(promptAction(stdin, "dotfiles main")).toEqual(expected);
+  });
+});
+
+describe("planTitle", () => {
+  test.each<[string | undefined, string]>([
+    ["intro\n## Cleanup  board\n# Later", "the Cleanup board plan"],
+    ["no heading", "the plan"],
+    [undefined, "the plan"],
+  ])("%p", (plan, expected) => {
+    expect(planTitle(plan)).toBe(expected);
   });
 });
 
@@ -194,23 +299,37 @@ describe("openedPane", () => {
 });
 
 describe("hook marker path", () => {
-  const Hooks = z.object({
-    hooks: z.object({
-      UserPromptSubmit: z.tuple([
-        z.object({ hooks: z.tuple([z.object({ command: z.string() })]) }),
-      ]),
-    }),
-  });
+  const Group = z.tuple([z.object({ hooks: z.tuple([z.object({ command: z.string() })]) })]);
+  const Hooks = z.object({ hooks: z.object({ UserPromptSubmit: Group, Stop: Group }) });
+  const hooks = async () =>
+    Hooks.parse(await Bun.file(join(import.meta.dirname, "..", "hooks", "hooks.json")).json())
+      .hooks;
 
   test("the shell fast path resolves to markerPath()", async () => {
-    const file = Bun.file(join(import.meta.dirname, "..", "hooks", "hooks.json"));
-    const { command } = Hooks.parse(await file.json()).hooks.UserPromptSubmit[0].hooks[0];
+    const { command } = (await hooks()).UserPromptSubmit[0].hooks[0];
     const [, expr] = command.match(/\[ -f (.+?) \] &&/) ?? [];
     expect(expr).toBeDefined();
     const shell = Bun.spawnSync(["sh", "-c", `printf %s ${expr}`], {
       env: { HOME: "/h", HERDR_PANE_ID: "wE5:p1", PATH: process.env.PATH },
     });
     expect(shell.stdout.toString()).toBe(markerPath("wE5:p1", "/h"));
+  });
+
+  // Stop clears a native prompt's label but leaves a review:human request,
+  // which ends its turn while still waiting on the reviewer.
+  test.each<[string, string | null, boolean]>([
+    ["a native prompt marker", PROMPT_MARKER, true],
+    ["a review:human marker", "", false],
+    ["no marker", null, false],
+  ])("Stop clears for %s: %p", async (_name, content, clears) => {
+    const { command } = (await hooks()).Stop[0].hooks[0];
+    const guard = command.slice(0, command.indexOf(" && bun "));
+    const home = join(process.env.TMPDIR ?? "/tmp", `attention-${crypto.randomUUID()}`);
+    if (content != null) await Bun.write(markerPath("wE5:p1", home), content);
+    const shell = Bun.spawnSync(["sh", "-c", guard], {
+      env: { HOME: home, HERDR_PANE_ID: "wE5:p1", PATH: process.env.PATH },
+    });
+    expect(shell.exitCode === 0).toBe(clears);
   });
 });
 

@@ -93,7 +93,7 @@ When the context above shows a detected PR template, follow the template's struc
 1. Push the branch: `git push -u origin HEAD`
 1. Resolve every label against the repo before creating: each `--label` value, plus the review label when the gate in the local bot review step warranted a metered review that no local pass already spent. Load [`references/labels.md`](references/labels.md) for the lookup commands and for what to do when a label doesn't resolve.
 1. Draft the title and body.
-1. When `--review-body` applies, write the body to `tmp/pr-body-<branch>.md`, run `review:human --doc tmp/pr-body-<branch>.md --summary "PR body for <repo>"`, and fold the feedback into the file before creating. Inside herdr that ends the turn, and the steps below resume when the review comes back. This step reviews the body alone. Under `/ship` the diff already had its review.
+1. When `--review-body` applies, write the body to `tmp/pr-body-<branch>.md`, run `review:human --doc tmp/pr-body-<branch>.md --kind pr-body --summary "<repo> <branch>: review the PR body"`, and fold the feedback into the file before creating. Inside herdr that ends the turn, and the steps below resume when the review comes back. This step reviews the body alone. Under `/ship` the diff already had its review.
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description-file tmp/pr-body-<branch>.md`

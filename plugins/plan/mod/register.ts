@@ -20,6 +20,7 @@ function basename(path: string): string {
 
 export function register(on: On): void {
   let planFile: string | undefined;
+  let planning = false;
   let shown = false;
   let wasOver = false;
 
@@ -30,17 +31,31 @@ export function register(on: On): void {
 
   // The plan-mode reminder names the session's plan file, so sidecars beside it don't count.
   on("prompt.attachment", { type: "plan_mode" }, ($, e, next) => {
+    if (e.agentId !== undefined) return next(e);
+    planning = true;
     const path = e.detail?.planFilePath;
-    if (e.agentId === undefined && path !== undefined && path !== planFile) {
+    if (path !== undefined && path !== planFile) {
       planFile = path;
       wasOver = false;
     }
     return next(e);
   });
 
+  // Plan mode can end without ExitPlanMode, as when the user cycles out of it.
+  on("prompt.attachment", { type: "plan_mode_exit" }, ($, e, next) => {
+    if (e.agentId !== undefined) return next(e);
+    planning = false;
+    if (shown) {
+      shown = false;
+      $.ui.status(undefined);
+    }
+    return next(e);
+  });
+
   on("tool.call", { tool: ["Write", "Edit"] }, async ($, e, next) => {
     const result = await next(e);
-    if (e.file_path !== planFile || result.deny !== undefined || result.isError) return result;
+    if (!planning || e.file_path !== planFile || result.deny !== undefined || result.isError)
+      return result;
 
     let chars: number;
     try {
@@ -77,6 +92,7 @@ export function register(on: On): void {
   on("tool.call", { tool: "ExitPlanMode" }, async ($, e, next) => {
     const result = await next(e);
     const denied = result.deny !== undefined || result.isError === true;
+    if (!denied) planning = false;
     if (!denied && shown) {
       shown = false;
       $.ui.status(undefined);

@@ -98,6 +98,10 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 **Drop it** when function hooks load by default.
 
+`AGENT_BROWSER_IDLE_TIMEOUT_MS=600000` stops an `agent-browser` daemon and its Chrome after 10 idle minutes, down from the CLI's one hour. A subagent that ends or is stopped without running `close` leaves its daemon behind, and a fan-out of browser-driving subagents once left ten of them holding 8.8 GiB. The daemon takes the timeout from the environment of the command that launched it, so it covers every launch from a Claude session and none from a shell. Only Claude drives the CLI here. It is working while every session `agent-browser session list` shows was used in the last 10 minutes. It is too short if an agent's session expires mid-task, which shows as a repeated `load` mod `browser.launch` event for one session and agent.
+
+**Drop it** when the CLI's default idle timeout is 10 minutes or less.
+
 ## Hooks
 
 Why a hook entry in `user/settings.json` earns its place, and what would retire it, for the entries that ship no `README.md` of their own. The hook scripts live in [`user/hooks/`](../user/hooks).

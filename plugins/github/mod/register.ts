@@ -35,7 +35,6 @@ interface Undelivered {
 
 interface Watch {
   snapshot: Snapshot | undefined;
-  flagged: boolean;
   undelivered: Undelivered | undefined;
   error: string | undefined;
   timer: { cancel(): void } | undefined;
@@ -46,7 +45,8 @@ interface Watch {
 
 type Read = { kind: "none" } | { kind: "pr"; snapshot: Snapshot };
 
-function show($: EngineInterface, watch: Watch, line: string | undefined) {
+function show($: EngineInterface, watch: Watch, text: string | undefined) {
+  const line = text === "" ? undefined : text;
   if (line === watch.line) return;
   watch.line = line;
   $.ui.invalidate("ui.render");
@@ -146,7 +146,6 @@ async function apply(
   if (read.kind === "none") {
     show($, watch, undefined);
     watch.snapshot = undefined;
-    watch.flagged = false;
     watch.undelivered = undefined;
     return POLL_MS.idle;
   }
@@ -154,7 +153,6 @@ async function apply(
   const prev = watch.snapshot;
   if (prev === undefined || prev.pr !== next.pr) {
     emit($, "pr.tracked", { pr: next.pr, head: next.head, phase: next.phase, state: next.state });
-    watch.flagged = false;
     watch.undelivered = undefined;
   } else {
     const decisions = decide(prev, next);
@@ -168,14 +166,13 @@ async function apply(
     if (due.length > 0) {
       const isSent = await inject($, next, due, attempt);
       if (!isCurrent()) return undefined;
-      watch.flagged = isSent;
       if (!isSent && attempt < MAX_ATTEMPTS) {
         watch.undelivered = { head: next.head, decisions: due, attempts: attempt };
       }
-    } else if (decisions.some((d) => d.kind !== "review")) watch.flagged = false;
+    }
   }
   watch.snapshot = next;
-  show($, watch, statusOf(next, watch.flagged));
+  show($, watch, statusOf(next));
   return delayOf(next);
 }
 
@@ -197,7 +194,8 @@ async function poll($: EngineInterface, watch: Watch, generation: number): Promi
     watch.error = message;
     delay = POLL_MS.error;
     if (watch.snapshot !== undefined && isCurrent()) {
-      show($, watch, `${statusOf(watch.snapshot, watch.flagged)} · stale`);
+      const line = statusOf(watch.snapshot);
+      show($, watch, line === "" ? "⚠️ stale" : `${line} · ⚠️ stale`);
     }
   }
   if (!isCurrent()) return;
@@ -221,7 +219,6 @@ async function hasGh($: EngineInterface): Promise<boolean> {
 export function register(on: On): void {
   const watch: Watch = {
     snapshot: undefined,
-    flagged: false,
     undelivered: undefined,
     error: undefined,
     timer: undefined,

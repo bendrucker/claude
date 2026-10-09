@@ -143,7 +143,8 @@ function flatten(text: string): string {
 function labelOf(node: CheckNode): string {
   if (node.__typename === "StatusContext") return flatten(node.context ?? "status");
   const name = node.name ?? "check";
-  return flatten(node.workflowName ? `${node.workflowName} / ${name}` : name);
+  const workflow = node.workflowName ?? "";
+  return flatten(workflow === "" ? name : `${workflow} / ${name}`);
 }
 
 function shown(label: string): string {
@@ -259,19 +260,23 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   return paragraphs.join("\n\n");
 }
 
+const REVIEW_TAGS: Partial<Record<string, string>> = {
+  APPROVED: "✅ approved",
+  CHANGES_REQUESTED: "❗ changes requested",
+  REVIEW_REQUIRED: "👀 review needed",
+};
+
 // The footer already links the PR, so the state rides after it on that line.
-export function statusOf(snapshot: Snapshot, isFlagged: boolean): string {
-  if (snapshot.state === "MERGED") return "merged";
-  if (snapshot.state === "CLOSED") return "closed";
-  let ci: string;
-  if (snapshot.phase === "failing") ci = `CI ✗ ${listed(snapshot.failed)}`;
+// Emoji are the only color the dim footer tail keeps.
+export function statusOf(snapshot: Snapshot): string {
+  if (snapshot.state === "MERGED") return "🟣 merged";
+  if (snapshot.state === "CLOSED") return "⚫ closed";
+  const parts: string[] = [];
+  if (snapshot.phase === "failing") parts.push(`🔴 ${listed(snapshot.failed)}`);
   else if (snapshot.phase === "pending") {
-    ci = `CI ${snapshot.total - snapshot.pending}/${snapshot.total}`;
-  } else if (snapshot.phase === "passing") ci = "CI ✓";
-  else ci = "no checks";
-  const parts = [ci];
-  if (snapshot.reviewDecision === "CHANGES_REQUESTED") parts.push("changes requested");
-  else if (snapshot.reviewDecision === "APPROVED") parts.push("approved");
-  const line = parts.join(" · ");
-  return isFlagged ? `${line} → Claude` : line;
+    parts.push(`🟡 CI ${snapshot.total - snapshot.pending}/${snapshot.total}`);
+  } else if (snapshot.phase === "passing") parts.push("🟢 CI");
+  const review = REVIEW_TAGS[snapshot.reviewDecision];
+  if (review !== undefined) parts.push(review);
+  return parts.join(" · ");
 }

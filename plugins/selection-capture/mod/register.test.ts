@@ -1,0 +1,146 @@
+import type { EngineInterface, On, UiSelection } from "claude-code";
+import { describe, expect, test } from "claude-code/testing";
+
+const START = { surface: "terminal", isInteractive: true, cwd: "/wt/topic" } as const;
+
+const MESSAGES = [{ role: "assistant", text: "Pin the version instead.", toolUses: [] }];
+
+interface Host {
+  things?: boolean;
+  opens?: boolean;
+  selection?: UiSelection;
+  messagesFail?: boolean;
+}
+
+function hostOf(on: On, host: Host = {}) {
+  const runs: string[][] = [];
+  const registered: string[] = [];
+  const toasts: string[] = [];
+  const events: Parameters<EngineInterface["modEvents"]["emit"]>[0][] = [];
+  on("engine.create", async ($, e, next) => ({
+    ...(await next(e)),
+    modEvents: { emit: () => Promise.resolve() },
+  }));
+  on("modEvents.emit", ($, e) => {
+    events.push(e);
+    return { value: undefined };
+  });
+  on("session.start", ($, e) => ({ cwd: e.cwd }));
+  on("session.id", () => ({ value: "s1" }));
+  on("session.root", () => ({ value: "/wt/topic" }));
+  on("session.messages", () => {
+    if (host.messagesFail === true) throw new Error("transcript unavailable");
+    return { value: MESSAGES };
+  });
+  on("ui.selection", () => ({ value: host.selection }));
+  on("ui.toast", ($, e) => {
+    toasts.push(e.text);
+    return { value: undefined };
+  });
+  on("ui.log", () => ({ value: undefined }));
+  on("command.register", ($, e) => {
+    registered.push(e.name);
+    return { value: { command: e.name } };
+  });
+  on("command.run", () => ({ text: "core" }));
+  on("process.run", ($, e) => {
+    runs.push([...e.argv]);
+    const [bin] = e.argv;
+    if (bin === "git") return { value: { exitCode: 0, stdout: "/src/repo/.git\n", stderr: "" } };
+    if (bin === "mdfind") {
+      const stdout = host.things === false ? "" : "/Applications/Things3.app\n";
+      return { value: { exitCode: 0, stdout, stderr: "" } };
+    }
+    return { value: { exitCode: host.opens === false ? 1 : 0, stdout: "", stderr: "no handler" } };
+  });
+  return { runs, registered, toasts, events };
+}
+
+function opened(runs: string[][]): string | undefined {
+  return runs.find(([bin]) => bin === "open")?.at(-1);
+}
+
+describe("register", () => {
+  test("registers /things only when Things is installed", async ($, on) => {
+    const host = hostOf(on, { things: false });
+    await $.session.start(START);
+    expect(host.registered).toEqual(["linear"]);
+    expect(host.events).toEqual([
+      { mod: "selection-capture", event: "session.start", detail: { things: false } },
+    ]);
+  });
+
+  test("/things opens a Things to-do in the background, launching from the main repo", async ($, on) => {
+    const host = hostOf(on, { selection: { text: "Pin the version" } });
+    await $.session.start(START);
+    const result = await $.command.run({ command: "things", args: "" });
+
+    expect(result.text).toBe("Things to-do: Pin the version");
+    expect(host.toasts).toEqual(["Things to-do: Pin the version"]);
+    expect(host.runs.find(([, flag]) => flag === "-g")).toBeDefined();
+    const url = decodeURIComponent(opened(host.runs) ?? "");
+    expect(url).toContain("things:///add?title=Pin the version");
+    expect(url).toContain("From Claude:");
+    expect(url).toContain("cwd=%2Fsrc%2Frepo");
+    expect(host.events.at(-1)).toMatchObject({
+      event: "capture",
+      ok: true,
+      detail: { target: "things", outcome: "opened", chars: 15, row: "Claude", titled: false },
+    });
+  });
+
+  test("/linear opens a prefilled issue titled by its argument", async ($, on) => {
+    const host = hostOf(on, { selection: { text: "Pin the version" } });
+    await $.session.start(START);
+    const result = await $.command.run({ command: "linear", args: "Pin bun" });
+
+    expect(result.text).toBe("Linear draft: Pin bun");
+    expect(opened(host.runs)).toMatch(/^https:\/\/linear\.new\?title=Pin%20bun&/);
+  });
+
+  test("with nothing selected, says so and opens nothing", async ($, on) => {
+    const host = hostOf(on);
+    await $.session.start(START);
+    const result = await $.command.run({ command: "things", args: "" });
+
+    expect(result.text).toContain("Nothing selected");
+    expect(opened(host.runs)).toBeUndefined();
+    expect(host.events.at(-1)).toMatchObject({
+      event: "capture",
+      ok: false,
+      detail: { target: "things", outcome: "no-selection" },
+    });
+  });
+
+  test("when open fails, prints the capture instead", async ($, on) => {
+    const host = hostOf(on, { selection: { text: "Pin the version" }, opens: false });
+    await $.session.start(START);
+    const result = await $.command.run({ command: "linear", args: "" });
+
+    expect(result.text).toContain("Could not open the Linear draft");
+    expect(result.text).toContain("> Pin the version");
+    expect(host.events.at(-1)).toMatchObject({
+      ok: false,
+      detail: { target: "linear", outcome: "open-failed", titled: false },
+    });
+  });
+
+  test("a failure before opening still logs the capture", async ($, on) => {
+    const host = hostOf(on, { selection: { text: "Pin the version" }, messagesFail: true });
+    await $.session.start(START);
+    const result = await $.command.run({ command: "linear", args: "" });
+
+    expect(result.text).toContain("Could not capture the Linear draft");
+    expect(opened(host.runs)).toBeUndefined();
+    expect(host.events.at(-1)).toMatchObject({
+      ok: false,
+      detail: { target: "linear", outcome: "error" },
+    });
+  });
+
+  test("leaves other commands to the engine", async ($, on) => {
+    hostOf(on);
+    await $.session.start(START);
+    expect((await $.command.run({ command: "help", args: "" })).text).toBe("core");
+  });
+});

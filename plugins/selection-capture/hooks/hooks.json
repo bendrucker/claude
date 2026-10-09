@@ -1,0 +1,4 @@
+{
+  "description": "Registers /things and /linear, which capture the mouse selection and its transcript row with a link back to Claude Code",
+  "modules": ["../mod/register.ts"]
+}

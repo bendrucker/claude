@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { realpathSync } from "node:fs";
+import { realpath } from "../../scripts/realpath";
 import { basename, dirname, join, relative } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -15,21 +15,6 @@ import { timeHook } from "../../scripts/hook-metrics";
 const MountInput = z.looseObject({ mountPath: z.string().optional().catch(undefined) });
 
 const GitPaths = z.tuple([z.string(), z.string(), z.string()]);
-
-function realpath(path: string): string | null {
-  try {
-    return realpathSync(path);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      "code" in error &&
-      (error.code === "ENOENT" || error.code === "ENOTDIR")
-    ) {
-      return null;
-    }
-    throw error;
-  }
-}
 
 // A mount path's directory may not exist yet, so resolve the closest ancestor
 // that does and carry the rest of the path over unresolved.
@@ -66,7 +51,7 @@ function checkoutOf(dir: string): Checkout | null {
   if (result.exitCode !== 0) return null;
   const parsed = GitPaths.safeParse(result.stdout.toString().trim().split("\n"));
   if (!parsed.success) return null;
-  const [toplevel, gitDir, commonDir] = parsed.data.map((p) => realpathSync(p));
+  const [toplevel, gitDir, commonDir] = parsed.data.map(realpath);
   if (toplevel == null || gitDir == null || commonDir == null) return null;
   return {
     toplevel,

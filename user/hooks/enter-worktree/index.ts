@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { realpathSync } from "node:fs";
+import { realpath } from "../../scripts/realpath";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
@@ -28,21 +28,6 @@ const WorktreeState = z.looseObject({
   type: z.literal("worktree-state"),
   worktreeSession: z.looseObject({ worktreePath: z.string() }).nullable(),
 });
-
-function realpath(path: string): string | null {
-  try {
-    return realpathSync(path);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      "code" in error &&
-      (error.code === "ENOENT" || error.code === "ENOTDIR")
-    ) {
-      return null;
-    }
-    throw error;
-  }
-}
 
 function gitCommonDir(dir: string): string | null {
   const result = Bun.spawnSync(

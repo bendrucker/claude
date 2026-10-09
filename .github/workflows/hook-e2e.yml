@@ -24,7 +24,7 @@ jobs:
       - name: Install Claude Code CLI
         id: cli
         background: true
-        run: curl -fsSL https://claude.ai/install.sh | bash
+        run: .github/actions/claude-code/install.sh
 
       - uses: ./.github/actions/bun-install
 

@@ -76,7 +76,11 @@ describe("processInput", () => {
 
 describe("denyReason", () => {
   it("gives the link command when the main checkout is known", () => {
-    expect(denyReason("/w/.env", "/m/.env")).toContain("`ln -s /m/.env /w/.env`");
+    expect(denyReason("/w/.env", "/m/.env")).toContain("`ln -s '/m/.env' '/w/.env'`");
+  });
+
+  it("quotes paths holding spaces and single quotes", () => {
+    expect(denyReason("/w x/.env", "/m'1/.env")).toContain(`\`ln -s '/m'\\''1/.env' '/w x/.env'\``);
   });
 
   it("falls back to general guidance for a bare repository", () => {

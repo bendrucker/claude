@@ -75,6 +75,10 @@ function checkoutOf(dir: string): Checkout | null {
   };
 }
 
+function shellQuote(path: string): string {
+  return `'${path.replaceAll("'", `'\\''`)}'`;
+}
+
 export function denyReason(mountPath: string, source: string | null): string {
   const base = `\`${mountPath}\` is inside a linked git worktree. A 1Password destination there outlives the worktree and blocks Bash in every session rooted above it.`;
   if (source == null) {
@@ -83,7 +87,7 @@ export function denyReason(mountPath: string, source: string | null): string {
   return [
     base,
     `Mount at the main checkout's \`${source}\` instead, skipping that if \`list_local_env_files\` already shows it.`,
-    `Then link it into this worktree: \`ln -s ${source} ${mountPath}\`.`,
+    `Then link it into this worktree: \`ln -s ${shellQuote(source)} ${shellQuote(mountPath)}\`.`,
   ].join(" ");
 }
 

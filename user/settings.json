@@ -240,6 +240,15 @@
         ]
       },
       {
+        "matcher": "mcp__plugin_1password_1password__create_local_env_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun ~/.claude/hooks/onepassword-mount"
+          }
+        ]
+      },
+      {
         "matcher": "*",
         "hooks": [
           {

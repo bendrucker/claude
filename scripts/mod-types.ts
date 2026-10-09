@@ -41,6 +41,22 @@ export function modPlugins(plugins: Plugin[]): { mods: Plugin[]; load: Plugin[] 
   return { mods, load: [...load.values()] };
 }
 
+/**
+ * The model-free `claude -p` run that loads `load` and writes their types. From
+ * 2.1.295, `-p` writes types only into watched plugin dirs, so the run turns the watch on.
+ */
+export function typesRun(
+  load: Plugin[],
+  configDir: string,
+  env: Record<string, string | undefined> = process.env,
+): { cmd: string[]; env: Record<string, string | undefined> } {
+  return {
+    // `/cost` answers locally, so the load writes the types without auth or a model call.
+    cmd: ["claude", "-p", ...load.flatMap((plugin) => ["--plugin-dir", plugin.dir ?? ""]), "/cost"],
+    env: { ...env, CLAUDE_CONFIG_DIR: configDir, CLAUDE_CODE_PLUGIN_DIR_WATCH: "1" },
+  };
+}
+
 if (import.meta.main) {
   if (Bun.which("claude") === null) {
     console.error("claude is not on PATH. Install Claude Code to generate mod engine types.");
@@ -53,16 +69,8 @@ if (import.meta.main) {
   const scratch = await mkdtemp(join(tmpdir(), "mod-types-"));
   let exitCode: number;
   try {
-    // `/cost` answers locally, so the load writes the types without auth or a model call.
-    const proc = Bun.spawn(
-      ["claude", "-p", ...load.flatMap((plugin) => ["--plugin-dir", plugin.dir ?? ""]), "/cost"],
-      {
-        cwd: scratch,
-        env: { ...process.env, CLAUDE_CONFIG_DIR: scratch },
-        stdout: "ignore",
-        stderr: "inherit",
-      },
-    );
+    const { cmd, env } = typesRun(load, scratch);
+    const proc = Bun.spawn(cmd, { cwd: scratch, env, stdout: "ignore", stderr: "inherit" });
     exitCode = await proc.exited;
   } finally {
     await rm(scratch, { recursive: true, force: true });

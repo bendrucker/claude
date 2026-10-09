@@ -39,9 +39,9 @@ Scopes combine rather than replace, so that run still carries the deployed file'
 
 ## Sandbox
 
-`excludedCommands` matches each command in a Bash invocation's top-level chain, the positions separated by `&&`, `;`, or a newline. One match anywhere in that chain exempts the entire invocation, non-matching commands included, so `cd <dir> && git <subcommand>` keeps the `git:*` exemption and needs no sandbox bypass. A verb reached only through `$(...)` does not match, and a command spawned by a non-exempt wrapper stays sandboxed. A wrapper that hands off to Apple Events or Launch Services needs a full skip via the `mac` plugin's marker hook, covered in [`scripts.md`](scripts.md).
+`excludedCommands` matches each command in a Bash invocation's top-level chain, the positions separated by `&&`, `;`, a newline, or a pipe. The invocation escapes only when every command in that chain matches, so `cd <dir> && git <subcommand>` and `git push 2>&1 | tail` both run sandboxed. Run `git` bare from the session's directory when it must escape. A verb reached only through `$(...)` does not match, and a command spawned by a non-exempt wrapper stays sandboxed. A wrapper that hands off to Apple Events or Launch Services needs a full skip via the `mac` plugin's marker hook, covered in [`scripts.md`](scripts.md).
 
-Because the exemption covers the whole invocation and outranks `filesystem` denies, every entry is a full sandbox escape for any command that mentions it. Weigh a new one against that reach. Verified against CLI 2.1.263, so re-probe before trusting it on a later build.
+Because the escape outranks `filesystem` denies, every entry is a full sandbox escape for any invocation made only of matching commands. Weigh a new one against that reach. Verified against CLI 2.1.294, so re-probe before trusting it on a later build.
 
 `filesystem.allowWrite` cannot narrow a deny, because a broad deny always wins. `~/.claude/plugins`, `~/.claude/jobs`, and `~/.claude/projects` are denied, so any entry beneath them is inert. Do not add one.
 

@@ -1,0 +1,9 @@
+{
+  "name": "load",
+  "description": "Keep Claude-driven browsers and builds from saturating the machine",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  },
+  "dependencies": ["mod-events"]
+}

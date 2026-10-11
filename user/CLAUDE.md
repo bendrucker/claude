@@ -39,7 +39,7 @@ Investigate in auto mode until the approach is settled, then enter plan mode to 
 
 ## Decisions
 
-Put every decision I have to confirm (a checkpoint, an approval, a choice between options) to me in Plannotator. It replaces asking in chat or with `AskUserQuestion`, including where a skill says to use `AskUserQuestion`. Write `tmp/<topic>.md` with one `:::question` block per decision, `- [ ]` choices, and a `Recommended:` line. The `plannotator` skill has the syntax. Open it with `plannotator annotate <file> --gate --json`, using `run_in_background` and a `7200000` timeout, then end the turn. Use the `plannotator` tool instead when one is loaded. Plan approval stays with the `ExitPlanMode` hook. Inside plan mode, where the file can't be written, keep `AskUserQuestion`.
+Ask a simple decision (a confirmation, an approval, a multiple-choice pick) with `AskUserQuestion`. It reaches me on Moshi and Remote Control. Use Plannotator when the decision lives inside a document I should read and mark up, such as a proposal, an analysis, or a draft with questions mixed in. Once I answer in chat while a gate is open, stop opening gates for the rest of the session. For a Plannotator decision, write `tmp/<topic>.md` with one `:::question` block per decision, `- [ ]` choices, and a `Recommended:` line. The `plannotator` skill has the syntax. Open it with `plannotator annotate <file> --gate --json`, using `run_in_background` and a `7200000` timeout, then end the turn. Use the `plannotator` tool instead when one is loaded. Plan approval stays with the `ExitPlanMode` hook.
 
 ## Check-ins
 

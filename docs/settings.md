@@ -74,7 +74,7 @@ The rest are tool caches and state directories holding no credential material:
 
 ## Escaped Commands
 
-`excludedCommands` entries run outside the sandbox. An invocation escapes only when every command in its chain matches an entry, pipeline members included, so `git push -u origin HEAD 2>&1 | tail` and `git config ... && echo` both run sandboxed because `tail` and `echo` match nothing. The escape outranks the `filesystem` denies, so an entry grants far more than the one verb it names. `git:*` means any invocation made only of `git` commands writes anywhere on disk. Judge a candidate on that reach.
+`excludedCommands` entries run outside the sandbox. An invocation escapes only when every command in its chain matches an entry, pipeline members included, so `git push -u origin HEAD 2>&1 | tail` and `git config ... && echo` both run sandboxed because `tail` and `echo` match nothing. A global option before the subcommand misses too, so the `git` plugin's HTTPS push fallback (`git -c credential.helper=... push`) runs sandboxed. The escape outranks the `filesystem` denies, so an entry grants far more than the one verb it names. `git:*` means any invocation made only of `git` commands writes anywhere on disk. Judge a candidate on that reach.
 
 - Self-authenticating network tools: `git`, `linear`, `aws`, `gcloud`, `az`, `pulumi`, `ssh`, `scp`, `rsync`, `docker`. Each carries its own auth and already reaches the network.
 - macOS host integration (`mac` plugin): `open`, `osascript`, `shortcuts`, `pbcopy`, `pbpaste`, `security`, `defaults`, `screencapture`, `say`, `afplay`, `diskutil`, `networksetup`, `dscl`. Host APIs the sandbox cannot model.

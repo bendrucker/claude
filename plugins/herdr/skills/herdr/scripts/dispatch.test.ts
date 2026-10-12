@@ -35,6 +35,8 @@ const WORKTREE = ok(
     },
   }),
 );
+// herdr's create, then the two config writes that point tracking at origin.
+const CREATED = [WORKTREE, ok(""), ok("")];
 const STARTED = ok(JSON.stringify({ result: { agent: { agent_status: "idle" } } }));
 const BASE_OK = ok("abc123\n");
 const AGENT_GET = ok(
@@ -84,7 +86,7 @@ const HAPPY_PATH = [
   ...REMOTES,
   ok(""),
   BASE_OK,
-  WORKTREE,
+  ...CREATED,
   STARTED,
   ok(""),
   AGENT_GET,
@@ -210,6 +212,15 @@ describe("dispatch", () => {
         "fix-thing",
         "--no-focus",
       ],
+      ["git", "-C", "/tmp/worktrees/demo/fix-thing", "config", "branch.fix-thing.remote", "origin"],
+      [
+        "git",
+        "-C",
+        "/tmp/worktrees/demo/fix-thing",
+        "config",
+        "branch.fix-thing.merge",
+        "refs/heads/fix-thing",
+      ],
       ["herdr", "agent", "start", "fix-thing", "--kind", "claude", "--pane", "wZZ:p1"],
       [
         "herdr",
@@ -240,8 +251,9 @@ describe("dispatch", () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
+      ok("origin\n"),
       BASE_OK,
-      WORKTREE,
+      ...CREATED,
       STARTED,
       ok(""),
       AGENT_GET,
@@ -253,6 +265,39 @@ describe("dispatch", () => {
       "/repo",
       "fetch",
     ]);
+  });
+
+  test("leaves tracking alone when the repository has no origin", async () => {
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      ok("upstream\n"),
+      BASE_OK,
+      WORKTREE,
+      STARTED,
+      ok(""),
+      AGENT_GET,
+    ]);
+    await dispatch({ ...options, base: "release-2026" }, run);
+    expect(calls.filter((argv) => argv[3] === "config")).toEqual([]);
+  });
+
+  test("starts the agent when recording tracking fails", async () => {
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      ...REMOTES,
+      ok(""),
+      BASE_OK,
+      WORKTREE,
+      fail("error: could not lock config file"),
+      STARTED,
+      ok(""),
+      AGENT_GET,
+    ]);
+    const { record } = await dispatch(options, run);
+    expect(calls.filter((argv) => argv[3] === "config")).toHaveLength(1);
+    expect(record.status).toBe("working");
   });
 
   test("fetches the remote the base names", async () => {
@@ -303,7 +348,7 @@ describe("dispatch", () => {
       ...REMOTES,
       ok(""),
       BASE_OK,
-      WORKTREE,
+      ...CREATED,
       fail(stderr),
     ]);
 
@@ -331,7 +376,7 @@ describe("dispatch", () => {
       ...REMOTES,
       ok(""),
       BASE_OK,
-      WORKTREE,
+      ...CREATED,
       fail(envelope("agent_not_ready")),
       blocked,
     ]);
@@ -358,7 +403,7 @@ describe("dispatch", () => {
         ...REMOTES,
         ok(""),
         BASE_OK,
-        WORKTREE,
+        ...CREATED,
         STARTED,
         fail(envelope(code)),
         idle,
@@ -396,7 +441,7 @@ describe("dispatch", () => {
       ...REMOTES,
       ok(""),
       BASE_OK,
-      WORKTREE,
+      ...CREATED,
       fail(envelope("agent_name_taken")),
       relisted,
       STARTED,
@@ -418,7 +463,7 @@ describe("dispatch", () => {
       ...REMOTES,
       ok(""),
       BASE_OK,
-      WORKTREE,
+      ...CREATED,
       fail(envelope("agent_name_taken")),
       took("fix-thing"),
       fail(envelope("agent_name_taken")),
@@ -442,7 +487,7 @@ describe("dispatch", () => {
       ...REMOTES,
       ok(""),
       BASE_OK,
-      WORKTREE,
+      ...CREATED,
       fail(taken),
       took,
       fail(taken),
@@ -463,7 +508,7 @@ describe("dispatch", () => {
       ...REMOTES,
       ok(""),
       BASE_OK,
-      WORKTREE,
+      ...CREATED,
       ok(JSON.stringify({ result: { agent: { agent_status: "working" } } })),
       ok(""),
       ok(""),
@@ -491,7 +536,7 @@ describe("dispatch", () => {
       ...REMOTES,
       ok(""),
       BASE_OK,
-      WORKTREE,
+      ...CREATED,
       ok(JSON.stringify({ result: { agent: { agent_status: "working" } } })),
       fail(envelope("timeout")),
       AGENT_GET,
@@ -510,7 +555,7 @@ describe("dispatch", () => {
       ...REMOTES,
       ok(""),
       BASE_OK,
-      WORKTREE,
+      ...CREATED,
       fail(stderr),
     ]);
 
@@ -529,7 +574,7 @@ describe("dispatch", () => {
       ...REMOTES,
       ok(""),
       BASE_OK,
-      WORKTREE,
+      ...CREATED,
       fail(stderr),
     ]);
 

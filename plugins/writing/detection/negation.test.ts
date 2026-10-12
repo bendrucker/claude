@@ -152,9 +152,9 @@ describe("notNegationHits", () => {
 });
 
 describe("NO_NEGATION_PATTERN", () => {
-  it("asks for the positive term ahead of verb negation", () => {
+  it("asks for verb negation ahead of the positive term", () => {
     const message = NO_NEGATION_PATTERN.message("holds no controls");
     expect(message).toContain("holds no controls");
-    expect(message.indexOf("a no-op")).toBeLessThan(message.indexOf("verb negation"));
+    expect(message.indexOf("doesn't")).toBeLessThan(message.indexOf("a no-op"));
   });
 });

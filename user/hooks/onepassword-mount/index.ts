@@ -19,6 +19,8 @@ const Cwd = z.looseObject({ cwd: z.string().optional().catch(undefined) });
 
 const GitPaths = z.tuple([z.string(), z.string(), z.string()]);
 
+const WorktreeRecord = z.tuple([z.string().startsWith("worktree ")], z.string());
+
 // A mount path's directory may not exist yet, so resolve the closest ancestor
 // that does and carry the rest of the path over unresolved.
 function resolveFromAncestor(path: string): { dir: string; resolved: string } {
@@ -72,10 +74,10 @@ function enclosingLinkedWorktree(dir: string): Checkout | null {
 // The first `git worktree list` entry is the main checkout, flagged `bare`
 // when the repository has none.
 function mainCheckout(dir: string): string | null {
-  const first = git(dir, "worktree", "list", "--porcelain")?.split("\n\n")[0]?.split("\n");
-  if (first == null || first.includes("bare")) return null;
-  const path = first.find((line) => line.startsWith("worktree "))?.slice("worktree ".length);
-  return path == null ? null : realpath(path);
+  const out = git(dir, "worktree", "list", "--porcelain");
+  const record = WorktreeRecord.safeParse(out?.split("\n\n")[0]?.split("\n"));
+  if (!record.success || record.data.includes("bare")) return null;
+  return realpath(record.data[0].slice("worktree ".length));
 }
 
 function shellQuote(path: string): string {

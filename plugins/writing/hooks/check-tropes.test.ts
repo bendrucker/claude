@@ -461,6 +461,17 @@ describe("Bash processInput", () => {
     expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
   });
 
+  it("denies an MR body that negates the noun", async () => {
+    const result = await processInput(
+      mockBash(
+        `glab mr create --description "The handler reads the cache, so the event costs no extra query."`,
+      ),
+    );
+    const denial = denialOf(result);
+    expect(denial.decision).toBe("deny");
+    expect(denial.reason).toContain("costs no extra");
+  });
+
   it("allows a comment that opens with a connective", async () => {
     const result = await processInput(
       mockBash(`glab mr note 871 --message "Otherwise, this looks right."`),

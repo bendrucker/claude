@@ -2,7 +2,7 @@
 
 import { realpath } from "../../scripts/realpath";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { type HookInput, readHookInput } from "../../scripts/hook-input";
@@ -34,33 +34,48 @@ function resolveFromAncestor(path: string): { dir: string; resolved: string } {
 interface Checkout {
   toplevel: string;
   linked: boolean;
-  main: string | null;
+}
+
+function git(dir: string, ...args: string[]): string | null {
+  const result = Bun.spawnSync(["git", "-C", dir, ...args], { stdout: "pipe", stderr: "ignore" });
+  return result.exitCode === 0 ? result.stdout.toString().trim() : null;
 }
 
 function checkoutOf(dir: string): Checkout | null {
-  const result = Bun.spawnSync(
-    [
-      "git",
-      "-C",
-      dir,
-      "rev-parse",
-      "--path-format=absolute",
-      "--show-toplevel",
-      "--git-dir",
-      "--git-common-dir",
-    ],
-    { stdout: "pipe", stderr: "ignore" },
+  const out = git(
+    dir,
+    "rev-parse",
+    "--path-format=absolute",
+    "--show-toplevel",
+    "--git-dir",
+    "--git-common-dir",
   );
-  if (result.exitCode !== 0) return null;
-  const parsed = GitPaths.safeParse(result.stdout.toString().trim().split("\n"));
+  const parsed = GitPaths.safeParse(out?.split("\n"));
   if (!parsed.success) return null;
   const [toplevel, gitDir, commonDir] = parsed.data.map(realpath);
   if (toplevel == null || gitDir == null || commonDir == null) return null;
-  return {
-    toplevel,
-    linked: gitDir !== commonDir,
-    main: basename(commonDir) === ".git" ? dirname(commonDir) : null,
-  };
+  return { toplevel, linked: gitDir !== commonDir };
+}
+
+// A submodule or nested repository inside a linked worktree is its own main
+// checkout, yet removing the outer worktree still removes the destination.
+function enclosingLinkedWorktree(dir: string): Checkout | null {
+  let checkout = checkoutOf(dir);
+  while (checkout != null && !checkout.linked) {
+    const parent = dirname(checkout.toplevel);
+    if (parent === checkout.toplevel) return null;
+    checkout = checkoutOf(parent);
+  }
+  return checkout;
+}
+
+// The first `git worktree list` entry is the main checkout, flagged `bare`
+// when the repository has none.
+function mainCheckout(dir: string): string | null {
+  const first = git(dir, "worktree", "list", "--porcelain")?.split("\n\n")[0]?.split("\n");
+  if (first == null || first.includes("bare")) return null;
+  const path = first.find((line) => line.startsWith("worktree "))?.slice("worktree ".length);
+  return path == null ? null : realpath(path);
 }
 
 function shellQuote(path: string): string {
@@ -88,11 +103,11 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
   const mountPath = isAbsolute(expanded) ? expanded : resolve(cwd ?? "/", expanded);
 
   const { dir, resolved } = resolveFromAncestor(mountPath);
-  const checkout = checkoutOf(dir);
-  if (checkout == null || !checkout.linked) return null;
+  const checkout = enclosingLinkedWorktree(dir);
+  if (checkout == null) return null;
 
-  const source =
-    checkout.main == null ? null : join(checkout.main, relative(checkout.toplevel, resolved));
+  const mainPath = mainCheckout(checkout.toplevel);
+  const source = mainPath == null ? null : join(mainPath, relative(checkout.toplevel, resolved));
 
   return {
     hookSpecificOutput: {

@@ -82,6 +82,22 @@ test("resolves a relative mount path against the session cwd", () => {
   );
 });
 
+test("denies a repository nested inside a linked worktree", () => {
+  const nested = join(worktree, "vendor", "lib");
+  git("init", "-q", nested);
+  const mountPath = join(nested, ".env");
+  expect(reasonFor(mountPath)).toBe(denyReason(mountPath, join(main, "vendor", "lib", ".env")));
+});
+
+test("gives general guidance for a worktree of a bare repository", () => {
+  const bare = join(root, "bare.git");
+  const bareWorktree = join(root, "bare-feature");
+  git("clone", "-q", "--bare", main, bare);
+  git("-C", bare, "worktree", "add", "-q", "-b", "bare-feature", bareWorktree);
+  const mountPath = join(bareWorktree, ".env");
+  expect(reasonFor(mountPath)).toBe(denyReason(mountPath, null));
+});
+
 describe("denyReason", () => {
   it("gives the link command when the main checkout is known", () => {
     expect(denyReason("/w/.env", "/m/.env")).toContain("`ln -s '/m/.env' '/w/.env'`");

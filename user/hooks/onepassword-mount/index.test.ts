@@ -15,17 +15,19 @@ function git(...args: string[]): void {
   if (result.exitCode !== 0) throw new Error(result.stderr.toString());
 }
 
-function mountInput(mountPath: unknown): HookInput {
-  return {
+function mountInput(mountPath: unknown, cwd?: string): HookInput {
+  const input: HookInput = {
     session_id: "test",
     hook_event_name: "PreToolUse",
     tool_name: "mcp__plugin_1password_1password__create_local_env_file",
     tool_input: { environmentName: "app", mountPath },
   };
+  if (cwd != null) input.cwd = cwd;
+  return input;
 }
 
-function reasonFor(mountPath: string): string | undefined {
-  const output = processInput(mountInput(mountPath));
+function reasonFor(mountPath: string, cwd?: string): string | undefined {
+  const output = processInput(mountInput(mountPath, cwd));
   const specific = output?.hookSpecificOutput;
   return specific?.hookEventName === "PreToolUse" ? specific.permissionDecisionReason : undefined;
 }
@@ -59,7 +61,7 @@ describe("processInput", () => {
   test.each<{ name: string; mountPath: () => string | undefined }>([
     { name: "main checkout", mountPath: () => join(main, ".env") },
     { name: "outside any repository", mountPath: () => join(root, ".env") },
-    { name: "relative path", mountPath: () => ".env" },
+    { name: "relative path without a cwd", mountPath: () => ".env" },
     { name: "missing path", mountPath: () => undefined },
   ])("allows $name", ({ mountPath }) => {
     expect(processInput(mountInput(mountPath()))).toBeNull();
@@ -72,6 +74,12 @@ describe("processInput", () => {
     const mountPath = join(worktree, ...segments);
     expect(reasonFor(mountPath)).toBe(denyReason(mountPath, join(main, ...segments)));
   });
+});
+
+test("resolves a relative mount path against the session cwd", () => {
+  expect(reasonFor(".dev.vars", worktree)).toBe(
+    denyReason(join(worktree, ".dev.vars"), join(main, ".dev.vars")),
+  );
 });
 
 describe("denyReason", () => {

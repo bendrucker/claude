@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 
 import { realpath } from "../../scripts/realpath";
-import { basename, dirname, join, relative } from "node:path";
+import { homedir } from "node:os";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { type HookInput, readHookInput } from "../../scripts/hook-input";
@@ -13,6 +14,8 @@ import { timeHook } from "../../scripts/hook-metrics";
 // someone deletes it by hand in the 1Password app.
 
 const MountInput = z.looseObject({ mountPath: z.string().optional().catch(undefined) });
+
+const Cwd = z.looseObject({ cwd: z.string().optional().catch(undefined) });
 
 const GitPaths = z.tuple([z.string(), z.string(), z.string()]);
 
@@ -77,8 +80,12 @@ export function denyReason(mountPath: string, source: string | null): string {
 }
 
 export function processInput(input: HookInput): SyncHookJSONOutput | null {
-  const mountPath = MountInput.safeParse(input.tool_input).data?.mountPath;
-  if (mountPath == null || !mountPath.startsWith("/")) return null;
+  const raw = MountInput.safeParse(input.tool_input).data?.mountPath;
+  if (raw == null || raw === "") return null;
+  const expanded = raw.startsWith("~/") ? join(homedir(), raw.slice(2)) : raw;
+  const cwd = Cwd.safeParse(input).data?.cwd;
+  if (!isAbsolute(expanded) && cwd == null) return null;
+  const mountPath = isAbsolute(expanded) ? expanded : resolve(cwd ?? "/", expanded);
 
   const { dir, resolved } = resolveFromAncestor(mountPath);
   const checkout = checkoutOf(dir);

@@ -1,5 +1,5 @@
 {
-  "description": "Clear the pane's review-requested label when the reviewer replies",
+  "description": "Label the pane while a review, plan approval, or question waits on the reviewer, and clear it once answered",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -7,6 +7,38 @@
           {
             "type": "command",
             "command": "[ -n \"$HERDR_PANE_ID\" ] && [ -f \"$HOME/.cache/claude/review-human/$(printf %s \"$HERDR_PANE_ID\" | tr : -)\" ] && bun \"${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts\" clear; exit 0"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ExitPlanMode|AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"$HERDR_PANE_ID\" ] && bun \"${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts\" prompt; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "ExitPlanMode|AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"$HERDR_PANE_ID\" ] && bun \"${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts\" prompt; exit 0"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"$HERDR_PANE_ID\" ] && grep -qsx prompt \"$HOME/.cache/claude/review-human/$(printf %s \"$HERDR_PANE_ID\" | tr : -)\" && bun \"${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts\" clear; exit 0"
           }
         ]
       }

@@ -138,7 +138,7 @@ describe("register", () => {
       phase: "pending",
       state: "OPEN",
     });
-    expect(await w.shown($)).toBe("🟡 CI 0/1");
+    expect(await w.shown($)).toBe("\u{f444} CI 0/1");
 
     world.view = pr("FAILURE");
     await w.clock.advance(POLL_MS.pending);
@@ -151,7 +151,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(await w.shown($)).toBe("🔴 ci / test");
+    expect(await w.shown($)).toBe("\u{f52f} ci / test");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -160,7 +160,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(await w.shown($)).toBe("🟢 CI");
+    expect(await w.shown($)).toBe("\u{f49e} CI");
   });
 
   test("requested changes wake the model and a comment review does not", async ($, on) => {
@@ -192,7 +192,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
 
     expect(w.submits.length).toBe(1);
-    expect(await w.shown($)).toBe("🔴 ci / test");
+    expect(await w.shown($)).toBe("\u{f52f} ci / test");
   });
 
   test("stays idle without gh", async ($, on) => {
@@ -251,7 +251,7 @@ describe("register", () => {
     world.branch = "master";
     await w.clock.advance(POLL_MS.idle);
     expect(w.views.length).toBe(1);
-    expect(await w.shown($)).toBe("🟡 CI 0/1");
+    expect(await w.shown($)).toBe("\u{f444} CI 0/1");
   });
 
   test("a repeated gh failure is logged once and backs off", async ($, on) => {
@@ -403,6 +403,6 @@ describe("register", () => {
     world.view = "HTTP 401: Bad credentials";
     await w.clock.advance(POLL_MS.settled);
 
-    expect(await w.shown($)).toBe("🔴 ci / test · ⚠️ stale");
+    expect(await w.shown($)).toBe("\u{f52f} ci / test · \u{f421} stale");
   });
 });

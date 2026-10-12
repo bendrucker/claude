@@ -1,5 +1,6 @@
 import type { EngineInterface, On } from "claude-code";
 import {
+  STALE,
   type Promoted,
   type Snapshot,
   VIEW_FIELDS,
@@ -195,7 +196,7 @@ async function poll($: EngineInterface, watch: Watch, generation: number): Promi
     delay = POLL_MS.error;
     if (watch.snapshot !== undefined && isCurrent()) {
       const line = statusOf(watch.snapshot);
-      show($, watch, line === "" ? "⚠️ stale" : `${line} · ⚠️ stale`);
+      show($, watch, line === "" ? STALE : `${line} · ${STALE}`);
     }
   }
   if (!isCurrent()) return;

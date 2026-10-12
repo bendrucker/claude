@@ -177,18 +177,26 @@ describe("labels", () => {
 describe("statusOf", () => {
   const passed = [run("a", "COMPLETED", "SUCCESS")];
   const cases: [string, Partial<PrView>, string][] = [
-    ["running", { statusCheckRollup: [run("b", "IN_PROGRESS"), ...passed] }, "🟡 CI 1/2"],
-    ["failing", { statusCheckRollup: [run("a", "COMPLETED", "FAILURE")] }, "🔴 ci / a"],
+    ["running", { statusCheckRollup: [run("b", "IN_PROGRESS"), ...passed] }, "\u{f444} CI 1/2"],
+    ["failing", { statusCheckRollup: [run("a", "COMPLETED", "FAILURE")] }, "\u{f52f} ci / a"],
     ["no checks and no review", {}, ""],
     [
       "review needed",
       { statusCheckRollup: passed, reviewDecision: "REVIEW_REQUIRED" },
-      "🟢 CI · 👀 review needed",
+      "\u{f49e} CI · \u{f441} review needed",
     ],
-    ["approved", { statusCheckRollup: passed, reviewDecision: "APPROVED" }, "🟢 CI · ✅ approved"],
-    ["changes requested", { reviewDecision: "CHANGES_REQUESTED" }, "❗ changes requested"],
-    ["merged", { state: "MERGED", statusCheckRollup: [run("a", "IN_PROGRESS")] }, "🟣 merged"],
-    ["closed", { state: "CLOSED" }, "⚫ closed"],
+    [
+      "approved",
+      { statusCheckRollup: passed, reviewDecision: "APPROVED" },
+      "\u{f49e} CI · \u{f42e} approved",
+    ],
+    ["changes requested", { reviewDecision: "CHANGES_REQUESTED" }, "\u{f4d2} changes requested"],
+    [
+      "merged",
+      { state: "MERGED", statusCheckRollup: [run("a", "IN_PROGRESS")] },
+      "\u{f419} merged",
+    ],
+    ["closed", { state: "CLOSED" }, "\u{f4dc} closed"],
   ];
   test("formats each state", () => {
     const shown = Object.fromEntries(

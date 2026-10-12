@@ -260,23 +260,32 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   return paragraphs.join("\n\n");
 }
 
-const REVIEW_TAGS: Partial<Record<string, string>> = {
-  APPROVED: "✅ approved",
-  CHANGES_REQUESTED: "❗ changes requested",
-  REVIEW_REQUIRED: "👀 review needed",
+// Nerd Font Octicons, the icons GitHub itself draws for each state.
+export const STALE = "\u{f421} stale";
+
+const ENDED: Partial<Record<string, string>> = {
+  MERGED: "\u{f419} merged",
+  CLOSED: "\u{f4dc} closed",
+};
+
+const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
+  none: () => undefined,
+  pending: (s) => `\u{f444} CI ${s.total - s.pending}/${s.total}`,
+  passing: () => "\u{f49e} CI",
+  failing: (s) => `\u{f52f} ${listed(s.failed)}`,
+};
+
+const REVIEWS: Partial<Record<string, string>> = {
+  APPROVED: "\u{f42e} approved",
+  CHANGES_REQUESTED: "\u{f4d2} changes requested",
+  REVIEW_REQUIRED: "\u{f441} review needed",
 };
 
 // The footer already links the PR, so the state rides after it on that line.
-// Emoji are the only color the dim footer tail keeps.
 export function statusOf(snapshot: Snapshot): string {
-  if (snapshot.state === "MERGED") return "🟣 merged";
-  if (snapshot.state === "CLOSED") return "⚫ closed";
-  const parts: string[] = [];
-  if (snapshot.phase === "failing") parts.push(`🔴 ${listed(snapshot.failed)}`);
-  else if (snapshot.phase === "pending") {
-    parts.push(`🟡 CI ${snapshot.total - snapshot.pending}/${snapshot.total}`);
-  } else if (snapshot.phase === "passing") parts.push("🟢 CI");
-  const review = REVIEW_TAGS[snapshot.reviewDecision];
-  if (review !== undefined) parts.push(review);
-  return parts.join(" · ");
+  const ended = ENDED[snapshot.state];
+  if (ended !== undefined) return ended;
+  return [CHECKS[snapshot.phase](snapshot), REVIEWS[snapshot.reviewDecision]]
+    .filter((part) => part !== undefined)
+    .join(" · ");
 }

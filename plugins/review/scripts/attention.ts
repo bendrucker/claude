@@ -3,6 +3,8 @@ import { mkdirSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { cli, command } from "cleye";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { toString } from "mdast-util-to-string";
 import { z } from "zod";
 
 // nf-fa-eye, the mark the sidebar row bound to `$review` renders.
@@ -52,12 +54,13 @@ const PromptHook = z.discriminatedUnion("tool_name", [
 export type PromptAction = { clear: true } | { clear: false; kind: Kind; summary: string };
 
 export function planTitle(plan: string | undefined): string {
-  const heading = plan?.match(/^#{1,6}\s+(.+)$/m)?.[1];
-  return heading == null ? "the plan" : `the ${oneLine(heading)} plan`;
+  const heading = fromMarkdown(plan ?? "").children.find((node) => node.type === "heading");
+  return heading == null ? "the plan" : `the ${oneLine(toString(heading))} plan`;
 }
 
-// `place` is `<repo> <branch>`, the prefix every summary carries.
-export function promptAction(stdin: string, place: string): PromptAction | null {
+// `place` returns `<repo> <branch>`, the prefix every summary carries. It
+// spawns git, so only a raise calls it.
+export function promptAction(stdin: string, place: () => string): PromptAction | null {
   let json: unknown;
   try {
     json = JSON.parse(stdin);
@@ -74,14 +77,14 @@ export function promptAction(stdin: string, place: string): PromptAction | null 
     return {
       clear: false,
       kind: "plan",
-      summary: `${place}: approve ${planTitle(input.tool_input.plan)}`,
+      summary: `${place()}: approve ${planTitle(input.tool_input.plan)}`,
     };
   }
   const [first, ...rest] = input.tool_input.questions;
   if (first == null) return null;
   const label = first.header == null ? first.question : `${first.header}: ${first.question}`;
   const more = rest.length > 0 ? ` (+${rest.length} more)` : "";
-  return { clear: false, kind: "question", summary: `${place}: ${oneLine(label)}${more}` };
+  return { clear: false, kind: "question", summary: `${place()}: ${oneLine(label)}${more}` };
 }
 
 function gitOutput(args: string[]): string {
@@ -365,7 +368,7 @@ const promptCmd = command(
   async () => {
     const paneId = currentPane();
     if (paneId == null) return;
-    const action = promptAction(await Bun.stdin.text(), repoBranch());
+    const action = promptAction(await Bun.stdin.text(), repoBranch);
     if (action == null) return;
     await (action.clear
       ? clear(paneId)

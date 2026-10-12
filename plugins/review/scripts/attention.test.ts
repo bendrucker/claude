@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, test } from "bun:test";
 import { join } from "node:path";
 import { z } from "zod";
 import {
@@ -102,7 +102,7 @@ describe("raise flags", () => {
     ["valid flags outside herdr", ["--kind", "pr-body", "--summary", "x"], 0, ""],
   ])("%s", (_name, flags, exitCode, stderr) => {
     const run = Bun.spawnSync(
-      ["bun", join(import.meta.dirname, "attention.ts"), "raise", ...flags],
+      [process.execPath, join(import.meta.dirname, "attention.ts"), "raise", ...flags],
       { env: { PATH: process.env.PATH } },
     );
     expect(run.exitCode).toBe(exitCode);
@@ -160,13 +160,16 @@ describe("promptAction", () => {
     ["no questions", hook("PreToolUse", "AskUserQuestion", { questions: [] }), null],
     ["not JSON", "", null],
   ])("%s", (_name, stdin, expected) => {
-    expect(promptAction(stdin, "dotfiles main")).toEqual(expected);
+    const place = mock(() => "dotfiles main");
+    expect(promptAction(stdin, place)).toEqual(expected);
+    expect(place).toHaveBeenCalledTimes(expected?.clear === false ? 1 : 0);
   });
 });
 
 describe("planTitle", () => {
   test.each<[string | undefined, string]>([
-    ["intro\n## Cleanup  board\n# Later", "the Cleanup board plan"],
+    ["intro\n## Cleanup  *board*\n# Later", "the Cleanup board plan"],
+    ["```md\n# Fenced\n```\n\nSetext title\n===", "the Setext title plan"],
     ["no heading", "the plan"],
     [undefined, "the plan"],
   ])("%p", (plan, expected) => {
@@ -325,11 +328,15 @@ describe("hook marker path", () => {
     const { command } = (await hooks()).Stop[0].hooks[0];
     const guard = command.slice(0, command.indexOf(" && bun "));
     const home = join(process.env.TMPDIR ?? "/tmp", `attention-${crypto.randomUUID()}`);
-    if (content != null) await Bun.write(markerPath("wE5:p1", home), content);
-    const shell = Bun.spawnSync(["sh", "-c", guard], {
-      env: { HOME: home, HERDR_PANE_ID: "wE5:p1", PATH: process.env.PATH },
-    });
-    expect(shell.exitCode === 0).toBe(clears);
+    try {
+      if (content != null) await Bun.write(markerPath("wE5:p1", home), content);
+      const shell = Bun.spawnSync(["sh", "-c", guard], {
+        env: { HOME: home, HERDR_PANE_ID: "wE5:p1", PATH: process.env.PATH },
+      });
+      expect(shell.exitCode === 0).toBe(clears);
+    } finally {
+      Bun.spawnSync(["rm", "-rf", home]);
+    }
   });
 });
 

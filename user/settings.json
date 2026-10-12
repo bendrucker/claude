@@ -484,7 +484,7 @@
       "source": {
         "source": "github",
         "repo": "vercel-labs/agent-browser",
-        "ref": "v0.38.1"
+        "ref": "v0.38.2"
       }
     },
     "plannotator": {

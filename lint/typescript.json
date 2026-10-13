@@ -109,6 +109,15 @@
         "unicorn/catch-error-name": "off",
         "promise/no-callback-in-promise": "off"
       }
+    },
+    {
+      // tsgolint spends 30-40s per file checking the return type of each
+      // handler passed to the engine's generic `on` overloads.
+      "files": ["plugins/*/mod/register*"],
+      "rules": {
+        "typescript/no-misused-promises": ["error", { "checksVoidReturn": { "arguments": false } }],
+        "typescript/strict-void-return": "off"
+      }
     }
   ]
 }

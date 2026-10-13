@@ -10,7 +10,7 @@ import {
   test,
 } from "bun:test";
 import { exec } from "node:child_process";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -33,6 +33,7 @@ import {
   processStop,
   runOxlintAgent,
   STOP_BLOCK_LIMIT,
+  stopEventsDir,
   TYPE_CHECK_ARGS,
   typeCheckArgs,
 } from ".";
@@ -206,6 +207,7 @@ async function createTypeAwareFixture(
 describe("ox hook", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ox-test-"));
+    process.env.OX_EVENTS_DIR = join(tempDir, "mod-events");
   });
 
   // A stop left blocking keeps its count file. Remove the ones these tests
@@ -511,6 +513,30 @@ describe("ox hook", () => {
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
       return transcriptPath;
     }
+
+    it("records the stop's phase timings for the session index", async () => {
+      const session = `events-${Date.now()}`;
+      const transcript = await unfixableSession(session);
+
+      await processStop(mockStopHookInput(transcript, false, session));
+
+      const dir = stopEventsDir(session);
+      const [name] = await readdir(dir);
+      const record = z
+        .looseObject({ event_name: z.string(), attributes: z.record(z.string(), z.unknown()) })
+        .parse(JSON.parse(await Bun.file(join(dir, name ?? "")).text()));
+      expect(record.event_name).toBe("ox.stop");
+      expect(Object.keys(record.attributes).toSorted()).toEqual([
+        "duration_ms",
+        "files",
+        "format_ms",
+        "lint_ms",
+        "outcome",
+        "session.id",
+        "type_check_ms",
+      ]);
+      expect(record.attributes.outcome).toBe("block");
+    });
 
     // A blocked Stop wakes the model to repair, and the Stop that follows
     // carries stop_hook_active. Skipping the gate there ends the session on a

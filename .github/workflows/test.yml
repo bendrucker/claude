@@ -30,6 +30,9 @@ jobs:
       - name: Check
         run: bun run check
 
+      - name: Stop gate latency
+        run: bun test ./.claude/hooks/ox/perf.integration.ts
+
   build:
     runs-on: ubuntu-latest
     steps:

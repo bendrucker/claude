@@ -11,6 +11,7 @@ import {
   envelopeCode,
   fetchArgs,
   formatRecord,
+  type Pause,
   type Runner,
   spawnRunner,
   taskSummary,
@@ -37,6 +38,12 @@ const WORKTREE = ok(
 );
 // herdr's create, then the two config writes that point tracking at origin.
 const CREATED = [WORKTREE, ok(""), ok("")];
+const agentIn = (status: string) =>
+  ok(
+    JSON.stringify({
+      result: { agent: { agent_status: status, agent_session: { value: "sess-2" } } },
+    }),
+  );
 const STARTED = ok(JSON.stringify({ result: { agent: { agent_status: "idle" } } }));
 const BASE_OK = ok("abc123\n");
 const AGENT_GET = ok(
@@ -57,6 +64,9 @@ function fakeRunner(responses: readonly CommandResult[]): { run: Runner; calls: 
   };
   return { run, calls };
 }
+
+const BUSY = fail(envelope("agent_pane_busy"));
+const instant: Pause = () => Promise.resolve();
 
 async function failureOf(attempt: Promise<unknown>): Promise<DispatchError> {
   try {
@@ -174,7 +184,7 @@ describe("validation", () => {
     ["base", { ...options, base: "  " }],
   ])("rejects a hostile %s before spawning", async (_field, bad) => {
     const { run, calls } = fakeRunner([]);
-    await failureOf(dispatch(bad, run));
+    await failureOf(dispatch(bad, run, instant));
     expect(calls).toEqual([]);
   });
 });
@@ -182,7 +192,7 @@ describe("validation", () => {
 describe("dispatch", () => {
   test("runs the sequence and never moves the checkout", async () => {
     const { run, calls } = fakeRunner(HAPPY_PATH);
-    const { record, root } = await dispatch(options, run);
+    const { record, root } = await dispatch(options, run, instant);
 
     expect(calls).toEqual([
       ["herdr", "agent", "list"],
@@ -243,7 +253,7 @@ describe("dispatch", () => {
 
     expect(root).toBe("/repo");
     expect(formatRecord(record)).toMatchInlineSnapshot(
-      `"{"workspace":"wZZ","pane":"wZZ:p1","agent":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":"sess-1","status":"working","prompted":true}"`,
+      `"{"workspace":"wZZ","pane":"wZZ:p1","agent":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":"sess-1","status":"working","prompted":true,"retry":null}"`,
     );
   });
 
@@ -258,7 +268,7 @@ describe("dispatch", () => {
       ok(""),
       AGENT_GET,
     ]);
-    await dispatch({ ...options, base: "release-2026" }, run);
+    await dispatch({ ...options, base: "release-2026" }, run, instant);
     expect(calls.map((argv) => argv.slice(0, 4))).not.toContainEqual([
       "git",
       "-C",
@@ -278,7 +288,7 @@ describe("dispatch", () => {
       ok(""),
       AGENT_GET,
     ]);
-    await dispatch({ ...options, base: "release-2026" }, run);
+    await dispatch({ ...options, base: "release-2026" }, run, instant);
     expect(calls.filter((argv) => argv[3] === "config")).toEqual([]);
   });
 
@@ -295,7 +305,7 @@ describe("dispatch", () => {
       ok(""),
       AGENT_GET,
     ]);
-    const { record } = await dispatch(options, run);
+    const { record } = await dispatch(options, run, instant);
     expect(calls.filter((argv) => argv[3] === "config")).toHaveLength(1);
     expect(record.status).toBe("working");
   });
@@ -349,7 +359,7 @@ describe("dispatch", () => {
 
   test("fetches the remote the base names", async () => {
     const { run, calls } = fakeRunner(HAPPY_PATH);
-    await dispatch({ ...options, base: "upstream/main" }, run);
+    await dispatch({ ...options, base: "upstream/main" }, run, instant);
     expect(calls).toContainEqual([
       "git",
       "-C",
@@ -362,14 +372,14 @@ describe("dispatch", () => {
 
   test("uses an explicit name that no live agent holds", async () => {
     const { run, calls } = fakeRunner(HAPPY_PATH);
-    const { record } = await dispatch({ ...options, name: "custom" }, run);
+    const { record } = await dispatch({ ...options, name: "custom" }, run, instant);
     expect(calls.at(-1)).toEqual(["herdr", "agent", "get", "custom"]);
     expect(record.agent).toBe("custom");
   });
 
   test("rejects an explicit name a live agent holds, before creating anything", async () => {
     const { run, calls } = fakeRunner([AGENT_LIST]);
-    const failure = await failureOf(dispatch({ ...options, name: "reviewer" }, run));
+    const failure = await failureOf(dispatch({ ...options, name: "reviewer" }, run, instant));
     expect(failure.message).toMatch(/already bound to a live agent/);
     expect(failure.partial).toBeNull();
     expect(calls).toEqual([["herdr", "agent", "list"]]);
@@ -382,13 +392,13 @@ describe("dispatch", () => {
     );
     const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, ...REMOTES, ok(""), BASE_OK, fail(stderr)]);
 
-    const failure = await failureOf(dispatch(options, run));
+    const failure = await failureOf(dispatch(options, run, instant));
     expect(failure.message).toBe(stderr);
     expect(failure.partial).toBeNull();
   });
 
   test("emits the partial record when the failure lands after the worktree exists", async () => {
-    const stderr = envelope("agent_pane_busy");
+    const stderr = envelope("agent_start_failed");
     const { run } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
@@ -399,7 +409,7 @@ describe("dispatch", () => {
       fail(stderr),
     ]);
 
-    const failure = await failureOf(dispatch(options, run));
+    const failure = await failureOf(dispatch(options, run, instant));
     expect(failure.message).toBe(stderr);
     expect(failure.partial).toEqual({
       workspace: "wZZ",
@@ -410,6 +420,7 @@ describe("dispatch", () => {
       session: null,
       status: "unknown",
       prompted: false,
+      retry: null,
     });
   });
 
@@ -428,7 +439,7 @@ describe("dispatch", () => {
       blocked,
     ]);
 
-    const { record } = await dispatch(options, run);
+    const { record } = await dispatch(options, run, instant);
     expect(calls.map((argv) => argv.slice(0, 3))).not.toContainEqual(["herdr", "agent", "prompt"]);
     expect(record.agent).toBe("fix-thing");
     expect(record.status).toBe("blocked");
@@ -436,45 +447,100 @@ describe("dispatch", () => {
     expect(record.prompted).toBe(false);
   });
 
-  test.each(["timeout", "agent_prompt_stalled"])(
-    "reports status after a %s on the wait",
-    async (code) => {
-      const idle = ok(
-        JSON.stringify({
-          result: { agent: { agent_status: "idle", agent_session: { value: "sess-2" } } },
-        }),
-      );
-      const { run } = fakeRunner([
-        AGENT_LIST,
-        GIT_COMMON,
-        ...REMOTES,
-        ok(""),
-        BASE_OK,
-        ...CREATED,
-        STARTED,
-        fail(envelope(code)),
-        idle,
-      ]);
-
-      const { record } = await dispatch(options, run);
-      expect(record.status).toBe("idle");
-      expect(record.session).toBe("sess-2");
-      // Neither code confirms the agent took the work, so the caller is told
-      // to read the pane rather than that the prompt landed.
-      expect(record.prompted).toBe(false);
+  // Each row scripts what follows a first submission that herdr could not
+  // confirm, through the final agent get.
+  test.each<{
+    name: string;
+    after: CommandResult[];
+    prompted: boolean;
+    retry: "enter" | "prompt" | null;
+    resent: string[];
+  }>([
+    {
+      name: "a fast turn finished before herdr looked",
+      after: [fail(envelope("agent_prompt_stalled")), agentIn("done")],
+      prompted: true,
+      retry: null,
+      resent: [],
     },
-  );
+    {
+      name: "a dialog holds the agent",
+      after: [fail(envelope("timeout")), agentIn("blocked")],
+      prompted: false,
+      retry: null,
+      resent: [],
+    },
+    {
+      name: "the Enter was lost",
+      after: [fail(envelope("agent_prompt_stalled")), agentIn("idle"), ok(""), ok("")],
+      prompted: true,
+      retry: "enter",
+      resent: ["send-keys"],
+    },
+    {
+      name: "the paste was lost",
+      after: [
+        fail(envelope("agent_prompt_stalled")),
+        agentIn("idle"),
+        ok(""),
+        fail(envelope("timeout")),
+        agentIn("idle"),
+        ok(""),
+      ],
+      prompted: true,
+      retry: "prompt",
+      resent: ["send-keys", "prompt"],
+    },
+    {
+      name: "the prompt never lands",
+      after: [
+        fail(envelope("agent_prompt_stalled")),
+        agentIn("idle"),
+        ok(""),
+        fail(envelope("timeout")),
+        agentIn("idle"),
+        fail(envelope("agent_prompt_stalled")),
+        agentIn("idle"),
+        ok(""),
+        fail(envelope("timeout")),
+        agentIn("idle"),
+      ],
+      prompted: false,
+      retry: "prompt",
+      resent: ["send-keys", "prompt", "send-keys"],
+    },
+  ])("recovers when $name", async ({ after, prompted, retry, resent }) => {
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      ...REMOTES,
+      ok(""),
+      BASE_OK,
+      ...CREATED,
+      STARTED,
+      ...after,
+      agentIn("idle"),
+    ]);
+
+    const { record } = await dispatch(options, run, instant);
+    expect(record).toMatchObject({ prompted, retry, session: "sess-2" });
+    const firstPrompt = calls.findIndex((argv) => argv[2] === "prompt");
+    const resends = calls
+      .slice(firstPrompt + 1)
+      .filter((argv) => argv[2] === "prompt" || argv[2] === "send-keys");
+    expect(resends.map((argv) => argv[2])).toEqual(resent);
+  });
 
   test("fails the dispatch when the repository cannot list its remotes", async () => {
     const { run } = fakeRunner([AGENT_LIST, GIT_COMMON, fail("fatal: not a git repository\n")]);
-    const failure = await failureOf(dispatch(options, run));
+    const failure = await failureOf(dispatch(options, run, instant));
     expect(failure.message).toMatch(/not a git repository/);
     expect(failure.partial).toBeNull();
   });
 
   test("names the step when it fails without writing to stderr", async () => {
     const { run } = fakeRunner([AGENT_LIST, { code: 128, stdout: "", stderr: "  \n" }]);
-    const failure = await failureOf(dispatch(options, run));
+    const failure = await failureOf(dispatch(options, run, instant));
     expect(failure.message).toBe("git -C /repo worktree list --porcelain exited 128");
   });
 
@@ -496,7 +562,7 @@ describe("dispatch", () => {
       AGENT_GET,
     ]);
 
-    const { record } = await dispatch(options, run);
+    const { record } = await dispatch(options, run, instant);
     expect(record.agent).toBe("fix-thing-2");
     expect(calls.at(-1)).toEqual(["herdr", "agent", "get", "fix-thing-2"]);
   });
@@ -520,7 +586,7 @@ describe("dispatch", () => {
       ok(JSON.stringify({ result: { agent: { agent_status: "working" } } })),
     ]);
 
-    const { record } = await dispatch(options, run);
+    const { record } = await dispatch(options, run, instant);
     expect(record.agent).toBe("fix-thing-3");
     expect(calls.filter((argv) => argv[2] === "start")).toHaveLength(3);
   });
@@ -542,7 +608,7 @@ describe("dispatch", () => {
       fail(taken),
     ]);
 
-    const failure = await failureOf(dispatch(options, run));
+    const failure = await failureOf(dispatch(options, run, instant));
     expect(failure.message).toBe(taken);
     expect(failure.partial?.path).toBe("/tmp/worktrees/demo/fix-thing");
     expect(calls.filter((argv) => argv[2] === "start")).toHaveLength(3);
@@ -562,7 +628,7 @@ describe("dispatch", () => {
       AGENT_GET,
     ]);
 
-    const { record } = await dispatch(options, run);
+    const { record } = await dispatch(options, run, instant);
     expect(calls).toContainEqual([
       "herdr",
       "agent",
@@ -589,13 +655,13 @@ describe("dispatch", () => {
       AGENT_GET,
     ]);
 
-    const { record } = await dispatch(options, run);
+    const { record } = await dispatch(options, run, instant);
     expect(record.prompted).toBe(false);
     expect(calls.filter((argv) => argv[2] === "prompt")).toHaveLength(0);
   });
 
   test("forwards an unrelated start failure rather than renaming", async () => {
-    const stderr = envelope("agent_pane_busy");
+    const stderr = envelope("agent_start_failed");
     const { run, calls } = fakeRunner([
       AGENT_LIST,
       GIT_COMMON,
@@ -606,11 +672,32 @@ describe("dispatch", () => {
       fail(stderr),
     ]);
 
-    const failure = await failureOf(dispatch(options, run));
+    const failure = await failureOf(dispatch(options, run, instant));
     expect(failure.message).toBe(stderr);
     expect(failure.partial?.path).toBe("/tmp/worktrees/demo/fix-thing");
     expect(calls.filter((argv) => argv[2] === "start")).toHaveLength(1);
     expect(calls.filter((argv) => argv[2] === "list")).toHaveLength(1);
+  });
+
+  test.each<{ name: string; afterBusy: CommandResult[]; started: boolean }>([
+    { name: "frees up", afterBusy: [STARTED, ok(""), AGENT_GET], started: true },
+    { name: "stays busy", afterBusy: [BUSY, BUSY], started: false },
+  ])("retries start while the pane $name", async ({ afterBusy, started }) => {
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      ...REMOTES,
+      ok(""),
+      BASE_OK,
+      ...CREATED,
+      BUSY,
+      ...afterBusy,
+    ]);
+
+    const attempt = dispatch({ ...options, timeout: 3_000 }, run, instant);
+    if (started) expect((await attempt).record.prompted).toBe(true);
+    else expect((await failureOf(attempt)).partial?.agent).toBeNull();
+    expect(calls.filter((argv) => argv[2] === "start")).toHaveLength(started ? 2 : 3);
   });
 
   test("never substitutes a name the caller asked for", async () => {
@@ -625,7 +712,7 @@ describe("dispatch", () => {
       fail(stderr),
     ]);
 
-    const failure = await failureOf(dispatch({ ...options, name: "custom" }, run));
+    const failure = await failureOf(dispatch({ ...options, name: "custom" }, run, instant));
     expect(failure.message).toBe(stderr);
     expect(calls.filter((argv) => argv[2] === "start")).toHaveLength(1);
     expect(calls.filter((argv) => argv[2] === "list")).toHaveLength(1);
@@ -640,7 +727,7 @@ describe("dispatch", () => {
       ok(JSON.stringify({ result: {} })),
       AGENT_LIST,
     ]);
-    const failure = await failureOf(dispatch(options, run));
+    const failure = await failureOf(dispatch(options, run, instant));
     expect(failure.message).toMatch(/herdr worktree create returned an unexpected shape/);
   });
 });

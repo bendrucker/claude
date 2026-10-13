@@ -123,7 +123,7 @@ describe("decide", () => {
     expect(decide(merged, { ...merged, failed: ["ci / other"] })).toEqual([]);
   });
 
-  test("promotes requested changes and drops other reviews", () => {
+  test("promotes every new review with its state", () => {
     const reviewed = {
       ...passing,
       reviews: [
@@ -132,8 +132,8 @@ describe("decide", () => {
       ],
     };
     expect(decide(passing, reviewed)).toEqual([
-      { action: "promote", kind: "review.changes_requested", author: "alice" },
-      { action: "drop", kind: "review", author: "greptile", state: "COMMENTED" },
+      { action: "promote", kind: "review", author: "alice", state: "CHANGES_REQUESTED" },
+      { action: "promote", kind: "review", author: "greptile", state: "COMMENTED" },
     ]);
     expect(decide(reviewed, reviewed)).toEqual([]);
   });

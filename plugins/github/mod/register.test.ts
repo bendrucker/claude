@@ -163,7 +163,7 @@ describe("register", () => {
     expect(await w.shown($)).toBe("\u{f49e} CI");
   });
 
-  test("requested changes wake the model and a comment review does not", async ($, on) => {
+  test("every new review wakes the model with its state", async ($, on) => {
     const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
     const w = worldOf(on, world);
 
@@ -176,11 +176,12 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
 
     expect(w.submits.length).toBe(1);
-    expect(w.submits[0]).toContain("@alice requested changes on PR #7");
-    expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["review"]);
+    expect(w.submits[0]).toContain("@greptile reviewed PR #7 (COMMENTED)");
+    expect(w.submits[0]).toContain("@alice reviewed PR #7 (CHANGES_REQUESTED)");
+    expect(w.named("drop")).toEqual([]);
   });
 
-  test("a comment review keeps an alert shown as sent", async ($, on) => {
+  test("a review after a sent alert carries only the review", async ($, on) => {
     const world: World = { branch: "topic", gh: GH_OK, view: pr("") };
     const w = worldOf(on, world);
 
@@ -191,7 +192,9 @@ describe("register", () => {
     world.view = pr("FAILURE", [{ id: "r1", state: "COMMENTED", author: { login: "bot" } }]);
     await w.clock.advance(POLL_MS.settled);
 
-    expect(w.submits.length).toBe(1);
+    expect(w.submits.length).toBe(2);
+    expect(w.submits[1]).toContain("@bot reviewed PR #7 (COMMENTED)");
+    expect(w.submits[1]).not.toContain("CI failed");
     expect(await w.shown($)).toBe("\u{f52f} ci / test");
   });
 

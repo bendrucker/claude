@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger in the plugin data dir under ~/.claude/plugins
+import { join } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
 import { appendDispatch, resolveDataDir } from "./ledger";
@@ -83,6 +84,7 @@ export interface DispatchRecord {
   // False when a trust or permission dialog held the agent at start, so the
   // worktree and the name exist but the agent never received the work.
   prompted: boolean;
+  submoduleError?: string;
 }
 
 export interface DispatchResult {
@@ -271,6 +273,21 @@ export function fetchArgs(remote: string, url: string): string[] {
   const ssh = /^(?:git@github\.com:|ssh:\/\/git@github\.com\/)(.+?)(?:\.git)?\/?$/.exec(url.trim());
   if (ssh?.[1] == null) return [remote];
   return [`https://github.com/${ssh[1]}.git`, `+refs/heads/*:refs/remotes/${remote}/*`];
+}
+
+// git worktree add leaves submodules empty and herdr runs no repository hook,
+// so a checkout whose tooling links into them comes up broken. The agent can
+// still repair it, so a failure is recorded rather than fatal.
+async function initSubmodules(run: Runner, path: string): Promise<string | undefined> {
+  if (!(await Bun.file(join(path, ".gitmodules")).exists())) return undefined;
+  const result = await run(["git", "-C", path, "submodule", "update", "--init", "--recursive"], {
+    timeoutMs: FETCH_TIMEOUT_MS,
+    env: { GIT_TERMINAL_PROMPT: "0" },
+  });
+  if (result.code === 0) return undefined;
+  return result.stderr.trim() === ""
+    ? `git submodule update exited ${result.code}`
+    : result.stderr.trim();
 }
 
 function agentNames(listed: z.infer<typeof AgentList>): ReadonlySet<string> {
@@ -481,6 +498,8 @@ export async function dispatch(
     };
 
     await trackOrigin(run, remotes, partial.path, options.branch);
+    const submoduleError = await initSubmodules(run, partial.path);
+    if (submoduleError != null) partial.submoduleError = submoduleError;
 
     const { name, started } = await startNamed(run, options, partial, wanted);
 
@@ -603,6 +622,10 @@ if (import.meta.main) {
       timeout: argv.flags.timeout,
     });
 
+    if (record.submoduleError != null)
+      process.stderr.write(
+        `warning: submodules in ${record.path} were not initialized: ${record.submoduleError}\n`,
+      );
     if (!record.prompted)
       process.stderr.write(
         `warning: herdr could not confirm ${record.agent ?? "the agent"} received the prompt. Read the pane with \`herdr agent read ${record.pane}\`: answer any dialog with \`herdr agent send-keys\` and submit the prompt yourself, or confirm the agent is already working on it.\n`,

@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // The Stop gate type-checks the whole tree, every mod included, so one
-// pathological rule/type pairing multiplies across all of them. It once took
-// 223s on a turn that edited a single mod file.
+// pathological rule/type pairing multiplies across all of them.
 const BUDGET_MS = 30_000;
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");

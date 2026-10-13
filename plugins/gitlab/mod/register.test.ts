@@ -253,7 +253,7 @@ describe("register", () => {
     ]);
   });
 
-  test("a merged MR is read back by IID, logged, and shown as merged", async ($, on) => {
+  test("a merged MR is read back by IID, logged, shown as merged, and read no further", async ($, on) => {
     const world: World = { branch: "topic", glab: GLAB_OK, view: mr() };
     const w = worldOf(on, world);
 
@@ -271,6 +271,11 @@ describe("register", () => {
     ]);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["mr.merged"]);
     expect(w.submits).toEqual([]);
+    expect(await w.shown($)).toBe("\u{f419} merged");
+
+    world.approvals = "approvals should not be read again";
+    await w.clock.advance(POLL_MS.closed);
+    expect(w.named("poll.error")).toEqual([]);
     expect(await w.shown($)).toBe("\u{f419} merged");
   });
 

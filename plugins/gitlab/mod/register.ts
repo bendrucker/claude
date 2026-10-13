@@ -73,7 +73,7 @@ async function isDefaultBranch($: EngineInterface, cwd: string, branch: string):
   return origin.stdout.trim() === `origin/${branch}`;
 }
 
-const NO_MR = /no open merge request/i;
+const NO_MR = /no (open )?merge request/i;
 
 // glab resolves the host from the git remote, which covers self-managed instances.
 async function glab($: EngineInterface, cwd: string, args: string[]): Promise<string> {
@@ -131,6 +131,11 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
   const stdout = await viewMr($, watch, cwd, branch);
   if (stdout === undefined) return { kind: "none" };
   const view = parsed(parseView(stdout), "glab mr view");
+  const prev = watch.snapshot;
+  // A merged or closed MR changes nothing else the watch shows.
+  if (prev?.mr === view.iid && !isOpen(prev) && view.state === prev.state) {
+    return { kind: "mr", snapshot: prev, branch };
+  }
   const mr = `projects/${view.projectId}/merge_requests/${view.iid}`;
   const pipeline = view.pipeline;
   const [approvals, notes, jobs, me] = await Promise.all([
@@ -148,7 +153,6 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
     jobs,
     me,
   });
-  const prev = watch.snapshot;
   // A deleted note can lower the newest id seen, which would re-admit older notes.
   const snapshot =
     prev?.mr === read.mr

@@ -157,12 +157,11 @@ export interface Snapshot {
   notes: { id: number; author: string }[];
 }
 
-export type ReviewState = "approved" | "unapproved" | "commented";
-
 export type Decision =
   | { action: "promote"; kind: "ci.failed"; failed: string[] }
   | { action: "promote"; kind: "review"; author: string; state: "approved" | "unapproved" }
   | { action: "promote"; kind: "review"; author: string; state: "commented"; notes: number }
+  | { action: "promote"; kind: "review"; state: "changes_requested" }
   | { action: "drop"; kind: "ci.passing" | "ci.pending" | "ci.none" }
   | { action: "drop"; kind: "push"; from: string }
   | { action: "drop"; kind: "approvals.reset"; authors: string[] }
@@ -181,8 +180,11 @@ const PENDING = new Set([
   "pending",
   "running",
   "scheduled",
-  "manual",
 ]);
+
+// A pipeline is manual only when a blocking manual job holds it, while a
+// non-blocking manual job sits in a finished pipeline.
+const PIPELINE_PENDING = new Set([...PENDING, "manual"]);
 
 const LABEL_MAX = 80;
 
@@ -211,7 +213,7 @@ function phaseOf(read: Read, failed: string[], pending: number): Phase {
   const pipeline = read.view.pipeline;
   if (pipeline === null) return "none";
   if (failed.length > 0) return "failing";
-  if (pending > 0 || PENDING.has(pipeline.status)) return "pending";
+  if (pending > 0 || PIPELINE_PENDING.has(pipeline.status)) return "pending";
   if (pipeline.status === "canceled" || pipeline.status === "skipped") return "none";
   return "passing";
 }
@@ -267,6 +269,11 @@ function reviewsOf(prev: Snapshot, next: Snapshot, isSameHead: boolean): Decisio
     }
   }
 
+  // GitLab names no reviewer for a request for changes.
+  if (next.isChangesRequested && !prev.isChangesRequested) {
+    decisions.push({ action: "promote", kind: "review", state: "changes_requested" });
+  }
+
   const byAuthor = new Map<string, number>();
   for (const note of next.notes.toSorted((a, b) => a.id - b.id)) {
     if (note.id > prev.noteCursor) byAuthor.set(note.author, (byAuthor.get(note.author) ?? 0) + 1);
@@ -279,7 +286,8 @@ function reviewsOf(prev: Snapshot, next: Snapshot, isSameHead: boolean): Decisio
 
 /**
  * What changed between two polls of the same MR. A job that newly fails, or
- * any new approval, unapproval, or comment from someone else, is promoted.
+ * any new approval, unapproval, request for changes, or comment from someone
+ * else, is promoted.
  * Every other change is dropped.
  */
 export function decide(prev: Snapshot, next: Snapshot): Decision[] {
@@ -312,6 +320,7 @@ function listed(labels: string[], max = 3): string {
 }
 
 function reviewLineOf(mr: string, decision: Extract<Promoted, { kind: "review" }>): string {
+  if (decision.state === "changes_requested") return `Changes were requested on ${mr}`;
   if (decision.state === "commented") {
     const comments = decision.notes === 1 ? "1 new comment" : `${decision.notes} new comments`;
     return `@${decision.author} commented on ${mr} (${comments})`;

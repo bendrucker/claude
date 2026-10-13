@@ -91,13 +91,15 @@ describe("parsers", () => {
 });
 
 describe("snapshotOf", () => {
-  test("an allowed failure passes, a canceled pipeline shows no CI, a manual one is pending, and a failed pipeline with no failed job names the pipeline", () => {
+  test("an allowed failure passes, a canceled pipeline shows no CI, a blocking manual one is pending, and a failed pipeline with no failed job names the pipeline", () => {
     const allowed = snap({ jobs: [job("lint", "failed", { allowFailure: true })] }, "success");
     expect(allowed.phase).toBe("passing");
     const downstream = snap({ jobs: [job("lint", "success")] }, "failed");
     expect(downstream.failed).toEqual(["pipeline"]);
     expect(snap({ jobs: [job("lint", "canceled")] }, "canceled").phase).toBe("none");
     expect(snap({ jobs: [job("deploy", "manual")] }, "manual").phase).toBe("pending");
+    const optional = [job("test", "success"), job("deploy", "manual", { allowFailure: true })];
+    expect(snap({ jobs: optional }, "success").phase).toBe("passing");
   });
 
   test("my own notes and approvals stay out, and the cursor covers every note", () => {
@@ -187,6 +189,18 @@ describe("decide", () => {
       ],
     ],
     [
+      "a request for changes promotes",
+      passing,
+      { ...passing, isChangesRequested: true },
+      [{ action: "promote", kind: "review", state: "changes_requested" }],
+    ],
+    [
+      "a standing request for changes stays quiet",
+      { ...passing, isChangesRequested: true },
+      { ...passing, isChangesRequested: true },
+      [],
+    ],
+    [
       "new comments promote once per author",
       snap({ notes: noted([3, "alice"]) }),
       snap({ notes: noted([6, "greptile"], [5, "alice"], [4, "greptile"], [3, "alice"]) }),
@@ -228,6 +242,11 @@ describe("messageOf", () => {
       "unapproval",
       [{ action: "promote", kind: "review", author: "alice", state: "unapproved" }],
       "@alice revoked their approval of MR !7: https://gitlab.com/g/r/-/merge_requests/7",
+    ],
+    [
+      "changes requested",
+      [{ action: "promote", kind: "review", state: "changes_requested" }],
+      "Changes were requested on MR !7: https://gitlab.com/g/r/-/merge_requests/7",
     ],
     [
       "comments",

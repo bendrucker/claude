@@ -173,8 +173,6 @@ async function inject(
   }
 }
 
-// What a dropped injection still has to say: failures only on the same head
-// and only for jobs still failing, reviews only while the MR is open.
 function stillDue(undelivered: Undelivered | undefined, next: Snapshot): Promoted[] {
   if (undelivered === undefined || !isOpen(next)) return [];
   return undelivered.decisions.flatMap((decision): Promoted[] => {

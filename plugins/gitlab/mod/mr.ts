@@ -340,7 +340,7 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   return paragraphs.join("\n\n");
 }
 
-// Nerd Font Octicons, matching the github plugin's footer.
+// Nerd Font Octicons.
 export const STALE = "\u{f421} stale";
 
 const ENDED: Partial<Record<string, string>> = {

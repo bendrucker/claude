@@ -28,7 +28,7 @@ export const POLL_MS = {
 
 // A dropped injection is retried on later polls, up to this many attempts.
 export const MAX_ATTEMPTS = 3;
-// Skipped when origin/HEAD is unset and the real default branch is unknown.
+// Fallback default branches when origin/HEAD is unset.
 const DEFAULT_BRANCHES = new Set(["main", "master"]);
 // /clear and /resume keep the process running, so the watch continues.
 const CONTINUING = new Set(["clear", "resume"]);
@@ -159,7 +159,7 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
       ? { ...read, noteCursor: Math.max(prev.noteCursor, read.noteCursor) }
       : read;
   // The reads are not atomic, so approvals a push reset can look withdrawn on the
-  // head read before it. A moved head reads the MR again.
+  // head read before it.
   if (
     !isRetry &&
     prev?.mr === snapshot.mr &&

@@ -27,14 +27,50 @@ export interface Job {
   allowFailure: boolean;
 }
 
+type Reader<T> = (value: unknown) => T | undefined;
+type Out<R> = R extends Reader<infer T> ? T : never;
+type Shaped<S> = { [K in keyof S]: Out<S[K]> };
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const textOf = (value: unknown): string | null => (typeof value === "string" ? value : null);
+const str: Reader<string> = (value) => (typeof value === "string" ? value : undefined);
+const num: Reader<number> = (value) => (typeof value === "number" ? value : undefined);
+const bool: Reader<boolean> = (value) => (typeof value === "boolean" ? value : undefined);
 
-const numberOf = (value: unknown): number | null => (typeof value === "number" ? value : null);
+const or =
+  <T, F>(read: Reader<T>, fallback: F): Reader<T | F> =>
+  (value) =>
+    read(value) ?? fallback;
 
-function decoded<T>(stdout: string, narrow: (value: unknown) => T | undefined): T | undefined {
+const map =
+  <T, U>(read: Reader<T>, to: (value: T) => U): Reader<U> =>
+  (value) => {
+    const result = read(value);
+    return result === undefined ? undefined : to(result);
+  };
+
+const list =
+  <T>(item: Reader<T>): Reader<T[]> =>
+  (value) =>
+    Array.isArray(value)
+      ? value.map(item).filter((entry): entry is T => entry !== undefined)
+      : undefined;
+
+function obj<S extends Record<string, Reader<unknown>>>(shape: S): Reader<Shaped<S>> {
+  // Every field holds its own reader's output, so a full read fits the shape.
+  const isRead = (out: Record<string, unknown>): out is Shaped<S> =>
+    Object.keys(shape).every((key) => out[key] !== undefined);
+  return (value) => {
+    if (!isRecord(value)) return undefined;
+    const out = Object.fromEntries(
+      Object.entries(shape).map(([key, read]) => [key, read(value[key])]),
+    );
+    return isRead(out) ? out : undefined;
+  };
+}
+
+function decoded<T>(stdout: string, read: Reader<T>): T | undefined {
   let value: unknown;
   try {
     value = JSON.parse(stdout);
@@ -42,99 +78,75 @@ function decoded<T>(stdout: string, narrow: (value: unknown) => T | undefined): 
     // The caller reports malformed output as an unexpected shape.
     return undefined;
   }
-  return narrow(value);
+  return read(value);
 }
 
-function listOf<T>(value: unknown, item: (v: unknown) => T | undefined): T[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  return value.map(item).filter((v): v is T => v !== undefined);
-}
+const readUsername = map(obj({ username: str }), (user) => user.username);
 
-const usernameOf = (value: unknown): string | null =>
-  isRecord(value) ? textOf(value.username) : null;
+const readPipeline = map(obj({ id: num, project_id: num, status: str }), (p) => ({
+  id: p.id,
+  projectId: p.project_id,
+  status: p.status,
+}));
 
-function pipelineOf(value: unknown): MrView["pipeline"] {
-  if (!isRecord(value)) return null;
-  const id = numberOf(value.id);
-  const projectId = numberOf(value.project_id);
-  const status = textOf(value.status);
-  if (id === null || projectId === null || status === null) return null;
-  return { id, projectId, status };
-}
+const readView: Reader<MrView> = map(
+  obj({
+    iid: num,
+    project_id: num,
+    web_url: str,
+    state: str,
+    sha: str,
+    detailed_merge_status: or(str, null),
+    head_pipeline: or(readPipeline, null),
+  }),
+  (v) => ({
+    iid: v.iid,
+    projectId: v.project_id,
+    url: v.web_url,
+    state: v.state,
+    sha: v.sha,
+    detailedMergeStatus: v.detailed_merge_status,
+    pipeline: v.head_pipeline,
+  }),
+);
 
-function viewOf(value: unknown): MrView | undefined {
-  if (
-    !isRecord(value) ||
-    typeof value.iid !== "number" ||
-    typeof value.project_id !== "number" ||
-    typeof value.web_url !== "string" ||
-    typeof value.state !== "string" ||
-    typeof value.sha !== "string"
-  ) {
-    return undefined;
-  }
-  return {
-    iid: value.iid,
-    projectId: value.project_id,
-    url: value.web_url,
-    state: value.state,
-    sha: value.sha,
-    detailedMergeStatus: textOf(value.detailed_merge_status),
-    pipeline: pipelineOf(value.head_pipeline),
-  };
-}
+const readApprovals: Reader<Approvals> = map(
+  obj({
+    approvals_required: or(num, 0),
+    approvals_left: or(num, 0),
+    approved_by: list(map(obj({ user: readUsername }), (entry) => entry.user)),
+  }),
+  (a) => ({
+    approvalsRequired: a.approvals_required,
+    approvalsLeft: a.approvals_left,
+    approvedBy: a.approved_by,
+  }),
+);
+
+const readNotes: Reader<Note[]> = list(
+  map(obj({ id: num, author: or(readUsername, "someone"), system: or(bool, false) }), (n) => ({
+    id: n.id,
+    author: n.author,
+    isSystem: n.system,
+  })),
+);
+
+const readJobs: Reader<Job[]> = list(
+  map(obj({ id: num, name: or(str, "job"), status: str, allow_failure: or(bool, false) }), (j) => ({
+    id: j.id,
+    name: j.name,
+    status: j.status,
+    allowFailure: j.allow_failure,
+  })),
+);
 
 /** Narrows `glab mr view -F json` output to an MrView, or undefined when it is not one. */
-export const parseView = (stdout: string): MrView | undefined => decoded(stdout, viewOf);
-
-function approvalsOf(value: unknown): Approvals | undefined {
-  if (!isRecord(value)) return undefined;
-  const approvedBy = listOf(value.approved_by, (entry) =>
-    isRecord(entry) ? (usernameOf(entry.user) ?? undefined) : undefined,
-  );
-  if (approvedBy === undefined) return undefined;
-  return {
-    approvalsRequired: numberOf(value.approvals_required) ?? 0,
-    approvalsLeft: numberOf(value.approvals_left) ?? 0,
-    approvedBy,
-  };
-}
-
+export const parseView = (stdout: string): MrView | undefined => decoded(stdout, readView);
 export const parseApprovals = (stdout: string): Approvals | undefined =>
-  decoded(stdout, approvalsOf);
-
-export function parseNotes(stdout: string): Note[] | undefined {
-  return decoded(stdout, (list) =>
-    listOf(list, (value) => {
-      if (!isRecord(value) || typeof value.id !== "number") return undefined;
-      return {
-        id: value.id,
-        author: usernameOf(value.author) ?? "someone",
-        isSystem: value.system === true,
-      };
-    }),
-  );
-}
-
-export function parseJobs(stdout: string): Job[] | undefined {
-  return decoded(stdout, (list) =>
-    listOf(list, (value) => {
-      if (!isRecord(value) || typeof value.id !== "number" || typeof value.status !== "string") {
-        return undefined;
-      }
-      return {
-        id: value.id,
-        name: textOf(value.name) ?? "job",
-        status: value.status,
-        allowFailure: value.allow_failure === true,
-      };
-    }),
-  );
-}
-
-export function parseUser(stdout: string): string | undefined {
-  return decoded(stdout, (value) => usernameOf(value) ?? undefined);
-}
+  decoded(stdout, readApprovals);
+export const parseNotes = (stdout: string): Note[] | undefined => decoded(stdout, readNotes);
+export const parseJobs = (stdout: string): Job[] | undefined => decoded(stdout, readJobs);
+export const parseUser = (stdout: string): string | undefined => decoded(stdout, readUsername);
 
 export type Phase = "none" | "pending" | "passing" | "failing";
 

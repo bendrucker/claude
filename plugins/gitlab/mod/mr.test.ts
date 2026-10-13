@@ -201,6 +201,37 @@ describe("decide", () => {
       [],
     ],
     [
+      "an approval with comments promotes both",
+      passing,
+      snap(
+        { jobs: [job("test", "success")], ...approvedBy("alice"), notes: noted([2, "alice"]) },
+        "success",
+      ),
+      [
+        { action: "promote", kind: "review", author: "alice", state: "approved" },
+        { action: "promote", kind: "review", author: "alice", state: "commented", notes: 1 },
+      ],
+    ],
+    [
+      "a request for changes with comments promotes both",
+      passing,
+      { ...passing, isChangesRequested: true, notes: [{ id: 2, author: "bob" }] },
+      [
+        { action: "promote", kind: "review", state: "changes_requested" },
+        { action: "promote", kind: "review", author: "bob", state: "commented", notes: 1 },
+      ],
+    ],
+    [
+      "comments after a push still promote",
+      passing,
+      pushed({ ...passing, notes: [{ id: 2, author: "bob" }] }),
+      [
+        { action: "drop", kind: "push", from: "aaaaaaa1111" },
+        { action: "drop", kind: "ci.passing" },
+        { action: "promote", kind: "review", author: "bob", state: "commented", notes: 1 },
+      ],
+    ],
+    [
       "new comments promote once per author",
       snap({ notes: noted([3, "alice"]) }),
       snap({ notes: noted([6, "greptile"], [5, "alice"], [4, "greptile"], [3, "alice"]) }),

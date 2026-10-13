@@ -300,6 +300,53 @@ describe("dispatch", () => {
     expect(record.status).toBe("working");
   });
 
+  test.each([
+    { name: "initializes", result: ok(""), expected: undefined },
+    {
+      name: "records a failure and still starts the agent",
+      result: fail("fatal: clone of 'vendor/lib' failed\n"),
+      expected: "fatal: clone of 'vendor/lib' failed",
+    },
+  ])("submodules: $name", async ({ result, expected }) => {
+    const path = mkdtempSync(join(tmpdir(), "dispatch-submodules-"));
+    await Bun.write(join(path, ".gitmodules"), "");
+    const worktree = ok(
+      JSON.stringify({
+        result: {
+          workspace: { workspace_id: "wZZ" },
+          root_pane: { pane_id: "wZZ:p1" },
+          worktree: { path },
+        },
+      }),
+    );
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      ...REMOTES,
+      ok(""),
+      BASE_OK,
+      worktree,
+      ok(""),
+      ok(""),
+      result,
+      STARTED,
+      ok(""),
+      AGENT_GET,
+    ]);
+    const { record } = await dispatch(options, run);
+    expect(calls).toContainEqual([
+      "git",
+      "-C",
+      path,
+      "submodule",
+      "update",
+      "--init",
+      "--recursive",
+    ]);
+    expect(record.submoduleError).toBe(expected);
+    expect(record.status).toBe("working");
+  });
+
   test("fetches the remote the base names", async () => {
     const { run, calls } = fakeRunner(HAPPY_PATH);
     await dispatch({ ...options, base: "upstream/main" }, run);

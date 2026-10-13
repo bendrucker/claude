@@ -536,7 +536,10 @@
         "*.coderabbit.ai",
         "auth.docker.io",
         "api.cloudflare.com",
-        "dash.cloudflare.com"
+        "dash.cloudflare.com",
+        "oidc.us-east-1.amazonaws.com",
+        "portal.sso.us-east-1.amazonaws.com",
+        "sts.us-east-1.amazonaws.com"
       ],
       "allowLocalBinding": true,
       "allowMachLookup": [
@@ -576,6 +579,8 @@
         "~/.plannotator",
         "~/.local/share/atuin",
         "~/.local/state/vm",
+        "~/.aws/cli/cache",
+        "~/.aws/sso/cache",
         "~/.docker/buildx",
         "~/.greptile",
         "~/.coderabbit",
@@ -591,6 +596,7 @@
       "scp:*",
       "rsync:*",
       "aws:*",
+      "vm:*",
       "gcloud:*",
       "az:*",
       "pulumi:*",

@@ -141,16 +141,21 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
       : jobsOf($, cwd, pipeline.projectId, pipeline.id),
     meOf($, watch, cwd),
   ]);
-  const snapshot = snapshotOf({
+  const read = snapshotOf({
     view,
     approvals: parsed(parseApprovals(approvals), "MR approvals"),
     notes: parsed(parseNotes(notes), "MR notes"),
     jobs,
     me,
   });
+  const prev = watch.snapshot;
+  // A deleted note can lower the newest id seen, which would re-admit older notes.
+  const snapshot =
+    prev?.mr === read.mr
+      ? { ...read, noteCursor: Math.max(prev.noteCursor, read.noteCursor) }
+      : read;
   // The reads are not atomic, so approvals a push reset can look withdrawn on the
   // head read before it. A moved head reads the MR again.
-  const prev = watch.snapshot;
   if (
     !isRetry &&
     prev?.mr === snapshot.mr &&

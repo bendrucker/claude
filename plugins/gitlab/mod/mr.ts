@@ -181,6 +181,7 @@ const PENDING = new Set([
   "pending",
   "running",
   "scheduled",
+  "manual",
 ]);
 
 const LABEL_MAX = 80;

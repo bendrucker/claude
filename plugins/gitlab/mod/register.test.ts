@@ -205,6 +205,26 @@ describe("register", () => {
     ]);
   });
 
+  test("a note back in the window after deletions stays quiet", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+      notes: [note(9, "alice"), note(5, "bob")],
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.notes = [];
+    await w.clock.advance(POLL_MS.settled);
+    world.notes = [note(5, "bob")];
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits).toEqual([]);
+  });
+
   test("approvals a push resets between reads are not an unapproval", async ($, on) => {
     const world: World = {
       branch: "topic",

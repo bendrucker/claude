@@ -64,11 +64,15 @@ describe("ox Stop gate latency", () => {
         await proc.exited;
         const elapsedMs = Math.round(performance.now() - start);
 
+        // A hook that crashes still exits 0 and fast. The ox.stop record
+        // proves the gate ran over the file.
         const eventsDir = join(dir, session);
         const [name] = await readdir(eventsDir).catch(() => []);
-        const phases = name == null ? null : await Bun.file(join(eventsDir, name)).text();
-        expect({ elapsedMs, killed: proc.signalCode != null, phases }).toMatchObject({
+        const record: unknown =
+          name == null ? null : JSON.parse(await Bun.file(join(eventsDir, name)).text());
+        expect({ elapsedMs, killed: proc.signalCode != null, record }).toMatchObject({
           killed: false,
+          record: { event_name: "ox.stop", attributes: { files: 1 } },
         });
         expect(elapsedMs).toBeLessThan(BUDGET_MS);
       } finally {

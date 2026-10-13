@@ -19,6 +19,9 @@ const NAME_ATTEMPTS = 3;
 const BUSY_PAUSE_MS = 1_000;
 const NUDGE_MS = 5_000;
 const LEFT_IDLE: ReadonlySet<string> = new Set(["working", "done"]);
+const LOCK_PAUSE_MS = 250;
+// A denied write shares the prefix, but only a lock someone holds exists already.
+const CONFIG_LOCK_HELD = /could not lock config file .*: File exists/;
 
 export interface CommandResult {
   code: number;
@@ -95,6 +98,7 @@ export interface DispatchRecord {
   // The recovery that ran when herdr could not confirm the first submission:
   // Enter alone, or the prompt again after Enter left the agent idle.
   retry: "enter" | "prompt" | null;
+  trackingError?: string;
 }
 
 export interface DispatchResult {
@@ -261,20 +265,50 @@ function baseRemote(remotes: ReadonlySet<string>, base: string): string | null {
   return remotes.has(candidate) ? candidate : null;
 }
 
+function failureText(result: CommandResult, label: string): string {
+  const stderr = result.stderr.trim();
+  return stderr === "" ? `${label} exited ${result.code}` : stderr;
+}
+
+// Every worktree of a repository writes the one .git/config, and git fails at
+// once rather than waiting when a sibling holds its lock.
+function retryConfigLock(run: Runner, budgetMs: number, pause: Pause): Runner {
+  const attempt = async (
+    argv: readonly string[],
+    options: RunOptions | undefined,
+    waited: number,
+  ): Promise<CommandResult> => {
+    const result = await run(argv, options);
+    if (result.code === 0 || !CONFIG_LOCK_HELD.test(result.stderr) || waited >= budgetMs)
+      return result;
+    await pause(LOCK_PAUSE_MS);
+    return attempt(argv, options, waited + LOCK_PAUSE_MS);
+  };
+  return (argv, options) => attempt(argv, options, 0);
+}
+
 // The sandbox denies a session's writes to the shared .git/config, where `git
 // push -u` records tracking, so record it here instead. herdr tracks the base,
 // which would measure the session's branch against origin/main. Tracking is a
-// convenience, so a failed write leaves herdr's and still starts the agent.
+// convenience, so a failed write is recorded and still starts the agent.
 async function trackOrigin(
   run: Runner,
   remotes: ReadonlySet<string>,
   path: string,
   branch: string,
-): Promise<void> {
-  if (!remotes.has("origin")) return;
+): Promise<string | undefined> {
+  if (!remotes.has("origin")) return undefined;
   const remote = await run(["git", "-C", path, "config", `branch.${branch}.remote`, "origin"]);
-  if (remote.code !== 0) return;
-  await run(["git", "-C", path, "config", `branch.${branch}.merge`, `refs/heads/${branch}`]);
+  if (remote.code !== 0) return failureText(remote, "git config");
+  const merge = await run([
+    "git",
+    "-C",
+    path,
+    "config",
+    `branch.${branch}.merge`,
+    `refs/heads/${branch}`,
+  ]);
+  return merge.code === 0 ? undefined : failureText(merge, "git config");
 }
 
 // GitHub over SSH signs with a key that may need a touch nobody is there to give, so
@@ -294,10 +328,7 @@ async function initSubmodules(run: Runner, path: string): Promise<string | undef
     timeoutMs: FETCH_TIMEOUT_MS,
     env: { GIT_TERMINAL_PROMPT: "0" },
   });
-  if (result.code === 0) return undefined;
-  return result.stderr.trim() === ""
-    ? `git submodule update exited ${result.code}`
-    : result.stderr.trim();
+  return result.code === 0 ? undefined : failureText(result, "git submodule update");
 }
 
 function agentNames(listed: z.infer<typeof AgentList>): ReadonlySet<string> {
@@ -528,8 +559,11 @@ export async function dispatch(
         null,
       );
 
+    // A create that loses the lock has already made the branch, and a retry
+    // checks that branch out rather than creating it again.
+    const locked = retryConfigLock(run, options.timeout, pause);
     const created = await requiredJson(
-      run,
+      locked,
       [
         "herdr",
         "worktree",
@@ -563,7 +597,8 @@ export async function dispatch(
     };
     const ctx: Context = { run, pause, options, partial };
 
-    await trackOrigin(run, remotes, partial.path, options.branch);
+    const trackingError = await trackOrigin(locked, remotes, partial.path, options.branch);
+    if (trackingError != null) partial.trackingError = trackingError;
     const submoduleError = await initSubmodules(run, partial.path);
     if (submoduleError != null) partial.submoduleError = submoduleError;
 
@@ -691,6 +726,10 @@ if (import.meta.main) {
     if (record.submoduleError != null)
       process.stderr.write(
         `warning: submodules in ${record.path} were not initialized: ${record.submoduleError}\n`,
+      );
+    if (record.trackingError != null)
+      process.stderr.write(
+        `warning: ${record.branch} does not track origin/${record.branch}: ${record.trackingError}\n`,
       );
     if (!record.prompted)
       process.stderr.write(

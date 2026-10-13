@@ -90,17 +90,29 @@ const GIT_COMMON = ok("worktree /repo\nHEAD abc123\nbranch refs/heads/main\n\n")
 // A remote list, then the URL of the remote the base names.
 const REMOTES = [ok("origin\nupstream\n"), ok("git@github.com:owner/repo.git\n")];
 
-const HAPPY_PATH = [
-  AGENT_LIST,
-  GIT_COMMON,
-  ...REMOTES,
-  ok(""),
-  BASE_OK,
-  ...CREATED,
-  STARTED,
-  ok(""),
-  AGENT_GET,
-];
+const BEFORE_CREATE = [AGENT_LIST, GIT_COMMON, ...REMOTES, ok(""), BASE_OK];
+const AFTER_CREATE = [STARTED, ok(""), AGENT_GET];
+const HAPPY_PATH = [...BEFORE_CREATE, ...CREATED, ...AFTER_CREATE];
+
+// What herdr and git print when a sibling worktree holds .git/config.lock.
+const LOCK_MESSAGE = "error: could not lock config file .git/config: File exists";
+const CREATE_LOCKED = fail(
+  envelope(
+    "worktree_create_failed",
+    `Preparing worktree (new branch 'fix-thing')\n${LOCK_MESSAGE}\nerror: unable to write upstream branch configuration`,
+  ),
+);
+const CONFIG_LOCKED: CommandResult = { code: 255, stdout: "", stderr: `${LOCK_MESSAGE}\n` };
+const DENIED = "error: could not lock config file .git/config: Operation not permitted";
+
+function recordedPause(): { pause: Pause; pauses: number[] } {
+  const pauses: number[] = [];
+  const pause: Pause = (ms) => {
+    pauses.push(ms);
+    return Promise.resolve();
+  };
+  return { pause, pauses };
+}
 
 describe("fetchArgs", () => {
   test.each([
@@ -292,22 +304,50 @@ describe("dispatch", () => {
     expect(calls.filter((argv) => argv[3] === "config")).toEqual([]);
   });
 
-  test("starts the agent when recording tracking fails", async () => {
-    const { run, calls } = fakeRunner([
-      AGENT_LIST,
-      GIT_COMMON,
-      ...REMOTES,
-      ok(""),
-      BASE_OK,
-      WORKTREE,
-      fail("error: could not lock config file"),
-      STARTED,
-      ok(""),
-      AGENT_GET,
-    ]);
-    const { record } = await dispatch(options, run, instant);
-    expect(calls.filter((argv) => argv[3] === "config")).toHaveLength(1);
+  test.each<{ name: string; timeout: number; tracking: CommandResult[]; expected?: string }>([
+    { name: "waits out a held lock", timeout: 15_000, tracking: [CONFIG_LOCKED, ok(""), ok("")] },
+    {
+      name: "records a lock that outlasts the timeout",
+      timeout: 500,
+      tracking: [CONFIG_LOCKED, CONFIG_LOCKED, CONFIG_LOCKED],
+      expected: LOCK_MESSAGE,
+    },
+    {
+      name: "records a denied write without retrying it",
+      timeout: 15_000,
+      tracking: [ok(""), fail(`${DENIED}\n`)],
+      expected: DENIED,
+    },
+  ])("tracking $name and still starts the agent", async ({ timeout, tracking, expected }) => {
+    const { run, calls } = fakeRunner([...BEFORE_CREATE, WORKTREE, ...tracking, ...AFTER_CREATE]);
+    const { record } = await dispatch({ ...options, timeout }, run, recordedPause().pause);
+    expect(calls.filter((argv) => argv[3] === "config")).toHaveLength(tracking.length);
+    expect(record.trackingError).toBe(expected);
     expect(record.status).toBe("working");
+  });
+
+  test("retries a create that lost the config lock", async () => {
+    const { pause, pauses } = recordedPause();
+    const { run, calls } = fakeRunner([
+      ...BEFORE_CREATE,
+      CREATE_LOCKED,
+      CREATE_LOCKED,
+      ...CREATED,
+      ...AFTER_CREATE,
+    ]);
+    const { record } = await dispatch(options, run, pause);
+    expect(calls.filter((argv) => argv[1] === "worktree" && argv[2] === "create")).toHaveLength(3);
+    expect(pauses).toEqual([250, 250]);
+    expect(record).toMatchObject({ path: "/tmp/worktrees/demo/fix-thing", status: "working" });
+  });
+
+  test("forwards the lock failure once it outlasts the timeout", async () => {
+    const { run } = fakeRunner([...BEFORE_CREATE, CREATE_LOCKED, CREATE_LOCKED, CREATE_LOCKED]);
+    const failure = await failureOf(
+      dispatch({ ...options, timeout: 500 }, run, recordedPause().pause),
+    );
+    expect(failure.message).toBe(CREATE_LOCKED.stderr);
+    expect(failure.partial).toBeNull();
   });
 
   test.each([

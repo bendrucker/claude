@@ -111,7 +111,8 @@ async function viewMr(
 
 async function jobsOf($: EngineInterface, cwd: string, projectId: number, pipeline: number) {
   const path = `projects/${projectId}/pipelines/${pipeline}/jobs?per_page=100`;
-  return parsed(parseJobs(await glab($, cwd, ["api", path])), "pipeline jobs");
+  const stdout = await glab($, cwd, ["api", "--paginate", path]);
+  return parsed(parseJobs(stdout), "pipeline jobs");
 }
 
 async function meOf($: EngineInterface, watch: Watch, cwd: string): Promise<string> {
@@ -120,7 +121,7 @@ async function meOf($: EngineInterface, watch: Watch, cwd: string): Promise<stri
   return watch.me;
 }
 
-async function readMr($: EngineInterface, watch: Watch): Promise<Read> {
+async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promise<Read> {
   const cwd = await $.session.cwd();
   const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
   const branch = head.stdout.trim();
@@ -147,6 +148,21 @@ async function readMr($: EngineInterface, watch: Watch): Promise<Read> {
     jobs,
     me,
   });
+  // The reads are not atomic, so approvals a push reset can look withdrawn on the
+  // head read before it. A moved head reads the MR again.
+  const prev = watch.snapshot;
+  if (
+    !isRetry &&
+    prev?.mr === snapshot.mr &&
+    prev.head === snapshot.head &&
+    prev.approvers.some((name) => !snapshot.approvers.includes(name))
+  ) {
+    const recheck = parsed(
+      parseView(await glab($, cwd, ["mr", "view", String(view.iid), "-F", "json"])),
+      "glab mr view",
+    );
+    if (recheck.sha !== view.sha) return readMr($, watch, true);
+  }
   return { kind: "mr", snapshot, branch };
 }
 
@@ -295,6 +311,7 @@ export function register(on: On): void {
   };
 
   on("session.start", async ($, e, next) => {
+    const generation = watch.generation;
     const started = await next(e);
     if (!e.isInteractive) {
       emit($, "session.start", { active: false, reason: "non-interactive" });
@@ -304,6 +321,8 @@ export function register(on: On): void {
       emit($, "session.start", { active: false, reason: "glab unavailable" });
       return started;
     }
+    // A session.end while this start was in flight has moved the generation on.
+    if (watch.generation !== generation) return started;
     emit($, "session.start", { active: true });
     if (watch.isStopped) {
       watch.isStopped = false;
@@ -322,6 +341,7 @@ export function register(on: On): void {
   on("session.end", ($, e, next) => {
     if (!CONTINUING.has(e.reason)) {
       watch.isStopped = true;
+      watch.generation += 1;
       watch.timer?.cancel();
       show($, watch, undefined);
     }

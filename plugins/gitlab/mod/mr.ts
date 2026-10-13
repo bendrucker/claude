@@ -211,6 +211,7 @@ function phaseOf(read: Read, failed: string[], pending: number): Phase {
   if (pipeline === null) return "none";
   if (failed.length > 0) return "failing";
   if (pending > 0 || PENDING.has(pipeline.status)) return "pending";
+  if (pipeline.status === "canceled" || pipeline.status === "skipped") return "none";
   return "passing";
 }
 

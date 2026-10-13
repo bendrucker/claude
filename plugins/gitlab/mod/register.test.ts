@@ -44,7 +44,10 @@ interface World {
   jobs?: unknown;
   approvals?: unknown;
   notes?: unknown;
+  // Runs after each read of the MR by branch, to move the MR mid-poll.
+  afterView?: () => void;
   slowMs?: number;
+  versionMs?: number;
   submitMs?: number;
   drop?: string;
 }
@@ -89,6 +92,7 @@ function worldOf(on: On, world: World) {
     }
     if (argv.startsWith("git ")) return result(`${world.branch}\n`);
     if (argv === "glab --version") {
+      if (world.versionMs !== undefined) await clock.sleep(world.versionMs);
       if (world.glab instanceof Error) throw world.glab;
       return { value: { ...world.glab, isStdoutTruncated: false, isStderrTruncated: false } };
     }
@@ -96,12 +100,15 @@ function worldOf(on: On, world: World) {
       views.push(argv);
       if (world.slowMs !== undefined) await clock.sleep(world.slowMs);
       if (argv === "glab mr view 7 -F json") return reply(world.byIid ?? world.view);
-      return reply(world.view);
+      const view = reply(world.view);
+      world.afterView?.();
+      return view;
     }
     if (argv === "glab api user") return reply({ username: "ben" });
     if (argv.endsWith("/approvals")) return reply(world.approvals ?? approvals());
     if (argv.includes("/notes?")) return reply(world.notes ?? []);
-    if (argv.includes("/pipelines/50/jobs?")) return reply(world.jobs ?? job("running"));
+    if (argv.startsWith("glab api --paginate projects/1/pipelines/50/jobs?"))
+      return reply(world.jobs ?? job("running"));
     throw new Error(`unexpected command: ${argv}`);
   });
   const named = (event: string) => events.filter((e) => e.event === event);
@@ -198,6 +205,34 @@ describe("register", () => {
     ]);
   });
 
+  test("approvals a push resets between reads are not an unapproval", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+      approvals: approvals("alice"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const pushed = { ...mr("success"), sha: "bbbbbbb2222" };
+    world.afterView = () => {
+      world.approvals = approvals();
+      world.view = pushed;
+      world.byIid = pushed;
+    };
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits).toEqual([]);
+    expect(w.named("drop").map((e) => e.detail?.kind)).toEqual([
+      "push",
+      "ci.passing",
+      "approvals.reset",
+    ]);
+  });
+
   test("a merged MR is read back by IID, logged, and shown as merged", async ($, on) => {
     const world: World = { branch: "topic", glab: GLAB_OK, view: mr() };
     const w = worldOf(on, world);
@@ -229,6 +264,18 @@ describe("register", () => {
       active: false,
       reason: "glab unavailable",
     });
+    expect(w.views).toEqual([]);
+  });
+
+  test("a session that ends during the glab check never polls", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr(), versionMs: 1000 });
+
+    const starting = $.session.start(START);
+    await $.session.end({ reason: "prompt_input_exit", sessionId: "s1", resume: { id: "s1" } });
+    await w.clock.advance(1000 + POLL_MS.idle * 3);
+    await starting;
+
+    expect(w.named("session.start")).toEqual([]);
     expect(w.views).toEqual([]);
   });
 

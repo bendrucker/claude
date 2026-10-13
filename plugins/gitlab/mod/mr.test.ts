@@ -91,11 +91,12 @@ describe("parsers", () => {
 });
 
 describe("snapshotOf", () => {
-  test("an allowed failure passes, and a failed pipeline with no failed job names the pipeline", () => {
+  test("an allowed failure passes, a canceled pipeline shows no CI, and a failed pipeline with no failed job names the pipeline", () => {
     const allowed = snap({ jobs: [job("lint", "failed", { allowFailure: true })] }, "success");
     expect(allowed.phase).toBe("passing");
     const downstream = snap({ jobs: [job("lint", "success")] }, "failed");
     expect(downstream.failed).toEqual(["pipeline"]);
+    expect(snap({ jobs: [job("lint", "canceled")] }, "canceled").phase).toBe("none");
   });
 
   test("my own notes and approvals stay out, and the cursor covers every note", () => {

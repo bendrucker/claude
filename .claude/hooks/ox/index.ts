@@ -2,7 +2,7 @@
 
 import { execFile } from "node:child_process";
 import { readdir, realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -575,16 +575,19 @@ function formatSections(lintOutput: string | null, typeCheck: TypeCheckResult): 
 // diagnostics come back unframed: the two callers say different things about
 // them, and Stop says two different things itself depending on whether it is
 // still willing to block.
-async function runOxGate(files: string[]): Promise<string | null> {
+async function runOxGate(
+  files: string[],
+  timings: Record<string, number> = {},
+): Promise<string | null> {
   if (files.length === 0) {
     return null;
   }
 
-  await runOxfmtWrite(files);
+  await timed(timings, "format_ms", () => runOxfmtWrite(files));
 
   const [lintOutput, typeCheck] = await Promise.all([
-    runOxlintAgentBatch(files),
-    runTypeCheck(files),
+    timed(timings, "lint_ms", () => runOxlintAgentBatch(files)),
+    timed(timings, "type_check_ms", () => runTypeCheck(files)),
   ]);
   if (lintOutput == null && typeCheck.output == null) {
     return null;
@@ -661,7 +664,68 @@ async function clearBlocks(sessionId: string): Promise<void> {
   }
 }
 
+async function timed<T>(
+  timings: Record<string, number>,
+  key: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  const start = performance.now();
+  try {
+    return await run();
+  } finally {
+    timings[key] = Math.round(performance.now() - start);
+  }
+}
+
+// Written in the mod-events layout so the session index reads it into
+// `mod_events` alongside the mods.
+export function stopEventsDir(sessionId: string): string {
+  const root = process.env.OX_EVENTS_DIR ?? join(homedir(), ".claude", "mod-events");
+  return join(root, sessionId.replace(UNSAFE_SESSION, "-"));
+}
+
+async function recordStop(
+  sessionId: string,
+  attributes: Record<string, number | string>,
+): Promise<void> {
+  const record = {
+    timestamp: new Date().toISOString(),
+    severity_text: "INFO",
+    severity_number: 9,
+    event_name: "ox.stop",
+    attributes: { "session.id": sessionId, ...attributes },
+    scope: { name: "ox" },
+  };
+  try {
+    const path = join(stopEventsDir(sessionId), `ox.${Date.now()}.${process.pid}.jsonl`);
+    await Bun.write(path, `${JSON.stringify(record)}\n`);
+  } catch {
+    // Telemetry must never fail the hook.
+  }
+}
+
 export async function processStop(input: StopInput): Promise<SyncHookJSONOutput | null> {
+  const start = performance.now();
+  const attributes: Record<string, number> = {};
+  const result = await gateStop(input, attributes);
+  let outcome = "pass";
+  if (result?.decision === "block") {
+    outcome = "block";
+  } else if (result != null) {
+    outcome = "warn";
+  }
+  await recordStop(input.session_id, {
+    ...attributes,
+    outcome,
+    duration_ms: Math.round(performance.now() - start),
+  });
+  return result;
+}
+
+async function gateStop(
+  input: StopInput,
+  attributes: Record<string, number>,
+): Promise<SyncHookJSONOutput | null> {
   // Every exit that is not a block clears the count, so a stale one can never
   // be read back as progress through a later round's budget.
   if (!(await oxlintCommand())) {
@@ -669,7 +733,9 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
     return null;
   }
 
-  const sections = await runOxGate(await parseTranscript(input.transcript_path, input.cwd));
+  const files = await parseTranscript(input.transcript_path, input.cwd);
+  attributes.files = files.length;
+  const sections = await runOxGate(files, attributes);
   if (sections == null || sections === "") {
     await clearBlocks(input.session_id);
     return null;

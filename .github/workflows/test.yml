@@ -57,6 +57,15 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
+      # The ox Stop gate's latency test type-checks the mods against these.
+      - name: Install Claude Code
+        run: |
+          .github/actions/claude-code/install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Generate mod engine types
+        run: bun run mod-types
+
       - name: Run tests
         run: bun test ./.claude ./user scripts/
 

@@ -11,7 +11,7 @@ const ROOT = join(import.meta.dirname, "..", "..", "..");
 const EDITED = join(ROOT, "plugins/github/mod/register.ts");
 
 // Untyped mods are left out of the type check, which would hide exactly the
-// cost this guards. CI generates the types, so there a missing one fails.
+// cost this guards.
 async function ready(): Promise<string | null> {
   if (!(await Bun.file(join(ROOT, "node_modules/oxlint/package.json")).exists())) {
     return "dependencies are not installed (`bun install`)";
@@ -22,13 +22,11 @@ async function ready(): Promise<string | null> {
   return typed ? null : "mod engine types are not generated (`bun run mod-types`)";
 }
 
-const missing = await ready();
-
 describe("ox Stop gate latency", () => {
-  it.skipIf(missing != null && process.env.CI == null)(
+  it(
     "gates a turn that edited a mod within budget",
     async () => {
-      expect(missing).toBeNull();
+      expect(await ready()).toBeNull();
 
       const dir = await mkdtemp(join(tmpdir(), "ox-perf-"));
       try {

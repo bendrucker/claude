@@ -534,6 +534,7 @@
         "claude.ai",
         "*.greptile.com",
         "*.coderabbit.ai",
+        "auth.docker.io",
         "api.cloudflare.com",
         "dash.cloudflare.com"
       ],
@@ -547,6 +548,7 @@
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
         "~/.config/herdr/herdr.sock",
         "~/.local/state/vm",
+        "~/.docker/run/docker.sock",
         "/tmp/claude"
       ]
     },
@@ -574,6 +576,7 @@
         "~/.plannotator",
         "~/.local/share/atuin",
         "~/.local/state/vm",
+        "~/.docker/buildx",
         "~/.greptile",
         "~/.coderabbit",
         "~/.agent-browser",

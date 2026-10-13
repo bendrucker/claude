@@ -105,11 +105,10 @@ export interface Snapshot {
 
 export type Decision =
   | { action: "promote"; kind: "ci.failed"; failed: string[] }
-  | { action: "promote"; kind: "review.changes_requested"; author: string }
+  | { action: "promote"; kind: "review"; author: string; state: string }
   | { action: "drop"; kind: "ci.passing" | "ci.pending" | "ci.none" }
   | { action: "drop"; kind: "push"; from: string }
-  | { action: "drop"; kind: "pr.closed" | "pr.merged" }
-  | { action: "drop"; kind: "review"; author: string; state: string };
+  | { action: "drop"; kind: "pr.closed" | "pr.merged" };
 
 export type Promoted = Extract<Decision, { action: "promote" }>;
 
@@ -199,7 +198,7 @@ export function snapshotOf(view: PrView): Snapshot {
 
 /**
  * What changed between two polls of the same PR. A check that newly fails, or
- * a review requesting changes, is promoted. Every other change is dropped.
+ * any new review, is promoted. Every other change is dropped.
  */
 export function decide(prev: Snapshot, next: Snapshot): Decision[] {
   if (next.state !== "OPEN") {
@@ -222,11 +221,12 @@ export function decide(prev: Snapshot, next: Snapshot): Decision[] {
   const seen = new Set(prev.reviews.map((r) => r.id));
   for (const review of next.reviews) {
     if (seen.has(review.id)) continue;
-    decisions.push(
-      review.state === "CHANGES_REQUESTED"
-        ? { action: "promote", kind: "review.changes_requested", author: review.author }
-        : { action: "drop", kind: "review", author: review.author, state: review.state },
-    );
+    decisions.push({
+      action: "promote",
+      kind: "review",
+      author: review.author,
+      state: review.state,
+    });
   }
   return decisions;
 }
@@ -247,7 +247,7 @@ function paragraphOf(snapshot: Snapshot, decision: Promoted): string {
     ].join("\n");
   }
   return [
-    `@${decision.author} requested changes on ${pr}: ${snapshot.url}`,
+    `@${decision.author} reviewed ${pr} (${decision.state}): ${snapshot.url}`,
     `Read the review with \`gh pr view ${snapshot.pr} --comments\`.`,
   ].join("\n");
 }

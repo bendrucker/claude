@@ -214,8 +214,8 @@ async function hasGh($: EngineInterface): Promise<boolean> {
 
 /**
  * Watches the current branch's pull request with `gh` and shows its CI and
- * review state at the end of the prompt footer. A newly failed check or a review requesting
- * changes is sent to the model; every other change is only shown and logged.
+ * review state at the end of the prompt footer. A newly failed check or any new review is
+ * sent to the model. Every other change is only shown and logged.
  */
 export function register(on: On): void {
   const watch: Watch = {

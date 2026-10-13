@@ -680,8 +680,14 @@ async function timed<T>(
 // Written in the mod-events layout so the session index reads it into
 // `mod_events` alongside the mods.
 export function stopEventsDir(sessionId: string): string {
-  const root = process.env.OX_EVENTS_DIR ?? join(homedir(), ".claude", "mod-events");
+  const config = setEnv("CLAUDE_CONFIG_DIR") ?? join(homedir(), ".claude");
+  const root = setEnv("OX_EVENTS_DIR") ?? join(config, "mod-events");
   return join(root, sessionId.replace(UNSAFE_SESSION, "-"));
+}
+
+function setEnv(name: string): string | undefined {
+  const value = process.env[name];
+  return value === undefined || value === "" ? undefined : value;
 }
 
 async function recordStop(
@@ -707,19 +713,24 @@ async function recordStop(
 export async function processStop(input: StopInput): Promise<SyncHookJSONOutput | null> {
   const start = performance.now();
   const attributes: Record<string, number> = {};
-  const result = await gateStop(input, attributes);
-  let outcome = "pass";
-  if (result?.decision === "block") {
-    outcome = "block";
-  } else if (result != null) {
-    outcome = "warn";
+  let outcome = "error";
+  try {
+    const result = await gateStop(input, attributes);
+    if (result?.decision === "block") {
+      outcome = "block";
+    } else if (result == null) {
+      outcome = "pass";
+    } else {
+      outcome = "warn";
+    }
+    return result;
+  } finally {
+    await recordStop(input.session_id, {
+      ...attributes,
+      outcome,
+      duration_ms: Math.round(performance.now() - start),
+    });
   }
-  await recordStop(input.session_id, {
-    ...attributes,
-    outcome,
-    duration_ms: Math.round(performance.now() - start),
-  });
-  return result;
 }
 
 async function gateStop(

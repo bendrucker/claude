@@ -14,6 +14,11 @@ const MAX_TASK_SUMMARY = 120;
 const MAX_PROMPT_BYTES = 128 * 1024;
 const FETCH_TIMEOUT_MS = 60_000;
 const NAME_ATTEMPTS = 3;
+// A new pane draws its prompt while a startup hook such as mise's still holds
+// the foreground, and agent start refuses the pane as busy until it lets go.
+const BUSY_PAUSE_MS = 1_000;
+const NUDGE_MS = 5_000;
+const LEFT_IDLE: ReadonlySet<string> = new Set(["working", "done"]);
 
 export interface CommandResult {
   code: number;
@@ -29,6 +34,8 @@ export interface RunOptions {
 }
 
 export type Runner = (argv: readonly string[], options?: RunOptions) => Promise<CommandResult>;
+
+export type Pause = (ms: number) => Promise<void>;
 
 // The sandbox marker covers the whole invocation, so every subprocess takes an argv array.
 export const spawnRunner: Runner = async (argv, options) => {
@@ -85,6 +92,9 @@ export interface DispatchRecord {
   // worktree and the name exist but the agent never received the work.
   prompted: boolean;
   submoduleError?: string;
+  // The recovery that ran when herdr could not confirm the first submission:
+  // Enter alone, or the prompt again after Enter left the agent idle.
+  retry: "enter" | "prompt" | null;
 }
 
 export interface DispatchResult {
@@ -129,7 +139,7 @@ const AgentInfo = z.object({
   }),
 });
 
-const AgentStarted = z.object({
+const AgentState = z.object({
   result: z.object({ agent: z.object({ agent_status: z.string() }) }),
 });
 
@@ -294,18 +304,25 @@ function agentNames(listed: z.infer<typeof AgentList>): ReadonlySet<string> {
   return new Set(listed.result.agents.flatMap((agent) => (agent.name == null ? [] : [agent.name])));
 }
 
+interface Context {
+  run: Runner;
+  pause: Pause;
+  options: DispatchOptions;
+  partial: DispatchRecord;
+}
+
 // A derived name can be bound by another dispatch between the list above and
 // this start, and herdr names that race. The worktree already exists by then,
 // so the dispatch takes the next free name rather than leaving it without an
 // agent. The replacement can lose the same race, so the retry is bounded. A
 // name the caller asked for has no substitute.
 async function startNamed(
-  run: Runner,
-  options: DispatchOptions,
-  partial: DispatchRecord,
+  ctx: Context,
   name: string,
   attempt = 1,
+  busy = Math.ceil(ctx.options.timeout / BUSY_PAUSE_MS),
 ): Promise<{ name: string; started: CommandResult }> {
+  const { run, options, partial } = ctx;
   const started = await run([
     "herdr",
     "agent",
@@ -316,28 +333,85 @@ async function startNamed(
     "--pane",
     partial.pane,
   ]);
-  if (
-    options.name != null ||
-    attempt >= NAME_ATTEMPTS ||
-    envelopeCode(started.stderr) !== "agent_name_taken"
-  )
+  const code = envelopeCode(started.stderr);
+  if (code === "agent_pane_busy" && busy > 1) {
+    await ctx.pause(BUSY_PAUSE_MS);
+    return startNamed(ctx, name, attempt, busy - 1);
+  }
+  if (options.name != null || attempt >= NAME_ATTEMPTS || code !== "agent_name_taken")
     return { name, started };
 
   const live = agentNames(await requiredJson(run, ["herdr", "agent", "list"], AgentList, partial));
-  return startNamed(run, options, partial, deriveName(options.branch, live), attempt + 1);
+  return startNamed(ctx, deriveName(options.branch, live), attempt + 1, busy);
+}
+
+async function statusOf(ctx: Context, name: string): Promise<string> {
+  const result = await ctx.run(["herdr", "agent", "get", name]);
+  if (result.code !== 0) return "unknown";
+  return decode(AgentState, result, "herdr agent get", ctx.partial).result.agent.agent_status;
+}
+
+async function submit(ctx: Context, name: string): Promise<boolean> {
+  const submitted = await ctx.run([
+    "herdr",
+    "agent",
+    "prompt",
+    name,
+    ctx.options.prompt,
+    "--wait",
+    "--until",
+    "working",
+    "--timeout",
+    String(ctx.options.timeout),
+  ]);
+  // Neither tolerated code confirms delivery. agent_prompt_stalled means
+  // nothing was observed after the paste, which a fast turn and a lost Enter
+  // both produce. A timeout under --until working means the agent reached
+  // blocked and stayed there, where a dialog may be holding the prompt.
+  if (fatal(submitted, "timeout", "agent_prompt_stalled"))
+    throw new DispatchError(submitted.stderr, ctx.partial);
+  return submitted.code === 0;
+}
+
+async function nudge(ctx: Context, name: string): Promise<string> {
+  await ctx.run(["herdr", "agent", "send-keys", name, "enter"]);
+  const working = await ctx.run([
+    "herdr",
+    "agent",
+    "wait",
+    name,
+    "--until",
+    "working",
+    "--timeout",
+    String(NUDGE_MS),
+  ]);
+  return working.code === 0 ? "working" : statusOf(ctx, name);
+}
+
+// Enter submits a paste that landed without one and is a no-op on an empty
+// input.
+async function submitOnce(
+  ctx: Context,
+  name: string,
+): Promise<{ status: string; nudged: boolean }> {
+  if (await submit(ctx, name)) return { status: "working", nudged: false };
+  // A fast turn can finish before herdr looks, and a blocked agent is holding
+  // a dialog that another key would answer.
+  const status = await statusOf(ctx, name);
+  if (status !== "idle") return { status, nudged: false };
+  return { status: await nudge(ctx, name), nudged: true };
 }
 
 // agent prompt --wait does not track turns, so a startup turn still running
 // would satisfy --until working and report work the agent never took. A
 // submission from idle is what makes the observed transition this prompt's.
 async function deliver(
-  run: Runner,
+  ctx: Context,
   name: string,
-  options: DispatchOptions,
-  partial: DispatchRecord,
   started: CommandResult,
-): Promise<boolean> {
-  const info = decode(AgentStarted, started, "herdr agent start", partial);
+): Promise<Pick<DispatchRecord, "prompted" | "retry">> {
+  const { run, options, partial } = ctx;
+  const info = decode(AgentState, started, "herdr agent start", partial);
   if (info.result.agent.agent_status !== "idle") {
     const settled = await run([
       "herdr",
@@ -349,28 +423,17 @@ async function deliver(
       "--timeout",
       String(options.timeout),
     ]);
-    if (settled.code !== 0) return false;
+    if (settled.code !== 0) return { prompted: false, retry: null };
   }
 
-  const submitted = await run([
-    "herdr",
-    "agent",
-    "prompt",
-    name,
-    options.prompt,
-    "--wait",
-    "--until",
-    "working",
-    "--timeout",
-    String(options.timeout),
-  ]);
-  // Neither tolerated code confirms delivery. agent_prompt_stalled means
-  // nothing was observed after the paste, which a fast turn and a lost Enter
-  // both produce. A timeout under --until working means the agent reached
-  // blocked and stayed there, where a dialog may be holding the prompt.
-  if (fatal(submitted, "timeout", "agent_prompt_stalled"))
-    throw new DispatchError(submitted.stderr, partial);
-  return submitted.code === 0;
+  // An agent can report idle before it accepts input, so a paste can be
+  // dropped or land without its Enter. The Enter in each attempt recovers the
+  // second, and the resubmission recovers the first.
+  const first = await submitOnce(ctx, name);
+  if (first.status !== "idle")
+    return { prompted: LEFT_IDLE.has(first.status), retry: first.nudged ? "enter" : null };
+  const second = await submitOnce(ctx, name);
+  return { prompted: LEFT_IDLE.has(second.status), retry: "prompt" };
 }
 
 export interface DispatchOptions {
@@ -385,6 +448,7 @@ export interface DispatchOptions {
 export async function dispatch(
   options: DispatchOptions,
   run: Runner = spawnRunner,
+  pause: Pause = Bun.sleep,
 ): Promise<DispatchResult> {
   if (!BRANCH_PATTERN.test(options.branch))
     throw new DispatchError(
@@ -495,13 +559,15 @@ export async function dispatch(
       session: null,
       status: "unknown",
       prompted: false,
+      retry: null,
     };
+    const ctx: Context = { run, pause, options, partial };
 
     await trackOrigin(run, remotes, partial.path, options.branch);
     const submoduleError = await initSubmodules(run, partial.path);
     if (submoduleError != null) partial.submoduleError = submoduleError;
 
-    const { name, started } = await startNamed(run, options, partial, wanted);
+    const { name, started } = await startNamed(ctx, wanted);
 
     // A brand-new worktree draws Claude Code's trust dialog. The name binds
     // anyway, and agent prompt stays refused until the dialog settles.
@@ -509,7 +575,7 @@ export async function dispatch(
     if (fatal(started, "agent_not_ready")) throw new DispatchError(started.stderr, partial);
     partial.agent = name;
 
-    if (ready) partial.prompted = await deliver(run, name, options, partial, started);
+    if (ready) Object.assign(partial, await deliver(ctx, name, started));
 
     const info = await requiredJson(run, ["herdr", "agent", "get", name], AgentInfo, partial);
 
@@ -628,7 +694,7 @@ if (import.meta.main) {
       );
     if (!record.prompted)
       process.stderr.write(
-        `warning: herdr could not confirm ${record.agent ?? "the agent"} received the prompt. Read the pane with \`herdr agent read ${record.pane}\`: answer any dialog with \`herdr agent send-keys\` and submit the prompt yourself, or confirm the agent is already working on it.\n`,
+        `warning: herdr could not confirm ${record.agent ?? "the agent"} received the prompt${record.retry == null ? "" : ` (retried: ${record.retry})`}. Read the pane with \`herdr agent read ${record.pane}\`: answer any dialog with \`herdr agent send-keys\` and submit the prompt yourself, or confirm the agent is already working on it.\n`,
       );
 
     writeLedger(record, root, "dispatched");

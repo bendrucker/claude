@@ -143,7 +143,7 @@ New work needing its own worktree and agent gets both in one call:
 bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
 ```
 
-It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir.
+It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A non-null `retry` means the first submission left the agent idle and the script resent Enter (`enter`) or the whole prompt (`prompt`). A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir.
 
 `worktrunk:wt-switch-create` re-roots this session instead.
 

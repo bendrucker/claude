@@ -35,7 +35,7 @@ Request after the mechanical passes have run. `/ship` orders them. Standalone on
 ## Request
 
 1. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts raise --kind <kind> --summary "<repo> <branch>: <what to review>"`. The kind is `code` for the diff and `doc` for a document, unless the caller passes a more specific `--kind` (`plan`, `pr-body`). A caller's `--kind` and `--summary` pass through verbatim.
-2. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts open --diff`, or `open --doc <file>` for a document. `open --diff` re-uses a reviewr sidebar already up over this working tree.
+2. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts open --diff`, or `open --doc <file>` for a document. `open --diff` re-uses a reviewr sidebar already up over this working tree. `open --doc` reloads the plannotator-tui pane it opened earlier for the same file, keeping Ben's annotations.
 3. End the turn with exactly one line naming the surface and that Send resumes the work. The surface shows the change. The line carries no recap.
 
 ## Resume

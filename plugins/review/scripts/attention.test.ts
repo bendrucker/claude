@@ -5,6 +5,7 @@ import {
   clearArgs,
   currentPane,
   docOpenArgs,
+  docPanePath,
   existingReviewr,
   isKind,
   kinds,
@@ -15,8 +16,10 @@ import {
   PROMPT_MARKER,
   promptAction,
   raiseArgs,
+  recordedDocPane,
   reviewGlyph,
   reviewrOpenArgs,
+  runsPlannotator,
 } from "./attention";
 
 describe("raiseArgs", () => {
@@ -337,6 +340,43 @@ describe("hook marker path", () => {
     } finally {
       Bun.spawnSync(["rm", "-rf", home]);
     }
+  });
+});
+
+describe("docPanePath", () => {
+  test("sits beside the marker", () => {
+    expect(docPanePath("wE5:p1", "/home/x")).toBe(
+      "/home/x/.cache/claude/review-human/wE5-p1.doc.json",
+    );
+  });
+});
+
+describe("recordedDocPane", () => {
+  const file = "/repo/tmp/plan.md";
+  test.each<[string, string, string | null]>([
+    ["the same file", JSON.stringify({ pane: "wE5:p3", file }), "wE5:p3"],
+    ["another file", JSON.stringify({ pane: "wE5:p3", file: "/repo/tmp/other.md" }), null],
+    ["a record missing the pane", JSON.stringify({ file }), null],
+    ["no record", "", null],
+  ])("%s", (_name, record, expected) => {
+    expect(recordedDocPane(record, file)).toBe(expected);
+  });
+});
+
+describe("runsPlannotator", () => {
+  const info = (...names: string[]) =>
+    JSON.stringify({
+      result: { process_info: { foreground_processes: names.map((name) => ({ name })) } },
+    });
+
+  test.each<[string, string, boolean]>([
+    ["the staged binary", info("plannotator-tui.exe"), true],
+    ["a shell left behind", info("zsh"), false],
+    ["another plugin", info("herdr-reviewr"), false],
+    ["an error envelope", JSON.stringify({ error: { code: "pane_not_found" } }), false],
+    ["no output", "", false],
+  ])("%s", (_name, stdout, expected) => {
+    expect(runsPlannotator(stdout)).toBe(expected);
   });
 });
 

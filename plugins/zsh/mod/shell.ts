@@ -68,7 +68,7 @@ interface Probing {
 
 export async function detect($: Probing): Promise<Shell> {
   // CLAUDE_CODE_SHELL, then $SHELL, each only when it names bash or zsh,
-    // then the first zsh on PATH.
+  // then the first zsh on PATH.
   const candidates = [await $.env.get("CLAUDE_CODE_SHELL"), await $.env.get("SHELL")];
   const path = candidates.find((c) => c !== undefined && /bash|zsh/.test(c)) ?? "zsh";
 

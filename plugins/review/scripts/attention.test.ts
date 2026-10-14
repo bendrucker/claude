@@ -5,6 +5,10 @@ import {
   clearArgs,
   currentPane,
   docOpenArgs,
+  docPanePath,
+  docPaneState,
+  type DocPaneState,
+  type DocPanes,
   existingReviewr,
   isKind,
   kinds,
@@ -15,6 +19,7 @@ import {
   PROMPT_MARKER,
   promptAction,
   raiseArgs,
+  recordedDocPanes,
   reviewGlyph,
   reviewrOpenArgs,
 } from "./attention";
@@ -337,6 +342,52 @@ describe("hook marker path", () => {
     } finally {
       Bun.spawnSync(["rm", "-rf", home]);
     }
+  });
+});
+
+describe("docPanePath", () => {
+  test("sits beside the marker", () => {
+    expect(docPanePath("wE5:p1", "/home/x")).toBe(
+      "/home/x/.cache/claude/review-human/wE5-p1.doc.json",
+    );
+  });
+});
+
+describe("recordedDocPanes", () => {
+  const panes = { "/repo/tmp/a.md": "wE5:p2", "/repo/tmp/b.md": "wE5:p3" };
+  test.each<[string, string, DocPanes]>([
+    ["one pane per file", JSON.stringify(panes), panes],
+    ["a non-string pane", JSON.stringify({ "/repo/tmp/a.md": 2 }), {}],
+    ["no record", "", {}],
+  ])("%s", (_name, record, expected) => {
+    expect(recordedDocPanes(record)).toEqual(expected);
+  });
+});
+
+describe("docPaneState", () => {
+  const info = (...names: string[]) =>
+    JSON.stringify({
+      result: { process_info: { foreground_processes: names.map((name) => ({ name })) } },
+    });
+
+  test.each<[string, string, DocPaneState]>([
+    ["the staged binary", info("plannotator-tui.exe"), "running"],
+    ["a shell left behind", info("zsh"), "gone"],
+    ["another plugin", info("herdr-reviewr"), "gone"],
+    [
+      "a closed pane",
+      JSON.stringify({ error: { code: "pane_not_found", message: "pane not found" } }),
+      "gone",
+    ],
+    [
+      "another herdr error",
+      JSON.stringify({ error: { code: "server_busy", message: "busy" } }),
+      "unknown",
+    ],
+    ["an unexpected envelope", JSON.stringify({ result: { type: "ok" } }), "unknown"],
+    ["no output", "", "unknown"],
+  ])("%s", (_name, stdout, expected) => {
+    expect(docPaneState(stdout)).toBe(expected);
   });
 });
 

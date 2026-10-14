@@ -265,6 +265,59 @@ export function existingReviewr(paneList: string, cwd: string): string | null {
   );
 }
 
+// plannotator-tui leaves its pane unlabeled and reads the file from its
+// environment, so the doc pane opened for a requesting pane is recorded
+// beside its marker.
+export function docPanePath(paneId: string, home = homedir()): string {
+  return `${markerPath(paneId, home)}.doc.json`;
+}
+
+// File path to the pane reviewing it.
+const DocPanes = z.record(z.string(), z.string());
+export type DocPanes = z.infer<typeof DocPanes>;
+
+export function recordedDocPanes(record: string): DocPanes {
+  let json: unknown;
+  try {
+    json = JSON.parse(record);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    return {};
+  }
+  const parsed = DocPanes.safeParse(json);
+  return parsed.success ? parsed.data : {};
+}
+
+const ProcessInfo = z.object({
+  result: z.object({
+    process_info: z.object({ foreground_processes: z.array(z.object({ name: z.string() })) }),
+  }),
+});
+
+export type DocPaneState = "running" | "gone" | "unknown";
+
+// A recorded pane id can outlive the TUI once Ben quits it. Anything short of
+// a definite answer is `unknown`, so a slow or failing herdr leaves a pane
+// holding annotations in place instead of opening a duplicate.
+export function docPaneState(processInfo: string): DocPaneState {
+  let json: unknown;
+  try {
+    json = JSON.parse(processInfo);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    return "unknown";
+  }
+  const failed = HerdrError.safeParse(json);
+  if (failed.success) return failed.data.error.code === "pane_not_found" ? "gone" : "unknown";
+  const parsed = ProcessInfo.safeParse(json);
+  if (!parsed.success) return "unknown";
+  return parsed.data.result.process_info.foreground_processes.some((proc) =>
+    proc.name.startsWith("plannotator-tui"),
+  )
+    ? "running"
+    : "gone";
+}
+
 export function currentPane(env: Record<string, string | undefined> = process.env): string | null {
   const paneId = env.HERDR_PANE_ID;
   if (env.HERDR_ENV !== "1" || paneId == null || paneId === "") return null;
@@ -296,14 +349,44 @@ function herdrJson(args: string[]): string {
   }
 }
 
-function openPane(args: string[], missingPlugin?: string): never {
+function openPane(args: string[], missingPlugin?: string): string {
   const outcome = openedPane(herdrJson(args));
   if ("error" in outcome && missingPlugin != null && outcome.error.includes("plugin not found")) {
     fail(missingPlugin);
   }
   if ("error" in outcome) fail(outcome.error);
   console.log(`opened ${outcome.pane}`);
-  process.exit(0);
+  return outcome.pane;
+}
+
+// `r` re-reads the file and re-anchors the saved annotations, and a file review
+// stays open after Send.
+async function openDoc(paneId: string, file: string): Promise<void> {
+  const path = canonical(resolve(file));
+  const recordPath = docPanePath(paneId);
+  const record = Bun.file(recordPath);
+  const panes = (await record.exists()) ? recordedDocPanes(await record.text()) : {};
+  const existing = panes[path];
+  if (existing != null) {
+    const state = docPaneState(herdrJson(["pane", "process-info", "--pane", existing]));
+    if (state === "unknown") fail(`herdr did not report on ${existing}; retry the open`);
+    if (state === "running") {
+      if (!herdr(["pane", "send-keys", existing, "r"])) fail(`could not reload ${existing}`);
+      console.log(`reloaded ${existing}`);
+      return;
+    }
+  }
+  panes[path] = openPane(
+    docOpenArgs(paneId, path),
+    `plannotator-tui not found: install the \`${ANNOTATE_PLUGIN}\` herdr plugin`,
+  );
+  // The pane is already up, so a lost record costs only the next reload.
+  try {
+    mkdirSync(dirname(recordPath), { recursive: true });
+    await Bun.write(recordPath, JSON.stringify(panes));
+  } catch (error) {
+    console.error(`could not record ${recordPath}: ${String(error)}`);
+  }
 }
 
 function fail(message: string): never {
@@ -394,10 +477,8 @@ const openCmd = command(
       currentPane() ?? fail("not inside a herdr pane (HERDR_PANE_ID unset): use --browser");
     if (parsed.flags.doc != null) {
       if (!(await Bun.file(parsed.flags.doc).exists())) fail(`no such file: ${parsed.flags.doc}`);
-      openPane(
-        docOpenArgs(paneId, parsed.flags.doc),
-        `plannotator-tui not found: install the \`${ANNOTATE_PLUGIN}\` herdr plugin`,
-      );
+      await openDoc(paneId, parsed.flags.doc);
+      process.exit(0);
     }
     const workspace = process.env.HERDR_WORKSPACE_ID;
     const open =
@@ -412,6 +493,7 @@ const openCmd = command(
       reviewrOpenArgs(paneId),
       `reviewr not found: install the \`${REVIEWR_PLUGIN}\` herdr plugin`,
     );
+    process.exit(0);
   },
 );
 

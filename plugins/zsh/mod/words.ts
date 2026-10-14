@@ -5,7 +5,6 @@
 export type Context = "plain" | "test" | "arith" | "assign";
 
 export interface Word {
-  /** The word's source text. */
   text: string;
   start: number;
   end: number;

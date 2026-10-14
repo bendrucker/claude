@@ -35,7 +35,6 @@ function quote(span: string): string | undefined {
   return parts.includes(undefined) ? undefined : parts.join("");
 }
 
-/** The edit that quotes `w.text` from `from` on, when every character there is unquoted. */
 function edit(w: Word, from: number, rule: Rule): Edit | undefined {
   const span = w.text.slice(from);
   if (span.startsWith("~") || !w.unquoted.slice(from).every(Boolean)) return undefined;

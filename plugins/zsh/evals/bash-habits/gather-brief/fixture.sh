@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# A small multi-language app: TS server, Vue client, SQL migrations, shell scripts.
 set -euo pipefail
 git init -q -b main
 echo "/.*" >> .git/info/exclude

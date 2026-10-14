@@ -195,6 +195,54 @@ describe("register", () => {
     ]);
   });
 
+  test("stops calling herdr after three failed starts", async ($, on) => {
+    const herdr = herdrOf(on, HERDR, { herdrExit: new Error("ENOENT") });
+
+    const polled = async (turnId: string) => {
+      herdr.state.agents = [agent("running")];
+      await $.turn.start({ text: "hi", turnId });
+      await herdr.clock.settle();
+      await herdr.clock.advance(30_000);
+    };
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    await polled("t1");
+    await polled("t2");
+    await polled("t3");
+    await end($);
+    await herdr.clock.settle();
+
+    expect(herdr.calls).toHaveLength(3);
+    expect(herdr.events.filter(({ event }) => event === "herdr.suspend")).toEqual([
+      {
+        event: "herdr.suspend",
+        ok: false,
+        detail: { suspended: true, spawnFailures: 3 },
+      },
+    ]);
+  });
+
+  test("a call that starts resets the failed-start count", async ($, on) => {
+    const herdr = herdrOf(on, HERDR, { herdrExit: new Error("ENOENT") });
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    await $.turn.start({ text: "hi", turnId: "t1" });
+    await herdr.clock.settle();
+    herdr.state.herdrExit = 1;
+    await $.turn.complete(COMPLETE);
+    await herdr.clock.settle();
+    herdr.state.herdrExit = new Error("ENOENT");
+    await $.turn.start({ text: "hi", turnId: "t2" });
+    await herdr.clock.settle();
+    await $.turn.start({ text: "hi", turnId: "t3" });
+    await herdr.clock.settle();
+
+    expect(herdr.calls).toHaveLength(5);
+    expect(herdr.events.some(({ event }) => event === "herdr.suspend")).toBe(false);
+  });
+
   // oxlint-disable-next-line vitest/prefer-each -- claude-code/testing has no test.each
   for (const [name, env, start] of [
     ["outside herdr", {}, START],

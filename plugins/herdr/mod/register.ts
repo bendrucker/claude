@@ -13,6 +13,10 @@ const ACTIVE = new Set(["pending", "running", "waiting", "idle"]);
 // its own pane go idle with no event here, so the counts are re-read on a timer.
 const POLL_MS = 10_000;
 
+// A herdr that cannot start (missing binary, hung past the timeout) would
+// otherwise be retried on every event and poll for the rest of the session.
+const SUSPEND_AFTER = 3;
+
 type Tokens = Record<string, string>;
 
 interface Pane {
@@ -26,6 +30,7 @@ interface Beacon {
   inFlight: Promise<void> | undefined;
   requests: number;
   seq: number;
+  spawnFailures: number;
   poll: { cancel: () => void } | undefined;
 }
 
@@ -80,6 +85,17 @@ async function herdr(
     ms,
     detail: { op: "report-metadata", exitCode, stderr: stderr.trim() },
   });
+  beacon.spawnFailures = exitCode === -1 ? beacon.spawnFailures + 1 : 0;
+  if (beacon.spawnFailures === SUSPEND_AFTER) {
+    beacon.pane = undefined;
+    poll($, beacon, false);
+    void $.modEvents.emit({
+      mod: MOD,
+      event: "herdr.suspend",
+      ok: false,
+      detail: { suspended: true, spawnFailures: SUSPEND_AFTER },
+    });
+  }
   return ok;
 }
 
@@ -160,6 +176,7 @@ export function register(on: On): void {
     inFlight: undefined,
     requests: 0,
     seq: 0,
+    spawnFailures: 0,
     poll: undefined,
   };
 
@@ -173,6 +190,7 @@ export function register(on: On): void {
     // Clock-based, so a restarted session's seqs stay above the last one's.
     beacon.seq = Math.max(beacon.seq, now * 1000);
     beacon.reported = {};
+    beacon.spawnFailures = 0;
     const isHosted = env === "1" && id !== undefined && id !== "" && e.isInteractive;
     beacon.pane = isHosted
       ? { bin: bin === undefined || bin === "" ? "herdr" : bin, id }

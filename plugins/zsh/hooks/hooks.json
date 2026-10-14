@@ -1,0 +1,4 @@
+{
+  "description": "Quotes flag globs, =words, and URLs that zsh would expand in Bash commands, and explains zsh errors in the result",
+  "modules": ["../mod/register.ts"]
+}

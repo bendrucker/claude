@@ -447,7 +447,8 @@
     "run-command@bendrucker": true,
     "mod-events@bendrucker": true,
     "session-limit@bendrucker": true,
-    "load@bendrucker": true
+    "load@bendrucker": true,
+    "zsh@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {

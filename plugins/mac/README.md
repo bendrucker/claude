@@ -13,6 +13,10 @@ macOS-specific automation and system integration.
 
 - **sandbox** — Reads the invoked script for the `claude:dangerouslyDisableSandbox` marker and disables the command sandbox when present. Matches both `Bash` and `Monitor` tool calls.
 
+### Mod
+
+- **bypass gate** — Denies a Bash call with `dangerouslyDisableSandbox: true` until the session has seen that command's verb fail sandboxed, exempting `bun install`. Emits `bypass.deny`, `bypass.allow`, and `bypass.retry` (with `ok` for the sandboxed retry's outcome) through `mod-events`. An experiment: remove it if fewer than ~50% of denies are followed by a successful sandboxed retry over two weeks.
+
 ### Scripts
 
 - `scripts/jxa.ts` — App-scoped JXA runner with AST-based `Application()` validation
@@ -45,4 +49,5 @@ The marker is inert on Linux and inert when the `mac` plugin is not installed. I
 
 ```bash
 bun test plugins/mac
+bun scripts/mod-test.ts mac
 ```

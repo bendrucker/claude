@@ -31,6 +31,8 @@ const resourcesDir = join(import.meta.dirname, "..", "resources");
 const plansFixtureDir = join(import.meta.dirname, "..", "fixtures", "plans");
 
 async function loadExtensions(database: Database) {
+  // `getenv` exists only in the duckdb CLI, so stub it for the node binding.
+  await database.run("CREATE OR REPLACE TEMP MACRO getenv(name) AS NULL");
   await database.run(await Bun.file(join(resourcesDir, "extensions.sql")).text());
 }
 

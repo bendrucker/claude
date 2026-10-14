@@ -164,6 +164,7 @@ async function createTestRepo(): Promise<string> {
   await $`git init -q -b main`.cwd(repo).quiet();
   await $`git config user.email test@example.com`.cwd(repo).quiet();
   await $`git config user.name "Test User"`.cwd(repo).quiet();
+  await $`git config commit.gpgsign false`.cwd(repo).quiet();
   await Bun.write(join(repo, "README.md"), "");
   await $`git add README.md`.cwd(repo).quiet();
   await $`git commit -q -m initial`.cwd(repo).quiet();

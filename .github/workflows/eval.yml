@@ -68,7 +68,7 @@ jobs:
           else
             for plugin in $(git diff --name-only "$BASE" HEAD | awk -F/ '$1 == "plugins" { print $2 }' | sort -u); do
               for suite in plugins/"$plugin"/evals/*/; do
-                if compgen -G "$suite*/case.yaml" > /dev/null; then
+                if compgen -G "$suite*/case.yaml" > /dev/null && [ ! -e "$suite.local-only" ]; then
                   native+=("${suite%/}")
                 fi
               done

@@ -270,7 +270,7 @@ class Lexer {
     // An fd number before a redirect, as in `2>/dev/null`.
     if (/^\d+$/.test(text) && (this.at() === "<" || this.at() === ">")) return text;
     const level = this.level;
-    const flags = Array.from(text, (_, i) => bare.has(start + i));
+    const flags = Array.from({ length: text.length }, (_, i) => bare.has(start + i));
     let context: Context = level.test ? "test" : "plain";
     if (this.pattern && text !== "esac") context = "pattern";
     if (

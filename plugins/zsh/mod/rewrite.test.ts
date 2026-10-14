@@ -64,6 +64,7 @@ describe("rewrite", () => {
         "case $a in --x=*) find . -name '*.md' ;; esac",
         ["flag-glob"],
       ],
+      ["glob after emoji", "grep --include=a😀*", "grep --include='a😀*'", ["flag-glob"]],
       ["triple equals", "echo ===", "echo '==='", ["equals"]],
       ["equals banner", "echo ==SESSIONS===", "echo '==SESSIONS==='", ["equals"]],
       ["url", "curl https://x.test/a?b=1", "curl 'https://x.test/a?b=1'", ["url"]],

@@ -379,6 +379,11 @@ describe("docPaneState", () => {
       JSON.stringify({ error: { code: "pane_not_found", message: "pane not found" } }),
       "gone",
     ],
+    [
+      "another herdr error",
+      JSON.stringify({ error: { code: "server_busy", message: "busy" } }),
+      "unknown",
+    ],
     ["an unexpected envelope", JSON.stringify({ result: { type: "ok" } }), "unknown"],
     ["no output", "", "unknown"],
   ])("%s", (_name, stdout, expected) => {

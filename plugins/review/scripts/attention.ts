@@ -296,9 +296,9 @@ const ProcessInfo = z.object({
 
 export type DocPaneState = "running" | "gone" | "unknown";
 
-// A recorded pane id can outlive the TUI: Ben quits it and herdr reuses the id
-// or leaves a shell behind. No parseable reply is `unknown`, so a slow herdr
-// does not orphan a pane holding annotations behind a duplicate.
+// A recorded pane id can outlive the TUI once Ben quits it. Anything short of
+// a definite answer is `unknown`, so a slow or failing herdr leaves a pane
+// holding annotations in place instead of opening a duplicate.
 export function docPaneState(processInfo: string): DocPaneState {
   let json: unknown;
   try {
@@ -307,7 +307,8 @@ export function docPaneState(processInfo: string): DocPaneState {
     if (!(error instanceof SyntaxError)) throw error;
     return "unknown";
   }
-  if (HerdrError.safeParse(json).success) return "gone";
+  const failed = HerdrError.safeParse(json);
+  if (failed.success) return failed.data.error.code === "pane_not_found" ? "gone" : "unknown";
   const parsed = ProcessInfo.safeParse(json);
   if (!parsed.success) return "unknown";
   return parsed.data.result.process_info.foreground_processes.some((proc) =>
@@ -361,7 +362,7 @@ function openPane(args: string[], missingPlugin?: string): string {
 // `r` re-reads the file and re-anchors the saved annotations, and a file review
 // stays open after Send.
 async function openDoc(paneId: string, file: string): Promise<void> {
-  const path = resolve(file);
+  const path = canonical(resolve(file));
   const recordPath = docPanePath(paneId);
   const record = Bun.file(recordPath);
   const panes = (await record.exists()) ? recordedDocPanes(await record.text()) : {};
@@ -379,8 +380,13 @@ async function openDoc(paneId: string, file: string): Promise<void> {
     docOpenArgs(paneId, path),
     `plannotator-tui not found: install the \`${ANNOTATE_PLUGIN}\` herdr plugin`,
   );
-  mkdirSync(dirname(recordPath), { recursive: true });
-  await Bun.write(recordPath, JSON.stringify(panes));
+  // The pane is already up, so a lost record costs only the next reload.
+  try {
+    mkdirSync(dirname(recordPath), { recursive: true });
+    await Bun.write(recordPath, JSON.stringify(panes));
+  } catch (error) {
+    console.error(`could not record ${recordPath}: ${String(error)}`);
+  }
 }
 
 function fail(message: string): never {

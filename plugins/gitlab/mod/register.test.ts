@@ -41,7 +41,7 @@ interface World {
   // A string is the stderr of a failed glab call.
   view: unknown;
   byIid?: unknown;
-  jobs?: unknown;
+  jobs?: unknown[];
   approvals?: unknown;
   notes?: unknown;
   // Runs after each read of the MR by branch, to move the MR mid-poll.
@@ -107,8 +107,9 @@ function worldOf(on: On, world: World) {
     if (argv === "glab api user") return reply({ username: "ben" });
     if (argv.endsWith("/approvals")) return reply(world.approvals ?? approvals());
     if (argv.includes("/notes?")) return reply(world.notes ?? []);
-    if (argv.startsWith("glab api --paginate projects/1/pipelines/50/jobs?"))
-      return reply(world.jobs ?? job("running"));
+    if (argv.startsWith("glab api --paginate --output ndjson projects/1/pipelines/50/jobs?")) {
+      return result((world.jobs ?? job("running")).map((row) => JSON.stringify(row)).join("\n"));
+    }
     throw new Error(`unexpected command: ${argv}`);
   });
   const named = (event: string) => events.filter((e) => e.event === event);
@@ -279,16 +280,19 @@ describe("register", () => {
     expect(await w.shown($)).toBe("\u{f419} merged");
   });
 
-  test("stays idle without glab", async ($, on) => {
-    const w = worldOf(on, { branch: "topic", glab: new Error("ENOENT"), view: mr() });
+  test("stays idle without glab or outside an interactive session", async ($, on) => {
+    const world: World = { branch: "topic", glab: new Error("ENOENT"), view: mr() };
+    const w = worldOf(on, world);
 
     await $.session.start(START);
+    world.glab = GLAB_OK;
+    await $.session.start({ ...START, isInteractive: false });
     await w.clock.advance(POLL_MS.idle * 3);
 
-    expect(w.named("session.start")[0]?.detail).toEqual({
-      active: false,
-      reason: "glab unavailable",
-    });
+    expect(w.named("session.start").map((e) => e.detail)).toEqual([
+      { active: false, reason: "glab unavailable" },
+      { active: false, reason: "non-interactive" },
+    ]);
     expect(w.views).toEqual([]);
   });
 
@@ -301,19 +305,6 @@ describe("register", () => {
     await starting;
 
     expect(w.named("session.start")).toEqual([]);
-    expect(w.views).toEqual([]);
-  });
-
-  test("a non-interactive session never polls", async ($, on) => {
-    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr() });
-
-    await $.session.start({ ...START, isInteractive: false });
-    await w.clock.advance(POLL_MS.idle * 3);
-
-    expect(w.named("session.start")[0]?.detail).toEqual({
-      active: false,
-      reason: "non-interactive",
-    });
     expect(w.views).toEqual([]);
   });
 
@@ -378,18 +369,6 @@ describe("register", () => {
     expect(w.named("poll.error")[0]?.detail).toEqual({
       error: "MR notes returned an unexpected shape",
     });
-  });
-
-  test("session end stops the watch and clears the status", async ($, on) => {
-    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr() });
-
-    await $.session.start(START);
-    await w.clock.settle();
-    await $.session.end({ reason: "prompt_input_exit", sessionId: "s1", resume: { id: "s1" } });
-    await w.clock.advance(POLL_MS.pending * 3);
-
-    expect(w.views.length).toBe(1);
-    expect(await w.shown($)).toBe(undefined);
   });
 
   test("a poll still in flight at session end leaves the status cleared", async ($, on) => {

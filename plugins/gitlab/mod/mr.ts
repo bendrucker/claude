@@ -1,32 +1,3 @@
-export interface MrView {
-  iid: number;
-  projectId: number;
-  url: string;
-  state: string;
-  sha: string;
-  detailedMergeStatus: string | null;
-  pipeline: { id: number; projectId: number; status: string } | null;
-}
-
-export interface Approvals {
-  approvalsRequired: number;
-  approvalsLeft: number;
-  approvedBy: string[];
-}
-
-export interface Note {
-  id: number;
-  author: string;
-  isSystem: boolean;
-}
-
-export interface Job {
-  id: number;
-  name: string;
-  status: string;
-  allowFailure: boolean;
-}
-
 type Reader<T> = (value: unknown) => T | undefined;
 type Out<R> = R extends Reader<infer T> ? T : never;
 type Shaped<S> = { [K in keyof S]: Out<S[K]> };
@@ -89,7 +60,7 @@ const readPipeline = map(obj({ id: num, project_id: num, status: str }), (p) => 
   status: p.status,
 }));
 
-const readView: Reader<MrView> = map(
+const readView = map(
   obj({
     iid: num,
     project_id: num,
@@ -110,7 +81,7 @@ const readView: Reader<MrView> = map(
   }),
 );
 
-const readApprovals: Reader<Approvals> = map(
+const readApprovals = map(
   obj({
     approvals_required: or(num, 0),
     approvals_left: or(num, 0),
@@ -123,29 +94,29 @@ const readApprovals: Reader<Approvals> = map(
   }),
 );
 
-const readNotes: Reader<Note[]> = list(
-  map(obj({ id: num, author: or(readUsername, "someone"), system: or(bool, false) }), (n) => ({
-    id: n.id,
-    author: n.author,
-    isSystem: n.system,
-  })),
+const readNote = map(
+  obj({ id: num, author: or(readUsername, "someone"), system: or(bool, false) }),
+  (n) => ({ id: n.id, author: n.author, isSystem: n.system }),
 );
 
-const readJobs: Reader<Job[]> = list(
-  map(obj({ id: num, name: or(str, "job"), status: str, allow_failure: or(bool, false) }), (j) => ({
-    id: j.id,
-    name: j.name,
-    status: j.status,
-    allowFailure: j.allow_failure,
-  })),
+const readJob = map(
+  obj({ id: num, name: or(str, "job"), status: str, allow_failure: or(bool, false) }),
+  (j) => ({ id: j.id, name: j.name, status: j.status, allowFailure: j.allow_failure }),
 );
+
+export type MrView = Out<typeof readView>;
+export type Approvals = Out<typeof readApprovals>;
+export type Note = Out<typeof readNote>;
+export type Job = Out<typeof readJob>;
 
 /** Narrows `glab mr view -F json` output to an MrView, or undefined when it is not one. */
 export const parseView = (stdout: string): MrView | undefined => decoded(stdout, readView);
 export const parseApprovals = (stdout: string): Approvals | undefined =>
   decoded(stdout, readApprovals);
-export const parseNotes = (stdout: string): Note[] | undefined => decoded(stdout, readNotes);
-export const parseJobs = (stdout: string): Job[] | undefined => decoded(stdout, readJobs);
+export const parseNotes = (stdout: string): Note[] | undefined => decoded(stdout, list(readNote));
+// `glab api --paginate --output ndjson` prints one job per line across every page.
+export const parseJobs = (stdout: string): Job[] | undefined =>
+  decoded(`[${stdout.split("\n").filter(Boolean).join(",")}]`, list(readJob));
 export const parseUser = (stdout: string): string | undefined => decoded(stdout, readUsername);
 
 export type Phase = "none" | "pending" | "passing" | "failing";
@@ -234,9 +205,10 @@ export function snapshotOf(read: Read): Snapshot {
   const { view, approvals, notes, jobs, me } = read;
   const failed: string[] = [];
   let pending = 0;
+  const isBlocked = view.pipeline?.status === "manual";
   for (const job of jobs) {
     if (job.status === "failed" && !job.allowFailure) failed.push(flatten(job.name));
-    else if (PENDING.has(job.status)) pending += 1;
+    else if (PENDING.has(job.status) || (isBlocked && job.status === "manual")) pending += 1;
   }
   // A failed downstream pipeline fails its trigger job, which the jobs list leaves out.
   if (view.pipeline?.status === "failed" && failed.length === 0) failed.push("pipeline");

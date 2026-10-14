@@ -111,7 +111,7 @@ async function viewMr(
 
 async function jobsOf($: EngineInterface, cwd: string, projectId: number, pipeline: number) {
   const path = `projects/${projectId}/pipelines/${pipeline}/jobs?per_page=100`;
-  const stdout = await glab($, cwd, ["api", "--paginate", path]);
+  const stdout = await glab($, cwd, ["api", "--paginate", "--output", "ndjson", path]);
   return parsed(parseJobs(stdout), "pipeline jobs");
 }
 

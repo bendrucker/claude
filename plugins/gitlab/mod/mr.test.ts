@@ -84,9 +84,16 @@ describe("parsers", () => {
     ]);
     expect(parseNotes("{}")).toBe(undefined);
 
-    expect(
-      parseJobs(JSON.stringify([{ id: 1, name: "lint", status: "failed", allow_failure: true }])),
-    ).toEqual([{ id: 1, name: "lint", status: "failed", allowFailure: true }]);
+    const pages = [
+      { id: 1, name: "lint", status: "failed", allow_failure: true },
+      { id: 2, name: "build", status: "success" },
+    ];
+    expect(parseJobs(`${pages.map((page) => JSON.stringify(page)).join("\n")}\n`)).toEqual([
+      { id: 1, name: "lint", status: "failed", allowFailure: true },
+      { id: 2, name: "build", status: "success", allowFailure: false },
+    ]);
+    expect(parseJobs("")).toEqual([]);
+    expect(parseJobs("{")).toBe(undefined);
   });
 });
 
@@ -316,6 +323,11 @@ describe("statusOf", () => {
   const cases: [string, Snapshot, string][] = [
     ["running", snap({ jobs: [job("b", "running"), ...passed] }), "\u{f444} CI 1/2"],
     ["failing", snap({ jobs: [job("a", "failed")] }, "failed"), "\u{f52f} a"],
+    [
+      "blocked on a manual job",
+      snap({ jobs: [job("deploy", "manual"), ...passed] }, "manual"),
+      "\u{f444} CI 1/2",
+    ],
     [
       "no pipeline and no approvals",
       snapshotOf({ ...read(), view: { ...read().view, pipeline: null } }),

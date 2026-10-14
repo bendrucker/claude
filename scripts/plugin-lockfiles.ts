@@ -277,8 +277,13 @@ const generateCommand = command(
       const lockfile = await existingLockfile(plugin.dir);
       if (lockfile !== null && !argv.flags.force) {
         // oxlint-disable-next-line no-await-in-loop -- see above.
-        const root = (await lockPackages(plugin.dir, lockfile))?.[""] ?? null;
-        if (root === null || ranges(root) === ranges(plugin.manifest)) {
+        const packages = await lockPackages(plugin.dir, lockfile);
+        const root = packages?.[""] ?? null;
+        if (
+          root === null ||
+          (ranges(root) === ranges(plugin.manifest) &&
+            unresolved(plugin.name, packages, plugin.manifest) === null)
+        ) {
           console.log(`= ${plugin.name} (${lockfile} is current)`);
           continue;
         }

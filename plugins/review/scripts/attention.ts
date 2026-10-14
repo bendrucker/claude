@@ -272,18 +272,20 @@ export function docPanePath(paneId: string, home = homedir()): string {
   return `${markerPath(paneId, home)}.doc.json`;
 }
 
-const DocPane = z.object({ pane: z.string(), file: z.string() });
+// File path to the pane reviewing it.
+const DocPanes = z.record(z.string(), z.string());
+export type DocPanes = z.infer<typeof DocPanes>;
 
-export function recordedDocPane(record: string, file: string): string | null {
+export function recordedDocPanes(record: string): DocPanes {
   let json: unknown;
   try {
     json = JSON.parse(record);
   } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
-    return null;
+    return {};
   }
-  const parsed = DocPane.safeParse(json);
-  return parsed.success && parsed.data.file === file ? parsed.data.pane : null;
+  const parsed = DocPanes.safeParse(json);
+  return parsed.success ? parsed.data : {};
 }
 
 const ProcessInfo = z.object({
@@ -292,23 +294,27 @@ const ProcessInfo = z.object({
   }),
 });
 
+export type DocPaneState = "running" | "gone" | "unknown";
+
 // A recorded pane id can outlive the TUI: Ben quits it and herdr reuses the id
-// or leaves a shell behind.
-export function runsPlannotator(processInfo: string): boolean {
+// or leaves a shell behind. No parseable reply is `unknown`, so a slow herdr
+// does not orphan a pane holding annotations behind a duplicate.
+export function docPaneState(processInfo: string): DocPaneState {
   let json: unknown;
   try {
     json = JSON.parse(processInfo);
   } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
-    return false;
+    return "unknown";
   }
+  if (HerdrError.safeParse(json).success) return "gone";
   const parsed = ProcessInfo.safeParse(json);
-  return (
-    parsed.success &&
-    parsed.data.result.process_info.foreground_processes.some((proc) =>
-      proc.name.startsWith("plannotator-tui"),
-    )
-  );
+  if (!parsed.success) return "unknown";
+  return parsed.data.result.process_info.foreground_processes.some((proc) =>
+    proc.name.startsWith("plannotator-tui"),
+  )
+    ? "running"
+    : "gone";
 }
 
 export function currentPane(env: Record<string, string | undefined> = process.env): string | null {
@@ -354,27 +360,27 @@ function openPane(args: string[], missingPlugin?: string): string {
 
 // `r` re-reads the file and re-anchors the saved annotations, and a file review
 // stays open after Send.
-async function reloadDocPane(paneId: string, file: string): Promise<boolean> {
-  const record = Bun.file(docPanePath(paneId));
-  if (!(await record.exists())) return false;
-  const pane = recordedDocPane(await record.text(), file);
-  if (pane == null) return false;
-  if (!runsPlannotator(herdrJson(["pane", "process-info", "--pane", pane]))) return false;
-  if (!herdr(["pane", "send-keys", pane, "r"])) return false;
-  console.log(`reloaded ${pane}`);
-  return true;
-}
-
 async function openDoc(paneId: string, file: string): Promise<void> {
   const path = resolve(file);
-  if (await reloadDocPane(paneId, path)) return;
-  const pane = openPane(
+  const recordPath = docPanePath(paneId);
+  const record = Bun.file(recordPath);
+  const panes = (await record.exists()) ? recordedDocPanes(await record.text()) : {};
+  const existing = panes[path];
+  if (existing != null) {
+    const state = docPaneState(herdrJson(["pane", "process-info", "--pane", existing]));
+    if (state === "unknown") fail(`herdr did not report on ${existing}; retry the open`);
+    if (state === "running") {
+      if (!herdr(["pane", "send-keys", existing, "r"])) fail(`could not reload ${existing}`);
+      console.log(`reloaded ${existing}`);
+      return;
+    }
+  }
+  panes[path] = openPane(
     docOpenArgs(paneId, path),
     `plannotator-tui not found: install the \`${ANNOTATE_PLUGIN}\` herdr plugin`,
   );
-  const record = docPanePath(paneId);
-  mkdirSync(dirname(record), { recursive: true });
-  await Bun.write(record, JSON.stringify({ pane, file: path }));
+  mkdirSync(dirname(recordPath), { recursive: true });
+  await Bun.write(recordPath, JSON.stringify(panes));
 }
 
 function fail(message: string): never {

@@ -57,13 +57,21 @@ interface Level {
   test: boolean;
   named: boolean;
   declaring: boolean;
+  header: boolean;
 }
 
 class Lexer {
   pos = 0;
   readonly found: Word[] = [];
   private commands = 0;
-  private level: Level = { command: 0, index: 0, test: false, named: false, declaring: false };
+  private level: Level = {
+    command: 0,
+    index: 0,
+    test: false,
+    named: false,
+    declaring: false,
+    header: false,
+  };
   private heredocs: Heredoc[] = [];
 
   constructor(private readonly src: string) {}
@@ -79,6 +87,7 @@ class Lexer {
       test: false,
       named: false,
       declaring: false,
+      header: false,
     };
   }
 
@@ -262,6 +271,9 @@ class Lexer {
       level.named = true;
       if (KEYWORDS.has(text) && literal) this.newCommand();
       else if (DECLARE.has(text) && literal) level.declaring = true;
+      else if (literal && (text === "function" || text.endsWith("()"))) level.header = true;
+    } else if (text === "{" && literal && level.header) {
+      this.newCommand();
     }
     return text;
   }

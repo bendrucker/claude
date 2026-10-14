@@ -39,6 +39,18 @@ describe("rewrite", () => {
         "cd x && find . -iname '[ab]*'",
         ["flag-glob"],
       ],
+      [
+        "find in function body",
+        "f() { find . -name *.yaml; }; f",
+        "f() { find . -name '*.yaml'; }; f",
+        ["flag-glob"],
+      ],
+      [
+        "find in function keyword body",
+        "function f { find . -name *.yaml; }",
+        "function f { find . -name '*.yaml'; }",
+        ["flag-glob"],
+      ],
       ["triple equals", "echo ===", "echo '==='", ["equals"]],
       ["equals banner", "echo ==SESSIONS===", "echo '==SESSIONS==='", ["equals"]],
       ["url", "curl https://x.test/a?b=1", "curl 'https://x.test/a?b=1'", ["url"]],

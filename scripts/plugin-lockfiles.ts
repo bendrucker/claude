@@ -123,9 +123,8 @@ type LockPackages = Record<string, Manifest>;
 /**
  * A lockfile's `packages` map, keyed `""` for the plugin itself, or null when unreadable.
  *
- * Only the npm formats carry the manifest's own ranges as JSON. A `bun.lock`
- * satisfies Claude Code just as well, so an unreadable format reports presence
- * without a staleness verdict rather than a violation.
+ * Other formats, such as `bun.lock`, satisfy Claude Code, so they report
+ * presence without a staleness verdict.
  */
 async function lockPackages(dir: string, lockfile: string): Promise<LockPackages | null> {
   if (lockfile !== "package-lock.json" && lockfile !== "npm-shrinkwrap.json") return null;
@@ -177,8 +176,8 @@ export function violation(
 /**
  * Declared dependencies the lockfile resolves no entry for, which `npm ci` reports as missing.
  *
- * The root ranges can still agree with package.json, as when a bot edits the
- * lockfile without re-resolving it.
+ * The lockfile's root ranges can agree with package.json while these entries
+ * are missing.
  */
 export function unresolved(
   name: string,

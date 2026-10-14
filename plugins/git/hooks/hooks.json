@@ -1,5 +1,5 @@
 {
-  "description": "Blocks direct commits to the default branch and recovers SSH-agent auth failures over HTTPS",
+  "description": "Blocks direct commits to the default branch, recovers SSH-agent auth failures over HTTPS, and routes refused commit signatures",
   "hooks": {
     "PreToolUse": [
       {
@@ -20,6 +20,11 @@
           {
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/https-fallback.ts\"",
+            "if": "Bash(git *)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/signing-refusal.ts\"",
             "if": "Bash(git *)"
           }
         ]

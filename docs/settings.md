@@ -111,10 +111,6 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 **Drop it** when the CLI's default idle timeout is 10 minutes or less.
 
-`GIT_CONFIG_COUNT` with its `GIT_CONFIG_KEY_n`/`GIT_CONFIG_VALUE_n` pairs sets `commit.gpgsign` and `tag.gpgsign` to `false` for every git command a session runs. An SSH signing agent that wants approval per signature refuses when nobody is at the machine, so an unattended commit, tag, or rebase fails with `agent refused operation`. Commits a session makes are unsigned, and the shell outside Claude still signs. A command that passes its own `GIT_CONFIG_COUNT` replaces these pairs. A signed commit, or `ssh-keygen` reporting `agent refused operation` in a session, means the env isn't reaching git.
-
-**Drop it** when a repo in rotation requires signed commits on pushed branches, or when signing no longer needs someone at the machine.
-
 ## Hooks
 
 Why a hook entry in `user/settings.json` earns its place, and what would retire it, for the entries that ship no `README.md` of their own. The hook scripts live in [`user/hooks/`](../user/hooks).

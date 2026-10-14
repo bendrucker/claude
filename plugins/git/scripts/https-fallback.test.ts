@@ -222,6 +222,12 @@ describe("processInput", () => {
       command: "git fetch git@git.example.com:owner/repo.git",
       error: "git@git.example.com: Permission denied (publickey).",
     },
+    {
+      name: "commit signing refusal ahead of a push",
+      command: "git commit -m x && git push git@github.com:owner/repo.git",
+      error:
+        "Couldn't sign message (signer): agent refused operation?\nfatal: failed to write commit object",
+    },
   ])("stays silent for $name", async ({ command, error }) => {
     expect(await processInput(mockInput(command, error), noRemotes)).toBeNull();
   });

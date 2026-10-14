@@ -917,13 +917,26 @@ describe("hook_events", () => {
     expect(row?.blocked).toBe(true);
   });
 
-  it("unwraps the message from a hook_blocking_error", async () => {
+  it.each<{ name: string; toolUseId: string; reason: string; command: string | null }>([
+    {
+      name: "a string-encoded payload without a command",
+      toolUseId: "hk-stop-1",
+      reason: "Biome check failed. Auto-fix was attempted but issues remain.",
+      command: null,
+    },
+    {
+      name: "an object payload naming its command",
+      toolUseId: "hk-stop-3",
+      reason: "comment-density: trim the comments before stopping.",
+      // oxlint-disable-next-line no-template-curly-in-string -- the fixture records the hook command unexpanded.
+      command: "bun ${CLAUDE_PLUGIN_ROOT}/hooks/density.ts",
+    },
+  ])("unwraps a hook_blocking_error from $name", async ({ toolUseId, reason, command }) => {
     const [row] = await db.query(
-      "SELECT reason, blocked FROM hook_events WHERE kind = 'hook_blocking_error' AND session_id = 'hooks-session'",
-      z.object({ reason: z.string(), blocked: z.boolean() }),
+      `SELECT reason, command, blocked FROM hook_events WHERE kind = 'hook_blocking_error' AND tool_use_id = '${toolUseId}'`,
+      z.object({ reason: z.string(), command: z.string().nullable(), blocked: z.boolean() }),
     );
-    expect(row?.reason).toBe("Biome check failed. Auto-fix was attempted but issues remain.");
-    expect(row?.blocked).toBe(true);
+    expect(row).toEqual({ reason, command, blocked: true });
   });
 
   it("classifies an ask decision as a non-blocking interruption", async () => {
@@ -2255,13 +2268,21 @@ describe("stop-hook-noop-detector query", () => {
   });
 
   it("counts blocking errors so a Stop gate is not a noop candidate", async () => {
-    // Blocking errors carry no command, so they group under the bare hook name, and the
-    // roster names the hook that ran rather than the event, so they match no fires.
+    // A blocking error predating the payload's command groups under the bare hook name,
+    // and the roster names the hook that ran rather than the event, so it matches no fires.
     const gate = (await detect()).get("Stop");
     expect(gate).toBeDefined();
     expect(Number(gate?.fires)).toBe(0);
     expect(Number(gate?.blocks)).toBe(Number(gate?.events));
     expect(Number(gate?.blocks)).toBeGreaterThan(0);
+  });
+
+  it("attributes a Stop block to the hook named inside its blockingError payload", async () => {
+    // oxlint-disable-next-line no-template-curly-in-string -- the fixture records the hook command unexpanded, so the key must match it.
+    const gate = (await detect()).get("bun ${CLAUDE_PLUGIN_ROOT}/hooks/density.ts");
+    expect(gate).toBeDefined();
+    expect(Number(gate?.fires)).toBe(1);
+    expect(Number(gate?.blocks)).toBe(1);
   });
 
   it("marks the hooks that ran at a gated Stop, since the gate names no command", async () => {

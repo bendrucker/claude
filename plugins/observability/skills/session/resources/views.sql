@@ -537,8 +537,9 @@ LATERAL (SELECT unnest(json_extract(s.hook_infos, '$[*]')) AS info) h;
 -- (PreToolUse, PostToolUse, Stop, SessionStart, UserPromptSubmit, PermissionRequest).
 -- A PreToolUse deny/ask is recorded as a hook_success whose decision lives inside the
 -- stdout JSON (hookSpecificOutput.permissionDecision), so the decision/reason are
--- parsed from there; exit-2 blocks arrive as hook_blocking_error. `command` names the
--- exact hook script (NULL for blocking_error / permission_decision records).
+-- parsed from there; exit-2 and `decision: block` stops arrive as hook_blocking_error,
+-- whose `command` sits inside the `blockingError` payload. `command` names the exact
+-- hook script (NULL for permission_decision records).
 CREATE OR REPLACE VIEW hook_events AS
 WITH att AS (
   -- Dedupe replayed lines (rewind/resume, same uuid) so a block never counts twice.
@@ -585,7 +586,10 @@ SELECT
   kind,
   (a->>'$.hookEvent') AS hook_event,
   (a->>'$.hookName')  AS hook_name,
-  (a->>'$.command')   AS command,
+  COALESCE(
+    (a->>'$.command'),
+    TRY_CAST(a->>'$.blockingError' AS JSON)->>'$.command'
+  ) AS command,
   (a->>'$.toolUseID') AS tool_use_id,
   TRY_CAST(a->>'$.exitCode'   AS INTEGER) AS exit_code,
   TRY_CAST(a->>'$.durationMs' AS BIGINT)  AS duration_ms,

@@ -15,15 +15,15 @@
 --   overhead. The join is full outer because the roster starts 2026-04-27, so an older
 --   attachment row has no fire to match.
 --
---   Blocking errors (exit-2 gates) arrive as `hook_blocking_error` with no command, stdout,
---   decision, or exit code, and nothing in the record identifies which hook exited 2, so
---   they group under the bare hook event name. `gated_stops` covers that gap from the
---   roster side: a Stop's `toolUseID` is shared by its summary and its blocking error, so a
---   hook's fires at a gated Stop are countable even though the gate itself is not
---   attributable. Zero events and zero gated stops is a hook that never ran at a blocked
---   Stop, while gated stops mean it may be the gate. Roster entries carrying `prompt_text`
---   are queued prompts the harness re-injected at Stop rather than configured hooks, and
---   are excluded.
+--   A Stop hook that blocks, by exit 2 or by printing `decision: block`, leaves a
+--   `hook_blocking_error` with no stdout, decision, or exit code. Its command sits inside
+--   the `blockingError` payload, which `hook_events` unwraps, so the block lands in
+--   `blocks` on the hook's own row. Records predating that field carry no command and
+--   group under the bare hook event name. `gated_stops` covers them from the roster side:
+--   a Stop's `toolUseID` is shared by its summary and its blocking error, so a hook's
+--   fires at a gated Stop are countable even when the gate is not attributable. Roster
+--   entries carrying `prompt_text` are queued prompts the harness re-injected at Stop
+--   rather than configured hooks, and are excluded.
 -- params:
 --   - after_date
 --   - before_date

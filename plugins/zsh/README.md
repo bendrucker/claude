@@ -26,6 +26,6 @@ Quotes the bash habits that misfire under zsh before the Bash tool runs them, an
 
 The `mods` query in `observability:session` reads these events from `mod_events`.
 
-- Retire a rewrite rule that appears in no `rewrite` event's `detail.rules` for 30 days.
+- Retire a rewrite rule that appears in no `rewrite` event's `rules` attribute for 30 days.
 - Retire a note class with no `explain` events in 30 days.
 - Retire the plugin if the Bash tool stops running zsh or runs it under bash emulation.

@@ -118,17 +118,18 @@ async function generate(plugin: PluginPackage): Promise<void> {
   }
 }
 
+type LockPackages = Record<string, Manifest>;
+
 /**
- * Dependency ranges a lockfile pins for the plugin itself, or null when unreadable.
+ * A lockfile's `packages` map, keyed `""` for the plugin itself, or null when unreadable.
  *
- * Only the npm formats carry the manifest's own ranges as JSON. A `bun.lock`
- * satisfies Claude Code just as well, so an unreadable format reports presence
- * without a staleness verdict rather than a violation.
+ * Other formats, such as `bun.lock`, satisfy Claude Code, so they report
+ * presence without a staleness verdict.
  */
-async function pinned(dir: string, lockfile: string): Promise<Manifest | null> {
+async function lockPackages(dir: string, lockfile: string): Promise<LockPackages | null> {
   if (lockfile !== "package-lock.json" && lockfile !== "npm-shrinkwrap.json") return null;
   const lock = await decodeFile(Lockfile, join(dir, lockfile));
-  return lock.packages?.[""] ?? null;
+  return lock.packages ?? {};
 }
 
 /**
@@ -173,6 +174,29 @@ export function violation(
 }
 
 /**
+ * Declared dependencies the lockfile resolves no entry for, which `npm ci` reports as missing.
+ *
+ * The lockfile's root ranges can agree with package.json while these entries
+ * are missing.
+ */
+export function unresolved(
+  name: string,
+  packages: LockPackages | null,
+  manifest: Manifest,
+): string | null {
+  if (packages === null) return null;
+  const missing = [
+    ...Object.keys(manifest.dependencies ?? {}),
+    ...Object.keys(manifest.devDependencies ?? {}),
+  ]
+    .filter((dependency) => !(`node_modules/${dependency}` in packages))
+    .toSorted();
+  return missing.length === 0
+    ? null
+    : `${name}: lockfile resolves no entry for ${missing.join(", ")}, so the install fails`;
+}
+
+/**
  * How a plugin's install would pull in its devDependencies, or null when it omits them.
  */
 export function devInstalled(
@@ -199,9 +223,10 @@ const check = command({ name: "check" }, async () => {
       const violations = await Promise.all(
         plugins.map(async (plugin) => {
           const lockfile = await existingLockfile(plugin.dir);
-          const root = lockfile === null ? null : await pinned(plugin.dir, lockfile);
+          const packages = lockfile === null ? null : await lockPackages(plugin.dir, lockfile);
           return [
-            violation(plugin.name, lockfile, root, plugin.manifest),
+            violation(plugin.name, lockfile, packages?.[""] ?? null, plugin.manifest),
+            unresolved(plugin.name, packages, plugin.manifest),
             lockfile === null
               ? null
               : devInstalled(plugin.name, plugin.manifest, await readTracked(".npmrc", plugin.dir)),
@@ -252,8 +277,13 @@ const generateCommand = command(
       const lockfile = await existingLockfile(plugin.dir);
       if (lockfile !== null && !argv.flags.force) {
         // oxlint-disable-next-line no-await-in-loop -- see above.
-        const root = await pinned(plugin.dir, lockfile);
-        if (root === null || ranges(root) === ranges(plugin.manifest)) {
+        const packages = await lockPackages(plugin.dir, lockfile);
+        const root = packages?.[""] ?? null;
+        if (
+          root === null ||
+          (ranges(root) === ranges(plugin.manifest) &&
+            unresolved(plugin.name, packages, plugin.manifest) === null)
+        ) {
           console.log(`= ${plugin.name} (${lockfile} is current)`);
           continue;
         }
@@ -272,7 +302,7 @@ if (import.meta.main) {
       commands: [check, generateCommand],
       help: {
         description:
-          "Manage the lockfiles Claude Code needs to install plugin dependencies. It installs them when it caches a plugin, but only when the plugin root holds a lockfile beside package.json, and skips a plugin without one silently. `generate` writes those lockfiles, `check` fails when one is missing, disagrees with package.json, or when a manifest sits below the plugin root where the install never reaches it.",
+          "Manage the lockfiles Claude Code needs to install plugin dependencies. It installs them when it caches a plugin, but only when the plugin root holds a lockfile beside package.json, and skips a plugin without one silently. `generate` writes those lockfiles, `check` fails when one is missing, disagrees with package.json, lacks an entry for a declared dependency, or when a manifest sits below the plugin root where the install never reaches it.",
       },
     },
     (parsed) => {

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { devInstalled, nestedManifests, ranges, violation } from "./plugin-lockfiles";
+import { devInstalled, nestedManifests, ranges, unresolved, violation } from "./plugin-lockfiles";
 
 test.each<{
   name: string;
@@ -99,6 +99,31 @@ test.each<{
   },
 ])("devInstalled: $name", ({ manifest, npmrc, expected }) => {
   expect(devInstalled("git", manifest, npmrc)).toBe(expected);
+});
+
+test.each<{
+  name: string;
+  packages: Parameters<typeof unresolved>[1];
+  expected: string | null;
+}>([
+  {
+    name: "every declared dependency resolved",
+    packages: { "": {}, "node_modules/zod": {}, "node_modules/esbuild": {} },
+    expected: null,
+  },
+  {
+    name: "entries dropped without re-resolving",
+    packages: { "": {} },
+    expected: "git: lockfile resolves no entry for esbuild, zod, so the install fails",
+  },
+  {
+    name: "an unreadable lockfile format",
+    packages: null,
+    expected: null,
+  },
+])("unresolved: $name", ({ packages, expected }) => {
+  const manifest = { dependencies: { zod: "^4.4.3" }, devDependencies: { esbuild: "^0.28.1" } };
+  expect(unresolved("git", packages, manifest)).toBe(expected);
 });
 
 test("ranges ignores declaration order", () => {

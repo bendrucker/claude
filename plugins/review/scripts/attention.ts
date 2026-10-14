@@ -353,7 +353,7 @@ function openPane(args: string[], missingPlugin?: string): string {
 }
 
 // `r` re-reads the file and re-anchors the saved annotations, and a file review
-// stays open after Send, so a revised document lands in the pane Ben is in.
+// stays open after Send.
 async function reloadDocPane(paneId: string, file: string): Promise<boolean> {
   const record = Bun.file(docPanePath(paneId));
   if (!(await record.exists())) return false;

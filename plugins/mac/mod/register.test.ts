@@ -51,6 +51,11 @@ describe("commandOf", () => {
     ["cd plugins && sed -n 1p x", { verb: "sed", subcommand: "-n" }],
     ["env NODE_ENV=test nohup /usr/bin/python3 -c 1", { verb: "python3", subcommand: "-c" }],
     ["ls", { verb: "ls", subcommand: undefined }],
+    ['FOO="a b" bun install', { verb: "bun", subcommand: "install" }],
+    ["env -i PATH=/bin bun install", { verb: "bun", subcommand: "install" }],
+    ["cd x 2>&1 && gh pr view", { verb: "gh", subcommand: "pr" }],
+    ["cd 'a;b' && sed -n 1p x", { verb: "sed", subcommand: "-n" }],
+    ['echo "a && b"', { verb: "echo", subcommand: "a && b" }],
     ["cd somewhere", undefined],
     ["", undefined],
   ];
@@ -75,15 +80,16 @@ describe("register", () => {
     ]);
   });
 
-  test("records a successful sandboxed retry after a deny", async ($, on) => {
+  test("records a successful sandboxed retry of the denied command", async ($, on) => {
     const world = worldOf(on);
 
     await bash($, "gh pr view 1", true);
     await bash($, "gh pr view 1", true);
-    await bash($, "gh pr view 1");
     await bash($, "gh pr view 2");
+    await bash($, "gh pr view 1");
+    await bash($, "gh pr view 1");
 
-    expect(world.ran).toEqual(["gh pr view 1", "gh pr view 2"]);
+    expect(world.ran).toEqual(["gh pr view 2", "gh pr view 1", "gh pr view 1"]);
     expect(world.events.map((e) => [e.event, e.ok, e.detail?.repeat])).toEqual([
       ["bypass.deny", undefined, false],
       ["bypass.deny", undefined, true],

@@ -2,9 +2,10 @@ import type { On } from "claude-code";
 
 const MOD = "mac";
 
-const SEPARATOR = /&&|\|\||[;|&\n]/;
+const SEPARATORS = new Set([";", "|", "&", "\n", "(", ")"]);
+const WHITESPACE = new Set([" ", "\t", "\r"]);
 const ASSIGNMENT = /^[A-Za-z_]\w*=/;
-// Words that stand ahead of the command they run.
+// Words that stand ahead of the command they run, along with their options.
 const PREFIXES = new Set(["env", "time", "nohup", "exec", "command", "sudo"]);
 const EXEMPT = new Map([["bun", new Set(["install", "i"])]]);
 
@@ -13,13 +14,56 @@ export interface Command {
   subcommand: string | undefined;
 }
 
+/** Splits a command into segments of words, honoring quotes and backslash escapes. */
+function segmentsOf(command: string): string[][] {
+  const segments: string[][] = [];
+  let words: string[] = [];
+  let word: string | undefined;
+  let quote: string | undefined;
+  const flush = () => {
+    if (word !== undefined) words.push(word);
+    word = undefined;
+  };
+  for (let i = 0; i < command.length; i++) {
+    const ch = command.charAt(i);
+    if (quote !== undefined) {
+      if (ch === quote) quote = undefined;
+      else if (quote === '"' && ch === "\\") word = (word ?? "") + command.charAt(++i);
+      else word = (word ?? "") + ch;
+    } else if (ch === "'" || ch === '"') {
+      quote = ch;
+      word ??= "";
+    } else if (ch === "\\") {
+      word = (word ?? "") + command.charAt(++i);
+    } else if (WHITESPACE.has(ch)) {
+      flush();
+    } else if (
+      SEPARATORS.has(ch) &&
+      !(ch === "&" && (word?.endsWith(">") || command.charAt(i + 1) === ">"))
+    ) {
+      flush();
+      if (words.length > 0) segments.push(words);
+      words = [];
+    } else {
+      word = (word ?? "") + ch;
+    }
+  }
+  flush();
+  if (words.length > 0) segments.push(words);
+  return segments;
+}
+
 /** The first segment that does more than change directory, past assignments and prefixes. */
 export function commandOf(command: string): Command | undefined {
-  for (const segment of command.split(SEPARATOR)) {
-    const words = segment.trim().split(/\s+/);
-    const start = words.findIndex((word) => !ASSIGNMENT.test(word) && !PREFIXES.has(word));
+  for (const words of segmentsOf(command)) {
+    let start = 0;
+    for (let word = words[start]; word !== undefined; word = words[start]) {
+      if (ASSIGNMENT.test(word)) start++;
+      else if (PREFIXES.has(word)) while (words[++start]?.startsWith("-")) continue;
+      else break;
+    }
     const word = words[start];
-    if (word === undefined || word === "" || word === "cd") continue;
+    if (word === undefined || word === "cd") continue;
     return { verb: word.slice(word.lastIndexOf("/") + 1), subcommand: words[start + 1] };
   }
   return undefined;
@@ -35,7 +79,7 @@ export function denyReason(verb: string): string {
 
 /**
  * Holds back a Bash sandbox bypass until the session has seen that command's
- * verb fail sandboxed, and records whether the sandboxed retry succeeded.
+ * verb fail sandboxed, and records whether the denied command's sandboxed retry succeeded.
  */
 export function register(on: On): void {
   const failed = new Set<string>();
@@ -50,7 +94,7 @@ export function register(on: On): void {
     const parsed = commandOf(e.command);
     if (parsed === undefined) return next(e);
     const { verb } = parsed;
-    const key = `${e.agentId ?? ""}/${verb}`;
+    const key = `${e.agentId ?? ""}\0${e.command}`;
     const detail = { verb, agent_id: e.agentId ?? null };
 
     if (e.dangerouslyDisableSandbox === true) {

@@ -16,6 +16,7 @@ export async function createConflictFixture(): Promise<Fixture> {
   await git("init -b main");
   await git("config user.email test@test.com");
   await git("config user.name Test");
+  await git("config commit.gpgsign false");
 
   await Bun.write(join(path, "file.txt"), "line 1\nline 2\nline 3\n");
   await git("add file.txt");
@@ -52,6 +53,7 @@ export async function createDivergenceFixture(options?: {
   const originGit = (args: string) => $`git ${args.split(" ")}`.cwd(originPath).quiet();
   await originGit("config user.email test@test.com");
   await originGit("config user.name Test");
+  await originGit("config commit.gpgsign false");
 
   await Bun.write(join(originPath, "shared.txt"), "original\n");
   await Bun.write(join(originPath, "origin-only.txt"), "origin\n");
@@ -62,6 +64,7 @@ export async function createDivergenceFixture(options?: {
   const cloneGit = (args: string) => $`git ${args.split(" ")}`.cwd(clonePath).quiet();
   await cloneGit("config user.email test@test.com");
   await cloneGit("config user.name Test");
+  await cloneGit("config commit.gpgsign false");
   await $`git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main`
     .cwd(clonePath)
     .quiet();

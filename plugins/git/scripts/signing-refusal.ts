@@ -18,8 +18,8 @@ export function hasSigningRefusal(output: string): boolean {
 }
 
 export const CONTEXT = [
-  "Git could not sign: the SSH agent refused because nobody approved its Touch ID prompt. Retrying unattended fails the same way.",
-  "Stop and ask the user to approve the Touch ID prompt, then retry once they confirm. Keep signing enabled.",
+  "Git could not sign: the SSH agent refused the signature. An agent that requires approval for each signature refuses when nobody responds, so an unattended retry fails the same way.",
+  "Stop and ask the user to approve the signing request on their agent, then retry once they confirm. Keep signing enabled.",
 ].join("\n");
 
 export function processInput(input: PostToolUseFailureHookInput): SyncHookJSONOutput | null {

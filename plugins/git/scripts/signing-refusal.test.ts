@@ -54,10 +54,10 @@ describe("hasSigningRefusal", () => {
 });
 
 describe("processInput", () => {
-  test("tells the model to stop and ask for Touch ID", () => {
+  test("tells the model to stop and ask for approval", () => {
     expect(CONTEXT).toMatchInlineSnapshot(`
-      "Git could not sign: the SSH agent refused because nobody approved its Touch ID prompt. Retrying unattended fails the same way.
-      Stop and ask the user to approve the Touch ID prompt, then retry once they confirm. Keep signing enabled."
+      "Git could not sign: the SSH agent refused the signature. An agent that requires approval for each signature refuses when nobody responds, so an unattended retry fails the same way.
+      Stop and ask the user to approve the signing request on their agent, then retry once they confirm. Keep signing enabled."
     `);
     expect(processInput(mockInput("git commit -m x", SIGNING_FAILURES.commit))).toEqual({
       hookSpecificOutput: { hookEventName: "PostToolUseFailure", additionalContext: CONTEXT },

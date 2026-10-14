@@ -1,0 +1,1 @@
+The plugin runs only under a zsh launcher with function hooks enabled, so the Ubuntu eval job measures nothing.

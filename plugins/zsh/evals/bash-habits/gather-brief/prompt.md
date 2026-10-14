@@ -1,0 +1,1 @@
+I'm writing up a ticket about invoice statuses. Gather the raw material in one pass so I can paste it: the root package.json, both migrations, the `Invoice` interface, the last few commits on `refund-status`, and every line in `.ts` and `.vue` files that compares against a status string. Show it to me with clear separators between sections.

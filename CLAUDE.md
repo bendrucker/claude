@@ -74,7 +74,7 @@ The older runners still read `ANTHROPIC_API_KEY` from the environment: the pr-bo
 op run --env-file=evals/op.env -- bun plugins/pull-request/evals/pr-body/scripts/judge.ts <run-dir>
 ```
 
-`.github/workflows/eval.yml` runs the native suites under `plugins/<plugin>/evals/` of every plugin a pull request touches, once it carries the `eval` label. `gh workflow run eval.yml --ref <branch> -f suite=<dir>` runs any suite on demand.
+`.github/workflows/eval.yml` runs the native suites under `plugins/<plugin>/evals/` of every plugin a pull request touches, once it carries the `eval` label. A suite directory holding a `.local-only` file is skipped there. `gh workflow run eval.yml --ref <branch> -f suite=<dir>` runs any suite on demand.
 
 ## Workflow
 

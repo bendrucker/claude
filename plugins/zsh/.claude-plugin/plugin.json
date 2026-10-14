@@ -1,0 +1,9 @@
+{
+  "name": "zsh",
+  "description": "Quote the bash habits that misfire under zsh before the Bash tool runs them, and explain zsh errors after",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  },
+  "dependencies": ["mod-events"]
+}

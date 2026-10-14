@@ -8,7 +8,7 @@ Run the session skill's `scripts/refresh.ts --refresh` once, alone (a refresh wi
 
 ## Fan-Out
 
-Launch one `Agent` call per dimension (hook latency, hook blocks, permissions and sandbox, context tax, tokens, turns and compaction, skill economy), the same mining fan-out `agent-ideas` uses. Point each agent at the session skill's `references/discovery.md` and the stable DB path. Each agent runs its dimension's named queries read-only plus any inline rollups, and returns structured candidate findings plus the exact SQL it ran. Read-only opens share the lock, so agents never contend.
+Launch one `Agent` call per dimension (hook latency, hook blocks, permissions and sandbox, context tax, tokens, turns and compaction, skill economy), the same mining fan-out `agent-ideas` uses. Point each agent at the session skill's `references/discovery.md` and the stable DB path. Each agent runs its dimension's named queries read-only plus any inline rollups, and returns candidate findings with their SQL, under the size bound and truncation recovery in `discovery.md`'s fan-out step. Read-only opens share the lock, so agents never contend.
 
 ## Grounding
 

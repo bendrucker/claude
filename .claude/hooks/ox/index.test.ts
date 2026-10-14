@@ -24,9 +24,12 @@ import type {
 import { z } from "zod";
 import {
   blockCountPath,
+  formatPostToolUseOutput,
   HookInput,
+  installed,
   invokesGitCommit,
   parseTranscript,
+  POST_TOOL_USE_LINE_LIMIT,
   processInput,
   processPostToolUse,
   processPreToolUse,
@@ -340,6 +343,30 @@ describe("ox hook", () => {
       expect(files).toEqual([tracked]);
     });
 
+    // The nested checkout is its own working tree, which the outer ignore rules can't reach.
+    it("drops a checkout nested under the session repo's tmp/", async () => {
+      const repoDir = await mkdtemp(join(tempDir, "scratch-host-"));
+      await execAsync("git init", { cwd: repoDir });
+      const nested = join(repoDir, "tmp", "probe");
+      await mkdir(nested, { recursive: true });
+      await execAsync("git init", { cwd: nested });
+      const scratch = join(nested, "scratch.ts");
+      const kept = join(repoDir, "kept.ts");
+      await Bun.write(scratch, "export const a = 1;\n");
+      await Bun.write(kept, "export const b = 2;\n");
+
+      const transcriptPath = join(tempDir, `transcript-nested-${Date.now()}.jsonl`);
+      await Bun.write(
+        transcriptPath,
+        createTranscriptContent([
+          { path: scratch, tool: "Write" },
+          { path: kept, tool: "Write" },
+        ]),
+      );
+
+      expect(await parseTranscript(transcriptPath, repoDir)).toEqual([kept]);
+    });
+
     it("drops a file edited outside the session's working directory", async () => {
       const outside = await mkdtemp(join(tmpdir(), "ox-scratchpad-"));
       const scratch = join(outside, "probe.ts");
@@ -486,6 +513,52 @@ describe("ox hook", () => {
 
       expect(context).toContain(reports);
       expect(context).not.toContain("tsgolint");
+    });
+  });
+
+  describe("installed", () => {
+    it.each<{
+      name: string;
+      declared: boolean;
+      contents: "absent" | "empty" | "bun-types";
+      expected: boolean;
+    }>([
+      { name: "no node_modules", declared: false, contents: "absent", expected: false },
+      { name: "types undeclared", declared: false, contents: "empty", expected: true },
+      { name: "declared types missing", declared: true, contents: "empty", expected: false },
+      { name: "declared types present", declared: true, contents: "bun-types", expected: true },
+    ])("$name", async ({ declared, contents, expected }) => {
+      const root = await mkdtemp(join(tempDir, "installed-"));
+      const devDependencies = declared ? { "@types/bun": "^1.3.0" } : {};
+      await Bun.write(join(root, "package.json"), JSON.stringify({ devDependencies }));
+      if (contents === "empty") {
+        await mkdir(join(root, "node_modules"));
+      } else if (contents === "bun-types") {
+        await Bun.write(join(root, "node_modules/@types/bun/package.json"), "{}");
+      }
+
+      expect(await installed(root)).toBe(expected);
+    });
+  });
+
+  describe("formatPostToolUseOutput", () => {
+    function diagnostics(count: number): string {
+      return Array.from({ length: count }, (_, line) => `a.ts:${line + 1}:1: error`).join("\n");
+    }
+
+    it("passes output within the limit through whole", () => {
+      const errors = diagnostics(POST_TOOL_USE_LINE_LIMIT);
+      expect(contextFrom(formatPostToolUseOutput("a.ts", errors))).toContain(errors);
+    });
+
+    it("caps output past the limit and points at the full check", () => {
+      const context = contextFrom(
+        formatPostToolUseOutput("a.ts", diagnostics(POST_TOOL_USE_LINE_LIMIT + 25)),
+      );
+
+      expect(context).toContain(`a.ts:${POST_TOOL_USE_LINE_LIMIT}:1: error`);
+      expect(context).not.toContain(`a.ts:${POST_TOOL_USE_LINE_LIMIT + 1}:1: error`);
+      expect(context).toContain("25 more lines omitted. Run `bun run check` for the rest.");
     });
   });
 

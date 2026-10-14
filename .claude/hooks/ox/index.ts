@@ -87,6 +87,11 @@ const BinManifest = z.looseObject({
   bin: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
 });
 
+const DependencyManifest = z.looseObject({
+  dependencies: z.record(z.string(), z.string()).optional(),
+  devDependencies: z.record(z.string(), z.string()).optional(),
+});
+
 const BlockState = z.looseObject({ blocks: z.number().optional() });
 
 const CommandFailure = z.looseObject({
@@ -128,6 +133,20 @@ async function isIgnored(filePath: string): Promise<boolean> {
   } catch {
     // git check-ignore exits non-zero for a tracked path, which this reads as "not ignored."
     return false;
+  }
+}
+
+// A checkout nested under the session repo's tmp/ (`git worktree add tmp/x`) is
+// its own working tree, so check-ignore run inside it never sees the outer
+// ignore rule. The caller drops that subtree by path instead.
+async function sessionRepo(cwd: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], { cwd });
+    const toplevel = stdout.trim();
+    return toplevel !== "" ? await realPath(toplevel) : null;
+  } catch {
+    // Outside any repo, the caller falls back to cwd as the root.
+    return null;
   }
 }
 
@@ -304,9 +323,15 @@ export async function parseTranscript(transcriptPath: string, cwd: string): Prom
   }
 
   const root = (await realPath(cwd)) ?? cwd;
+  const scratch = join((await sessionRepo(root)) ?? root, "tmp");
   const checks = [...candidates].map(async (path) => {
     const real = await realPath(path);
-    return { path, keep: real != null && withinCwd(real, root) && !(await isIgnored(path)) };
+    const keep =
+      real != null &&
+      withinCwd(real, root) &&
+      !withinCwd(real, scratch) &&
+      !(await isIgnored(path));
+    return { path, keep };
   });
   const results = await Promise.all(checks);
   return results.filter((result) => result.keep).map((result) => result.path);
@@ -455,14 +480,30 @@ async function runOxfmtWrite(files: string[]): Promise<void> {
 // environment, and no edit the session can make will clear them, so the type
 // section is dropped instead of blocking. The presence of `node_modules`
 // decides it rather than the diagnostics themselves, so one typo'd package name
-// in an installed tree cannot silence the whole gate.
-
-async function installed(cwd: string | undefined): Promise<boolean> {
+// in an installed tree cannot silence the whole gate. A partial install can
+// carry `node_modules` without `@types/bun`, leaving every `Bun` global
+// unresolved, so a tree that declares it must also have it.
+export async function installed(cwd: string | undefined): Promise<boolean> {
+  const root = cwd ?? process.cwd();
   try {
-    await readdir(join(cwd ?? process.cwd(), "node_modules"));
-    return true;
+    await readdir(join(root, "node_modules"));
   } catch {
     // Per the comment above: no node_modules means uninstalled, so the type section drops instead of blocking.
+    return false;
+  }
+  if (!(await declares(root, "@types/bun"))) {
+    return true;
+  }
+  return fileExists(join(root, "node_modules", "@types", "bun", "package.json"));
+}
+
+async function declares(root: string, pkg: string): Promise<boolean> {
+  const path = join(root, "package.json");
+  try {
+    const manifest = decode(DependencyManifest, await Bun.file(path).json(), path);
+    return pkg in { ...manifest.dependencies, ...manifest.devDependencies };
+  } catch {
+    // A missing or malformed manifest reads as undeclared.
     return false;
   }
 }
@@ -535,13 +576,29 @@ async function runTypeCheck(files: string[]): Promise<TypeCheckResult> {
   };
 }
 
-function formatPostToolUseOutput(filePath: string, errors: string): SyncHookJSONOutput {
+// A file with a cascading error can report hundreds of lines on every edit, and
+// each lands in context. The head carries the actionable ones.
+export const POST_TOOL_USE_LINE_LIMIT = 40;
+
+export function formatPostToolUseOutput(filePath: string, errors: string): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
       hookEventName: "PostToolUse",
-      additionalContext: `⚠️ oxlint found issues in ${filePath}:\n\n${errors}\n\nThese will be checked again before the session ends.`,
+      additionalContext: `⚠️ oxlint found issues in ${filePath}:\n\n${capped(errors)}\n\nThese will be checked again before the session ends.`,
     },
   };
+}
+
+function capped(errors: string): string {
+  const diagnostics = errors.split("\n");
+  if (diagnostics.length <= POST_TOOL_USE_LINE_LIMIT) {
+    return errors;
+  }
+  const omitted = diagnostics.length - POST_TOOL_USE_LINE_LIMIT;
+  return [
+    ...diagnostics.slice(0, POST_TOOL_USE_LINE_LIMIT),
+    `${omitted} more lines omitted. Run \`bun run check\` for the rest.`,
+  ].join("\n");
 }
 
 // The type-check run reports lint errors alongside TypeScript diagnostics and

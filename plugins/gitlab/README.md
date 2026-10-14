@@ -22,7 +22,7 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 
 ### Mod
 
-- [`register.ts`](mod/register.ts) watches the current branch's merge request and shows its pipeline and approval state at the end of the prompt footer. A newly failed job or any new approval, unapproval, or comment from someone else reaches the model, and everything is logged to `mod-events`. Needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` and a signed-in `glab`
+- [`register.ts`](mod/register.ts) watches the current branch's merge request and shows its pipeline and approval state at the end of the prompt footer. A newly failed job or any new approval, unapproval, request for changes, or comment from someone else reaches the model, and everything is logged to `mod-events`. Needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` and a signed-in `glab`
 
 ## Testing
 

@@ -303,7 +303,7 @@ async function hasGlab($: EngineInterface): Promise<boolean> {
 /**
  * Watches the current branch's merge request with `glab` and shows its pipeline
  * and approval state at the end of the prompt footer. A newly failed job or any
- * new approval, unapproval, or comment from someone else is sent to the model.
+ * new approval, unapproval, request for changes, or comment from someone else is sent to the model.
  * Every other change is only shown and logged.
  */
 export function register(on: On): void {

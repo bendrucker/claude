@@ -1,5 +1,5 @@
 {
-  "description": "Disables the command sandbox for plugin scripts that hand off to macOS automation (Apple Events, Launch Services). Its mod denies a Bash sandbox bypass whose command verb has not yet failed sandboxed this session, as an experiment: remove the mod if fewer than ~50% of bypass.deny events are followed by a successful sandboxed bypass.retry over two weeks",
+  "description": "Disables the command sandbox for plugin scripts that hand off to macOS automation (Apple Events, Launch Services), and denies a Bash sandbox bypass until that command has failed sandboxed",
   "hooks": {
     "PreToolUse": [
       {

@@ -80,6 +80,9 @@ export function denyReason(verb: string): string {
 /**
  * Holds back a Bash sandbox bypass until the session has seen that command's
  * verb fail sandboxed, and records whether the denied command's sandboxed retry succeeded.
+ *
+ * An experiment: remove it if fewer than ~50% of `bypass.deny` events are
+ * followed by a successful `bypass.retry` over two weeks.
  */
 export function register(on: On): void {
   const failed = new Set<string>();

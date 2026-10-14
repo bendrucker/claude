@@ -87,11 +87,7 @@
       "Bash(glab ci trace:*)",
       "Bash(glab mr view:*)",
       "Bash(bun:*)",
-      "Bash(jq:*)",
-      "mcp__plugin_1password_1password__authenticate",
-      "mcp__plugin_1password_1password__list_environments",
-      "mcp__plugin_1password_1password__list_variables",
-      "mcp__plugin_1password_1password__list_local_env_files"
+      "Bash(jq:*)"
     ],
     "deny": []
   },
@@ -236,15 +232,6 @@
           {
             "type": "command",
             "command": "bun ~/.claude/hooks/enter-worktree"
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__plugin_1password_1password__create_local_env_file",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun ~/.claude/hooks/onepassword-mount"
           }
         ]
       },
@@ -460,8 +447,7 @@
     "run-command@bendrucker": true,
     "mod-events@bendrucker": true,
     "session-limit@bendrucker": true,
-    "load@bendrucker": true,
-    "1password@1password": true
+    "load@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -502,12 +488,6 @@
         "source": "github",
         "repo": "backnotprop/plannotator",
         "ref": "v0.27.25"
-      }
-    },
-    "1password": {
-      "source": {
-        "source": "github",
-        "repo": "1Password/1password-claude-plugin"
       }
     }
   },

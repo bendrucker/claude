@@ -80,7 +80,7 @@ describe("words", () => {
           "case",
           "a",
           "in",
-          "a",
+          "a <pattern>",
           "ls",
           "esac",
         ],

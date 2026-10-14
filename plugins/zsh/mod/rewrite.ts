@@ -16,9 +16,21 @@ interface Edit {
 }
 
 const FLAG = /^--[A-Za-z0-9][\w-]*=/;
-const URL = /^[A-Za-z][\w+.-]*:\/\//;
+export const URL = /^[A-Za-z][\w+.-]*:\/\//;
 const FIND = /^(?:.*\/)?find$/;
-const PREDICATES = new Set(["-name", "-iname", "-path", "-ipath", "-wholename", "-iwholename"]);
+const PREDICATES = new Set([
+  "-name",
+  "-iname",
+  "-path",
+  "-ipath",
+  "-wholename",
+  "-iwholename",
+  "-lname",
+  "-ilname",
+]);
+// Prefixes that run the next word as the command. Their own flags are skipped too.
+const ASSIGNMENT = /^[A-Za-z_]\w*=/;
+const WRAPPERS = new Set(["sudo", "env", "nice", "nohup"]);
 const GLOB = /[*?[]/;
 const BRACE = /([{},])/;
 
@@ -46,9 +58,15 @@ function edit(w: Word, from: number, rule: Rule): Edit | undefined {
 function findValues(all: Word[]): Set<Word> {
   const values = new Set<Word>();
   const byCommand = new Map<number, Word[]>();
-  for (const w of all) byCommand.set(w.command, [...(byCommand.get(w.command) ?? []), w]);
+  for (const w of all) {
+    const list = byCommand.get(w.command);
+    if (list === undefined) byCommand.set(w.command, [w]);
+    else list.push(w);
+  }
   for (const list of byCommand.values()) {
-    const head = list.find((w) => w.index === 0);
+    const head = list.find(
+      (w) => !ASSIGNMENT.test(w.text) && !WRAPPERS.has(w.text) && !w.text.startsWith("-"),
+    );
     if (head === undefined || !FIND.test(head.text) || !head.unquoted.every(Boolean)) continue;
     for (const w of list) {
       if (w.context !== "plain" || !PREDICATES.has(w.text)) continue;
@@ -88,6 +106,7 @@ function ruleFor(w: Word, findValue: boolean, gates: Gates): Edit | undefined {
  */
 export function rewrite(command: string, gates: Gates): { command: string; rules: Rule[] } {
   if (!gates.glob && !gates.equals) return { command, rules: [] };
+  if (!/[*?[=]/.test(command)) return { command, rules: [] };
   const all = words(command);
   const values = findValues(all);
   const edits: Edit[] = [];

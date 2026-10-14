@@ -51,6 +51,19 @@ describe("rewrite", () => {
         "function f { find . -name '*.yaml'; }",
         ["flag-glob"],
       ],
+      ["find behind sudo", "sudo find / -name *.log", "sudo find / -name '*.log'", ["flag-glob"]],
+      [
+        "find behind env",
+        "env X=1 find . -lname *.ts",
+        "env X=1 find . -lname '*.ts'",
+        ["flag-glob"],
+      ],
+      [
+        "case body",
+        "case $a in --x=*) find . -name *.md ;; esac",
+        "case $a in --x=*) find . -name '*.md' ;; esac",
+        ["flag-glob"],
+      ],
       ["triple equals", "echo ===", "echo '==='", ["equals"]],
       ["equals banner", "echo ==SESSIONS===", "echo '==SESSIONS==='", ["equals"]],
       ["url", "curl https://x.test/a?b=1", "curl 'https://x.test/a?b=1'", ["url"]],
@@ -106,6 +119,8 @@ describe("rewrite", () => {
       ["predicate outside find", "ls -name *.ts"],
       ["url without glob", "curl https://x.test/a"],
       ["tilde value", "find . -path ~/x*"],
+      ["case patterns", 'case "$1" in --prefix=*|http://*) ;; (=*) ;; esac'],
+      ["case on lines", "case $a in\n  --dir=*) d=1 ;;\nesac"],
     ];
     for (const [name, command] of cases) {
       expect({ name, got: rewrite(command, ALL) }).toEqual({ name, got: { command, rules: [] } });

@@ -2,7 +2,7 @@
  * Where a word sits: `test` inside `[[ ]]`, `arith` for a `(( ))` command,
  * `assign` for `NAME=...`. zsh doesn't glob any of those.
  */
-export type Context = "plain" | "test" | "arith" | "assign";
+export type Context = "plain" | "test" | "arith" | "assign" | "pattern";
 
 export interface Word {
   text: string;
@@ -41,6 +41,8 @@ const KEYWORDS = new Set([
   "command",
   "exec",
 ]);
+const CONTROL = new Set([";;", ";&", ";|", "&&", "||", "|&"]);
+const ARM_END = new Set([";;", ";&", ";|"]);
 const DECLARE = new Set(["typeset", "local", "export", "declare", "readonly", "integer", "float"]);
 const ASSIGNMENT = /^[A-Za-z_]\w*(\[[^\]]*\])?\+?=/;
 const REDIRECTS = ["<<<", "<<-", "<<", "<>", "<&", ">>|", ">>!", ">>", ">|", ">!", ">&", "<", ">"];
@@ -73,6 +75,8 @@ class Lexer {
     header: false,
   };
   private heredocs: Heredoc[] = [];
+  /** Inside a `case` pattern list, between `in` or `;;` and the closing `)`. */
+  private pattern = false;
 
   constructor(private readonly src: string) {}
 
@@ -94,6 +98,8 @@ class Lexer {
   /** Lexes commands until `end` (unconsumed) or the end of input. */
   list(end: ")" | "`" | undefined): void {
     const outer = this.level;
+    const outerPattern = this.pattern;
+    this.pattern = false;
     this.newCommand();
     let parens = 0;
     let cases = 0;
@@ -121,13 +127,22 @@ class Lexer {
         this.pos += this.at(2) === ">" ? 3 : 2;
       } else if (c === ";" || c === "&" || c === "|") {
         const two = c + (this.at(1) ?? "");
-        this.pos += [";;", ";&", ";|", "&&", "||", "|&"].includes(two) ? 2 : 1;
+        const op = CONTROL.has(two) ? two : c;
+        this.pos += op.length;
+        if (this.pattern && op === "|") continue;
+        if (cases > 0 && ARM_END.has(op)) this.pattern = true;
         this.newCommand();
       } else if (c === "(" && this.at(1) === "(" && this.level.index === 0) {
         this.arith();
+      } else if (c === "(" && this.pattern) {
+        this.pos++;
       } else if (c === "(") {
         this.pos++;
         parens++;
+        this.newCommand();
+      } else if (c === ")" && this.pattern) {
+        this.pos++;
+        this.pattern = false;
         this.newCommand();
       } else if (c === ")") {
         this.pos++;
@@ -139,10 +154,15 @@ class Lexer {
       } else {
         const word = this.word(end);
         if (word === "case" && this.level.index === 1) cases++;
-        if (word === "esac" && cases > 0) cases--;
+        else if (word === "in" && cases > 0 && this.level.index === 3) this.pattern = true;
+        else if (word === "esac" && cases > 0) {
+          cases--;
+          this.pattern = false;
+        }
       }
     }
     this.level = outer;
+    this.pattern = outerPattern;
   }
 
   /** Skips each pending heredoc body, which starts at the current line. */
@@ -252,6 +272,7 @@ class Lexer {
     const level = this.level;
     const flags = Array.from(text, (_, i) => bare.has(start + i));
     let context: Context = level.test ? "test" : "plain";
+    if (this.pattern && text !== "esac") context = "pattern";
     if (
       !level.test &&
       (!level.named || level.declaring) &&

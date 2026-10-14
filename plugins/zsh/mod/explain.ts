@@ -1,3 +1,5 @@
+import { URL } from "./rewrite";
+
 export type Class = "glob" | "equals" | "reserved" | "split" | "bash-syntax";
 
 export interface Note {
@@ -13,7 +15,6 @@ interface Hit {
 }
 
 const ERROR_LINE = /^(?:\(eval\)|zsh):\d+: (.*)$/gm;
-const URL = /^[a-z][a-z0-9+.-]*:\/\//i;
 
 function classify(message: string): Hit | undefined {
   const glob = /^no matches found: (.*)$/.exec(message);

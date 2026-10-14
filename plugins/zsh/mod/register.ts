@@ -1,7 +1,7 @@
 import type { EngineInterface, On } from "claude-code";
 import { type Class, explain } from "./explain";
 import { rewrite } from "./rewrite";
-import { type Shell, detect } from "./shell";
+import { PROBE, type Shell, fallback, probed, resolve } from "./shell";
 
 const MOD = "zsh";
 
@@ -14,6 +14,15 @@ function failed($: EngineInterface, hook: string, kind: string, message?: string
   $.modEvents
     .emit({ mod: MOD, event: "error", ok: false, detail: { hook, kind, message: message ?? null } })
     .catch(() => undefined);
+}
+
+async function detect($: EngineInterface): Promise<Shell> {
+  const path = resolve([await $.env.get("CLAUDE_CODE_SHELL"), await $.env.get("SHELL")]);
+  try {
+    return probed(path, await $.process.run([path, "-c", PROBE], { timeoutMs: 5000 }));
+  } catch (error) {
+    return fallback(path, error instanceof Error ? error.message : String(error));
+  }
 }
 
 export function register(on: On): void {

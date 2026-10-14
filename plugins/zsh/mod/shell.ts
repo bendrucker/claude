@@ -1,4 +1,4 @@
-import type { EngineInterface } from "claude-code";
+import type { ProcessRunResult } from "claude-code";
 
 export type Option = "nomatch" | "nullglob" | "cshnullglob" | "equals";
 
@@ -20,7 +20,7 @@ export const DEFAULTS: Record<Option, boolean> = {
 
 const OPTIONS: Option[] = ["nomatch", "nullglob", "cshnullglob", "equals"];
 
-const PROBE = `printf '%s\\n' "$ZSH_VERSION" ${OPTIONS.map((o) => `"\${options[${o}]}"`).join(" ")}`;
+export const PROBE = `printf '%s\\n' "$ZSH_VERSION" ${OPTIONS.map((o) => `"\${options[${o}]}"`).join(" ")}`;
 
 function gatesOf(options: Record<Option, boolean>): Shell["gates"] {
   return {
@@ -50,7 +50,7 @@ function isZsh(path: string): boolean {
   return /(^|\/)zsh$/.test(path);
 }
 
-function fallback(path: string, error: string): Shell {
+export function fallback(path: string, error: string): Shell {
   return {
     path,
     version: null,
@@ -61,22 +61,13 @@ function fallback(path: string, error: string): Shell {
   };
 }
 
-interface Probing {
-  env: Pick<EngineInterface["env"], "get">;
-  process: Pick<EngineInterface["process"], "run">;
+// CLAUDE_CODE_SHELL, then $SHELL, each only when it names bash or zsh,
+// then the first zsh on PATH.
+export function resolve(candidates: (string | undefined)[]): string {
+  return candidates.find((c) => c !== undefined && /bash|zsh/.test(c)) ?? "zsh";
 }
 
-export async function detect($: Probing): Promise<Shell> {
-  // CLAUDE_CODE_SHELL, then $SHELL, each only when it names bash or zsh,
-  // then the first zsh on PATH.
-  const candidates = [await $.env.get("CLAUDE_CODE_SHELL"), await $.env.get("SHELL")];
-  const path = candidates.find((c) => c !== undefined && /bash|zsh/.test(c)) ?? "zsh";
-
-  try {
-    const result = await $.process.run([path, "-c", PROBE], { timeoutMs: 5000 });
-    if (result.exitCode !== 0) return fallback(path, `probe exited ${result.exitCode}`);
-    return parse(path, result.stdout);
-  } catch (error) {
-    return fallback(path, error instanceof Error ? error.message : String(error));
-  }
+export function probed(path: string, result: ProcessRunResult): Shell {
+  if (result.exitCode !== 0) return fallback(path, `probe exited ${result.exitCode}`);
+  return parse(path, result.stdout);
 }

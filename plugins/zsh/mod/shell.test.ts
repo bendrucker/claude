@@ -1,6 +1,6 @@
 import type { ProcessRunResult } from "claude-code";
 import { describe, expect, test } from "claude-code/testing";
-import { DEFAULTS, type Shell, detect, parse } from "./shell";
+import { DEFAULTS, fallback, parse, probed, resolve } from "./shell";
 
 function ran(stdout: string, exitCode = 0): ProcessRunResult {
   return { exitCode, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false };
@@ -49,87 +49,51 @@ describe("parse", () => {
   });
 });
 
-interface Probe {
-  shell: Shell;
-  argvs: string[][];
-}
+describe("resolve", () => {
+  test("picks the shell in the Bash tool's order", () => {
+    const cases: [string, (string | undefined)[], string][] = [
+      ["override wins", ["/opt/zsh", "/bin/bash"], "/opt/zsh"],
+      ["invalid override", ["/bin/fish", "/bin/zsh"], "/bin/zsh"],
+      ["SHELL alone", [undefined, "/bin/bash"], "/bin/bash"],
+      ["unsupported SHELL", [undefined, "/usr/bin/fish"], "zsh"],
+      ["nothing set", [undefined, undefined], "zsh"],
+    ];
+    for (const [name, candidates, want] of cases) {
+      expect({ name, got: resolve(candidates) }).toEqual({ name, got: want });
+    }
+  });
+});
 
-async function probeOf(
-  variables: Record<string, string>,
-  reply: () => ProcessRunResult,
-): Promise<Probe> {
-  const argvs: string[][] = [];
-  const $: Parameters<typeof detect>[0] = {
-    env: { get: (name) => Promise.resolve(variables[name]) },
-    process: {
-      run: (argv) => {
-        argvs.push([...argv]);
-        return Promise.resolve().then(reply);
-      },
-    },
-  };
-  return { shell: await detect($), argvs };
-}
-
-describe("detect", () => {
-  test("probes the SHELL path and parses the output", async () => {
-    const probe = await probeOf({ SHELL: "/opt/bin/zsh" }, () => ran("5.9.2\non\non\noff\non\n"));
-    expect(probe.shell).toMatchObject({
+describe("probed", () => {
+  test("parses a zsh probe and leaves a non-zsh shell inert", () => {
+    expect(probed("/opt/bin/zsh", ran("5.9.2\non\non\noff\non\n"))).toMatchObject({
       path: "/opt/bin/zsh",
       version: "5.9.2",
       active: true,
       gates: { glob: false, equals: true },
       error: null,
     });
-    expect(probe.argvs).toHaveLength(1);
-    expect(probe.argvs[0]?.slice(0, 2)).toEqual(["/opt/bin/zsh", "-c"]);
-    expect(probe.argvs[0]?.[2]).toContain("ZSH_VERSION");
+    expect(probed("/bin/bash", ran("\n\n\n\n\n"))).toMatchObject({
+      path: "/bin/bash",
+      active: false,
+      error: null,
+    });
   });
 
-  test("leaves a non-zsh shell inert", async () => {
-    const probe = await probeOf({ SHELL: "/bin/bash" }, () => ran("\n\n\n\n\n"));
-    expect(probe.shell).toMatchObject({ path: "/bin/bash", active: false, error: null });
-  });
-
-  test("resolves the shell in the Bash tool's order", async () => {
-    const cases: [string, Record<string, string>, string][] = [
-      ["override wins", { CLAUDE_CODE_SHELL: "/opt/zsh", SHELL: "/bin/bash" }, "/opt/zsh"],
-      ["invalid override", { CLAUDE_CODE_SHELL: "/bin/fish", SHELL: "/bin/zsh" }, "/bin/zsh"],
-      ["SHELL alone", { SHELL: "/bin/bash" }, "/bin/bash"],
-      ["unsupported SHELL", { SHELL: "/usr/bin/fish" }, "zsh"],
-      ["nothing set", {}, "zsh"],
-    ];
-    const probes = await Promise.all(
-      cases.map(([, variables]) => probeOf(variables, () => ran(ZSH_DEFAULTS))),
-    );
-    expect(probes.map((p) => p.argvs[0]?.[0])).toEqual(cases.map((row) => row[2]));
-  });
-
-  const failures: [string, string, boolean][] = [
-    ["zsh path", "/usr/bin/zsh", true],
-    ["bash path", "/bin/bash", false],
-  ];
-
-  test("falls back to defaults when the probe fails", async () => {
-    const rows = failures.flatMap(
-      ([name, path, active]): [string, string, boolean, () => ProcessRunResult, string][] => [
-        [`${name} exits nonzero`, path, active, () => ran("", 2), "probe exited 2"],
-        [
-          `${name} throws`,
-          path,
-          active,
-          () => {
-            throw new Error("timed out");
-          },
-          "timed out",
-        ],
+  test("falls back to defaults when the probe fails", () => {
+    const cases: [string, ReturnType<typeof fallback>, string, boolean, string][] = [
+      [
+        "zsh exits nonzero",
+        probed("/usr/bin/zsh", ran("", 2)),
+        "/usr/bin/zsh",
+        true,
+        "probe exited 2",
       ],
-    );
-    const probes = await Promise.all(
-      rows.map(([, path, , reply]) => probeOf({ SHELL: path }, reply)),
-    );
-    for (const [i, [name, path, active, , error]] of rows.entries()) {
-      expect({ name, shell: probes[i]?.shell }).toMatchObject({
+      ["bash exits nonzero", probed("/bin/bash", ran("", 2)), "/bin/bash", false, "probe exited 2"],
+      ["zsh throws", fallback("/usr/bin/zsh", "timed out"), "/usr/bin/zsh", true, "timed out"],
+    ];
+    for (const [name, shell, path, active, error] of cases) {
+      expect({ name, shell }).toMatchObject({
         name,
         shell: {
           path,

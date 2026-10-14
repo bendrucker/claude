@@ -23,4 +23,4 @@ the reviewer's text, which may run to several lines
 
 reviewr never writes to the worktree, the index, or any branch. Its one write is a baseline ref under `refs/reviewr/turn-base/`. Leave those alone.
 
-Its `last-turn` scope reads the same scraped `agent_status` as [Agent Status](../SKILL.md#agent-status), treating a resting-to-working transition as a turn edge. A turn that finishes inside one poll interval is invisible to it, so a very fast edit can be missing from that view.
+Its `last-turn` scope reads the same scraped `agent_status` as [Agent Status](agents.md#agent-status), treating a resting-to-working transition as a turn edge. A turn that finishes inside one poll interval is invisible to it, so a very fast edit can be missing from that view.

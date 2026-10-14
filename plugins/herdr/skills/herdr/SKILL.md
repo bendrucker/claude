@@ -86,11 +86,7 @@ IDs are opaque handles shaped `w1` for a workspace, `w1:t1` for a tab, and `w1:p
 
 ## Machines
 
-`herdr machine list` names the SSH machines saved here. `herdr --machine <label> <command>` forwards a single API command to one of them, from the `api`, `agent`, `pane`, `workspace`, `worktree`, `tab`, and `notification` groups. Everything else is local management, rejected with exit 2 before the network. Nothing forwarded runs git or writes a file, so a machine answers for its panes and agents and for nothing in its checkouts.
-
-IDs repeat across machines and carry no machine of their own. The orientation block above and your own `HERDR_*` variables both describe this machine, so their IDs take a bare command. An ID from another machine's listing takes `--machine <label>` on every command touching it.
-
-A saved machine is not a reachable one: the listing reports what the config holds rather than what answers, and probing to find out costs seconds per sleeping machine. Report a connection failure as "machine `<label>` is unreachable" rather than quoting herdr's error, which names the SSH target. That failure is the result, and herdr runs nothing here in its place.
+The orientation block and `HERDR_*` describe this machine. Before running `herdr machine list`, passing `--machine`, or acting on an ID from another machine, read [`references/machines.md`](references/machines.md).
 
 ## Splits
 
@@ -143,36 +139,13 @@ New work needing its own worktree and agent gets both in one call:
 bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
 ```
 
-It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Read `prompted` on the JSON line: false means herdr never confirmed the agent took the work, so read the pane before reporting the hand-off. A non-null `retry` means the first submission left the agent idle and the script resent Enter (`enter`) or the whole prompt (`prompt`). A failure prints the error, then the partial record once the worktree exists. Every dispatch appends to `dispatches.jsonl` in the plugin data dir.
+It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Before reporting the hand-off, read the result fields in [`references/agents.md`](references/agents.md#dispatch-result).
 
 `worktrunk:wt-switch-create` re-roots this session instead.
 
-### Starting an Agent
+### Starting an Agent and Status
 
-`agent start` attaches an agent to an existing free pane, sitting at its interactive prompt with nothing in the foreground. Split first, start second:
-
-```bash
-pane=$(herdr pane split --current --direction right --cwd "$PWD" --no-focus | jq -r '.result.pane.pane_id')
-herdr agent start reviewer --kind claude --pane "$pane"
-```
-
-If the command substitution is refused, run the two steps separately and pass `.result.pane.pane_id` to `--pane`.
-
-Only `agent start` binds a name. An agent launched through `pane run` or `pane send-text` never gets one, and `agent start` against that pane returns `agent_pane_busy`. Target it by pane ID, which `agent prompt`, `agent read`, and `agent wait` all accept.
-
-The name is the handle every later command uses, so make it descriptive. It must match `[a-z][a-z0-9_-]{0,31}` and be unique among live agents. It binds to the pane's current occupant and clears when that agent exits, is released, or is replaced. Arguments for the agent's own CLI go after `--`.
-
-An agent that comes up into a permission or trust dialog returns `agent_not_ready` without waiting out the startup timeout. The name is bound, so `agent read` and `agent send-keys` reach the pane. `agent prompt` stays refused until it settles at `idle`.
-
-### Agent Status
-
-For Claude, the integration hook herdr installs reports only session identity. herdr then refuses lifecycle reports from any other source for that pane. The `idle`, `working`, `blocked`, and `done` states come from matching the pane's screen against a detection manifest, so an unusual or suppressed terminal title reads as `unknown`.
-
-`idle` and `done` are one resting state, split by whether the pane's tab has been seen. A seen tab rests at `idle`. Work that finished in a tab nobody looked at rests at `done`. The user focusing that tab marks it seen, and so does a `focus` command you issue. Plain reads never do, so an agent followed entirely through `agent read` stays `done`.
-
-`blocked` means herdr recognized an approval or question UI. `unknown` means an agent is present and the scraper could not classify it, and does not mean it finished.
-
-`herdr agent explain <pane>` prints the manifest rule that fired, the region it read, and the text it matched.
+Before running `agent start` in a pane you split, or when an agent's status (`idle`, `done`, `blocked`, `unknown`) looks wrong, read [`references/agents.md`](references/agents.md).
 
 ## Collaborative File Viewing
 
@@ -226,16 +199,6 @@ The `❯` line at the bottom of a Claude pane carries Claude Code's own prompt s
 
 ## Plugins
 
-```bash
-herdr plugin list
-herdr plugin action list | jq -r --arg os macos '.result.actions[] | select(.platforms | index($os)) | "\(.plugin_id)  \(.action_id)  \(.title)"'
-herdr plugin action invoke "$action_id" --plugin "$plugin_id"
-```
-
-Actions carry a `platforms` array and the CLI has no platform flag. Filter client-side, as above.
-
-`herdr plugin log list` shows a plugin's command output, which is where to look when an action produces no visible effect. `herdr plugin config-dir <plugin_id>` locates its config.
-
-`herdr plugin pane open` needs `--entrypoint` alongside `--plugin`, and exits 2 without it. Its `--placement` then decides which of the addressing flags are legal, and each wrong one comes back `invalid_params`. `--help` lists four placements, and the binary also accepts `popup` and `fullscreen`.
+Before invoking a plugin action, reading a plugin's logs, or running `herdr plugin pane open`, read [`references/plugins.md`](references/plugins.md).
 
 A turn carrying `path:line-range` blocks, each with diff lines and reviewer text under it, came from the reviewr sidebar. [`references/reviewr.md`](references/reviewr.md) covers anchoring those comments and the plugin's one-way contract.

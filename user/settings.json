@@ -650,6 +650,11 @@
     "NODE_USE_ENV_PROXY": "1",
     "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
     "CLAUDE_CODE_ENABLE_FUNCTION_HOOKS": "1",
-    "AGENT_BROWSER_IDLE_TIMEOUT_MS": "600000"
+    "AGENT_BROWSER_IDLE_TIMEOUT_MS": "600000",
+    "GIT_CONFIG_COUNT": "2",
+    "GIT_CONFIG_KEY_0": "commit.gpgsign",
+    "GIT_CONFIG_VALUE_0": "false",
+    "GIT_CONFIG_KEY_1": "tag.gpgsign",
+    "GIT_CONFIG_VALUE_1": "false"
   }
 }

@@ -9,7 +9,6 @@ Git workflow and branching best practices for Claude Code.
 - **Hooks**:
   - Blocks direct commits to the default branch
   - Recovers a failed git network operation over HTTPS when the SSH agent refuses to sign
-  - Stops retries of a refused commit or tag signature and asks the user to approve it
 
 ## HTTPS Fallback
 
@@ -25,11 +24,7 @@ The hook suggests, it does not retry. Rewriting the URL through `insteadOf` rath
 
 A host outside the provider table (a self-hosted forge, an enterprise domain) gets no suggestion, since no known CLI could authenticate the retry. Extending support is one row in `PROVIDERS` in `scripts/https-fallback.ts`.
 
-Commit and tag signing go through `ssh-keygen -Y sign` instead, and HTTPS cannot replace a signature. The fallback stays silent on them, and the signing refusal hook handles them.
-
-## Signing Refusal
-
-With `gpg.format=ssh`, an SSH agent that requires approval for each signature refuses an unattended `git commit`, `tag`, or `rebase`, and `ssh-keygen` reports `Couldn't sign message (signer): agent refused operation`. Retrying fails the same way until someone approves. The `PostToolUseFailure` hook recognizes that output and tells the model to stop, ask the user to approve the signing request, and retry once they confirm, with signing left enabled.
+Commit and tag signing use a different code path (`ssh-keygen -Y sign`) and are out of scope. Those still need Touch ID.
 
 ## Testing
 

@@ -6,6 +6,7 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import { $ } from "bun";
 import { BashInput, PostToolUseFailure } from "./hook-input";
+import { hasSigningRefusal } from "./signing-refusal";
 
 /**
  * Secretive gates every signature behind Touch ID, so an unattended `ssh` gets
@@ -163,7 +164,8 @@ export async function processInput(
   if (command == null || command === "") return null;
 
   if (gitNetworkSubcommand(command) == null || gitNetworkSubcommand(command) === "") return null;
-  if (!hasSshAuthFailure(input.error)) return null;
+  // A refused commit signature also reads `agent refused operation`, and HTTPS cannot fix it.
+  if (!hasSshAuthFailure(input.error) || hasSigningRefusal(input.error)) return null;
 
   const cwd = input.cwd;
   const target = sshProviderOf(command) ?? sshProviderOf(await readRemotes(cwd));

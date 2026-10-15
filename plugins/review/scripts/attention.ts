@@ -247,22 +247,24 @@ function canonical(path: string): string {
 
 // reviewr labels its pane on launch. A sidebar already up over the same
 // working tree is re-used; one over another tree would show the wrong diff.
-export function existingReviewr(paneList: string, cwd: string): string | null {
+export type ReviewrLookup = { pane: string } | "none" | "unknown";
+
+export function existingReviewr(paneList: string, cwd: string): ReviewrLookup {
   let json: unknown;
   try {
     json = JSON.parse(paneList);
   } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
-    return null;
+    return "unknown";
   }
   const parsed = PaneList.safeParse(json);
-  if (!parsed.success) return null;
+  if (!parsed.success) return "unknown";
   const tree = canonical(cwd);
-  return (
-    parsed.data.result.panes.find(
-      (pane) => pane.label === "reviewr" && pane.cwd != null && canonical(pane.cwd) === tree,
-    )?.pane_id ?? null
+  const pane = parsed.data.result.panes.find(
+    (candidate) =>
+      candidate.label === "reviewr" && candidate.cwd != null && canonical(candidate.cwd) === tree,
   );
+  return pane == null ? "none" : { pane: pane.pane_id };
 }
 
 // plannotator-tui leaves its pane unlabeled and reads the file from its
@@ -412,7 +414,9 @@ async function openDoc(paneId: string, file: string): Promise<void> {
 // drops unsent comments, so a surface still running afterwards holds some.
 function quitSurface(pane: string, binary: string): void {
   if (paneState(pane, binary) === "gone") return;
-  if (!herdr(["pane", "send-keys", pane, "q"])) fail(`could not quit ${pane}`);
+  if (!herdr(["pane", "send-keys", pane, "q"]) && paneState(pane, binary) !== "gone") {
+    fail(`could not quit ${pane}`);
+  }
   const deadline = Date.now() + CLOSE_WAIT_MS;
   while (Date.now() < deadline) {
     Bun.sleepSync(CLOSE_POLL_MS);
@@ -529,10 +533,10 @@ const openCmd = command(
     const workspace = process.env.HERDR_WORKSPACE_ID;
     const open =
       workspace == null
-        ? null
+        ? "none"
         : existingReviewr(herdrJson(["pane", "list", "--workspace", workspace]), process.cwd());
-    if (open != null) {
-      console.log(`reviewr already open (${open})`);
+    if (typeof open === "object") {
+      console.log(`reviewr already open (${open.pane})`);
       process.exit(0);
     }
     openPane(
@@ -563,12 +567,14 @@ const closeCmd = command(
       await closeDoc(paneId, parsed.flags.doc);
       process.exit(0);
     }
-    const workspace = process.env.HERDR_WORKSPACE_ID;
-    const open =
-      workspace == null
-        ? null
-        : existingReviewr(herdrJson(["pane", "list", "--workspace", workspace]), process.cwd());
-    if (open != null) quitSurface(open, REVIEWR_PROCESS);
+    const workspace =
+      process.env.HERDR_WORKSPACE_ID ?? fail("HERDR_WORKSPACE_ID unset: cannot find reviewr");
+    const open = existingReviewr(
+      herdrJson(["pane", "list", "--workspace", workspace]),
+      process.cwd(),
+    );
+    if (open === "unknown") fail("herdr did not list panes; retry the close");
+    if (open !== "none") quitSurface(open.pane, REVIEWR_PROCESS);
     process.exit(0);
   },
 );

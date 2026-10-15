@@ -21,6 +21,7 @@ import {
   reviewGlyph,
   reviewrOpenArgs,
   surfaceState,
+  type ReviewrLookup,
   type SurfaceState,
 } from "./attention";
 
@@ -396,32 +397,32 @@ describe("existingReviewr", () => {
   const list = (panes: { pane_id: string; label?: string | null; cwd?: string }[]) =>
     JSON.stringify({ result: { panes } });
 
-  test.each<[string, string, string | null]>([
+  test.each<[string, string, ReviewrLookup]>([
     [
       "a labeled pane over the same tree",
       list([
         { pane_id: "wE5:p1", cwd: tree },
         { pane_id: "wE5:p4", label: "reviewr", cwd: tree },
       ]),
-      "wE5:p4",
+      { pane: "wE5:p4" },
     ],
     [
       "a labeled pane over another tree",
       list([{ pane_id: "wE5:p4", label: "reviewr", cwd: "/repo/two" }]),
-      null,
+      "none",
     ],
-    ["a labeled pane with no cwd", list([{ pane_id: "wE5:p4", label: "reviewr" }]), null],
+    ["a labeled pane with no cwd", list([{ pane_id: "wE5:p4", label: "reviewr" }]), "none"],
     [
       "no reviewr pane",
       list([
         { pane_id: "wE5:p1", label: null, cwd: tree },
         { pane_id: "wE5:p3", label: "Annotate", cwd: tree },
       ]),
-      null,
+      "none",
     ],
-    ["an error envelope", JSON.stringify({ error: { code: "server_unavailable" } }), null],
-    ["no output", "", null],
+    ["an error envelope", JSON.stringify({ error: { code: "server_unavailable" } }), "unknown"],
+    ["no output", "", "unknown"],
   ])("%s", (_name, json, expected) => {
-    expect(existingReviewr(json, tree)).toBe(expected);
+    expect(existingReviewr(json, tree)).toEqual(expected);
   });
 });

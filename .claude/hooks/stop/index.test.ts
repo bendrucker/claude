@@ -251,7 +251,7 @@ describe("processStop", () => {
   async function withStubbedCommands<T>(
     exitCodes: Record<string, number>,
     run: (bin: string, readCalls: () => Promise<string[]>) => Promise<T>,
-    outputs: Record<string, string> = {},
+    outputs: Record<string, { stdout?: string; stderr?: string }> = {},
   ): Promise<T> {
     const stubDir = await mkdtemp(join(tmpdir(), "stop-hook-stub-"));
     const bin = join(stubDir, "bin");
@@ -259,11 +259,13 @@ describe("processStop", () => {
     await Promise.all(
       ["bun", "prek"].map(async (name) => {
         const stub = join(bin, name);
-        const outputFile = join(stubDir, `${name}.out`);
-        await Bun.write(outputFile, outputs[name] ?? "");
+        const stdoutFile = join(stubDir, `${name}.out`);
+        const stderrFile = join(stubDir, `${name}.err`);
+        await Bun.write(stdoutFile, outputs[name]?.stdout ?? "");
+        await Bun.write(stderrFile, outputs[name]?.stderr ?? "");
         await Bun.write(
           stub,
-          `#!/bin/sh\necho "${name} $*" >> "${log}"\ncat "${outputFile}"\nexit ${exitCodes[name] ?? 0}\n`,
+          `#!/bin/sh\necho "${name} $*" >> "${log}"\ncat "${stdoutFile}"\ncat "${stderrFile}" >&2\nexit ${exitCodes[name] ?? 0}\n`,
         );
         Bun.spawnSync(["chmod", "+x", stub]);
       }),
@@ -445,10 +447,10 @@ describe("processStop", () => {
       async () => {
         expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toEqual({
           decision: "block",
-          reason: `Check failures:\n\n${PLUGIN_TEST_FAILURE}`,
+          reason: `Check failures:\n\n${PLUGIN_TEST_FAILURE}\n\nerror: failed to clean up stash`,
         });
       },
-      { prek: PREK_OUTPUT },
+      { prek: { stdout: PREK_OUTPUT, stderr: "error: failed to clean up stash\n" } },
     );
 
     await rm(cwd, { recursive: true, force: true });

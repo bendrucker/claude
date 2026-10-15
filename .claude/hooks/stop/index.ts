@@ -269,7 +269,10 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
     // these same files, plus any new ones, until a run of this Stop passes.
     const failure = PrekFailure.safeParse(error);
     const execError = failure.success ? failure.data : {};
-    const output = summarizePrekOutput(`${execError.stdout ?? ""}${execError.stderr ?? ""}`);
+    const output = [execError.stdout, execError.stderr]
+      .map((stream) => summarizePrekOutput(stream ?? ""))
+      .filter((summary) => summary !== "")
+      .join("\n\n");
 
     let context: string;
     if (execError.code === "ENOENT") {

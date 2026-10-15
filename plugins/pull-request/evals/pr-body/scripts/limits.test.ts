@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Result } from "../../../../../evals/native/regrade";
-import { applyLimits, bodyOf, render } from "./limits";
+import { applyLimits, type Body, bodyOf, render } from "./limits";
 
 const long = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
 const spans = (n: number) => Array.from({ length: n }, (_, i) => `\`c${i}\``).join(" ");
@@ -84,7 +84,7 @@ test("scores the stub body when a tool result carries one and the reply otherwis
   `);
 });
 
-test.each<{ name: string; trace: string; body: string | undefined; source?: string }>([
+test.each<{ name: string; trace: string; body: string | undefined; source?: Body["source"] }>([
   {
     name: "string tool_result content",
     trace: jsonl([toolResult("noise\nPR-BODY-BEGIN\nHello\nPR-BODY-END")]),
@@ -112,5 +112,5 @@ test.each<{ name: string; trace: string; body: string | undefined; source?: stri
   { name: "reply without a Title line", trace: replyTrace("Just prose."), body: undefined },
 ])("bodyOf: $name", ({ trace, body, source }) => {
   expect(bodyOf(trace)?.text).toBe(body);
-  expect(bodyOf(trace)?.source).toBe(source);
+  expect(bodyOf(trace)?.source).toEqual(source);
 });

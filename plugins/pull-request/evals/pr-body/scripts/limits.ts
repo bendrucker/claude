@@ -133,8 +133,9 @@ function cell(m: Map<string, [number, number]>, arm: string, row: string): strin
 }
 
 export function render(counts: Counts): string {
-  const arms = new Set<string>();
-  for (const m of counts.values()) for (const key of m.keys()) arms.add(armOf(key));
+  const seen = new Set<string>();
+  for (const m of counts.values()) for (const key of m.keys()) seen.add(armOf(key));
+  const arms = [...seen].toSorted();
   const names = Object.values(ROWS);
   const header = ["case"];
   for (const a of arms) for (const r of names) header.push(`${a} ${r}`);

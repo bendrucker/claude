@@ -36,8 +36,10 @@ export const StopInput = z.looseObject({
 
 type StopInput = z.infer<typeof StopInput>;
 
+// `code` is the exit status on a non-zero exit and a string like "ENOENT" when
+// the spawn itself failed.
 const PrekFailure = z.looseObject({
-  code: z.string().optional(),
+  code: z.union([z.string(), z.number()]).optional(),
   killed: z.boolean().optional(),
   stdout: z.string().optional(),
   stderr: z.string().optional(),
@@ -165,6 +167,48 @@ export function scopePaths(files: string[], cwd: string): string[] {
   return scoped;
 }
 
+const PREK_STATUS = /^\S.*?\.{2,}(?:\([^)]*\))?(Passed|Failed|Skipped)$/;
+const FAILURE_TAIL_LINES = 40;
+
+function tail(lines: string[]): string[] {
+  if (lines.length <= FAILURE_TAIL_LINES) {
+    return lines;
+  }
+  return [
+    `... ${lines.length - FAILURE_TAIL_LINES} earlier lines omitted`,
+    ...lines.slice(-FAILURE_TAIL_LINES),
+  ];
+}
+
+// Keeps each failing hook's status line and the tail of its output, dropping
+// the passed and skipped hooks.
+export function summarizePrekOutput(output: string): string {
+  const lines = output
+    .trim()
+    .split("\n")
+    .map((line) => line.trimEnd());
+  const failed: string[][] = [];
+  let current: string[] | null = null;
+  for (const line of lines) {
+    const status = PREK_STATUS.exec(line)?.[1];
+    if (status != null) {
+      current = status === "Failed" ? [line] : null;
+      if (current) {
+        failed.push(current);
+      }
+    } else {
+      current?.push(line);
+    }
+  }
+
+  if (failed.length === 0) {
+    return tail(lines).join("\n");
+  }
+  return failed
+    .map(([header = "", ...body]) => [header, ...tail(body)].join("\n").trimEnd())
+    .join("\n\n");
+}
+
 const UNSAFE_SESSION = /[^A-Za-z0-9._-]+/g;
 
 export function statePath(sessionId: string): string {
@@ -226,7 +270,7 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
     // these same files, plus any new ones, until a run of this Stop passes.
     const failure = PrekFailure.safeParse(error);
     const execError = failure.success ? failure.data : {};
-    const output = `${execError.stdout ?? ""}${execError.stderr ?? ""}`.trim();
+    const output = summarizePrekOutput(`${execError.stdout ?? ""}${execError.stderr ?? ""}`);
 
     let context: string;
     if (execError.code === "ENOENT") {

@@ -180,8 +180,7 @@ function tail(lines: string[]): string[] {
   ];
 }
 
-// Keeps each failing hook's status line and the tail of its output, dropping
-// the passed and skipped hooks.
+// Keeps each failing hook's status line and the tail of its output.
 export function summarizePrekOutput(output: string): string {
   const lines = output
     .trim()

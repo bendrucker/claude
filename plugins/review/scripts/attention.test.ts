@@ -6,8 +6,6 @@ import {
   currentPane,
   docOpenArgs,
   docPanePath,
-  docPaneState,
-  type DocPaneState,
   type DocPanes,
   existingReviewr,
   isKind,
@@ -22,6 +20,8 @@ import {
   recordedDocPanes,
   reviewGlyph,
   reviewrOpenArgs,
+  surfaceState,
+  type SurfaceState,
 } from "./attention";
 
 describe("raiseArgs", () => {
@@ -364,13 +364,13 @@ describe("recordedDocPanes", () => {
   });
 });
 
-describe("docPaneState", () => {
+describe("surfaceState", () => {
   const info = (...names: string[]) =>
     JSON.stringify({
       result: { process_info: { foreground_processes: names.map((name) => ({ name })) } },
     });
 
-  test.each<[string, string, DocPaneState]>([
+  test.each<[string, string, SurfaceState]>([
     ["the staged binary", info("plannotator-tui.exe"), "running"],
     ["a shell left behind", info("zsh"), "gone"],
     ["another plugin", info("herdr-reviewr"), "gone"],
@@ -387,7 +387,7 @@ describe("docPaneState", () => {
     ["an unexpected envelope", JSON.stringify({ result: { type: "ok" } }), "unknown"],
     ["no output", "", "unknown"],
   ])("%s", (_name, stdout, expected) => {
-    expect(docPaneState(stdout)).toBe(expected);
+    expect(surfaceState(stdout, "plannotator-tui")).toBe(expected);
   });
 });
 

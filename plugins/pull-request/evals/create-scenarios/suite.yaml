@@ -1,1 +1,1 @@
-allow_tools: ["Bash(git:*)", "Bash(bun:*)", Write]
+allow_tools: [Bash, Write]

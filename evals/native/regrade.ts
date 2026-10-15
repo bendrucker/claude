@@ -19,7 +19,7 @@ export const Result = z.looseObject({
   cases: z.array(z.looseObject({ name: z.string(), arms: z.record(z.string(), z.array(Run)) })),
 });
 
-type Run = z.output<typeof Run>;
+export type Run = z.output<typeof Run>;
 
 /** The runner's run score: the weighted pass rate of its scored graders on that arm. */
 export function score(run: Run, arm: string): number | null {

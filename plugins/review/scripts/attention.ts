@@ -411,28 +411,67 @@ async function openDoc(paneId: string, file: string): Promise<void> {
   await writeDocPanes(recordPath, panes);
 }
 
+export interface SurfaceControl {
+  state(): SurfaceState;
+  quit(): boolean;
+  sleep(ms: number): void;
+  now(): number;
+}
+
+export type QuitOutcome =
+  | { kind: "gone" }
+  | { kind: "closed" }
+  | { kind: "held" }
+  | { kind: "error"; message: string };
+
 // Quitting with `q` rather than closing the pane lets reviewr ask before it
 // drops unsent comments, so a surface still running afterwards holds some.
-function quitSurface(pane: string, binary: string): void {
-  const before = paneState(pane, binary);
-  if (before === "gone") return;
-  if (before === "unknown") fail(`herdr did not report on ${pane}; retry the close`);
-  if (!herdr(["pane", "send-keys", pane, "q"]) && paneState(pane, binary) !== "gone") {
-    fail(`could not quit ${pane}`);
+export function quitSurface(pane: string, control: SurfaceControl): QuitOutcome {
+  const before = control.state();
+  if (before === "gone") return { kind: "gone" };
+  if (before === "unknown") {
+    return { kind: "error", message: `herdr did not report on ${pane}; retry the close` };
   }
-  const deadline = Date.now() + CLOSE_WAIT_MS;
+  if (!control.quit()) {
+    return control.state() === "gone"
+      ? { kind: "gone" }
+      : { kind: "error", message: `could not quit ${pane}` };
+  }
+  const deadline = control.now() + CLOSE_WAIT_MS;
   let state: SurfaceState = "running";
-  while (Date.now() < deadline) {
-    Bun.sleepSync(CLOSE_POLL_MS);
-    state = paneState(pane, binary);
-    if (state === "gone") {
-      console.log(`closed ${pane}`);
-      return;
-    }
+  while (control.now() < deadline) {
+    control.sleep(CLOSE_POLL_MS);
+    state = control.state();
+    if (state === "gone") return { kind: "closed" };
   }
-  if (state === "unknown") fail(`herdr did not report on ${pane} after quit; retry the close`);
-  console.error(`${pane} stayed open after quit: it holds unsent comments or a draft`);
-  process.exit(HELD_EXIT);
+  if (state === "unknown") {
+    return {
+      kind: "error",
+      message: `herdr did not report on ${pane} after quit; retry the close`,
+    };
+  }
+  return { kind: "held" };
+}
+
+function herdrSurface(pane: string, binary: string): SurfaceControl {
+  return {
+    state: () => paneState(pane, binary),
+    quit: () => herdr(["pane", "send-keys", pane, "q"]),
+    sleep: (ms) => {
+      Bun.sleepSync(ms);
+    },
+    now: () => Date.now(),
+  };
+}
+
+// Exits unless the surface is gone, so a caller only continues past a closed pane.
+function reportQuit(pane: string, outcome: QuitOutcome): void {
+  if (outcome.kind === "closed") console.log(`closed ${pane}`);
+  if (outcome.kind === "error") fail(outcome.message);
+  if (outcome.kind === "held") {
+    console.error(`${pane} stayed open after quit: it holds unsent comments or a draft`);
+    process.exit(HELD_EXIT);
+  }
 }
 
 async function closeDoc(paneId: string, file: string): Promise<void> {
@@ -441,7 +480,7 @@ async function closeDoc(paneId: string, file: string): Promise<void> {
   const panes = await readDocPanes(recordPath);
   const pane = panes[path];
   if (pane == null) return;
-  quitSurface(pane, DOC_PROCESS);
+  reportQuit(pane, quitSurface(pane, herdrSurface(pane, DOC_PROCESS)));
   delete panes[path];
   await writeDocPanes(recordPath, panes);
 }
@@ -581,7 +620,9 @@ const closeCmd = command(
       process.cwd(),
     );
     if (open === "unknown") fail("herdr did not list panes; retry the close");
-    if (open !== "none") quitSurface(open.pane, REVIEWR_PROCESS);
+    if (open !== "none") {
+      reportQuit(open.pane, quitSurface(open.pane, herdrSurface(open.pane, REVIEWR_PROCESS)));
+    }
     process.exit(0);
   },
 );

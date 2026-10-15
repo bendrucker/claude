@@ -16,6 +16,9 @@ import {
   planTitle,
   PROMPT_MARKER,
   promptAction,
+  type QuitOutcome,
+  quitSurface,
+  type SurfaceControl,
   raiseArgs,
   recordedDocPanes,
   reviewGlyph,
@@ -424,5 +427,58 @@ describe("existingReviewr", () => {
     ["no output", "", "unknown"],
   ])("%s", (_name, json, expected) => {
     expect(existingReviewr(json, tree)).toEqual(expected);
+  });
+});
+
+describe("quitSurface", () => {
+  // Replays `states` one read at a time, holding the last; each sleep advances the clock.
+  function makeControl(states: SurfaceState[], quits = true) {
+    let clock = 0;
+    let read = 0;
+    const control: SurfaceControl & { quitCalls: number } = {
+      quitCalls: 0,
+      state: () => states[Math.min(read++, states.length - 1)] ?? "unknown",
+      quit: () => {
+        control.quitCalls += 1;
+        return quits;
+      },
+      sleep: (ms) => {
+        clock += ms;
+      },
+      now: () => clock,
+    };
+    return control;
+  }
+
+  test.each<[string, SurfaceState[], boolean, QuitOutcome, number]>([
+    ["already gone", ["gone"], true, { kind: "gone" }, 0],
+    ["quits on q", ["running", "running", "gone"], true, { kind: "closed" }, 1],
+    ["holds unsent comments", ["running"], true, { kind: "held" }, 1],
+    [
+      "unreported before quit",
+      ["unknown"],
+      true,
+      { kind: "error", message: "herdr did not report on wE5:p4; retry the close" },
+      0,
+    ],
+    [
+      "unreported after quit",
+      ["running", "unknown"],
+      true,
+      { kind: "error", message: "herdr did not report on wE5:p4 after quit; retry the close" },
+      1,
+    ],
+    ["closed before the key landed", ["running", "gone"], false, { kind: "gone" }, 1],
+    [
+      "key refused while running",
+      ["running"],
+      false,
+      { kind: "error", message: "could not quit wE5:p4" },
+      1,
+    ],
+  ])("%s", (_name, states, quits, expected, quitCalls) => {
+    const control = makeControl(states, quits);
+    expect(quitSurface("wE5:p4", control)).toEqual(expected);
+    expect(control.quitCalls).toBe(quitCalls);
   });
 });

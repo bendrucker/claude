@@ -42,7 +42,7 @@ Request after the mechanical passes have run. `/ship` orders them. Standalone on
 
 The next user turn carries the comment batch plus Ben's own remarks. Each block is a `path:lines` header, the verbatim snippet, and his text. The herdr plugin's `skills/herdr/references/reviewr.md` covers the shape in full. Act on all of it. Sending cleared reviewr's store. The batch in the turn is the only copy. This plugin's `UserPromptSubmit` hook has already cleared the pane label.
 
-The review ends when Ben says approve, ship, or no further comments. Then run `attention.ts close --diff`, or `close --doc <file>` for a document, which quits the surface. Exit 1 means the surface stayed open holding unsent comments: tell Ben and leave it. Otherwise act on the batch and request again.
+Until Ben says approve, ship, or no further comments, act on the batch and request again. Once he does, run `attention.ts close --diff`, or `close --doc <file>` for a document, which quits the surface. Exit 2 means the surface stayed open holding unsent comments or a draft: tell Ben and leave it. Any other failure: relay its stderr to Ben.
 
 ## Gate
 

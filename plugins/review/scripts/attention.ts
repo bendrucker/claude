@@ -302,6 +302,7 @@ const REVIEWR_PROCESS = "herdr-reviewr";
 const DOC_PROCESS = "plannotator-tui";
 const CLOSE_WAIT_MS = 2_000;
 const CLOSE_POLL_MS = 200;
+const HELD_EXIT = 2;
 
 // A pane id can outlive the surface once Ben quits it. Anything short of a
 // definite answer is `unknown`, so a slow or failing herdr leaves a pane
@@ -413,19 +414,25 @@ async function openDoc(paneId: string, file: string): Promise<void> {
 // Quitting with `q` rather than closing the pane lets reviewr ask before it
 // drops unsent comments, so a surface still running afterwards holds some.
 function quitSurface(pane: string, binary: string): void {
-  if (paneState(pane, binary) === "gone") return;
+  const before = paneState(pane, binary);
+  if (before === "gone") return;
+  if (before === "unknown") fail(`herdr did not report on ${pane}; retry the close`);
   if (!herdr(["pane", "send-keys", pane, "q"]) && paneState(pane, binary) !== "gone") {
     fail(`could not quit ${pane}`);
   }
   const deadline = Date.now() + CLOSE_WAIT_MS;
+  let state: SurfaceState = "running";
   while (Date.now() < deadline) {
     Bun.sleepSync(CLOSE_POLL_MS);
-    if (paneState(pane, binary) === "gone") {
+    state = paneState(pane, binary);
+    if (state === "gone") {
       console.log(`closed ${pane}`);
       return;
     }
   }
-  fail(`${pane} stayed open after quit: it holds unsent comments or a draft`);
+  if (state === "unknown") fail(`herdr did not report on ${pane} after quit; retry the close`);
+  console.error(`${pane} stayed open after quit: it holds unsent comments or a draft`);
+  process.exit(HELD_EXIT);
 }
 
 async function closeDoc(paneId: string, file: string): Promise<void> {
@@ -557,7 +564,7 @@ const closeCmd = command(
     },
   },
   async (parsed) => {
-    if (!parsed.flags.diff && parsed.flags.doc == null) {
+    if (parsed.flags.diff === (parsed.flags.doc != null)) {
       parsed.showHelp();
       process.exit(1);
     }

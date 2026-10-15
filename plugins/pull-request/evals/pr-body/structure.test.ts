@@ -38,11 +38,12 @@ describe("measureStructure", () => {
 });
 
 describe("overLimits", () => {
-  test.each([
+  const cases: [string, ReturnType<typeof overLimits>][] = [
     [long(20), []],
     [long(41), ["maxBlockWords"]],
     [Array.from({ length: 5 }, () => long(30)).join("\n\n"), ["visibleWords"]],
-  ])("%#", (body, expected) => {
+  ];
+  test.each(cases)("%#", (body, expected) => {
     expect(overLimits(measureStructure(body))).toEqual(expected);
   });
 });

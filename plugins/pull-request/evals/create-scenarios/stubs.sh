@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs glab and gh stand-ins whose create command prints the title and body it was given.
+# Installs glab and gh stand-ins whose create and edit commands print the title and body they were given.
 # The session's Bash tool sources only $HOME/.zshenv, so that file puts the stand-ins first.
 set -euo pipefail
 stub="$HOME/.local/stub"
@@ -9,7 +9,7 @@ cat > "$stub/glab" <<'STUB'
 tool=$(basename "$0")
 args="$*"
 case "$tool:${1:-} ${2:-}" in
-  glab:"mr create" | gh:"pr create") ;;
+  glab:"mr create" | glab:"mr update" | gh:"pr create" | gh:"pr edit") ;;
   *)
     echo "$tool stand-in: $args is unavailable offline" >&2
     exit 1

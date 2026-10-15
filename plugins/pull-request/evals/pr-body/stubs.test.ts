@@ -100,6 +100,23 @@ describe("gh pr create", () => {
   });
 });
 
+describe("body edits", () => {
+  test.each([
+    [
+      "glab",
+      ["mr", "update", "1", "--description", "Edited"],
+      "https://gitlab.com/team/service/-/merge_requests/1",
+    ],
+    ["gh", ["pr", "edit", "1", "--body", "Edited"], "https://github.com/team/service/pull/1"],
+  ])("%s %j prints the edited body", (tool, args, url) => {
+    Bun.spawnSync(["git", "remote", "set-url", "origin", "https://gitlab.com/team/service.git"], {
+      cwd: repo,
+    });
+    const r = run(stub(tool), args);
+    expect(r.out).toBe(block("", "Edited", url));
+  });
+});
+
 describe("other subcommands", () => {
   test.each([
     ["glab", ["mr", "list"]],

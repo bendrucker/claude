@@ -1,0 +1,4 @@
+# Pulled from the eval bucket by pr-body/scripts/sync.ts, and claude plugin eval output.
+/scenario-*/
+/examples/
+/results/

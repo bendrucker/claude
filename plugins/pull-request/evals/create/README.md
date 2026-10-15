@@ -2,7 +2,7 @@
 
 A native `claude plugin eval` suite for `pull-request:create`. Each case scaffolds a git repo with `fixture.sh`, asks for a PR, and grades the drafted title and body, with and without the plugins.
 
-Cases tagged `scenario` are the eight curated PRs from [`pr-body/scenarios/`](../pr-body/scenarios/), whose prompts carry a diff summary and session notes in place of a real diff. They sit outside the `dev` and `holdout` split, so `--case 'scenario-*'` runs them on their own. The [`pr-body` README](../pr-body/README.md#scenario-cases) covers their graders.
+The eight curated scenario cases, whose prompts carry a real PR's diff summary and session notes, live in the eval bucket and run from the local-only [`create-scenarios`](../create-scenarios/) suite. [`pr-body/scripts/sync.ts`](../pr-body/scripts/sync.ts) `pull` fetches them, and the [`pr-body` README](../pr-body/README.md#scenario-cases) covers their graders.
 
 `gh workflow run eval.yml --ref <branch> -f suite=plugins/pull-request/evals/create` runs it in CI and reports to an `eval / pull-request-evals-create` check on the branch's head commit. `-f args='--runs 1 --case plan-deviations'` narrows the run, `-f ref=<ref>` reads the plugins at another ref against this branch's cases, and `-f baseline=<run id>,<run id>` adds [`compare.ts`](../../../../evals/native/compare.ts) tables against the pooled baseline runs, flagged rows first.
 

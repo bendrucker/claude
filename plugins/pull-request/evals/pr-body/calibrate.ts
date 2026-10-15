@@ -8,7 +8,12 @@ const Label = z.looseObject({
   verdict: z.enum(["good", "bad", "skip"]).nullable(),
 });
 
-const labels = await decodeFile(z.array(Label), join(import.meta.dirname, "labels.json"));
+const path = join(import.meta.dirname, "fixtures", "labels.json");
+if (!(await Bun.file(path).exists())) {
+  console.error(`${path} is missing. Run scripts/sync.ts pull to fetch it.`);
+  process.exit(1);
+}
+const labels = await decodeFile(z.array(Label), path);
 
 const labeled = labels.filter((l) => l.verdict === "good" || l.verdict === "bad");
 

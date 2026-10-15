@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { StopHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { parseTranscript, processStop, scopePaths, statePath } from ".";
+import { parseTranscript, processStop, scopePaths, statePath, summarizePrekOutput } from ".";
 
 let tempDir: string;
 let sessionCounter = 0;
@@ -169,6 +169,47 @@ describe("parseTranscript", () => {
   });
 });
 
+const PLUGIN_TEST_FAILURE = [
+  "Plugin tests.............................................................Failed",
+  "- hook id: plugin-test",
+  "- exit code: 1",
+  "",
+  "  limits.test.ts:",
+  "  error: expect(received).toMatchSnapshot(expected)",
+].join("\n");
+
+const PREK_OUTPUT = [
+  PLUGIN_TEST_FAILURE,
+  "Plugin validation....................................(no files to check)Skipped",
+  "Marketplace completeness.................................................Passed",
+  "",
+].join("\n");
+
+describe("summarizePrekOutput", () => {
+  const longBody = Array.from({ length: 50 }, (_, i) => `  line ${i + 1}`);
+
+  test.each<[string, string, string]>([
+    ["keeps only failing hooks", PREK_OUTPUT, PLUGIN_TEST_FAILURE],
+    [
+      "keeps every failing hook",
+      `${PREK_OUTPUT}Lint.....Failed\n  bad\n`,
+      `${PLUGIN_TEST_FAILURE}\n\nLint.....Failed\n  bad`,
+    ],
+    [
+      "tails a long failing hook",
+      ["Plugin tests.....Failed", ...longBody, "Other.....Passed"].join("\n"),
+      ["Plugin tests.....Failed", "... 10 earlier lines omitted", ...longBody.slice(10)].join("\n"),
+    ],
+    [
+      "tails unrecognized output",
+      [...longBody, ""].join("\n"),
+      ["... 10 earlier lines omitted", ...longBody.slice(10)].join("\n"),
+    ],
+  ])("%s", (_name, output, expected) => {
+    expect(summarizePrekOutput(output)).toBe(expected);
+  });
+});
+
 describe("scopePaths", () => {
   test.each<[string[], string[], string[]]>([
     [["repo"], ["repo", "plugins", "mac", "plugin.json"], [join("plugins", "mac", "plugin.json")]],
@@ -210,6 +251,7 @@ describe("processStop", () => {
   async function withStubbedCommands<T>(
     exitCodes: Record<string, number>,
     run: (bin: string, readCalls: () => Promise<string[]>) => Promise<T>,
+    outputs: Record<string, { stdout?: string; stderr?: string }> = {},
   ): Promise<T> {
     const stubDir = await mkdtemp(join(tmpdir(), "stop-hook-stub-"));
     const bin = join(stubDir, "bin");
@@ -217,9 +259,13 @@ describe("processStop", () => {
     await Promise.all(
       ["bun", "prek"].map(async (name) => {
         const stub = join(bin, name);
+        const stdoutFile = join(stubDir, `${name}.out`);
+        const stderrFile = join(stubDir, `${name}.err`);
+        await Bun.write(stdoutFile, outputs[name]?.stdout ?? "");
+        await Bun.write(stderrFile, outputs[name]?.stderr ?? "");
         await Bun.write(
           stub,
-          `#!/bin/sh\necho "${name} $*" >> "${log}"\nexit ${exitCodes[name] ?? 0}\n`,
+          `#!/bin/sh\necho "${name} $*" >> "${log}"\ncat "${stdoutFile}"\ncat "${stderrFile}" >&2\nexit ${exitCodes[name] ?? 0}\n`,
         );
         Bun.spawnSync(["chmod", "+x", stub]);
       }),
@@ -385,6 +431,27 @@ describe("processStop", () => {
         "prek run --files second.ts",
       ]);
     });
+
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("blocks with the failing hook's output when prek exits non-zero", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+    const filePath = join(cwd, "touched.ts");
+    await Bun.write(filePath, "export {}");
+    const transcriptPath = join(cwd, "transcript.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+    await withStubbedCommands(
+      { prek: 1 },
+      async () => {
+        expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toEqual({
+          decision: "block",
+          reason: `Check failures:\n\n${PLUGIN_TEST_FAILURE}\n\nerror: failed to clean up stash`,
+        });
+      },
+      { prek: { stdout: PREK_OUTPUT, stderr: "error: failed to clean up stash\n" } },
+    );
 
     await rm(cwd, { recursive: true, force: true });
   });

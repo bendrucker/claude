@@ -56,7 +56,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/compare.ts run tmp/bench/<comparison> \
 bun ${CLAUDE_SKILL_DIR}/scripts/compare.ts report tmp/bench/<comparison> --markdown
 ```
 
-The first `--arm` is the base. Arguments after `--` go to every `hyperfine` call. Give each comparison its own directory, since `run` refuses one that already holds exports. `run` writes the hypothesis and per-round load to `meta.json` there, and `report` prints both above the table. `report` also reads `--export-json` files from a plain `hyperfine` run, and pools every file and directory it is given per arm name.
+The first `--arm` is the base. Arguments after `--` go to every `hyperfine` call. Give each comparison its own directory, since `run` refuses one that already holds exports. `run` writes the hypothesis and per-round load to `meta.json` there, and `report` prints both above the table. When a round is flagged, it adds a second table pooled without the flagged rounds. `report` also reads `--export-json` files from a plain `hyperfine` run, and pools every file and directory it is given per arm name.
 
 ## Noise Floor
 

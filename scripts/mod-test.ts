@@ -27,7 +27,6 @@ try {
   await Promise.all(PARTS.map((part) => $`cp -R ${join(source, part)} ${join(dir, part)}`));
   const proc = Bun.spawn(["claude", "plugin", "test", dir], {
     stdio: ["inherit", "inherit", "inherit"],
-    env: { ...process.env, CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1" },
   });
   process.exitCode = await proc.exited;
 } finally {

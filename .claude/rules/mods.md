@@ -6,7 +6,7 @@ paths:
 
 # Mods
 
-A mod is a plugin's function-hooks module: TypeScript that the engine loads from the `modules` list in `hooks/hooks.json` and runs against engine events through `$`. Function hooks are early access and load only under `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
+A mod is a plugin's function-hooks module: TypeScript that the engine loads from the `modules` list in `hooks/hooks.json` and runs against engine events through `$`.
 
 ## Layout
 

@@ -14,7 +14,7 @@ A native `claude plugin eval` suite for the `zsh` plugin. Each case scaffolds a 
 | `missing-glob` | `ls config/*.json` with no match | reply states zero JSON and three YAML files |
 | `heredoc-untouched` | a `===` or `*.ts` line inside a heredoc | the trace shows the body intact |
 
-`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 bun evals/native/run.ts plugins/zsh/evals/bash-habits -- --runs 3` runs the suite. Launch it outside Claude Code's sandbox, since it spawns `claude` sessions. Each case lists the plugin and `mod-events` in `plugins`, paths that resolve from the case directory.
+`bun evals/native/run.ts plugins/zsh/evals/bash-habits -- --runs 3` runs the suite. Launch it outside Claude Code's sandbox, since it spawns `claude` sessions. Each case lists the plugin and `mod-events` in `plugins`, paths that resolve from the case directory.
 
 ## Reading the Arms
 
@@ -30,4 +30,4 @@ The trace graders match zsh's `(eval):N:` error prefix. The bare message also ap
 
 ## Scope
 
-Eval sessions load function hooks only when `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` is set in the launching environment. Their Bash tool runs the launcher's `$SHELL` (or `CLAUDE_CODE_SHELL`), which a case cannot set. The suite measures something only when launched from a zsh machine. CI runners run bash, where the plugin is a no-op, so the `.local-only` marker keeps the eval workflow from selecting this suite on labeled PRs.
+The Bash tool in eval sessions runs the launcher's `$SHELL` (or `CLAUDE_CODE_SHELL`), which a case cannot set. The suite measures something only when launched from a zsh machine. CI runners run bash, where the plugin is a no-op, so the `.local-only` marker keeps the eval workflow from selecting this suite on labeled PRs.

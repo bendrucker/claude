@@ -5,9 +5,11 @@
 // order spreads it over both, and the report pools every round's samples
 // per arm.
 
-import { mkdirSync, readdirSync } from "node:fs";
-import { loadavg } from "node:os";
-import { join } from "node:path";
+// concurrent climbs append to one comparison log, so writes need O_APPEND atomicity. Bun.write read-modify-write would drop lines.
+// oxlint-disable-next-line no-restricted-imports
+import { appendFileSync, mkdirSync, readdirSync } from "node:fs";
+import { availableParallelism, homedir, loadavg } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { cli, command } from "cleye";
 import { table } from "table";
 import { z } from "zod";
@@ -182,12 +184,72 @@ export function render(rows: Row[], markdown: boolean): string {
   ].join("\n");
 }
 
+const Meta = z.object({
+  hypothesis: z.string(),
+  started: z.string(),
+  ncpu: z.number(),
+  arms: z.array(z.object({ name: z.string(), command: z.string() })),
+  rounds: z.array(
+    z.object({ order: z.array(z.string()), loadBefore: z.number(), loadAfter: z.number() }),
+  ),
+});
+
+export type Meta = z.infer<typeof Meta>;
+
+const META = "meta.json";
+
+// A round counts as loaded once the one-minute load average passes twice the
+// core count, where queued work starts stretching wall time.
+export function flagged(meta: Meta): number[] {
+  return meta.rounds.flatMap((r, i) =>
+    Math.max(r.loadBefore, r.loadAfter) > 2 * meta.ncpu ? [i + 1] : [],
+  );
+}
+
+export function loadSummary(meta: Meta): string {
+  const loaded = flagged(meta);
+  const head = `hypothesis: ${meta.hypothesis}`;
+  if (loaded.length === 0) return `${head}\nload: no round above 2×${meta.ncpu} cpus`;
+  return `${head}\nload: ${loaded.length} of ${meta.rounds.length} rounds above 2×${meta.ncpu} cpus (${loaded.join(", ")}). Re-run an accept that rests on them`;
+}
+
+export function logPath(env: Record<string, string | undefined> = process.env): string {
+  return join(env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "performance", "comparisons.jsonl");
+}
+
+function logComparison(meta: Meta, out: string, planned: number): void {
+  const path = logPath();
+  mkdirSync(dirname(path), { recursive: true });
+  const loads = meta.rounds.flatMap((r) => [r.loadBefore, r.loadAfter]);
+  const entry = {
+    ts: new Date().toISOString(),
+    cwd: process.cwd(),
+    dir: resolve(out),
+    hypothesis: meta.hypothesis,
+    arms: meta.arms.map((a) => a.name),
+    planned,
+    rounds: meta.rounds.length,
+    flagged: flagged(meta),
+    maxLoad: loads.length > 0 ? Math.max(...loads) : null,
+    ncpu: meta.ncpu,
+  };
+  appendFileSync(path, `${JSON.stringify(entry)}\n`);
+}
+
+async function readMeta(paths: string[]): Promise<Meta[]> {
+  const files = paths.filter((p) => !p.endsWith(".json")).map((dir) => Bun.file(join(dir, META)));
+  const present = await Promise.all(files.map(async (f) => ((await f.exists()) ? f : null)));
+  return Promise.all(
+    present.filter((f) => f !== null).map(async (f) => Meta.parse(await f.json())),
+  );
+}
+
 async function readExports(paths: string[]): Promise<z.infer<typeof Export>[]> {
   const files = paths.flatMap((path) =>
     path.endsWith(".json")
       ? [path]
       : readdirSync(path)
-          .filter((f) => f.endsWith(".json"))
+          .filter((f) => f.endsWith(".json") && f !== META)
           .toSorted()
           .map((f) => join(path, f)),
   );
@@ -218,6 +280,11 @@ const runCmd = command(
       },
       runs: { type: Number, default: 3, description: "Runs per arm per round" },
       warmup: { type: Number, default: 1, description: "Warmup runs per arm per round" },
+      hypothesis: {
+        type: String,
+        description:
+          "The prediction this comparison tests: the profile entry, the metric, and the expected move. 'A/A' for a noise floor",
+      },
     },
     help: {
       description:
@@ -231,47 +298,80 @@ const runCmd = command(
       return { name: spec.slice(0, eq), command: spec.slice(eq + 1) };
     });
     if (arms.length < 2) throw new Error("give at least two --arm flags");
+    const hypothesis = argv.flags.hypothesis?.trim() ?? "";
+    if (hypothesis === "")
+      throw new Error(
+        "give --hypothesis before measuring: the profile entry, the metric, and the expected move, or 'A/A' for a noise floor",
+      );
     if (Bun.which("hyperfine") === null) throw new Error("hyperfine not found on PATH");
     mkdirSync(argv._.out, { recursive: true });
     if (readdirSync(argv._.out).some((f) => f.endsWith(".json")))
       throw new Error(`${argv._.out} already holds exports; report would pool them with this run`);
-    for (let round = 0; round < argv.flags.rounds; round++) {
-      const shift = round % arms.length;
-      const ordered = [...arms.slice(shift), ...arms.slice(0, shift)];
-      const out = join(argv._.out, `round-${String(round).padStart(3, "0")}.json`);
-      const args = [
-        "hyperfine",
-        "--runs",
-        String(argv.flags.runs),
-        "--warmup",
-        String(argv.flags.warmup),
-        "--export-json",
-        out,
-        ...argv._.hyperfineArgs,
-        ...ordered.flatMap((a) => ["-n", a.name, a.command]),
-      ];
-      console.error(
-        `round ${round + 1}/${argv.flags.rounds}: ${ordered.map((a) => a.name).join(", ")} (load ${loadavg()[0]?.toFixed(1)})`,
-      );
-      const proc = Bun.spawnSync(args, { stdio: ["inherit", "ignore", "inherit"] });
-      if (proc.exitCode !== 0)
-        throw new Error(
-          `hyperfine exited ${proc.exitCode} in round ${round + 1}, which it does when a run exits nonzero. Pass -i after -- to record the failed run instead`,
-        );
-      // oxlint-disable-next-line no-await-in-loop -- rounds run one after another, and each reports before the next starts.
-      const pooled = pool([Export.parse(await Bun.file(out).json())]);
-      console.error(`  ${progress(pooled)}`);
-      const failed = pooled.filter((a) => a.failures > 0).map((a) => a.name);
-      if (failed.length > 0)
-        throw new Error(
-          `${failed.join(", ")} failed in round ${round + 1}. Run each once with its output visible to find the cause before measuring`,
-        );
+    const ncpu = availableParallelism();
+    const meta: Meta = { hypothesis, started: new Date().toISOString(), ncpu, arms, rounds: [] };
+    const metaPath = join(argv._.out, META);
+    await Bun.write(metaPath, JSON.stringify(meta, null, 2));
+    try {
+      await runRounds(argv, arms, meta, metaPath);
+    } finally {
+      logComparison(meta, argv._.out, argv.flags.rounds);
     }
     console.error(
       `results in ${argv._.out}; next: compare.ts report ${argv._.out} --base ${arms[0]?.name}`,
     );
   },
 );
+
+async function runRounds(
+  argv: {
+    _: { out: string; hyperfineArgs: string[] };
+    flags: { rounds: number; runs: number; warmup: number };
+  },
+  arms: { name: string; command: string }[],
+  meta: Meta,
+  metaPath: string,
+): Promise<void> {
+  for (let round = 0; round < argv.flags.rounds; round++) {
+    const shift = round % arms.length;
+    const ordered = [...arms.slice(shift), ...arms.slice(0, shift)];
+    const out = join(argv._.out, `round-${String(round).padStart(3, "0")}.json`);
+    const args = [
+      "hyperfine",
+      "--runs",
+      String(argv.flags.runs),
+      "--warmup",
+      String(argv.flags.warmup),
+      "--export-json",
+      out,
+      ...argv._.hyperfineArgs,
+      ...ordered.flatMap((a) => ["-n", a.name, a.command]),
+    ];
+    console.error(
+      `round ${round + 1}/${argv.flags.rounds}: ${ordered.map((a) => a.name).join(", ")}`,
+    );
+    const loadBefore = loadavg()[0] ?? 0;
+    const proc = Bun.spawnSync(args, { stdio: ["inherit", "ignore", "inherit"] });
+    const loadAfter = loadavg()[0] ?? 0;
+    meta.rounds.push({ order: ordered.map((a) => a.name), loadBefore, loadAfter });
+    // oxlint-disable-next-line no-await-in-loop -- rounds run one after another, and each records its load before the next starts.
+    await Bun.write(metaPath, JSON.stringify(meta, null, 2));
+    if (proc.exitCode !== 0)
+      throw new Error(
+        `hyperfine exited ${proc.exitCode} in round ${round + 1}, which it does when a run exits nonzero. Pass -i after -- to record the failed run instead`,
+      );
+    // oxlint-disable-next-line no-await-in-loop -- rounds run one after another, and each reports before the next starts.
+    const pooled = pool([Export.parse(await Bun.file(out).json())]);
+    const loaded = Math.max(loadBefore, loadAfter) > 2 * meta.ncpu ? " ⚠" : "";
+    console.error(
+      `  ${progress(pooled)}  load ${loadBefore.toFixed(0)}→${loadAfter.toFixed(0)} /${meta.ncpu}cpu${loaded}`,
+    );
+    const failed = pooled.filter((a) => a.failures > 0).map((a) => a.name);
+    if (failed.length > 0)
+      throw new Error(
+        `${failed.join(", ")} failed in round ${round + 1}. Run each once with its output visible to find the cause before measuring`,
+      );
+  }
+}
 
 const reportCmd = command(
   {
@@ -303,6 +403,7 @@ const reportCmd = command(
     const arms = pool(await readExports(argv._.exports));
     const base = argv.flags.base ?? arms[0]?.name;
     if (base === undefined) throw new Error("no results found");
+    for (const meta of await readMeta(argv._.exports)) console.log(`${loadSummary(meta)}\n`);
     console.log(
       render(
         compare(arms, base, argv.flags.alpha, argv.flags.minEffect),

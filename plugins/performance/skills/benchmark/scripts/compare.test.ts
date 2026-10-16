@@ -1,5 +1,17 @@
 import { describe, expect, it } from "bun:test";
-import { compare, median, permutationP, pool, progress, relativeMad, render } from "./compare";
+import {
+  compare,
+  flagged,
+  loadSummary,
+  logPath,
+  median,
+  type Meta,
+  permutationP,
+  pool,
+  progress,
+  relativeMad,
+  render,
+} from "./compare";
 
 function seeded(seed: number): () => number {
   let state = seed;
@@ -118,6 +130,77 @@ describe("progress", () => {
         { name: "none", times: [], memory: [], failures: 1 },
       ]),
     ).toBe("base 90.0ms, cand 2.50s (2 failed at 336.00s, 5.20s), none - (1 failed)");
+  });
+});
+
+function makeMeta(loads: [number, number][]): Meta {
+  return {
+    hypothesis: "memo cuts parse; wall -8%",
+    started: "2026-10-16T00:00:00.000Z",
+    ncpu: 10,
+    arms: [],
+    rounds: loads.map(([loadBefore, loadAfter]) => ({ order: [], loadBefore, loadAfter })),
+  };
+}
+
+describe("flagged", () => {
+  it.each<{ name: string; loads: [number, number][]; expected: number[] }>([
+    {
+      name: "quiet rounds",
+      loads: [
+        [3, 5],
+        [19, 20],
+      ],
+      expected: [],
+    },
+    {
+      name: "load rising during a round",
+      loads: [
+        [5, 8],
+        [12, 25],
+      ],
+      expected: [2],
+    },
+    {
+      name: "load falling during a round",
+      loads: [
+        [52, 18],
+        [4, 4],
+      ],
+      expected: [1],
+    },
+  ])("$name", ({ loads, expected }) => {
+    expect(flagged(makeMeta(loads))).toEqual(expected);
+  });
+});
+
+describe("loadSummary", () => {
+  it.each<{ name: string; loads: [number, number][] }>([
+    { name: "quiet", loads: [[3, 5]] },
+    {
+      name: "loaded",
+      loads: [
+        [3, 5],
+        [52, 61],
+        [4, 4],
+        [30, 22],
+      ],
+    },
+  ])("$name", ({ loads }) => {
+    expect(loadSummary(makeMeta(loads))).toMatchSnapshot();
+  });
+});
+
+describe("logPath", () => {
+  it.each([
+    {
+      name: "XDG cache home",
+      env: { XDG_CACHE_HOME: "/x" },
+      expected: "/x/performance/comparisons.jsonl",
+    },
+    { name: "home cache", env: {}, expected: "/.cache/performance/comparisons.jsonl" },
+  ])("$name", ({ env, expected }) => {
+    expect(logPath(env)).toEndWith(expected);
   });
 });
 

@@ -17,3 +17,13 @@ exports[`render renders a terminal table 1`] = `
 ╚══════╧════╧═════════╧══════╧════════╧═══════╧═════════╧════════╝
 "
 `;
+
+exports[`loadSummary quiet 1`] = `
+"hypothesis: memo cuts parse; wall -8%
+load: no round above 2×10 cpus"
+`;
+
+exports[`loadSummary loaded 1`] = `
+"hypothesis: memo cuts parse; wall -8%
+load: 2 of 4 rounds above 2×10 cpus (2, 4). Re-run an accept that rests on them"
+`;

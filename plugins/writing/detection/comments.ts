@@ -27,7 +27,6 @@ function isBundledLanguage(id: string): id is BundledLanguage {
   return id in bundledLanguages;
 }
 
-// Resolve by extension, or by name for extensionless files like `Dockerfile`.
 export function languageForPath(filePath: string): BundledLanguage | null {
   const name = basename(filePath).toLowerCase();
   const ext = getExtension(name);
@@ -55,9 +54,8 @@ function stripGutter(comment: string): string {
     .trim();
 }
 
-// Pull comments and docstrings out of source by the grammar for the file's
-// language, so each language's own comment syntax applies, including CSS and
-// JS embedded in HTML. An unknown language returns an empty string.
+// Extract comments by the file's language grammar, including CSS and JS
+// embedded in HTML.
 export async function extractComments(text: string, filePath: string): Promise<string> {
   const lang = languageForPath(filePath);
   if (lang == null || text === "") return "";

@@ -58,8 +58,8 @@ export async function collectFiles(input: string): Promise<string[]> {
   return files.toSorted();
 }
 
-function scanInput(text: string, filePath: string | undefined): number {
-  const violations = scanAll(text, filePath);
+async function scanInput(text: string, filePath: string | undefined): Promise<number> {
+  const violations = await scanAll(text, filePath);
 
   if (violations.length === 0) {
     console.log("No violations found.");
@@ -81,8 +81,7 @@ export async function scanFiles(files: string[]): Promise<FileViolations[]> {
   const results: FileViolations[] = [];
   for (const path of files) {
     // oxlint-disable-next-line no-await-in-loop -- audit runs over an arbitrary tree; reading every file at once would hold the whole corpus in memory.
-    const text = await Bun.file(path).text();
-    const violations = scanAll(text, path);
+    const violations = await scanAll(await Bun.file(path).text(), path);
     if (violations.length > 0) results.push({ path, violations });
   }
   return results;
@@ -289,8 +288,8 @@ const scoreCmd = command(
         loadProfile(profilePath(dataDir)),
         loadStatistics(statisticsPath(dataDir)),
       ]);
-      console.log(`\n${renderVoiceDeltaTable(text, profileData, statistics)}`);
-      const signatures = renderSignatureTable(text, statistics);
+      console.log(`\n${await renderVoiceDeltaTable(text, profileData, statistics)}`);
+      const signatures = await renderSignatureTable(text, statistics);
       if (signatures !== null) console.log(`\n${signatures}`);
     }
 
@@ -320,7 +319,7 @@ if (import.meta.main) {
     async (argv) => {
       if (argv.flags.input) {
         const { text, filePath } = await readInput(argv._.path);
-        process.exit(scanInput(text, filePath));
+        process.exit(await scanInput(text, filePath));
       }
       argv.showHelp();
       process.exit(1);

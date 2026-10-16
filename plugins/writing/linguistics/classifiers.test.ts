@@ -21,13 +21,15 @@ describe("CLASSIFIERS", () => {
     ]);
   });
 
-  it("every classifier returns a verdict for every seed case", () => {
-    for (const classifier of CLASSIFIERS) {
-      for (const { heading } of seedCases) {
-        const verdict = classifier.classify(heading);
-        expect(typeof verdict.flagged).toBe("boolean");
-        expect(verdict.kind).toBeDefined();
-      }
+  it("every classifier returns a verdict for every seed case", async () => {
+    const verdicts = await Promise.all(
+      CLASSIFIERS.flatMap((classifier) =>
+        seedCases.map(async ({ heading }) => classifier.classify(heading)),
+      ),
+    );
+    for (const verdict of verdicts) {
+      expect(typeof verdict.flagged).toBe("boolean");
+      expect(verdict.kind).toBeDefined();
     }
   });
 });
@@ -147,9 +149,9 @@ describe("compromise candidates", () => {
   const npTest = npTestClassifier(compromiseTagger);
   const hybrid = hybridClassifier(compromiseTagger);
 
-  it.each(compromiseCases)("$description", (testCase) => {
-    expect(finiteVerb.classify(testCase.heading).flagged).toBe(testCase.finiteVerb);
-    expect(npTest.classify(testCase.heading).flagged).toBe(testCase.npTest);
-    expect(hybrid.classify(testCase.heading).flagged).toBe(testCase.hybrid);
+  it.each(compromiseCases)("$description", async (testCase) => {
+    expect((await finiteVerb.classify(testCase.heading)).flagged).toBe(testCase.finiteVerb);
+    expect((await npTest.classify(testCase.heading)).flagged).toBe(testCase.npTest);
+    expect((await hybrid.classify(testCase.heading)).flagged).toBe(testCase.hybrid);
   });
 });

@@ -13,8 +13,8 @@ Refactors the loader for clarity.
 `;
 
 describe("buildProfileFromCorpus", () => {
-  test("counts documents, tokens, and word n-grams", () => {
-    const profile = buildProfileFromCorpus(corpus, "2026-05-24");
+  test("counts documents, tokens, and word n-grams", async () => {
+    const profile = await buildProfileFromCorpus(corpus, "2026-05-24");
     expect(profile.documentCount).toBe(2);
     expect(profile.totalTokens).toBeGreaterThan(0);
     expect(profile.ngrams["1"]?.updates).toBe(2);
@@ -24,8 +24,10 @@ describe("buildProfileFromCorpus", () => {
   });
 });
 
+const corpusProfile = await buildProfileFromCorpus(corpus, "2026-05-24");
+
 describe("phraseProfileStat", () => {
-  const profile = buildProfileFromCorpus(corpus, "2026-05-24");
+  const profile = corpusProfile;
 
   test("returns count and per-million for a present bigram", () => {
     const stat = phraseProfileStat(profile, "the cache");
@@ -46,17 +48,21 @@ describe("phraseProfileStat", () => {
     expect(stat.count).toBe(2);
   });
 
-  test("returns zero against an empty profile", () => {
-    const empty = buildProfileFromCorpus("", "2026-05-24");
+  test("returns zero against an empty profile", async () => {
+    const empty = await buildProfileFromCorpus("", "2026-05-24");
     expect(phraseProfileStat(empty, "anything").count).toBe(0);
   });
 });
 
-describe("phraseProfileStatStemmed", () => {
-  const inflected = `===== https://github.com/o/r/pull/1 (2020-01-01, +1/-0) =====
+const inflectedProfile = await buildProfileFromCorpus(
+  `===== https://github.com/o/r/pull/1 (2020-01-01, +1/-0) =====
 The handler fails loudly on bad input. A second guard also fails loudly.
-`;
-  const profile = buildProfileFromCorpus(inflected, "2026-05-24");
+`,
+  "2026-05-24",
+);
+
+describe("phraseProfileStatStemmed", () => {
+  const profile = inflectedProfile;
 
   test("matches an inflected baseline phrase against the rule stem", () => {
     // The baseline says "fails loudly" twice; the wordlist rule is "fail
@@ -71,8 +77,8 @@ The handler fails loudly on bad input. A second guard also fails loudly.
     expect(phraseProfileStatStemmed(profile, "source of truth").count).toBe(0);
   });
 
-  test("returns zero against an empty profile", () => {
-    const empty = buildProfileFromCorpus("", "2026-05-24");
+  test("returns zero against an empty profile", async () => {
+    const empty = await buildProfileFromCorpus("", "2026-05-24");
     expect(phraseProfileStatStemmed(empty, "fail loudly").count).toBe(0);
   });
 });

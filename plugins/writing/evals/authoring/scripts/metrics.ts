@@ -140,8 +140,8 @@ export function hookDenies(trace: string): number {
 }
 
 /** Trope density per 1000 words. */
-export function tropeDensity(text: string): number {
-  const report = scoreText(text, undefined);
+export async function tropeDensity(text: string): Promise<number> {
+  const report = await scoreText(text, undefined);
   if (report.wordCount === 0) return 0;
   const hits = report.categories.reduce((sum, c) => sum + c.hits, 0);
   return hits / (report.wordCount / 1000);
@@ -168,17 +168,24 @@ export async function loadRuns(
   });
   const read = await Promise.all(traces.map(async (t) => [t, await Bun.file(t).text()] as const));
 
+  const measured = await Promise.all(
+    read.map(async ([path, text]) => {
+      const match = /^(.+)-(with|without)-\d+\.jsonl$/.exec(basename(path));
+      if (match === null) return undefined;
+      const draft = extractDeliverable(text, files.get(match[1] ?? ""));
+      const metrics: RunMetrics = {
+        tokens: tokenUsage(text),
+        denies: hookDenies(text),
+        density: draft === undefined ? undefined : await tropeDensity(draft),
+      };
+      return { key: `${match[1]}/${match[2]}`, metrics };
+    }),
+  );
+
   const out: Runs = new Map();
-  for (const [path, text] of read) {
-    const match = /^(.+)-(with|without)-\d+\.jsonl$/.exec(basename(path));
-    if (match === null) continue;
-    const key = `${match[1]}/${match[2]}`;
-    const draft = extractDeliverable(text, files.get(match[1] ?? ""));
-    const metrics: RunMetrics = {
-      tokens: tokenUsage(text),
-      denies: hookDenies(text),
-      density: draft === undefined ? undefined : tropeDensity(draft),
-    };
+  for (const run of measured) {
+    if (run === undefined) continue;
+    const { key, metrics } = run;
     const cell = out.get(key) ?? [];
     cell.push(metrics);
     out.set(key, cell);

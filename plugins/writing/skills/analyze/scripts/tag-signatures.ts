@@ -13,14 +13,12 @@ import {
   selectCorpora,
 } from "./corpus-selection";
 import { rank, type RankedTerm, type RankOptions, tokenizeCorpus } from "./fightin-words";
-import { tagSequence } from "./tag-ngram";
+import { loadTagSequence } from "./tag-ngram";
 import { splitHalves, type VoiceDocument } from "./voice-corpus";
 
 // The tagger costs about a minute over the study corpus, and the null re-reads
 // sentences the ranking already tagged.
-export function cachingTagger(
-  tag: (sentence: string) => string[] = tagSequence,
-): (sentence: string) => string[] {
+export function cachingTagger(tag: (sentence: string) => string[]): (sentence: string) => string[] {
   const cache = new Map<string, string[]>();
   return (sentence) => {
     const cached = cache.get(sentence);
@@ -138,7 +136,7 @@ if (import.meta.main) {
   const sizes = argv.flags.sizes.length > 0 ? argv.flags.sizes : [3, 4, 5];
   const selection = await selectCorpora(argv.flags);
   const { study, baseline } = selection;
-  const tokenize = cachingTagger();
+  const tokenize = cachingTagger(await loadTagSequence());
 
   const { prior, minCount, minDocs } = argv.flags;
   const options = { sizes, prior, minCount, minDocs };

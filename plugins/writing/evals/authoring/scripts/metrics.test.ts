@@ -151,13 +151,13 @@ describe("hookDenies", () => {
 });
 
 describe("tropeDensity", () => {
-  test("is zero for clean prose and positive for flagged vocabulary", () => {
-    expect(tropeDensity("Plain text with no flagged words at all here today.")).toBe(0);
-    expect(tropeDensity("Let's delve into the details of this change.")).toBeGreaterThan(0);
+  test("is zero for clean prose and positive for flagged vocabulary", async () => {
+    expect(await tropeDensity("Plain text with no flagged words at all here today.")).toBe(0);
+    expect(await tropeDensity("Let's delve into the details of this change.")).toBeGreaterThan(0);
   });
 
-  test("is zero for empty text", () => {
-    expect(tropeDensity("")).toBe(0);
+  test("is zero for empty text", async () => {
+    expect(await tropeDensity("")).toBe(0);
   });
 });
 

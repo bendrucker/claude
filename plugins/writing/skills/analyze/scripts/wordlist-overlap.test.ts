@@ -74,33 +74,35 @@ describe("curatedEntries", () => {
 });
 
 describe("coverageOf", () => {
-  test("a curated vocabulary entry is reported as wordlist-covered", () => {
-    expect(coverageOf("delve", "").wordlist).toBe(true);
+  test("a curated vocabulary entry is reported as wordlist-covered", async () => {
+    expect((await coverageOf("delve", "")).wordlist).toBe(true);
   });
 
-  test("an inflected form of a curated entry still matches", () => {
-    expect(coverageOf("meticulously", "").wordlist).toBe(true);
+  test("an inflected form of a curated entry still matches", async () => {
+    expect((await coverageOf("meticulously", "")).wordlist).toBe(true);
   });
 
-  test("an ordinary function word matches nothing", () => {
-    const coverage = coverageOf("the", "The change is in the parser.");
+  test("an ordinary function word matches nothing", async () => {
+    const coverage = await coverageOf("the", "The change is in the parser.");
     expect(coverage.wordlist).toBe(false);
     expect(coverage.lexical).toBe(false);
   });
 
-  test("a sentence tripping a detector reports its category", () => {
-    expect(coverageOf("dig", "Let me dig into the failing test.").categories).toContain("dig into");
-  });
-
-  // The hook skips skillOnly patterns; this batch surface exists to audit them.
-  test("a skill-only detector still counts as coverage", () => {
-    expect(coverageOf("rides", "The retry path rides on the same socket.").categories).toContain(
-      "rides on",
+  test("a sentence tripping a detector reports its category", async () => {
+    expect((await coverageOf("dig", "Let me dig into the failing test.")).categories).toContain(
+      "dig into",
     );
   });
 
-  test("an empty example cannot trip a sentence-level detector", () => {
-    expect(coverageOf("the", "").categories).toEqual([]);
+  // The hook skips skillOnly patterns; this batch surface exists to audit them.
+  test("a skill-only detector still counts as coverage", async () => {
+    expect(
+      (await coverageOf("rides", "The retry path rides on the same socket.")).categories,
+    ).toContain("rides on");
+  });
+
+  test("an empty example cannot trip a sentence-level detector", async () => {
+    expect((await coverageOf("the", "")).categories).toEqual([]);
   });
 });
 

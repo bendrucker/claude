@@ -1,5 +1,6 @@
 import { basename } from "node:path";
-import { type BundledLanguage, bundledLanguages, createHighlighter, type Highlighter } from "shiki";
+import type { BundledLanguage, Highlighter } from "shiki";
+import { bundledLanguages } from "shiki/langs";
 import { getExtension } from "./paths";
 
 // Shiki needs a theme to tokenize. The grammar alone produces the scopes read
@@ -34,8 +35,12 @@ const MAX_LINE_LENGTH = 2_000;
 
 let highlighter: Promise<Highlighter> | undefined;
 
+// Shiki's entry costs ~100ms to load, which the writing hook pays only for a
+// code file. `shiki/langs` carries the language table alone.
 async function highlighterFor(lang: BundledLanguage): Promise<Highlighter> {
-  highlighter ??= createHighlighter({ themes: [theme], langs: [] });
+  highlighter ??= import("shiki").then(({ createHighlighter }) =>
+    createHighlighter({ themes: [theme], langs: [] }),
+  );
   const loaded = await highlighter;
   if (!loaded.getLoadedLanguages().includes(lang)) await loaded.loadLanguage(lang);
   return loaded;
@@ -88,6 +93,9 @@ export async function extractComments(text: string, filePath: string): Promise<s
     lang,
     theme,
     includeExplanation: "scopeName",
+    // Past the default 500ms a line stops early and the explanation throws, which
+    // a loaded host reaches on ordinary code. exceedsLineLimit bounds the rest.
+    tokenizeTimeLimit: 0,
   });
 
   const parts: string[] = [];

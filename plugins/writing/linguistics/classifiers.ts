@@ -24,15 +24,23 @@ const NOUN_PHRASE: HeadingVerdict = { kind: "noun-phrase", flagged: false, evide
 // more likely a compound ("Test Coverage Strategy").
 const IMPERATIVE_SECOND = new Set<CoarseTag>(["DET", "ADP", "PRON", "ADJ", "ADV"]);
 
+/** A heading classifier backed by a tagger, which tags asynchronously. */
+export interface TaggedClassifier {
+  name: string;
+  classify(heading: string): Promise<HeadingVerdict>;
+}
+
+export type CandidateClassifier = HeadingClassifier | TaggedClassifier;
+
 interface TaggedHeading {
   tokens: TaggedToken[];
   enumerator: boolean;
 }
 
-function tagHeading(tagger: Tagger, heading: string): TaggedHeading {
+async function tagHeading(tagger: Tagger, heading: string): Promise<TaggedHeading> {
   const { text, enumerator } = preprocessHeading(heading);
   if (text.length === 0) return { tokens: [], enumerator };
-  return { tokens: tagger.tag(text).flatMap((sentence) => sentence.tokens), enumerator };
+  return { tokens: (await tagger.tag(text)).flatMap((sentence) => sentence.tokens), enumerator };
 }
 
 function interrogative(tokens: TaggedToken[]): HeadingVerdict | null {
@@ -56,11 +64,11 @@ function clauseVerdict(tokens: TaggedToken[], index: number): HeadingVerdict {
  * Flag only when a finite verb follows a subject candidate. Misses
  * imperatives by design.
  */
-export function finiteVerbClassifier(tagger: Tagger): HeadingClassifier {
+export function finiteVerbClassifier(tagger: Tagger): TaggedClassifier {
   return {
     name: `finite-verb:${tagger.name}`,
-    classify(heading) {
-      const { tokens } = tagHeading(tagger, heading);
+    async classify(heading) {
+      const { tokens } = await tagHeading(tagger, heading);
       if (tokens.length === 0) return NOUN_PHRASE;
       const exempt = interrogative(tokens);
       if (exempt) return exempt;
@@ -76,11 +84,11 @@ export function finiteVerbClassifier(tagger: Tagger): HeadingClassifier {
  * when the parse fails AND there is corroborating verb evidence, so
  * tagger noise on jargon does not flag verb-less fragments.
  */
-export function npTestClassifier(tagger: Tagger): HeadingClassifier {
+export function npTestClassifier(tagger: Tagger): TaggedClassifier {
   return {
     name: `np-test:${tagger.name}`,
-    classify(heading) {
-      const { tokens, enumerator } = tagHeading(tagger, heading);
+    async classify(heading) {
+      const { tokens, enumerator } = await tagHeading(tagger, heading);
       if (tokens.length === 0) return NOUN_PHRASE;
       const exempt = interrogative(tokens);
       if (exempt) return exempt;
@@ -139,13 +147,13 @@ export function npTestClassifier(tagger: Tagger): HeadingClassifier {
  * LINKING_VERBS, and verb-plus-determiner/preposition opener instead of
  * IMPERATIVE_OPENERS.
  */
-export function hybridClassifier(tagger: Tagger): HeadingClassifier {
+export function hybridClassifier(tagger: Tagger): TaggedClassifier {
   return {
     name: `hybrid:${tagger.name}`,
-    classify(heading) {
+    async classify(heading) {
       const { text, enumerator } = preprocessHeading(heading);
       if (text.length === 0) return NOUN_PHRASE;
-      const tokens = tagger.tag(text).flatMap((sentence) => sentence.tokens);
+      const tokens = (await tagger.tag(text)).flatMap((sentence) => sentence.tokens);
       if (tokens.length === 0) return NOUN_PHRASE;
       const exempt = interrogative(tokens);
       if (exempt) return exempt;
@@ -161,7 +169,7 @@ export function hybridClassifier(tagger: Tagger): HeadingClassifier {
           .filter((word) => word.length > 0);
         const afterText = text.slice(colonIndex + 1).trim();
         const after = afterText.split(/\s+/).filter((word) => word.length > 0);
-        const afterTokens = tagger.tag(afterText).flatMap((sentence) => sentence.tokens);
+        const afterTokens = (await tagger.tag(afterText)).flatMap((sentence) => sentence.tokens);
         const predicate = afterTokens.some(
           (token) => (token.finite && token.tag !== "AUX") || token.normal === "not",
         );
@@ -205,7 +213,7 @@ export function hybridClassifier(tagger: Tagger): HeadingClassifier {
 
 const TAGGERS: Tagger[] = [compromiseTagger, naturalTagger];
 
-export const CLASSIFIERS: HeadingClassifier[] = [
+export const CLASSIFIERS: CandidateClassifier[] = [
   baselineClassifier,
   ...TAGGERS.flatMap((tagger) => [
     finiteVerbClassifier(tagger),

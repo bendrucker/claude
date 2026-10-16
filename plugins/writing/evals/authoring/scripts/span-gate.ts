@@ -28,8 +28,8 @@ export type Rule =
   | {
       kind: "fn";
       category: string;
-      test: (text: string) => Hits;
-      spans?: ((text: string) => PatternSpan[]) | undefined;
+      test: (text: string) => Hits | Promise<Hits>;
+      spans?: ((text: string) => PatternSpan[] | Promise<PatternSpan[]>) | undefined;
     }
   | { kind: "weighted"; category: string; entries: StemmedWeight[]; threshold: number }
   | { kind: "wordlist"; category: string; stems: Set<string> };
@@ -74,7 +74,7 @@ export function blankCode(text: string): string {
 }
 
 // Reports a char offset instead of a line/column, since a labeled `Span` is offset-keyed.
-export function indexedScan(text: string, rule: Rule): IndexedMatch[] {
+export async function indexedScan(text: string, rule: Rule): Promise<IndexedMatch[]> {
   const stripped = blankCode(text);
   if (rule.kind === "regex") {
     const flags = rule.test.flags.includes("g") ? rule.test.flags : `${rule.test.flags}g`;
@@ -88,13 +88,13 @@ export function indexedScan(text: string, rule: Rule): IndexedMatch[] {
   }
   if (rule.kind === "fn") {
     if (rule.spans) {
-      return rule.spans(stripped).map(({ index, matched }) => ({
+      return (await rule.spans(stripped)).map(({ index, matched }) => ({
         category: rule.category,
         start: index,
         end: index + matched.length,
       }));
     }
-    const hits = rule.test(stripped);
+    const hits = await rule.test(stripped);
     return hits.count === 0 ? [] : sampleSpan(stripped, hits.sample, rule.category);
   }
   if (rule.kind === "weighted") {
@@ -113,10 +113,11 @@ export function indexedScan(text: string, rule: Rule): IndexedMatch[] {
   return results;
 }
 
-export function unionScan(text: string, rules: Rule[]): IndexedMatch[] {
+export async function unionScan(text: string, rules: Rule[]): Promise<IndexedMatch[]> {
   const seen = new Set<string>();
-  return rules.flatMap((rule) =>
-    indexedScan(text, rule).filter((hit) => {
+  const scans = await Promise.all(rules.map((rule) => indexedScan(text, rule)));
+  return scans.flatMap((hits) =>
+    hits.filter((hit) => {
       const key = `${hit.start}:${hit.end}`;
       if (seen.has(key)) return false;
       seen.add(key);
@@ -216,23 +217,29 @@ export interface SetScore {
  * of more than one is scored as their union: a span counts as found, or a hit as flagged, once
  * per span/hit even when several rules independently cover it.
  */
-export function scoreRules(rules: Rule[], pairs: Map<string, Pair>, labels: Label[]): SetScore {
+export async function scoreRules(
+  rules: Rule[],
+  pairs: Map<string, Pair>,
+  labels: Label[],
+): Promise<SetScore> {
   const defects = defectSpans(labels);
   const pool = precisionPool(pairs, labels);
 
-  let recallHits = 0;
-  for (const defect of defects) {
-    const pair = pairs.get(defect.pairId);
-    if (!pair) continue;
-    const text = pair[defect.key].text;
-    if (unionScan(text, rules).some((hit) => overlaps(hit, defect))) recallHits++;
-  }
+  const recalled = await Promise.all(
+    defects.map(async (defect) => {
+      const pair = pairs.get(defect.pairId);
+      if (!pair) return false;
+      return (await unionScan(pair[defect.key].text, rules)).some((hit) => overlaps(hit, defect));
+    }),
+  );
+  const recallHits = recalled.filter(Boolean).length;
 
+  const poolHits = await Promise.all(pool.map((draft) => unionScan(draft.text, rules)));
   let flagged = 0;
   let confirmed = 0;
-  for (const draft of pool) {
+  for (const [index, draft] of pool.entries()) {
     const draftDefects = defects.filter((d) => d.pairId === draft.pairId && d.key === draft.key);
-    for (const hit of unionScan(draft.text, rules)) {
+    for (const hit of poolHits[index] ?? []) {
       flagged++;
       if (draftDefects.some((d) => overlaps(hit, d))) confirmed++;
     }
@@ -257,18 +264,19 @@ export interface RuleReport {
   judged: boolean;
 }
 
-export function scoreCatalog(
+export async function scoreCatalog(
   rules: Rule[],
   pairs: Map<string, Pair>,
   labels: Label[],
   minFlagged: number,
-): RuleReport[] {
-  return rules
-    .map((rule) => {
-      const score = scoreRules([rule], pairs, labels);
+): Promise<RuleReport[]> {
+  const reports = await Promise.all(
+    rules.map(async (rule) => {
+      const score = await scoreRules([rule], pairs, labels);
       return { rule: rule.category, score, judged: score.flagged >= minFlagged };
-    })
-    .toSorted((a, b) => b.score.recall - a.score.recall);
+    }),
+  );
+  return reports.toSorted((a, b) => b.score.recall - a.score.recall);
 }
 
 export interface BaselineVerdict {
@@ -280,14 +288,16 @@ export interface BaselineVerdict {
 }
 
 /** The offline gate: a candidate rule set clears only when it finds more and flags no worse. */
-export function scoreBaseline(
+export async function scoreBaseline(
   shippedRules: Rule[],
   candidateRules: Rule[],
   pairs: Map<string, Pair>,
   labels: Label[],
-): BaselineVerdict {
-  const shipped = scoreRules(shippedRules, pairs, labels);
-  const candidate = scoreRules(candidateRules, pairs, labels);
+): Promise<BaselineVerdict> {
+  const [shipped, candidate] = await Promise.all([
+    scoreRules(shippedRules, pairs, labels),
+    scoreRules(candidateRules, pairs, labels),
+  ]);
   const recallRises = candidate.recall > shipped.recall;
   const precisionHolds = candidate.low >= shipped.low;
   return { shipped, candidate, recallRises, precisionHolds, pass: recallRises && precisionHolds };
@@ -396,13 +406,13 @@ export const program = new Command("span-gate.ts")
         console.error("--baseline needs at least one --rule or --wordlist candidate.");
         process.exit(2);
       }
-      const verdict = scoreBaseline(catalogRules(), candidates, pairs, labels);
+      const verdict = await scoreBaseline(catalogRules(), candidates, pairs, labels);
       console.log(renderBaseline(verdict));
       process.exit(verdict.pass ? 0 : 1);
     }
 
     const rules = candidates.length > 0 ? candidates : catalogRules();
-    const reports = scoreCatalog(rules, pairs, labels, options.minFlagged);
+    const reports = await scoreCatalog(rules, pairs, labels, options.minFlagged);
     console.log(renderReport(reports, options.minFlagged));
   });
 

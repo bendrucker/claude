@@ -343,3 +343,39 @@ describe("shared skips", () => {
     expect(log.outcome).toBe("silent");
   });
 });
+
+describe("deferred dependencies", () => {
+  // A fresh process, since this file's other imports already hold both packages.
+  function loadedAfter(input: PreToolUseHookInput): string[] {
+    const script = `
+      const { dispatch } = await import(${JSON.stringify(join(import.meta.dir, "pretooluse.ts"))});
+      await dispatch(${JSON.stringify(input)});
+      console.log(JSON.stringify(Object.keys(require.cache)));
+    `;
+    const run = Bun.spawnSync([process.execPath, "-e", script], {
+      env: { ...process.env, TMPDIR: stateDir },
+    });
+    if (run.exitCode !== 0) throw new Error(run.stderr.toString());
+    const keys: unknown = JSON.parse(run.stdout.toString());
+    if (!Array.isArray(keys)) throw new Error(run.stdout.toString());
+    const loaded = keys.flatMap((key) =>
+      typeof key === "string" && /node_modules\/(compromise\/|shiki\/dist\/index)/.test(key)
+        ? [key.includes("compromise") ? "compromise" : "shiki"]
+        : [],
+    );
+    return [...new Set(loaded)];
+  }
+
+  test.each([
+    ["prose without an indefinite", "Write", { file_path: "docs/a.md", content: "Plain.\n" }, []],
+    [
+      "prose with an indefinite",
+      "Write",
+      { file_path: "docs/a.md", content: "It adds nothing.\n" },
+      ["compromise"],
+    ],
+    ["a code edit", "Edit", { file_path: "src/a.ts", old_string: "1", new_string: "2" }, ["shiki"]],
+  ])("%s", (_name, tool, toolInput, expected) => {
+    expect(loadedAfter(mockInput(tool, toolInput))).toEqual(expected);
+  });
+});

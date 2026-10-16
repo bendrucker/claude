@@ -24,8 +24,8 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { table } from "table";
 import { z } from "zod";
 import { visit } from "unist-util-visit";
-import { CLASSIFIERS } from "../../../linguistics/classifiers";
-import type { HeadingClassifier, HeadingKind } from "../../../linguistics/heading";
+import { type CandidateClassifier, CLASSIFIERS } from "../../../linguistics/classifiers";
+import type { HeadingKind } from "../../../linguistics/heading";
 import { powerFromCurrentSample } from "../../../linguistics/power";
 import { openSessionDb } from "./db";
 import { DeliverableRow } from "./dump";
@@ -102,21 +102,24 @@ export interface Evaluation {
   verdicts: Map<string, Map<string, boolean>>;
 }
 
-export function evaluateClassifiers(
+export async function evaluateClassifiers(
   headings: HeadingRecord[],
-  classifiers: HeadingClassifier[],
-): Evaluation {
+  classifiers: CandidateClassifier[],
+): Promise<Evaluation> {
   const baseline = classifiers[0];
   if (!baseline) throw new Error("no classifiers given");
 
   const verdicts = new Map<string, Map<string, boolean>>();
   const disagreements: string[] = [];
 
-  for (const { heading } of headings) {
-    const row = new Map<string, boolean>();
-    for (const classifier of classifiers) {
-      row.set(classifier.name, classifier.classify(heading).flagged);
-    }
+  const rows = await Promise.all(
+    headings.map(async ({ heading }) => {
+      const results = await Promise.all(classifiers.map(async (c) => c.classify(heading)));
+      return new Map(classifiers.map((c, index) => [c.name, results[index]?.flagged ?? false]));
+    }),
+  );
+  for (const [index, { heading }] of headings.entries()) {
+    const row = rows[index] ?? new Map<string, boolean>();
     verdicts.set(heading, row);
     const base = row.get(baseline.name);
     if ([...row.values()].some((flagged) => flagged !== base)) {
@@ -190,31 +193,36 @@ export interface PrecisionRecall {
 
 export function scoreAgainstLabels(
   labeled: LabeledHeading[],
-  classifiers: HeadingClassifier[],
-): PrecisionRecall[] {
-  return classifiers.map((classifier) => {
-    let tp = 0;
-    let fp = 0;
-    let fn = 0;
-    for (const { heading, label } of labeled) {
-      const flagged = classifier.classify(heading).flagged;
-      const want = SHOULD_FLAG.has(label);
-      if (flagged && want) tp++;
-      else if (flagged && !want) fp++;
-      else if (!flagged && want) fn++;
-    }
-    const ci = wilson(tp, tp + fp);
-    return {
-      name: classifier.name,
-      tp,
-      fp,
-      fn,
-      precision: tp + fp > 0 ? tp / (tp + fp) : 1,
-      precisionLo: ci.lo,
-      precisionHi: ci.hi,
-      recall: tp + fn > 0 ? tp / (tp + fn) : 1,
-    };
-  });
+  classifiers: CandidateClassifier[],
+): Promise<PrecisionRecall[]> {
+  return Promise.all(
+    classifiers.map(async (classifier) => {
+      let tp = 0;
+      let fp = 0;
+      let fn = 0;
+      const results = await Promise.all(
+        labeled.map(async ({ heading }) => classifier.classify(heading)),
+      );
+      for (const [index, { label }] of labeled.entries()) {
+        const flagged = results[index]?.flagged ?? false;
+        const want = SHOULD_FLAG.has(label);
+        if (flagged && want) tp++;
+        else if (flagged && !want) fp++;
+        else if (!flagged && want) fn++;
+      }
+      const ci = wilson(tp, tp + fp);
+      return {
+        name: classifier.name,
+        tp,
+        fp,
+        fn,
+        precision: tp + fp > 0 ? tp / (tp + fp) : 1,
+        precisionLo: ci.lo,
+        precisionHi: ci.hi,
+        recall: tp + fn > 0 ? tp / (tp + fn) : 1,
+      };
+    }),
+  );
 }
 
 export function parseLabelsFile(content: string): LabeledHeading[] {
@@ -415,7 +423,7 @@ async function main(): Promise<void> {
   );
   console.error(`Corpus written to ${corpusPath} (local only; never commit or paste)`);
 
-  const evaluation = evaluateClassifiers(headings, CLASSIFIERS);
+  const evaluation = await evaluateClassifiers(headings, CLASSIFIERS);
 
   console.log(`Headings: ${headings.length} unique (${source})`);
   console.log(
@@ -457,12 +465,16 @@ async function main(): Promise<void> {
     labeled = parseLabelsFile(await Bun.file(argv.flags.labels).text());
     const randomOnly = labeled.filter((row) => row.source === "random");
     console.log(`Labeled: ${labeled.length} rows (${randomOnly.length} random)`);
-    for (const [title, subset] of [
+    const subsets = [
       ["all labeled rows", labeled],
       ["random sample only (unbiased)", randomOnly],
-    ] as const) {
+    ] as const;
+    const scored = await Promise.all(
+      subsets.map(async ([, subset]) => scoreAgainstLabels(subset, CLASSIFIERS)),
+    );
+    for (const [index, [title, subset]] of subsets.entries()) {
       if (subset.length === 0) continue;
-      const scores = scoreAgainstLabels(subset, CLASSIFIERS);
+      const scores = scored[index] ?? [];
       console.log(`Precision/recall, ${title}:`);
       console.log(
         table([

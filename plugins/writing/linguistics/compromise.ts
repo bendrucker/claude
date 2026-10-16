@@ -1,4 +1,4 @@
-import nlp from "compromise";
+import type Nlp from "compromise";
 import { z } from "zod";
 import type { Tagger } from "./tagger";
 import {
@@ -69,11 +69,11 @@ function tenseOf(tags: string[]): Tense | undefined {
   return undefined;
 }
 
-export const compromiseTagger: Tagger = {
-  name: "compromise",
-  tag(text: string): TaggedSentence[] {
-    const sentences = CompromiseSentences.parse(nlp(text).json({ offset: true }));
-    return sentences.map((sentence) => ({
+export type TagText = (text: string) => TaggedSentence[];
+
+function tagWith(nlp: typeof Nlp): TagText {
+  return (text) =>
+    CompromiseSentences.parse(nlp(text).json({ offset: true })).map((sentence) => ({
       text: sentence.text,
       tokens: sentence.terms.map((term) => ({
         text: term.text,
@@ -87,5 +87,20 @@ export const compromiseTagger: Tagger = {
         ...mapTerm(term),
       })),
     }));
+}
+
+// Loading compromise costs the writing PreToolUse hook ~100ms, and most calls
+// never tag. Corpus scripts await this once and tag sentence by sentence.
+let loading: Promise<TagText> | undefined;
+
+export function loadCompromise(): Promise<TagText> {
+  loading ??= import("compromise").then(({ default: nlp }) => tagWith(nlp));
+  return loading;
+}
+
+export const compromiseTagger: Tagger = {
+  name: "compromise",
+  async tag(text) {
+    return (await loadCompromise())(text);
   },
 };

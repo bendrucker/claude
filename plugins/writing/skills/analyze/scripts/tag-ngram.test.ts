@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { processRows } from "./ngram";
-import { matchShapes, tagSequence } from "./tag-ngram";
+import { loadTagSequence, matchShapes } from "./tag-ngram";
+
+const tagSequence = await loadTagSequence();
 
 // Invented sentences exercising the structural shapes the signature
 // miner exists to catch: passive voice, participial openers, "not X
@@ -38,7 +40,7 @@ describe("tag sequences through processRows", () => {
     { session_id: "b", text: "The cache was invalidated by a background sweep." },
     { session_id: "c" },
   ];
-  const tokenize = (sentence: string) => tagSequence(sentence);
+  const tokenize = tagSequence;
 
   it("counts tag trigrams across rows", () => {
     const { stats } = processRows(rows, [3], { tokenize });

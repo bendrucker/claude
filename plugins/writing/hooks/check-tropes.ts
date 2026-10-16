@@ -257,7 +257,7 @@ async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | n
       scanPair = { newText, oldText };
     }
   }
-  const matches = scanIntroduced(scanPair.newText, scanPair.oldText, filePath, "file");
+  const matches = await scanIntroduced(scanPair.newText, scanPair.oldText, filePath, "file");
 
   const deny = firstByTier(matches, "deny");
   if (deny) {
@@ -286,7 +286,7 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<HookResult
   const texts = await collectText(input);
   if (texts.length === 0) return null;
 
-  const matches = scan(texts.join("\n"), undefined, "sideEffect");
+  const matches = await scan(texts.join("\n"), undefined, "sideEffect");
 
   // A structural deny blocks the call, so it outranks every other finding
   // regardless of where its pattern sits in the catalog. Selecting the first

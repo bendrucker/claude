@@ -45,8 +45,8 @@ describe("normalizedDistance", () => {
 });
 
 describe("tagShape", () => {
-  it("filters determiners, punctuation, and numbers", () => {
-    const shape = tagShape("The 3 parsers validate the payload.");
+  it("filters determiners, punctuation, and numbers", async () => {
+    const shape = await tagShape("The 3 parsers validate the payload.");
     expect(shape).not.toContain("DET");
     expect(shape).not.toContain("NUM");
     expect(shape).not.toContain("PUNCT");
@@ -55,40 +55,43 @@ describe("tagShape", () => {
 });
 
 describe("tricolonHits", () => {
-  it("flags three consecutive sentences with the same shape", () => {
-    const hits = tricolonHits(PARALLEL_TRIPLE);
+  it("flags three consecutive sentences with the same shape", async () => {
+    const hits = await tricolonHits(PARALLEL_TRIPLE);
     expect(hits.count).toBe(1);
     expect(hits.sample).toContain("The parser validates");
   });
 
-  it("finds a triple in the middle of surrounding prose", () => {
+  it("finds a triple in the middle of surrounding prose", async () => {
     const text = `The deployment finished without incident yesterday afternoon. ${PARALLEL_TRIPLE} Nothing else changed.`;
-    expect(tricolonHits(text).count).toBe(1);
+    expect((await tricolonHits(text)).count).toBe(1);
   });
 
-  it("ignores texts with fewer than three sentences", () => {
+  it("ignores texts with fewer than three sentences", async () => {
     expect(
-      tricolonHits(
-        "The parser validates the incoming request payload quickly. The router dispatches the matching handler function cleanly.",
+      (
+        await tricolonHits(
+          "The parser validates the incoming request payload quickly. The router dispatches the matching handler function cleanly.",
+        )
       ).count,
     ).toBe(0);
   });
 
-  it("ignores parallel sentences below the token gate", () => {
+  it("ignores parallel sentences below the token gate", async () => {
     expect(
-      tricolonHits("The cache starts cold. The queue fills fast. The worker drains it.").count,
+      (await tricolonHits("The cache starts cold. The queue fills fast. The worker drains it."))
+        .count,
     ).toBe(0);
   });
 
-  it("ignores structurally varied sentences of sufficient length", () => {
+  it("ignores structurally varied sentences of sufficient length", async () => {
     const text =
       "The parser validates the incoming request payload quickly. " +
       "The busy router near the gateway dispatches handlers cleanly under load. " +
       "Because traffic spikes are unpredictable there, operators who watch the dashboards rarely intervene manually.";
-    expect(tricolonHits(text).count).toBe(0);
+    expect((await tricolonHits(text)).count).toBe(0);
   });
 
-  it("does not flag a drifting sequence whose outer sentences diverge", () => {
+  it("does not flag a drifting sequence whose outer sentences diverge", async () => {
     // Adjacent pairs sit under the threshold (0.25, 0.20) while the outer
     // pair lands above it (0.40), so an adjacent-only comparison would flag
     // this. The all-pairwise rule must not.
@@ -96,6 +99,6 @@ describe("tricolonHits", () => {
       "The parser validates the incoming request payload quickly. " +
       "The parser validates the incoming request payload quickly during startup. " +
       "Early on, the parser validates the incoming request payload quickly during startup.";
-    expect(tricolonHits(text).count).toBe(0);
+    expect((await tricolonHits(text)).count).toBe(0);
   });
 });

@@ -73,19 +73,19 @@ describe("stripCode", () => {
 
 describe("scan", () => {
   describe("spaced em dashes", () => {
-    it("detects spaced em dash", () => {
-      const match = scan("This is \u2014 a problem");
+    it("detects spaced em dash", async () => {
+      const match = await scan("This is \u2014 a problem");
       expect(match[0]?.tier).toBe("deny");
       expect(match[0]?.category).toBe("spaced em dash");
     });
 
-    it("steers toward splitting into two sentences", () => {
-      const match = scan("This is \u2014 a problem");
+    it("steers toward splitting into two sentences", async () => {
+      const match = await scan("This is \u2014 a problem");
       expect(match[0]?.message).toContain("two sentences");
     });
 
-    it.each(["This is\u2014fine", "2024 \u2013 2025"])('allows: "%s"', (allowed) => {
-      expect(firstByTier(scan(allowed), "deny")).toBeUndefined();
+    it.each(["This is\u2014fine", "2024 \u2013 2025"])('allows: "%s"', async (allowed) => {
+      expect(firstByTier(await scan(allowed), "deny")).toBeUndefined();
     });
   });
 
@@ -102,15 +102,15 @@ describe("scan", () => {
       "nuanced",
     ];
 
-    it.each(words)('detects "%s"', (word) => {
-      const deny = firstByTier(scan(`The ${word} of the project`), "deny");
+    it.each(words)('detects "%s"', async (word) => {
+      const deny = firstByTier(await scan(`The ${word} of the project`), "deny");
       expect(deny?.category).toBe("AI vocabulary");
     });
 
     it.each(["```\ndelve into code\n```", "The `delve` function"])(
       'ignores in code: "%s..."',
-      (safe) => {
-        expect(firstByTier(scan(safe), "deny")).toBeUndefined();
+      async (safe) => {
+        expect(firstByTier(await scan(safe), "deny")).toBeUndefined();
       },
     );
   });
@@ -119,12 +119,12 @@ describe("scan", () => {
     const deny = ["The module serves as the entry point", "This stands as a reminder"];
     const allow = ["The restaurant serves food"];
 
-    it.each(deny)('flags: "%s"', (text) => {
-      expect(firstByTier(scan(text), "deny")?.category).toBe("copula avoidance");
+    it.each(deny)('flags: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "deny")?.category).toBe("copula avoidance");
     });
 
-    it.each(allow)('allows: "%s"', (text) => {
-      expect(firstByTier(scan(text), "deny")).toBeUndefined();
+    it.each(allow)('allows: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "deny")).toBeUndefined();
     });
   });
 
@@ -182,20 +182,22 @@ describe("scan", () => {
       "Write a test for this function.",
     ];
 
-    it.each(shouldFlag)('flags: "%s"', (text) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("test result reporting");
+    it.each(shouldFlag)('flags: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "context")?.category).toBe("test result reporting");
     });
 
-    it.each(shouldNotFlag)('allows: "%s"', (text) => {
-      expect(scan(text).find((m) => m.category === "test result reporting")).toBeUndefined();
+    it.each(shouldNotFlag)('allows: "%s"', async (text) => {
+      expect(
+        (await scan(text)).find((m) => m.category === "test result reporting"),
+      ).toBeUndefined();
     });
   });
 
   describe("promotional language", () => {
     const flag = ["The library boasts excellent performance", "A groundbreaking approach"];
 
-    it.each(flag)('flags: "%s"', (text) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("promotional language");
+    it.each(flag)('flags: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "context")?.category).toBe("promotional language");
     });
   });
 
@@ -218,12 +220,12 @@ describe("scan", () => {
       "There is no way the runtime needed that much memory.",
     ];
 
-    it.each(flag)('flags: "%s"', (text) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("no X needed brag");
+    it.each(flag)('flags: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "context")?.category).toBe("no X needed brag");
     });
 
-    it.each(allow)("allows: %j", (text) => {
-      expect(scan(text).find((m) => m.category === "no X needed brag")).toBeUndefined();
+    it.each(allow)("allows: %j", async (text) => {
+      expect((await scan(text)).find((m) => m.category === "no X needed brag")).toBeUndefined();
     });
   });
 
@@ -234,12 +236,12 @@ describe("scan", () => {
     ];
     const allow = ["Not just yet"];
 
-    it.each(flag)('flags: "%s"', (text) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("parallelism");
+    it.each(flag)('flags: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "context")?.category).toBe("parallelism");
     });
 
-    it.each(allow)('allows: "%s"', (text) => {
-      expect(firstByTier(scan(text), "context")).toBeUndefined();
+    it.each(allow)('allows: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "context")).toBeUndefined();
     });
   });
 
@@ -258,47 +260,47 @@ describe("scan", () => {
       ["unspaced em dashes", emDashes],
       ["mixed connectors", mixed],
       ["letter-flanked hyphens", hyphen],
-    ] as const)("flags %s", (_name, text) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("connector density");
+    ] as const)("flags %s", async (_name, text) => {
+      expect(firstByTier(await scan(text), "context")?.category).toBe("connector density");
     });
 
-    it("fires at exactly 30% density (3 of 10)", () => {
+    it("fires at exactly 30% density (3 of 10)", async () => {
       const text =
         "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input; it errors. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely.";
-      expect(firstByTier(scan(text), "context")?.category).toBe("connector density");
+      expect(firstByTier(await scan(text), "context")?.category).toBe("connector density");
     });
 
-    it("does not fire below MIN_CONNECTOR_SENTENCES (2 of 10)", () => {
+    it("does not fire below MIN_CONNECTOR_SENTENCES (2 of 10)", async () => {
       const text =
         "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input and errors. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely.";
-      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
     });
 
-    it("does not fire below MIN_SENTENCES (4 all connectored)", () => {
+    it("does not fire below MIN_SENTENCES (4 all connectored)", async () => {
       const text =
         "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input; it errors. The server validates; it stops.";
-      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
     });
 
-    it("does not fire below density threshold (3 of 11, 27%)", () => {
+    it("does not fire below density threshold (3 of 11, 27%)", async () => {
       const text =
         "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input; it errors. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely. The cron schedules the task.";
-      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
     });
 
-    it("does not fire on one semicolon list among clean sentences", () => {
+    it("does not fire on one semicolon list among clean sentences", async () => {
       const text =
         "The build depends on three steps; compile; link; package. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely. The cron schedules the task. The cache warms slowly.";
-      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
     });
 
-    it("does not fire on a numeric range", () => {
+    it("does not fire on a numeric range", async () => {
       const text =
         "The project ran from 2024 - 2025 without issues. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day.";
-      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
     });
 
-    it("does not fire on markdown table rows alone", () => {
+    it("does not fire on markdown table rows alone", async () => {
       const text = [
         "| col a | col b | col c |",
         "| --- | --- | --- |",
@@ -307,15 +309,15 @@ describe("scan", () => {
         "| e; f | g; h | i; j |",
         "| k; l | u; v | w; z |",
       ].join("\n");
-      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
     });
 
-    it("does not fire on a two-sentence text", () => {
+    it("does not fire on a two-sentence text", async () => {
       const text = "The cache starts cold; it fills later. The retry logic backs off; it succeeds.";
-      expect(scan(text).find((m) => m.category === "connector density")).toBeUndefined();
+      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
     });
 
-    it("does not fire on a definition bullet list", () => {
+    it("does not fire on a definition bullet list", async () => {
       const text = [
         "- **jxa** — JXA language guide for automation",
         "- **jxa-run** — App-scoped JXA runner with validation",
@@ -325,11 +327,11 @@ describe("scan", () => {
         "- **tmux** — Layout awareness and pane management",
       ].join("\n");
       expect(
-        scan(text, "README.md").find((m) => m.category === "connector density"),
+        (await scan(text, "README.md")).find((m) => m.category === "connector density"),
       ).toBeUndefined();
     });
 
-    it("does not fire on a numbered definition list", () => {
+    it("does not fire on a numbered definition list", async () => {
       const text = [
         "1. Flowchart — nodes and edges here",
         "2. Sequence — participants and messages",
@@ -338,10 +340,12 @@ describe("scan", () => {
         "5. Class — members and methods here",
         "6. Gantt — tasks and milestones here",
       ].join("\n");
-      expect(scan(text, "doc.md").find((m) => m.category === "connector density")).toBeUndefined();
+      expect(
+        (await scan(text, "doc.md")).find((m) => m.category === "connector density"),
+      ).toBeUndefined();
     });
 
-    it("does not fire on reference-link bullets with periods in the path", () => {
+    it("does not fire on reference-link bullets with periods in the path", async () => {
       const text = [
         "- [Flowchart](./references/flowchart.md) — Nodes, edges, subgraphs, direction",
         "- [Sequence](./references/sequence.md) — Participants, messages, activations",
@@ -351,11 +355,11 @@ describe("scan", () => {
         "- [Gantt](./references/gantt.md) — Tasks, sections, milestones",
       ].join("\n");
       expect(
-        scan(text, "SKILL.md").find((m) => m.category === "connector density"),
+        (await scan(text, "SKILL.md")).find((m) => m.category === "connector density"),
       ).toBeUndefined();
     });
 
-    it("does not fire on headings with hyphen subtitles", () => {
+    it("does not fire on headings with hyphen subtitles", async () => {
       const text = [
         "## Flowchart - Basic",
         "## Flowchart - Unclosed Bracket",
@@ -364,24 +368,26 @@ describe("scan", () => {
         "## ER - Cardinality",
         "## Class - Inheritance",
       ].join("\n");
-      expect(scan(text, "doc.md").find((m) => m.category === "connector density")).toBeUndefined();
-    });
-
-    it("detects in prose files", () => {
-      expect(firstByTier(scan(semicolons, "doc.md"), "context")?.category).toBe(
-        "connector density",
-      );
-    });
-
-    it("applies when no path is given", () => {
-      expect(firstByTier(scan(semicolons, undefined), "context")?.category).toBe(
-        "connector density",
-      );
-    });
-
-    it.each(["script.sh", "index.ts", "style.css"])("skips in %s", (path) => {
       expect(
-        scan(semicolons, path).find((m) => m.category === "connector density"),
+        (await scan(text, "doc.md")).find((m) => m.category === "connector density"),
+      ).toBeUndefined();
+    });
+
+    it("detects in prose files", async () => {
+      expect(firstByTier(await scan(semicolons, "doc.md"), "context")?.category).toBe(
+        "connector density",
+      );
+    });
+
+    it("applies when no path is given", async () => {
+      expect(firstByTier(await scan(semicolons, undefined), "context")?.category).toBe(
+        "connector density",
+      );
+    });
+
+    it.each(["script.sh", "index.ts", "style.css"])("skips in %s", async (path) => {
+      expect(
+        (await scan(semicolons, path)).find((m) => m.category === "connector density"),
       ).toBeUndefined();
     });
   });
@@ -424,44 +430,50 @@ describe("scan", () => {
       expect(semicolonSpliceHits(text, min).count).toBe(count);
     });
 
-    it("flags two splices in short prose below the density gate", () => {
-      expect(scan(twoSplices).find((m) => m.category === "semicolon splice")).toBeDefined();
+    it("flags two splices in short prose below the density gate", async () => {
+      expect((await scan(twoSplices)).find((m) => m.category === "semicolon splice")).toBeDefined();
     });
 
-    it("stays silent on a single splice in prose", () => {
-      expect(scan(oneSplice).find((m) => m.category === "semicolon splice")).toBeUndefined();
-    });
-
-    it("detects in prose files", () => {
+    it("stays silent on a single splice in prose", async () => {
       expect(
-        scan(twoSplices, "doc.md").find((m) => m.category === "semicolon splice"),
+        (await scan(oneSplice)).find((m) => m.category === "semicolon splice"),
+      ).toBeUndefined();
+    });
+
+    it("detects in prose files", async () => {
+      expect(
+        (await scan(twoSplices, "doc.md")).find((m) => m.category === "semicolon splice"),
       ).toBeDefined();
     });
 
-    it.each(["script.sh", "index.ts"])("skips in %s", (path) => {
-      expect(scan(twoSplices, path).find((m) => m.category === "semicolon splice")).toBeUndefined();
+    it.each(["script.sh", "index.ts"])("skips in %s", async (path) => {
+      expect(
+        (await scan(twoSplices, path)).find((m) => m.category === "semicolon splice"),
+      ).toBeUndefined();
     });
   });
 
-  it("returns all matches per tier", () => {
-    const denyMatches = scan("This delve serves as a testament").filter((m) => m.tier === "deny");
+  it("returns all matches per tier", async () => {
+    const denyMatches = (await scan("This delve serves as a testament")).filter(
+      (m) => m.tier === "deny",
+    );
     const categories = denyMatches.map((m) => m.category);
     expect(categories).toContain("AI vocabulary");
     expect(categories).toContain("copula avoidance");
   });
 
-  it("returns empty for empty string", () => {
-    expect(scan("")).toHaveLength(0);
+  it("returns empty for empty string", async () => {
+    expect(await scan("")).toHaveLength(0);
   });
 
-  it("returns empty for clean prose", () => {
-    expect(scan("The function processes input and returns a result.")).toHaveLength(0);
+  it("returns empty for clean prose", async () => {
+    expect(await scan("The function processes input and returns a result.")).toHaveLength(0);
   });
 
   describe("sycophantic opener", () => {
-    it("does not fire when openers.txt is empty", () => {
+    it("does not fire when openers.txt is empty", async () => {
       expect(
-        scan("Excellent. That works.").find((m) => m.category === "sycophantic opener"),
+        (await scan("Excellent. That works.")).find((m) => m.category === "sycophantic opener"),
       ).toBeUndefined();
     });
   });
@@ -469,35 +481,39 @@ describe("scan", () => {
   describe("sycophantic acknowledgment", () => {
     it.each(["You're right, that was wrong.", "You're absolutely right about that."])(
       "flags: %j",
-      (text) => {
-        expect(firstByTier(scan(text), "deny")?.category).toBe("sycophantic acknowledgment");
+      async (text) => {
+        expect(firstByTier(await scan(text), "deny")?.category).toBe("sycophantic acknowledgment");
       },
     );
 
-    it("allows: turn right", () => {
+    it("allows: turn right", async () => {
       expect(
-        scan("Turn right at the corner.").find((m) => m.category === "sycophantic acknowledgment"),
+        (await scan("Turn right at the corner.")).find(
+          (m) => m.category === "sycophantic acknowledgment",
+        ),
       ).toBeUndefined();
     });
   });
 
   describe("permission-seeking", () => {
-    it("flags: want me to fix", () => {
-      expect(firstByTier(scan("Want me to fix the bug?"), "deny")?.category).toBe(
+    it("flags: want me to fix", async () => {
+      expect(firstByTier(await scan("Want me to fix the bug?"), "deny")?.category).toBe(
         "permission-seeking",
       );
     });
 
-    it("allows: they want me there", () => {
+    it("allows: they want me there", async () => {
       expect(
-        scan("They want me there by noon.").find((m) => m.category === "permission-seeking"),
+        (await scan("They want me there by noon.")).find(
+          (m) => m.category === "permission-seeking",
+        ),
       ).toBeUndefined();
     });
   });
 
   describe("hedging close", () => {
-    it("flags: would you like", () => {
-      expect(firstByTier(scan("Would you like me to retry?"), "deny")?.category).toBe(
+    it("flags: would you like", async () => {
+      expect(firstByTier(await scan("Would you like me to retry?"), "deny")?.category).toBe(
         "hedging close",
       );
     });
@@ -508,8 +524,8 @@ describe("scan", () => {
       "Open a sibling pane rather than reaching for Bash.",
       "Reach for the linter before the formatter.",
     ];
-    it.each(flag)('flags: "%s"', (text) => {
-      expect(firstByTier(scan(text), "deny")?.category).toBe("reaching for");
+    it.each(flag)('flags: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "deny")?.category).toBe("reaching for");
     });
   });
 
@@ -532,32 +548,33 @@ describe("scan", () => {
       "```\nif err != nil, not ok\n```",
     ];
 
-    it.each(flag)('flags: "%s"', (text) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("contrast not");
+    it.each(flag)('flags: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "context")?.category).toBe("contrast not");
     });
 
-    it.each(allow)("allows: %j", (text) => {
-      expect(scan(text).find((m) => m.category === "contrast not")).toBeUndefined();
+    it.each(allow)("allows: %j", async (text) => {
+      expect((await scan(text)).find((m) => m.category === "contrast not")).toBeUndefined();
     });
   });
 
   describe("passive PR summary", () => {
-    it("flags in markdown: 'is added'", () => {
+    it("flags in markdown: 'is added'", async () => {
       expect(
-        firstByTier(scan("Retry logic is added to the HTTP client.", "pr.md"), "context")?.category,
-      ).toBe("passive PR summary");
-    });
-
-    it("flags in markdown: 'was refactored'", () => {
-      expect(
-        firstByTier(scan("The cache layer was refactored last week.", "pr.md"), "context")
+        firstByTier(await scan("Retry logic is added to the HTTP client.", "pr.md"), "context")
           ?.category,
       ).toBe("passive PR summary");
     });
 
-    it("skips in code files", () => {
+    it("flags in markdown: 'was refactored'", async () => {
       expect(
-        scan("retry logic is added to the http client", "index.ts").find(
+        firstByTier(await scan("The cache layer was refactored last week.", "pr.md"), "context")
+          ?.category,
+      ).toBe("passive PR summary");
+    });
+
+    it("skips in code files", async () => {
+      expect(
+        (await scan("retry logic is added to the http client", "index.ts")).find(
           (m) => m.category === "passive PR summary",
         ),
       ).toBeUndefined();
@@ -565,15 +582,16 @@ describe("scan", () => {
   });
 
   describe("tests cover preamble", () => {
-    it("flags: 'Tests cover ...'", () => {
+    it("flags: 'Tests cover ...'", async () => {
       expect(
-        firstByTier(scan("Tests cover error handling for malformed JSON."), "context")?.category,
+        firstByTier(await scan("Tests cover error handling for malformed JSON."), "context")
+          ?.category,
       ).toBe("tests cover preamble");
     });
 
-    it("allows: 'Added tests covering ...'", () => {
+    it("allows: 'Added tests covering ...'", async () => {
       expect(
-        scan("Added tests covering the error handling for malformed JSON.").find(
+        (await scan("Added tests covering the error handling for malformed JSON.")).find(
           (m) => m.category === "tests cover preamble",
         ),
       ).toBeUndefined();
@@ -581,15 +599,16 @@ describe("scan", () => {
   });
 
   describe("path bullet", () => {
-    it("flags in markdown", () => {
+    it("flags in markdown", async () => {
       expect(
-        firstByTier(scan("- **src/foo.ts**: refactors the helper", "doc.md"), "context")?.category,
+        firstByTier(await scan("- **src/foo.ts**: refactors the helper", "doc.md"), "context")
+          ?.category,
       ).toBe("path bullet");
     });
 
-    it("skips in code files", () => {
+    it("skips in code files", async () => {
       expect(
-        scan("- **src/foo.ts**: refactors the helper", "index.ts").find(
+        (await scan("- **src/foo.ts**: refactors the helper", "index.ts")).find(
           (m) => m.category === "path bullet",
         ),
       ).toBeUndefined();
@@ -597,10 +616,10 @@ describe("scan", () => {
   });
 
   describe("trailing hedge", () => {
-    it("flags in markdown: 'regardless.' at line end", () => {
+    it("flags in markdown: 'regardless.' at line end", async () => {
       expect(
         firstByTier(
-          scan("It keeps the running shells stale regardless.\nNext sentence.", "doc.md"),
+          await scan("It keeps the running shells stale regardless.\nNext sentence.", "doc.md"),
           "context",
         )?.category,
       ).toBe("trailing hedge");
@@ -608,15 +627,17 @@ describe("scan", () => {
   });
 
   describe("label bold", () => {
-    it("flags in markdown: '**Why:**' label", () => {
-      expect(firstByTier(scan("**Why:** the diff is small", "doc.md"), "context")?.category).toBe(
-        "label bold",
-      );
+    it("flags in markdown: '**Why:**' label", async () => {
+      expect(
+        firstByTier(await scan("**Why:** the diff is small", "doc.md"), "context")?.category,
+      ).toBe("label bold");
     });
 
-    it("skips in code files", () => {
+    it("skips in code files", async () => {
       expect(
-        scan("**Why:** the diff is small", "index.ts").find((m) => m.category === "label bold"),
+        (await scan("**Why:** the diff is small", "index.ts")).find(
+          (m) => m.category === "label bold",
+        ),
       ).toBeUndefined();
     });
   });
@@ -629,31 +650,36 @@ describe("scan", () => {
       "She dove into the schema migration.",
       "We're digging into the root cause.",
       "The audit dives into each subsystem.",
-    ])("flags: %j", (text) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("dig into");
+    ])("flags: %j", async (text) => {
+      expect(firstByTier(await scan(text), "context")?.category).toBe("dig into");
     });
 
-    it.each(["She dug a trench.", "Water drains into the basin."])("allows: %j", (text) => {
-      expect(scan(text).find((m) => m.category === "dig into")).toBeUndefined();
+    it.each(["She dug a trench.", "Water drains into the basin."])("allows: %j", async (text) => {
+      expect((await scan(text)).find((m) => m.category === "dig into")).toBeUndefined();
     });
   });
 
   describe("hedging observation", () => {
-    it.each(["This looks like a regression.", "The fix appears to hold."])("flags: %j", (text) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("hedging observation");
-    });
+    it.each(["This looks like a regression.", "The fix appears to hold."])(
+      "flags: %j",
+      async (text) => {
+        expect(firstByTier(await scan(text), "context")?.category).toBe("hedging observation");
+      },
+    );
   });
 
   describe("filler", () => {
     it.each(["Importantly, the test was skipped.", "In terms of latency, it improved."])(
       "flags: %j",
-      (text) => {
-        expect(firstByTier(scan(text), "context")?.category).toBe("filler");
+      async (text) => {
+        expect(firstByTier(await scan(text), "context")?.category).toBe("filler");
       },
     );
 
-    it("allows prose without filler markers", () => {
-      expect(scan("The cache starts cold.").find((m) => m.category === "filler")).toBeUndefined();
+    it("allows prose without filler markers", async () => {
+      expect(
+        (await scan("The cache starts cold.")).find((m) => m.category === "filler"),
+      ).toBeUndefined();
     });
   });
 
@@ -669,28 +695,28 @@ describe("scan", () => {
       { text: "One caveat worth your attention.", category: "attention-flag worth" },
       { text: "The refactor is worth doing before the freeze.", category: undefined },
       { text: "The fix is worth confirming against staging.", category: undefined },
-    ])("$text -> $category", ({ text, category }) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe(category);
+    ])("$text -> $category", async ({ text, category }) => {
+      expect(firstByTier(await scan(text), "context")?.category).toBe(category);
     });
   });
 
   describe("I understand", () => {
-    it("flags: 'I understand the issue'", () => {
-      expect(firstByTier(scan("I understand the issue."), "context")?.category).toBe(
+    it("flags: 'I understand the issue'", async () => {
+      expect(firstByTier(await scan("I understand the issue."), "context")?.category).toBe(
         "I understand",
       );
     });
 
-    it("allows: 'do you understand'", () => {
+    it("allows: 'do you understand'", async () => {
       expect(
-        scan("Do you understand the issue?").find((m) => m.category === "I understand"),
+        (await scan("Do you understand the issue?")).find((m) => m.category === "I understand"),
       ).toBeUndefined();
     });
   });
 
   describe("salutation", () => {
-    function salutation(text: string): PatternMatch | undefined {
-      return scan(text, undefined, "sideEffect").find((m) => m.category === "salutation");
+    async function salutation(text: string): Promise<PatternMatch | undefined> {
+      return (await scan(text, undefined, "sideEffect")).find((m) => m.category === "salutation");
     }
 
     const addressed = [
@@ -704,8 +730,8 @@ describe("scan", () => {
       "Dana,\nThe retry loop swallows the error.",
     ];
 
-    it.each(addressed)("denies: %j", (text) => {
-      const match = salutation(text);
+    it.each(addressed)("denies: %j", async (text) => {
+      const match = await salutation(text);
       expect(match?.tier).toBe("deny");
       expect(match?.structural).toBe(true);
     });
@@ -727,17 +753,19 @@ describe("scan", () => {
       "Tests, then the docs.",
     ];
 
-    it.each(substantive)("allows: %j", (text) => {
-      expect(salutation(text)).toBeUndefined();
+    it.each(substantive)("allows: %j", async (text) => {
+      expect(await salutation(text)).toBeUndefined();
     });
 
-    it("ignores an address that is not on the opening line", () => {
-      expect(salutation("The sweep is too broad.\n\nDana, it fires on every run.")).toBeUndefined();
-    });
-
-    it("skips file context", () => {
+    it("ignores an address that is not on the opening line", async () => {
       expect(
-        scan("Dana, this fires for the entire run.", undefined, "file").find(
+        await salutation("The sweep is too broad.\n\nDana, it fires on every run."),
+      ).toBeUndefined();
+    });
+
+    it("skips file context", async () => {
+      expect(
+        (await scan("Dana, this fires for the entire run.", undefined, "file")).find(
           (m) => m.category === "salutation",
         ),
       ).toBeUndefined();
@@ -752,39 +780,41 @@ describe("scan", () => {
       { text: "I understand the issue.", category: "I understand" },
     ];
 
-    it.each(conversational)('fires without context: "$text"', ({ text, category }) => {
-      expect(scan(text).find((m) => m.category === category)).toBeDefined();
+    it.each(conversational)('fires without context: "$text"', async ({ text, category }) => {
+      expect((await scan(text)).find((m) => m.category === category)).toBeDefined();
     });
 
-    it.each(conversational)('fires in sideEffect context: "$text"', ({ text, category }) => {
+    it.each(conversational)('fires in sideEffect context: "$text"', async ({ text, category }) => {
       expect(
-        scan(text, undefined, "sideEffect").find((m) => m.category === category),
+        (await scan(text, undefined, "sideEffect")).find((m) => m.category === category),
       ).toBeDefined();
     });
 
-    it.each(conversational)('skips in file context: "$text"', ({ text, category }) => {
-      expect(scan(text, undefined, "file").find((m) => m.category === category)).toBeUndefined();
+    it.each(conversational)('skips in file context: "$text"', async ({ text, category }) => {
+      expect(
+        (await scan(text, undefined, "file")).find((m) => m.category === category),
+      ).toBeUndefined();
     });
 
-    it("non-conversational patterns still fire in file context", () => {
+    it("non-conversational patterns still fire in file context", async () => {
       expect(
-        firstByTier(scan("The tapestry of the project", undefined, "file"), "deny")?.category,
+        firstByTier(await scan("The tapestry of the project", undefined, "file"), "deny")?.category,
       ).toBe("AI vocabulary");
     });
   });
 
   describe("marketing verbs (weighted)", () => {
-    it("does not flag a single hit below threshold", () => {
+    it("does not flag a single hit below threshold", async () => {
       // empower is 2.5, below the 3.0 threshold on its own.
       expect(
-        scan("This release empowers users.").find((m) => m.category === "marketing verbs"),
+        (await scan("This release empowers users.")).find((m) => m.category === "marketing verbs"),
       ).toBeUndefined();
     });
 
-    it("flags repeated high-weight hits", () => {
+    it("flags repeated high-weight hits", async () => {
       // Two occurrences of empower (2.5 each) = 5.0, well above 3.0.
       const text = "This empowers teams. That empowers customers.";
-      expect(firstByTier(scan(text), "context")?.category).toBe("marketing verbs");
+      expect(firstByTier(await scan(text), "context")?.category).toBe("marketing verbs");
     });
   });
 
@@ -806,44 +836,45 @@ describe("scan", () => {
       "a hatch you can escape through",
       "loudly proclaimed the failure",
     ];
-    it.each(flag)("flags %j", (text) => {
-      expect(firstByTier(scan(text), "context")?.category).toBe("flowery phrasing");
+    it.each(flag)("flags %j", async (text) => {
+      expect(firstByTier(await scan(text), "context")?.category).toBe("flowery phrasing");
     });
-    it.each(allow)("allows %j", (text) => {
-      expect(scan(text).find((m) => m.category === "flowery phrasing")).toBeUndefined();
+    it.each(allow)("allows %j", async (text) => {
+      expect((await scan(text)).find((m) => m.category === "flowery phrasing")).toBeUndefined();
     });
-    it("does not fire in non-prose file context", () => {
+    it("does not fire in non-prose file context", async () => {
       expect(
-        scan("a single source of truth", "module.ts", "file").find(
+        (await scan("a single source of truth", "module.ts", "file")).find(
           (m) => m.category === "flowery phrasing",
         ),
       ).toBeUndefined();
     });
-    it("fires in prose file context", () => {
+    it("fires in prose file context", async () => {
       expect(
-        firstByTier(scan("a single source of truth", "README.md", "file"), "context")?.category,
+        firstByTier(await scan("a single source of truth", "README.md", "file"), "context")
+          ?.category,
       ).toBe("flowery phrasing");
     });
   });
 
   describe("soft phrasing (weighted)", () => {
-    it("does not flag a lone soft word", () => {
+    it("does not flag a lone soft word", async () => {
       // cleanly is 1.5, below the 3.0 threshold on its own.
       expect(
-        scan("the fixtures strip cleanly").find((m) => m.category === "soft phrasing"),
+        (await scan("the fixtures strip cleanly")).find((m) => m.category === "soft phrasing"),
       ).toBeUndefined();
     });
 
-    it("flags when soft words stack", () => {
+    it("flags when soft words stack", async () => {
       // Two occurrences of cleanly (1.5 each) = 3.0, at the threshold.
       const text = "the migration runs cleanly and the tests strip cleanly";
-      expect(firstByTier(scan(text), "context")?.category).toBe("soft phrasing");
+      expect(firstByTier(await scan(text), "context")?.category).toBe("soft phrasing");
     });
 
-    it("does not fire in non-prose file context", () => {
+    it("does not fire in non-prose file context", async () => {
       const text = "the migration runs cleanly and the tests strip cleanly";
       expect(
-        scan(text, "module.ts", "file").find((m) => m.category === "soft phrasing"),
+        (await scan(text, "module.ts", "file")).find((m) => m.category === "soft phrasing"),
       ).toBeUndefined();
     });
   });
@@ -853,8 +884,10 @@ describe("scan", () => {
       ["rides on", "The teardown rides on the normal end of a team."],
       ["can bite", "A stale cache entry can bite at runtime."],
       ["surface as verb", "The hook should surface the conflict to the user."],
-    ])("scan() does not report %s", (category, text) => {
-      expect(scan(text, "doc.md", "file").find((m) => m.category === category)).toBeUndefined();
+    ])("scan() does not report %s", async (category, text) => {
+      expect(
+        (await scan(text, "doc.md", "file")).find((m) => m.category === category),
+      ).toBeUndefined();
     });
   });
 });

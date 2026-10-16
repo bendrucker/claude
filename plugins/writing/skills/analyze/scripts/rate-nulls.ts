@@ -26,18 +26,17 @@ import type { VoiceDocument } from "./voice-corpus";
 /** Feature id to the feature's rate for each document, in corpus order. */
 export type RateMatrix = Map<string, number[]>;
 
-export function rateMatrix(
+export async function rateMatrix(
   docs: VoiceDocument[],
   features: VoiceDeltaFeature[] = VOICE_DELTA_FEATURES,
-): RateMatrix {
-  const matrix: RateMatrix = new Map();
-  for (const feature of features) {
-    matrix.set(
-      feature.id,
-      docs.map((doc) => feature.compute(doc.body)),
-    );
-  }
-  return matrix;
+): Promise<RateMatrix> {
+  const rows = await Promise.all(
+    features.map(async (feature) => {
+      const rates = await Promise.all(docs.map(async (doc) => feature.compute(doc.body)));
+      return [feature.id, rates] as const;
+    }),
+  );
+  return new Map(rows);
 }
 
 export function meanOf(rates: number[], indices: number[]): number {
@@ -103,14 +102,16 @@ export interface FloorOptions {
 // still say anything about sampling spread.
 const MIN_BASELINE_DOCS = 4;
 
-export function featureFloors(
+export async function featureFloors(
   study: VoiceDocument[],
   baseline: VoiceDocument[],
   options: FloorOptions,
   features: VoiceDeltaFeature[] = VOICE_DELTA_FEATURES,
-): FeatureFloor[] {
-  const studyRates = rateMatrix(study, features);
-  const baselineRates = rateMatrix(baseline, features);
+): Promise<FeatureFloor[]> {
+  const [studyRates, baselineRates] = await Promise.all([
+    rateMatrix(study, features),
+    rateMatrix(baseline, features),
+  ]);
   const all = Array.from({ length: baseline.length }, (_, index) => index);
   const random = mulberry32(options.seed);
   const halves = Array.from({ length: options.splits }, () =>
@@ -316,7 +317,7 @@ if (import.meta.main) {
   const features = argv.flags.candidates
     ? [...VOICE_DELTA_FEATURES, ...RETIRED_FEATURES]
     : VOICE_DELTA_FEATURES;
-  const floors = featureFloors(
+  const floors = await featureFloors(
     selection.study.documents,
     selection.baseline.documents,
     options,

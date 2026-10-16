@@ -28,6 +28,7 @@ import {
   type TagSignatures,
   type WritingStatistics,
 } from "./statistics";
+import { loadTagSequence } from "./tag-ngram";
 import { aboveFloor, cachingTagger, nullFloor } from "./tag-signatures";
 
 const SECTIONS = ["rate-nulls", "tag-signatures", "hook-health"] as const;
@@ -161,7 +162,7 @@ if (import.meta.main) {
         percentile: argv.flags.percentile,
         seed: argv.flags.seed,
       };
-      const floors = featureFloors(study, baseline, options);
+      const floors = await featureFloors(study, baseline, options);
       const run: RateNullRun = {
         ...options,
         minWords: band.min ?? null,
@@ -181,7 +182,7 @@ if (import.meta.main) {
       const sizes = argv.flags.sizes.length > 0 ? argv.flags.sizes : [3, 4, 5];
       const { prior, minCount, minDocs } = argv.flags;
       const options = { sizes, prior, minCount, minDocs };
-      const tokenize = cachingTagger();
+      const tokenize = cachingTagger(await loadTagSequence());
       // The signature ranking pools the study kinds, so the band restricts it
       // the same way it restricts the rate floors: an over-represented shape
       // that only tracks document length is not a voice signature.

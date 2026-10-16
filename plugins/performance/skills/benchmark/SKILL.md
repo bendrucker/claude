@@ -13,7 +13,7 @@ Goal: a comparison the user can trust. Every arm runs the same scenario from the
 
 ## Tools
 
-- `hyperfine`: !`hyperfine --version 2>/dev/null || echo "not found. Required unless the project's own tooling covers its job."`
+- `hyperfine` 2.0 or later: !`hyperfine --version 2>/dev/null || echo "not found. Required unless the project's own tooling covers its job."`
 - `bun` (runs `compare.ts`): !`bun --version 2>/dev/null || echo "not found. Required for compare.ts."`
 
 ## Existing Tooling

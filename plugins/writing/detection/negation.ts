@@ -54,9 +54,10 @@ interface Located {
  * splits hyphenated words, so the pieces are rejoined under the last piece's
  * tag ("one-shot", "no-op"), which also keeps "no-" out of the indefinites.
  */
-function locate(sentence: string): Located[] {
+async function locate(sentence: string): Promise<Located[]> {
   const located: Located[] = [];
-  for (const token of compromiseTagger.tag(sentence).flatMap((tagged) => tagged.tokens)) {
+  const sentences = await compromiseTagger.tag(sentence);
+  for (const token of sentences.flatMap((tagged) => tagged.tokens)) {
     if (token.span === undefined) continue;
     const previous = located.at(-1);
     if (previous !== undefined && sentence.slice(previous.end, token.span.start) === "-") {
@@ -117,9 +118,9 @@ function opensClause(
   return !(determiner && tense === "past" && !adjacent(sentence, tokens, at + 1));
 }
 
-function sentenceSpans(sentence: string): PatternSpan[] {
+async function sentenceSpans(sentence: string): Promise<PatternSpan[]> {
   if (!INDEFINITE_WORD.test(sentence)) return [];
-  const tokens = locate(sentence);
+  const tokens = await locate(sentence);
   const spans: PatternSpan[] = [];
   for (const [at, indefinite] of tokens.entries()) {
     if (!INDEFINITES.has(indefinite.token.normal)) continue;
@@ -144,22 +145,28 @@ function sentenceSpans(sentence: string): PatternSpan[] {
   return spans;
 }
 
-export function noNegationSpans(text: string): PatternSpan[] {
-  const spans: PatternSpan[] = [];
+export async function noNegationSpans(text: string): Promise<PatternSpan[]> {
+  const placed: { base: number; sentence: string }[] = [];
   let cursor = 0;
   for (const sentence of splitSentences(text)) {
     const base = text.indexOf(sentence, cursor);
     if (base === -1) continue;
     cursor = base + sentence.length;
-    for (const span of sentenceSpans(sentence)) {
-      spans.push({ index: base + span.index, matched: span.matched });
-    }
+    placed.push({ base, sentence });
   }
-  return spans;
+  const spans = await Promise.all(
+    placed.map(async ({ base, sentence }) =>
+      (await sentenceSpans(sentence)).map((span) => ({
+        index: base + span.index,
+        matched: span.matched,
+      })),
+    ),
+  );
+  return spans.flat();
 }
 
-export function noNegationHits(text: string): Hits {
-  const spans = noNegationSpans(text);
+export async function noNegationHits(text: string): Promise<Hits> {
+  const spans = await noNegationSpans(text);
   return { count: spans.length, sample: spans[0]?.matched ?? "" };
 }
 
@@ -171,10 +178,12 @@ const CLAUSE_BREAK = /[,;:()[\]–—]/;
  * the nonassertive indefinite that follows it ("doesn't add anything"), so the
  * window runs forward from the negative particle and stops at a clause edge.
  */
-export function notNegationHits(text: string): Hits {
+export async function notNegationHits(text: string): Promise<Hits> {
   const samples: string[] = [];
-  for (const sentence of splitSentences(text)) {
-    const tokens = locate(sentence);
+  const sentences = splitSentences(text);
+  const located = await Promise.all(sentences.map(locate));
+  for (const [index, sentence] of sentences.entries()) {
+    const tokens = located[index] ?? [];
     const claimed = new Set<number>();
     for (const [at, cue] of tokens.entries()) {
       if (cue.token.tag !== "PART") continue;

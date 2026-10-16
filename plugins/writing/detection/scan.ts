@@ -54,15 +54,15 @@ function positionOfSample(text: string, sample: string): Position {
   return { line: 1, col: 1 };
 }
 
-function regexResults(stripped: string, def: PatternDef): ScanResult[] {
+async function regexResults(stripped: string, def: PatternDef): Promise<ScanResult[]> {
   if (typeof def.test === "function") {
     if (def.spans) {
-      return def.spans(stripped).map(({ index, matched }) => {
+      return (await def.spans(stripped)).map(({ index, matched }) => {
         const { line, col } = positionAt(stripped, index);
         return { line, col, category: def.category, matched, message: def.message(matched) };
       });
     }
-    const hits = def.test(stripped);
+    const hits = await def.test(stripped);
     if (hits.count === 0) return [];
     const { line, col } = positionOfSample(stripped, hits.sample);
     return [
@@ -111,16 +111,13 @@ function weightedResults(stripped: string, group: WeightedPatternGroup): ScanRes
 
 // Report every trope match in `text`, without per-tier dedup or diff-awareness.
 // Patterns run in `file` context: `fileOnly` patterns apply, `sideEffectOnly` do not.
-export function scanAll(text: string, filePath?: string): ScanResult[] {
+export async function scanAll(text: string, filePath?: string): Promise<ScanResult[]> {
   const stripped = stripCode(text);
   const prose = filePath === undefined || isProseFile(filePath);
-  const results: ScanResult[] = [];
-
-  for (const def of [...PATTERNS, ...BATCH_PATTERNS]) {
-    if (def.sideEffectOnly) continue;
-    if (def.fileOnly && !prose) continue;
-    results.push(...regexResults(stripped, def));
-  }
+  const defs = [...PATTERNS, ...BATCH_PATTERNS].filter(
+    (def) => !def.sideEffectOnly && (prose || !def.fileOnly),
+  );
+  const results = (await Promise.all(defs.map((def) => regexResults(stripped, def)))).flat();
 
   for (const group of WEIGHTED_PATTERNS) {
     if (group.fileOnly && !prose) continue;

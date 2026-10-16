@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { rank, type RankedTerm, tokenizeCorpus } from "./fightin-words";
+import { loadTagSequence } from "./tag-ngram";
 import {
   aboveFloor,
   cachingTagger,
@@ -182,10 +183,10 @@ describe("renderReport", () => {
 });
 
 describe("ranking tag sequences end to end", () => {
-  it("ranks a shape the study corpus repeats and the baseline does not", () => {
+  it("ranks a shape the study corpus repeats and the baseline does not", async () => {
     const study = messages(6, "The flag was removed. The cache was invalidated.");
     const baseline = [doc("pr-1", "We removed the flag. I invalidated the cache.")];
-    const tokenize = cachingTagger();
+    const tokenize = cachingTagger(await loadTagSequence());
     const rows = rank(
       tokenizeCorpus(study, [3], tokenize),
       tokenizeCorpus(baseline, [3], tokenize),

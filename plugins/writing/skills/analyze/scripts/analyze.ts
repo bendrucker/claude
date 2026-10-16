@@ -24,7 +24,7 @@ import { aggregateTrends, analyzeDocument } from "./rate-detectors";
 import { type CandidatePhrase, type ReportInput, renderReport } from "./report";
 import { buildRuleHealth, FtsAuditRow } from "./rule-health";
 import { auditStructuralPatterns } from "./structural";
-import { type TagSignatureRow, tagSequence } from "./tag-ngram";
+import { loadTagSequence, type TagSignatureRow } from "./tag-ngram";
 import { computeCorpusRates } from "./voice-delta";
 import { loadProfile, phraseProfileStat } from "./voice-profile";
 import { loadWordlists, type WordlistEntry } from "./wordlists";
@@ -348,11 +348,12 @@ export async function runAnalysis(
   console.error("Computing structural signatures (part-of-speech tag sequences)");
   const tagSizes = [3, 4, 5];
   const tagExamples = new Map<string, string>();
+  const tagSentence = await loadTagSequence();
   const tagAssistant = processRows(deliverableRows, tagSizes, {
-    tokenize: (s) => tagSequence(s),
+    tokenize: tagSentence,
     examples: tagExamples,
   });
-  const tagUser = processCorpus(userText, tagSizes, (s) => tagSequence(s));
+  const tagUser = processCorpus(userText, tagSizes, tagSentence);
   // Tag sequences draw from an alphabet of ~17 tags, so they are far
   // denser than word n-grams; the floors are higher to compensate.
   const tagLifts = computeLift({
@@ -415,7 +416,7 @@ export async function runAnalysis(
       surface === "deliverable" ? findQuote(entry.phrase, deliverableRows) : null,
   });
 
-  const voiceDeltaRates = computeCorpusRates(deliverableRows.map((r) => r.text));
+  const voiceDeltaRates = await computeCorpusRates(deliverableRows.map((r) => r.text));
 
   return {
     generatedAt: config.generatedAt,

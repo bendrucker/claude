@@ -31,7 +31,7 @@ export interface VoiceDeltaFeature {
   source: string;
   // Compute the feature rate from raw text. Rates are per-1000 words unless
   // isFraction is true. Returns 0 when no content is present.
-  compute: (text: string) => number;
+  compute: (text: string) => number | Promise<number>;
   format?: (rate: number) => string;
   // When true, the rate is a fraction (0–1) rather than per-1000 words.
   isFraction?: boolean;
@@ -289,10 +289,10 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
     provenance: "skill-prescribed",
     source:
       'SKILL.md Word Choice: name the positive term first ("a no-op", "unchanged"), then verb negation when the negation is the point',
-    compute: (text) => {
+    compute: async (text) => {
       const stripped = stripCode(text);
-      const noForm = noNegationHits(stripped).count;
-      const notForm = notNegationHits(stripped).count;
+      const noForm = (await noNegationHits(stripped)).count;
+      const notForm = (await notNegationHits(stripped)).count;
       if (noForm + notForm === 0) return 0;
       return noForm / (noForm + notForm);
     },
@@ -305,10 +305,11 @@ export const VOICE_DELTA_FEATURES: VoiceDeltaFeature[] = [
     provenance: "skill-prescribed",
     source:
       'SKILL.md Word Choice: name the positive term first ("a no-op", "unchanged"), then verb negation when the negation is the point',
-    compute: (text) => {
+    compute: async (text) => {
       const stripped = stripCode(text);
       const words = strippedWordCount(stripped);
-      return per1k(noNegationHits(stripped).count + notNegationHits(stripped).count, words);
+      const [no, not] = await Promise.all([noNegationHits(stripped), notNegationHits(stripped)]);
+      return per1k(no.count + not.count, words);
     },
   },
   {
@@ -520,13 +521,18 @@ export interface FeatureRate {
 
 // The register check applies to single-document scoring only. Corpus
 // aggregation runs over all documents regardless of individual length.
-export function computeCorpusRates(texts: string[]): Map<string, FeatureRate> {
+export async function computeCorpusRates(texts: string[]): Promise<Map<string, FeatureRate>> {
   const sums = new Map<string, number>();
   const counts = new Map<string, number>();
 
-  for (const text of texts) {
-    for (const feature of VOICE_DELTA_FEATURES) {
-      const rate = feature.compute(text);
+  const perText = await Promise.all(
+    texts.map((text) =>
+      Promise.all(VOICE_DELTA_FEATURES.map(async (feature) => feature.compute(text))),
+    ),
+  );
+  for (const rates of perText) {
+    for (const [index, feature] of VOICE_DELTA_FEATURES.entries()) {
+      const rate = rates[index] ?? 0;
       sums.set(feature.id, (sums.get(feature.id) ?? 0) + rate);
       counts.set(feature.id, (counts.get(feature.id) ?? 0) + 1);
     }

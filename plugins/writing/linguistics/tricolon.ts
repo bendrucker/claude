@@ -23,9 +23,8 @@ const TRICOLON_DISTANCE_THRESHOLD = 0.35;
 const SHAPE_NEUTRAL_TAGS: ReadonlySet<CoarseTag> = new Set(["DET", "PUNCT", "NUM"]);
 
 /** Coarse POS shape of a sentence with shape-neutral tags removed. */
-export function tagShape(sentence: string): CoarseTag[] {
-  return compromiseTagger
-    .tag(sentence)
+export async function tagShape(sentence: string): Promise<CoarseTag[]> {
+  return (await compromiseTagger.tag(sentence))
     .flatMap((tagged) => tagged.tokens)
     .map((token) => token.tag)
     .filter((tag) => !SHAPE_NEUTRAL_TAGS.has(tag));
@@ -60,10 +59,10 @@ function isParallelTriple(a: CoarseTag[], b: CoarseTag[], c: CoarseTag[]): boole
   );
 }
 
-export function tricolonHits(text: string): Hits {
+export async function tricolonHits(text: string): Promise<Hits> {
   const sentences = splitSentences(text);
   if (sentences.length < 3) return { count: 0, sample: "" };
-  const shapes = sentences.map(tagShape);
+  const shapes = await Promise.all(sentences.map(tagShape));
   for (let i = 0; i + 2 < sentences.length; i++) {
     const [a, b, c] = [shapes[i], shapes[i + 1], shapes[i + 2]];
     if (!a || !b || !c) continue;

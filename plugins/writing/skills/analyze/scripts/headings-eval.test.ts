@@ -68,8 +68,8 @@ describe("evaluateClassifiers", () => {
   const baseline = fake("baseline", (h) => h.includes("is"));
   const candidate = fake("candidate", (h) => h.includes("is") || h.startsWith("Run"));
 
-  it("computes flag rate and agreement against the first classifier", () => {
-    const { stats, disagreements } = evaluateClassifiers(headings, [baseline, candidate]);
+  it("computes flag rate and agreement against the first classifier", async () => {
+    const { stats, disagreements } = await evaluateClassifiers(headings, [baseline, candidate]);
     expect(stats[0]).toEqual({
       name: "baseline",
       flags: 1,
@@ -172,14 +172,14 @@ describe("formatPowerReport", () => {
 });
 
 describe("scoreAgainstLabels", () => {
-  it("computes precision and recall", () => {
+  it("computes precision and recall", async () => {
     const labeled = [
       { heading: "Latency is High", label: "clause" as const, source: "random" as const },
       { heading: "Cache Layer", label: "noun-phrase" as const, source: "random" as const },
       { heading: "Run the Migration", label: "imperative" as const, source: "random" as const },
     ];
     const classifier = fake("candidate", (h) => h.includes("is") || h.includes("Cache"));
-    const [score] = scoreAgainstLabels(labeled, [classifier]);
+    const [score] = await scoreAgainstLabels(labeled, [classifier]);
     expect(score?.tp).toBe(1);
     expect(score?.fp).toBe(1);
     expect(score?.fn).toBe(1);

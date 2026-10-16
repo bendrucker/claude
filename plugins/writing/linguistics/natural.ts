@@ -17,7 +17,7 @@ const tokenizer = new natural.WordTokenizer();
 
 export const naturalTagger: Tagger = {
   name: "natural",
-  tag(text: string): TaggedSentence[] {
+  tag(text: string): Promise<TaggedSentence[]> {
     const words = tokenizer.tokenize(text);
     const tokens = brill.tag(words).taggedWords.map((tagged) => {
       const normal = tagged.token.toLowerCase();
@@ -34,6 +34,6 @@ export const naturalTagger: Tagger = {
         finite,
       };
     });
-    return [{ text, tokens }];
+    return Promise.resolve([{ text, tokens }]);
   },
 };

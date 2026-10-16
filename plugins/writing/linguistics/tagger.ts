@@ -7,5 +7,5 @@ export interface Tagger {
    * treat the whole input as one sentence, which is correct for
    * heading-sized inputs.
    */
-  tag(text: string): TaggedSentence[];
+  tag(text: string): Promise<TaggedSentence[]>;
 }

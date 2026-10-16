@@ -71,24 +71,26 @@ describe("noNegationHits", () => {
     "The trace lists a path no worker took twice.",
   ];
 
-  it.each(flag)('flags: "%s"', (text) => {
-    expect(noNegationHits(text).count).toBe(1);
+  it.each(flag)('flags: "%s"', async (text) => {
+    expect((await noNegationHits(text)).count).toBe(1);
   });
 
-  it.each(allow)('allows: "%s"', (text) => {
-    expect(noNegationHits(text).count).toBe(0);
+  it.each(allow)('allows: "%s"', async (text) => {
+    expect((await noNegationHits(text)).count).toBe(0);
   });
 
-  it("reads a hyphenated head after no as a determiner, not as no one", () => {
-    expect(noNegationHits("Losing means no one-shot path.").sample).toBe("means no one-shot");
+  it("reads a hyphenated head after no as a determiner, not as no one", async () => {
+    expect((await noNegationHits("Losing means no one-shot path.")).sample).toBe(
+      "means no one-shot",
+    );
   });
 
-  it("counts every construction in a sentence and samples the first", () => {
+  it("counts every construction in a sentence and samples the first", async () => {
     const text = "The change adds none, and the request returns nothing on a miss.";
-    expect(noNegationHits(text)).toEqual({ count: 2, sample: "adds none" });
+    expect(await noNegationHits(text)).toEqual({ count: 2, sample: "adds none" });
   });
 
-  it("reports the samples in a paragraph mixing every case", () => {
+  it("reports the samples in a paragraph mixing every case", async () => {
     const paragraph = [
       "The tooltip surface holds no controls, and the fallbacks have none.",
       "Spaces past the ninth cost no call, so the router needs neither.",
@@ -97,23 +99,23 @@ describe("noNegationHits", () => {
       "There is no lock on the guard, and it doesn't add anything the default lacks.",
       "The migration left nothing behind, which leaves no one to page.",
     ].join(" ");
-    expect(noNegationSpans(paragraph).map((span) => span.matched)).toMatchSnapshot();
+    expect((await noNegationSpans(paragraph)).map((span) => span.matched)).toMatchSnapshot();
   });
 
-  it("reports one scan result per construction", () => {
+  it("reports one scan result per construction", async () => {
     const text = "The wrapper adds nothing, holds no controls, and leaves no one to page.";
-    const categories = scanAll(text, "notes.md").map((result) => result.category);
+    const categories = (await scanAll(text, "notes.md")).map((result) => result.category);
     expect(categories.filter((category) => category === "no-negation")).toHaveLength(3);
   });
 
-  it("never flags an excluded governing word", () => {
-    hegel.test((tc) => {
+  it("never flags an excluded governing word", async () => {
+    await hegel.testAsync(async (tc) => {
       const governor = tc.draw(gs.sampledFrom([...EXCLUDED_GOVERNORS]));
       const indefinite = tc.draw(
         gs.sampledFrom(["no", "none", "nothing", "nobody", "nowhere", "neither", "no one"]),
       );
       const head = tc.draw(gs.sampledFrom(["controls", "trace", "flag", "entry", "call"]));
-      expect(noNegationHits(`The router ${governor} ${indefinite} ${head}.`).count).toBe(0);
+      expect((await noNegationHits(`The router ${governor} ${indefinite} ${head}.`)).count).toBe(0);
     });
   });
 });
@@ -142,12 +144,12 @@ describe("notNegationHits", () => {
     "It is not clear whether anyone will run it.",
   ];
 
-  it.each(flag)('flags: "%s"', (text) => {
-    expect(notNegationHits(text).count).toBe(1);
+  it.each(flag)('flags: "%s"', async (text) => {
+    expect((await notNegationHits(text)).count).toBe(1);
   });
 
-  it.each(allow)('allows: "%s"', (text) => {
-    expect(notNegationHits(text).count).toBe(0);
+  it.each(allow)('allows: "%s"', async (text) => {
+    expect((await notNegationHits(text)).count).toBe(0);
   });
 });
 

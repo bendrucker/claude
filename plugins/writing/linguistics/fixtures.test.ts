@@ -31,13 +31,16 @@ describe("sentence-heading false-positive ceiling", () => {
   // known number of these negatives today. This is recorded, not gated;
   // promotion of a candidate into the hook would require driving these to
   // zero, and a change here flags drift without failing CI.
-  it("records candidate false positives on the negatives", () => {
+  it("records candidate false positives on the negatives", async () => {
     const counts = Object.fromEntries(
-      CLASSIFIERS.map((classifier) => [
-        classifier.name,
-        sentenceHeadingNegatives.filter(({ heading }) => classifier.classify(heading).flagged)
-          .length,
-      ]),
+      await Promise.all(
+        CLASSIFIERS.map(async (classifier) => {
+          const verdicts = await Promise.all(
+            sentenceHeadingNegatives.map(async ({ heading }) => classifier.classify(heading)),
+          );
+          return [classifier.name, verdicts.filter((verdict) => verdict.flagged).length] as const;
+        }),
+      ),
     );
     expect(counts).toEqual({
       baseline: 0,

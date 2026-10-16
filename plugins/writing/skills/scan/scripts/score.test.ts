@@ -16,30 +16,30 @@ function category(report: Awaited<ReturnType<typeof buildReport>>, group: string
 }
 
 describe("scoreText", () => {
-  it("counts word tokens over stripped code", () => {
+  it("counts word tokens over stripped code", async () => {
     const text = "The function reads input. `ignored code here`";
-    const score = scoreText(text, undefined);
+    const score = await scoreText(text, undefined);
     expect(score.wordCount).toBe(4);
   });
 
-  it("reports density as hits per 1000 words", () => {
+  it("reports density as hits per 1000 words", async () => {
     // One em dash in a 1000-word body lands at density 1.0.
     const filler = `${"word ".repeat(998)}a — b`;
-    const score = scoreText(filler, "doc.md");
+    const score = await scoreText(filler, "doc.md");
     expect(score.wordCount).toBe(1000);
     const emDash = score.categories.find((c) => c.category === "spaced em dash");
     expect(emDash?.hits).toBe(1);
     expect(emDash?.density).toBeCloseTo(1.0, 5);
   });
 
-  it("returns no categories for clean prose", () => {
-    const score = scoreText("The function reads input and writes output.", undefined);
+  it("returns no categories for clean prose", async () => {
+    const score = await scoreText("The function reads input and writes output.", undefined);
     expect(score.categories).toHaveLength(0);
   });
 
-  it("scores a custom vocabulary pass when given a matcher", () => {
+  it("scores a custom vocabulary pass when given a matcher", async () => {
     const match = compileStemmedWordlist("widget\n");
-    const score = scoreText("The widget powers the widgets.", undefined, match);
+    const score = await scoreText("The widget powers the widgets.", undefined, match);
     const custom = score.categories.find((c) => c.category === "custom vocabulary");
     expect(custom?.hits).toBe(2);
   });
@@ -139,13 +139,13 @@ describe("renderVoiceDeltaTable", () => {
     { name: "missing baseline still renders rates", text: inRegisterText, profile: null },
   ];
 
-  it.each(cases)("$name", ({ text, profile }) => {
-    expect(renderVoiceDeltaTable(text, profile)).toMatchSnapshot();
+  it.each(cases)("$name", async ({ text, profile }) => {
+    expect(await renderVoiceDeltaTable(text, profile)).toMatchSnapshot();
   });
 
-  it("omits the baseline column when the comparison is skipped or unavailable", () => {
-    expect(renderVoiceDeltaTable("Too short.", fixtureProfile)).not.toContain("Baseline");
-    expect(renderVoiceDeltaTable(inRegisterText, null)).not.toContain("Baseline");
+  it("omits the baseline column when the comparison is skipped or unavailable", async () => {
+    expect(await renderVoiceDeltaTable("Too short.", fixtureProfile)).not.toContain("Baseline");
+    expect(await renderVoiceDeltaTable(inRegisterText, null)).not.toContain("Baseline");
   });
 });
 
@@ -182,30 +182,32 @@ const gatedStatistics: WritingStatistics = {
 };
 
 describe("renderVoiceDeltaTable with null floors", () => {
-  it("adds a verdict per feature and names the bands a delta failed", () => {
+  it("adds a verdict per feature and names the bands a delta failed", async () => {
     expect(
-      renderVoiceDeltaTable(inRegisterText, fixtureProfile, gatedStatistics),
+      await renderVoiceDeltaTable(inRegisterText, fixtureProfile, gatedStatistics),
     ).toMatchSnapshot();
   });
 
-  it("holds the verdict column back without a baseline to gate", () => {
-    expect(renderVoiceDeltaTable(inRegisterText, null, gatedStatistics)).not.toContain("Null");
-    expect(renderVoiceDeltaTable("Too short.", fixtureProfile, gatedStatistics)).not.toContain(
-      "Null floor:",
+  it("holds the verdict column back without a baseline to gate", async () => {
+    expect(await renderVoiceDeltaTable(inRegisterText, null, gatedStatistics)).not.toContain(
+      "Null",
     );
+    expect(
+      await renderVoiceDeltaTable("Too short.", fixtureProfile, gatedStatistics),
+    ).not.toContain("Null floor:");
   });
 
-  it("holds it back when no null has been measured", () => {
+  it("holds it back when no null has been measured", async () => {
     const empty = { generatedAt: "2026-01-01T00:00:00.000Z", rateNulls: { runs: [] } };
-    expect(renderVoiceDeltaTable(inRegisterText, fixtureProfile, empty)).toBe(
-      renderVoiceDeltaTable(inRegisterText, fixtureProfile),
+    expect(await renderVoiceDeltaTable(inRegisterText, fixtureProfile, empty)).toBe(
+      await renderVoiceDeltaTable(inRegisterText, fixtureProfile),
     );
   });
 
   // A band rebuilt before a feature existed carries no floor for it. Reading
   // the one run that does cover it as `clears` would certify a gap against the
   // length confound the banding exists to rule out.
-  it("withholds clears from a feature a stored band never measured", () => {
+  it("withholds clears from a feature a stored band never measured", async () => {
     const partial: WritingStatistics = {
       generatedAt: "2026-01-01T00:00:00.000Z",
       rateNulls: {
@@ -232,7 +234,7 @@ describe("renderVoiceDeltaTable with null floors", () => {
         ],
       },
     };
-    const rendered = renderVoiceDeltaTable(inRegisterText, fixtureProfile, partial);
+    const rendered = await renderVoiceDeltaTable(inRegisterText, fixtureProfile, partial);
     expect(rendered).toContain("partial");
     expect(rendered).toContain("No floor covers these features in every band");
     expect(rendered).toContain("100-400 word band");
@@ -252,18 +254,18 @@ describe("renderSignatureTable", () => {
     },
   };
 
-  it("reads the document's hit share against the two corpus shares", () => {
+  it("reads the document's hit share against the two corpus shares", async () => {
     expect(
-      renderSignatureTable("The flag is removed after the rollout.", signed),
+      await renderSignatureTable("The flag is removed after the rollout.", signed),
     ).toMatchSnapshot();
   });
 
-  it("says so when the document offers no n-grams to match", () => {
-    expect(renderSignatureTable("Yes.", signed)).toContain("no tag 3-grams");
+  it("says so when the document offers no n-grams to match", async () => {
+    expect(await renderSignatureTable("Yes.", signed)).toContain("no tag 3-grams");
   });
 
-  it("renders nothing until the signatures have been mined", () => {
-    expect(renderSignatureTable(inRegisterText, null)).toBeNull();
+  it("renders nothing until the signatures have been mined", async () => {
+    expect(await renderSignatureTable(inRegisterText, null)).toBeNull();
     const none = {
       generatedAt: "2026-01-01T00:00:00.000Z",
       tagSignatures: {
@@ -275,6 +277,6 @@ describe("renderSignatureTable", () => {
         shapes: [],
       },
     };
-    expect(renderSignatureTable(inRegisterText, none)).toBeNull();
+    expect(await renderSignatureTable(inRegisterText, none)).toBeNull();
   });
 });

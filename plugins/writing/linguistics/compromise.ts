@@ -69,28 +69,11 @@ function tenseOf(tags: string[]): Tense | undefined {
   return undefined;
 }
 
-// Loading compromise costs the writing PreToolUse hook ~100ms on every call,
-// and most calls never tag. `tag` is synchronous, so the load is a `require`.
-let nlp: typeof Nlp | undefined;
+export type TagText = (text: string) => TaggedSentence[];
 
-function isNlp(value: unknown): value is typeof Nlp {
-  return typeof value === "function";
-}
-
-function load(): typeof Nlp {
-  if (nlp === undefined) {
-    const loaded: unknown = require("compromise");
-    if (!isNlp(loaded)) throw new Error("compromise did not export a function");
-    nlp = loaded;
-  }
-  return nlp;
-}
-
-export const compromiseTagger: Tagger = {
-  name: "compromise",
-  tag(text: string): TaggedSentence[] {
-    const sentences = CompromiseSentences.parse(load()(text).json({ offset: true }));
-    return sentences.map((sentence) => ({
+function tagWith(nlp: typeof Nlp): TagText {
+  return (text) =>
+    CompromiseSentences.parse(nlp(text).json({ offset: true })).map((sentence) => ({
       text: sentence.text,
       tokens: sentence.terms.map((term) => ({
         text: term.text,
@@ -104,5 +87,20 @@ export const compromiseTagger: Tagger = {
         ...mapTerm(term),
       })),
     }));
+}
+
+// Loading compromise costs the writing PreToolUse hook ~100ms, and most calls
+// never tag. Corpus scripts await this once and tag sentence by sentence.
+let loading: Promise<TagText> | undefined;
+
+export function loadCompromise(): Promise<TagText> {
+  loading ??= import("compromise").then(({ default: nlp }) => tagWith(nlp));
+  return loading;
+}
+
+export const compromiseTagger: Tagger = {
+  name: "compromise",
+  async tag(text) {
+    return (await loadCompromise())(text);
   },
 };

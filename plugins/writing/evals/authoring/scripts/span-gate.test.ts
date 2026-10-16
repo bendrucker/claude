@@ -98,32 +98,34 @@ describe("precisionPool", () => {
 });
 
 describe("indexedScan", () => {
-  test("reports char offsets for a plain regex rule", () => {
+  test("reports char offsets for a plain regex rule", async () => {
     const rule: Rule = { kind: "regex", category: "em dash", test: / — /g };
-    expect(indexedScan("one — two", rule)).toEqual([{ category: "em dash", start: 3, end: 6 }]);
+    expect(await indexedScan("one — two", rule)).toEqual([
+      { category: "em dash", start: 3, end: 6 },
+    ]);
   });
 
-  test("offsets survive fenced code, since stripCode blanks it in place", () => {
+  test("offsets survive fenced code, since stripCode blanks it in place", async () => {
     const rule: Rule = { kind: "regex", category: "em dash", test: / — /g };
     const text = "```\na — b\n```\nc — d";
-    const hits = indexedScan(text, rule);
+    const hits = await indexedScan(text, rule);
     expect(hits).toEqual([{ category: "em dash", start: 15, end: 18 }]);
     expect(text.slice(15, 18)).toBe(" — ");
   });
 
-  test("a wordlist rule matches stemmed word tokens", () => {
+  test("a wordlist rule matches stemmed word tokens", async () => {
     const rule = wordlistRule("candidate vocab", "delve\n");
-    expect(indexedScan("Let's delve into the details.", rule)).toEqual([
+    expect(await indexedScan("Let's delve into the details.", rule)).toEqual([
       { category: "candidate vocab", start: 6, end: 11 },
     ]);
   });
 
-  test("the shipped catalog includes the AI vocabulary list", () => {
+  test("the shipped catalog includes the AI vocabulary list", async () => {
     const rules = catalogRules();
     const vocabulary = rules.find((r) => r.category === "AI vocabulary");
     expect(vocabulary).toBeDefined();
     if (!vocabulary) return;
-    expect(indexedScan("Let's delve into this.", vocabulary).length).toBeGreaterThan(0);
+    expect((await indexedScan("Let's delve into this.", vocabulary)).length).toBeGreaterThan(0);
   });
 });
 
@@ -133,8 +135,8 @@ describe("unionScan", () => {
   test.each<{ name: string; rules: Rule[] }>([
     { name: "one rule", rules: [rule] },
     { name: "the same rule twice", rules: [rule, rule] },
-  ])("counts each hit once: $name", ({ rules }) => {
-    expect(unionScan("a — b — c", rules)).toHaveLength(2);
+  ])("counts each hit once: $name", async ({ rules }) => {
+    expect(await unionScan("a — b — c", rules)).toHaveLength(2);
   });
 });
 
@@ -169,37 +171,37 @@ describe("scoreRules and scoreCatalog", () => {
   const labels = [label("p1", "b", [span("a", 3, 8, "critical")]), label("p2", "b", [])];
   const rule: Rule = { kind: "regex", category: "delve", test: /delve/gi };
 
-  test("recall counts a defect span the rule overlaps, on either draft", () => {
-    const score = scoreRules([rule], pairs, labels);
+  test("recall counts a defect span the rule overlaps, on either draft", async () => {
+    const score = await scoreRules([rule], pairs, labels);
     expect(score).toMatchObject({ recallHits: 1, totalDefects: 1 });
   });
 
-  test("precision is scored only on the drafts Ben preferred", () => {
-    const score = scoreRules([rule], pairs, labels);
+  test("precision is scored only on the drafts Ben preferred", async () => {
+    const score = await scoreRules([rule], pairs, labels);
     expect(score).toMatchObject({ flagged: 1, confirmed: 0, precision: 0 });
   });
 
-  test("scoreCatalog sorts rules by recall and marks under-flagged rules unjudged", () => {
-    const reports = scoreCatalog([rule], pairs, labels, 10);
+  test("scoreCatalog sorts rules by recall and marks under-flagged rules unjudged", async () => {
+    const reports = await scoreCatalog([rule], pairs, labels, 10);
     expect(reports).toHaveLength(1);
     expect(reports[0]).toMatchObject({ rule: "delve", judged: false });
   });
 });
 
 describe("scoreBaseline", () => {
-  test("passes when the candidate recalls more without losing the precision floor", () => {
+  test("passes when the candidate recalls more without losing the precision floor", async () => {
     const pairs = new Map([["p1", pair("p1", "We delve often.", "A plain and clear line.")]]);
     const labels = [label("p1", "b", [span("a", 3, 8, "critical")])];
     const shipped: Rule[] = [{ kind: "regex", category: "em dash", test: / — /g }];
     const candidate: Rule[] = [{ kind: "regex", category: "delve", test: /delve/gi }];
-    const verdict = scoreBaseline(shipped, candidate, pairs, labels);
+    const verdict = await scoreBaseline(shipped, candidate, pairs, labels);
     expect(verdict).toMatchObject({ recallRises: true, pass: true });
   });
 });
 
 describe("rendering", () => {
-  test("renderReport includes the too few to judge floor", () => {
-    const reports = scoreCatalog(
+  test("renderReport includes the too few to judge floor", async () => {
+    const reports = await scoreCatalog(
       [{ kind: "regex", category: "delve", test: /delve/gi }],
       new Map([["p1", pair("p1", "We delve often.", "Plain text here.")]]),
       [label("p1", "b", [span("a", 3, 8, "critical")])],
@@ -210,10 +212,10 @@ describe("rendering", () => {
     expect(text).toContain("delve");
   });
 
-  test("renderBaseline reports the gate verdict", () => {
+  test("renderBaseline reports the gate verdict", async () => {
     const pairs = new Map([["p1", pair("p1", "We delve often.", "A plain and clear line.")]]);
     const labels = [label("p1", "b", [span("a", 3, 8, "critical")])];
-    const verdict = scoreBaseline(
+    const verdict = await scoreBaseline(
       [{ kind: "regex", category: "em dash", test: / — /g }],
       [{ kind: "regex", category: "delve", test: /delve/gi }],
       pairs,

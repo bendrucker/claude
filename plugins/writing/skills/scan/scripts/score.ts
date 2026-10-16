@@ -13,7 +13,7 @@ import {
   type WritingStatistics,
 } from "../../analyze/scripts/statistics";
 import { cleanText, splitSentences } from "../../analyze/scripts/ngram";
-import { matchShapes } from "../../analyze/scripts/tag-ngram";
+import { loadTagSequence, matchShapes } from "../../analyze/scripts/tag-ngram";
 import { checkRegister, VOICE_DELTA_FEATURES } from "../../analyze/scripts/voice-delta";
 import type { VoiceProfile } from "../../analyze/scripts/voice-profile";
 
@@ -46,13 +46,13 @@ function density(hits: number, wordCount: number): number {
   return hits / (wordCount / 1000);
 }
 
-function categoryScores(
+async function categoryScores(
   text: string,
   filePath: string | undefined,
   wordCount: number,
-): CategoryScore[] {
+): Promise<CategoryScore[]> {
   const counts = new Map<string, number>();
-  for (const result of scanAll(text, filePath)) {
+  for (const result of await scanAll(text, filePath)) {
     counts.set(result.category, (counts.get(result.category) ?? 0) + 1);
   }
   return [...counts.entries()].map(([category, hits]) => ({
@@ -71,13 +71,13 @@ function customVocabularyScore(
   return { category: CUSTOM_VOCABULARY, hits, density: density(hits, wordCount) };
 }
 
-export function scoreText(
+export async function scoreText(
   text: string,
   filePath: string | undefined,
   customMatch?: (text: string) => { count: number },
-): GroupScore {
+): Promise<GroupScore> {
   const wordCount = countWords(stripCode(text));
-  const categories = categoryScores(text, filePath, wordCount);
+  const categories = await categoryScores(text, filePath, wordCount);
   if (customMatch) {
     categories.push(customVocabularyScore(text, customMatch, wordCount));
   }
@@ -92,7 +92,7 @@ export async function scoreComments(
   const comments = await extractComments(text, filePath);
   if (comments.trim().length === 0) return undefined;
   // Score comments as prose so prose-only patterns apply to them.
-  return { ...scoreText(comments, undefined, customMatch), group: "comments" };
+  return { ...(await scoreText(comments, undefined, customMatch)), group: "comments" };
 }
 
 // Whether to extract and score code comments as a separate group. Prose files
@@ -115,7 +115,7 @@ export async function buildReport(
   filePath: string | undefined,
   options: ReportOptions,
 ): Promise<ScoreReport> {
-  const groups: GroupScore[] = [scoreText(text, filePath, options.customMatch)];
+  const groups: GroupScore[] = [await scoreText(text, filePath, options.customMatch)];
   if (options.comments && filePath !== undefined) {
     const comments = await scoreComments(text, filePath, options.customMatch);
     if (comments) groups.push(comments);
@@ -159,11 +159,11 @@ export async function loadCustomMatch(
 // the permutation null each feature's corpus gap was measured against, which
 // separates the features whose delta means something from the ones a
 // same-corpus split reaches on its own.
-export function renderVoiceDeltaTable(
+export async function renderVoiceDeltaTable(
   text: string,
   profile: VoiceProfile | null,
   statistics: WritingStatistics | null = null,
-): string {
+): Promise<string> {
   const register = checkRegister(text);
   const baseline = profile?.voiceDelta ?? null;
 
@@ -189,8 +189,11 @@ export function renderVoiceDeltaTable(
   const rows: string[][] = [];
   const noise: { feature: (typeof VOICE_DELTA_FEATURES)[number]; failed: string[] }[] = [];
   const partial: { feature: (typeof VOICE_DELTA_FEATURES)[number]; failed: string[] }[] = [];
-  for (const feature of VOICE_DELTA_FEATURES) {
-    const rate = feature.compute(text);
+  const rates = await Promise.all(
+    VOICE_DELTA_FEATURES.map(async (feature) => feature.compute(text)),
+  );
+  for (const [index, feature] of VOICE_DELTA_FEATURES.entries()) {
+    const rate = rates[index] ?? 0;
     const fmt = feature.format ?? ((r: number) => r.toFixed(2));
     const rateStr = fmt(rate);
 
@@ -263,10 +266,10 @@ function share(value: number): string {
 // split of that corpus against itself. One occurrence decides nothing, so the
 // reportable number is the share of the document's tag n-grams landing on a
 // confirmed shape, read against the two corpus shares.
-export function renderSignatureTable(
+export async function renderSignatureTable(
   text: string,
   statistics: WritingStatistics | null,
-): string | null {
+): Promise<string | null> {
   const signatures = statistics?.tagSignatures;
   if (signatures === undefined || signatures.shapes.length === 0) return null;
 
@@ -275,7 +278,12 @@ export function renderSignatureTable(
   // which drop URLs, headings, tables, and identifiers and end a window at a
   // newline. A document tagged any other way reports its hits against a
   // different denominator, so the comparison has to run the same pipeline.
-  const match = matchShapes([...splitSentences(cleanText(text))], signatures.sizes, shapes);
+  const match = matchShapes(
+    [...splitSentences(cleanText(text))],
+    signatures.sizes,
+    shapes,
+    await loadTagSequence(),
+  );
   const lines = ["Corpus Signatures"];
 
   if (match.total === 0) {

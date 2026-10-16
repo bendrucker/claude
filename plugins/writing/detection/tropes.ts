@@ -33,13 +33,13 @@ export interface PatternDef {
   tier: PatternTier;
   layer: DetectorLayer;
   category: string;
-  test: RegExp | ((text: string) => Hits);
+  test: RegExp | ((text: string) => Hits | Promise<Hits>);
   /**
    * Per-instance spans for the scan surface. A function `test` reports one
    * Hits sample, which collapses a detector that flags many independent
    * instances to a single scan result. Such a detector supplies this too.
    */
-  spans?: (text: string) => PatternSpan[];
+  spans?: (text: string) => PatternSpan[] | Promise<PatternSpan[]>;
   message: (matched: string) => string;
   fileOnly?: boolean;
   sideEffectOnly?: boolean;
@@ -1274,7 +1274,7 @@ export function stripCode(text: string): string {
     .replace(INLINE_CODE, (code) => " ".repeat(code.length));
 }
 
-function patternHits(stripped: string, def: PatternDef): Hits {
+async function patternHits(stripped: string, def: PatternDef): Promise<Hits> {
   if (typeof def.test === "function") {
     return def.test(stripped);
   }
@@ -1283,13 +1283,17 @@ function patternHits(stripped: string, def: PatternDef): Hits {
   return { count: all?.length ?? 0, sample: all?.[0] ?? "" };
 }
 
-export function scan(text: string, filePath?: string, context?: ScanContext): PatternMatch[] {
+export function scan(
+  text: string,
+  filePath?: string,
+  context?: ScanContext,
+): Promise<PatternMatch[]> {
   return scanIntroduced(text, "", filePath, context);
 }
 
 // The batch analyze surface audits every pattern, skillOnly included. The hook
 // path through scan() skips them.
-export function scanAudit(text: string): PatternMatch[] {
+export function scanAudit(text: string): Promise<PatternMatch[]> {
   return collectMatches(text, "", undefined, undefined, true);
 }
 
@@ -1298,39 +1302,42 @@ export function scanIntroduced(
   oldText: string,
   filePath?: string,
   context?: ScanContext,
-): PatternMatch[] {
+): Promise<PatternMatch[]> {
   return collectMatches(newText, oldText, filePath, context, false);
 }
 
-function collectMatches(
+async function collectMatches(
   newText: string,
   oldText: string,
   filePath: string | undefined,
   context: ScanContext | undefined,
   includeSkillOnly: boolean,
-): PatternMatch[] {
+): Promise<PatternMatch[]> {
   const newStripped = stripCode(newText);
   const oldStripped = stripCode(oldText);
-  const matches: PatternMatch[] = [];
-
-  for (const def of PATTERNS) {
-    if (def.skillOnly && !includeSkillOnly) continue;
-    if (def.fileOnly && filePath != null && filePath !== "" && !isProseFile(filePath)) continue;
-    if (def.sideEffectOnly && context === "file") continue;
-
-    const newHits = patternHits(newStripped, def);
-    if (newHits.count === 0) continue;
-    const oldHits = patternHits(oldStripped, def);
-    if (newHits.count <= oldHits.count) continue;
-
-    matches.push({
-      tier: def.tier,
-      category: def.category,
-      matched: newHits.sample,
-      message: def.message(newHits.sample),
-      structural: def.structural ?? false,
-    });
-  }
+  const proseOnly = filePath != null && filePath !== "" && !isProseFile(filePath);
+  const defs = PATTERNS.filter(
+    (def) =>
+      (includeSkillOnly || !def.skillOnly) &&
+      !(def.fileOnly && proseOnly) &&
+      !(def.sideEffectOnly && context === "file"),
+  );
+  const introduced = await Promise.all(
+    defs.map(async (def): Promise<PatternMatch | undefined> => {
+      const newHits = await patternHits(newStripped, def);
+      if (newHits.count === 0) return undefined;
+      const oldHits = await patternHits(oldStripped, def);
+      if (newHits.count <= oldHits.count) return undefined;
+      return {
+        tier: def.tier,
+        category: def.category,
+        matched: newHits.sample,
+        message: def.message(newHits.sample),
+        structural: def.structural ?? false,
+      };
+    }),
+  );
+  const matches = introduced.filter((match) => match !== undefined);
 
   for (const group of WEIGHTED_PATTERNS) {
     if (group.fileOnly && filePath != null && filePath !== "" && !isProseFile(filePath)) continue;

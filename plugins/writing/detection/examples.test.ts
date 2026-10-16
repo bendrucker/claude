@@ -17,9 +17,9 @@ function labeled(texts: readonly string[]): { label: string; text: string }[] {
   return texts.map((text) => ({ label: JSON.stringify(text.slice(0, 60)), text }));
 }
 
-function hits(def: PatternDef, text: string): number {
+async function hits(def: PatternDef, text: string): Promise<number> {
   if (typeof def.test === "function") {
-    return def.test(text).count;
+    return (await def.test(text)).count;
   }
   def.test.lastIndex = 0;
   return text.match(def.test)?.length ?? 0;
@@ -32,12 +32,12 @@ describe("pattern examples", () => {
       expect(def.negatives.length).toBeGreaterThanOrEqual(2);
     });
 
-    it.each(labeled(def.positives))("matches: $label", ({ text }) => {
-      expect(hits(def, text)).toBeGreaterThan(0);
+    it.each(labeled(def.positives))("matches: $label", async ({ text }) => {
+      expect(await hits(def, text)).toBeGreaterThan(0);
     });
 
-    it.each(labeled(def.negatives))("does not match: $label", ({ text }) => {
-      expect(hits(def, text)).toBe(0);
+    it.each(labeled(def.negatives))("does not match: $label", async ({ text }) => {
+      expect(await hits(def, text)).toBe(0);
     });
   });
 

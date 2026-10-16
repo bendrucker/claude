@@ -8,8 +8,7 @@
  * wordlists. Punctuation is dropped, so this is the part-of-speech layer
  * (word types only), not syntax.
  */
-import { compromiseTagger } from "../../../linguistics/compromise";
-import type { Tagger } from "../../../linguistics/tagger";
+import { loadCompromise, type TagText } from "../../../linguistics/compromise";
 import type { LiftRow } from "./ngram";
 
 export interface TagSignatureRow extends LiftRow {
@@ -22,12 +21,17 @@ export interface TagSignatureRow extends LiftRow {
  * `tokenizeSentence`: it plugs into the same `processRows`/`processCorpus`
  * pipeline as the word tokenizer, so the lift math is shared.
  */
-export function tagSequence(sentence: string, tagger: Tagger = compromiseTagger): string[] {
-  return tagger
-    .tag(sentence)
+export function tagSequence(sentence: string, tag: TagText): string[] {
+  return tag(sentence)
     .flatMap((tagged) => tagged.tokens)
     .filter((token) => token.tag !== "PUNCT" && token.tag !== "X")
     .map((token) => token.tag);
+}
+
+/** Load compromise once and return a synchronous `tagSequence` for corpus loops. */
+export async function loadTagSequence(): Promise<(sentence: string) => string[]> {
+  const tag = await loadCompromise();
+  return (sentence) => tagSequence(sentence, tag);
 }
 
 export interface ShapeMatch {
@@ -47,7 +51,7 @@ export function matchShapes(
   sentences: string[],
   sizes: number[],
   shapes: Set<string>,
-  tag: (sentence: string) => string[] = tagSequence,
+  tag: (sentence: string) => string[],
 ): ShapeMatch {
   const counts = new Map<string, number>();
   let hits = 0;

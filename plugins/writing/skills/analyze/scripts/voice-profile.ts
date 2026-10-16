@@ -41,7 +41,10 @@ export type VoiceProfile = z.infer<typeof VoiceProfile>;
 
 export { VoiceDeltaBaseline } from "./voice-delta";
 
-export function buildProfile(docs: VoiceDocument[], generatedAt: string): VoiceProfile {
+export async function buildProfile(
+  docs: VoiceDocument[],
+  generatedAt: string,
+): Promise<VoiceProfile> {
   const ngrams = new Map<number, Map<string, number>>(PROFILE_SIZES.map((n) => [n, new Map()]));
   const stemmedNgrams = new Map<number, Map<string, number>>(
     PROFILE_SIZES.map((n) => [n, new Map()]),
@@ -63,7 +66,7 @@ export function buildProfile(docs: VoiceDocument[], generatedAt: string): VoiceP
     addNgramCounts(stemmedNgrams, stemmed);
   }
 
-  const corpusRates = computeCorpusRates(docs.map((d) => d.body));
+  const corpusRates = await computeCorpusRates(docs.map((d) => d.body));
   const voiceDelta: VoiceDeltaBaseline = {
     rates: Object.fromEntries([...corpusRates.entries()].map(([id, fr]) => [id, fr.rate])),
     documentCount: docs.length,
@@ -103,7 +106,10 @@ function serializeNgrams(
   return serialized;
 }
 
-export function buildProfileFromCorpus(corpusText: string, generatedAt: string): VoiceProfile {
+export function buildProfileFromCorpus(
+  corpusText: string,
+  generatedAt: string,
+): Promise<VoiceProfile> {
   return buildProfile(parseCorpus(corpusText), generatedAt);
 }
 
@@ -183,7 +189,7 @@ if (import.meta.main) {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const profile = buildProfileFromCorpus(await Bun.file(corpus).text(), today);
+  const profile = await buildProfileFromCorpus(await Bun.file(corpus).text(), today);
   mkdirSync(voiceBaselineDir(dataDir), { recursive: true });
   const out = profilePath(dataDir);
   await Bun.write(out, `${JSON.stringify(profile, null, 2)}\n`);

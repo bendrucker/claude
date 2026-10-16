@@ -358,11 +358,12 @@ describe("deferred dependencies", () => {
     if (run.exitCode !== 0) throw new Error(run.stderr.toString());
     const keys: unknown = JSON.parse(run.stdout.toString());
     if (!Array.isArray(keys)) throw new Error(run.stdout.toString());
-    return keys.flatMap((key) =>
+    const loaded = keys.flatMap((key) =>
       typeof key === "string" && /node_modules\/(compromise\/|shiki\/dist\/index)/.test(key)
         ? [key.includes("compromise") ? "compromise" : "shiki"]
         : [],
     );
+    return [...new Set(loaded)];
   }
 
   test.each([

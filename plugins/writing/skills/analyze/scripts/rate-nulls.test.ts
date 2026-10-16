@@ -92,14 +92,14 @@ describe("describeBand", () => {
 });
 
 describe("rateMatrix", () => {
-  test("holds one rate per document for every feature", () => {
-    const matrix = rateMatrix([doc("a", PLAIN), doc("b", HEAVY)]);
+  test("holds one rate per document for every feature", async () => {
+    const matrix = await rateMatrix([doc("a", PLAIN), doc("b", HEAVY)]);
     expect(matrix.size).toBe(VOICE_DELTA_FEATURES.length);
     for (const rates of matrix.values()) expect(rates).toHaveLength(2);
   });
 
-  test("scores the feature set it is given", () => {
-    const matrix = rateMatrix([doc("a", PLAIN)], RETIRED_FEATURES);
+  test("scores the feature set it is given", async () => {
+    const matrix = await rateMatrix([doc("a", PLAIN)], RETIRED_FEATURES);
     expect([...matrix.keys()]).toEqual(RETIRED_FEATURES.map((f) => f.id));
   });
 });
@@ -154,41 +154,46 @@ describe("percentile", () => {
 describe("featureFloors", () => {
   const uniform = Array.from({ length: 40 }, (_, index) => doc(`b${index}`, PLAIN));
 
-  test("floors a homogeneous baseline at zero, so any real gap clears", () => {
-    const floors = featureFloors([doc("a", HEAVY)], uniform, OPTIONS);
+  test("floors a homogeneous baseline at zero, so any real gap clears", async () => {
+    const floors = await featureFloors([doc("a", HEAVY)], uniform, OPTIONS);
     expect(floorOf(floors, "heading_rate").floor).toBe(0);
     expect(clearsFloor(floorOf(floors, "heading_rate"))).toBe(true);
   });
 
-  test("a study corpus matching the baseline clears nothing", () => {
-    const floors = featureFloors([doc("a", PLAIN)], uniform, OPTIONS);
+  test("a study corpus matching the baseline clears nothing", async () => {
+    const floors = await featureFloors([doc("a", PLAIN)], uniform, OPTIONS);
     expect(floorOf(floors, "heading_rate").gap).toBe(0);
     expect(clearsFloor(floorOf(floors, "heading_rate"))).toBe(false);
   });
 
-  test("a mixed baseline floors above zero", () => {
+  test("a mixed baseline floors above zero", async () => {
     const mixed = Array.from({ length: 40 }, (_, index) =>
       doc(`b${index}`, index % 2 === 0 ? PLAIN : HEAVY),
     );
     expect(
-      floorOf(featureFloors([doc("a", PLAIN)], mixed, OPTIONS), "heading_rate").floor ?? 0,
+      floorOf(await featureFloors([doc("a", PLAIN)], mixed, OPTIONS), "heading_rate").floor ?? 0,
     ).toBeGreaterThan(0);
   });
 
-  test("reports no floor when the baseline is too small to split", () => {
-    const floor = floorOf(featureFloors([doc("a", PLAIN)], [doc("b", PLAIN)], OPTIONS), "url_rate");
+  test("reports no floor when the baseline is too small to split", async () => {
+    const floor = floorOf(
+      await featureFloors([doc("a", PLAIN)], [doc("b", PLAIN)], OPTIONS),
+      "url_rate",
+    );
     expect(floor.floor).toBeNull();
     expect(floor.unfloored).toContain("fewer than");
   });
 
-  test("is reproducible for one seed", () => {
+  test("is reproducible for one seed", async () => {
     const mixed = Array.from({ length: 30 }, (_, index) =>
       doc(`b${index}`, index % 3 === 0 ? PLAIN : HEAVY),
     );
-    const run = (seed: number): (number | null)[] =>
-      featureFloors([doc("a", PLAIN)], mixed, { ...OPTIONS, seed }).map((floor) => floor.floor);
-    expect(run(5)).toEqual(run(5));
-    expect(run(5)).not.toEqual(run(6));
+    const run = async (seed: number): Promise<(number | null)[]> =>
+      (await featureFloors([doc("a", PLAIN)], mixed, { ...OPTIONS, seed })).map(
+        (floor) => floor.floor,
+      );
+    expect(await run(5)).toEqual(await run(5));
+    expect(await run(5)).not.toEqual(await run(6));
   });
 });
 

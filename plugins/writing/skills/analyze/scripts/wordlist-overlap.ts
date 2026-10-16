@@ -65,9 +65,9 @@ function matchesWordlist(term: string): boolean {
   return false;
 }
 
-export function coverageOf(term: string, example: string): Coverage {
-  const onTerm = scanAudit(term);
-  const onSentence = example === "" ? [] : scanAudit(example);
+export async function coverageOf(term: string, example: string): Promise<Coverage> {
+  const onTerm = await scanAudit(term);
+  const onSentence = example === "" ? [] : await scanAudit(example);
   return {
     wordlist: matchesWordlist(term),
     lexical: onTerm.some((match) => LAYER_BY_CATEGORY.get(match.category) === "vocabulary"),
@@ -263,10 +263,11 @@ if (import.meta.main) {
 
   const { prior, minCount, minDocs } = argv.flags;
   const ranked = rank(a, b, { sizes, prior, minCount, minDocs });
-  const measured: MeasuredTerm[] = ranked.slice(0, argv.flags.top).map((row) => ({
-    row,
-    coverage: coverageOf(row.term, row.example),
-  }));
+  const measured: MeasuredTerm[] = await Promise.all(
+    ranked
+      .slice(0, argv.flags.top)
+      .map(async (row) => ({ row, coverage: await coverageOf(row.term, row.example) })),
+  );
 
   const nullOptions = { sizes, prior, minCount, minDocs };
   const kindFloors = nullFloorByKind(study.documents, nullOptions);

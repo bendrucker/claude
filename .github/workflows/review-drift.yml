@@ -22,10 +22,7 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
-      - name: Install Claude Code
-        run: |
-          .github/actions/claude-code/install.sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - uses: ./.github/actions/claude-code
 
       - name: Check upstream code-review drift
         id: drift

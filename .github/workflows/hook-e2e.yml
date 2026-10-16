@@ -21,15 +21,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Install Claude Code CLI
-        id: cli
-        background: true
-        run: .github/actions/claude-code/install.sh
+      - uses: ./.github/actions/claude-code
 
       - uses: ./.github/actions/bun-install
-
-      - name: Wait for CLI
-        wait: cli
 
       - name: Run hook E2E tests
         run: |

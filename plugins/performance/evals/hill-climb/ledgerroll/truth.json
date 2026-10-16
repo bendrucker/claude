@@ -1,0 +1,80 @@
+{
+  "profile": "repo/profile.txt",
+  "items": [
+    {
+      "id": "decode-map",
+      "label": "win",
+      "gain": 0.11,
+      "profile_entry": "encoding/json.Unmarshal 0.66s 11.00% cum (decodeState.object, literalInterface, mapassign_faststr)",
+      "note": "decodeRecord unmarshals every line into map[string]any and type-asserts fields out of it. Decoding into a typed struct drops the map inserts and interface boxing.",
+      "patterns": [
+        "Unmarshal",
+        "decodeState",
+        "map\\[string\\](any|interface)",
+        "decodeRecord",
+        "typed struct"
+      ]
+    },
+    {
+      "id": "resort",
+      "label": "win",
+      "gain": 0.1,
+      "profile_entry": "sort.Slice 0.60s 10.00% cum (pdqsort_func, insertionSort_func 6.33%, reflectlite.Swapper)",
+      "note": "aggregate re-sorts the whole group after every append. Sorting each group once after grouping removes nearly all of it.",
+      "patterns": [
+        "sort\\.Slice",
+        "re-?sort",
+        "insertionSort",
+        "pdqsort",
+        "sort\\w*[^\\n]{0,80}(each|every|per) (append|insert|txn|transaction)",
+        "sort\\w*[^\\n]{0,40}\\bonce\\b",
+        "sort[^\\n]{0,60}out of the[^\\n]{0,30}loop"
+      ]
+    },
+    {
+      "id": "render-sprintf",
+      "label": "win",
+      "gain": 0.08,
+      "profile_entry": "fmt.Sprintf 0.84s 14.00% cum, 0.48s from main.renderRow",
+      "note": "renderRow formats each row with fmt.Sprintf and string concatenation. Appending into one reused buffer with strconv removes the formatting and most of concatstrings.",
+      "patterns": [
+        "renderRow",
+        "Sprintf[^\\n]{0,60}(row|cell|render|csv)",
+        "(row|cell|render|csv)[^\\n]{0,60}Sprintf",
+        "strconv\\.Append",
+        "AppendFloat"
+      ]
+    },
+    {
+      "id": "groupkey-sprintf",
+      "label": "win",
+      "gain": 0.06,
+      "profile_entry": "fmt.Sprintf 0.84s 14.00% cum, 0.36s from main.groupKey",
+      "note": "groupKey builds a map key with fmt.Sprintf per transaction. A struct key of account and currency removes it.",
+      "patterns": [
+        "groupKey",
+        "struct key",
+        "composite key",
+        "Sprintf[^\\n]{0,60}key",
+        "key[^\\n]{0,60}Sprintf"
+      ]
+    },
+    {
+      "id": "gzip",
+      "label": "trap",
+      "gain": 0,
+      "profile_entry": "compress/gzip.(*Reader).Read 1.86s 31.00% cum (flate huffmanBlock 25.00%, crc32 3.00%)",
+      "note": "Decompression is the largest entry and unavoidable: the feed's compression is fixed, the standard library is the only decompressor in scope, and on 1 vCPU overlapping it with parsing gains nothing. Ranking by raw share alone puts it first.",
+      "patterns": ["gzip", "flate", "decompress", "huffman", "crc32"]
+    }
+  ],
+  "parallelism": [
+    "parallel",
+    "concurren",
+    "goroutine",
+    "GOMAXPROCS",
+    "errgroup",
+    "worker pool",
+    "pipelin"
+  ]
+}

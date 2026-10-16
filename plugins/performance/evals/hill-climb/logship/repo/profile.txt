@@ -1,0 +1,42 @@
+$ go tool pprof -top -cum -nodecount=27 -nodefraction=0 logship cpu.pprof
+File: logship
+Type: cpu
+Time: 2026-10-14 09:12:40 PDT
+Duration: 4.16s, Total samples = 4.10s (98.56%)
+Showing nodes accounting for 2.57s, 62.68% of 4.10s total
+Showing top 27 nodes out of 143
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      3.85s 93.90%  main.main
+         0     0%     0%      3.85s 93.90%  runtime.main
+         0     0%     0%      3.84s 93.66%  main.run
+         0     0%     0%      3.22s 78.54%  main.processBatch
+     1.71s 41.71% 41.71%      1.80s 43.90%  main.dedupe
+         0     0% 41.71%      0.99s 24.15%  regexp.MustCompile
+         0     0% 41.71%      0.99s 24.15%  regexp.Compile (inline)
+     0.02s  0.49% 42.20%      0.98s 23.90%  regexp.compile
+     0.03s  0.73% 42.93%      0.98s 23.90%  main.parseLine
+     0.01s  0.24% 43.17%      0.42s 10.24%  main.normalizeHost
+     0.06s  1.46% 44.63%      0.41s 10.00%  regexp/syntax.Parse
+     0.11s  2.68% 47.32%      0.38s  9.27%  runtime.mallocgc
+     0.04s  0.98% 48.29%      0.33s  8.05%  regexp.(*Regexp).FindStringSubmatch
+         0     0% 48.29%      0.30s  7.32%  main.fanOut
+     0.01s  0.24% 48.54%      0.29s  7.07%  main.resolveRegion
+     0.25s  6.10% 54.63%      0.25s  6.10%  crypto/sha256.block
+     0.03s  0.73% 55.37%      0.24s  5.85%  regexp/syntax.Compile
+         0     0% 55.37%      0.22s  5.37%  runtime.gcBgMarkWorker
+         0     0% 55.37%      0.22s  5.37%  main.writeOutput
+     0.02s  0.49% 55.85%      0.20s  4.88%  encoding/json.Marshal
+     0.14s  3.41% 59.27%      0.14s  3.41%  runtime.scanobject
+         0     0% 59.27%      0.10s  2.44%  main.readEvents
+     0.09s  2.20% 61.46%      0.09s  2.20%  main.eventKey
+     0.01s  0.24% 61.71%      0.08s  1.95%  bufio.(*Scanner).Scan
+     0.02s  0.49% 62.20%      0.04s  0.98%  regexp.(*Regexp).ReplaceAllString
+     0.01s  0.24% 62.44%      0.02s  0.49%  main.(*Stats).Inc
+     0.01s  0.24% 62.68%      0.01s  0.24%  sync.(*Mutex).Lock
+
+$ go tool pprof -peek 'regexp.MustCompile$' logship cpu.pprof
+      flat  flat%   sum%        cum   cum%   calls calls% + context
+                                             0.62s 62.63% |   main.parseLine
+                                             0.37s 37.37% |   main.normalizeHost
+         0     0%     0%      0.99s 24.15%                | regexp.MustCompile
+                                             0.99s   100% |   regexp.Compile (inline)

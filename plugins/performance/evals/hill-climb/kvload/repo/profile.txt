@@ -1,0 +1,28 @@
+$ go tool pprof -top -cum -nodecount=20 -nodefraction=0 kvload cpu.pprof
+File: kvload
+Type: cpu
+Time: 2026-10-14 02:10:31 UTC
+Duration: 8.62s, Total samples = 2.05s (23.78%)
+Showing nodes accounting for 1.79s, 87.32% of 2.05s total
+Showing top 20 nodes out of 118
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      2.03s 99.02%  runtime.main
+         0     0%     0%      2.03s 99.02%  main.main
+         0     0%     0%      2.02s 98.54%  main.run
+     0.02s  0.98%  0.98%      2.01s 98.05%  main.Import
+     0.04s  1.95%  2.93%      1.12s 54.63%  main.(*Store).Put
+     0.05s  2.44%  5.37%      0.71s 34.63%  encoding/json.Marshal
+     0.03s  1.46%  6.83%      0.58s 28.29%  encoding/json.Unmarshal
+     0.31s 15.12% 21.95%      0.52s 25.37%  encoding/json.(*encodeState).reflectValue
+     0.22s 10.73% 32.68%      0.41s 20.00%  encoding/json.(*decodeState).object
+     0.03s  1.46% 34.15%      0.29s 14.15%  main.normalize
+     0.27s 13.17% 47.32%      0.27s 13.17%  hash/crc32.ieeeCLMUL
+     0.21s 10.24% 57.56%      0.24s 11.71%  strings.ToLower
+     0.11s  5.37% 62.93%      0.21s 10.24%  runtime.mallocgc
+     0.08s  3.90% 66.83%      0.13s  6.34%  encoding/json.(*encodeState).string
+     0.01s  0.49% 67.32%      0.10s  4.88%  os.(*File).Write
+     0.09s  4.39% 71.71%      0.09s  4.39%  syscall.Syscall
+     0.01s  0.49% 72.20%      0.09s  4.39%  os.(*File).Sync
+     0.08s  3.90% 76.10%      0.08s  3.90%  runtime.memmove
+     0.07s  3.41% 79.51%      0.07s  3.41%  strings.ToUpper
+     0.06s  2.93% 82.44%      0.06s  2.93%  runtime.scanobject

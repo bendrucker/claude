@@ -1,0 +1,10 @@
+{
+  "kind": "decide",
+  "trap": "near-floor",
+  "decisions": ["accept"],
+  "note": "Control: the gain is only 1.1 times the noise floor, but it clears it, at p < 0.1, on quiet rounds, with the guard passing.",
+  "reason": [
+    ["\\bp\\b(\\s*[=<\\u2248]|\\s+(is|of))\\s*0?\\.\\d", "signific", "beat (the )?noise"],
+    ["noise", "A/A", "floor"]
+  ]
+}

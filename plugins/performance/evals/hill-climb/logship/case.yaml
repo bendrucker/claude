@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: logship
+tags: [ranking]
+plugins: ["../../.."]
+execution:
+  model: claude-sonnet-5-5
+  max_turns: 30
+  timeout_seconds: 600
+  allowed_tools: [Read, Glob, Grep, Skill]
+  append_system_prompt: >-
+    Nothing can be built or run in this session, and nobody answers while you
+    work, so reply once. End the reply with the ranked candidate list as a
+    numbered markdown list, best first, one item per candidate.
+context:
+  scaffold_script: fixture.sh

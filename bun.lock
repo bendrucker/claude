@@ -235,6 +235,16 @@
         "zod": "^4.4.3",
       },
     },
+    "plugins/performance/evals/hill-climb": {
+      "name": "performance-hill-climb-eval",
+      "dependencies": {
+        "@commander-js/extra-typings": "~15.0.0",
+        "commander": "~15.0.0",
+        "simple-statistics": "^7.12.0",
+        "table": "^6.9.0",
+        "zod": "^4.4.3",
+      },
+    },
     "plugins/plan": {
       "name": "@bendrucker/claude-plan",
       "dependencies": {
@@ -1664,6 +1674,8 @@
     "path-to-regexp": ["path-to-regexp@8.4.2", "", {}, "sha512-qRcuIdP69NPm4qbACK+aDogI5CBDMi1jKe0ry5rSQJz8JVLsC7jV8XpiJjGRLLol3N+R5ihGYcrPLTno6pAdBA=="],
 
     "performance": ["performance@workspace:plugins/performance"],
+
+    "performance-hill-climb-eval": ["performance-hill-climb-eval@workspace:plugins/performance/evals/hill-climb"],
 
     "pg": ["pg@8.21.0", "", { "dependencies": { "pg-connection-string": "^2.13.0", "pg-pool": "^3.14.0", "pg-protocol": "^1.14.0", "pg-types": "2.2.0", "pgpass": "1.0.5" }, "optionalDependencies": { "pg-cloudflare": "^1.4.0" }, "peerDependencies": { "pg-native": ">=3.0.1" }, "optionalPeers": ["pg-native"] }, "sha512-AUP1EYJuHraQGsVoCQVIcM7TEJVGtDzxWtGFZd8rds9d+CCXlU5Js1rYgfLNvxy9iJrpHjGrRjoi/3BT9fRyiA=="],
 

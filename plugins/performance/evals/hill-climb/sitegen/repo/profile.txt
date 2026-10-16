@@ -1,0 +1,28 @@
+$ go tool pprof -top -cum -nodecount=20 -nodefraction=0 bin/sitegen cpu.pprof
+File: sitegen
+Type: cpu
+Time: 2026-10-13 18:41:07 PDT
+Duration: 7.12s, Total samples = 6.84s (96.07%)
+Showing nodes accounting for 5.87s, 85.82% of 6.84s total
+Showing top 20 nodes out of 131
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      6.79s 99.27%  runtime.main
+         0     0%     0%      6.79s 99.27%  main.main
+     0.01s  0.15%  0.15%      6.78s 99.12%  main.build
+     0.03s  0.44%  0.58%      4.86s 71.05%  main.renderPage
+     0.04s  0.58%  1.17%      2.27s 33.19%  html/template.(*Template).Execute
+     0.21s  3.07%  4.24%      1.71s 25.00%  text/template.(*state).walk
+     0.02s  0.29%  4.53%      1.48s 21.64%  main.writeImage
+     1.20s 17.54% 22.08%      1.20s 17.54%  main.minify
+     1.02s 14.91% 36.99%      1.02s 14.91%  crypto/sha256.block
+     0.11s  1.61% 38.60%      0.88s 12.87%  main.markdown
+     0.39s  5.70% 44.30%      0.71s 10.38%  html/template.htmlEscaper
+     0.52s  7.60% 51.90%      0.55s  8.04%  runtime.mallocgc
+     0.03s  0.44% 52.34%      0.43s  6.29%  main.navLinks
+     0.36s  5.26% 57.60%      0.36s  5.26%  strings.(*Builder).WriteString
+     0.02s  0.29% 57.89%      0.36s  5.26%  main.(*Cache).Get
+     0.01s  0.15% 58.04%      0.31s  4.53%  os.ReadFile
+     0.01s  0.15% 58.19%      0.28s  4.09%  main.expandIncludes
+     0.24s  3.51% 61.70%      0.24s  3.51%  regexp.(*Regexp).ReplaceAllFunc
+     0.17s  2.49% 64.18%      0.21s  3.07%  path/filepath.WalkDir
+     0.19s  2.78% 66.96%      0.19s  2.78%  syscall.Syscall

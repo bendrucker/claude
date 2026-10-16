@@ -1,0 +1,23 @@
+$ go tool pprof -sample_index=alloc_space -top -cum -nodecount=16 quotesvc heap.pprof
+File: quotesvc
+Type: alloc_space
+Time: 2026-10-14 14:02:51 UTC
+Showing nodes accounting for 1.38GB, 91.39% of 1.51GB total
+Showing top 16 nodes out of 74
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%     1.46GB 96.69%  net/http.(*conn).serve
+         0     0%     0%     1.12GB 74.17%  net/http.HandlerFunc.ServeHTTP
+    0.02GB  1.32%  1.32%     1.12GB 74.17%  main.quoteHandler.func1
+    0.31GB 20.53% 21.85%     0.52GB 34.44%  encoding/json.(*Encoder).Encode
+         0     0% 21.85%     0.29GB 19.21%  main.cents
+    0.29GB 19.21% 41.06%     0.29GB 19.21%  fmt.Sprintf
+    0.21GB 13.91% 54.97%     0.21GB 13.91%  encoding/json.(*encodeState).marshal
+    0.20GB 13.25% 68.22%     0.20GB 13.25%  bufio.NewWriterSize
+         0     0% 68.22%     0.17GB 11.26%  net/http.Header.Set
+    0.17GB 11.26% 79.47%     0.17GB 11.26%  net/textproto.MIMEHeader.Set
+         0     0% 79.47%     0.14GB  9.27%  net/url.(*URL).Query
+    0.14GB  9.27% 88.74%     0.14GB  9.27%  net/url.parseQuery
+    0.02GB  1.32% 90.07%     0.12GB  7.95%  time.Time.Format
+    0.01GB  0.66% 90.73%     0.09GB  5.96%  strconv.Itoa
+         0     0% 90.73%     0.04GB  2.65%  main.(*Cache).refresh
+    0.01GB  0.66% 91.39%     0.04GB  2.65%  main.(*Pricing).Fetch

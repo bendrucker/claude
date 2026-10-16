@@ -22,7 +22,7 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 
 ### Mod
 
-- [`register.ts`](mod/register.ts) watches the current branch's merge request and shows its pipeline and approval state at the end of the prompt footer. The MR merging or closing, a conflict or required rebase onto its target (pointing at `git:conflicts`, and announced even when already present), a push from outside this checkout, a newly failed job, a request for changes, and new approvals, unapprovals, or comments from anyone else, one line per author, reach the model, and everything is logged to `mod-events`. Needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` and a signed-in `glab`
+- [`register.ts`](mod/register.ts) watches the current branch's merge request and shows its pipeline and approval state at the end of the prompt footer. The model is told when the MR merges or closes, when it conflicts with its target or needs a rebase that the target requires, when its branch moves to a commit the local repository lacks, when a job newly fails, when changes are requested, and when other people approve, revoke an approval, or comment, in one line per author. A conflict alert points at the `git:conflicts` skill and fires even when the conflict is already there as the MR is first seen. Every decision and send is logged to `mod-events`. Needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` and a signed-in `glab`
 
 ## Testing
 

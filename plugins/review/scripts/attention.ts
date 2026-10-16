@@ -247,22 +247,24 @@ function canonical(path: string): string {
 
 // reviewr labels its pane on launch. A sidebar already up over the same
 // working tree is re-used; one over another tree would show the wrong diff.
-export function existingReviewr(paneList: string, cwd: string): string | null {
+export type ReviewrLookup = { pane: string } | "none" | "unknown";
+
+export function existingReviewr(paneList: string, cwd: string): ReviewrLookup {
   let json: unknown;
   try {
     json = JSON.parse(paneList);
   } catch (error) {
     if (!(error instanceof SyntaxError)) throw error;
-    return null;
+    return "unknown";
   }
   const parsed = PaneList.safeParse(json);
-  if (!parsed.success) return null;
+  if (!parsed.success) return "unknown";
   const tree = canonical(cwd);
-  return (
-    parsed.data.result.panes.find(
-      (pane) => pane.label === "reviewr" && pane.cwd != null && canonical(pane.cwd) === tree,
-    )?.pane_id ?? null
+  const pane = parsed.data.result.panes.find(
+    (candidate) =>
+      candidate.label === "reviewr" && candidate.cwd != null && canonical(candidate.cwd) === tree,
   );
+  return pane == null ? "none" : { pane: pane.pane_id };
 }
 
 // plannotator-tui leaves its pane unlabeled and reads the file from its
@@ -294,12 +296,18 @@ const ProcessInfo = z.object({
   }),
 });
 
-export type DocPaneState = "running" | "gone" | "unknown";
+export type SurfaceState = "running" | "gone" | "unknown";
 
-// A recorded pane id can outlive the TUI once Ben quits it. Anything short of
-// a definite answer is `unknown`, so a slow or failing herdr leaves a pane
-// holding annotations in place instead of opening a duplicate.
-export function docPaneState(processInfo: string): DocPaneState {
+const REVIEWR_PROCESS = "herdr-reviewr";
+const DOC_PROCESS = "plannotator-tui";
+const CLOSE_WAIT_MS = 2_000;
+const CLOSE_POLL_MS = 200;
+const HELD_EXIT = 2;
+
+// A pane id can outlive the surface once Ben quits it. Anything short of a
+// definite answer is `unknown`, so a slow or failing herdr leaves a pane
+// holding comments in place instead of opening a duplicate or reporting it closed.
+export function surfaceState(processInfo: string, binary: string): SurfaceState {
   let json: unknown;
   try {
     json = JSON.parse(processInfo);
@@ -312,7 +320,7 @@ export function docPaneState(processInfo: string): DocPaneState {
   const parsed = ProcessInfo.safeParse(json);
   if (!parsed.success) return "unknown";
   return parsed.data.result.process_info.foreground_processes.some((proc) =>
-    proc.name.startsWith("plannotator-tui"),
+    proc.name.startsWith(binary),
   )
     ? "running"
     : "gone";
@@ -340,9 +348,11 @@ function herdr(args: string[]): boolean {
   }
 }
 
+// herdr writes its error envelope to stderr.
 function herdrJson(args: string[]): string {
   try {
-    return Bun.spawnSync(["herdr", ...args], { timeout: HERDR_TIMEOUT_MS }).stdout.toString();
+    const result = Bun.spawnSync(["herdr", ...args], { timeout: HERDR_TIMEOUT_MS });
+    return result.exitCode === 0 ? result.stdout.toString() : result.stderr.toString();
   } catch {
     // Per the comment above: down, slow, or missing, herdr must not fail the caller.
     return "";
@@ -359,16 +369,34 @@ function openPane(args: string[], missingPlugin?: string): string {
   return outcome.pane;
 }
 
+function paneState(pane: string, binary: string): SurfaceState {
+  return surfaceState(herdrJson(["pane", "process-info", "--pane", pane]), binary);
+}
+
+async function readDocPanes(recordPath: string): Promise<DocPanes> {
+  const record = Bun.file(recordPath);
+  return (await record.exists()) ? recordedDocPanes(await record.text()) : {};
+}
+
+// The pane is already up or gone, so a lost record costs only the next reload.
+async function writeDocPanes(recordPath: string, panes: DocPanes): Promise<void> {
+  try {
+    mkdirSync(dirname(recordPath), { recursive: true });
+    await Bun.write(recordPath, JSON.stringify(panes));
+  } catch (error) {
+    console.error(`could not record ${recordPath}: ${String(error)}`);
+  }
+}
+
 // `r` re-reads the file and re-anchors the saved annotations, and a file review
 // stays open after Send.
 async function openDoc(paneId: string, file: string): Promise<void> {
   const path = canonical(resolve(file));
   const recordPath = docPanePath(paneId);
-  const record = Bun.file(recordPath);
-  const panes = (await record.exists()) ? recordedDocPanes(await record.text()) : {};
+  const panes = await readDocPanes(recordPath);
   const existing = panes[path];
   if (existing != null) {
-    const state = docPaneState(herdrJson(["pane", "process-info", "--pane", existing]));
+    const state = paneState(existing, DOC_PROCESS);
     if (state === "unknown") fail(`herdr did not report on ${existing}; retry the open`);
     if (state === "running") {
       if (!herdr(["pane", "send-keys", existing, "r"])) fail(`could not reload ${existing}`);
@@ -380,13 +408,81 @@ async function openDoc(paneId: string, file: string): Promise<void> {
     docOpenArgs(paneId, path),
     `plannotator-tui not found: install the \`${ANNOTATE_PLUGIN}\` herdr plugin`,
   );
-  // The pane is already up, so a lost record costs only the next reload.
-  try {
-    mkdirSync(dirname(recordPath), { recursive: true });
-    await Bun.write(recordPath, JSON.stringify(panes));
-  } catch (error) {
-    console.error(`could not record ${recordPath}: ${String(error)}`);
+  await writeDocPanes(recordPath, panes);
+}
+
+export interface SurfaceControl {
+  state(): SurfaceState;
+  quit(): boolean;
+  sleep(ms: number): void;
+  now(): number;
+}
+
+export type QuitOutcome =
+  | { kind: "gone" }
+  | { kind: "closed" }
+  | { kind: "held" }
+  | { kind: "error"; message: string };
+
+// Quitting with `q` rather than closing the pane lets reviewr ask before it
+// drops unsent comments, so a surface still running afterwards holds some.
+export function quitSurface(pane: string, control: SurfaceControl): QuitOutcome {
+  const before = control.state();
+  if (before === "gone") return { kind: "gone" };
+  if (before === "unknown") {
+    return { kind: "error", message: `herdr did not report on ${pane}; retry the close` };
   }
+  if (!control.quit()) {
+    return control.state() === "gone"
+      ? { kind: "gone" }
+      : { kind: "error", message: `could not quit ${pane}` };
+  }
+  const deadline = control.now() + CLOSE_WAIT_MS;
+  let state: SurfaceState = "running";
+  while (control.now() < deadline) {
+    control.sleep(CLOSE_POLL_MS);
+    state = control.state();
+    if (state === "gone") return { kind: "closed" };
+  }
+  if (state === "unknown") {
+    return {
+      kind: "error",
+      message: `herdr did not report on ${pane} after quit; retry the close`,
+    };
+  }
+  return { kind: "held" };
+}
+
+function herdrSurface(pane: string, binary: string): SurfaceControl {
+  return {
+    state: () => paneState(pane, binary),
+    quit: () => herdr(["pane", "send-keys", pane, "q"]),
+    sleep: (ms) => {
+      Bun.sleepSync(ms);
+    },
+    now: () => Date.now(),
+  };
+}
+
+// Exits unless the surface is gone, so a caller only continues past a closed pane.
+function reportQuit(pane: string, outcome: QuitOutcome): void {
+  if (outcome.kind === "closed") console.log(`closed ${pane}`);
+  if (outcome.kind === "error") fail(outcome.message);
+  if (outcome.kind === "held") {
+    console.error(`${pane} stayed open after quit: it holds unsent comments or a draft`);
+    process.exit(HELD_EXIT);
+  }
+}
+
+async function closeDoc(paneId: string, file: string): Promise<void> {
+  const path = canonical(resolve(file));
+  const recordPath = docPanePath(paneId);
+  const panes = await readDocPanes(recordPath);
+  const pane = panes[path];
+  if (pane == null) return;
+  reportQuit(pane, quitSurface(pane, herdrSurface(pane, DOC_PROCESS)));
+  delete panes[path];
+  await writeDocPanes(recordPath, panes);
 }
 
 function fail(message: string): never {
@@ -483,10 +579,10 @@ const openCmd = command(
     const workspace = process.env.HERDR_WORKSPACE_ID;
     const open =
       workspace == null
-        ? null
+        ? "none"
         : existingReviewr(herdrJson(["pane", "list", "--workspace", workspace]), process.cwd());
-    if (open != null) {
-      console.log(`reviewr already open (${open})`);
+    if (typeof open === "object") {
+      console.log(`reviewr already open (${open.pane})`);
       process.exit(0);
     }
     openPane(
@@ -497,9 +593,46 @@ const openCmd = command(
   },
 );
 
+const closeCmd = command(
+  {
+    name: "close",
+    help: { description: "Quit the review surface once Ben approves" },
+    flags: {
+      diff: { type: Boolean, description: "Quit reviewr over the working diff" },
+      doc: { type: String, description: "Quit plannotator-tui over this file" },
+    },
+  },
+  async (parsed) => {
+    if (parsed.flags.diff === (parsed.flags.doc != null)) {
+      parsed.showHelp();
+      process.exit(1);
+    }
+    const paneId = currentPane();
+    if (paneId == null) return;
+    if (parsed.flags.doc != null) {
+      await closeDoc(paneId, parsed.flags.doc);
+      process.exit(0);
+    }
+    const workspace =
+      process.env.HERDR_WORKSPACE_ID ?? fail("HERDR_WORKSPACE_ID unset: cannot find reviewr");
+    const open = existingReviewr(
+      herdrJson(["pane", "list", "--workspace", workspace]),
+      process.cwd(),
+    );
+    if (open === "unknown") fail("herdr did not list panes; retry the close");
+    if (open !== "none") {
+      reportQuit(open.pane, quitSurface(open.pane, herdrSurface(open.pane, REVIEWR_PROCESS)));
+    }
+    process.exit(0);
+  },
+);
+
 if (import.meta.main) {
-  await cli({ name: "attention", commands: [raiseCmd, clearCmd, promptCmd, openCmd] }, (parsed) => {
-    parsed.showHelp();
-    process.exit(1);
-  });
+  await cli(
+    { name: "attention", commands: [raiseCmd, clearCmd, promptCmd, openCmd, closeCmd] },
+    (parsed) => {
+      parsed.showHelp();
+      process.exit(1);
+    },
+  );
 }

@@ -6,8 +6,6 @@ import {
   currentPane,
   docOpenArgs,
   docPanePath,
-  docPaneState,
-  type DocPaneState,
   type DocPanes,
   existingReviewr,
   isKind,
@@ -18,10 +16,16 @@ import {
   planTitle,
   PROMPT_MARKER,
   promptAction,
+  type QuitOutcome,
+  quitSurface,
+  type SurfaceControl,
   raiseArgs,
   recordedDocPanes,
   reviewGlyph,
   reviewrOpenArgs,
+  surfaceState,
+  type ReviewrLookup,
+  type SurfaceState,
 } from "./attention";
 
 describe("raiseArgs", () => {
@@ -364,13 +368,13 @@ describe("recordedDocPanes", () => {
   });
 });
 
-describe("docPaneState", () => {
+describe("surfaceState", () => {
   const info = (...names: string[]) =>
     JSON.stringify({
       result: { process_info: { foreground_processes: names.map((name) => ({ name })) } },
     });
 
-  test.each<[string, string, DocPaneState]>([
+  test.each<[string, string, SurfaceState]>([
     ["the staged binary", info("plannotator-tui.exe"), "running"],
     ["a shell left behind", info("zsh"), "gone"],
     ["another plugin", info("herdr-reviewr"), "gone"],
@@ -387,7 +391,7 @@ describe("docPaneState", () => {
     ["an unexpected envelope", JSON.stringify({ result: { type: "ok" } }), "unknown"],
     ["no output", "", "unknown"],
   ])("%s", (_name, stdout, expected) => {
-    expect(docPaneState(stdout)).toBe(expected);
+    expect(surfaceState(stdout, "plannotator-tui")).toBe(expected);
   });
 });
 
@@ -396,32 +400,85 @@ describe("existingReviewr", () => {
   const list = (panes: { pane_id: string; label?: string | null; cwd?: string }[]) =>
     JSON.stringify({ result: { panes } });
 
-  test.each<[string, string, string | null]>([
+  test.each<[string, string, ReviewrLookup]>([
     [
       "a labeled pane over the same tree",
       list([
         { pane_id: "wE5:p1", cwd: tree },
         { pane_id: "wE5:p4", label: "reviewr", cwd: tree },
       ]),
-      "wE5:p4",
+      { pane: "wE5:p4" },
     ],
     [
       "a labeled pane over another tree",
       list([{ pane_id: "wE5:p4", label: "reviewr", cwd: "/repo/two" }]),
-      null,
+      "none",
     ],
-    ["a labeled pane with no cwd", list([{ pane_id: "wE5:p4", label: "reviewr" }]), null],
+    ["a labeled pane with no cwd", list([{ pane_id: "wE5:p4", label: "reviewr" }]), "none"],
     [
       "no reviewr pane",
       list([
         { pane_id: "wE5:p1", label: null, cwd: tree },
         { pane_id: "wE5:p3", label: "Annotate", cwd: tree },
       ]),
-      null,
+      "none",
     ],
-    ["an error envelope", JSON.stringify({ error: { code: "server_unavailable" } }), null],
-    ["no output", "", null],
+    ["an error envelope", JSON.stringify({ error: { code: "server_unavailable" } }), "unknown"],
+    ["no output", "", "unknown"],
   ])("%s", (_name, json, expected) => {
-    expect(existingReviewr(json, tree)).toBe(expected);
+    expect(existingReviewr(json, tree)).toEqual(expected);
+  });
+});
+
+describe("quitSurface", () => {
+  // Replays `states` one read at a time, holding the last; each sleep advances the clock.
+  function makeControl(states: SurfaceState[], quits = true) {
+    let clock = 0;
+    let read = 0;
+    const control: SurfaceControl & { quitCalls: number } = {
+      quitCalls: 0,
+      state: () => states[Math.min(read++, states.length - 1)] ?? "unknown",
+      quit: () => {
+        control.quitCalls += 1;
+        return quits;
+      },
+      sleep: (ms) => {
+        clock += ms;
+      },
+      now: () => clock,
+    };
+    return control;
+  }
+
+  test.each<[string, SurfaceState[], boolean, QuitOutcome, number]>([
+    ["already gone", ["gone"], true, { kind: "gone" }, 0],
+    ["quits on q", ["running", "running", "gone"], true, { kind: "closed" }, 1],
+    ["holds unsent comments", ["running"], true, { kind: "held" }, 1],
+    [
+      "unreported before quit",
+      ["unknown"],
+      true,
+      { kind: "error", message: "herdr did not report on wE5:p4; retry the close" },
+      0,
+    ],
+    [
+      "unreported after quit",
+      ["running", "unknown"],
+      true,
+      { kind: "error", message: "herdr did not report on wE5:p4 after quit; retry the close" },
+      1,
+    ],
+    ["closed before the key landed", ["running", "gone"], false, { kind: "gone" }, 1],
+    [
+      "key refused while running",
+      ["running"],
+      false,
+      { kind: "error", message: "could not quit wE5:p4" },
+      1,
+    ],
+  ])("%s", (_name, states, quits, expected, quitCalls) => {
+    const control = makeControl(states, quits);
+    expect(quitSurface("wE5:p4", control)).toEqual(expected);
+    expect(control.quitCalls).toBe(quitCalls);
   });
 });

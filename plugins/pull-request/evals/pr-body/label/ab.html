@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PR Body A/B</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+  /* One pair per screen: body on top, verdict bar pinned to the thumb zone. */
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --fg: #1d2330; --muted: #5d6676; --line: #dde1e8;
+    --accent: #2f6fdb; --accent-fg: #ffffff; --chip: #eef2f8; --good: #1f8a4c;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #12151b; --surface: #1a1e26; --fg: #e4e8ef; --muted: #98a1b0; --line: #2c323d;
+      --accent: #6c9cf0; --accent-fg: #0d1117; --chip: #232934; --good: #4cc27f; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 var(--sans); }
+  body { padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) calc(150px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  header { position: sticky; top: 0; z-index: 2; background: var(--bg); display: flex; flex-direction: column; gap: 8px; padding-block: 10px; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .meta { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 10px; padding: 8px 12px; min-height: 40px; cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; min-height: 44px; font-weight: 600; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+  .bodies { display: grid; gap: 12px; }
+  article { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px 16px 12px; min-width: 0; overflow-wrap: anywhere; }
+  article h1, article h2, article h3 { font-size: 1.05em; margin: 1em 0 .4em; }
+  article code { font: .88em var(--mono); background: var(--chip); padding: .1em .3em; border-radius: 4px; }
+  article pre { overflow-x: auto; background: var(--chip); padding: 10px; border-radius: 8px; }
+  article pre code { background: none; padding: 0; }
+  article table { display: block; overflow-x: auto; border-collapse: collapse; font-size: 14px; }
+  article td, article th { border: 1px solid var(--line); padding: 4px 8px; }
+  article details { border: 1px dashed var(--line); border-radius: 8px; padding: 6px 10px; margin: 8px 0; }
+  article ul, article ol { padding-left: 1.3em; }
+  .tag { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--muted); margin-top: 10px; }
+  @media (min-width: 900px) { .bodies { grid-template-columns: 1fr 1fr; } .seg { display: none; } }
+  @media (max-width: 899px) { article[data-hidden="true"] { display: none; } }
+  .extras { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { border-radius: 999px; background: var(--chip); border-color: transparent; font-size: 14px; min-height: 36px; }
+  .chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+  textarea { width: 100%; font: 15px/1.45 var(--sans); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  #edited { font-family: var(--mono); font-size: 13px; min-height: 260px; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--bg); border-top: 1px solid var(--line);
+    padding: 10px max(12px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); display: grid; gap: 8px; }
+  .verdict { display: grid; grid-template-columns: 1fr .7fr 1fr; gap: 8px; }
+  .verdict button { min-height: 52px; font-weight: 700; }
+  .verdict button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  .save { background: var(--good); color: #fff; border-color: var(--good); font-weight: 700; min-height: 48px; }
+  .save:disabled { opacity: .45; }
+  .done { color: var(--good); font-weight: 700; }
+  .empty { padding: 40px 0; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <button id="prev" aria-label="Previous pair">‹</button>
+    <div class="meta" id="meta">Loading…</div>
+    <button id="next" aria-label="Next pair">›</button>
+    <button id="todo">Next open</button>
+  </div>
+  <div class="seg" role="group" aria-label="Show body">
+    <button id="showA" aria-pressed="true">A</button>
+    <button id="showB" aria-pressed="false">B</button>
+  </div>
+</header>
+
+<main id="main">
+  <div class="bodies">
+    <article id="bodyA"></article>
+    <article id="bodyB" data-hidden="true"></article>
+  </div>
+  <div class="extras">
+    <div class="tag">WHY (OPTIONAL)</div>
+    <div class="chips" id="chips"></div>
+    <textarea id="note" rows="2" placeholder="Note"></textarea>
+    <button id="editToggle">Edit the winner to merge-ready</button>
+    <textarea id="edited" hidden placeholder="Pick A or B first"></textarea>
+  </div>
+</main>
+
+<div class="bar">
+  <div class="verdict" role="group" aria-label="Verdict">
+    <button id="pickA" data-choice="left">A better</button>
+    <button id="pickTie" data-choice="tie">Tie</button>
+    <button id="pickB" data-choice="right">B better</button>
+  </div>
+  <button class="save" id="save" disabled>Save and next</button>
+</div>
+
+<script>
+const REASONS = ["Too long", "Too terse", "Missing substance", "Better lead", "Better structure", "Identifier soup", "Restates diff", "Data belongs in details"];
+const $ = (id) => document.getElementById(id);
+let pairs = [], index = 0, state = null;
+
+marked.setOptions({ gfm: true, breaks: false });
+
+function fresh(pair) {
+  const l = pair.label;
+  return { choice: l?.choice ?? null, reasons: new Set(l?.reasons ?? []), note: l?.note ?? "", edited: l?.edited ?? "" };
+}
+
+function render() {
+  if (pairs.length === 0) { $("main").innerHTML = '<p class="empty">No pairs. Run scripts/ab-pairs.ts first.</p>'; return; }
+  const pair = pairs[index];
+  state = fresh(pair);
+  const labeled = pairs.filter((p) => p.label).length;
+  $("meta").innerHTML = `<b>${index + 1}/${pairs.length}</b> · ${pair.group} · ${pair.case}${pair.label ? ' · <span class="done">saved</span>' : ""} · ${labeled} done`;
+  $("bodyA").innerHTML = '<div class="tag">A</div>' + marked.parse(pair.left);
+  $("bodyB").innerHTML = '<div class="tag">B</div>' + marked.parse(pair.right);
+  $("note").value = state.note;
+  $("edited").value = state.edited;
+  $("edited").hidden = state.edited === "";
+  show("A");
+  paint();
+  window.scrollTo(0, 0);
+}
+
+function show(side) {
+  $("bodyA").dataset.hidden = side !== "A";
+  $("bodyB").dataset.hidden = side !== "B";
+  $("showA").setAttribute("aria-pressed", side === "A");
+  $("showB").setAttribute("aria-pressed", side === "B");
+}
+
+function paint() {
+  for (const id of ["pickA", "pickTie", "pickB"]) $(id).setAttribute("aria-pressed", $(id).dataset.choice === state.choice);
+  $("chips").replaceChildren(...REASONS.map((r) => {
+    const b = document.createElement("button");
+    b.textContent = r;
+    b.setAttribute("aria-pressed", state.reasons.has(r));
+    b.onclick = () => { state.reasons.has(r) ? state.reasons.delete(r) : state.reasons.add(r); paint(); };
+    return b;
+  }));
+  $("save").disabled = state.choice === null;
+}
+
+function pick(choice) {
+  state.choice = choice;
+  const ed = $("edited");
+  if (!ed.hidden && ed.value === "" && choice !== "tie") ed.value = choice === "left" ? pairs[index].left : pairs[index].right;
+  paint();
+}
+
+$("pickA").onclick = () => pick("left");
+$("pickB").onclick = () => pick("right");
+$("pickTie").onclick = () => pick("tie");
+$("showA").onclick = () => show("A");
+$("showB").onclick = () => show("B");
+$("prev").onclick = () => { index = (index - 1 + pairs.length) % pairs.length; render(); };
+$("next").onclick = () => { index = (index + 1) % pairs.length; render(); };
+$("todo").onclick = () => { const i = pairs.findIndex((p, j) => j > index && !p.label); const k = i >= 0 ? i : pairs.findIndex((p) => !p.label); if (k >= 0) { index = k; render(); } };
+$("editToggle").onclick = () => {
+  const ed = $("edited");
+  ed.hidden = !ed.hidden;
+  if (!ed.hidden && ed.value === "" && state.choice && state.choice !== "tie") ed.value = state.choice === "left" ? pairs[index].left : pairs[index].right;
+};
+
+$("save").onclick = async () => {
+  const pair = pairs[index];
+  const winnerBody = state.choice === "left" ? pair.left : state.choice === "right" ? pair.right : null;
+  const editedText = $("edited").value.trim();
+  const label = { choice: state.choice, reasons: [...state.reasons], note: $("note").value.trim() };
+  if (editedText !== "" && editedText !== winnerBody?.trim()) label.edited = editedText;
+  $("save").disabled = true;
+  $("save").textContent = "Saving…";
+  try {
+    const res = await fetch(`/api/label/${pair.id}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(label) });
+    if (!res.ok) throw new Error(await res.text());
+    pair.label = label;
+    $("save").textContent = "Save and next";
+    $("todo").onclick();
+    if (pairs.every((p) => p.label)) render();
+  } catch (err) {
+    $("save").textContent = `Save failed: ${err.message}. Tap to retry`;
+    $("save").disabled = false;
+  }
+};
+
+fetch("/api/pairs").then((r) => r.json()).then((data) => {
+  pairs = data;
+  const open = pairs.findIndex((p) => !p.label);
+  index = open >= 0 ? open : 0;
+  render();
+});
+</script>
+</body>
+</html>

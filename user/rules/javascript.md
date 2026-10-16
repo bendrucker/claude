@@ -10,4 +10,4 @@ paths:
 
 # JavaScript
 
-- Use existing APIs that return promises instead of constructing promises with `new`.
+- Call an API's promise-returning form (such as `node:fs/promises`) instead of wrapping a callback in `new Promise`.

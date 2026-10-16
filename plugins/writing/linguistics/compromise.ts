@@ -1,4 +1,4 @@
-import nlp from "compromise";
+import type Nlp from "compromise";
 import { z } from "zod";
 import type { Tagger } from "./tagger";
 import {
@@ -69,10 +69,19 @@ function tenseOf(tags: string[]): Tense | undefined {
   return undefined;
 }
 
+// Loading compromise costs the writing PreToolUse hook ~100ms on every call,
+// and most calls never tag. `tag` is synchronous, so the load is a `require`.
+let nlp: typeof Nlp | undefined;
+
+function load(): typeof Nlp {
+  nlp ??= require("compromise");
+  return nlp;
+}
+
 export const compromiseTagger: Tagger = {
   name: "compromise",
   tag(text: string): TaggedSentence[] {
-    const sentences = CompromiseSentences.parse(nlp(text).json({ offset: true }));
+    const sentences = CompromiseSentences.parse(load()(text).json({ offset: true }));
     return sentences.map((sentence) => ({
       text: sentence.text,
       tokens: sentence.terms.map((term) => ({

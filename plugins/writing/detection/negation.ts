@@ -19,6 +19,8 @@ import type { PatternDef, PatternSpan } from "./tropes";
 import { type Hits, WORDLISTS } from "./wordlists";
 
 const INDEFINITES = new Set(["no", "none", "nothing", "nobody", "nowhere", "neither"]);
+// Tagging is the expensive step, and a sentence without an indefinite has no span.
+const INDEFINITE_WORD = new RegExp(String.raw`\b(?:${[...INDEFINITES].join("|")})\b`, "i");
 // "no" and "neither" determine a noun, so the head word completes the window.
 const DETERMINERS = new Set(["no", "neither"]);
 
@@ -116,6 +118,7 @@ function opensClause(
 }
 
 function sentenceSpans(sentence: string): PatternSpan[] {
+  if (!INDEFINITE_WORD.test(sentence)) return [];
   const tokens = locate(sentence);
   const spans: PatternSpan[] = [];
   for (const [at, indefinite] of tokens.entries()) {

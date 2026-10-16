@@ -1,0 +1,99 @@
+{
+  "kind": "offcpu",
+  "profile": "repo/profile.txt",
+  "checks": [
+    {
+      "id": "gap",
+      "note": "The profile ranks bytes allocated, which says nothing about where a request waits. The p99 (171 ms) sits near the upstream's 140 ms batch latency while p50 is 1.9 ms and the process uses 0.09 cores: requests queue behind the refresh, which holds the write lock across the upstream fetch.",
+      "all": [
+        ["alloc", "heap", "memory profile", "bytes"],
+        ["latency", "p99", "tail", "time", "wait"],
+        [
+          "n't",
+          "\\bnot\\b",
+          "rather than",
+          "instead",
+          "wrong",
+          "mismatch",
+          "\\bonly\\b",
+          "proxy",
+          "unrelated",
+          "says nothing",
+          "tells (us )?nothing",
+          "measures"
+        ]
+      ]
+    },
+    {
+      "id": "profile",
+      "note": "The next measurement is one that sees where a slow request waits: a block or mutex profile, an execution trace, an off-CPU or wall-clock profile, or per-request timing.",
+      "all": [
+        [
+          "block(ing)? profil",
+          "mutex profil",
+          "contention profil",
+          "SetBlockProfileRate",
+          "SetMutexProfileFraction",
+          "go tool trace",
+          "execution trace",
+          "runtime/trace",
+          "\\btrace\\b",
+          "off.?cpu",
+          "wall.?clock profil",
+          "fgprof",
+          "span",
+          "per.request (tim|latenc|breakdown)",
+          "latency (profil|breakdown|histogram)",
+          "(measure|time|instrument)\\w*[^\\n]{0,40}(lock|wait|refresh|RLock|Get)"
+        ]
+      ]
+    }
+  ],
+  "leads": [
+    "lock",
+    "mutex",
+    "refresh",
+    "singleflight",
+    "copy.on.write",
+    "atomic",
+    "swap",
+    "stale",
+    "contention",
+    "block",
+    "upstream",
+    "fetch",
+    "trace",
+    "off.?cpu",
+    "wait"
+  ],
+  "traps": [
+    {
+      "id": "json",
+      "note": "JSON encoding leads the allocation profile, but allocation volume is not latency.",
+      "patterns": ["json", "Encode", "marshal"]
+    },
+    {
+      "id": "sprintf",
+      "note": "fmt.Sprintf in cents is 19% of bytes allocated and well under a millisecond per request.",
+      "patterns": ["Sprintf", "\\bcents\\b", "strconv", "Itoa"]
+    },
+    {
+      "id": "alloc",
+      "note": "Pooling buffers or cutting allocations targets bytes, not the wait behind the lock.",
+      "patterns": [
+        "sync\\.Pool",
+        "\\bpool",
+        "alloc",
+        "bufio",
+        "buffer",
+        "\\bGC\\b",
+        "garbage",
+        "Header\\.Set",
+        "parseQuery",
+        "Query\\(\\)",
+        "time\\.Format",
+        "Format"
+      ]
+    }
+  ]
+}

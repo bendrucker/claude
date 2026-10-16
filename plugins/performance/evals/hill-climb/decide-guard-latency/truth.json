@@ -1,0 +1,18 @@
+{
+  "kind": "decide",
+  "trap": "guard",
+  "decisions": ["reject"],
+  "note": "The gain is real, but the guard check failed before timing.",
+  "reason": [
+    [
+      "guard",
+      "cmp\\b",
+      "differ",
+      "golden",
+      "byte-identical",
+      "not identical",
+      "behaviou?r (change|differ)",
+      "changes? (the )?(output|behaviou?r|results?)"
+    ]
+  ]
+}

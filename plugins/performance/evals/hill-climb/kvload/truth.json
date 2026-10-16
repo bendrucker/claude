@@ -1,0 +1,94 @@
+{
+  "kind": "offcpu",
+  "profile": "repo/profile.txt",
+  "checks": [
+    {
+      "id": "gap",
+      "note": "Wall time is 8.62s against 2.11s of user plus system CPU, and the profile samples 2.05s of an 8.62s run. About three quarters of the run is spent off the CPU, waiting on a per-record fsync.",
+      "all": [
+        ["wall", "8\\.6", "duration", "elapsed"],
+        ["cpu", "user\\s*\\+\\s*sys", "samples", "2\\.0\\d?\\s*s", "2\\.1\\d?\\s*s"],
+        [
+          "wait",
+          "block",
+          "idle",
+          "off.?cpu",
+          "not (on|using|burning) (the )?cpu",
+          "i/o",
+          "\\bio\\b",
+          "fsync",
+          "syscall",
+          "quarter",
+          "2[34](\\.\\d+)?\\s?%",
+          "[34](\\.\\d)?\\s?(x|×)",
+          "7[67](\\.\\d)?\\s?%",
+          "gap",
+          "6\\.[4-6]\\d?\\s?s",
+          "missing",
+          "unaccounted",
+          "(doesn't|does not|can't|cannot) (see|show|account|explain)"
+        ]
+      ]
+    },
+    {
+      "id": "profile",
+      "note": "The next measurement is one that sees waiting: an off-CPU or wall-clock profile, a syscall trace, or timing the fsync calls.",
+      "all": [
+        [
+          "off.?cpu",
+          "trace",
+          "wall.?clock profil",
+          "block(ing)? profil",
+          "fgprof",
+          "strace",
+          "dtruss",
+          "perf (trace|sched)",
+          "syscall (trac|count|profil|tim)",
+          "fs_usage",
+          "iostat",
+          "offcputime",
+          "bpftrace",
+          "instrument",
+          "time (each|every|the) (phase|step|fsync|sync|write)",
+          "(measure|count|instrument)\\w*[^\\n]{0,40}(fsync|\\bsync\\b|wait|block|i/o)"
+        ]
+      ]
+    }
+  ],
+  "leads": [
+    "fsync",
+    "\\bsync\\b",
+    "\\.Sync",
+    "batch",
+    "group commit",
+    "durab",
+    "flush",
+    "off.?cpu",
+    "trace",
+    "wall.?clock",
+    "block",
+    "wait"
+  ],
+  "traps": [
+    {
+      "id": "json",
+      "note": "JSON encoding and decoding lead the CPU profile, but the profile covers under a quarter of the wall time.",
+      "patterns": ["json", "Marshal", "Unmarshal", "reflect", "encod", "decod"]
+    },
+    {
+      "id": "crc",
+      "note": "crc32 is 13% of CPU samples, about 3% of wall time.",
+      "patterns": ["crc", "checksum"]
+    },
+    {
+      "id": "normalize",
+      "note": "normalize and strings.ToLower are 14% of CPU samples, about 3% of wall time.",
+      "patterns": ["normaliz", "ToLower", "ToUpper"]
+    },
+    {
+      "id": "alloc",
+      "note": "Allocation and GC work are a slice of a slice.",
+      "patterns": ["malloc", "alloc", "\\bGC\\b", "garbage"]
+    }
+  ]
+}

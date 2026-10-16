@@ -76,6 +76,18 @@ describe("scoreOffCpu", () => {
     ],
     [
       "sitegen",
+      "a parallel image pool citing cold resizing",
+      "1. **Render pages in parallel.**\n2. **Run `writeImage` in a worker pool.** Cold resizing dominates wall time.",
+      2,
+    ],
+    [
+      "sitegen",
+      "a parallel image pool citing warm hashing",
+      "1. **Run `writeImage` in a worker pool.** It is 21.6%, mostly sha256.\n2. **Resize images in parallel.**",
+      2,
+    ],
+    [
+      "sitegen",
       "remote includes ranked last by rule",
       "1. Render pages in parallel.\n2. Cache parsed templates.\n3. **Prefetch remote includes.** No profile entry behind it, so it ranks last.",
       3,

@@ -38,7 +38,14 @@
       "prefetch",
       "\\bfetch",
       "download"
-    ]
+    ],
+    "cited": {
+      "headline": [
+        "(parallel|concurren|worker|pool|goroutine)[^\\n]{0,60}(\\bimages?\\b|writeImage)",
+        "(\\bimages?\\b|writeImage)[^\\n]{0,60}(parallel|concurren|worker|pool|goroutine)"
+      ],
+      "body": ["resiz", "\\bcold\\b", "cache miss", "unprofiled", "not (visible )?in the profile"]
+    }
   },
   "leads": [
     "image",

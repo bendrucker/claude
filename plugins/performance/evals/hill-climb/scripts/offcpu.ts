@@ -19,7 +19,12 @@ export const OffCpuTruth = z.object({
   /** An entry naming one of these is the right lead or a profiling step, not a trap. */
   leads: Patterns,
   /** A candidate whose headline matches one of these targets the true wall-time lead. */
-  primary: z.object({ note: z.string(), patterns: Patterns }),
+  primary: z.object({
+    note: z.string(),
+    patterns: Patterns,
+    /** A headline matching `headline` targets the lead only when its entry also matches `body`. */
+    cited: z.object({ headline: Patterns, body: Patterns }).optional(),
+  }),
   traps: z.array(z.object({ id: z.string(), note: z.string(), patterns: Patterns })),
 });
 export type OffCpuTruth = z.output<typeof OffCpuTruth>;
@@ -43,7 +48,8 @@ const any = (patterns: string[]) => {
 /** An entry that measures before ranking, which isn't a candidate. */
 const PROFILING_STEP = any([
   String.raw`^\W*(re-?)?profil`,
-  String.raw`^\W*(measure|confirm|record|capture|take|run) `,
+  String.raw`^\W*(measure|confirm|record|capture|take) `,
+  String.raw`^\W*run\b[^.]{0,40}(profil|trace|bench|timing)`,
   String.raw`\b(off.?cpu|block|mutex|wall.?clock) profile\b`,
   "strace",
   "go tool trace",
@@ -78,10 +84,13 @@ export function scoreOffCpu(reply: string, truth: OffCpuTruth): OffCpuScore {
     .map(headline)
     .filter((h) => !notMicro(h))
     .flatMap((h) => truth.traps.find((t) => any(t.patterns)(h))?.id ?? []);
-  const primary = any(truth.primary.patterns);
-  const candidates = rankedList(reply)
-    .map(headline)
-    .filter((h) => primary(h) || !PROFILING_STEP(h));
+  const named = any(truth.primary.patterns);
+  const { cited } = truth.primary;
+  const citedHeadline = any(cited?.headline ?? []);
+  const citedBody = any(cited?.body ?? []);
+  const primary = (entry: string) =>
+    named(headline(entry)) || (citedHeadline(headline(entry)) && citedBody(entry));
+  const candidates = rankedList(reply).filter((e) => primary(e) || !PROFILING_STEP(headline(e)));
   const found = candidates.findIndex(primary);
   const leadRank = found === -1 ? candidates.length + 1 : found + 1;
   const parts = [

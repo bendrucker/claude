@@ -34,17 +34,15 @@ test.each<{ name: string; input: string; expected: number }>([
 });
 ```
 
-`describe.each` parametrizes an entire suite the same way.
-
 #### Formatted Output
 
-Call `toMatchInlineSnapshot()` with no argument. The first run writes the received value into the test file. When the output changes intentionally, rerun with `-u` and review what it wrote.
+Call `toMatchInlineSnapshot()` with no argument and let the runner write it. After an intentional output change, rerun with `-u` and review what it wrote.
 
 Past roughly 20 lines, use `toMatchSnapshot()`, which writes to `__snapshots__/*.snap`.
 
 #### Invariants
 
-Write one `fast-check` property plus a small example table. `fast-check` needs no runner adapter.
+Write one `fast-check` property plus a small example table.
 
 ```ts
 import * as fc from "fast-check";
@@ -60,7 +58,7 @@ test("encode/decode roundtrip", () => {
 
 Put `expect` calls inside the property. An assertion failure or any other throw fails the run, except `fc.pre(condition)`, whose throw skips the case. Constrain the arbitrary (`fc.integer({ min: 1 })`, `fc.string({ minLength: 1 })`) or use `fc.pre` instead of generating values and filtering them.
 
-On failure `fast-check` shrinks toward a smaller counterexample and prints `{ seed, path, endOnFailure }`. Replay by passing that object to `fc.assert(prop, ...)`.
+Replay a failure by passing the printed `{ seed, path, endOnFailure }` to `fc.assert(prop, ...)`.
 
 #### Fake Instances
 

@@ -17,11 +17,9 @@ Load the `astral:uv`, `astral:ruff`, and `astral:ty` skills for detailed guidanc
 
 ## Type Hints
 
-- Always type function signatures, class attributes, and variables whose type is not obvious.
 - Avoid `Any`. Use specific types, `TypeVar`, or protocols.
 - Avoid `# type: ignore` outside rare cases in test code.
 - Use `from __future__ import annotations` for forward references and cleaner type hints.
-- Prefer `list[T]`, `dict[K, V]`, `set[T]`, `tuple[T, ...]` over `typing.List`, `typing.Dict`, etc. (Python 3.9+).
 
 Example:
 ```python
@@ -37,27 +35,7 @@ def process_items(items: list[str], max_count: int | None = None) -> dict[str, i
 
 ## Tests
 
-Write parametrized tests using `pytest`:
-
-```python
-import pytest
-
-@pytest.mark.parametrize(
-    ("input_value", "expected"),
-    [
-        ("hello", "HELLO"),
-        ("world", "WORLD"),
-        ("", ""),
-    ],
-)
-def test_uppercase(input_value: str, expected: str) -> None:
-    assert my_function(input_value) == expected
-```
+Use `pytest.mark.parametrize` for repeated cases.
 
 - Use descriptive parameter names, and type test functions `-> None`.
 - Group related tests in classes, and use fixtures for shared setup and teardown.
-
-## Code Style
-
-- Follow PEP 8 conventions.
-- Use f-strings for string formatting.

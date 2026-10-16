@@ -10,11 +10,10 @@ Run `terraform version` before giving language syntax or CLI advice. Assume 1.12
 
 ## Operations
 
-- Work declaratively through `.tf` files.
 - Never execute write operations (`apply`, `destroy`, `import`, `state mv`). Provide the command as output for the user to run.
 - Read-only commands (`plan`, `validate`, `fmt`, `state list`, `show`) are safe to run.
 - Run `terraform fmt -recursive` before committing.
-- Never edit state files manually or use `terraform state` write commands. Use `import` blocks to import, `removed` blocks to drop from state, and `moved` blocks to refactor addresses.
+- Never edit state files by hand. Use `import` blocks to import, `removed` blocks to drop from state, and `moved` blocks to refactor addresses.
 
 ```hcl
 import {
@@ -38,21 +37,10 @@ moved {
 
 ## File Organization
 
-```
-main.tf           # Primary resources
-variables.tf      # Input variable declarations
-outputs.tf        # Output value declarations
-versions.tf       # Terraform and provider version constraints
-terraform.tfvars  # Variable values (gitignored if sensitive)
-```
-
-Split larger modules by logical component: `compute.tf`, `networking.tf`, `security.tf`, `data.tf`, `locals.tf`.
+Use `main.tf`, `variables.tf`, `outputs.tf`, and `versions.tf`. Split larger modules by component.
 
 ## Style
 
-- 2-space indentation (enforced by `fmt`), snake_case identifiers.
-- Quote string values; leave boolean and number values unquoted.
 - Prefer implicit dependencies (attribute references) over explicit `depends_on`.
 - Use `for_each` for resource sets, `count` only for conditional creation.
 - Always declare variable types explicitly, and mark sensitive outputs with `sensitive = true`.
-- Never commit secrets. Use variable validation for input constraints, and scan with `tfsec`, `checkov`, or `terrascan`.

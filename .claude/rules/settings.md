@@ -5,8 +5,6 @@ paths:
 
 # Settings
 
-`user/settings.json` holds user-level config (plugins, permissions, sandbox, hooks). `.claude/settings.json` holds project-level config. See the [settings documentation](https://code.claude.com/docs/en/settings) for available options.
-
 Read [`hooks.md`](hooks.md) before adding or changing a hook entry in either file.
 
 Why each sandbox grant and hook exists, and what would retire it, is in [`docs/settings.md`](../../docs/settings.md). Read it before adding, removing, or narrowing a host, write path, socket, escaped command, or hook entry.

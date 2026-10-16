@@ -367,6 +367,26 @@ describe("ox hook", () => {
       expect(await parseTranscript(transcriptPath, repoDir)).toEqual([kept]);
     });
 
+    // The whole-tree type check reaches tmp/ whatever the transcript held, so
+    // the repo config must ignore it too.
+    it("keeps the repo's tmp/ out of the whole-tree type check", async () => {
+      const repoRoot = join(import.meta.dirname, "..", "..", "..");
+      await mkdir(join(repoRoot, "tmp"), { recursive: true });
+      const scratch = await mkdtemp(join(repoRoot, "tmp", "ox-type-check-"));
+      try {
+        const broken = join(scratch, "broken.ts");
+        await Bun.write(broken, 'export const a: number = "x";\n');
+        const result = Bun.spawnSync(
+          [join(repoRoot, "node_modules", ".bin", "oxlint"), ...TYPE_CHECK_ARGS, broken],
+          { cwd: repoRoot },
+        );
+        expect(result.stdout.toString()).toBe("");
+        expect(result.exitCode).toBe(0);
+      } finally {
+        await rm(scratch, { recursive: true, force: true });
+      }
+    });
+
     it("drops a file edited outside the session's working directory", async () => {
       const outside = await mkdtemp(join(tmpdir(), "ox-scratchpad-"));
       const scratch = join(outside, "probe.ts");

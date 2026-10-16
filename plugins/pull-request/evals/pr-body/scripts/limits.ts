@@ -30,6 +30,8 @@ const ROWS = {
   visibleWords: "visible-words",
   maxBlockWords: "max-block",
   proseCodeSpans: "prose-code-spans",
+  pathSpans: "path-spans",
+  contrastPhrases: "contrast-phrases",
   hiddenWords: "hidden-words",
   maxItemsPerList: "list-items",
 } as const satisfies Record<CheckKey, string>;
@@ -156,7 +158,7 @@ export function render(counts: Counts): string {
 
 const program = new Command()
   .description(
-    "Add visible-words, max-block, prose-code-spans, hidden-words, and list-items rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
+    "Add visible-words, max-block, prose-code-spans, path-spans, contrast-phrases, hidden-words, and list-items rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
   )
   .argument("<results-dir...>", "results directories holding aggregate-result.json and traces/")
   .action(async (dirs) => {

@@ -39,7 +39,18 @@ export interface Structure {
   dashes: number;
   inlineCodePer100: number;
   proseCodeSpans: number;
+  pathSpans: number;
+  contrastPhrases: number;
 }
+
+// A span reads as a file path when it has a directory separator or a source
+// file extension. A dotted identifier like `opts.cases` is not one.
+const PATH_SPAN =
+  /^(?!\w+:\/\/)[^\s()]*(?:\/[^\s()]*|\.(?:[cm]?[jt]sx?|json|ya?ml|toml|md|mdx|py|go|rs|rb|sh|zsh|sql|tf|lock|txt|css|html|java|kt|swift|env))$/;
+
+// Contrast connectives Claude stacks to justify a decision. Ben's own PRs
+// rarely use two.
+const CONTRAST = /\b(?:instead of|rather than|so that|without)\b/gi;
 
 const wordSeg = new Intl.Segmenter("en", { granularity: "word" });
 const sentenceSeg = new Intl.Segmenter("en", { granularity: "sentence" });
@@ -88,6 +99,7 @@ interface Acc {
   collapsedBlocks: number;
   checkboxes: number;
   inlineCode: number;
+  pathSpans: number;
   proseText: string[];
 }
 
@@ -97,9 +109,9 @@ function countImages(node: Nodes): number {
   return "children" in node ? node.children.reduce((n, c) => n + countImages(c), 0) : 0;
 }
 
-function countInlineCode(node: Nodes): number {
-  if (node.type === "inlineCode") return 1;
-  return "children" in node ? node.children.reduce((n, c) => n + countInlineCode(c), 0) : 0;
+function countInlineCode(node: Nodes, path = false): number {
+  if (node.type === "inlineCode") return !path || PATH_SPAN.test(node.value) ? 1 : 0;
+  return "children" in node ? node.children.reduce((n, c) => n + countInlineCode(c, path), 0) : 0;
 }
 
 function visitList(list: List, acc: Acc): void {
@@ -112,9 +124,9 @@ function visitList(list: List, acc: Acc): void {
     acc.bulletSentences.push(sentences(text).length);
     acc.listWords += words;
     acc.visibleWords += words;
-    acc.inlineCode += item.children
-      .filter((c) => c.type !== "list")
-      .reduce((n, c) => n + countInlineCode(c), 0);
+    const own = item.children.filter((c) => c.type !== "list");
+    acc.inlineCode += own.reduce((n, c) => n + countInlineCode(c), 0);
+    acc.pathSpans += own.reduce((n, c) => n + countInlineCode(c, true), 0);
     acc.visibleImages += countImages(item);
     acc.proseText.push(text);
     for (const child of item.children) if (child.type === "list") visitList(child, acc);
@@ -162,6 +174,7 @@ function visitChildren(children: RootContent[], acc: Acc, collapsed: boolean): v
         acc.visibleWords += words;
         acc.visibleImages += countImages(node);
         acc.inlineCode += countInlineCode(node);
+        acc.pathSpans += countInlineCode(node, true);
         acc.proseText.push(text);
         break;
       }
@@ -213,6 +226,7 @@ export function measureStructure(body: string): Structure {
     collapsedBlocks: 0,
     checkboxes: 0,
     inlineCode: 0,
+    pathSpans: 0,
     proseText: [],
   };
   visitChildren(root.children, acc, false);
@@ -251,6 +265,8 @@ export function measureStructure(body: string): Structure {
     dashes: per100((prose.match(/\s[—–]\s|—/g) ?? []).length, v),
     inlineCodePer100: per100(acc.inlineCode, v),
     proseCodeSpans: acc.inlineCode,
+    pathSpans: acc.pathSpans,
+    contrastPhrases: (prose.match(CONTRAST) ?? []).length,
   };
 }
 
@@ -260,6 +276,8 @@ export const LIMITS = {
   visibleWords: 120,
   maxBlockWords: 40,
   proseCodeSpans: 6,
+  pathSpans: 1,
+  contrastPhrases: 1,
 } as const satisfies Partial<Structure>;
 
 export type LimitKey = keyof typeof LIMITS;

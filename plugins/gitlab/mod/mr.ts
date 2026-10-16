@@ -337,9 +337,11 @@ export function decide(prev: Snapshot, next: Snapshot): Decision[] {
     );
   }
 
-  if (isBlocked(next.block) && next.block !== prev.block) {
+  // A reopened MR starts clear, so a block it still carries is news again.
+  const before = isOpen(prev) ? prev.block : "none";
+  if (isBlocked(next.block) && next.block !== before) {
     decisions.push({ action: "promote", kind: next.block });
-  } else if (next.block === "none" && isBlocked(prev.block)) {
+  } else if (next.block === "none" && isBlocked(before)) {
     decisions.push({ action: "drop", kind: "unblocked" });
   }
 
@@ -354,6 +356,13 @@ export function decide(prev: Snapshot, next: Snapshot): Decision[] {
 
   decisions.push(...feedbackOf(prev, next, isSameHead));
   return decisions;
+}
+
+// An approval and its revocation cancel out, since the model saw neither.
+function approvalOf(carried: Approval, fresh: Approval): Approval {
+  if (fresh === null) return carried;
+  if (carried === null) return fresh;
+  return carried === fresh ? fresh : null;
 }
 
 /**
@@ -383,7 +392,7 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
     const held = byAuthor.get(d.author);
     byAuthor.set(d.author, {
       ...d,
-      approval: d.approval ?? held?.approval ?? null,
+      approval: approvalOf(held?.approval ?? null, d.approval),
       notes: (held?.notes ?? 0) + d.notes,
     });
   }

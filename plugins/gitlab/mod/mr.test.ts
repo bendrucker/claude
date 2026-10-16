@@ -333,6 +333,12 @@ describe("combine", () => {
     ]);
   });
 
+  test("an approval and its revocation cancel out", () => {
+    expect(combine([fb("bob", "approved")], [fb("bob", "unapproved", 1)])).toEqual([
+      fb("bob", null, 1),
+    ]);
+  });
+
   test("the MR's end replaces everything else", () => {
     expect(combine([fb("alice", null, 1)], [{ action: "promote", kind: "mr.merged" }])).toEqual([
       { action: "promote", kind: "mr.merged" },

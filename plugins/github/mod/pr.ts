@@ -144,7 +144,7 @@ export interface Snapshot {
 
 /** The session's own login and whether the PR head commit exists locally. */
 export interface Local {
-  me: string;
+  me: string | undefined;
   isHeadKnown: boolean;
 }
 
@@ -315,9 +315,11 @@ export function decide(prev: Snapshot, next: Snapshot): Decision[] {
     );
   }
 
-  if (isBlocked(next.block) && next.block !== prev.block) {
+  // A reopened PR starts clear, so a block it still carries is news again.
+  const before = prev.state === "OPEN" ? prev.block : "none";
+  if (isBlocked(next.block) && next.block !== before) {
     decisions.push({ action: "promote", kind: next.block });
-  } else if (next.block === "none" && isBlocked(prev.block)) {
+  } else if (next.block === "none" && isBlocked(before)) {
     decisions.push({ action: "drop", kind: "unblocked" });
   }
 

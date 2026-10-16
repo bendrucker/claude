@@ -39,6 +39,8 @@ interface World {
   drop?: string;
   /** Heads this checkout lacks, as a push from elsewhere leaves them. */
   foreign?: string[];
+  /** A token that cannot read `/user`. */
+  noLogin?: boolean;
 }
 
 function worldOf(on: On, world: World) {
@@ -92,11 +94,11 @@ function worldOf(on: On, world: World) {
         },
       };
     }
-    if (argv === "gh api user --jq .login") {
+    if (argv === "gh api user --hostname github.com --jq .login") {
       return {
         value: {
-          exitCode: 0,
-          stdout: "ben\n",
+          exitCode: world.noLogin === true ? 1 : 0,
+          stdout: world.noLogin === true ? "" : "ben\n",
           stderr: "",
           isStdoutTruncated: false,
           isStderrTruncated: false,
@@ -313,20 +315,82 @@ describe("register", () => {
     expect(w.submits).toEqual(["PR #7 closed without merging: https://github.com/o/r/pull/7"]);
   });
 
-  test("a dropped conflict is not retried against a new commit still being checked", async ($, on) => {
+  async function dropConflictThenRecheck($: Engine, on: On, settled: string): Promise<number> {
+    const view = (headRefOid: string, mergeable: string) => ({
+      ...pr("SUCCESS"),
+      headRefOid,
+      mergeable,
+    });
     const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS"), drop: "busy" };
     const w = worldOf(on, world);
-
     await $.session.start(START);
     await w.clock.settle();
-    world.view = { ...pr("SUCCESS"), mergeable: "CONFLICTING" };
+    world.view = view("aaaaaaa1111", "CONFLICTING");
     await w.clock.advance(POLL_MS.settled);
     delete world.drop;
-    world.view = { ...pr("SUCCESS"), headRefOid: "bbbbbbb2222", mergeable: "UNKNOWN" };
+    world.view = view("bbbbbbb2222", "UNKNOWN");
     await w.clock.advance(POLL_MS.settled);
-
     expect(w.submits.length).toBe(1);
-    expect(await w.shown($)).toBe("\u{f49e} CI");
+    world.view = view("bbbbbbb2222", settled);
+    await w.clock.advance(POLL_MS.settled);
+    return w.submits.length;
+  }
+
+  test("a dropped conflict waits out a recheck and goes when the new commit still conflicts", async ($, on) => {
+    expect(await dropConflictThenRecheck($, on, "CONFLICTING")).toBe(2);
+  });
+
+  test("a dropped conflict waits out a recheck and is gone when the new commit is clean", async ($, on) => {
+    expect(await dropConflictThenRecheck($, on, "MERGEABLE")).toBe(1);
+  });
+
+  test("a push while a conflict stands does not announce it again", async ($, on) => {
+    const view = (headRefOid: string, mergeable: string) => ({
+      ...pr("SUCCESS"),
+      headRefOid,
+      mergeable,
+    });
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+    const w = worldOf(on, world);
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = view("aaaaaaa1111", "CONFLICTING");
+    await w.clock.advance(POLL_MS.settled);
+    world.view = view("bbbbbbb2222", "UNKNOWN");
+    await w.clock.advance(POLL_MS.settled);
+    world.view = view("bbbbbbb2222", "CONFLICTING");
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits.length).toBe(1);
+  });
+
+  test("a PR reopened with its conflict announces it again", async ($, on) => {
+    const conflicting = { ...pr("SUCCESS"), mergeable: "CONFLICTING" };
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+    const w = worldOf(on, world);
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = conflicting;
+    await w.clock.advance(POLL_MS.settled);
+    world.view = { ...conflicting, state: "CLOSED" };
+    await w.clock.advance(POLL_MS.settled);
+    world.view = conflicting;
+    await w.clock.advance(POLL_MS.closed);
+    expect(w.named("promote").map((e) => e.detail?.kind)).toEqual([
+      "conflict",
+      "pr.closed",
+      "conflict",
+    ]);
+  });
+
+  test("a token that cannot read the login still watches the PR", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS"), noLogin: true };
+    const w = worldOf(on, world);
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = pr("FAILURE");
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.submits.length).toBe(1);
   });
 
   test("a review after a sent alert carries only the review", async ($, on) => {

@@ -125,12 +125,23 @@ async function meOf($: EngineInterface, watch: Watch, cwd: string): Promise<stri
 
 // Every worktree of the repository shares one object store, so only a push from
 // another clone or from GitLab itself leaves the head unknown here. Only exit 1
-// means a missing object, so a failing git fails the poll instead of crying push.
+// means a missing object, so a failing git reads as known rather than crying push.
 async function isKnown($: EngineInterface, cwd: string, sha: string): Promise<boolean> {
   const argv = ["git", "rev-parse", "--verify", "--quiet", `${sha}^{commit}`];
   const result = await $.process.run(argv, { cwd });
-  if (result.exitCode > 1) throw new Error(`git rev-parse exited ${result.exitCode}`);
-  return result.exitCode === 0;
+  return result.exitCode !== 1;
+}
+
+// A commit once present stays present, so only a new or missing head is checked again.
+async function isHeadKnownOf(
+  $: EngineInterface,
+  watch: Watch,
+  cwd: string,
+  sha: string,
+): Promise<boolean> {
+  const prev = watch.snapshot;
+  if (prev?.head === sha && prev.isHeadKnown) return true;
+  return isKnown($, cwd, sha);
 }
 
 async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promise<Read> {
@@ -157,7 +168,7 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
       ? Promise.resolve<Job[]>([])
       : jobsOf($, cwd, pipeline.projectId, pipeline.id),
     meOf($, watch, cwd),
-    isKnown($, cwd, view.sha),
+    isHeadKnownOf($, watch, cwd, view.sha),
   ]);
   const read = snapshotOf({
     view,
@@ -212,25 +223,40 @@ async function inject(
   }
 }
 
-function stillDue(undelivered: Undelivered | undefined, next: Snapshot): Promoted[] {
-  if (undelivered === undefined) return [];
-  return undelivered.decisions.flatMap((decision): Promoted[] => {
+interface Due {
+  due: Promoted[];
+  /** Blocks waiting on the forge to decide mergeability, kept unsent. */
+  held: Promoted[];
+}
+
+// `decided` is this poll's own mergeability answer, before any carry-forward.
+function stillDue(
+  undelivered: Undelivered | undefined,
+  next: Snapshot,
+  decided: Snapshot["block"],
+): Due {
+  if (undelivered === undefined) return { due: [], held: [] };
+  const held: Promoted[] = [];
+  const due = undelivered.decisions.flatMap((decision): Promoted[] => {
     if (decision.kind === "mr.merged") return next.state === "merged" ? [decision] : [];
     if (decision.kind === "mr.closed") return next.state === "closed" ? [decision] : [];
     if (!isOpen(next)) return [];
     if (decision.kind === "conflict" || decision.kind === "behind") {
-      if (undelivered.head !== next.head) return [];
-      return next.block === undefined || next.block === decision.kind ? [decision] : [];
+      if (decided === undefined) held.push(decision);
+      return decided === decision.kind ? [decision] : [];
     }
     if (decision.kind === "push.foreign") return next.isHeadKnown ? [] : [decision];
+    if (decision.kind === "changes_requested") return next.isChangesRequested ? [decision] : [];
     if (decision.kind !== "ci.failed") return [decision];
     if (undelivered.head !== next.head) return [];
     const failed = decision.failed.filter((label) => next.failed.includes(label));
     return failed.length > 0 ? [{ ...decision, failed }] : [];
   });
+  return { due, held };
 }
 
-// Resolves false when the watch stopped or restarted during the send.
+// Resolves false when the watch stopped or restarted during the send. What failed
+// to send and what is `held` stay undelivered for the next poll.
 async function send(
   $: EngineInterface,
   watch: Watch,
@@ -238,12 +264,17 @@ async function send(
   due: Promoted[],
   attempt: number,
   isCurrent: () => boolean,
+  held: Promoted[] = [],
 ): Promise<boolean> {
-  if (due.length === 0) return true;
-  const isSent = await inject($, next, due, attempt);
-  if (!isCurrent()) return false;
-  if (!isSent && attempt < MAX_ATTEMPTS) {
-    watch.undelivered = { head: next.head, decisions: due, attempts: attempt };
+  let failed: Promoted[] = [];
+  if (due.length > 0) {
+    const isSent = await inject($, next, due, attempt);
+    if (!isCurrent()) return false;
+    if (!isSent && attempt < MAX_ATTEMPTS) failed = due;
+  }
+  if (failed.length > 0 || held.length > 0) {
+    const attempts = failed.length > 0 ? attempt : attempt - 1;
+    watch.undelivered = { head: next.head, decisions: [...failed, ...held], attempts };
   }
   return true;
 }
@@ -272,15 +303,10 @@ async function apply(
     prev !== undefined &&
     prev.mr === read.snapshot.mr &&
     prev.projectId === read.snapshot.projectId;
-  // An undecided poll keeps the last answer for the same commits, so a recompute
-  // does not re-announce a block.
+  // An undecided poll keeps the last answer, so a recompute does not re-announce a block.
+  const decided = read.snapshot.block;
   const next =
-    isSameMr &&
-    read.snapshot.block === undefined &&
-    read.snapshot.head === prev.head &&
-    read.snapshot.target === prev.target
-      ? { ...read.snapshot, block: prev.block }
-      : read.snapshot;
+    isSameMr && decided === undefined ? { ...read.snapshot, block: prev.block } : read.snapshot;
   if (!isSameMr) {
     emit($, "mr.tracked", { mr: next.mr, head: next.head, phase: next.phase, state: next.state });
     watch.undelivered = undefined;
@@ -295,10 +321,12 @@ async function apply(
       emit($, action, { mr: next.mr, head: next.head, ...detail });
     }
     const fresh = decisions.filter((d): d is Promoted => d.action === "promote");
-    const due = combine(stillDue(watch.undelivered, next), fresh);
+    const { due, held } = stillDue(watch.undelivered, next, decided);
     const attempt = fresh.length > 0 ? 1 : (watch.undelivered?.attempts ?? 0) + 1;
     watch.undelivered = undefined;
-    if (!(await send($, watch, next, due, attempt, isCurrent))) return undefined;
+    if (!(await send($, watch, next, combine(due, fresh), attempt, isCurrent, held))) {
+      return undefined;
+    }
   }
   watch.snapshot = next;
   watch.branch = read.branch;

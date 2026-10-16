@@ -207,6 +207,22 @@ async function createTypeAwareFixture(
   return filePath;
 }
 
+// The stop gate type-checks the whole working tree each file resolves to, so a
+// fixture outside any repo would type-check this whole repository instead. Only
+// the checker is linked: oxlint walks a linked node_modules as source.
+async function createGateRepo(baseDir: string): Promise<string> {
+  const repoDir = await mkdtemp(join(baseDir, "gate-repo-"));
+  await execAsync("git init", { cwd: repoDir });
+  await Bun.write(
+    join(repoDir, ".oxlintrc.json"),
+    JSON.stringify({ rules: { "no-dupe-keys": "error" } }),
+  );
+  const tsgolint = join(import.meta.dirname, "..", "..", "..", "node_modules", ".bin", "tsgolint");
+  await mkdir(join(repoDir, "node_modules", ".bin"), { recursive: true });
+  await execAsync(`ln -s "${tsgolint}" node_modules/.bin/tsgolint`, { cwd: repoDir });
+  return repoDir;
+}
+
 describe("ox hook", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ox-test-"));
@@ -593,7 +609,7 @@ describe("ox hook", () => {
     // A session holding one lint error oxfmt cannot fix, stopped repeatedly.
     // Each block-budget test drives its own so the on-disk count stays its own.
     async function unfixableSession(session: string): Promise<string> {
-      const filePath = await copyFixture("unfixable.ts", tempDir);
+      const filePath = await copyFixture("unfixable.ts", await createGateRepo(tempDir));
       const transcriptPath = join(tempDir, `transcript-${session}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
       return transcriptPath;
@@ -691,7 +707,7 @@ describe("ox hook", () => {
     });
 
     it("returns null when all files pass", async () => {
-      const filePath = await copyFixture("valid.ts", tempDir);
+      const filePath = await copyFixture("valid.ts", await createGateRepo(tempDir));
       const transcriptPath = join(tempDir, `transcript-valid-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
 
@@ -700,7 +716,7 @@ describe("ox hook", () => {
     });
 
     it("auto-formats fixable deviations and allows stop", async () => {
-      const filePath = await copyFixture("fixable.ts", tempDir);
+      const filePath = await copyFixture("fixable.ts", await createGateRepo(tempDir));
       const transcriptPath = join(tempDir, `transcript-fixable-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
 
@@ -712,7 +728,7 @@ describe("ox hook", () => {
     });
 
     it("returns block decision when issues cannot be auto-fixed", async () => {
-      const filePath = await copyFixture("unfixable.ts", tempDir);
+      const filePath = await copyFixture("unfixable.ts", await createGateRepo(tempDir));
       const transcriptPath = join(tempDir, `transcript-unfixable-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
 
@@ -735,10 +751,11 @@ describe("ox hook", () => {
     });
 
     it("processes multiple files together", async () => {
+      const repoDir = await createGateRepo(tempDir);
       const [validPath, fixablePath, unfixablePath] = await Promise.all([
-        copyFixture("valid.ts", tempDir),
-        copyFixture("fixable.ts", tempDir),
-        copyFixture("unfixable.ts", tempDir),
+        copyFixture("valid.ts", repoDir),
+        copyFixture("fixable.ts", repoDir),
+        copyFixture("unfixable.ts", repoDir),
       ]);
 
       const transcriptPath = join(tempDir, `transcript-multi-${Date.now()}.jsonl`);
@@ -851,7 +868,7 @@ describe("ox hook", () => {
   // the closing verb, and the fact that both batch file paths into a command.
   describe("runOxGate", () => {
     it("names the blocked action in the reason", async () => {
-      const filePath = await copyFixture("unfixable.ts", tempDir);
+      const filePath = await copyFixture("unfixable.ts", await createGateRepo(tempDir));
       const transcriptPath = join(tempDir, `transcript-verb-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
 
@@ -897,7 +914,7 @@ describe("ox hook", () => {
     });
 
     it("routes Stop events correctly", async () => {
-      const filePath = await copyFixture("unfixable.ts", tempDir);
+      const filePath = await copyFixture("unfixable.ts", await createGateRepo(tempDir));
       const transcriptPath = join(tempDir, `transcript-route-${Date.now()}.jsonl`);
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
 

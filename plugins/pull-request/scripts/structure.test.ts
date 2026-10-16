@@ -61,7 +61,7 @@ describe("measureStructure", () => {
 });
 
 describe("exceededLimits", () => {
-  test.each<[string, Structure, string[]]>([
+  test.each<[string, Parameters<typeof exceededLimits>[0], string[]]>([
     ["at every limit", { visibleWords: 120, maxBlockWords: 40, proseCodeSpans: 6 }, []],
     ["words only", { visibleWords: 121, maxBlockWords: 40, proseCodeSpans: 6 }, ["visible words"]],
     [

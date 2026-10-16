@@ -114,6 +114,8 @@ jobs:
       - uses: ./.github/actions/bun-install
 
       - uses: ./.github/actions/claude-code
+        with:
+          sandbox: true
 
       # --threshold 0 leaves the exit code to runner errors. Scores are read
       # from aggregate-result.json, where a case below 1.0 is the normal state.

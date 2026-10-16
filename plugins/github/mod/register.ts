@@ -4,6 +4,8 @@ import {
   type Promoted,
   type Snapshot,
   VIEW_FIELDS,
+  baselineOf,
+  combine,
   decide,
   messageOf,
   parseView,
@@ -36,6 +38,7 @@ interface Undelivered {
 
 interface Watch {
   snapshot: Snapshot | undefined;
+  me: string | undefined;
   undelivered: Undelivered | undefined;
   error: string | undefined;
   timer: { cancel(): void } | undefined;
@@ -66,7 +69,45 @@ async function isDefaultBranch($: EngineInterface, cwd: string, branch: string):
   return origin.stdout.trim() === `origin/${branch}`;
 }
 
-async function readPr($: EngineInterface): Promise<Read> {
+// The login only filters the viewer's own feedback, so a token that cannot read
+// it leaves that feedback unfiltered rather than failing the poll.
+async function meOf(
+  $: EngineInterface,
+  watch: Watch,
+  cwd: string,
+  url: string,
+): Promise<string | undefined> {
+  if (watch.me !== undefined) return watch.me;
+  const argv = ["gh", "api", "user", "--hostname", new URL(url).hostname, "--jq", ".login"];
+  const user = await $.process.run(argv, { cwd, timeoutMs: 20_000 });
+  const login = user.stdout.trim();
+  if (user.exitCode !== 0 || login === "") return undefined;
+  watch.me = login;
+  return login;
+}
+
+// Every worktree of the repository shares one object store, so only a push from
+// another clone or from GitHub itself leaves the head unknown here. Only exit 1
+// means a missing object, so a failing git reads as known rather than crying push.
+async function isKnown($: EngineInterface, cwd: string, sha: string): Promise<boolean> {
+  const argv = ["git", "rev-parse", "--verify", "--quiet", `${sha}^{commit}`];
+  const result = await $.process.run(argv, { cwd });
+  return result.exitCode !== 1;
+}
+
+// A commit once present stays present, so only a new or missing head is checked again.
+async function isHeadKnownOf(
+  $: EngineInterface,
+  watch: Watch,
+  cwd: string,
+  sha: string,
+): Promise<boolean> {
+  const prev = watch.snapshot;
+  if (prev?.head === sha && prev.isHeadKnown) return true;
+  return isKnown($, cwd, sha);
+}
+
+async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
   const cwd = await $.session.cwd();
   const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
   const branch = head.stdout.trim();
@@ -84,7 +125,11 @@ async function readPr($: EngineInterface): Promise<Read> {
   }
   const parsed = parseView(view.stdout);
   if (parsed === undefined) throw new Error("gh pr view returned an unexpected shape");
-  return { kind: "pr", snapshot: snapshotOf(parsed) };
+  const [me, isHeadKnown] = await Promise.all([
+    meOf($, watch, cwd, parsed.url),
+    isHeadKnownOf($, watch, cwd, parsed.headRefOid),
+  ]);
+  return { kind: "pr", snapshot: snapshotOf(parsed, { me, isHeadKnown }) };
 }
 
 async function inject(
@@ -110,26 +155,59 @@ async function inject(
   }
 }
 
-// What a dropped injection still has to say: failures only on the same head
-// and only for checks still failing, reviews only while the PR is open.
-function stillDue(undelivered: Undelivered | undefined, next: Snapshot): Promoted[] {
-  if (undelivered === undefined || next.state !== "OPEN") return [];
-  return undelivered.decisions.flatMap((decision): Promoted[] => {
+interface Due {
+  due: Promoted[];
+  /** Blocks waiting on the forge to decide mergeability, kept unsent. */
+  held: Promoted[];
+}
+
+// `decided` is this poll's own mergeability answer, before any carry-forward.
+function stillDue(
+  undelivered: Undelivered | undefined,
+  next: Snapshot,
+  decided: Snapshot["block"],
+): Due {
+  if (undelivered === undefined) return { due: [], held: [] };
+  const held: Promoted[] = [];
+  const due = undelivered.decisions.flatMap((decision): Promoted[] => {
+    if (decision.kind === "pr.merged") return next.state === "MERGED" ? [decision] : [];
+    if (decision.kind === "pr.closed") return next.state === "CLOSED" ? [decision] : [];
+    if (next.state !== "OPEN") return [];
+    if (decision.kind === "conflict" || decision.kind === "behind") {
+      if (decided === undefined) held.push(decision);
+      return decided === decision.kind ? [decision] : [];
+    }
+    if (decision.kind === "push.foreign") return next.isHeadKnown ? [] : [decision];
     if (decision.kind !== "ci.failed") return [decision];
     if (undelivered.head !== next.head) return [];
     const failed = decision.failed.filter((label) => next.failed.includes(label));
     return failed.length > 0 ? [{ ...decision, failed }] : [];
   });
+  return { due, held };
 }
 
-function merge(carried: Promoted[], fresh: Promoted[]): Promoted[] {
-  const failed = [...carried, ...fresh].flatMap((d) => (d.kind === "ci.failed" ? d.failed : []));
-  const reviews = [...carried, ...fresh].filter((d) => d.kind !== "ci.failed");
-  if (failed.length === 0) return reviews;
-  return [
-    { action: "promote", kind: "ci.failed", failed: [...new Set(failed)].toSorted() },
-    ...reviews,
-  ];
+// Resolves false when the watch stopped or restarted during the send. What failed
+// to send and what is `held` stay undelivered for the next poll.
+async function send(
+  $: EngineInterface,
+  watch: Watch,
+  next: Snapshot,
+  due: Promoted[],
+  attempt: number,
+  isCurrent: () => boolean,
+  held: Promoted[] = [],
+): Promise<boolean> {
+  let failed: Promoted[] = [];
+  if (due.length > 0) {
+    const isSent = await inject($, next, due, attempt);
+    if (!isCurrent()) return false;
+    if (!isSent && attempt < MAX_ATTEMPTS) failed = due;
+  }
+  if (failed.length > 0 || held.length > 0) {
+    const attempts = failed.length > 0 ? attempt : attempt - 1;
+    watch.undelivered = { head: next.head, decisions: [...failed, ...held], attempts };
+  }
+  return true;
 }
 
 function delayOf(snapshot: Snapshot): number {
@@ -150,26 +228,31 @@ async function apply(
     watch.undelivered = undefined;
     return POLL_MS.idle;
   }
-  const next = read.snapshot;
   const prev = watch.snapshot;
-  if (prev === undefined || prev.pr !== next.pr) {
+  const isSamePr = prev !== undefined && prev.pr === read.snapshot.pr;
+  // An undecided poll keeps the last answer, so a recompute does not re-announce a block.
+  const decided = read.snapshot.block;
+  const next =
+    isSamePr && decided === undefined ? { ...read.snapshot, block: prev.block } : read.snapshot;
+  if (!isSamePr) {
     emit($, "pr.tracked", { pr: next.pr, head: next.head, phase: next.phase, state: next.state });
     watch.undelivered = undefined;
+    const baseline = baselineOf(next);
+    for (const { action, ...detail } of baseline) {
+      emit($, action, { pr: next.pr, head: next.head, baseline: true, ...detail });
+    }
+    if (!(await send($, watch, next, baseline, 1, isCurrent))) return undefined;
   } else {
     const decisions = decide(prev, next);
     for (const { action, ...detail } of decisions) {
       emit($, action, { pr: next.pr, head: next.head, ...detail });
     }
     const fresh = decisions.filter((d): d is Promoted => d.action === "promote");
-    const due = merge(stillDue(watch.undelivered, next), fresh);
+    const { due, held } = stillDue(watch.undelivered, next, decided);
     const attempt = fresh.length > 0 ? 1 : (watch.undelivered?.attempts ?? 0) + 1;
     watch.undelivered = undefined;
-    if (due.length > 0) {
-      const isSent = await inject($, next, due, attempt);
-      if (!isCurrent()) return undefined;
-      if (!isSent && attempt < MAX_ATTEMPTS) {
-        watch.undelivered = { head: next.head, decisions: due, attempts: attempt };
-      }
+    if (!(await send($, watch, next, combine(due, fresh), attempt, isCurrent, held))) {
+      return undefined;
     }
   }
   watch.snapshot = next;
@@ -182,7 +265,7 @@ async function poll($: EngineInterface, watch: Watch, generation: number): Promi
   if (!isCurrent()) return;
   let delay: number;
   try {
-    const read = await readPr($);
+    const read = await readPr($, watch);
     // A session.end that landed while gh ran has already cleared the status.
     if (!isCurrent()) return;
     const applied = await apply($, watch, read, isCurrent);
@@ -214,12 +297,14 @@ async function hasGh($: EngineInterface): Promise<boolean> {
 
 /**
  * Watches the current branch's pull request with `gh` and shows its CI and
- * review state at the end of the prompt footer. A newly failed check or any new review is
- * sent to the model. Every other change is only shown and logged.
+ * review state at the end of the prompt footer. What `decide` promotes is sent
+ * to the model, along with a block already present when a PR is first seen.
+ * Every other change is only shown and logged.
  */
 export function register(on: On): void {
   const watch: Watch = {
     snapshot: undefined,
+    me: undefined,
     undelivered: undefined,
     error: undefined,
     timer: undefined,
@@ -241,6 +326,7 @@ export function register(on: On): void {
     emit($, "session.start", { active: true });
     if (watch.isStopped) {
       watch.isStopped = false;
+      watch.me = undefined;
       watch.generation += 1;
       void poll($, watch, watch.generation);
     }

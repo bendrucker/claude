@@ -49,6 +49,8 @@ interface World {
   slowMs?: number;
   versionMs?: number;
   submitMs?: number;
+  /** Heads this checkout lacks, as a push from elsewhere leaves them. */
+  foreign?: string[];
   drop?: string;
 }
 
@@ -89,6 +91,18 @@ function worldOf(on: On, world: World) {
     const argv = e.argv.join(" ");
     if (argv.startsWith("git symbolic-ref")) {
       return world.originHead === undefined ? result("", "", 1) : result(`${world.originHead}\n`);
+    }
+    if (argv.startsWith("git rev-parse --verify")) {
+      const isForeign = (world.foreign ?? []).some((sha) => argv.includes(sha));
+      return {
+        value: {
+          exitCode: isForeign ? 1 : 0,
+          stdout: "",
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
     }
     if (argv.startsWith("git ")) return result(`${world.branch}\n`);
     if (argv === "glab --version") {
@@ -174,6 +188,70 @@ describe("register", () => {
     expect(await w.shown($)).toBe("\u{f49e} CI · \u{f441} 1 approval needed");
   });
 
+  test("an MR already conflicting when first seen is announced once, through a recheck", async ($, on) => {
+    const conflicting = { ...mr("success"), has_conflicts: true, target_branch: "main" };
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: conflicting,
+      jobs: job("success"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = { ...conflicting, has_conflicts: false, detailed_merge_status: "checking" };
+    await w.clock.advance(POLL_MS.settled);
+    world.view = conflicting;
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits.length).toBe(1);
+    expect(w.submits[0]).toContain("MR !7 has merge conflicts with `main` at aaaaaaa.");
+    expect(w.named("promote")[0]?.detail).toMatchObject({ kind: "conflict", baseline: true });
+  });
+
+  test("a dropped conflict is not retried against a new commit still being checked", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+      drop: "busy",
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = { ...mr("success"), has_conflicts: true };
+    await w.clock.advance(POLL_MS.settled);
+    delete world.drop;
+    world.view = { ...mr("success"), sha: "bbbbbbb2222", detailed_merge_status: "checking" };
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits.length).toBe(1);
+  });
+
+  test("a push from elsewhere wakes the model", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.foreign = ["ccccccc3333"];
+    world.view = { ...mr("success"), sha: "ccccccc3333" };
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits.length).toBe(1);
+    expect(w.submits[0]).toContain(
+      "moved from aaaaaaa to ccccccc, a commit this checkout does not have",
+    );
+  });
+
   test("every review from someone else wakes the model, comment-only included", async ($, on) => {
     const world: World = {
       branch: "topic",
@@ -199,7 +277,7 @@ describe("register", () => {
     world.approvals = approvals();
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits[2]).toContain("@alice revoked their approval of MR !7");
-    expect(w.named("promote").map((e) => e.detail?.state)).toEqual([
+    expect(w.named("promote").map((e) => e.detail?.approval ?? "commented")).toEqual([
       "commented",
       "approved",
       "unapproved",
@@ -254,7 +332,7 @@ describe("register", () => {
     ]);
   });
 
-  test("a merged MR is read back by IID, logged, shown as merged, and read no further", async ($, on) => {
+  test("a merged MR is read back by IID, sent to the model, shown as merged, and read no further", async ($, on) => {
     const world: World = { branch: "topic", glab: GLAB_OK, view: mr() };
     const w = worldOf(on, world);
 
@@ -270,8 +348,8 @@ describe("register", () => {
       "glab mr view -F json",
       "glab mr view 7 -F json",
     ]);
-    expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["mr.merged"]);
-    expect(w.submits).toEqual([]);
+    expect(w.named("promote").map((e) => e.detail?.kind)).toEqual(["mr.merged"]);
+    expect(w.submits).toEqual(["MR !7 merged: https://gitlab.example.com/g/r/-/merge_requests/7"]);
     expect(await w.shown($)).toBe("\u{f419} merged");
 
     world.approvals = "approvals should not be read again";

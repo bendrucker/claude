@@ -68,6 +68,12 @@ load: 2 of 6 rounds above 2×8 cpus (2, 5). Re-run an accept that rests on them
 | base | 18 | 7.51s | 1.4% | base |  | 288.0 |  |
 | candidate | 18 | 7.24s | 2.4% | -3.6%* | 0.061 | 291.5 |  |
 
+without the loaded rounds:
+| arm | n | median | ±MAD | change | p | peak MB | failed |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| base | 12 | 7.51s | 1.6% | base |  | 288.0 |  |
+| candidate | 12 | 7.39s | 2.1% | -1.6% | 0.330 | 291.5 |  |
+
 * p < 0.1 and |change| ≥ 3%. † fewer than 4 runs a side, too few to star.
 ```
 

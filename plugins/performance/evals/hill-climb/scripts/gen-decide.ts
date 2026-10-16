@@ -211,6 +211,8 @@ interface Trap {
   floor?: (v: number) => number;
   /** The 1-based rounds that ran loaded. */
   loaded?: number[];
+  /** The full metric pooled without the loaded rounds, unless every round ran loaded. */
+  unloaded?: (v: number) => Measured;
   guardFails?: boolean;
 }
 
@@ -374,6 +376,7 @@ export const TRAPS: Trap[] = [
     full: (v) => ({ change: -at([4.0, 4.4, 3.6], v), p: at([0.044, 0.028, 0.061], v) }),
     floor: (v) => at([3.6, 4.0, 3.3], v),
     loaded: [2, 5],
+    unloaded: (v) => ({ change: -at([1.2, 0.8, 1.6], v), p: at([0.41, 0.56, 0.33], v) }),
   },
   {
     id: "near-floor",
@@ -404,6 +407,7 @@ export const TRAPS: Trap[] = [
     lead: "big",
     full: (v) => ({ change: -at([14.6, 12.2, 15.8], v), p: 0.001 }),
     loaded: [4],
+    unloaded: (v) => ({ change: -at([14.9, 12.0, 15.5], v), p: 0.002 }),
   },
 ];
 
@@ -424,6 +428,8 @@ interface Arm {
   failures: number;
 }
 
+const FOOTNOTE = `* p < ${ALPHA} and |change| ≥ ${MIN_EFFECT}%. † fewer than 4 runs a side, too few to star.`;
+
 /** A `compare.ts report --markdown` table for a base and a candidate arm. */
 export function report(base: Arm, cand: Arm, p: number): string {
   const change = (cand.median / base.median - 1) * 100;
@@ -439,8 +445,6 @@ export function report(base: Arm, cand: Arm, p: number): string {
       `${change >= 0 ? "+" : ""}${change.toFixed(1)}%${significant ? "*" : ""}`,
       p.toFixed(3),
     ]),
-    "",
-    `* p < ${ALPHA} and |change| ≥ ${MIN_EFFECT}%. † fewer than 4 runs a side, too few to star.`,
   ].join("\n");
 }
 
@@ -510,6 +514,22 @@ export function generate(trap: Trap, domain: Domain, v: number, k: number): Gene
   const n = 2 + ((k * 3) % 5);
   const hypothesis = `${lead.hypothesis}.`;
   const rs = rounds(domain.ncpu, trap.loaded ?? [], k);
+  const quiet = RUNS - (trap.loaded?.length ?? 0) * (RUNS / rs.length);
+  const rest = trap.unloaded?.(v);
+  const unloadedTable =
+    rest === undefined
+      ? "every round was loaded"
+      : report(
+          arm("base", base, quiet, 0, k + 4),
+          arm("candidate", base * (1 + rest.change / 100), quiet, 0, k + 5),
+          rest.p,
+        );
+  const fullBlock = [
+    fullTable,
+    ...(trap.loaded === undefined ? [] : ["", "without the loaded rounds:", unloadedTable]),
+    "",
+    FOOTNOTE,
+  ].join("\n");
   const command = (a: string) => domain.command.replace("{arm}", a);
   const meta = {
     hypothesis: lead.hypothesis,
@@ -576,6 +596,8 @@ export function generate(trap: Trap, domain: Domain, v: number, k: number): Gene
     `hypothesis: ${lead.hypothesis}`,
     "",
     screenTable,
+    "",
+    FOOTNOTE,
     "```",
     "",
     `## Full metric: \`compare.ts report ${dir} --markdown\``,
@@ -584,7 +606,7 @@ export function generate(trap: Trap, domain: Domain, v: number, k: number): Gene
     `hypothesis: ${lead.hypothesis}`,
     loadLine(domain.ncpu, rs),
     "",
-    fullTable,
+    fullBlock,
     "```",
     "",
     `## \`${dir}/meta.json\``,

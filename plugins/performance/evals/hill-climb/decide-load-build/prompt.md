@@ -68,6 +68,9 @@ load: 6 of 6 rounds above 2×16 cpus (1, 2, 3, 4, 5, 6). Re-run an accept that r
 | base | 18 | 212.60s | 2.1% | base |  | 9120.0 |  |
 | candidate | 18 | 192.62s | 1.9% | -9.4%* | 0.004 | 9193.0 |  |
 
+without the loaded rounds:
+every round was loaded
+
 * p < 0.1 and |change| ≥ 3%. † fewer than 4 runs a side, too few to star.
 ```
 

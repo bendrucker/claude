@@ -82,7 +82,7 @@ Make one change per candidate. Before measuring it, append to the notes file, so
 - The target: which metric moves, and in which direction.
 - The guards a side effect would hit.
 
-A candidate without a profile entry behind it ranks last.
+A candidate without a profile entry behind it ranks last, unless a measurement sizes the time it targets: the gap between wall and CPU time, or a cold run against the warm one profiled. Rank that candidate at its measured size.
 
 Pass the same hypothesis to `compare.ts run --hypothesis`, which stores it with the comparison's load record.
 

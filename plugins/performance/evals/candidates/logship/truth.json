@@ -19,7 +19,8 @@
         "MustCompile",
         "regexp\\.Compile",
         "(pre-?)?compil\\w*[^\\n]{0,60}reg(ular )?ex",
-        "reg(ular )?ex\\w*[^\\n]{0,60}(compil|hoist)"
+        "reg(ular )?ex\\w*[^\\n]{0,60}(compil|hoist)",
+        "hoist\\w*[^\\n]{0,60}reg(ular )?ex"
       ]
     },
     {

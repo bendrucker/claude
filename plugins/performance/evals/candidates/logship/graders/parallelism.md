@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '^\s*([-*]|\d+[.)])[^\n]*(parallel|concurren|goroutine|GOMAXPROCS|errgroup|worker pool)'
+pattern: '^\s*([-*+]|\d+[.)])\s[^\n]*(parallel|concurren|goroutine|GOMAXPROCS|errgroup|worker pool)'
 flags: im
 match: contains
 ---

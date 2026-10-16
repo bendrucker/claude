@@ -15,11 +15,21 @@ import {
 } from "./score";
 
 const suite = join(import.meta.dir, "..");
-const truth = Truth.parse(await Bun.file(join(suite, "logship", "truth.json")).json());
-const profile = await Bun.file(join(suite, "logship", truth.profile)).text();
-const example = (name: string) => Bun.file(join(suite, "examples", "logship", name)).text();
-const pass = await example("pass.md");
-const trapFirst = await example("trap-first.md");
+
+async function load(name: string) {
+  const truth = Truth.parse(await Bun.file(join(suite, name, "truth.json")).json());
+  const profile = await Bun.file(join(suite, name, truth.profile)).text();
+  return { truth, profile };
+}
+const cases = { logship: await load("logship"), ledgerroll: await load("ledgerroll") };
+const { profile } = cases.logship;
+const example = (name: string, file: string) =>
+  Bun.file(join(suite, "examples", name, file)).text();
+const pass = await example("logship", "pass.md");
+const trapFirst = await example("logship", "trap-first.md");
+const ledgerPass = await example("ledgerroll", "pass.md");
+const byShare = await example("ledgerroll", "by-share.md");
+const paragraphParallel = await example("ledgerroll", "paragraph-parallel.md");
 
 describe("listBlocks", () => {
   test.each<[string, string, Block[]]>([
@@ -75,7 +85,16 @@ describe("cites", () => {
 
 describe("scoreReply", () => {
   const regexShare = 0.2415 / (0.439 + 0.2415);
-  test.each([
+  const ledgerWins = 0.11 + 0.1 + 0.08 + 0.06;
+  test.each<{
+    name: string;
+    case?: keyof typeof cases;
+    reply: string;
+    recall: number;
+    traps: string[];
+    cited: number;
+    parallelism: boolean;
+  }>([
     {
       name: "the pass example",
       reply: pass,
@@ -118,6 +137,15 @@ describe("scoreReply", () => {
       parallelism: false,
     },
     {
+      name: "a regex hoist named verb first",
+      reply:
+        "1. Hoist the two regexes to package-level `var`s.\n2. Replace the O(n²) scan in `dedupe`.",
+      recall: 1,
+      traps: [],
+      cited: 0.5,
+      parallelism: false,
+    },
+    {
       name: "no list",
       reply: "Profile first.",
       recall: 0,
@@ -125,8 +153,64 @@ describe("scoreReply", () => {
       cited: 0,
       parallelism: false,
     },
-  ])("$name", ({ reply, recall, traps, cited, parallelism }) => {
-    const score = scoreReply(reply, truth, profile);
+    {
+      name: "the ledgerroll pass example",
+      case: "ledgerroll",
+      reply: ledgerPass,
+      recall: 1,
+      traps: [],
+      cited: 1,
+      parallelism: true,
+    },
+    {
+      name: "the ledgerroll raw-share example",
+      case: "ledgerroll",
+      reply: byShare,
+      recall: (0.1 + 0.08 + 0.06) / ledgerWins,
+      traps: ["gzip"],
+      cited: 1,
+      parallelism: false,
+    },
+    {
+      name: "parallelism set aside outside the list",
+      case: "ledgerroll",
+      reply: paragraphParallel,
+      recall: 1,
+      traps: [],
+      cited: 1,
+      parallelism: false,
+    },
+    {
+      name: "a ledgerroll win that names gzip in passing",
+      case: "ledgerroll",
+      reply:
+        "1. Typed struct in `decodeRecord`, since gzip is fixed.\n2. `sort.Slice` once per group.",
+      recall: 0.21 / ledgerWins,
+      traps: [],
+      cited: 1,
+      parallelism: false,
+    },
+    {
+      name: "a resort described without naming sort.Slice",
+      case: "ledgerroll",
+      reply: "1. Sort each group once after grouping, instead of after every append (0.60 s).",
+      recall: 0.1 / ledgerWins,
+      traps: [],
+      cited: 0,
+      parallelism: false,
+    },
+    {
+      name: "a ledgerroll win ranked sixth",
+      case: "ledgerroll",
+      reply: "1. gzip\n2. GC\n3. `decodeRecord`\n4. `sort.Slice`\n5. `renderRow`\n6. `groupKey`",
+      recall: 0.29 / ledgerWins,
+      traps: ["gzip"],
+      cited: 4 / 6,
+      parallelism: false,
+    },
+  ])("$name", ({ case: name = "logship", reply, recall, traps, cited, parallelism }) => {
+    const fixture = cases[name];
+    const score = scoreReply(reply, fixture.truth, fixture.profile);
     expect(score.recall).toBeCloseTo(recall);
     expect(score.traps.toSorted()).toEqual(traps);
     expect(score.cited).toBeCloseTo(cited);

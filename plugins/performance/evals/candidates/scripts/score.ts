@@ -241,36 +241,36 @@ export function render(runs: ScoredRun[]): string {
     r.parallelism ? "yes" : "no",
     fixed(r.composite),
   ]);
+  const names = [...new Set(runs.map((r) => r.case))].toSorted();
   const arms = [...new Set(runs.map((r) => r.arm))].toSorted();
-  const of = (arm: string) => runs.filter((r) => r.arm === arm);
+  const of = (name: string, arm: string) => runs.filter((r) => r.case === name && r.arm === arm);
   const avg = (rs: ScoredRun[], pick: (r: ScoredRun) => number) =>
     rs.length === 0 ? "-" : fixed(mean(rs.map(pick)));
-  const summary = arms.map((arm) => {
-    const rs = of(arm);
-    return [
-      arm,
-      String(rs.length),
-      avg(rs, (r) => r.recall),
-      avg(rs, (r) => r.traps.length),
-      avg(rs, (r) => r.cited),
-      avg(rs, (r) => (r.parallelism ? 1 : 0)),
-      avg(rs, (r) => r.composite),
-    ];
-  });
-  const out = [
-    table([head, ...rows]),
-    table([
-      ["arm", "runs", "recall@5", "traps top 2", "cited", "parallel", "composite"],
-      ...summary,
-    ]),
-  ];
+  const summary = names.flatMap((name) =>
+    arms.map((arm) => {
+      const rs = of(name, arm);
+      return [
+        name,
+        arm,
+        String(rs.length),
+        avg(rs, (r) => r.recall),
+        avg(rs, (r) => r.traps.length),
+        avg(rs, (r) => r.cited),
+        avg(rs, (r) => (r.parallelism ? 1 : 0)),
+        avg(rs, (r) => r.composite),
+      ];
+    }),
+  );
+  const summaryHead = ["case", "arm", "runs", ...head.slice(3)];
+  const out = [table([head, ...rows]), table([summaryHead, ...summary])];
   const [base, other] = arms;
-  if (base !== undefined && other !== undefined) {
-    const p = pValue(
-      of(base).map((r) => r.composite),
-      of(other).map((r) => r.composite),
+  if (base === undefined || other === undefined) return out.join("\n");
+  for (const name of names) {
+    const p = (pick: (r: ScoredRun) => number) =>
+      pValue(of(name, base).map(pick), of(name, other).map(pick)).toFixed(3);
+    out.push(
+      `${name} ${other} vs ${base}: permutation p = ${p((r) => r.composite)} composite, ${p((r) => r.cited)} cited`,
     );
-    out.push(`composite ${other} vs ${base}: permutation p = ${p.toFixed(3)}`);
   }
   return out.join("\n");
 }

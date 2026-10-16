@@ -1,5 +1,5 @@
 name: Bun install
-description: Set up Bun, restore the dependency cache, and install with a frozen lockfile
+description: Set up Bun and install with a frozen lockfile
 
 runs:
   using: composite
@@ -12,13 +12,8 @@ runs:
         # as an unexplained red build on an untouched branch.
         bun-version: 1.4.2
 
-    - name: Cache dependencies
-      uses: actions/cache@v6
-      with:
-        path: ~/.bun/install/cache
-        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-        restore-keys: bun-${{ runner.os }}-
-
+    # No dependency cache: restoring the ~900 MB store takes longer than
+    # installing from the registry.
     - name: Install dependencies
       shell: bash
       run: bun install --frozen-lockfile

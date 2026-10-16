@@ -269,10 +269,18 @@ const isLimitKey = (k: string): k is LimitKey => k in LIMITS;
 export const limitKeys: LimitKey[] = Object.keys(LIMITS).filter(isLimitKey);
 
 // Trimming a body to fit the limits must not move its prose into <details>,
-// tables, or fences. No baseline body comes near this.
+// tables, or fences, or pile it into one long list. No baseline body comes near
+// the first, and lists past five items are rare in Ben's own PRs.
 export const GUARDS = {
   hiddenWords: 60,
+  maxItemsPerList: 5,
 } as const satisfies Partial<Structure>;
+
+export type GuardKey = keyof typeof GUARDS;
+
+const isGuardKey = (k: string): k is GuardKey => k in GUARDS;
+
+export const guardKeys: GuardKey[] = Object.keys(GUARDS).filter(isGuardKey);
 
 export function overLimits(s: Structure): LimitKey[] {
   return limitKeys.filter((k) => s[k] > LIMITS[k]);

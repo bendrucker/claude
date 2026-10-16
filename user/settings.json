@@ -448,6 +448,7 @@
     "mod-events@bendrucker": true,
     "session-limit@bendrucker": true,
     "load@bendrucker": true,
+    "performance@bendrucker": true,
     "zsh@bendrucker": true
   },
   "extraKnownMarketplaces": {

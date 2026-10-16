@@ -12,13 +12,21 @@ import { cli, command } from "cleye";
 import { table } from "table";
 import { z } from "zod";
 
+const Value = z.object({ value: z.number() });
+
 const Export = z.object({
+  schema_version: z.literal(2),
   results: z.array(
     z.object({
       command: z.string(),
-      times: z.array(z.number()),
-      memory_usage_byte: z.array(z.number()).optional(),
-      exit_codes: z.array(z.number().nullable()),
+      name: z.string().nullable(),
+      measurements: z.array(
+        z.object({
+          time_wall_clock: Value,
+          memory_peak_resident: Value.optional(),
+          exit_code: z.number().nullable(),
+        }),
+      ),
     }),
   ),
 });
@@ -74,23 +82,19 @@ export function pool(exports: z.infer<typeof Export>[]): Arm[] {
   const arms = new Map<string, Arm>();
   for (const file of exports) {
     for (const result of file.results) {
-      const arm = arms.get(result.command) ?? {
-        name: result.command,
-        times: [],
-        memory: [],
-        failures: 0,
-      };
-      for (const [i, time] of result.times.entries()) {
-        if (result.exit_codes[i] !== 0) {
+      const name = result.name ?? result.command;
+      const arm = arms.get(name) ?? { name, times: [], memory: [], failures: 0 };
+      for (const m of result.measurements) {
+        const time = m.time_wall_clock.value;
+        if (m.exit_code !== 0) {
           arm.failures++;
           (arm.failedTimes ??= []).push(time);
           continue;
         }
         arm.times.push(time);
-        const memory = result.memory_usage_byte?.[i];
-        if (memory !== undefined) arm.memory.push(memory);
+        if (m.memory_peak_resident !== undefined) arm.memory.push(m.memory_peak_resident.value);
       }
-      arms.set(result.command, arm);
+      arms.set(name, arm);
     }
   }
   return [...arms.values()];
@@ -192,7 +196,7 @@ async function readExports(paths: string[]): Promise<z.infer<typeof Export>[]> {
       try {
         return Export.parse(await Bun.file(file).json());
       } catch (error) {
-        throw new Error(`${file} is not a hyperfine export`, { cause: error });
+        throw new Error(`${file} is not a hyperfine 2 export`, { cause: error });
       }
     }),
   );

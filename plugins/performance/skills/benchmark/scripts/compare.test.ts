@@ -9,8 +9,20 @@ function seeded(seed: number): () => number {
   };
 }
 
-function result(command: string, times: number[], exitCodes = times.map(() => 0)) {
-  return { command, times, exit_codes: exitCodes, memory_usage_byte: times.map(() => 50e6) };
+function result(name: string | null, times: number[], exitCodes = times.map(() => 0)) {
+  return {
+    command: `run ${name ?? "unnamed"}`,
+    name,
+    measurements: times.map((value, i) => ({
+      time_wall_clock: { value },
+      memory_peak_resident: { value: 50e6 },
+      exit_code: exitCodes[i] ?? 0,
+    })),
+  };
+}
+
+function file(...results: ReturnType<typeof result>[]) {
+  return { schema_version: 2 as const, results };
 }
 
 describe("median", () => {
@@ -45,13 +57,18 @@ describe("permutationP", () => {
 describe("pool", () => {
   it("merges rounds per arm and drops failed runs", () => {
     const arms = pool([
-      { results: [result("base", [1, 2]), result("cand", [3, 4], [0, 1])] },
-      { results: [result("cand", [5]), result("base", [6])] },
+      file(result("base", [1, 2]), result("cand", [3, 4], [0, 1])),
+      file(result("cand", [5]), result("base", [6])),
     ]);
     expect(arms).toEqual([
       { name: "base", times: [1, 2, 6], memory: [50e6, 50e6, 50e6], failures: 0 },
       { name: "cand", times: [3, 5], memory: [50e6, 50e6], failures: 1, failedTimes: [4] },
     ]);
+  });
+
+  it("keys an unnamed result by its command", () => {
+    const [arm] = pool([file({ ...result(null, [1]), command: "sleep 1" })]);
+    expect(arm?.name).toBe("sleep 1");
   });
 });
 

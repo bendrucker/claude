@@ -5,6 +5,7 @@ runs:
   using: composite
   steps:
     - name: Setup Bun
+      id: setup-bun
       uses: oven-sh/setup-bun@v2
       with:
         # Pinned so a Bun release lands as a reviewable diff. Unpinned, CI
@@ -16,8 +17,9 @@ runs:
       uses: actions/cache@v6
       with:
         path: ~/.bun/install/cache
-        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-        restore-keys: bun-${{ runner.os }}-
+        # No restore-keys: a partial hit restores the old cache and saves it
+        # back with the new packages added, so it grows with every lockfile.
+        key: bun-${{ runner.os }}-${{ steps.setup-bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
 
     - name: Install dependencies
       shell: bash

@@ -1,4 +1,5 @@
 name: test
+# climb arm marker: selects the full plugin matrix for measurement
 
 on:
   pull_request: {}

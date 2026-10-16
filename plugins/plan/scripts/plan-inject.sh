@@ -13,7 +13,9 @@
 #
 # Shares the plan-injected marker with context.sh, so whichever fires first wins
 # and the other short-circuits.
-input=$(cat)
+# Hook input arrives as one JSON line, so the read builtin takes all of it
+# without the subshell and cat process that $(cat) costs on every tool call.
+IFS= read -r input || [ -n "$input" ] || exit 0
 
 # The PreToolUse entry has to keep matcher * (no matcher expresses "whichever
 # tool comes first in plan mode"), so this runs on every tool call in every

@@ -97,12 +97,14 @@ describe("snapshotOf", () => {
       conflicting: blockOf({ mergeable: "CONFLICTING" }),
       dirty: blockOf({ mergeable: "UNKNOWN", mergeStateStatus: "DIRTY" }),
       behind: blockOf({ mergeStateStatus: "BEHIND" }),
+      behindWhileUnknown: blockOf({ mergeable: "UNKNOWN", mergeStateStatus: "BEHIND" }),
       unknown: blockOf({ mergeable: "UNKNOWN" }),
     }).toEqual({
       clean: "none",
       conflicting: "conflict",
       dirty: "conflict",
       behind: "behind",
+      behindWhileUnknown: "behind",
       unknown: undefined,
     });
   });

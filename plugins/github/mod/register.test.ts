@@ -80,7 +80,7 @@ function worldOf(on: On, world: World) {
         },
       };
     }
-    if (argv.startsWith("git cat-file")) {
+    if (argv.startsWith("git rev-parse --verify")) {
       const isForeign = (world.foreign ?? []).some((sha) => argv.includes(sha));
       return {
         value: {

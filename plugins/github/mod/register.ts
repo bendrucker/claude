@@ -82,9 +82,12 @@ async function meOf($: EngineInterface, watch: Watch, cwd: string): Promise<stri
 }
 
 // Every worktree of the repository shares one object store, so only a push from
-// another clone or from GitHub itself leaves the head unknown here.
+// another clone or from GitHub itself leaves the head unknown here. Only exit 1
+// means a missing object, so a failing git fails the poll instead of crying push.
 async function isKnown($: EngineInterface, cwd: string, sha: string): Promise<boolean> {
-  const result = await $.process.run(["git", "cat-file", "-e", `${sha}^{commit}`], { cwd });
+  const argv = ["git", "rev-parse", "--verify", "--quiet", `${sha}^{commit}`];
+  const result = await $.process.run(argv, { cwd });
+  if (result.exitCode > 1) throw new Error(`git rev-parse exited ${result.exitCode}`);
   return result.exitCode === 0;
 }
 
@@ -285,6 +288,7 @@ export function register(on: On): void {
     emit($, "session.start", { active: true });
     if (watch.isStopped) {
       watch.isStopped = false;
+      watch.me = undefined;
       watch.generation += 1;
       void poll($, watch, watch.generation);
     }

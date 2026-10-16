@@ -218,8 +218,9 @@ function latest(nodes: CheckNode[]): CheckNode[] {
 // GitHub reports BEHIND only where a ruleset requires an up-to-date branch.
 function blockOf(view: PrView): Block | undefined {
   if (view.mergeable === "CONFLICTING" || view.mergeStateStatus === "DIRTY") return "conflict";
+  if (view.mergeStateStatus === "BEHIND") return "behind";
   if (view.mergeable === "UNKNOWN" || view.mergeStateStatus === "UNKNOWN") return undefined;
-  return view.mergeStateStatus === "BEHIND" ? "behind" : "none";
+  return "none";
 }
 
 export function snapshotOf(view: PrView, local: Local): Snapshot {

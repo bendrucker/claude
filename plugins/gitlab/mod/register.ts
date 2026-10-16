@@ -4,6 +4,8 @@ import {
   type Job,
   type Promoted,
   type Snapshot,
+  baselineOf,
+  combine,
   decide,
   isOpen,
   messageOf,
@@ -121,6 +123,13 @@ async function meOf($: EngineInterface, watch: Watch, cwd: string): Promise<stri
   return watch.me;
 }
 
+// Every worktree of the repository shares one object store, so only a push from
+// another clone or from GitLab itself leaves the head unknown here.
+async function isKnown($: EngineInterface, cwd: string, sha: string): Promise<boolean> {
+  const result = await $.process.run(["git", "cat-file", "-e", `${sha}^{commit}`], { cwd });
+  return result.exitCode === 0;
+}
+
 async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promise<Read> {
   const cwd = await $.session.cwd();
   const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
@@ -138,13 +147,14 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
   }
   const mr = `projects/${view.projectId}/merge_requests/${view.iid}`;
   const pipeline = view.pipeline;
-  const [approvals, notes, jobs, me] = await Promise.all([
+  const [approvals, notes, jobs, me, isHeadKnown] = await Promise.all([
     glab($, cwd, ["api", `${mr}/approvals`]),
     glab($, cwd, ["api", `${mr}/notes?sort=desc&order_by=created_at&per_page=100`]),
     pipeline === null
       ? Promise.resolve<Job[]>([])
       : jobsOf($, cwd, pipeline.projectId, pipeline.id),
     meOf($, watch, cwd),
+    isKnown($, cwd, view.sha),
   ]);
   const read = snapshotOf({
     view,
@@ -152,6 +162,7 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
     notes: parsed(parseNotes(notes), "MR notes"),
     jobs,
     me,
+    isHeadKnown,
   });
   // A deleted note can lower the newest id seen, which would re-admit older notes.
   const snapshot =
@@ -198,9 +209,18 @@ async function inject(
   }
 }
 
+// What a dropped injection still has to say: the MR's end always, a block
+// while it lasts, a foreign push until the checkout has it, failures only on
+// the same head for jobs still failing, and feedback while the MR is open.
 function stillDue(undelivered: Undelivered | undefined, next: Snapshot): Promoted[] {
-  if (undelivered === undefined || !isOpen(next)) return [];
+  if (undelivered === undefined) return [];
   return undelivered.decisions.flatMap((decision): Promoted[] => {
+    if (decision.kind === "mr.merged" || decision.kind === "mr.closed") return [decision];
+    if (!isOpen(next)) return [];
+    if (decision.kind === "conflict" || decision.kind === "behind") {
+      return next.block === undefined || next.block === decision.kind ? [decision] : [];
+    }
+    if (decision.kind === "push.foreign") return next.isHeadKnown ? [] : [decision];
     if (decision.kind !== "ci.failed") return [decision];
     if (undelivered.head !== next.head) return [];
     const failed = decision.failed.filter((label) => next.failed.includes(label));
@@ -208,14 +228,22 @@ function stillDue(undelivered: Undelivered | undefined, next: Snapshot): Promote
   });
 }
 
-function merge(carried: Promoted[], fresh: Promoted[]): Promoted[] {
-  const failed = [...carried, ...fresh].flatMap((d) => (d.kind === "ci.failed" ? d.failed : []));
-  const reviews = [...carried, ...fresh].filter((d) => d.kind !== "ci.failed");
-  if (failed.length === 0) return reviews;
-  return [
-    { action: "promote", kind: "ci.failed", failed: [...new Set(failed)].toSorted() },
-    ...reviews,
-  ];
+// Resolves false when the watch stopped or restarted during the send.
+async function send(
+  $: EngineInterface,
+  watch: Watch,
+  next: Snapshot,
+  due: Promoted[],
+  attempt: number,
+  isCurrent: () => boolean,
+): Promise<boolean> {
+  if (due.length === 0) return true;
+  const isSent = await inject($, next, due, attempt);
+  if (!isCurrent()) return false;
+  if (!isSent && attempt < MAX_ATTEMPTS) {
+    watch.undelivered = { head: next.head, decisions: due, attempts: attempt };
+  }
+  return true;
 }
 
 function delayOf(snapshot: Snapshot): number {
@@ -237,27 +265,34 @@ async function apply(
     watch.undelivered = undefined;
     return POLL_MS.idle;
   }
-  const next = read.snapshot;
   const prev = watch.snapshot;
-  if (prev === undefined || prev.mr !== next.mr || prev.projectId !== next.projectId) {
+  const isSameMr =
+    prev !== undefined &&
+    prev.mr === read.snapshot.mr &&
+    prev.projectId === read.snapshot.projectId;
+  // An undecided poll keeps the last answer, so a recompute does not re-announce a block.
+  const next =
+    isSameMr && read.snapshot.block === undefined
+      ? { ...read.snapshot, block: prev.block }
+      : read.snapshot;
+  if (!isSameMr) {
     emit($, "mr.tracked", { mr: next.mr, head: next.head, phase: next.phase, state: next.state });
     watch.undelivered = undefined;
+    const baseline = baselineOf(next);
+    for (const { action, ...detail } of baseline) {
+      emit($, action, { mr: next.mr, head: next.head, baseline: true, ...detail });
+    }
+    if (!(await send($, watch, next, baseline, 1, isCurrent))) return undefined;
   } else {
     const decisions = decide(prev, next);
     for (const { action, ...detail } of decisions) {
       emit($, action, { mr: next.mr, head: next.head, ...detail });
     }
     const fresh = decisions.filter((d): d is Promoted => d.action === "promote");
-    const due = merge(stillDue(watch.undelivered, next), fresh);
+    const due = combine(stillDue(watch.undelivered, next), fresh);
     const attempt = fresh.length > 0 ? 1 : (watch.undelivered?.attempts ?? 0) + 1;
     watch.undelivered = undefined;
-    if (due.length > 0) {
-      const isSent = await inject($, next, due, attempt);
-      if (!isCurrent()) return undefined;
-      if (!isSent && attempt < MAX_ATTEMPTS) {
-        watch.undelivered = { head: next.head, decisions: due, attempts: attempt };
-      }
-    }
+    if (!(await send($, watch, next, due, attempt, isCurrent))) return undefined;
   }
   watch.snapshot = next;
   watch.branch = read.branch;
@@ -302,9 +337,9 @@ async function hasGlab($: EngineInterface): Promise<boolean> {
 
 /**
  * Watches the current branch's merge request with `glab` and shows its pipeline
- * and approval state at the end of the prompt footer. A newly failed job or any
- * new approval, unapproval, request for changes, or comment from someone else is sent to the model.
- * Every other change is only shown and logged.
+ * and approval state at the end of the prompt footer. What `decide` promotes is
+ * sent to the model, along with a block already present when an MR is first
+ * seen. Every other change is only shown and logged.
  */
 export function register(on: On): void {
   const watch: Watch = {

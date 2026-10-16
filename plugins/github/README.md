@@ -15,7 +15,7 @@ GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
   - `github-rulesets-manager`: Configure repository rulesets and branch protection
   - `logs`: Extracts relevant lines from failing-job logs (invoked by `actions-monitor`)
 - **Hook**: Intercepts WebFetch for efficient GitHub data access
-- **Mod**: [`register.ts`](mod/register.ts) watches the current branch's pull request and shows its CI and review state at the end of the prompt footer. A newly failed check or any new review, with its state, reaches the model, and everything is logged to `mod-events`. Needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` and a signed-in `gh`
+- **Mod**: [`register.ts`](mod/register.ts) watches the current branch's pull request and shows its CI and review state at the end of the prompt footer. The PR merging or closing, a conflict or required update with its base (pointing at `git:conflicts`, and announced even when already present), a push from outside this checkout, a newly failed check, and new reviews or comments from anyone else, one line per author, reach the model, and everything is logged to `mod-events`. Needs `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` and a signed-in `gh`
 
 ## Testing
 

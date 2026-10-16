@@ -37,6 +37,8 @@ interface World {
   slowMs?: number;
   submitMs?: number;
   drop?: string;
+  /** Heads this checkout lacks, as a push from elsewhere leaves them. */
+  foreign?: string[];
 }
 
 function worldOf(on: On, world: World) {
@@ -72,6 +74,29 @@ function worldOf(on: On, world: World) {
         value: {
           exitCode: world.originHead === undefined ? 1 : 0,
           stdout: world.originHead === undefined ? "" : `${world.originHead}\n`,
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
+    if (argv.startsWith("git cat-file")) {
+      const isForeign = (world.foreign ?? []).some((sha) => argv.includes(sha));
+      return {
+        value: {
+          exitCode: isForeign ? 1 : 0,
+          stdout: "",
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
+    if (argv === "gh api user --jq .login") {
+      return {
+        value: {
+          exitCode: 0,
+          stdout: "ben\n",
           stderr: "",
           isStdoutTruncated: false,
           isStderrTruncated: false,
@@ -179,6 +204,97 @@ describe("register", () => {
     expect(w.submits[0]).toContain("@greptile reviewed PR #7 (COMMENTED)");
     expect(w.submits[0]).toContain("@alice reviewed PR #7 (CHANGES_REQUESTED)");
     expect(w.named("drop")).toEqual([]);
+  });
+
+  test("a conflict wakes the model once, through a mergeability recompute", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+    const w = worldOf(on, world);
+    const merging = (mergeable: string) => ({ ...pr("SUCCESS"), mergeable, baseRefName: "main" });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = merging("CONFLICTING");
+    await w.clock.advance(POLL_MS.settled);
+    world.view = merging("UNKNOWN");
+    await w.clock.advance(POLL_MS.settled);
+    world.view = merging("CONFLICTING");
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits.length).toBe(1);
+    expect(w.submits[0]).toContain("PR #7 has merge conflicts with `main` at aaaaaaa.");
+    expect(w.submits[0]).toContain("`git:conflicts`");
+    expect(await w.shown($)).toBe("\u{f47f} conflicts · \u{f49e} CI");
+
+    world.view = merging("MERGEABLE");
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["unblocked"]);
+  });
+
+  test("a PR already conflicting when first seen is announced once", async ($, on) => {
+    const conflicting = { ...pr("FAILURE"), mergeable: "CONFLICTING", baseRefName: "main" };
+    const world: World = { branch: "topic", gh: GH_OK, view: conflicting };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits.length).toBe(1);
+    expect(w.submits[0]).toContain("PR #7 has merge conflicts");
+    expect(w.submits[0]).not.toContain("CI failed");
+    expect(w.named("promote")[0]?.detail).toMatchObject({ kind: "conflict", baseline: true });
+  });
+
+  test("my own thread replies never come back as reviews", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = {
+      ...pr("SUCCESS", [{ id: "r1", state: "COMMENTED", author: { login: "ben" } }]),
+      comments: [{ id: "c1", author: { login: "ben" }, viewerDidAuthor: true }],
+    };
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits).toEqual([]);
+  });
+
+  test("a push from elsewhere wakes the model, and one from this checkout does not", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = { ...pr("SUCCESS"), headRefOid: "bbbbbbb2222" };
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits).toEqual([]);
+
+    world.foreign = ["ccccccc3333"];
+    world.view = { ...pr("SUCCESS"), headRefOid: "ccccccc3333" };
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits.length).toBe(1);
+    expect(w.submits[0]).toContain(
+      "moved from bbbbbbb to ccccccc, a commit this checkout does not have",
+    );
+  });
+
+  test("a merge wakes the model and a dropped one is retried after the PR ends", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS"), drop: "busy" };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = { ...pr("SUCCESS"), state: "MERGED" };
+    await w.clock.advance(POLL_MS.settled);
+    delete world.drop;
+    await w.clock.advance(POLL_MS.closed);
+
+    expect(w.submits).toEqual([
+      "PR #7 merged: https://github.com/o/r/pull/7",
+      "PR #7 merged: https://github.com/o/r/pull/7",
+    ]);
+    expect(await w.shown($)).toBe("\u{f419} merged");
   });
 
   test("a review after a sent alert carries only the review", async ($, on) => {

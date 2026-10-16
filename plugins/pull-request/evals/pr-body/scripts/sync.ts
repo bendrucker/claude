@@ -26,7 +26,18 @@ export const mirrors: Mirror[] = [
   {
     local: scenarios,
     remote: `${BUCKET}/create-scenarios`,
-    filters: ["--exclude", "*", "--include", "scenario-*", "--include", "examples/scenario-*"],
+    filters: [
+      "--exclude",
+      "*",
+      "--include",
+      "scenario-*",
+      "--include",
+      "examples/scenario-*",
+      "--include",
+      "work-*",
+      "--include",
+      "examples/work-*",
+    ],
   },
 ];
 

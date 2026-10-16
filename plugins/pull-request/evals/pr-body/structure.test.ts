@@ -3,6 +3,8 @@ import { measureStructure, overLimits } from "./structure";
 
 const long = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
 
+const codeSpans = (n: number) => Array.from({ length: n }, (_, i) => `\`c${i}\``).join(" ");
+
 describe("measureStructure", () => {
   test.each([
     [
@@ -37,11 +39,27 @@ describe("measureStructure", () => {
   });
 });
 
+describe("proseCodeSpans", () => {
+  test("counts spans in paragraphs and list items only", () => {
+    const body = [
+      "Use `a` and `b`.",
+      "- item `c`\n  - nested `d`",
+      "| h |\n|---|\n| `t` |",
+      "```\n`fenced`\n```",
+      "<details>\n\nhidden `e`\n\n</details>",
+    ].join("\n\n");
+    expect(measureStructure(body).proseCodeSpans).toBe(4);
+  });
+});
+
 describe("overLimits", () => {
   const cases: [string, ReturnType<typeof overLimits>][] = [
     [long(20), []],
     [long(41), ["maxBlockWords"]],
     [Array.from({ length: 5 }, () => long(30)).join("\n\n"), ["visibleWords"]],
+    [codeSpans(7), ["proseCodeSpans"]],
+    [codeSpans(6), []],
+    [`${long(41)} ${codeSpans(7)}`, ["maxBlockWords", "proseCodeSpans"]],
   ];
   test.each(cases)("%#", (body, expected) => {
     expect(overLimits(measureStructure(body))).toEqual(expected);

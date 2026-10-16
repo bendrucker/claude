@@ -37,6 +37,7 @@ export interface Structure {
   semicolons: number;
   dashes: number;
   inlineCodePer100: number;
+  proseCodeSpans: number;
 }
 
 const wordSeg = new Intl.Segmenter("en", { granularity: "word" });
@@ -108,7 +109,9 @@ function visitList(list: List, acc: Acc): void {
     acc.bulletSentences.push(sentences(text).length);
     acc.listWords += words;
     acc.visibleWords += words;
-    acc.inlineCode += countInlineCode(item);
+    acc.inlineCode += item.children
+      .filter((c) => c.type !== "list")
+      .reduce((n, c) => n + countInlineCode(c), 0);
     acc.visibleImages += countImages(item);
     acc.proseText.push(text);
     for (const child of item.children) if (child.type === "list") visitList(child, acc);
@@ -236,6 +239,7 @@ export function measureStructure(body: string): Structure {
     semicolons: per100((prose.match(/;/g) ?? []).length, v),
     dashes: per100((prose.match(/\s[—–]\s|—/g) ?? []).length, v),
     inlineCodePer100: per100(acc.inlineCode, v),
+    proseCodeSpans: acc.inlineCode,
   };
 }
 
@@ -244,8 +248,15 @@ export function measureStructure(body: string): Structure {
 export const LIMITS = {
   visibleWords: 120,
   maxBlockWords: 40,
+  proseCodeSpans: 6,
 } as const satisfies Partial<Structure>;
 
-export function overLimits(s: Structure): (keyof typeof LIMITS)[] {
-  return (["visibleWords", "maxBlockWords"] as const).filter((k) => s[k] > LIMITS[k]);
+export type LimitKey = keyof typeof LIMITS;
+
+const isLimitKey = (k: string): k is LimitKey => k in LIMITS;
+
+export const limitKeys: LimitKey[] = Object.keys(LIMITS).filter(isLimitKey);
+
+export function overLimits(s: Structure): LimitKey[] {
+  return limitKeys.filter((k) => s[k] > LIMITS[k]);
 }

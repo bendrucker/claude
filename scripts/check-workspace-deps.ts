@@ -8,9 +8,8 @@ import { isBuiltin, packageName, scanImports } from "./imports";
 
 // Exit codes: 0 clean, VIOLATION_EXIT when undeclared dependencies are found.
 // Anything else (bun exits 1 on uncaught errors) means the checker itself
-// failed to run. The Stop hook in .claude/hooks/workspace-deps relies on this
-// distinction to avoid reporting a crash as a violation.
-export const VIOLATION_EXIT = 2;
+// failed to run.
+const VIOLATION_EXIT = 2;
 
 const PackageJson = z.looseObject({
   workspaces: z.array(z.string()).optional(),
@@ -85,7 +84,7 @@ export function protectedWorkspaces(dirs: string[]): string[] {
   return dirs.filter((dir) => dir === ".claude" || dir.startsWith(".claude/"));
 }
 
-async function checkDeps(): Promise<string[]> {
+export async function findViolations(): Promise<string[]> {
   const cwd = join(import.meta.dirname, "..");
   const [root, trackedManifests, sources] = await Promise.all([
     decodeFile(PackageJson, join(cwd, "package.json")),
@@ -162,7 +161,7 @@ async function checkDeps(): Promise<string[]> {
 }
 
 if (import.meta.main) {
-  await runCheck(checkDeps, {
+  await runCheck(findViolations, {
     stream: "stderr",
     indent: false,
     failureExit: VIOLATION_EXIT,

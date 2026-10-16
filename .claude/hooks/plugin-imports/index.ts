@@ -4,21 +4,14 @@ import { join } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { decodeStdin } from "../../../packages/decode/index";
+import { importViolations, violationText } from "../../../scripts/check";
 
 const StopInput = z.looseObject({
   hook_event_name: z.literal("Stop"),
-  cwd: z.string(),
   stop_hook_active: z.boolean().optional(),
 });
 
 type StopInput = z.infer<typeof StopInput>;
-
-// Mirrors VIOLATION_EXIT in scripts/check-plugin-imports.ts. Deliberately a
-// literal rather than an import: importing the checker would pull its module
-// graph into the hook, so a checker that cannot load would crash the hook
-// instead of reaching the non-blocking "checker could not run" path below.
-// The hook's test imports both to keep the values in sync.
-const VIOLATION_EXIT = 2;
 
 const CHECKER_PATH = join(
   import.meta.dirname,
@@ -35,28 +28,20 @@ export async function processStop(
 ): Promise<SyncHookJSONOutput | null> {
   if (input.stop_hook_active) return null;
 
-  const proc = Bun.spawn(["bun", checkerPath], {
-    cwd: input.cwd,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-
-  const exitCode = await proc.exited;
-  if (exitCode === 0) return null;
-
-  const stderr = await new Response(proc.stderr).text();
-
-  if (exitCode === VIOLATION_EXIT) {
+  let violations: string[];
+  try {
+    violations = await importViolations(checkerPath);
+  } catch (error) {
+    // A checker that cannot load or throws is surfaced without blocking the stop.
     return {
-      decision: "block",
-      reason: `Cross-plugin imports detected:\n\n${stderr}\n\nFix these imports before stopping. Plugins must not import from outside their own directory.`,
+      systemMessage: `plugin-imports: checker could not run; skipping cross-plugin import check.\n\n${String(error)}`,
     };
   }
+  if (violations.length === 0) return null;
 
-  // Any other non-zero exit means the checker itself failed to run (e.g.
-  // module resolution failure). Surface it without blocking the stop.
   return {
-    systemMessage: `plugin-imports: checker could not run (exit ${exitCode}); skipping cross-plugin import check.\n\n${stderr.trim()}`,
+    decision: "block",
+    reason: `Cross-plugin imports detected:\n\n${violationText(violations)}\n\nFix these imports before stopping. Plugins must not import from outside their own directory.`,
   };
 }
 

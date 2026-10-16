@@ -3,7 +3,6 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { StopHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { VIOLATION_EXIT } from "../../../scripts/check-plugin-imports";
 import { processStop } from ".";
 
 let tempDir: string;
@@ -40,33 +39,40 @@ describe("processStop", () => {
   });
 
   it("returns null when the checker passes", async () => {
-    const checker = await fakeChecker("clean.ts", "process.exit(0);");
+    const checker = await fakeChecker(
+      "clean.ts",
+      "export async function findViolations() { return []; }",
+    );
     expect(await processStop(stopInput(), checker)).toBeNull();
   });
 
-  it("blocks with the checker's stderr on the violation exit code", async () => {
+  it("blocks with the checker's violations", async () => {
     const checker = await fakeChecker(
       "violation.ts",
-      `console.error("plugin-a: foo.ts imports outside plugin boundary");
-process.exit(${VIOLATION_EXIT});`,
+      `export async function findViolations() { return ["plugin-a: foo.ts imports outside plugin boundary"]; }`,
     );
 
     const output = await processStop(stopInput(), checker);
     expect(output?.decision).toBe("block");
     expect(output?.reason).toContain("Cross-plugin imports detected");
-    expect(output?.reason).toContain("imports outside plugin boundary");
+    expect(output?.reason).toContain("imports outside plugin boundary\n");
   });
 
-  test.each<{ name: string; crashes: boolean }>([
-    { name: "reports a non-blocking systemMessage when the checker crashes", crashes: true },
-    { name: "does not block when the checker script is missing", crashes: false },
-  ])("$name", async ({ crashes }) => {
-    const checker = crashes
-      ? await fakeChecker(
-          "crash.ts",
-          `throw new Error("Cannot find module '@bendrucker/claude-marketplace'");`,
-        )
-      : join(tempDir, "missing.ts");
+  test.each<{ name: string; source: string | null }>([
+    {
+      name: "reports a non-blocking systemMessage when the checker crashes",
+      source: `throw new Error("Cannot find module '@bendrucker/claude-marketplace'");`,
+    },
+    { name: "does not block when the checker script is missing", source: null },
+    {
+      name: "does not block when the checker exports no findViolations",
+      source: "export const findViolations = 1;",
+    },
+  ])("$name", async ({ name, source }) => {
+    const checker =
+      source === null
+        ? join(tempDir, "missing.ts")
+        : await fakeChecker(`${name.replaceAll(" ", "-")}.ts`, source);
 
     const output = await processStop(stopInput(), checker);
     expect(output?.decision).toBeUndefined();

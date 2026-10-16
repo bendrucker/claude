@@ -6,7 +6,7 @@ Runs [oxlint](https://oxc.rs/docs/guide/usage/linter.html) and [oxfmt](https://o
 
 #### During Work (PostToolUse)
 
-When you `Edit` or `Write` a file oxlint understands, it runs and shows any issues as context. This is informational only. It never writes to the file, so your later edits in the same turn still match what is on disk. Formatting is deferred to the Stop and pre-commit gates.
+When you `Edit` or `Write` a file oxlint understands, it runs and shows any issues as context. Type-aware rules wait for the Stop gate, since tsgolint costs about a second per run however small the file. This is informational only. It never writes to the file, so your later edits in the same turn still match what is on disk. Formatting is deferred to the Stop and pre-commit gates.
 
 This pass reads `.oxlintrc.fast.json` where the working tree has one, falling back to the default config. Loading oxlint's JS plugin host costs a fixed ~150ms whatever rules it carries, so a tree that keeps its JS-plugin rules out of the fast config pays that only at the gates below, which always read the default config.
 

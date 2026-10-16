@@ -21,6 +21,8 @@ The notes file is the climb's single record. A reader who was not in the session
 - Acceptance: <run count per side, interleaving, test and threshold, guard condition>.
 - Stop: <ceiling, three rejections in a row, or budget>.
 
+Mark an item the user never answered as `assumed: <value>`.
+
 ## Harness
 
 <The command that runs a comparison, where results land, and what was checked before the baseline: build flags, cache state, machine load.>
@@ -33,9 +35,15 @@ The notes file is the climb's single record. A reader who was not in the session
 
 <Top entries of the baseline profile and the tool that produced them. Updated after each accept.>
 
+## Set Aside
+
+| Lead | Profile entry | Reason |
+| --- | --- | --- |
+| <idea not climbed> | <entry or none> | <why: out of scope, below the noise floor, the user declined> |
+
 ## Candidates
 
-### <Accepted | Rejected>: <short name> (`<commit or patch>`)
+### <Accepted | Kept, unconfirmed | Rejected>: <short name> (`<commit or patch>`)
 
 Hypothesis: <which profile entry, and why this change should cut it>.
 
@@ -54,7 +62,7 @@ Target: <metric and direction>. Guards: <which>. Guard check: <result>.
 
 ## Where It Stands
 
-<Base against final on every scenario, `dev` and `holdout`, starred where significant. The stop reason. Leads left for later.>
+<Base against final on every scenario, `dev` and `holdout`, starred where significant. The stop reason.>
 ````
 
 ## Conventions

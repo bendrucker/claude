@@ -140,7 +140,14 @@ describe("cli adapter", () => {
     const rows = await runQuery(adapter, { sql: "SELECT 1 AS n" }, Row, { host: "work", limit: 5 });
 
     expect(rows).toEqual([{ n: 1 }]);
-    expect(seen.command).toEqual(["duckdb", "-readonly", "-json", "/tmp/session.duckdb"]);
+    expect(seen.command).toEqual([
+      "duckdb",
+      "-readonly",
+      "-json",
+      "-init",
+      expect.stringMatching(/resources\/limits\.sql$/),
+      "/tmp/session.duckdb",
+    ]);
     expect(seen.stdin).toBe(
       `SET VARIABLE "host" = 'work';\nSET VARIABLE "limit" = 5;\nSELECT 1 AS n`,
     );

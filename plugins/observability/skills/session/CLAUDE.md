@@ -63,13 +63,15 @@ DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` because `=` binds t
 
 `getDb` opens read-write, which needs an exclusive DuckDB file lock: the writers (`refresh.ts` past its stamp, `import.ts`, `forget.ts`, `hosts.ts`) must not run concurrently with each other or with readers. Read-only opens take a shared lock: any number coexist, but none can open mid-refresh and a refresh cannot start while readers hold the file. Either collision fails with `Could not set lock`. The workflow fan-out pattern is therefore "refresh once, then have every agent query with `duckdb -readonly` over the shared file" (documented in SKILL.md "Parallel Queries"). This is why the agent-facing query path is the bare `duckdb` CLI rather than a wrapper: a read-only open at the stable path is all a caller needs, and a wrapper would force every parallel agent through it for no benefit. The plugin's own read-only scripts still share one, `query.ts` below, because they also share the binding and decoding an ad-hoc query does not.
 
+Every open is resource-capped, because DuckDB's defaults (80% of RAM, every core, spill up to 90% of free disk) apply per process and a fan-out of readers multiplies them past the machine. Readers load `resources/limits.sql` through `-init` (4 GiB, 4 threads, a per-process spill dir under `$TMPDIR`), and `extensions.sql` carries a copy because `-init` takes one file. The writer passes `WRITER_LIMITS` to `DuckDBInstance.create`. A query that outgrows its cap spills or fails with an out-of-memory error instead of swapping the machine.
+
 The four writers carry the `claude:dangerouslyDisableSandbox` marker after their shebang. The sandbox denies writes under `~/.claude/plugins`, which covers the plugin data dir holding the index, and the deny shadows any `filesystem.allowWrite` entry beneath it. See [`plugins/mac/README.md`](../../../mac/README.md) for the marker.
 
 ### Callers
 
 - `db.ts`: orchestrates migration, schema, scan, per-file import, view rebuild and versioning, checkpoint, compaction.
 - `refresh.ts`: CLI entry point. Stamp fast-path, `ensureIndex`, compaction guard, prints DB path to stdout.
-- `query.ts`: the one path from a named query (or literal SQL) plus params to decoded rows. Two adapters share the variable binding: `nodeAdapter` binds on the read-write connection `db.ts` already holds, and `cliAdapter` spawns `duckdb -readonly` with a timeout, rendering the same params as `SET VARIABLE` lines through one escaping function. `usage.ts` and `schema.ts` take the read-only adapter so they never wait on a refresh's write lock.
+- `query.ts`: the one path from a named query (or literal SQL) plus params to decoded rows. Two adapters share the variable binding: `nodeAdapter` binds on the read-write connection `db.ts` already holds, and `cliAdapter` spawns `duckdb -readonly -init limits.sql` with a timeout, rendering the same params as `SET VARIABLE` lines through one escaping function. `usage.ts` and `schema.ts` take the read-only adapter so they never wait on a refresh's write lock.
 
 ### Development
 

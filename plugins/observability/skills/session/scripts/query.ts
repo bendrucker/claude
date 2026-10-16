@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Database } from "./db";
 
 const QUERIES_DIR = join(import.meta.dirname, "..", "resources", "queries");
+const LIMITS_FILE = join(import.meta.dirname, "..", "resources", "limits.sql");
 
 export type QueryValue = string | number | null | undefined;
 
@@ -101,7 +102,7 @@ export function cliAdapter(dbPath: string, options: CliOptions = {}): QueryAdapt
 
     async execute(sql, schema) {
       const signal = AbortSignal.timeout(timeoutMs);
-      const proc = spawn(["duckdb", "-readonly", "-json", dbPath], {
+      const proc = spawn(["duckdb", "-readonly", "-json", "-init", LIMITS_FILE, dbPath], {
         stdin: Buffer.from(sql),
         signal,
       });

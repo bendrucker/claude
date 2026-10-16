@@ -12,6 +12,7 @@ Search and analyze Claude Code conversation history using a DuckDB index over JS
 - `scripts/db.ts` - DuckDB index, schema, host enumeration, and query logic
 - `resources/schema/` - Table and view definitions (ordered, run on startup)
 - `resources/queries/` - Parameterized SQL for built-in queries
+- `resources/limits.sql` - Per-process memory, thread, and spill caps for read-only query processes, pulled in via `-init`
 - `resources/extensions.sql` - Community extension setup (`markdown`, `yaml`), pulled into a query process via `-init`
 - `resources/import.sql` - JSONL parsing and flattening
 

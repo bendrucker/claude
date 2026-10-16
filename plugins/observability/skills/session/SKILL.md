@@ -35,11 +35,11 @@ bun ${CLAUDE_SKILL_DIR}/scripts/refresh.ts
 
 ### Querying
 
-After refresh, query with the `duckdb` CLI or any DuckDB client, always `-readonly`. Querying never writes, and a read-write open would block refreshes and other readers. Add `-json` too: the default box format returns only 40 rows however many matched, and `-csv` emits the newlines embedded in `command` and `text` raw, so a row stops being one line. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works. `getvariable('limit')` is unaffected either way.
+After refresh, query with the `duckdb` CLI or any DuckDB client, always `-readonly`. Querying never writes, and a read-write open would block refreshes and other readers. Add `-init ${CLAUDE_SKILL_DIR}/resources/limits.sql`, which caps the process at 4 GiB and 4 threads. DuckDB's own defaults (80% of RAM, every core) apply per process, so a few concurrent readers over the index can freeze the machine. Add `-json` too: the default box format returns only 40 rows however many matched, and `-csv` emits the newlines embedded in `command` and `text` raw, so a row stops being one line. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works. `getvariable('limit')` is unaffected either way.
 
 ```bash
-duckdb -readonly -json ${CLAUDE_PLUGIN_DATA}/session.duckdb "SELECT model, SUM(output_tokens) FROM message_usage GROUP BY model"
-duckdb -readonly -json ${CLAUDE_PLUGIN_DATA}/session.duckdb < ${CLAUDE_SKILL_DIR}/resources/queries/stats.sql
+duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql ${CLAUDE_PLUGIN_DATA}/session.duckdb "SELECT model, SUM(output_tokens) FROM message_usage GROUP BY model"
+duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql ${CLAUDE_PLUGIN_DATA}/session.duckdb < ${CLAUDE_SKILL_DIR}/resources/queries/stats.sql
 ```
 
 `scripts/usage.ts` renders a session's token-burn timeline (`--session <id>`) in the terminal, or the top sessions by estimated cost (`--days <n>`) when no session is given. It opens the index read-only. Cost is an estimate from public API rates. Checked against the 62 sessions that carry a real `cost-state.totalCostUSD`, it comes in at 0.97 of billed spend ($1,582 against $1,631), so treat it as a close approximation. That record appears in only 66 of 1,645 recent files, which is why the estimate is the primary surface.
@@ -50,7 +50,7 @@ DuckDB locks the database file per process. Read-only opens take a shared lock, 
 
 ### Parallel Queries (Workflows)
 
-For a fan-out of agents investigating the corpus, the orchestrator runs `refresh.ts --refresh` once up front, then every agent opens `${CLAUDE_PLUGIN_DATA}/session.duckdb` read-only. Never let a fanned-out agent call `refresh.ts`: past the stamp's `--max-age` it opens read-write and collides with every reader. Queries read a shared file, so the agents need no worktree. Worked example (param scoping via `SET VARIABLE`, breadth-first survey surfaces) in [`references/workflows.md`](references/workflows.md).
+For a fan-out of agents investigating the corpus, the orchestrator runs `refresh.ts --refresh` once up front, then every agent opens `${CLAUDE_PLUGIN_DATA}/session.duckdb` read-only with `-init limits.sql`. Never let a fanned-out agent call `refresh.ts`: past the stamp's `--max-age` it opens read-write and collides with every reader. Queries read a shared file, so the agents need no worktree. Worked example (param scoping via `SET VARIABLE`, breadth-first survey surfaces) in [`references/workflows.md`](references/workflows.md).
 
 For self-improvement discovery (fanning out over the whole corpus to mine config-change candidates, then grounding them against the live config), [`references/discovery.md`](references/discovery.md) carries the full recipe.
 
@@ -90,7 +90,7 @@ Load [`references/catalog.md`](references/catalog.md) before running a query you
 
 ### Queries That Read Disk
 
-Four queries read files on disk instead of the index. Three of them (`plan-sections`, `frontmatter`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-init resources/extensions.sql`, which loads both in the same process before the piped query and runs under `-readonly`. `hook-self-timing` reads JSONL and needs no extension. The common-path queries above omit `-init` and pay nothing. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
+Four queries read files on disk instead of the index. Three of them (`plan-sections`, `frontmatter`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-init resources/extensions.sql` in place of `limits.sql`. It carries the same limits, loads both extensions in the same process before the piped query, and runs under `-readonly`. `hook-self-timing` reads JSONL and needs no extension. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
 
 ```bash
 duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/extensions.sql ${CLAUDE_PLUGIN_DATA}/session.duckdb \

@@ -26,6 +26,7 @@ import {
   type WrappedParagraph,
 } from "./prose";
 import { classifyPrHeading } from "./sentence-heading";
+import { exceededLimits, measureStructure } from "./structure";
 
 /** Facts about the repository the rules consult only when a body warrants it. */
 export interface RepoContext {
@@ -212,10 +213,6 @@ function sentenceShapedHeadings(body: string): SentenceHeading[] {
   return flagged;
 }
 
-// A body past this length is a document. On a repo the author owns and merges
-// alone, nobody is going to read it.
-const PERSONAL_BODY_WORD_LIMIT = 450;
-
 const RULES = [
   rule({
     id: "unreadable-body",
@@ -305,15 +302,15 @@ const RULES = [
     },
   }),
   rule({
-    id: "personal-length",
-    tier: "warn",
-    detect: async (body, context) => {
-      const words = countProseWords(body);
-      if (words <= PERSONAL_BODY_WORD_LIMIT) return null;
-      return (await context.personalRepo()) ? words : null;
+    id: "structure-limits",
+    tier: "deny",
+    detect: (body) => nonEmpty(exceededLimits(measureStructure(body))),
+    message: (exceeded) => {
+      const detail = exceeded
+        .map(({ label, measured, limit }) => `${label} ${measured} > ${limit}`)
+        .join(", ");
+      return `The body is over its structure limits (${detail}). Tables, fenced output, and \`<details>\` don't count. Rewrite it under them, then retry the create. This check doesn't run again, so make the cut in one rewrite.`;
     },
-    message: (words) =>
-      `The body runs ${words} words on a repo you own and merge yourself. Nobody else is reading this. Keep what you would want on a bisect six months out and cut the rest.`,
   }),
   rule({
     id: "title-length",

@@ -13,16 +13,21 @@ import {
 const PROSE_PARAGRAPH =
   "The cache stores frequently accessed records in memory. It evicts the oldest entry when full. A configurable TTL bounds staleness. Reads fall back to the database on a miss.";
 
-// Clears the small-body word limit.
-const LONG_PROSE = Array(6).fill(PROSE_PARAGRAPH).join("\n\n");
+// 174 words, past the visible-word limit.
+const VISIBLE_PROSE = Array(6).fill(PROSE_PARAGRAPH).join("\n\n");
 
-// Clears the personal-repo word limit.
-const OVERLONG_PROSE = Array(16).fill(PROSE_PARAGRAPH).join("\n\n");
+// The same words collapsed: clears the small-body word limit without being visible.
+const LONG_PROSE = `<details>\n<summary>Notes</summary>\n\n${VISIBLE_PROSE}\n\n</details>`;
+
+// One paragraph of 52 words in three sentences.
+const BLOCK_PARAGRAPH =
+  "The cache stores frequently accessed records in memory and evicts the oldest entry once it fills up completely. A configurable expiry bounds how stale any record may become before reads fall back to the database again. Every miss is logged with the key and the time spent waiting on the backing store.";
+
+const TABLE = `| Key | Value |\n| --- | --- |\n${Array(30).fill("| alpha beta gamma | delta epsilon zeta |").join("\n")}`;
 
 const SHA40 = "2554da150000000000000000000000000000abcd";
 const KNOWN_COMMITS = new Set(["2554da15", "dc8acf12", SHA40]);
 const repo: Partial<BodyContext> = { hasCommit: (sha) => Promise.resolve(KNOWN_COMMITS.has(sha)) };
-const personal: Partial<BodyContext> = { personalRepo: () => Promise.resolve(true) };
 const titled = (title: string): Partial<BodyContext> => ({ title });
 
 interface Row {
@@ -197,9 +202,13 @@ describe("warn rules", () => {
     {
       name: "sentence past the run-on length",
       body: `Reshapes the resolver ${"and threads the request through another layer ".repeat(7)}now.`,
-      fires: ["run-on-prose"],
+      fires: ["run-on-prose", "structure-limits"],
     },
-    { name: "comma-stacked enumeration", body: commaSplice, fires: ["run-on-prose"] },
+    {
+      name: "comma-stacked enumeration",
+      body: commaSplice,
+      fires: ["run-on-prose", "structure-limits"],
+    },
     {
       name: "five-sentence paragraph with a trailer",
       body: "Reshapes the resolver. It reads the cache first. It falls back to the database. It then tries the network. It retries once before giving up.\n\nFixes #1",
@@ -322,16 +331,43 @@ describe("warn rules", () => {
       fires: [],
     },
     {
-      name: "long body on a personal repo",
-      body: OVERLONG_PROSE,
-      context: personal,
-      fires: ["personal-length"],
+      name: "visible words past the limit",
+      body: VISIBLE_PROSE,
+      fires: ["structure-limits"],
     },
-    { name: "long body on a shared repo", body: OVERLONG_PROSE, fires: [] },
     {
-      name: "short body on a personal repo",
-      body: "Adds an LRU cache to the resolver.",
-      context: personal,
+      name: "personal repo reports the overlong body once",
+      body: VISIBLE_PROSE,
+      context: { personalRepo: () => Promise.resolve(true) },
+      fires: ["structure-limits"],
+    },
+    { name: "paragraphs under every limit", body: PROSE_PARAGRAPH, fires: [] },
+    { name: "long table", body: `Adds the lookup.\n\n${TABLE}`, fires: [] },
+    { name: "long collapsed block", body: `Adds the lookup.\n\n${LONG_PROSE}`, fires: [] },
+    {
+      name: "long fenced output",
+      body: `Adds the lookup.\n\n\`\`\`\n${Array(100).fill("alpha beta gamma delta").join("\n")}\n\`\`\``,
+      fires: [],
+    },
+    { name: "one block past the limit", body: BLOCK_PARAGRAPH, fires: ["structure-limits"] },
+    {
+      name: "bullet past the block limit",
+      body: `- ${BLOCK_PARAGRAPH}`,
+      fires: ["structure-limits"],
+    },
+    {
+      name: "code spans past the limit",
+      body: "Renames `a`, `b`, `c`, `d`, `e`, `f`, and `g`.",
+      fires: ["structure-limits"],
+    },
+    {
+      name: "code spans at the limit",
+      body: "Renames `a`, `b`, `c`, `d`, `e`, and `f`.",
+      fires: [],
+    },
+    {
+      name: "code spans in a collapsed block",
+      body: "<details>\n<summary>Names</summary>\n\nRenames `a`, `b`, `c`, `d`, `e`, `f`, and `g`.\n\n</details>",
       fires: [],
     },
     {
@@ -362,7 +398,11 @@ describe("warn rules", () => {
       fires: ["title-length"],
     },
   ])("$name", async ({ body, context, fires }) => {
-    expect(await fired("warn", body, context)).toEqual(fires);
+    const limits = fires.includes("structure-limits");
+    expect(await fired("warn", body, context)).toEqual(
+      fires.filter((id) => id !== "structure-limits"),
+    );
+    expect((await fired("deny", body, context)).includes("structure-limits")).toBe(limits);
   });
 });
 
@@ -448,11 +488,16 @@ describe("rule messages", () => {
       fragments: ["read as sentences", '"Why the Cache Is Cold"'],
     },
     {
-      name: "personal length",
-      body: OVERLONG_PROSE,
-      context: personal,
-      id: "personal-length",
-      fragments: ["repo you own"],
+      name: "structure limits name each measurement",
+      body: `${VISIBLE_PROSE}\n\n${BLOCK_PARAGRAPH}\n\nRenames \`a\`, \`b\`, \`c\`, \`d\`, \`e\`, \`f\`, and \`g\`.`,
+      id: "structure-limits",
+      fragments: [
+        "visible words 235 > 120",
+        "longest paragraph or bullet words 52 > 40",
+        "inline code spans 7 > 6",
+        "`<details>` don't count",
+        "doesn't run again",
+      ],
     },
     {
       name: "title length",

@@ -6,7 +6,7 @@ import { table } from "table";
 import { z } from "zod";
 import { traceReply } from "../../../../../evals/native/load";
 import { type Run, Result, score } from "../../../../../evals/native/regrade";
-import { LIMITS, type LimitKey, limitKeys, measureStructure } from "../structure";
+import { GUARDS, LIMITS, guardKeys, limitKeys, measureStructure } from "../structure";
 
 // Scores a results directory against the PR-body structure limits, so changing
 // a limit doesn't require new sessions.
@@ -22,11 +22,19 @@ const TraceLine = z.looseObject({
   message: z.looseObject({ content: z.unknown() }).optional(),
 });
 
+const CHECKS = { ...LIMITS, ...GUARDS };
+type CheckKey = keyof typeof CHECKS;
+const checkKeys: CheckKey[] = [...limitKeys, ...guardKeys];
+
 const ROWS = {
   visibleWords: "visible-words",
   maxBlockWords: "max-block",
   proseCodeSpans: "prose-code-spans",
-} as const satisfies Record<LimitKey, string>;
+  pathSpans: "path-spans",
+  contrastPhrases: "contrast-phrases",
+  hiddenWords: "hidden-words",
+  maxItemsPerList: "list-items",
+} as const satisfies Record<CheckKey, string>;
 
 const STUB_BLOCK = /^PR-BODY-BEGIN[^\S\n]*\n([\s\S]*?)\n?^PR-BODY-END[^\S\n]*$/gm;
 
@@ -65,13 +73,13 @@ export function bodyOf(trace: string): Body | undefined {
 
 export function limitRows(body: Body): Run["graders"] {
   const s = measureStructure(body.text);
-  return limitKeys.map((key) => ({
+  return checkKeys.map((key) => ({
     name: ROWS[key],
-    passed: s[key] <= LIMITS[key],
+    passed: s[key] <= CHECKS[key],
     weight: 1,
     scored: true,
     withOnly: false,
-    explanation: `${key} ${s[key]} against limit ${LIMITS[key]} (body from ${body.source})`,
+    explanation: `${key} ${s[key]} against limit ${CHECKS[key]} (body from ${body.source})`,
   }));
 }
 
@@ -150,7 +158,7 @@ export function render(counts: Counts): string {
 
 const program = new Command()
   .description(
-    "Add visible-words, max-block, and prose-code-spans rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
+    "Add visible-words, max-block, prose-code-spans, path-spans, contrast-phrases, hidden-words, and list-items rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
   )
   .argument("<results-dir...>", "results directories holding aggregate-result.json and traces/")
   .action(async (dirs) => {

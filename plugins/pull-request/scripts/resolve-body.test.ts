@@ -9,34 +9,34 @@ import {
   effectiveCwd,
   extractBodySpec,
   extractTitle,
-  isPrBodyCommand,
+  prVerb,
   resolveBody,
 } from "./resolve-body";
 
-describe("isPrBodyCommand", () => {
-  test.each<[string, boolean]>([
-    ["gh pr create --body-file body.md", true],
-    ["cd /repo && gh pr create --body-file body.md", true],
-    ["GH_PAGER=cat gh pr create --body-file body.md", true],
-    ["GIT_SSH_COMMAND=false gh pr create --title x", true],
-    ["gh pr edit 12 --body-file body.md", true],
-    ["glab mr create --description-file body.md", true],
-    ["glab mr update 3 --description x", true],
-    ["git status", false],
-    ["gh pr list", false],
-    ["gh pr view 12", false],
-    ["ls -la", false],
-    ["{ echo one; echo two; }", false],
-    ["for f in *.ts; do wc -l $f; done", false],
-    ["cat <<'EOF' > notes.md\nnothing here\nEOF", false],
-    ["cat > notes.md <<'EOF'\nrun gh pr create --body-file x.md later\nEOF", false],
+describe("prVerb", () => {
+  test.each<[string, string | null]>([
+    ["gh pr create --body-file body.md", "gh pr create"],
+    ["cd /repo && gh pr create --body-file body.md", "gh pr create"],
+    ["GH_PAGER=cat gh pr create --body-file body.md", "gh pr create"],
+    ["GIT_SSH_COMMAND=false gh pr create --title x", "gh pr create"],
+    ["gh pr edit 12 --body-file body.md", "gh pr edit"],
+    ["glab mr create --description-file body.md", "glab mr create"],
+    ["glab mr update 3 --description x", "glab mr update"],
+    ["git status", null],
+    ["gh pr list", null],
+    ["gh pr view 12", null],
+    ["ls -la", null],
+    ["{ echo one; echo two; }", null],
+    ["for f in *.ts; do wc -l $f; done", null],
+    ["cat <<'EOF' > notes.md\nnothing here\nEOF", null],
+    ["cat > notes.md <<'EOF'\nrun gh pr create --body-file x.md later\nEOF", null],
     // The verb as an argument to something else: a note, a log line, a doc.
-    ["bun url.ts add --notes 'retry with gh pr edit 12 --body-file body.md'", false],
-    ['bun url.ts add --notes "Blocked.\nRun gh pr edit 12 --body-file body.md\nThen push."', false],
-    ["echo gh pr create --body-file body.md", false],
-    ["grep -r 'glab mr update' plugins/", false],
-  ])("isPrBodyCommand(%p) -> %p", (command, expected) => {
-    expect(isPrBodyCommand(command)).toBe(expected);
+    ["bun url.ts add --notes 'retry with gh pr edit 12 --body-file body.md'", null],
+    ['bun url.ts add --notes "Blocked.\nRun gh pr edit 12 --body-file body.md\nThen push."', null],
+    ["echo gh pr create --body-file body.md", null],
+    ["grep -r 'glab mr update' plugins/", null],
+  ])("prVerb(%p) -> %p", (command, expected) => {
+    expect(prVerb(command)).toBe(expected);
   });
 });
 

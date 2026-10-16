@@ -4,16 +4,25 @@
 import { rename } from "node:fs/promises";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { type BodyContext, decide, headingCaseCorrection, scanBody } from "./body-rules";
+import {
+  type BodyContext,
+  decide,
+  headingCaseCorrection,
+  type RuleMatch,
+  scanBody,
+} from "./body-rules";
 import type { HeadingCaseViolation } from "./heading-case";
 import { gitRepo } from "./repo";
-import { effectiveCwd, extractTitle, isPrBodyCommand, resolveBody } from "./resolve-body";
+import { effectiveCwd, extractTitle, prVerb, resolveBody } from "./resolve-body";
 import { splice } from "./shell";
+import { measureStructure } from "./structure";
+import { eventsRoot, raisedBefore, recordValidation } from "./validation-events";
 
 const BashInput = z.looseObject({ command: z.string() });
 
 export const HookInput = z.looseObject({
   cwd: z.string().optional(),
+  session_id: z.string().optional(),
   tool_input: z.unknown(),
 });
 export type HookInput = z.infer<typeof HookInput>;
@@ -51,10 +60,30 @@ async function replaceFile(file: string, text: string): Promise<boolean> {
   }
 }
 
-export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {
+// The limits ask for one decisive rewrite before the PR exists. Re-raising them
+// on each retry or edit turns the cut into word-by-word whittling.
+async function oneShotLimits(
+  matches: RuleMatch[],
+  verb: string,
+  sessionId: string | undefined,
+  events: string,
+): Promise<RuleMatch[]> {
+  const limits = matches.some((match) => match.id === "structure-limits");
+  if (!limits) return matches;
+  const once =
+    verb.endsWith("create") &&
+    (sessionId === undefined || !(await raisedBefore(sessionId, "structure-limits", events)));
+  return once ? matches : matches.filter((match) => match.id !== "structure-limits");
+}
+
+export async function processInput(
+  input: HookInput,
+  events: string = eventsRoot(),
+): Promise<SyncHookJSONOutput | null> {
   const toolInput = BashInput.safeParse(input.tool_input).data;
   const command = toolInput?.command;
-  if (command === undefined || !isPrBodyCommand(command)) {
+  const verb = command === undefined ? null : prVerb(command);
+  if (command === undefined || verb === null) {
     return null;
   }
   const cwd = input.cwd ?? process.cwd();
@@ -65,7 +94,17 @@ export async function processInput(input: HookInput): Promise<SyncHookJSONOutput
     unreadable: resolved.kind === "unreadable" ? resolved.detail : null,
     ...gitRepo(effectiveCwd(command, cwd)),
   };
-  const matches = await scanBody(body, context);
+  const matches = await oneShotLimits(
+    await scanBody(body, context),
+    verb,
+    input.session_id,
+    events,
+  );
+  if (input.session_id !== undefined) {
+    const rules = matches.map((match) => match.id);
+    const event = { sessionId: input.session_id, verb, rules, structure: measureStructure(body) };
+    await recordValidation(event, events);
+  }
 
   const file = resolved.kind === "text" ? resolved.file : null;
   if (file !== null) {

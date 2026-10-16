@@ -6,6 +6,9 @@
     "ap-style-title-case": "^2.0.0",
     "cleye": "^2.0.0",
     "mdast-util-from-markdown": "^2.0.2",
+    "mdast-util-gfm": "^3.1.0",
+    "mdast-util-to-string": "^4.0.0",
+    "micromark-extension-gfm": "^3.0.0",
     "mvdan-sh": "^0.10.1",
     "unist-util-visit": "^5.1.0",
     "zod": "^4.4.3"

@@ -56,6 +56,61 @@ describe("processInput", () => {
     return { tool_input: { command }, ...(cwd != null && cwd !== "" && { cwd }) };
   }
 
+  describe("validation events", () => {
+    async function validateAs(session: string | undefined): Promise<string> {
+      const events = join(tempDir, "mod-events");
+      const body = join(tempDir, "body.md");
+      await Bun.write(
+        body,
+        `${"Adds words. ".repeat(65)}\n\n| a | b |\n| - | - |\n| one | two |\n`,
+      );
+      const input = createInput(`gh pr create --title "x: y" --body-file ${body}`);
+      await processInput(
+        { ...input, ...(session !== undefined && { session_id: session }) },
+        events,
+      );
+      return events;
+    }
+
+    it("records the rules that fired and the measured structure", async () => {
+      const events = await validateAs("s-1");
+      const text = await Bun.file(join(events, "s-1", "pull-request.validate.jsonl")).text();
+      const record: unknown = JSON.parse(text);
+      expect(record).toMatchObject({
+        event_name: "pull-request.body.validate",
+        severity_text: "WARN",
+        attributes: {
+          verb: "gh pr create",
+          rules: ["run-on-prose", "structure-limits"],
+          visibleWords: 130,
+          hiddenWords: 4,
+          "session.id": "s-1",
+        },
+      });
+    });
+
+    it("denies over-limit creates once per session and never on edits", async () => {
+      const events = join(tempDir, "mod-events");
+      const body = join(tempDir, "body.md");
+      await Bun.write(body, "Adds words. ".repeat(65));
+      const run = (verb: string) =>
+        processInput(
+          { ...createInput(`gh pr ${verb} --body-file ${body}`), session_id: "s-2" },
+          events,
+        );
+      expect(getDenyReason(await run("edit 1"))).toBeUndefined();
+      expect(getDenyReason(await run("create --title 'x: y'"))).toContain("doesn't run again");
+      expect(getDenyReason(await run("create --title 'x: y'"))).toBeUndefined();
+    });
+
+    it("records nothing without a session", async () => {
+      const events = await validateAs(undefined);
+      expect(await Bun.file(join(events, "s-1", "pull-request.validate.jsonl")).exists()).toBe(
+        false,
+      );
+    });
+  });
+
   it("returns null when command has no --body-file", async () => {
     const result = await processInput(createInput("gh pr create --title 'Test'"));
     expect(result).toBeNull();

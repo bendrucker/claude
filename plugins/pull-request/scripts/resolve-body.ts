@@ -63,8 +63,9 @@ function findPrCommand(command: string): PrInvocation | null {
   return null;
 }
 
-export function isPrBodyCommand(command: string): boolean {
-  return findPrCommand(command) !== null;
+/** The PR command a shell line runs, as in `gh pr create`. */
+export function prVerb(command: string): string | null {
+  return findPrCommand(command)?.verb.join(" ") ?? null;
 }
 
 // Splitting on segments rather than text keeps the expansion in `--body="$X"`

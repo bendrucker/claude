@@ -259,6 +259,17 @@ describe("semicolon splices", () => {
     ).toBeNull();
   });
 
+  it("ignores hex colors in an HTML style block", async () => {
+    const html = [
+      "<style>",
+      "/* Dark palette. */",
+      ":root { --bg: #12151b; --surface: #1a1e26; --fg: #e4e8ef; --muted: #98a1b0; --line: #2c323d;",
+      "  --accent: #6c9cf0; --accent-fg: #0d1117; --chip: #232934; --good: #4cc27f; color-scheme: dark; }",
+      "</style>",
+    ].join("\n");
+    expect(await processInput(mockWrite(html, "page.html"))).toBeNull();
+  });
+
   it("flags two splices in a short prose file", async () => {
     const result = await processInput(
       mockWrite(

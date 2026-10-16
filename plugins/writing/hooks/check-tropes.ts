@@ -210,10 +210,14 @@ async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | n
   // Prose rules target prose. In a code file the model's prose surface is its
   // comments, so scan those; strings and identifiers are program text the
   // model did not write as prose.
-  const prose = filePath == null || filePath === "" || isProseFile(filePath);
+  const codePath = filePath == null || filePath === "" || isProseFile(filePath) ? null : filePath;
+  const prose = codePath == null;
   const scanPair = prose
     ? pair
-    : { newText: extractComments(pair.newText), oldText: extractComments(pair.oldText) };
+    : {
+        newText: await extractComments(pair.newText, codePath),
+        oldText: await extractComments(pair.oldText, codePath),
+      };
   const matches = scanIntroduced(scanPair.newText, scanPair.oldText, filePath, "file");
 
   const deny = firstByTier(matches, "deny");

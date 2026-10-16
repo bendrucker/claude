@@ -271,7 +271,7 @@ const scoreCmd = command(
       comments: shouldScoreComments(filePath, argv.flags.comments, argv.flags.noComments),
     };
     if (customMatch) options.customMatch = customMatch;
-    const report = buildReport(text, filePath, options);
+    const report = await buildReport(text, filePath, options);
 
     if (argv.flags.json) {
       console.log(JSON.stringify(report, null, 2));

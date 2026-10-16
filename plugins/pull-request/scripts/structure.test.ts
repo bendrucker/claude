@@ -30,25 +30,30 @@ describe("measureStructure", () => {
       visibleWords: evalMeasure.visibleWords,
       maxBlockWords: evalMeasure.maxBlockWords,
       proseCodeSpans: evalMeasure.proseCodeSpans,
+      hiddenWords: evalMeasure.hiddenWords,
     });
   });
 
   test.each<[string, string, Structure]>([
-    ["table cells", BODIES.table ?? "", { visibleWords: 3, maxBlockWords: 3, proseCodeSpans: 0 }],
+    [
+      "table cells",
+      BODIES.table ?? "",
+      { visibleWords: 3, maxBlockWords: 3, proseCodeSpans: 0, hiddenWords: 8 },
+    ],
     [
       "details",
       BODIES["details block"] ?? "",
-      { visibleWords: 2, maxBlockWords: 1, proseCodeSpans: 0 },
+      { visibleWords: 2, maxBlockWords: 1, proseCodeSpans: 0, hiddenWords: 4 },
     ],
     [
       "fenced output",
       BODIES["fenced output"] ?? "",
-      { visibleWords: 2, maxBlockWords: 1, proseCodeSpans: 0 },
+      { visibleWords: 2, maxBlockWords: 1, proseCodeSpans: 0, hiddenWords: 7 },
     ],
     [
       "list items",
       BODIES["nested list"] ?? "",
-      { visibleWords: 9, maxBlockWords: 3, proseCodeSpans: 1 },
+      { visibleWords: 9, maxBlockWords: 3, proseCodeSpans: 1, hiddenWords: 0 },
     ],
   ])("measures %s", (_name, body, expected) => {
     expect(measureStructure(body)).toEqual(expected);

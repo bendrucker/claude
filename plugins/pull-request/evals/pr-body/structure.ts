@@ -10,6 +10,7 @@ import { gfm } from "micromark-extension-gfm";
 export interface Structure {
   visibleWords: number;
   collapsedWords: number;
+  hiddenWords: number;
   leadWords: number;
   paragraphs: number;
   maxParagraphWords: number;
@@ -77,6 +78,8 @@ interface Acc {
   listSizes: number[];
   visibleWords: number;
   collapsedWords: number;
+  tableWords: number;
+  fenceWords: number;
   listWords: number;
   headings: number;
   visibleTables: number;
@@ -135,7 +138,8 @@ function visitChildren(children: RootContent[], acc: Acc, collapsed: boolean): v
     }
     const hidden = collapsed || depth > 0;
     if (hidden) {
-      acc.collapsedWords += node.type === "code" ? 0 : countWords(toString(node));
+      if (node.type === "code") acc.fenceWords += countWords(node.value);
+      else acc.collapsedWords += countWords(toString(node));
       continue;
     }
     // oxlint-disable-next-line typescript/switch-exhaustiveness-check -- other block types carry no prose
@@ -166,10 +170,14 @@ function visitChildren(children: RootContent[], acc: Acc, collapsed: boolean): v
         break;
       case "table":
         acc.visibleTables++;
+        acc.tableWords += countWords(
+          node.children.flatMap((row) => row.children.map((c) => toString(c))).join(" "),
+        );
         acc.visibleImages += countImages(node);
         break;
       case "code":
         acc.visibleCodeLines += node.value.split("\n").length;
+        acc.fenceWords += countWords(node.value);
         break;
       case "blockquote":
         visitChildren(node.children, acc, false);
@@ -195,6 +203,8 @@ export function measureStructure(body: string): Structure {
     listSizes: [],
     visibleWords: 0,
     collapsedWords: 0,
+    tableWords: 0,
+    fenceWords: 0,
     listWords: 0,
     headings: 0,
     visibleTables: 0,
@@ -212,6 +222,7 @@ export function measureStructure(body: string): Structure {
   return {
     visibleWords: v,
     collapsedWords: acc.collapsedWords,
+    hiddenWords: acc.collapsedWords + acc.tableWords + acc.fenceWords,
     leadWords: firstParagraph ? countWords(toString(firstParagraph)) : 0,
     paragraphs: acc.paragraphWords.length,
     maxParagraphWords: max(acc.paragraphWords),
@@ -256,6 +267,12 @@ export type LimitKey = keyof typeof LIMITS;
 const isLimitKey = (k: string): k is LimitKey => k in LIMITS;
 
 export const limitKeys: LimitKey[] = Object.keys(LIMITS).filter(isLimitKey);
+
+// Trimming a body to fit the limits must not move its prose into <details>,
+// tables, or fences. No baseline body comes near this.
+export const GUARDS = {
+  hiddenWords: 60,
+} as const satisfies Partial<Structure>;
 
 export function overLimits(s: Structure): LimitKey[] {
   return limitKeys.filter((k) => s[k] > LIMITS[k]);

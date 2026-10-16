@@ -13,7 +13,11 @@ export interface Structure {
   maxBlockWords: number;
   /** Inline code spans in visible paragraphs and list items. */
   proseCodeSpans: number;
+  /** Words in tables, fenced code, and <details>, which the limits skip. */
+  hiddenWords: number;
 }
+
+type LimitKey = "visibleWords" | "maxBlockWords" | "proseCodeSpans";
 
 // One-sided limits fitted against hand-written PRs: a body fails only by
 // exceeding them, so terseness is never penalized.
@@ -21,19 +25,19 @@ export const LIMITS = {
   visibleWords: 120,
   maxBlockWords: 40,
   proseCodeSpans: 6,
-} as const satisfies Structure;
+} as const satisfies Pick<Structure, LimitKey>;
 
 const LIMIT_LABELS = {
   visibleWords: "visible words",
   maxBlockWords: "longest paragraph or bullet words",
   proseCodeSpans: "inline code spans",
-} as const satisfies Record<keyof Structure, string>;
+} as const satisfies Record<LimitKey, string>;
 
 const LIMIT_KEYS = [
   "visibleWords",
   "maxBlockWords",
   "proseCodeSpans",
-] as const satisfies (keyof Structure)[];
+] as const satisfies LimitKey[];
 
 const wordSegmenter = new Intl.Segmenter("en", { granularity: "word" });
 
@@ -58,6 +62,7 @@ interface Tally {
   visibleWords: number;
   blockWords: number[];
   proseCodeSpans: number;
+  hiddenWords: number;
 }
 
 function ownChildren(item: ListItem): RootContent[] {
@@ -79,10 +84,16 @@ function tallyBlocks(nodes: RootContent[], tally: Tally): void {
   let detailsDepth = 0;
   for (const node of nodes) {
     if (node.type === "html") {
-      detailsDepth = Math.max(0, detailsDepth + detailsDelta(node.value));
+      const delta = detailsDelta(node.value);
+      if (delta === 0 && /<details[\s>]/i.test(node.value))
+        tally.hiddenWords += countWords(node.value.replaceAll(/<[^>]+>/g, " "));
+      detailsDepth = Math.max(0, detailsDepth + delta);
       continue;
     }
-    if (detailsDepth > 0) continue;
+    if (detailsDepth > 0) {
+      tally.hiddenWords += countWords(node.type === "code" ? node.value : toString(node));
+      continue;
+    }
     if (node.type === "heading") {
       tally.visibleWords += countWords(toString(node));
     } else if (node.type === "paragraph") {
@@ -92,6 +103,11 @@ function tallyBlocks(nodes: RootContent[], tally: Tally): void {
       tally.proseCodeSpans += countInlineCode(node);
     } else if (node.type === "list") {
       tallyList(node, tally);
+    } else if (node.type === "table") {
+      const cells = node.children.flatMap((row) => row.children.map((cell) => toString(cell)));
+      tally.hiddenWords += countWords(cells.join(" "));
+    } else if (node.type === "code") {
+      tally.hiddenWords += countWords(node.value);
     } else if (node.type === "blockquote") {
       tallyBlocks(node.children, tally);
     }
@@ -100,12 +116,13 @@ function tallyBlocks(nodes: RootContent[], tally: Tally): void {
 
 export function measureStructure(body: string): Structure {
   const root = fromMarkdown(body, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
-  const tally: Tally = { visibleWords: 0, blockWords: [], proseCodeSpans: 0 };
+  const tally: Tally = { visibleWords: 0, blockWords: [], proseCodeSpans: 0, hiddenWords: 0 };
   tallyBlocks(root.children, tally);
   return {
     visibleWords: tally.visibleWords,
     maxBlockWords: Math.max(0, ...tally.blockWords),
     proseCodeSpans: tally.proseCodeSpans,
+    hiddenWords: tally.hiddenWords,
   };
 }
 
@@ -115,7 +132,7 @@ export interface ExceededLimit {
   limit: number;
 }
 
-export function exceededLimits(structure: Structure): ExceededLimit[] {
+export function exceededLimits(structure: Pick<Structure, LimitKey>): ExceededLimit[] {
   return LIMIT_KEYS.flatMap((key) =>
     structure[key] > LIMITS[key]
       ? [{ label: LIMIT_LABELS[key], measured: structure[key], limit: LIMITS[key] }]

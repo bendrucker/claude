@@ -46,8 +46,8 @@ export interface HostEntry {
   policy: HostPolicy;
 }
 
-// DuckDB defaults to 80% of RAM and every core. The writer holds the file
-// exclusively, so it runs alone and gets twice a reader's budget (limits.sql).
+// The writer holds the file exclusively and runs alone, so it gets twice a
+// reader's budget.
 const WRITER_LIMITS = { memory_limit: "8GiB", threads: "4", max_temp_directory_size: "32GiB" };
 
 async function createDatabase(dbPath: string): Promise<Database> {

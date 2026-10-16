@@ -52,6 +52,16 @@ export function register(on: On): void {
     return started;
   });
 
+  // /clear and /resume start a new conversation without a session.start.
+  on("session.end", ($, e, next) => {
+    if (e.reason !== "clear" && e.reason !== "resume") return next(e);
+    latest = { requestId: "", found: [], runs: [] };
+    seen.clear();
+    shownFor = undefined;
+    $.ui.invalidate("ui.render");
+    return next(e);
+  });
+
   on("ui.render", { component: "PromptHint" }, ($, e, next) => {
     const now = e.props.hint.includes("shell mode") && !e.props.isDraft;
     if (now !== shell) {

@@ -51,6 +51,12 @@ export function register(on: On): void {
     return next(e);
   });
 
+  // /clear and /resume start a new conversation without a session.start.
+  on("session.end", ($, e, next) => {
+    if (e.reason === "clear" || e.reason === "resume") state.seen.clear();
+    return next(e);
+  });
+
   on("tool.call", { tool: "Bash" }, async ($, e, next) => {
     const shell = state.shell;
     if (shell === undefined || !shell.active) return next(e);

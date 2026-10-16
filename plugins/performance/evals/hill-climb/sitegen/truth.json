@@ -1,0 +1,86 @@
+{
+  "kind": "offcpu",
+  "profile": "repo/profile.txt",
+  "checks": [
+    {
+      "id": "gap",
+      "note": "The profile ran 7.1s in the maintainer's working copy, where `.sitegen-cache/` already holds every resized image and remote include. The metric is the 64.2s CI build that starts without the cache, so the profile never sees the resizing or the fetches.",
+      "all": [
+        ["profil", "7\\.1", "6\\.8", "working copy", "laptop", "local"],
+        ["warm", "cache[ds]?\\b", "cache (hit|was|is)", "populated", "already"],
+        ["cold", "empty", "fresh", "without (the |a )?cache", "\\bCI\\b", "64", "miss"]
+      ]
+    },
+    {
+      "id": "profile",
+      "note": "The next measurement profiles the CI scenario itself: a build from an empty cache, through the harness.",
+      "all": [
+        [
+          "re-?profil",
+          "cold[^\\n]{0,60}profil",
+          "profil\\w*[^\\n]{0,80}(cold|empty|clean|fresh|without (the |a )?cache|no cache|cleared|ci-build|harness|\\bCI\\b)",
+          "(clear|empty|delete|remove|wipe|reset)\\w*[^\\n]{0,60}cache[^\\n]{0,80}(profil|trace)",
+          "new profile",
+          "profile (it |the build )?again"
+        ]
+      ]
+    }
+  ],
+  "primary": {
+    "note": "On a cold cache, resizing every screenshot and fetching every remote include, which the warm profile never sees.",
+    "patterns": [
+      "resiz",
+      "screenshot",
+      "thumbnail",
+      "remote",
+      "\\bincludes?\\b",
+      "expandIncludes",
+      "prefetch",
+      "\\bfetch",
+      "download"
+    ],
+    "cited": {
+      "headline": [
+        "(parallel|concurren|worker|pool|goroutine)[^\\n]{0,60}(\\bimages?\\b|writeImage)",
+        "(\\bimages?\\b|writeImage)[^\\n]{0,60}(parallel|concurren|worker|pool|goroutine)"
+      ],
+      "body": ["resiz", "\\bcold\\b", "cache miss", "unprofiled", "not (visible )?in the profile"]
+    }
+  },
+  "leads": [
+    "image",
+    "resiz",
+    "screenshot",
+    "jpeg",
+    "fetch",
+    "remote",
+    "include",
+    "download",
+    "cache miss",
+    "cold",
+    "re-?profil",
+    "profile"
+  ],
+  "traps": [
+    {
+      "id": "template",
+      "note": "Template execution leads the warm profile, about 2.3s of a 64s cold build.",
+      "patterns": ["template", "Execute", "escap"]
+    },
+    {
+      "id": "minify",
+      "note": "minify is 1.2s in the warm profile.",
+      "patterns": ["minif"]
+    },
+    {
+      "id": "markdown",
+      "note": "Markdown rendering is under a second warm.",
+      "patterns": ["markdown", "WriteString", "navLinks", "\\bnav\\b"]
+    },
+    {
+      "id": "hashing",
+      "note": "sha256 of each image for its cache key shows as 15% only because the warm build skips the resizing it guards.",
+      "patterns": ["sha256", "hash"]
+    }
+  ]
+}

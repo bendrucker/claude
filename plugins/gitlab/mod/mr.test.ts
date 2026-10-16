@@ -1,6 +1,8 @@
 import { describe, expect, test } from "claude-code/testing";
 import {
+  type Approval,
   type Decision,
+  type Promoted,
   type Job,
   type Read,
   type Snapshot,
@@ -10,6 +12,8 @@ import {
   parseJobs,
   parseNotes,
   parseView,
+  baselineOf,
+  combine,
   snapshotOf,
   statusOf,
 } from "./mr.ts";
@@ -29,6 +33,8 @@ const read = (over: Partial<Read> = {}, pipelineStatus = "running"): Read => ({
     url: "https://gitlab.com/g/r/-/merge_requests/7",
     state: "opened",
     sha: "aaaaaaa1111",
+    target: "main",
+    hasConflicts: false,
     detailedMergeStatus: null,
     pipeline: { id: 50, projectId: 1, status: pipelineStatus },
   },
@@ -36,7 +42,16 @@ const read = (over: Partial<Read> = {}, pipelineStatus = "running"): Read => ({
   notes: [],
   jobs: [],
   me: "ben",
+  isHeadKnown: true,
   ...over,
+});
+
+const fb = (author: string, approval: Approval, notes = 0): Promoted => ({
+  action: "promote",
+  kind: "feedback",
+  author,
+  approval,
+  notes,
 });
 
 const snap = (over: Partial<Read> = {}, pipelineStatus?: string) =>
@@ -135,7 +150,49 @@ describe("decide", () => {
     notes.map(([id, author]) => ({ id, author, isSystem: false }));
   const pushed = (s: Snapshot): Snapshot => ({ ...s, head: "bbbbbbb2222" });
 
+  const blocked = (block: Snapshot["block"]): Snapshot => ({ ...passing, block });
+
   const cases: [string, Snapshot, Snapshot, Decision[]][] = [
+    [
+      "a new conflict promotes",
+      passing,
+      blocked("conflict"),
+      [{ action: "promote", kind: "conflict" }],
+    ],
+    [
+      "a conflict after an undecided read promotes",
+      blocked(undefined),
+      blocked("conflict"),
+      [{ action: "promote", kind: "conflict" }],
+    ],
+    ["the same conflict stays quiet", blocked("conflict"), blocked("conflict"), []],
+    [
+      "needing a rebase promotes",
+      passing,
+      blocked("behind"),
+      [{ action: "promote", kind: "behind" }],
+    ],
+    [
+      "a conflict replacing a needed rebase promotes",
+      blocked("behind"),
+      blocked("conflict"),
+      [{ action: "promote", kind: "conflict" }],
+    ],
+    [
+      "clearing a block drops",
+      blocked("conflict"),
+      passing,
+      [{ action: "drop", kind: "unblocked" }],
+    ],
+    [
+      "a push this checkout lacks promotes",
+      passing,
+      { ...pushed(passing), isHeadKnown: false },
+      [
+        { action: "promote", kind: "push.foreign", from: "aaaaaaa1111" },
+        { action: "drop", kind: "ci.passing" },
+      ],
+    ],
     [
       "a new failure promotes",
       pending,
@@ -155,16 +212,16 @@ describe("decide", () => {
     ["green drops", pending, passing, [{ action: "drop", kind: "ci.passing" }]],
     ["pending drops", passing, pending, [{ action: "drop", kind: "ci.pending" }]],
     [
-      "merging drops",
+      "merging promotes",
       passing,
       { ...passing, state: "merged" },
-      [{ action: "drop", kind: "mr.merged" }],
+      [{ action: "promote", kind: "mr.merged" }],
     ],
     [
-      "closing drops",
+      "closing promotes",
       passing,
       { ...passing, state: "closed" },
-      [{ action: "drop", kind: "mr.closed" }],
+      [{ action: "promote", kind: "mr.closed" }],
     ],
     ["a locked MR is still open", passing, { ...passing, state: "locked" }, []],
     [
@@ -177,13 +234,13 @@ describe("decide", () => {
       "an approval promotes",
       passing,
       snap({ jobs: [job("test", "success")], ...approvedBy("alice") }, "success"),
-      [{ action: "promote", kind: "review", author: "alice", state: "approved" }],
+      [fb("alice", "approved")],
     ],
     [
       "an unapproval promotes",
       snap({ ...approvedBy("alice") }),
       snap(),
-      [{ action: "promote", kind: "review", author: "alice", state: "unapproved" }],
+      [fb("alice", "unapproved")],
     ],
     [
       "approvals a push resets drop",
@@ -199,7 +256,7 @@ describe("decide", () => {
       "a request for changes promotes",
       passing,
       { ...passing, isChangesRequested: true },
-      [{ action: "promote", kind: "review", state: "changes_requested" }],
+      [{ action: "promote", kind: "changes_requested" }],
     ],
     [
       "a standing request for changes stays quiet",
@@ -208,25 +265,19 @@ describe("decide", () => {
       [],
     ],
     [
-      "an approval with comments promotes both",
+      "an approval with comments promotes one entry",
       passing,
       snap(
         { jobs: [job("test", "success")], ...approvedBy("alice"), notes: noted([2, "alice"]) },
         "success",
       ),
-      [
-        { action: "promote", kind: "review", author: "alice", state: "approved" },
-        { action: "promote", kind: "review", author: "alice", state: "commented", notes: 1 },
-      ],
+      [fb("alice", "approved", 1)],
     ],
     [
       "a request for changes with comments promotes both",
       passing,
       { ...passing, isChangesRequested: true, notes: [{ id: 2, author: "bob" }] },
-      [
-        { action: "promote", kind: "review", state: "changes_requested" },
-        { action: "promote", kind: "review", author: "bob", state: "commented", notes: 1 },
-      ],
+      [{ action: "promote", kind: "changes_requested" }, fb("bob", null, 1)],
     ],
     [
       "comments after a push still promote",
@@ -235,17 +286,14 @@ describe("decide", () => {
       [
         { action: "drop", kind: "push", from: "aaaaaaa1111" },
         { action: "drop", kind: "ci.passing" },
-        { action: "promote", kind: "review", author: "bob", state: "commented", notes: 1 },
+        fb("bob", null, 1),
       ],
     ],
     [
       "new comments promote once per author",
       snap({ notes: noted([3, "alice"]) }),
       snap({ notes: noted([6, "greptile"], [5, "alice"], [4, "greptile"], [3, "alice"]) }),
-      [
-        { action: "promote", kind: "review", author: "greptile", state: "commented", notes: 2 },
-        { action: "promote", kind: "review", author: "alice", state: "commented", notes: 1 },
-      ],
+      [fb("greptile", null, 2), fb("alice", null, 1)],
     ],
     [
       "an older note back in the window after a deletion stays quiet",
@@ -263,6 +311,58 @@ describe("decide", () => {
   });
 });
 
+describe("combine", () => {
+  test("folds a retry into fresh decisions without repeating anything", () => {
+    const carried: Promoted[] = [
+      { action: "promote", kind: "behind" },
+      { action: "promote", kind: "ci.failed", failed: ["b", "a"] },
+      { action: "promote", kind: "changes_requested" },
+      fb("alice", "approved", 1),
+    ];
+    const fresh: Promoted[] = [
+      fb("alice", null, 2),
+      { action: "promote", kind: "ci.failed", failed: ["a", "c"] },
+      { action: "promote", kind: "conflict" },
+      { action: "promote", kind: "changes_requested" },
+    ];
+    expect(combine(carried, fresh)).toEqual([
+      { action: "promote", kind: "conflict" },
+      { action: "promote", kind: "ci.failed", failed: ["a", "b", "c"] },
+      { action: "promote", kind: "changes_requested" },
+      fb("alice", "approved", 3),
+    ]);
+  });
+
+  test("an approval and its revocation cancel out", () => {
+    expect(combine([fb("bob", "approved")], [fb("bob", "unapproved", 1)])).toEqual([
+      fb("bob", null, 1),
+    ]);
+  });
+
+  test("the MR's end replaces everything else", () => {
+    expect(combine([fb("alice", null, 1)], [{ action: "promote", kind: "mr.merged" }])).toEqual([
+      { action: "promote", kind: "mr.merged" },
+    ]);
+  });
+});
+
+describe("baselineOf", () => {
+  test("an MR first seen blocked announces only the block", () => {
+    const failing = snap({ jobs: [job("test", "failed")] }, "failed");
+    expect({
+      conflict: baselineOf({ ...failing, block: "conflict" }),
+      behind: baselineOf({ ...failing, block: "behind" }),
+      clear: baselineOf(failing),
+      merged: baselineOf({ ...failing, block: "conflict", state: "merged" }),
+    }).toEqual({
+      conflict: [{ action: "promote", kind: "conflict" }],
+      behind: [{ action: "promote", kind: "behind" }],
+      clear: [],
+      merged: [],
+    });
+  });
+});
+
 describe("messageOf", () => {
   const snapshot = snap({ jobs: [job("test", "failed")] }, "failed");
   const cases: [string, Parameters<typeof messageOf>[1], string][] = [
@@ -273,23 +373,47 @@ describe("messageOf", () => {
     ],
     [
       "approval",
-      [{ action: "promote", kind: "review", author: "alice", state: "approved" }],
-      "@alice approved MR !7: https://gitlab.com/g/r/-/merge_requests/7\nRead the discussion with `glab mr view 7 --comments`.",
+      [fb("alice", "approved")],
+      "@alice approved MR !7\nhttps://gitlab.com/g/r/-/merge_requests/7\nRead the discussion with `glab mr view 7 --comments`.",
     ],
     [
       "unapproval",
-      [{ action: "promote", kind: "review", author: "alice", state: "unapproved" }],
-      "@alice revoked their approval of MR !7: https://gitlab.com/g/r/-/merge_requests/7",
+      [fb("alice", "unapproved")],
+      "@alice revoked their approval of MR !7\nhttps://gitlab.com/g/r/-/merge_requests/7",
     ],
     [
       "changes requested",
-      [{ action: "promote", kind: "review", state: "changes_requested" }],
-      "Changes were requested on MR !7: https://gitlab.com/g/r/-/merge_requests/7",
+      [{ action: "promote", kind: "changes_requested" }],
+      "Changes were requested on MR !7\nhttps://gitlab.com/g/r/-/merge_requests/7",
+    ],
+    [
+      "conflict",
+      [{ action: "promote", kind: "conflict" }],
+      "MR !7 has merge conflicts with `main` at aaaaaaa.\nUpdate the branch from `main`, resolve the conflicts with the `git:conflicts` skill, and push.",
+    ],
+    [
+      "behind",
+      [{ action: "promote", kind: "behind" }],
+      "MR !7 is behind `main` at aaaaaaa, and merging requires a rebase.\nRebase onto `main`, resolve any conflicts with the `git:conflicts` skill, and push.",
+    ],
+    [
+      "foreign push",
+      [{ action: "promote", kind: "push.foreign", from: "0000000ffff" }],
+      "MR !7's branch moved from 0000000 to aaaaaaa, a commit this checkout does not have.\nPull it before committing or pushing again.",
+    ],
+    [
+      "feedback from several reviewers shares one pointer",
+      [
+        { action: "promote", kind: "changes_requested" },
+        fb("alice", "approved", 2),
+        fb("bot", null, 1),
+      ],
+      "Changes were requested on MR !7\n@alice approved MR !7 (2 new comments)\n@bot commented on MR !7 (1 new comment)\nhttps://gitlab.com/g/r/-/merge_requests/7\nRead the discussion with `glab mr view 7 --comments`.",
     ],
     [
       "comments",
-      [{ action: "promote", kind: "review", author: "bot", state: "commented", notes: 3 }],
-      "@bot commented on MR !7 (3 new comments): https://gitlab.com/g/r/-/merge_requests/7",
+      [fb("bot", null, 3)],
+      "@bot commented on MR !7 (3 new comments)\nhttps://gitlab.com/g/r/-/merge_requests/7",
     ],
   ];
   test("leads with each event and closes with the watch note", () => {
@@ -362,6 +486,30 @@ describe("statusOf", () => {
     ],
     ["merged", { ...snap({ jobs: [job("a", "running")] }), state: "merged" }, "\u{f419} merged"],
     ["closed", { ...snap(), state: "closed" }, "\u{f4dc} closed"],
+    [
+      "conflicting",
+      snapshotOf({
+        ...read({ jobs: passed }, "success"),
+        view: { ...read({}, "success").view, detailedMergeStatus: "conflict" },
+      }),
+      "\u{f47f} conflicts · \u{f49e} CI",
+    ],
+    [
+      "needs a rebase",
+      snapshotOf({
+        ...read({ jobs: passed }, "success"),
+        view: { ...read({}, "success").view, detailedMergeStatus: "need_rebase" },
+      }),
+      "\u{f47f} behind · \u{f49e} CI",
+    ],
+    [
+      "undecided mergeability shows no conflict",
+      snapshotOf({
+        ...read({ jobs: passed }, "success"),
+        view: { ...read({}, "success").view, detailedMergeStatus: "checking" },
+      }),
+      "\u{f49e} CI",
+    ],
   ];
   test("formats each state", () => {
     const shown = Object.fromEntries(cases.map(([name, snapshot]) => [name, statusOf(snapshot)]));

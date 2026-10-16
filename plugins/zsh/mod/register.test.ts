@@ -125,4 +125,25 @@ describe("register", () => {
     expect(world.ran).toEqual(["echo '==='"]);
     expect(named(world, "error")).toMatchObject([{ hook: "session.start", kind: "probe" }]);
   });
+
+  // oxlint-disable-next-line vitest/prefer-each -- claude-code/testing has no test.each.
+  for (const [reason, repeat] of [
+    ["clear", false],
+    ["resume", false],
+    ["prompt_input_exit", true],
+  ] as const) {
+    test(`after a session ends on ${reason}, a repeat note is brief: ${repeat}`, async ($, on) => {
+      const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
+      on("session.end", (_, e) => ({ sessionId: e.sessionId }));
+      await $.session.start(START);
+      world.output = "(eval):1: no matches found: plugins/zsh/*.nope";
+      await bash($, "ls plugins/zsh/*.nope");
+      await $.session.end({ reason, sessionId: "s1", resume: { id: "s1" } });
+      await bash($, "ls plugins/zsh/*.nope");
+      expect(named(world, "explain")).toEqual([
+        { class: "glob", repeat: false },
+        { class: "glob", repeat },
+      ]);
+    });
+  }
 });

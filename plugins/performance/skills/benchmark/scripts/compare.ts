@@ -213,6 +213,15 @@ export function loadSummary(meta: Meta): string {
   return `${head}\nload: ${loaded.length} of ${meta.rounds.length} rounds above 2×${meta.ncpu} cpus (${loaded.join(", ")}). Re-run an accept that rests on them`;
 }
 
+export function roundFile(index: number): string {
+  return `round-${String(index).padStart(3, "0")}.json`;
+}
+
+/** Export files of the rounds `flagged` reports, in a `run` output directory. */
+export function loadedRounds(dir: string, meta: Meta): string[] {
+  return flagged(meta).map((round) => join(dir, roundFile(round - 1)));
+}
+
 export function logPath(env: Record<string, string | undefined> = process.env): string {
   return join(env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "performance", "comparisons.jsonl");
 }
@@ -236,23 +245,31 @@ function logComparison(meta: Meta, out: string, planned: number): void {
   appendFileSync(path, `${JSON.stringify(entry)}\n`);
 }
 
-async function readMeta(paths: string[]): Promise<Meta[]> {
-  const files = paths.filter((p) => !p.endsWith(".json")).map((dir) => Bun.file(join(dir, META)));
-  const present = await Promise.all(files.map(async (f) => ((await f.exists()) ? f : null)));
-  return Promise.all(
-    present.filter((f) => f !== null).map(async (f) => Meta.parse(await f.json())),
+async function readMeta(paths: string[]): Promise<{ dir: string; meta: Meta }[]> {
+  const dirs = paths.filter((p) => !p.endsWith(".json"));
+  const read = await Promise.all(
+    dirs.map(async (dir) => {
+      const file = Bun.file(join(dir, META));
+      return (await file.exists()) ? { dir, meta: Meta.parse(await file.json()) } : null;
+    }),
   );
+  return read.filter((m) => m !== null);
 }
 
-async function readExports(paths: string[]): Promise<z.infer<typeof Export>[]> {
-  const files = paths.flatMap((path) =>
-    path.endsWith(".json")
-      ? [path]
-      : readdirSync(path)
-          .filter((f) => f.endsWith(".json") && f !== META)
-          .toSorted()
-          .map((f) => join(path, f)),
-  );
+async function readExports(
+  paths: string[],
+  skip = new Set<string>(),
+): Promise<z.infer<typeof Export>[]> {
+  const files = paths
+    .flatMap((path) =>
+      path.endsWith(".json")
+        ? [path]
+        : readdirSync(path)
+            .filter((f) => f.endsWith(".json") && f !== META)
+            .toSorted()
+            .map((f) => join(path, f)),
+    )
+    .filter((file) => !skip.has(file));
   return Promise.all(
     files.map(async (file) => {
       try {
@@ -334,7 +351,7 @@ async function runRounds(
   for (let round = 0; round < argv.flags.rounds; round++) {
     const shift = round % arms.length;
     const ordered = [...arms.slice(shift), ...arms.slice(0, shift)];
-    const out = join(argv._.out, `round-${String(round).padStart(3, "0")}.json`);
+    const out = join(argv._.out, roundFile(round));
     const args = [
       "hyperfine",
       "--runs",
@@ -403,13 +420,20 @@ const reportCmd = command(
     const arms = pool(await readExports(argv._.exports));
     const base = argv.flags.base ?? arms[0]?.name;
     if (base === undefined) throw new Error("no results found");
-    for (const meta of await readMeta(argv._.exports)) console.log(`${loadSummary(meta)}\n`);
-    console.log(
+    const metas = await readMeta(argv._.exports);
+    for (const { meta } of metas) console.log(`${loadSummary(meta)}\n`);
+    const report = (pooled: Arm[]) =>
       render(
-        compare(arms, base, argv.flags.alpha, argv.flags.minEffect),
+        compare(pooled, base, argv.flags.alpha, argv.flags.minEffect),
         argv.flags.markdown === true,
-      ),
-    );
+      );
+    console.log(report(arms));
+    const loaded = metas.flatMap(({ dir, meta }) => loadedRounds(dir, meta));
+    if (loaded.length > 0) {
+      const rest = pool(await readExports(argv._.exports, new Set(loaded)));
+      const left = rest.some((a) => a.name === base) ? report(rest) : "every round was loaded";
+      console.log(`\nwithout the loaded rounds:\n${left}`);
+    }
     console.log(
       `* p < ${argv.flags.alpha} and |change| ≥ ${argv.flags.minEffect * 100}%. † fewer than 4 runs a side, too few to star.`,
     );

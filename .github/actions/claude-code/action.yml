@@ -1,5 +1,11 @@
 name: Claude Code
-description: Install the Claude Code CLI and the sandbox its agent runs need
+description: Install the Claude Code CLI, optionally with the sandbox its agent runs need
+
+inputs:
+  sandbox:
+    description: Install the bubblewrap sandbox that agent runs need
+    default: "false"
+
 runs:
   using: composite
   steps:
@@ -9,6 +15,7 @@ runs:
     # on every command because Node's piped stdin is a socket, so each output
     # would open with a permission error. zsh -c skips rc files.
     - name: Install sandbox dependencies
+      if: inputs.sandbox == 'true'
       shell: bash
       run: |
         set -euo pipefail
@@ -16,8 +23,34 @@ runs:
         sudo apt-get install -y -q bubblewrap socat zsh
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
         echo "SHELL=$(command -v zsh)" >> "$GITHUB_ENV"
+
+    # install.sh holds the version pin, so its hash keys the cache.
+    - name: Restore Claude Code
+      id: cache
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/.local/share/claude/versions
+          ~/.local/bin/claude
+          ~/.claude.json
+        key: claude-code-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/actions/claude-code/install.sh') }}
+
     - name: Install Claude Code
+      if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      run: |
-        "$GITHUB_ACTION_PATH/install.sh"
-        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      run: '"$GITHUB_ACTION_PATH/install.sh"'
+
+    # Saved before any step runs claude, which writes to ~/.claude.json.
+    - name: Save Claude Code
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: |
+          ~/.local/share/claude/versions
+          ~/.local/bin/claude
+          ~/.claude.json
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+
+    - name: Add Claude Code to PATH
+      shell: bash
+      run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"

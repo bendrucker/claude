@@ -1,0 +1,47 @@
+$ go tool pprof -top -cum -nodecount=32 -nodefraction=0 ledgerroll cpu.pprof
+File: ledgerroll
+Type: cpu
+Time: 2026-10-14 06:40:12 UTC
+Duration: 6.08s, Total samples = 6.00s (98.68%)
+Showing nodes accounting for 3.94s, 65.67% of 6.00s total
+Showing top 32 nodes out of 171
+      flat  flat%   sum%        cum   cum%
+         0     0%     0%      5.47s 91.17%  runtime.main
+         0     0%     0%      5.47s 91.17%  main.main
+         0     0%     0%      5.46s 91.00%  main.run
+         0     0%     0%      3.00s 50.00%  main.readRecords
+         0     0%     0%      1.86s 31.00%  compress/gzip.(*Reader).Read
+         0     0%     0%      1.68s 28.00%  compress/flate.(*decompressor).Read
+     1.08s 18.00% 18.00%      1.50s 25.00%  compress/flate.(*decompressor).huffmanBlock
+     0.04s  0.67% 18.67%      1.26s 21.00%  main.aggregate
+     0.02s  0.33% 19.00%      1.20s 20.00%  main.render
+     0.02s  0.33% 19.33%      1.02s 17.00%  main.decodeRecord
+     0.04s  0.67% 20.00%      0.90s 15.00%  main.renderRow
+     0.06s  1.00% 21.00%      0.84s 14.00%  fmt.Sprintf
+         0     0% 21.00%      0.66s 11.00%  encoding/json.Unmarshal
+     0.12s  2.00% 23.00%      0.60s 10.00%  encoding/json.(*decodeState).object
+         0     0% 23.00%      0.60s 10.00%  sort.Slice
+     0.06s  1.00% 24.00%      0.52s  8.67%  sort.pdqsort_func
+         0     0% 24.00%      0.48s  8.00%  runtime.gcBgMarkWorker
+     0.42s  7.00% 31.00%      0.42s  7.00%  compress/flate.(*decompressor).huffSym
+     0.38s  6.33% 37.33%      0.38s  6.33%  sort.insertionSort_func
+     0.02s  0.33% 37.67%      0.38s  6.33%  main.groupKey
+     0.30s  5.00% 42.67%      0.30s  5.00%  runtime.scanobject
+         0     0% 42.67%      0.28s  4.67%  os.(*File).Write
+     0.24s  4.00% 46.67%      0.24s  4.00%  syscall.syscall
+     0.24s  4.00% 50.67%      0.24s  4.00%  runtime.mapaccess2_faststr
+         0     0% 50.67%      0.24s  4.00%  main.parseTime
+     0.18s  3.00% 53.67%      0.18s  3.00%  compress/flate.(*dictDecoder).writeCopy
+     0.18s  3.00% 56.67%      0.18s  3.00%  hash/crc32.ieeeCLMUL
+     0.18s  3.00% 59.67%      0.18s  3.00%  runtime.concatstrings
+     0.14s  2.33% 62.00%      0.14s  2.33%  runtime.mapassign_faststr
+     0.04s  0.67% 62.67%      0.12s  2.00%  bufio.(*Scanner).Scan
+     0.10s  1.67% 64.33%      0.10s  1.67%  encoding/json.(*decodeState).literalInterface
+     0.08s  1.33% 65.67%      0.08s  1.33%  internal/reflectlite.Swapper
+
+$ go tool pprof -peek 'fmt.Sprintf$' ledgerroll cpu.pprof
+      flat  flat%   sum%        cum   cum%   calls calls% + context
+                                             0.48s 57.14% |   main.renderRow
+                                             0.36s 42.86% |   main.groupKey
+     0.06s  1.00%  1.00%      0.84s 14.00%                | fmt.Sprintf
+                                             0.78s 92.86% |   fmt.(*pp).doPrintf

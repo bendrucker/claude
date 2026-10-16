@@ -229,4 +229,27 @@ describe("register", () => {
     await $.session.start({ surface: "terminal", isInteractive: true, cwd: "/work" });
     expect(world.events).toEqual([{ mod: "plan", event: "session.start" }]);
   });
+
+  // oxlint-disable-next-line vitest/prefer-each -- claude-code/testing has no test.each.
+  for (const reason of ["clear", "resume"] as const) {
+    test(`a session ending on ${reason} leaves plan mode and clears the count`, async ($, on) => {
+      const world = worldOf(on);
+      on("session.end", (_, e) => ({ sessionId: e.sessionId }));
+      await planMode($);
+      await write($, world, 11_700);
+      await $.session.end({ reason, sessionId: "s1", resume: { id: "s1" } });
+      await write($, world, 11_700);
+      expect(world.status).toEqual(["11.7k (117%)", undefined]);
+    });
+  }
+
+  test("a session ending on exit keeps the count", async ($, on) => {
+    const world = worldOf(on);
+    on("session.end", (_, e) => ({ sessionId: e.sessionId }));
+    await planMode($);
+    await write($, world, 11_700);
+    await $.session.end({ reason: "prompt_input_exit", sessionId: "s1", resume: { id: "s1" } });
+    await write($, world, 11_800);
+    expect(world.status).toEqual(["11.7k (117%)", "11.8k (118%)"]);
+  });
 });

@@ -29,6 +29,19 @@ export function register(on: On): void {
     return next(e);
   });
 
+  // /clear and /resume start a new conversation without a session.start.
+  on("session.end", ($, e, next) => {
+    if (e.reason !== "clear" && e.reason !== "resume") return next(e);
+    planning = false;
+    planFile = undefined;
+    wasOver = false;
+    if (shown) {
+      shown = false;
+      $.ui.status(undefined);
+    }
+    return next(e);
+  });
+
   // The plan-mode reminder names the session's plan file, so sidecars beside it don't count.
   on("prompt.attachment", { type: "plan_mode" }, ($, e, next) => {
     if (e.agentId !== undefined) return next(e);

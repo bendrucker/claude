@@ -202,4 +202,20 @@ describe("register", () => {
       },
     ]);
   });
+
+  // oxlint-disable-next-line vitest/prefer-each -- claude-code/testing has no test.each.
+  for (const [reason, count] of [
+    ["clear", 0],
+    ["resume", 0],
+    ["prompt_input_exit", 3],
+  ] as const) {
+    test(`a session ending on ${reason} leaves ${count} buttons in the list`, async ($, on) => {
+      core(on);
+      on("session.end", (_, e) => ({ sessionId: e.sessionId }));
+      await reply($);
+      await hint($, SHELL);
+      await $.session.end({ reason, sessionId: "s1", resume: { id: "s1" } });
+      expect(await (await band($)).findAll({ type: "Button" })).toHaveLength(count);
+    });
+  }
 });

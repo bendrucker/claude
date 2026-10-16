@@ -67,6 +67,8 @@ const readView = map(
     web_url: str,
     state: str,
     sha: str,
+    target_branch: or(str, ""),
+    has_conflicts: or(bool, false),
     detailed_merge_status: or(str, null),
     head_pipeline: or(readPipeline, null),
   }),
@@ -76,6 +78,8 @@ const readView = map(
     url: v.web_url,
     state: v.state,
     sha: v.sha,
+    target: v.target_branch,
+    hasConflicts: v.has_conflicts,
     detailedMergeStatus: v.detailed_merge_status,
     pipeline: v.head_pipeline,
   }),
@@ -121,12 +125,20 @@ export const parseUser = (stdout: string): string | undefined => decoded(stdout,
 
 export type Phase = "none" | "pending" | "passing" | "failing";
 
+/** What stands between the branch and a merge that the session can fix. */
+export type Block = "conflict" | "behind" | "none";
+
 export interface Snapshot {
   mr: number;
   projectId: number;
   url: string;
   state: string;
   head: string;
+  /** False when the head is a commit this checkout has never seen. */
+  isHeadKnown: boolean;
+  target: string;
+  /** Undefined while GitLab is still computing mergeability. */
+  block: Block | undefined;
   pipeline: number | undefined;
   phase: Phase;
   total: number;
@@ -140,15 +152,21 @@ export interface Snapshot {
   notes: { id: number; author: string }[];
 }
 
+export type Approval = "approved" | "unapproved" | null;
+
 export type Decision =
+  | { action: "promote"; kind: "mr.merged" }
+  | { action: "promote"; kind: "mr.closed" }
+  | { action: "promote"; kind: "conflict" }
+  | { action: "promote"; kind: "behind" }
+  | { action: "promote"; kind: "push.foreign"; from: string }
   | { action: "promote"; kind: "ci.failed"; failed: string[] }
-  | { action: "promote"; kind: "review"; author: string; state: "approved" | "unapproved" }
-  | { action: "promote"; kind: "review"; author: string; state: "commented"; notes: number }
-  | { action: "promote"; kind: "review"; state: "changes_requested" }
+  | { action: "promote"; kind: "changes_requested" }
+  | { action: "promote"; kind: "feedback"; author: string; approval: Approval; notes: number }
+  | { action: "drop"; kind: "unblocked" }
   | { action: "drop"; kind: "ci.passing" | "ci.pending" | "ci.none" }
   | { action: "drop"; kind: "push"; from: string }
-  | { action: "drop"; kind: "approvals.reset"; authors: string[] }
-  | { action: "drop"; kind: "mr.closed" | "mr.merged" };
+  | { action: "drop"; kind: "approvals.reset"; authors: string[] };
 
 export type Promoted = Extract<Decision, { action: "promote" }>;
 
@@ -190,6 +208,7 @@ export interface Read {
   notes: Note[];
   jobs: Job[];
   me: string;
+  isHeadKnown: boolean;
 }
 
 function phaseOf(read: Read, failed: string[], pending: number): Phase {
@@ -201,14 +220,24 @@ function phaseOf(read: Read, failed: string[], pending: number): Phase {
   return "passing";
 }
 
+const UNDECIDED = new Set(["checking", "unchecked", "preparing"]);
+
+// `detailed_merge_status` can lead `has_conflicts`, so either one decides.
+// GitLab reports need_rebase only where the merge method requires an up-to-date branch.
+function blockOf(view: MrView): Block | undefined {
+  if (view.hasConflicts || view.detailedMergeStatus === "conflict") return "conflict";
+  if (UNDECIDED.has(view.detailedMergeStatus ?? "")) return undefined;
+  return view.detailedMergeStatus === "need_rebase" ? "behind" : "none";
+}
+
 export function snapshotOf(read: Read): Snapshot {
   const { view, approvals, notes, jobs, me } = read;
   const failed: string[] = [];
   let pending = 0;
-  const isBlocked = view.pipeline?.status === "manual";
+  const isManual = view.pipeline?.status === "manual";
   for (const job of jobs) {
     if (job.status === "failed" && !job.allowFailure) failed.push(flatten(job.name));
-    else if (PENDING.has(job.status) || (isBlocked && job.status === "manual")) pending += 1;
+    else if (PENDING.has(job.status) || (isManual && job.status === "manual")) pending += 1;
   }
   // A failed downstream pipeline fails its trigger job, which the jobs list leaves out.
   if (view.pipeline?.status === "failed" && failed.length === 0) failed.push("pipeline");
@@ -219,6 +248,9 @@ export function snapshotOf(read: Read): Snapshot {
     url: view.url,
     state: view.state,
     head: view.sha,
+    isHeadKnown: read.isHeadKnown,
+    target: view.target,
+    block: blockOf(view),
     pipeline: view.pipeline?.id,
     phase: phaseOf(read, failed, pending),
     total: jobs.length,
@@ -235,53 +267,83 @@ export function snapshotOf(read: Read): Snapshot {
   };
 }
 
-function reviewsOf(prev: Snapshot, next: Snapshot, isSameHead: boolean): Decision[] {
+const isBlocked = (block: Block | undefined): block is "conflict" | "behind" =>
+  block === "conflict" || block === "behind";
+
+/** What an MR first seen already blocked has to say. Nothing else counts at baseline. */
+export function baselineOf(snapshot: Snapshot): Promoted[] {
+  if (!isOpen(snapshot) || !isBlocked(snapshot.block)) return [];
+  return [{ action: "promote", kind: snapshot.block }];
+}
+
+type Feedback = Extract<Promoted, { kind: "feedback" }>;
+
+function feedbackOf(prev: Snapshot, next: Snapshot, isSameHead: boolean): Decision[] {
   const decisions: Decision[] = [];
+  const byAuthor = new Map<string, Feedback>();
+  const entry = (author: string): Feedback => {
+    const held = byAuthor.get(author) ?? {
+      action: "promote",
+      kind: "feedback",
+      author,
+      approval: null,
+      notes: 0,
+    };
+    byAuthor.set(author, held);
+    return held;
+  };
   const before = new Set(prev.approvers);
   const after = new Set(next.approvers);
   for (const author of next.approvers) {
-    if (!before.has(author))
-      decisions.push({ action: "promote", kind: "review", author, state: "approved" });
+    if (!before.has(author)) entry(author).approval = "approved";
   }
   const removed = prev.approvers.filter((author) => !after.has(author));
   // A push can reset approvals, which no reviewer did.
   if (removed.length > 0 && !isSameHead) {
     decisions.push({ action: "drop", kind: "approvals.reset", authors: removed });
   } else {
-    for (const author of removed) {
-      decisions.push({ action: "promote", kind: "review", author, state: "unapproved" });
-    }
+    for (const author of removed) entry(author).approval = "unapproved";
+  }
+  for (const note of next.notes.toSorted((a, b) => a.id - b.id)) {
+    if (note.id > prev.noteCursor) entry(note.author).notes += 1;
   }
 
   // GitLab names no reviewer for a request for changes.
   if (next.isChangesRequested && !prev.isChangesRequested) {
-    decisions.push({ action: "promote", kind: "review", state: "changes_requested" });
+    decisions.push({ action: "promote", kind: "changes_requested" });
   }
-
-  const byAuthor = new Map<string, number>();
-  for (const note of next.notes.toSorted((a, b) => a.id - b.id)) {
-    if (note.id > prev.noteCursor) byAuthor.set(note.author, (byAuthor.get(note.author) ?? 0) + 1);
-  }
-  for (const [author, notes] of byAuthor) {
-    decisions.push({ action: "promote", kind: "review", author, state: "commented", notes });
-  }
+  decisions.push(...byAuthor.values());
   return decisions;
 }
 
 /**
- * What changed between two polls of the same MR. A job that newly fails, or
- * any new approval, unapproval, request for changes, or comment from someone
- * else, is promoted.
- * Every other change is dropped.
+ * What changed between two polls of the same MR. The MR merging or closing, a
+ * new conflict or required rebase, a push from outside this checkout, a job
+ * that newly fails, a request for changes, and new approvals, unapprovals, or
+ * comments from someone else are promoted. Every other change is dropped.
  */
 export function decide(prev: Snapshot, next: Snapshot): Decision[] {
   if (!isOpen(next)) {
     if (!isOpen(prev)) return [];
-    return [{ action: "drop", kind: next.state === "merged" ? "mr.merged" : "mr.closed" }];
+    return [{ action: "promote", kind: next.state === "merged" ? "mr.merged" : "mr.closed" }];
   }
   const decisions: Decision[] = [];
   const isSameHead = prev.head === next.head;
-  if (!isSameHead) decisions.push({ action: "drop", kind: "push", from: prev.head });
+  if (!isSameHead) {
+    decisions.push(
+      next.isHeadKnown
+        ? { action: "drop", kind: "push", from: prev.head }
+        : { action: "promote", kind: "push.foreign", from: prev.head },
+    );
+  }
+
+  // A reopened MR starts clear, so a block it still carries is news again.
+  const before = isOpen(prev) ? prev.block : "none";
+  if (isBlocked(next.block) && next.block !== before) {
+    decisions.push({ action: "promote", kind: next.block });
+  } else if (next.block === "none" && isBlocked(before)) {
+    decisions.push({ action: "drop", kind: "unblocked" });
+  }
 
   const known = new Set(isSameHead ? prev.failed : []);
   const failed = next.failed.filter((label) => !known.has(label));
@@ -292,8 +354,50 @@ export function decide(prev: Snapshot, next: Snapshot): Decision[] {
     else if (next.phase === "none") decisions.push({ action: "drop", kind: "ci.none" });
   }
 
-  decisions.push(...reviewsOf(prev, next, isSameHead));
+  decisions.push(...feedbackOf(prev, next, isSameHead));
   return decisions;
+}
+
+// An approval and its revocation cancel out, since the model saw neither.
+function approvalOf(carried: Approval, fresh: Approval): Approval {
+  if (fresh === null) return carried;
+  if (carried === null) return fresh;
+  return carried === fresh ? fresh : null;
+}
+
+/**
+ * Folds a retried send into fresh decisions as one message: the latest block,
+ * the earliest foreign push, every failed job once, and one entry per author
+ * holding their latest approval change.
+ */
+export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
+  const all = [...carried, ...fresh];
+  const ended = all.findLast((d) => d.kind === "mr.merged" || d.kind === "mr.closed");
+  if (ended !== undefined) return [ended];
+  const out: Promoted[] = [];
+  const block = all.findLast((d) => d.kind === "conflict" || d.kind === "behind");
+  if (block !== undefined) out.push(block);
+  const push = all.find((d) => d.kind === "push.foreign");
+  if (push !== undefined) out.push(push);
+  const failed = all.flatMap((d) => (d.kind === "ci.failed" ? d.failed : []));
+  if (failed.length > 0) {
+    out.push({ action: "promote", kind: "ci.failed", failed: [...new Set(failed)].toSorted() });
+  }
+  if (all.some((d) => d.kind === "changes_requested")) {
+    out.push({ action: "promote", kind: "changes_requested" });
+  }
+  const byAuthor = new Map<string, Feedback>();
+  for (const d of all) {
+    if (d.kind !== "feedback") continue;
+    const held = byAuthor.get(d.author);
+    byAuthor.set(d.author, {
+      ...d,
+      approval: approvalOf(held?.approval ?? null, d.approval),
+      notes: (held?.notes ?? 0) + d.notes,
+    });
+  }
+  out.push(...byAuthor.values());
+  return out;
 }
 
 const short = (sha: string) => sha.slice(0, 7);
@@ -303,40 +407,83 @@ function listed(labels: string[], max = 3): string {
   return labels.length > max ? `${head} (+${labels.length - max})` : head;
 }
 
-function reviewLineOf(mr: string, decision: Extract<Promoted, { kind: "review" }>): string {
-  if (decision.state === "changes_requested") return `Changes were requested on ${mr}`;
-  if (decision.state === "commented") {
-    const comments = decision.notes === 1 ? "1 new comment" : `${decision.notes} new comments`;
-    return `@${decision.author} commented on ${mr} (${comments})`;
-  }
-  if (decision.state === "approved") return `@${decision.author} approved ${mr}`;
-  return `@${decision.author} revoked their approval of ${mr}`;
+function feedbackLineOf(mr: string, decision: Feedback): string {
+  const { author, approval, notes } = decision;
+  const comments = notes === 1 ? "1 new comment" : `${notes} new comments`;
+  if (approval === null) return `@${author} commented on ${mr} (${comments})`;
+  const line =
+    approval === "approved"
+      ? `@${author} approved ${mr}`
+      : `@${author} revoked their approval of ${mr}`;
+  return notes > 0 ? `${line} (${comments})` : line;
 }
 
-function paragraphOf(snapshot: Snapshot, decision: Promoted): string {
+function paragraphOf(
+  snapshot: Snapshot,
+  decision: Exclude<Promoted, { kind: "feedback" | "changes_requested" }>,
+): string {
   const mr = `MR !${snapshot.mr}`;
-  if (decision.kind === "ci.failed") {
+  const target = snapshot.target === "" ? "its target branch" : `\`${snapshot.target}\``;
+  if (decision.kind === "mr.merged") return `${mr} merged: ${snapshot.url}`;
+  if (decision.kind === "mr.closed") return `${mr} closed without merging: ${snapshot.url}`;
+  if (decision.kind === "conflict") {
     return [
-      `Pipeline failed on ${mr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
-      `Read the failure with \`glab ci get --merge-request=${snapshot.mr} --status=failed\` and \`glab ci trace <job> --pipeline-id ${snapshot.pipeline}\`.`,
+      `${mr} has merge conflicts with ${target} at ${short(snapshot.head)}.`,
+      `Update the branch from ${target}, resolve the conflicts with the \`git:conflicts\` skill, and push.`,
+    ].join("\n");
+  }
+  if (decision.kind === "behind") {
+    return [
+      `${mr} is behind ${target} at ${short(snapshot.head)}, and merging requires a rebase.`,
+      `Rebase onto ${target}, resolve any conflicts with the \`git:conflicts\` skill, and push.`,
+    ].join("\n");
+  }
+  if (decision.kind === "push.foreign") {
+    return [
+      `${mr}'s branch moved from ${short(decision.from)} to ${short(snapshot.head)}, a commit this checkout does not have.`,
+      "Pull it before committing or pushing again.",
     ].join("\n");
   }
   return [
-    `${reviewLineOf(mr, decision)}: ${snapshot.url}`,
-    `Read the discussion with \`glab mr view ${snapshot.mr} --comments\`.`,
+    `Pipeline failed on ${mr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
+    `Read the failure with \`glab ci get --merge-request=${snapshot.mr} --status=failed\` and \`glab ci trace <job> --pipeline-id ${snapshot.pipeline}\`.`,
   ].join("\n");
 }
 
 export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
-  const paragraphs = promoted.map((decision) => paragraphOf(snapshot, decision));
-  paragraphs.push(
-    "The gitlab plugin watches this MR's pipeline and reviews, so polling them is unnecessary.",
-  );
+  const mr = `MR !${snapshot.mr}`;
+  const paragraphs: string[] = [];
+  const feedback: string[] = [];
+  for (const decision of promoted) {
+    if (decision.kind === "changes_requested") feedback.push(`Changes were requested on ${mr}`);
+    else if (decision.kind === "feedback") feedback.push(feedbackLineOf(mr, decision));
+    else paragraphs.push(paragraphOf(snapshot, decision));
+  }
+  if (feedback.length > 0) {
+    paragraphs.push(
+      [
+        ...feedback,
+        snapshot.url,
+        `Read the discussion with \`glab mr view ${snapshot.mr} --comments\`.`,
+      ].join("\n"),
+    );
+  }
+  if (isOpen(snapshot)) {
+    paragraphs.push(
+      "The gitlab plugin watches this MR's pipeline, reviews, comments, and mergeability, so polling them is unnecessary.",
+    );
+  }
   return paragraphs.join("\n\n");
 }
 
 // Nerd Font Octicons.
 export const STALE = "\u{f421} stale";
+
+const BLOCKS: Record<Block, string | undefined> = {
+  conflict: "\u{f47f} conflicts",
+  behind: "\u{f47f} behind",
+  none: undefined,
+};
 
 const ENDED: Partial<Record<string, string>> = {
   merged: "\u{f419} merged",
@@ -363,7 +510,7 @@ function reviewOf(snapshot: Snapshot): string | undefined {
 export function statusOf(snapshot: Snapshot): string {
   const ended = ENDED[snapshot.state];
   if (ended !== undefined) return ended;
-  return [CHECKS[snapshot.phase](snapshot), reviewOf(snapshot)]
+  return [BLOCKS[snapshot.block ?? "none"], CHECKS[snapshot.phase](snapshot), reviewOf(snapshot)]
     .filter((part) => part !== undefined)
     .join(" · ");
 }

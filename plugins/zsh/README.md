@@ -1,6 +1,6 @@
 # Zsh
 
-Quotes the bash habits that misfire under zsh before the Bash tool runs them, and adds a note to the result after a zsh error. Requires `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
+Quotes the bash habits that misfire under zsh before the Bash tool runs them, and adds a note to the result after a zsh error.
 
 ## Contents
 
@@ -16,7 +16,7 @@ Quotes the bash habits that misfire under zsh before the Bash tool runs them, an
 - **Notes**: `glob`, `equals`, `reserved`, `split`, and `bash-syntax`. A repeat within a session gets the short form.
 - **Shell detection**: the mod picks the shell from `CLAUDE_CODE_SHELL`, then `$SHELL`, then `zsh` on `PATH`, and probes `nomatch`, `nullglob`, `cshnullglob`, and `equals` with a non-interactive `zsh -c`. The glob options gate `flag-glob` and `url`, and `equals` gates the `equals` rule. Under any other shell the mod is a no-op.
 - **Events**: `session.start`, `rewrite`, `explain`, and `error` go to [`mod-events`](../mod-events/README.md).
-- **Evals**: [`evals/bash-habits`](evals/bash-habits/) A/Bs the plugin against Bash habits that misfire under zsh. It runs locally only, from a zsh launcher with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
+- **Evals**: [`evals/bash-habits`](evals/bash-habits/) A/Bs the plugin against Bash habits that misfire under zsh. It runs locally only, from a zsh launcher.
 
 ## Tests
 

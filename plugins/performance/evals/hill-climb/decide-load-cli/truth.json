@@ -1,0 +1,17 @@
+{
+  "kind": "decide",
+  "trap": "load",
+  "decisions": ["re-run"],
+  "note": "The gain is significant, but every round ran with the load average above twice the core count.",
+  "reason": [
+    [
+      "load average",
+      "\\bloaded\\b",
+      "machine load",
+      "\\bload\\b[^\\n]{0,60}(flag|round|above|high|2\\u00D7|2x|cpu|core)",
+      "(flag|round)[^\\n]{0,60}\\bload\\b",
+      "busy",
+      "noisy machine"
+    ]
+  ]
+}

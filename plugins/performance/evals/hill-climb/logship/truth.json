@@ -1,0 +1,51 @@
+{
+  "profile": "repo/profile.txt",
+  "items": [
+    {
+      "id": "dedupe",
+      "label": "win",
+      "gain": 0.439,
+      "profile_entry": "main.dedupe 1.80s 43.90% cum",
+      "note": "dedupe compares each key against every kept key, O(n^2) over 20k events. A map makes it O(n) and removes nearly all of its 43.9%.",
+      "patterns": ["dedup", "O\\(n(²|\\^2|\\*n| squared)\\)", "quadratic", "eventKey"]
+    },
+    {
+      "id": "regex-compile",
+      "label": "win",
+      "gain": 0.2415,
+      "profile_entry": "regexp.MustCompile 0.99s 24.15% cum (parseLine 0.62s, normalizeHost 0.37s)",
+      "note": "parseLine and normalizeHost each call regexp.MustCompile per line. Hoisting both to package-level vars removes the compile cost and leaves the matching.",
+      "patterns": [
+        "MustCompile",
+        "regexp\\.Compile",
+        "(pre-?)?compil\\w*[^\\n]{0,60}reg(ular )?ex",
+        "reg(ular )?ex\\w*[^\\n]{0,60}(compil|hoist)",
+        "hoist\\w*[^\\n]{0,60}reg(ular )?ex"
+      ]
+    },
+    {
+      "id": "stats-mutex",
+      "label": "trap",
+      "gain": 0.0049,
+      "profile_entry": "main.(*Stats).Inc 0.02s 0.49% cum, sync.(*Mutex).Lock 0.01s 0.24%",
+      "note": "Inc takes a mutex per event while a reporter goroutine reads once a second, so it looks contended. The profile puts it under 0.5%.",
+      "patterns": [
+        "mutex",
+        "Stats\\.Inc",
+        "\\(\\*Stats\\)\\.Inc",
+        "sync\\.Mutex",
+        "lock contention",
+        "contended"
+      ]
+    },
+    {
+      "id": "fanout-parallel",
+      "label": "trap",
+      "gain": 0.037,
+      "profile_entry": "main.fanOut 0.30s 7.32% cum (crypto/sha256.block 0.25s)",
+      "note": "fanOut resolves four regions one after another with a TODO to make it concurrent. CPU is 0.99 of wall, so there is no waiting to overlap, and on 2 vCPU running the CPU-bound regions in parallel saves at most half of 7.32%. A real but minor lead: listing it low or setting it aside with that reason is right, and ranking it in the top two over-promises.",
+      "patterns": ["fanOut", "resolveRegion", "sha256"]
+    }
+  ],
+  "parallelism": ["parallel", "concurren", "goroutine", "GOMAXPROCS", "errgroup", "worker pool"]
+}

@@ -19,10 +19,7 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
-      - name: Install Claude Code
-        run: |
-          .github/actions/claude-code/install.sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - uses: ./.github/actions/claude-code
 
       - name: Generate mod engine types
         run: bun run mod-types
@@ -41,10 +38,7 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
-      - name: Install Claude Code
-        run: |
-          .github/actions/claude-code/install.sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - uses: ./.github/actions/claude-code
 
       - name: Generate mod engine types
         run: bun run mod-types
@@ -214,19 +208,11 @@ jobs:
           echo "has_swift=$(find "plugins/$plugin" -name '*.swift' | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "has_playwright=$(find "plugins/$plugin" -name package.json -not -path '*/node_modules/*' -print0 | xargs -0 grep -lF '"playwright"' 2>/dev/null | grep -q . && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
-      - name: Install Claude Code CLI
-        id: cli
-        background: true
-        run: .github/actions/claude-code/install.sh
+      - uses: ./.github/actions/claude-code
 
       - uses: ./.github/actions/bun-install
 
-      - name: Wait for CLI
-        wait: cli
-
       - name: Validate plugin
-        env:
-          CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1"
         run: claude plugin validate "plugins/${{ matrix.plugin.name }}"
 
       - name: Check gating hooks
@@ -284,6 +270,8 @@ jobs:
         uses: jdx/mise-action@v4
         with:
           working_directory: plugins/${{ matrix.plugin.name }}
+          # The cache key globs every file in the workspace (~24s), while a cold install takes ~3s.
+          cache: false
 
       # Profilers record through perf events, which the runner's default paranoia level blocks.
       - name: Allow perf events
@@ -369,10 +357,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
-      - name: Install Claude Code CLI
-        id: cli
-        background: true
-        run: .github/actions/claude-code/install.sh
+      - uses: ./.github/actions/claude-code
 
       - name: Setup Claude configuration
         run: |
@@ -380,9 +365,6 @@ jobs:
           for item in user/*; do
             ln -sfn "$GITHUB_WORKSPACE/$item" "$HOME/.claude/$(basename "$item")"
           done
-
-      - name: Wait for CLI
-        wait: cli
 
       - name: Generate context report
         run: |

@@ -46,8 +46,12 @@ export interface HostEntry {
   policy: HostPolicy;
 }
 
+// The writer holds the file exclusively and runs alone, so it gets twice a
+// reader's budget.
+const WRITER_LIMITS = { memory_limit: "8GiB", threads: "4", max_temp_directory_size: "32GiB" };
+
 async function createDatabase(dbPath: string): Promise<Database> {
-  const instance = await DuckDBInstance.create(dbPath);
+  const instance = await DuckDBInstance.create(dbPath, WRITER_LIMITS);
   const connection = await instance.connect();
 
   return {

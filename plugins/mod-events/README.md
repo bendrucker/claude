@@ -2,7 +2,7 @@
 
 Telemetry for mods. It adds `$.modEvents.emit`, which writes each mod's events to per-session JSONL. Each line is an OpenTelemetry log record, so a collector can tail the files, and the `observability:session` index ingests them as `mod_events`.
 
-- **Mod**: [`register.ts`](mod/register.ts) provides `emit` and records at session start whether the session is local or reached over mosh or ssh, with each attached herdr client's reach. Requires `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
+- **Mod**: [`register.ts`](mod/register.ts) provides `emit` and records at session start whether the session is local or reached over mosh or ssh, with each attached herdr client's reach.
 - **Types**: [`types/index.d.ts`](types/index.d.ts) declares `$.modEvents.emit`.
 
 ## Emitting

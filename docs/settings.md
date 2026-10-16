@@ -116,10 +116,6 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 **Drop it** when a later CLI caps `general-purpose` under Fable natively.
 
-`CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1` loads the mods in `plugins/*/mod/`, which the engine skips without it while function hooks are early access. See [`mods.md`](../.claude/rules/mods.md).
-
-**Drop it** when function hooks load by default.
-
 `AGENT_BROWSER_IDLE_TIMEOUT_MS=600000` stops an `agent-browser` daemon and its Chrome after 10 idle minutes, down from the CLI's one hour. A subagent that ends or is stopped without running `close` leaves its daemon behind, and a fan-out of browser-driving subagents once left ten of them holding 8.8 GiB. The daemon takes the timeout from the environment of the command that launched it, so it covers every launch from a Claude session and none from a shell. Only Claude drives the CLI here. It is working while every session `agent-browser session list` shows was used in the last 10 minutes. It is too short if an agent's session expires mid-task, which shows as a repeated `load` mod `browser.launch` event for one session and agent.
 
 **Drop it** when the CLI's default idle timeout is 10 minutes or less.
@@ -194,7 +190,7 @@ Do not wait for an upstream announcement. [#41156](https://github.com/anthropics
 
 The sandbox denies writes to every `.git/config` and `.git/hooks` path, and `allowWrite` cannot override that. A linked worktree shares the main checkout's `.git/config`, so a sandboxed `git push -u` from one pushes and then fails with `could not lock config file` while recording the upstream. The denial is deliberate. `core.hooksPath` or `core.fsmonitor` set in that file would run code in every worktree.
 
-Tracking is recorded at creation instead, by tools that run unsandboxed. The `herdr` plugin's dispatch, which its sandbox marker runs outside the sandbox, sets `branch.<name>.remote` to `origin` and `branch.<name>.merge` to `refs/heads/<name>` when the repository has an `origin`, best-effort. Worktrunk's `wt switch --create` gets the same from a dotfiles `pre-start` hook. Worktrees from `EnterWorktree` or `Agent(isolation='worktree')` still track their base. **Drop both** when a sandboxed `git push -u origin HEAD 2>&1 | tail` from a linked worktree records its upstream.
+Tracking is recorded at creation instead, by tools that run unsandboxed. The `herdr` plugin's dispatch, which its sandbox marker runs outside the sandbox, sets `branch.<name>.remote` to `origin` and `branch.<name>.merge` to `refs/heads/<name>` when the repository has an `origin`, best-effort. Worktrunk's `wt switch --create` gets the same from a dotfiles `pre-start` hook. Worktrees from `EnterWorktree` or `Agent(isolation='worktree')` still track their base. Pre-recorded tracking only helps a push without `-u`, because `git push -u` rewrites the config under its lock even when the values already match. `pull-request:create` drops `-u` when the branch already tracks `origin/<branch>`. **Drop both** when a sandboxed `git push -u origin HEAD 2>&1 | tail` from a linked worktree records its upstream.
 
 #### Path Globs
 

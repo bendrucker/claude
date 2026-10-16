@@ -355,8 +355,9 @@ describe("deferred dependencies", () => {
     const run = Bun.spawnSync([process.execPath, "-e", script], {
       env: { ...process.env, TMPDIR: stateDir },
     });
+    if (run.exitCode !== 0) throw new Error(run.stderr.toString());
     const keys: unknown = JSON.parse(run.stdout.toString());
-    if (!Array.isArray(keys)) throw new Error(run.stderr.toString());
+    if (!Array.isArray(keys)) throw new Error(run.stdout.toString());
     return keys.flatMap((key) =>
       typeof key === "string" && /node_modules\/(compromise\/|shiki\/dist\/index)/.test(key)
         ? [key.includes("compromise") ? "compromise" : "shiki"]

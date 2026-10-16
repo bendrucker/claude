@@ -64,6 +64,12 @@ describe("extractComments", () => {
       src: '<script>\n// wait for fonts\nconst c = "#fff";\n</script>',
       expected: "wait for fonts",
     },
+    {
+      name: "line past the tokenizer limit",
+      path: "a.js",
+      src: `const a = "${"x".repeat(25_000)}";\n// keep going`,
+      expected: "keep going",
+    },
     { name: "unknown language", path: "data.unknownext", src: "# note", expected: "" },
     { name: "inherited object key", path: "notes.__proto__", src: "# note", expected: "" },
   ])("$name", async ({ path, src, expected }) => {

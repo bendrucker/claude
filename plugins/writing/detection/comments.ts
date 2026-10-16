@@ -30,6 +30,8 @@ const EXTENSION_LANGUAGES = new Map<string, BundledLanguage>([
   ["j2", "jinja"],
 ]);
 
+const MAX_LINE_LENGTH = 2_000;
+
 let highlighter: Promise<Highlighter> | undefined;
 
 async function highlighterFor(lang: BundledLanguage): Promise<Highlighter> {
@@ -75,7 +77,13 @@ function stripGutter(comment: string): string {
 export async function extractComments(text: string, filePath: string): Promise<string> {
   const lang = languageForPath(filePath);
   if (lang == null || text === "") return "";
-  const { tokens } = (await highlighterFor(lang)).codeToTokens(text, {
+  // Minified and generated lines stall the tokenizer and crash its scope
+  // explanation, and hold no prose, so blank them.
+  const source = text
+    .split("\n")
+    .map((line) => (line.length > MAX_LINE_LENGTH ? "" : line))
+    .join("\n");
+  const { tokens } = (await highlighterFor(lang)).codeToTokens(source, {
     lang,
     theme,
     includeExplanation: "scopeName",

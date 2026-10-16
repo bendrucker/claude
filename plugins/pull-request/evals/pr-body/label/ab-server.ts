@@ -71,9 +71,9 @@ const server = Bun.serve({
         })),
       );
     }
-    const match = /^\/api\/label\/([\w-]+)$/.exec(url.pathname);
-    if (match !== null && req.method === "POST") {
-      const pair = byId.get(match[1]);
+    const labelId = /^\/api\/label\/([\w-]+)$/.exec(url.pathname)?.[1];
+    if (labelId !== undefined && req.method === "POST") {
+      const pair = byId.get(labelId);
       if (pair === undefined) return new Response("unknown pair", { status: 404 });
       const label = Label.parse(await req.json());
       const winner = label.choice === "tie" ? "tie" : pair[label.choice].arm;

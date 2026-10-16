@@ -49,8 +49,10 @@ function lastWrittenBody(trace: string): string | undefined {
       const use = ToolUse.safeParse(block);
       const command = use.success ? use.data.input.command : undefined;
       if (command === undefined) continue;
-      for (const [, file, , text] of command.matchAll(HEREDOC)) files.set(file, text);
-      for (const [, file] of command.matchAll(BODY_FILE)) last = files.get(file) ?? last;
+      for (const [, file, , text] of command.matchAll(HEREDOC))
+        if (file !== undefined && text !== undefined) files.set(file, text);
+      for (const [, file] of command.matchAll(BODY_FILE))
+        if (file !== undefined) last = files.get(file) ?? last;
     }
   }
   return last;
@@ -70,13 +72,13 @@ async function bodies(dirs: string): Promise<Map<string, string[]>> {
   ).flat();
   const read = await Promise.all(
     paths.flatMap(({ name, path }) => {
-      const match = /^(.*)-with-\d+\.jsonl$/.exec(name);
-      if (match === null || !casePattern.test(match[1])) return [];
+      const caseName = /^(.*)-with-\d+\.jsonl$/.exec(name)?.[1];
+      if (caseName === undefined || !casePattern.test(caseName)) return [];
       return [
         Bun.file(path)
           .text()
           .then((trace) => ({
-            name: match[1],
+            name: caseName,
             body: lastWrittenBody(trace) ?? bodyOf(trace)?.text,
           })),
       ];
@@ -102,19 +104,13 @@ const [a, b] = await Promise.all([bodies(opts.a), bodies(opts.b)]);
 const added: z.infer<typeof Pair>[] = [];
 for (const [name, aBodies] of a) {
   const bBodies = b.get(name) ?? [];
-  for (let i = 0; i < Math.min(aBodies.length, bBodies.length); i++) {
-    const sides = [
-      { arm: opts.aName, body: aBodies[i] },
-      { arm: opts.bName, body: bBodies[i] },
-    ];
-    if (Math.random() < 0.5) sides.reverse();
-    added.push({
-      id: `${opts.group}-${name}-${i}`,
-      group: opts.group,
-      case: name,
-      left: sides[0],
-      right: sides[1],
-    });
+  for (const [i, aBody] of aBodies.entries()) {
+    const bBody = bBodies[i];
+    if (bBody === undefined) break;
+    const sideA = { arm: opts.aName, body: aBody };
+    const sideB = { arm: opts.bName, body: bBody };
+    const [left, right] = Math.random() < 0.5 ? [sideB, sideA] : [sideA, sideB];
+    added.push({ id: `${opts.group}-${name}-${i}`, group: opts.group, case: name, left, right });
   }
 }
 const ids = new Set(added.map((p) => p.id));

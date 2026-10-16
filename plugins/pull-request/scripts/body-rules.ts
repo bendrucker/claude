@@ -303,13 +303,13 @@ const RULES = [
   }),
   rule({
     id: "structure-limits",
-    tier: "warn",
+    tier: "deny",
     detect: (body) => nonEmpty(exceededLimits(measureStructure(body))),
     message: (exceeded) => {
       const detail = exceeded
         .map(({ label, measured, limit }) => `${label} ${measured} > ${limit}`)
         .join(", ");
-      return `The body is over its structure limits (${detail}). Tables, fenced output, and \`<details>\` don't count. Trim it and apply the edit to the PR you just created with \`glab mr update <id> --description-file <file>\` or \`gh pr edit <n> --body-file <file>\`.`;
+      return `The body is over its structure limits (${detail}). Tables, fenced output, and \`<details>\` don't count. Rewrite it under them, then retry the create. This check doesn't run again, so make the cut in one rewrite.`;
     },
   }),
   rule({

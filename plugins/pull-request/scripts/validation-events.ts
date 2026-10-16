@@ -50,3 +50,16 @@ export async function recordValidation(event: Validation, root: string): Promise
     console.error(`[pull-request/validate] validation event not recorded: ${String(error)}`);
   }
 }
+
+/** Whether an earlier validation in this session already raised the rule. */
+export async function raisedBefore(
+  sessionId: string,
+  rule: string,
+  root: string,
+): Promise<boolean> {
+  if (!/^[\w-]+$/.test(sessionId)) return false;
+  const file = Bun.file(join(root, sessionId, "pull-request.validate.jsonl"));
+  if (!(await file.exists())) return false;
+  const text = await file.text();
+  return text.split("\n").some((line) => line.includes(`"${rule}"`));
+}

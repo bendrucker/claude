@@ -398,7 +398,11 @@ describe("warn rules", () => {
       fires: ["title-length"],
     },
   ])("$name", async ({ body, context, fires }) => {
-    expect(await fired("warn", body, context)).toEqual(fires);
+    const limits = fires.includes("structure-limits");
+    expect(await fired("warn", body, context)).toEqual(
+      fires.filter((id) => id !== "structure-limits"),
+    );
+    expect((await fired("deny", body, context)).includes("structure-limits")).toBe(limits);
   });
 });
 
@@ -492,8 +496,7 @@ describe("rule messages", () => {
         "longest paragraph or bullet words 52 > 40",
         "inline code spans 7 > 6",
         "`<details>` don't count",
-        "glab mr update",
-        "gh pr edit",
+        "doesn't run again",
       ],
     },
     {

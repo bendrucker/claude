@@ -200,7 +200,7 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    world.view = { ...mr("success"), detailed_merge_status: "checking" };
+    world.view = { ...conflicting, has_conflicts: false, detailed_merge_status: "checking" };
     await w.clock.advance(POLL_MS.settled);
     world.view = conflicting;
     await w.clock.advance(POLL_MS.settled);
@@ -208,6 +208,27 @@ describe("register", () => {
     expect(w.submits.length).toBe(1);
     expect(w.submits[0]).toContain("MR !7 has merge conflicts with `main` at aaaaaaa.");
     expect(w.named("promote")[0]?.detail).toMatchObject({ kind: "conflict", baseline: true });
+  });
+
+  test("a dropped conflict is not retried against a new commit still being checked", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+      drop: "busy",
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = { ...mr("success"), has_conflicts: true };
+    await w.clock.advance(POLL_MS.settled);
+    delete world.drop;
+    world.view = { ...mr("success"), sha: "bbbbbbb2222", detailed_merge_status: "checking" };
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits.length).toBe(1);
   });
 
   test("a push from elsewhere wakes the model", async ($, on) => {

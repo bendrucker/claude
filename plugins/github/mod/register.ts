@@ -142,9 +142,11 @@ async function inject(
 function stillDue(undelivered: Undelivered | undefined, next: Snapshot): Promoted[] {
   if (undelivered === undefined) return [];
   return undelivered.decisions.flatMap((decision): Promoted[] => {
-    if (decision.kind === "pr.merged" || decision.kind === "pr.closed") return [decision];
+    if (decision.kind === "pr.merged") return next.state === "MERGED" ? [decision] : [];
+    if (decision.kind === "pr.closed") return next.state === "CLOSED" ? [decision] : [];
     if (next.state !== "OPEN") return [];
     if (decision.kind === "conflict" || decision.kind === "behind") {
+      if (undelivered.head !== next.head) return [];
       return next.block === undefined || next.block === decision.kind ? [decision] : [];
     }
     if (decision.kind === "push.foreign") return next.isHeadKnown ? [] : [decision];
@@ -193,9 +195,13 @@ async function apply(
   }
   const prev = watch.snapshot;
   const isSamePr = prev !== undefined && prev.pr === read.snapshot.pr;
-  // An undecided poll keeps the last answer, so a recompute does not re-announce a block.
+  // An undecided poll keeps the last answer for the same commits, so a recompute
+  // does not re-announce a block.
   const next =
-    isSamePr && read.snapshot.block === undefined
+    isSamePr &&
+    read.snapshot.block === undefined &&
+    read.snapshot.head === prev.head &&
+    read.snapshot.base === prev.base
       ? { ...read.snapshot, block: prev.block }
       : read.snapshot;
   if (!isSamePr) {

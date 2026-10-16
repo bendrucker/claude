@@ -297,6 +297,38 @@ describe("register", () => {
     expect(await w.shown($)).toBe("\u{f419} merged");
   });
 
+  test("a dropped close is not retried once the PR reopens", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS"), drop: "busy" };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = { ...pr("SUCCESS"), state: "CLOSED" };
+    await w.clock.advance(POLL_MS.settled);
+    delete world.drop;
+    world.view = pr("SUCCESS");
+    await w.clock.advance(POLL_MS.closed);
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits).toEqual(["PR #7 closed without merging: https://github.com/o/r/pull/7"]);
+  });
+
+  test("a dropped conflict is not retried against a new commit still being checked", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS"), drop: "busy" };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = { ...pr("SUCCESS"), mergeable: "CONFLICTING" };
+    await w.clock.advance(POLL_MS.settled);
+    delete world.drop;
+    world.view = { ...pr("SUCCESS"), headRefOid: "bbbbbbb2222", mergeable: "UNKNOWN" };
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(w.submits.length).toBe(1);
+    expect(await w.shown($)).toBe("\u{f49e} CI");
+  });
+
   test("a review after a sent alert carries only the review", async ($, on) => {
     const world: World = { branch: "topic", gh: GH_OK, view: pr("") };
     const w = worldOf(on, world);

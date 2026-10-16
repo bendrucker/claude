@@ -2,7 +2,6 @@
 
 import { basename } from "node:path";
 import { z } from "zod";
-import { scoreTree } from "../detection/tree";
 import { editedPaths } from "../detection/transcript";
 
 const StopInput = z.object({
@@ -98,6 +97,9 @@ async function main(): Promise<void> {
   const paths = editedPaths(transcript);
   if (paths.length === 0) return;
 
+  // Loading the scoring stack costs ~90ms of CPU, mostly grammar and regex
+  // engine setup, and most turns don't edit a file, so it loads only past here.
+  const { scoreTree } = await import("../detection/tree");
   const { session } = await scoreTree({ cwd: input.cwd ?? process.cwd(), paths });
   if (session.tier !== "strong") return;
   if (blockedEarlier(transcript)) return;

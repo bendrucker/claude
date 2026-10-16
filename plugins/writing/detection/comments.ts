@@ -78,12 +78,10 @@ export async function extractComments(text: string, filePath: string): Promise<s
   const lang = languageForPath(filePath);
   if (lang == null || text === "") return "";
   // Minified and generated lines stall the tokenizer and crash its scope
-  // explanation, and hold no prose, so blank them.
-  const source = text
-    .split("\n")
-    .map((line) => (line.length > MAX_LINE_LENGTH ? "" : line))
-    .join("\n");
-  const { tokens } = (await highlighterFor(lang)).codeToTokens(source, {
+  // explanation. Dropping only the line would shift the grammar state of the
+  // lines after it, so skip the whole file.
+  if (text.split("\n").some((line) => line.length > MAX_LINE_LENGTH)) return "";
+  const { tokens } = (await highlighterFor(lang)).codeToTokens(text, {
     lang,
     theme,
     includeExplanation: "scopeName",

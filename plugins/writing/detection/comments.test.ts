@@ -65,10 +65,10 @@ describe("extractComments", () => {
       expected: "wait for fonts",
     },
     {
-      name: "line past the tokenizer limit",
+      name: "file with a line past the tokenizer limit",
       path: "a.js",
       src: `const a = "${"x".repeat(25_000)}";\n// keep going`,
-      expected: "keep going",
+      expected: "",
     },
     { name: "unknown language", path: "data.unknownext", src: "# note", expected: "" },
     { name: "inherited object key", path: "notes.__proto__", src: "# note", expected: "" },

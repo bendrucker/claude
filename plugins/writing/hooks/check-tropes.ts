@@ -199,7 +199,15 @@ function commentSplice(comments: { newText: string; oldText: string }): string |
   if (newHits.count === 0) return null;
   const oldHits = semicolonSpliceHits(comments.oldText, COMMENT_SPLICE_MIN);
   if (newHits.count <= oldHits.count) return null;
-  return `A code comment splices clauses with a semicolon ("${newHits.sample}"). Comments can be fragments. Use a period or drop a word.`;
+  // Quote a splice from a line the edit introduced over one already in the file.
+  const oldLines = new Set(comments.oldText.split("\n"));
+  const introduced = comments.newText
+    .split("\n")
+    .filter((line) => !oldLines.has(line))
+    .join("\n");
+  const introducedHits = semicolonSpliceHits(introduced, COMMENT_SPLICE_MIN);
+  const sample = introducedHits.count > 0 ? introducedHits.sample : newHits.sample;
+  return `A code comment splices clauses with a semicolon ("${sample}"). Comments can be fragments. Use a period or drop a word.`;
 }
 
 // A fragment tokenizes without the grammar state around it, so a comment

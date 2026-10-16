@@ -27,7 +27,6 @@ const TraceLine = z.object({
 });
 const CaseFile = z.object({ tags: z.array(z.string()).optional() });
 
-/** Per-run measures read from a trace. */
 export const measures = ["words", "turns", "seconds", "tokens", "cost"] as const;
 export type Measure = (typeof measures)[number];
 type Measured = Partial<Record<Measure, number | undefined>>;

@@ -17,7 +17,6 @@ export interface RenderOptions {
 
 type Section = [title: string, head: string[], rows: string[][]];
 
-/** Per-run measures reported beside the scores, with their decimal places. */
 const perRun: [title: string, measure: Measure, digits: number][] = [
   ["Reply words", "words", 0],
   ["Turns per run", "turns", 1],

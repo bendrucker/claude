@@ -32,7 +32,8 @@ describe("units", () => {
     ["paragraphs", "a\nb\n\nc", ["a\nb", "c"]],
     ["top-level items keep nested ones", "- a\n  - b\n- c", ["- a\n  - b", "- c"]],
     ["headings stand alone", "## Rules\n- a", ["## Rules", "- a"]],
-    ["table rows", "| a | b |\n| c | d |", ["| a | b |", "| c | d |"]],
+    ["table rows", "| a | b |\n| c | d |", ["| a | b |", "| c | d |", "| a | b |\n| c | d |"]],
+    ["a one-row table", "| a | b |\n\ntext", ["| a | b |", "text"]],
   ])("%s", (_, text, expected) => {
     expect(units(text)).toEqual(expected);
   });

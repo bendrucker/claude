@@ -26,9 +26,10 @@ export const FrameTruth = z.object({
 export type FrameTruth = z.output<typeof FrameTruth>;
 
 const HEADING = /^(#{1,6})\s+(.*)$/;
+const TABLE_ROW = /^\s*\|/;
 const ITEM = /^\s?([-*+]|\d+[.)])\s|^\s*\|/;
 
-/** Paragraphs, top-level list items, table rows, and headings. */
+/** Paragraphs, top-level list items, table rows, headings, and each whole table after its rows. */
 export function units(text: string): string[] {
   const out: string[] = [];
   let current: string[] = [];
@@ -36,7 +37,18 @@ export function units(text: string): string[] {
     if (current.length > 0) out.push(current.join("\n"));
     current = [];
   };
+  let table: string[] = [];
+  const closeTable = () => {
+    if (table.length >= 2) out.push(table.join("\n"));
+    table = [];
+  };
   for (const line of text.split("\n")) {
+    const isRow = TABLE_ROW.test(line);
+    if (!isRow && table.length > 0) {
+      flush();
+      closeTable();
+    }
+    if (isRow) table.push(line);
     if (line.trim() === "" || HEADING.test(line)) {
       flush();
       if (line.trim() !== "") out.push(line);
@@ -46,6 +58,7 @@ export function units(text: string): string[] {
     current.push(line);
   }
   flush();
+  closeTable();
   return out;
 }
 

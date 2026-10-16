@@ -12,6 +12,7 @@
     "**/*.d.ts",
     "**/jxa/**/*.js",
     ".claude/workflows/**",
-    ".worktrees/**"
+    ".worktrees/**",
+    "tmp/**"
   ]
 }

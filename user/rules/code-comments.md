@@ -18,9 +18,7 @@ A comment earns its place when it tells the reader something the adjacent code d
 - **What-on-dense**: the code is genuinely complex (a regex, bit-twiddling, a dense expression), so restate it in words.
 - **Why-on-simple**: the code is simple but the reason it exists is non-obvious, so explain the reason.
 
-Delete a **what-on-simple** comment, where the code is simple and the comment only says what it does.
-
-Default to no comment. Most comments an agent writes fail the test above. A comment that earns its place is one sentence carrying the fact. A docstring states the contract in one line. Typed signatures already document parameters and return values.
+Default to no comment. A comment that earns its place is one sentence carrying the fact. A docstring states the contract in one line. Typed signatures already document parameters and return values.
 
 ## Avoid
 

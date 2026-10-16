@@ -48,7 +48,7 @@ A mod that draws UI through `ui.render` is written in `.tsx`, and its tsconfig a
 
 ## Telemetry
 
-Every mod emits through the `mod-events` plugin: list `"mod-events"` under `dependencies` in `plugin.json`, then call `void $.modEvents.emit({ mod, event, ok?, ms?, detail? })`. Emit `session.start` once from a `session.start` hook as the heartbeat, plus an event for each outcome worth querying, such as a call's exit code or a user's pick. The session index loads the events into `mod_events`, read by its `mods` query. `$.session.append` is reserved for session-limit warnings and peer messages, and each use is also emitted.
+Every mod emits through the `mod-events` plugin: list `"mod-events"` under `dependencies` in `plugin.json`, then call `void $.modEvents.emit({ mod, event, ok?, ms?, detail? })`. Emit `session.start` once from a `session.start` hook as the heartbeat, plus an event for each outcome worth querying, such as a call's exit code or a user's pick. `$.session.append` is reserved for session-limit warnings and peer messages, and each use is also emitted.
 
 ## Tests
 

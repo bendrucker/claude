@@ -6,15 +6,15 @@ paths:
 
 # Hooks
 
-See the `plugin:hook` skill for hook documentation. Plugin hooks are defined in `hooks/hooks.json`. An oxlint/oxfmt hook (`.claude/hooks/ox/`) reports lint errors after file edits, and gates Stop and `git commit` with formatting plus a type check.
-
-Raw `git worktree add` is denied in favor of the `worktrunk` skill, except under `tmp/`.
+See the `plugin:hook` skill for hook documentation. An oxlint/oxfmt hook (`.claude/hooks/ox/`) reports lint errors after file edits, and gates Stop and `git commit` with formatting plus a type check.
 
 Wrap `${CLAUDE_PLUGIN_ROOT}` in double quotes in shell-form hook commands: `bun "${CLAUDE_PLUGIN_ROOT}/scripts/foo.ts"`. Leave matcher fields unquoted. Run `bun scripts/check-hook-quoting.ts` to validate.
 
 ## Bash Matchers
 
 A `Bash(...)` belongs in a per-hook `if`, and the entry's `matcher` stays a bare tool name. Run `bun scripts/check-hook-matchers.ts` to validate.
+
+`${CLAUDE_PLUGIN_ROOT}` expands only in `command` strings, so never put it in a `matcher` or `if`.
 
 Treat a `Bash(...)` matcher or `if` condition as a spawn-reducing pre-filter, never as the authorization decision. It fails open on shell metacharacters, matching brace groups, for-loops, here-docs, redirects, and long pipelines that invoke something else entirely.
 
@@ -29,4 +29,4 @@ Only the vibe-island bridge and the herdr state export in `user/settings.json` q
 
 ## MCP Matchers
 
-Hook matchers for MCP tools must include all three naming patterns (local, plugin, Claude AI). Run `bun scripts/check-mcp-matchers.ts` to validate. See [`plugins.md`](plugins.md) for the patterns and known display-name mappings.
+Run `bun scripts/check-mcp-matchers.ts` for MCP tool matchers. The three naming patterns are in [`plugins.md`](plugins.md).

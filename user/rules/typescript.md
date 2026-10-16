@@ -6,8 +6,8 @@ paths:
 
 # TypeScript
 
-- Avoid using `any` type. Use specific types or `unknown` if necessary.
-- Prefer static `import` statements over dynamic `await import()`. There is no reason to defer loading a built-in or first-party module.
+- Use a specific type in place of `any`, or `unknown` when no specific type fits.
+- Prefer static `import` statements over dynamic `await import()`.
 
 ## External Data
 

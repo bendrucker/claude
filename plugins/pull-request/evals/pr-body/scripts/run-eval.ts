@@ -128,11 +128,12 @@ export function manifestPath(runDir: string): string {
 }
 
 export async function loadScenarios(dir: string): Promise<Scenario[]> {
-  const names = (await readdir(dir)).filter((n) => n.endsWith(".json")).toSorted();
+  const names = (await readdir(dir).catch(() => [])).filter((n) => n.endsWith(".json")).toSorted();
   const scenarios = await Promise.all(
     names.map(async (name) => decodeFile(Scenario, join(dir, name))),
   );
-  if (scenarios.length === 0) throw new Error(`No scenario JSON files in ${dir}`);
+  if (scenarios.length === 0)
+    throw new Error(`No scenario JSON files in ${dir}. Run scripts/sync.ts pull to fetch them.`);
   return scenarios;
 }
 
@@ -294,7 +295,7 @@ async function main(): Promise<void> {
     flags: {
       scenarios: {
         type: String,
-        default: join(dir, "scenarios"),
+        default: join(dir, "fixtures", "scenarios"),
         description: "Directory of scenario JSON files",
       },
       armA: { type: String, description: "Markdown file holding arm A's guidance text" },

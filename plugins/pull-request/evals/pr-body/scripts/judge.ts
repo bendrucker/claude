@@ -288,7 +288,7 @@ async function main(): Promise<void> {
     flags: {
       scenarios: {
         type: String,
-        default: join(dir, "scenarios"),
+        default: join(dir, "fixtures", "scenarios"),
         description: "Directory of scenario JSON files",
       },
       prompt: {

@@ -142,7 +142,7 @@ export interface Snapshot {
   comments: { id: string; author: string }[];
 }
 
-/** What the poll knows about the session's side: who it is and what it has. */
+/** The session's own login and whether the PR head commit exists locally. */
 export interface Local {
   me: string;
   isHeadKnown: boolean;

@@ -209,9 +209,6 @@ async function inject(
   }
 }
 
-// What a dropped injection still has to say: the MR's end always, a block
-// while it lasts, a foreign push until the checkout has it, failures only on
-// the same head for jobs still failing, and feedback while the MR is open.
 function stillDue(undelivered: Undelivered | undefined, next: Snapshot): Promoted[] {
   if (undelivered === undefined) return [];
   return undelivered.decisions.flatMap((decision): Promoted[] => {

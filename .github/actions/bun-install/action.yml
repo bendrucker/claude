@@ -12,13 +12,6 @@ runs:
         # as an unexplained red build on an untouched branch.
         bun-version: 1.4.2
 
-    - name: Cache dependencies
-      uses: actions/cache@v6
-      with:
-        path: ~/.bun/install/cache
-        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-        restore-keys: bun-${{ runner.os }}-
-
     - name: Install dependencies
       shell: bash
       run: bun install --frozen-lockfile

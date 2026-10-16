@@ -512,28 +512,20 @@ describe("ox hook", () => {
       return Reported.safeParse(result?.hookSpecificOutput).data?.additionalContext;
     }
 
-    it.each<{ name: string; nodeModules: NodeModules; reports: string }>([
-      {
-        name: "reports a violation only the type-aware pass sees",
-        nodeModules: "linked",
-        reports: "no-misused-promises",
-      },
-      {
-        name: "skips the type-aware pass where node_modules is absent",
-        nodeModules: "absent",
-        reports: "no-dupe-keys",
-      },
-      {
-        name: "falls back to the plain pass where node_modules omits tsgolint",
-        nodeModules: "empty",
-        reports: "no-dupe-keys",
-      },
-    ])("$name", async ({ nodeModules, reports }) => {
-      const context = await typeAwareContext(nodeModules);
+    it.each<{ nodeModules: NodeModules }>([
+      { nodeModules: "linked" },
+      { nodeModules: "absent" },
+      { nodeModules: "empty" },
+    ])(
+      "leaves type-aware rules to the gate with node_modules $nodeModules",
+      async ({ nodeModules }) => {
+        const context = await typeAwareContext(nodeModules);
 
-      expect(context).toContain(reports);
-      expect(context).not.toContain("tsgolint");
-    });
+        expect(context).toContain("no-dupe-keys");
+        expect(context).not.toContain("no-misused-promises");
+        expect(context).not.toContain("tsgolint");
+      },
+    );
   });
 
   describe("installed", () => {

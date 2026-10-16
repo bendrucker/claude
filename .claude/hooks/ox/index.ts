@@ -397,34 +397,11 @@ function commandOutput(error: unknown): string | null {
 // to excluded files read as lint or format failures and block Stop.
 const LINT_ARGS = ["--no-error-on-unmatched-pattern", "-f", "agent"];
 
-// Only the per-file pass runs type-aware. The gate below pairs its batch with a
-// whole-tree --type-aware --type-check that reports the same rules, so asking
-// for them twice buys nothing and costs the gate a second type-aware run.
-//
-// --type-aware in a tree tsgolint cannot resolve reports the missing executable
-// instead of linting, and no edit clears that. `installed` skips the doomed run
-// where node_modules is absent. A tree carrying node_modules without the checker
-// shows up only in the diagnostics, so the plain pass runs as a fallback to
-// recover the findings that need no type information.
-async function runOxlintPass(
-  command: OxCommand,
-  args: string[],
-  cwd: string | undefined,
-): Promise<string | null> {
-  if (!(await installed(cwd))) {
-    return runOx(command, args, cwd);
-  }
-  const output = await runOx(command, ["--type-aware", ...args], cwd);
-  return output?.includes("Failed to find tsgolint executable")
-    ? runOx(command, args, cwd)
-    : output;
-}
-
 // Loading oxlint's JS plugin host costs a fixed ~150ms on top of a per-file
-// type-aware pass, whatever rules it carries. A tree that keeps its JS-plugin
-// rules in .oxlintrc.json and mirrors the rest into .oxlintrc.fast.json pays
-// that only at the gate, where the batch and whole-tree passes below still read
-// the default config. A tree without the file lints against its default config.
+// pass, whatever rules it carries. A tree that keeps its JS-plugin rules in
+// .oxlintrc.json and mirrors the rest into .oxlintrc.fast.json pays that only
+// at the gate, where the batch and whole-tree passes below still read the
+// default config. A tree without the file lints against its default config.
 const FAST_CONFIG = ".oxlintrc.fast.json";
 
 async function fastConfigArgs(cwd: string | undefined): Promise<string[]> {
@@ -432,6 +409,9 @@ async function fastConfigArgs(cwd: string | undefined): Promise<string[]> {
   return (await Bun.file(path).exists()) ? ["-c", path] : [];
 }
 
+// The per-file pass runs without type information. tsgolint costs ~1s of CPU
+// per run however small the file, and the gate's whole-tree --type-aware
+// --type-check reports the same rules before the session stops.
 export async function runOxlintAgent(filePath: string): Promise<string | null> {
   const command = await oxlintCommand();
   if (!command) {
@@ -439,7 +419,7 @@ export async function runOxlintAgent(filePath: string): Promise<string | null> {
   }
   const cwd = await oxWorkingTree(filePath);
   const config = await fastConfigArgs(cwd);
-  return runOxlintPass(command, [...config, ...LINT_ARGS, filePath], cwd);
+  return runOx(command, [...config, ...LINT_ARGS, filePath], cwd);
 }
 
 async function runOxlintAgentBatch(files: string[]): Promise<string | null> {

@@ -81,3 +81,38 @@ export async function runCheck(check: Check, options: CheckOptions = {}): Promis
 
   exit(failureExit);
 }
+
+function exportsFindViolations(
+  module: unknown,
+): module is { findViolations: () => Promise<unknown[]> } {
+  return (
+    typeof module === "object" &&
+    module !== null &&
+    "findViolations" in module &&
+    typeof module.findViolations === "function"
+  );
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+/**
+ * Runs a check script's exported `findViolations` in this process.
+ *
+ * The import is dynamic so a script that cannot load (a missing module, a
+ * syntax error) rejects here, where a hook can report it without blocking,
+ * instead of failing the importer's own module graph.
+ */
+export async function importViolations(path: string): Promise<string[]> {
+  const module: unknown = await import(path);
+  if (!exportsFindViolations(module)) throw new Error(`${path} exports no findViolations`);
+  const violations: unknown = await module.findViolations();
+  if (!isStringArray(violations)) throw new Error(`${path} findViolations returned non-strings`);
+  return violations;
+}
+
+/** The text {@link runCheck} writes for violations with no header and no indent. */
+export function violationText(violations: string[]): string {
+  return violations.map((line) => `${line}\n`).join("");
+}

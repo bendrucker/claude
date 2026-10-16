@@ -8,9 +8,8 @@ import { scanImports } from "./imports";
 
 // Exit codes: 0 clean, VIOLATION_EXIT when cross-plugin imports are found.
 // Anything else (bun exits 1 on uncaught errors) means the checker itself
-// failed to run. The Stop hook in .claude/hooks/plugin-imports relies on this
-// distinction to avoid reporting a crash as a violation.
-export const VIOLATION_EXIT = 2;
+// failed to run.
+const VIOLATION_EXIT = 2;
 
 const rootDir = join(import.meta.dirname, "..");
 const pluginsDir = join(rootDir, "plugins");
@@ -58,7 +57,7 @@ async function checkPlugin(pluginDir: string): Promise<string[]> {
   return violations;
 }
 
-async function findViolations(): Promise<string[]> {
+export async function findViolations(): Promise<string[]> {
   const pluginDirs = await getPluginDirs();
   const results = await Promise.all(pluginDirs.map(checkPlugin));
   return results.flat();

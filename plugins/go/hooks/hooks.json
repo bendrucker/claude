@@ -3,11 +3,17 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|MultiEdit|Write",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/check.ts\""
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/check.ts\"",
+            "if": "Edit(**/*.go)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/check.ts\"",
+            "if": "Write(**/*.go)"
           }
         ]
       }

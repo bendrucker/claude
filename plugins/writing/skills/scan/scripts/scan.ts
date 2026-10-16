@@ -266,6 +266,10 @@ const scoreCmd = command(
   },
   async (argv) => {
     const { text, filePath } = await readInput(argv._.input);
+    if (argv.flags.comments === true && filePath === undefined) {
+      console.error("--comments needs a file path to pick the comment syntax.");
+      process.exit(1);
+    }
     const customMatch = await loadCustomMatch(argv.flags.wordlist);
     const options: ReportOptions = {
       comments: shouldScoreComments(filePath, argv.flags.comments, argv.flags.noComments),

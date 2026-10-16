@@ -7,31 +7,31 @@ import { getExtension } from "./paths";
 const theme = { name: "bare", settings: [] };
 
 // Extensions Shiki has no alias for.
-const EXTENSION_LANGUAGES: Record<string, BundledLanguage> = {
-  h: "c",
-  cc: "cpp",
-  cxx: "cpp",
-  hh: "cpp",
-  hpp: "cpp",
-  htm: "html",
-  svg: "xml",
-  ex: "elixir",
-  exs: "elixir",
-  pl: "perl",
-  ml: "ocaml",
-  el: "emacs-lisp",
-  j2: "jinja",
-};
+const EXTENSION_LANGUAGES = new Map<string, BundledLanguage>([
+  ["h", "c"],
+  ["cc", "cpp"],
+  ["cxx", "cpp"],
+  ["hh", "cpp"],
+  ["hpp", "cpp"],
+  ["htm", "html"],
+  ["svg", "xml"],
+  ["ex", "elixir"],
+  ["exs", "elixir"],
+  ["pl", "perl"],
+  ["ml", "ocaml"],
+  ["el", "emacs-lisp"],
+  ["j2", "jinja"],
+]);
 
 function isBundledLanguage(id: string): id is BundledLanguage {
-  return id in bundledLanguages;
+  return Object.hasOwn(bundledLanguages, id);
 }
 
 export function languageForPath(filePath: string): BundledLanguage | null {
   const name = basename(filePath).toLowerCase();
   const ext = getExtension(name);
   const key = ext === "" ? name : ext;
-  return EXTENSION_LANGUAGES[key] ?? (isBundledLanguage(key) ? key : null);
+  return EXTENSION_LANGUAGES.get(key) ?? (isBundledLanguage(key) ? key : null);
 }
 
 function isCommentText(scopes: string[]): boolean {

@@ -65,6 +65,7 @@ describe("extractComments", () => {
       expected: "wait for fonts",
     },
     { name: "unknown language", path: "data.unknownext", src: "# note", expected: "" },
+    { name: "inherited object key", path: "notes.__proto__", src: "# note", expected: "" },
   ])("$name", async ({ path, src, expected }) => {
     expect(await extractComments(src, path)).toBe(expected);
   });

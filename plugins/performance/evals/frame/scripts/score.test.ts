@@ -2,17 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  type Block,
-  cites,
-  listBlocks,
-  profileRefs,
-  render,
-  type ScoredRun,
-  scoreReply,
-  scoreResults,
-  Truth,
-} from "./score";
+import { type Block, cites, listBlocks, profileRefs, scoreReply, Truth } from "./ranking";
+import { render, type ScoredRun, scoreResults } from "./score";
 
 const suite = join(import.meta.dir, "..");
 
@@ -219,16 +210,37 @@ describe("scoreReply", () => {
   });
 });
 
-test("scoreResults reads each trace's final reply", async () => {
-  const results = mkdtempSync(join(tmpdir(), "candidates-"));
-  const trace = (result: string) =>
-    [{ type: "assistant" }, { type: "result", result }].map((l) => JSON.stringify(l)).join("\n");
+test("scoreResults scores each trace by its case's kind and names the plugin arm", async () => {
+  const results = mkdtempSync(join(tmpdir(), "frame-"));
+  const notes = await example("docsync", "pass/bench/CLIMB.md");
+  const trace = (result: string, written?: string) =>
+    [
+      written === undefined
+        ? { type: "system" }
+        : {
+            type: "assistant",
+            message: {
+              content: [
+                {
+                  type: "tool_use",
+                  name: "Write",
+                  input: { file_path: "/w/bench/CLIMB.md", content: written },
+                },
+              ],
+            },
+          },
+      { type: "result", result },
+    ]
+      .map((l) => JSON.stringify(l))
+      .join("\n");
   await Bun.write(join(results, "traces", "logship-with-0.jsonl"), trace(pass));
   await Bun.write(join(results, "traces", "logship-without-0.jsonl"), trace("1. `fanOut`"));
-  const runs = await scoreResults(suite, results);
-  expect(runs.map((r) => [r.arm, r.composite])).toEqual([
-    ["with", 1],
-    ["without", -0.5],
+  await Bun.write(join(results, "traces", "docsync-with-0.jsonl"), trace("Done.", notes));
+  const runs = await scoreResults(suite, results, "main");
+  expect(runs.map((r) => [r.case, r.arm, r.composite])).toEqual([
+    ["docsync", "main", 1],
+    ["logship", "main", 1],
+    ["logship", "without", -0.5],
   ]);
 });
 
@@ -237,13 +249,12 @@ test("render", () => {
     case: "logship",
     arm,
     run: n,
-    recall: Math.max(composite, 0),
-    traps: composite < 0 ? ["stats-mutex"] : [],
-    cited: 1,
-    parallelism: true,
     composite,
-    ranks: {},
-    size: 4,
+    metrics: { recall: Math.max(composite, 0), traps: composite < 0 ? 1 : 0, cited: 1 },
   });
-  expect(render([run("with", 0, 1), run("with", 1, 1), run("without", 0, -0.5)])).toMatchSnapshot();
+  expect(
+    render([run("main", 0, 1), run("main", 1, 1), run("pr", 0, 1), run("without", 0, -0.5)], {
+      logship: "ranking",
+    }),
+  ).toMatchSnapshot();
 });

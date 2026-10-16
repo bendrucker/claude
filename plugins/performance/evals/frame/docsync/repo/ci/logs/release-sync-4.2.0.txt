@@ -1,0 +1,16 @@
+2026-10-02T17:03:52.418Z Requested by mreyes via workflow_dispatch (release 4.2.0)
+2026-10-02T17:03:52.977Z Runner: ubuntu-24.04, 4 vCPU, 16 GB
+2026-10-02T17:03:53.102Z ##[group]Run actions/checkout@v4
+2026-10-02T17:03:54.880Z ##[endgroup]
+2026-10-02T17:03:54.881Z ##[group]Run go build -o bin/docsync .
+2026-10-02T17:04:11.190Z ##[endgroup]
+2026-10-02T17:04:11.203Z ##[group]Run bin/docsync sync
+2026-10-02T17:04:11.813Z docsync: resolve 0.61s (38 of 41 packages changed)
+2026-10-02T17:05:23.633Z docsync: fetch 71.82s (38 archives)
+2026-10-02T17:06:21.523Z docsync: apply 57.89s (38 packages, 6214 pages, relink 41.07s)
+2026-10-02T17:06:24.803Z docsync: index 3.28s
+2026-10-02T17:06:24.806Z docsync: synced 4.2.0 in 133.60s
+2026-10-02T17:06:24.811Z ##[endgroup]
+2026-10-02T17:06:24.812Z ##[group]Run peter-evans/create-pull-request@v7
+2026-10-02T17:06:27.455Z Created pull request #612: docs: sync reference to 4.2.0
+2026-10-02T17:06:27.456Z ##[endgroup]

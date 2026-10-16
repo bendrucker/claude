@@ -1,14 +1,7 @@
-#!/usr/bin/env bun
-import { globSync } from "node:fs";
-import { basename, join } from "node:path";
-import { Command } from "@commander-js/extra-typings";
-import { mean } from "simple-statistics";
-import { table } from "table";
 import { z } from "zod";
-import { pValue } from "../../../../../evals/native/compare";
-import { traceReply } from "../../../../../evals/native/load";
 
 export const Truth = z.object({
+  kind: z.literal("ranking").default("ranking"),
   profile: z.string(),
   items: z.array(
     z.object({
@@ -203,86 +196,3 @@ export function scoreReply(reply: string, truth: Truth, profile: string): Score 
     size: entries.length,
   };
 }
-
-export interface ScoredRun extends Score {
-  case: string;
-  arm: string;
-  run: number;
-}
-
-const TRACE = /^(.+)-([^-]+)-(\d+)\.jsonl$/;
-
-/** Scores every trace under `<results>/traces/` against its case's truth. */
-export async function scoreResults(suite: string, results: string): Promise<ScoredRun[]> {
-  const files = globSync("traces/*.jsonl", { cwd: results }).toSorted();
-  const runs = files.map(async (file) => {
-    const m = TRACE.exec(basename(file));
-    if (m === null) return [];
-    const [, name = "", arm = "", n = "0"] = m;
-    const truth = Truth.parse(await Bun.file(join(suite, name, "truth.json")).json());
-    const profile = await Bun.file(join(suite, name, truth.profile)).text();
-    const reply = traceReply(await Bun.file(join(results, file)).text()) ?? "";
-    return [{ case: name, arm, run: Number(n), ...scoreReply(reply, truth, profile) }];
-  });
-  return (await Promise.all(runs)).flat();
-}
-
-const fixed = (x: number) => x.toFixed(2);
-
-export function render(runs: ScoredRun[]): string {
-  const head = ["case", "arm", "run", "recall@5", "traps top 2", "cited", "parallel", "composite"];
-  const rows = runs.map((r) => [
-    r.case,
-    r.arm,
-    String(r.run),
-    fixed(r.recall),
-    r.traps.length === 0 ? "-" : r.traps.join(", "),
-    fixed(r.cited),
-    r.parallelism ? "yes" : "no",
-    fixed(r.composite),
-  ]);
-  const names = [...new Set(runs.map((r) => r.case))].toSorted();
-  const arms = [...new Set(runs.map((r) => r.arm))].toSorted();
-  const of = (name: string, arm: string) => runs.filter((r) => r.case === name && r.arm === arm);
-  const avg = (rs: ScoredRun[], pick: (r: ScoredRun) => number) =>
-    rs.length === 0 ? "-" : fixed(mean(rs.map(pick)));
-  const summary = names.flatMap((name) =>
-    arms.map((arm) => {
-      const rs = of(name, arm);
-      return [
-        name,
-        arm,
-        String(rs.length),
-        avg(rs, (r) => r.recall),
-        avg(rs, (r) => r.traps.length),
-        avg(rs, (r) => r.cited),
-        avg(rs, (r) => (r.parallelism ? 1 : 0)),
-        avg(rs, (r) => r.composite),
-      ];
-    }),
-  );
-  const summaryHead = ["case", "arm", "runs", ...head.slice(3)];
-  const out = [table([head, ...rows]), table([summaryHead, ...summary])];
-  const [base, other] = arms;
-  if (base === undefined || other === undefined) return out.join("\n");
-  for (const name of names) {
-    const p = (pick: (r: ScoredRun) => number) =>
-      pValue(of(name, base).map(pick), of(name, other).map(pick)).toFixed(3);
-    out.push(
-      `${name} ${other} vs ${base}: permutation p = ${p((r) => r.composite)} composite, ${p((r) => r.cited)} cited`,
-    );
-  }
-  return out.join("\n");
-}
-
-export const program = new Command("score.ts")
-  .description("Score candidate lists in claude plugin eval results against each case's truth.json")
-  .argument("<results...>", "results directories holding traces/")
-  .option("--json", "Print the scored runs as JSON")
-  .action(async (results, { json }) => {
-    const suite = join(import.meta.dir, "..");
-    const runs = (await Promise.all(results.map((r) => scoreResults(suite, r)))).flat();
-    console.log(json === true ? JSON.stringify(runs, null, 2) : render(runs));
-  });
-
-if (import.meta.main) await program.parseAsync();

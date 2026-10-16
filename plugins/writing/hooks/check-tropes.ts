@@ -1,5 +1,5 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { extractComments } from "../detection/comments";
+import { exceedsLineLimit, extractComments } from "../detection/comments";
 import { isProseFile } from "../detection/paths";
 import {
   firstByTier,
@@ -245,11 +245,17 @@ async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | n
   let scanPair = pair;
   if (codePath != null) {
     const source = (await wholeFilePair(input, codePath)) ?? pair;
-    const [newText, oldText] = await Promise.all([
-      extractComments(source.newText, codePath),
-      extractComments(source.oldText, codePath),
-    ]);
-    scanPair = { newText, oldText };
+    // An unscannable version extracts as empty, which would make every
+    // comment in the other version look introduced.
+    if (exceedsLineLimit(source.newText) || exceedsLineLimit(source.oldText)) {
+      scanPair = { newText: "", oldText: "" };
+    } else {
+      const [newText, oldText] = await Promise.all([
+        extractComments(source.newText, codePath),
+        extractComments(source.oldText, codePath),
+      ]);
+      scanPair = { newText, oldText };
+    }
   }
   const matches = scanIntroduced(scanPair.newText, scanPair.oldText, filePath, "file");
 

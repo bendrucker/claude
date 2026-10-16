@@ -72,15 +72,18 @@ function stripGutter(comment: string): string {
     .trim();
 }
 
+// Minified and generated lines stall the tokenizer and crash its scope
+// explanation. Dropping only the line would shift the grammar state of the
+// lines after it, so such files go unscanned.
+export function exceedsLineLimit(text: string): boolean {
+  return text.split("\n").some((line) => line.length > MAX_LINE_LENGTH);
+}
+
 // Extract comments by the file's language grammar, including CSS and JS
 // embedded in HTML.
 export async function extractComments(text: string, filePath: string): Promise<string> {
   const lang = languageForPath(filePath);
-  if (lang == null || text === "") return "";
-  // Minified and generated lines stall the tokenizer and crash its scope
-  // explanation. Dropping only the line would shift the grammar state of the
-  // lines after it, so skip the whole file.
-  if (text.split("\n").some((line) => line.length > MAX_LINE_LENGTH)) return "";
+  if (lang == null || text === "" || exceedsLineLimit(text)) return "";
   const { tokens } = (await highlighterFor(lang)).codeToTokens(text, {
     lang,
     theme,

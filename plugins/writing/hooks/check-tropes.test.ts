@@ -297,6 +297,13 @@ describe("semicolon splices", () => {
     expect(contextOf(result)?.match(/\("(.*)"\)/)?.[1]).toBe(quote);
   });
 
+  it("ignores existing comments when an edit shortens an overlong line", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "trope-long-")), "app.js");
+    const long = `const blob = "${"x".repeat(3_000)}";`;
+    await Bun.write(file, `// The cache warms slowly; then it saturates.\n${long}\n`);
+    expect(await processInput(mockEdit('const blob = "";', long, file))).toBeNull();
+  });
+
   it("flags two splices in a short prose file", async () => {
     const result = await processInput(
       mockWrite(

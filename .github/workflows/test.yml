@@ -225,8 +225,6 @@ jobs:
         wait: cli
 
       - name: Validate plugin
-        env:
-          CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1"
         run: claude plugin validate "plugins/${{ matrix.plugin.name }}"
 
       - name: Check gating hooks

@@ -28,7 +28,6 @@ if (import.meta.main) {
   const dir = argv[2];
   if (dir === undefined) throw new Error("usage: check-gating-catch.ts <plugin dir>");
   const { exitCode, stdout, stderr } = await $`claude plugin validate ${dir} --json`
-    .env({ ...process.env, CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1" })
     .nothrow()
     .quiet();
   if (exitCode !== 0) {

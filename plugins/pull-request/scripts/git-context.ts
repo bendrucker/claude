@@ -22,12 +22,20 @@ function diff(): string {
   }
 }
 
+function upstream(): string {
+  try {
+    return exec("git rev-parse --abbrev-ref --symbolic-full-name @{u}");
+  } catch {
+    return "none";
+  }
+}
+
 export function gitContext(): string {
   const branch = exec("git branch --show-current");
   const status = exec("git status --short");
   const log = exec("git log --oneline -20");
 
-  const sections = [`Branch: ${branch}`];
+  const sections = [`Branch: ${branch}`, `Upstream: ${upstream()}`];
 
   if (status !== "") {
     sections.push(`Status:\n${status}`);

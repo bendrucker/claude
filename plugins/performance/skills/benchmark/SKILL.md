@@ -35,7 +35,7 @@ Pin the scenario before timing it. A run that changes its own input measures a d
 - Reset state per run with `--prepare` (restore a fixture, clear or warm a cache), and one-time setup with `--setup`. Match the cache state to the scenario the user cares about. A cold-start metric needs a cold cache on every run.
 - Stub or hold fixed everything outside the program: network, remote state, other processes' files. When the program syncs with a remote, point it at a local copy that stays unchanged.
 - Pass `-N` when the command is a single executable with arguments, which removes the shell's startup from every sample.
-- Before a baseline, put the machine on AC power with power saving off, and quiet it as far as it goes. When it cannot go idle, interleaving keeps the comparison fair, and the load average `compare.ts run` prints each round explains a round that stands out.
+- Before a baseline, put the machine on AC power with power saving off, and quiet it as far as it goes. When it cannot go idle, interleaving keeps the comparison fair. `compare.ts` records the load average around each round and flags rounds above twice the core count.
 - When the program is a test suite, raise the runner's timeout in every arm's command (`bun test --timeout`, `pytest --timeout`), so a load spike slows a run instead of failing it. Read the first timeout before raising it, since it can be a real cost worth a candidate.
 - For a shell script or shell startup (`.zshrc`, `.bashrc`), read [references/shell.md](references/shell.md).
 
@@ -52,11 +52,11 @@ Compare with the bundled script, which runs short `hyperfine` rounds in rotating
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/compare.ts run tmp/bench/<comparison> \
-  --arm 'base=<command>' --arm 'candidate=<command>' --rounds 6 --runs 3 -- -N --prepare '<reset>'
+  --hypothesis '<change and predicted effect>' --arm 'base=<command>' --arm 'candidate=<command>' --rounds 6 --runs 3 -- -N --prepare '<reset>'
 bun ${CLAUDE_SKILL_DIR}/scripts/compare.ts report tmp/bench/<comparison> --markdown
 ```
 
-The first `--arm` is the base. Arguments after `--` go to every `hyperfine` call. Give each comparison its own directory, since `run` refuses one that already holds exports. `report` also reads `--export-json` files from a plain `hyperfine` run, and pools every file and directory it is given per arm name.
+The first `--arm` is the base. Arguments after `--` go to every `hyperfine` call. Give each comparison its own directory, since `run` refuses one that already holds exports. `run` writes the hypothesis and per-round load to `meta.json` there, and `report` prints both above the table. `report` also reads `--export-json` files from a plain `hyperfine` run, and pools every file and directory it is given per arm name.
 
 ## Noise Floor
 

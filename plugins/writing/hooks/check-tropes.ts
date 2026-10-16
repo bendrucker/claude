@@ -202,6 +202,28 @@ function commentSplice(comments: { newText: string; oldText: string }): string |
   return `A code comment splices clauses with a semicolon ("${newHits.sample}"). Comments can be fragments. Use a period or drop a word.`;
 }
 
+// A fragment tokenizes without the grammar state around it, so a comment
+// inside `<script>` or a block comment reads as code. Apply the edits to the
+// file on disk and extract from both whole versions instead.
+async function wholeFilePair(
+  input: PreToolUseHookInput,
+  filePath: string,
+): Promise<{ newText: string; oldText: string } | null> {
+  if (input.tool_name === "Write") return null;
+  const toolInput = toolInputOf(input);
+  const edits = input.tool_name === "MultiEdit" ? (toolInput.edits ?? []) : [toolInput];
+  if (edits.length === 0) return null;
+  const file = Bun.file(filePath);
+  if (!(await file.exists())) return null;
+  const oldText = await file.text();
+  let newText = oldText;
+  for (const { old_string: from, new_string: to, replace_all: all } of edits) {
+    if (from == null || from === "" || to == null || !newText.includes(from)) return null;
+    newText = all === true ? newText.replaceAll(from, () => to) : newText.replace(from, () => to);
+  }
+  return { newText, oldText };
+}
+
 async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | null> {
   const pair = await collectFileOpPair(input);
   if (!pair) return null;
@@ -212,12 +234,15 @@ async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | n
   // model did not write as prose.
   const codePath = filePath == null || filePath === "" || isProseFile(filePath) ? null : filePath;
   const prose = codePath == null;
-  const scanPair = prose
-    ? pair
-    : {
-        newText: await extractComments(pair.newText, codePath),
-        oldText: await extractComments(pair.oldText, codePath),
-      };
+  let scanPair = pair;
+  if (codePath != null) {
+    const source = (await wholeFilePair(input, codePath)) ?? pair;
+    const [newText, oldText] = await Promise.all([
+      extractComments(source.newText, codePath),
+      extractComments(source.oldText, codePath),
+    ]);
+    scanPair = { newText, oldText };
+  }
   const matches = scanIntroduced(scanPair.newText, scanPair.oldText, filePath, "file");
 
   const deny = firstByTier(matches, "deny");

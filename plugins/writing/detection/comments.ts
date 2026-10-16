@@ -1,13 +1,20 @@
 import { basename } from "node:path";
-import { type BundledLanguage, bundledLanguages, createHighlighter } from "shiki";
+import { type BundledLanguage, bundledLanguages, createHighlighter, type Highlighter } from "shiki";
 import { getExtension } from "./paths";
 
 // Shiki needs a theme to tokenize. The grammar alone produces the scopes read
 // here, so an empty one avoids loading a bundled theme.
 const theme = { name: "bare", settings: [] };
 
-// Extensions Shiki has no alias for.
+// Extensions and file names Shiki has no alias for.
 const EXTENSION_LANGUAGES = new Map<string, BundledLanguage>([
+  ["bashrc", "shellscript"],
+  ["zshrc", "shellscript"],
+  ["zprofile", "shellscript"],
+  ["profile", "shellscript"],
+  ["envrc", "shellscript"],
+  ["env", "dotenv"],
+  ["containerfile", "dockerfile"],
   ["h", "c"],
   ["cc", "cpp"],
   ["cxx", "cpp"],
@@ -22,6 +29,15 @@ const EXTENSION_LANGUAGES = new Map<string, BundledLanguage>([
   ["el", "emacs-lisp"],
   ["j2", "jinja"],
 ]);
+
+let highlighter: Promise<Highlighter> | undefined;
+
+async function highlighterFor(lang: BundledLanguage): Promise<Highlighter> {
+  highlighter ??= createHighlighter({ themes: [theme], langs: [] });
+  const loaded = await highlighter;
+  if (!loaded.getLoadedLanguages().includes(lang)) await loaded.loadLanguage(lang);
+  return loaded;
+}
 
 function isBundledLanguage(id: string): id is BundledLanguage {
   return Object.hasOwn(bundledLanguages, id);
@@ -59,8 +75,7 @@ function stripGutter(comment: string): string {
 export async function extractComments(text: string, filePath: string): Promise<string> {
   const lang = languageForPath(filePath);
   if (lang == null || text === "") return "";
-  const highlighter = await createHighlighter({ themes: [theme], langs: [lang] });
-  const { tokens } = highlighter.codeToTokens(text, {
+  const { tokens } = (await highlighterFor(lang)).codeToTokens(text, {
     lang,
     theme,
     includeExplanation: "scopeName",

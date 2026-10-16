@@ -270,6 +270,33 @@ describe("semicolon splices", () => {
     expect(await processInput(mockWrite(html, "page.html"))).toBeNull();
   });
 
+  test.each<{ name: string; edit: [string, string]; flagged: boolean }>([
+    {
+      name: "flags a splice edited into a script block",
+      edit: ["// wait for fonts", "// keep sorted; callers rely on order"],
+      flagged: true,
+    },
+    {
+      name: "ignores a pre-existing splice elsewhere in the file",
+      edit: ["const ready = 1;", "const ready = 2;"],
+      flagged: false,
+    },
+  ])("$name", async ({ edit: [oldString, newString], flagged }) => {
+    const file = join(mkdtempSync(join(tmpdir(), "trope-html-")), "page.html");
+    await Bun.write(
+      file,
+      [
+        "<!-- The page loads fast; the fonts arrive later. -->",
+        "<script>",
+        "// wait for fonts",
+        "const ready = 1;",
+        "</script>",
+      ].join("\n"),
+    );
+    const result = await processInput(mockEdit(newString, oldString, file));
+    expect(contextOf(result)?.includes("semicolon") ?? false).toBe(flagged);
+  });
+
   it("flags two splices in a short prose file", async () => {
     const result = await processInput(
       mockWrite(

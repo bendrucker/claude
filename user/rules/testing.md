@@ -8,11 +8,9 @@ paths:
 
 # Testing
 
-## Technique Selection
-
 #### Repeated Cases
 
-When two or more tests differ only in their data, collapse them into one table-driven test. Give every row a name so a failure identifies the row without counting.
+When two or more tests differ only in their data, collapse them into one table-driven test. Name every row so a failure identifies it.
 
 #### Formatted Output
 
@@ -20,14 +18,12 @@ Assert formatted or structured output with one snapshot over the whole value.
 
 #### Invariants
 
-When a property holds across a range of inputs, state it as a property test over generated input. Shapes to look for: roundtrip (`decode(encode(x))` equals `x`), idempotence, permutation invariance, partition (parts recombine to the whole), and agreement with a simpler oracle.
+When a property holds across a range of inputs, write a property test over generated input. Look for roundtrip (`decode(encode(x))` equals `x`), idempotence, permutation invariance, partition (parts recombine to the whole), and agreement with a simpler oracle.
 
 #### Fake Instances
 
-Build filler instances of a domain type from a builder or generator defined beside the tests, overriding the fields the case cares about.
+Build filler instances of a domain type from a builder or generator defined beside the tests. Override only the fields the case cares about.
 
-## Refactor Bar
+#### Refactors
 
-A test refactor preserves behavior: the same assertions, fewer lines, and the same suite passing before and after.
-
-When a test is hard to write, treat the difficulty as evidence about the interface and reshape it before adding scaffolding to the test.
+Keep the same assertions and the same passing suite when refactoring a test. When a test is hard to write, reshape the interface under test before adding scaffolding to the test.

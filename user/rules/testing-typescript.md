@@ -10,74 +10,18 @@ paths:
 
 # Testing TypeScript
 
-## Matchers
-
 #### Repeated Cases
 
-Use `test.each` with a typed table. Title each row through the template so a failure names the row.
-
-```ts
-// Tuple rows: positional args, %s/%d/%p placeholders in the title
-test.each<[string, number]>([
-  ["", 0],
-  ["a", 1],
-])("length of %p is %d", (input, expected) => {
-  expect(input.length).toBe(expected);
-});
-
-// Object rows: named fields, $field placeholders in the title
-test.each<{ name: string; input: string; expected: number }>([
-  { name: "empty string", input: "", expected: 0 },
-  { name: "single char", input: "a", expected: 1 },
-])("$name", ({ input, expected }) => {
-  expect(input.length).toBe(expected);
-});
-```
+Use `test.each` with a typed table, such as `test.each<{ name: string; input: string }>`. Put each row's identity in the title through `%s`/`%p` or `$field` placeholders.
 
 #### Formatted Output
 
-Call `toMatchInlineSnapshot()` with no argument and let the runner write it. After an intentional output change, rerun with `-u` and review what it wrote.
-
-Past roughly 20 lines, use `toMatchSnapshot()`, which writes to `__snapshots__/*.snap`.
+Call `toMatchInlineSnapshot()` with no argument and let the first run write the value. After an intended change, rerun with `-u` and review what it wrote. Past about 20 lines, use `toMatchSnapshot()` instead.
 
 #### Invariants
 
-Write one `fast-check` property plus a small example table.
-
-```ts
-import * as fc from "fast-check";
-
-test("encode/decode roundtrip", () => {
-  fc.assert(
-    fc.property(fc.array(fc.integer()), (values) => {
-      expect(decode(encode(values))).toEqual(values);
-    }),
-  );
-});
-```
-
-Put `expect` calls inside the property. An assertion failure or any other throw fails the run, except `fc.pre(condition)`, whose throw skips the case. Constrain the arbitrary (`fc.integer({ min: 1 })`, `fc.string({ minLength: 1 })`) or use `fc.pre` instead of generating values and filtering them.
-
-Replay a failure by passing the printed `{ seed, path, endOnFailure }` to `fc.assert(prop, ...)`.
+Write one `fast-check` property plus a small example table. Put `expect` calls inside the property. Constrain the arbitrary (`fc.integer({ min: 1 })`) or use `fc.pre` instead of generating and filtering. To replay a failure, pass the printed `{ seed, path, endOnFailure }` object as the second argument to `fc.assert`.
 
 #### Fake Instances
 
-Write a `make<Type>(overrides)` builder in the test file.
-
-```ts
-function makeFinding(overrides: Partial<Finding> = {}): Finding {
-  return { path: "src/a.ts", line: 1, severity: "low", ...overrides };
-}
-```
-
-Where `fast-check` is already a dependency, define a typed `fc.record` arbitrary beside the tests and reuse it in properties.
-
-```ts
-const finding = fc.record<Finding>({
-  path: fc.string({ minLength: 1 }),
-  line: fc.integer({ min: 1 }),
-  severity: fc.constantFrom("low", "high"),
-});
-```
-
-Skip faker-style dependencies.
+Write a `make<Type>(overrides: Partial<Type> = {})` builder in the test file. Where `fast-check` is already a dependency, define a typed `fc.record<Type>` arbitrary beside the tests and reuse it in properties. Do not add faker-style dependencies.

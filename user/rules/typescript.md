@@ -6,20 +6,20 @@ paths:
 
 # TypeScript
 
-- Use a specific type in place of `any`, or `unknown` when no specific type fits.
-- Prefer static `import` statements over dynamic `await import()`.
+- Use a specific type or `unknown` instead of `any`.
+- Use static `import` statements instead of `await import()` for built-in and first-party modules.
 
 ## External Data
 
-Everything entering the program is `unknown`: `JSON.parse`, subprocess stdout, file reads, network responses, and hook input on stdin. Validate it against a zod schema where it arrives, and let the schema produce the type.
+Treat everything entering the program as `unknown`: `JSON.parse`, subprocess stdout, file reads, network responses, and hook input on stdin. Validate it with a zod schema where it arrives, and take the type from the schema. In a module that must stay dependency-free, validate with a `value is T` predicate instead.
 
 ```ts
 const Pr = z.object({ number: z.number(), title: z.string() });
 const pr = Pr.parse(JSON.parse(stdout));
 ```
 
-Describe only the fields the code reads. A schema mirroring an upstream type drifts from it and claims more than the code needs.
+Describe only the fields the code reads, since a schema mirroring an upstream type drifts from it.
 
-An `as` on external data is a promise the compiler cannot check, so a wrong payload runs on undetected and fails somewhere unrelated. Casting to `Record<string, unknown>` and asserting each field with `as string` is the same mistake spread over more lines.
+Never `as`-cast external data. Casting to `Record<string, unknown>` and then each field `as string` counts too.
 
-Inside typed code, narrow rather than assert: `typeof`, `instanceof`, `in`, or a `value is T` predicate. Use `satisfies` to check a literal against a type without widening it.
+Inside typed code, narrow with `typeof`, `instanceof`, `in`, or a `value is T` predicate instead of asserting. Use `satisfies` to check a literal against a type without widening it.

@@ -6,11 +6,5 @@ paths:
 
 # Markdown
 
-## Prose
-
-Load the `writing:writing` skill for tone and style rules (AI trope avoidance, em dashes, vocabulary, voice).
-
-## Structure
-
-- Prefer `####` (or deeper) headers over `**Label**:` for labeled subsections.
-- Delete sections that exist only to match a template.
+- Use a `####` (or deeper) heading for a labeled subsection instead of a `**Label**:` line.
+- Delete any section that exists only to fill a template.

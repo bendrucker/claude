@@ -93,6 +93,9 @@ export async function extractComments(text: string, filePath: string): Promise<s
     lang,
     theme,
     includeExplanation: "scopeName",
+    // Past the default 500ms a line stops early and the explanation throws, which
+    // a loaded host reaches on ordinary code. exceedsLineLimit bounds the rest.
+    tokenizeTimeLimit: 0,
   });
 
   const parts: string[] = [];

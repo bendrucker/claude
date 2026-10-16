@@ -165,7 +165,18 @@ describe("traceMeasures", () => {
       trace: jsonl({ type: "result", result: "one" }),
       expected: { words: 1 },
     },
+    {
+      name: "past a truncated earlier line",
+      trace: `{"type":"assist\n${jsonl({ type: "result", result: "one", num_turns: 2 })}\n`,
+      expected: { words: 1, turns: 2 },
+    },
+    {
+      name: "null stats as absent",
+      trace: jsonl({ type: "result", result: "one", total_cost_usd: null, usage: null }),
+      expected: { words: 1 },
+    },
     { name: "no result line", trace: jsonl({ type: "assistant" }), expected: {} },
+    { name: "an empty trace", trace: "", expected: {} },
   ])("reads $name", ({ trace, expected }) => {
     expect(traceMeasures(trace)).toEqual(expected);
   });

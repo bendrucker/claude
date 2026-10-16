@@ -17,13 +17,12 @@ const Run = z.object({
 const Result = z.object({
   cases: z.array(z.object({ name: z.string(), arms: z.record(z.string(), z.array(Run)) })),
 });
-const TraceLine = z.object({
-  type: z.string(),
-  result: z.string().optional(),
-  num_turns: z.number().optional(),
-  duration_ms: z.number().optional(),
-  total_cost_usd: z.number().optional(),
-  usage: z.object({ output_tokens: z.number().optional() }).optional(),
+const TraceLine = z.object({ type: z.string(), result: z.string().optional() });
+const ResultLine = TraceLine.extend({
+  num_turns: z.number().nullish(),
+  duration_ms: z.number().nullish(),
+  total_cost_usd: z.number().nullish(),
+  usage: z.object({ output_tokens: z.number().nullish() }).nullish(),
 });
 const CaseFile = z.object({ tags: z.array(z.string()).optional() });
 
@@ -73,19 +72,20 @@ export function traceReply(trace: string): string | undefined {
   return undefined;
 }
 
-/** A trace's measures, each absent when the trace lacks what it reads. */
+/** A trace's measures from its last `result` line, each absent when that line lacks it. */
 export function traceMeasures(trace: string): Measured {
-  const lines = trace
-    .trim()
+  const line = trace
     .split("\n")
-    .map((l) => TraceLine.parse(JSON.parse(l)));
-  const last = lines.findLast((l) => l.type === "result");
+    .filter((l) => l.trim() !== "")
+    .findLast((l) => TraceLine.parse(JSON.parse(l)).type === "result");
+  if (line === undefined) return {};
+  const last = ResultLine.parse(JSON.parse(line));
   return {
-    words: traceReply(trace)?.split(/\s+/).filter(Boolean).length,
-    turns: last?.num_turns,
-    seconds: last?.duration_ms === undefined ? undefined : last.duration_ms / 1000,
-    tokens: last?.usage?.output_tokens,
-    cost: last?.total_cost_usd,
+    words: last.result?.split(/\s+/).filter(Boolean).length,
+    turns: last.num_turns ?? undefined,
+    seconds: last.duration_ms == null ? undefined : last.duration_ms / 1000,
+    tokens: last.usage?.output_tokens ?? undefined,
+    cost: last.total_cost_usd ?? undefined,
   };
 }
 

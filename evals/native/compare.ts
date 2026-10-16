@@ -4,7 +4,7 @@ import { cli } from "cleye";
 import seedrandom from "seedrandom";
 import { mean, min, permutationTest } from "simple-statistics";
 import { table } from "table";
-import { type Cell, type Column, loadColumn, loadTags, type Measure } from "./load";
+import { type Cell, type Column, loadColumn, loadTags, type Measure, measures } from "./load";
 
 export interface RenderOptions {
   columns: Column[];
@@ -17,13 +17,13 @@ export interface RenderOptions {
 
 type Section = [title: string, head: string[], rows: string[][]];
 
-const perRun: [title: string, measure: Measure, digits: number][] = [
-  ["Reply words", "words", 0],
-  ["Turns per run", "turns", 1],
-  ["Seconds per run", "seconds", 1],
-  ["Output tokens per run", "tokens", 0],
-  ["Cost per run (USD)", "cost", 3],
-];
+const perRun: Record<Measure, [title: string, digits: number]> = {
+  words: ["Reply words", 0],
+  turns: ["Turns per run", 1],
+  seconds: ["Seconds per run", 1],
+  tokens: ["Output tokens per run", 0],
+  cost: ["Cost per run (USD)", 3],
+};
 
 const fmt = (xs: number[], digits: number) => (xs.length > 0 ? mean(xs).toFixed(digits) : "-");
 
@@ -77,17 +77,20 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
     key,
     ...series(key, (c) => c.scores).map((xs) => (xs.length > 0 ? min(xs).toFixed(2) : "-")),
   ]);
-  const measureSections = perRun.map(([title, measure, digits]): Section => [
-    title,
-    ["case/arm"],
-    keys.map((key) =>
-      row(
-        [key],
-        series(key, (c) => c[measure]),
-        digits,
+  const measureSections = measures.map((measure): Section => {
+    const [title, digits] = perRun[measure];
+    return [
+      title,
+      ["case/arm"],
+      keys.map((key) =>
+        row(
+          [key],
+          series(key, (c) => c[measure]),
+          digits,
+        ),
       ),
-    ),
-  ]);
+    ];
+  });
   const graderRows = keys.flatMap((key) => {
     const names = new Set(columns.flatMap((c) => [...(c.get(key)?.graders.keys() ?? [])]));
     return [...names].toSorted().map((name) =>

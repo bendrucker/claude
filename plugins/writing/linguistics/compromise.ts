@@ -73,8 +73,16 @@ function tenseOf(tags: string[]): Tense | undefined {
 // and most calls never tag. `tag` is synchronous, so the load is a `require`.
 let nlp: typeof Nlp | undefined;
 
+function isNlp(value: unknown): value is typeof Nlp {
+  return typeof value === "function";
+}
+
 function load(): typeof Nlp {
-  nlp ??= require("compromise");
+  if (nlp === undefined) {
+    const loaded: unknown = require("compromise");
+    if (!isNlp(loaded)) throw new Error("compromise did not export a function");
+    nlp = loaded;
+  }
   return nlp;
 }
 

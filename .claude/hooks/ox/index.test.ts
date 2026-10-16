@@ -597,7 +597,7 @@ describe("ox hook", () => {
     ]);
   });
 
-  describe("processStop", () => {
+  describe.concurrent("processStop", () => {
     // A session holding one lint error oxfmt cannot fix, stopped repeatedly.
     // Each block-budget test drives its own so the on-disk count stays its own.
     async function unfixableSession(session: string): Promise<string> {
@@ -857,7 +857,7 @@ describe("ox hook", () => {
 
   // Stop and the commit gate share one pipeline, so these cover what differs:
   // the closing verb, and the fact that both batch file paths into a command.
-  describe("runOxGate", () => {
+  describe.concurrent("runOxGate", () => {
     it("names the blocked action in the reason", async () => {
       const filePath = await copyFixture("unfixable.ts", tempDir);
       const transcriptPath = join(tempDir, `transcript-verb-${Date.now()}.jsonl`);

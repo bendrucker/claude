@@ -40,7 +40,7 @@ describe("PreToolUse gating", () => {
         entry.matcher,
         entry.hooks.map((hook) => ({
           script: scriptName(hook.command),
-          guarded: hook.command.startsWith("in=$(cat);"),
+          guarded: hook.command.startsWith("IFS= read -r in;"),
         })),
       ]),
     );

@@ -1,5 +1,5 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { extractComments } from "../detection/comments";
+import { exceedsLineLimit, extractComments } from "../detection/comments";
 import { isProseFile } from "../detection/paths";
 import {
   firstByTier,
@@ -199,7 +199,37 @@ function commentSplice(comments: { newText: string; oldText: string }): string |
   if (newHits.count === 0) return null;
   const oldHits = semicolonSpliceHits(comments.oldText, COMMENT_SPLICE_MIN);
   if (newHits.count <= oldHits.count) return null;
-  return `A code comment splices clauses with a semicolon ("${newHits.sample}"). Comments can be fragments. Use a period or drop a word.`;
+  // Quote a splice from a line the edit introduced over one already in the file.
+  const oldLines = new Set(comments.oldText.split("\n"));
+  const introduced = comments.newText
+    .split("\n")
+    .filter((line) => !oldLines.has(line))
+    .join("\n");
+  const introducedHits = semicolonSpliceHits(introduced, COMMENT_SPLICE_MIN);
+  const sample = introducedHits.count > 0 ? introducedHits.sample : newHits.sample;
+  return `A code comment splices clauses with a semicolon ("${sample}"). Comments can be fragments. Use a period or drop a word.`;
+}
+
+// A fragment tokenizes without the grammar state around it, so a comment
+// inside `<script>` or a block comment reads as code. Apply the edits to the
+// file on disk and extract from both whole versions instead.
+async function wholeFilePair(
+  input: PreToolUseHookInput,
+  filePath: string,
+): Promise<{ newText: string; oldText: string } | null> {
+  if (input.tool_name === "Write") return null;
+  const toolInput = toolInputOf(input);
+  const edits = input.tool_name === "MultiEdit" ? (toolInput.edits ?? []) : [toolInput];
+  if (edits.length === 0) return null;
+  const file = Bun.file(filePath);
+  if (!(await file.exists())) return null;
+  const oldText = await file.text();
+  let newText = oldText;
+  for (const { old_string: from, new_string: to, replace_all: all } of edits) {
+    if (from == null || from === "" || to == null || !newText.includes(from)) return null;
+    newText = all === true ? newText.replaceAll(from, () => to) : newText.replace(from, () => to);
+  }
+  return { newText, oldText };
 }
 
 async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | null> {
@@ -210,10 +240,23 @@ async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | n
   // Prose rules target prose. In a code file the model's prose surface is its
   // comments, so scan those; strings and identifiers are program text the
   // model did not write as prose.
-  const prose = filePath == null || filePath === "" || isProseFile(filePath);
-  const scanPair = prose
-    ? pair
-    : { newText: extractComments(pair.newText), oldText: extractComments(pair.oldText) };
+  const codePath = filePath == null || filePath === "" || isProseFile(filePath) ? null : filePath;
+  const prose = codePath == null;
+  let scanPair = pair;
+  if (codePath != null) {
+    const source = (await wholeFilePair(input, codePath)) ?? pair;
+    // An unscannable version extracts as empty, which would make every
+    // comment in the other version look introduced.
+    if (exceedsLineLimit(source.newText) || exceedsLineLimit(source.oldText)) {
+      scanPair = { newText: "", oldText: "" };
+    } else {
+      const [newText, oldText] = await Promise.all([
+        extractComments(source.newText, codePath),
+        extractComments(source.oldText, codePath),
+      ]);
+      scanPair = { newText, oldText };
+    }
+  }
   const matches = scanIntroduced(scanPair.newText, scanPair.oldText, filePath, "file");
 
   const deny = firstByTier(matches, "deny");

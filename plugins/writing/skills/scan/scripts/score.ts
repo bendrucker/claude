@@ -84,11 +84,12 @@ export function scoreText(
   return { group: "prose", wordCount, categories };
 }
 
-export function scoreComments(
+export async function scoreComments(
   text: string,
+  filePath: string,
   customMatch?: (text: string) => { count: number },
-): GroupScore | undefined {
-  const comments = extractComments(text);
+): Promise<GroupScore | undefined> {
+  const comments = await extractComments(text, filePath);
   if (comments.trim().length === 0) return undefined;
   // Score comments as prose so prose-only patterns apply to them.
   return { ...scoreText(comments, undefined, customMatch), group: "comments" };
@@ -109,14 +110,14 @@ export function shouldScoreComments(
   return !isProseFile(filePath);
 }
 
-export function buildReport(
+export async function buildReport(
   text: string,
   filePath: string | undefined,
   options: ReportOptions,
-): ScoreReport {
+): Promise<ScoreReport> {
   const groups: GroupScore[] = [scoreText(text, filePath, options.customMatch)];
-  if (options.comments) {
-    const comments = scoreComments(text, options.customMatch);
+  if (options.comments && filePath !== undefined) {
+    const comments = await scoreComments(text, filePath, options.customMatch);
     if (comments) groups.push(comments);
   }
   return { filePath, groups };

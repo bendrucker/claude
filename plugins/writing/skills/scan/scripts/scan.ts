@@ -266,12 +266,16 @@ const scoreCmd = command(
   },
   async (argv) => {
     const { text, filePath } = await readInput(argv._.input);
+    if (argv.flags.comments === true && filePath === undefined) {
+      console.error("--comments needs a file path to pick the comment syntax.");
+      process.exit(1);
+    }
     const customMatch = await loadCustomMatch(argv.flags.wordlist);
     const options: ReportOptions = {
       comments: shouldScoreComments(filePath, argv.flags.comments, argv.flags.noComments),
     };
     if (customMatch) options.customMatch = customMatch;
-    const report = buildReport(text, filePath, options);
+    const report = await buildReport(text, filePath, options);
 
     if (argv.flags.json) {
       console.log(JSON.stringify(report, null, 2));

@@ -9,12 +9,14 @@ const ToolInput = z.looseObject({
   content: z.string().optional().catch(undefined),
   new_string: z.string().optional().catch(undefined),
   old_string: z.string().optional().catch(undefined),
+  replace_all: z.boolean().optional().catch(undefined),
   command: z.string().optional().catch(undefined),
   edits: z
     .array(
       z.looseObject({
         new_string: z.string().optional().catch(undefined),
         old_string: z.string().optional().catch(undefined),
+        replace_all: z.boolean().optional().catch(undefined),
       }),
     )
     .optional()

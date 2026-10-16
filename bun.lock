@@ -380,6 +380,7 @@
         "compromise": "^14.15.1",
         "mdast-util-from-markdown": "^2.0.2",
         "natural": "^8.1.1",
+        "shiki": "^4.3.0",
         "stemmer": "^2.0.1",
         "table": "^6.9.0",
         "unist-util-visit": "^5.1.0",

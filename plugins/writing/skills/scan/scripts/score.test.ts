@@ -11,7 +11,7 @@ import {
   scoreText,
 } from "./score";
 
-function category(report: ReturnType<typeof buildReport>, group: string, name: string) {
+function category(report: Awaited<ReturnType<typeof buildReport>>, group: string, name: string) {
   return report.groups.find((g) => g.group === group)?.categories.find((c) => c.category === name);
 }
 
@@ -46,44 +46,45 @@ describe("scoreText", () => {
 });
 
 describe("scoreComments", () => {
-  it("scores extracted comments as a separate prose group", () => {
+  it("scores extracted comments as a separate prose group", async () => {
     const src = "function f() {\n  // We reach for the helper here.\n  return 1;\n}\n";
-    const group = scoreComments(src);
+    const group = await scoreComments(src, "src.ts");
     expect(group?.group).toBe("comments");
     const reaching = group?.categories.find((c) => c.category === "reaching for");
     expect(reaching?.hits).toBe(1);
   });
 
-  it("returns undefined when there are no comments", () => {
-    expect(scoreComments("const x = 1;\nconst y = 2;\n")).toBeUndefined();
+  it("returns undefined when there are no comments", async () => {
+    expect(await scoreComments("const x = 1;\nconst y = 2;\n", "src.ts")).toBeUndefined();
   });
 });
 
 describe("buildReport", () => {
-  it("emits only the prose group when comments are off", () => {
-    const report = buildReport("// leverage this", "src.ts", { comments: false });
+  it("emits only the prose group when comments are off", async () => {
+    const report = await buildReport("// leverage this", "src.ts", { comments: false });
     expect(report.groups.map((g) => g.group)).toEqual(["prose"]);
   });
 
-  it("adds a comments group when comments are on", () => {
+  it("adds a comments group when comments are on", async () => {
     const src = "function f() {\n  // We delve into the leverage here today.\n}\n";
-    const report = buildReport(src, "src.ts", { comments: true });
+    const report = await buildReport(src, "src.ts", { comments: true });
     expect(report.groups.map((g) => g.group)).toContain("comments");
     expect(category(report, "comments", "AI vocabulary")?.hits).toBeGreaterThan(0);
   });
 
-  it("applies the custom matcher to every group", () => {
+  it("applies the custom matcher to every group", async () => {
     const match = compileStemmedWordlist("widget\n");
     const src = "const w = 1; // a widget comment\nwidget();\n";
-    const report = buildReport(src, "src.ts", { comments: true, customMatch: match });
+    const report = await buildReport(src, "src.ts", { comments: true, customMatch: match });
     expect(category(report, "prose", "custom vocabulary")?.hits).toBe(2);
     expect(category(report, "comments", "custom vocabulary")?.hits).toBe(1);
   });
 });
 
 describe("renderTable", () => {
-  it("header with word count and category rows", () => {
-    expect(renderTable(buildReport("a — b", "doc.md", { comments: false }))).toMatchInlineSnapshot(`
+  it("header with word count and category rows", async () => {
+    expect(renderTable(await buildReport("a — b", "doc.md", { comments: false })))
+      .toMatchInlineSnapshot(`
       "prose (2 words)
       ╔════════════════╤══════╤═════════════╗
       ║ Category       │ Hits │ Density /1k ║
@@ -93,9 +94,10 @@ describe("renderTable", () => {
     `);
   });
 
-  it("no patterns for clean prose", () => {
-    expect(renderTable(buildReport("The function reads input.", "doc.md", { comments: false })))
-      .toMatchInlineSnapshot(`
+  it("no patterns for clean prose", async () => {
+    expect(
+      renderTable(await buildReport("The function reads input.", "doc.md", { comments: false })),
+    ).toMatchInlineSnapshot(`
       "prose (4 words)
       No patterns detected."
     `);

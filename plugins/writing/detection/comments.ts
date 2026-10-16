@@ -1,42 +1,109 @@
-const SINGLE_LINE_COMMENT = /(?:^|\s)(?:\/\/|#)[^\n]*/g;
-const BLOCK_COMMENT = /\/\*[\s\S]*?\*\//g;
-const HTML_COMMENT = /<!--[\s\S]*?-->/g;
-const TRIPLE_QUOTED = /("""|''')[\s\S]*?\1/g;
+import { basename } from "node:path";
+import { type BundledLanguage, bundledLanguages, createHighlighter, type Highlighter } from "shiki";
+import { getExtension } from "./paths";
 
-// Strip a block comment's delimiters and the leading `*` gutter JSDoc-style
-// bodies carry on each line.
-function blockBody(block: string): string {
-  return block
-    .replace(/^\/\*+/, "")
-    .replace(/\*+\/$/, "")
+// Shiki needs a theme to tokenize. The grammar alone produces the scopes read
+// here, so an empty one avoids loading a bundled theme.
+const theme = { name: "bare", settings: [] };
+
+// Extensions and file names Shiki has no alias for.
+const EXTENSION_LANGUAGES = new Map<string, BundledLanguage>([
+  ["bashrc", "shellscript"],
+  ["zshrc", "shellscript"],
+  ["zprofile", "shellscript"],
+  ["profile", "shellscript"],
+  ["envrc", "shellscript"],
+  ["env", "dotenv"],
+  ["containerfile", "dockerfile"],
+  ["h", "c"],
+  ["cc", "cpp"],
+  ["cxx", "cpp"],
+  ["hh", "cpp"],
+  ["hpp", "cpp"],
+  ["htm", "html"],
+  ["svg", "xml"],
+  ["ex", "elixir"],
+  ["exs", "elixir"],
+  ["pl", "perl"],
+  ["ml", "ocaml"],
+  ["el", "emacs-lisp"],
+  ["j2", "jinja"],
+]);
+
+const MAX_LINE_LENGTH = 2_000;
+
+let highlighter: Promise<Highlighter> | undefined;
+
+async function highlighterFor(lang: BundledLanguage): Promise<Highlighter> {
+  highlighter ??= createHighlighter({ themes: [theme], langs: [] });
+  const loaded = await highlighter;
+  if (!loaded.getLoadedLanguages().includes(lang)) await loaded.loadLanguage(lang);
+  return loaded;
+}
+
+function isBundledLanguage(id: string): id is BundledLanguage {
+  return Object.hasOwn(bundledLanguages, id);
+}
+
+export function languageForPath(filePath: string): BundledLanguage | null {
+  const name = basename(filePath).toLowerCase();
+  const ext = getExtension(name);
+  const key = ext === "" ? name : ext;
+  return EXTENSION_LANGUAGES.get(key) ?? (isBundledLanguage(key) ? key : null);
+}
+
+function isCommentText(scopes: string[]): boolean {
+  const inComment = scopes.some(
+    (s) => s.startsWith("comment.") || s.startsWith("string.quoted.docstring"),
+  );
+  const delimiter = scopes.some(
+    (s) =>
+      s.startsWith("punctuation.definition.comment") ||
+      s.startsWith("punctuation.definition.string"),
+  );
+  return inComment && !delimiter;
+}
+
+function stripGutter(comment: string): string {
+  return comment
     .split("\n")
     .map((line) => line.replace(/^\s*\*\s?/, "").trim())
     .join("\n")
     .trim();
 }
 
-// Pull comments out of source so they can be checked as prose: single-line
-// (`//`, `#`), block (`/* */`, including JSDoc), HTML (`<!-- -->`), and
-// triple-quoted Python docstrings. No AST: this catches the common cases and
-// treats every comment as prose regardless of language.
-export function extractComments(text: string): string {
+// Minified and generated lines stall the tokenizer and crash its scope
+// explanation. Dropping only the line would shift the grammar state of the
+// lines after it, so such files go unscanned.
+export function exceedsLineLimit(text: string): boolean {
+  return text.split("\n").some((line) => line.length > MAX_LINE_LENGTH);
+}
+
+// Extract comments by the file's language grammar, including CSS and JS
+// embedded in HTML.
+export async function extractComments(text: string, filePath: string): Promise<string> {
+  const lang = languageForPath(filePath);
+  if (lang == null || text === "" || exceedsLineLimit(text)) return "";
+  const { tokens } = (await highlighterFor(lang)).codeToTokens(text, {
+    lang,
+    theme,
+    includeExplanation: "scopeName",
+  });
+
   const parts: string[] = [];
-  for (const match of text.matchAll(SINGLE_LINE_COMMENT)) {
-    parts.push(match[0].replace(/^\s*(?:\/\/|#)\s?/, ""));
+  let current: string | null = null;
+  const flush = () => {
+    if (current != null) parts.push(stripGutter(current));
+    current = null;
+  };
+  for (const line of tokens) {
+    for (const piece of line.flatMap((token) => token.explanation ?? [])) {
+      const scopes = piece.scopes.map((scope) => scope.scopeName);
+      if (isCommentText(scopes)) current = (current ?? "") + piece.content;
+      else if (!scopes.some((s) => s.startsWith("punctuation.definition.comment"))) flush();
+    }
+    if (current != null) current += "\n";
   }
-  for (const match of text.matchAll(BLOCK_COMMENT)) {
-    parts.push(blockBody(match[0]));
-  }
-  for (const match of text.matchAll(HTML_COMMENT)) {
-    parts.push(
-      match[0]
-        .replace(/^<!--\s?/, "")
-        .replace(/\s?-->$/, "")
-        .trim(),
-    );
-  }
-  for (const match of text.matchAll(TRIPLE_QUOTED)) {
-    parts.push(match[0].slice(3, -3).trim());
-  }
+  flush();
   return parts.filter((part) => part.length > 0).join("\n");
 }

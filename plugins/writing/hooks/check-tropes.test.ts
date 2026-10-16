@@ -259,6 +259,51 @@ describe("semicolon splices", () => {
     ).toBeNull();
   });
 
+  it("ignores hex colors in an HTML style block", async () => {
+    const html = [
+      "<style>",
+      "/* Dark palette. */",
+      ":root { --bg: #12151b; --surface: #1a1e26; --fg: #e4e8ef; --muted: #98a1b0; --line: #2c323d;",
+      "  --accent: #6c9cf0; --accent-fg: #0d1117; --chip: #232934; --good: #4cc27f; color-scheme: dark; }",
+      "</style>",
+    ].join("\n");
+    expect(await processInput(mockWrite(html, "page.html"))).toBeNull();
+  });
+
+  test.each<{ name: string; edit: [string, string]; quote: string | undefined }>([
+    {
+      name: "flags and quotes a splice edited into a script block",
+      edit: ["// wait for fonts", "// keep sorted; callers rely on order"],
+      quote: "keep sorted; callers rely on order",
+    },
+    {
+      name: "ignores a pre-existing splice elsewhere in the file",
+      edit: ["const ready = 1;", "const ready = 2;"],
+      quote: undefined,
+    },
+  ])("$name", async ({ edit: [oldString, newString], quote }) => {
+    const file = join(mkdtempSync(join(tmpdir(), "trope-html-")), "page.html");
+    await Bun.write(
+      file,
+      [
+        "<!-- The page loads fast; the fonts arrive later. -->",
+        "<script>",
+        "// wait for fonts",
+        "const ready = 1;",
+        "</script>",
+      ].join("\n"),
+    );
+    const result = await processInput(mockEdit(newString, oldString, file));
+    expect(contextOf(result)?.match(/\("(.*)"\)/)?.[1]).toBe(quote);
+  });
+
+  it("ignores existing comments when an edit shortens an overlong line", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "trope-long-")), "app.js");
+    const long = `const blob = "${"x".repeat(3_000)}";`;
+    await Bun.write(file, `// The cache warms slowly; then it saturates.\n${long}\n`);
+    expect(await processInput(mockEdit('const blob = "";', long, file))).toBeNull();
+  });
+
   it("flags two splices in a short prose file", async () => {
     const result = await processInput(
       mockWrite(

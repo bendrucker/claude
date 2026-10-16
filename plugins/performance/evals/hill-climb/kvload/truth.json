@@ -55,6 +55,10 @@
       ]
     }
   ],
+  "primary": {
+    "note": "The per-record wal.Sync in Store.Put, about 6.5 s of the 8.62 s wall.",
+    "patterns": ["fsync", "\\bsyncs?\\b", "\\.Sync", "group commit", "durab"]
+  },
   "leads": [
     "fsync",
     "\\bsync\\b",

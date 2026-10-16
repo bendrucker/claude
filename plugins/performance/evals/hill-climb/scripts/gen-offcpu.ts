@@ -2,7 +2,7 @@
 import { globSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
-import { OffCpuTruth } from "./offcpu";
+import { OffCpuTruth, SPREADS_WORK } from "./offcpu";
 
 const quote = (s: string) => `'${s.replaceAll("'", "''")}'`;
 const alt = (ps: string[]) => `(?:${ps.join("|")})`;
@@ -29,7 +29,7 @@ export function proxies(truth: OffCpuTruth): Record<string, string> {
   }
   const traps = truth.traps.flatMap((t) => t.patterns);
   files["no-trap-top2.md"] = grader(
-    String.raw`^\s{0,3}[12][.)](?![^\n]*${alt(truth.leads)})[^\n]*${alt(traps)}`,
+    String.raw`^\s{0,3}[12][.)](?![^\n]*${alt([...truth.leads, ...SPREADS_WORK])})[^\n]*${alt(traps)}`,
     "im",
     "not_contains",
     `Neither of the first two candidates is a CPU micro-optimization the profile over-ranks: ${truth.traps.map((t) => t.id).join(", ")}.`,

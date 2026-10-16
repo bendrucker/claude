@@ -31,8 +31,9 @@ test("every trap covers three domains", () => {
   expect(count((c) => c.truth.decisions.join(" or "))).toEqual({
     reject: 12,
     "reject or re-run": 3,
-    "re-run": 6,
-    accept: 3,
+    "re-run": 9,
+    "accept or re-run": 3,
+    accept: 9,
   });
 });
 
@@ -54,8 +55,9 @@ test.each([
 });
 
 test.each([
-  [false, "load: no round above 2×8 cpus"],
-  [true, "load: 6 of 6 rounds above 2×8 cpus (1, 2, 3, 4, 5, 6)"],
-])("loadLine with loaded=%p", (loaded, line) => {
+  [[], "load: no round above 2×8 cpus"],
+  [[1, 2, 3, 4, 5, 6], "load: 6 of 6 rounds above 2×8 cpus (1, 2, 3, 4, 5, 6)"],
+  [[2, 5], "load: 2 of 6 rounds above 2×8 cpus (2, 5)"],
+])("loadLine with rounds %p loaded", (loaded, line) => {
   expect(loadLine(8, rounds(8, loaded, 4))).toStartWith(line);
 });

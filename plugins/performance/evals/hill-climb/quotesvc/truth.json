@@ -49,6 +49,20 @@
       ]
     }
   ],
+  "primary": {
+    "note": "Cache.refresh holds the write lock across pricing.Fetch, so readers wait out the upstream call.",
+    "patterns": [
+      "\\block",
+      "mutex",
+      "refresh",
+      "RWMutex",
+      "atomic",
+      "copy.on.write",
+      "snapshot",
+      "singleflight",
+      "contention"
+    ]
+  },
   "leads": [
     "lock",
     "mutex",

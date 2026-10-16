@@ -25,7 +25,7 @@ export interface ScoredRun {
   arm: string;
   run: number;
   composite: number;
-  /** Per-metric scores in [0, 1], except `traps`, which counts. */
+  /** Per-metric scores in [0, 1], except `traps`, a count, and `lead-rank`, a rank. */
   metrics: Record<string, number>;
 }
 
@@ -34,7 +34,7 @@ const KEY_METRIC: Record<Kind, string> = {
   ranking: "cited",
   frame: "assumed",
   decide: "decision",
-  offcpu: "gap",
+  offcpu: "lead@1",
 };
 
 type Scored = Pick<ScoredRun, "composite" | "metrics">;
@@ -64,7 +64,15 @@ export function scoreTrace(trace: string, truth: CaseTruth, profile: string): Sc
   if (truth.kind === "offcpu") {
     const s = scoreOffCpu(reply, truth);
     const checks = Object.fromEntries(Object.entries(s.checks).map(([k, v]) => [k, Number(v)]));
-    return { composite: s.composite, metrics: { ...checks, traps: s.traps.length } };
+    return {
+      composite: s.composite,
+      metrics: {
+        ...checks,
+        traps: s.traps.length,
+        "lead@1": Number(s.leadRank === 1),
+        "lead-rank": s.leadRank,
+      },
+    };
   }
   const s = scoreReply(reply, truth, profile);
   return {

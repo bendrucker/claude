@@ -17,7 +17,7 @@ describe("scoreOffCpu", () => {
     ["kvload", "pass.md", { gap: true, profile: true }, []],
     ["kvload", "cpu-first.md", { gap: false, profile: false }, ["json", "crc"]],
     ["quotesvc", "pass.md", { gap: true, profile: true }, []],
-    ["quotesvc", "alloc-first.md", { gap: false, profile: false }, ["json", "sprintf", "alloc"]],
+    ["quotesvc", "alloc-first.md", { gap: false, profile: false }, ["json", "sprintf"]],
     ["sitegen", "pass.md", { gap: true, profile: true }, []],
     ["sitegen", "warm-first.md", { gap: false, profile: false }, ["template", "minify"]],
   ])("%s %s", async (name, file, checks, traps) => {
@@ -34,8 +34,54 @@ describe("scoreOffCpu", () => {
     ],
     ["a trap at rank three is fine", "1. Batch fsync.\n2. Measure off-CPU.\n3. crc32 table.", []],
     ["a trap at rank two counts", "1. Batch fsync.\n2. Faster crc32.", ["crc"]],
+    [
+      "parallel CPU work after the fsync fix, naming three entries",
+      "1. **Drop the per-record fsync and sync once at the end.**\n2. **Run decode, normalize, marshal and CRC in parallel, with an ordered writer.**\n   - It targets the 2.05 s of CPU work.",
+      [],
+    ],
+    [
+      "one trap per candidate",
+      "1. **Hand-write the JSON encoder.** Also drops the crc32 copy.\n2. Batch fsync.",
+      ["json"],
+    ],
+    [
+      "a lead in the detail leaves a micro-opt headline a trap",
+      "1. Batch fsync.\n2. **Cut JSON re-encoding in `Put`.** Flush before the final sync.",
+      ["json"],
+    ],
   ])("%s", async (_, reply, traps) => {
     expect(scoreOffCpu(reply, await truthOf("kvload")).traps).toEqual(traps);
+  });
+
+  test.each<[string, string, string, number]>([
+    ["kvload", "fsync first", "1. **Batch the WAL `fsync`.**\n2. Faster crc32.", 1],
+    [
+      "kvload",
+      "a profiling step before the lead",
+      "1. Measure off-CPU time with `strace -c`.\n2. Sync once at the end.",
+      1,
+    ],
+    ["kvload", "absent", "1. Hand-write the encoder.\n2. Faster crc32.", 3],
+    [
+      "quotesvc",
+      "lock second",
+      "1. Pool the JSON buffers.\n2. **Fetch outside the write lock in `Cache.refresh`.**",
+      2,
+    ],
+    [
+      "sitegen",
+      "writeImage hashing is not the lead",
+      "1. **Hash and write each image once.**\n2. **Resize images in parallel.**",
+      2,
+    ],
+    [
+      "sitegen",
+      "remote includes ranked last by rule",
+      "1. Render pages in parallel.\n2. Cache parsed templates.\n3. **Prefetch remote includes.** No profile entry behind it, so it ranks last.",
+      3,
+    ],
+  ])("leadRank %s: %s", async (name, _, reply, rank) => {
+    expect(scoreOffCpu(reply, await truthOf(name)).leadRank).toBe(rank);
   });
 
   test.each([

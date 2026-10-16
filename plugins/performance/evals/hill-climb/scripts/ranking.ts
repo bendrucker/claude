@@ -122,11 +122,16 @@ export function itemRanks(entries: string[], truth: Truth): Map<string, number |
 
 const normalize = (text: string) => text.replaceAll("`", "").replaceAll(/\(\*?([^()]*)\)/g, "$1");
 
-/** Function names and percentages from a pprof `top` listing that count as citing it. */
-export function profileRefs(profile: string): { names: string[]; percents: string[] } {
+/** Function names, percentages, and seconds from a pprof `top` listing that count as citing it. */
+export function profileRefs(profile: string): {
+  names: string[];
+  percents: number[];
+  seconds: number[];
+} {
   const row = /^\s*(\S+)\s+(\S+%)\s+(\S+%)\s+(\S+)\s+(\S+%)\s+(.+?)(\s+\(inline\))?\s*$/;
   const names = new Set<string>();
-  const percents = new Set<string>();
+  const percents = new Set<number>();
+  const seconds = new Set<number>();
   for (const line of profile.split("\n")) {
     const m = row.exec(line);
     if (m === null) continue;
@@ -137,21 +142,38 @@ export function profileRefs(profile: string): { names: string[]; percents: strin
     const last = segments.at(-1) ?? "";
     if (last.length >= 6) names.add(last);
     for (const p of [m[2], m[5]]) {
-      if (p === undefined || p === "0%") continue;
-      percents.add(p);
-      percents.add(p.replace(/0%$/, "%"));
+      const value = Number.parseFloat(p ?? "");
+      if (value > 0) percents.add(value);
+    }
+    for (const t of [m[1], m[4]]) {
+      const s = /^(\d+(?:\.\d+)?)(m?s)$/.exec(t ?? "");
+      if (s === null) continue;
+      const value = Number(s[1]) / (s[2] === "ms" ? 1000 : 1);
+      if (value > 0) seconds.add(value);
     }
   }
-  return { names: [...names], percents: [...percents] };
+  return { names: [...names], percents: [...percents], seconds: [...seconds] };
 }
 
 const escape = (s: string) => s.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+
+const PERCENT = /(?<![\d.])(\d+(?:\.(\d+))?)\s?%/g;
+const SECONDS = /(?<![\d.])(\d+\.(\d+))\s?s\b/g;
+
+/** Whether `cited` is `listed` rounded to the precision `cited` was written at. */
+const rounds = (listed: number, cited: string, decimals: number) =>
+  Math.abs(listed - Number(cited)) <= 0.5 * 10 ** -decimals + 1e-9;
 
 export function cites(entry: string, refs: ReturnType<typeof profileRefs>): boolean {
   const text = normalize(entry);
   return (
     refs.names.some((n) => new RegExp(`(?<![\\w])${escape(n)}(?![\\w])`, "i").test(text)) ||
-    refs.percents.some((p) => new RegExp(`(?<![\\d.])${escape(p)}`).test(text))
+    [...text.matchAll(PERCENT)].some(([, cited = "", decimals = ""]) =>
+      refs.percents.some((v) => rounds(v, cited, decimals.length)),
+    ) ||
+    [...text.matchAll(SECONDS)].some(([, cited = "", decimals = ""]) =>
+      refs.seconds.some((v) => rounds(v, cited, decimals.length)),
+    )
   );
 }
 

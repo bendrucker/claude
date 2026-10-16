@@ -206,10 +206,11 @@ interface Trap {
   note: string;
   reason: string[][];
   lead: "big" | "small";
-  full: (v: number) => Measured;
+  full: (v: number, lead: Lead) => Measured;
   screen?: (v: number) => Measured;
   floor?: (v: number) => number;
-  loaded?: boolean;
+  /** The 1-based rounds that ran loaded. */
+  loaded?: number[];
   guardFails?: boolean;
 }
 
@@ -219,6 +220,37 @@ const SIGNIFICANT = [
   String.raw`\bp\b(\s*[=<≈]|\s+(is|of))\s*0?\.\d`,
   "signific",
   "beat (the )?noise",
+];
+
+const LOAD = [
+  "load average",
+  String.raw`\bloaded\b`,
+  "machine load",
+  String.raw`\bload\b[^\n]{0,60}(flag|round|above|high|2×|2x|cpu|core)`,
+  String.raw`(flag|round)[^\n]{0,60}\bload\b`,
+  "busy",
+  "noisy machine",
+];
+
+const BOUND = [
+  [
+    "exceed",
+    "larger than",
+    "more than",
+    "bigger than",
+    "greater than",
+    "beyond",
+    "bound",
+    "unexplained",
+    "(can't|cannot|doesn't|does not) (be )?(explain|account)",
+    "impossible",
+    "implausibl",
+    "only accounts",
+    "at most",
+    "can't come from",
+    "cannot come from",
+  ],
+  ["profile", "share", "cum", "critical path"],
 ];
 
 export const TRAPS: Trap[] = [
@@ -235,45 +267,16 @@ export const TRAPS: Trap[] = [
     id: "load",
     decisions: ["re-run"],
     note: "The gain is significant, but every round ran with the load average above twice the core count.",
-    reason: [
-      [
-        "load average",
-        String.raw`\bloaded\b`,
-        "machine load",
-        String.raw`\bload\b[^\n]{0,60}(flag|round|above|high|2×|2x|cpu|core)`,
-        String.raw`(flag|round)[^\n]{0,60}\bload\b`,
-        "busy",
-        "noisy machine",
-      ],
-    ],
+    reason: [LOAD],
     lead: "big",
     full: (v) => ({ change: -at([11.8, 9.4, 13.6], v), p: at([0.002, 0.004, 0.001], v) }),
-    loaded: true,
+    loaded: [1, 2, 3, 4, 5, 6],
   },
   {
     id: "profile-bound",
     decisions: ["re-run"],
     note: "The gain is larger than the target entry's whole share of the profile, so it cannot come from that entry alone.",
-    reason: [
-      [
-        "exceed",
-        "larger than",
-        "more than",
-        "bigger than",
-        "greater than",
-        "beyond",
-        "bound",
-        "unexplained",
-        "(can't|cannot|doesn't|does not) (be )?(explain|account)",
-        "impossible",
-        "implausibl",
-        "only accounts",
-        "at most",
-        "can't come from",
-        "cannot come from",
-      ],
-      ["profile", "share", "cum", "critical path"],
-    ],
+    reason: BOUND,
     lead: "small",
     full: (v) => ({ change: -at([17.9, 21.4, 15.6], v), p: at([0.001, 0.001, 0.002], v) }),
     screen: (v) => ({ change: -at([44.2, 51.0, 39.3], v), p: 0.001 }),
@@ -362,6 +365,46 @@ export const TRAPS: Trap[] = [
     full: (v) => ({ change: at([-0.9, 0.6, -1.4], v), p: at([0.55, 0.74, 0.41], v) }),
     screen: (v) => ({ change: -at([2.1, 1.4, 3.0], v), p: at([0.31, 0.52, 0.22], v) }),
   },
+  {
+    id: "compound",
+    decisions: ["re-run"],
+    note: "Two of six rounds ran loaded, and the gain clears the noise floor by only a tenth, so the accept may rest on the loaded rounds.",
+    reason: [LOAD, ["noise", "A/A", "floor", "margin", "barely", "just (above|over|past)"]],
+    lead: "big",
+    full: (v) => ({ change: -at([4.0, 4.4, 3.6], v), p: at([0.044, 0.028, 0.061], v) }),
+    floor: (v) => at([3.6, 4.0, 3.3], v),
+    loaded: [2, 5],
+  },
+  {
+    id: "near-floor",
+    decisions: ["accept"],
+    note: "Control: the gain is only 1.1 times the noise floor, but it clears it, at p < 0.1, on quiet rounds, with the guard passing.",
+    reason: [SIGNIFICANT, ["noise", "A/A", "floor"]],
+    lead: "big",
+    full: (v) => ({ change: -at([3.7, 4.2, 4.6], v), p: at([0.031, 0.054, 0.018], v) }),
+    floor: (v) => at([3.4, 3.8, 4.2], v),
+  },
+  {
+    id: "near-bound",
+    decisions: ["accept", "re-run"],
+    note: "The gain is 1.05 times the target entry's whole profile share. The excess is inside the noise floor, so accepting with the excess reported or re-measuring both hold, as long as the reply notices the bound.",
+    reason: BOUND,
+    lead: "small",
+    full: (v, lead) => ({
+      change: -Number((lead.cum * 1.05).toFixed(1)),
+      p: at([0.004, 0.002, 0.006], v),
+    }),
+    screen: (v) => ({ change: -at([38.1, 44.6, 35.2], v), p: 0.001 }),
+  },
+  {
+    id: "partial-load",
+    decisions: ["accept"],
+    note: "Control: one of six rounds ran loaded, and a gain this size at p = 0.001 cannot rest on three runs a side, so the flag doesn't block the accept.",
+    reason: [LOAD],
+    lead: "big",
+    full: (v) => ({ change: -at([14.6, 12.2, 15.8], v), p: 0.001 }),
+    loaded: [4],
+  },
 ];
 
 const RUNS = 18;
@@ -407,15 +450,16 @@ interface Round {
   loadAfter: number;
 }
 
-export function rounds(ncpu: number, loaded: boolean, k: number): Round[] {
+export function rounds(ncpu: number, loaded: number[], k: number): Round[] {
   return Array.from({ length: 6 }, (_, i) => {
+    const busyRound = loaded.includes(i + 1);
     const quiet = 1.1 + ((k * 7 + i * 3) % 30) / 10;
     const busy = 2 * ncpu + 3 + ((k * 5 + i * 4) % 12);
-    const load = loaded ? busy : quiet;
+    const load = busyRound ? busy : quiet;
     return {
       order: i % 2 === 0 ? ["base", "candidate"] : ["candidate", "base"],
       loadBefore: Number(load.toFixed(2)),
-      loadAfter: Number((load + (loaded ? 1.5 : 0.4)).toFixed(2)),
+      loadAfter: Number((load + (busyRound ? 1.5 : 0.4)).toFixed(2)),
     };
   });
 }
@@ -437,7 +481,7 @@ export interface Generated {
 export function generate(trap: Trap, domain: Domain, v: number, k: number): Generated {
   const lead = domain[trap.lead];
   const floor = trap.floor?.(v) ?? at([1.4, 1.8, 2.2, 1.6, 2.5, 1.2], k);
-  const full = trap.full(v);
+  const full = trap.full(v, lead);
   const screen = trap.screen?.(v) ?? {
     change: Math.max(-62, full.change / (lead.cum / 100)),
     p: 0.001,
@@ -465,7 +509,7 @@ export function generate(trap: Trap, domain: Domain, v: number, k: number): Gene
   );
   const n = 2 + ((k * 3) % 5);
   const hypothesis = `${lead.hypothesis}.`;
-  const rs = rounds(domain.ncpu, trap.loaded === true, k);
+  const rs = rounds(domain.ncpu, trap.loaded ?? [], k);
   const command = (a: string) => domain.command.replace("{arm}", a);
   const meta = {
     hypothesis: lead.hypothesis,

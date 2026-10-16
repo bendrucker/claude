@@ -66,9 +66,18 @@ describe("cites", () => {
     ["regexp.MustCompile", true],
     ["about 43.9% of samples", true],
     ["24.15%", true],
+    ["24.2%", true],
+    ["44% of samples", true],
+    ["43.90 % cum", true],
+    ["45% of samples", false],
     ["take the lock less", false],
     ["Buffer stdout in larger chunks", false],
     ["4.16 s wall", false],
+    ["cut the 1.80 s", true],
+    ["0.99s spent compiling", true],
+    ["about 1.8 s", true],
+    ["about 1.7 s", true],
+    ["about 2 s", false],
   ])("%s → %p", (entry, expected) => {
     expect(cites(entry, refs)).toBe(expected);
   });
@@ -187,7 +196,17 @@ describe("scoreReply", () => {
       reply: "1. Sort each group once after grouping, instead of after every append (0.60 s).",
       recall: 0.1 / ledgerWins,
       traps: [],
-      cited: 0,
+      cited: 1,
+      parallelism: false,
+    },
+    {
+      name: "shares cited as rounded percentages",
+      case: "ledgerroll",
+      reply:
+        "1. Fix the aggregate sort (`sort.Slice`, 10% of CPU).\n2. Replace `fmt.Sprintf` in render and `groupKey` (14% of CPU).\n3. Reuse the JSON decoder and struct in `decodeRecord` (17% cumulative).\n4. Reduce allocations to cut GC (8% of CPU).",
+      recall: 1,
+      traps: [],
+      cited: 1,
       parallelism: false,
     },
     {

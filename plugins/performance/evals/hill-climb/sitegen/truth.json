@@ -26,6 +26,20 @@
       ]
     }
   ],
+  "primary": {
+    "note": "On a cold cache, resizing every screenshot and fetching every remote include, which the warm profile never sees.",
+    "patterns": [
+      "resiz",
+      "screenshot",
+      "thumbnail",
+      "remote",
+      "\\bincludes?\\b",
+      "expandIncludes",
+      "prefetch",
+      "\\bfetch",
+      "download"
+    ]
+  },
   "leads": [
     "image",
     "resiz",
@@ -38,10 +52,7 @@
     "cache miss",
     "cold",
     "re-?profil",
-    "profile",
-    "parallel",
-    "concurren",
-    "worker"
+    "profile"
   ],
   "traps": [
     {

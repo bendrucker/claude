@@ -7,6 +7,10 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 | --- | --- | --- | --- |
 | Case score | c/with | 1.00 | 0.00* |
 | Reply words | c/with | 3 | 6* |
+| Turns per run | c/with | 2.0 | 5.0* |
+| Seconds per run | c/with | 10.0 | 30.0* |
+| Output tokens per run | c/with | 500 | 900* |
+| Cost per run (USD) | c/with | 0.100 | 0.300* |
 | Grader pass rate | c/with · fact | 1.00 | 0.00* |
 | Grader pass rate | c/with · fired (indicator) | 1.00 | 0.00* |
 
@@ -31,6 +35,38 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 | case/arm | base | next |
 | --- | --- | --- |
 | c/with | 3 | 6* |
+
+</details>
+
+<details><summary>Turns per run</summary>
+
+| case/arm | base | next |
+| --- | --- | --- |
+| c/with | 2.0 | 5.0* |
+
+</details>
+
+<details><summary>Seconds per run</summary>
+
+| case/arm | base | next |
+| --- | --- | --- |
+| c/with | 10.0 | 30.0* |
+
+</details>
+
+<details><summary>Output tokens per run</summary>
+
+| case/arm | base | next |
+| --- | --- | --- |
+| c/with | 500 | 900* |
+
+</details>
+
+<details><summary>Cost per run (USD)</summary>
+
+| case/arm | base | next |
+| --- | --- | --- |
+| c/with | 0.100 | 0.300* |
 
 </details>
 
@@ -98,6 +134,58 @@ Reply words
 ╟───────────┼──────╢
 ║ b/without │ 6    ║
 ╚═══════════╧══════╝
+
+Turns per run
+╔═══════════╤══════╗
+║ case/arm  │ base ║
+╟───────────┼──────╢
+║ a/with    │ 2.0  ║
+╟───────────┼──────╢
+║ a/without │ 5.0  ║
+╟───────────┼──────╢
+║ b/with    │ 5.0  ║
+╟───────────┼──────╢
+║ b/without │ 5.0  ║
+╚═══════════╧══════╝
+
+Seconds per run
+╔═══════════╤══════╗
+║ case/arm  │ base ║
+╟───────────┼──────╢
+║ a/with    │ 10.0 ║
+╟───────────┼──────╢
+║ a/without │ 30.0 ║
+╟───────────┼──────╢
+║ b/with    │ 30.0 ║
+╟───────────┼──────╢
+║ b/without │ 30.0 ║
+╚═══════════╧══════╝
+
+Output tokens per run
+╔═══════════╤══════╗
+║ case/arm  │ base ║
+╟───────────┼──────╢
+║ a/with    │ 500  ║
+╟───────────┼──────╢
+║ a/without │ 900  ║
+╟───────────┼──────╢
+║ b/with    │ 900  ║
+╟───────────┼──────╢
+║ b/without │ 900  ║
+╚═══════════╧══════╝
+
+Cost per run (USD)
+╔═══════════╤═══════╗
+║ case/arm  │ base  ║
+╟───────────┼───────╢
+║ a/with    │ 0.100 ║
+╟───────────┼───────╢
+║ a/without │ 0.300 ║
+╟───────────┼───────╢
+║ b/with    │ 0.300 ║
+╟───────────┼───────╢
+║ b/without │ 0.300 ║
+╚═══════════╧═══════╝
 
 Grader pass rate
 ╔═══════════╤═══════════════════╤══════╗

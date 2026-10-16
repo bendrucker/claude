@@ -3,12 +3,14 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pFloor, pValue, render } from "./compare";
-import { erroredRuns, loadColumn, loadTags } from "./load";
+import { erroredRuns, loadColumn, loadTags, traceMeasures } from "./load";
 
 interface RunSpec {
   score: number;
   graders: [name: string, passed: boolean, scored?: boolean, explanation?: string][];
   reply?: string | undefined;
+  /** Fields of the trace's result line beside the reply. */
+  stats?: Record<string, unknown>;
   error?: string | null | undefined;
 }
 
@@ -23,7 +25,10 @@ async function result(cases: Record<string, Record<string, RunSpec[]>>): Promise
         arm,
         runs.map((run, i) => {
           if (run.reply !== undefined) {
-            const lines = [{ type: "assistant" }, { type: "result", result: run.reply }];
+            const lines = [
+              { type: "assistant" },
+              { type: "result", result: run.reply, ...run.stats },
+            ];
             writes.push(
               Bun.write(
                 join(dir, "traces", `${name}-${arm}-${i}.jsonl`),
@@ -57,6 +62,7 @@ const pass = (score = 1): RunSpec => ({
     ["fired", true, false],
   ],
   reply: "one two three",
+  stats: { num_turns: 2, duration_ms: 10_000, total_cost_usd: 0.1, usage: { output_tokens: 500 } },
 });
 const fail = (): RunSpec => ({
   score: 0,
@@ -65,6 +71,7 @@ const fail = (): RunSpec => ({
     ["fired", false, false],
   ],
   reply: "one two three four five six",
+  stats: { num_turns: 5, duration_ms: 30_000, total_cost_usd: 0.3, usage: { output_tokens: 900 } },
 });
 
 describe("pValue", () => {
@@ -92,6 +99,10 @@ describe("loadColumn", () => {
     expect(column.get("c/with")).toEqual({
       scores: [1, 0],
       words: [3, 6],
+      turns: [2, 5],
+      seconds: [10, 30],
+      tokens: [500, 900],
+      cost: [0.1, 0.3],
       errored: 0,
       graders: new Map([
         ["fact", [true, false]],
@@ -123,9 +134,51 @@ describe("loadColumn", () => {
     expect((await loadColumn([path])).get("c/with")?.errored).toBe(0);
   });
 
-  test("skips word counts for runs without a trace", async () => {
+  test("skips measures for runs without a trace", async () => {
     const path = await result({ c: { with: [{ ...pass(), reply: undefined }] } });
-    expect((await loadColumn([path])).get("c/with")?.words).toEqual([]);
+    const cell = (await loadColumn([path])).get("c/with");
+    expect([cell?.words, cell?.turns, cell?.cost]).toEqual([[], [], []]);
+  });
+});
+
+describe("traceMeasures", () => {
+  const jsonl = (...lines: object[]) => lines.map((l) => JSON.stringify(l)).join("\n");
+
+  test.each<{ name: string; trace: string; expected: ReturnType<typeof traceMeasures> }>([
+    {
+      name: "a full result line",
+      trace: jsonl(
+        { type: "assistant" },
+        {
+          type: "result",
+          result: "two words",
+          num_turns: 3,
+          duration_ms: 1500,
+          total_cost_usd: 0.02,
+          usage: { output_tokens: 40 },
+        },
+      ),
+      expected: { words: 2, turns: 3, seconds: 1.5, tokens: 40, cost: 0.02 },
+    },
+    {
+      name: "a result line without stats",
+      trace: jsonl({ type: "result", result: "one" }),
+      expected: { words: 1 },
+    },
+    {
+      name: "past a truncated earlier line",
+      trace: `{"type":"assist\n${jsonl({ type: "result", result: "one", num_turns: 2 })}\n`,
+      expected: { words: 1, turns: 2 },
+    },
+    {
+      name: "null stats as absent",
+      trace: jsonl({ type: "result", result: "one", total_cost_usd: null, usage: null }),
+      expected: { words: 1 },
+    },
+    { name: "no result line", trace: jsonl({ type: "assistant" }), expected: {} },
+    { name: "an empty trace", trace: "", expected: {} },
+  ])("reads $name", ({ trace, expected }) => {
+    expect(traceMeasures(trace)).toEqual(expected);
   });
 });
 

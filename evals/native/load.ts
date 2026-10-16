@@ -18,13 +18,22 @@ const Result = z.object({
   cases: z.array(z.object({ name: z.string(), arms: z.record(z.string(), z.array(Run)) })),
 });
 const TraceLine = z.object({ type: z.string(), result: z.string().optional() });
+const ResultLine = TraceLine.extend({
+  num_turns: z.number().nullish(),
+  duration_ms: z.number().nullish(),
+  total_cost_usd: z.number().nullish(),
+  usage: z.object({ output_tokens: z.number().nullish() }).nullish(),
+});
 const CaseFile = z.object({ tags: z.array(z.string()).optional() });
 
+export const measures = ["words", "turns", "seconds", "tokens", "cost"] as const;
+export type Measure = (typeof measures)[number];
+type Measured = Partial<Record<Measure, number | undefined>>;
+
 /** Every run of one case and arm, pooled across the result files of a column. */
-export interface Cell {
+export interface Cell extends Record<Measure, number[]> {
   graders: Map<string, boolean[]>;
   scores: number[];
-  words: number[];
   /** Runs left out of the pool because they errored. */
   errored: number;
 }
@@ -63,17 +72,31 @@ export function traceReply(trace: string): string | undefined {
   return undefined;
 }
 
-async function replyWords(path: string): Promise<number | undefined> {
+/** A trace's measures from its last `result` line, each absent when that line lacks it. */
+export function traceMeasures(trace: string): Measured {
+  const line = trace
+    .split("\n")
+    .filter((l) => l.trim() !== "")
+    .findLast((l) => TraceLine.parse(JSON.parse(l)).type === "result");
+  if (line === undefined) return {};
+  const last = ResultLine.parse(JSON.parse(line));
+  return {
+    words: last.result?.split(/\s+/).filter(Boolean).length,
+    turns: last.num_turns ?? undefined,
+    seconds: last.duration_ms == null ? undefined : last.duration_ms / 1000,
+    tokens: last.usage?.output_tokens ?? undefined,
+    cost: last.total_cost_usd ?? undefined,
+  };
+}
+
+async function measure(path: string): Promise<Measured> {
   const file = Bun.file(path);
-  if (!(await file.exists())) return undefined;
-  return traceReply(await file.text())
-    ?.split(/\s+/)
-    .filter(Boolean).length;
+  return (await file.exists()) ? traceMeasures(await file.text()) : {};
 }
 
 interface Loaded {
   result: z.output<typeof Result>;
-  words: Map<string, (number | undefined)[]>;
+  measured: Map<string, Measured[]>;
 }
 
 async function load(path: string): Promise<Loaded> {
@@ -81,24 +104,35 @@ async function load(path: string): Promise<Loaded> {
   const traces = join(dirname(path), "traces");
   const keyed = result.cases.flatMap((c) =>
     Object.entries(c.arms).map(async ([arm, runs]) => {
-      const words = await Promise.all(
-        runs.map((_, i) => replyWords(join(traces, `${c.name}-${arm}-${i}.jsonl`))),
+      const measured = await Promise.all(
+        runs.map((_, i) => measure(join(traces, `${c.name}-${arm}-${i}.jsonl`))),
       );
-      return [`${c.name}/${arm}`, words] as const;
+      return [`${c.name}/${arm}`, measured] as const;
     }),
   );
-  return { result, words: new Map(await Promise.all(keyed)) };
+  return { result, measured: new Map(await Promise.all(keyed)) };
 }
 
-function merge(column: Column, { result, words }: Loaded) {
+function pool(cell: Cell, values: Measured) {
+  for (const m of measures) {
+    const value = values[m];
+    if (value !== undefined) cell[m].push(value);
+  }
+}
+
+function merge(column: Column, { result, measured }: Loaded) {
   for (const c of result.cases) {
     for (const [arm, runs] of Object.entries(c.arms)) {
       const key = `${c.name}/${arm}`;
       const cell: Cell = column.get(key) ?? {
         graders: new Map(),
         scores: [],
-        words: [],
         errored: 0,
+        words: [],
+        turns: [],
+        seconds: [],
+        tokens: [],
+        cost: [],
       };
       for (const [i, run] of runs.entries()) {
         if (runError(run) !== undefined) {
@@ -106,8 +140,7 @@ function merge(column: Column, { result, words }: Loaded) {
           continue;
         }
         if (run.score !== null) cell.scores.push(run.score);
-        const count = words.get(key)?.[i];
-        if (count !== undefined) cell.words.push(count);
+        pool(cell, measured.get(key)?.[i] ?? {});
         // Under ablation the with-only graders are unscored indicators, such as a skill firing.
         for (const grader of run.graders) {
           const name = grader.scored ? grader.name : `${grader.name} (indicator)`;

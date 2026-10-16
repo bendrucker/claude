@@ -4,7 +4,7 @@ import { cli } from "cleye";
 import seedrandom from "seedrandom";
 import { mean, min, permutationTest } from "simple-statistics";
 import { table } from "table";
-import { type Cell, type Column, loadColumn, loadTags } from "./load";
+import { type Cell, type Column, loadColumn, loadTags, type Measure, measures } from "./load";
 
 export interface RenderOptions {
   columns: Column[];
@@ -16,6 +16,14 @@ export interface RenderOptions {
 }
 
 type Section = [title: string, head: string[], rows: string[][]];
+
+const perRun: Record<Measure, [title: string, digits: number]> = {
+  words: ["Reply words", 0],
+  turns: ["Turns per run", 1],
+  seconds: ["Seconds per run", 1],
+  tokens: ["Output tokens per run", 0],
+  cost: ["Cost per run (USD)", 3],
+};
 
 const fmt = (xs: number[], digits: number) => (xs.length > 0 ? mean(xs).toFixed(digits) : "-");
 
@@ -69,13 +77,20 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
     key,
     ...series(key, (c) => c.scores).map((xs) => (xs.length > 0 ? min(xs).toFixed(2) : "-")),
   ]);
-  const wordRows = keys.map((key) =>
-    row(
-      [key],
-      series(key, (c) => c.words),
-      0,
-    ),
-  );
+  const measureSections = measures.map((measure): Section => {
+    const [title, digits] = perRun[measure];
+    return [
+      title,
+      ["case/arm"],
+      keys.map((key) =>
+        row(
+          [key],
+          series(key, (c) => c[measure]),
+          digits,
+        ),
+      ),
+    ];
+  });
   const graderRows = keys.flatMap((key) => {
     const names = new Set(columns.flatMap((c) => [...(c.get(key)?.graders.keys() ?? [])]));
     return [...names].toSorted().map((name) =>
@@ -90,7 +105,7 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
   const result: Section[] = [
     ["Case score", ["case/arm"], scoreRows],
     ["Case minimum", ["case/arm"], minRows],
-    ["Reply words", ["case/arm"], wordRows],
+    ...measureSections,
     ["Grader pass rate", ["case/arm", "grader"], graderRows],
   ];
   if (tags !== undefined) {

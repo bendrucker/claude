@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   compare,
   flagged,
+  loadedRounds,
   loadSummary,
   logPath,
   median,
@@ -171,6 +172,18 @@ describe("flagged", () => {
     },
   ])("$name", ({ loads, expected }) => {
     expect(flagged(makeMeta(loads))).toEqual(expected);
+  });
+});
+
+describe("loadedRounds", () => {
+  it("names the export file of each flagged round", () => {
+    const meta = makeMeta([
+      [3, 5],
+      [52, 61],
+      [4, 4],
+      [30, 22],
+    ]);
+    expect(loadedRounds("out", meta)).toEqual(["out/round-001.json", "out/round-003.json"]);
   });
 });
 

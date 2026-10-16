@@ -272,6 +272,8 @@ jobs:
         uses: jdx/mise-action@v4
         with:
           working_directory: plugins/${{ matrix.plugin.name }}
+          # The cache key globs every file in the workspace (~24s), while a cold install takes ~3s.
+          cache: false
 
       # Profilers record through perf events, which the runner's default paranoia level blocks.
       - name: Allow perf events

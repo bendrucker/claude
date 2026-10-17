@@ -227,15 +227,6 @@
         ]
       },
       {
-        "matcher": "EnterWorktree",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun ~/.claude/hooks/enter-worktree"
-          }
-        ]
-      },
-      {
         "matcher": "*",
         "hooks": [
           {

@@ -1,15 +1,21 @@
 #!/usr/bin/env bun
-import { createHash } from "node:crypto";
 import { globSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { query } from "@anthropic-ai/claude-agent-sdk";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import seedrandom from "seedrandom";
 import { mean } from "simple-statistics";
 import { table } from "table";
 import { z } from "zod";
-import { decode, decodeFile, decodeJson } from "../../../../../packages/decode/index";
+import { decode, decodeFile } from "../../../../../packages/decode/index";
+import {
+  cacheKey as judgeKey,
+  isFresh,
+  judgeBlind,
+  other,
+  promptHash as hashPrompt,
+  structured,
+} from "../../../../../packages/eval-judge/index";
 import { loadTags, traceReply } from "../../../../../evals/native/load";
 import { mapPool } from "./pool";
 import { Judgment, Key, Label, Pair, Pick, SURFACES, Surface, Verdict } from "./pairs";
@@ -392,13 +398,8 @@ async function writePairs(pairs: Pair[], out: string): Promise<void> {
   );
 }
 
-/** Which key sits on the left ("1") slot of the judge prompt. */
-export function blind(flip: boolean): Key {
-  return flip ? "b" : "a";
-}
-
 export function renderJudgePrompt(template: string, pair: Pair, left: Key): string {
-  const right: Key = left === "a" ? "b" : "a";
+  const right = other(left);
   return template
     .replaceAll("{{surface}}", pair.surface)
     .replaceAll("{{brief}}", pair.brief)
@@ -406,56 +407,18 @@ export function renderJudgePrompt(template: string, pair: Pair, left: Key): stri
     .replaceAll("{{right}}", pair[right].text);
 }
 
-export function deblindPick(raw: "1" | "2" | "tie", left: Key): Pick {
-  if (raw === "tie") return "tie";
-  const right: Key = left === "a" ? "b" : "a";
-  return raw === "1" ? left : right;
-}
-
 const JudgeReply = z.object({ reason: z.string(), pick: z.enum(["1", "2", "tie"]) });
 export type JudgeReply = z.infer<typeof JudgeReply>;
 
 export type ModelCall = (prompt: string, model: string) => Promise<JudgeReply>;
 
-function judgeReplySchema(): Record<string, unknown> {
-  return {
-    type: "object",
-    properties: {
-      reason: { type: "string" },
-      pick: { type: "string", enum: ["1", "2", "tie"] },
-    },
-    required: ["reason", "pick"],
-    additionalProperties: false,
-  };
-}
-
-async function callModel(prompt: string, model: string): Promise<JudgeReply> {
-  for await (const message of query({
-    prompt,
-    options: {
-      model,
-      // Structured output lands through a tool call, plus a retry turn when the schema rejects it.
-      maxTurns: 5,
-      tools: [],
-      settingSources: [],
-      mcpServers: {},
-      strictMcpConfig: true,
-      outputFormat: { type: "json_schema", schema: judgeReplySchema() },
-    },
-  })) {
-    if (message.type !== "result") continue;
-    if (message.subtype !== "success") throw new Error(`judge call failed: ${message.subtype}`);
-    return message.structured_output !== undefined
-      ? decode(JudgeReply, message.structured_output, "judge reply")
-      : decodeJson(JudgeReply, message.result, "judge reply");
-  }
-  throw new Error("judge call produced no result message");
+function callModel(prompt: string, model: string): Promise<JudgeReply> {
+  return structured(JudgeReply, prompt, { model, label: "judge reply" });
 }
 
 /**
- * Judges one pair. `--swap` judges it in both slot orders and records a tie when the two
- * verdicts disagree, since a judge that flips its pick with the draft's position is not a
- * reliable signal either way.
+ * Judges one pair blind. `--swap` judges it in both slot orders and records a tie when the two
+ * verdicts disagree.
  */
 export async function judgePair(
   pair: Pair,
@@ -466,21 +429,10 @@ export async function judgePair(
   call: ModelCall,
   rng: () => number = Math.random,
 ): Promise<Judgment> {
-  const left = blind(rng() < 0.5);
-  const primary = await call(renderJudgePrompt(template, pair, left), model);
-  let pick = deblindPick(primary.pick, left);
-  let reason = primary.reason;
-
-  if (swap) {
-    const swappedLeft: Key = left === "a" ? "b" : "a";
-    const secondary = await call(renderJudgePrompt(template, pair, swappedLeft), model);
-    const swappedPick = deblindPick(secondary.pick, swappedLeft);
-    if (swappedPick !== pick) {
-      reason = `swap disagreement (${pick} then ${swappedPick}): ${reason} / ${secondary.reason}`;
-      pick = "tie";
-    }
-  }
-
+  const { pick, left, reason } = await judgeBlind(
+    (side) => call(renderJudgePrompt(template, pair, side), model),
+    { swap, rng },
+  );
   return {
     id: pair.id,
     pick,
@@ -494,14 +446,7 @@ export async function judgePair(
 
 /** Identifies the exact judge call a Judgment answers: prompt, model, swap, and the texts judged. */
 export function cacheKey(promptHash: string, model: string, swap: boolean, pair: Pair): string {
-  return createHash("sha256")
-    .update(JSON.stringify([promptHash, model, swap, pair.brief, pair.a.text, pair.b.text]))
-    .digest("hex")
-    .slice(0, 16);
-}
-
-export function isFresh(existing: Judgment | undefined, key: string): existing is Judgment {
-  return existing?.key === key;
+  return judgeKey(promptHash, model, swap, pair.brief, pair.a.text, pair.b.text);
 }
 
 function listJson(dir: string): string[] {
@@ -528,7 +473,7 @@ async function judgeMain(flags: JudgeFlags): Promise<void> {
     throw new Error("--pairs and --out are required");
   }
   const template = await Bun.file(flags.prompt).text();
-  const promptHash = createHash("sha256").update(template).digest("hex").slice(0, 12);
+  const promptHash = hashPrompt(template);
   const pairs = await readAll(Pair, pairsDir);
   await mkdir(outDir, { recursive: true });
 

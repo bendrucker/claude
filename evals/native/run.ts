@@ -6,6 +6,7 @@ import { $ } from "bun";
 import { cli } from "cleye";
 import { parse } from "yaml";
 import { z } from "zod";
+import { subscriptionEnv } from "../../packages/eval-judge/env";
 import { erroredRuns } from "./load";
 import { shareGraders } from "./shared-graders";
 import { stage } from "./stage";
@@ -212,9 +213,7 @@ if (import.meta.main) {
   const allow = config.allow_tools.length > 0 ? ["--allow-tools", ...config.allow_tools] : [];
 
   // An API key in the environment would bill the API instead of the subscription.
-  const env = { ...process.env };
-  delete env.ANTHROPIC_API_KEY;
-  delete env.ANTHROPIC_AUTH_TOKEN;
+  const env = subscriptionEnv();
   const proc = Bun.spawn(
     [
       "claude",

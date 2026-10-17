@@ -54,7 +54,7 @@ One older runner still reads `ANTHROPIC_API_KEY` from the environment: `plugins/
 op run --env-file=evals/op.env -- bun plugins/writing/skills/analyze/scripts/analyze.ts --session-db <db> --judge
 ```
 
-CI spends subscription credits through a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`. `eval.yml` runs the native suites of every plugin a pull request touches once it carries the `eval` label, skipping a suite that holds a `.local-only` file. `gh workflow run eval.yml --ref <branch> -f suite=<dir>` runs any suite on demand.
+CI spends subscription credits through a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`. `eval.yml` runs every native suite a pull request touches once it carries the `eval` label: the suite itself, a plugin its cases load, or a `user/` skill or rule its `suite.yaml` wraps. It skips a suite that holds a `.local-only` file. `gh workflow run eval.yml --ref <branch> -f suite=<dir>` runs any suite on demand.
 
 ## Workflow
 

@@ -15,7 +15,7 @@ describe("buildDispatchArgs", () => {
     expect(buildDispatchArgs({ url: "https://github.com/o/r/pull/1" })).toEqual([
       "--bg",
       "--agent",
-      "review",
+      "review:review",
       "https://github.com/o/r/pull/1",
     ]);
   });

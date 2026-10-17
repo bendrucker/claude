@@ -19,7 +19,7 @@ allowed-tools:
 
 # Review Inbox
 
-Dispatch inbound PR/MR reviews as background sessions. Each review runs as its own `claude --bg --agent review <url>` session, collected in the `claude agents` view. You fetch the pending queue and dispatch. Monitoring, completion, and worktree isolation belong to the agent view and the harness, not to you.
+Dispatch inbound PR/MR reviews as background sessions. Each review runs as its own `claude --bg --agent review:review <url>` session, collected in the `claude agents` view. You fetch the pending queue and dispatch. Monitoring, completion, and worktree isolation belong to the agent view and the harness, not to you.
 
 ## Arguments
 
@@ -55,7 +55,7 @@ For each selected review:
 
 #### Resolve the Local Repo Path
 
-The `review` agent checks out the PR branch with `gh pr checkout`, so the session runs inside a local clone of the PR's repo. Ask where the repo is cloned. If it is not cloned, clone it first. The path is required to dispatch.
+The `review:review` agent checks out the PR branch with `gh pr checkout`, so the session runs inside a local clone of the PR's repo. Ask where the repo is cloned. If it is not cloned, clone it first. The path is required to dispatch.
 
 #### Dispatch
 
@@ -63,7 +63,7 @@ The `review` agent checks out the PR branch with `gh pr checkout`, so the sessio
 bun ${CLAUDE_SKILL_DIR}/scripts/spawn.ts <pr-url> --repo-path <local-path> --data-dir ${CLAUDE_PLUGIN_DATA}
 ```
 
-`spawn.ts` runs `claude --bg --agent review <pr-url>` in the repo clone. The session collects in `claude agents`. On its first write (the review agent's `gh pr checkout`) the harness moves it into an isolated worktree, so parallel reviews never share a working tree. `spawn.ts` records the launched session in a dedup set and refuses a URL it has already dispatched, so a re-dispatch is a no-op.
+`spawn.ts` runs `claude --bg --agent review:review <pr-url>` in the repo clone. The session collects in `claude agents`. On its first write (the review agent's `gh pr checkout`) the harness moves it into an isolated worktree, so parallel reviews never share a working tree. `spawn.ts` records the launched session in a dedup set and refuses a URL it has already dispatched, so a re-dispatch is a no-op.
 
 Pass `--permission-mode <default|acceptEdits|plan|bypassPermissions>` to set the dispatched session's permission mode. Omit it to keep Claude's default.
 

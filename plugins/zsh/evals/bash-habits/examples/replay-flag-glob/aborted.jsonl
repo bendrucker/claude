@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","cwd":"/tmp/claude-eval/home/cwd","tools":["Bash"]}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"grep -rln \"widgetCount\" src --include=*.ts --include=*.tsx | grep -v test; echo ---; find src -iname \"*actions*\"; echo ---; head -3 src/store/state.ts"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"(eval):1: no matches found: --include=*.ts\n---\nsrc/store/actions.ts\n---\nexport const state = {\n  widgetCount: 0,\n};"}]}}
+{"type":"result","subtype":"success","is_error":false,"num_turns":2,"result":"zsh rejected the grep with `no matches found: --include=*.ts`, so only the find and head ran: `src/store/actions.ts` and the first three lines of the state file."}

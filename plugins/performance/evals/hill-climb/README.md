@@ -37,6 +37,8 @@ The `logship` fan-out is a trap because CPU is 0.99 of wall on 2 vCPU. On `ledge
 
 Each `*-top5` grader places a win in the first five candidates and weighs its share of the case's planted gain, so together they score gain-weighted recall@5 at half the case score. `no-trap-top2` and `parallelism` take a quarter each.
 
+The ranked graders read the first line of each numbered item (`1.` or `1)`) or each table row whose first cell is the rank (`| 1 |`). `no-trap-top2` ignores a trap named on a line that also names a win, so dismissing the trap in passing does not count as ranking it.
+
 ## Off-CPU
 
 Each case hands the session a small Go repo, a settled `frame.md`, and a profile that's correct but answers the wrong question. A good reply notices the mismatch and asks for, or plans, the profile that would see the time before ranking what the given one shows. The trap is a micro-optimization from the given profile in the top two.

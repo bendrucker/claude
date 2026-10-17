@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '^\s{0,3}[1-5][.)][^\n]*(sort\.Slice|re-?sort|insertionSort|pdqsort|sort\w*[^\n]{0,80}(each|every|per) (append|insert|txn|transaction))'
+pattern: '^\s{0,3}(?:[1-5][.)]|\|\s*[*_`#]*[1-5][*_`]*\s*\|)[^\n]*(sort\.Slice|re-?sort|insertionSort|pdqsort|sort\w*[^\n]{0,80}(each|every|per) (append|insert|txn|transaction))'
 flags: im
 match: contains
 weight: 0.29

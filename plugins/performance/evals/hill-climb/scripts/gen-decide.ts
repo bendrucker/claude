@@ -231,7 +231,7 @@ interface Trap {
 const at = <T>(xs: [T, ...T[]], i: number): T => xs[i % xs.length] ?? xs[0];
 
 const SIGNIFICANT = [
-  String.raw`\bp\b(\s*[=<≈]|\s+(is|of))\s*0?\.\d`,
+  String.raw`\bp\b(?:[- ]?values?)?(\s*[=<≈]|\s+(is|of))\s*0?\.\d`,
   "signific",
   "beat (the )?noise",
 ];

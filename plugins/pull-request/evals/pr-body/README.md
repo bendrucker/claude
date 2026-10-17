@@ -1,6 +1,6 @@
 # PR Body Eval
 
-A local harness for measuring the PR bodies that `pull-request:create` produces, so edits to `plugins/pull-request/skills/create/` are gated on output quality instead of lint alone. It follows the structure of [`plugins/issue/evals/issue-refine`](../../../issue/evals/issue-refine) for mining and labeling, and the structure of the retired `evals/pr-headings` harness for scoring.
+A local harness for measuring the PR bodies that `pull-request:create` produces, so edits to `plugins/pull-request/skills/create/` are gated on output quality instead of lint alone. It follows the structure of [`plugins/issue/evals/issue-refine`](../../../issue/evals/issue-refine) for mining and labeling, and ports its heading classifier from the retired `evals/pr-headings` harness.
 
 The loop: mine real bodies, label them, turn the labels into structure limits and heading regexes, then run the curated scenarios as native cases against two refs of the guidance and compare scores.
 

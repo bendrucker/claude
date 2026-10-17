@@ -142,16 +142,21 @@ export function register(on: On): void {
   on("ui.press", { plugin: "run-command" }, async ($, e, next) => {
     const command = pressed(e.element);
     if (command === undefined) return next(e);
+    const { isFilled, refusal } = await $.prompt.fill({ text: command, mode: "insert" });
+    const outcome: { source: string; filled: boolean; refusal?: string } = {
+      source: "click",
+      filled: isFilled,
+    };
+    if (refusal) outcome.refusal = refusal;
     const index = RUN_ALL.exec(e.element)?.[1];
     if (index !== undefined) {
       // The list may have moved on since the button drew, so only a matching run gives the count.
       const run = latest.runs[Number(index)];
       const count = run?.command === command ? run.count : undefined;
-      void $.modEvents.emit({ mod: MOD, event: "pick.all", detail: { count, source: "click" } });
+      void $.modEvents.emit({ mod: MOD, event: "pick.all", detail: { count, ...outcome } });
     } else {
-      void $.modEvents.emit({ mod: MOD, event: "pick", detail: { command, source: "click" } });
+      void $.modEvents.emit({ mod: MOD, event: "pick", detail: { command, ...outcome } });
     }
-    await $.prompt.fill({ text: command, mode: "insert" });
     return { element: e.element };
   });
 }

@@ -180,16 +180,6 @@
         "zod": "^4.4.3",
       },
     },
-    "plugins/issue": {
-      "name": "issue",
-      "dependencies": {
-        "cleye": "^2.0.0",
-      },
-      "devDependencies": {
-        "gray-matter": "^4.0.3",
-        "zod": "^4.4.3",
-      },
-    },
     "plugins/linear": {
       "name": "linear",
       "dependencies": {
@@ -281,12 +271,9 @@
     "plugins/plan/evals/gate": {
       "name": "plan-gate-eval",
       "dependencies": {
-        "cleye": "^2.2.1",
-        "table": "^6.9.0",
+        "@commander-js/extra-typings": "~15.0.0",
+        "commander": "~15.0.0",
         "zod": "^4.4.3",
-      },
-      "devDependencies": {
-        "@anthropic-ai/claude-agent-sdk": "^0.3.0",
       },
     },
     "plugins/plugin": {
@@ -1437,8 +1424,6 @@
     "is-var-name": ["is-var-name@2.0.0", "", {}, "sha512-U+7mpdfaV4Qz2hDNy1Vt7TjWwdIp6br/w7CUlTnyMdsJq+IOSZrh+RsJNlSSckPAnTllhWxpiqC7VSxVTbcr2Q=="],
 
     "isexe": ["isexe@2.0.0", "", {}, "sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw=="],
-
-    "issue": ["issue@workspace:plugins/issue"],
 
     "jose": ["jose@6.2.3", "", {}, "sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw=="],
 

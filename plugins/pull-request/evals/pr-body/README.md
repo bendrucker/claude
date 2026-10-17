@@ -1,6 +1,6 @@
 # PR Body Eval
 
-A local harness for measuring the PR bodies that `pull-request:create` produces, so edits to `plugins/pull-request/skills/create/` are gated on output quality instead of lint alone. It follows the structure of [`plugins/issue/evals/issue-refine`](../../../issue/evals/issue-refine) for mining and labeling, and ports its heading classifier from the retired `evals/pr-headings` harness.
+A local harness for measuring the PR bodies that `pull-request:create` produces, so edits to `plugins/pull-request/skills/create/` are gated on output quality instead of lint alone. It ports its heading classifier from the retired `evals/pr-headings` harness.
 
 The loop: mine real bodies, label them, turn the labels into structure limits and heading regexes, then run the curated scenarios as native cases against two refs of the guidance and compare scores.
 
@@ -63,7 +63,7 @@ bun plugins/pull-request/evals/pr-body/label/server.ts                      # ht
 
 Open the URL and review each body. Select any span in the rendered body to attach an inline comment with a severity (critical, minor, praise), and set a verdict, quality tags, and freeform notes per PR. Highlights persist across reloads. Everything autosaves to `feedback/<id>.json`. The header links to the PR on GitHub so the diff is one click away while judging the body.
 
-The UI is copied from `plugins/issue/evals/issue-refine/label/` and adapted. Copying is the current convention across the harnesses. Extracting a shared harness package is a known deferred refactor.
+Each harness carries its own copy of this UI. Extracting a shared labeler package is a known deferred refactor.
 
 ## Scenario Cases
 

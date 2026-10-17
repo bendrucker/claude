@@ -3,7 +3,7 @@
 What separates a good refined issue from a bad one, derived from labeling a batch
 of real `issue:refine` outputs. Each item names the rule, the evidence behind it,
 and the skill text that produces the violation. This drives both the skill edits
-and the A/B scorer.
+and the suite's graders.
 
 The cases that scored "good" with no marks share a shape: name the problem,
 point at the code, stop. The marked cases were longer and more structured, and
@@ -85,23 +85,21 @@ different on purpose. Keep the title to one line, no wordy parentheticals.
   ("404 Page Missing Top Nav Bar" should read "404 page missing top nav bar").
 - Skill location: `SKILL.md` Output Structure puts the title in the artifact's
   `title` frontmatter field and requires sentence case there, distinct from the
-  title-case body headings. The scorer reads the title from that field.
+  title-case body headings. The title graders read that field.
 
-### 7. Possible Missing Spike Type
+### 7. Spike Type
 
 A spike (timeboxed investigation, output is a recommendation not a shipped change)
 was typed as a bug and read wrong.
 
 - Evidence: sample-01 tagged `wrong-type`, note "should be labeled Spike".
-- Skill location: `SKILL.md` Issue Types lists only bug / feature / refactor.
-- Confidence: one data point. Confirm before acting.
+- Skill location: `SKILL.md` Issue Types lists Spike, with its guide in `spike.md`.
+- Confidence: one data point.
 
-## How this scores an A/B run
+## How the Suite Scores
 
-The scorer parses the artifact's frontmatter first and reads the title and type
-from it, then runs findings 1-5 over the body alone, so relation links in the
-frontmatter never register as bare references. Findings 1, 2, 3, and 6 are
-mechanical and check by pattern. Findings 4 and 5 are partly mechanical (word
-list) and partly judgment. The A/B harness runs a synthetic brief through both
-skill versions, counts violations per finding, and adds an LLM judge for the
-judgment calls.
+Title graders read the frontmatter, and body graders stop at Agent Context, so
+relation links in the frontmatter never register as bare references. Findings 1,
+2, 3, and 6 check by pattern. Findings 4 and 5 approximate the reviewer's judgment
+with a word list and a heading count. Finding 7 is the
+`type-spike` grader on the spike cases.

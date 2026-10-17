@@ -8,7 +8,6 @@ macOS-specific automation and system integration.
 
 - **jxa** — JXA language guide for writing JavaScript for Automation code
 - **jxa-run** — App-scoped JXA runner with AST-based Application() validation
-- **scheduled**: Reconciles launchd agents for scheduled Claude Code runs against per-machine descriptor groups (`/mac:scheduled`)
 
 ### Hooks
 

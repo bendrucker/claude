@@ -17,6 +17,8 @@ export const SuiteFile = z.object({
   /** Gated tools the cases need, passed to `--allow-tools`. */
   allow_tools: z.array(z.string()).default([]),
   judge_model: z.string().default("claude-sonnet-5-5"),
+  /** Repo-relative paths a scaffold reads, such as `packages/eval-stubs`, staged from the working tree. */
+  stage: z.array(z.string()).default([]),
   /** Artifacts that are not a plugin, wrapped into one by `wrap.ts`. */
   wrap: z
     .object({
@@ -105,6 +107,7 @@ export async function prepare(
     config.wrap === undefined
       ? await stagePlugins(repo, suite, ref, root)
       : await stageWrapped(repo, suite, ref, root, config.wrap);
+  await stage(repo, undefined, config.stage, root);
   await shareGraders(join(staged.target, staged.evalDir), config.graders);
   return staged;
 }

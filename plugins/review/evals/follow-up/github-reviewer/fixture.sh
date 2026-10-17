@@ -1,19 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-bash "$(dirname "$0")/../stubs.sh"
-git init -q -b main
-echo "/.*" >> .git/info/exclude
-git config user.name "Ben Drucker"
-git config user.email bvdrucker@gmail.com
-git config commit.gpgsign false
-git remote add origin https://github.com/acme/api-server.git
-
-commit() {
-  git add -A
-  GIT_AUTHOR_NAME="$1" GIT_AUTHOR_EMAIL="$2" GIT_COMMITTER_NAME="$1" GIT_COMMITTER_EMAIL="$2" \
-    GIT_AUTHOR_DATE="$3" GIT_COMMITTER_DATE="$3" git commit -qm "$4"
-  git rev-parse HEAD
-}
+stubs="$(dirname "$0")/../../../../../packages/eval-stubs"
+bash "$stubs/install.sh"
+source "$stubs/preamble.sh" https://github.com/acme/api-server.git
 
 mkdir -p src/routes src/db src/lib test
 cat > package.json <<'JSON'
@@ -83,7 +72,7 @@ test("placeholder", () => {
   expect(true).toBe(true);
 });
 TS
-BASE=$(commit "Ben Drucker" bvdrucker@gmail.com "2026-09-01T10:00:00Z" "api: users and orders routes")
+BASE=$(commit "2026-09-01T10:00:00Z" "api: users and orders routes")
 
 git switch -qc users-pagination
 cat > src/routes/users.ts <<'TS'
@@ -120,7 +109,7 @@ export async function listOrders(req: Request, res: Response) {
   res.json({ orders: withItems, next: orders.at(-1)?.id ?? null });
 }
 TS
-REVIEWED=$(commit "Dana Kim" dana@acme.dev "2026-09-02T15:00:00Z" "api: cursor pagination for users and orders")
+REVIEWED=$(commit_as "Dana Kim" dana@acme.dev "2026-09-02T15:00:00Z" "api: cursor pagination for users and orders")
 
 cat > src/routes/users.ts <<'TS'
 import type { Request, Response } from "express";
@@ -167,7 +156,7 @@ test("clamps limit into 1..100", async () => {
   expect(out.code).toBe(200);
 });
 TS
-commit "Dana Kim" dana@acme.dev "2026-09-03T09:00:00Z" "users: validate and clamp limit" >/dev/null
+commit_as "Dana Kim" dana@acme.dev "2026-09-03T09:00:00Z" "users: validate and clamp limit" >/dev/null
 
 cat > src/db/pool.ts <<'TS'
 import pg from "pg";
@@ -238,7 +227,7 @@ export async function listOrders(req: Request, res: Response) {
   res.json({ orders: withItems, next: orders.at(-1)?.id ?? null });
 }
 TS
-HEAD_SHA=$(commit "Dana Kim" dana@acme.dev "2026-09-03T11:30:00Z" "db: release clients on error, scope orders to the caller")
+HEAD_SHA=$(commit_as "Dana Kim" dana@acme.dev "2026-09-03T11:30:00Z" "db: release clients on error, scope orders to the caller")
 
 # The reviewer's checkout still sits on the reviewed commit, behind the pushed head.
 git update-ref refs/remotes/origin/main "$BASE"
@@ -246,7 +235,7 @@ git update-ref refs/remotes/origin/users-pagination "$HEAD_SHA"
 git reset -q --hard "$REVIEWED"
 git branch -q --set-upstream-to=origin/users-pagination
 
-jq -n --arg root "$PWD" --arg base "$BASE" --arg reviewed "$REVIEWED" --arg head "$HEAD_SHA" -f /dev/stdin > "$HOME/.review-snapshot/meta.json" <<'JQ'
+jq -n --arg root "$PWD" --arg base "$BASE" --arg reviewed "$REVIEWED" --arg head "$HEAD_SHA" -f /dev/stdin > "$HOME/.eval-stubs/meta.json" <<'JQ'
 {
   root: $root,
   repo: "acme/api-server",

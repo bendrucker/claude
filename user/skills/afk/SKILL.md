@@ -37,7 +37,7 @@ Use this moment before Ben leaves. Keep it to a few lines, then proceed.
 
 1. One line of detected state: power, lid, tether, and expected return if a duration was given.
 2. State the contract being entered: finish the current task, batch reversible decisions behind logged defaults, defer bandwidth- and power-heavy steps under the detected constraints.
-3. Remind him to switch to a permissive mode (`shift+tab` to `acceptEdits`, or `auto`) so edits and commands do not stall while he is away. This skill cannot detect or set permission mode.
+3. Remind him to switch to a permissive mode (`acceptEdits` or `auto`) so edits and commands do not stall while he is away. In the terminal that is `shift+tab`. In the desktop app it is the mode picker by the prompt box. This skill cannot detect or set permission mode.
 4. Remind him that blocking questions reach his phone only if Remote Control is connected and push is enabled in `/config`.
 5. If the in-flight task already has a genuinely ambiguous priority or a visible irreversible fork, ask it **now** with `AskUserQuestion` while he can answer cheaply. Otherwise proceed without ceremony.
 

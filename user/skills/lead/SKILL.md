@@ -1,7 +1,7 @@
 ---
 name: lead
 description: >-
-  Lead a multi-PR project: scope issues into pull requests, dispatch with herdr
+  Lead a multi-PR project: scope issues into pull requests and dispatch them through herdr, which it requires.
 argument-hint: "<project url | issue set>"
 disable-model-invocation: true
 ---

@@ -1,7 +1,7 @@
 ---
 name: watch-session
 description: >-
-  Use when the user asks you to watch a herdr pane or Claude session while they test a skill or do a task by hand, to fix that skill or draft a new one from what the session does. For writing a skill without a session to watch, use plugin:skill.
+  Use when the user asks you to watch a herdr pane or Claude session while they test a skill or do a task by hand, to fix that skill or draft a new one from what the session does. Requires herdr. For writing a skill without a session to watch, use plugin:skill.
 argument-hint: "<pane-id | session-uuid> [--skill <dir> | --learn <name>] [--prompt <text>] [--every <duration>]"
 disable-model-invocation: true
 allowed-tools:

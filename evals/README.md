@@ -1,6 +1,6 @@
 # Evals
 
-This directory is the generic layer: the native suite runner and the report that prices runs from any suite. Per-skill harnesses live with the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, each with its own README: [`pr-body`](../plugins/pull-request/evals/pr-body/), [`issue-refine`](../plugins/issue/evals/issue-refine/), [`comment-density`](../plugins/comments/evals/comment-density/).
+This directory is the generic layer: the native suite runner and the report that prices runs from any suite. Per-skill harnesses live with the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, each with its own README: [`pr-body`](../plugins/pull-request/evals/pr-body/), [`comment-density`](../plugins/comments/evals/comment-density/).
 
 [`scripts/`](scripts/) is shared across them. It reports what native runs cost and how they scored.
 
@@ -10,7 +10,7 @@ This directory is the generic layer: the native suite runner and the report that
 
 - `run.ts <suite> [--ref <ref>] -- <args>` stages the plugins the cases load, as they stand at `--ref` (the working tree by default), next to the suite from the working tree, so every ref is graded by the same cases. `--case` may repeat, and takes any `Bun.Glob` pattern: `run.ts` prunes the staged suite to the cases any glob matches, since the runner keeps only the last `--case` and matches plain `*` only. It runs on subscription auth with any API key removed from the environment, and results land in `<suite>/results/<timestamp>[-label]/`, with each run's trace copied to `traces/<case>-<arm>-<n>.jsonl`.
 - `compare.ts <column>...` compares result files column by column, each column a comma-joined pool of `aggregate-result.json` paths, the first the baseline. A `*` marks p < `--alpha` (0.1) under a two-sided permutation test. A `†` marks a cell with too few runs for any star: at 0.1 that takes 4 runs a side, since 3 against 3 bottoms out at exactly 0.1. A run that errored, from its `error` field or a judge call that threw, leaves the pool, and `!` marks its case. `run.ts` exits 1 when any run errored, which fails the eval job. `--suite` adds per-tag scores from each case's `tags`. `--markdown` puts starred rows first for a job summary.
-- `check.ts <suite>` tests each case's `regex` graders against examples in `<suite>/examples/<case>/`, outside the case directories so no session sees them. A `.md` example is a hand-written reply whose frontmatter `fail:` lists the graders it must fail. A `.jsonl` example is a trace, such as one copied from a run's `traces/`, with `fail:` in a sibling `.yaml`. It grades trace graders on the raw JSONL, as the runner does, and reply graders on its last `result` line. A directory named after an example holds the files its file-target graders read, such as `examples/<case>/good/src/a.ts` beside `good.md`. Every other grader an example reaches must pass it, and the output names regex graders no example reaches, such as file targets. CI runs it over every suite with an `examples/` directory.
+- `check.ts <suite>` tests each case's `regex` graders against examples in `<suite>/examples/<case>/`, outside the case directories so no session sees them. A `.md` example is a hand-written reply whose frontmatter `fail:` lists the graders it must fail. A `.jsonl` example is a trace, such as one copied from a run's `traces/`, with `fail:` in a sibling `.yaml`. It grades trace graders on the raw JSONL, as the runner does, and reply graders on its last `result` line. A directory named after an example holds the files its file-target graders read, such as `examples/<case>/good/src/a.ts` beside `good.md`. Every other grader an example reaches must pass it, and the output names regex graders no example reaches, such as file targets. CI runs it over every suite with an `examples/` directory. It also fails a case whose `prompt.md` is blank or `undefined`, which the runner would send as the prompt, and a test runs that check over every tracked suite.
 - `regrade.ts <suite> <results>...` re-scores stored runs against the suite's current grader set from their `traces/`, dropping graders whose file is gone and grading regex graders added since the run, and writes `<results>-regraded/` for `compare.ts`, so a grader fix needs no new sessions. `llm` and file-target graders keep their recorded verdicts.
 - `calls.ts <results>... [--match <regex>]` takes results directories or their `aggregate-result.json` paths, and counts the runs per case and arm that read each file or loaded each skill, from `traces/`. It answers whether sessions opened a reference, which grepping traces for the filename cannot, since injected skill text names files too.
 - `wrap.ts` builds a throwaway plugin from skills, agents, and context documents that are not in a plugin. A suite opts in through `suite.yaml`:
@@ -18,6 +18,7 @@ This directory is the generic layer: the native suite runner and the report that
 ```yaml
 allow_tools: ["Bash(git:*)"]    # gated tools passed to --allow-tools
 judge_model: claude-sonnet-5-5
+stage: [packages/eval-stubs]    # repo paths a scaffold reads, staged from the working tree
 wrap:                           # omit when the cases load a plugin
   skills: [user/skills/tdd]
   context: [user/rules/typescript.md]
@@ -26,6 +27,8 @@ graders:                        # <suite>/graders/<name>.md to the case-name glo
   out-present: "*"
   create-fired: ["pr-*"]
 ```
+
+A case's scaffold runs from the staged tree, which holds only the plugins and the suite, so a scaffold that reads shared code names it under `stage`, at the same repo-relative path. [`packages/eval-stubs`](../packages/eval-stubs/) is the shared case: offline `gh` and `glab` stand-ins and the git-init fixture preamble.
 
 A grader two or more cases repeat byte for byte lives once in `<suite>/graders/`, joined by globs (`!quiet-*` for every case but the quiet ones) or an explicit case list. `run.ts` copies it into each matching case as it stages the suite, skipping a case that holds a grader by that name, and `check.ts` and `regrade.ts` read the same merged set. A bare `claude plugin eval` run never sees these graders. `check.ts` names any case grader that shadows one `suite.yaml` shares in.
 

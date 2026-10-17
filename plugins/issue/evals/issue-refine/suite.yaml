@@ -1,0 +1,24 @@
+graders:
+  skill-fired: "*"
+  frontmatter: "*"
+  no-h1: "*"
+  heading-antithesis: "*"
+  heading-sentence: "*"
+  heading-title-case: "*"
+  bare-ref: "*"
+  raw-url: "*"
+  related-section: "*"
+  line-numbers: "*"
+  jargon: "*"
+  over-structured: "*"
+  option-menu: "*"
+  summary-heading: "*"
+  title-length: "*"
+  title-parenthetical: "*"
+  title-sentence-case: "*"
+  type-bug: ["bug-*"]
+  type-feature: ["feature-*"]
+  type-refactor: ["refactor-*"]
+  type-spike: ["spike-*"]
+  no-headings: [bug-404-nav, refactor-double-session-read]
+  relations: [bug-partial-success, spike-workspace]

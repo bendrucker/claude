@@ -1,0 +1,12 @@
+Refine this into an issue:
+
+The nightly data export reports success even when some object retrievals time out. Related to TEAM-412 (the retry work) and TEAM-388 (the timeout config). The wrong status comes from the summary builder and the orchestrator's retrieve loop. We need the overall status to reflect partial failures so downstream jobs don't consume an incomplete snapshot.
+
+Files:
+- core/src/export/ExportSummary.java (builds the summary; the overallSuccess flag is set around lines 140-145 without checking per-object retrieve status)
+- core/src/export/ExportProcessorOrchestrator.java (the retrieve loop, lines 200-230, swallows per-object timeouts)
+- core/src/export/SalesforceRetrieveService.java (lines 250-272, where the timeout is caught and logged but not propagated)
+
+Related issues:
+- TEAM-412 — Add retry with backoff to object retrieval — https://tracker.example.com/issue/TEAM-412
+- TEAM-388 — Make per-object timeout configurable — https://tracker.example.com/issue/TEAM-388

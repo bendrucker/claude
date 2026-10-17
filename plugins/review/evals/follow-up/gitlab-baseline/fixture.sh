@@ -1,19 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-bash "$(dirname "$0")/../stubs.sh"
-git init -q -b main
-echo "/.*" >> .git/info/exclude
-git config user.name "Ben Drucker"
-git config user.email bvdrucker@gmail.com
-git config commit.gpgsign false
-git remote add origin https://gitlab.example.com/team/service.git
-
-commit() {
-  git add -A
-  GIT_AUTHOR_NAME="$1" GIT_AUTHOR_EMAIL="$2" GIT_COMMITTER_NAME="$1" GIT_COMMITTER_EMAIL="$2" \
-    GIT_AUTHOR_DATE="$3" GIT_COMMITTER_DATE="$3" git commit -qm "$4"
-  git rev-parse HEAD
-}
+stubs="$(dirname "$0")/../../../../../packages/eval-stubs"
+bash "$stubs/install.sh"
+source "$stubs/preamble.sh" https://gitlab.example.com/team/service.git
 
 mkdir -p cmd/service internal/ratelimit
 cat > go.mod <<'GO'
@@ -35,7 +24,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", mux))
 }
 GO
-BASE=$(commit "Ben Drucker" bvdrucker@gmail.com "2026-09-01T10:00:00Z" "service: health endpoint")
+BASE=$(commit "2026-09-01T10:00:00Z" "service: health endpoint")
 
 git switch -qc ratelimit
 cat > internal/ratelimit/limiter.go <<'GO'
@@ -96,7 +85,7 @@ func Middleware(l *Limiter, next http.Handler) http.Handler {
 	})
 }
 GO
-V1=$(commit "Priya Nair" priya@team.example.com "2026-09-08T14:00:00Z" "ratelimit: token bucket per client")
+V1=$(commit_as "Priya Nair" priya@team.example.com "2026-09-08T14:00:00Z" "ratelimit: token bucket per client")
 
 cat > internal/ratelimit/limiter_test.go <<'GO'
 package ratelimit
@@ -132,7 +121,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", ratelimit.Middleware(limiter, mux)))
 }
 GO
-V2=$(commit "Priya Nair" priya@team.example.com "2026-09-09T11:00:00Z" "ratelimit: wire into the server, add a burst test")
+V2=$(commit_as "Priya Nair" priya@team.example.com "2026-09-09T11:00:00Z" "ratelimit: wire into the server, add a burst test")
 
 cat > internal/ratelimit/limiter.go <<'GO'
 package ratelimit
@@ -253,7 +242,7 @@ func TestAllowUpToBurst(t *testing.T) {
 	}
 }
 GO
-V3=$(commit "Priya Nair" priya@team.example.com "2026-09-11T16:00:00Z" "ratelimit: evict idle buckets, lock the map, answer 429")
+V3=$(commit_as "Priya Nair" priya@team.example.com "2026-09-11T16:00:00Z" "ratelimit: evict idle buckets, lock the map, answer 429")
 
 # The reviewer's checkout sits on main. The MR branch exists only as a remote ref.
 git update-ref refs/remotes/origin/main "$BASE"
@@ -261,7 +250,7 @@ git update-ref refs/remotes/origin/ratelimit "$V3"
 git switch -q main
 git branch -q -D ratelimit
 
-jq -n --arg root "$PWD" --arg base "$BASE" --arg v1 "$V1" --arg v2 "$V2" --arg v3 "$V3" -f /dev/stdin > "$HOME/.review-snapshot/meta.json" <<'JQ'
+jq -n --arg root "$PWD" --arg base "$BASE" --arg v1 "$V1" --arg v2 "$V2" --arg v3 "$V3" -f /dev/stdin > "$HOME/.eval-stubs/meta.json" <<'JQ'
 def user($u): {bdrucker: {id: 7, username: "bdrucker", name: "Ben Drucker"}, "priya-n": {id: 31, username: "priya-n", name: "Priya Nair"}, "sam-o": {id: 44, username: "sam-o", name: "Sam Okafor"}}[$u];
 def pos($path; $line): {base_sha: $base, start_sha: $base, head_sha: $v2, old_path: $path, new_path: $path, position_type: "text", old_line: null, new_line: $line};
 def note($id; $u; $at; $body): {id: $id, type: "DiscussionNote", body: $body, author: user($u), created_at: $at, updated_at: $at, system: false, noteable_id: 89089, noteable_type: "MergeRequest", noteable_iid: 89, resolvable: false};

@@ -6,21 +6,26 @@ import { $ } from "bun";
 
 const SOURCES = ["echo.ts", "gh.ts", "glab.ts", "snapshot.ts", "install.sh", "preamble.sh"];
 
+// A --check module: one verdict line per body, from its word count.
+const CHECK = `export default (body: string) => [\`WORDS \${body.split(/\\s+/).length <= 3 ? "pass" : "fail"}\`];\n`;
+
 interface Home {
   home: string;
   cwd: string;
 }
 
 /** A run home whose stand-ins were bundled from a copy of the package with no node_modules above it. */
-async function install(): Promise<Home> {
+async function install(args: string[] = []): Promise<Home> {
   const stage = mkdtempSync(join(tmpdir(), "eval-stubs-stage-"));
-  await Promise.all(
-    SOURCES.map(async (f) => Bun.write(join(stage, f), Bun.file(join(import.meta.dir, f)))),
-  );
+  await Promise.all([
+    ...SOURCES.map(async (f) => Bun.write(join(stage, f), Bun.file(join(import.meta.dir, f)))),
+    Bun.write(join(stage, "check.ts"), CHECK),
+  ]);
   const home = mkdtempSync(join(tmpdir(), "eval-stubs-home-"));
   const cwd = join(home, "cwd");
   mkdirSync(cwd);
-  const proc = Bun.spawnSync(["bash", join(stage, "install.sh")], {
+  const flags = args.map((a) => (a === "check.ts" ? join(stage, a) : a));
+  const proc = Bun.spawnSync(["bash", join(stage, "install.sh"), ...flags], {
     cwd,
     env: { PATH: process.env.PATH ?? "", HOME: home, TMPDIR: tmpdir() },
   });
@@ -68,11 +73,12 @@ describe("install.sh", () => {
     expect(proc.stderr.toString()).toContain("refusing to edit");
   });
 
-  test("puts self-contained gh and glab first on PATH through .zshenv", async () => {
+  test("puts self-contained gh and glab first on PATH through .zshenv and .bashrc", async () => {
     const run = await install();
-    expect(await Bun.file(join(run.home, ".zshenv")).text()).toBe(
-      `export PATH="${join(run.home, ".eval-stubs/bin")}:$PATH"\n`,
-    );
+    const line = `export PATH="${join(run.home, ".eval-stubs/bin")}:$PATH"\n`;
+    const rcs = [".zshenv", ".bashrc"].map(async (rc) => Bun.file(join(run.home, rc)).text());
+    expect(await Promise.all(rcs)).toEqual([line, line]);
+    expect(await Bun.file(join(run.cwd, ".eval-verdicts")).exists()).toBe(false);
     for (const tool of ["gh", "glab"]) {
       expect(Bun.spawnSync(["test", "-x", join(run.home, ".eval-stubs/bin", tool)]).exitCode).toBe(
         0,
@@ -132,6 +138,16 @@ describe("echo mode", () => {
     }
   });
 
+  test.each([
+    ["gh", "pr"],
+    ["glab", "mr"],
+  ])("%s fails like gh on a body file it cannot read", (tool, noun) => {
+    const r = stub(run, tool, [noun, "create", "-t", "T", "--body-file", "tmp/missing.md"]);
+    expect(r.code).toBe(1);
+    expect(r.out).toBe("");
+    expect(r.err).toBe("open tmp/missing.md: no such file or directory\n");
+  });
+
   test.each([["-F"], ["-d"], ["--description"]])("reads the body from stdin for %s -", (flag) => {
     const r = stub(run, "glab", ["mr", "create", "-t", "T", flag, "-"], "Piped\n- a\n- b\n");
     expect(r.out).toBe(block("T", "Piped\n- a\n- b", gitlab));
@@ -168,6 +184,58 @@ describe("echo mode", () => {
     expect(r.code).toBe(1);
     expect(r.out).toBe("");
     expect(r.err).toBe(`${tool} stand-in: ${args.join(" ")} is unavailable offline\n`);
+  });
+});
+
+describe("--check", () => {
+  const github = "https://github.com/team/service/pull/1";
+
+  async function installIn(args: string[]): Promise<Home> {
+    const run = await install(args);
+    await $`git init -q && git remote add origin https://github.com/team/service.git`.cwd(run.cwd);
+    return run;
+  }
+
+  const verdicts = (run: Home) => Bun.file(join(run.cwd, ".eval-verdicts")).text();
+
+  test("echo mode prints the verdicts after the URL and records them", async () => {
+    const run = await installIn(["--check", "check.ts"]);
+    expect(await verdicts(run)).toBe("");
+    const r = stub(run, "gh", ["pr", "create", "--title", "T", "--body", "one two three"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe(
+      `PR-TITLE: T\nPR-BODY-BEGIN\none two three\nPR-BODY-END\n${github}\nWORDS pass\n`,
+    );
+    expect(await verdicts(run)).toBe("WORDS pass\n");
+  });
+
+  test("--offline prints only the verdicts, then fails", async () => {
+    const run = await installIn(["--offline", "--check", "check.ts"]);
+    const r = stub(run, "gh", ["pr", "edit", "1", "--body", "one two three four"]);
+    expect(r.code).toBe(1);
+    expect(r.out).toBe("WORDS fail\n");
+    expect(r.err).toBe("gh stand-in: pr edit is unavailable offline\n");
+    expect(await verdicts(run)).toBe("WORDS fail\n");
+  });
+
+  test("a later counted call replaces the recorded verdicts", async () => {
+    const run = await installIn(["--offline", "--check", "check.ts"]);
+    stub(run, "gh", ["pr", "create", "-t", "T", "--body", "one two three four"]);
+    stub(run, "gh", ["pr", "edit", "1", "--body", "one two three"]);
+    expect(await verdicts(run)).toBe("WORDS pass\n");
+  });
+
+  test.each([
+    ["a body under three words", ["--body", "x"]],
+    ["an empty body", ["--body", ""]],
+    ["--dry-run", ["--dry-run", "--body", "one two three four"]],
+  ])("%s neither prints nor records verdicts", async (_, flags) => {
+    const run = await installIn(["--offline", "--check", "check.ts"]);
+    stub(run, "gh", ["pr", "create", "-t", "T", "--body", "one two three"]);
+    const r = stub(run, "gh", ["pr", "create", "-t", "T", ...flags]);
+    expect(r.code).toBe(1);
+    expect(r.out).toBe("");
+    expect(await verdicts(run)).toBe("WORDS pass\n");
   });
 });
 

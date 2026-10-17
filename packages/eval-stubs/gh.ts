@@ -129,8 +129,7 @@ function decode(m: Fields): Meta {
 
 const argv = process.argv.slice(2);
 const snapshot = await readSnapshot();
-if (snapshot === undefined) echo("gh", argv);
-const meta = decode(snapshot);
+const meta = decode(snapshot ?? (await echo("gh", argv)));
 const { root } = meta;
 const [owner = "", name = ""] = meta.repo.split("/");
 const url = `https://github.com/${meta.repo}/pull/${meta.pull.number}`;

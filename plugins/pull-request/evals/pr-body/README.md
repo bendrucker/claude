@@ -29,6 +29,8 @@ bun plugins/pull-request/evals/pr-body/scripts/sync.ts push   # --profile agents
 
 `scripts/limits.ts <results-dir>...` scores each run's PR body against the limits as `visible-words`, `max-block`, and `prose-code-spans` rows and writes `<results-dir>-limits/` for `compare.ts`. Run it before `compare.ts`. The `work-*` cases in `create-scenarios` come from edited work MRs, described in summary with no source. Their fixtures run `create-scenarios/stubs.sh`, which installs the [`eval-stubs`](../../../../packages/eval-stubs/) `glab` and `gh` in echo mode so the body-rules hook fires on the create call and `limits.ts` reads the body the stand-in printed.
 
+The top-level `limits.ts` prints a `PR-LIMIT <row>=pass|fail` line per limit and guard. `create-scenarios/stubs.sh` passes it to the stand-ins as their `--check`, so each counted create or edit records those lines in `.eval-verdicts`, which the `limit-*` file graders in `create` and `create-scenarios` read. The `create` fixtures install it `--offline`, so the call fails after measuring and the session replies with the draft. The `scenario-*` fixtures don't install the stand-ins, so `scripts/limits.ts` still scores them from the reply.
+
 `scripts/fit.ts` checks a metric against `data/revisions/`: how often a revision moves it down, and with `--human`, how well it separates plugin drafts from Ben's writing (AUC).
 
 ```bash
@@ -111,4 +113,5 @@ Current numbers: 96.8% precision, 87.0% recall, F1 0.92. Precision is the one to
 - `scripts/mine.ts`: builds `data/samples.json` from `pr_links` plus `gh pr list`
 - `label/server.ts`, `label/index.html`: the review UI
 - `classifier.ts`, `calibrate.ts`: the heading screen and its calibration
+- `structure.ts`, `limits.ts`: the structure limits and the stand-in check that prints them
 - `scripts/sync.ts`: pulls and pushes `fixtures/` and the `create-scenarios` cases

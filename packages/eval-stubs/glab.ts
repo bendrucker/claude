@@ -129,8 +129,7 @@ function decode(m: Fields): Meta {
 
 const argv = process.argv.slice(2);
 const snapshot = await readSnapshot();
-if (snapshot === undefined) echo("glab", argv);
-const meta = decode(snapshot);
+const meta = decode(snapshot ?? (await echo("glab", argv)));
 const { root } = meta;
 const latest = meta.versions.at(-1) ?? fail("snapshot: no MR versions");
 const webUrl = `https://${meta.host}/${meta.project}/-/merge_requests/${meta.mr.iid}`;

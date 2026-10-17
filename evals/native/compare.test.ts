@@ -192,6 +192,18 @@ describe("render", () => {
     ).toMatchSnapshot();
   });
 
+  test("reports a lone column with its scores open and nothing starred", async () => {
+    const path = await result({ c: { with: [pass(), fail()], without: [fail()] } });
+    const out = render({
+      columns: [await loadColumn([path])],
+      labels: ["run"],
+      alpha: 0.1,
+      markdown: true,
+    });
+    expect(out).toMatchSnapshot();
+    expect(out).not.toContain("noise rule");
+  });
+
   test("rolls case scores up by tag", async () => {
     const suite = mkdtempSync(join(tmpdir(), "suite-"));
     await Promise.all([

@@ -129,15 +129,36 @@ const line = (cells: string[]) => `| ${cells.join(" | ")} |`;
 const markdown = (head: string[], rows: string[][]) =>
   [line(head), line(head.map(() => "---")), ...rows.map(line)].join("\n");
 
-/** Renders the comparison report, as terminal tables or as markdown with starred rows first. */
+/** Sections a single-column markdown report shows open rather than collapsed. */
+const headline = new Set(["Tag score", "Case score"]);
+
+/**
+ * Renders the comparison report, as terminal tables or as markdown with starred rows first.
+ * A single column has nothing to star, so it reports that run alone with its scores open.
+ */
 export function render(options: RenderOptions): string {
   const { labels, alpha } = options;
   const all = sections(options);
-  const out = [
-    `* marks p < ${alpha} against ${labels[0]} (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.\n`,
-  ];
+  const single = options.columns.length === 1;
+  const out = single
+    ? []
+    : [
+        `* marks p < ${alpha} against ${labels[0]} (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.\n`,
+      ];
   if (!options.markdown) {
     for (const [title, head, rows] of all) out.push(title, table([[...head, ...labels], ...rows]));
+    return out.join("\n");
+  }
+
+  if (single) {
+    for (const [title, head, rows] of all) {
+      const body = markdown([...head, ...labels], rows);
+      out.push(
+        headline.has(title)
+          ? `### ${title}\n\n${body}\n`
+          : `<details><summary>${title}</summary>\n\n${body}\n\n</details>\n`,
+      );
+    }
     return out.join("\n");
   }
 
@@ -186,7 +207,7 @@ if (import.meta.main) {
     },
     help: {
       description:
-        "Compare native plugin eval results. Each column is one aggregate-result.json, or several joined by commas whose runs pool into one column. The first column is the baseline.",
+        "Compare native plugin eval results. Each column is one aggregate-result.json, or several joined by commas whose runs pool into one column. The first column is the baseline, and a lone column reports that run without comparison.",
     },
   });
   const paths = argv._.columns.map((c) => c.split(","));

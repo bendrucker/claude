@@ -867,10 +867,27 @@ SELECT
   attributes->>'decision'                                 AS decision,
   attributes->>'rule'                                     AS rule,
   attributes->>'hook'                                     AS hook,
+  attributes->>'setting'                                  AS setting,
+  attributes->>'decider'                                  AS decider,
+  attributes->>'ceiling'                                  AS ceiling,
   attributes->>'reason'                                   AS reason,
+  TRY_CAST(attributes->>'read_only' AS BOOLEAN)           AS read_only,
   epoch_ms(TRY_CAST(attributes->>'started_at' AS BIGINT)) AS started_at,
   TRY_CAST(attributes->>'check_ms' AS BIGINT)             AS check_ms,
   duration_ms,
   attributes->>'outcome'                                  AS outcome
 FROM mod_events
 WHERE event_name = 'auto-mode.tool.verdict';
+
+-- One row per call the auto-mode classifier refused, from the mod's `classifier.deny` events.
+CREATE OR REPLACE VIEW classifier_denials AS
+SELECT
+  host,
+  session_id,
+  ts,
+  attributes->>'tool_use_id'     AS tool_use_id,
+  attributes->>'tool_name'       AS tool_name,
+  attributes->>'permission_mode' AS permission_mode,
+  attributes->>'reason'          AS reason
+FROM mod_events
+WHERE event_name = 'auto-mode.classifier.deny';

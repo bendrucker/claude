@@ -280,7 +280,7 @@ jobs:
 
       - name: Run tests
         if: steps.inspect.outputs.has_tests == 'true'
-        run: bun test "plugins/${{ matrix.plugin.name }}/"
+        run: bun test --parallel "plugins/${{ matrix.plugin.name }}/"
 
       - name: Run mod tests
         if: steps.inspect.outputs.has_mod_tests == 'true'

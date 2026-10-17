@@ -25,7 +25,7 @@ DuckDB fetches these from `community-extensions.duckdb.org` on the first `INSTAL
 ## Testing
 
 ```bash
-bun test ./plugins/observability/skills/session/scripts/db.test.ts
+bun test --parallel ./plugins/observability/
 ```
 
 ## Inspiration

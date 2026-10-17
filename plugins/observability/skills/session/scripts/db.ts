@@ -47,8 +47,14 @@ export interface HostEntry {
 }
 
 // The writer holds the file exclusively and runs alone, so it gets twice a
-// reader's budget.
-const WRITER_LIMITS = { memory_limit: "8GiB", threads: "4", max_temp_directory_size: "32GiB" };
+// reader's budget. Insertion order stays off so bulk imports can spill instead
+// of pinning blocks up to the memory limit.
+const WRITER_LIMITS = {
+  memory_limit: "8GiB",
+  threads: "4",
+  max_temp_directory_size: "32GiB",
+  preserve_insertion_order: "false",
+};
 
 async function createDatabase(dbPath: string): Promise<Database> {
   const instance = await DuckDBInstance.create(dbPath, WRITER_LIMITS);

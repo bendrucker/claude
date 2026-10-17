@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '^\s{0,3}[1-5][.)][^\n]*(Unmarshal|decodeState|map\[string\](any|interface)|decodeRecord|typed struct)'
+pattern: '^\s{0,3}(?:[1-5][.)]|\|\s*[*_`#]*[1-5][*_`]*\s*\|)[^\n]*(Unmarshal|decodeState|map\[string\](any|interface)|decodeRecord|typed struct)'
 flags: im
 match: contains
 weight: 0.31

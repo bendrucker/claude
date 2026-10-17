@@ -5,7 +5,7 @@ import { SLOP_CATEGORIES, VERDICT_ACTIONS, type Verdict } from "./schema";
 
 /**
  * Shared judge primitives: the versioned prompt and per-verdict validation, used
- * by both the agent fan-out and the eval oracle. The prompt is a committed,
+ * by the agent fan-out and the eval. The prompt is a committed,
  * versioned artifact, and every run records its sha256, so a prompt edit
  * invalidates prior numbers.
  */
@@ -26,7 +26,7 @@ export async function loadPrompt(promptPath: string = PROMPT_PATH): Promise<Vers
   return { text, sha256: sha256(text) };
 }
 
-/** Comments per shard in production, and per batch in the oracle. */
+/** Comments per shard. */
 export const BATCH_SIZE = 20;
 
 const TRIM_TO_ERROR = `"trimTo" must be a non-empty string`;
@@ -70,9 +70,7 @@ const VerdictInput = z
 
 /**
  * Validates one verdict object's shape, returning a typed `Verdict`. `label`
- * identifies the entry in error messages (a comment id on the apply path, or a
- * batch index in the oracle). Shared so the agent fan-out and the oracle reject
- * malformed verdicts identically.
+ * identifies the entry in error messages.
  */
 export function parseVerdict(value: unknown, label: string | number): Verdict {
   const parsed = VerdictInput.safeParse(value);

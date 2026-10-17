@@ -43,15 +43,15 @@ To answer what customizations exist, run `bun run inventory [kind]` instead of r
 
 Per-skill harnesses live at `plugins/<plugin>/evals/<suite>/`, each with a README covering its loop. They share a shape: mine a sample, label it in a browser, then score or A/B. Text mined from real PRs, sessions, or work repos lives in the private eval bucket (`s3://ben-drucker-agents-eval-corpus/<harness>/`), never in the repo. Hand-authored synthetic ground truth stays tracked (`briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, and some hold work-repo content that must not land here.
 
-- The pr-body A/B lives as `scenario-*` cases in the local-only `pull-request/evals/create-scenarios` suite, and the harness's `scripts/sync.ts pull` fetches them from the eval bucket. The pr-body harness's `scripts/judge.ts <run-dir>` is retained as the blinded audit reference for the rubric graders
+- The pr-body A/B lives as `scenario-*` cases in the local-only `pull-request/evals/create-scenarios` suite, and the harness's `scripts/sync.ts pull` fetches them from the eval bucket
 - The comments judge's ship gate is `bun plugins/comments/evals/eval.ts build`, then hand the printed `<preflight>` block to the Workflow tool, then `score --job <dir> --gate`. It scores the labeled corpus through the workflow that ships, on subscription auth
 
 Run a native `claude plugin eval` suite through `bun evals/native/run.ts <suite> -- <args>`, not the bare command. It strips `ANTHROPIC_API_KEY` so runs spend subscription credits, and stages the artifacts at `--ref` against the working-tree cases. Write each case as `<case>/case.yaml`, since `run.ts`, `check.ts`, and CI find cases by that file even though the runner also accepts `prompt.md`. A suite testing skills, agents, or context files outside a plugin wraps them through `suite.yaml`, because the runner ignores a `CLAUDE.md` or `.claude/rules` in the case's working directory. [`evals/README.md`](evals/README.md) covers the wrappers.
 
-The older runners still read `ANTHROPIC_API_KEY` from the environment: the pr-body harness's `scripts/run-eval.ts` and `scripts/judge.ts`, `plugins/comments/evals/eval.ts --gate` (the oracle cross-check, not the gate itself), and `plugins/writing/skills/analyze` with `--judge`. [`evals/op.env`](evals/op.env) holds the 1Password secret reference, which `op run` resolves at run time, so no secret rests on disk. Reserve it for those runners:
+One older runner still reads `ANTHROPIC_API_KEY` from the environment: `plugins/writing/skills/analyze` with `--judge`. [`evals/op.env`](evals/op.env) holds the 1Password secret reference, which `op run` resolves at run time, so no secret rests on disk. Reserve it for that runner:
 
 ```bash
-op run --env-file=evals/op.env -- bun plugins/pull-request/evals/pr-body/scripts/judge.ts <run-dir>
+op run --env-file=evals/op.env -- bun plugins/writing/skills/analyze/scripts/analyze.ts --session-db <db> --judge
 ```
 
 CI spends subscription credits through a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`. `eval.yml` runs the native suites of every plugin a pull request touches once it carries the `eval` label, skipping a suite that holds a `.local-only` file. `gh workflow run eval.yml --ref <branch> -f suite=<dir>` runs any suite on demand.

@@ -12,7 +12,8 @@ import { readTranscriptTail } from "./transcript";
 // Claude Code refuses an EnterWorktree it can already see will fail: a target
 // outside the session's repository, the current directory itself, or, once
 // the session has switched into a worktree, anything outside the repository's
-// `.claude/worktrees/`. Worktrunk never places worktrees there.
+// `.claude/worktrees/`. Worktrees made with `git worktree add` or another tool
+// usually live elsewhere.
 
 const TRANSCRIPT_TAIL_BYTES = 2 * 1024 * 1024;
 
@@ -71,7 +72,6 @@ export function sameDirectoryReason(target: string): string {
 export function crossRepoReason(target: string): string {
   return [
     `\`${target}\` belongs to a different repository than this session, and EnterWorktree only enters worktrees of the session's own repository.`,
-    "For work that becomes its own pull request, dispatch a sibling agent into it through the `herdr:herdr` skill.",
     `For read-only work, spawn an \`Agent\` with \`cwd\` set to \`${target}\`.`,
   ].join(" ");
 }

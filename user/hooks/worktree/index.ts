@@ -1,8 +1,11 @@
-#!/usr/bin/env bun
+#!/usr/bin/env npx tsx
 
-import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { BashInput, PreToolUse } from "./hook-input";
-import { timeHook } from "./hook-metrics";
+import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
+import { type HookInput, readHookInput } from "../../scripts/hook-input";
+import { timeHook } from "../../scripts/hook-metrics";
+
+const BashInput = z.looseObject({ command: z.string().optional().catch(undefined) });
 
 const ALLOWED_SUBCOMMANDS = new Set(["list", "prune", "unlock"]);
 const REPLACED_SUBCOMMANDS = new Set(["add", "remove"]);
@@ -83,16 +86,7 @@ export function formatAskOutput(): SyncHookJSONOutput {
   };
 }
 
-// Every redirect names the worktrunk skill, so the hook stays silent where the
-// `wt` CLI is not installed, as in a cloud session.
-export function processInput(
-  input: Pick<PreToolUseHookInput, "tool_input">,
-  worktrunkInstalled: boolean = Bun.which("wt") !== null,
-): SyncHookJSONOutput | null {
-  if (!worktrunkInstalled) {
-    return null;
-  }
-
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
   const command = BashInput.safeParse(input.tool_input).data?.command;
   if (command == null || command === "") {
     return null;
@@ -120,12 +114,12 @@ export function processInput(
 }
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
-    input = PreToolUse.parse(JSON.parse(await Bun.stdin.text()));
+    input = await readHookInput("worktree");
   } catch (error) {
     console.error(
-      `[git/worktree] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
+      `[worktree] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }

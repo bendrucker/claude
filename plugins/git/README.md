@@ -8,7 +8,6 @@ Git workflow and branching best practices for Claude Code.
   - `conflicts`: Resolve git merge conflicts during rebase, merge, or cherry-pick. Drives the operation to completion and pushes when asked.
 - **Hooks**:
   - Blocks direct commits to the default branch
-  - Redirects `git worktree add` and `remove` to the worktrunk skill when the `wt` CLI is installed, allowing throwaway worktrees under `tmp/` (and removal under `.worktrees/`)
   - Refuses an `EnterWorktree` call the harness would reject
   - Recovers a failed git network operation over HTTPS when the SSH agent refuses to sign
   - Handles a refused commit or tag signature: asks for approval where signing is required, retries unsigned elsewhere
@@ -41,11 +40,11 @@ When signing is required, the hook tells the model to stop and ask the user to u
 
 ## Enter Worktree
 
-The `PreToolUse` hook on `EnterWorktree` denies a `path` call the harness is certain to reject. Claude Code enters only a worktree of the session's own repository, refuses the current directory, and after the session's first switch it enters only paths under the main checkout's `.claude/worktrees/`. Worktrunk places worktrees under `.worktrees/` or a sibling directory, so the `worktrunk:wt-switch-create` skill hits these rejections on every cross-repo or worktree-to-worktree switch before it falls back to `cd`. The skill lives in the worktrunk repository, so the check lives here. Repository identity comes from `git rev-parse --git-common-dir`. Whether the session has switched comes from the newest `worktree-state` record in the transcript, the harness's own record of it. A session that merely started in a linked worktree can still switch once, and the hook allows that. Anything it cannot resolve, including subagent calls, passes through to the harness.
+The `PreToolUse` hook on `EnterWorktree` denies a `path` call the harness is certain to reject. Claude Code enters only a worktree of the session's own repository, refuses the current directory, and after the session's first switch it enters only paths under the main checkout's `.claude/worktrees/`. Worktrees made outside the harness, by `git worktree add` or a worktree manager, usually live elsewhere, so a skill that enters one hits these rejections on every cross-repo or worktree-to-worktree switch before it falls back to `cd`. Repository identity comes from `git rev-parse --git-common-dir`. Whether the session has switched comes from the newest `worktree-state` record in the transcript, the harness's own record of it. A session that merely started in a linked worktree can still switch once, and the hook allows that. Anything it cannot resolve, including subagent calls, passes through to the harness.
 
-**Delete it** once the `tool-failure-rates` session query shows the "is not a registered worktree", "is not under", "does not exist, so", and "is the current working directory" `EnterWorktree` signatures gone, and the upstream skill makes the same check before calling the tool.
+**Delete it** once the `tool-failure-rates` session query shows the "is not a registered worktree", "is not under", "does not exist, so", and "is the current working directory" `EnterWorktree` signatures gone, and the skills that call the tool make the same check first.
 
-Both worktree hooks self-time into `~/.claude/hook-metrics/` through `scripts/hook-metrics.ts`, a checked copy of `user/scripts/hook-metrics.ts` that `scripts/copies.test.ts` keeps identical.
+The hook self-times into `~/.claude/hook-metrics/` through `scripts/hook-metrics.ts`, a checked copy of `user/scripts/hook-metrics.ts` that `scripts/copies.test.ts` keeps identical.
 
 ## Testing
 

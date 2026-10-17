@@ -9,7 +9,7 @@ import {
   sameDirectoryReason,
   unmanagedReason,
   worktreeSessionActive,
-} from "./index";
+} from "./enter-worktree";
 
 function git(cwd: string, ...args: string[]): void {
   const result = Bun.spawnSync(["git", "-C", cwd, ...args], { stdout: "ignore", stderr: "pipe" });

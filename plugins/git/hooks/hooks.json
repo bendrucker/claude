@@ -1,5 +1,5 @@
 {
-  "description": "Blocks direct commits to the default branch, recovers SSH-agent auth failures over HTTPS, and routes refused commit signatures",
+  "description": "Blocks direct commits to the default branch, routes git worktree commands to Worktrunk, refuses EnterWorktree calls the harness would reject, recovers SSH-agent auth failures over HTTPS, and routes refused commit signatures",
   "hooks": {
     "PreToolUse": [
       {
@@ -9,6 +9,20 @@
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/block-default-branch-commit.ts\"",
             "if": "Bash(git commit:*)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/worktree.ts\"",
+            "if": "Bash(git worktree *)"
+          }
+        ]
+      },
+      {
+        "matcher": "EnterWorktree",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/enter-worktree.ts\""
           }
         ]
       }

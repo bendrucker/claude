@@ -18,7 +18,7 @@ A `Bash(...)` belongs in a per-hook `if`, and the entry's `matcher` stays a bare
 
 Treat a `Bash(...)` matcher or `if` condition as a spawn-reducing pre-filter, never as the authorization decision. It fails open on shell metacharacters, matching brace groups, for-loops, here-docs, redirects, and long pipelines that invoke something else entirely.
 
-So every Bash-matched hook script must re-read `input.tool_input.command` and confirm the command really invokes what the hook governs before it denies, blocks, or rewrites. Working examples: `plugins/git/scripts/block-default-branch-commit.ts` (`invokesGitCommit`), `user/hooks/worktree/index.ts`, `plugins/shortcuts/hooks/open.ts`.
+So every Bash-matched hook script must re-read `input.tool_input.command` and confirm the command really invokes what the hook governs before it denies, blocks, or rewrites. Working examples: `plugins/git/scripts/block-default-branch-commit.ts` (`invokesGitCommit`), `plugins/git/scripts/worktree.ts`, `plugins/shortcuts/hooks/open.ts`.
 
 ## Async
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 
-import { realpath } from "../../scripts/realpath";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
-import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { type HookInput, readHookInput } from "../../scripts/hook-input";
-import { timeHook } from "../../scripts/hook-metrics";
-import { readTranscriptTail } from "../../scripts/transcript";
+import { PreToolUse } from "./hook-input";
+import { timeHook } from "./hook-metrics";
+import { realpath } from "./realpath";
+import { readTranscriptTail } from "./transcript";
 
 // Claude Code refuses an EnterWorktree it can already see will fail: a target
 // outside the session's repository, the current directory itself, or, once
@@ -112,14 +112,15 @@ export async function processInput(input: Envelope): Promise<SyncHookJSONOutput 
 }
 
 async function main(): Promise<void> {
-  let raw: HookInput;
+  let raw: PreToolUseHookInput;
   let input: Envelope;
   try {
-    raw = await readHookInput("enter-worktree");
-    input = Envelope.parse(raw);
+    const json: unknown = JSON.parse(await Bun.stdin.text());
+    raw = PreToolUse.parse(json);
+    input = Envelope.parse(json);
   } catch (error) {
     console.error(
-      `[enter-worktree] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
+      `[git/enter-worktree] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }

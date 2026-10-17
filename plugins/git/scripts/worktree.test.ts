@@ -1,22 +1,24 @@
 import { describe, expect, it, test } from "bun:test";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import type { HookInput } from "../../scripts/hook-input";
 import {
   formatAskOutput,
   formatDenyOutput,
   isThrowawayAdd,
   isThrowawayRemove,
-  processInput,
-} from "./index";
+  processInput as processWithWorktrunk,
+} from "./worktree";
 
-function bashInput(command: string): HookInput {
-  return {
-    session_id: "test",
-    hook_event_name: "PreToolUse",
-    tool_name: "Bash",
-    tool_input: { command },
-  };
+function bashInput(command: string): { tool_input: unknown } {
+  return { tool_input: { command } };
 }
+
+function processInput(input: { tool_input: unknown }): SyncHookJSONOutput | null {
+  return processWithWorktrunk(input, true);
+}
+
+test("stays silent without the wt CLI", () => {
+  expect(processWithWorktrunk(bashInput("git worktree add ../path"), false)).toBeNull();
+});
 
 describe("processInput", () => {
   it("denies git worktree add", () => {

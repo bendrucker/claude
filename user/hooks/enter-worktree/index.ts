@@ -8,11 +8,14 @@ import { z } from "zod";
 import { type HookInput, readHookInput } from "../../scripts/hook-input";
 import { timeHook } from "../../scripts/hook-metrics";
 import { readTranscriptTail } from "../../scripts/transcript";
+import { hostWorktree } from "../worktree/host-worktree";
 
 // Claude Code refuses an EnterWorktree it can already see will fail: a target
 // outside the session's repository, the current directory itself, or, once
 // the session has switched into a worktree, anything outside the repository's
-// `.claude/worktrees/`. Worktrunk never places worktrees there.
+// `.claude/worktrees/`. Worktrunk never places worktrees there. A session
+// that a host app such as Claude desktop already placed in a worktree stays
+// in it.
 
 const TRANSCRIPT_TAIL_BYTES = 2 * 1024 * 1024;
 
@@ -76,6 +79,10 @@ export function crossRepoReason(target: string): string {
   ].join(" ");
 }
 
+export function hostWorktreeReason(tree: string): string {
+  return `This session runs in \`${tree}\`, a worktree the host app created for it. Keep working there instead of switching to another.`;
+}
+
 export function unmanagedReason(target: string, managedDir: string): string {
   return [
     `This session has already switched into a worktree, and from here EnterWorktree only enters worktrees under \`${managedDir}/\`.`,
@@ -83,10 +90,16 @@ export function unmanagedReason(target: string, managedDir: string): string {
   ].join(" ");
 }
 
-export async function processInput(input: Envelope): Promise<SyncHookJSONOutput | null> {
+export async function processInput(
+  input: Envelope,
+  env: Record<string, string | undefined> = process.env,
+): Promise<SyncHookJSONOutput | null> {
   const rawTarget = input.tool_input.path;
   const cwd = input.cwd;
-  if (rawTarget == null || rawTarget === "" || cwd == null || cwd === "") return null;
+  if (cwd == null || cwd === "") return null;
+  const host = hostWorktree(cwd, env);
+  if (rawTarget == null || rawTarget === "")
+    return host == null ? null : deny(hostWorktreeReason(host));
 
   const expanded = rawTarget.startsWith("~/") ? join(homedir(), rawTarget.slice(2)) : rawTarget;
   const target = realpath(isAbsolute(expanded) ? expanded : resolve(cwd, expanded));
@@ -99,6 +112,7 @@ export async function processInput(input: Envelope): Promise<SyncHookJSONOutput 
   const currentCommon = gitCommonDir(current);
   if (targetCommon == null || currentCommon == null) return null;
   if (targetCommon !== currentCommon) return deny(crossRepoReason(target));
+  if (host != null) return deny(hostWorktreeReason(host));
 
   // Subagents keep their own worktree state, which the session transcript does
   // not record.

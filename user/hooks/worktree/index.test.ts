@@ -1,9 +1,14 @@
-import { describe, expect, it, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
+import { mkdirSync, mkdtempSync, realpathSync } from "node:fs";
+import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import type { HookInput } from "../../scripts/hook-input";
 import {
   formatAskOutput,
   formatDenyOutput,
+  formatHostDenyOutput,
   isThrowawayAdd,
   isThrowawayRemove,
   processInput,
@@ -278,5 +283,45 @@ describe("isThrowawayRemove", () => {
 
   it("does not match other subcommands", () => {
     expect(isThrowawayRemove("git worktree add tmp/x")).toBe(false);
+  });
+});
+
+describe("host worktree session", () => {
+  let root: string;
+  let tree: string;
+  let outside: string;
+
+  beforeAll(() => {
+    root = realpathSync(mkdtempSync(join(tmpdir(), "worktree-host-")));
+    tree = join(root, "tree");
+    outside = join(root, "outside");
+    mkdirSync(join(tree, "sub"), { recursive: true });
+    mkdirSync(outside);
+  });
+
+  afterAll(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  const run = (command: string, cwd: string) =>
+    processInput({ ...bashInput(command), cwd }, { CLAUDE_CODE_HOST_WORKTREE: tree });
+
+  test("denies an add with a stay-here reason", () => {
+    expect(run("git worktree add ../path -b branch", join(tree, "sub"))).toEqual(
+      formatHostDenyOutput(tree),
+    );
+  });
+
+  test("keeps the tmp/ exemption for add", () => {
+    expect(run("git worktree add tmp/verify", tree)).toBeNull();
+  });
+
+  test("passes remove and unknown subcommands to the permission flow", () => {
+    expect(run("git worktree remove ../path", tree)).toBeNull();
+    expect(run("git worktree lock ../path", tree)).toBeNull();
+  });
+
+  test("ignores a declared worktree that does not contain the session", () => {
+    expect(run("git worktree add ../path", outside)).toEqual(formatDenyOutput("add"));
   });
 });

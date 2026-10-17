@@ -1,0 +1,4 @@
+allow_tools: ["Bash(bun:*)"]
+graders:
+  skill-fired: "*"
+  rewrite-block: "*"

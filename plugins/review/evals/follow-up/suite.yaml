@@ -1,2 +1,7 @@
 allow_tools: [Bash]
 stage: [packages/eval-stubs]
+graders:
+  no-commit: "*"
+  fan-out: [github-reviewer, gitlab-baseline, silent-resolve]
+  intent: [github-reviewer, gitlab-baseline]
+  no-post: [github-reviewer, silent-resolve]

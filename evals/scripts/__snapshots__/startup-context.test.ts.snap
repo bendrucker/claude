@@ -1,0 +1,45 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`parseContext reads every table under its heading 1`] = `
+{
+  "agents": [
+    {
+      "name": "analyst",
+      "source": "User",
+      "tokens": 137,
+    },
+  ],
+  "categories": {
+    "Memory files": 12200,
+    "Skills": 9500,
+    "System prompt": 2500,
+  },
+  "mcpTools": [
+    {
+      "name": "mcp__docs__read",
+      "server": "docs",
+      "tokens": 318,
+    },
+  ],
+  "memory": [
+    {
+      "path": "/home/user/.claude/CLAUDE.md",
+      "tokens": 2800,
+      "type": "User",
+    },
+  ],
+  "skills": [
+    {
+      "name": "grilling",
+      "source": "User",
+      "tokens": 90,
+    },
+    {
+      "name": "code-review",
+      "source": "Built-in",
+      "tokens": 20,
+    },
+  ],
+  "total": 27900,
+}
+`;

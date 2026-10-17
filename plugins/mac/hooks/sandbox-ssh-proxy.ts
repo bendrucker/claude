@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
 
-import { readHookInput } from "../../scripts/hook-input";
-import { timeHook } from "../../scripts/hook-metrics";
+import { type HookMetricInput, timeHook } from "./hook-metrics";
 
 // On macOS the sandbox proxies git's ssh through `nc -X 5`, which cannot send
 // the SOCKS credentials the proxy requires. Each sandboxed command sources this
@@ -18,12 +17,34 @@ export const ENV_SNIPPET = `case "$GIT_SSH_COMMAND" in
 esac
 `;
 
+/** Writes the snippet to the session's env file on macOS. Elsewhere the sandbox has no `nc` proxy to fix. */
+export async function writeEnvFile(
+  envFile = process.env.CLAUDE_ENV_FILE,
+  platform = process.platform,
+): Promise<boolean> {
+  if (platform !== "darwin" || envFile === undefined || envFile === "") return false;
+  await Bun.write(envFile, ENV_SNIPPET);
+  return true;
+}
+
+function isRecord(value: unknown): value is HookMetricInput {
+  return value != null && typeof value === "object";
+}
+
+async function readInput(): Promise<HookMetricInput> {
+  try {
+    const value: unknown = JSON.parse(await Bun.stdin.text());
+    return isRecord(value) ? value : {};
+  } catch {
+    // The envelope only labels the metric, so an unreadable one still runs the hook.
+    return {};
+  }
+}
+
 async function main(): Promise<void> {
-  const input = await readHookInput("sandbox-ssh-proxy");
+  const input = await readInput();
   await timeHook("sandbox-ssh-proxy", input, async () => {
-    const envFile = process.env.CLAUDE_ENV_FILE;
-    if (envFile !== undefined && envFile !== "" && process.platform === "darwin")
-      await Bun.write(envFile, ENV_SNIPPET);
+    await writeEnvFile();
     return null;
   });
 }

@@ -122,7 +122,7 @@ test("a case inherits the suite graders its globs match and overrides by name", 
   ]);
 });
 
-test.each([
+test.each<{ body: string; expected: string[] }>([
   { body: "Ship this branch.\n", expected: [] },
   { body: "undefined\n", expected: ["one"] },
   { body: "null", expected: ["one"] },

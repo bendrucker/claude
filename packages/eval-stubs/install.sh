@@ -4,10 +4,7 @@
 # Bash tool's zsh sources only .zshenv from the run's home and its bash .bashrc, so those files put
 # the stand-ins first for both eval arms. A fixture that writes $HOME/.eval-stubs/meta.json gets snapshot answers;
 # without one, the stand-ins echo create and edit calls.
-#
-# --check <module> bundles a module whose default export maps a create or edit body to verdict
-# lines, which echo mode prints and records in .eval-verdicts. --offline makes create and edit print only those lines and then
-# fail as offline, as every other command does.
+# README.md covers --check and --offline.
 set -euo pipefail
 check=""
 offline=false
@@ -42,8 +39,7 @@ for cli in gh glab; do
 done
 if [[ -n "$check" ]]; then
   "$bun" build "$check" --target bun --outfile "$dir/check.js" > /dev/null
-  # An empty verdict file fails the graders that read it when no create counts, where a missing
-  # one would error the run.
+  # An empty file fails the graders when no call counts; a missing one would error the run.
   : > .eval-verdicts
 fi
 if $offline; then

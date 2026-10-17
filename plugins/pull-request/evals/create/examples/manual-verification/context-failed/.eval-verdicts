@@ -1,7 +1,0 @@
-PR-LIMIT visible-words=pass (67 of 120)
-PR-LIMIT max-block=pass (40 of 40)
-PR-LIMIT prose-code-spans=pass (0 of 6)
-PR-LIMIT path-spans=pass (0 of 1)
-PR-LIMIT contrast-phrases=pass (0 of 1)
-PR-LIMIT hidden-words=pass (0 of 60)
-PR-LIMIT list-items=pass (0 of 5)

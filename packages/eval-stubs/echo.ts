@@ -16,23 +16,13 @@ function stdin(): string {
   return spawnSync("cat", { stdio: ["inherit", "pipe", "inherit"], encoding: "utf8" }).stdout;
 }
 
-/**
- * The file, beside the session's working tree, that holds the verdicts of the last create or edit
- * that counts. A `{ source: file }` grader reads it, so piping the call through `tail` or `head`
- * cannot drop a verdict. The fixtures' git exclude of `/.*` keeps it out of commits.
- */
+/** Holds the last counted call's verdicts in the working tree, for a `{ source: file }` grader. */
 export const VERDICTS = ".eval-verdicts";
 
-/**
- * A body under this many words is a probe, such as `--body "x"` sent to test the command, and its
- * verdicts neither print nor replace the recorded ones.
- */
+/** A body under this many words is a probe, such as `--body "x"`, and records nothing. */
 export const MIN_WORDS = 3;
 
-/**
- * Reads a file, or stdin for `-`, without trailing newlines, as `$(cat …)` would. On a file it
- * can't read, fails with gh's error, such as `open tmp/body.md: no such file or directory`.
- */
+/** Reads a file, or stdin for `-`, without trailing newlines, failing as gh does on an unreadable file. */
 function slurp(path: string): string {
   if (path === "-") return stdin().replace(/\n+$/, "");
   const read = spawnSync("cat", [path], { encoding: "utf8" });

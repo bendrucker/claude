@@ -1,1 +1,1 @@
-fail: [skill-loaded, limit-max-block, limit-path-spans]
+fail: [skill-loaded]

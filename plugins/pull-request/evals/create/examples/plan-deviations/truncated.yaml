@@ -1,2 +1,0 @@
-# `| tail -3` hid the max-block line from the trace; the recorded file still holds it.
-fail: [limit-max-block]

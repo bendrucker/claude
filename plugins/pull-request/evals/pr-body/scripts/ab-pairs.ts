@@ -3,7 +3,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
-import { bodyOf } from "./body";
+import { bodyOf } from "./limits";
 
 // Pairs two eval columns' PR bodies case by case for blind A/B labeling in label/ab-server.ts.
 

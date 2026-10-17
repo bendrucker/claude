@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 bash "$(dirname "$0")/../stubs.sh"
-# The sandbox denies writes to .git/config, so keep the git dir in .repo, where push -u can set the upstream.
 git init -q -b main --separate-git-dir=.repo
 # The Linux sandbox mounts placeholder dotfiles into the working tree.
 echo "/.*" >> .repo/info/exclude

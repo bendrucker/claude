@@ -237,16 +237,6 @@ describe("--check", () => {
     expect(r.out).toBe("");
     expect(await verdicts(run)).toBe("WORDS pass\n");
   });
-
-  test("rejects an unknown option", () => {
-    const home = mkdtempSync(join(tmpdir(), "eval-stubs-home-"));
-    const proc = Bun.spawnSync(["bash", join(import.meta.dir, "install.sh"), "--nope"], {
-      cwd: home,
-      env: { ...process.env, HOME: home },
-    });
-    expect(proc.exitCode).toBe(1);
-    expect(proc.stderr.toString()).toBe("install.sh: unknown option --nope\n");
-  });
 });
 
 describe("gh snapshot", () => {

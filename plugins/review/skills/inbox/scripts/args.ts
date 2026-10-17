@@ -13,7 +13,7 @@ export function parsePermissionMode(value: string): PermissionMode {
 }
 
 // Build the `claude` args that launch a background review session bound to the
-// `review:review` agent. The session collects in `claude agents` and, on its first
+// `review` agent. The session collects in `claude agents` and, on its first
 // write (the agent's `gh pr checkout`), the harness moves it into an isolated
 // worktree, so parallel reviews never share a working tree. `--bg` assigns and
 // manages its own session id (it rejects `--session-id`), so the id is read
@@ -30,7 +30,7 @@ export function buildDispatchArgs({
   return [
     "--bg",
     "--agent",
-    "review:review",
+    "review",
     ...(permissionMode != null ? ["--permission-mode", permissionMode] : []),
     url,
   ];

@@ -326,9 +326,15 @@ export function surfaceState(processInfo: string, binary: string): SurfaceState 
     : "gone";
 }
 
+// The desktop app reviews through the browser gate, so a herdr environment it
+// inherited names a pane this session does not run in.
+export function isDesktop(env: Record<string, string | undefined> = process.env): boolean {
+  return env.CLAUDE_CODE_ENTRYPOINT?.startsWith("claude-desktop") ?? false;
+}
+
 export function currentPane(env: Record<string, string | undefined> = process.env): string | null {
   const paneId = env.HERDR_PANE_ID;
-  if (env.HERDR_ENV !== "1" || paneId == null || paneId === "") return null;
+  if (isDesktop(env) || env.HERDR_ENV !== "1" || paneId == null || paneId === "") return null;
   return paneId;
 }
 
@@ -570,7 +576,12 @@ const openCmd = command(
       process.exit(1);
     }
     const paneId =
-      currentPane() ?? fail("not inside a herdr pane (HERDR_PANE_ID unset): use --browser");
+      currentPane() ??
+      fail(
+        isDesktop()
+          ? "desktop app session: use --browser"
+          : "not inside a herdr pane (HERDR_PANE_ID unset): use --browser",
+      );
     if (parsed.flags.doc != null) {
       if (!(await Bun.file(parsed.flags.doc).exists())) fail(`no such file: ${parsed.flags.doc}`);
       await openDoc(paneId, parsed.flags.doc);

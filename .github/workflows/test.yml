@@ -83,7 +83,7 @@ jobs:
             echo "::group::$suite"
             bun evals/native/check.ts "$suite" || status=1
             echo "::endgroup::"
-          done < <(find evals plugins -type d -name examples -path '*/evals/*' -not -path '*/node_modules/*' | sort)
+          done < <(find evals plugins/*/evals -type d -name examples -not -path '*/node_modules/*' | sort)
           exit "$status"
 
   validate:

@@ -72,7 +72,7 @@ Serialized before create: `review:code --fix`, `simplify`, and comment trims all
 6. **`writing:review`** over touched human prose. Address salient findings before the body is written.
 7. **`run`** to drive the change end to end.
 8. **Join `plan:review`** when it was gated in, and act on fix-worthy drift before the human review sees the diff. Carry deferred follow-ups into the report.
-9. **`review:human`** when gated in: after every fix pass and the join, so the cleaned diff is what gets seen ([Human Review Gate](references/passes.md#human-review-gate)). Create runs only on approval: the terminal surface ends the turn until the review resumes, and the browser gate (the desktop app's default) blocks until it returns.
+9. **`review:human`** when gated in: after every fix pass and the join, so the cleaned diff is what gets seen ([Human Review Gate](references/passes.md#human-review-gate)). Terminal mode by default: it ends the turn, and Create runs only when the review resumes with approval.
 
 Dirty tree at the comment pass: ask whether to commit first. `comments:audit` operates on `HEAD` and needs a clean tree.
 

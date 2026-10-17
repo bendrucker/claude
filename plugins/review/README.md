@@ -11,7 +11,7 @@ Code review workflows for Claude Code.
 - **`follow-up`**: Follow up on a PR/MR you reviewed: check if your comments were addressed, find silent resolves, decide whether to re-approve
 - **`meat-proxy`**: Draft a short reply that hands an AI-relayed PR, MR, or doc back to its author with motivation and scope questions, holding line-level findings in private notes. Drafts only, never posts
 - **`inbox`**: Dispatch inbound PR/MR reviews as background sessions that collect in `claude agents` (GitHub and GitLab)
-- **`human`**: Request Ben's own review of the working diff or a document, in the terminal (reviewr, plannotator-tui) or the browser (plannotator). Raises a herdr pane label and toast that the plugin's `UserPromptSubmit` hook clears when he replies. The desktop app (`CLAUDE_CODE_ENTRYPOINT=claude-desktop*`) always takes the browser gate. It has no desktop-native mode: the side panel renders a file with nowhere to anchor a comment, and the skill can neither open the app's diff view nor rely on the shape its inline comments take on return. Either way the feedback would lose the `path:lines` blocks and the approved/annotated/dismissed decision the review loop keys on
+- **`human`**: Request Ben's own review of the working diff or a document, in the terminal (reviewr, plannotator-tui) or the browser (plannotator). Raises a herdr pane label and toast that the plugin's `UserPromptSubmit` hook clears when he replies
 
 ### Hooks
 

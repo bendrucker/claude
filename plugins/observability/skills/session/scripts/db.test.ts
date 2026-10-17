@@ -152,6 +152,18 @@ describe("sessions view", () => {
     expect(rows[0]?.project_path).toBe("/Users/test/project");
     expect(rows[0]?.git_branch).toBe("main");
   });
+
+  it("takes the earliest entrypoint", async () => {
+    const rows = await db.query(
+      "SELECT session_id, entrypoint FROM sessions WHERE session_id IN ('plan-session', 'ship-session', 'basic-session') ORDER BY session_id",
+      z.object({ session_id: z.string(), entrypoint: z.string().nullable() }),
+    );
+    expect(rows).toEqual([
+      { session_id: "basic-session", entrypoint: null },
+      { session_id: "plan-session", entrypoint: "claude-desktop" },
+      { session_id: "ship-session", entrypoint: "remote_desktop" },
+    ]);
+  });
 });
 
 describe("search", () => {

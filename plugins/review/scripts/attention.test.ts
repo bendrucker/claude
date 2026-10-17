@@ -8,7 +8,6 @@ import {
   docPanePath,
   type DocPanes,
   existingReviewr,
-  isDesktop,
   isKind,
   kinds,
   markerPath,
@@ -220,30 +219,8 @@ describe("currentPane", () => {
     ["outside herdr", { HERDR_PANE_ID: "wE5:p1" }, null],
     ["herdr env with no pane", { HERDR_ENV: "1" }, null],
     ["herdr env with an empty pane", { HERDR_ENV: "1", HERDR_PANE_ID: "" }, null],
-    [
-      "terminal session inside herdr",
-      { HERDR_ENV: "1", HERDR_PANE_ID: "wE5:p1", CLAUDE_CODE_ENTRYPOINT: "cli" },
-      "wE5:p1",
-    ],
-    [
-      "desktop app with an inherited herdr env",
-      { HERDR_ENV: "1", HERDR_PANE_ID: "wE5:p1", CLAUDE_CODE_ENTRYPOINT: "claude-desktop" },
-      null,
-    ],
   ])("%s", (_name, env, expected) => {
     expect(currentPane(env)).toBe(expected);
-  });
-});
-
-describe("isDesktop", () => {
-  test.each<[string | undefined, boolean]>([
-    ["claude-desktop", true],
-    ["claude-desktop-3p", true],
-    ["cli", false],
-    ["sdk-ts", false],
-    [undefined, false],
-  ])("%s", (entrypoint, expected) => {
-    expect(isDesktop({ CLAUDE_CODE_ENTRYPOINT: entrypoint })).toBe(expected);
   });
 });
 

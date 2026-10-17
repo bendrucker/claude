@@ -11,11 +11,10 @@ allowed-tools:
 
 # Human Review
 
-Put the change in front of Ben and act on what comes back. `attention.ts` labels the herdr pane `review`, sets its `$review`, `$review_kind`, and `$review_summary` tokens, and raises a toast. Outside herdr, or under a `claude-desktop*` entrypoint, `raise` and `clear` are no-ops and `open` exits 1.
+Put the change in front of Ben and act on what comes back. `attention.ts` labels the herdr pane `review`, sets its `$review`, `$review_kind`, and `$review_summary` tokens, and raises a toast. Outside herdr, `raise` and `clear` are no-ops and `open` exits 1.
 
 ## Context
 
-- entrypoint: !`printf %s "${CLAUDE_CODE_ENTRYPOINT:-unknown}"`
 - herdr pane: !`[ "$HERDR_ENV" = 1 ] && printf %s "${HERDR_PANE_ID:-none}" || printf none`
 
 ## Modes
@@ -27,14 +26,7 @@ Put the change in front of Ben and act on what comes back. `attention.ts` labels
 | `--browser`, diff | `plannotator review --git --json [--base <ref>]` | Blocks. The decision is the tool result |
 | `--browser`, `--doc <file>` | `plannotator annotate <file> --gate --json --require-approval` | Blocks. The decision is the tool result |
 
-Terminal surfaces open as a split beside this pane, named explicitly and without taking focus, and deliver into it once it is idle. So the turn has to end before Send can land. They need the herdr pane above.
-
-Pick the surface from Context:
-
-- Entrypoint `claude-desktop` or `claude-desktop-3p`: the desktop app. Run the gate as if `--browser` were passed, whatever the pane reads.
-- Entrypoint `remote_desktop`: a cloud session, where Plannotator's browser opens in the container and never reaches Ben. Name the branch and what to review, then end the turn. His reply in the app is the next user turn: act on it as in Resume, as free text rather than `path:lines` blocks.
-- Any other entrypoint with the herdr pane `none`: run the gate as if `--browser` were passed.
-- Otherwise: Terminal.
+Terminal surfaces open as a split beside this pane, named explicitly and without taking focus, and deliver into it once it is idle. So the turn has to end before Send can land. They need the herdr pane above. When it reads `none`, run the gate as if `--browser` were passed. In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
 
 ## Precondition
 

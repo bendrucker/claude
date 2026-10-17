@@ -17,6 +17,7 @@ SELECT
   TRY_CAST(r.data->>'$.message.usage.cache_creation_input_tokens' AS BIGINT) AS cache_creation_tokens,
   (r.data->>'$.promptSource')         AS prompt_source,
   (r.data->>'$.interruptedMessageId') AS interrupted_message_id,
+  (r.data->>'$.entrypoint')           AS entrypoint,
   (r.data->>'$.attributionSkill')     AS attribution_skill,
   (r.data->>'$.attributionPlugin')    AS attribution_plugin,
   (r.data->>'$.attributionAgent')     AS attribution_agent,
@@ -383,6 +384,10 @@ FROM unified;
 -- `label` is the session's human-readable name, from session_labels. It replaces the
 -- `summary` this view used to carry: `summary` records are no longer written, so that
 -- column had gone NULL corpus-wide.
+--
+-- `entrypoint` is the harness surface the session started from (`cli`, `claude-desktop`,
+-- `sdk-ts`, ...), the first one its messages carry. A session resumed from another
+-- surface writes the new value on later lines, so the earliest wins rather than any.
 CREATE OR REPLACE VIEW sessions AS
 SELECT
   m.*,
@@ -398,6 +403,7 @@ FROM (
     MAX(timestamp) - MIN(timestamp) AS duration,
     ANY_VALUE(project_path) AS project_path,
     ANY_VALUE(git_branch)   AS git_branch,
+    arg_min(entrypoint, timestamp) FILTER (WHERE entrypoint IS NOT NULL) AS entrypoint,
     COUNT(*) FILTER (WHERE type = 'user' AND NOT is_meta) AS user_messages,
     COUNT(*) FILTER (WHERE type = 'assistant')            AS assistant_messages
   FROM messages
@@ -434,6 +440,7 @@ SELECT
   (data->>'$.permissionMode')  AS permission_mode,
   (data->>'$.version')         AS version,
   (data->>'$.slug')            AS slug,
+  (data->>'$.entrypoint')      AS entrypoint,
   data
 FROM raw;
 

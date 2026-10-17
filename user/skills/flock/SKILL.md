@@ -1,7 +1,7 @@
 ---
 name: flock
 description: >-
-  Coordinate every pane, worktree, and pull request open across the herdr server: close out what has landed, merge what has cleared the bar, and report what needs you. One flock per machine. Requires herdr. Use via /flock.
+  Coordinate every pane, worktree, and pull request open across the herdr server: close out what has landed, merge what has cleared the bar, and report what needs you. One flock per machine. Use via /flock.
 argument-hint: "[focus hint]"
 disable-model-invocation: true
 allowed-tools:

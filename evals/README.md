@@ -1,6 +1,6 @@
 # Evals
 
-This directory is the generic layer: the native suite runner and the report that prices runs from any suite. Per-skill harnesses live with the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, each with its own README: [`pr-body`](../plugins/pull-request/evals/pr-body/), [`issue-refine`](../plugins/issue/evals/issue-refine/), [`review-voice`](../plugins/review/evals/review-voice/), [`comment-density`](../plugins/comments/evals/comment-density/).
+This directory is the generic layer: the native suite runner and the report that prices runs from any suite. Per-skill harnesses live with the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, each with its own README: [`pr-body`](../plugins/pull-request/evals/pr-body/), [`review-voice`](../plugins/review/evals/review-voice/), [`comment-density`](../plugins/comments/evals/comment-density/).
 
 [`scripts/`](scripts/) is shared across them. It reports what native runs cost and how they scored.
 

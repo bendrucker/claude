@@ -1,0 +1,10 @@
+Refine this into an issue:
+
+Let users pin conversations to the top of the sidebar so the ones they care about stay reachable. Pinned items should stay pinned across sessions and sort above the normal recency-ordered list.
+
+Files:
+- sidebar/list.tsx (ConversationList renders items in recency order)
+- sidebar/store.ts (conversationStore holds the ordered list and persists it)
+
+Related issues:
+- TEAM-330: Rework sidebar ordering to a single sort comparator (in progress)

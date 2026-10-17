@@ -3,7 +3,17 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import { caseCount, casePlugins, collectTraces, keepCases, prepare, splitCases } from "./run";
+import {
+  caseCount,
+  casePlugins,
+  collectTraces,
+  keepCases,
+  pluginErrors,
+  prepare,
+  splitCases,
+  strayArgs,
+  withDependencies,
+} from "./run";
 import { openInvocation, siblingLinks } from "./wrap";
 
 let repo: string;
@@ -11,7 +21,10 @@ let repo: string;
 const files: Record<string, string> = {
   "plugins/p/.claude-plugin/plugin.json": '{"name":"p"}',
   "plugins/p/skills/s/SKILL.md": "committed skill",
-  "plugins/q/.claude-plugin/plugin.json": '{"name":"q"}',
+  "plugins/q/.claude-plugin/plugin.json": '{"name":"q","dependencies":["r"]}',
+  "plugins/r/.claude-plugin/plugin.json": '{"name":"r","dependencies":["s","q"]}',
+  "plugins/s/.claude-plugin/plugin.json": '{"name":"s"}',
+  "plugins/bad/.claude-plugin/plugin.json": '{"name":"bad","dependencies":["missing"]}',
   "plugins/p/evals/suite/one/case.yaml": "plugins: [../../.., ../../../../q]\n",
   "plugins/p/evals/suite/one/prompt.md": "committed prompt",
   "plugins/p/evals/suite/suite.yaml": "stage: [packages/stubs]\ngraders:\n  fired: '*'\n",
@@ -42,8 +55,18 @@ beforeAll(async () => {
 
 const read = (path: string) => Bun.file(path).text();
 
-test("casePlugins resolves each case's plugins against the repo", async () => {
-  expect(await casePlugins(repo, "plugins/p/evals/suite")).toEqual(["plugins/p", "plugins/q"]);
+test("casePlugins resolves each case's plugins and their dependencies against the repo", async () => {
+  expect(await casePlugins(repo, "plugins/p/evals/suite")).toEqual([
+    "plugins/p",
+    "plugins/q",
+    "plugins/r",
+    "plugins/s",
+  ]);
+});
+
+test("withDependencies rejects a dependency with no sibling plugin", async () => {
+  const failure = await withDependencies(repo, ["plugins/bad"]).catch((error: unknown) => error);
+  expect(String(failure)).toContain("plugins/missing is not a plugin");
 });
 
 describe("prepare", () => {
@@ -54,7 +77,10 @@ describe("prepare", () => {
     const { target, evalDir } = await prepare(repo, "plugins/p/evals/suite", ref);
     expect(evalDir).toBe("p/evals/suite");
     expect(await read(join(target, "p/skills/s/SKILL.md"))).toBe(skill);
-    expect(await read(join(target, "q/.claude-plugin/plugin.json"))).toBe('{"name":"q"}');
+    expect(await read(join(target, "s/.claude-plugin/plugin.json"))).toBe('{"name":"s"}');
+    expect(await read(join(target, evalDir, "one/case.yaml"))).toBe(
+      "plugins: [ ../../.., ../../../../q, ../../../../r, ../../../../s ]\n",
+    );
     expect(await read(join(target, evalDir, "one/prompt.md"))).toBe("working prompt");
     expect(await read(join(target, evalDir, "one/graders/fired.md"))).toBe("shared grader");
     expect(await Bun.file(join(target, evalDir, "graders/fired.md")).exists()).toBe(false);
@@ -143,4 +169,55 @@ test("keepCases prunes staged cases to those any glob matches", async () => {
   expect(await Bun.file(join(dir, "quiet-b/case.yaml")).exists()).toBe(false);
   expect(await Bun.file(join(dir, "examples/case.yaml")).exists()).toBe(true);
   expect(keepCases(dir, ["nope"])).rejects.toThrow("No case matches");
+});
+
+describe("pluginErrors", () => {
+  const init = (errors: unknown) =>
+    `${JSON.stringify({ type: "system", subtype: "hook_started" })}\n${JSON.stringify({ type: "system", subtype: "init", plugin_errors: errors })}\n`;
+
+  test("lists each init plugin error by case, arm, and run", async () => {
+    const output = mkdtempSync(join(tmpdir(), "run-output-"));
+    const runs = [{}, {}];
+    await Bun.write(
+      join(output, "aggregate-result.json"),
+      JSON.stringify({ cases: [{ name: "one", arms: { with: runs, without: runs } }] }),
+    );
+    const error = { plugin: "gitlab@inline", type: "dependency-unsatisfied", message: "no git" };
+    await Bun.write(join(output, "traces/one-with-1.jsonl"), init([error]));
+    await Bun.write(join(output, "traces/one-with-0.jsonl"), init([]));
+    await Bun.write(join(output, "traces/one-without-0.jsonl"), init(null));
+    expect(await pluginErrors(output)).toEqual([
+      "one/with/1: gitlab@inline dependency-unsatisfied: no git",
+    ]);
+  });
+
+  test("is empty without a result", async () => {
+    expect(await pluginErrors(mkdtempSync(join(tmpdir(), "run-output-")))).toEqual([]);
+  });
+});
+
+test.each<{
+  name: string;
+  positionals: string[];
+  passthrough: string[];
+  flags: Record<string, unknown>;
+  stray: string[];
+}>([
+  { name: "only the suite", positionals: ["s"], passthrough: [], flags: {}, stray: [] },
+  {
+    name: "runner args after --",
+    positionals: ["s", "--case", "a"],
+    passthrough: ["--case", "a"],
+    flags: {},
+    stray: [],
+  },
+  {
+    name: "a runner flag before --",
+    positionals: ["s", "a", "--runs", "2"],
+    passthrough: ["--runs", "2"],
+    flags: { case: [true] },
+    stray: ["--case", "a"],
+  },
+])("strayArgs with $name", ({ positionals, passthrough, flags, stray }) => {
+  expect(strayArgs(positionals, passthrough, flags)).toEqual(stray);
 });

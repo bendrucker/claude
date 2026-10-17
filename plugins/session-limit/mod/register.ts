@@ -1,5 +1,5 @@
 import type { On } from "claude-code";
-import { evaluate } from "./bands";
+import { evaluate, summarize } from "./bands";
 
 const MOD = "session-limit";
 const ANNOUNCED = { plugin: "session-limit", key: "announced" } as const;
@@ -7,6 +7,12 @@ const ANNOUNCED = { plugin: "session-limit", key: "announced" } as const;
 export function register(on: On): void {
   on("session.start", ($, e, next) => {
     void $.modEvents.emit({ mod: MOD, event: "session.start" });
+    return next(e);
+  });
+
+  // /clear and /resume start a new conversation without a session.start.
+  on("session.end", async ($, e, next) => {
+    if (e.reason === "clear" || e.reason === "resume") await $.state.set(ANNOUNCED, {});
     return next(e);
   });
 
@@ -31,7 +37,10 @@ export function register(on: On): void {
           (error: unknown) => ({ ok: false, uuid: null, error: String(error) }),
         );
       // A refused append leaves the bands unannounced so the next measurement retries.
-      if (outcome.ok) await $.state.set(ANNOUNCED, announced);
+      if (outcome.ok) {
+        await $.state.set(ANNOUNCED, announced);
+        $.ui.log(summarize(crossings));
+      }
       void $.modEvents.emit({
         mod: MOD,
         event: "inject",

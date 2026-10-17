@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { casePlugins, readSuite } from "./run";
+import { siblingLinks } from "./wrap";
 
 /** Every suite CI may run: a directory of `<case>/case.yaml` without a `.local-only` file. */
 export async function suites(repo: string): Promise<string[]> {
@@ -15,11 +16,30 @@ export async function suites(repo: string): Promise<string[]> {
   return all.filter((_, i) => !local[i]);
 }
 
-/** Repo paths a suite's scores depend on: the suite, then what it wraps or the plugins its cases load. */
+/** Files outside a wrapped skill that it links to, which `wrap.ts` copies in beside it. */
+async function skillSiblings(repo: string, skill: string): Promise<string[]> {
+  const files = globSync("**/*.md", { cwd: join(repo, skill) });
+  const links = await Promise.all(
+    files.map(async (f) =>
+      siblingLinks(skill, join(skill, f), await Bun.file(join(repo, skill, f)).text()),
+    ),
+  );
+  return links.flat();
+}
+
+/** Repo paths a suite's scores depend on: the suite, the plugins its cases load, and what it wraps. */
 export async function inputs(repo: string, suite: string): Promise<string[]> {
   const { wrap } = await readSuite(join(repo, suite));
-  if (wrap !== undefined) return [suite, ...wrap.skills, ...wrap.agents, ...wrap.context];
-  return [suite, ...(await casePlugins(repo, suite))];
+  const wrapped =
+    wrap === undefined
+      ? []
+      : [
+          ...wrap.skills,
+          ...(await Promise.all(wrap.skills.map((s) => skillSiblings(repo, s)))).flat(),
+          ...wrap.agents,
+          ...wrap.context,
+        ];
+  return [...new Set([suite, ...(await casePlugins(repo, suite)), ...wrapped])];
 }
 
 const within = (path: string, input: string) => path === input || path.startsWith(`${input}/`);

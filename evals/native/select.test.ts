@@ -15,7 +15,8 @@ const files: Record<string, string> = {
   "plugins/q/skills/s/SKILL.md": "",
   "evals/user/tdd/suite.yaml":
     "wrap:\n  skills: [user/skills/tdd]\n  context: [user/rules/ts.md]\n",
-  "evals/user/tdd/one/case.yaml": "plugins: [../..]\n",
+  "evals/user/tdd/one/case.yaml": "plugins: [../.., ../../../../plugins/q]\n",
+  "user/skills/tdd/SKILL.md": "See [shared](../shared/ref.md) and [docs](https://x.dev).\n",
 };
 
 beforeAll(async () => {
@@ -36,7 +37,12 @@ test.each<{ name: string; changed: string[]; expected: string[] }>([
   {
     name: "a plugin the cases load runs the suite",
     changed: ["plugins/q/skills/s/SKILL.md"],
-    expected: ["plugins/p/evals/b"],
+    expected: ["evals/user/tdd", "plugins/p/evals/b"],
+  },
+  {
+    name: "a file a wrapped skill links to",
+    changed: ["user/skills/shared/ref.md"],
+    expected: ["evals/user/tdd"],
   },
   { name: "a wrapped skill", changed: ["user/skills/tdd/SKILL.md"], expected: ["evals/user/tdd"] },
   { name: "a wrapped rule", changed: ["user/rules/ts.md"], expected: ["evals/user/tdd"] },

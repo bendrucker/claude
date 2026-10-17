@@ -48,6 +48,7 @@ jobs:
           fetch-depth: 0
 
       - uses: ./.github/actions/bun-install
+        if: github.event_name == 'pull_request'
 
       # A labeled PR runs every suite whose cases, loaded plugins, or wrapped
       # artifacts it touches. run.ts fails a dispatched suite when zero cases ran.

@@ -1,1 +1,9 @@
 allow_tools: ["Bash(git:*)", "Bash(bun:*)", Write]
+graders:
+  skill-fired: "!quiet-*"
+  skill-loaded: "!quiet-*"
+  writing-fired: "!quiet-*"
+  no-attribution: "!quiet-*"
+  title-length: "!quiet-*"
+  create-quiet: "quiet-*"
+  no-test-tally: [manual-verification, overturned-theory]

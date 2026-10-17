@@ -2,7 +2,15 @@ import { globSync } from "node:fs";
 import { basename, dirname, extname, join, relative } from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
-import { caseGraders, frontmatter, type Graders, type Recorded, verdict } from "./graders";
+import {
+  caseGraders,
+  frontmatter,
+  type Graders,
+  type Recorded,
+  sharedFor,
+  verdict,
+} from "./graders";
+import { readSuite } from "./suite";
 import { traceReply } from "./trace";
 
 const Example = z.object({ fail: z.array(z.string()).default([]) });
@@ -41,6 +49,43 @@ export interface Checked {
   mismatches: Mismatch[];
   /** Regex graders, as `<case>/<grader>`, that no example could grade. */
   unchecked: string[];
+  /** Cases whose `prompt.md` would send the session nothing, such as a blank or `undefined` body. */
+  prompts: string[];
+  /** Case graders that hide one `suite.yaml` shares in, from {@link shadowed}. */
+  shadowed: string[];
+}
+
+/**
+ * Cases in a suite whose `prompt.md` is blank or the text of a missing value, such as
+ * `undefined` from a generator that interpolated a field the case lacked. The runner sends the
+ * body as the prompt, so the session would answer that text instead of the case.
+ */
+export async function emptyPrompts(suite: string): Promise<string[]> {
+  const cases = globSync("*/case.yaml", { cwd: suite }).map((f) => dirname(f));
+  const bad = await Promise.all(
+    cases.map(async (c) => {
+      const file = Bun.file(join(suite, c, "prompt.md"));
+      if (!(await file.exists())) return [];
+      return /^(undefined|null)?$/.test((await file.text()).trim()) ? [c] : [];
+    }),
+  );
+  return bad.flat().toSorted();
+}
+
+/** Case graders, as `<case>/<grader>`, that hide a grader `suite.yaml` shares into the case. */
+export async function shadowed(suite: string): Promise<string[]> {
+  const shared = (await readSuite(suite)).graders;
+  return globSync("*/case.yaml", { cwd: suite })
+    .map(dirname)
+    .flatMap((name) => {
+      const own = new Set(
+        globSync("graders/*.md", { cwd: join(suite, name) }).map((f) => basename(f, ".md")),
+      );
+      return sharedFor(shared, name)
+        .filter((g) => own.has(g))
+        .map((g) => `${name}/${g}`);
+    })
+    .toSorted();
 }
 
 /**
@@ -82,5 +127,10 @@ export async function check(suite: string): Promise<Checked> {
       .filter(([g, grader]) => grader.type === "regex" && !reached.has(`${c}/${g}`))
       .map(([g]) => `${c}/${g}`),
   );
-  return { mismatches: results.flat(), unchecked: unchecked.toSorted() };
+  return {
+    mismatches: results.flat(),
+    unchecked: unchecked.toSorted(),
+    prompts: await emptyPrompts(suite),
+    shadowed: await shadowed(suite),
+  };
 }

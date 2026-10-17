@@ -33,7 +33,6 @@ const baseInput = {
     sectionCountDistribution: {},
     templateOnSmallDocumentCount: 0,
   },
-  meaningAudit: null,
   candidatePhrases: [] as CandidatePhrase[],
   corrections: [] as CorrectionRow[],
   corrective: [] as CorrectiveRow[],
@@ -59,32 +58,6 @@ const fixtureProfile: VoiceProfile = {
 function rateEntry(featureId: string, rate: number): [string, FeatureRate] {
   return [featureId, { featureId, rate, documentCount: 4 }];
 }
-
-const meaningAuditInput: ReportInput = {
-  ...baseInput,
-  meaningAudit: {
-    promptSha256: "abc123def456",
-    model: "claude-haiku-4-5",
-    documents: 40,
-    estimatedCostUsd: 0.1234,
-    criteria: [
-      {
-        id: "information-density",
-        question: "Does this text tell the reviewer anything new?",
-        flagged: 12,
-        total: 40,
-        spans: ["These changes ensure\ncorrect behavior."],
-      },
-      {
-        id: "sycophancy",
-        question: "Does the text flatter the reader?",
-        flagged: 0,
-        total: 40,
-        spans: [],
-      },
-    ],
-  },
-};
 
 const provenanceInput: ReportInput = { ...baseInput, voiceProfile: fixtureProfile };
 
@@ -123,7 +96,6 @@ const cases: { name: string; input: ReportInput }[] = [
       ],
     },
   },
-  { name: "meaning audit", input: meaningAuditInput },
   {
     name: "proposed removals diff block",
     input: {
@@ -286,14 +258,6 @@ describe("renderReport", () => {
     expect(removalIdx).toBeGreaterThan(summaryIdx);
     expect(additionIdx).toBeGreaterThan(removalIdx);
     expect(healthIdx).toBeGreaterThan(additionIdx);
-  });
-
-  test("flattens multi-line meaning-audit spans and omits unflagged criteria", () => {
-    const output = renderReport(meaningAuditInput);
-    // Multi-line spans are flattened so they cannot break the list item.
-    expect(output).toContain('information-density: "These changes ensure correct behavior."');
-    // Unflagged criteria contribute no sampled-span line.
-    expect(output).not.toContain('sycophancy: "');
   });
 
   test("labels every voice-delta feature row with its provenance", () => {

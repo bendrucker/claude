@@ -2,6 +2,7 @@
 import { dirname, join, relative, resolve } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
+import { subscriptionEnv } from "../../packages/eval-judge/env";
 import { erroredRuns, readResult } from "../../packages/evals/result";
 import { collectTraces, keepCases, prepare, splitCases } from "../../packages/evals/run";
 import { readSuite } from "../../packages/evals/suite";
@@ -30,9 +31,7 @@ export const program = new Command("run.ts")
     const allow = config.allow_tools.length > 0 ? ["--allow-tools", ...config.allow_tools] : [];
 
     // An API key in the environment would bill the API instead of the subscription.
-    const env = { ...process.env };
-    delete env.ANTHROPIC_API_KEY;
-    delete env.ANTHROPIC_AUTH_TOKEN;
+    const env = subscriptionEnv();
     const proc = Bun.spawn(
       [
         "claude",

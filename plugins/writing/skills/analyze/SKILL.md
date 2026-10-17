@@ -5,7 +5,7 @@ description: >-
   session history and surfacing candidate phrases. Use when refreshing trope
   detection, reviewing wordlist health, or mining sessions for new AI-writing
   patterns to add or stale rules to remove.
-argument-hint: "[--since date] [--model glob] [--judge]"
+argument-hint: "[--since date] [--model glob]"
 disable-model-invocation: true
 allowed-tools:
   - Bash
@@ -23,7 +23,6 @@ Forward these from `$ARGUMENTS` to `analyze.ts` (see [Run](#run)):
 
 - `--since <date>`: restrict the corpus to sessions on or after the date. Default: the full index.
 - `--model <glob>`: restrict to matching model IDs (e.g. `*opus*`). Default: all models.
-- `--judge`: add the LLM-judge pass over the deliverable corpus. See [Meaning-Layer Judge](#meaning-layer-judge). Default: off.
 
 ## Prerequisites
 
@@ -59,24 +58,6 @@ bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH"
 ```
 
 Run with `--help` for the remaining flags. Writes a markdown report to `tmp/trope-analysis-<date>.md`. The report may quote any host in the combined index, so keep it under `tmp/` and never paste host-specific content into committed work.
-
-## Meaning-Layer Judge
-
-`--judge` adds an LLM-judge pass over the deliverable corpus. It requires `ANTHROPIC_API_KEY`, prints a cost estimate before any call, and caps documents with `--judge-limit` (default 100, cents per run on the default Haiku-class model):
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH" --judge
-```
-
-The judge prompt is a versioned artifact (`resources/judge/prompt.md`). The report records its hash, and numbers from different hashes are not comparable. Judge flag rates are uncalibrated until the #791 labeling passes run (a user checkpoint). The standalone runner covers ad-hoc files, the reproducibility gate, and the #769 heading baseline:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/judge-run.ts files <paths...>
-bun ${CLAUDE_SKILL_DIR}/scripts/judge-run.ts gate
-bun ${CLAUDE_SKILL_DIR}/scripts/judge-run.ts headings tmp/heading-labels.tsv
-```
-
-See the "Meaning-Layer Judge" section of [references/methodology.md](references/methodology.md) for the rubric, prompt versioning, gate, and calibration protocol.
 
 ## Detector Coverage
 

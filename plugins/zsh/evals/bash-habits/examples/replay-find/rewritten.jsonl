@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","cwd":"/tmp/claude-eval/home/cwd","tools":["Bash"]}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"find . -maxdepth 3 -name *.yaml -not -path \"./node_modules/*\" | sort"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"./config/dashboard.yaml\n./config/routes.yaml"}]}}
+{"type":"result","subtype":"success","is_error":false,"num_turns":2,"result":"It printed `./config/dashboard.yaml` and `./config/routes.yaml`."}

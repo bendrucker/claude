@@ -21,9 +21,7 @@ Code review workflows for Claude Code.
 
 - **`review`**: Reviews a pushed PR with fresh eyes in an isolated worktree, never editing it. Runs `peer` on a peer's PR and a cold audit on Ben's own. The agent `inbox` dispatches.
 - **`angle`**: Runs one finder angle over a diff and returns candidates. The unit of `code`'s find fan-out and its sweep pass.
-- **`verifier`**: Judges candidates against the code as CONFIRMED, PLAUSIBLE, or REFUTED. The unit of `code`'s verify phase.
-
-`angle` and `verifier` pin no model, and `code` spawns both on Sonnet. `review` inherits the caller's model.
+- **`verifier`**: Judges candidates against the code as CONFIRMED, PLAUSIBLE, or REFUTED. The unit of `code`'s verify 
 
 ## Testing
 

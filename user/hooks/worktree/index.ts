@@ -4,6 +4,7 @@ import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { type HookInput, readHookInput } from "../../scripts/hook-input";
 import { timeHook } from "../../scripts/hook-metrics";
+import { hostWorktree } from "./host-worktree";
 
 const BashInput = z.looseObject({ command: z.string().optional().catch(undefined) });
 
@@ -75,6 +76,20 @@ export function formatDenyOutput(subcommand: string): SyncHookJSONOutput {
   };
 }
 
+// The worktrunk redirect assumes this session picks its own worktrees. A host
+// that already placed the session in one wants it to stay there, so only a
+// new worktree is refused and everything else goes to the normal permission
+// flow.
+export function formatHostDenyOutput(tree: string): SyncHookJSONOutput {
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: `This session runs in \`${tree}\`, a worktree the host app created for it. Keep working there instead of adding another. For a throwaway verification checkout, add it under \`tmp/\`.`,
+    },
+  };
+}
+
 export function formatAskOutput(): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
@@ -86,7 +101,10 @@ export function formatAskOutput(): SyncHookJSONOutput {
   };
 }
 
-export function processInput(input: HookInput): SyncHookJSONOutput | null {
+export function processInput(
+  input: HookInput,
+  env: Record<string, string | undefined> = process.env,
+): SyncHookJSONOutput | null {
   const command = BashInput.safeParse(input.tool_input).data?.command;
   if (command == null || command === "") {
     return null;
@@ -105,6 +123,10 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
   }
   if (subcommand === "remove" && isThrowawayRemove(command)) {
     return null;
+  }
+  const host = hostWorktree(typeof input.cwd === "string" ? input.cwd : undefined, env);
+  if (host != null) {
+    return subcommand === "add" ? formatHostDenyOutput(host) : null;
   }
   if (REPLACED_SUBCOMMANDS.has(subcommand)) {
     return formatDenyOutput(subcommand);

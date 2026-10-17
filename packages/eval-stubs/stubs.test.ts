@@ -207,6 +207,7 @@ describe("gh snapshot", () => {
             state: "CHANGES_REQUESTED",
             submittedAt: "1",
             commit: shas.head,
+            body: "Needs a test.",
           },
           { id: 2, author: "mchen", state: "COMMENTED", submittedAt: "2", commit: shas.head },
           { id: 3, author: "bot", bot: true, state: "COMMENTED", submittedAt: "3", commit: "x" },
@@ -233,6 +234,19 @@ describe("gh snapshot", () => {
       commits: [{ messageHeadline: "app: second line" }, { messageHeadline: "app: add b" }],
       reviewDecision: "CHANGES_REQUESTED",
     });
+  });
+
+  test("plain view lists each reviewer's standing state", () => {
+    const lines = stub(run, "gh", ["pr", "view", "7"]).out.split("\n");
+    expect(lines).toContain("reviewers:\tmchen (Changes requested), bot (Commented)");
+    expect(lines.slice(-3)).toEqual(["--", "Adds b.", ""]);
+  });
+
+  test("plain view with --comments prints review bodies, not the header", () => {
+    const r = stub(run, "gh", ["pr", "view", "7", "--comments"]);
+    expect(r.out).toBe(
+      "author:\tmchen\nassociation:\tmember\nedited:\tfalse\nstatus:\tchanges requested\n--\nNeeds a test.\n--\n",
+    );
   });
 
   test("a later comment keeps a change request in latestReviews", () => {

@@ -1,5 +1,5 @@
 {
-  "description": "Blocks direct commits to the default branch, records push -u tracking outside the sandbox, recovers SSH-agent auth failures over HTTPS, and routes refused commit signatures",
+  "description": "Blocks direct commits to the default branch, records push -u tracking outside the sandbox, refuses EnterWorktree calls the harness would reject, recovers SSH-agent auth failures over HTTPS, and routes refused commit signatures",
   "hooks": {
     "PreToolUse": [
       {
@@ -14,6 +14,15 @@
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/push-upstream.ts\"",
             "if": "Bash(git push:*)"
+          }
+        ]
+      },
+      {
+        "matcher": "EnterWorktree",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/enter-worktree.ts\""
           }
         ]
       }

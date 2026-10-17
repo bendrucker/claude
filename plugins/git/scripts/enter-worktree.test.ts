@@ -9,7 +9,7 @@ import {
   sameDirectoryReason,
   unmanagedReason,
   worktreeSessionActive,
-} from "./index";
+} from "./enter-worktree";
 
 function git(cwd: string, ...args: string[]): void {
   const result = Bun.spawnSync(["git", "-C", cwd, ...args], { stdout: "ignore", stderr: "pipe" });
@@ -252,7 +252,7 @@ test("reasons", () => {
     unmanaged: unmanagedReason("/src/repo/.worktrees/topic", "/src/repo/.claude/worktrees"),
   }).toMatchInlineSnapshot(`
     {
-      "crossRepo": "\`/src/other/.worktrees/topic\` belongs to a different repository than this session, and EnterWorktree only enters worktrees of the session's own repository. For work that becomes its own pull request, dispatch a sibling agent into it through the \`herdr:herdr\` skill. For read-only work, spawn an \`Agent\` with \`cwd\` set to \`/src/other/.worktrees/topic\`.",
+      "crossRepo": "\`/src/other/.worktrees/topic\` belongs to a different repository than this session, and EnterWorktree only enters worktrees of the session's own repository. For read-only work, spawn an \`Agent\` with \`cwd\` set to \`/src/other/.worktrees/topic\`.",
       "same": "\`/src/repo/.worktrees/topic\` is already the working directory. Keep working here.",
       "unmanaged": "This session has already switched into a worktree, and from here EnterWorktree only enters worktrees under \`/src/repo/.claude/worktrees/\`. Work in \`/src/repo/.worktrees/topic\` from the current session with \`git -C /src/repo/.worktrees/topic\` and absolute paths.",
     }

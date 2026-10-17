@@ -1,7 +1,0 @@
-{
-  "kind": "decide",
-  "trap": "failed-runs",
-  "decisions": ["reject", "re-run"],
-  "note": "The candidate arm has failed runs, which the report drops from its median, so the arm falls short of the Rules' run count. Rejecting, or re-running once the failures are explained, both hold the gain back.",
-  "reason": [["fail", "exit", "error", "crash", "non-?zero"]]
-}

@@ -46,6 +46,5 @@
       "note": "fanOut resolves four regions one after another with a TODO to make it concurrent. CPU is 0.99 of wall, so there is no waiting to overlap, and on 2 vCPU running the CPU-bound regions in parallel saves at most half of 7.32%. A real but minor lead: listing it low or setting it aside with that reason is right, and ranking it in the top two over-promises.",
       "patterns": ["fanOut", "resolveRegion", "sha256"]
     }
-  ],
-  "parallelism": ["parallel", "concurren", "goroutine", "GOMAXPROCS", "errgroup", "worker pool"]
+  ]
 }

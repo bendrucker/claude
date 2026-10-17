@@ -18,6 +18,7 @@ This directory is the generic layer: the native suite runner and the report that
 ```yaml
 allow_tools: ["Bash(git:*)"]    # gated tools passed to --allow-tools
 judge_model: claude-sonnet-5-5
+stage: [packages/eval-stubs]    # repo paths a scaffold reads, staged from the working tree
 wrap:                           # omit when the cases load a plugin
   skills: [user/skills/tdd]
   context: [user/rules/typescript.md]
@@ -25,6 +26,8 @@ graders:                        # <suite>/graders/<name>.md to the case-name glo
   out-present: "*"
   create-fired: ["pr-*"]
 ```
+
+A case's scaffold runs from the staged tree, which holds only the plugins and the suite, so a scaffold that reads shared code names it under `stage`, at the same repo-relative path. [`packages/eval-stubs`](../packages/eval-stubs/) is the shared case: offline `gh` and `glab` stand-ins and the git-init fixture preamble.
 
 A grader every case repeats lives once in `<suite>/graders/`. `run.ts` copies it into each matching case as it stages the suite, skipping a case that holds a grader by that name, and `check.ts` and `regrade.ts` read the same merged set.
 

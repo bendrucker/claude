@@ -52,6 +52,9 @@
         "@hegeldev/hegel": "^0.4.7",
       },
     },
+    "packages/eval-stubs": {
+      "name": "@bendrucker/claude-eval-stubs",
+    },
     "packages/marketplace": {
       "name": "@bendrucker/claude-marketplace",
       "dependencies": {
@@ -494,6 +497,8 @@
     "@bendrucker/claude-comments": ["@bendrucker/claude-comments@workspace:plugins/comments"],
 
     "@bendrucker/claude-decode": ["@bendrucker/claude-decode@workspace:packages/decode"],
+
+    "@bendrucker/claude-eval-stubs": ["@bendrucker/claude-eval-stubs@workspace:packages/eval-stubs"],
 
     "@bendrucker/claude-marketplace": ["@bendrucker/claude-marketplace@workspace:packages/marketplace"],
 

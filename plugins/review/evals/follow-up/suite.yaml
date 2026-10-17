@@ -1,1 +1,2 @@
 allow_tools: [Bash]
+stage: [packages/eval-stubs]

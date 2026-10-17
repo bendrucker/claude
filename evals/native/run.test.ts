@@ -14,7 +14,8 @@ const files: Record<string, string> = {
   "plugins/q/.claude-plugin/plugin.json": '{"name":"q"}',
   "plugins/p/evals/suite/one/case.yaml": "plugins: [../../.., ../../../../q]\n",
   "plugins/p/evals/suite/one/prompt.md": "committed prompt",
-  "plugins/p/evals/suite/suite.yaml": "graders:\n  fired: '*'\n",
+  "plugins/p/evals/suite/suite.yaml": "stage: [packages/stubs]\ngraders:\n  fired: '*'\n",
+  "packages/stubs/install.sh": "committed stub",
   "plugins/p/evals/suite/graders/fired.md": "shared grader",
   "user/skills/tdd/SKILL.md":
     "---\ndisable-model-invocation: true\n---\ncommitted user skill [v](../other/LANGUAGE.md)",
@@ -35,6 +36,7 @@ beforeAll(async () => {
     Bun.write(join(repo, "plugins/p/skills/s/SKILL.md"), "working skill"),
     Bun.write(join(repo, "plugins/p/evals/suite/one/prompt.md"), "working prompt"),
     Bun.write(join(repo, "user/skills/tdd/SKILL.md"), "working user skill"),
+    Bun.write(join(repo, "packages/stubs/install.sh"), "working stub"),
   ]);
 });
 
@@ -56,6 +58,7 @@ describe("prepare", () => {
     expect(await read(join(target, evalDir, "one/prompt.md"))).toBe("working prompt");
     expect(await read(join(target, evalDir, "one/graders/fired.md"))).toBe("shared grader");
     expect(await Bun.file(join(target, evalDir, "graders/fired.md")).exists()).toBe(false);
+    expect(await read(join(target, "../packages/stubs/install.sh"))).toBe("working stub");
   });
 
   test("wraps skills and context that are not a plugin", async () => {

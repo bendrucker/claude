@@ -395,7 +395,6 @@
     "plugins/writing": {
       "name": "@bendrucker/claude-writing",
       "dependencies": {
-        "@anthropic-ai/sdk": "^0.129.0",
         "@duckdb/node-api": "1.5.0-r.1",
         "ap-style-title-case": "^2.0.0",
         "cleye": "^2.2.1",

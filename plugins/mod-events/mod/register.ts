@@ -8,7 +8,8 @@ interface Chunk {
   path: string;
   text: string;
   version: number;
-  isWriting: boolean;
+  written: number;
+  inFlight: Promise<void> | undefined;
 }
 
 interface Log {
@@ -72,18 +73,23 @@ export function surfaceOf(
   return { surface: summarize(clients, isSsh), clients: clients.toSorted() };
 }
 
-async function flush($: EngineInterface, chunk: Chunk): Promise<void> {
-  if (chunk.isWriting) return;
-  chunk.isWriting = true;
+async function write($: EngineInterface, chunk: Chunk): Promise<void> {
+  const version = chunk.version;
   try {
-    let written: number;
-    do {
-      written = chunk.version;
-      // oxlint-disable-next-line no-await-in-loop -- each rewrite must land before the next, or an older text could win.
-      await $.fs.write(chunk.path, chunk.text);
-    } while (written !== chunk.version);
+    await $.fs.write(chunk.path, chunk.text);
+    chunk.written = Math.max(chunk.written, version);
   } finally {
-    chunk.isWriting = false;
+    chunk.inFlight = undefined;
+  }
+}
+
+// One write runs at a time, so an older text cannot land over a newer one.
+async function flush($: EngineInterface, chunk: Chunk): Promise<void> {
+  const target = chunk.version;
+  while (chunk.written < target) {
+    chunk.inFlight ??= write($, chunk);
+    // oxlint-disable-next-line no-await-in-loop -- a write already in flight may predate this line.
+    await chunk.inFlight;
   }
 }
 
@@ -151,7 +157,8 @@ async function record($: EngineInterface, log: Log, input: ModEventsInput): Prom
         path: `${root}/${key}.${log.instance}.${n}.jsonl`,
         text: "",
         version: 0,
-        isWriting: false,
+        written: 0,
+        inFlight: undefined,
       },
     };
     log.chunks.set(key, slot);

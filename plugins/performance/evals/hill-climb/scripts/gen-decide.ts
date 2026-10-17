@@ -3,7 +3,19 @@ import { globSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
-import type { Decision, DecideTruth } from "./decide";
+
+export const DECISIONS = ["accept", "reject", "keep-unconfirmed", "re-run"] as const;
+export type Decision = (typeof DECISIONS)[number];
+
+/** What a decide case's graders check. */
+export interface DecideTruth {
+  trap: string;
+  /** The decisions the evidence supports, any one of which is right. */
+  decisions: Decision[];
+  note: string;
+  /** Pattern groups the reply must each match somewhere for the reason to name the trap. */
+  reason: string[][];
+}
 
 interface Lead {
   name: string;
@@ -480,6 +492,7 @@ export interface Generated {
   name: string;
   prompt: string;
   truth: DecideTruth;
+  split: "dev" | "holdout";
 }
 
 export function generate(trap: Trap, domain: Domain, v: number, k: number): Generated {
@@ -619,8 +632,8 @@ export function generate(trap: Trap, domain: Domain, v: number, k: number): Gene
   return {
     name: `decide-${trap.id}-${domain.id}`,
     prompt,
+    split: v === 2 ? "holdout" : "dev",
     truth: {
-      kind: "decide",
       trap: trap.id,
       decisions: trap.decisions,
       note: trap.note,
@@ -629,7 +642,10 @@ export function generate(trap: Trap, domain: Domain, v: number, k: number): Gene
   };
 }
 
-/** Every trap on three of the four domains, skipping a different domain per trap. */
+/**
+ * Every trap on three of the four domains, skipping a different domain per trap. Each trap's
+ * third domain is its holdout.
+ */
 export function all(): Generated[] {
   return TRAPS.flatMap((trap, t) =>
     DOMAINS.filter((_, d) => d !== t % DOMAINS.length).map((domain, v) =>
@@ -640,7 +656,7 @@ export function all(): Generated[] {
 
 const CASE = `schema_version: "1.1"
 name: {name}
-tags: [decide]
+tags: [decide, {split}]
 plugins: ["../../.."]
 execution:
   model: claude-sonnet-5-5
@@ -661,24 +677,35 @@ const DECISION_PATTERN = {
   "re-run": "re-?run",
 } as const;
 
+const LINE = "^[\\s>*_#-]*decision[*_\\s]*:[*_\\s`]*";
+const ANY = Object.values(DECISION_PATTERN).join("|");
+
+/** A `Decision:` line naming one of `decisions` with no later `Decision:` line after it. */
+export function lastDecision(decisions: Decision[]): string {
+  const named = decisions.map((d) => DECISION_PATTERN[d]).join("|");
+  return String.raw`${LINE}(?:${named})\b(?![\s\S]*${LINE}(?:${ANY})\b)`;
+}
+
+/** The reason passes only beside the right decision, so a wrong call scores zero. */
 export function graders(truth: DecideTruth): Record<string, string> {
+  const decision = lastDecision(truth.decisions);
   const lookahead = truth.reason.map((g) => `(?=[\\s\\S]*(?:${g.join("|")}))`).join("");
   return {
     "decision.md": [
       "---",
       "type: regex",
-      `pattern: '^[\\s>*_#-]*decision[*_\\s]*:[*_\\s\`]*(?:${truth.decisions.map((d) => DECISION_PATTERN[d]).join("|")})\\b'`,
+      `pattern: '${decision}'`,
       "flags: im",
       "match: contains",
       "---",
-      `The reply decides \`${truth.decisions.join("` or `")}\`. ${truth.note}`,
+      `The reply's last \`Decision:\` line is \`${truth.decisions.join("` or `")}\`. ${truth.note}`,
       "",
     ].join("\n"),
     "reason.md": [
       "---",
       "type: regex",
-      `pattern: '^${lookahead.replaceAll("'", "''")}'`,
-      "flags: i",
+      `pattern: '^(?<![\\s\\S])(?=[\\s\\S]*${decision})${lookahead.replaceAll("'", "''")}'`,
+      "flags: im",
       "match: contains",
       "---",
       `The reply's reason names the trap. ${truth.note}`,
@@ -696,9 +723,8 @@ export const program = new Command("gen-decide.ts")
     const cases = all();
     const writes = cases.flatMap((c) => {
       const files: Record<string, string> = {
-        "case.yaml": CASE.replace("{name}", c.name),
+        "case.yaml": CASE.replace("{name}", c.name).replace("{split}", c.split),
         "prompt.md": c.prompt,
-        "truth.json": `${JSON.stringify(c.truth, null, 2)}\n`,
       };
       for (const [file, text] of Object.entries(graders(c.truth)))
         files[join("graders", file)] = text;

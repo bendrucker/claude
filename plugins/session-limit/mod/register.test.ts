@@ -1,6 +1,6 @@
 import type { On, SessionRateLimit, UsageUnit } from "claude-code";
 import { type Engine, describe, expect, mock, test } from "claude-code/testing";
-import { BANDS, crossedBand, evaluate } from "./bands";
+import { BANDS, crossedBand, evaluate, formatResetTime } from "./bands";
 
 const FIVE_RESETS = "2026-10-06T21:00:00.000Z";
 const SEVEN_RESETS = "2026-10-12T06:00:00.000Z";
@@ -16,12 +16,24 @@ function limits(fivePct: number, sevenPct = 0, fiveResets = FIVE_RESETS): Sessio
 interface World {
   events: unknown[];
   announced: unknown[];
+  logs: string[];
 }
 
-function worldOf(on: On, { refuseAppend = true } = {}): World {
-  const world: World = { events: [], announced: [] };
+function worldOf(
+  on: On,
+  { append = "refuse" }: { append?: "refuse" | "land" | "throw" } = {},
+): World {
+  const world: World = { events: [], announced: [], logs: [] };
   mock.clock(on, { now: NOW });
-  if (refuseAppend) on("session.append", () => ({ deny: "refused" }));
+  if (append === "refuse") on("session.append", () => ({ deny: "refused" }));
+  on("ui.log", ($, e) => {
+    world.logs.push(e.text);
+    return { value: undefined };
+  });
+  if (append === "throw")
+    on("session.append", () => {
+      throw new Error("append failed");
+    });
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
@@ -140,7 +152,7 @@ describe("register", () => {
   });
 
   test("announces a band once the injection lands", async ($, on) => {
-    const world = worldOf(on, { refuseAppend: false });
+    const world = worldOf(on, { append: "land" });
     await measure($, limits(90));
     await measure($, limits(91));
     const announced = {
@@ -149,7 +161,56 @@ describe("register", () => {
     };
     expect(world.announced).toEqual([announced, announced]);
     expect(world.events).toEqual([expect.objectContaining({ event: "inject", ok: true })]);
+    expect(world.logs).toEqual([
+      `Usage notice sent to Claude: 5-hour limit at 90% (resets ${formatResetTime(FIVE_RESETS)})`,
+    ]);
   });
+
+  test("logs nothing to the user when the injection is refused", async ($, on) => {
+    const world = worldOf(on);
+    await measure($, limits(95, 95));
+    expect(world.logs).toEqual([]);
+  });
+
+  // The engine skips a throwing hook, so the row still lands beneath it.
+  test("reports a landed injection when an append hook throws", async ($, on) => {
+    const world = worldOf(on, { append: "throw" });
+    const result = await measure($, limits(90));
+    expect(result).toEqual({ changed: ["rateLimits"] });
+    expect(world.announced).toHaveLength(1);
+    expect(world.logs).toHaveLength(1);
+    expect(world.events).toEqual([expect.objectContaining({ event: "inject", ok: true })]);
+  });
+
+  test("announces a limit with no reset time", async ($, on) => {
+    const world = worldOf(on, { append: "land" });
+    await measure($, [{ kind: "five_hour", percentUsed: 90 }]);
+    expect(world.announced).toEqual([{ five_hour: { band: 90, resetsAt: "" } }]);
+    expect(world.logs).toEqual(["Usage notice sent to Claude: 5-hour limit at 90%"]);
+    expect(world.events).toEqual([
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          crossings: [{ kind: "five_hour", threshold: 90, percentUsed: 90, resetsAt: null }],
+        }),
+      }),
+    ]);
+  });
+
+  // oxlint-disable-next-line vitest/prefer-each -- claude-code/testing has no test.each.
+  for (const [reason, reannounced] of [
+    ["clear", true],
+    ["resume", true],
+    ["prompt_input_exit", false],
+  ] as const) {
+    test(`after a session ends on ${reason}, re-announces a band: ${reannounced}`, async ($, on) => {
+      const world = worldOf(on, { append: "land" });
+      on("session.end", (_, e) => ({ sessionId: e.sessionId }));
+      await measure($, limits(90));
+      await $.session.end({ reason, sessionId: "s1", resume: { id: "s1" } });
+      await measure($, limits(91));
+      expect(world.logs).toHaveLength(reannounced ? 2 : 1);
+    });
+  }
 
   test("ignores measurements where rate limits did not move", async ($, on) => {
     const world = worldOf(on);

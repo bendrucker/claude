@@ -14,6 +14,9 @@ interface Verdict {
   reason: string | null;
   rule: string | null;
   hook: string | null;
+  setting: string | null;
+  decider: string | null;
+  ceiling: string | null;
   checkedAt: number;
 }
 
@@ -49,6 +52,9 @@ export function register(on: On): void {
         reason: verdict.reason ?? null,
         rule: verdict.rule ?? null,
         hook: verdict.hook ?? null,
+        setting: verdict.setting ?? null,
+        decider: verdict.decider ?? null,
+        ceiling: verdict.ceiling ?? null,
         checkedAt: await $.clock.now(),
       });
     }
@@ -79,7 +85,11 @@ export function register(on: On): void {
         decision: verdict?.decision ?? null,
         rule: verdict?.rule ?? null,
         hook: verdict?.hook ?? null,
+        setting: verdict?.setting ?? null,
+        decider: verdict?.decider ?? null,
+        ceiling: verdict?.ceiling ?? null,
         reason: verdict?.reason ?? null,
+        read_only: "result" in settled ? settled.result.isReadOnly === true : null,
         started_at: startedAt,
         check_ms: verdict === undefined ? null : verdict.checkedAt - startedAt,
         outcome,

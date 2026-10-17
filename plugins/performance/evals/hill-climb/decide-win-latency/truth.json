@@ -1,7 +1,0 @@
-{
-  "kind": "decide",
-  "trap": "win",
-  "decisions": ["accept"],
-  "note": "Control: a significant gain past the noise floor, inside the profile bound, on quiet rounds, with the guard passing.",
-  "reason": [["\\bp\\b(\\s*[=<\\u2248]|\\s+(is|of))\\s*0?\\.\\d", "signific", "beat (the )?noise"]]
-}

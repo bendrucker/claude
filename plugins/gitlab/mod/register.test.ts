@@ -449,6 +449,52 @@ describe("register", () => {
     });
   });
 
+  test("/clear and /resume keep the watch running", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr() });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const status = await w.shown($);
+    await $.session.end({ reason: "clear", sessionId: "s1", resume: { id: "s1" } });
+    await w.clock.advance(POLL_MS.pending);
+    expect(w.views.length).toBe(2);
+    await $.session.end({ reason: "resume", sessionId: "s1", resume: { id: "s1" } });
+    await w.clock.advance(POLL_MS.pending);
+
+    expect(w.views.length).toBe(3);
+    expect(status).not.toBe(undefined);
+    expect(await w.shown($)).toBe(status);
+  });
+
+  test("logout stops the watch and clears the status", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr() });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.session.end({ reason: "logout", sessionId: "s1", resume: { id: "s1" } });
+    await w.clock.advance(POLL_MS.pending * 3);
+
+    expect(w.views.length).toBe(1);
+    expect(await w.shown($)).toBe(undefined);
+  });
+
+  test("a send waiting on a busy session still advances the footer and the next poll", async ($, on) => {
+    const world: World = { branch: "topic", glab: GLAB_OK, view: mr(), submitMs: POLL_MS.closed };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const before = await w.shown($);
+    world.jobs = job("failed");
+    await w.clock.advance(POLL_MS.pending);
+    expect(w.submits.length).toBe(1);
+    expect(await w.shown($)).not.toBe(before);
+
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.views.length).toBe(3);
+    expect(w.submits.length).toBe(1);
+  });
+
   test("a poll still in flight at session end leaves the status cleared", async ($, on) => {
     const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr(), slowMs: 10_000 });
 

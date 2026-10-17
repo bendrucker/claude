@@ -63,6 +63,16 @@ export function formatResetTime(resetsAt: string | undefined): string {
   });
 }
 
+const LABELS: Record<string, string> = { five_hour: "5-hour", seven_day: "7-day" };
+
+export function summarize(crossings: readonly Crossing[]): string {
+  const parts = crossings.map(({ kind, percentUsed, resetsAt }) => {
+    const reset = resetsAt == null ? "" : ` (resets ${formatResetTime(resetsAt)})`;
+    return `${LABELS[kind] ?? kind} limit at ${percentUsed}%${reset}`;
+  });
+  return `Usage notice sent to Claude: ${parts.join(", ")}`;
+}
+
 export function crossedBand(percentUsed: number, bands: readonly Band[]): Band | undefined {
   return bands.findLast((band) => percentUsed >= band.threshold);
 }

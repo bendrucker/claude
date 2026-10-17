@@ -1,7 +1,7 @@
 schema_version: "1.1"
 name: spike-thumbnail-offload
 tags: [spike, full]
-plugins: ["../../.."]
+plugins: ["../../..", "../../../../pull-request"]
 execution:
   model: claude-sonnet-5-5
   max_turns: 15

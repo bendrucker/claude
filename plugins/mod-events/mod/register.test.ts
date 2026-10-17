@@ -32,7 +32,13 @@ const WITH_CALLER = { plugins: [CALLER] };
 const emit = ($: Engine, input: ModEventsInput) =>
   $.turn.start({ text: JSON.stringify(input), turnId: "t" });
 
-function world(on: On, env: Record<string, string> = HOME, ps = "", isWritable = true) {
+function world(
+  on: On,
+  env: Record<string, string> = HOME,
+  ps = "",
+  isWritable = true,
+  writeMs = 0,
+) {
   const writes = new Map<string, string>();
   const history: { path: string; text: string }[] = [];
   const clock = mock.clock(on, { now: 1000 });
@@ -41,8 +47,9 @@ function world(on: On, env: Record<string, string> = HOME, ps = "", isWritable =
   on("session.id", () => ({ value: "s1" }));
   on("session.version", () => ({ value: { version: "2.1.291" } }));
   on("turn.start", ($, e) => ({ turnId: e.turnId }));
-  on("fs.write", ($, e) => {
+  on("fs.write", async ($, e) => {
     if (!isWritable) throw new Error("EACCES");
+    if (writeMs > 0) await clock.sleep(writeMs);
     writes.set(e.path, e.text);
     history.push({ path: e.path, text: e.text });
     return { value: undefined };
@@ -148,6 +155,18 @@ describe("emit", () => {
     await emit($, { mod: "big", event: "b", detail });
     expect(w.lines(`${ROOT}/s1/big.1000.0.jsonl`).length).toBe(1);
     expect(w.lines(`${ROOT}/s1/big.1000.1.jsonl`).length).toBe(1);
+  });
+
+  test("each concurrent emit resolves after its line is written", WITH_CALLER, async ($, on) => {
+    const w = world(on, HOME, "", true, 10);
+    const landed = ["a", "b", "c"].map(async (event) => {
+      await emit($, { mod: "herdr", event });
+      return w
+        .lines(`${ROOT}/s1/herdr.1000.0.jsonl`)
+        .some((line) => line.event_name === `herdr.${event}`);
+    });
+    await w.clock.advance(100);
+    expect(await Promise.all(landed)).toEqual([true, true, true]);
   });
 
   test("writes under CLAUDE_CONFIG_DIR when set", WITH_CALLER, async ($, on) => {

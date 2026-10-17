@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<issue>\s*(?:```\w*\n)?---\n(?:(?!\n---\n)[\s\S])*?^relations:(?:(?!\n---\n)[\s\S])*?tracker\.example\.com/issue/TEAM-\d+'
+pattern: '<issue>\s*(?:```\w*\n)?-{3}\n(?:(?!\n-{3}\n)[\s\S])*?^relations:(?:(?!\n-{3}\n)[\s\S])*?tracker\.example\.com/issue/TEAM-\d+'
 flags: m
 match: contains
 ---

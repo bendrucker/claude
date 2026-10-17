@@ -9,8 +9,9 @@ const MAIN = "main";
 const ENDED = new Set(["completed", "failed", "killed"]);
 const CONTINUING = new Set(["clear", "resume"]);
 
-// A background subagent stopped with TaskStop ends with no event of its own, so
-// its sessions are looked for on a timer while one is open.
+// SubagentStop closes an agent's sessions at once, but a background subagent
+// stopped with TaskStop doesn't fire it, so its sessions are looked for on a
+// timer while one is open.
 const SWEEP_MS = 30_000;
 
 interface State {
@@ -218,6 +219,15 @@ export function register(on: On): void {
     failed($, "turn.complete", next.error.kind, next.error.message);
     return next(e);
   });
+
+  on("classic.SubagentStop", async ($, e, next) => {
+    const sessions = [...state.owners]
+      .filter(([session, owner]) => owner === e.agent_id && !state.pending.has(session))
+      .map(([session]) => session);
+    await Promise.all(sessions.map((s) => close($, state, s, "agent-stop", 5000)));
+    if (sessions.length > 0) await sweep($, state);
+    return next(e);
+  }).catch(($, e, next) => next(e));
 
   on("session.end", async ($, e, next) => {
     if (CONTINUING.has(e.reason)) return next(e);

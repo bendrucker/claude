@@ -2,6 +2,7 @@ import { globSync, readdirSync } from "node:fs";
 import { dirname, join, normalize, resolve } from "node:path";
 import { parse } from "yaml";
 import { z } from "zod";
+import { siblingLinks } from "./wrap";
 
 /** Where native suites live, relative to the repo root. */
 export const SUITE_GLOBS = ["plugins/*/evals/*", "evals/user/*"];
@@ -97,4 +98,46 @@ export function resultFiles(root: string): string[] {
     .filter((path) => !path.endsWith("-regraded/aggregate-result.json"))
     .map((path) => join(base, path))
     .toSorted();
+}
+
+/** Files outside a wrapped skill that it links to, which `wrap.ts` copies in beside it. */
+async function skillSiblings(repo: string, skill: string): Promise<string[]> {
+  const files = globSync("**/*.md", { cwd: join(repo, skill) });
+  const links = await Promise.all(
+    files.map(async (f) =>
+      siblingLinks(skill, join(skill, f), await Bun.file(join(repo, skill, f)).text()),
+    ),
+  );
+  return links.flat();
+}
+
+/** Repo paths a suite's scores depend on: the suite, the plugins its cases load, and what it wraps. */
+export async function suiteInputs(repo: string, suite: string): Promise<string[]> {
+  const { wrap } = await readSuite(join(repo, suite));
+  const wrapped =
+    wrap === undefined
+      ? []
+      : [
+          ...wrap.skills,
+          ...(await Promise.all(wrap.skills.map((s) => skillSiblings(repo, s)))).flat(),
+          ...wrap.agents,
+          ...wrap.context,
+        ];
+  return [...new Set([suite, ...(await casePlugins(repo, suite)), ...wrapped])];
+}
+
+const within = (path: string, input: string) => path === input || path.startsWith(`${input}/`);
+
+/** The suites CI may run whose inputs hold any of the changed paths, skipping local-only suites. */
+export async function selectSuites(repo: string, changed: string[]): Promise<string[]> {
+  const all = findSuites(repo)
+    .filter((s) => !s.localOnly)
+    .map((s) => s.dir);
+  const hit = await Promise.all(
+    all.map(async (suite) => {
+      const paths = await suiteInputs(repo, suite);
+      return changed.some((c) => paths.some((p) => within(c, p)));
+    }),
+  );
+  return all.filter((_, i) => hit[i]);
 }

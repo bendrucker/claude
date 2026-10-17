@@ -17,7 +17,7 @@ function collect(value: string, previous: string[] = []): string[] {
 
 export const program = new Command("compare.ts")
   .description(
-    "Compare native plugin eval results. Each column is one aggregate-result.json, or several joined by commas whose runs pool into one column. The first column is the baseline.",
+    "Compare native plugin eval results. Each column is one aggregate-result.json, or several joined by commas whose runs pool into one column. The first column is the baseline, and a lone column reports that run without comparison.",
   )
   .argument("<columns...>", "comma-joined aggregate-result.json paths per column")
   .option(

@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","cwd":"/tmp/claude-eval/home/cwd","tools":["Bash"]}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"head -3 package.json && echo === && grep -c widgetCount src/store/state.ts && echo ==DOCS=== && ls docs"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"{\n  \"name\": \"widgets\",\n  \"version\": \"1.0.0\",\n(eval):1: == not found"}]}}
+{"type":"result","subtype":"success","is_error":false,"num_turns":2,"result":"It printed the first three lines of package.json, then zsh stopped with `== not found` on the separator, so nothing after it ran."}

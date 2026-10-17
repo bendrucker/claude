@@ -1,1 +1,5 @@
 allow_tools: [Bash]
+graders:
+  skill-fired: "*"
+  no-commit: "*"
+  no-push: "*"

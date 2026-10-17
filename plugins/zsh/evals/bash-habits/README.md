@@ -16,6 +16,8 @@ A native `claude plugin eval` suite for the `zsh` plugin. Each case scaffolds a 
 
 `bun evals/native/run.ts plugins/zsh/evals/bash-habits -- --runs 3` runs the suite. Launch it outside Claude Code's sandbox, since it spawns `claude` sessions. Each case lists the plugin and `mod-events` in `plugins`, paths that resolve from the case directory.
 
+`bun evals/native/check.ts plugins/zsh/evals/bash-habits` tests the regex graders against the traces and replies in [`examples/`](examples/): each case has one that passes every grader and one that fails the graders its sidecar names.
+
 ## Reading the Arms
 
 The with arm loads the plugin. The without arm doesn't.

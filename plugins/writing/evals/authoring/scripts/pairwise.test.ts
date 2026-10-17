@@ -7,23 +7,21 @@ import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 import seedrandom from "seedrandom";
 import { decodeFile } from "../../../../../packages/decode/index";
+import { isFresh } from "../../../../../packages/eval-judge/index";
 import { Pair, type Judgment, type Key, type Label, type Pick } from "./pairs";
 import {
   agreementOf,
-  blind,
   cacheKey,
   buildPairs,
   calibrate,
   changedRegion,
   collectDrafts,
   compareLabels,
-  deblindPick,
   extractDeliverable,
   extractOut,
   extractWrite,
   formatCalibration,
   formatScore,
-  isFresh,
   judgePair,
   leftPickShare,
   parseMap,
@@ -465,25 +463,6 @@ describe("buildPairs", () => {
     },
   ])("rejects an invalid flag combination", ({ flags, message }) => {
     expect(buildPairs(flags)).rejects.toThrow(message);
-  });
-});
-
-describe("blind / deblindPick", () => {
-  test.each<{ flip: boolean; left: Key }>([
-    { flip: false, left: "a" },
-    { flip: true, left: "b" },
-  ])("blind($flip) puts $left on the left", ({ flip, left }) => {
-    expect(blind(flip)).toBe(left);
-  });
-
-  test.each<{ raw: "1" | "2" | "tie"; left: Key; expected: Pick }>([
-    { raw: "1", left: "a", expected: "a" },
-    { raw: "2", left: "a", expected: "b" },
-    { raw: "1", left: "b", expected: "b" },
-    { raw: "2", left: "b", expected: "a" },
-    { raw: "tie", left: "a", expected: "tie" },
-  ])("deblindPick($raw, $left) -> $expected", ({ raw, left, expected }) => {
-    expect(deblindPick(raw, left)).toBe(expected);
   });
 });
 

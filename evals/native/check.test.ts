@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { check, emptyPrompts, type Mismatch } from "./check";
+import { check, emptyPrompts, type Mismatch, shadowed } from "./check";
 
 async function suite(files: Record<string, string>): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), "check-"));
@@ -147,4 +147,17 @@ test("no tracked case sends an empty prompt", async () => {
   );
   expect(suites.size).toBeGreaterThan(0);
   expect(empty.flat()).toEqual([]);
+});
+
+test("names case graders that shadow a suite grader", async () => {
+  const dir = await suite({
+    "suite.yaml": "graders:\n  fired: '*'\n  short: 'one'\n",
+    "graders/fired.md": "---\ntype: llm\n---\n",
+    "graders/short.md": "---\ntype: llm\n---\n",
+    "one/case.yaml": "name: one\n",
+    "one/graders/fired.md": "---\ntype: llm\n---\n",
+    "two/case.yaml": "name: two\n",
+    "two/graders/short.md": "---\ntype: llm\n---\n",
+  });
+  expect(await shadowed(dir)).toEqual(["one/fired"]);
 });

@@ -120,6 +120,10 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 **Drop it** when the CLI's default idle timeout is 10 minutes or less.
 
+`CLAUDE_CODE_DISABLE_ARTIFACT=1` and `CLAUDE_CODE_SEND_FEEDBACK=0` take the `Artifact` and `SendFeedback` tools out of every interactive request. Together they cut an interactive main thread's first turn from 58.6k to 44.0k tokens, measured on 2026-10-16 from two otherwise identical sessions' transcripts. Between 2026-07-08 and 2026-10-16, `Artifact` was called in 32 of 2,161 sessions across both hosts, and `SendFeedback` in 22. A launch environment does not override the settings value, so a session that needs to publish an artifact starts with `--settings` pointing at a copy of this file without the variable.
+
+**Drop them** when `Artifact` loads deferred behind ToolSearch, or when relaunching to publish becomes routine.
+
 ## Hooks
 
 Why a hook entry in `user/settings.json` earns its place, and what would retire it, for the entries that ship no `README.md` of their own. The hook scripts live in [`user/hooks/`](../user/hooks).

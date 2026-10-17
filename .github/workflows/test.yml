@@ -75,6 +75,17 @@ jobs:
       - name: Run tests
         run: bun test evals/
 
+      - name: Check regex graders against examples
+        run: |
+          status=0
+          while IFS= read -r examples; do
+            suite=$(dirname "$examples")
+            echo "::group::$suite"
+            bun evals/native/check.ts "$suite" || status=1
+            echo "::endgroup::"
+          done < <(find evals plugins/*/evals -type d -name examples -not -path '*/node_modules/*' | sort)
+          exit "$status"
+
   validate:
     runs-on: ubuntu-latest
     steps:

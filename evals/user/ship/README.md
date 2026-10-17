@@ -2,7 +2,7 @@
 
 A native `claude plugin eval` suite for the user skill [`ship`](../../../user/skills/ship/SKILL.md), which [`suite.yaml`](suite.yaml) wraps into a throwaway plugin. It grades the gating decision only: which review passes a diff warrants. Running the passes, opening the PR, and babysitting CI belong to other skills and cost too much per run.
 
-Each case's `fixture.sh` builds a repository whose branch carries a diff against a local bare `origin`. `append_system_prompt` simulates `/ship` with the case's flags, asks for the plan between `<out>` tags as a one-line plan, an `in:` line, and an `out:` line, and stops the session before any pass runs. Regex graders read those lines: `in-<pass>` holds when the pass is gated in, `not-in-<pass>` when it is left off. `stops` fails a session that loads any skill but ship, and `remote-base` checks the diff was taken against the remote tracking ref, and `review-code-<effort>` checks the inferred effort. The effort and config-only cases tell the session a review bot is available, so the Bot Review Gate has something to decide.
+Each case's `fixture.sh` builds a repository whose branch carries a diff against a local bare `origin`. `append_system_prompt` simulates `/ship` with the case's flags, asks for the plan between `<out>` tags as a one-line plan, an `in:` line, and an `out:` line, and stops the session before any pass runs. Regex graders read those lines, each held once in [`graders/`](graders/) and joined to its cases by [`suite.yaml`](suite.yaml): `in-<pass>` holds when the pass is gated in, `not-in-<pass>` when it is left off. `stops`, a `tool_used` grader scored on both arms, fails a session that loads any skill but ship, and `remote-base` checks the diff was taken against the remote tracking ref, and `review-code-<effort>` checks the inferred effort. The effort and config-only cases tell the session a review bot is available, so the Bot Review Gate has something to decide.
 
 The diff kinds, each with a `dev` and a `holdout` case:
 
@@ -26,4 +26,4 @@ The diff kinds, each with a `dev` and a `holdout` case:
 
 `gh workflow run eval.yml --ref <branch> -f suite=evals/user/ship -f args='--tag dev'` runs one replicate in CI. `bun evals/native/run.ts evals/user/ship -- --tag dev` runs it locally with the Bash sandbox disabled. Results land in the gitignored `results/<timestamp>/`.
 
-`bun evals/native/check.ts evals/user/ship` tests the regex graders against the hand-written replies and traces in [`examples/`](examples/).
+`bun evals/native/check.ts evals/user/ship` tests the regex graders against the hand-written replies and traces in [`examples/`](examples/). It does not grade `stops`, so a `ran-pass` trace's `fail: [stops]` goes unchecked.

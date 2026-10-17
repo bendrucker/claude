@@ -32,6 +32,7 @@ Terminal surfaces open as a split beside this pane, named explicitly and without
 Pick the surface from Context:
 
 - Entrypoint `claude-desktop` or `claude-desktop-3p`: the desktop app. Run the gate as if `--browser` were passed, whatever the pane reads.
+- Entrypoint `remote_desktop`: a cloud session, where Plannotator's browser opens in the container and never reaches Ben. Name the branch and what to review, then end the turn. His reply in the app is the next user turn: act on it as in Resume, as free text rather than `path:lines` blocks.
 - Any other entrypoint with the herdr pane `none`: run the gate as if `--browser` were passed.
 - Otherwise: Terminal.
 

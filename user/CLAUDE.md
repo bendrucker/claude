@@ -57,7 +57,7 @@ Point `cwd` at the main repo, never a worktree.
 
 ## Worktrees
 
-Start any change meant to become its own PR in a worktree created with `worktrunk:wt-switch-create`, even where the harness suggests `EnterWorktree`. When the session already runs on a topic branch in a worktree, including one the desktop app created, stay there. Work handed to a sibling agent gets its worktree through `herdr:herdr`.
+Start any change meant to become its own PR in a worktree created with `worktrunk:wt-switch-create`, even where the harness suggests `EnterWorktree`. When the session already runs on a topic branch in a worktree, stay there. That includes a worktree the host app created for the session (`CLAUDE_CODE_HOST_WORKTREE` is set, as in Claude desktop), which is the PR's worktree. Work handed to a sibling agent gets its worktree through `herdr:herdr`.
 
 Inside an isolated worktree, write files with `Write` or `Edit` and keep each Bash command a single plain command. The isolation guard refuses heredocs, `$(...)`, loops, and a `cd` into the main checkout before git.
 

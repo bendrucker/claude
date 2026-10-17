@@ -16,8 +16,8 @@
 --   The in-process duration excludes process spawn and interpreter start, which the harness
 --   figure includes, so it runs below `hooks.p50_ms` by that fixed overhead. These files
 --   are written on this machine only and carry no host column, so an imported host's
---   metrics are not part of the index. Only hooks that call the `user/scripts/hook-metrics`
---   helper appear, and with no file written yet DuckDB raises an IO Error naming the glob
+--   metrics are not part of the index. Only hooks that call a `hook-metrics` helper appear
+--   (`user/scripts/hook-metrics` or a plugin's checked copy of it), and with no file written yet DuckDB raises an IO Error naming the glob
 --   rather than returning no rows.
 -- params:
 --   - name: metrics_glob

@@ -2,7 +2,6 @@
   "name": "pr-body-eval",
   "private": true,
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.129.0",
     "@commander-js/extra-typings": "^15.0.0",
     "@types/mdast": "^4.0.4",
     "cleye": "^2.2.1",

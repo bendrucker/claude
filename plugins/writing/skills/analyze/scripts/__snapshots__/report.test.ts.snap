@@ -89,12 +89,6 @@ Corpus-level rate metrics across deliverable documents. These are aggregate sign
 
 _No deliverable documents analyzed._
 
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
-
 ## Corrective Feedback
 
 Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
@@ -215,12 +209,6 @@ Section count distribution (## Changes / ## Testing / ## Issue / ## References):
 | 3 | 0 |
 | 4 | 0 |
 
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
-
 ## Corrective Feedback
 
 Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
@@ -325,130 +313,6 @@ Coarse part-of-speech tag sequences distinctive to the model's deliverable prose
 Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
 
 _No deliverable documents analyzed._
-
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
-
-## Corrective Feedback
-
-Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
-
-_No corrective-feedback moments in window._
-
-## Correction Candidates
-
-Adjacent (long assistant, short user) pairs. Scan for prose corrections.
-
-_No correction candidates in window._
-"
-`;
-
-exports[`renderReport meaning audit 1`] = `
-"# Writing trope analysis (2026-05-24)
-
-Window: 2026-04-24 to 2026-05-24
-Model filter: \`*opus*\`
-Project filter: (none)
-Min lift threshold (additions): 5.0x
-Min occurrences to count as alive: 5
-Top N candidates: 10
-
-## Summary
-
-- All assistant text: 0 chars
-- Deliverable prose (Write/Edit/Bash): 0 chars
-- User text (human only): 0 chars
-- Voice baseline: not loaded (run ingest-voice.ts + voice-profile.ts)
-- Current wordlist entries audited: 0
-- Rules kept (distinctive and alive): 0
-- Proposed removals: 0 (dead: 0, not distinctive: 0)
-- Proposed additions (new candidates above threshold): 0
-- Correction candidates surfaced: 0
-- Corrective-feedback moments surfaced: 0
-
-## Voice Delta
-
-No voice-delta baseline loaded. Run \`ingest-voice.ts\` then \`voice-profile.ts\` to build a baseline. Rates shown are corpus means only.
-
-| feature | provenance | corpus rate |
-| --- | --- | --- |
-| First-person voice (I/we per 1k) | skill-encouraged | 0.00 |
-| Body length (words) | skill-encouraged | 0 |
-| URL cross-references (per 1k words) | ungoverned | 0.00 |
-| Sentence length median (words) | ungoverned | 0.0 |
-| Template presence (## Changes + ## Testing) | skill-prescribed | 0% |
-| Unique heading texts (count) | skill-prescribed | 0 |
-| Has any heading (fraction of documents) | skill-prescribed | 0% |
-| Action-verb opener lines (fraction of lines) | skill-prescribed | 0.0% |
-| Backtick density (per 1k words) | skill-prescribed | 0.00 |
-| Backtick-manifest bullets (fraction of bullets) | ungoverned | 0.0% |
-| Consequence chains (, so <det>) per 1k words | ungoverned | 0.00 |
-| Subordinate:coordinate clause ratio | ungoverned | 0.00 |
-| No-negation share (no-form of all negated indefinites) | skill-prescribed | 0.00 |
-| Negation (no-form and not-form per 1k) | skill-prescribed | 0.00 |
-| Negative contrast (rather than/instead of/never per 1k) | ungoverned | 0.00 |
-| Discourse markers (however/therefore/in addition per 1k) | ungoverned | 0.00 |
-
-## Proposed Wordlist Removals
-
-Two reasons a rule earns removal:
-
-- **dead**: the model produced it fewer than 5 times in the window on the surface where the rule fires, so the rule rarely fires.
-- **not distinctive**: the comparison baseline uses it at least as often as the model (per token), so the rule would flag the user's own voice rather than slop.
-
-Each rule is judged on its firing surface. Chat-surface rules (openers, sycophantic patterns) compare the model's chat against the user's chat. Deliverable-surface rules (flowery phrases, soft phrasing) compare the model's deliverable prose against the user's voice baseline, so a tell frequent in PR bodies and absent from the baseline reads as keep, not dead.
-
-_No removals proposed._
-
-## Proposed Wordlist Additions
-
-Phrases distinctive to the assistant (lift >= 5.0x) not yet in the wordlists. The baseline columns report the phrase's rate in the user's voice baseline; a count of 0 is the strongest "absent from my baseline" signal.
-
-_No additions proposed._
-
-## Current Rule Health
-
-Full audit of every wordlist entry on its firing surface. \`remove\` rules are either dead or not distinctive (see Proposed Removals). The surface column shows which corpora the model/baseline rates come from.
-
-_No wordlists found at \`plugins/writing/wordlists/\`._
-
-## Structural Pattern Audit
-
-Regex-based patterns from the writing hook, run against all model-generated text.
-Patterns are grouped by detector layer. Cross-sentence patterns shipping in the hook
-without a promotion record appear here as misplacement signals.
-
-_No structural patterns defined._
-
-## Structural Signatures
-
-Coarse part-of-speech tag sequences distinctive to the model's deliverable prose vs the user's voice. Word-independent: when vocabulary drifts between model releases, these shapes persist. Examples are verbatim corpus sentences. This report is local-only, so replace them with invented examples before quoting anywhere else.
-
-_No structural signatures above threshold._
-
-## Structural Trends
-
-Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
-
-_No deliverable documents analyzed._
-
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-Prompt: \`abc123def456\` | Model: \`claude-haiku-4-5\` | Documents: 40 | Est. cost: $0.1234
-
-| criterion | question | flagged | rate |
-| --- | --- | --- | --- |
-| information-density | Does this text tell the reviewer anything new? | 12/40 | 30% |
-| sycophancy | Does the text flatter the reader? | 0/40 | 0% |
-
-Sampled spans (local-only; spot-check before acting):
-
-- information-density: "These changes ensure correct behavior."
 
 ## Corrective Feedback
 
@@ -560,12 +424,6 @@ _No structural signatures above threshold._
 Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
 
 _No deliverable documents analyzed._
-
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
 
 ## Corrective Feedback
 
@@ -680,12 +538,6 @@ Corpus-level rate metrics across deliverable documents. These are aggregate sign
 
 _No deliverable documents analyzed._
 
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
-
 ## Corrective Feedback
 
 Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
@@ -788,12 +640,6 @@ _No structural signatures above threshold._
 Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
 
 _No deliverable documents analyzed._
-
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
 
 ## Corrective Feedback
 
@@ -909,12 +755,6 @@ _No structural signatures above threshold._
 Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
 
 _No deliverable documents analyzed._
-
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
 
 ## Corrective Feedback
 
@@ -1036,12 +876,6 @@ Corpus-level rate metrics across deliverable documents. These are aggregate sign
 
 _No deliverable documents analyzed._
 
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
-
 ## Corrective Feedback
 
 Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
@@ -1144,12 +978,6 @@ _No structural signatures above threshold._
 Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
 
 _No deliverable documents analyzed._
-
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
 
 ## Corrective Feedback
 
@@ -1254,12 +1082,6 @@ Corpus-level rate metrics across deliverable documents. These are aggregate sign
 
 _No deliverable documents analyzed._
 
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
-
 ## Corrective Feedback
 
 Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
@@ -1362,12 +1184,6 @@ _No structural signatures above threshold._
 Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
 
 _No deliverable documents analyzed._
-
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
 
 ## Corrective Feedback
 
@@ -1472,12 +1288,6 @@ Corpus-level rate metrics across deliverable documents. These are aggregate sign
 
 _No deliverable documents analyzed._
 
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
-
 ## Corrective Feedback
 
 Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
@@ -1581,12 +1391,6 @@ Corpus-level rate metrics across deliverable documents. These are aggregate sign
 
 _No deliverable documents analyzed._
 
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
-
 ## Corrective Feedback
 
 Short, human-authored user messages that name a writing problem (frustration lexicon match), paired with the preceding model output. These are labeled-slop moments: the user explicitly called out prose the model produced.
@@ -1689,12 +1493,6 @@ _No structural signatures above threshold._
 Corpus-level rate metrics across deliverable documents. These are aggregate signals, not per-document flags.
 
 _No deliverable documents analyzed._
-
-## Meaning-Layer Audit (LLM Judge)
-
-Per-criterion flag rates from the batch LLM judge over the deliverable corpus, in rubric order (information-density leads; press-release-structure is deprioritized). The prompt is a versioned artifact: a different hash means these numbers are not comparable to prior runs. Sampled spans quote session text, so this section stays in the local report and is never committed.
-
-_Judge not run. Pass \`--judge\` (requires \`ANTHROPIC_API_KEY\`) to enable._
 
 ## Corrective Feedback
 

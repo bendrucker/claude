@@ -2,3 +2,26 @@ allow_tools: ["Bash(bun:*)", "Bash(python3:*)", Write, Edit]
 judge_model: claude-sonnet-5-5
 wrap:
   skills: [user/skills/tdd]
+graders:
+  skill-fired: "*"
+  asks-seam: "*ask-seam-*"
+  no-code-written: "*ask-seam-*"
+  no-test-written: "*ask-seam-*"
+  green:
+    [
+      balance-pin-size,
+      balance-pin-slug,
+      bugfix-leap-year,
+      cart-discount,
+      ho-balance-pin-bytes,
+      ho-bugfix-csv,
+      ho-mock-boundary-mailer,
+      ho-parse-money,
+      ho-read-back-settings,
+      ho-tautology-shipping,
+      mock-boundary-clock,
+      mock-boundary-weather,
+      parse-duration,
+      side-channel-users,
+      tautology-invoice,
+    ]

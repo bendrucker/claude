@@ -14,7 +14,6 @@ import { type Provenance, ProvenanceSchema } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
 import { workflowJudge } from "../judge/adapter";
 import { buildJob, type ShardComment, writeJob } from "../judge/job";
-import { loadPrompt } from "../judge/judge";
 import {
   SLOP_CATEGORIES,
   type SlopCategory,
@@ -22,12 +21,6 @@ import {
   type Verdict,
   type VerdictAction,
 } from "../judge/schema";
-import {
-  anthropicCommentJudge,
-  type CommentJudgeInput,
-  JUDGE_MODEL,
-  judgeComments,
-} from "./oracle";
 
 /**
  * One labeled comment with the surrounding context the judge sees. `action`
@@ -186,18 +179,6 @@ function validateFixture(value: unknown, file: string): Fixture {
 export function fixtureToShardComment(fixture: Fixture): ShardComment {
   return {
     id: fixture.id,
-    path: fixture.path,
-    language: fixture.language,
-    kind: fixture.kind,
-    text: fixture.comment,
-    context: fixture.context,
-    provenance: fixture.provenance,
-    doc: fixture.doc,
-  };
-}
-
-export function fixtureToInput(fixture: Fixture): CommentJudgeInput {
-  return {
     path: fixture.path,
     language: fixture.language,
     kind: fixture.kind,
@@ -555,18 +536,6 @@ async function score(jobDir: string | undefined, gate: boolean): Promise<number>
   return gateOn(fixtures, alignVerdicts(fixtures, await readJobVerdicts(jobDir)), gate);
 }
 
-async function oracle(model: string, gate: boolean): Promise<number> {
-  const fixtures = await loadFixtures();
-  if (fixtures.length === 0) {
-    console.error("No fixtures found.");
-    return 1;
-  }
-  const prompt = await loadPrompt();
-  console.error(`Judging fixtures on ${model} (prompt ${prompt.sha256.slice(0, 12)})`);
-  const judge = anthropicCommentJudge({ prompt: prompt.text, model });
-  return gateOn(fixtures, await judgeComments(judge, fixtures.map(fixtureToInput)), gate);
-}
-
 const GATE_FLAG = {
   type: Boolean,
   default: false,
@@ -605,19 +574,9 @@ if (import.meta.main) {
     },
   );
 
-  await cli(
-    {
-      name: "eval",
-      flags: {
-        model: { type: String, default: JUDGE_MODEL, description: "Judge model id" },
-        gate: GATE_FLAG,
-      },
-      commands: [buildCmd, scoreCmd],
-    },
-    (parsed) => {
-      task = oracle(parsed.flags.model, parsed.flags.gate);
-    },
-  );
+  await cli({ name: "eval", commands: [buildCmd, scoreCmd] }, (parsed) => {
+    parsed.showHelp();
+  });
 
   process.exit(
     await (task?.catch((error: unknown) => {

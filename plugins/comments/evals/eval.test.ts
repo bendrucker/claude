@@ -9,7 +9,6 @@ import {
   carriesFact,
   clearVerdicts,
   type Fixture,
-  fixtureToInput,
   fixtureToShardComment,
   gateFailures,
   loadFixtures,
@@ -17,7 +16,6 @@ import {
   RETENTION_CEILING,
   scoreResults,
 } from "./eval";
-import { anthropicCommentJudge, judgeComments } from "./oracle";
 
 function fixture(over: Partial<Fixture>): Fixture {
   return {
@@ -332,7 +330,6 @@ describe("fixture corpus", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const f of fixtures) {
       expect(f.context.length).toBeGreaterThan(0);
-      expect(fixtureToInput(f).text).toBe(f.comment);
       expect(fixtureToShardComment(f)).toMatchObject({ id: f.id, text: f.comment });
       if (f.action === "rewrite") expect(f.rewrite?.length).toBeGreaterThan(0);
     }
@@ -390,25 +387,4 @@ describe("fixture validation", () => {
     expect(thrown).toBeInstanceOf(Error);
     expect(String(thrown)).toMatch(message);
   });
-});
-
-// The oracle's must-keep cross-check: it must never drop a justified comment's
-// fact. The gate of record runs the same corpus through the production
-// workflow (`eval.ts build`, then `score --gate`). This is the batched SDK
-// second opinion, and it samples, so a run can differ. Self-skips without an
-// API key, keeping CI off the API.
-const hasKey = Boolean(process.env.ANTHROPIC_API_KEY);
-
-describe("oracle must-keep check", () => {
-  test.skipIf(!hasKey)(
-    "judge keeps every must-keep fact",
-    async () => {
-      const fixtures = (await loadFixtures()).filter((f) => f.action === "keep");
-      const prompt = await loadPrompt();
-      const judge = anthropicCommentJudge({ prompt: prompt.text });
-      const verdicts = await judgeComments(judge, fixtures.map(fixtureToInput));
-      expect(scoreResults(fixtures, verdicts).keepViolations).toEqual([]);
-    },
-    120_000,
-  );
 });

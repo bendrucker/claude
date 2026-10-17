@@ -4,8 +4,8 @@ import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { table } from "table";
 import { z } from "zod";
-import { traceReply } from "../../../../../evals/native/load";
-import { type Run, Result, score } from "../../../../../evals/native/regrade";
+import { type Run, Result, score } from "../../../../../packages/evals/result";
+import { traceReply } from "../../../../../packages/evals/trace";
 import { GUARDS, LIMITS, guardKeys, limitKeys, measureStructure } from "../structure";
 
 // Scores a results directory against the PR-body structure limits, so changing

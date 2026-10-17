@@ -1,0 +1,2052 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.281",
+  "startedAt": "2026-09-24T16:24:18.099Z",
+  "durationSeconds": 68,
+  "costUsd": 1.4329079999999998,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/hill-climb-VTasPr/plugins",
+    "ablation": "with-without",
+    "judgeModel": "claude-sonnet-5",
+    "tagFilters": ["holdout"],
+    "threshold": 0,
+    "concurrency": 4,
+    "plugins": [
+      {
+        "name": "writing",
+        "path": "/tmp/hill-climb-VTasPr/plugins/writing"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "comment-light-touch",
+      "dir": "writing/evals/no-diary/comment-light-touch",
+      "source": "mixed",
+      "promptMarkdown": "give this comment a no-diary pass\n\n```go\n// Postgres truncates identifiers at 63 bytes. Index names built from long\n// table and column names would collide after truncation, so names past the\n// limit get a short hash suffix instead.\nfunc indexName(table string, cols []string) string {\n```",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 3,
+      "timeoutSeconds": 300,
+      "maxTurns": 15,
+      "graders": [
+        {
+          "name": "keeps-code",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-collision",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-hash",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-limit",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "rewrite-block",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>[\\s\\S]*</rewrite>",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "skill-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "writing:no-diary",
+            "arm": "with-only"
+          }
+        },
+        {
+          "name": "unchanged",
+          "type": "llm",
+          "weight": 1,
+          "graderMarkdown": "The comment is left essentially as written, with at most minor wording changes, because it holds no diary.\nFor example, a rewrite that tightens one clause (\"so long names get a short hash suffix\") while keeping the truncation limit, the collision, and the hash passes.",
+          "config": {
+            "criteria": "The comment is left essentially as written, with at most minor wording changes, because it holds no diary.\nFor example, a rewrite that tightens one clause (\"so long names get a short hash suffix\") while keeping the truncation limit, the collision, and the hash passes.",
+            "focus": "last_message"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.6666666666666666,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.07675879999999999,
+            "judgeCostUsd": 0.006449999999999999,
+            "durationSeconds": 14,
+            "startedAt": "2026-09-24T16:24:18.248Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-3YvMOL/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "unchanged",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "The comment is already close to the code-comments bar (it states a constraint, not history), but it's wordier than it needs to be — the collision explanation restates why truncation is a problem, and \"instead\" implies an unstated alternative.\n\n<rewrite>\n// Postgres truncates identifiers at 63 bytes, so index names built from long\n// table and column names get a hash suffix once they exceed the limit.\nfunc indexName(table string, cols []string) string {\n</rewrite>\n\nCut the \"would collide\" clause — it just restates the consequence of truncation, which the reader already infers from \"so names past the limit get a hash suffix.\" Dropped \"instead\" since it pointed at an unstated alternative."
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 5,
+            "costUsd": 0.08247,
+            "judgeCostUsd": 0.007801999999999998,
+            "durationSeconds": 15,
+            "startedAt": "2026-09-24T16:24:18.248Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-qXR3FA/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "unchanged",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [true, true, true],
+                "evidence": "<rewrite>\n// Postgres truncates identifiers at 63 bytes, so long table/column names can\n// collide after truncation. Names over the limit get a short hash suffix to\n// stay unique.\nfunc indexName(table string, cols []string) string {\n</rewrite>\n\nCut \"instead\" (implied alternative with no reader benefit) and merged the cause/effect into one sentence. Kept the rationale (collision risk) since it explains why the hash suffix exists, not just what the code does."
+              }
+            ]
+          },
+          {
+            "score": 0.8333333333333334,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.0733722,
+            "judgeCostUsd": 0.005561999999999999,
+            "durationSeconds": 14,
+            "startedAt": "2026-09-24T16:24:18.248Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-Y0rDGK/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "unchanged",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "Cut the \"would collide... instead\" narration — that's justifying the decision rather than stating what a reader needs. Kept one clause for the reason since it explains an otherwise-unlisted case (why a hash suffix instead of plain truncation).\n\n<rewrite>\n// Postgres truncates identifiers at 63 bytes; names past the limit get a\n// short hash suffix to avoid collisions after truncation.\nfunc indexName(table string, cols []string) string {\n</rewrite>"
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.039604600000000004,
+            "judgeCostUsd": 0.001752,
+            "durationSeconds": 8,
+            "startedAt": "2026-09-24T16:24:18.248Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-rSBfa5/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "unchanged",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [true, true, true],
+                "evidence": "<rewrite>\n// Postgres truncates identifiers at 63 bytes; names past the limit get a\n// short hash suffix to avoid collisions.\nfunc indexName(table string, cols []string) string {\n</rewrite>"
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.0463866,
+            "judgeCostUsd": 0.004945999999999997,
+            "durationSeconds": 9,
+            "startedAt": "2026-09-24T16:24:25.991Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-AimCv3/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "unchanged",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [true, true, true],
+                "evidence": "<rewrite>\n// Postgres truncates identifiers at 63 bytes, so long table/column names\n// could collide after truncation; names past the limit get a hash suffix.\nfunc indexName(table string, cols []string) string {\n</rewrite>"
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.0396046,
+            "judgeCostUsd": 0.0017519999999999984,
+            "durationSeconds": 5,
+            "startedAt": "2026-09-24T16:24:32.376Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-qVmDLP/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "unchanged",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [true, true, true],
+                "evidence": "<rewrite>\n// Postgres truncates identifiers at 63 bytes; names past the limit get a\n// short hash suffix to avoid collisions.\nfunc indexName(table string, cols []string) string {\n</rewrite>"
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.8333333333333334,
+        "passRate": 0.3333333333333333,
+        "scoreWithout": 1,
+        "passRateWithout": 1,
+        "delta": -0.16666666666666663
+      }
+    },
+    {
+      "name": "issue-user-draft",
+      "dir": "writing/evals/no-diary/issue-user-draft",
+      "source": "mixed",
+      "promptMarkdown": "here's my draft issue, strip the diary but keep it sounding like me\n\n---\n## Export CSV drops the last row\n\nok so this one bit me twice this week. I spent an afternoon convinced it was a timezone thing, then a buffering thing, before I figured it out: the writer never flushes when the row count is an exact multiple of 500 (the batch size). Exports of 499 or 501 rows are fine, 500 or 1000 lose the final row.\n\nFix is probably just a flush() after the loop, I'm pretty sure.\n---",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 3,
+      "timeoutSeconds": 300,
+      "maxTurns": 15,
+      "graders": [
+        {
+          "name": "keeps-batch",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:500)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-examples",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:499|501)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-flush",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:flush)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-voice",
+          "type": "llm",
+          "weight": 1,
+          "graderMarkdown": "The rewrite keeps the author's casual first-person register rather than converting it to formal issue prose.\nFor example, \"This bit me twice this week: the writer never flushes when the row count is an exact multiple of 500.\" passes, since it keeps the casual first person without the monologue.",
+          "config": {
+            "criteria": "The rewrite keeps the author's casual first-person register rather than converting it to formal issue prose.\nFor example, \"This bit me twice this week: the writer never flushes when the row count is an exact multiple of 500.\" passes, since it keeps the casual first person without the monologue.",
+            "focus": "last_message"
+          }
+        },
+        {
+          "name": "no-monologue",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:afternoon|timezone|buffering thing|figured it out|convinced)",
+            "flags": "i",
+            "match": "not_contains"
+          }
+        },
+        {
+          "name": "rewrite-block",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>[\\s\\S]*</rewrite>",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "skill-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "writing:no-diary",
+            "arm": "with-only"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.0785434,
+            "judgeCostUsd": 0.0037139999999999986,
+            "durationSeconds": 22,
+            "startedAt": "2026-09-24T16:24:32.542Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-JQRGQs/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-batch",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:500)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-examples",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:499|501)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-flush",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:flush)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-voice",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [true, true, true],
+                "evidence": "Cut: the \"bit me twice this week\" framing, and the afternoon spent chasing timezone/buffering theories before landing on the real cause — that's the debugging journey, not the bug report.\n\n<rewrite>\n## Export CSV drops the last row\n\nThe writer never flushes when the row count is an exact multiple of 500 (the batch size). Exports of 499 or 501 rows are fine, 500 or 1000 lose the final row.\n\nFix is probably just a flush() after the loop, I'm pretty sure.\n</rewrite>"
+              },
+              {
+                "name": "no-monologue",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 0.8333333333333334,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.0725852,
+            "judgeCostUsd": 0.004968000000000004,
+            "durationSeconds": 14,
+            "startedAt": "2026-09-24T16:24:33.349Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-yjJXma/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-batch",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:500)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-examples",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:499|501)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-flush",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:flush)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-voice",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "Cut the \"bit me twice,\" the timezone/buffering false leads, and the \"figured it out\" framing — those are the diary. Kept the finding and the fix, in your words.\n\n<rewrite>\n## Export CSV drops the last row\n\nThe writer never flushes when the row count is an exact multiple of 500 (the batch size). Exports of 499 or 501 rows are fine, 500 or 1000 lose the final row.\n\nFix is probably just a flush() after the loop, I'm pretty sure.\n</rewrite>"
+              },
+              {
+                "name": "no-monologue",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.070382,
+            "judgeCostUsd": 0.004838000000000002,
+            "durationSeconds": 13,
+            "startedAt": "2026-09-24T16:24:34.568Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-DMp8cw/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-batch",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:500)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-examples",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:499|501)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-flush",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:flush)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-voice",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [true, true, true],
+                "evidence": "Cut the diary, kept your voice on the fix.\n\n<rewrite>\n## Export CSV drops the last row\n\nThe writer never flushes when the row count is an exact multiple of 500 (the batch size). Exports of 499 or 501 rows are fine, 500 or 1000 lose the final row.\n\nFix is probably just a flush() after the loop, I'm pretty sure.\n</rewrite>\n\nRemovals:\n- **Change evolution** — \"bit me twice this week,\" the afternoon spent chasing a timezone theory then a buffering theory, \"before I figured it out.\"\n\nEverything else was already result-stated or your own voice, so it stayed."
+              },
+              {
+                "name": "no-monologue",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.8333333333333334,
+            "passed": false,
+            "turns": 1,
+            "costUsd": 0.0404366,
+            "judgeCostUsd": 0.001985999999999998,
+            "durationSeconds": 7,
+            "startedAt": "2026-09-24T16:24:37.676Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-REB0ul/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-batch",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:500)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-examples",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:499|501)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-flush",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:flush)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-voice",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "<rewrite>\n## Export CSV drops the last row\n\nThe writer never flushes when the row count is an exact multiple of 500 (the batch size). Exports of 499 or 501 rows are fine; 500 or 1000 lose the final row.\n\nFix is probably just a flush() after the loop.\n</rewrite>"
+              },
+              {
+                "name": "no-monologue",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.8333333333333334,
+            "passed": false,
+            "turns": 1,
+            "costUsd": 0.0411266,
+            "judgeCostUsd": 0.002651999999999998,
+            "durationSeconds": 6,
+            "startedAt": "2026-09-24T16:24:44.356Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-CLc9Ff/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-batch",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:500)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-examples",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:499|501)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-flush",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:flush)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-voice",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "<rewrite>\n## Export CSV drops the last row\n\nThe writer never flushes when the row count is an exact multiple of 500 (the batch size). Exports of 499 or 501 rows are fine; 500 or 1000 lose the final row.\n\nFix is probably just a flush() after the loop.\n</rewrite>"
+              },
+              {
+                "name": "no-monologue",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.8333333333333334,
+            "passed": false,
+            "turns": 1,
+            "costUsd": 0.0425986,
+            "judgeCostUsd": 0.004115999999999998,
+            "durationSeconds": 5,
+            "startedAt": "2026-09-24T16:24:47.111Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-QbfKWi/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-batch",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:500)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-examples",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:499|501)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-flush",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:flush)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-voice",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "<rewrite>\n## Export CSV drops the last row\n\nThe writer never flushes when the row count is an exact multiple of 500 (the batch size). Exports of 499 or 501 rows are fine; 500 or 1000 lose the final row.\n\nFix is probably just a `flush()` after the loop.\n</rewrite>"
+              },
+              {
+                "name": "no-monologue",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.9444444444444445,
+        "passRate": 0.6666666666666666,
+        "scoreWithout": 0.8333333333333334,
+        "passRateWithout": 0,
+        "delta": 0.11111111111111116
+      }
+    },
+    {
+      "name": "pr-meta-heading",
+      "dir": "writing/evals/no-diary/pr-meta-heading",
+      "source": "mixed",
+      "promptMarkdown": "trim this pr body, too much diary\n\n---\n## Things That Wouldn't Be Obvious To A Reviewer\n\nThis section covers the non-obvious parts of the change. First, I noticed while working on this that the cast on line 40 was unrequested, but I added it anyway. Second, it's worth noting that the schema asymmetry here is deliberate.\n\n## Changes\n\n- `src/query/build.ts`: added cast\n- `src/query/build.test.ts`: added test\n- `src/types.ts`: widened type\n---",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 3,
+      "timeoutSeconds": 300,
+      "maxTurns": 15,
+      "graders": [
+        {
+          "name": "keeps-asymmetry",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:asymmetr)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-cast",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:cast)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "no-file-inventory",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:build\\.test\\.ts|src/types\\.ts)",
+            "flags": "i",
+            "match": "not_contains"
+          }
+        },
+        {
+          "name": "no-invention",
+          "type": "llm",
+          "weight": 1,
+          "graderMarkdown": "The rewrite invents no reason for the cast or the schema asymmetry beyond what the input states.\nFor example, \"The cast on line 40 was not requested. The schema asymmetry is deliberate.\" passes, since it states both facts with no reason attached.",
+          "config": {
+            "criteria": "The rewrite invents no reason for the cast or the schema asymmetry beyond what the input states.\nFor example, \"The cast on line 40 was not requested. The schema asymmetry is deliberate.\" passes, since it states both facts with no reason attached.",
+            "focus": "last_message"
+          }
+        },
+        {
+          "name": "no-meta-heading",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:obvious to a reviewer|this section)",
+            "flags": "i",
+            "match": "not_contains"
+          }
+        },
+        {
+          "name": "no-self-narration",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:I noticed|unrequested|worth noting|anyway)",
+            "flags": "i",
+            "match": "not_contains"
+          }
+        },
+        {
+          "name": "rewrite-block",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>[\\s\\S]*</rewrite>",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "skill-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "writing:no-diary",
+            "arm": "with-only"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.7142857142857143,
+            "passed": false,
+            "turns": 6,
+            "costUsd": 0.09363079999999999,
+            "judgeCostUsd": 0.0036659999999999957,
+            "durationSeconds": 27,
+            "startedAt": "2026-09-24T16:24:47.683Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-WATGw8/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-asymmetry",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:asymmetr)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-cast",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:cast)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-file-inventory",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern found (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-invention",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "Confirms it: no file-inventory changes section, and the cast note should just state what it prevents, not that it was noticed or unrequested.\n\n<rewrite>\n## Non-obvious\n\nThe cast on line 40 in `src/query/build.ts` prevents [describe the type error it avoids]. The schema asymmetry in `src/types.ts` is intentional.\n</rewrite>\n\nI cut the \"noticed while working on this\" / \"added it anyway\" narration and the noted-but-unmotivated framing, and dropped the \"Changes\" file list since it just restates the diff. I left a placeholder for what the cast actually prevents since the original text never said — fill that in, or I can drop the sentence if there's no real reason to flag it."
+              },
+              {
+                "name": "no-meta-heading",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-self-narration",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 0.8571428571428571,
+            "passed": false,
+            "turns": 5,
+            "costUsd": 0.09643080000000001,
+            "judgeCostUsd": 0.0048960000000000045,
+            "durationSeconds": 22,
+            "startedAt": "2026-09-24T16:24:50.659Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-XzZHcA/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-asymmetry",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:asymmetr)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-cast",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:cast)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-file-inventory",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-invention",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "Cut the narration (\"I noticed,\" \"it's worth noting\"), the unrequested/noticed framing, and the file-inventory list — replaced with what the changes actually do.\n\n<rewrite>\n## Notes for Reviewers\n\nThe cast on line 40 is intentional, not leftover from an earlier draft. The schema asymmetry is deliberate.\n\n## Changes\n\n- Added a cast in query building, and widened the corresponding type to match.\n- Added test coverage for the cast.\n</rewrite>\n\nCut: the self-describing intro line, \"I noticed while working on this\" / \"it's worth noting\" narration, \"but I added it anyway,\" and the per-file inventory in Changes (replaced with the behavior it covers, per the no-file-inventory rule for PR bodies)."
+              },
+              {
+                "name": "no-meta-heading",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-self-narration",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 0.8571428571428571,
+            "passed": false,
+            "turns": 5,
+            "costUsd": 0.0982862,
+            "judgeCostUsd": 0.0026700000000000057,
+            "durationSeconds": 28,
+            "startedAt": "2026-09-24T16:24:52.428Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-YJnYji/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-asymmetry",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:asymmetr)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-cast",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:cast)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-file-inventory",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-invention",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "Cut the narration of noticing/adding the cast and the file-by-file inventory; kept the two decisions a reviewer can't get from the diff.\n\n**Removals**\n- Change evolution / provenance: \"I noticed while working on this... added it anyway\" — reads as process narration with no remaining fact once the \"unrequested\" framing is dropped.\n- Restatement: the per-file changes list — a file inventory, not behavior.\n\n<rewrite>\n---\n## Notes for Reviewers\n\nThe schema asymmetry is deliberate.\n\n## Changes\n\nWidened the query type to match the schema, added a cast in `build.ts` where the two don't align, and a test covering it.\n---\n</rewrite>"
+              },
+              {
+                "name": "no-meta-heading",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-self-narration",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.5714285714285714,
+            "passed": false,
+            "turns": 1,
+            "costUsd": 0.0405586,
+            "judgeCostUsd": 0.0020100000000000014,
+            "durationSeconds": 7,
+            "startedAt": "2026-09-24T16:24:54.329Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-CoQAz8/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-asymmetry",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:asymmetr)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-cast",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:cast)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-file-inventory",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern found (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-invention",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "<rewrite>\n## Notes For Reviewer\n\n- The cast on line 40 was unrequested but added deliberately.\n- The schema asymmetry is intentional.\n\n## Changes\n\n- `src/query/build.ts`: added cast\n- `src/query/build.test.ts`: added test\n- `src/types.ts`: widened type\n</rewrite>"
+              },
+              {
+                "name": "no-meta-heading",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-self-narration",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern found (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.42857142857142855,
+            "passed": false,
+            "turns": 1,
+            "costUsd": 0.040770600000000004,
+            "judgeCostUsd": 0.002094000000000002,
+            "durationSeconds": 5,
+            "startedAt": "2026-09-24T16:25:00.883Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-H8QDty/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-asymmetry",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:asymmetr)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-cast",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:cast)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-file-inventory",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern found (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-invention",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "<rewrite>\n## Things That Wouldn't Be Obvious To A Reviewer\n\n- The cast in `build.ts` is unrequested but intentional.\n- The schema asymmetry is deliberate.\n\n## Changes\n\n- `src/query/build.ts`: added cast\n- `src/query/build.test.ts`: added test\n- `src/types.ts`: widened type\n</rewrite>"
+              },
+              {
+                "name": "no-meta-heading",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern found (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-self-narration",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern found (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 0.5714285714285714,
+            "passed": false,
+            "turns": 1,
+            "costUsd": 0.042590600000000006,
+            "judgeCostUsd": 0.003954000000000006,
+            "durationSeconds": 5,
+            "startedAt": "2026-09-24T16:25:06.227Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-efnaMp/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-asymmetry",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:asymmetr)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-cast",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:cast)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-file-inventory",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern found (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-invention",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "<rewrite>\n## Notes for Reviewer\n\n- Cast on line 40 in `src/query/build.ts` is unrequested but intentional.\n- Schema asymmetry is deliberate.\n\n## Changes\n\n- `src/query/build.ts`: added cast\n- `src/query/build.test.ts`: added test\n- `src/types.ts`: widened type\n</rewrite>"
+              },
+              {
+                "name": "no-meta-heading",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-self-narration",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern found (expected absent)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.8095238095238094,
+        "passRate": 0,
+        "scoreWithout": 0.5238095238095238,
+        "passRateWithout": 0,
+        "delta": 0.2857142857142856
+      }
+    },
+    {
+      "name": "skill-rationale-rule",
+      "dir": "writing/evals/no-diary/skill-rationale-rule",
+      "source": "mixed",
+      "promptMarkdown": "this skill section reads like a diary, clean it up\n\n---\n## Quoting\n\nQuote every shell argument with single quotes. We used double quotes until the March incident, when a branch named `fix-$HOME` expanded to a path and a cleanup step deleted the wrong directory. Single quotes stop the shell expanding `$`, backticks, and `!` inside the argument, so apply them to any value that came from a user, a branch name, or a file path. This rule was added after a long discussion in #88.\n---",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 3,
+      "timeoutSeconds": 300,
+      "maxTurns": 15,
+      "graders": [
+        {
+          "name": "keeps-reason",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:expan)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-rule",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:single quote)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-scope",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:branch)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "no-history",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:march|incident|until|deleted|#88|discussion)",
+            "flags": "i",
+            "match": "not_contains"
+          }
+        },
+        {
+          "name": "rewrite-block",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>[\\s\\S]*</rewrite>",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "skill-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "writing:no-diary",
+            "arm": "with-only"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.069494,
+            "judgeCostUsd": 0,
+            "durationSeconds": 12,
+            "startedAt": "2026-09-24T16:25:11.361Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-6XnzvU/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-reason",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:expan)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-rule",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:single quote)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-scope",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:branch)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-history",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 5,
+            "costUsd": 0.067574,
+            "judgeCostUsd": 0,
+            "durationSeconds": 8,
+            "startedAt": "2026-09-24T16:25:12.221Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-FdNrXX/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-reason",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:expan)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-rule",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:single quote)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-scope",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:branch)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-history",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.0638434,
+            "judgeCostUsd": 0,
+            "durationSeconds": 9,
+            "startedAt": "2026-09-24T16:25:14.290Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-InwphJ/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-reason",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:expan)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-rule",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:single quote)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-scope",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:branch)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-history",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.0388466,
+            "judgeCostUsd": 0,
+            "durationSeconds": 3,
+            "startedAt": "2026-09-24T16:25:20.614Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-P1IYVL/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-reason",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:expan)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-rule",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:single quote)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-scope",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:branch)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-history",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.0382766,
+            "judgeCostUsd": 0,
+            "durationSeconds": 2,
+            "startedAt": "2026-09-24T16:25:20.667Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-IwLKt8/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-reason",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:expan)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-rule",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:single quote)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-scope",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:branch)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-history",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.0387366,
+            "judgeCostUsd": 0,
+            "durationSeconds": 3,
+            "startedAt": "2026-09-24T16:25:23.026Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-1FDlIW/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-reason",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:expan)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-rule",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:single quote)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-scope",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:branch)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "no-history",
+                "passed": true,
+                "weight": 1,
+                "explanation": "pattern absent as expected",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1,
+        "scoreWithout": 1,
+        "passRateWithout": 1,
+        "delta": 0
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 4,
+    "casesPassed": 4,
+    "overallScore": 0.8968253968253969,
+    "overallPassRate": 0.5,
+    "meanDelta": 0.05753968253968253
+  }
+}

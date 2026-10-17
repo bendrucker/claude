@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Result } from "../../../../../evals/native/regrade";
+import { Result } from "../../../../../packages/evals/result";
 import { applyLimits, type Body, bodyOf, render } from "./limits";
 
 const long = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");

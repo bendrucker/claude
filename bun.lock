@@ -52,6 +52,22 @@
         "@hegeldev/hegel": "^0.4.7",
       },
     },
+    "packages/evals": {
+      "name": "@bendrucker/claude-evals",
+      "dependencies": {
+        "mdast-util-from-markdown": "^2.0.2",
+        "seedrandom": "^3.0.5",
+        "simple-statistics": "^7.12.0",
+        "table": "^6.9.0",
+        "unist-util-visit": "^5.1.0",
+        "yaml": "^2.7.1",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@types/mdast": "^4.0.4",
+        "@types/seedrandom": "^3.0.8",
+      },
+    },
     "packages/marketplace": {
       "name": "@bendrucker/claude-marketplace",
       "dependencies": {
@@ -494,6 +510,8 @@
     "@bendrucker/claude-comments": ["@bendrucker/claude-comments@workspace:plugins/comments"],
 
     "@bendrucker/claude-decode": ["@bendrucker/claude-decode@workspace:packages/decode"],
+
+    "@bendrucker/claude-evals": ["@bendrucker/claude-evals@workspace:packages/evals"],
 
     "@bendrucker/claude-marketplace": ["@bendrucker/claude-marketplace@workspace:packages/marketplace"],
 

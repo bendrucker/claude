@@ -2,7 +2,8 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Result, regrade } from "./regrade";
+import { regrade } from "./regrade";
+import { type Result as Parsed, Result, readResult, score } from "./result";
 
 const grader = (name: string, passed: boolean, withOnly = false) => ({
   name,
@@ -119,4 +120,36 @@ test("takes a swapped-in regex grader's arm from its file", async () => {
     ["no-skill", true, false],
   ]);
   expect(run?.score).toBe(1);
+});
+
+// Runner output from a no-diary run and a pull-request create run, with the no-diary case's
+// graders as they stood at the commit that ran. A drift from the runner's weighting, with-only
+// exclusion, or regex semantics changes a recomputed score or flips a verdict here.
+const FIXTURES = join(import.meta.dirname, "test");
+
+const verdicts = (result: Parsed) =>
+  result.cases.map((c) => [
+    c.name,
+    Object.entries(c.arms).map(([arm, runs]) => [
+      arm,
+      runs.map((r) => [r.score, r.graders.map((g) => [g.name, g.passed, g.scored])]),
+    ]),
+  ]);
+
+test.each(["no-diary/run", "create"])("score reproduces every run score in %s", async (dir) => {
+  const result = await readResult(join(FIXTURES, dir, "aggregate-result.json"));
+  const runs = result.cases.flatMap((c) =>
+    Object.entries(c.arms).flatMap(([arm, rs]) => rs.map((run) => ({ arm, run }))),
+  );
+  expect(runs.length).toBeGreaterThan(0);
+  for (const { arm, run } of runs) expect(score(run, arm)).toBeCloseTo(run.score ?? NaN, 9);
+});
+
+test("regrade reproduces the runner's verdicts from the stored traces", async () => {
+  const fixture = join(FIXTURES, "no-diary");
+  const out = join(mkdtempSync(join(tmpdir(), "regrade-")), "run-regraded");
+  expect(await regrade(join(fixture, "suite"), join(fixture, "run"), out)).toEqual([]);
+  const before = await readResult(join(fixture, "run", "aggregate-result.json"));
+  const after = await readResult(join(out, "aggregate-result.json"));
+  expect(verdicts(after)).toEqual(verdicts(before));
 });

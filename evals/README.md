@@ -6,12 +6,18 @@ This directory is the generic layer: the native suite runner and the report that
 
 ## Native Suites
 
-[`native/`](native/) runs and compares `claude plugin eval` suites. The [plugin evals docs](https://code.claude.com/docs/en/plugin-evals.md) define the `case.yaml` and grader schemas.
+[`native/`](native/) holds the CLIs that run and compare `claude plugin eval` suites. The [plugin evals docs](https://code.claude.com/docs/en/plugin-evals.md) define the `case.yaml` and grader schemas. Their logic lives in [`packages/evals`](../packages/evals/), which harness scripts import by relative path:
+
+- `result.ts`: one loose schema for `aggregate-result.json`, the runner's run score, errored runs, and `writeResult` for a post-scorer that emits the native shape.
+- `trace.ts`: the final reply, per-run measures, and tool calls from a trace.
+- `stats.ts`: the permutation `pValue` and its `pFloor`, a sign-flip p-value for win rates, and the Wilson interval.
+- `suite.ts`: `suite.yaml`, case plugins and tags, and discovery of suites and their results.
+- `pool.ts`: `mapPool`, a bounded-concurrency map.
 
 - `run.ts <suite> [--ref <ref>] -- <args>` stages the plugins the cases load, as they stand at `--ref` (the working tree by default), next to the suite from the working tree, so every ref is graded by the same cases. `--case` may repeat, and takes any `Bun.Glob` pattern: `run.ts` prunes the staged suite to the cases any glob matches, since the runner keeps only the last `--case` and matches plain `*` only. It runs on subscription auth with any API key removed from the environment, and results land in `<suite>/results/<timestamp>[-label]/`, with each run's trace copied to `traces/<case>-<arm>-<n>.jsonl`.
-- `compare.ts <column>...` compares result files column by column, each column a comma-joined pool of `aggregate-result.json` paths, the first the baseline. A `*` marks p < `--alpha` (0.1) under a two-sided permutation test. A `†` marks a cell with too few runs for any star: at 0.1 that takes 4 runs a side, since 3 against 3 bottoms out at exactly 0.1. A run that errored, from its `error` field or a judge call that threw, leaves the pool, and `!` marks its case. `run.ts` exits 1 when any run errored, which fails the eval job. `--suite` adds per-tag scores from each case's `tags`. `--markdown` puts starred rows first for a job summary.
+- `compare.ts <column>...` compares result files column by column, each column a comma-joined pool of `aggregate-result.json` paths, the first the baseline. A `*` marks p < `--alpha` (0.1) under a two-sided permutation test. A `†` marks a cell with too few runs for any star: at 0.1 that takes 4 runs a side, since 3 against 3 bottoms out at exactly 0.1. A run that errored, from its `error` field or a judge call that threw, leaves the pool, and `!` marks its case. The runner exits 1 on a run that ended on an API error, and `run.ts` also exits 1 on a run graded despite an error, such as a timeout, which fails the eval job. `--suite` adds per-tag scores from each case's `tags`. `--markdown` puts starred rows first for a job summary.
 - `check.ts <suite>` tests each case's `regex` graders against examples in `<suite>/examples/<case>/`, outside the case directories so no session sees them. A `.md` example is a hand-written reply whose frontmatter `fail:` lists the graders it must fail. A `.jsonl` example is a trace, such as one copied from a run's `traces/`, with `fail:` in a sibling `.yaml`. It grades trace graders on the raw JSONL, as the runner does, and reply graders on its last `result` line. A directory named after an example holds the files its file-target graders read, such as `examples/<case>/good/src/a.ts` beside `good.md`. Every other grader an example reaches must pass it, and the output names regex graders no example reaches, such as file targets.
-- `regrade.ts <suite> <results>...` re-scores stored runs against the suite's current grader set from their `traces/`, dropping graders whose file is gone and grading regex graders added since the run, and writes `<results>-regraded/` for `compare.ts`, so a grader fix needs no new sessions. `llm` and file-target graders keep their recorded verdicts.
+- `regrade.ts <suite> <results>...` re-scores stored runs against the suite's current grader set from their `traces/`, dropping graders whose file is gone and grading regex graders added since the run, and writes `<results>-regraded/` for `compare.ts`, so a grader fix needs no new sessions. `llm` and file-target graders keep their recorded verdicts. Real runner output in [`packages/evals/test/`](../packages/evals/test/) pins its scoring to the runner's.
 - `calls.ts <results>... [--match <regex>]` takes results directories or their `aggregate-result.json` paths, and counts the runs per case and arm that read each file or loaded each skill, from `traces/`. It answers whether sessions opened a reference, which grepping traces for the filename cannot, since injected skill text names files too.
 - `wrap.ts` builds a throwaway plugin from skills, agents, and context documents that are not in a plugin. A suite opts in through `suite.yaml`:
 
@@ -29,6 +35,23 @@ graders:                        # <suite>/graders/<name>.md to the case-name glo
 A grader every case repeats lives once in `<suite>/graders/`. `run.ts` copies it into each matching case as it stages the suite, skipping a case that holds a grader by that name, and `check.ts` and `regrade.ts` read the same merged set.
 
 The runner ignores a `CLAUDE.md` or `.claude/rules` in the scaffolded working directory, so wrapped context reaches the session through a `SessionStart` hook instead. It injects every context file whatever its `paths:` frontmatter says. A wrapped skill keeps the files it links to beside it, such as a sibling skill's reference, and loses `disable-model-invocation`, so a user-invoked skill can load from a natural-language prompt on the with arm.
+
+### Workarounds
+
+Each piece of `run.ts` and `suite.yaml` that covers a runner gap goes when its trigger lands upstream:
+
+| Workaround | Remove when |
+| --- | --- |
+| Staging the artifacts at `--ref` beside the working-tree suite | The runner loads a plugin as it stands at a commit |
+| Pruning staged cases to any `--case` glob | `--case` repeats as an OR, as `--tag` does |
+| `--keep-temp` and copying traces into `traces/` | The runner writes each trace into the output directory |
+| Removing `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` | The runner takes a flag that selects subscription auth |
+| `npm ci` in each staged plugin with a lockfile | The runner installs a path target's dependencies, as a cached install does |
+| Exiting 1 on a run graded despite an error | The runner fails on a timed-out or turn-capped run, or a grader that threw |
+| `allow_tools` | The runner reads `--allow-tools` from a suite or manifest file |
+| `judge_model` | The runner reads the judge model from a suite or manifest file |
+| `wrap` | The runner evaluates skills, agents, and context documents outside a plugin, with ablation and context injection |
+| `graders` | The runner reads suite-level graders |
 
 ## Results Corpus
 
@@ -58,7 +81,7 @@ The projection scales the last 30 days of spend over the window actually observe
 ## Tests
 
 ```bash
-bun test evals/scripts
+bun test evals/scripts packages/evals
 ```
 
 The fixtures under [`scripts/test/corpus/`](scripts/test/corpus/) are a hand-authored repo tree of `aggregate-result.json` files, tracked so the file discovery and the rollup stay pinned. The report test needs the `duckdb` CLI.

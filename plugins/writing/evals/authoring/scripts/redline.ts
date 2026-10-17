@@ -8,7 +8,7 @@ import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typin
 import { z } from "zod";
 import { decode, decodeFile, decodeJson } from "../../../../../packages/decode/index";
 import { tokenize } from "../label/align";
-import { mapPool } from "./pool";
+import { mapPool } from "../../../../../packages/evals/pool";
 import { Judgment, Pair, Pick } from "./pairs";
 
 export interface WordDistance {

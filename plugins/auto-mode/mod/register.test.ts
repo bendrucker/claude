@@ -1,4 +1,4 @@
-import type { EngineInterface, On, ToolCallResult } from "claude-code";
+import type { EngineInterface, On, ToolCallResult, TurnStepInput } from "claude-code";
 
 import { type Engine, describe, expect, mock, test, tier } from "claude-code/testing";
 
@@ -14,6 +14,16 @@ interface World {
   clock: ReturnType<typeof mock.clock>;
 }
 
+function seatEvents(on: On): ModEventsInput[] {
+  const events: ModEventsInput[] = [];
+  on("engine.create", async ($, e, next) => ({
+    ...(await next(e)),
+    modEvents: { emit: () => Promise.resolve() },
+  }));
+  on("modEvents.emit", ($, e) => (events.push(e), { value: undefined }));
+  return events;
+}
+
 function worldOf(
   on: On,
   {
@@ -21,23 +31,22 @@ function worldOf(
     ms = 0,
     result = { result: "ok" },
     failCalls = 0,
+    verdict = {},
   }: {
     decision?: "allow" | "ask" | "deny";
     ms?: number;
     result?: ToolCallResult;
     failCalls?: number;
+    verdict?: { setting?: string; decider?: "host" };
   } = {},
 ): World {
-  const events: ModEventsInput[] = [];
+  const events = seatEvents(on);
   let failures = failCalls;
   let calls = 0;
   const clock = mock.clock(on, { now: 1_000 });
-  on("engine.create", async ($, e, next) => ({
-    ...(await next(e)),
-    modEvents: { emit: () => Promise.resolve() },
-  }));
-  on("modEvents.emit", ($, e) => (events.push(e), { value: undefined }));
-  on("tool.check", () => (decision === "allow" ? { decision, rule: "Bash(ls)" } : { decision }));
+  on("tool.check", () =>
+    decision === "allow" ? { decision, rule: "Bash(ls)", ...verdict } : { decision, ...verdict },
+  );
   on("tool.call", async () => {
     calls += 1;
     await clock.sleep(ms);
@@ -56,6 +65,34 @@ async function run($: Engine, world: World, ms: number) {
   const pending = $.tool.call(CALL);
   await world.clock.advance(ms);
   return pending;
+}
+
+function stubStep(on: On, world: World) {
+  on("turn.step", async function* () {
+    yield* [];
+    await world.clock.sleep(750);
+    return {
+      turnId: "t1",
+      index: 2,
+      answer: "",
+      toolUses: [],
+      serverToolUses: [
+        { id: "srv_1", name: "advisor", input: {}, startedAt: 5_000, endedAt: 5_750 },
+        { id: "srv_2", name: "advisor", input: {}, startedAt: 6_000 },
+      ],
+      stopReason: "end_turn",
+      usage: null,
+    };
+  });
+}
+
+async function drainStep($: Engine, world: World, input: TurnStepInput) {
+  const stream = $.turn.step(input);
+  const drained = (async () => {
+    for await (const _ of stream);
+  })();
+  await world.clock.advance(750);
+  await drained;
 }
 
 async function settle(world: World, pending: Promise<unknown>) {
@@ -83,7 +120,11 @@ describe("register", () => {
           decision: "ask",
           rule: null,
           hook: null,
+          setting: null,
+          decider: null,
+          ceiling: null,
           reason: null,
+          read_only: false,
           started_at: 1_000,
           check_ms: 0,
           outcome: "ok",
@@ -145,6 +186,44 @@ describe("register", () => {
     ]);
   });
 
+  test("records the check's setting and decider, and a read-only run", async ($, on) => {
+    const world = worldOf(on, {
+      result: { result: "ok", isReadOnly: true },
+      verdict: { setting: "permissions.blockReadsOutsideWorkingDirectories", decider: "host" },
+    });
+
+    await run($, world, 0);
+
+    expect(world.events).toEqual([
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          setting: "permissions.blockReadsOutsideWorkingDirectories",
+          decider: "host",
+          ceiling: null,
+          read_only: true,
+        }),
+      }),
+    ]);
+  });
+
+  test("fails open when the clock rejects", async ($, on) => {
+    const events = seatEvents(on);
+    let calls = 0;
+    on("clock.now", () => {
+      throw new Error("clock down");
+    });
+    on("tool.check", () => ({ decision: "ask" }));
+    on("tool.call", () => ((calls += 1), { result: "ok" }));
+
+    expect(
+      await $.tool.check({ tool: CALL.tool, input: {}, tool_use_id: CALL.tool_use_id }),
+    ).toEqual(expect.objectContaining({ decision: "ask" }));
+    expect(await $.tool.call(CALL)).toEqual(expect.objectContaining({ result: "ok" }));
+
+    expect(calls).toBe(1);
+    expect(events).toEqual([]);
+  });
+
   test("a call the check never saw records no verdict", async ($, on) => {
     const world = worldOf(on);
 
@@ -189,29 +268,9 @@ describe("register", () => {
 
   test("records each server tool a step ran", async ($, on) => {
     const world = worldOf(on);
-    on("turn.step", async function* () {
-      yield* [];
-      await world.clock.sleep(750);
-      return {
-        turnId: "t1",
-        index: 2,
-        answer: "",
-        toolUses: [],
-        serverToolUses: [
-          { id: "srv_1", name: "advisor", input: {}, startedAt: 5_000, endedAt: 5_750 },
-          { id: "srv_2", name: "advisor", input: {}, startedAt: 6_000 },
-        ],
-        stopReason: "end_turn",
-        usage: null,
-      };
-    });
+    stubStep(on, world);
 
-    const stream = $.turn.step({ turnId: "t1", index: 2, model: "m", messageCount: 1 });
-    const drained = (async () => {
-      for await (const _ of stream);
-    })();
-    await world.clock.advance(750);
-    await drained;
+    await drainStep($, world, { turnId: "t1", index: 2, model: "m", messageCount: 1 });
 
     expect(world.events).toEqual([
       {
@@ -232,6 +291,24 @@ describe("register", () => {
         event: "server.tool",
         detail: expect.objectContaining({ tool_use_id: "srv_2" }),
       },
+    ]);
+  });
+
+  test("records a subagent step's server tools on its loop", async ($, on) => {
+    const world = worldOf(on);
+    stubStep(on, world);
+
+    await drainStep($, world, {
+      turnId: "t1",
+      index: 2,
+      model: "m",
+      messageCount: 1,
+      agentId: "a1",
+    });
+
+    expect(world.events.map((e) => [e.event, e.detail?.agent_id])).toEqual([
+      ["server.tool", "a1"],
+      ["server.tool", "a1"],
     ]);
   });
 

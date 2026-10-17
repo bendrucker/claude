@@ -267,7 +267,7 @@ jobs:
 
       - name: Install plugin tools
         if: hashFiles(format('plugins/{0}/mise.toml', matrix.plugin.name)) != ''
-        uses: jdx/mise-action@v4
+        uses: jdx/mise-action@v5
         with:
           working_directory: plugins/${{ matrix.plugin.name }}
           # The cache key globs every file in the workspace (~24s), while a cold install takes ~3s.

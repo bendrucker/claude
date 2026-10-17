@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","cwd":"/tmp/claude-eval/home/cwd","tools":["Bash"]}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"cat package.json; echo ===; cat migrations/*.sql; echo ===; grep -n -A8 'interface Invoice' src/types.ts; echo ===; git log --oneline -5 refund-status; echo ===; grep -rn --include=*.ts --include=*.vue status src"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"{ \"name\": \"billing\" }\n(eval):1: == not found\n(eval):1: no matches found: --include=*.ts"}]}}
+{"type":"result","subtype":"success","is_error":false,"num_turns":2,"result":"Only package.json printed before zsh stopped on the separator and the grep flags."}

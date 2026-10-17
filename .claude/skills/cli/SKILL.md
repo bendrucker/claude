@@ -94,7 +94,7 @@ if (import.meta.main) {
 
 ## Subcommands
 
-Build each command with `new Command(name)` and attach it with `addCommand`. A group is a command whose children are its actions, so `watch-session trial start` nests with no extra wiring:
+Build each command with `new Command(name)` and attach it with `addCommand`. A group is a command whose children are its actions, so `trials trial start` nests with no extra wiring:
 
 ```ts
 #!/usr/bin/env bun
@@ -120,7 +120,7 @@ const trial = new Command("trial")
   .addCommand(start)
   .addCommand(end);
 
-export const program = new Command("watch-session").enablePositionalOptions().addCommand(trial);
+export const program = new Command("trials").enablePositionalOptions().addCommand(trial);
 
 if (import.meta.main) {
   await program.parseAsync();
@@ -141,7 +141,7 @@ Call `exitOverride()` and `configureOutput()` on every command in the tree. `add
 ```ts
 import { CommanderError, type CommandUnknownOpts } from "@commander-js/extra-typings";
 import { expect, test } from "bun:test";
-import { program, start } from "./watch-session";
+import { program, start } from "./trials";
 
 async function run(command: CommandUnknownOpts, argv: string[]): Promise<string> {
   let output = "";

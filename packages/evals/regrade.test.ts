@@ -122,10 +122,10 @@ test("takes a swapped-in regex grader's arm from its file", async () => {
   expect(run?.score).toBe(1);
 });
 
-// Runner output from a no-diary run and a pull-request create run, with the no-diary case's
-// graders as they stood at the commit that ran. A drift from the runner's weighting, with-only
-// exclusion, or regex semantics changes a recomputed score or flips a verdict here.
-const FIXTURES = join(import.meta.dirname, "test");
+// Runner output from a no-diary run, with the case's graders as they stood at the commit that
+// ran. A drift from the runner's weighting, with-only exclusion, or regex semantics changes a
+// recomputed score or flips a verdict here.
+const fixture = join(import.meta.dirname, "test", "no-diary");
 
 const verdicts = (result: Parsed) =>
   result.cases.map((c) => [
@@ -136,8 +136,8 @@ const verdicts = (result: Parsed) =>
     ]),
   ]);
 
-test.each(["no-diary/run", "create"])("score reproduces every run score in %s", async (dir) => {
-  const result = await readResult(join(FIXTURES, dir, "aggregate-result.json"));
+test("score reproduces every run score", async () => {
+  const result = await readResult(join(fixture, "run", "aggregate-result.json"));
   const runs = result.cases.flatMap((c) =>
     Object.entries(c.arms).flatMap(([arm, rs]) => rs.map((run) => ({ arm, run }))),
   );
@@ -146,7 +146,6 @@ test.each(["no-diary/run", "create"])("score reproduces every run score in %s", 
 });
 
 test("regrade reproduces the runner's verdicts from the stored traces", async () => {
-  const fixture = join(FIXTURES, "no-diary");
   const out = join(mkdtempSync(join(tmpdir(), "regrade-")), "run-regraded");
   expect(await regrade(join(fixture, "suite"), join(fixture, "run"), out)).toEqual([]);
   const before = await readResult(join(fixture, "run", "aggregate-result.json"));

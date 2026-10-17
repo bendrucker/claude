@@ -42,20 +42,7 @@ The runner ignores a `CLAUDE.md` or `.claude/rules` in the scaffolded working di
 
 ### Workarounds
 
-Each piece of `run.ts` and `suite.yaml` that covers a runner gap goes when its trigger lands upstream:
-
-| Workaround | Remove when |
-| --- | --- |
-| Staging the artifacts at `--ref` beside the working-tree suite | The runner loads a plugin as it stands at a commit |
-| Pruning staged cases to any `--case` glob | `--case` repeats as an OR, as `--tag` does |
-| `--keep-temp` and copying traces into `traces/` | The runner writes each trace into the output directory |
-| Removing `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` | The runner takes a flag that selects subscription auth |
-| `npm ci` in each staged plugin with a lockfile | The runner installs a path target's dependencies, as a cached install does |
-| Exiting 1 on a run graded despite an error | The runner fails on a timed-out or turn-capped run, or a grader that threw |
-| `allow_tools` | The runner reads `--allow-tools` from a suite or manifest file |
-| `judge_model` | The runner reads the judge model from a suite or manifest file |
-| `wrap` | The runner evaluates skills, agents, and context documents outside a plugin, with ablation and context injection |
-| `graders` | The runner reads suite-level graders |
+Each covers a runner gap and goes when upstream closes it: `--ref` staging (loading a plugin at a commit), `--case` pruning (repeatable `--case`), trace copying (traces in the output directory), API key removal (a subscription-auth flag), `npm ci` in staged plugins (dependency install for path targets), exiting 1 on graded errors (the runner failing timed-out runs), and `allow_tools`, `judge_model`, `wrap`, and `graders` in `suite.yaml` (suite-level config for each).
 
 ## Results Corpus
 

@@ -1,9 +1,21 @@
-allow_tools: ["Bash(git:*)", "Bash(bun:*)", Write]
+allow_tools: ["Bash(git:*)", "Bash(bun:*)", "Bash(gh:*)", Write]
+stage:
+  - packages/eval-stubs
+  - plugins/pull-request/evals/create-scenarios/stubs.sh
+  - plugins/pull-request/evals/pr-body/limits.ts
+  - plugins/pull-request/evals/pr-body/structure.ts
 graders:
   skill-fired: "!quiet-*"
   skill-loaded: "!quiet-*"
   writing-fired: "!quiet-*"
   no-attribution: "!quiet-*"
   title-length: "!quiet-*"
+  limit-visible-words: "!quiet-*"
+  limit-max-block: "!quiet-*"
+  limit-prose-code-spans: "!quiet-*"
+  limit-path-spans: "!quiet-*"
+  limit-contrast-phrases: "!quiet-*"
+  limit-hidden-words: "!quiet-*"
+  limit-list-items: "!quiet-*"
   create-quiet: "quiet-*"
   no-test-tally: [manual-verification, overturned-theory]

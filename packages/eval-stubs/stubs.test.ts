@@ -6,21 +6,26 @@ import { $ } from "bun";
 
 const SOURCES = ["echo.ts", "gh.ts", "glab.ts", "snapshot.ts", "install.sh", "preamble.sh"];
 
+// A --check module: one verdict line per body, from its word count.
+const CHECK = `export default (body: string) => [\`WORDS \${body.split(/\\s+/).length <= 3 ? "pass" : "fail"}\`];\n`;
+
 interface Home {
   home: string;
   cwd: string;
 }
 
 /** A run home whose stand-ins were bundled from a copy of the package with no node_modules above it. */
-async function install(): Promise<Home> {
+async function install(args: string[] = []): Promise<Home> {
   const stage = mkdtempSync(join(tmpdir(), "eval-stubs-stage-"));
-  await Promise.all(
-    SOURCES.map(async (f) => Bun.write(join(stage, f), Bun.file(join(import.meta.dir, f)))),
-  );
+  await Promise.all([
+    ...SOURCES.map(async (f) => Bun.write(join(stage, f), Bun.file(join(import.meta.dir, f)))),
+    Bun.write(join(stage, "check.ts"), CHECK),
+  ]);
   const home = mkdtempSync(join(tmpdir(), "eval-stubs-home-"));
   const cwd = join(home, "cwd");
   mkdirSync(cwd);
-  const proc = Bun.spawnSync(["bash", join(stage, "install.sh")], {
+  const flags = args.map((a) => (a === "check.ts" ? join(stage, a) : a));
+  const proc = Bun.spawnSync(["bash", join(stage, "install.sh"), ...flags], {
     cwd,
     env: { PATH: process.env.PATH ?? "", HOME: home, TMPDIR: tmpdir() },
   });
@@ -168,6 +173,41 @@ describe("echo mode", () => {
     expect(r.code).toBe(1);
     expect(r.out).toBe("");
     expect(r.err).toBe(`${tool} stand-in: ${args.join(" ")} is unavailable offline\n`);
+  });
+});
+
+describe("--check", () => {
+  const github = "https://github.com/team/service/pull/1";
+
+  async function installIn(args: string[]): Promise<Home> {
+    const run = await install(args);
+    await $`git init -q && git remote add origin https://github.com/team/service.git`.cwd(run.cwd);
+    return run;
+  }
+
+  test("echo mode prints the verdicts after the URL", async () => {
+    const run = await installIn(["--check", "check.ts"]);
+    const r = stub(run, "gh", ["pr", "create", "--title", "T", "--body", "one two"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe(`PR-TITLE: T\nPR-BODY-BEGIN\none two\nPR-BODY-END\n${github}\nWORDS pass\n`);
+  });
+
+  test("--offline prints only the verdicts, then fails", async () => {
+    const run = await installIn(["--offline", "--check", "check.ts"]);
+    const r = stub(run, "gh", ["pr", "edit", "1", "--body", "one two three four"]);
+    expect(r.code).toBe(1);
+    expect(r.out).toBe("WORDS fail\n");
+    expect(r.err).toBe("gh stand-in: pr edit is unavailable offline\n");
+  });
+
+  test("rejects an unknown option", () => {
+    const home = mkdtempSync(join(tmpdir(), "eval-stubs-home-"));
+    const proc = Bun.spawnSync(["bash", join(import.meta.dir, "install.sh"), "--nope"], {
+      cwd: home,
+      env: { ...process.env, HOME: home },
+    });
+    expect(proc.exitCode).toBe(1);
+    expect(proc.stderr.toString()).toBe("install.sh: unknown option --nope\n");
   });
 });
 

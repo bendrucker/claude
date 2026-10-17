@@ -25,9 +25,11 @@ bun plugins/pull-request/evals/pr-body/scripts/sync.ts push   # --profile agents
 
 ## Structure Limits
 
-`structure.ts` parses a body to mdast and measures what a reader sees without expanding anything: prose outside fenced code and `<details>`. `LIMITS` holds three one-sided limits: 120 visible words, 40 words in the longest paragraph or bullet, and 6 inline code spans in paragraphs and list items (`proseCodeSpans`, excluding tables, fenced code, and `<details>`). A body fails only by exceeding one, so collapsing data or writing less never costs anything. The output should be a baseline Ben adds to, shorter than what he writes himself.
+`structure.ts` parses a body to mdast and measures what a reader sees without expanding anything: prose outside fenced code and `<details>`. `LIMITS` holds one-sided limits on visible words, words in the longest paragraph or bullet, inline code spans in paragraphs and list items, spans naming a file path, and contrast phrases. A body fails only by exceeding one, so collapsing data or writing less never costs anything. The output should be a baseline Ben adds to, shorter than what he writes himself.
 
-`scripts/limits.ts <results-dir>...` scores each run's PR body against the limits as `visible-words`, `max-block`, and `prose-code-spans` rows and writes `<results-dir>-limits/` for `compare.ts`. Run it before `compare.ts`. The `work-*` cases in `create-scenarios` come from edited work MRs, described in summary with no source. Their fixtures run `create-scenarios/stubs.sh`, which puts stand-in `glab` and `gh` on `PATH` so the body-rules hook fires on the create call and `limits.ts` reads the body the stand-in printed.
+`GUARDS` caps words moved into tables, fences, and `<details>`, and list length, so trimming cannot hide prose. `limits.ts` turns each limit and guard into a `PR-LIMIT <row>=pass|fail` line. `create-scenarios/stubs.sh` installs the [`eval-stubs`](../../../../packages/eval-stubs/) `gh` and `glab` with it as their `--check`, so every create or edit call prints the lines, and the `limit-*` trace graders in `create` and `create-scenarios` score the last line per row. A run with no create call fails them. The `work-*` cases in `create-scenarios` come from edited work MRs, described in summary with no source, and their fixtures run `stubs.sh` in echo mode. The `create` cases run it `--offline`, so the call fails after measuring and the session replies with the draft.
+
+`scripts/body.ts` recovers a run's body from its trace, the last stand-in echo or else the reply after `Title:`, for `scripts/ab-pairs.ts`.
 
 `scripts/fit.ts` checks a metric against `data/revisions/`: how often a revision moves it down, and with `--human`, how well it separates plugin drafts from Ben's writing (AUC).
 
@@ -84,6 +86,8 @@ Each scenario case grades:
 - `generic-heading`: no heading that would fit any PR, such as `Summary` or `Test Plan`
 - `narration-leak`, `verbosity`, `self-contained`, `substance-retention`: `llm` graders ported from the retired promptfoo rubrics, scoped to the body after the `Title:` line. `verbosity` embeds the diff summary and `substance-retention` the session notes, so the judge grades against the scenario
 
+The `limit-*` graders join only the `work-*` cases, since the `scenario-*` fixtures don't install the stand-ins. A scenario fixture that runs `../create-scenarios/stubs.sh --offline` can join them once `suite.yaml` widens their glob.
+
 The judge sees only the final reply, one criterion at a time, and answers with one word. `narration-leak` judges sentences only, since `generic-heading` settles the heading half of the old rubric deterministically. The rubrics this suite replaced scored an isolated slip near the middle of a scale. A native verdict is binary, so `narration-leak` and `self-contained` pass a single slip in an otherwise clean body and fail on a pattern.
 
 The three heading regexes split the classifier's signals into sentence case, question-shaped or sentence-terminated headings, and comma or parenthetical clauses. Against `fixtures/labels.json` they reach 100% precision and 76.8% recall together (sentence case alone 55.1% recall, the other two 21.7% each). The classifier itself reaches 87.0% recall, so the regexes trade recall on predicate verbs and short parentheticals for zero false positives. `bun evals/native/check.ts plugins/pull-request/evals/create-scenarios` checks each case's regex graders against `examples/scenario-<id>/`, where `shipped.md` is the PR body that actually merged.
@@ -111,4 +115,5 @@ Current numbers: 96.8% precision, 87.0% recall, F1 0.92. Precision is the one to
 - `scripts/mine.ts`: builds `data/samples.json` from `pr_links` plus `gh pr list`
 - `label/server.ts`, `label/index.html`: the review UI
 - `classifier.ts`, `calibrate.ts`: the heading screen and its calibration
+- `structure.ts`, `limits.ts`: the structure limits and the stand-in check that prints them
 - `scripts/sync.ts`: pulls and pushes `fixtures/` and the `create-scenarios` cases

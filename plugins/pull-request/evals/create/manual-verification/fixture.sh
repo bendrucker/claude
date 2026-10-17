@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+bash "$(dirname "$0")/../stubs.sh"
 git init -q -b main
 # The Linux sandbox mounts placeholder dotfiles into the working tree.
 echo "/.*" >> .git/info/exclude

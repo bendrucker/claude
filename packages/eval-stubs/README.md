@@ -18,6 +18,8 @@ source "$stubs/preamble.sh" https://github.com/acme/api-server.git
 - **Snapshot**: the fixture writes `$HOME/.eval-stubs/meta.json` describing one pull request (`repo`, `pull`, `reviews`, `threads`, optional `checks`) or merge request (`host`, `project`, `mr`, `versions`, `discussions`), plus `root` and the SHAs it committed. The `Meta` types in `gh.ts` and `glab.ts` define the fields. Diffs, commits, and file contents come from the scaffolded repo. Every write is refused.
 - **Echo**: with no `meta.json`, `gh pr create|edit` and `glab mr create|update` print the title and body between `PR-TITLE:`, `PR-BODY-BEGIN`, and `PR-BODY-END` lines, then the URL. Every other command fails as offline.
 
+`install.sh --check <module>` bundles a module whose default export maps a create or edit body to verdict lines, which echo mode prints after the URL. A trace-target `regex` grader then scores the run in-run. `--offline` makes create and edit print only those lines and fail as offline, for a case graded on the drafted reply. [`pr-body/limits.ts`](../../plugins/pull-request/evals/pr-body/limits.ts) is the one check. The module and anything it imports must be staged, with their dependencies resolvable from a staged plugin's `node_modules`.
+
 ## Tests
 
 ```bash

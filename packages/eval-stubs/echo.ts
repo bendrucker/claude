@@ -1,4 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+import { dir } from "./snapshot";
 
 /** The create and edit commands echo mode answers, per tool. */
 const WRITES = { gh: ["pr create", "pr edit"], glab: ["mr create", "mr update"] } as const;
@@ -52,7 +55,8 @@ export function requestUrl(tool: Tool, remote: string): string {
 
 /**
  * Prints the title and body a create or edit call was given between markers a grader or a
- * post-run scorer reads, and fails every other command, as the network is unreachable.
+ * post-run scorer reads, then the bundled check's verdict lines, and fails every other command,
+ * as the network is unreachable. Offline, a create or edit prints only the verdicts and fails too.
  */
 export function echo(tool: Tool, argv: string[]): never {
   const [cmd = "", sub = "", ...rest] = argv;
@@ -61,9 +65,34 @@ export function echo(tool: Tool, argv: string[]): never {
     process.exit(1);
   }
   const { title, body } = parseWrite(rest);
+  const installed = readdirSync(dir());
+  const verdicts = installed.includes("check.js") ? checkLines(body) : "";
+  if (installed.includes("offline")) {
+    process.stdout.write(verdicts);
+    process.stderr.write(`${tool} stand-in: ${cmd} ${sub} is unavailable offline\n`);
+    process.exit(1);
+  }
   const remote = spawnSync("git", ["remote", "get-url", "origin"], { encoding: "utf8" });
   process.stdout.write(
-    `PR-TITLE: ${title}\nPR-BODY-BEGIN\n${body}\nPR-BODY-END\n${requestUrl(tool, remote.stdout)}\n`,
+    `PR-TITLE: ${title}\nPR-BODY-BEGIN\n${body}\nPR-BODY-END\n${requestUrl(tool, remote.stdout)}\n${verdicts}`,
   );
   process.exit(0);
+}
+
+interface Check {
+  default: (body: string) => string[];
+}
+
+function isCheck(m: unknown): m is Check {
+  return typeof m === "object" && m !== null && "default" in m && typeof m.default === "function";
+}
+
+/** The verdict lines the module `install.sh --check` bundled prints for a body. */
+function checkLines(body: string): string {
+  const check: unknown = import.meta.require(join(dir(), "check.js"));
+  if (!isCheck(check)) throw new Error("check.js has no default export function");
+  return check
+    .default(body)
+    .map((line) => `${line}\n`)
+    .join("");
 }

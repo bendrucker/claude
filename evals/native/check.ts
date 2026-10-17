@@ -126,6 +126,8 @@ export interface Checked {
   prompts: string[];
   /** Case graders that hide one `suite.yaml` shares in, from {@link shadowed}. */
   shadowed: string[];
+  /** Graders whose frontmatter the runner would cut short, from {@link earlyClose}. */
+  earlyClose: string[];
 }
 
 /**
@@ -140,6 +142,25 @@ export async function emptyPrompts(suite: string): Promise<string[]> {
       const file = Bun.file(join(suite, c, "prompt.md"));
       if (!(await file.exists())) return [];
       return /^(undefined|null)?$/.test((await file.text()).trim()) ? [c] : [];
+    }),
+  );
+  return bad.flat().toSorted();
+}
+
+/**
+ * Grader files in a suite, relative to it, whose frontmatter holds a `---` before its closing
+ * line. The runner ends frontmatter at the first `---` anywhere, even mid-line, so such a
+ * grader fails to load as invalid YAML and takes every case that reaches it down with it.
+ * Write a literal run of dashes in a pattern as `-{3}`.
+ */
+export async function earlyClose(suite: string): Promise<string[]> {
+  const files = globSync(["graders/*.md", "*/graders/*.md"], { cwd: suite });
+  const bad = await Promise.all(
+    files.map(async (f) => {
+      const text = await Bun.file(join(suite, f)).text();
+      const match = /^---\n([\s\S]*?)\n---/.exec(text);
+      if (match === null) return [];
+      return text.indexOf("---", 3) === match[0].length - 3 ? [] : [f];
     }),
   );
   return bad.flat().toSorted();
@@ -205,21 +226,29 @@ export async function check(suite: string): Promise<Checked> {
     unchecked: unchecked.toSorted(),
     prompts: await emptyPrompts(suite),
     shadowed: await shadowed(suite),
+    earlyClose: await earlyClose(suite),
   };
 }
 
 export const program = new Command("check.ts")
   .description(
-    "Fail on a case whose prompt.md is blank or `undefined`, then test a suite's regex graders against the examples in <suite>/examples/<case>/ before spending runs on them: hand-written replies as .md with a frontmatter `fail:` list, and traces as .jsonl with `fail:` in a sibling .yaml. A directory named after an example holds the files its file-target graders read. Every grader an example can reach must pass it unless listed. Also names case graders that shadow one suite.yaml shares in.",
+    "Fail on a case whose prompt.md is blank or `undefined`, or a grader whose frontmatter holds a `---` the runner would end it at, then test a suite's regex graders against the examples in <suite>/examples/<case>/ before spending runs on them: hand-written replies as .md with a frontmatter `fail:` list, and traces as .jsonl with `fail:` in a sibling .yaml. A directory named after an example holds the files its file-target graders read. Every grader an example can reach must pass it unless listed. Also names case graders that shadow one suite.yaml shares in.",
   )
   .argument("<suite>", "suite directory")
   .action(async (suite) => {
-    const { mismatches, unchecked, prompts, shadowed: hidden } = await check(suite);
+    const {
+      mismatches,
+      unchecked,
+      prompts,
+      shadowed: hidden,
+      earlyClose: cut,
+    } = await check(suite);
     for (const m of mismatches) console.log(`${m.example}: ${m.grader} should ${m.expected}`);
     for (const c of prompts) console.log(`${c}/prompt.md: empty prompt`);
+    for (const g of cut) console.log(`${g}: \`---\` inside frontmatter; the runner ends it there`);
     if (unchecked.length > 0) console.log(`No example reaches: ${unchecked.join(", ")}`);
     if (hidden.length > 0) console.log(`Case graders shadow suite.yaml: ${hidden.join(", ")}`);
-    if (mismatches.length > 0 || prompts.length > 0) process.exit(1);
+    if (mismatches.length > 0 || prompts.length > 0 || cut.length > 0) process.exit(1);
     console.log("Every regex grader agrees with its examples.");
   });
 

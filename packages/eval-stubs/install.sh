@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Installs the gh and glab stand-ins into the run's home, each bundled into one file so it runs
 # after the staged tree is gone. Case sessions inherit PATH from the operator's shell, and the
-# Bash tool's zsh sources only .zshenv from the run's home, so that file puts the stand-ins first
-# for both eval arms. A fixture that writes $HOME/.eval-stubs/meta.json gets snapshot answers;
+# Bash tool's zsh sources only .zshenv from the run's home and its bash .bashrc, so those files put
+# the stand-ins first for both eval arms. A fixture that writes $HOME/.eval-stubs/meta.json gets snapshot answers;
 # without one, the stand-ins echo create and edit calls.
 #
 # --check <module> bundles a module whose default export maps a create or edit body to verdict
-# lines, which echo mode prints. --offline makes create and edit print only those lines and then
+# lines, which echo mode prints and records in .eval-verdicts. --offline makes create and edit print only those lines and then
 # fail as offline, as every other command does.
 set -euo pipefail
 check=""
@@ -42,8 +42,13 @@ for cli in gh glab; do
 done
 if [[ -n "$check" ]]; then
   "$bun" build "$check" --target bun --outfile "$dir/check.js" > /dev/null
+  # An empty verdict file fails the graders that read it when no create counts, where a missing
+  # one would error the run.
+  : > .eval-verdicts
 fi
 if $offline; then
   touch "$dir/offline"
 fi
-echo "export PATH=\"$dir/bin:\$PATH\"" >> "$HOME/.zshenv"
+for rc in .zshenv .bashrc; do
+  echo "export PATH=\"$dir/bin:\$PATH\"" >> "$HOME/$rc"
+done

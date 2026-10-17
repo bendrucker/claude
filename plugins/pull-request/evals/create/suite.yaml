@@ -1,4 +1,4 @@
-allow_tools: ["Bash(git:*)", "Bash(bun:*)", "Bash(gh:*)", Write]
+allow_tools: [Bash, Write]
 stage:
   - packages/eval-stubs
   - plugins/pull-request/evals/create-scenarios/stubs.sh

@@ -1,7 +1,8 @@
 ---
 type: regex
-target: trace
-pattern: 'PR-LIMIT list-items=pass(?![\s\S]*PR-LIMIT list-items=)'
+target: { source: file, path: .eval-verdicts }
+pattern: '^PR-LIMIT list-items=pass\b'
+flags: m
 match: contains
 ---
-The last body the session handed to a create or edit call stays within the `maxItemsPerList` limit in `pr-body/structure.ts`, from the `PR-LIMIT` line the gh or glab stand-in printed. It fails when no create call reached the stand-in.
+The last body the session handed to a create or edit call stays within the `maxItemsPerList` limit in `pr-body/structure.ts`, from the `PR-LIMIT` line the gh or glab stand-in recorded in `.eval-verdicts`. A `--dry-run` or a body under three words does not count, and the grader fails when no counted create or edit reached the stand-in.

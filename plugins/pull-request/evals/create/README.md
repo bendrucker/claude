@@ -2,7 +2,7 @@
 
 A native `claude plugin eval` suite for `pull-request:create`. Each case scaffolds a git repo with `fixture.sh`, asks for a PR, and grades the drafted title and body, with and without the plugins.
 
-The PR cases' fixtures run [`stubs.sh`](stubs.sh), which installs the [`eval-stubs`](../../../../packages/eval-stubs/) `gh` offline. A create or edit call prints its [structure limit](../pr-body/README.md#structure-limits) verdicts and fails, so the session still replies with the draft, and the shared `limit-*` graders read the verdicts off the trace.
+The PR cases' fixtures run [`stubs.sh`](stubs.sh), which installs the [`eval-stubs`](../../../../packages/eval-stubs/) `gh` offline. A create or edit call prints its [structure limit](../pr-body/README.md#structure-limits) verdicts, records them in `.eval-verdicts`, and fails, so the session still replies with the draft. The shared `limit-*` graders read that file. A body file that does not exist fails the call as gh does, and a `--dry-run` or a body under three words is a probe that records nothing.
 
 The eight curated scenario cases, whose prompts carry a real PR's diff summary and session notes, live in the eval bucket and run from the local-only [`create-scenarios`](../create-scenarios/) suite. [`pr-body/scripts/sync.ts`](../pr-body/scripts/sync.ts) `pull` fetches them, and the [`pr-body` README](../pr-body/README.md#scenario-cases) covers their graders.
 

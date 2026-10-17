@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { dir } from "./snapshot";
 
 /** The create and edit commands echo mode answers, per tool. */
@@ -16,10 +16,38 @@ function stdin(): string {
   return spawnSync("cat", { stdio: ["inherit", "pipe", "inherit"], encoding: "utf8" }).stdout;
 }
 
-/** Reads a file, or stdin for `-`, without trailing newlines, as `$(cat …)` would. */
+/**
+ * The file, beside the session's working tree, that holds the verdicts of the last create or edit
+ * that counts. A `{ source: file }` grader reads it, so piping the call through `tail` or `head`
+ * cannot drop a verdict. The fixtures' git exclude of `/.*` keeps it out of commits.
+ */
+export const VERDICTS = ".eval-verdicts";
+
+/**
+ * A body under this many words is a probe, such as `--body "x"` sent to test the command, and its
+ * verdicts neither print nor replace the recorded ones.
+ */
+export const MIN_WORDS = 3;
+
+/**
+ * Reads a file, or stdin for `-`, without trailing newlines, as `$(cat …)` would. On a file it
+ * can't read, fails with gh's error, such as `open tmp/body.md: no such file or directory`.
+ */
 function slurp(path: string): string {
-  const text = path === "-" ? stdin() : spawnSync("cat", [path], { encoding: "utf8" }).stdout;
-  return text.replace(/\n+$/, "");
+  if (path === "-") return stdin().replace(/\n+$/, "");
+  const read = spawnSync("cat", [path], { encoding: "utf8" });
+  if (read.status !== 0) {
+    const reason = (read.stderr.trim().split(": ").at(-1) ?? "").toLowerCase();
+    process.stderr.write(`${reason === "is a directory" ? "read" : "open"} ${path}: ${reason}\n`);
+    process.exit(1);
+  }
+  return read.stdout.replace(/\n+$/, "");
+}
+
+/** Whether a call's verdicts count: not a `--dry-run`, and a body of at least {@link MIN_WORDS} words. */
+export function counts(argv: string[], body: string): boolean {
+  if (argv.includes("--dry-run")) return false;
+  return body.split(/\s+/).filter((w) => w !== "").length >= MIN_WORDS;
 }
 
 /** The title and body a create or edit call carries, from any of its flag spellings. */
@@ -57,8 +85,9 @@ export function requestUrl(tool: Tool, remote: string): string {
  * Prints the title and body a create or edit call was given between markers a grader or a
  * post-run scorer reads, then the bundled check's verdict lines, and fails every other command,
  * as the network is unreachable. Offline, a create or edit prints only the verdicts and fails too.
+ * A call whose verdicts count also writes them to {@link VERDICTS}, replacing any earlier ones.
  */
-export function echo(tool: Tool, argv: string[]): never {
+export async function echo(tool: Tool, argv: string[]): Promise<never> {
   const [cmd = "", sub = "", ...rest] = argv;
   if (!(WRITES[tool] as readonly string[]).includes(`${cmd} ${sub}`)) {
     process.stderr.write(`${tool} stand-in: ${argv.join(" ")} is unavailable offline\n`);
@@ -66,7 +95,8 @@ export function echo(tool: Tool, argv: string[]): never {
   }
   const { title, body } = parseWrite(rest);
   const installed = readdirSync(dir());
-  const verdicts = installed.includes("check.js") ? checkLines(body) : "";
+  const verdicts = installed.includes("check.js") && counts(rest, body) ? checkLines(body) : "";
+  if (verdicts !== "") await record(verdicts);
   if (installed.includes("offline")) {
     process.stdout.write(verdicts);
     process.stderr.write(`${tool} stand-in: ${cmd} ${sub} is unavailable offline\n`);
@@ -77,6 +107,16 @@ export function echo(tool: Tool, argv: string[]): never {
     `PR-TITLE: ${title}\nPR-BODY-BEGIN\n${body}\nPR-BODY-END\n${requestUrl(tool, remote.stdout)}\n${verdicts}`,
   );
   process.exit(0);
+}
+
+/** Replaces the recorded verdicts, warning instead of failing the call when the file can't be written. */
+async function record(verdicts: string): Promise<void> {
+  const file = join(dirname(dir()), "cwd", VERDICTS);
+  try {
+    await Bun.write(file, verdicts);
+  } catch (error) {
+    process.stderr.write(`stand-in: could not record verdicts in ${file}: ${String(error)}\n`);
+  }
 }
 
 interface Check {

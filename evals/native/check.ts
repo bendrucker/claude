@@ -96,7 +96,10 @@ export async function caseGraders(suite: string, name: string): Promise<Graders>
 
 /** Reads every file under a directory by relative path, or undefined when there is none. */
 async function readFiles(dir: string): Promise<Map<string, string> | undefined> {
-  const entries = globSync("**/*", { cwd: dir, withFileTypes: true }).filter((e) => e.isFile());
+  // `**/*` skips dotfiles, which a file-target grader may read, such as `.eval-verdicts`.
+  const entries = globSync(["**/*", "**/.*"], { cwd: dir, withFileTypes: true }).filter((e) =>
+    e.isFile(),
+  );
   if (entries.length === 0) return undefined;
   const read = entries.map(async (e) => {
     const path = join(e.parentPath, e.name);

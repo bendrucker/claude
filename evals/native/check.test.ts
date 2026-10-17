@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { check, emptyPrompts, type Mismatch, shadowed } from "./check";
+import { check, earlyClose, emptyPrompts, type Mismatch, shadowed } from "./check";
 
 async function suite(files: Record<string, string>): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), "check-"));
@@ -132,16 +132,21 @@ test.each<{ body: string; expected: string[] }>([
   expect(await emptyPrompts(dir)).toEqual(expected);
 });
 
-test("no tracked case sends an empty prompt", async () => {
-  const root = join(import.meta.dirname, "../..");
+/** Every tracked suite directory, as the parent of a directory holding a `case.yaml`. */
+function trackedSuites(root: string): Set<string> {
   const listed = Bun.spawnSync(["git", "ls-files", "*/case.yaml"], { cwd: root });
-  const suites = new Set(
+  return new Set(
     listed.stdout
       .toString()
       .split("\n")
       .filter(Boolean)
       .map((f) => dirname(dirname(f))),
   );
+}
+
+test("no tracked case sends an empty prompt", async () => {
+  const root = join(import.meta.dirname, "../..");
+  const suites = trackedSuites(root);
   const empty = await Promise.all(
     [...suites].map(async (s) => (await emptyPrompts(join(root, s))).map((c) => `${s}/${c}`)),
   );
@@ -160,4 +165,25 @@ test("names case graders that shadow a suite grader", async () => {
     "two/graders/short.md": "---\ntype: llm\n---\n",
   });
   expect(await shadowed(dir)).toEqual(["one/fired"]);
+});
+
+test("names graders whose frontmatter holds a --- before its closing line", async () => {
+  const dir = await suite({
+    "graders/mid-line.md": "---\ntype: regex\npattern: '<issue>\\n---\\n'\n---\n",
+    "graders/repeat.md": "---\ntype: regex\npattern: '<issue>\\n-{3}\\n'\n---\n",
+    "one/case.yaml": "name: one\n",
+    "one/graders/rule.md": "---\ntype: regex\npattern: 'a---b'\n---\nbody --- here\n",
+    "one/graders/body.md": "---\ntype: llm\n---\nA --- in the body is fine.\n---\n",
+  });
+  expect(await earlyClose(dir)).toEqual(["graders/mid-line.md", "one/graders/rule.md"]);
+});
+
+test("no tracked grader holds a --- the runner would end its frontmatter at", async () => {
+  const root = join(import.meta.dirname, "../..");
+  const suites = trackedSuites(root);
+  const cut = await Promise.all(
+    [...suites].map(async (s) => (await earlyClose(join(root, s))).map((g) => `${s}/${g}`)),
+  );
+  expect(suites.size).toBeGreaterThan(0);
+  expect(cut.flat()).toEqual([]);
 });

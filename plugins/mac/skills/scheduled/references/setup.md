@@ -5,7 +5,7 @@ First-run interview. Produces `~/.config/claude-scheduled/config.json`, which de
 ## Detect Before Asking
 
 - Read the hostname (`scutil --get ComputerName`, falling back to `hostname`) to suggest a machine identity for the interview.
-- Check for existing `user/scheduled/*` directories in this repo checkout (in-repo group candidates).
+- Check for existing `user/scheduled/*` directories in the `bendrucker/claude` checkout (`~/src/bendrucker/claude`) as in-repo group candidates.
 - Check `~/.config/claude-scheduled/*` for out-of-repo group directories from a prior setup.
 
 ## Interview
@@ -29,4 +29,4 @@ Echo the written config back for confirmation, then continue into the originally
 
 ## Re-Run
 
-`/scheduled setup` re-runs the interview. The current config is already injected at the top of `SKILL.md`, so offer each current group as a default answer, plus the option to add or remove a group.
+`/mac:scheduled setup` re-runs the interview. The current config is already injected at the top of `SKILL.md`, so offer each current group as a default answer, plus the option to add or remove a group.

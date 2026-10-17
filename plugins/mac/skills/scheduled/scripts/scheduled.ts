@@ -5,7 +5,6 @@ import { basename, join, resolve } from "node:path";
 import { cli, command } from "cleye";
 import { table } from "table";
 import { z } from "zod";
-import { decode, decodeFile } from "../../../../packages/decode/index";
 
 export const LABEL_ROOT = "me.bendrucker.claude";
 const LAUNCH_AGENTS_DIR = join(homedir(), "Library/LaunchAgents");
@@ -193,8 +192,15 @@ ${intervalKeys.join("\n")}
 `;
 }
 
+/** Validates a parsed value. `source` names the file in any failure. */
+function parse<S extends z.ZodType>(schema: S, value: unknown, source: string): z.output<S> {
+  const result = schema.safeParse(value);
+  if (!result.success) throw new Error(`invalid ${source}:\n${z.prettifyError(result.error)}`);
+  return result.data;
+}
+
 export function parseDescriptor(text: string, source: string): Descriptor {
-  return decode(Descriptor, Bun.YAML.parse(text), source);
+  return parse(Descriptor, Bun.YAML.parse(text), source);
 }
 
 export async function listDescriptors(dir: string): Promise<DescriptorFile[]> {
@@ -227,10 +233,10 @@ async function loadConfig(): Promise<Config> {
   const file = Bun.file(CONFIG_PATH);
   if (!(await file.exists())) {
     throw new Error(
-      `no group directories given and no config at ${CONFIG_PATH}; run /scheduled setup or pass directories explicitly`,
+      `no group directories given and no config at ${CONFIG_PATH}; run /mac:scheduled setup or pass directories explicitly`,
     );
   }
-  return decodeFile(Config, CONFIG_PATH);
+  return parse(Config, await file.json(), CONFIG_PATH);
 }
 
 async function resolveGroups(dirs: string[]): Promise<{ group: string; dir: string }[]> {

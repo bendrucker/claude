@@ -195,7 +195,17 @@ workdir: ~/src/bendrucker/claude
 
 describe("listDescriptors", () => {
   test("reads the committed home group", async () => {
-    const dir = join(import.meta.dirname, "..", "..", "..", "scheduled", "home");
+    const dir = join(
+      import.meta.dirname,
+      "..",
+      "..",
+      "..",
+      "..",
+      "..",
+      "user",
+      "scheduled",
+      "home",
+    );
     const entries = await listDescriptors(dir);
     expect(entries.map((e) => e.descriptor.label)).toContain("discover");
   });

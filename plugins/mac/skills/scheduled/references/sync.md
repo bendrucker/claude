@@ -4,7 +4,7 @@
 
 ## Always Dry-Run First
 
-Run `bun user/skills/scheduled/scripts/scheduled.ts sync --dry-run [dir...]` (every managed group from the config when no directories are given) and present the printed install/update/prune table before doing anything else. `--dry-run` touches no launchctl and writes no files, so it is always safe to run first, and to re-run after every descriptor edit.
+Run the `sync` command from `SKILL.md` with `--dry-run` (every managed group from the config when no directories are given) and present the printed install/update/prune table before doing anything else. `--dry-run` touches no launchctl and writes no files, so it is always safe to run first, and to re-run after every descriptor edit.
 
 ## Confirm, Then Install
 
@@ -20,4 +20,4 @@ For each managed group directory:
 
 ## Verify
 
-`/scheduled status` shows load state per agent (`launchctl print`). `/scheduled run <label>` (`<group>.<label>` or the full launchd label) kickstarts an agent immediately, without waiting for its schedule, to confirm a newly-installed agent actually fires.
+`/mac:scheduled status` shows load state per agent (`launchctl print`). `/mac:scheduled run <label>` (`<group>.<label>` or the full launchd label) kickstarts an agent immediately, without waiting for its schedule, to confirm a newly-installed agent actually fires.

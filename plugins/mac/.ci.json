@@ -1,3 +1,4 @@
 {
-  "runner": "macos-latest"
+  "runner": "macos-latest",
+  "paths": ["user/scheduled/"]
 }

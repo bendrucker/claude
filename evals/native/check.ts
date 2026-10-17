@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { globSync } from "node:fs";
 import { basename, dirname, extname, join, relative } from "node:path";
-import { cli } from "cleye";
+import { Command } from "@commander-js/extra-typings";
 import { parse } from "yaml";
 import { z } from "zod";
 import { traceReply } from "./load";
@@ -122,6 +122,24 @@ export interface Checked {
   mismatches: Mismatch[];
   /** Regex graders, as `<case>/<grader>`, that no example could grade. */
   unchecked: string[];
+  /** Case graders that hide one `suite.yaml` shares in, from {@link shadowed}. */
+  shadowed: string[];
+}
+
+/** Case graders, as `<case>/<grader>`, that hide a grader `suite.yaml` shares into the case. */
+export async function shadowed(suite: string): Promise<string[]> {
+  const shared = (await readSuite(suite)).graders;
+  return globSync("*/case.yaml", { cwd: suite })
+    .map(dirname)
+    .flatMap((name) => {
+      const own = new Set(
+        globSync("graders/*.md", { cwd: join(suite, name) }).map((f) => basename(f, ".md")),
+      );
+      return sharedFor(shared, name)
+        .filter((g) => own.has(g))
+        .map((g) => `${name}/${g}`);
+    })
+    .toSorted();
 }
 
 /**
@@ -163,21 +181,27 @@ export async function check(suite: string): Promise<Checked> {
       .filter(([g, grader]) => grader.type === "regex" && !reached.has(`${c}/${g}`))
       .map(([g]) => `${c}/${g}`),
   );
-  return { mismatches: results.flat(), unchecked: unchecked.toSorted() };
+  return {
+    mismatches: results.flat(),
+    unchecked: unchecked.toSorted(),
+    shadowed: await shadowed(suite),
+  };
 }
 
-if (import.meta.main) {
-  const argv = cli({
-    name: "check.ts",
-    parameters: ["<suite>"],
-    help: {
-      description:
-        "Test a suite's regex graders against the examples in <suite>/examples/<case>/ before spending runs on them: hand-written replies as .md with a frontmatter `fail:` list, and traces as .jsonl with `fail:` in a sibling .yaml. A directory named after an example holds the files its file-target graders read. Every grader an example can reach must pass it unless listed.",
-    },
+export const program = new Command("check.ts")
+  .description(
+    "Test a suite's regex graders against the examples in <suite>/examples/<case>/ before spending runs on them: hand-written replies as .md with a frontmatter `fail:` list, and traces as .jsonl with `fail:` in a sibling .yaml. A directory named after an example holds the files its file-target graders read. Every grader an example can reach must pass it unless listed. Also names case graders that shadow one suite.yaml shares in.",
+  )
+  .argument("<suite>", "suite directory")
+  .action(async (suite) => {
+    const { mismatches, unchecked, shadowed: hidden } = await check(suite);
+    for (const m of mismatches) console.log(`${m.example}: ${m.grader} should ${m.expected}`);
+    if (unchecked.length > 0) console.log(`No example reaches: ${unchecked.join(", ")}`);
+    if (hidden.length > 0) console.log(`Case graders shadow suite.yaml: ${hidden.join(", ")}`);
+    if (mismatches.length > 0) process.exit(1);
+    console.log("Every regex grader agrees with its examples.");
   });
-  const { mismatches, unchecked } = await check(argv._.suite);
-  for (const m of mismatches) console.log(`${m.example}: ${m.grader} should ${m.expected}`);
-  if (unchecked.length > 0) console.log(`No example reaches: ${unchecked.join(", ")}`);
-  if (mismatches.length > 0) process.exit(1);
-  console.log("Every regex grader agrees with its examples.");
+
+if (import.meta.main) {
+  await program.parseAsync();
 }

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { check, type Mismatch } from "./check";
+import { check, type Mismatch, shadowed } from "./check";
 
 async function suite(files: Record<string, string>): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), "check-"));
@@ -120,4 +120,17 @@ test("a case inherits the suite graders its globs match and overrides by name", 
   expect((await check(dir)).mismatches).toEqual([
     { example: "examples/one/good.md", grader: "tagged", expected: "pass" },
   ]);
+});
+
+test("names case graders that shadow a suite grader", async () => {
+  const dir = await suite({
+    "suite.yaml": "graders:\n  fired: '*'\n  short: 'one'\n",
+    "graders/fired.md": "---\ntype: llm\n---\n",
+    "graders/short.md": "---\ntype: llm\n---\n",
+    "one/case.yaml": "name: one\n",
+    "one/graders/fired.md": "---\ntype: llm\n---\n",
+    "two/case.yaml": "name: two\n",
+    "two/graders/short.md": "---\ntype: llm\n---\n",
+  });
+  expect(await shadowed(dir)).toEqual(["one/fired"]);
 });

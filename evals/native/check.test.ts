@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { check, type Mismatch } from "./check";
+import { dirname, join } from "node:path";
+import { check, emptyPrompts, type Mismatch } from "./check";
 
 async function suite(files: Record<string, string>): Promise<string> {
   const dir = mkdtempSync(join(tmpdir(), "check-"));
@@ -120,4 +120,31 @@ test("a case inherits the suite graders its globs match and overrides by name", 
   expect((await check(dir)).mismatches).toEqual([
     { example: "examples/one/good.md", grader: "tagged", expected: "pass" },
   ]);
+});
+
+test.each([
+  { body: "Ship this branch.\n", expected: [] },
+  { body: "undefined\n", expected: ["one"] },
+  { body: "null", expected: ["one"] },
+  { body: "  \n", expected: ["one"] },
+])("a prompt.md of $body reports $expected", async ({ body, expected }) => {
+  const dir = await suite({ "one/case.yaml": "name: one\n", "one/prompt.md": body });
+  expect(await emptyPrompts(dir)).toEqual(expected);
+});
+
+test("no tracked case sends an empty prompt", async () => {
+  const root = join(import.meta.dirname, "../..");
+  const listed = Bun.spawnSync(["git", "ls-files", "*/case.yaml"], { cwd: root });
+  const suites = new Set(
+    listed.stdout
+      .toString()
+      .split("\n")
+      .filter(Boolean)
+      .map((f) => dirname(dirname(f))),
+  );
+  const empty = await Promise.all(
+    [...suites].map(async (s) => (await emptyPrompts(join(root, s))).map((c) => `${s}/${c}`)),
+  );
+  expect(suites.size).toBeGreaterThan(0);
+  expect(empty.flat()).toEqual([]);
 });

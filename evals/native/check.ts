@@ -122,6 +122,25 @@ export interface Checked {
   mismatches: Mismatch[];
   /** Regex graders, as `<case>/<grader>`, that no example could grade. */
   unchecked: string[];
+  /** Cases whose `prompt.md` would send the session nothing, such as a blank or `undefined` body. */
+  prompts: string[];
+}
+
+/**
+ * Cases in a suite whose `prompt.md` is blank or the text of a missing value, such as
+ * `undefined` from a generator that interpolated a field the case lacked. The runner sends the
+ * body as the prompt, so the session would answer that text instead of the case.
+ */
+export async function emptyPrompts(suite: string): Promise<string[]> {
+  const cases = globSync("*/case.yaml", { cwd: suite }).map((f) => dirname(f));
+  const bad = await Promise.all(
+    cases.map(async (c) => {
+      const file = Bun.file(join(suite, c, "prompt.md"));
+      if (!(await file.exists())) return [];
+      return /^(undefined|null)?$/.test((await file.text()).trim()) ? [c] : [];
+    }),
+  );
+  return bad.flat().toSorted();
 }
 
 /**
@@ -163,7 +182,11 @@ export async function check(suite: string): Promise<Checked> {
       .filter(([g, grader]) => grader.type === "regex" && !reached.has(`${c}/${g}`))
       .map(([g]) => `${c}/${g}`),
   );
-  return { mismatches: results.flat(), unchecked: unchecked.toSorted() };
+  return {
+    mismatches: results.flat(),
+    unchecked: unchecked.toSorted(),
+    prompts: await emptyPrompts(suite),
+  };
 }
 
 if (import.meta.main) {
@@ -172,12 +195,13 @@ if (import.meta.main) {
     parameters: ["<suite>"],
     help: {
       description:
-        "Test a suite's regex graders against the examples in <suite>/examples/<case>/ before spending runs on them: hand-written replies as .md with a frontmatter `fail:` list, and traces as .jsonl with `fail:` in a sibling .yaml. A directory named after an example holds the files its file-target graders read. Every grader an example can reach must pass it unless listed.",
+        "Fail on a case whose prompt.md is blank or `undefined`, then test a suite's regex graders against the examples in <suite>/examples/<case>/ before spending runs on them: hand-written replies as .md with a frontmatter `fail:` list, and traces as .jsonl with `fail:` in a sibling .yaml. A directory named after an example holds the files its file-target graders read. Every grader an example can reach must pass it unless listed.",
     },
   });
-  const { mismatches, unchecked } = await check(argv._.suite);
+  const { mismatches, unchecked, prompts } = await check(argv._.suite);
   for (const m of mismatches) console.log(`${m.example}: ${m.grader} should ${m.expected}`);
+  for (const c of prompts) console.log(`${c}/prompt.md: empty prompt`);
   if (unchecked.length > 0) console.log(`No example reaches: ${unchecked.join(", ")}`);
-  if (mismatches.length > 0) process.exit(1);
+  if (mismatches.length > 0 || prompts.length > 0) process.exit(1);
   console.log("Every regex grader agrees with its examples.");
 }

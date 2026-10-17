@@ -30,6 +30,8 @@ claude --plugin-dir ./plugins/<name> --setting-sources local
 
 This isolates the session from user/project settings, loading only the specified plugin. Use this to verify changes before committing.
 
+Prefix the command with `CLAUDE_CODE_ENTRYPOINT=claude-desktop` to exercise a plugin's desktop app branches from the terminal. [`docs/desktop.md`](docs/desktop.md) covers what that reaches and what still needs the app.
+
 ## License
 
 MIT © [Ben Drucker](http://bendrucker.me)

@@ -238,26 +238,72 @@ describe("telemetry ingest", () => {
         tool: "Bash",
         decision: "ask",
         hook: "PreToolUse",
+        setting: "permissions.blockReadsOutsideWorkingDirectories",
+        decider: "host",
+        ceiling: "ask",
+        read_only: true,
         outcome: "deny",
+      },
+    };
+    const denyBase = makeModRecord({ mod: "auto-mode", event_name: "auto-mode.classifier.deny" });
+    const deny = {
+      ...denyBase,
+      attributes: {
+        ...denyBase.attributes,
+        tool_use_id: "t2",
+        tool_name: "Bash",
+        permission_mode: "auto",
+        reason: "destroys the filesystem",
       },
     };
     await Bun.write(
       join(modEventsDir, "s1", "auto-mode.1.0.jsonl"),
-      `${JSON.stringify(verdict)}\n`,
+      `${JSON.stringify(verdict)}\n${JSON.stringify(deny)}\n`,
     );
     await reindex();
 
-    const rows = await db.query(
-      "SELECT tool_use_id, hook, duration_ms, outcome FROM classifier_verdicts",
+    const verdicts = await db.query(
+      "SELECT tool_use_id, hook, setting, decider, ceiling, read_only, duration_ms, outcome FROM classifier_verdicts",
       z.object({
         tool_use_id: z.string(),
         hook: z.string().nullable(),
+        setting: z.string().nullable(),
+        decider: z.string().nullable(),
+        ceiling: z.string().nullable(),
+        read_only: z.boolean().nullable(),
         duration_ms: z.bigint().nullable(),
         outcome: z.string().nullable(),
       }),
     );
-    expect(rows).toEqual([
-      { tool_use_id: "t1", hook: "PreToolUse", duration_ms: 40n, outcome: "deny" },
+    expect(verdicts).toEqual([
+      {
+        tool_use_id: "t1",
+        hook: "PreToolUse",
+        setting: "permissions.blockReadsOutsideWorkingDirectories",
+        decider: "host",
+        ceiling: "ask",
+        read_only: true,
+        duration_ms: 40n,
+        outcome: "deny",
+      },
+    ]);
+
+    const denials = await db.query(
+      "SELECT tool_use_id, tool_name, permission_mode, reason FROM classifier_denials",
+      z.object({
+        tool_use_id: z.string(),
+        tool_name: z.string(),
+        permission_mode: z.string().nullable(),
+        reason: z.string(),
+      }),
+    );
+    expect(denials).toEqual([
+      {
+        tool_use_id: "t2",
+        tool_name: "Bash",
+        permission_mode: "auto",
+        reason: "destroys the filesystem",
+      },
     ]);
   });
 });

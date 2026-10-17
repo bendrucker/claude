@@ -53,6 +53,8 @@ export interface Checked {
   prompts: string[];
   /** Case graders that hide one `suite.yaml` shares in, from {@link shadowed}. */
   shadowed: string[];
+  /** Graders whose frontmatter the runner would cut short, from {@link earlyClose}. */
+  earlyClose: string[];
 }
 
 /**
@@ -67,6 +69,25 @@ export async function emptyPrompts(suite: string): Promise<string[]> {
       const file = Bun.file(join(suite, c, "prompt.md"));
       if (!(await file.exists())) return [];
       return /^(undefined|null)?$/.test((await file.text()).trim()) ? [c] : [];
+    }),
+  );
+  return bad.flat().toSorted();
+}
+
+/**
+ * Grader files in a suite, relative to it, whose frontmatter holds a `---` before its closing
+ * line. The runner ends frontmatter at the first `---` anywhere, even mid-line, so such a
+ * grader fails to load as invalid YAML and takes every case that reaches it down with it.
+ * Write a literal run of dashes in a pattern as `-{3}`.
+ */
+export async function earlyClose(suite: string): Promise<string[]> {
+  const files = globSync(["graders/*.md", "*/graders/*.md"], { cwd: suite });
+  const bad = await Promise.all(
+    files.map(async (f) => {
+      const text = await Bun.file(join(suite, f)).text();
+      const match = /^---\n([\s\S]*?)\n---/.exec(text);
+      if (match === null) return [];
+      return text.indexOf("---", 3) === match[0].length - 3 ? [] : [f];
     }),
   );
   return bad.flat().toSorted();
@@ -132,5 +153,6 @@ export async function check(suite: string): Promise<Checked> {
     unchecked: unchecked.toSorted(),
     prompts: await emptyPrompts(suite),
     shadowed: await shadowed(suite),
+    earlyClose: await earlyClose(suite),
   };
 }

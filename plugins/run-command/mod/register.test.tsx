@@ -13,7 +13,7 @@ const REPLY = {
 const SHELL = { isDraft: false, isWorking: false, hint: "! for shell mode" };
 const IDLE = { isDraft: false, isWorking: false, hint: "? for shortcuts" };
 
-function core(on: On, events: ModEventsInput[] = []): string[] {
+function core(on: On, events: ModEventsInput[] = [], isFilled = true): string[] {
   const fills: string[] = [];
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
@@ -30,6 +30,7 @@ function core(on: On, events: ModEventsInput[] = []): string[] {
     return <Text>{e.component}</Text>;
   });
   on("prompt.fill", ($, e) => {
+    if (!isFilled) return { isFilled };
     fills.push(e.text);
     return { isFilled: true, text: e.text, cursor: e.text.length };
   });
@@ -134,7 +135,11 @@ describe("register", () => {
     expect(edited.text).toBe(joined);
     expect(events).toEqual([
       { mod: "run-command", event: "list.shown", detail: { count: 4 } },
-      { mod: "run-command", event: "pick.all", detail: { count: 3, source: "click" } },
+      {
+        mod: "run-command",
+        event: "pick.all",
+        detail: { count: 3, source: "click", filled: true },
+      },
       { mod: "run-command", event: "pick.all", detail: { count: 3, source: "digit" } },
     ]);
   });
@@ -154,7 +159,7 @@ describe("register", () => {
     expect(events.at(-1)).toEqual({
       mod: "run-command",
       event: "pick.all",
-      detail: { count: 3, source: "click" },
+      detail: { count: 3, source: "click", filled: true },
     });
   });
 
@@ -198,9 +203,23 @@ describe("register", () => {
       {
         mod: "run-command",
         event: "pick",
-        detail: { command: "git status --short", source: "click" },
+        detail: { command: "git status --short", source: "click", filled: true },
       },
     ]);
+  });
+
+  test("a click whose fill is refused records it unfilled", async ($, on) => {
+    const events: ModEventsInput[] = [];
+    const fills = core(on, events, false);
+    const message = await reply($);
+    await hint($, SHELL);
+    await message.press({ key: "run-command:1:wt list" });
+    expect(fills).toEqual([]);
+    expect(events.at(-1)).toEqual({
+      mod: "run-command",
+      event: "pick",
+      detail: { command: "wt list", source: "click", filled: false },
+    });
   });
 
   // oxlint-disable-next-line vitest/prefer-each -- claude-code/testing has no test.each.

@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<issue>\s*(?:```\w*\n)?---\n(?:(?!\n---\n)[\s\S])*?^type:[ \t]*refactor[ \t]*$'
+pattern: '<issue>\s*(?:```\w*\n)?-{3}\n(?:(?!\n-{3}\n)[\s\S])*?^type:[ \t]*refactor[ \t]*$'
 flags: m
 match: contains
 ---

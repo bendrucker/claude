@@ -1,21 +1,21 @@
 # `performance:hill-climb` Eval
 
-A native `claude plugin eval` suite for the judgment steps of `performance:hill-climb`: the Frame, the Checkpoint's candidate ranking, the choice of profile, and the Decide step. Every case hands the session `/performance:hill-climb` with frozen inputs. Nothing builds or runs, so a case costs one read-and-write session instead of a climb. Cases are tagged by family (`frame`, `ranking`, `offcpu`, `decide`).
+A native `claude plugin eval` suite for the judgment steps of `performance:hill-climb`: the Frame, the Checkpoint's candidate ranking, the choice of profile, and the Decide step. Every case hands the session `/performance:hill-climb` with frozen inputs. Nothing builds or runs, so a case costs one read-and-write session instead of a climb. Cases are tagged by family (`frame`, `ranking`, `offcpu`, `decide`) and by split (`dev`, `holdout`). The suite is `.local-only`, since a labeled-PR run of all 42 cases would pass the monthly eval budget.
 
 ## Frame
 
-`docsync` is an unattended, dispatched climb whose brief is wrong about the workload. The brief reads "Hill-climb `docsync sync` startup, harness at bench/, report back", and `append_system_prompt` says nobody will answer. The session stops at the end of the Frame and writes `bench/CLIMB.md`. [`truth.json`](docsync/truth.json) holds what a good Frame records:
+`docsync` is an unattended, dispatched climb whose brief is wrong about the workload. The brief reads "Hill-climb `docsync sync` startup, harness at bench/, report back", and `append_system_prompt` says nobody will answer. The session stops at the end of the Frame and writes `bench/CLIMB.md`, which every grader reads. A good Frame records:
 
-| Check | Where | Ground truth |
+| Grader | Where | Ground truth |
 | --- | --- | --- |
-| `mismatch` | notes or reply | The `bench/` fixture's lockfile matches its manifest, so every benchmark run takes the up-to-date exit and skips fetch, apply, and index. |
-| `waits` | notes or reply | A maintainer runs the sync after each upstream release and waits for it before opening the docs PR (README usage). |
-| `time-split` | notes or reply | The release-sync log puts 133.6s into fetch (71.82s) and apply (57.89s). |
-| `parallelism` | Rules | Fetch downloads 38 archives one at a time, so the Rules say whether parallelism is in scope. |
-| `assumed` | Rules | The share of the eight Frame items the brief leaves open (ceiling, fast signal, guard, side effects, scope, inputs, budget, parallelism) marked `assumed: <value>`. |
+| `mismatch` | one line | The `bench/` fixture's lockfile matches its manifest, so every benchmark run takes the up-to-date exit and skips fetch, apply, and index. |
+| `waits` | one line | A maintainer runs the sync after each upstream release and waits for it before opening the docs PR (README usage). |
+| `time-split` | one section | The release-sync log puts 133.6s into fetch (71.82s) and apply (57.89s). |
+| `parallelism` | a list item | Fetch downloads 38 archives one at a time, so the notes say whether parallelism is in scope. |
+| `assumed-*` | a Rules line | Each of the eight Frame items the brief leaves open (ceiling, fast signal, guard, side effects, scope, inputs, budget, parallelism) is marked `assumed: <value>`. Each weighs 1/8, so together they count as one check. |
 | `checkpoint` | notes | A Checkpoint section with content. |
 
-The metric is left out of `assumed`, since the brief names a target that the evidence contradicts.
+The metric is left out of `assumed-*`, since the brief names a target that the evidence contradicts.
 
 ## Ranking
 
@@ -35,6 +35,10 @@ The metric is left out of `assumed`, since the brief names a target that the evi
 
 The `logship` fan-out is a trap because CPU is 0.99 of wall on 2 vCPU. On `ledgerroll`, ranking by raw share puts gzip first, and the two `Sprintf` wins share one 14% entry split only in the peek listing.
 
+Each `*-top5` grader places a win in the first five candidates and weighs its share of the case's planted gain, so together they score gain-weighted recall@5 at half the case score. `no-trap-top2` and `parallelism` take a quarter each.
+
+The ranked graders read the first line of each numbered item (`1.` or `1)`) or each table row whose first cell is the rank (`| 1 |`). `no-trap-top2` ignores a trap named on a line that also names a win, so dismissing the trap in passing does not count as ranking it.
+
 ## Off-CPU
 
 Each case hands the session a small Go repo, a settled `frame.md`, and a profile that's correct but answers the wrong question. A good reply notices the mismatch and asks for, or plans, the profile that would see the time before ranking what the given one shows. The trap is a micro-optimization from the given profile in the top two.
@@ -45,11 +49,11 @@ Each case hands the session a small Go repo, a settled `frame.md`, and a profile
 | `quotesvc` | p99 171 ms, p50 1.9 ms | allocation | readers block while `refresh` holds the write lock across an upstream fetch |
 | `sitegen` | cold CI build, 64.2 s | CPU, warm cache | image resizing and remote includes, cache hits only when warm |
 
-The graders check the outcome and accept any wording that gets there. `gap` names the mismatch, and `profile` requests a profile or measurement that sees the time. `lead@1` and `lead-rank` place the first candidate whose headline targets the true lead (`primary` in `truth.json`), skipping profiling steps.
+The graders check the outcome and accept any wording that gets there. `gap` names the mismatch on one line, `profile` requests a profile or measurement that sees the time, and `no-trap-top2` keeps the micro-optimizations out of the top two. [`scripts/gen-offcpu.ts`](scripts/gen-offcpu.ts) writes them from `truth.json`. `score.ts` adds `lead@1`, the first candidate whose headline targets the true lead (`primary` in `truth.json`), skipping profiling steps.
 
 ## Decide
 
-36 single-turn cases, generated by [`scripts/gen-decide.ts`](scripts/gen-decide.ts) from one template. Each hands the session a `CLIMB.md` excerpt (Rules, the A/A noise floor, the profile top, the candidate's hypothesis and target), frozen `compare.ts report` output for the screen and the full metric, and `meta.json`, then asks for the decision. Each trap appears on three of four domains (CLI startup, test suite, build, request latency):
+36 single-turn cases, generated by [`scripts/gen-decide.ts`](scripts/gen-decide.ts) from one template. Each hands the session a `CLIMB.md` excerpt (Rules, the A/A noise floor, the profile top, the candidate's hypothesis and target), frozen `compare.ts report` output for the screen and the full metric, and `meta.json`, then asks for the decision. Each trap appears on three of four domains (CLI startup, test suite, build, request latency), and the third is its holdout:
 
 | Trap | Expected | What's planted |
 | --- | --- | --- |
@@ -66,22 +70,19 @@ The graders check the outcome and accept any wording that gets there. `gap` name
 | `near-bound` | accept or re-run | a gain 1.05 times the target's profile share, an excess inside noise |
 | `partial-load` | accept | 1 of 6 rounds loaded under a 12 to 16% gain at p = 0.001 |
 
-`failed-runs` accepts reject or re-run, since both hold the gain back until the failures are explained. Keep unconfirmed is never expected, since it needs the user's agreement and nobody answers. Edit the generator and rerun `bun plugins/performance/evals/hill-climb/scripts/gen-decide.ts` rather than editing a case. A test fails when the committed cases drift from it.
+`failed-runs` accepts reject or re-run, since both hold the gain back until the failures are explained. Keep unconfirmed is never expected, since it needs the user's agreement and nobody answers. `decision` matches the reply's last `Decision:` line, and `reason` passes when that decision is right and the reply names the trap, so a case scores half for the right call alone. Edit the generator and rerun `bun plugins/performance/evals/hill-climb/scripts/gen-decide.ts` rather than editing a case. A test fails when the committed cases drift from it.
 
-## Graders
+## Scoring
 
-[`scripts/score.ts`](scripts/score.ts) is the headline score. It reads each case's `truth.json` by `kind`:
+The native graders' weighted pass rate is the headline score. [`scripts/score.ts`](scripts/score.ts) scores what a regex can't and writes it as `<results>/scored.json`, in `aggregate-result.json` shape:
 
-- **frame** ([`frame.ts`](scripts/frame.ts)): rebuilds the notes file from the trace's Write and Edit calls. A check passes when one paragraph, list item, or table row matches every one of its pattern groups. The composite is the mean of the checks, the checkpoint, and the `assumed` share.
-- **ranking** ([`ranking.ts`](scripts/ranking.ts)): finds the reply's candidate list and scores gain-weighted recall@5, traps ranked in the top two (0.5 off the composite each, counted only on an entry that doesn't name a win), the share of candidates citing a profile entry, and whether a list item weighs parallelism.
-- **offcpu** ([`offcpu.ts`](scripts/offcpu.ts)): a check passes when one paragraph or list item matches every pattern group. Each of the top two candidates in the last ranked list counts as at most one trap, judged on its headline, and a headline that names the lead, a profiling step, or spreading work across cores isn't one. The composite is the mean of the checks, a trap-free top two, and `lead@1`.
-- **decide** ([`decide.ts`](scripts/decide.ts)): reads the reply's last `Decision:` line. `decision` is exact match on it, and `reason` passes when the decision is right and the reply names the trap. The composite is their mean.
-
-The regex graders in each case are the runner-side proxies `compare.ts` reads. `docsync`'s read `bench/CLIMB.md`. [`scripts/gen-offcpu.ts`](scripts/gen-offcpu.ts) writes the off-CPU proxies from `truth.json`.
+- **ranking** ([`ranking.ts`](scripts/ranking.ts)): finds the reply's candidate list and scores the share of its entries that cite a profile entry by name, percentage, or seconds. `cited-all` passes when every entry does.
+- **offcpu** ([`offcpu.ts`](scripts/offcpu.ts)): scores the reciprocal rank of the first candidate in the last ranked list whose headline targets the true lead. `lead@1` passes when it ranks first.
 
 ## Running
 
-`bun evals/native/run.ts plugins/performance/evals/hill-climb --ref <ref> -- --runs 4` runs the plugin at `<ref>` against a no-plugin baseline, with the Bash sandbox disabled. Add `--ablation none` after `--` to skip the baseline when comparing a second ref, `--case '<glob>'` to pick cases, and `--model <id>` to override the model. Results land in the gitignored `results/<timestamp>-<label>/`.
+`bun evals/native/run.ts plugins/performance/evals/hill-climb --ref <ref> -- --runs 4 --tag dev` runs the plugin at `<ref>` against a no-plugin baseline on the dev split, with the Bash sandbox disabled. Add `--ablation none` after `--` to skip the baseline when comparing a second ref, `--tag holdout` to confirm a win, and `--model <id>` to override the model. Results land in the gitignored `results/<timestamp>-<label>/`.
 
-- `bun plugins/performance/evals/hill-climb/scripts/score.ts <label>=<results>...` scores every trace and prints per-arm tables with permutation p-values between every pair of arms, for each case (each trap, for Decide) and pooled for each family. The label renames each results directory's plugin arm, so two refs stay apart.
+- `bun plugins/performance/evals/hill-climb/scripts/score.ts <results>...` writes `scored.json` into each results directory.
+- `bun evals/native/compare.ts <base>/aggregate-result.json <candidate>/aggregate-result.json --suite plugins/performance/evals/hill-climb` compares the native scores by case and tag. Pass each `scored.json` instead for the lead and citation scores.
 - `bun evals/native/check.ts plugins/performance/evals/hill-climb` tests the regex graders against [`examples/`](examples/).

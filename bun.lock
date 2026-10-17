@@ -62,6 +62,9 @@
         "zod": "^4.4.3",
       },
     },
+    "packages/eval-stubs": {
+      "name": "@bendrucker/claude-eval-stubs",
+    },
     "packages/evals": {
       "name": "@bendrucker/claude-evals",
       "dependencies": {
@@ -504,6 +507,8 @@
     "@bendrucker/claude-decode": ["@bendrucker/claude-decode@workspace:packages/decode"],
 
     "@bendrucker/claude-eval-judge": ["@bendrucker/claude-eval-judge@workspace:packages/eval-judge"],
+
+    "@bendrucker/claude-eval-stubs": ["@bendrucker/claude-eval-stubs@workspace:packages/eval-stubs"],
 
     "@bendrucker/claude-evals": ["@bendrucker/claude-evals@workspace:packages/evals"],
 

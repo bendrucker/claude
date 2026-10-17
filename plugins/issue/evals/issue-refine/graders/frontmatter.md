@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<issue>\s*(?:```\w*\n)?---\n(?=(?:(?!\n---\n)[\s\S])*?^title:[ \t]*\S)(?=(?:(?!\n---\n)[\s\S])*?^type:[ \t]*(?:bug|feature|refactor|spike)[ \t]*$)'
+pattern: '<issue>\s*(?:```\w*\n)?-{3}\n(?=(?:(?!\n-{3}\n)[\s\S])*?^title:[ \t]*\S)(?=(?:(?!\n-{3}\n)[\s\S])*?^type:[ \t]*(?:bug|feature|refactor|spike)[ \t]*$)'
 flags: m
 match: contains
 ---

@@ -1,16 +1,34 @@
-import { mkdtempSync, readdirSync } from "node:fs";
+import { globSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
 import { $ } from "bun";
+import { parseDocument } from "yaml";
+import { z } from "zod";
 import { shareGraders } from "./graders";
 import { readResult } from "./result";
 import { stage } from "./stage";
-import { casePlugins, readSuite, type SuiteFile } from "./suite";
+import { casePlugins, listedPlugins, readSuite, type SuiteFile, withDependencies } from "./suite";
 import { wrap } from "./wrap";
 
 export interface Staged {
   target: string;
   evalDir: string;
+}
+
+/** Appends each staged case's missing plugin dependencies to its `plugins:` list. */
+async function addCaseDependencies(repo: string, suite: string, root: string): Promise<void> {
+  const files = globSync("*/case.yaml", { cwd: join(root, suite) });
+  await Promise.all(
+    files.map(async (file) => {
+      const listed = await listedPlugins(root, suite, file);
+      const missing = (await withDependencies(repo, listed)).filter((p) => !listed.includes(p));
+      if (missing.length === 0) return;
+      const path = join(root, suite, file);
+      const doc = parseDocument(await Bun.file(path).text());
+      for (const p of missing) doc.addIn(["plugins"], relative(join(suite, dirname(file)), p));
+      await Bun.write(path, doc.toString());
+    }),
+  );
 }
 
 async function stagePlugins(
@@ -27,6 +45,7 @@ async function stagePlugins(
   // The suite always comes from the working tree, so every ref is graded by the same cases.
   await $`rm -rf ${join(root, suite)}`.quiet();
   await stage(repo, undefined, [suite], root);
+  await addCaseDependencies(repo, suite, root);
   await Promise.all(
     plugins.map(async (p) => {
       if (!(await Bun.file(join(root, p, "package-lock.json")).exists())) return;
@@ -64,6 +83,7 @@ export async function prepare(
     config.wrap === undefined
       ? await stagePlugins(repo, suite, ref, root)
       : await stageWrapped(repo, suite, ref, root, config.wrap);
+  await stage(repo, undefined, config.stage, root);
   await shareGraders(join(staged.target, staged.evalDir), config.graders);
   return staged;
 }
@@ -93,6 +113,65 @@ export async function keepCases(dir: string, globs: string[]): Promise<string[]>
     cases.filter((e) => !kept.includes(e.name)).map(async (e) => $`rm -rf ${join(dir, e.name)}`),
   );
   return kept.toSorted();
+}
+
+const InitEvent = z.object({
+  type: z.literal("system"),
+  subtype: z.literal("init"),
+  plugin_errors: z
+    .array(z.object({ plugin: z.string(), type: z.string(), message: z.string() }))
+    .nullish(),
+});
+
+/**
+ * Lists every plugin error a collected trace's init event reports, as `<case>/<arm>/<n>`
+ * followed by the error. A plugin that fails to load leaves its arm running without it, which
+ * the runner otherwise scores without complaint.
+ */
+export async function pluginErrors(output: string): Promise<string[]> {
+  const path = join(output, "aggregate-result.json");
+  if (!(await Bun.file(path).exists())) return [];
+  const { cases } = await readResult(path);
+  const found = await Promise.all(
+    cases.flatMap((c) =>
+      Object.entries(c.arms).flatMap(([arm, runs]) =>
+        runs.map(async (_, i) => {
+          const trace = Bun.file(join(output, "traces", `${c.name}-${arm}-${i}.jsonl`));
+          if (!(await trace.exists())) return [];
+          for (const line of (await trace.text()).split("\n")) {
+            if (line.trim() === "") continue;
+            const init = InitEvent.safeParse(JSON.parse(line));
+            if (!init.success) continue;
+            return (init.data.plugin_errors ?? []).map(
+              (e) => `${c.name}/${arm}/${i}: ${e.plugin} ${e.type}: ${e.message}`,
+            );
+          }
+          return [];
+        }),
+      ),
+    ),
+  );
+  return found.flat();
+}
+
+/**
+ * Command-line arguments given before `--` other than the suite, `--ref`, `--label`, and help.
+ * Runner arguments such as `--case` go after `--`, and one before it would be misread as a
+ * `run.ts` option or a runner argument.
+ */
+export function strayArgs(args: string[]): string[] {
+  const end = args.indexOf("--");
+  const before = end === -1 ? args : args.slice(0, end);
+  const stray: string[] = [];
+  let suite = false;
+  for (let i = 0; i < before.length; i++) {
+    const arg = before[i] ?? "";
+    if (arg === "--ref" || arg === "--label") i++;
+    else if (/^--(ref|label)=/.test(arg) || arg === "-h" || arg === "--help") continue;
+    else if (!suite && !arg.startsWith("-")) suite = true;
+    else stray.push(arg);
+  }
+  return stray;
 }
 
 /**

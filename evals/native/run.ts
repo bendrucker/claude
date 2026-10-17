@@ -4,7 +4,14 @@ import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { subscriptionEnv } from "../../packages/eval-judge/env";
 import { erroredRuns, readResult } from "../../packages/evals/result";
-import { collectTraces, keepCases, prepare, splitCases } from "../../packages/evals/run";
+import {
+  collectTraces,
+  keepCases,
+  pluginErrors,
+  prepare,
+  splitCases,
+  strayArgs,
+} from "../../packages/evals/run";
 import { readSuite } from "../../packages/evals/suite";
 
 export const program = new Command("run.ts")
@@ -55,6 +62,14 @@ export const program = new Command("run.ts")
     const code = await proc.exited;
     await collectTraces(output);
     await $`rm -rf ${dirname(target)}`.quiet();
+    const loadErrors = await pluginErrors(output);
+    if (loadErrors.length > 0) {
+      console.error(
+        `${loadErrors.length} plugin errors at session start, so those arms ran without the plugin:`,
+      );
+      for (const e of loadErrors) console.error(`  ${e}`);
+      process.exit(1);
+    }
     // The runner fails on a run that ended on an API error, which it leaves ungraded. A run it
     // graded despite an error, such as a timeout or a judge call that threw, exits clean.
     const result = join(output, "aggregate-result.json");
@@ -70,5 +85,12 @@ export const program = new Command("run.ts")
   });
 
 if (import.meta.main) {
+  const stray = strayArgs(process.argv.slice(2));
+  if (stray.length > 0) {
+    console.error(
+      `Unknown arguments before --: ${stray.join(" ")}. Runner arguments go after --, as in: run.ts <suite> -- --case <glob>`,
+    );
+    process.exit(2);
+  }
   await program.parseAsync();
 }

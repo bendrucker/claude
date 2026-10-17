@@ -1,0 +1,5 @@
+{
+  "name": "@bendrucker/claude-eval-stubs",
+  "private": true,
+  "type": "module"
+}

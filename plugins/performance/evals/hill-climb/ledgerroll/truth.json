@@ -67,14 +67,5 @@
       "note": "Decompression is the largest entry and unavoidable: the feed's compression is fixed, the standard library is the only decompressor in scope, and on 1 vCPU overlapping it with parsing gains nothing. Ranking by raw share alone puts it first.",
       "patterns": ["gzip", "flate", "decompress", "huffman", "crc32"]
     }
-  ],
-  "parallelism": [
-    "parallel",
-    "concurren",
-    "goroutine",
-    "GOMAXPROCS",
-    "errgroup",
-    "worker pool",
-    "pipelin"
   ]
 }

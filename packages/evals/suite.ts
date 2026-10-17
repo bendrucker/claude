@@ -15,6 +15,8 @@ export const SuiteFile = z.object({
   /** Gated tools the cases need, passed to `--allow-tools`. */
   allow_tools: z.array(z.string()).default([]),
   judge_model: z.string().default("claude-sonnet-5-5"),
+  /** Repo-relative paths a scaffold reads, such as `packages/eval-stubs`, staged from the working tree. */
+  stage: z.array(z.string()).default([]),
   /** Artifacts that are not a plugin, wrapped into one by `wrap.ts`. */
   wrap: z
     .object({
@@ -44,16 +46,53 @@ export async function readSuite(dir: string): Promise<SuiteFile> {
   return SuiteFile.parse((await file.exists()) ? parse(await file.text()) : {});
 }
 
-/** Repo-relative plugin directories the suite's cases load. */
-export async function casePlugins(repo: string, suite: string): Promise<string[]> {
-  const files = globSync("*/case.yaml", { cwd: join(repo, suite) });
-  const lists = await Promise.all(
-    files.map(async (file) => {
-      const { plugins } = CaseFile.parse(parse(await Bun.file(join(repo, suite, file)).text()));
-      return plugins.map((p) => normalize(join(suite, dirname(file), p)));
+const PluginManifest = z.object({ dependencies: z.array(z.string()).default([]) });
+
+/**
+ * Adds the plugins that repo-relative plugin directories declare as `dependencies`,
+ * transitively. A dependency names a sibling plugin directory. The runner loads each case
+ * plugin inline and reports one whose dependency is not also inline as `dependency-unsatisfied`,
+ * so it never loads.
+ */
+export async function withDependencies(repo: string, plugins: string[]): Promise<string[]> {
+  const seen = new Set<string>();
+  let next = plugins;
+  while (next.length > 0) {
+    const fresh = [...new Set(next)].filter((p) => !seen.has(p));
+    for (const p of fresh) seen.add(p);
+    // oxlint-disable-next-line no-await-in-loop -- each level's plugins come from the last
+    const deps = await Promise.all(fresh.map((p) => dependencies(repo, p)));
+    next = deps.flat();
+  }
+  return [...seen].toSorted();
+}
+
+/** Repo-relative directories of the plugins one plugin declares as dependencies. */
+async function dependencies(repo: string, plugin: string): Promise<string[]> {
+  const manifest = Bun.file(join(repo, plugin, ".claude-plugin/plugin.json"));
+  if (!(await manifest.exists())) return [];
+  const { dependencies: names } = PluginManifest.parse(await manifest.json());
+  return Promise.all(
+    names.map(async (name) => {
+      const dep = join(dirname(plugin), name);
+      if (!(await Bun.file(join(repo, dep, ".claude-plugin/plugin.json")).exists()))
+        throw new Error(`${plugin} depends on ${name}, but ${dep} is not a plugin`);
+      return dep;
     }),
   );
-  return [...new Set(lists.flat())].toSorted();
+}
+
+/** Repo-relative plugin directories a case lists, as written in its `case.yaml`. */
+export async function listedPlugins(repo: string, suite: string, file: string): Promise<string[]> {
+  const { plugins } = CaseFile.parse(parse(await Bun.file(join(repo, suite, file)).text()));
+  return plugins.map((p) => normalize(join(suite, dirname(file), p)));
+}
+
+/** Repo-relative plugin directories the suite's cases load, with their dependencies. */
+export async function casePlugins(repo: string, suite: string): Promise<string[]> {
+  const files = globSync("*/case.yaml", { cwd: join(repo, suite) });
+  const lists = await Promise.all(files.map((file) => listedPlugins(repo, suite, file)));
+  return withDependencies(repo, [...new Set(lists.flat())]);
 }
 
 /** Maps each case in a suite directory to the tags its case.yaml declares. */

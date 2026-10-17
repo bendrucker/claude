@@ -3,8 +3,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import { collectTraces, keepCases, prepare, splitCases } from "./run";
-import { casePlugins } from "./suite";
+import { collectTraces, keepCases, pluginErrors, prepare, splitCases, strayArgs } from "./run";
+import { casePlugins, withDependencies } from "./suite";
 import { openInvocation, siblingLinks } from "./wrap";
 
 let repo: string;
@@ -12,10 +12,14 @@ let repo: string;
 const files: Record<string, string> = {
   "plugins/p/.claude-plugin/plugin.json": '{"name":"p"}',
   "plugins/p/skills/s/SKILL.md": "committed skill",
-  "plugins/q/.claude-plugin/plugin.json": '{"name":"q"}',
+  "plugins/q/.claude-plugin/plugin.json": '{"name":"q","dependencies":["r"]}',
+  "plugins/r/.claude-plugin/plugin.json": '{"name":"r","dependencies":["s","q"]}',
+  "plugins/s/.claude-plugin/plugin.json": '{"name":"s"}',
+  "plugins/bad/.claude-plugin/plugin.json": '{"name":"bad","dependencies":["missing"]}',
   "plugins/p/evals/suite/one/case.yaml": "plugins: [../../.., ../../../../q]\n",
   "plugins/p/evals/suite/one/prompt.md": "committed prompt",
-  "plugins/p/evals/suite/suite.yaml": "graders:\n  fired: '*'\n",
+  "plugins/p/evals/suite/suite.yaml": "stage: [packages/stubs]\ngraders:\n  fired: '*'\n",
+  "packages/stubs/install.sh": "committed stub",
   "plugins/p/evals/suite/graders/fired.md": "shared grader",
   "user/skills/tdd/SKILL.md":
     "---\ndisable-model-invocation: true\n---\ncommitted user skill [v](../other/LANGUAGE.md)",
@@ -36,13 +40,24 @@ beforeAll(async () => {
     Bun.write(join(repo, "plugins/p/skills/s/SKILL.md"), "working skill"),
     Bun.write(join(repo, "plugins/p/evals/suite/one/prompt.md"), "working prompt"),
     Bun.write(join(repo, "user/skills/tdd/SKILL.md"), "working user skill"),
+    Bun.write(join(repo, "packages/stubs/install.sh"), "working stub"),
   ]);
 });
 
 const read = (path: string) => Bun.file(path).text();
 
-test("casePlugins resolves each case's plugins against the repo", async () => {
-  expect(await casePlugins(repo, "plugins/p/evals/suite")).toEqual(["plugins/p", "plugins/q"]);
+test("casePlugins resolves each case's plugins and their dependencies against the repo", async () => {
+  expect(await casePlugins(repo, "plugins/p/evals/suite")).toEqual([
+    "plugins/p",
+    "plugins/q",
+    "plugins/r",
+    "plugins/s",
+  ]);
+});
+
+test("withDependencies rejects a dependency with no sibling plugin", async () => {
+  const failure = await withDependencies(repo, ["plugins/bad"]).catch((error: unknown) => error);
+  expect(String(failure)).toContain("plugins/missing is not a plugin");
 });
 
 describe("prepare", () => {
@@ -53,10 +68,14 @@ describe("prepare", () => {
     const { target, evalDir } = await prepare(repo, "plugins/p/evals/suite", ref);
     expect(evalDir).toBe("p/evals/suite");
     expect(await read(join(target, "p/skills/s/SKILL.md"))).toBe(skill);
-    expect(await read(join(target, "q/.claude-plugin/plugin.json"))).toBe('{"name":"q"}');
+    expect(await read(join(target, "s/.claude-plugin/plugin.json"))).toBe('{"name":"s"}');
+    expect(await read(join(target, evalDir, "one/case.yaml"))).toBe(
+      "plugins: [ ../../.., ../../../../q, ../../../../r, ../../../../s ]\n",
+    );
     expect(await read(join(target, evalDir, "one/prompt.md"))).toBe("working prompt");
     expect(await read(join(target, evalDir, "one/graders/fired.md"))).toBe("shared grader");
     expect(await Bun.file(join(target, evalDir, "graders/fired.md")).exists()).toBe(false);
+    expect(await read(join(target, "../packages/stubs/install.sh"))).toBe("working stub");
   });
 
   test("wraps skills and context that are not a plugin", async () => {
@@ -131,4 +150,47 @@ test("keepCases prunes staged cases to those any glob matches", async () => {
   expect(await Bun.file(join(dir, "quiet-b/case.yaml")).exists()).toBe(false);
   expect(await Bun.file(join(dir, "examples/case.yaml")).exists()).toBe(true);
   expect(keepCases(dir, ["nope"])).rejects.toThrow("No case matches");
+});
+
+describe("pluginErrors", () => {
+  const init = (errors: unknown) =>
+    `${JSON.stringify({ type: "system", subtype: "hook_started" })}\n${JSON.stringify({ type: "system", subtype: "init", plugin_errors: errors })}\n`;
+
+  test("lists each init plugin error by case, arm, and run", async () => {
+    const output = mkdtempSync(join(tmpdir(), "run-output-"));
+    const runs = [{}, {}];
+    await Bun.write(
+      join(output, "aggregate-result.json"),
+      JSON.stringify({ cases: [{ name: "one", arms: { with: runs, without: runs } }] }),
+    );
+    const error = { plugin: "gitlab@inline", type: "dependency-unsatisfied", message: "no git" };
+    await Bun.write(join(output, "traces/one-with-1.jsonl"), init([error]));
+    await Bun.write(join(output, "traces/one-with-0.jsonl"), init([]));
+    await Bun.write(join(output, "traces/one-without-0.jsonl"), init(null));
+    expect(await pluginErrors(output)).toEqual([
+      "one/with/1: gitlab@inline dependency-unsatisfied: no git",
+    ]);
+  });
+
+  test("is empty without a result", async () => {
+    expect(await pluginErrors(mkdtempSync(join(tmpdir(), "run-output-")))).toEqual([]);
+  });
+});
+
+test.each<{ name: string; args: string[]; stray: string[] }>([
+  { name: "only the suite", args: ["s"], stray: [] },
+  { name: "runner args after --", args: ["s", "--", "--case", "a"], stray: [] },
+  {
+    name: "run.ts flags before --",
+    args: ["--ref", "main", "s", "--label=x", "--", "--runs", "2"],
+    stray: [],
+  },
+  {
+    name: "a runner flag before --",
+    args: ["s", "--case", "a", "--", "--runs", "2"],
+    stray: ["--case", "a"],
+  },
+  { name: "runner args without --", args: ["s", "--runs", "2"], stray: ["--runs", "2"] },
+])("strayArgs with $name", ({ args, stray }) => {
+  expect(strayArgs(args)).toEqual(stray);
 });

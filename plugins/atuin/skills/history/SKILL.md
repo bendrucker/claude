@@ -1,5 +1,6 @@
 ---
 name: atuin:history
+disable-model-invocation: true
 description: Report shell history from atuin's local capture. Covers what commands ran, when, where, and how they exited. Use when asked "what commands did I run", "what was I working on in the terminal", "have I ever run X", "how do I usually invoke X", or about recent shell activity, command frequency, or failed commands.
 argument-hint: "[query]"
 allowed-tools:

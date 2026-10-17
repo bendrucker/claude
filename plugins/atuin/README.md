@@ -16,4 +16,4 @@ Capture is provisioned separately by the `atuin` dotfiles topic. This plugin is 
 
 ## Curation
 
-The always-on cost is one skill description. If the session index shows `atuin:history` never invoked over a few weeks of "recent activity" questions, drop the plugin from `enabledPlugins`.
+`atuin:history` runs only when typed, so the plugin doesn't add to every session's context. Model routing was dropped after three routed calls in the 100 days to 2026-10-16.

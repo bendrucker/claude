@@ -1,2 +1,56 @@
 wrap:
   skills: [user/skills/show-me]
+graders:
+  diff-block: [config-move, routes-split]
+  no-diagram: [slugify-lookup, value-lookup]
+  no-long-block:
+    [
+      component-change-diff,
+      config-move,
+      design-order,
+      file-roles,
+      price-cache,
+      routes-split,
+      save-dedupe,
+      webhook-retry-design,
+    ]
+  one-block: "*-lookup"
+  sequence-diagram: [campaign-send, upload-pipeline]
+  short: [slugify-lookup, value-lookup]
+  short-close:
+    [
+      backoff-logic,
+      cli-dispatch,
+      component-change-diff,
+      config-move,
+      declined-card,
+      design-order,
+      file-roles,
+      plugin-loader-design,
+      price-cache,
+      product-update,
+      pseudocode-logic,
+      request-flow,
+      routes-split,
+      save-dedupe,
+      settings-page,
+      theme-toggle,
+      webhook-retry-design,
+    ]
+  signatures: [design-order, plugin-loader-design, price-cache, webhook-retry-design]
+  skill-fired:
+    [
+      cli-dispatch,
+      config-move,
+      file-roles,
+      plugin-loader-design,
+      request-flow,
+      save-dedupe,
+      settings-page,
+      signature-lookup,
+      transport-split,
+      upload-pipeline,
+      value-lookup,
+      webhook-retry-design,
+    ]
+  types-first: [price-cache, webhook-retry-design]

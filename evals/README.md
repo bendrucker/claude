@@ -21,6 +21,7 @@ judge_model: claude-sonnet-5-5
 wrap:                           # omit when the cases load a plugin
   skills: [user/skills/tdd]
   context: [user/rules/typescript.md]
+stage: [packages/eval-stubs]    # repo paths a fixture reads, staged from the working tree
 graders:                        # <suite>/graders/<name>.md to the case-name globs it joins
   out-present: "*"
   create-fired: ["pr-*"]

@@ -1,5 +1,5 @@
 ---
-fail: [waits, assumed]
+fail: [waits, assumed-ceiling, assumed-fast-signal, assumed-guard, assumed-side-effects, assumed-scope, assumed-inputs, assumed-budget, assumed-parallelism]
 ---
 I wrote the plan to `bench/CLIMB.md`, with a Rules section and a Checkpoint section. I built and ran nothing, so there are no measurements yet. The `/performance:hill-climb` command isn't installed in this session, so I did the task by hand from your arguments.
 

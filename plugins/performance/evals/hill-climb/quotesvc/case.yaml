@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: quotesvc
-tags: [offcpu]
+tags: [offcpu, dev]
 plugins: ["../../.."]
 execution:
   model: claude-sonnet-5-5

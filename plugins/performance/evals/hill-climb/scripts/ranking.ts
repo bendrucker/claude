@@ -13,13 +13,8 @@ export const Truth = z.object({
       patterns: z.array(z.string()),
     }),
   ),
-  parallelism: z.array(z.string()),
 });
 export type Truth = z.output<typeof Truth>;
-
-export const RECALL_AT = 5;
-export const TRAP_RANKS = 2;
-export const TRAP_PENALTY = 0.5;
 
 export interface Block {
   kind: "numbered" | "table" | "bullet";
@@ -105,21 +100,6 @@ export function candidateList(blocks: Block[], truth: Truth): string[] {
   return best?.entries ?? [];
 }
 
-/**
- * The 1-based rank of each planted item in the list. A trap counts only on an entry that names
- * no win, so a win that dismisses a trap in passing does not rank the trap.
- */
-export function itemRanks(entries: string[], truth: Truth): Map<string, number | undefined> {
-  const wins = matcher(truth.items.filter((i) => i.label === "win").flatMap((i) => i.patterns));
-  return new Map(
-    truth.items.map((item) => {
-      const named = matcher(item.patterns);
-      const i = entries.findIndex((e) => named(e) && (item.label === "win" || !wins(e)));
-      return [item.id, i === -1 ? undefined : i + 1];
-    }),
-  );
-}
-
 const normalize = (text: string) => text.replaceAll("`", "").replaceAll(/\(\*?([^()]*)\)/g, "$1");
 
 /** Function names, percentages, and seconds from a pprof `top` listing that count as citing it. */
@@ -177,44 +157,10 @@ export function cites(entry: string, refs: ReturnType<typeof profileRefs>): bool
   );
 }
 
-export interface Score {
-  /** Gain-weighted share of the planted wins ranked in the first `RECALL_AT`. */
-  recall: number;
-  /** Traps ranked in the first `TRAP_RANKS`. */
-  traps: string[];
-  /** Share of the candidate list's entries that name a profile entry. */
-  cited: number;
-  /** Whether any list item weighs parallelism. */
-  parallelism: boolean;
-  /** `recall` less `TRAP_PENALTY` per trap in the first `TRAP_RANKS`. */
-  composite: number;
-  ranks: Record<string, number | null>;
-  size: number;
-}
-
-export function scoreReply(reply: string, truth: Truth, profile: string): Score {
-  const blocks = listBlocks(reply);
-  const entries = candidateList(blocks, truth);
-  const ranks = itemRanks(entries, truth);
-  const within = (id: string, n: number) => (ranks.get(id) ?? Infinity) <= n;
-  const wins = truth.items.filter((i) => i.label === "win");
-  const total = wins.reduce((sum, i) => sum + i.gain, 0);
-  const recall =
-    wins.filter((i) => within(i.id, RECALL_AT)).reduce((sum, i) => sum + i.gain, 0) / total;
-  const traps = truth.items
-    .filter((i) => i.label === "trap" && within(i.id, TRAP_RANKS))
-    .map((i) => i.id);
+/** Share of the candidate list's entries that name a profile entry, or 0 with no list. */
+export function citedShare(reply: string, truth: Truth, profile: string): number {
+  const entries = candidateList(listBlocks(reply), truth);
+  if (entries.length === 0) return 0;
   const refs = profileRefs(profile);
-  const cited =
-    entries.length === 0 ? 0 : entries.filter((e) => cites(e, refs)).length / entries.length;
-  const parallel = matcher(truth.parallelism);
-  return {
-    recall,
-    traps,
-    cited,
-    parallelism: blocks.some((b) => b.entries.some(parallel)),
-    composite: recall - TRAP_PENALTY * traps.length,
-    ranks: Object.fromEntries([...ranks].map(([id, r]) => [id, r ?? null])),
-    size: entries.length,
-  };
+  return entries.filter((e) => cites(e, refs)).length / entries.length;
 }

@@ -36,7 +36,7 @@ Investigate in auto mode until the approach is settled, then enter plan mode to 
 
 ## Decisions
 
-Ask a simple decision (a confirmation, an approval, a multiple-choice pick) with `AskUserQuestion`, because it reaches my phone. When the decision lives inside a document I should read and mark up, write `tmp/<topic>.md` with one question block per decision and a recommendation, open it with Plannotator as the `plannotator` skill describes, and end the turn. Once I answer in chat while a gate is open, stop opening gates for the rest of the session.
+Ask a simple decision (a confirmation, an approval, a multiple-choice pick) with `AskUserQuestion`, because it reaches my phone. When the decision lives inside a document I should read and mark up, write `tmp/<topic>.md` with one question block per decision and a recommendation, open it with Plannotator as the `plannotator` skill describes, and end the turn. Where Plannotator can't reach me, publish the file as an Artifact instead. Once I answer in chat while a gate is open, stop opening gates for the rest of the session.
 
 ## Check-ins
 
@@ -69,7 +69,7 @@ My Claude Code setup lives in [`bendrucker/claude`](https://github.com/bendrucke
 
 Machine setup lives in [`bendrucker/dotfiles`](https://github.com/bendrucker/dotfiles) at `~/.dotfiles`. Anything the machine or shell must provide needs a merged dotfiles PR first, because the Claude repo installs nothing. That covers binaries, `$PATH` entries, aliases and functions, exported env vars, install steps, symlinks, launchd agents, macOS permission grants, and recurring jobs. Claude-only env vars go in `settings.json` instead.
 
-When work in another repo needs a change in either repo, hand it to a sibling agent through `herdr:herdr` and report the PR back to me. Where herdr is unavailable, tell me the change.
+When work in another repo needs a change in either repo, hand it to a sibling agent through `herdr:herdr` and report the PR back to me. Where herdr is unavailable, queue it with `spawn_task`, or tell me the change.
 
 Reach secrets through 1Password `op run`. SSH keys live in Secretive, which refuses to sign while the Mac is locked.
 

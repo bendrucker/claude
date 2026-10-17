@@ -156,7 +156,11 @@ diff "$TMPDIR/before.json" "$TMPDIR/after.json"
 
 `moshi-hook status` calls these entries stale whenever an event it owns also holds a hook it did not write, because it compares the event's whole group list against its own generated output. Branch `chief` adds a `chief-tap.ts` entry to five of them, which is enough to make `status` name `Notification`, `PermissionRequest`, `PostToolUse`, `SessionStart`, and `Stop` outdated against a file whose Moshi entries are current. Appending one `/bin/sh -c 'true'` group to `Stop` in a scratch copy reproduces it. Re-running `install` does not clear the report, because it leaves the foreign group in place and re-appends its own entry last. Read `status` against a scratch copy of the tracked file before acting on it, where the same command reports `claude current`.
 
-**Delete them** when a permission prompt no longer needs answering off the machine, which `moshi-hook unpair` and `moshi-hook uninstall --target claude` would follow. Re-run the regeneration above when a `moshi-hook` release changes the hook set, and take the generator's output for the entries it owns. Verified against 0.3.22.
+**Delete them** when a permission prompt no longer needs answering off the machine, which `moshi-hook unpair` and `moshi-hook uninstall --target claude` would follow. Re-run the regeneration above when a `moshi-hook` release changes the hook set, and take the generator's output for the entries it owns, then put the `unless-desktop.sh` prefix below back on each one. Verified against 0.3.22.
+
+[`unless-desktop.sh`](../user/hooks/unless-desktop.sh) wraps every vibe-island and `moshi-hook` command and skips it under a `claude-desktop*` entrypoint, where the app draws its own notifications and approvals. Skips log to hook metrics as `unless-desktop`.
+
+**Drop it** by 2027-01-15 if no `unless-desktop` rows appear, or sooner if the app misses a prompt the bridges would have delivered.
 
 ## Plugins
 

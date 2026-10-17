@@ -8,6 +8,7 @@ Git workflow and branching best practices for Claude Code.
   - `conflicts`: Resolve git merge conflicts during rebase, merge, or cherry-pick. Drives the operation to completion and pushes when asked.
 - **Hooks**:
   - Blocks direct commits to the default branch
+  - Records `git push -u` tracking outside the sandbox, which denies the `.git/config` write a linked worktree's push makes
   - Refuses an `EnterWorktree` call the harness would reject
   - Recovers a failed git network operation over HTTPS when the SSH agent refuses to sign
   - Handles a refused commit or tag signature: asks for approval where signing is required, retries unsigned elsewhere

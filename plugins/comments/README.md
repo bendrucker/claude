@@ -20,7 +20,7 @@ Both run extraction, intrinsic-complexity ranking, an agent fan-out for judging,
 - **`judge/`**: the versioned `prompt.md`, the verdict schema, per-verdict validation, and the job builder that shards comments for the Workflow.
 - **`workflow/`**: the committed Workflow script the skill hands the job to.
 - **`apply/`**: the deterministic edit engine, the verdict id-match against re-extracted comments, the branch writer, and the report renderer. The edit engine refuses to delete a required doc comment, drop a Go doc comment's `Name` lead, or splice a line wider than the comment it replaces.
-- **`evals/`**: the labeled fixture corpus and the action-accuracy eval, which scores it either through the production Workflow judge (the ship gate) or through the SDK oracle (a batched cross-check).
+- **`evals/`**: the labeled fixture corpus and the action-accuracy eval, which scores it through the production Workflow judge (the ship gate).
 - A preventive steering rule lives at `user/rules/code-comments.md`, scoped by path to code files.
 
 ## Density Hook
@@ -54,9 +54,3 @@ The gate scores fact survival on `keep` fixtures and on `trim` fixtures with a g
 The report separates keep precision from slop recall. `--gate` also fails when headline slop recall falls under `RECALL_FLOOR` in `evals/eval.ts`.
 
 Fixtures that `judge/prompt.md` quotes are marked `quoted`. Their precision and recall report as a separate bucket, outside the headline numbers and the recall floor. The must-keep check still covers them.
-
-The SDK oracle cross-checks the rubric over the same corpus, scoring it in batched Messages calls. It needs `ANTHROPIC_API_KEY`, and it samples, so repeated runs can differ:
-
-```bash
-bun run plugins/comments/evals/eval.ts --gate
-```

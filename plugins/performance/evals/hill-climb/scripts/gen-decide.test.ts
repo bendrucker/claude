@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
-import { loadGraders, verdict } from "../../../../../evals/native/check";
+import { loadGraders, verdict } from "../../../../../packages/evals/graders";
 import { all, type Decision, graders, lastDecision, loadLine, report, rounds } from "./gen-decide";
 
 const suite = join(import.meta.dir, "..");

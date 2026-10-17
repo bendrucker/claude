@@ -14,7 +14,7 @@ import {
   views,
   WINDOW_DAYS,
 } from "../report";
-import { resultFiles } from "../results";
+import { resultFiles } from "../../../packages/evals/suite";
 
 const CORPUS = join(import.meta.dirname, "corpus");
 const EMPTY = mkdtempSync(join(tmpdir(), "report-"));

@@ -498,6 +498,50 @@ function checks(): string {
   return meta.checks.map((c) => `${c.name}\t${c.state}\t${c.elapsed}\t${c.link}\n`).join("");
 }
 
+const STATE_TITLE: Record<string, string> = {
+  APPROVED: "Approved",
+  CHANGES_REQUESTED: "Changes requested",
+  COMMENTED: "Commented",
+  DISMISSED: "Dismissed",
+};
+
+/** `gh pr view` text when stdout is not a terminal. */
+function viewText(): string {
+  const files = prFiles();
+  const reviewers = latest()
+    .map((r) => `${r.author} (${STATE_TITLE[r.state] ?? r.state})`)
+    .join(", ");
+  return [
+    `title:\t${meta.pull.title}`,
+    "state:\tOPEN",
+    `author:\t${meta.pull.author}`,
+    "labels:\t",
+    "assignees:\t",
+    `reviewers:\t${reviewers}`,
+    "projects:\t",
+    "milestone:\t",
+    `number:\t${meta.pull.number}`,
+    `url:\t${url}`,
+    `additions:\t${files.reduce((n, f) => n + f.additions, 0)}`,
+    `deletions:\t${files.reduce((n, f) => n + f.deletions, 0)}`,
+    "auto-merge:\tdisabled",
+    "--",
+    `${meta.pull.body}\n`,
+  ].join("\n");
+}
+
+/** `gh pr view --comments` text when stdout is not a terminal: review bodies oldest first, skipping bodiless comment reviews as gh does. Inline thread comments are not shown. */
+function viewComments(): string {
+  return meta.reviews
+    .filter((r) => !(r.state === "COMMENTED" && r.body === ""))
+    .toSorted((a, b) => a.submittedAt.localeCompare(b.submittedAt))
+    .map(
+      (r) =>
+        `author:\t${r.author}\nassociation:\t${r.bot ? "none" : "member"}\nedited:\tfalse\nstatus:\t${(STATE_TITLE[r.state] ?? "none").toLowerCase()}\n--\n${r.body}\n--\n`,
+    )
+    .join("");
+}
+
 function pr(sub: string, args: Args): Out {
   const repo = flag(args, "-R", "--repo");
   if (repo !== undefined && repo.replace(/^https:\/\/github\.com\//, "") !== meta.repo)
@@ -510,7 +554,7 @@ function pr(sub: string, args: Args): Out {
   if (!matches(args.positional[0])) fail(`no pull requests found for ${args.positional[0]}`);
   if (sub === "view") {
     if (json !== undefined) return { json: pick(json) };
-    return `title:\t${meta.pull.title}\nstate:\tOPEN\nauthor:\t${meta.pull.author}\nnumber:\t${meta.pull.number}\nurl:\t${url}\n--\n${meta.pull.body}\n`;
+    return has(args, "--comments") ? viewComments() : viewText();
   }
   if (sub === "diff") {
     if (has(args, "--name-only")) return git(root, "diff", "--name-only", meta.base, meta.head);

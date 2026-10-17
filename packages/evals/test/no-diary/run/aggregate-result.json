@@ -1,0 +1,539 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.281",
+  "startedAt": "2026-09-24T16:24:18.099Z",
+  "durationSeconds": 68,
+  "costUsd": 1.4329079999999998,
+  "partial": false,
+  "suite": {
+    "root": "/tmp/hill-climb-VTasPr/plugins",
+    "ablation": "with-without",
+    "judgeModel": "claude-sonnet-5",
+    "tagFilters": ["holdout"],
+    "threshold": 0,
+    "concurrency": 4,
+    "plugins": [
+      {
+        "name": "writing",
+        "path": "/tmp/hill-climb-VTasPr/plugins/writing"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "comment-light-touch",
+      "dir": "writing/evals/no-diary/comment-light-touch",
+      "source": "mixed",
+      "promptMarkdown": "give this comment a no-diary pass\n\n```go\n// Postgres truncates identifiers at 63 bytes. Index names built from long\n// table and column names would collide after truncation, so names past the\n// limit get a short hash suffix instead.\nfunc indexName(table string, cols []string) string {\n```",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 3,
+      "timeoutSeconds": 300,
+      "maxTurns": 15,
+      "graders": [
+        {
+          "name": "keeps-code",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-collision",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-hash",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "keeps-limit",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "rewrite-block",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "<rewrite>[\\s\\S]*</rewrite>",
+            "flags": "",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "skill-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "writing:no-diary",
+            "arm": "with-only"
+          }
+        },
+        {
+          "name": "unchanged",
+          "type": "llm",
+          "weight": 1,
+          "graderMarkdown": "The comment is left essentially as written, with at most minor wording changes, because it holds no diary.\nFor example, a rewrite that tightens one clause (\"so long names get a short hash suffix\") while keeping the truncation limit, the collision, and the hash passes.",
+          "config": {
+            "criteria": "The comment is left essentially as written, with at most minor wording changes, because it holds no diary.\nFor example, a rewrite that tightens one clause (\"so long names get a short hash suffix\") while keeping the truncation limit, the collision, and the hash passes.",
+            "focus": "last_message"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.6666666666666666,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.07675879999999999,
+            "judgeCostUsd": 0.006449999999999999,
+            "durationSeconds": 14,
+            "startedAt": "2026-09-24T16:24:18.248Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-3YvMOL/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "unchanged",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "The comment is already close to the code-comments bar (it states a constraint, not history), but it's wordier than it needs to be — the collision explanation restates why truncation is a problem, and \"instead\" implies an unstated alternative.\n\n<rewrite>\n// Postgres truncates identifiers at 63 bytes, so index names built from long\n// table and column names get a hash suffix once they exceed the limit.\nfunc indexName(table string, cols []string) string {\n</rewrite>\n\nCut the \"would collide\" clause — it just restates the consequence of truncation, which the reader already infers from \"so names past the limit get a hash suffix.\" Dropped \"instead\" since it pointed at an unstated alternative."
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 5,
+            "costUsd": 0.08247,
+            "judgeCostUsd": 0.007801999999999998,
+            "durationSeconds": 15,
+            "startedAt": "2026-09-24T16:24:18.248Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-qXR3FA/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "unchanged",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [true, true, true],
+                "evidence": "<rewrite>\n// Postgres truncates identifiers at 63 bytes, so long table/column names can\n// collide after truncation. Names over the limit get a short hash suffix to\n// stay unique.\nfunc indexName(table string, cols []string) string {\n</rewrite>\n\nCut \"instead\" (implied alternative with no reader benefit) and merged the cause/effect into one sentence. Kept the rationale (collision risk) since it explains why the hash suffix exists, not just what the code does."
+              }
+            ]
+          },
+          {
+            "score": 0.8333333333333334,
+            "passed": false,
+            "turns": 4,
+            "costUsd": 0.0733722,
+            "judgeCostUsd": 0.005561999999999999,
+            "durationSeconds": 14,
+            "startedAt": "2026-09-24T16:24:18.248Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-Y0rDGK/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": true,
+                "scored": false
+              },
+              {
+                "name": "unchanged",
+                "passed": false,
+                "weight": 1,
+                "explanation": "judge votes: FAIL FAIL FAIL",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [false, false, false],
+                "evidence": "Cut the \"would collide... instead\" narration — that's justifying the decision rather than stating what a reader needs. Kept one clause for the reason since it explains an otherwise-unlisted case (why a hash suffix instead of plain truncation).\n\n<rewrite>\n// Postgres truncates identifiers at 63 bytes; names past the limit get a\n// short hash suffix to avoid collisions after truncation.\nfunc indexName(table string, cols []string) string {\n</rewrite>"
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.039604600000000004,
+            "judgeCostUsd": 0.001752,
+            "durationSeconds": 8,
+            "startedAt": "2026-09-24T16:24:18.248Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-rSBfa5/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "unchanged",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [true, true, true],
+                "evidence": "<rewrite>\n// Postgres truncates identifiers at 63 bytes; names past the limit get a\n// short hash suffix to avoid collisions.\nfunc indexName(table string, cols []string) string {\n</rewrite>"
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.0463866,
+            "judgeCostUsd": 0.004945999999999997,
+            "durationSeconds": 9,
+            "startedAt": "2026-09-24T16:24:25.991Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-AimCv3/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "unchanged",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [true, true, true],
+                "evidence": "<rewrite>\n// Postgres truncates identifiers at 63 bytes, so long table/column names\n// could collide after truncation; names past the limit get a hash suffix.\nfunc indexName(table string, cols []string) string {\n</rewrite>"
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.0396046,
+            "judgeCostUsd": 0.0017519999999999984,
+            "durationSeconds": 5,
+            "startedAt": "2026-09-24T16:24:32.376Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-qVmDLP/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "keeps-code",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:func indexName)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-collision",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:collid|collision)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-hash",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:hash)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "keeps-limit",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>(?:(?!</rewrite>)[\\s\\S])*?(?:63)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "rewrite-block",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched <rewrite>[\\s\\S]*</rewrite>",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "unchanged",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [true, true, true],
+                "evidence": "<rewrite>\n// Postgres truncates identifiers at 63 bytes; names past the limit get a\n// short hash suffix to avoid collisions.\nfunc indexName(table string, cols []string) string {\n</rewrite>"
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.8333333333333334,
+        "passRate": 0.3333333333333333,
+        "scoreWithout": 1,
+        "passRateWithout": 1,
+        "delta": -0.16666666666666663
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 4,
+    "casesPassed": 4,
+    "overallScore": 0.8968253968253969,
+    "overallPassRate": 0.5,
+    "meanDelta": 0.05753968253968253
+  }
+}

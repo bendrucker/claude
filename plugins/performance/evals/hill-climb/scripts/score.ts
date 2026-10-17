@@ -3,7 +3,7 @@ import { globSync } from "node:fs";
 import { basename, join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
-import { traceReply } from "../../../../../evals/native/load";
+import { traceReply } from "../../../../../packages/evals/trace";
 import { leadRank, OffCpuTruth } from "./offcpu";
 import { citedShare, Truth } from "./ranking";
 

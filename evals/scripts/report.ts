@@ -1,14 +1,16 @@
 #!/usr/bin/env bun
 
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { getBorderCharacters, table } from "table";
 import { z } from "zod";
 import type { RunCommand } from "./command";
 import { literal, query, timestampLiteral } from "./duckdb";
-import { repoRoot, resultFiles } from "./results";
+import { resultFiles } from "../../packages/evals/suite";
 
 export const BUDGET_USD = 20;
+
+const REPO_ROOT = join(import.meta.dirname, "..", "..");
 export const WINDOW_DAYS = 30;
 
 // A single fresh run would otherwise project as 30 days of the same spend. The
@@ -237,7 +239,7 @@ export const program = new Command("report")
   .description(
     "Roll up native eval runs (every aggregate-result.json under plugins/*/evals/*/results/ and evals/user/*/results/) per suite, with a monthly projection of list-price spend against a budget.",
   )
-  .option("--root <dir>", "repo root to read results under", repoRoot())
+  .option("--root <dir>", "repo root to read results under", REPO_ROOT)
   .option("--budget <usd>", "monthly budget in USD", amount, BUDGET_USD)
   .option("--sql <query>", "run SQL against the `runs` and `cases` views instead of the rollup")
   .option("--json", "emit the rollup as JSON")

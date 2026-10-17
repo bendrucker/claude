@@ -12,6 +12,7 @@ macOS-specific automation and system integration.
 ### Hooks
 
 - **sandbox** — Reads the invoked script for the `claude:dangerouslyDisableSandbox` marker and disables the command sandbox when present. Matches both `Bash` and `Monitor` tool calls.
+- **sandbox-ssh-proxy**: `SessionStart` hook that lets sandboxed git reach SSH remotes on macOS ([details](hooks/sandbox-ssh-proxy.md))
 
 ### Scripts
 

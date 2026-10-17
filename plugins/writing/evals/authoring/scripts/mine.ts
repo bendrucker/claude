@@ -7,7 +7,7 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import { z } from "zod";
 import { decodeJson } from "../../../../../packages/decode/index";
-import { mapPool } from "./pool";
+import { mapPool } from "../../../../../packages/evals/pool";
 
 // GitHub's secondary rate limit penalizes concurrent requests from one token.
 const GITHUB_CONCURRENCY = 1;

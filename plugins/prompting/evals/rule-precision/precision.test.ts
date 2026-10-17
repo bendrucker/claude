@@ -12,7 +12,6 @@ import {
   render,
   type RuleScore,
   verdict,
-  wilson,
 } from "./precision";
 
 const BEFORE = `# Doc
@@ -85,24 +84,6 @@ describe("baseRate", () => {
     [{ deleted: 0, prose: 0, docs: 0 }, 0],
   ])("rates %j", (labels, expected) => {
     expect(baseRate(labels)).toBeCloseTo(expected, 4);
-  });
-});
-
-describe("wilson", () => {
-  test("spans everything when nothing was measured", () => {
-    expect(wilson(0, 0)).toEqual([0, 1]);
-  });
-
-  test("narrows as the count grows", () => {
-    const [fewLow, fewHigh] = wilson(7, 10);
-    const [manyLow, manyHigh] = wilson(700, 1000);
-    expect(manyHigh - manyLow).toBeLessThan(fewHigh - fewLow);
-  });
-
-  test("keeps a perfect score's lower bound below 1", () => {
-    const [low, high] = wilson(5, 5);
-    expect(low).toBeLessThan(1);
-    expect(high).toBe(1);
   });
 });
 

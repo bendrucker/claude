@@ -9,7 +9,6 @@
   "main": "index.js",
   "scripts": {
     "types:generate": "sdef-to-dts /Applications/Things3.app --output src/Things3.d.ts",
-    "build": "esbuild src/example.ts --bundle --platform=neutral --format=iife --log-level=error > /dev/null",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -20,10 +19,8 @@
   },
   "devDependencies": {
     "@jxa/global-type": "^1.4.0",
-    "@jxa/run": "^1.4.0",
     "@jxa/sdef-to-dts": "^1.4.0",
     "@types/node": "^25.1.0",
-    "esbuild": "^0.28.1",
     "typescript": "^7.0.0"
   }
 }

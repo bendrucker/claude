@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '^\s{0,3}[1-5][.)][^\n]*(Sprintf|renderRow|groupKey|strconv\.Append)'
+pattern: '^\s{0,3}(?:[1-5][.)]|\|\s*[*_`#]*[1-5][*_`]*\s*\|)[^\n]*(Sprintf|renderRow|groupKey|strconv\.Append)'
 flags: im
 match: contains
 weight: 0.4

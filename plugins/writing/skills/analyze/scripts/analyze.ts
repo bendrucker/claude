@@ -184,10 +184,7 @@ async function main(): Promise<void> {
 // Orchestrates the tested modules over an opened session DB into a ReportInput.
 // All inputs come from db + config; no flag parsing, clock reads, or report
 // rendering happen here, so a fixture DB can drive the whole composition.
-export async function runAnalysis(
-  db: Database,
-  config: AnalysisConfig,
-): Promise<ReportInput> {
+export async function runAnalysis(db: Database, config: AnalysisConfig): Promise<ReportInput> {
   const baseParams: Record<string, string | null> = {
     after_date: config.since,
     before_date: config.until,

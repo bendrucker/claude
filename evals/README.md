@@ -55,6 +55,8 @@ The projection scales the last 30 days of spend over the window actually observe
 
 `costUsd` in a result is the runner's list-price total for the run's sessions and judge calls. `run.ts` removes `ANTHROPIC_API_KEY` from the environment, so local runs spend the Claude Code login's subscription credits and CI spends the `CLAUDE_CODE_OAUTH_TOKEN` secret's. The budget is a spending signal at list price, and a run over it bills nothing extra.
 
+A judge outside the runner, such as the authoring suite's pairwise judge, calls `structured` from [`packages/eval-judge`](../packages/eval-judge/index.ts), which strips the same variables before its Agent SDK `query()`. The package also holds the blind, de-blind, and swap helpers and cache keys.
+
 ## Tests
 
 ```bash

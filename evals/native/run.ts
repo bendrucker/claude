@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, normalize, relative, resolve } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
-import { parse } from "yaml";
+import { parse, parseDocument } from "yaml";
 import { z } from "zod";
 import { subscriptionEnv } from "../../packages/eval-judge/env";
 import { erroredRuns } from "./load";
@@ -39,6 +39,8 @@ export const SuiteFile = z.object({
 
 const CaseFile = z.object({ plugins: z.array(z.string()).default([]) });
 
+const PluginManifest = z.object({ dependencies: z.array(z.string()).default([]) });
+
 const Result = z.object({
   cases: z.array(
     z.object({
@@ -53,16 +55,67 @@ export async function readSuite(dir: string): Promise<z.output<typeof SuiteFile>
   return SuiteFile.parse((await file.exists()) ? parse(await file.text()) : {});
 }
 
-/** Repo-relative plugin directories the suite's cases load. */
-export async function casePlugins(repo: string, suite: string): Promise<string[]> {
-  const files = globSync("*/case.yaml", { cwd: join(repo, suite) });
-  const lists = await Promise.all(
-    files.map(async (file) => {
-      const { plugins } = CaseFile.parse(parse(await Bun.file(join(repo, suite, file)).text()));
-      return plugins.map((p) => normalize(join(suite, dirname(file), p)));
+/**
+ * Adds the plugins that repo-relative plugin directories declare as `dependencies`,
+ * transitively. A dependency names a sibling plugin directory. The runner loads each case
+ * plugin inline and reports one whose dependency is not also inline as `dependency-unsatisfied`,
+ * so it never loads.
+ */
+export async function withDependencies(repo: string, plugins: string[]): Promise<string[]> {
+  const seen = new Set<string>();
+  let next = plugins;
+  while (next.length > 0) {
+    const fresh = [...new Set(next)].filter((p) => !seen.has(p));
+    for (const p of fresh) seen.add(p);
+    // oxlint-disable-next-line no-await-in-loop -- each level's plugins come from the last
+    const deps = await Promise.all(fresh.map((p) => dependencies(repo, p)));
+    next = deps.flat();
+  }
+  return [...seen].toSorted();
+}
+
+/** Repo-relative directories of the plugins one plugin declares as dependencies. */
+async function dependencies(repo: string, plugin: string): Promise<string[]> {
+  const manifest = Bun.file(join(repo, plugin, ".claude-plugin/plugin.json"));
+  if (!(await manifest.exists())) return [];
+  const { dependencies: names } = PluginManifest.parse(await manifest.json());
+  return Promise.all(
+    names.map(async (name) => {
+      const dep = join(dirname(plugin), name);
+      if (!(await Bun.file(join(repo, dep, ".claude-plugin/plugin.json")).exists()))
+        throw new Error(`${plugin} depends on ${name}, but ${dep} is not a plugin`);
+      return dep;
     }),
   );
-  return [...new Set(lists.flat())].toSorted();
+}
+
+/** Repo-relative plugin directories a case lists, as written in its `case.yaml`. */
+async function listedPlugins(repo: string, suite: string, file: string): Promise<string[]> {
+  const { plugins } = CaseFile.parse(parse(await Bun.file(join(repo, suite, file)).text()));
+  return plugins.map((p) => normalize(join(suite, dirname(file), p)));
+}
+
+/** Repo-relative plugin directories the suite's cases load, with their dependencies. */
+export async function casePlugins(repo: string, suite: string): Promise<string[]> {
+  const files = globSync("*/case.yaml", { cwd: join(repo, suite) });
+  const lists = await Promise.all(files.map((file) => listedPlugins(repo, suite, file)));
+  return withDependencies(repo, [...new Set(lists.flat())]);
+}
+
+/** Appends each staged case's missing plugin dependencies to its `plugins:` list. */
+async function addCaseDependencies(repo: string, suite: string, root: string): Promise<void> {
+  const files = globSync("*/case.yaml", { cwd: join(root, suite) });
+  await Promise.all(
+    files.map(async (file) => {
+      const listed = await listedPlugins(root, suite, file);
+      const missing = (await withDependencies(repo, listed)).filter((p) => !listed.includes(p));
+      if (missing.length === 0) return;
+      const path = join(root, suite, file);
+      const doc = parseDocument(await Bun.file(path).text());
+      for (const p of missing) doc.addIn(["plugins"], relative(join(suite, dirname(file)), p));
+      await Bun.write(path, doc.toString());
+    }),
+  );
 }
 
 interface Staged {
@@ -84,6 +137,7 @@ async function stagePlugins(
   // The suite always comes from the working tree, so every ref is graded by the same cases.
   await $`rm -rf ${join(root, suite)}`.quiet();
   await stage(repo, undefined, [suite], root);
+  await addCaseDependencies(repo, suite, root);
   await Promise.all(
     plugins.map(async (p) => {
       if (!(await Bun.file(join(root, p, "package-lock.json")).exists())) return;
@@ -165,6 +219,58 @@ export async function caseCount(output: string): Promise<number> {
   return Result.parse(await file.json()).cases.length;
 }
 
+const InitEvent = z.object({
+  type: z.literal("system"),
+  subtype: z.literal("init"),
+  plugin_errors: z
+    .array(z.object({ plugin: z.string(), type: z.string(), message: z.string() }))
+    .nullish(),
+});
+
+/**
+ * Lists every plugin error a collected trace's init event reports, as `<case>/<arm>/<n>`
+ * followed by the error. A plugin that fails to load leaves its arm running without it, which
+ * the runner otherwise scores without complaint.
+ */
+export async function pluginErrors(output: string): Promise<string[]> {
+  const file = Bun.file(join(output, "aggregate-result.json"));
+  if (!(await file.exists())) return [];
+  const { cases } = Result.parse(await file.json());
+  const found = await Promise.all(
+    cases.flatMap((c) =>
+      Object.entries(c.arms).flatMap(([arm, runs]) =>
+        runs.map(async (_, i) => {
+          const trace = Bun.file(join(output, "traces", `${c.name}-${arm}-${i}.jsonl`));
+          if (!(await trace.exists())) return [];
+          for (const line of (await trace.text()).split("\n")) {
+            if (line.trim() === "") continue;
+            const init = InitEvent.safeParse(JSON.parse(line));
+            if (!init.success) continue;
+            return (init.data.plugin_errors ?? []).map(
+              (e) => `${c.name}/${arm}/${i}: ${e.plugin} ${e.type}: ${e.message}`,
+            );
+          }
+          return [];
+        }),
+      ),
+    ),
+  );
+  return found.flat();
+}
+
+/**
+ * Arguments given before `--`, which cleye would otherwise drop or misread. Only `--ref` and
+ * `--label` belong there; runner arguments such as `--case` go after `--`.
+ */
+export function strayArgs(
+  positionals: string[],
+  passthrough: string[],
+  unknownFlags: Record<string, unknown>,
+): string[] {
+  const extra = positionals.slice(1, positionals.length - passthrough.length);
+  return [...Object.keys(unknownFlags).map((f) => `--${f}`), ...extra];
+}
+
 export async function collectTraces(output: string): Promise<void> {
   const file = Bun.file(join(output, "aggregate-result.json"));
   if (!(await file.exists())) return;
@@ -201,6 +307,13 @@ if (import.meta.main) {
         "Run a claude plugin eval suite against the artifacts it tests as they stand at a ref. Arguments after -- pass through to claude plugin eval.",
     },
   });
+  const stray = strayArgs(argv._, argv._["--"], argv.unknownFlags);
+  if (stray.length > 0) {
+    console.error(
+      `Unknown arguments before --: ${stray.join(" ")}. Runner arguments go after --, as in: run.ts <suite> -- --case <glob>`,
+    );
+    process.exit(2);
+  }
   const repo = (await $`git rev-parse --show-toplevel`.text()).trim();
   const suite = relative(repo, resolve(argv._.suite));
   const config = await readSuite(join(repo, suite));
@@ -243,6 +356,14 @@ if (import.meta.main) {
   // A --case or --tag that matches nothing otherwise exits clean with nothing graded.
   if (code === 0 && (await caseCount(output)) === 0) {
     console.error(`No case ran. Check the case filters in: ${argv._.args.join(" ")}`);
+    process.exit(1);
+  }
+  const loadErrors = await pluginErrors(output);
+  if (loadErrors.length > 0) {
+    console.error(
+      `${loadErrors.length} plugin errors at session start, so those arms ran without the plugin:`,
+    );
+    for (const e of loadErrors) console.error(`  ${e}`);
     process.exit(1);
   }
   const result = join(output, "aggregate-result.json");

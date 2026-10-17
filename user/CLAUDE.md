@@ -4,7 +4,7 @@
 
 - Don't join independent clauses with semicolons or em dashes. End the sentence instead. A colon or other connector in their place is not a fix.
 - Wrap filenames and code identifiers with `backticks` in any markdown context.
-- In chat replies, write PR, issue, MR, and tracker-key (`ABC-123`) references as links, like `[dotfiles#827](https://github.com/bendrucker/dotfiles/pull/827)`, because a bare ID doesn't render as a link. Take the URL that `gh`, `glab`, or the tracker tool printed, or build it from the repo's remote. With no known URL, keep the bare ID.
+- In chat replies, write PR, issue, MR, and tracker-key (`ABC-123`) references as links, like `[dotfiles#827](https://github.com/bendrucker/dotfiles/pull/827)`, because the terminal doesn't autolink them. Take the URL that `gh`, `glab`, or the tracker tool printed, or build it from the repo's remote. With no known URL, keep the bare ID.
 - Don't hard-wrap markdown prose you author. In an existing file, follow its wrapping.
 - Include a trailing newline in all new files.
 - Put explanation of code you're writing in a message before the edit.
@@ -36,7 +36,7 @@ Investigate in auto mode until the approach is settled, then enter plan mode to 
 
 ## Decisions
 
-Ask a simple decision (a confirmation, an approval, a multiple-choice pick) with `AskUserQuestion`, because it reaches my phone. When the decision lives inside a document I should read and mark up, write `tmp/<topic>.md` with one question block per decision and a recommendation, open it with Plannotator as the `plannotator` skill describes, and end the turn. Where Plannotator can't reach me, as in the desktop app, publish the file as an Artifact or render it in the side panel instead. Once I answer in chat while a gate is open, stop opening gates for the rest of the session.
+Ask a simple decision (a confirmation, an approval, a multiple-choice pick) with `AskUserQuestion`, because it reaches my phone. When the decision lives inside a document I should read and mark up, write `tmp/<topic>.md` with one question block per decision and a recommendation, open it with Plannotator as the `plannotator` skill describes, and end the turn. Where Plannotator can't reach me, publish the file as an Artifact instead. Once I answer in chat while a gate is open, stop opening gates for the rest of the session.
 
 ## Check-ins
 
@@ -57,7 +57,7 @@ Point `cwd` at the main repo, never a worktree.
 
 ## Worktrees
 
-Start any change meant to become its own PR in a worktree created with `worktrunk:wt-switch-create`, even where the harness suggests `EnterWorktree`. When the session already runs on a topic branch in a worktree, stay there. That includes a worktree the host app created for the session (`CLAUDE_CODE_HOST_WORKTREE` is set, as in Claude desktop), which is the PR's worktree. Work handed to a sibling agent gets its worktree through `herdr:herdr`.
+Start any change meant to become its own PR in a worktree created with `worktrunk:wt-switch-create`, even where the harness suggests `EnterWorktree`. When already on a topic branch in a worktree, stay there. Work handed to a sibling agent gets its worktree through `herdr:herdr`.
 
 Inside an isolated worktree, write files with `Write` or `Edit` and keep each Bash command a single plain command. The isolation guard refuses heredocs, `$(...)`, loops, and a `cd` into the main checkout before git.
 
@@ -69,7 +69,7 @@ My Claude Code setup lives in [`bendrucker/claude`](https://github.com/bendrucke
 
 Machine setup lives in [`bendrucker/dotfiles`](https://github.com/bendrucker/dotfiles) at `~/.dotfiles`. Anything the machine or shell must provide needs a merged dotfiles PR first, because the Claude repo installs nothing. That covers binaries, `$PATH` entries, aliases and functions, exported env vars, install steps, symlinks, launchd agents, macOS permission grants, and recurring jobs. Claude-only env vars go in `settings.json` instead.
 
-When work in another repo needs a change in either repo, hand it to a sibling agent through `herdr:herdr` and report the PR back to me. Where herdr is unavailable, queue the change as a suggested task with `spawn_task` when that tool exists, or else tell me the change.
+When work in another repo needs a change in either repo, hand it to a sibling agent through `herdr:herdr` and report the PR back to me. Where herdr is unavailable, queue it with `spawn_task`, or tell me the change.
 
 Reach secrets through 1Password `op run`. SSH keys live in Secretive, which refuses to sign while the Mac is locked.
 

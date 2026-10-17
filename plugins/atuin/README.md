@@ -13,7 +13,3 @@ Atuin records every shell command (with directory, exit code, duration, and host
 ## Capture Setup
 
 Capture is provisioned separately by the `atuin` dotfiles topic. This plugin is read-only and assumes capture is already running.
-
-## Curation
-
-`atuin:history` runs only when typed, so the plugin doesn't add to every session's context. Model routing was dropped after three routed calls in the 100 days to 2026-10-16.

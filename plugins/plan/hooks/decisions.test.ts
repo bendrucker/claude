@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { APPEND_ONLY_REASON, DENY_REASON, sizeReason } from "../../../hooks/gate";
+import { APPEND_ONLY_REASON, DENY_REASON, sizeReason } from "./gate";
 import {
   assertDistinctSessions,
   bySession,

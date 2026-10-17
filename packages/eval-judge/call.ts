@@ -1,6 +1,7 @@
 import { type Options, query } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { decode, decodeJson } from "../decode/index";
+import { subscriptionEnv } from "./env";
 
 /** The slice of an Agent SDK message a structured call reads. */
 export interface Message {
@@ -18,16 +19,6 @@ export interface StructuredOptions {
   label: string;
   /** Replaces the Agent SDK `query`, for tests. */
   query?: QueryFn;
-}
-
-/** The environment minus API credentials, so the call spends the Claude Code login's subscription. */
-export function subscriptionEnv(
-  env: Record<string, string | undefined> = process.env,
-): Record<string, string | undefined> {
-  const out = { ...env };
-  delete out.ANTHROPIC_API_KEY;
-  delete out.ANTHROPIC_AUTH_TOKEN;
-  return out;
 }
 
 /** The JSON schema a structured-output call sends for `schema`. */

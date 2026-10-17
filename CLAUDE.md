@@ -60,4 +60,3 @@ CI spends subscription credits through a `CLAUDE_CODE_OAUTH_TOKEN` secret from `
 
 - To test a plugin in isolation: `claude --plugin-dir ./plugins/<name> --setting-sources local`.
 - To test `user/settings.json` before installing: `./dev.sh` (any extra args pass through to `claude`).
-- To exercise desktop app branches: `./dev.sh --desktop`, plus the manual checklist in [`docs/desktop.md`](docs/desktop.md).

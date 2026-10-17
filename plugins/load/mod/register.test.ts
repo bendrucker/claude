@@ -28,13 +28,14 @@ interface World {
   ran: string[];
   events: ModEventsInput[];
   /** Replaces the `session list` answer. */
-  list?: ProcessRunResult;
+  list: ProcessRunResult | undefined;
   clock: MockClock;
 }
 
 function worldOf(on: On): World {
   const world: World = {
     clock: mock.clock(on),
+    list: undefined,
     live: new Set(),
     agents: [],
     ps: "",

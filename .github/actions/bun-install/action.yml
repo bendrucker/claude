@@ -1,6 +1,11 @@
 name: Bun install
 description: Set up Bun and install with a frozen lockfile
 
+inputs:
+  workspace:
+    description: Install only the root and this workspace path with its nested workspaces, instead of every workspace
+    default: ''
+
 runs:
   using: composite
   steps:
@@ -16,4 +21,11 @@ runs:
     # installing from the registry.
     - name: Install dependencies
       shell: bash
-      run: bun install --frozen-lockfile
+      env:
+        WORKSPACE: ${{ inputs.workspace }}
+      run: |
+        if [[ -n "$WORKSPACE" ]]; then
+          bun install --frozen-lockfile --filter ./ --filter "./$WORKSPACE" --filter "./$WORKSPACE/**"
+        else
+          bun install --frozen-lockfile
+        fi

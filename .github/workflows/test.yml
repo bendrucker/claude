@@ -211,6 +211,9 @@ jobs:
       - uses: ./.github/actions/claude-code
 
       - uses: ./.github/actions/bun-install
+        with:
+          # Only macOS, where a full install takes ~3x longer: eval harnesses may import sibling plugins, which a filtered install leaves out.
+          workspace: ${{ runner.os == 'macOS' && format('plugins/{0}', matrix.plugin.name) || '' }}
 
       - name: Validate plugin
         run: claude plugin validate "plugins/${{ matrix.plugin.name }}"

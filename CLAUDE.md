@@ -48,7 +48,7 @@ Per-skill harnesses live at `plugins/<plugin>/evals/<suite>/`, each with a READM
 
 Run a native `claude plugin eval` suite through `bun evals/native/run.ts <suite> -- <args>`, not the bare command. It strips `ANTHROPIC_API_KEY` so runs spend subscription credits, and stages the artifacts at `--ref` against the working-tree cases. Write each case as `<case>/case.yaml`, since `run.ts`, `check.ts`, and CI find cases by that file even though the runner also accepts `prompt.md`. A suite testing skills, agents, or context files outside a plugin wraps them through `suite.yaml`, because the runner ignores a `CLAUDE.md` or `.claude/rules` in the case's working directory. [`evals/README.md`](evals/README.md) covers the wrappers.
 
-CI spends subscription credits through a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`. `eval.yml` runs the native suites of every plugin a pull request touches once it carries the `eval` label, skipping a suite that holds a `.local-only` file. `gh workflow run eval.yml --ref <branch> -f suite=<dir>` runs any suite on demand.
+CI spends subscription credits through a `CLAUDE_CODE_OAUTH_TOKEN` secret from `claude setup-token`. `eval.yml` runs every native suite a pull request touches once it carries the `eval` label: the suite itself, a plugin its cases load, or a `user/` skill or rule its `suite.yaml` wraps. It skips a suite that holds a `.local-only` file. `gh workflow run eval.yml --ref <branch> -f suite=<dir>` runs any suite on demand.
 
 ## Workflow
 

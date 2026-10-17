@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<issue>\s*(?:```\w*\n)?---\n(?:(?!</issue>)[\s\S])*?\n---\n(?:(?!</issue>|^##[^\n]*Agent Context)[\s\S])*?^#{2,6}[ \t][^\n]*(?:,[ \t]*(?:not|never)\b|n''t\b)'
+pattern: '<issue>\s*(?:```\w*\n)?---\n(?:(?!\n---\n|</issue>)[\s\S])*?\n---\n(?:(?!</issue>|^##[^\n]*Agent Context)[\s\S])*?^#{2,6}[ \t][^\n]*(?:,[ \t]*(?:not|never)\b|n''t\b)'
 flags: mi
 match: not_contains
 weight: 3

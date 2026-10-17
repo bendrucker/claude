@@ -87,14 +87,14 @@ different on purpose. Keep the title to one line, no wordy parentheticals.
   `title` frontmatter field and requires sentence case there, distinct from the
   title-case body headings. The title graders read that field.
 
-### 7. Possible Missing Spike Type
+### 7. Spike Type
 
 A spike (timeboxed investigation, output is a recommendation not a shipped change)
 was typed as a bug and read wrong.
 
 - Evidence: sample-01 tagged `wrong-type`, note "should be labeled Spike".
-- Skill location: `SKILL.md` Issue Types lists only bug / feature / refactor.
-- Confidence: one data point. Confirm before acting.
+- Skill location: `SKILL.md` Issue Types lists Spike, with its guide in `spike.md`.
+- Confidence: one data point.
 
 ## How the Suite Scores
 

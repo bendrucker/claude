@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '<issue>\s*(?:```\w*\n)?---\n(?:(?!</issue>)[\s\S])*?\n---\n(?:(?!</issue>|^##[^\n]*Agent Context)[\s\S])*?^#{2,6}[ \t]+(?:\d+[.)][ \t]*)?(?:[a-z]|[^\n]*?[ \t](?!(?:a|an|the|and|but|or|nor|for|of|in|on|to|with|vs|via|per|at|by|as|from|into|over|under)\b)[a-z])'
+pattern: '<issue>\s*(?:```\w*\n)?---\n(?:(?!\n---\n|</issue>)[\s\S])*?\n---\n(?:(?!</issue>|^##[^\n]*Agent Context)[\s\S])*?^#{2,6}[ \t]+(?:\d+[.)][ \t]*)?(?:[a-z]|[^\n]*?[ \t](?!(?:a|an|the|and|but|or|nor|for|of|in|on|to|with|vs|via|per|at|by|as|from|into|over|under)\b)[a-z])'
 flags: m
 match: not_contains
 ---

@@ -255,8 +255,7 @@ function stillDue(
   return { due, held };
 }
 
-// Resolves false when the watch stopped or restarted during the send. What failed
-// to send and what is `held` stay undelivered for the next poll.
+// A failed send joins whatever a poll that ran meanwhile left undelivered.
 async function send(
   $: EngineInterface,
   watch: Watch,
@@ -264,19 +263,15 @@ async function send(
   due: Promoted[],
   attempt: number,
   isCurrent: () => boolean,
-  held: Promoted[] = [],
-): Promise<boolean> {
-  let failed: Promoted[] = [];
-  if (due.length > 0) {
-    const isSent = await inject($, next, due, attempt);
-    if (!isCurrent()) return false;
-    if (!isSent && attempt < MAX_ATTEMPTS) failed = due;
-  }
-  if (failed.length > 0 || held.length > 0) {
-    const attempts = failed.length > 0 ? attempt : attempt - 1;
-    watch.undelivered = { head: next.head, decisions: [...failed, ...held], attempts };
-  }
-  return true;
+): Promise<void> {
+  const isSent = await inject($, next, due, attempt);
+  if (!isCurrent() || isSent || attempt >= MAX_ATTEMPTS) return;
+  const pending = watch.undelivered;
+  watch.undelivered = {
+    head: pending?.head ?? next.head,
+    decisions: pending === undefined ? due : combine(due, pending.decisions),
+    attempts: Math.max(attempt, pending?.attempts ?? 0),
+  };
 }
 
 function delayOf(snapshot: Snapshot): number {
@@ -284,19 +279,19 @@ function delayOf(snapshot: Snapshot): number {
   return snapshot.phase === "pending" ? POLL_MS.pending : POLL_MS.settled;
 }
 
-// Resolves undefined when the watch stopped or restarted during the send.
-async function apply(
-  $: EngineInterface,
-  watch: Watch,
-  read: Read,
-  isCurrent: () => boolean,
-): Promise<number | undefined> {
+interface Applied {
+  delay: number;
+  /** The send, which waits for an idle session, so the next poll is not held on it. */
+  delivery: Promise<void> | undefined;
+}
+
+function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => boolean): Applied {
   if (read.kind === "none") {
     show($, watch, undefined);
     watch.snapshot = undefined;
     watch.branch = undefined;
     watch.undelivered = undefined;
-    return POLL_MS.idle;
+    return { delay: POLL_MS.idle, delivery: undefined };
   }
   const prev = watch.snapshot;
   const isSameMr =
@@ -307,44 +302,46 @@ async function apply(
   const decided = read.snapshot.block;
   const next =
     isSameMr && decided === undefined ? { ...read.snapshot, block: prev.block } : read.snapshot;
+  let due: Promoted[];
+  let attempt = 1;
   if (!isSameMr) {
     emit($, "mr.tracked", { mr: next.mr, head: next.head, phase: next.phase, state: next.state });
     watch.undelivered = undefined;
-    const baseline = baselineOf(next);
-    for (const { action, ...detail } of baseline) {
+    due = baselineOf(next);
+    for (const { action, ...detail } of due) {
       emit($, action, { mr: next.mr, head: next.head, baseline: true, ...detail });
     }
-    if (!(await send($, watch, next, baseline, 1, isCurrent))) return undefined;
   } else {
     const decisions = decide(prev, next);
     for (const { action, ...detail } of decisions) {
       emit($, action, { mr: next.mr, head: next.head, ...detail });
     }
     const fresh = decisions.filter((d): d is Promoted => d.action === "promote");
-    const { due, held } = stillDue(watch.undelivered, next, decided);
-    const attempt = fresh.length > 0 ? 1 : (watch.undelivered?.attempts ?? 0) + 1;
-    watch.undelivered = undefined;
-    if (!(await send($, watch, next, combine(due, fresh), attempt, isCurrent, held))) {
-      return undefined;
-    }
+    const still = stillDue(watch.undelivered, next, decided);
+    attempt = fresh.length > 0 ? 1 : (watch.undelivered?.attempts ?? 0) + 1;
+    watch.undelivered =
+      still.held.length > 0
+        ? { head: next.head, decisions: still.held, attempts: attempt - 1 }
+        : undefined;
+    due = combine(still.due, fresh);
   }
   watch.snapshot = next;
   watch.branch = read.branch;
   show($, watch, statusOf(next));
-  return delayOf(next);
+  const delivery = due.length > 0 ? send($, watch, next, due, attempt, isCurrent) : undefined;
+  return { delay: delayOf(next), delivery };
 }
 
 async function poll($: EngineInterface, watch: Watch, generation: number): Promise<void> {
   const isCurrent = () => !watch.isStopped && watch.generation === generation;
   if (!isCurrent()) return;
   let delay: number;
+  let delivery: Promise<void> | undefined;
   try {
     const read = await readMr($, watch);
     // A session.end that landed while glab ran has already cleared the status.
     if (!isCurrent()) return;
-    const applied = await apply($, watch, read, isCurrent);
-    if (applied === undefined) return;
-    delay = applied;
+    ({ delay, delivery } = apply($, watch, read, isCurrent));
     watch.error = undefined;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -358,6 +355,7 @@ async function poll($: EngineInterface, watch: Watch, generation: number): Promi
   }
   if (!isCurrent()) return;
   watch.timer = $.clock.after(delay, () => void poll($, watch, generation));
+  await delivery;
 }
 
 async function hasGlab($: EngineInterface): Promise<boolean> {

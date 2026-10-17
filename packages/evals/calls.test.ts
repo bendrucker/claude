@@ -2,7 +2,8 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { calls, shortPath, tally } from "./calls";
+import { tally } from "./calls";
+import { calls, shortPath } from "./trace";
 
 const use = (name: string, input: Record<string, string>) => ({
   type: "assistant",

@@ -6,12 +6,18 @@ This directory is the generic layer: the native suite runner and the report that
 
 ## Native Suites
 
-[`native/`](native/) runs and compares `claude plugin eval` suites. The [plugin evals docs](https://code.claude.com/docs/en/plugin-evals.md) define the `case.yaml` and grader schemas.
+[`native/`](native/) holds the CLIs that run and compare `claude plugin eval` suites. The [plugin evals docs](https://code.claude.com/docs/en/plugin-evals.md) define the `case.yaml` and grader schemas. Their logic lives in [`packages/evals`](../packages/evals/), which harness scripts import by relative path:
+
+- `result.ts`: one loose schema for `aggregate-result.json`, the runner's run score, errored runs, and `writeResult` for a post-scorer that emits the native shape.
+- `trace.ts`: the final reply, per-run measures, and tool calls from a trace.
+- `stats.ts`: the permutation `pValue` and its `pFloor`, a sign-flip p-value for win rates, and the Wilson interval.
+- `suite.ts`: `suite.yaml`, case plugins and tags, discovery of suites and their results, and `selectSuites`, which picks the suites a set of changed paths touches.
+- `pool.ts`: `mapPool`, a bounded-concurrency map.
 
 - `run.ts <suite> [--ref <ref>] -- <args>` stages the plugins the cases load, as they stand at `--ref` (the working tree by default), next to the suite from the working tree, so every ref is graded by the same cases. It also stages the plugins those declare in `dependencies`, transitively, and adds them to each staged case's `plugins:`, since the runner refuses to load a plugin whose dependency is not loaded beside it. It exits 1 when any trace's init event reports `plugin_errors`, and exits 2 on any argument before `--` other than `--ref` and `--label`. `--case` may repeat, and takes any `Bun.Glob` pattern: `run.ts` prunes the staged suite to the cases any glob matches, since the runner keeps only the last `--case` and matches plain `*` only. It runs on subscription auth with any API key removed from the environment, and results land in `<suite>/results/<timestamp>[-label]/`, with each run's trace copied to `traces/<case>-<arm>-<n>.jsonl`.
-- `compare.ts <column>...` compares result files column by column, each column a comma-joined pool of `aggregate-result.json` paths, the first the baseline. A `*` marks p < `--alpha` (0.1) under a two-sided permutation test. A `†` marks a cell with too few runs for any star: at 0.1 that takes 4 runs a side, since 3 against 3 bottoms out at exactly 0.1. A run that errored, from its `error` field or a judge call that threw, leaves the pool, and `!` marks its case. `run.ts` exits 1 when any run errored, which fails the eval job. `--suite` adds per-tag scores from each case's `tags`. `--markdown` puts starred rows first for a job summary. A single column reports that run alone, with its case and tag scores open, which is how `eval.yml` reports a run without a baseline.
+- `compare.ts <column>...` compares result files column by column, each column a comma-joined pool of `aggregate-result.json` paths, the first the baseline. A `*` marks p < `--alpha` (0.1) under a two-sided permutation test. A `†` marks a cell with too few runs for any star: at 0.1 that takes 4 runs a side, since 3 against 3 bottoms out at exactly 0.1. A run that errored, from its `error` field or a judge call that threw, leaves the pool, and `!` marks its case. The runner exits 1 on a run that ended on an API error, and `run.ts` also exits 1 on a run graded despite an error, such as a timeout, which fails the eval job. `--suite` adds per-tag scores from each case's `tags`. `--markdown` puts starred rows first for a job summary. A single column reports that run alone, with its case and tag scores open, which is how `eval.yml` reports a run without a baseline.
 - `check.ts <suite>` tests each case's `regex` graders against examples in `<suite>/examples/<case>/`, outside the case directories so no session sees them. A `.md` example is a hand-written reply whose frontmatter `fail:` lists the graders it must fail. A `.jsonl` example is a trace, such as one copied from a run's `traces/`, with `fail:` in a sibling `.yaml`. It grades trace graders on the raw JSONL, as the runner does, and reply graders on its last `result` line. A directory named after an example holds the files its file-target graders read, such as `examples/<case>/good/src/a.ts` beside `good.md`. Every other grader an example reaches must pass it, and the output names regex graders no example reaches, such as file targets. CI runs it over every suite with an `examples/` directory. It also fails a case whose `prompt.md` is blank or `undefined`, which the runner would send as the prompt, and a test runs that check over every tracked suite.
-- `regrade.ts <suite> <results>...` re-scores stored runs against the suite's current grader set from their `traces/`, dropping graders whose file is gone and grading regex graders added since the run, and writes `<results>-regraded/` for `compare.ts`, so a grader fix needs no new sessions. `llm` and file-target graders keep their recorded verdicts.
+- `regrade.ts <suite> <results>...` re-scores stored runs against the suite's current grader set from their `traces/`, dropping graders whose file is gone and grading regex graders added since the run, and writes `<results>-regraded/` for `compare.ts`, so a grader fix needs no new sessions. `llm` and file-target graders keep their recorded verdicts. Real runner output in [`packages/evals/test/`](../packages/evals/test/) pins its scoring to the runner's.
 - `select.ts [paths...]` prints the suites a set of changed paths touches as a JSON array, reading the paths from stdin when none are given. A suite is touched through its own directory, a plugin its cases load, or an artifact its `suite.yaml` wraps, and a suite holding a `.local-only` file never runs. `eval.yml` feeds it a pull request's diff.
 - `calls.ts <results>... [--match <regex>]` takes results directories or their `aggregate-result.json` paths, and counts the runs per case and arm that read each file or loaded each skill, from `traces/`. It answers whether sessions opened a reference, which grepping traces for the filename cannot, since injected skill text names files too.
 - `wrap.ts` builds a throwaway plugin from skills, agents, and context documents that are not in a plugin. A suite opts in through `suite.yaml`:
@@ -33,6 +39,10 @@ A case's scaffold runs from the staged tree, which holds only the plugins and th
 A grader two or more cases repeat byte for byte lives once in `<suite>/graders/`, joined by globs (`!quiet-*` for every case but the quiet ones) or an explicit case list. `run.ts` copies it into each matching case as it stages the suite, skipping a case that holds a grader by that name, and `check.ts` and `regrade.ts` read the same merged set. A bare `claude plugin eval` run never sees these graders. `check.ts` names any case grader that shadows one `suite.yaml` shares in.
 
 The runner ignores a `CLAUDE.md` or `.claude/rules` in the scaffolded working directory, so wrapped context reaches the session through a `SessionStart` hook instead. It injects every context file whatever its `paths:` frontmatter says. A wrapped skill keeps the files it links to beside it, such as a sibling skill's reference, and loses `disable-model-invocation`, so a user-invoked skill can load from a natural-language prompt on the with arm.
+
+### Workarounds
+
+Each covers a runner gap and goes when upstream closes it: `--ref` staging (loading a plugin at a commit), `--case` pruning (repeatable `--case`), trace copying (traces in the output directory), API key removal (a subscription-auth flag), `npm ci` in staged plugins (dependency install for path targets), exiting 1 on graded errors (the runner failing timed-out runs), and `allow_tools`, `judge_model`, `wrap`, and `graders` in `suite.yaml` (suite-level config for each).
 
 ## Results Corpus
 
@@ -64,7 +74,7 @@ A judge outside the runner, such as the authoring suite's pairwise judge, calls 
 ## Tests
 
 ```bash
-bun test evals/scripts
+bun test evals/scripts packages/evals
 ```
 
 The fixtures under [`scripts/test/corpus/`](scripts/test/corpus/) are a hand-authored repo tree of `aggregate-result.json` files, tracked so the file discovery and the rollup stay pinned. The report test needs the `duckdb` CLI.

@@ -16,8 +16,10 @@ import {
   promptHash as hashPrompt,
   structured,
 } from "../../../../../packages/eval-judge/index";
-import { loadTags, traceReply } from "../../../../../evals/native/load";
-import { mapPool } from "./pool";
+import { mapPool } from "../../../../../packages/evals/pool";
+import { signFlipPValue, wilson } from "../../../../../packages/evals/stats";
+import { loadTags } from "../../../../../packages/evals/suite";
+import { traceReply } from "../../../../../packages/evals/trace";
 import { Judgment, Key, Label, Pair, Pick, SURFACES, Surface, Verdict } from "./pairs";
 
 const OUT_TAG = /<out>([\s\S]*?)<\/out>/;
@@ -508,34 +510,6 @@ export function winValue(pick: Pick): number {
   return pick === "b" ? 1 : 0;
 }
 
-/**
- * Two-sided sign-flip permutation p-value for a win rate against the no-preference null of 0.5.
- * Ties always flip to themselves, so they carry no evidence either way. Deterministic under a
- * seeded `rng`.
- */
-export function signFlipPValue(
-  wins: readonly number[],
-  trials = 10_000,
-  rng: () => number = Math.random,
-): number {
-  const decided = wins.filter((w) => w !== 0.5);
-  if (decided.length === 0) return Number.NaN;
-  const observed = Math.abs(mean(wins) - 0.5);
-  let extreme = 0;
-  for (let t = 0; t < trials; t++) {
-    let sum = 0;
-    for (const w of wins) {
-      if (w === 0.5) {
-        sum += 0.5;
-      } else {
-        sum += rng() < 0.5 ? w : 1 - w;
-      }
-    }
-    if (Math.abs(sum / wins.length - 0.5) >= observed - 1e-9) extreme++;
-  }
-  return extreme / trials;
-}
-
 /** Share of non-tie picks that landed on the left ("1") slot, a position-bias indicator. */
 export function leftPickShare(judgments: readonly Verdict[]): number {
   const decided = judgments.filter((j) => j.pick !== "tie");
@@ -630,18 +604,6 @@ async function scoreMain(flags: ScoreFlags): Promise<void> {
     readAll(Pair, flags.pairs),
   ]);
   console.log(formatScore(scoreJudgments(pairs, judgments), flags.alpha));
-}
-
-/** Wilson score interval for a proportion. */
-export function wilson(hits: number, total: number, zScore = 1.96): [number, number] {
-  if (total === 0) return [0, 1];
-  const p = hits / total;
-  const denominator = 1 + (zScore * zScore) / total;
-  const center = (p + (zScore * zScore) / (2 * total)) / denominator;
-  const spread =
-    (zScore / denominator) *
-    Math.sqrt((p * (1 - p)) / total + (zScore * zScore) / (4 * total * total));
-  return [Math.max(0, center - spread), Math.min(1, center + spread)];
 }
 
 export interface Comparison {

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadColumn } from "../../../../../evals/native/load";
+import { loadColumn } from "../../../../../packages/evals/column";
 import { scoreResults } from "./score";
 
 const suite = join(import.meta.dir, "..");

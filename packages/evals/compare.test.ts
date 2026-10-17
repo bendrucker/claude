@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pFloor, pValue, render } from "./compare";
-import { erroredRuns, loadColumn, loadTags, traceMeasures } from "./load";
+import { loadColumn } from "./column";
+import { render } from "./compare";
+import { erroredRuns, readResult } from "./result";
+import { loadTags } from "./suite";
+import { traceMeasures } from "./trace";
 
 interface RunSpec {
   score: number;
@@ -74,23 +77,6 @@ const fail = (): RunSpec => ({
   stats: { num_turns: 5, duration_ms: 30_000, total_cost_usd: 0.3, usage: { output_tokens: 900 } },
 });
 
-describe("pValue", () => {
-  test.each<{ name: string; base: number[]; other: number[]; expected: number }>([
-    { name: "identical constant samples", base: [1, 1, 1], other: [1, 1], expected: 1 },
-    { name: "an empty side", base: [], other: [1], expected: NaN },
-  ])("returns $expected for $name", ({ base, other, expected }) => {
-    expect(pValue(base, other)).toBe(expected);
-  });
-
-  test("separates six passes from six failures", () => {
-    expect(pValue([1, 1, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0])).toBeLessThan(0.1);
-  });
-
-  test("does not separate one flip in three", () => {
-    expect(pValue([1, 1, 1], [1, 1, 0])).toBeGreaterThan(0.1);
-  });
-});
-
 describe("loadColumn", () => {
   test("pools runs across result files and marks unscored graders as indicators", async () => {
     const a = await result({ c: { with: [pass()], without: [fail()] } });
@@ -123,9 +109,9 @@ describe("loadColumn", () => {
     });
     const cell = (await loadColumn([path])).get("c/with");
     expect([cell?.scores, cell?.errored]).toEqual([[1], 2]);
-    expect(await erroredRuns(path)).toEqual([
-      "c/with/1: exit 1: You've hit your session limit",
-      "c/with/2: grader threw: judge call failed",
+    expect(erroredRuns(await readResult(path))).toEqual([
+      { label: "c/with/1: exit 1: You've hit your session limit", graded: true },
+      { label: "c/with/2: grader threw: judge call failed", graded: true },
     ]);
   });
 
@@ -217,17 +203,6 @@ describe("render", () => {
     const column = await loadColumn([path]);
     const tags = await loadTags(suite);
     expect(render({ columns: [column], labels: ["base"], alpha: 0.1, tags })).toMatchSnapshot();
-  });
-});
-
-describe("pFloor", () => {
-  test.each<{ n1: number; n2: number; floor: number }>([
-    { n1: 2, n2: 2, floor: 1 / 3 },
-    { n1: 3, n2: 3, floor: 0.1 },
-    { n1: 4, n2: 4, floor: 2 / 70 },
-    { n1: 2, n2: 4, floor: 1 / 15 },
-  ])("is $floor for $n1 against $n2", ({ n1, n2, floor }) => {
-    expect(pFloor(n1, n2)).toBeCloseTo(floor);
   });
 });
 

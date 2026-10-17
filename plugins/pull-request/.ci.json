@@ -1,3 +1,7 @@
 {
-  "paths": ["plugins/writing/linguistics/", "plugins/writing/hooks/heading-case.ts"]
+  "paths": [
+    "plugins/writing/linguistics/",
+    "plugins/writing/hooks/heading-case.ts",
+    "packages/evals/"
+  ]
 }

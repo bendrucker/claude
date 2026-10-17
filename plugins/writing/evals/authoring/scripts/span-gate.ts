@@ -14,7 +14,7 @@ import {
   weightedStemHits,
 } from "../../../detection/wordlists";
 import { BATCH_PATTERNS } from "../../../detection/scan";
-import { wilson } from "../../../../prompting/evals/rule-precision/precision";
+import { wilson } from "../../../../../packages/evals/stats";
 import { type Key, Label, Pair } from "./pairs";
 
 /**

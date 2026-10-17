@@ -3,17 +3,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import {
-  caseCount,
-  casePlugins,
-  collectTraces,
-  keepCases,
-  pluginErrors,
-  prepare,
-  splitCases,
-  strayArgs,
-  withDependencies,
-} from "./run";
+import { collectTraces, keepCases, pluginErrors, prepare, splitCases, strayArgs } from "./run";
+import { casePlugins, withDependencies } from "./suite";
 import { openInvocation, siblingLinks } from "./wrap";
 
 let repo: string;
@@ -117,16 +108,6 @@ test("collectTraces copies kept traces beside the results and removes the runner
   expect(await Bun.file(trace).exists()).toBe(false);
 });
 
-test.each<{ name: string; result: string | undefined; count: number }>([
-  { name: "no result file", result: undefined, count: 0 },
-  { name: "a filter that matched nothing", result: '{"cases":[]}', count: 0 },
-  { name: "one graded case", result: '{"cases":[{"name":"one","arms":{}}]}', count: 1 },
-])("caseCount is $count for $name", async ({ result, count }) => {
-  const output = mkdtempSync(join(tmpdir(), "run-output-"));
-  if (result !== undefined) await Bun.write(join(output, "aggregate-result.json"), result);
-  expect(await caseCount(output)).toBe(count);
-});
-
 test.each([
   {
     name: "drops the key and keeps the rest",
@@ -196,28 +177,20 @@ describe("pluginErrors", () => {
   });
 });
 
-test.each<{
-  name: string;
-  positionals: string[];
-  passthrough: string[];
-  flags: Record<string, unknown>;
-  stray: string[];
-}>([
-  { name: "only the suite", positionals: ["s"], passthrough: [], flags: {}, stray: [] },
+test.each<{ name: string; args: string[]; stray: string[] }>([
+  { name: "only the suite", args: ["s"], stray: [] },
+  { name: "runner args after --", args: ["s", "--", "--case", "a"], stray: [] },
   {
-    name: "runner args after --",
-    positionals: ["s", "--case", "a"],
-    passthrough: ["--case", "a"],
-    flags: {},
+    name: "run.ts flags before --",
+    args: ["--ref", "main", "s", "--label=x", "--", "--runs", "2"],
     stray: [],
   },
   {
     name: "a runner flag before --",
-    positionals: ["s", "a", "--runs", "2"],
-    passthrough: ["--runs", "2"],
-    flags: { case: [true] },
+    args: ["s", "--case", "a", "--", "--runs", "2"],
     stray: ["--case", "a"],
   },
-])("strayArgs with $name", ({ positionals, passthrough, flags, stray }) => {
-  expect(strayArgs(positionals, passthrough, flags)).toEqual(stray);
+  { name: "runner args without --", args: ["s", "--runs", "2"], stray: ["--runs", "2"] },
+])("strayArgs with $name", ({ args, stray }) => {
+  expect(strayArgs(args)).toEqual(stray);
 });

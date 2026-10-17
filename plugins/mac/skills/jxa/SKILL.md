@@ -1,5 +1,6 @@
 ---
 name: mac:jxa
+disable-model-invocation: true
 description: Reference for writing JXA (JavaScript for Automation) scripts run through `osascript -l JavaScript`. Covers the JavaScriptCore ES5 constraints, `run(argv)`, and the `Application()` bridge.
 ---
 

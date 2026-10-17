@@ -423,7 +423,6 @@
     "gopls-lsp@claude-plugins-official": true,
     "atuin@bendrucker": true,
     "comments@bendrucker": true,
-    "agent-browser@agent-browser": true,
     "plannotator@plannotator": true,
     "herdr@bendrucker": true,
     "run-command@bendrucker": true,

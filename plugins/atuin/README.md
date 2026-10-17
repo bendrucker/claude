@@ -13,7 +13,3 @@ Atuin records every shell command (with directory, exit code, duration, and host
 ## Capture Setup
 
 Capture is provisioned separately by the `atuin` dotfiles topic. This plugin is read-only and assumes capture is already running.
-
-## Curation
-
-The always-on cost is one skill description. If the session index shows `atuin:history` never invoked over a few weeks of "recent activity" questions, drop the plugin from `enabledPlugins`.

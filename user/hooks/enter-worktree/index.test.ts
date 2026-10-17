@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   crossRepoReason,
-  hostWorktreeReason,
   processInput,
   sameDirectoryReason,
   unmanagedReason,
@@ -127,7 +126,6 @@ describe("processInput", () => {
     path: () => string | undefined;
     transcript?: string;
     agent?: boolean;
-    host?: () => string;
     reason: (() => string) | null;
   }
 
@@ -224,56 +222,15 @@ describe("processInput", () => {
       transcript: "entered",
       reason: null,
     },
-    {
-      name: "name-only creation inside a host worktree",
-      cwd: () => managed,
-      path: () => undefined,
-      host: () => managed,
-      reason: () => hostWorktreeReason(managed),
-    },
-    {
-      name: "same-repository target inside a host worktree",
-      cwd: () => managed,
-      path: () => sibling,
-      transcript: "unknown",
-      host: () => managed,
-      reason: () => hostWorktreeReason(managed),
-    },
-    {
-      name: "subagent inside a host worktree",
-      cwd: () => managed,
-      path: () => sibling,
-      agent: true,
-      host: () => managed,
-      reason: () => hostWorktreeReason(managed),
-    },
-    {
-      name: "cross-repo target inside a host worktree keeps its reason",
-      cwd: () => managed,
-      path: () => other,
-      host: () => managed,
-      reason: () => crossRepoReason(other),
-    },
-    {
-      name: "host worktree that does not contain the session is ignored",
-      cwd: () => repo,
-      path: () => sibling,
-      transcript: "exited",
-      host: () => managed,
-      reason: null,
-    },
   ];
 
-  test.each(cases)("$name", async ({ cwd, path, transcript, agent, host, reason }) => {
-    const output = await processInput(
-      {
-        cwd: cwd(),
-        agent_id: agent === true ? "agent" : undefined,
-        transcript_path: transcript == null ? undefined : transcripts[transcript],
-        tool_input: { path: path() },
-      },
-      { CLAUDE_CODE_HOST_WORKTREE: host?.() },
-    );
+  test.each(cases)("$name", async ({ cwd, path, transcript, agent, reason }) => {
+    const output = await processInput({
+      cwd: cwd(),
+      agent_id: agent === true ? "agent" : undefined,
+      transcript_path: transcript == null ? undefined : transcripts[transcript],
+      tool_input: { path: path() },
+    });
     if (reason == null) {
       expect(output).toBeNull();
     } else {
@@ -292,12 +249,10 @@ test("reasons", () => {
   expect({
     same: sameDirectoryReason("/src/repo/.worktrees/topic"),
     crossRepo: crossRepoReason("/src/other/.worktrees/topic"),
-    host: hostWorktreeReason("/src/repo/.claude/worktrees/topic"),
     unmanaged: unmanagedReason("/src/repo/.worktrees/topic", "/src/repo/.claude/worktrees"),
   }).toMatchInlineSnapshot(`
     {
       "crossRepo": "\`/src/other/.worktrees/topic\` belongs to a different repository than this session, and EnterWorktree only enters worktrees of the session's own repository. For work that becomes its own pull request, dispatch a sibling agent into it through the \`herdr:herdr\` skill. For read-only work, spawn an \`Agent\` with \`cwd\` set to \`/src/other/.worktrees/topic\`.",
-      "host": "This session runs in \`/src/repo/.claude/worktrees/topic\`, a worktree the host app created for it. Keep working there instead of switching to another.",
       "same": "\`/src/repo/.worktrees/topic\` is already the working directory. Keep working here.",
       "unmanaged": "This session has already switched into a worktree, and from here EnterWorktree only enters worktrees under \`/src/repo/.claude/worktrees/\`. Work in \`/src/repo/.worktrees/topic\` from the current session with \`git -C /src/repo/.worktrees/topic\` and absolute paths.",
     }

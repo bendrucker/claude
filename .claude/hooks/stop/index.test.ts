@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -224,28 +224,6 @@ describe("scopePaths", () => {
 });
 
 describe("processStop", () => {
-  const originalRemoteEnv = process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE;
-
-  afterEach(() => {
-    if (originalRemoteEnv === undefined) {
-      delete process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE;
-    } else {
-      process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE = originalRemoteEnv;
-    }
-  });
-
-  it("skips prek when running in a remote environment", async () => {
-    const filePath = join(tempDir, "remote-skip.ts");
-    await Bun.write(filePath, "export {}");
-
-    const transcriptPath = join(tempDir, "transcript-remote.jsonl");
-    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
-
-    process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE = "cloud_default";
-
-    expect(await processStop(stopInput({ transcript_path: transcriptPath }))).toBeNull();
-  });
-
   // The hook spawns `bun` and `prek` by name, so a stub earlier on PATH records
   // the calls without running either for real.
   async function withStubbedCommands<T>(

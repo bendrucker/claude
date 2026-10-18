@@ -92,6 +92,7 @@
   "sandbox": {
     "network": {
       "allowedDomains": ["www.schemastore.org"]
-    }
+    },
+    "excludedCommands": ["ssh:*", "scp:*", "rsync:*", "vm:*", "aws:*"]
   }
 }

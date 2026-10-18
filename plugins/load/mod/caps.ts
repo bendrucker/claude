@@ -17,7 +17,11 @@ export function parseCaps(entries: readonly string[]): { caps: Cap[]; invalid: s
     const match = ENTRY.exec(entry);
     try {
       if (match === null) throw new Error("not pool:limit:regex");
-      caps.push({ pool: match[1] ?? "", limit: Number(match[2]), pattern: new RegExp(match[3]) });
+      caps.push({
+        pool: match[1] ?? "",
+        limit: Number(match[2]),
+        pattern: new RegExp(match[3] ?? ""),
+      });
     } catch {
       invalid.push(entry);
     }

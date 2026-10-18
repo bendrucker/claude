@@ -82,6 +82,8 @@ Make one change per candidate. Before measuring it, append to the notes file, so
 - The target: which metric moves, and in which direction.
 - The guards a side effect would hit.
 
+Write the change for the workload, never for a `dev` input's specifics (its sizes, paths, or contents). A fast path keyed on the fixture passes `dev` and loses on `holdout`.
+
 A candidate without a profile entry behind it ranks last, unless a measurement sizes the time it targets: the gap between wall and CPU time, or a cold run against the warm one profiled. Rank that candidate at its measured size.
 
 Pass the same hypothesis to `compare.ts run --hypothesis`, which stores it with the comparison's load record.
@@ -107,13 +109,14 @@ After each decision:
 - Re-profile after an accept, since the ranking shifts.
 - Report the first decision to the user in one line, and continue unless the user redirects.
 - Commit a mid-climb harness change separately, re-run the baseline, and note it in the notes file.
+- After two rejections in a row, re-run the A/A and re-profile before the next candidate. A stall often means the noise floor rose or the profile ranks work the scenario does not wait on.
 
 ## Stopping
 
 Stop when any of these holds, and say which:
 
 - The metric reached the ceiling.
-- Three candidates in a row were rejected.
+- A third candidate in a row was rejected after that A/A and re-profile.
 - The profile's remaining entries are outside the Frame's scope.
 - The budget cannot cover another candidate at the baseline's run count while leaving time for the holdout and the report.
 

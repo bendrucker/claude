@@ -29,7 +29,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
 ```
 
-Three output formats: `json` (default), `digest`, and `table`.
+Four output formats: `json` (default), `digest`, `table`, and `raw`.
 
 To filter `--author` to yourself, resolve your username with `glab api user 2>/dev/null | jq -r .username`. The `glab api user --jq .username` form returns empty on glab 1.102.0.
 
@@ -54,10 +54,10 @@ The default (`--format json`) is a flat array of summary objects, one per discus
 
 `file` and `line` are omitted entirely for general (non-inline) discussions, so handle them as optional. `lineRange` is always present but `null` unless the comment spans multiple lines.
 
-The summary flattens each thread to its **first note only**. To see the author's replies or the full thread, fetch the raw payload, which keeps every note:
+The summary flattens each thread to its **first note only**. To see the author's replies or the full thread, pass `--format raw`, which prints the filtered discussions in GitLab's `{ id, notes: [...] }` shape with every note:
 
 ```bash
-glab api "projects/:id/merge_requests/<iid>/discussions?per_page=100" 2>/dev/null
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --resolvable --author username --format raw
 ```
 
 A GitLab "reply" that is a `changed line in version N` system note (`notes[].system == true`) is not a substantive response. Filter those out before treating a thread as answered.

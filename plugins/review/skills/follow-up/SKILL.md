@@ -66,7 +66,7 @@ If a query ever needs hand-authoring (fetching `reviewThreads` is the usual case
 
 #### GitLab
 
-Use the `gitlab:merge-request` skill's discussions tooling to fetch the resolvable threads you started, both resolved and unresolved. You need each thread's original body, its location, and any later notes (the author's replies), so pull the full discussion payload, not just the first-note summary. That skill covers the script, username lookup, and the raw-payload caveat.
+Use the `gitlab:merge-request` skill's discussions script, which that skill documents. Resolve your username first, then fetch the resolvable threads you started, resolved and unresolved, with every note: `discussions.ts list <iid> --resolvable --author <username> --format raw`. You need each thread's original body, its location, and the author's later replies, which the default first-note summary drops.
 
 ### Classify Threads
 

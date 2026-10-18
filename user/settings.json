@@ -413,6 +413,16 @@
         "assigned_state": "Todo",
         "unassigned_state": "Backlog"
       }
+    },
+    "pull-request@bendrucker": {
+      "options": {
+        "auto_merge": true
+      }
+    },
+    "things@bendrucker": {
+      "options": {
+        "link_base": "https://things.bendrucker.me/show?id="
+      }
     }
   },
   "enabledPlugins": {

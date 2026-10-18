@@ -58,11 +58,20 @@ function provider(host: string, cli: string): Provider {
 }
 
 /**
- * Hosts whose CLI holds credentials that grant HTTPS push access. A host absent
- * here (self-hosted forges, enterprise domains) has no known credential helper,
- * so the hook stays silent rather than suggest a retry that cannot authenticate.
+ * Parses the `https_hosts` option: comma-separated `host=cli` pairs naming hosts
+ * whose CLI holds HTTPS credentials. A host absent here has no known credential
+ * helper, so the hook stays silent rather than suggest a retry that cannot authenticate.
  */
-const PROVIDERS = [provider("github.com", "gh"), provider("gitlab.com", "glab")];
+export function parseHosts(spec: string): Provider[] {
+  return spec.split(",").flatMap((pair) => {
+    const [host = "", cli = ""] = pair.split("=").map((part) => part.trim());
+    return host !== "" && cli !== "" ? [provider(host, cli)] : [];
+  });
+}
+
+function configuredProviders(): Provider[] {
+  return parseHosts(process.env.CLAUDE_PLUGIN_OPTION_HTTPS_HOSTS ?? "");
+}
 
 function httpsConfig({ host, cli }: Provider): string {
   return [
@@ -78,8 +87,11 @@ export function hasSshAuthFailure(output: string): boolean {
 }
 
 /** Returns the provider whose SSH remote form appears in the text, or null. */
-export function sshProviderOf(text: string): Provider | null {
-  return PROVIDERS.find((p) => p.patterns.some((pattern) => pattern.test(text))) ?? null;
+export function sshProviderOf(
+  text: string,
+  providers: Provider[] = configuredProviders(),
+): Provider | null {
+  return providers.find((p) => p.patterns.some((pattern) => pattern.test(text))) ?? null;
 }
 
 const GIT_INVOCATION = /(?:^|[;&|]\s*|\s)git(?=\s)/g;
@@ -168,7 +180,9 @@ export async function processInput(
   if (!hasSshAuthFailure(input.error) || hasSigningRefusal(input.error)) return null;
 
   const cwd = input.cwd;
-  const target = sshProviderOf(command) ?? sshProviderOf(await readRemotes(cwd));
+  const providers = configuredProviders();
+  const target =
+    sshProviderOf(command, providers) ?? sshProviderOf(await readRemotes(cwd), providers);
   if (!target) return null;
 
   const retryCommand = rewriteCommand(command, target);

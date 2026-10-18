@@ -18,7 +18,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/pr-comments.ts <pr-url> [--role author|reviewe
 
 - `--role`: `author` fetches all unresolved threads, the feedback that needs addressing. `reviewer` fetches only unresolved threads started by the authenticated user, to check whether comments have been resolved. Defaults by whether the authenticated user is the PR author.
 - `--since last-review`: threads with activity since the last relevant review. As author: the most recent review by a human other than you (bot reviews excluded). As reviewer: your most recent submitted review. An ISO date (e.g. `2025-01-15`) sets an explicit cutoff.
-- `--bots`: only review-bot threads: accounts the API types as `Bot` (Copilot, CodeRabbit, Greptile) plus logins in `$CLAUDE_PLUGIN_DATA/reviewers.txt`. Use this filter to detect bots rather than hardcoding logins.
+- `--bots`: only review-bot threads: accounts the API types as `Bot` (Copilot, CodeRabbit, Greptile) plus the plugin's configured `reviewers`. Always pass `--reviewers=${user_config.reviewers}` with it. Use this filter to detect bots rather than hardcoding logins.
 - `--include-resolved`: include resolved threads, tagged `(resolved)`, for follow-up-style flows that must surface silently resolved threads.
 
 Output is compact markdown grouped by file with line numbers and full comment bodies. Each thread prints its node `id`, used to reply and resolve.

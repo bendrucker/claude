@@ -1,9 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it, test } from "bun:test";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { StopHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { parseTranscript, processStop, scopePaths, statePath, summarizePrekOutput } from ".";
+import type { StopHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import {
+  parseTranscript,
+  processStop,
+  scopePaths,
+  STOP_BLOCK_LIMIT,
+  statePath,
+  stopEventsDir,
+  summarizePrekOutput,
+} from ".";
 
 let tempDir: string;
 let sessionCounter = 0;
@@ -11,6 +19,7 @@ const stopSessions = new Set<string>();
 
 beforeAll(async () => {
   tempDir = await mkdtemp(join(tmpdir(), "stop-hook-test-"));
+  process.env.STOP_EVENTS_DIR = join(tempDir, "mod-events");
 });
 
 afterAll(async () => {
@@ -274,18 +283,18 @@ describe("processStop", () => {
     {
       name: "installs before prek when the stop directory is a JS project",
       manifest: true,
-      expected: (cwd) => [`bun install --cwd ${cwd}`, "prek run --files touched.ts"],
+      expected: (cwd) => [`bun install --cwd ${cwd}`, "prek run -v --files touched.ts"],
     },
     {
       name: "runs prek anyway when the install fails",
       manifest: true,
       exitCodes: { bun: 1 },
-      expected: (cwd) => [`bun install --cwd ${cwd}`, "prek run --files touched.ts"],
+      expected: (cwd) => [`bun install --cwd ${cwd}`, "prek run -v --files touched.ts"],
     },
     {
       name: "runs prek without installing when the stop directory has no manifest",
       manifest: false,
-      expected: () => ["prek run --files touched.ts"],
+      expected: () => ["prek run -v --files touched.ts"],
     },
   ])("$name", async ({ manifest, exitCodes, expected }) => {
     const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
@@ -318,7 +327,7 @@ describe("processStop", () => {
       await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
 
       expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toBeNull();
-      expect(await readCalls()).toEqual(["prek run --files touched.ts"]);
+      expect(await readCalls()).toEqual(["prek run -v --files touched.ts"]);
     });
 
     await rm(cwd, { recursive: true, force: true });
@@ -341,7 +350,7 @@ describe("processStop", () => {
       expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toBeNull();
       expect(await readCalls()).toEqual([
         `bun install --cwd ${cwd}`,
-        "prek run --files touched.ts",
+        "prek run -v --files touched.ts",
       ]);
     });
 
@@ -372,11 +381,11 @@ describe("processStop", () => {
 
     await withStubbedCommands({}, async (_bin, readCalls) => {
       expect(await processStop(session)).toBeNull();
-      expect(await readCalls()).toEqual(["prek run --files touched.ts"]);
+      expect(await readCalls()).toEqual(["prek run -v --files touched.ts"]);
 
       // Same transcript, same session: nothing new to check.
       expect(await processStop(session)).toBeNull();
-      expect(await readCalls()).toEqual(["prek run --files touched.ts"]);
+      expect(await readCalls()).toEqual(["prek run -v --files touched.ts"]);
     });
 
     await rm(cwd, { recursive: true, force: true });
@@ -394,7 +403,7 @@ describe("processStop", () => {
     await withStubbedCommands({}, async (_bin, readCalls) => {
       await Bun.write(transcriptPath, createTranscriptContent([{ path: firstPath, tool: "Edit" }]));
       expect(await processStop(session)).toBeNull();
-      expect(await readCalls()).toEqual(["prek run --files first.ts"]);
+      expect(await readCalls()).toEqual(["prek run -v --files first.ts"]);
 
       await Bun.write(
         transcriptPath,
@@ -405,8 +414,8 @@ describe("processStop", () => {
       );
       expect(await processStop(session)).toBeNull();
       expect(await readCalls()).toEqual([
-        "prek run --files first.ts",
-        "prek run --files second.ts",
+        "prek run -v --files first.ts",
+        "prek run -v --files second.ts",
       ]);
     });
 
@@ -452,11 +461,109 @@ describe("processStop", () => {
       expect(second?.decision).toBe("block");
 
       expect(await readCalls()).toEqual([
-        "prek run --files touched.ts",
-        "prek run --files touched.ts",
+        "prek run -v --files touched.ts",
+        "prek run -v --files touched.ts",
       ]);
     });
 
     await rm(cwd, { recursive: true, force: true });
+  });
+
+  // One session holding a failure prek keeps reporting, stopped repeatedly.
+  async function stopsWhileFailing(
+    stops: boolean[],
+    stdout = PREK_OUTPUT,
+  ): Promise<{ results: (SyncHookJSONOutput | null)[]; calls: string[]; session: string }> {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+    const filePath = join(cwd, "touched.ts");
+    await Bun.write(filePath, "export {}");
+    const transcriptPath = join(cwd, "transcript.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+    const session = uniqueSession();
+
+    try {
+      return await withStubbedCommands(
+        { prek: 1 },
+        async (_bin, readCalls) => {
+          const results: (SyncHookJSONOutput | null)[] = [];
+          for (const active of stops) {
+            const input = stopInput({
+              session_id: session,
+              transcript_path: transcriptPath,
+              cwd,
+              stop_hook_active: active,
+            });
+            // oxlint-disable-next-line no-await-in-loop -- each stop reads the block count the previous one wrote.
+            results.push(await processStop(input));
+          }
+          return { results, calls: await readCalls(), session };
+        },
+        { prek: { stdout } },
+      );
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  }
+
+  it("checks the re-entrant stop rather than skipping it", async () => {
+    const { results, calls } = await stopsWhileFailing([false, true]);
+    expect(results.map((result) => result?.decision)).toEqual(["block", "block"]);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("gives way once the failure survives the block limit", async () => {
+    const stops = [false, ...Array.from({ length: STOP_BLOCK_LIMIT }, () => true)];
+    const { results } = await stopsWhileFailing(stops);
+    expect(results.slice(0, STOP_BLOCK_LIMIT).map((result) => result?.decision)).toEqual(
+      Array.from({ length: STOP_BLOCK_LIMIT }, () => "block"),
+    );
+    expect(results.at(-1)?.decision).toBeUndefined();
+    expect(results.at(-1)?.systemMessage).toContain("no longer blocking");
+  });
+
+  it("restarts the count on a stop that did not follow a block", async () => {
+    const { results } = await stopsWhileFailing([false, true, false]);
+    expect(results.map((result) => result?.decision)).toEqual(["block", "block", "block"]);
+  });
+
+  it("passes a run whose only failures are files a fixer rewrote", async () => {
+    const formatted = [
+      "Format...................................................................Failed",
+      "- hook id: oxfmt",
+      "- duration: 0.14s",
+      "- files were modified by this hook",
+      "Lint and type check......................................................Passed",
+      "- hook id: oxlint",
+      "- duration: 11.65s",
+    ].join("\n");
+    const { results, session } = await stopsWhileFailing([false], formatted);
+    expect(results).toEqual([null]);
+
+    const dir = stopEventsDir(session);
+    const [name] = await readdir(dir);
+    const record: unknown = await Bun.file(join(dir, name ?? "")).json();
+    expect(record).toMatchObject({
+      event_name: "prek.stop",
+      attributes: { outcome: "pass", files: 1, oxfmt_ms: 140, oxlint_ms: 11_650, failed: "oxfmt" },
+    });
+  });
+
+  it("warns without blocking when prek is missing", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+    const filePath = join(cwd, "touched.ts");
+    await Bun.write(filePath, "export {}");
+    const transcriptPath = join(cwd, "transcript.jsonl");
+    await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+
+    const originalPath = process.env.PATH;
+    process.env.PATH = "/nonexistent";
+    try {
+      expect(await processStop(stopInput({ transcript_path: transcriptPath, cwd }))).toEqual({
+        systemMessage: "⚠️ Stop checks skipped: prek is not installed or not in PATH",
+      });
+    } finally {
+      process.env.PATH = originalPath;
+      await rm(cwd, { recursive: true, force: true });
+    }
   });
 });

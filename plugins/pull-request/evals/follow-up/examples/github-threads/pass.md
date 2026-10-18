@@ -1,11 +1,4 @@
-**Rate-limit order creation per tenant** (#247): 6 review threads.
-
-| State | Count |
-| --- | --- |
-| Unresolved, no reply | 2 |
-| Unresolved, replied | 1 |
-| Resolved, with reply | 1 |
-| Resolved, silent | 2 |
+**Rate-limit order creation per tenant** (#247): 6 review threads: 3 open, 3 resolved, 2 of them with no reply.
 
 ## Needs a reply
 
@@ -16,9 +9,13 @@
 
 - `src/config.ts:6` (@mchen): per-tenant limits. You replied that it's tracked in #251.
 
-## Silently resolved
+## Resolved with no reply
 
 - `test/rate-limit.test.ts:31` (@priya-k): the test sleeps two real seconds. Resolved with no reply and the sleep is still there.
 - `src/routes/orders.ts:54` (@mchen): return 429 with `Retry-After` instead of 503. Resolved with no reply, and `tooManyRequests` still returns 503.
+
+## Resolved with a reply
+
+- `src/middleware/rate-limit.ts:18` (@priya-k): `retryAfer` typo. You replied and fixed it.
 
 Want me to draft replies for the two open threads?

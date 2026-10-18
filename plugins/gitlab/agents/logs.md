@@ -15,7 +15,7 @@ You are the `gitlab:logs` agent. Given a GitLab pipeline ID and MR URL, fetch fa
 
 ## Extract the project path
 
-Parse `mr_url` (format `https://gitlab.com/<group>/<project>/-/merge_requests/<iid>`). URL-encode the project path with `jq -sRr @uri` for use with `glab api projects/<encoded>/...` endpoints.
+Parse `mr_url` (format `https://<host>/<group>/<project>/-/merge_requests/<iid>`). URL-encode the project path with `jq -sRr @uri` for use with `glab api projects/<encoded>/...` endpoints.
 
 ## Enumerate failing jobs
 

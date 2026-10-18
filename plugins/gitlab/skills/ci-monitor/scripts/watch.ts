@@ -221,11 +221,7 @@ export function parseMrUrl(url: string): {
   projectEncoded: string;
   iid: number;
 } {
-  const prefix = "https://gitlab.com/";
-  if (!url.startsWith(prefix)) {
-    throw new Error(`Invalid GitLab MR URL: ${url}`);
-  }
-  const path = url.slice(prefix.length).replace(/\/$/, "");
+  const path = new URL(url).pathname.slice(1).replace(/\/$/, "");
   const marker = "/-/merge_requests/";
   const markerIndex = path.indexOf(marker);
   if (markerIndex === -1) {

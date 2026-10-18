@@ -111,6 +111,13 @@ describe("parseMrUrl", () => {
       projectEncoded: "group%2Fproject",
       iid: 12,
     },
+    {
+      name: "parses a self-hosted MR URL",
+      url: "https://git.example.com/group/project/-/merge_requests/3",
+      project: "group/project",
+      projectEncoded: "group%2Fproject",
+      iid: 3,
+    },
   ])("$name", ({ url, project, projectEncoded, iid }) => {
     const parsed = parseMrUrl(url);
     expect(parsed.project).toBe(project);

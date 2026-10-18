@@ -63,10 +63,6 @@ const routes: Route[] = [
   },
 ];
 
-export function isGitLabUrl(url: string): boolean {
-  return url.startsWith("https://gitlab.com/");
-}
-
 export function matchRoute(path: string): RouteMatch | null {
   for (const route of routes) {
     const params = Params.safeParse(route.pattern.match(path));
@@ -78,7 +74,7 @@ export function matchRoute(path: string): RouteMatch | null {
 }
 
 export function parseGitLabUrl(url: string): { type: string; suggestion: string } | null {
-  const path = url.slice("https://gitlab.com/".length);
+  const path = new URL(url).pathname.slice(1);
 
   // Check if this contains a /-/ path separator (resource path)
   const resourceIndex = path.indexOf("/-/");
@@ -100,7 +96,7 @@ export function parseGitLabUrl(url: string): { type: string; suggestion: string 
   // No /-/ means this is a project root (possibly with nested groups)
   // Match: group/project or group/subgroup/project etc.
   const pathWithoutSlash = path.replace(/\/$/, "");
-  if (pathWithoutSlash.includes("/") && !pathWithoutSlash.includes("?")) {
+  if (pathWithoutSlash.includes("/")) {
     return {
       type: "repo",
       suggestion: `Use: glab repo view [<project>].`,
@@ -124,12 +120,8 @@ export function formatOutput(
 }
 
 export function processInput(input: HookInput): SyncHookJSONOutput | null {
+  // hooks.json scopes this hook to GitLab domains.
   const { url } = WebFetchInput.parse(input.tool_input);
-
-  if (!isGitLabUrl(url)) {
-    return null;
-  }
-
   const parsed = parseGitLabUrl(url);
   if (parsed) {
     return formatOutput("deny", parsed.suggestion);

@@ -1,7 +1,7 @@
 import { describe, expect, it, test } from "bun:test";
 import { join } from "node:path";
 import type { PreToolUseHookSpecificOutput } from "@anthropic-ai/claude-agent-sdk";
-import { formatOutput, type HookInput, isGitLabUrl, parseGitLabUrl, processInput } from "./fetch";
+import { formatOutput, type HookInput, parseGitLabUrl, processInput } from "./fetch";
 
 function mockInput(url: string): HookInput {
   return {
@@ -20,18 +20,6 @@ function getOutput(input: HookInput): PreToolUseHookSpecificOutput | null {
   if (output?.hookEventName !== "PreToolUse") return null;
   return output;
 }
-
-describe("isGitLabUrl", () => {
-  test.each<[string, boolean]>([
-    ["https://gitlab.com/gitlab-org/gitlab", true],
-    ["https://gitlab.com/group/subgroup/project", true],
-    ["https://example.com", false],
-    ["https://github.com/owner/repo", false],
-    ["http://gitlab.com/owner/repo", false],
-  ])("%p is %p", (url, expected) => {
-    expect(isGitLabUrl(url)).toBe(expected);
-  });
-});
 
 describe("parseGitLabUrl", () => {
   it("returns null for non-project GitLab URLs", () => {
@@ -130,14 +118,6 @@ describe("formatOutput", () => {
 });
 
 describe("processInput", () => {
-  it("returns null for non-GitLab URLs", () => {
-    expect(processInput(mockInput("https://example.com"))).toBeNull();
-  });
-
-  it("returns null for GitHub URLs", () => {
-    expect(processInput(mockInput("https://github.com/owner/repo"))).toBeNull();
-  });
-
   test.each<{ name: string; url: string; reason: string }>([
     {
       name: "denies project root with glab repo view suggestion",

@@ -21,7 +21,7 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
     hookSpecificOutput: {
       hookEventName: "PostToolUse",
       additionalContext:
-        "glab OAuth token expired. Run: glab auth login --hostname gitlab.com --git-protocol ssh (requires dangerouslyDisableSandbox: true for browser OAuth flow)",
+        "glab OAuth token expired. Run: glab auth login --hostname <host> with the GitLab host the command targeted (requires dangerouslyDisableSandbox: true for browser OAuth flow)",
     },
   };
 }

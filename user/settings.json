@@ -408,6 +408,12 @@
         "refuse": 4
       }
     },
+    "linear@bendrucker": {
+      "options": {
+        "assigned_state": "Todo",
+        "unassigned_state": "Backlog"
+      }
+    },
     "pull-request@bendrucker": {
       "options": {
         "auto_merge": true

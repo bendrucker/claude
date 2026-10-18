@@ -37,6 +37,7 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
   if (HAS_STATE.test(command) || HAS_START.test(command)) return null;
 
   const state = getDefaultState(command.match(ASSIGNEE)?.[1]);
+  if (state == null) return null;
 
   // In a compound command, an appended flag lands on the last segment, so hand
   // the fix back for the author to place.

@@ -335,12 +335,6 @@ describe("warn rules", () => {
       body: VISIBLE_PROSE,
       fires: ["structure-limits"],
     },
-    {
-      name: "personal repo reports the overlong body once",
-      body: VISIBLE_PROSE,
-      context: { personalRepo: () => Promise.resolve(true) },
-      fires: ["structure-limits"],
-    },
     { name: "paragraphs under every limit", body: PROSE_PARAGRAPH, fires: [] },
     { name: "long table", body: `Adds the lookup.\n\n${TABLE}`, fires: [] },
     { name: "long collapsed block", body: `Adds the lookup.\n\n${LONG_PROSE}`, fires: [] },

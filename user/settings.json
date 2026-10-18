@@ -401,8 +401,7 @@
           "build:4:\\bvitest(?:\\.mjs)?(?=\\s|$)(?!.*\\s(?:--watch|watch|dev)\\b)",
           "build:4:\\bjest(?:\\.js)?(?=\\s|$)(?!.*\\s(?:-i|--runInBand|--watch|--watchAll)\\b)",
           "build:4:\\bplaywright(?:/test/cli\\.js)? test\\b",
-          "duckdb:4:(?:^|/)duckdb(?=\\s|$)",
-          "duckdb:4:/observability/skills/session/scripts/(?:refresh|import|query)\\.ts\\b"
+          "duckdb:4:(?:^|/)duckdb(?=\\s|$)"
         ],
         "maxLoadPerCore": 4,
         "paceLoadPerCore": 1.5,

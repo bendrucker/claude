@@ -184,6 +184,7 @@ describe("register", () => {
     caps: [String.raw`build:2:\b(?:vite|ladle)(?:\.js)? build\b`],
     maxLoadPerCore: 3,
     paceLoadPerCore: 1.5,
+    strainLoadPerCore: 3,
   };
 
   test(

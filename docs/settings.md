@@ -164,7 +164,7 @@ diff "$TMPDIR/before.json" "$TMPDIR/after.json"
 
 **Keep it** if a change has drawn on the `classifier_verdicts` view by then, such as tuning which blocks the escalation mod asks about, or a finding in a session review. **Drop it** otherwise: remove the mod, and the plugin with it if nothing else has joined, and let `mod-events` retention expire the recorded events.
 
-`pluginConfigs` sets `load@bendrucker` for these Macs, where an agent's heavy work slows everything else on the machine. Cloud sessions never read this file, so there the mod stays inert and can saturate the VM. The caps are generous backstops: 4 builds and test runs, and 4 DuckDB processes, after 20 concurrent DuckDB processes forced a hard reset. Pacing starts at 1.5x load per core and steps up at 3x. **Tighten a cap** when `cap.start` events show its pool full during a slowdown. **Raise the pacing threshold** if `pace` events fire on a machine that still feels responsive.
+`pluginConfigs` sets `load@bendrucker` for these Macs, where an agent's heavy work slows everything else on the machine. Cloud sessions never read this file, so there the mod stays inert and can saturate the VM. The caps are generous backstops: 4 builds and test runs, and 4 DuckDB processes, after 20 concurrent DuckDB processes forced a hard reset. Pacing starts at 1.5x load per core (`paceLoadPerCore`) and turns firm at 3x (`strainLoadPerCore`). **Tighten a cap** when `cap.start` events show its pool full during a slowdown. **Raise the pacing threshold** if `pace` events fire on a machine that still feels responsive.
 
 ## Sandbox Findings
 

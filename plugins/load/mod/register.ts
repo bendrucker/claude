@@ -11,7 +11,7 @@ import {
   processes,
 } from "./caps";
 import { segments } from "./command";
-import { type Level, level, reminder } from "./pace";
+import { type Level, type Thresholds, level, reminder } from "./pace";
 
 const MOD = "load";
 const MAIN = "main";
@@ -31,7 +31,7 @@ interface Config {
   caps: Cap[];
   invalid: string[];
   maxLoadPerCore: number;
-  paceLoadPerCore: number;
+  pace: Thresholds;
 }
 
 function configOf(options: PluginOptions): Config {
@@ -43,7 +43,7 @@ function configOf(options: PluginOptions): Config {
   return {
     ...parseCaps(Array.isArray(entries) ? entries : []),
     maxLoadPerCore: number("maxLoadPerCore"),
-    paceLoadPerCore: number("paceLoadPerCore"),
+    pace: { busy: number("paceLoadPerCore"), strained: number("strainLoadPerCore") },
   };
 }
 
@@ -110,9 +110,9 @@ async function pace(
   config: Config,
   owner: string,
 ): Promise<string | undefined> {
-  if (config.paceLoadPerCore <= 0) return undefined;
+  if (config.pace.busy <= 0) return undefined;
   const now = await sampled($, state, config);
-  const grade = level(now, config.paceLoadPerCore);
+  const grade = level(now, config.pace);
   const told = state.told.get(owner) ?? 0;
   // A calmer machine re-arms the reminder for when load climbs again.
   if (grade < told) state.told.set(owner, grade);

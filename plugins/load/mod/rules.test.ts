@@ -238,13 +238,15 @@ describe("caps", () => {
 describe("pace", () => {
   const calm: Machine = { running: [], sessions: 1, loadPerCore: 0.5, pressure: 1 };
 
-  test("grades load against the pacing threshold, off at 0", () => {
-    expect(level(calm, 1.5)).toBe(0);
-    expect(level({ ...calm, loadPerCore: 1.5 }, 1.5)).toBe(1);
-    expect(level({ ...calm, pressure: 2 }, 1.5)).toBe(1);
-    expect(level({ ...calm, loadPerCore: 3 }, 1.5)).toBe(2);
-    expect(level({ ...calm, pressure: 4 }, 1.5)).toBe(2);
-    expect(level({ ...calm, loadPerCore: 9, pressure: 4 }, 0)).toBe(0);
+  test("grades load against the pacing thresholds, off at 0", () => {
+    const pace = { busy: 1.5, strained: 3 };
+    expect(level(calm, pace)).toBe(0);
+    expect(level({ ...calm, loadPerCore: 1.5 }, pace)).toBe(1);
+    expect(level({ ...calm, pressure: 2 }, pace)).toBe(1);
+    expect(level({ ...calm, loadPerCore: 3 }, pace)).toBe(2);
+    expect(level({ ...calm, pressure: 4 }, pace)).toBe(2);
+    expect(level({ ...calm, loadPerCore: 9 }, { busy: 1.5, strained: 0 })).toBe(1);
+    expect(level({ ...calm, loadPerCore: 9, pressure: 4 }, { busy: 0, strained: 3 })).toBe(0);
   });
 
   test("tells the model what is loading the machine", () => {

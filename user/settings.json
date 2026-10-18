@@ -405,7 +405,8 @@
           "duckdb:4:/observability/skills/session/scripts/(?:refresh|import|query)\\.ts\\b"
         ],
         "maxLoadPerCore": 4,
-        "paceLoadPerCore": 1.5
+        "paceLoadPerCore": 1.5,
+        "strainLoadPerCore": 3
       }
     }
   },

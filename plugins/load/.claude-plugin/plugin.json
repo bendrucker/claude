@@ -24,7 +24,14 @@
     "paceLoadPerCore": {
       "type": "number",
       "title": "Pacing threshold per core",
-      "description": "Remind the model to pace heavy work once load per core reaches this, again at twice it, or under memory pressure. 0 turns pacing off.",
+      "description": "Remind the model to pace heavy work once load per core reaches this, or under memory pressure. 0 turns pacing off.",
+      "default": 0,
+      "min": 0
+    },
+    "strainLoadPerCore": {
+      "type": "number",
+      "title": "Strained threshold per core",
+      "description": "Tell the model to start no heavy work it doesn't need once load per core reaches this, or under critical memory pressure. 0 leaves only memory pressure.",
       "default": 0,
       "min": 0
     }

@@ -39,8 +39,8 @@ Record the `claude --version` and the model each arm ran on beside the baseline.
 
 Read the failing grader explanations, then the traces behind them (`traces/<case>-<arm>-<n>.jsonl`, whose last `result` line is the reply). Sort each failure into one bucket:
 
-- **Skill.** The output is wrong and the skill caused it or failed to prevent it. A candidate targets these. When the rule sits in a reference the sessions never opened, the candidate either inlines it or sharpens the pointer to it. Count the opens with `bun evals/native/calls.ts <results>... --match <file>`, since injected skill text puts the filename in every trace. When another rule claims the case before the session reaches the target rule, put the fix in the text the session already follows for that case. A session that opened the rule and still hedged it also belongs here: the rule's wording lost to the default.
-- **Grader.** The output meets the intent and the grader failed it, or the reverse. Fix the grader in its own change, then re-score every stored run with `bun evals/native/regrade.ts <suite> <results>...` and compare the `-regraded` copies. Only a changed `llm` or file-target grader needs a re-baseline. Leave graders fixed during a climb, since a grader edit moves the baseline.
+- **Skill.** The output is wrong and the skill caused it or failed to prevent it. A candidate targets these. When the rule sits in a reference the sessions never opened, the candidate either inlines it or sharpens the pointer to it. Count the opens with `bun evals/native/calls.ts <results>... --match <file>`, since injected skill text puts the filename in every trace. When another rule claims the case before the session reaches the target rule, put the fix in the text the session already follows for that case. A session that opened the rule and still hedged it also belongs here: the rule's wording lost to the model's trained default. When several such failures reproduce one outdated form, put a table mapping each old form to its replacement near the top of the body, ahead of the examples it governs.
+- **Grader.** The output meets the intent and the grader failed it, or the reverse. A case that never moves while candidates fix its neighbors belongs here until its prompt is shown to state everything its graders check. Fix the grader in its own change, then re-score every stored run with `bun evals/native/regrade.ts <suite> <results>...` and compare the `-regraded` copies. Only a changed `llm` or file-target grader needs a re-baseline. Leave graders fixed during a climb, since a grader edit moves the baseline.
 - **Reach.** The skill never fired, so the output is the model's default. A description-only candidate targets these. Its target is the skill-fired indicator on the cases that missed, and its guards are the quiet cases and the case scores. Fix skill failures on cases that fire first, since widening reach spreads them.
 - **Floor.** The model cannot do it at this tier. Leave it.
 
@@ -55,6 +55,8 @@ Make one change per candidate, on its own branch off the base. Before running it
 - The guard graders a side effect would hit. A change that orders a step ("first X") needs a guard on every case where a different step must come first.
 
 Writing the target first keeps the decision from being fitted to whichever row happened to move.
+
+Size the change to clear the noise floor from `Ready the Suite`: rewrite the section behind a failure bucket or add the rule it lacks. A reworded line rarely moves a star.
 
 Write the instruction as the failing behavior in general terms, never with a `dev` case's nouns, phrases, or fixture details. Write the requirement a grader checks, never the grader or the suite. Check every example the change names against the `holdout` fixtures, and swap out any a `holdout` case uses. A gain on that case would then measure the example rather than the rule.
 
@@ -88,6 +90,10 @@ About one row in ten stars by chance at the default alpha. Treat a starred row o
 
 The next candidate branches off the accepted change and re-baselines on it. Candidates may run in parallel off one base. When two are accepted, the second re-runs on top of the first before it merges.
 
+#### Stall
+
+After two null candidates in a row, stop editing. Re-read every remaining `dev` failure in the latest traces and bucket each one afresh. Fix grader-bucket failures and ambiguous prompts and regrade before the next candidate, since only skill failures feed it.
+
 #### Holdout
 
 After the last accepted change, run `holdout` on the original base and on the final commit, pooled to the same run count. On CI, dispatch the final branch for both, adding `-f ref=<base sha>` for the base side so both read the same cases. The climb holds when the holdout score does not fall. Compare the two with `compare.ts` and report a gain only where `holdout` stars. Otherwise report the result as a `dev` gain with no demonstrated holdout gain. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it.
@@ -96,10 +102,10 @@ After the last accepted change, run `holdout` on the original base and on the fi
 
 Stop when any of these holds, and say which:
 
-- The `dev` score has no room left above the noise from `Ready the Suite`.
-- Three candidates in a row came back null. Add harder cases, then resume.
+- The `dev` score has no room left above the noise from `Ready the Suite`. Climb tokens at parity with removal candidates instead, or stop.
+- A third null candidate followed a `Stall` review. Add harder cases, then resume.
 - The budget cannot cover another candidate at the baseline's replicate count. Skip `holdout` when nothing was accepted, since the final commit is the base.
-- Every remaining failure buckets as reach or floor. Fix grader-bucket failures and regrade first, and resume if a skill failure surfaces.
+- A `Stall` review buckets every remaining failure as reach or floor.
 
 After a model upgrade, re-run the baseline before climbing. When the with arm no longer stars above the without arm, the model now does what the skill asked: propose retiring the skill or cutting it to the instructions that still star.
 

@@ -1,6 +1,6 @@
 ---
 name: issue:refine
-description: Refining issues with technical context and structured details. Use when expanding a brief bug, feature, or refactor description into a detailed issue suitable for developers and AI agents.
+description: Refining issues with technical context and structured details. Use when asked to refine, draft, or write up an issue, including expanding a brief bug, feature, refactor, or spike (timeboxed investigation) description into a detailed issue suitable for developers and AI agents.
 argument-hint: "[--type bug|feature|refactor|spike] [--compact]"
 ---
 

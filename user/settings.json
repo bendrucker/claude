@@ -452,8 +452,8 @@
   "extraKnownMarketplaces": {
     "bendrucker": {
       "source": {
-        "source": "github",
-        "repo": "bendrucker/claude"
+        "source": "directory",
+        "path": "/Users/ben/.claude-repo"
       }
     },
     "claude-plugins-official": {

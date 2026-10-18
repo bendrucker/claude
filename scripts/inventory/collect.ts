@@ -220,6 +220,8 @@ async function readRule(path: string): Promise<Rule> {
 // come from their own manifests.
 const SETTINGS_FILES = [
   "user/settings.json",
+  "managed/settings.json",
+  "platforms/remote/settings.json",
   ".claude/settings.json",
   ".claude/settings.local.json",
 ];

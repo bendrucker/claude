@@ -42,7 +42,7 @@ repos:
       - id: settings-validate
         name: Settings validation
         language: system
-        files: ^(\.claude/settings\.json|user/settings\.json)$
+        files: ^(\.claude/settings\.json|user/settings\.json|managed/settings\.json|platforms/[^/]+/settings\.json)$
         pass_filenames: false
         entry: bun packages/validate/settings.ts
 

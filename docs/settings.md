@@ -4,7 +4,7 @@ Why each sandbox grant and hook in `settings.json` exists and what would retire 
 
 ## Hosts
 
-Granted in `user/settings.json` unless noted. `sandbox.network.allowedDomains` opens a host to sandboxed Bash. A `WebFetch(domain:...)` permission lets the `WebFetch` tool fetch it without a prompt, and the sandbox also admits it. A host gets a `WebFetch` entry only when the session index shows the tool fetching it, and an `allowedDomains` entry when a CLI reaches it.
+Sandbox entries live in `user/settings.json` and `WebFetch` grants in `managed/settings.json` unless noted. `sandbox.network.allowedDomains` opens a host to sandboxed Bash. A `WebFetch(domain:...)` permission lets the `WebFetch` tool fetch it without a prompt, and the sandbox also admits it. A host gets a `WebFetch` entry only when the session index shows the tool fetching it, and an `allowedDomains` entry when a CLI reaches it.
 
 - Package registries: `registry.npmjs.org` and `pypi.org` (both), `www.npmjs.com` (`WebFetch`), `rubygems.org`, `proxy.golang.org`, `sum.golang.org`, `bun.sh` (`allowedDomains`), and `community-extensions.duckdb.org` (both, the DuckDB `markdown` and `yaml` extensions, fetched on first `INSTALL ... FROM community`).
 - Docs: `platform.claude.com`, `code.claude.com`, `modelcontextprotocol.io`, `pkg.go.dev`, `bun.com` (`WebFetch`).
@@ -126,7 +126,7 @@ The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered unde
 
 ## Hooks
 
-Why a hook entry in `user/settings.json` earns its place, and what would retire it, for the entries that ship no `README.md` of their own. The hook scripts live in [`user/hooks/`](../user/hooks).
+Why a hook entry in `user/settings.json` or `managed/settings.json` earns its place, and what would retire it, for the entries that ship no `README.md` of their own. The hook scripts live in [`user/hooks/`](../user/hooks).
 
 [`find-scope`](../user/hooks/find-scope) denies, on a `PreToolUse` matching `Bash`, a `find` whose first operand is `/`, `~`, `$HOME`, or a bare home directory and which carries no `-maxdepth`. Over the 262,859 Bash calls recorded between 2026-04-21 and 2026-09-09 the matcher fires on 237, a tenth of a percent, and those 237 ran a median of 85 seconds and burned 5.1 hours between them. A third returned nothing at all, having hit the 120-second Bash timeout or been pushed to the background. The native instruction to prefer Grep and Glob over the shell was already in force for every one of them, which is why this is a hook rather than another line of prose. The `if` filter keeps the spawn to roughly 2,500 Bash calls a month. Matching hooks run in parallel, and this one overlaps the `worktree` hook rather than queueing behind it.
 

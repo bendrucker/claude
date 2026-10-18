@@ -395,6 +395,7 @@
   "pluginConfigs": {
     "load@bendrucker": {
       "options": {
+        "browserSessions": 3,
         "caps": [
           "build:4:\\b(?:ladle|vite|storybook)(?:\\.js)? build\\b|\\bbuild-storybook\\b",
           "build:4:\\bpytest\\b.* (?:-n ?|--numprocesses[ =])(?:auto|logical|\\d+)\\b",
@@ -417,12 +418,18 @@
     "pull-request@bendrucker": {
       "options": {
         "auto_merge": true,
-        "stack_file": "wt/stack"
+        "stack_file": "wt/stack",
+        "body_review_skill": "review:human"
       }
     },
     "things@bendrucker": {
       "options": {
         "link_base": "https://things.bendrucker.me/show?id="
+      }
+    },
+    "session-limit@bendrucker": {
+      "options": {
+        "overage": true
       }
     },
     "mod-events@bendrucker": {

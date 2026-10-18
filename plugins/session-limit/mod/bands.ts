@@ -3,7 +3,7 @@ import type { SessionLimitAnnounced } from "../types";
 
 export interface Band {
   threshold: number;
-  message: (resetsAt: string | undefined, nowMs: number) => string;
+  message: (resetsAt: string | undefined, nowMs: number, overage: boolean) => string;
 }
 
 export type Announced = SessionLimitAnnounced;
@@ -34,14 +34,15 @@ export const BANDS: Record<string, Band[]> = {
     },
     {
       threshold: 100,
-      message: (resetsAt, nowMs) => {
+      message: (resetsAt, nowMs, overage) => {
         const reset = formatResetTime(resetsAt);
         const msUntilReset = resetsAt == null ? Number.NaN : Date.parse(resetsAt) - nowMs;
         const withinHorizon = msUntilReset > 0 && msUntilReset <= WAKEUP_HORIZON_MS;
         const resume = withinHorizon
           ? `then schedule a wake-up for just after ${reset} (no need to ask) so work resumes on a fresh block, and stop`
           : `then tell the user to return at ${reset} to resume on a fresh block, and stop`;
-        return `The 5-hour usage block is exhausted (resets ${reset}). Every further request now spends overage credits. Finish only in-flight work, ${resume}. Start no new work.`;
+        const spend = overage ? " Every further request now spends overage credits." : "";
+        return `The 5-hour usage block is exhausted (resets ${reset}).${spend} Finish only in-flight work, ${resume}. Start no new work.`;
       },
     },
   ],
@@ -87,6 +88,7 @@ export function evaluate(
   limits: readonly SessionRateLimit[],
   prev: Announced,
   nowMs: number,
+  overage = false,
 ): { announced: Announced; crossings: Crossing[] } {
   const announced: Announced = { ...prev };
   const crossings: Crossing[] = [];
@@ -109,7 +111,7 @@ export function evaluate(
       threshold: crossed.threshold,
       percentUsed: limit.percentUsed,
       resetsAt: limit.resetsAt,
-      message: crossed.message(limit.resetsAt, nowMs),
+      message: crossed.message(limit.resetsAt, nowMs, overage),
     });
   }
 

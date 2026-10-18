@@ -13,7 +13,6 @@ allowed-tools:
   - Skill(gitlab:merge-request)
   - Skill(gitlab:api)
   - Skill(github:attach)
-  - Skill(review:human)
   - "Bash(git add:*)"
   - "Bash(git commit:*)"
   - "Bash(git push:*)"
@@ -51,7 +50,7 @@ Parse `$ARGUMENTS` for these flags. With no flags, open a PR/MR ready for review
 - `--base <ref>`: parent branch to target. Default: the repo's default branch. A branch whose parent is another topic branch is a stack layer, identified only by this flag or by the user. The upstream ref tracks the branch's own remote copy, so it cannot identify the parent.
 - `--label <name>`: apply a label, repeatable. Default: none.
 - `--no-review`: skip the hosted review request. Default: on a repo that gates its hosted bot on a label, request the review when the diff clears the metered-review gate and no local pass ran.
-- `--[no-]review-body`: put the drafted body in front of the user before creating. Default: on when the Remote URL above names an owner other than you, off on your own repos.
+- `--[no-]review-body`: review the drafted body with `${user_config.body_review_skill}` before creating. Default: on when the Remote URL above names an owner other than you, off on your own repos. Off when that skill name is empty.
 
 ## Title
 
@@ -93,7 +92,7 @@ When the context above shows a detected PR template, follow the template's struc
 1. Push the branch: `git push -u origin HEAD`
 1. Resolve every label against the repo before creating: each `--label` value, plus the review label when the gate in the local bot review step warranted a metered review that no local pass already spent. Load [`references/labels.md`](references/labels.md) for the lookup commands and for what to do when a label doesn't resolve.
 1. Draft the title and body.
-1. When `--review-body` applies, write the body to `tmp/pr-body-<branch>.md`, run `review:human --doc tmp/pr-body-<branch>.md --kind pr-body --summary "<repo> <branch>: review the PR body"`, and fold the feedback into the file before creating. Inside herdr that ends the turn, and the steps below resume when the review comes back. This step reviews the body alone. Under `/ship` the diff already had its review.
+1. When `--review-body` applies, write the body to `tmp/pr-body-<branch>.md`, run `${user_config.body_review_skill} --doc tmp/pr-body-<branch>.md --kind pr-body --summary "<repo> <branch>: review the PR body"`, and fold the feedback into the file before creating. This step reviews the body alone. Under `/ship` the diff already had its review.
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description-file tmp/pr-body-<branch>.md`

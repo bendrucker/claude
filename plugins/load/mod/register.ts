@@ -1,14 +1,17 @@
-import type { EngineInterface, On } from "claude-code";
+import type { EngineInterface, On, PluginOptions } from "claude-code";
 import { type BrowserCall, type Census, browserCalls, judge } from "./browser";
 import {
+  type Cap,
   type Machine,
-  judgeBuilds,
+  judge as judgeCaps,
   loadPerCore,
-  planBuilds,
+  parseCaps,
+  plan as planCaps,
   pressureLevel,
-  runningBuilds,
-} from "./builds";
+  processes,
+} from "./caps";
 import { segments } from "./command";
+import { type Level, level, reminder } from "./pace";
 
 const MOD = "load";
 const MAIN = "main";
@@ -21,13 +24,39 @@ const CONTINUING = new Set(["clear", "resume"]);
 // timer while one is open.
 const SWEEP_MS = 30_000;
 
+// Pacing samples the machine at most this often, so most tool calls cost nothing.
+const SAMPLE_MS = 15_000;
+
+interface Config {
+  caps: Cap[];
+  invalid: string[];
+  maxLoadPerCore: number;
+  paceLoadPerCore: number;
+}
+
+function configOf(options: PluginOptions): Config {
+  const entries = options.caps;
+  const number = (key: string) => {
+    const value = options[key];
+    return typeof value === "number" ? value : 0;
+  };
+  return {
+    ...parseCaps(Array.isArray(entries) ? entries : []),
+    maxLoadPerCore: number("maxLoadPerCore"),
+    paceLoadPerCore: number("paceLoadPerCore"),
+  };
+}
+
 interface State {
   /** Session to the agent that launched it. */
   owners: Map<string, string>;
   pending: Set<string>;
-  /** Builds allowed to start whose call has not returned. */
-  building: string[];
+  /** Pools of capped jobs allowed to start whose call has not returned. */
+  starting: string[];
   sweep: { cancel: () => void } | undefined;
+  sample: { at: number; machine: Machine } | undefined;
+  /** Pacing level each agent was last told. */
+  told: Map<string, Level>;
 }
 
 async function liveSessions($: EngineInterface): Promise<Set<string>> {
@@ -50,22 +79,58 @@ async function liveSessions($: EngineInterface): Promise<Set<string>> {
   return new Set(sessions.filter((s) => typeof s === "string"));
 }
 
-async function machine($: EngineInterface): Promise<Machine> {
+async function machine($: EngineInterface, caps: readonly Cap[]): Promise<Machine> {
   const [ps, sysctl] = await Promise.all([
-    $.process.run(["ps", "-axo", "command="], { timeoutMs: 5000 }),
+    $.process.run(["ps", "-axo", "pid=,ppid=,command="], { timeoutMs: 5000 }),
     // The pressure level is hidden from `sysctl -a` but reads by name without root.
     $.process.run(
       ["sysctl", "-n", "vm.loadavg", "hw.ncpu", "kern.memorystatus_vm_pressure_level"],
-      {
-        timeoutMs: 5000,
-      },
+      { timeoutMs: 5000 },
     ),
   ]);
   return {
-    running: runningBuilds(ps.stdout),
+    ...processes(caps, ps.stdout),
     loadPerCore: loadPerCore(sysctl.stdout),
     pressure: pressureLevel(sysctl.stdout),
   };
+}
+
+async function sampled($: EngineInterface, state: State, config: Config): Promise<Machine> {
+  const now = await $.clock.now();
+  if (state.sample === undefined || now - state.sample.at >= SAMPLE_MS) {
+    state.sample = { at: now, machine: await machine($, config.caps) };
+  }
+  return state.sample.machine;
+}
+
+/** Guidance for an agent whose machine got busier since it was last told. */
+async function pace(
+  $: EngineInterface,
+  state: State,
+  config: Config,
+  owner: string,
+): Promise<string | undefined> {
+  if (config.paceLoadPerCore <= 0) return undefined;
+  const now = await sampled($, state, config);
+  const grade = level(now, config.paceLoadPerCore);
+  const told = state.told.get(owner) ?? 0;
+  // A calmer machine re-arms the reminder for when load climbs again.
+  if (grade < told) state.told.set(owner, grade);
+  if (grade <= told) return undefined;
+  state.told.set(owner, grade);
+  void $.modEvents.emit({
+    mod: MOD,
+    event: "pace",
+    detail: {
+      level: grade,
+      loadPerCore: now.loadPerCore ?? null,
+      pressure: now.pressure ?? null,
+      sessions: now.sessions,
+      running: now.running,
+      agent: owner === MAIN ? null : owner,
+    },
+  });
+  return reminder(now, grade);
 }
 
 function census(state: State, owner: string, isSubagent: boolean, live: Set<string>): Census {
@@ -153,19 +218,42 @@ function failed($: EngineInterface, hook: string, kind: string, message?: string
     .catch(() => undefined);
 }
 
-export function register(on: On): void {
-  const state: State = { owners: new Map(), pending: new Set(), building: [], sweep: undefined };
+export function register(on: On, options: PluginOptions): void {
+  const config = configOf(options);
+  const state: State = {
+    owners: new Map(),
+    pending: new Set(),
+    starting: [],
+    sweep: undefined,
+    sample: undefined,
+    told: new Map(),
+  };
 
   on("session.start", ($, e, next) => {
-    void $.modEvents.emit({ mod: MOD, event: "session.start" });
+    void $.modEvents.emit({
+      mod: MOD,
+      event: "session.start",
+      ...(config.invalid.length > 0 && { ok: false, detail: { invalidCaps: config.invalid } }),
+    });
+    return next(e);
+  });
+
+  // Runs after the tool, so the sample never delays the call itself.
+  on("tool.call", async ($, e, next) => {
+    const result = await next(e);
+    if (result.deny !== undefined) return result;
+    const text = await pace($, state, config, e.agentId ?? MAIN);
+    return text === undefined ? result : { ...result, context: [...(result.context ?? []), text] };
+  }).catch(($, e, next) => {
+    failed($, "pace", next.error.kind, next.error.message);
     return next(e);
   });
 
   on("tool.call", { tool: "Bash" }, async ($, e, next) => {
     const parts = segments(e.command);
     const calls = browserCalls(parts);
-    const plan = planBuilds(parts);
-    if (calls.length === 0 && plan.kinds.length === 0) return next(e);
+    const plan = planCaps(config.caps, parts);
+    if (calls.length === 0 && plan.pools.length === 0) return next(e);
 
     const owner = e.agentId ?? MAIN;
     const agent = e.agentId ?? null;
@@ -188,16 +276,17 @@ export function register(on: On): void {
       }
     }
 
-    if (plan.kinds.length > 0) {
-      const probed = await machine($);
-      const now = { ...probed, running: [...probed.running, ...state.building] };
-      const verdict = judgeBuilds(plan, now);
+    if (plan.pools.length > 0) {
+      const probed = await machine($, config.caps);
+      state.sample = { at: await $.clock.now(), machine: probed };
+      const now = { ...probed, running: [...probed.running, ...state.starting] };
+      const verdict = judgeCaps(config.caps, plan, now, config.maxLoadPerCore);
       void $.modEvents.emit({
         mod: MOD,
-        event: verdict.deny === undefined ? "build.start" : "build.deny",
+        event: verdict.deny === undefined ? "cap.start" : "cap.deny",
         detail: {
           reason: verdict.reason ?? null,
-          kinds: plan.kinds,
+          pools: plan.pools,
           running: now.running,
           loadPerCore: now.loadPerCore ?? null,
           pressure: now.pressure ?? null,
@@ -207,7 +296,7 @@ export function register(on: On): void {
       if (verdict.deny !== undefined) return { deny: verdict.deny };
     }
 
-    state.building.push(...plan.kinds);
+    state.starting.push(...plan.pools);
     const launched = record(state, calls, owner, live);
     for (const session of launched) {
       void $.modEvents.emit({
@@ -220,7 +309,7 @@ export function register(on: On): void {
       return await next(e);
     } finally {
       for (const session of launched) state.pending.delete(session);
-      for (const kind of plan.kinds) state.building.splice(state.building.indexOf(kind), 1);
+      for (const pool of plan.pools) state.starting.splice(state.starting.indexOf(pool), 1);
       forget(state, calls);
       if (launched.length > 0) await sweep($, state);
     }

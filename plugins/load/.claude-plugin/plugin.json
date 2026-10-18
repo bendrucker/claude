@@ -1,9 +1,32 @@
 {
   "name": "load",
-  "description": "Keep Claude-driven browsers and builds from saturating the machine",
+  "description": "Pace Claude's heavy work to the machine it runs on, with configurable hard caps",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
   },
-  "dependencies": ["mod-events"]
+  "dependencies": ["mod-events"],
+  "userConfig": {
+    "caps": {
+      "type": "string",
+      "multiple": true,
+      "title": "Hard caps",
+      "description": "pool:limit:regex entries. A Bash command matching the regex is refused while `limit` processes matching its pool already run. Entries sharing a pool share its limit. Empty caps nothing.",
+      "default": []
+    },
+    "maxLoadPerCore": {
+      "type": "number",
+      "title": "Load cap per core",
+      "description": "Refuse capped commands while the load average per core is above this. 0 turns it off.",
+      "default": 0,
+      "min": 0
+    },
+    "paceLoadPerCore": {
+      "type": "number",
+      "title": "Pacing threshold per core",
+      "description": "Remind the model to pace heavy work once load per core reaches this, again at twice it, or under memory pressure. 0 turns pacing off.",
+      "default": 0,
+      "min": 0
+    }
+  }
 }

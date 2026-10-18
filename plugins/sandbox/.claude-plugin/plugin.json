@@ -1,0 +1,9 @@
+{
+  "name": "sandbox",
+  "description": "Refuse a sandbox bypass whose commands already escape through sandbox.excludedCommands, naming the form that escapes without the flag",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  },
+  "dependencies": ["mod-events"]
+}

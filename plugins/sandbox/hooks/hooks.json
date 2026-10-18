@@ -1,0 +1,4 @@
+{
+  "description": "Denies a dangerouslyDisableSandbox Bash call whose commands all match sandbox.excludedCommands once a cd, export, 2>&1, or trailing output filter is dropped, and names the form that escapes without the flag",
+  "modules": ["../mod/register.ts"]
+}

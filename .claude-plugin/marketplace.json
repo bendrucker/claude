@@ -172,6 +172,11 @@
       "source": "./plugins/run-command"
     },
     {
+      "name": "sandbox",
+      "description": "Refuse a sandbox bypass whose commands already escape through sandbox.excludedCommands, naming the form that escapes without the flag",
+      "source": "./plugins/sandbox"
+    },
+    {
       "name": "session-limit",
       "description": "Warn the model mid-turn as the 5-hour or 7-day limit nears",
       "source": "./plugins/session-limit"

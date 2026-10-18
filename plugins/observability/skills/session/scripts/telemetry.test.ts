@@ -392,6 +392,52 @@ describe("mods query", () => {
   });
 });
 
+describe("sandbox-bypass-scaffold query", () => {
+  it("reports the weekly share of bypasses the sandbox mod denied", async () => {
+    const projectsDir = join(tmpDir, "claude", "projects");
+    const sessionDir = join(tmpDir, "claude", "mod-events", "s1");
+    for (const dir of [projectsDir, sessionDir]) mkdirSync(dir, { recursive: true });
+    const bypass = (attributes: object) => ({
+      ...makeModRecord({ mod: "sandbox", event_name: "sandbox.bypass" }),
+      attributes: { ...attributes, "session.id": "s1" },
+    });
+    await Bun.write(
+      join(sessionDir, "sandbox.1.0.jsonl"),
+      [
+        bypass({ verdict: "deny", reason: null, scaffolds: ["cd", "filter"] }),
+        bypass({ verdict: "deny", reason: null, scaffolds: ["filter"] }),
+        bypass({ verdict: "allow", reason: "unmatched", scaffolds: [] }),
+        bypass({ verdict: "allow", reason: "unmatched", scaffolds: [] }),
+      ]
+        .map((e) => `${JSON.stringify(e)}\n`)
+        .join(""),
+    );
+    await ensureIndex(db, { projectsDir, importsDir: join(tmpDir, "imports") });
+
+    const rows = await runQuery(
+      db,
+      "sandbox-bypass-scaffold",
+      z.object({
+        bypasses: z.bigint(),
+        scaffolded: z.bigint(),
+        scaffolded_pct: z.number(),
+        scaffolds: z.string().nullable(),
+        allow_reasons: z.string().nullable(),
+      }),
+      { after_date: null, before_date: null, host: null },
+    );
+    expect(rows).toEqual([
+      {
+        bypasses: 4n,
+        scaffolded: 2n,
+        scaffolded_pct: 50,
+        scaffolds: `{"cd":1,"filter":2}`,
+        allow_reasons: `{"unmatched":2}`,
+      },
+    ]);
+  });
+});
+
 describe("overCap", () => {
   const file = (name: string, mtime: number, size: number) => ({ path: name, mtime, size });
 

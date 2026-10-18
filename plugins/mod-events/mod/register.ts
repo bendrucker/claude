@@ -1,4 +1,4 @@
-import type { EngineInterface, On } from "claude-code";
+import type { EngineInterface, On, PluginOptions } from "claude-code";
 import type { ModEventsInput, ModEventsRecord } from "../types";
 
 const MOD = "mod-events";
@@ -54,21 +54,23 @@ function summarize(clients: Surface[], isSsh: boolean): Surface {
 }
 
 /**
- * Classifies each attached herdr client by its ancestry. The server is the
- * `herdr` process whose parent is launchd, and every other one is a client.
+ * Classifies each attached multiplexer client by its ancestry. The server is
+ * the `multiplexer` process whose parent is launchd, and every other one is a
+ * client.
  */
 export function surfaceOf(
   ps: string | undefined,
   sshConnection: string | undefined,
+  multiplexer: string,
 ): { surface: Surface; clients: Surface[] } {
   const clients: Surface[] = [];
   if (ps !== undefined) {
     const table = parsePs(ps);
     for (const p of table.values()) {
-      if (p.name === "herdr" && p.ppid > 1) clients.push(reachOf(table, p.pid));
+      if (p.name === multiplexer && p.ppid > 1) clients.push(reachOf(table, p.pid));
     }
   }
-  // Panes inherit the herdr server's env, so `SSH_CONNECTION` speaks for the session only without clients.
+  // Panes inherit the multiplexer server's env, so `SSH_CONNECTION` speaks for the session only without clients.
   const isSsh = clients.length === 0 && sshConnection !== undefined && sshConnection !== "";
   return { surface: summarize(clients, isSsh), clients: clients.toSorted() };
 }
@@ -178,15 +180,20 @@ async function emit($: EngineInterface, log: Log, input: ModEventsInput): Promis
   }
 }
 
-async function readSurface($: EngineInterface): Promise<ReturnType<typeof surfaceOf>> {
+async function readSurface(
+  $: EngineInterface,
+  multiplexer: string,
+): Promise<ReturnType<typeof surfaceOf>> {
   const [ssh, ps] = await Promise.all([
     $.env.get("SSH_CONNECTION"),
-    $.process
-      .run(["ps", "-axo", "pid=,ppid=,comm="], { timeoutMs: 5000 })
-      .then((r) => (r.exitCode === 0 ? r.stdout : undefined))
-      .catch(() => undefined),
+    multiplexer === ""
+      ? undefined
+      : $.process
+          .run(["ps", "-axo", "pid=,ppid=,comm="], { timeoutMs: 5000 })
+          .then((r) => (r.exitCode === 0 ? r.stdout : undefined))
+          .catch(() => undefined),
   ]);
-  return surfaceOf(ps, ssh);
+  return surfaceOf(ps, ssh, multiplexer);
 }
 
 /**
@@ -197,7 +204,8 @@ async function readSurface($: EngineInterface): Promise<ReturnType<typeof surfac
  * 64 KB and a reload starts a new instance. Each rewrite only appends, and a
  * rolled chunk is never written again, so a tailer's offset stays valid.
  */
-export function register(on: On): void {
+export function register(on: On, options: PluginOptions): void {
+  const multiplexer = typeof options.multiplexer === "string" ? options.multiplexer : "";
   const log: Log = { root: undefined, instance: undefined, resource: undefined, chunks: new Map() };
 
   on("engine.create", async ($, e, next) => {
@@ -212,7 +220,7 @@ export function register(on: On): void {
 
   on("session.start", async ($, e, next) => {
     const started = await next(e);
-    const { surface, clients } = await readSurface($);
+    const { surface, clients } = await readSurface($, multiplexer);
     log.resource = { ...(await resourceOf($, log)), "claude_code.surface": surface };
     await emit($, log, {
       mod: MOD,

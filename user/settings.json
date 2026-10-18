@@ -408,6 +408,11 @@
         "refuse": 4
       }
     },
+    "mod-events@bendrucker": {
+      "options": {
+        "multiplexer": "herdr"
+      }
+    },
     "things@bendrucker": {
       "options": {
         "link_base": "https://things.bendrucker.me/show?id="

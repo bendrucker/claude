@@ -41,7 +41,7 @@ Use `records`, `fields`, `schema`, and `keys` whenever a dimension needs a path 
 
 Grounding is required. Raw query findings can go stale if config changes.
 
-Re-check every candidate against the live files under `/Users/ben/src/bendrucker/claude`. Drop the candidate if the config already addresses it; downgrade it if the evidence is thin or host-skewed. Carry two fields per candidate:
+Re-check every candidate against the live config repo, the git toplevel of `dirname "$(readlink ~/.claude/settings.json)"`. Drop the candidate if the config already addresses it; downgrade it if the evidence is thin or host-skewed. Carry two fields per candidate:
 
 - `grounded` (boolean): the finding survived the re-check against live config.
 - `confidence` (high/medium/low): how strong the grounded evidence is.

@@ -4,5 +4,13 @@
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
+  },
+  "userConfig": {
+    "https_hosts": {
+      "type": "string",
+      "title": "HTTPS fallback hosts",
+      "description": "Comma-separated host=cli pairs. When SSH auth to a host fails, the hook suggests retrying over HTTPS through that CLI's auth git-credential helper.",
+      "default": "github.com=gh,gitlab.com=glab"
+    }
   }
 }

@@ -407,6 +407,11 @@
         "warn": 3,
         "refuse": 4
       }
+    },
+    "things@bendrucker": {
+      "options": {
+        "link_base": "https://things.bendrucker.me/show?id="
+      }
     }
   },
   "enabledPlugins": {

@@ -407,6 +407,12 @@
         "warn": 3,
         "refuse": 4
       }
+    },
+    "linear@bendrucker": {
+      "options": {
+        "assigned_state": "Todo",
+        "unassigned_state": "Backlog"
+      }
     }
   },
   "enabledPlugins": {

@@ -4,5 +4,19 @@
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
+  },
+  "userConfig": {
+    "assigned_state": {
+      "type": "string",
+      "title": "Assigned issue state",
+      "description": "Workflow state for a new issue created with an assignee and no state. Empty leaves the state unset.",
+      "default": ""
+    },
+    "unassigned_state": {
+      "type": "string",
+      "title": "Unassigned issue state",
+      "description": "Workflow state for a new issue created with no assignee and no state. Empty leaves the state unset.",
+      "default": ""
+    }
   }
 }

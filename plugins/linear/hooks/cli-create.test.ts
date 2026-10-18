@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { processInput } from "./cli-create";
 
@@ -13,6 +13,16 @@ function mockInput(command: string): PreToolUseHookInput {
     tool_use_id: "test",
   };
 }
+
+beforeEach(() => {
+  process.env.CLAUDE_PLUGIN_OPTION_ASSIGNED_STATE = "Todo";
+  process.env.CLAUDE_PLUGIN_OPTION_UNASSIGNED_STATE = "Backlog";
+});
+
+afterEach(() => {
+  delete process.env.CLAUDE_PLUGIN_OPTION_ASSIGNED_STATE;
+  delete process.env.CLAUDE_PLUGIN_OPTION_UNASSIGNED_STATE;
+});
 
 describe("processInput", () => {
   test.each([
@@ -39,5 +49,10 @@ describe("processInput", () => {
     ["trailing whitespace is trimmed before the flag", "linear issue create --title x  "],
   ])("%s", (_name, command) => {
     expect(processInput(mockInput(command))).toMatchSnapshot();
+  });
+
+  test("no default state configured passes through", () => {
+    process.env.CLAUDE_PLUGIN_OPTION_UNASSIGNED_STATE = "";
+    expect(processInput(mockInput("linear issue create --title x"))).toBeNull();
   });
 });

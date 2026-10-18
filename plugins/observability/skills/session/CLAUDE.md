@@ -2,7 +2,7 @@
 
 ## DuckDB Architecture
 
-JSONL files in `~/.claude/projects/` are the canonical data. The DuckDB database is a derived cache living in the plugin data dir (`getDataDir` derives `~/.claude/plugins/data/<plugin>-<marketplace>/` from the script's installed location, either a cache copy or a plugin loaded in place from a `directory` marketplace in `known_marketplaces.json`; `CLAUDE_PLUGIN_DATA` overrides it, and tests always set it). Dev runs from a bare checkout error without the override, so development never touches the live index. Other machines' corpora, copied under `~/.claude/session-imports/<label>/projects/`, are indexed under a `host` label alongside `local` (see SKILL.md "Cross-Machine History").
+JSONL files in `~/.claude/projects/` are the canonical data. The DuckDB database is a derived cache at `${XDG_DATA_HOME:-~/.local/share}/claude-sessions/`, outside `~/.claude` because the desktop app refuses to grant a cloud session any folder under it. `CLAUDE_SESSION_INDEX_DIR` overrides the path, and tests always set it. A dev run without the override writes the live index. The first read-write open at the default path moves an index left in the old plugin data dir (`~/.claude/plugins/data/observability-*`), and moves nothing when both exist. Other machines' corpora, copied under `~/.claude/session-imports/<label>/projects/`, are indexed under a `host` label alongside `local` (see SKILL.md "Cross-Machine History").
 
 ### Schema
 
@@ -41,7 +41,7 @@ Debug logs and mod events carry a size cap (2 GB and 500 MB). After each sync, `
 
 ### Refresh Entry Point
 
-`refresh.ts` prints the DB path to stdout (everything else goes to stderr). A `last-refresh` stamp file makes runs within `--max-age` (default 300s) print the path and exit before opening the database, so the fast path never takes a lock. `--refresh` bypasses the stamp. On a lock conflict it retries briefly, then defers to the concurrent refresher and exits 0 with the path. It also sweeps the pre-plugin-data stray indexes under `$TMPDIR/claude-session` and `/tmp/claude-session`, only when running against the derived production data dir.
+`refresh.ts` prints the DB path to stdout (everything else goes to stderr). A `last-refresh` stamp file makes runs within `--max-age` (default 300s) print the path and exit before opening the database, so the fast path never takes a lock. `--refresh` bypasses the stamp. On a lock conflict it retries briefly, then defers to the concurrent refresher and exits 0 with the path.
 
 ### Migration
 
@@ -65,7 +65,7 @@ DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` because `=` binds t
 
 Every open this skill makes or documents is resource-capped, because DuckDB's defaults (80% of RAM, every core, spill up to 90% of free disk) apply per process and a fan-out of readers multiplies them past the machine. Readers load `resources/limits.sql` through `-init` (4 GiB, 4 threads, a per-process spill dir under `$TMPDIR`), and `extensions.sql` carries a copy because `-init` takes one file. The writer passes `WRITER_LIMITS` to `DuckDBInstance.create`. A query that outgrows its cap spills or fails with an out-of-memory error instead of swapping the machine.
 
-The four writers carry the `claude:dangerouslyDisableSandbox` marker after their shebang. The sandbox denies writes under `~/.claude/plugins`, which covers the plugin data dir holding the index, and the deny shadows any `filesystem.allowWrite` entry beneath it. See [`plugins/mac/README.md`](../../../mac/README.md) for the marker.
+The four writers carry the `claude:dangerouslyDisableSandbox` marker after their shebang. Each writes somewhere the sandbox denies: `refresh.ts` prunes `~/.claude/debug` and `~/.claude/mod-events`, `import.ts` and `forget.ts` change `~/.claude/session-imports`, `hosts.ts` opens the index read-write, and the first open moves the old index out of `~/.claude/plugins`. See [`plugins/mac/README.md`](../../../mac/README.md) for the marker.
 
 ### Callers
 
@@ -75,4 +75,4 @@ The four writers carry the `claude:dangerouslyDisableSandbox` marker after their
 
 ### Development
 
-`getDataDir` errors outside an installed plugin, so any dev invocation (tests, manual runs from the repo checkout) must set `CLAUDE_PLUGIN_DATA`, typically to a temp dir. `bun test` covers this via per-test `mkdtemp` dirs.
+Set `CLAUDE_SESSION_INDEX_DIR` to a temp dir for any dev invocation that should not touch the live index. `bun test` covers this via per-test `mkdtemp` dirs.

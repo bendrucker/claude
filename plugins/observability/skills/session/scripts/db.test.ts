@@ -3035,14 +3035,14 @@ describe("schema map", () => {
   });
 
   it("falls back to the committed map when the index cannot be reached", async () => {
-    const dataDir = process.env.CLAUDE_PLUGIN_DATA;
-    process.env.CLAUDE_PLUGIN_DATA = join(tmpDir, "absent");
+    const dataDir = process.env.CLAUDE_SESSION_INDEX_DIR;
+    process.env.CLAUDE_SESSION_INDEX_DIR = join(tmpDir, "absent");
     try {
       const lines = (await schemaMap()).split("\n");
       expect(lines.map((line) => line.split(":")[0])).toEqual([...SURFACES]);
     } finally {
-      if (dataDir === undefined) delete process.env.CLAUDE_PLUGIN_DATA;
-      else process.env.CLAUDE_PLUGIN_DATA = dataDir;
+      if (dataDir === undefined) delete process.env.CLAUDE_SESSION_INDEX_DIR;
+      else process.env.CLAUDE_SESSION_INDEX_DIR = dataDir;
     }
   });
 });

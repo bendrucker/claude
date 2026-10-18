@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: temporary. Opens the DuckDB index read-write in
-// the plugin data dir, which an upstream sandbox defect makes unwritable. Remove this
-// when the probe in docs/settings.md succeeds.
+// claude:dangerouslyDisableSandbox: writes the copied corpus under
+// ~/.claude/session-imports, which the sandbox denies.
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { $ } from "bun";
@@ -86,7 +85,7 @@ if (!existing) {
   await $`chmod 600 ${manifestPath}`.quiet();
 }
 
-const dataDir = await getDataDir();
+const dataDir = getDataDir();
 await mkdir(dataDir, { recursive: true });
 
 const db = await getDb(dataDir);

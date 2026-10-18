@@ -184,11 +184,7 @@ Three paths hit this:
 - `~/.claude/jobs`. The harness tells background-job sessions to write under `$CLAUDE_JOB_DIR/tmp` and injects the deny itself, so `user/settings.json` cannot narrow it. Jobs fall back to `$TMPDIR`, losing the per-job isolation the directory was meant to provide.
 - `~/.claude/projects`, holding the per-project memory directories. Only Bash runs under Seatbelt, so a `Write` from the tool layer lands while `rm` or `cp` on the same file returns `Operation not permitted`. Auto mode routing file edits through Bash is what makes the gap reachable so often. Verified inert against Claude Code 2.1.232.
 
-The four session-index writers carry the `mac` plugin's `claude:dangerouslyDisableSandbox` marker to work around this, trading real sandbox coverage for a working toolchain. **Drop the markers** when this probe succeeds under the sandbox:
-
-```
-touch ~/.claude/plugins/data/.sandbox-probe && rm ~/.claude/plugins/data/.sandbox-probe
-```
+The session index lives in `~/.local/share/claude-sessions`, clear of this deny. Its writers still skip the sandbox, for writes elsewhere under `~/.claude` (see the session skill's `CLAUDE.md`).
 
 Do not wait for an upstream announcement. [#41156](https://github.com/anthropics/claude-code/issues/41156) raised the same conflict at the permission-prompt layer and was closed `NOT_PLANNED` by a staleness bot. Related: [#51973](https://github.com/anthropics/claude-code/issues/51973), [#34900](https://github.com/anthropics/claude-code/issues/34900).
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: temporary. Opens the DuckDB index read-write in
-// the plugin data dir, which an upstream sandbox defect makes unwritable. Remove this
-// when the probe in docs/settings.md succeeds.
+// claude:dangerouslyDisableSandbox: deletes the host's copy under
+// ~/.claude/session-imports, which the sandbox denies.
 import { rm } from "node:fs/promises";
 import { cli } from "cleye";
 import {
@@ -37,7 +36,7 @@ if (label === LOCAL_HOST) {
   process.exit(1);
 }
 
-const db = await getDb(await getDataDir());
+const db = await getDb(getDataDir());
 let deleted = 0;
 try {
   await ensureSchema(db);

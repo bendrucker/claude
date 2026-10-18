@@ -4,5 +4,13 @@
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
+  },
+  "userConfig": {
+    "auto_merge": {
+      "type": "boolean",
+      "title": "Auto-merge",
+      "description": "Enable auto-merge on PRs that pull-request:create opens on repos you own. `--[no-]auto` overrides it per PR.",
+      "default": false
+    }
   }
 }

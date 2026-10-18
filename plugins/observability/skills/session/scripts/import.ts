@@ -86,7 +86,7 @@ if (!existing) {
   await $`chmod 600 ${manifestPath}`.quiet();
 }
 
-const dataDir = getDataDir();
+const dataDir = await getDataDir();
 await mkdir(dataDir, { recursive: true });
 
 const db = await getDb(dataDir);

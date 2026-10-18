@@ -10,7 +10,7 @@ import { getDataDir, getDb, LOCAL_HOST, listImportedHosts, sessionDbPath } from 
 
 cli({ name: "hosts", flags: {} });
 
-const dataDir = getDataDir();
+const dataDir = await getDataDir();
 
 async function lastImports(): Promise<Record<string, string>> {
   if (!(await Bun.file(sessionDbPath(dataDir)).exists())) return {};

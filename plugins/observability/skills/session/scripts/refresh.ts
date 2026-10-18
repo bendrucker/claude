@@ -35,7 +35,7 @@ const argv = cli({
   },
 });
 
-const dataDir = getDataDir();
+const dataDir = await getDataDir();
 const dbPath = sessionDbPath(dataDir);
 const stampPath = join(dataDir, "last-refresh");
 

@@ -37,7 +37,7 @@ if (label === LOCAL_HOST) {
   process.exit(1);
 }
 
-const db = await getDb(getDataDir());
+const db = await getDb(await getDataDir());
 let deleted = 0;
 try {
   await ensureSchema(db);

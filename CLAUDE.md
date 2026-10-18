@@ -5,9 +5,9 @@ This repository contains my personal Claude Code configuration and a plugin mark
 ## Structure
 
 - `schemas/`: JSON Schemas for Claude Code config formats. Upstream-backed ones (`plugin`, `marketplace`, `settings`) keep only our edits as an RFC 6902 overlay in [`schemas/overlays/`](schemas/overlays/), merged with the live upstream base in memory at validation time; the rest are hand-authored
-- `user/`: User-level configuration, symlinked to `~/.claude` by the [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in dotfiles. `user/settings.json` is the Mac's user settings
+- `user/`: User-level configuration, symlinked to `~/.claude` by the [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in dotfiles. `user/settings.json` is the user settings for local machines
 - `managed/settings.json`: Settings for every platform, installed as a managed-settings drop-in, so they outrank project settings
-- `platforms/<name>/`: Entries dotfiles links into `~/.claude` on one platform beside `user/`'s, replacing any of the same name: `platform.md`, which `user/CLAUDE.md` imports, and the cloud's own `settings.json`
+- `platforms/local/`, `platforms/remote/`: Entries dotfiles links into `~/.claude` beside `user/`'s on a local machine or in a remote (cloud) session, replacing any of the same name: `platform.md`, which `user/CLAUDE.md` imports, and the remote `settings.json`
 - `docs/`: Reference material too long to auto-inject, linked from the rule that needs it
 
 ## Curation
@@ -55,4 +55,4 @@ CI spends subscription credits through a `CLAUDE_CODE_OAUTH_TOKEN` secret from `
 ## Workflow
 
 - To test a plugin in isolation: `claude --plugin-dir ./plugins/<name> --setting-sources local`.
-- To test the Mac settings before installing: `./dev.sh` (any extra args pass through to `claude`).
+- To test the local settings before installing: `./dev.sh` (any extra args pass through to `claude`).

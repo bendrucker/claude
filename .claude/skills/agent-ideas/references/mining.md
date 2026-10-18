@@ -61,7 +61,7 @@ title, and the rest becomes the notes body.
 When checking `repoOverlap`, the surfaces that already exist:
 
 - Skills: `plugins/*/skills/*/SKILL.md`, `.claude/skills/*/SKILL.md`, and `user/skills/*`
-- Hooks: `plugins/*/hooks/`, plus hooks in `.claude/settings.json`, `user/settings.json`, `managed/settings.json`, and `platforms/cloud/settings.json`
+- Hooks: `plugins/*/hooks/`, plus hooks in `.claude/settings.json`, `user/settings.json`, `managed/settings.json`, and `platforms/remote/settings.json`
 - Settings/permissions/sandbox: `.claude/settings.json` (project), `user/settings.json` (Mac user), and `managed/settings.json` (every platform)
 - Rules: `.claude/rules/*.md` (project, path-scoped) and `user/rules/*.md` (user, all repos)
 

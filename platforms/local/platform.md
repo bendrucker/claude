@@ -1,4 +1,4 @@
-# Mac
+# Local
 
 ## Workflow
 

@@ -221,7 +221,7 @@ async function readRule(path: string): Promise<Rule> {
 const SETTINGS_FILES = [
   "user/settings.json",
   "managed/settings.json",
-  "platforms/cloud/settings.json",
+  "platforms/remote/settings.json",
   ".claude/settings.json",
   ".claude/settings.local.json",
 ];

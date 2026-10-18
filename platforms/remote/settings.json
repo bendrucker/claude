@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "git -C ~/.claude-repo pull --ff-only --quiet && /opt/dotfiles/claude/link cloud >/dev/null",
+            "command": "git -C ~/.claude-repo pull --ff-only --quiet && /opt/dotfiles/claude/link remote >/dev/null",
             "async": true
           }
         ]

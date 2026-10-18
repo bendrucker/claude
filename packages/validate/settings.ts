@@ -6,7 +6,7 @@ runEntry(() =>
       ".claude/settings.json",
       "user/settings.json",
       "managed/settings.json",
-      "platforms/cloud/settings.json",
+      "platforms/remote/settings.json",
     ],
     schema: { overlay: "settings" },
     warnAdditional: true,

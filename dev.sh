@@ -2,7 +2,7 @@
 # Run Claude Code with user settings from this repo (for testing before install)
 #
 # Usage:
-#   ./dev.sh                           # Test the Mac settings
+#   ./dev.sh                           # Test the local settings
 #   ./dev.sh --plugin-dir ./plugins/x  # Also test a local plugin
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

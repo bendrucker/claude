@@ -45,7 +45,7 @@ Inside an isolated worktree, write files with `Write` or `Edit` and keep each Ba
 
 ## Claude Configuration
 
-My Claude Code setup lives in [`bendrucker/claude`](https://github.com/bendrucker/claude). The `~/.claude` symlinks point into `~/.claude-repo`, a deployed clone of `main`, so an edit through the symlinks lands outside any branch. Settings that apply everywhere live in `managed/settings.json`, installed as managed settings. `user/settings.json` is the Mac's user file, and `platforms/<name>/` holds the entries one platform links in place of or beside `user/`'s. Project-scoped `.claude/` directories stay with their repo.
+My Claude Code setup lives in [`bendrucker/claude`](https://github.com/bendrucker/claude). The `~/.claude` symlinks point into `~/.claude-repo`, a deployed clone of `main`, so an edit through the symlinks lands outside any branch. Settings that apply everywhere live in `managed/settings.json`, installed as managed settings. `user/settings.json` is the local machines' user file, and `platforms/local/` and `platforms/remote/` hold the entries a local machine or a remote session links in place of or beside `user/`'s. Project-scoped `.claude/` directories stay with their repo.
 
 ## Dotfiles
 

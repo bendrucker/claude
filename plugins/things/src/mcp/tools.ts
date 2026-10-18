@@ -3,7 +3,13 @@ import { z } from "zod";
 import { ensureThingsRunning } from "../../scripts/ensure-running";
 import { buildAttribution } from "../../scripts/inbox";
 import { REORDER_MECHANISM, reorder } from "../../scripts/reorder";
-import { buildJsonPayload, type DispatchResult, dispatch, warnFallback } from "../../scripts/url";
+import {
+  buildJsonPayload,
+  DEFAULT_LINK_BASE,
+  type DispatchResult,
+  dispatch,
+  warnFallback,
+} from "../../scripts/url";
 import { runScript } from "./jxa";
 import { requireTags, type TagRequirer } from "./tags";
 
@@ -15,7 +21,7 @@ const LIST_IDS = {
   someday: "TMSomedayListSource",
 } as const;
 
-const TODO_LINK_BASE = "https://things.bendrucker.me/show?id=";
+const TODO_LINK_BASE = process.env.THINGS_LINK_BASE ?? DEFAULT_LINK_BASE;
 
 // Things URL scheme rate limit: 250 operations per 10 seconds.
 const BATCH_SIZE = 250;

@@ -407,6 +407,11 @@
         "warn": 3,
         "refuse": 4
       }
+    },
+    "session-limit@bendrucker": {
+      "options": {
+        "overage": true
+      }
     }
   },
   "enabledPlugins": {

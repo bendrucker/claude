@@ -1,6 +1,10 @@
 # Session Limit
 
-Steer the model to wind down before a usage block runs out and spills into overage.
+Steer the model to wind down before a usage block runs out.
+
+## Configuration
+
+`overage` (default `false`): set it on accounts with extra usage so the exhausted-block message warns that further requests spend overage credits.
 
 ## Contents
 

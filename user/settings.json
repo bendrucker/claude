@@ -408,14 +408,26 @@
         "refuse": 4
       }
     },
-    "mod-events@bendrucker": {
+    "linear@bendrucker": {
       "options": {
-        "multiplexer": "herdr"
+        "assigned_state": "Todo",
+        "unassigned_state": "Backlog"
+      }
+    },
+    "pull-request@bendrucker": {
+      "options": {
+        "auto_merge": true,
+        "stack_file": "wt/stack"
       }
     },
     "things@bendrucker": {
       "options": {
         "link_base": "https://things.bendrucker.me/show?id="
+      }
+    },
+    "mod-events@bendrucker": {
+      "options": {
+        "multiplexer": "herdr"
       }
     }
   },

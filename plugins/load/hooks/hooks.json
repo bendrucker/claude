@@ -1,4 +1,4 @@
 {
-  "description": "Caps agent-browser sessions per agent and machine-wide, closes an ended agent's sessions, and refuses parallel or overlapping heavy builds",
+  "description": "Reminds the model to pace heavy work as machine load climbs, refuses commands over configured caps, and caps agent-browser sessions per agent and machine-wide",
   "modules": ["../mod/register.ts"]
 }

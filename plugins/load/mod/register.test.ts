@@ -180,25 +180,80 @@ describe("register", () => {
     expect(world.closed).toEqual(["main-1"]);
   });
 
-  test("refuses a build while two run and reports the machine state", async ($, on) => {
-    const world = worldOf(on);
-    world.ps = "node /r/node_modules/.bin/ladle build\nnode /r/node_modules/vite/bin/vite.js build";
+  const options = {
+    caps: [String.raw`build:2:\b(?:vite|ladle)(?:\.js)? build\b`],
+    refuse: 3,
+    remind: 1.5,
+    warn: 3,
+  };
 
-    const denied = await bash($, "npx ladle build --outDir out");
-    expect(denied.deny).toContain("2 heavy builds");
-    expect(world.ran).toEqual([]);
-    expect(world.events.at(-1)).toEqual({
-      mod: "load",
-      event: "build.deny",
-      detail: {
-        reason: "running",
-        kinds: ["ladle"],
-        running: ["ladle", "vite"],
-        loadPerCore: 1 / 14,
-        agent: null,
-      },
-    });
+  test(
+    "refuses a capped job while its pool is full and reports the machine state",
+    { options },
+    async ($, on) => {
+      const world = worldOf(on);
+      world.ps = [
+        "10 1 node /r/node_modules/.bin/ladle build",
+        "11 1 node /r/node_modules/vite/bin/vite.js build",
+      ].join("\n");
+
+      const denied = await bash($, "npx ladle build --outDir out");
+      expect(denied.deny).toContain("2 build jobs");
+      expect(world.ran).toEqual([]);
+      expect(world.events.at(-1)).toEqual({
+        mod: "load",
+        event: "cap.deny",
+        detail: {
+          reason: "running",
+          pools: ["build"],
+          running: ["build", "build"],
+          loadPerCore: 1 / 14,
+          pressure: null,
+          agent: null,
+        },
+      });
+    },
+  );
+
+  test("caps nothing without configured caps", async ($, on) => {
+    const world = worldOf(on);
+    world.ps = "10 1 vite build\n11 1 vite build\n12 1 vite build";
+    world.load = "{ 90.00 1.00 1.00 }\n14\n4";
+    await bash($, "vite build");
+    expect(world.ran).toEqual(["vite build"]);
+    expect(world.events).toEqual([]);
   });
+
+  test(
+    "reminds each agent once per level as the machine gets busier",
+    { options },
+    async ($, on) => {
+      const world = worldOf(on);
+      const context = async (agentId?: string) => (await bash($, "ls", agentId)).context ?? [];
+
+      expect(await context()).toEqual([]);
+
+      world.load = "{ 28.00 1.00 1.00 }\n14";
+      await world.clock.advance(15_000);
+      const [busy] = await context();
+      expect(busy).toContain("This machine is busy (load 2.0x its cores)");
+      expect(await context()).toEqual([]);
+      expect(await context("a1")).toHaveLength(1);
+
+      world.load = "{ 56.00 1.00 1.00 }\n14";
+      await world.clock.advance(15_000);
+      expect((await context())[0]).toContain("strained");
+
+      world.load = "{ 1.00 1.00 1.00 }\n14";
+      await world.clock.advance(15_000);
+      expect(await context()).toEqual([]);
+      world.load = "{ 28.00 1.00 1.00 }\n14";
+      await world.clock.advance(15_000);
+      expect(await context()).toHaveLength(1);
+
+      expect(names(world).filter((name) => name === "pace")).toHaveLength(4);
+    },
+  );
 
   test("passes other commands through untouched", async ($, on) => {
     const world = worldOf(on);

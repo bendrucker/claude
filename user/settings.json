@@ -392,6 +392,23 @@
       }
     ]
   },
+  "pluginConfigs": {
+    "load@bendrucker": {
+      "options": {
+        "caps": [
+          "build:4:\\b(?:ladle|vite|storybook)(?:\\.js)? build\\b|\\bbuild-storybook\\b",
+          "build:4:\\bpytest\\b.* (?:-n ?|--numprocesses[ =])(?:auto|logical|\\d+)\\b",
+          "build:4:\\bvitest(?:\\.mjs)?(?=\\s|$)(?!.*\\s(?:--watch|watch|dev)\\b)",
+          "build:4:\\bjest(?:\\.js)?(?=\\s|$)(?!.*\\s(?:-i|--runInBand|--watch|--watchAll)\\b)",
+          "build:4:\\bplaywright(?:/test/cli\\.js)? test\\b",
+          "duckdb:4:(?:^|/)duckdb(?=\\s|$)"
+        ],
+        "remind": 1.5,
+        "warn": 3,
+        "refuse": 4
+      }
+    }
+  },
   "enabledPlugins": {
     "go@bendrucker": true,
     "mac@bendrucker": true,

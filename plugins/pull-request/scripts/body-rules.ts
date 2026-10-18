@@ -30,8 +30,6 @@ import { exceededLimits, measureStructure } from "./structure";
 
 /** Facts about the repository the rules consult only when a body warrants it. */
 export interface RepoContext {
-  /** The repo is owned by the authenticated user, so the PR is self-reviewed. */
-  personalRepo: () => Promise<boolean>;
   /** Whether a backticked hex run names a commit in the repo. */
   hasCommit: (sha: string) => Promise<boolean>;
 }
@@ -345,7 +343,6 @@ export async function scanBody(
   const full: BodyContext = {
     title: context.title ?? null,
     unreadable: context.unreadable ?? null,
-    personalRepo: context.personalRepo ?? (() => Promise.resolve(false)),
     hasCommit: context.hasCommit ?? (() => Promise.resolve(false)),
   };
   const matches = await Promise.all(

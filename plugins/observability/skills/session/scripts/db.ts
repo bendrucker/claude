@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { homedir } from "node:os";
+import { join, relative, sep } from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { $ } from "bun";
 import { z } from "zod";
@@ -124,7 +125,7 @@ export function importRoot(label: string, importsDir?: string): string {
 // their own installed location: cache/<marketplace>/<plugin>/<hash>/... maps to
 // data/<plugin>-<marketplace>/. The env var remains as an override (tests,
 // hooks, dev checkouts).
-export function getDataDir(): string {
+export async function getDataDir(): Promise<string> {
   if (process.env.CLAUDE_PLUGIN_DATA != null && process.env.CLAUDE_PLUGIN_DATA !== "")
     return process.env.CLAUDE_PLUGIN_DATA;
 
@@ -137,9 +138,42 @@ export function getDataDir(): string {
     return join(pluginsDir, "data", `${plugin}-${marketplace}`);
   }
 
+  const inPlace = await inPlaceDataDir(import.meta.dirname);
+  if (inPlace !== undefined) return inPlace;
+
   throw new Error(
     "Cannot locate plugin data directory: not running from an installed plugin. Set CLAUDE_PLUGIN_DATA.",
   );
+}
+
+const KnownMarketplaces = z.record(
+  z.string(),
+  z.looseObject({
+    source: z.looseObject({ source: z.string() }).optional().catch(undefined),
+    installLocation: z.string().optional().catch(undefined),
+  }),
+);
+
+// A relative-path plugin in a marketplace added from a local directory loads in
+// place, so its scripts run from inside the marketplace rather than under cache/.
+// Matching against the registered directory keeps a dev checkout, which is no
+// registered marketplace, failing as before instead of writing the live index.
+export async function inPlaceDataDir(
+  scriptDir: string,
+  pluginsDir = join(homedir(), ".claude", "plugins"),
+): Promise<string | undefined> {
+  const file = Bun.file(join(pluginsDir, "known_marketplaces.json"));
+  // No registry means no local marketplace to load from, so the caller's error stands.
+  if (!(await file.exists())) return undefined;
+  const registry = KnownMarketplaces.parse(await file.json());
+
+  for (const [marketplace, entry] of Object.entries(registry)) {
+    if (entry.source?.source !== "directory" || entry.installLocation === undefined) continue;
+    const segments = relative(entry.installLocation, scriptDir).split(sep);
+    if (segments[0] !== "plugins" || segments.length < 2 || segments[1] === "..") continue;
+    return join(pluginsDir, "data", `${segments[1]}-${marketplace}`);
+  }
+  return undefined;
 }
 
 export function sessionDbPath(dataDir: string): string {

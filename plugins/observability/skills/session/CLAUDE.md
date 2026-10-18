@@ -2,7 +2,7 @@
 
 ## DuckDB Architecture
 
-JSONL files in `~/.claude/projects/` are the canonical data. The DuckDB database is a derived cache living in the plugin data dir (`getDataDir` derives `~/.claude/plugins/data/<plugin>-<marketplace>/` from the script's installed location; `CLAUDE_PLUGIN_DATA` overrides it, and tests always set it). Dev runs from a bare checkout error without the override, so development never touches the live index. Other machines' corpora, copied under `~/.claude/session-imports/<label>/projects/`, are indexed under a `host` label alongside `local` (see SKILL.md "Cross-Machine History").
+JSONL files in `~/.claude/projects/` are the canonical data. The DuckDB database is a derived cache living in the plugin data dir (`getDataDir` derives `~/.claude/plugins/data/<plugin>-<marketplace>/` from the script's installed location, either a cache copy or a plugin loaded in place from a `directory` marketplace in `known_marketplaces.json`; `CLAUDE_PLUGIN_DATA` overrides it, and tests always set it). Dev runs from a bare checkout error without the override, so development never touches the live index. Other machines' corpora, copied under `~/.claude/session-imports/<label>/projects/`, are indexed under a `host` label alongside `local` (see SKILL.md "Cross-Machine History").
 
 ### Schema
 

@@ -146,7 +146,7 @@ if (import.meta.main) {
     },
   });
 
-  const dbPath = sessionDbPath(getDataDir());
+  const dbPath = sessionDbPath(await getDataDir());
   if (!(await Bun.file(dbPath).exists())) {
     console.error(`Session index not found at ${dbPath}. Run scripts/refresh.ts first.`);
     process.exit(1);

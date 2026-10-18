@@ -160,6 +160,10 @@ diff "$TMPDIR/before.json" "$TMPDIR/after.json"
 
 ## Plugins
 
+`extraKnownMarketplaces.bendrucker` is a `github` source here, and on local machines a managed drop-in outranks it with a `directory` source at the deployed clone, `~/.claude-repo`, which `claude-sync` keeps on `main`. dotfiles' `claude/install.sh` writes that drop-in from `$HOME`, because Claude Code expands no `~` in a `directory` path and resolves a relative one against the project, so no tracked file can hold it (verified against CLI 2.1.302). Claude Code loads a relative-path plugin from a local marketplace in place, so a pulled change takes effect at the next session start or `/reload-plugins`, with no cached copy and no version to bump. It installs no npm dependencies for an in-place plugin, so `claude-sync` runs `bun install --frozen-lockfile` at the clone's root, whose workspaces cover every plugin. An entry that names its own repo, like `honeycomb`, is still copied into the cache when enabled. Public consumers, and a machine without the drop-in, install through the cache, which is what `plugin-lockfiles check` protects.
+
+**Drop the drop-in** if dotfiles stops deploying `~/.claude-repo`, or drop the `bun install` if Claude Code starts installing in-place dependencies itself.
+
 `auto-mode@bendrucker` collects enhancements for auto mode. Its first mod records every tool call's permission verdict, the only record of asks that end in approval. Revisit the verdict mod around 2026-11-09.
 
 **Keep it** if a change has drawn on the `classifier_verdicts` view by then, such as tuning which blocks the escalation mod asks about, or a finding in a session review. **Drop it** otherwise: remove the mod, and the plugin with it if nothing else has joined, and let `mod-events` retention expire the recorded events.

@@ -5,9 +5,7 @@
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
   },
-  "dependencies": [
-    "mod-events"
-  ],
+  "dependencies": ["mod-events"],
   "userConfig": {
     "caps": {
       "type": "string",

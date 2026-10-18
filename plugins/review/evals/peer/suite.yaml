@@ -1,1 +1,8 @@
 allow_tools: [Bash]
+stage: [packages/eval-stubs]
+graders:
+  comments-block: "*"
+  no-author-name: "*"
+  no-greeting: "*"
+  second-person: "*"
+  skill-fired: "*"

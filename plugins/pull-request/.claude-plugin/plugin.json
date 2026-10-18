@@ -4,5 +4,13 @@
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
+  },
+  "userConfig": {
+    "body_review_skill": {
+      "type": "string",
+      "title": "Body review skill",
+      "description": "Skill that --review-body runs on the drafted PR body, called with --doc <file> --kind pr-body --summary <text>. Empty turns the body review off.",
+      "default": ""
+    }
   }
 }

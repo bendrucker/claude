@@ -407,6 +407,11 @@
         "warn": 3,
         "refuse": 4
       }
+    },
+    "pull-request@bendrucker": {
+      "options": {
+        "body_review_skill": "review:human"
+      }
     }
   },
   "enabledPlugins": {

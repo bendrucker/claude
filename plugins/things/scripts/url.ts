@@ -128,6 +128,9 @@ export function findXcallRunner(
   return findSiblingScript(pluginRoot, "x-callback-url", "scripts", "run.sh");
 }
 
+/** Where a printed todo link points when the caller names no other base. */
+export const DEFAULT_LINK_BASE = "things:///show?id=";
+
 const BOOLEAN_ATTRIBUTES = ["completed", "canceled", "reveal", "duplicate"] as const;
 
 /**
@@ -394,6 +397,11 @@ if (import.meta.main) {
         default: false,
         description: "Create any tag that does not exist yet. Without it, an unknown tag fails",
       },
+      linkBase: {
+        type: String,
+        default: DEFAULT_LINK_BASE,
+        description: "Prefix for the printed todo link, followed by the todo id",
+      },
     },
   });
 
@@ -449,7 +457,9 @@ if (import.meta.main) {
   }
 
   const result = await dispatch(dispatchCommand, dispatchParams, callbackActions);
-  if (result.output !== null) {
+  if (result.id !== null) {
+    console.log(`${argv.flags.linkBase}${result.id}`);
+  } else if (result.output !== null) {
     console.log(result.output);
   }
   if (argv.flags.callback) warnFallback(result);

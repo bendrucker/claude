@@ -289,6 +289,24 @@ describe("dispatch", () => {
     ]);
   });
 
+  test("falls back to the remote when the HTTPS fetch fails", async () => {
+    const { run, calls } = fakeRunner([
+      AGENT_LIST,
+      GIT_COMMON,
+      ...REMOTES,
+      fail("fatal: could not read Username"),
+      ok(""),
+      BASE_OK,
+      ...CREATED,
+      ...AFTER_CREATE,
+    ]);
+    await dispatch(options, run, instant);
+    expect(calls.filter((argv) => argv[3] === "fetch").map((argv) => argv[4])).toEqual([
+      "https://github.com/owner/repo.git",
+      "origin",
+    ]);
+  });
+
   test("leaves tracking alone when the repository has no origin", async () => {
     const { run, calls } = fakeRunner([
       AGENT_LIST,

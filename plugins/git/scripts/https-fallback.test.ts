@@ -14,6 +14,8 @@ import {
   sshProviderOf,
 } from "./https-fallback";
 
+process.env.CLAUDE_PLUGIN_OPTION_HTTPS_HOSTS = "github.com=gh, gitlab.com=glab,malformed";
+
 const github = sshProviderOf("git@github.com:owner/repo.git");
 const gitlab = sshProviderOf("git@gitlab.com:owner/repo.git");
 if (!github || !gitlab) throw new Error("provider table missing github.com or gitlab.com");

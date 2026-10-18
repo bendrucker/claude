@@ -113,7 +113,7 @@ Fetch, filter, resolve, and summarize MR discussion threads.
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --resolvable --unresolved --format digest
 
 # Only review-bot threads
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --bots
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --bots --reviewers=${user_config.reviewers}
 
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id>...
 ```

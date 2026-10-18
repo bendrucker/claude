@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { getDefaultState, normalizeInput, processInput } from "./save-issue";
 
@@ -17,6 +17,16 @@ function mockInput(
   };
 }
 
+beforeEach(() => {
+  process.env.CLAUDE_PLUGIN_OPTION_ASSIGNED_STATE = "Todo";
+  process.env.CLAUDE_PLUGIN_OPTION_UNASSIGNED_STATE = "Backlog";
+});
+
+afterEach(() => {
+  delete process.env.CLAUDE_PLUGIN_OPTION_ASSIGNED_STATE;
+  delete process.env.CLAUDE_PLUGIN_OPTION_UNASSIGNED_STATE;
+});
+
 describe("getDefaultState", () => {
   test.each<[string, string | undefined, string]>([
     ["returns Backlog when no assignee", undefined, "Backlog"],
@@ -24,6 +34,16 @@ describe("getDefaultState", () => {
     ["returns Backlog when assignee is empty string", "", "Backlog"],
   ])("%s", (_name, assignee, expected) => {
     expect(getDefaultState(assignee)).toBe(expected);
+  });
+
+  test("returns undefined when the option is empty", () => {
+    process.env.CLAUDE_PLUGIN_OPTION_UNASSIGNED_STATE = "";
+    expect(getDefaultState(undefined)).toBeUndefined();
+  });
+
+  test("returns undefined when the option is unset", () => {
+    delete process.env.CLAUDE_PLUGIN_OPTION_ASSIGNED_STATE;
+    expect(getDefaultState("me")).toBeUndefined();
   });
 });
 
@@ -73,5 +93,10 @@ describe("processInput", () => {
     ["plugin MCP create_issue tool name", "mcp__plugin_linear_linear__create_issue"],
   ])("works with the %s", (_name, toolName) => {
     expect(processInput(mockInput({ title: "x", team: "ENG" }, toolName))).toMatchSnapshot();
+  });
+
+  test("create with no default state configured passes through", () => {
+    process.env.CLAUDE_PLUGIN_OPTION_UNASSIGNED_STATE = "";
+    expect(processInput(mockInput({ title: "x", team: "ENG" }))).toBeNull();
   });
 });

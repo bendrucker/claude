@@ -4,5 +4,19 @@
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
+  },
+  "userConfig": {
+    "auto_merge": {
+      "type": "boolean",
+      "title": "Auto-merge",
+      "description": "Enable auto-merge on PRs that pull-request:create opens on repos you own. `--[no-]auto` overrides it per PR.",
+      "default": false
+    },
+    "stack_file": {
+      "type": "string",
+      "title": "Stack file",
+      "description": "Path relative to the git common dir of a file listing branches one per line, tab-indented under their parent. The PR body context diffs against a branch's parent there when it has no PR yet. Empty skips it.",
+      "default": ""
+    }
   }
 }

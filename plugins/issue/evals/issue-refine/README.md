@@ -6,6 +6,8 @@ The graders encode [`RUBRIC.md`](RUBRIC.md), which came from labeling real refin
 
 Cases are tagged by type (`bug`, `feature`, `refactor`, `spike`) and size (`trivial`, `compact`, `full`). `seeded` marks the two briefs written to bait the rubric's failures: bare issue numbers and line ranges in the brief.
 
+The `neg-*` cases, tagged `negative`, are requests the skill must not take: filing, listing, or checking an issue in Linear, with the `linear` plugin loaded beside it so the two skills compete. They skip the rubric graders and score only `refine-not-fired`, a `tool_used` grader on both arms. `linear-fired` on `neg-linear-file` is a with-only indicator that the Linear skill took the request.
+
 `bun evals/native/run.ts plugins/issue/evals/issue-refine -- --tag seeded` runs it locally, and `gh workflow run eval.yml --ref <branch> -f suite=plugins/issue/evals/issue-refine` in CI. Results land in the gitignored `results/`.
 
 `examples/<case>/` holds, per case, an issue every grader accepts, plus issues that trip each grader. `bun evals/native/check.ts plugins/issue/evals/issue-refine` tests every regex grader against them.

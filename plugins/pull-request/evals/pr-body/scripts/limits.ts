@@ -4,9 +4,10 @@ import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { table } from "table";
 import { z } from "zod";
-import { traceReply } from "../../../../../evals/native/load";
-import { type Run, Result, score } from "../../../../../evals/native/regrade";
-import { GUARDS, LIMITS, guardKeys, limitKeys, measureStructure } from "../structure";
+import { type Run, Result, score } from "../../../../../packages/evals/result";
+import { traceReply } from "../../../../../packages/evals/trace";
+import { CHECKS, ROWS, checkKeys } from "../limits";
+import { measureStructure } from "../structure";
 
 // Scores a results directory against the PR-body structure limits, so changing
 // a limit doesn't require new sessions.
@@ -21,20 +22,6 @@ const ToolResult = z.object({
 const TraceLine = z.looseObject({
   message: z.looseObject({ content: z.unknown() }).optional(),
 });
-
-const CHECKS = { ...LIMITS, ...GUARDS };
-type CheckKey = keyof typeof CHECKS;
-const checkKeys: CheckKey[] = [...limitKeys, ...guardKeys];
-
-const ROWS = {
-  visibleWords: "visible-words",
-  maxBlockWords: "max-block",
-  proseCodeSpans: "prose-code-spans",
-  pathSpans: "path-spans",
-  contrastPhrases: "contrast-phrases",
-  hiddenWords: "hidden-words",
-  maxItemsPerList: "list-items",
-} as const satisfies Record<CheckKey, string>;
 
 const STUB_BLOCK = /^PR-BODY-BEGIN[^\S\n]*\n([\s\S]*?)\n?^PR-BODY-END[^\S\n]*$/gm;
 

@@ -1,5 +1,5 @@
 import type { AgentInfo, EngineInterface, On, ProcessRunResult } from "claude-code";
-import { type Engine, describe, expect, mock, test } from "claude-code/testing";
+import { type Engine, type MockClock, describe, expect, mock, test } from "claude-code/testing";
 
 type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 
@@ -27,10 +27,15 @@ interface World {
   closed: string[];
   ran: string[];
   events: ModEventsInput[];
+  /** Replaces the `session list` answer. */
+  list: ProcessRunResult | undefined;
+  clock: MockClock;
 }
 
 function worldOf(on: On): World {
   const world: World = {
+    clock: mock.clock(on),
+    list: undefined,
     live: new Set(),
     agents: [],
     ps: "",
@@ -39,7 +44,6 @@ function worldOf(on: On): World {
     ran: [],
     events: [],
   };
-  mock.clock(on);
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
@@ -58,6 +62,7 @@ function worldOf(on: On): World {
       world.live.delete(session);
       return { value: ran("") };
     }
+    if (world.list) return { value: world.list };
     const sessions = [...world.live];
     return { value: ran(JSON.stringify({ success: true, data: { sessions } })) };
   });
@@ -93,6 +98,61 @@ describe("register", () => {
     expect(world.closed).toEqual(["ev-1"]);
     expect(world.live).toEqual(new Set(["theirs"]));
     expect(names(world)).toEqual(["browser.launch", "browser.close"]);
+  });
+
+  test("closes only the stopped subagent's sessions on SubagentStop", async ($, on) => {
+    const world = worldOf(on);
+    on("classic.SubagentStop", () => ({}));
+
+    await bash($, "agent-browser --session ev-1 open x", "a1");
+    await bash($, "agent-browser --session ev-2 open y", "a2");
+    await $.classic.SubagentStop({
+      stop_hook_active: false,
+      agent_id: "a1",
+      agent_transcript_path: "/t/a1.jsonl",
+      agent_type: "general-purpose",
+    });
+
+    expect(world.closed).toEqual(["ev-1"]);
+    expect(world.live).toEqual(new Set(["ev-2"]));
+    expect(world.events.at(-1)).toEqual({
+      mod: "load",
+      event: "browser.close",
+      ok: true,
+      detail: { session: "ev-1", agent: "a1", trigger: "agent-stop", exitCode: 0, stderr: "" },
+    });
+  });
+
+  test("sweeps an ended subagent's session on the 30s timer", async ($, on) => {
+    const world = worldOf(on);
+
+    await bash($, "agent-browser --session ev-1 open x", "a1");
+    world.agents = [agent("a1", "killed")];
+    await world.clock.advance(29_999);
+    expect(world.closed).toEqual([]);
+
+    await world.clock.advance(1);
+    expect(world.closed).toEqual(["ev-1"]);
+  });
+
+  test("fails open when session list fails or answers garbage", async ($, on) => {
+    const world = worldOf(on);
+
+    world.list = { ...ran(""), exitCode: 1, stderr: "daemon down" };
+    const failed = await bash($, "agent-browser --session ev-1 open x", "a1");
+    world.list = ran("not json");
+    const garbled = await bash($, "agent-browser --session ev-2 open y", "a1");
+    world.list = ran(JSON.stringify({ data: { sessions: "nope" } }));
+    const malformed = await bash($, "agent-browser --session ev-3 open z", "a1");
+
+    for (const result of [failed, garbled, malformed]) expect(result.deny).toBeUndefined();
+    expect(world.ran).toHaveLength(3);
+    expect(names(world)).toEqual(["error", "error", "error"]);
+
+    world.list = undefined;
+    world.live.clear();
+    await bash($, "agent-browser --session ev-4 open w", "a1");
+    expect(names(world).at(-1)).toBe("browser.launch");
   });
 
   test("refuses a subagent's second session and lets the call through after close", async ($, on) => {

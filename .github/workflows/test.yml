@@ -75,6 +75,17 @@ jobs:
       - name: Run tests
         run: bun test evals/
 
+      - name: Check regex graders against examples
+        run: |
+          status=0
+          while IFS= read -r examples; do
+            suite=$(dirname "$examples")
+            echo "::group::$suite"
+            bun evals/native/check.ts "$suite" || status=1
+            echo "::endgroup::"
+          done < <(find evals plugins/*/evals -type d -name examples -not -path '*/node_modules/*' | sort)
+          exit "$status"
+
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -248,8 +259,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: playwright-${{ runner.os }}-
+          key: playwright-shell-${{ runner.os }}-${{ hashFiles('bun.lock') }}
 
       - name: Install system dependencies
         if: runner.os == 'Linux'
@@ -258,7 +268,8 @@ jobs:
           deps=$(find "$plugin" -name package.json -not -path '*/node_modules/*' -not -path '*/.bun-cache/*' \
             -print0 | xargs -0 jq -r '[.dependencies // {}, .devDependencies // {}] | map(keys) | flatten[]' 2>/dev/null | sort -u)
           if echo "$deps" | grep -q '^playwright$'; then
-            bun "$plugin/node_modules/.bin/playwright" install chromium --with-deps
+            # The runner image ships chromium's libraries, and launch() fails loudly if one goes missing.
+            bun "$plugin/node_modules/.bin/playwright" install --only-shell chromium
           fi
           if echo "$deps" | grep -q '^@duckdb/node-api$'; then
             curl -fsSL https://install.duckdb.org | bash

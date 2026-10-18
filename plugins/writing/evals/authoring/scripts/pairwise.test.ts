@@ -5,25 +5,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
-import seedrandom from "seedrandom";
 import { decodeFile } from "../../../../../packages/decode/index";
+import { isFresh } from "../../../../../packages/eval-judge/index";
 import { Pair, type Judgment, type Key, type Label, type Pick } from "./pairs";
 import {
   agreementOf,
-  blind,
   cacheKey,
   buildPairs,
   calibrate,
   changedRegion,
   collectDrafts,
   compareLabels,
-  deblindPick,
   extractDeliverable,
   extractOut,
   extractWrite,
   formatCalibration,
   formatScore,
-  isFresh,
   judgePair,
   leftPickShare,
   parseMap,
@@ -31,9 +28,7 @@ import {
   readVerdicts,
   renderJudgePrompt,
   scoreJudgments,
-  signFlipPValue,
   surfaceFor,
-  wilson,
   winValue,
 } from "./pairwise";
 
@@ -468,25 +463,6 @@ describe("buildPairs", () => {
   });
 });
 
-describe("blind / deblindPick", () => {
-  test.each<{ flip: boolean; left: Key }>([
-    { flip: false, left: "a" },
-    { flip: true, left: "b" },
-  ])("blind($flip) puts $left on the left", ({ flip, left }) => {
-    expect(blind(flip)).toBe(left);
-  });
-
-  test.each<{ raw: "1" | "2" | "tie"; left: Key; expected: Pick }>([
-    { raw: "1", left: "a", expected: "a" },
-    { raw: "2", left: "a", expected: "b" },
-    { raw: "1", left: "b", expected: "b" },
-    { raw: "2", left: "b", expected: "a" },
-    { raw: "tie", left: "a", expected: "tie" },
-  ])("deblindPick($raw, $left) -> $expected", ({ raw, left, expected }) => {
-    expect(deblindPick(raw, left)).toBe(expected);
-  });
-});
-
 describe("renderJudgePrompt", () => {
   const pair: Pair = {
     id: "p1",
@@ -625,29 +601,6 @@ describe("winValue", () => {
   });
 });
 
-describe("signFlipPValue", () => {
-  test("returns NaN when every pair tied", () => {
-    expect(signFlipPValue([0.5, 0.5, 0.5])).toBeNaN();
-  });
-
-  test("a unanimous win for b is extreme", () => {
-    const rng = seedrandom("test-a");
-    expect(signFlipPValue([1, 1, 1, 1, 1, 1, 1, 1], 2000, rng)).toBeLessThan(0.05);
-  });
-
-  test("an even split is not extreme", () => {
-    const rng = seedrandom("test-b");
-    expect(signFlipPValue([1, 0, 1, 0, 1, 0], 2000, rng)).toBeGreaterThan(0.5);
-  });
-
-  test("is deterministic under a seeded rng", () => {
-    const wins = [1, 1, 0, 1, 0.5, 1, 0];
-    const a = signFlipPValue(wins, 500, seedrandom("same-seed"));
-    const b = signFlipPValue(wins, 500, seedrandom("same-seed"));
-    expect(a).toBe(b);
-  });
-});
-
 describe("leftPickShare", () => {
   const j = (pick: Pick, left: Key): Judgment => ({
     id: "x",
@@ -756,26 +709,6 @@ describe("pairwise CLI", () => {
       .catch((error: unknown) => error);
     err.mockRestore();
     expect(failure).toBeInstanceOf(CommanderError);
-  });
-});
-
-describe("wilson", () => {
-  test.each<{ hits: number; total: number; expected?: number[] }>([
-    { hits: 0, total: 0, expected: [0, 1] },
-    { hits: 10, total: 10 },
-    { hits: 0, total: 10 },
-  ])("wilson($hits, $total) stays within [0, 1]", ({ hits, total, expected }) => {
-    const [lo, hi] = wilson(hits, total);
-    if (expected) expect([lo, hi]).toEqual(expected);
-    expect(lo).toBeGreaterThanOrEqual(0);
-    expect(hi).toBeLessThanOrEqual(1);
-    expect(lo).toBeLessThanOrEqual(hi);
-  });
-
-  test("a wider sample at the same rate narrows the interval", () => {
-    const [lo1, hi1] = wilson(7, 10);
-    const [lo2, hi2] = wilson(70, 100);
-    expect(hi2 - lo2).toBeLessThan(hi1 - lo1);
   });
 });
 

@@ -1,19 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-bash "$(dirname "$0")/../stubs.sh"
-git init -q -b main
-echo "/.*" >> .git/info/exclude
-git config user.name "Ben Drucker"
-git config user.email bvdrucker@gmail.com
-git config commit.gpgsign false
-git remote add origin https://github.com/org/repo.git
-
-commit() {
-  git add -A
-  GIT_AUTHOR_NAME="$1" GIT_AUTHOR_EMAIL="$2" GIT_COMMITTER_NAME="$1" GIT_COMMITTER_EMAIL="$2" \
-    GIT_AUTHOR_DATE="$3" GIT_COMMITTER_DATE="$3" git commit -qm "$4"
-  git rev-parse HEAD
-}
+stubs="$(dirname "$0")/../../../../../packages/eval-stubs"
+bash "$stubs/install.sh"
+source "$stubs/preamble.sh" https://github.com/org/repo.git
 
 mkdir -p notifier tests
 touch notifier/__init__.py tests/__init__.py
@@ -27,7 +16,7 @@ name = "notifier"
 version = "0.4.0"
 requires-python = ">=3.12"
 TOML
-BASE=$(commit "Ben Drucker" bvdrucker@gmail.com "2026-09-01T10:00:00Z" "notifier: unsubscribe list")
+BASE=$(commit "2026-09-01T10:00:00Z" "notifier: unsubscribe list")
 
 git switch -qc daily-digest
 cat > notifier/send.py <<'PY'
@@ -72,7 +61,7 @@ def deliver(address: str, body: str, attempts: int = 3) -> None:
             if attempt == attempts - 1:
                 raise
 PY
-REVIEWED=$(commit "Lee Morgan" lee@org.example "2026-09-14T15:00:00Z" "notifier: daily digest email")
+REVIEWED=$(commit_as "Lee Morgan" lee@org.example "2026-09-14T15:00:00Z" "notifier: daily digest email")
 
 cat > notifier/send.py <<'PY'
 import logging
@@ -136,14 +125,14 @@ def test_dedupes_addresses_case_insensitively():
         digest.send_digests(users, {1: [], 2: []}, set())
     assert deliver.call_count == 1
 PY
-HEAD_SHA=$(commit "Lee Morgan" lee@org.example "2026-09-15T10:20:00Z" "notifier: address review")
+HEAD_SHA=$(commit_as "Lee Morgan" lee@org.example "2026-09-15T10:20:00Z" "notifier: address review")
 
 # The reviewer's checkout tracks the PR branch and is up to date with it.
 git update-ref refs/remotes/origin/main "$BASE"
 git update-ref refs/remotes/origin/daily-digest "$HEAD_SHA"
 git branch -q --set-upstream-to=origin/daily-digest
 
-jq -n --arg root "$PWD" --arg base "$BASE" --arg reviewed "$REVIEWED" --arg head "$HEAD_SHA" -f /dev/stdin > "$HOME/.review-snapshot/meta.json" <<'JQ'
+jq -n --arg root "$PWD" --arg base "$BASE" --arg reviewed "$REVIEWED" --arg head "$HEAD_SHA" -f /dev/stdin > "$HOME/.eval-stubs/meta.json" <<'JQ'
 def ask($at; $body): [{author: "bendrucker", createdAt: $at, commit: $reviewed, body: $body}];
 {
   root: $root,

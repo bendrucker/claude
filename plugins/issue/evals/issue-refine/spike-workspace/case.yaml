@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: spike-workspace
+tags: [spike, full, seeded]
+plugins: ["../../..", "../../../../pull-request"]
+execution:
+  model: claude-sonnet-5-5
+  max_turns: 15
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Skill, Write]
+  append_system_prompt: >-
+    No repository or tracker is reachable. Treat the files and related issues
+    in the prompt as what you found investigating. The tracker is Linear: a
+    markdown link to an issue URL expands inline. No user will answer questions
+    or approve a draft. Reply with the finished issue, frontmatter and body,
+    between a line holding only <issue> and a line holding only </issue>.

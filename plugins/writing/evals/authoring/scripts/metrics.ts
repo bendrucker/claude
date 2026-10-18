@@ -5,7 +5,7 @@ import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { mean } from "simple-statistics";
 import { table } from "table";
 import { z } from "zod";
-import { pFloor, pValue } from "../../../../../evals/native/compare";
+import { pFloor, pValue } from "../../../../../packages/evals/stats";
 import { scoreText } from "../../../skills/scan/scripts/score";
 import { extractDeliverable, parseMap } from "./pairwise";
 

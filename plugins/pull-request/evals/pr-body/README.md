@@ -1,12 +1,12 @@
 # PR Body Eval
 
-A local harness for measuring the PR bodies that `pull-request:create` produces, so edits to `plugins/pull-request/skills/create/` are gated on output quality instead of lint alone. It follows the structure of [`plugins/issue/evals/issue-refine`](../../../issue/evals/issue-refine) for mining and labeling, and the structure of the retired `evals/pr-headings` harness for scoring.
+A local harness for measuring the PR bodies that `pull-request:create` produces, so edits to `plugins/pull-request/skills/create/` are gated on output quality instead of lint alone. It ports its heading classifier from the retired `evals/pr-headings` harness.
 
-The loop: mine real bodies, label them, turn the labels into a mechanical score, then run the curated scenarios as native cases against two refs of the guidance and compare scores.
+The loop: mine real bodies, label them, turn the labels into structure limits and heading regexes, then run the curated scenarios as native cases against two refs of the guidance and compare scores.
 
 ## Privacy
 
-The session index includes an imported `work` host marked block-egress, and work PR bodies live on private hosts anyway. `scripts/mine.ts` hardcodes `host = 'local'` and `repository LIKE 'bendrucker/%'` in its SQL, so only public personal PRs are ever mined. Keep those filters if you touch the query. `data/`, `feedback/`, and `results/` are gitignored regardless.
+The session index includes an imported `work` host marked block-egress, and work PR bodies live on private hosts anyway. `scripts/mine.ts` hardcodes `host = 'local'` and `repository LIKE 'bendrucker/%'` in its SQL, so only public personal PRs are ever mined. Keep those filters if you touch the query. `data/` and `feedback/` are gitignored regardless.
 
 ## Fixtures
 
@@ -21,13 +21,15 @@ bun plugins/pull-request/evals/pr-body/scripts/sync.ts pull   # --profile agents
 bun plugins/pull-request/evals/pr-body/scripts/sync.ts push   # --profile agents-admin
 ```
 
-`--dry-run` lists the changes without copying. `calibrate.ts`, `run-eval.ts`, and `judge.ts` read `fixtures/` and exit with a pointer to `pull` when it is missing.
+`--dry-run` lists the changes without copying. `calibrate.ts` reads `fixtures/` and exits with a pointer to `pull` when it is missing.
 
 ## Structure Limits
 
 `structure.ts` parses a body to mdast and measures what a reader sees without expanding anything: prose outside fenced code and `<details>`. `LIMITS` holds three one-sided limits: 120 visible words, 40 words in the longest paragraph or bullet, and 6 inline code spans in paragraphs and list items (`proseCodeSpans`, excluding tables, fenced code, and `<details>`). A body fails only by exceeding one, so collapsing data or writing less never costs anything. The output should be a baseline Ben adds to, shorter than what he writes himself.
 
-`scripts/limits.ts <results-dir>...` scores each run's PR body against the limits as `visible-words`, `max-block`, and `prose-code-spans` rows and writes `<results-dir>-limits/` for `compare.ts`. Run it before `compare.ts`. The `work-*` cases in `create-scenarios` come from edited work MRs, described in summary with no source. Their fixtures run `create-scenarios/stubs.sh`, which puts stand-in `glab` and `gh` on `PATH` so the body-rules hook fires on the create call and `limits.ts` reads the body the stand-in printed.
+`scripts/limits.ts <results-dir>...` scores each run's PR body against the limits as `visible-words`, `max-block`, and `prose-code-spans` rows and writes `<results-dir>-limits/` for `compare.ts`. Run it before `compare.ts`. The `work-*` cases in `create-scenarios` come from edited work MRs, described in summary with no source. Their fixtures run `create-scenarios/stubs.sh`, which installs the [`eval-stubs`](../../../../packages/eval-stubs/) `glab` and `gh` in echo mode so the body-rules hook fires on the create call and `limits.ts` reads the body the stand-in printed.
+
+The top-level `limits.ts` prints a `PR-LIMIT <row>=pass|fail` line per limit and guard. `create-scenarios/stubs.sh` passes it to the stand-ins as their `--check`, so each counted create or edit records those lines in `.eval-verdicts`, which the `limit-*` file graders in `create` and `create-scenarios` read. The `create` fixtures install it `--offline`, so the call fails after measuring and the session replies with the draft. The `scenario-*` fixtures don't install the stand-ins, so `scripts/limits.ts` still scores them from the reply.
 
 `scripts/fit.ts` checks a metric against `data/revisions/`: how often a revision moves it down, and with `--human`, how well it separates plugin drafts from Ben's writing (AUC).
 
@@ -63,11 +65,7 @@ bun plugins/pull-request/evals/pr-body/label/server.ts                      # ht
 
 Open the URL and review each body. Select any span in the rendered body to attach an inline comment with a severity (critical, minor, praise), and set a verdict, quality tags, and freeform notes per PR. Highlights persist across reloads. Everything autosaves to `feedback/<id>.json`. The header links to the PR on GitHub so the diff is one click away while judging the body.
 
-The UI is copied from `plugins/issue/evals/issue-refine/label/` and adapted. Copying is the current convention across the harnesses. Extracting a shared harness package is a known deferred refactor.
-
-## Scoring
-
-`scripts/score.ts` is the rubric as code: the recurring critical spans and tags from a labeling session become mechanical checks. The CLI scores one file and prints a readable report, or a machine row with `--json`. `run-eval.ts` calls the same scorer as a library to emit one JSON row per body, so a run is greppable, diffable, and joinable across arms without a second format.
+Each harness carries its own copy of this UI. Extracting a shared labeler package is a known deferred refactor.
 
 ## Scenario Cases
 
@@ -94,7 +92,7 @@ The three heading regexes split the classifier's signals into sentence case, que
 
 ## Calibration
 
-`classifier.ts` is the lexical sentence-heading screen ported from the `pr-headings` harness. `classifyPrHeading(heading)` returns `{ flagged, signals }`, where each signal names the tell that fired (trailing punctuation, interrogative opener, predicate verb, sentence case, length). `score.ts` uses it for the headings dimension, and the scenario cases' heading regexes approximate it.
+`classifier.ts` is the lexical sentence-heading screen ported from the `pr-headings` harness. `classifyPrHeading(heading)` returns `{ flagged, signals }`, where each signal names the tell that fired (trailing punctuation, interrogative opener, predicate verb, sentence case, length). The scenario cases' heading regexes approximate it.
 
 `calibrate.ts` scores the classifier against `fixtures/labels.json`, 102 headings hand-labeled good or bad:
 
@@ -104,44 +102,16 @@ bun plugins/pull-request/evals/pr-body/calibrate.ts
 
 Current numbers: 96.8% precision, 87.0% recall, F1 0.92. Precision is the one to defend. A false positive flags a heading the user considers good, which is how a screen loses trust. Treat a drop below 95% as a regression in the port, and fix the port rather than tuning the classifier to the labels.
 
-## Legacy A/B Eval
-
-`scripts/run-eval.ts` measures whether a guidance revision changes what the model writes. It predates the native scenario cases and cannot load skills, so both arms are plain markdown files inlined into the generation prompt. It stays as the audit reference the scenario cases' `llm` graders are checked against.
-
-```bash
-bun plugins/pull-request/evals/pr-body/scripts/run-eval.ts --arm-a <current-guidance.md> --arm-b <revised-guidance.md>
-```
-
-Arm A is the current guidance text, arm B the revision under test. Each scenario runs twice per arm (two seeds) to separate a real effect from sampling noise. Generation runs on Opus, matching the model that writes bodies in practice. Judging runs on Sonnet via `scripts/judge.ts` and `judge-prompt.md`, blinded to which arm produced which body. Both steps need `ANTHROPIC_API_KEY`.
-
-Scenarios live in `fixtures/scenarios/<id>.json`, one file per real PR, with the shipped body kept for reference and baseline scoring:
-
-```json
-{
-  "id": "NNN-<repo-short>-<pr number>",
-  "url": "https://github.com/bendrucker/claude/pull/977",
-  "title": "...",
-  "repo": "bendrucker/claude",
-  "tier": "personal",
-  "diffSummary": "what changed at concept level, plus rough size (files, +/- lines)",
-  "substance": ["decisions, evidence, rejected alternatives, deferred work a body could mine"],
-  "originalBody": "the body actually shipped"
-}
-```
-
 ## Ground Truth
 
 - `fixtures/labels.json`: 102 labeled headings, the calibration target, in the bucket
-- `fixtures/scenarios/`: curated generation scenarios with the shipped body for reference, the source of the `scenario-*` cases in `../create-scenarios/`, in the bucket
-- `judge-prompt.md`: the judge rubric, tracked
-- `data/`, `feedback/`, `results/`: gitignored, rebuilt by the miner, the labeler, and the runners
+- `fixtures/scenarios/`: curated generation scenarios, one JSON file per real PR with its diff summary, session notes (`substance`), and shipped body (`originalBody`), the source of the `scenario-*` cases in `../create-scenarios/`, in the bucket
+- `data/`, `feedback/`: gitignored, rebuilt by the miner and the labeler
 
 ## Layout
 
 - `scripts/mine.ts`: builds `data/samples.json` from `pr_links` plus `gh pr list`
-- `scripts/score.ts`: mechanical rubric, one JSON row per body
-- `scripts/run-eval.ts`: legacy two-arm generation over `fixtures/scenarios/`
-- `scripts/judge.ts`, `judge-prompt.md`: the legacy blinded LLM judge
 - `label/server.ts`, `label/index.html`: the review UI
 - `classifier.ts`, `calibrate.ts`: the heading screen and its calibration
+- `structure.ts`, `limits.ts`: the structure limits and the stand-in check that prints them
 - `scripts/sync.ts`: pulls and pushes `fixtures/` and the `create-scenarios` cases

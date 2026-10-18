@@ -1,3 +1,4 @@
 {
-  "runner": ["ubuntu-latest", "macos-latest"]
+  "runner": ["ubuntu-latest", "macos-latest"],
+  "paths": ["packages/evals/"]
 }

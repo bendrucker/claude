@@ -1,20 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-bash "$(dirname "$0")/../stubs.sh"
-git init -q -b main
-echo "/.*" >> .git/info/exclude
-git config user.name "Ben Drucker"
-git config user.email bvdrucker@gmail.com
-git config commit.gpgsign false
-git remote add origin https://gitlab.example.com/whirlai/api.git
-
-commit() {
-  git add -A
-  GIT_AUTHOR_NAME="$1" GIT_AUTHOR_EMAIL="$2" GIT_COMMITTER_NAME="$1" GIT_COMMITTER_EMAIL="$2" \
-    GIT_AUTHOR_DATE="$3" GIT_COMMITTER_DATE="$3" git commit -qm "$4"
-  git rev-parse HEAD
-}
-author() { commit "Mateo Ruiz" mateo@whirl.example "$@"; }
+stubs="$(dirname "$0")/../../../../../packages/eval-stubs"
+bash "$stubs/install.sh"
+source "$stubs/preamble.sh" https://gitlab.example.com/whirlai/api.git
+author() { commit_as "Mateo Ruiz" mateo@whirl.example "$@"; }
 
 mkdir -p billing tests
 touch billing/__init__.py tests/__init__.py
@@ -25,7 +14,7 @@ from sqlalchemy.orm import Session
 engine = create_engine("postgresql+psycopg://localhost/whirl")
 session = Session(engine)
 PY
-BASE=$(commit "Ben Drucker" bvdrucker@gmail.com "2026-09-01T10:00:00Z" "billing: database session")
+BASE=$(commit "2026-09-01T10:00:00Z" "billing: database session")
 
 git switch -qc billing-invoices
 cat > billing/models.py <<'PY'
@@ -370,7 +359,7 @@ git update-ref refs/remotes/origin/billing-invoices "$V5"
 git reset -q --hard "$V4"
 git branch -q --set-upstream-to=origin/billing-invoices
 
-jq -n --arg root "$PWD" --arg base "$BASE" --arg v1 "$V1" --arg v2 "$V2" --arg v3 "$V3" --arg v4 "$V4" --arg v5 "$V5" --argjson L "$L" -f /dev/stdin > "$HOME/.review-snapshot/meta.json" <<'JQ'
+jq -n --arg root "$PWD" --arg base "$BASE" --arg v1 "$V1" --arg v2 "$V2" --arg v3 "$V3" --arg v4 "$V4" --arg v5 "$V5" --argjson L "$L" -f /dev/stdin > "$HOME/.eval-stubs/meta.json" <<'JQ'
 def user($u): {bdrucker: {id: 7, username: "bdrucker", name: "Ben Drucker"}, "mateo-r": {id: 52, username: "mateo-r", name: "Mateo Ruiz"}}[$u];
 def note($id; $u; $at; $body): {id: $id, type: "DiscussionNote", body: $body, author: user($u), created_at: $at, updated_at: $at, system: false, noteable_id: 548548, noteable_type: "MergeRequest", noteable_iid: 548, resolvable: false};
 def diffnote($id; $k; $head; $at; $body): note($id; "bdrucker"; $at; $body) + {type: "DiffNote", position: {base_sha: $base, start_sha: $base, head_sha: $head, old_path: $L[$k].path, new_path: $L[$k].path, position_type: "text", old_line: null, new_line: $L[$k].line}};

@@ -13,6 +13,8 @@ const COMPLETE = {
   reason: "answer",
 } as const;
 
+const IDLE = { teammate_name: "reviewer", team_name: "team" };
+
 const report = (seq: number, args: string) =>
   `herdr pane report-metadata w1:p1 --source bendrucker:herdr --seq ${seq} ${args}`;
 
@@ -38,11 +40,14 @@ interface World {
   agents: AgentInfo[];
   branch: string;
   herdrExit: number | Error;
+  emitMs: number;
 }
 
 function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}) {
-  const state: World = { agents: [], branch: "main", herdrExit: 0, ...world };
+  const state: World = { agents: [], branch: "main", herdrExit: 0, emitMs: 0, ...world };
   const calls: string[] = [];
+  const timeouts: (number | undefined)[] = [];
+  const order: string[] = [];
   const events: {
     event: string;
     ok?: boolean | undefined;
@@ -53,14 +58,22 @@ function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}
   on("session.start", ($, e) => ({ cwd: e.cwd }));
   on("turn.start", ($, e) => ({ turnId: e.turnId }));
   on("turn.complete", () => ({ text: "" }));
-  on("session.end", ($, e) => ({ sessionId: e.sessionId }));
+  on("session.end", ($, e) => {
+    order.push("session.end");
+    return { sessionId: e.sessionId };
+  });
+  on("classic.SubagentStart", () => ({}));
+  on("classic.SubagentStop", () => ({}));
+  on("classic.TeammateIdle", () => ({}));
   on("agent.list", () => ({ value: state.agents }));
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
   }));
-  on("modEvents.emit", ($, e) => {
+  on("modEvents.emit", async ($, e) => {
+    if (state.emitMs > 0) await clock.sleep(state.emitMs);
     events.push({ event: e.event, ok: e.ok, detail: e.detail });
+    order.push(e.event);
     return { value: undefined };
   });
   on("process.run", ($, e) => {
@@ -68,12 +81,13 @@ function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}
       return { value: ran(0, `${state.branch}\n`, "") };
     }
     calls.push(e.argv.join(" "));
+    timeouts.push(e.init?.timeoutMs);
     const exit = state.herdrExit;
     if (exit instanceof Error) throw exit;
     return { value: ran(exit, "", exit === 0 ? "" : "pane_not_found\n") };
   });
   const failures = () => events.filter((event) => event.ok === false);
-  return { calls, events, failures, clock, state };
+  return { calls, events, failures, clock, state, timeouts, order };
 }
 
 const end = ($: Engine) =>
@@ -149,6 +163,51 @@ describe("register", () => {
       report(1, "--token subagents=↳1 --token branch=main"),
       report(2, "--clear-token subagents"),
     ]);
+  });
+
+  // oxlint-disable-next-line vitest/prefer-each -- claude-code/testing has no test.each
+  for (const [name, fire] of [
+    [
+      "SubagentStart",
+      ($: Engine) => $.classic.SubagentStart({ agent_id: "a1", agent_type: "Explore" }),
+    ],
+    [
+      "SubagentStop",
+      ($: Engine) =>
+        $.classic.SubagentStop({
+          agent_id: "a1",
+          agent_type: "Explore",
+          agent_transcript_path: "/t",
+          stop_hook_active: false,
+        }),
+    ],
+    ["TeammateIdle", ($: Engine) => $.classic.TeammateIdle(IDLE)],
+  ] as const) {
+    test(`${name} re-reads the counts`, async ($, on) => {
+      const herdr = herdrOf(on, HERDR);
+
+      await $.session.start(START);
+      await herdr.clock.settle();
+      herdr.state.agents = [agent("running")];
+      await fire($);
+      await herdr.clock.settle();
+
+      expect(herdr.calls.at(-1)).toBe(report(2, "--token subagents=↳1"));
+    });
+  }
+
+  test("the end's clear fits the session.end budget and is recorded before it returns", async ($, on) => {
+    const herdr = herdrOf(on, HERDR);
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    herdr.state.emitMs = 5;
+    const ended = end($);
+    await herdr.clock.advance(5);
+    await ended;
+
+    expect(herdr.timeouts.at(-1)).toBe(1000);
+    expect(herdr.order.slice(-2)).toEqual(["herdr.call", "session.end"]);
   });
 
   test("a /clear keeps the tokens", async ($, on) => {

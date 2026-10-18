@@ -7,6 +7,7 @@ import {
   scanPrompt,
   scanWith,
 } from "../../skills/scan/scripts/rules";
+import { wilson } from "../../../../packages/evals/stats";
 
 export interface RuleScore {
   rule: string;
@@ -65,20 +66,6 @@ export function deletedLines(
     }
   }
   return removed;
-}
-
-/**
- * Wilson score interval for a proportion. A rule measured on a handful of hits
- * gets a visibly wide interval instead of a number that reads as settled.
- */
-export function wilson(hits: number, total: number, z = 1.96): [number, number] {
-  if (total === 0) return [0, 1];
-  const p = hits / total;
-  const denominator = 1 + (z * z) / total;
-  const center = (p + (z * z) / (2 * total)) / denominator;
-  const spread =
-    (z / denominator) * Math.sqrt((p * (1 - p)) / total + (z * z) / (4 * total * total));
-  return [Math.max(0, center - spread), Math.min(1, center + spread)];
 }
 
 /** A candidate rule given on the command line as `name=/pattern/flags`. */

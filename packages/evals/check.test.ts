@@ -1,0 +1,204 @@
+import { expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { check, earlyClose, emptyPrompts, type Mismatch, shadowed } from "./check";
+
+async function suite(files: Record<string, string>): Promise<string> {
+  const dir = mkdtempSync(join(tmpdir(), "check-"));
+  await Promise.all(Object.entries(files).map(([p, body]) => Bun.write(join(dir, p), body)));
+  return dir;
+}
+
+const graders = {
+  "one/graders/short.md": "---\ntype: regex\npattern: '.{20,}'\nmatch: not_contains\n---\n",
+  "one/graders/fact.md": "---\ntype: regex\npattern: '230 ?ms'\nflags: i\n---\n",
+  "one/graders/judge.md": "---\ntype: llm\n---\nIs it good?\n",
+  "one/graders/twice.md": "---\ntype: regex\npattern: 'p99'\nmatch: count:1\n---\n",
+  "one/graders/trace.md": "---\ntype: regex\npattern: 'echo x'\ntarget: trace\n---\n",
+};
+
+test.each<{ name: string; example: string; expected: Mismatch[] }>([
+  { name: "a good reply passes every regex", example: "p99 230ms", expected: [] },
+  { name: "a declared failure fails", example: "---\nfail: [fact]\n---\np99 none", expected: [] },
+  {
+    name: "an undeclared failure is reported",
+    example: "p99 fell to 230ms after the jitter change",
+    expected: [{ example: "examples/one/good.md", grader: "short", expected: "pass" }],
+  },
+  {
+    name: "a count grader fails on the wrong count",
+    example: "p99 230ms p99",
+    expected: [{ example: "examples/one/good.md", grader: "twice", expected: "pass" }],
+  },
+  {
+    name: "a declared failure that passes is reported",
+    example: "---\nfail: [fact]\n---\np99 230MS",
+    expected: [{ example: "examples/one/good.md", grader: "fact", expected: "fail" }],
+  },
+])("$name", async ({ example, expected }) => {
+  const dir = await suite({ ...graders, "examples/one/good.md": example });
+  expect((await check(dir)).mismatches).toEqual(expected);
+});
+
+const trace = (reply: string, command: string) =>
+  [
+    {
+      type: "assistant",
+      message: { content: [{ type: "tool_use", name: "Bash", input: { command } }] },
+    },
+    { type: "result", result: reply },
+  ]
+    .map((l) => JSON.stringify(l))
+    .join("\n");
+
+test.each<{ name: string; files: Record<string, string>; expected: Mismatch[] }>([
+  {
+    name: "a trace example grades trace and reply graders",
+    files: { "examples/one/run.jsonl": trace("p99 230ms", "echo x") },
+    expected: [],
+  },
+  {
+    name: "a trace example fails a trace grader its sidecar does not list",
+    files: { "examples/one/run.jsonl": trace("p99 230ms", "echo y") },
+    expected: [{ example: "examples/one/run.jsonl", grader: "trace", expected: "pass" }],
+  },
+  {
+    name: "a sidecar declares a trace failure",
+    files: {
+      "examples/one/run.jsonl": trace("p99 230ms", "echo y"),
+      "examples/one/run.yaml": "fail: [trace]\n",
+    },
+    expected: [],
+  },
+])("$name", async ({ files, expected }) => {
+  const dir = await suite({ ...graders, ...files });
+  expect((await check(dir)).mismatches).toEqual(expected);
+});
+
+test.each<{ name: string; file: string; expected: Mismatch[] }>([
+  { name: "passes a file grader on a matching file", file: "export const x = 1;", expected: [] },
+  {
+    name: "fails a file grader on a file without the pattern",
+    file: "export const y = 1;",
+    expected: [{ example: "examples/one/good.md", grader: "file", expected: "pass" }],
+  },
+])("an example directory $name", async ({ file, expected }) => {
+  const dir = await suite({
+    ...graders,
+    "one/graders/file.md":
+      "---\ntype: regex\npattern: 'const x'\ntarget:\n  source: file\n  path: src/a.ts\n---\n",
+    "examples/one/good.md": "p99 230ms",
+    "examples/one/good/src/a.ts": file,
+  });
+  expect((await check(dir)).mismatches).toEqual(expected);
+});
+
+test("an example directory supplies a dotfile to a file grader", async () => {
+  const dir = await suite({
+    ...graders,
+    "one/graders/dot.md":
+      "---\ntype: regex\npattern: 'ok'\ntarget:\n  source: file\n  path: .verdicts\n---\n",
+    "examples/one/good.md": "p99 230ms",
+    "examples/one/good/.verdicts": "not yet",
+  });
+  const { mismatches, unchecked } = await check(dir);
+  expect(mismatches).toEqual([
+    { example: "examples/one/good.md", grader: "dot", expected: "pass" },
+  ]);
+  expect(unchecked).not.toContain("one/dot");
+});
+
+test("names the regex graders no example reaches", async () => {
+  const dir = await suite({
+    ...graders,
+    "one/graders/file.md":
+      "---\ntype: regex\npattern: 'x'\ntarget:\n  source: file\n  path: a.ts\n---\n",
+    "examples/one/good.md": "p99 230ms",
+  });
+  expect((await check(dir)).unchecked).toEqual(["one/file", "one/trace"]);
+});
+
+test("rejects an example naming a grader the case lacks", async () => {
+  const dir = await suite({ ...graders, "examples/one/bad.md": "---\nfail: [nope]\n---\n" });
+  expect(check(dir)).rejects.toThrow("unknown graders: nope");
+});
+
+test("a case inherits the suite graders its globs match and overrides by name", async () => {
+  const dir = await suite({
+    ...graders,
+    "suite.yaml": "graders:\n  tagged: '*'\n  short: '*'\n",
+    "graders/tagged.md": "---\ntype: regex\npattern: '<out>'\n---\n",
+    "graders/short.md": "---\ntype: regex\npattern: 'never'\n---\n",
+    "examples/one/good.md": "p99 230ms",
+  });
+  expect((await check(dir)).mismatches).toEqual([
+    { example: "examples/one/good.md", grader: "tagged", expected: "pass" },
+  ]);
+});
+
+test.each<{ body: string; expected: string[] }>([
+  { body: "Ship this branch.\n", expected: [] },
+  { body: "undefined\n", expected: ["one"] },
+  { body: "null", expected: ["one"] },
+  { body: "  \n", expected: ["one"] },
+])("a prompt.md of $body reports $expected", async ({ body, expected }) => {
+  const dir = await suite({ "one/case.yaml": "name: one\n", "one/prompt.md": body });
+  expect(await emptyPrompts(dir)).toEqual(expected);
+});
+
+/** Every tracked suite directory, as the parent of a directory holding a `case.yaml`. */
+function trackedSuites(root: string): Set<string> {
+  const listed = Bun.spawnSync(["git", "ls-files", "*/case.yaml"], { cwd: root });
+  return new Set(
+    listed.stdout
+      .toString()
+      .split("\n")
+      .filter(Boolean)
+      .map((f) => dirname(dirname(f))),
+  );
+}
+
+test("no tracked case sends an empty prompt", async () => {
+  const root = join(import.meta.dirname, "../..");
+  const suites = trackedSuites(root);
+  const empty = await Promise.all(
+    [...suites].map(async (s) => (await emptyPrompts(join(root, s))).map((c) => `${s}/${c}`)),
+  );
+  expect(suites.size).toBeGreaterThan(0);
+  expect(empty.flat()).toEqual([]);
+});
+
+test("names case graders that shadow a suite grader", async () => {
+  const dir = await suite({
+    "suite.yaml": "graders:\n  fired: '*'\n  short: 'one'\n",
+    "graders/fired.md": "---\ntype: llm\n---\n",
+    "graders/short.md": "---\ntype: llm\n---\n",
+    "one/case.yaml": "name: one\n",
+    "one/graders/fired.md": "---\ntype: llm\n---\n",
+    "two/case.yaml": "name: two\n",
+    "two/graders/short.md": "---\ntype: llm\n---\n",
+  });
+  expect(await shadowed(dir)).toEqual(["one/fired"]);
+});
+
+test("names graders whose frontmatter holds a --- before its closing line", async () => {
+  const dir = await suite({
+    "graders/mid-line.md": "---\ntype: regex\npattern: '<issue>\\n---\\n'\n---\n",
+    "graders/repeat.md": "---\ntype: regex\npattern: '<issue>\\n-{3}\\n'\n---\n",
+    "one/case.yaml": "name: one\n",
+    "one/graders/rule.md": "---\ntype: regex\npattern: 'a---b'\n---\nbody --- here\n",
+    "one/graders/body.md": "---\ntype: llm\n---\nA --- in the body is fine.\n---\n",
+  });
+  expect(await earlyClose(dir)).toEqual(["graders/mid-line.md", "one/graders/rule.md"]);
+});
+
+test("no tracked grader holds a --- the runner would end its frontmatter at", async () => {
+  const root = join(import.meta.dirname, "../..");
+  const suites = trackedSuites(root);
+  const cut = await Promise.all(
+    [...suites].map(async (s) => (await earlyClose(join(root, s))).map((g) => `${s}/${g}`)),
+  );
+  expect(suites.size).toBeGreaterThan(0);
+  expect(cut.flat()).toEqual([]);
+});

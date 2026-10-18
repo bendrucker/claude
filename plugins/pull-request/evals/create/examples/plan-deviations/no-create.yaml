@@ -1,0 +1,8 @@
+fail:
+  - limit-visible-words
+  - limit-max-block
+  - limit-prose-code-spans
+  - limit-path-spans
+  - limit-contrast-phrases
+  - limit-hidden-words
+  - limit-list-items

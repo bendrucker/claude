@@ -1,1 +1,6 @@
 allow_tools: [Bash]
+stage: [packages/eval-stubs]
+graders:
+  skill-fired: "*"
+  no-commit: "*"
+  no-push: "*"

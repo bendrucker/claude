@@ -2,3 +2,10 @@ allow_tools: [Bash, Edit, Write]
 judge_model: claude-sonnet-5-5
 wrap:
   skills: [user/skills/diagnosing-bugs]
+graders:
+  skill-fired: "*"
+  no-claimed-cause: [account-timeout, unreproducible]
+  no-edits: [account-timeout, diagnose-only, env-ignored, unreproducible]
+  no-new-files: "directed-*"
+  quiet: "quiet-*"
+  ran-tests: "directed-*"

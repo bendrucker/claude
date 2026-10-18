@@ -26,7 +26,7 @@ The loop needs these from any harness:
 }
 ```
 
-`score` is the run's weighted grader mean. `scored: false` marks an indicator such as a skill-fired check. A reply for the word counts goes in `traces/<case>-<arm>-<n>.jsonl` beside the file, as a final `{"type": "result", "result": "<reply>"}` line. Pass `--suite` only when the cases live in `<suite>/<case>/case.yaml` with a `tags` list.
+`score` is the run's weighted grader mean. `scored: false` marks an indicator such as a skill-fired check. A reply for the word counts goes in `traces/<case>-<arm>-<n>.jsonl` beside the file, as a final `{"type": "result", "result": "<reply>"}` line. In this repo, `writeResult` from `packages/evals/result.ts` writes both, scoring each run the way the runner does. Pass `--suite` only when the cases live in `<suite>/<case>/case.yaml` with a `tags` list.
 
 ## Agent SDKs and Other CLIs
 

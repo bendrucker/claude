@@ -9,9 +9,12 @@ const CONTINUING = new Set(["clear", "resume"]);
 
 const ACTIVE = new Set(["pending", "running", "waiting", "idle"]);
 
-// While an agent is counted, a background subagent can finish or a teammate in
-// its own pane go idle with no event here, so the counts are re-read on a timer.
+// Subagent and teammate events trigger a refresh, and while an agent is counted
+// the counts are also re-read on a timer in case one of those events is missed.
 const POLL_MS = 10_000;
+
+// session.end shares 1.5 seconds across every hook.
+const END_TIMEOUT_MS = 1000;
 
 // A herdr that cannot start (missing binary, hung past the timeout) would
 // otherwise be retried on every event and poll for the rest of the session.
@@ -59,6 +62,7 @@ async function herdr(
   beacon: Beacon,
   pane: Pane,
   args: string[],
+  timeoutMs = 3000,
 ): Promise<boolean> {
   beacon.seq += 1;
   const argv = [
@@ -74,11 +78,11 @@ async function herdr(
   ];
   const startedAt = await $.clock.now();
   const { exitCode, stderr } = await $.process
-    .run(argv, { timeoutMs: 3000 })
+    .run(argv, { timeoutMs })
     .catch((error: unknown) => ({ exitCode: -1, stderr: String(error) }));
   const ms = (await $.clock.now()) - startedAt;
   const ok = exitCode === 0;
-  void $.modEvents.emit({
+  await $.modEvents.emit({
     mod: MOD,
     event: "herdr.call",
     ok,
@@ -210,6 +214,21 @@ export function register(on: On): void {
     return next(e);
   });
 
+  on("classic.SubagentStart", ($, e, next) => {
+    refresh($, beacon);
+    return next(e);
+  }).catch(($, e, next) => next(e));
+
+  on("classic.SubagentStop", ($, e, next) => {
+    refresh($, beacon);
+    return next(e);
+  }).catch(($, e, next) => next(e));
+
+  on("classic.TeammateIdle", ($, e, next) => {
+    refresh($, beacon);
+    return next(e);
+  }).catch(($, e, next) => next(e));
+
   on("session.end", async ($, e, next) => {
     if (CONTINUING.has(e.reason)) {
       refresh($, beacon);
@@ -226,6 +245,7 @@ export function register(on: On): void {
         beacon,
         pane,
         TOKEN_NAMES.flatMap((name) => ["--clear-token", name]),
+        END_TIMEOUT_MS,
       );
     }
     return next(e);

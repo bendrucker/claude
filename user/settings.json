@@ -279,15 +279,6 @@
     ],
     "SessionStart": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun ~/.claude/hooks/sandbox-ssh-proxy",
-            "timeout": 10
-          }
-        ]
-      },
-      {
         "matcher": "startup|resume|clear",
         "hooks": [
           {
@@ -632,6 +623,8 @@
     "CLAUDE_CODE_NO_FLICKER": "1",
     "NODE_USE_ENV_PROXY": "1",
     "CLAUDE_CODE_SUBAGENT_MODEL": "opus",
-    "AGENT_BROWSER_IDLE_TIMEOUT_MS": "600000"
+    "AGENT_BROWSER_IDLE_TIMEOUT_MS": "600000",
+    "CLAUDE_CODE_DISABLE_ARTIFACT": "1",
+    "CLAUDE_CODE_SEND_FEEDBACK": "0"
   }
 }

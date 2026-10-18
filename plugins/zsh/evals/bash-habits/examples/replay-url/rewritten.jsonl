@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","cwd":"/tmp/claude-eval/home/cwd","tools":["Bash"]}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Bash","input":{"command":"printf \"%s\\n\" https://example.test/writing?tag=vue | sed \"s/?.*//\""}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"https://example.test/writing"}]}}
+{"type":"result","subtype":"success","is_error":false,"num_turns":2,"result":"It printed `https://example.test/writing`, the URL with its query stripped."}

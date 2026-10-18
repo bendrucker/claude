@@ -238,10 +238,6 @@ export async function processStop(input: StopInput): Promise<SyncHookJSONOutput 
     return null;
   }
 
-  if ((process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE ?? "") !== "") {
-    return null;
-  }
-
   const sinceLine = await processedLines(input.session_id);
   const { files, lineCount } = await parseTranscript(input.transcript_path, sinceLine);
   if (files.length === 0) {

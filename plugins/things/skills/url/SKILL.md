@@ -23,10 +23,10 @@ Write operations for Things 3 via the `things:///` URL scheme.
 Use `url.ts` for most operations. It handles auth tokens and URL encoding.
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts <command> [key=value ...]
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts --link-base "${user_config.link_base}" <command> [key=value ...]
 
 # Bulk update: pass multiple id= params to batch via JSON command
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts update id=X id=Y id=Z when=tomorrow
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts --link-base "${user_config.link_base}" update id=X id=Y id=Z when=tomorrow
 ```
 
 For raw URL scheme access: `open -g "things:///add?title=Buy%20milk&when=today"`. Use `-g` for data commands to run in background. Omit it for `show`/`search` to foreground Things.
@@ -52,7 +52,7 @@ Full parameters, JSON payload schema, and limits: [url-scheme.md](url-scheme.md)
 Things drops a tag it does not already hold and still reports success. `url.ts` resolves `tags` and `add-tags` against the stored tags first, so an unknown tag fails the call and names itself instead of vanishing from the write. Pass `--create-tags` to create the missing ones:
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts add title="Fix login" tags=bug --create-tags
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/url.ts --link-base "${user_config.link_base}" add title="Fix login" tags=bug --create-tags
 ```
 
 Matching folds case, so `Bug` resolves to a stored `bug`. An empty `tags=` still clears a todo's tags. Tags inside a raw `json data=...` payload go through unchecked.
@@ -70,19 +70,19 @@ Items appear at the top of the list in the order specified. Default list is `tod
 For quick captures to the inbox, use `inbox.ts`. It tags each todo `Claude` and appends session attribution, so prefer it over `url.ts add` when delegating a task mid-session.
 
 ```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --session-id ${CLAUDE_SESSION_ID} title="Buy milk"
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/inbox.ts --link-base "${user_config.link_base}" --session-id ${CLAUDE_SESSION_ID} title="Buy milk"
 ```
 
 `title` captures one todo. `titles` (newline-separated) captures several at once. Add tags with `--tag` (repeatable). Other params: `notes` (max 10,000 chars), `tags` (comma-separated), `checklist-items` (newline-separated, max 100).
 
-On success it prints a confirmation. With the `x-callback-url` plugin, xcall returns the todo ID and the script prints `https://things.bendrucker.me/show?id=...`. Present that link to the user. Without xcall it prints `captured: <title>`.
+On success it prints a confirmation. With the `x-callback-url` plugin, xcall returns the todo ID and the script prints a link to it. Present the printed link. Without xcall it prints `captured: <title>`.
 
 ## Callback
 
-When the `x-callback-url` plugin is installed, `url.ts` uses xcall to get a response from Things on stdout. Present the result as clickable `https://things.bendrucker.me/show?id=<id>` links:
+When the `x-callback-url` plugin is installed, `url.ts` uses xcall to get a response from Things on stdout:
 
-- **Single todo** (`add`, `update`): returns `x-things-id=<id>` — present one link
-- **Batch** (`json`): returns `x-things-ids=["id1","id2"]` — present a bulleted list with each todo's title and link
+- **Single todo** (`add`, `update`): prints a link to the todo. Present the printed link
+- **Batch** (`json`): prints `x-things-ids=["id1","id2"]`. Present a bulleted list with each todo's title and `${user_config.link_base}<id>` link
 
 Callback is enabled by default. Disable with `--callback=false` to fall back to fire-and-forget via `open -g`. If xcall is unavailable, the script falls back silently.
 

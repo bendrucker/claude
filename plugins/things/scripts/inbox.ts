@@ -5,7 +5,7 @@ import { cli } from "cleye";
 import { ensureThingsRunning } from "./ensure-running";
 import { requireTags } from "../src/mcp/tags";
 import { mergeTags, parseTags } from "./tags";
-import { dispatch, warnFallback } from "./url";
+import { DEFAULT_LINK_BASE, dispatch, warnFallback } from "./url";
 
 const INBOX_PARAMS = new Set(["title", "titles", "notes", "tags", "checklist-items"]);
 
@@ -62,6 +62,11 @@ if (import.meta.main) {
         description: "Claude session ID for attribution",
         alias: "s",
       },
+      linkBase: {
+        type: String,
+        default: DEFAULT_LINK_BASE,
+        description: "Prefix for the printed todo link, followed by the todo id",
+      },
       tag: {
         type: [String],
         description: "Extra tags to add (repeatable)",
@@ -103,7 +108,7 @@ if (import.meta.main) {
 
     const result = await dispatch("add", params);
     if (result.id != null && result.id !== "") {
-      console.log(`https://things.bendrucker.me/show?id=${result.id}`);
+      console.log(`${argv.flags.linkBase}${result.id}`);
     } else {
       warnFallback(result);
       printCaptured(params);

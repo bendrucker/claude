@@ -55,6 +55,8 @@ Every write but `reorder_todos` maps its arguments through the one `ATTRIBUTES` 
 
 `registerTools` takes a `ThingsClient` carrying the launch check, the dispatcher, the tag requirer, and the batch pacing. `tools.test.ts` passes a fake and drives each write through a real in-memory MCP round trip, which covers what a handler builds without touching Things.
 
+A write that returns a todo id links to it under `THINGS_LINK_BASE`, defaulting to `things:///show?id=`. Set it in the environment tailgate spawns this server with, since a child process cannot read plugin options.
+
 `capture_inbox` accepts an optional `session_id` and `directory`. Given a `session_id` it appends a resume command to the todo's notes. `directory` is a parameter because this process runs as tailgate's child, whose working directory has nothing to do with the session being attributed.
 
 ## Tags

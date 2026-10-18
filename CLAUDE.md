@@ -5,7 +5,9 @@ This repository contains my personal Claude Code configuration and a plugin mark
 ## Structure
 
 - `schemas/`: JSON Schemas for Claude Code config formats. Upstream-backed ones (`plugin`, `marketplace`, `settings`) keep only our edits as an RFC 6902 overlay in [`schemas/overlays/`](schemas/overlays/), merged with the live upstream base in memory at validation time; the rest are hand-authored
-- `user/`: User-level configuration, symlinked to `~/.claude` by the [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in dotfiles
+- `user/`: User-level configuration, symlinked to `~/.claude` by the [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in dotfiles. `user/settings.json` is the Mac's user settings
+- `managed/settings.json`: Settings for every platform, installed as a managed-settings drop-in, so they outrank project settings
+- `platforms/<name>/`: What one platform adds. Dotfiles links `CLAUDE.md` to `~/.claude/platform.md`, which `user/CLAUDE.md` imports. `platforms/cloud/settings.json` is the cloud's user settings
 - `docs/`: Reference material too long to auto-inject, linked from the rule that needs it
 
 ## Curation
@@ -29,7 +31,7 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/). `bun run inv
 ## Verification
 
 - `bun scripts/check-marketplace.ts`: verifies all plugin directories are listed in `marketplace.json`. Runs in CI.
-- `bun scripts/check-hook-paths.ts`: verifies every hook command in `user/settings.json` and `.claude/settings.json` names a tracked path, so a hook cannot outlive the script it invokes. Runs in CI.
+- `bun scripts/check-hook-paths.ts`: verifies every hook command in each settings file this repo ships names a tracked path, so a hook cannot outlive the script it invokes. Runs in CI.
 - `bun run plugin-lockfiles check`: verifies every plugin declaring dependencies ships a lockfile that agrees with its `package.json`, which is what Claude Code requires before it will install those dependencies into the plugin cache. `generate` writes them. Runs in CI.
 - `bun run schemas check`: fetches current upstream and verifies the upstream-backed schema overlays still apply, flagging overlay edits that upstream has absorbed and warning on edits that overwrite an upstream definition. Runs in CI.
 - `bun run skill-lint "plugins/<name>/skills/*"`: validates SKILL.md frontmatter and reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
@@ -53,4 +55,4 @@ CI spends subscription credits through a `CLAUDE_CODE_OAUTH_TOKEN` secret from `
 ## Workflow
 
 - To test a plugin in isolation: `claude --plugin-dir ./plugins/<name> --setting-sources local`.
-- To test `user/settings.json` before installing: `./dev.sh` (any extra args pass through to `claude`).
+- To test the Mac settings before installing: `./dev.sh` (any extra args pass through to `claude`).

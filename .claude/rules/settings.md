@@ -9,6 +9,10 @@ Read [`hooks.md`](hooks.md) before adding or changing a hook entry in either fil
 
 Why each sandbox grant and hook exists, and what would retire it, is in [`docs/settings.md`](../../docs/settings.md). Read it before adding, removing, or narrowing a host, write path, socket, escaped command, or hook entry.
 
+## Layers
+
+`managed/settings.json` loads on every platform as managed settings. Put an entry there only when it is right in a cloud VM too, because a lower scope cannot remove a list entry or hook it adds, and its scalars outrank project settings and `/config`. Everything else stays in `user/settings.json`, the Mac's user file, where `/plugin`, moshi, and herdr write and `claude-sync` reads plugin declarations. Cloud-only entries go in `platforms/cloud/settings.json`.
+
 ## Permission Paths
 
 A pattern starting with `/` is relative to the settings file. Use `//` for absolute paths. Tilde expansion works.
@@ -30,7 +34,7 @@ Tiers resolve in order: `hard_deny`, `soft_deny`, `allow` overriding a matching 
 Point the CLI at a worktree copy to test an edit. It otherwise resolves the deployed `~/.claude-repo` checkout:
 
 ```sh
-claude --settings "$PWD/user/settings.json" auto-mode critique
+claude --settings "$PWD/managed/settings.json" auto-mode critique
 ```
 
 Scopes combine rather than replace, so that run still carries the deployed file's entries alongside the worktree's.

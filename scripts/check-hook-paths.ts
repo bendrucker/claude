@@ -38,6 +38,11 @@ export interface Source {
 
 export const USER_SETTINGS: Source = { file: "user/settings.json", prefixes: HOME_PREFIXES };
 
+/** The shared layer every platform installs as managed settings, and cloud's own user file. */
+export const LAYER_SETTINGS: Source[] = ["managed/settings.json", "platforms/cloud/settings.json"].map(
+  (file) => ({ file, prefixes: HOME_PREFIXES }),
+);
+
 /**
  * `$CLAUDE_PROJECT_DIR` expands to whatever repository the session runs in, so
  * it resolves against this checkout only for the project settings file.
@@ -47,7 +52,7 @@ export const PROJECT_SETTINGS: Source = {
   prefixes: { ...HOME_PREFIXES, ...PROJECT_PREFIXES },
 };
 
-export const SOURCES: Source[] = [USER_SETTINGS, PROJECT_SETTINGS];
+export const SOURCES: Source[] = [USER_SETTINGS, ...LAYER_SETTINGS, PROJECT_SETTINGS];
 
 function quoteRegex(literal: string): string {
   return literal.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);

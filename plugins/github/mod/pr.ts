@@ -443,31 +443,45 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   return paragraphs.join("\n\n");
 }
 
-// Nerd Font Octicons, the icons GitHub itself draws for each state.
-export const STALE = "\u{f421} stale";
+// Nerd Font Octicons, the icons GitHub draws for each state, keyed by glyph
+// name: nf-oct-git_merge is gitMerge.
+const OCT = {
+  alert: "\u{f421}",
+  check: "\u{f42e}",
+  checkCircle: "\u{f49e}",
+  dotFill: "\u{f444}",
+  eye: "\u{f441}",
+  fileDiff: "\u{f4d2}",
+  gitCompare: "\u{f47f}",
+  gitMerge: "\u{f419}",
+  gitPullRequestClosed: "\u{f4dc}",
+  xCircle: "\u{f52f}",
+};
+
+export const STALE = `${OCT.alert} stale`;
 
 const BLOCKS: Record<Block, string | undefined> = {
-  conflict: "\u{f47f} conflicts",
-  behind: "\u{f47f} behind",
+  conflict: `${OCT.gitCompare} conflicts`,
+  behind: `${OCT.gitCompare} behind`,
   none: undefined,
 };
 
 const ENDED: Partial<Record<string, string>> = {
-  MERGED: "\u{f419} merged",
-  CLOSED: "\u{f4dc} closed",
+  MERGED: `${OCT.gitMerge} merged`,
+  CLOSED: `${OCT.gitPullRequestClosed} closed`,
 };
 
 const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
   none: () => undefined,
-  pending: (s) => `\u{f444} CI ${s.total - s.pending}/${s.total}`,
-  passing: () => "\u{f49e} CI",
-  failing: (s) => `\u{f52f} ${listed(s.failed)}`,
+  pending: (s) => `${OCT.dotFill} CI ${s.total - s.pending}/${s.total}`,
+  passing: () => `${OCT.checkCircle} CI`,
+  failing: (s) => `${OCT.xCircle} ${listed(s.failed)}`,
 };
 
 const REVIEWS: Partial<Record<string, string>> = {
-  APPROVED: "\u{f42e} approved",
-  CHANGES_REQUESTED: "\u{f4d2} changes requested",
-  REVIEW_REQUIRED: "\u{f441} review needed",
+  APPROVED: `${OCT.check} approved`,
+  CHANGES_REQUESTED: `${OCT.fileDiff} changes requested`,
+  REVIEW_REQUIRED: `${OCT.eye} review needed`,
 };
 
 // The footer already links the PR, so the state rides after it on that line.

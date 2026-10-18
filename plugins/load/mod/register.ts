@@ -28,6 +28,7 @@ const SWEEP_MS = 30_000;
 const SAMPLE_MS = 15_000;
 
 interface Config {
+  browserSessions: number;
   caps: Cap[];
   invalid: string[];
   refuse: number;
@@ -41,6 +42,7 @@ function configOf(options: PluginOptions): Config {
     return typeof value === "number" ? value : 0;
   };
   return {
+    browserSessions: number("browserSessions"),
     ...parseCaps(Array.isArray(entries) ? entries : []),
     refuse: number("refuse"),
     pace: { remind: number("remind"), warn: number("warn") },
@@ -260,7 +262,11 @@ export function register(on: On, options: PluginOptions): void {
     let live = new Set<string>();
     if (calls.length > 0) {
       live = await liveSessions($);
-      const verdict = judge(calls, census(state, owner, e.agentId !== undefined, live));
+      const verdict = judge(
+        calls,
+        census(state, owner, e.agentId !== undefined, live),
+        config.browserSessions,
+      );
       if (verdict.deny !== undefined) {
         void $.modEvents.emit({
           mod: MOD,

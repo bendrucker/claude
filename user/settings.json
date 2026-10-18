@@ -395,6 +395,7 @@
   "pluginConfigs": {
     "load@bendrucker": {
       "options": {
+        "browserSessions": 3,
         "caps": [
           "build:4:\\b(?:ladle|vite|storybook)(?:\\.js)? build\\b|\\bbuild-storybook\\b",
           "build:4:\\bpytest\\b.* (?:-n ?|--numprocesses[ =])(?:auto|logical|\\d+)\\b",

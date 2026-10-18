@@ -115,11 +115,10 @@ export interface Census {
   others: Set<string>;
 }
 
-export const MAX_DAEMONS = 3;
-
 const list = (sessions: Iterable<string>) => [...sessions].map((s) => `\`${s}\``).join(", ");
 
-export function judge(calls: BrowserCall[], census: Census): Verdict {
+/** `sessions` caps browsers running machine-wide; 0 caps nothing. */
+export function judge(calls: BrowserCall[], census: Census, sessions: number): Verdict {
   if (calls.some((call) => call.effect === "close-all") && census.others.size > 0) {
     return {
       reason: "close-all",
@@ -150,10 +149,10 @@ export function judge(calls: BrowserCall[], census: Census): Verdict {
       };
     }
     const running = new Set([...census.live, ...pending]);
-    if (running.size >= MAX_DAEMONS) {
+    if (sessions > 0 && running.size >= sessions) {
       return {
         reason: "cap",
-        deny: `${running.size} browser sessions are already running on this machine (${list(running)}), the limit is ${MAX_DAEMONS}. Reuse one you own, close one you are done with, or finish this item without a browser and retry once another agent finishes.`,
+        deny: `${running.size} browser sessions are already running on this machine (${list(running)}), the limit is ${sessions}. Reuse one you own, close one you are done with, or finish this item without a browser and retry once another agent finishes.`,
       };
     }
     mine.add(session);

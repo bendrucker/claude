@@ -374,6 +374,16 @@ describe("register", () => {
     expect(w.views).toEqual([]);
   });
 
+  test("never polls with the watch option off", { options: { watch: false } }, async ($, on) => {
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr() });
+
+    await $.session.start(START);
+    await w.clock.advance(POLL_MS.idle * 3);
+
+    expect(w.named("session.start")[0]?.detail).toEqual({ active: false, reason: "watch off" });
+    expect(w.views).toEqual([]);
+  });
+
   test("a session that ends during the glab check never polls", async ($, on) => {
     const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr(), versionMs: 1000 });
 

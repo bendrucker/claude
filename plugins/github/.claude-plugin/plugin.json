@@ -12,6 +12,12 @@
       "title": "Extra reviewers",
       "description": "Comma-separated logins that --bots treats as review bots, beyond the structural bot detection. Empty adds none.",
       "default": ""
+    },
+    "watch": {
+      "type": "boolean",
+      "title": "Watch the pull request",
+      "description": "Watch the current branch's pull request in interactive sessions and show its state in the prompt footer.",
+      "default": true
     }
   }
 }

@@ -476,34 +476,47 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   return paragraphs.join("\n\n");
 }
 
-// Nerd Font Octicons.
-export const STALE = "\u{f421} stale";
+// Nerd Font Octicons, keyed by glyph name: nf-oct-git_merge is gitMerge.
+const OCT = {
+  alert: "\u{f421}",
+  check: "\u{f42e}",
+  checkCircle: "\u{f49e}",
+  dotFill: "\u{f444}",
+  eye: "\u{f441}",
+  fileDiff: "\u{f4d2}",
+  gitCompare: "\u{f47f}",
+  gitMerge: "\u{f419}",
+  gitPullRequestClosed: "\u{f4dc}",
+  xCircle: "\u{f52f}",
+};
+
+export const STALE = `${OCT.alert} stale`;
 
 const BLOCKS: Record<Block, string | undefined> = {
-  conflict: "\u{f47f} conflicts",
-  behind: "\u{f47f} behind",
+  conflict: `${OCT.gitCompare} conflicts`,
+  behind: `${OCT.gitCompare} behind`,
   none: undefined,
 };
 
 const ENDED: Partial<Record<string, string>> = {
-  merged: "\u{f419} merged",
-  closed: "\u{f4dc} closed",
+  merged: `${OCT.gitMerge} merged`,
+  closed: `${OCT.gitPullRequestClosed} closed`,
 };
 
 const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
   none: () => undefined,
-  pending: (s) => `\u{f444} CI ${s.total - s.pending}/${s.total}`,
-  passing: () => "\u{f49e} CI",
-  failing: (s) => `\u{f52f} ${listed(s.failed)}`,
+  pending: (s) => `${OCT.dotFill} CI ${s.total - s.pending}/${s.total}`,
+  passing: () => `${OCT.checkCircle} CI`,
+  failing: (s) => `${OCT.xCircle} ${listed(s.failed)}`,
 };
 
 function reviewOf(snapshot: Snapshot): string | undefined {
-  if (snapshot.isChangesRequested) return "\u{f4d2} changes requested";
+  if (snapshot.isChangesRequested) return `${OCT.fileDiff} changes requested`;
   if (snapshot.approvalsLeft > 0) {
     const left = snapshot.approvalsLeft;
-    return `\u{f441} ${left} ${left === 1 ? "approval" : "approvals"} needed`;
+    return `${OCT.eye} ${left} ${left === 1 ? "approval" : "approvals"} needed`;
   }
-  return snapshot.isApproved ? "\u{f42e} approved" : undefined;
+  return snapshot.isApproved ? `${OCT.check} approved` : undefined;
 }
 
 // The footer already links the MR, so the state rides after it on that line.

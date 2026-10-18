@@ -407,6 +407,11 @@
         "warn": 3,
         "refuse": 4
       }
+    },
+    "pull-request@bendrucker": {
+      "options": {
+        "stack_file": "wt/stack"
+      }
     }
   },
   "enabledPlugins": {

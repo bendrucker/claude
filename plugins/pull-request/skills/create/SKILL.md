@@ -38,7 +38,7 @@ The commit log, PR template, CONTRIBUTING notes, and review-bot config in the co
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts`
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/sem-context.ts`
+!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/sem-context.ts --stack-file "${user_config.stack_file}"`
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts`
 

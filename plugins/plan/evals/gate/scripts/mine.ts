@@ -88,12 +88,9 @@ export function toPresent(row: z.infer<typeof MinedRow>): Present {
 }
 
 function resolveDbPath(db: string | undefined): string {
-  if (db !== undefined) return db;
-  const pluginData = process.env.CLAUDE_PLUGIN_DATA;
-  const dataDir =
-    pluginData !== undefined && pluginData !== ""
-      ? join(dirname(pluginData), "observability-bendrucker")
-      : join(process.env.HOME ?? "", ".claude", "plugins", "data", "observability-bendrucker");
+  if (db != null && db !== "") return db;
+  const dataHome = process.env.XDG_DATA_HOME ?? join(process.env.HOME ?? "", ".local", "share");
+  const dataDir = process.env.CLAUDE_SESSION_INDEX_DIR ?? join(dataHome, "claude-sessions");
   return join(dataDir, "session.duckdb");
 }
 

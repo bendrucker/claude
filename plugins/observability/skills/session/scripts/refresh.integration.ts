@@ -30,7 +30,7 @@ afterEach(async () => {
 function env() {
   return {
     ...process.env,
-    CLAUDE_PLUGIN_DATA: dataDir,
+    CLAUDE_SESSION_INDEX_DIR: dataDir,
     CLAUDE_PROJECTS_DIR: corpusDir,
     CLAUDE_SESSION_IMPORTS_DIR: join(tmpDir, "imports"),
   };

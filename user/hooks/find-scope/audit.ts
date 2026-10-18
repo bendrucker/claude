@@ -8,11 +8,11 @@ import { decodeJson } from "../../../packages/decode/index";
 import { styleText } from "../../scripts/style";
 import { findsUnboundedFromBroadRoot } from "./index";
 
-// CLAUDE_PLUGIN_DATA is the session skill's own override for where its index
+// CLAUDE_SESSION_INDEX_DIR is the session skill's own override for where its index
 // lives, so an audit run against a copied corpus honors it too.
 const DATA_DIR =
-  process.env.CLAUDE_PLUGIN_DATA ??
-  `${process.env.HOME}/.claude/plugins/data/observability-bendrucker`;
+  process.env.CLAUDE_SESSION_INDEX_DIR ??
+  `${process.env.XDG_DATA_HOME ?? `${process.env.HOME}/.local/share`}/claude-sessions`;
 const DB = `${DATA_DIR}/session.duckdb`;
 
 // The date reaches DuckDB inside a SQL literal, so it is checked before it is

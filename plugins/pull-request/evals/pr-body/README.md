@@ -52,10 +52,10 @@ Then mine PR bodies:
 ```bash
 bun plugins/pull-request/evals/pr-body/scripts/mine.ts                      # writes data/samples.json
 bun plugins/pull-request/evals/pr-body/scripts/mine.ts --limit 80
-bun plugins/pull-request/evals/pr-body/scripts/mine.ts --db ~/.claude/plugins/data/observability-bendrucker/session.duckdb
+bun plugins/pull-request/evals/pr-body/scripts/mine.ts --db ~/.local/share/claude-sessions/session.duckdb
 ```
 
-`mine.ts` enumerates PRs opened from local sessions via the index's `pr_links` view, fetches their bodies with `gh pr list`, drops bodies below `--min-chars`, and selects a repo-balanced sample that interleaves long sectioned bodies with tight one-paragraph ones. Each item records repo, PR number, URL, date, state, and the originating session id. Without `--db` it resolves the index from `CLAUDE_PLUGIN_DATA`, matching the other `evals/` miners.
+`mine.ts` enumerates PRs opened from local sessions via the index's `pr_links` view, fetches their bodies with `gh pr list`, drops bodies below `--min-chars`, and selects a repo-balanced sample that interleaves long sectioned bodies with tight one-paragraph ones. Each item records repo, PR number, URL, date, state, and the originating session id. Without `--db` it reads the session skill's index, matching the other `evals/` miners.
 
 ## Labeling
 

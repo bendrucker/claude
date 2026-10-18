@@ -1,11 +1,8 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: temporary. Opens the DuckDB index read-write in
-// the plugin data dir, which an upstream sandbox defect makes unwritable. Remove this
-// when the probe in docs/settings.md succeeds.
+// claude:dangerouslyDisableSandbox: prunes debug logs and mod events under ~/.claude
+// and moves a legacy index out of ~/.claude/plugins, both denied to the sandbox.
 import { mkdirSync } from "node:fs";
-import { rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { cli } from "cleye";
 import {
   compactDatabase,
@@ -35,32 +32,9 @@ const argv = cli({
   },
 });
 
-const dataDir = await getDataDir();
+const dataDir = getDataDir();
 const dbPath = sessionDbPath(dataDir);
 const stampPath = join(dataDir, "last-refresh");
-
-// Earlier versions kept the index in TMPDIR. Those copies are stale derived
-// caches that silently diverge from the real one. Swept only when running
-// against the real (derived) data dir: a CLAUDE_PLUGIN_DATA override means a
-// test or dev run, which must not delete machine-wide state.
-async function cleanupStrayDatabases(): Promise<void> {
-  if (process.env.CLAUDE_PLUGIN_DATA != null && process.env.CLAUDE_PLUGIN_DATA !== "") return;
-  const strayDirs = new Set([join(tmpdir(), "claude-session"), "/tmp/claude-session"]);
-  for (const dir of strayDirs) {
-    if (resolve(dir) === resolve(dataDir)) continue;
-    // oxlint-disable-next-line no-await-in-loop -- two known stray directories; concurrency buys nothing.
-    if (!(await Bun.file(sessionDbPath(dir)).exists())) continue;
-    try {
-      // oxlint-disable-next-line no-await-in-loop -- two known stray directories; concurrency buys nothing.
-      await rm(dir, { recursive: true, force: true });
-      console.error(`refresh: removed stale index at ${dir}`);
-    } catch (error) {
-      console.error(
-        `refresh: could not remove stale index at ${dir}: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-}
 
 async function stampIsFresh(): Promise<boolean> {
   const stamp = Bun.file(stampPath);
@@ -87,8 +61,6 @@ async function openWithRetry(): Promise<Database | null> {
     await Bun.sleep(250);
   }
 }
-
-await cleanupStrayDatabases();
 
 if (!argv.flags.refresh && (await Bun.file(dbPath).exists()) && (await stampIsFresh())) {
   process.stdout.write(`${dbPath}\n`);

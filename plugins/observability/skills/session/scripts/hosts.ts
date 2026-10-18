@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: temporary. Opens the DuckDB index read-write in
-// the plugin data dir, which an upstream sandbox defect makes unwritable. Remove this
-// when the probe in docs/settings.md succeeds.
+// claude:dangerouslyDisableSandbox: opens the index read-write, outside the sandbox's
+// writable paths.
 import { join } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
@@ -10,7 +9,7 @@ import { getDataDir, getDb, LOCAL_HOST, listImportedHosts, sessionDbPath } from 
 
 cli({ name: "hosts", flags: {} });
 
-const dataDir = await getDataDir();
+const dataDir = getDataDir();
 
 async function lastImports(): Promise<Record<string, string>> {
   if (!(await Bun.file(sessionDbPath(dataDir)).exists())) return {};

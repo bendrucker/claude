@@ -1,7 +1,7 @@
-import { readdirSync } from "node:fs";
+import { mkdirSync, readdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, relative, sep } from "node:path";
+import { dirname, join } from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { $ } from "bun";
 import { z } from "zod";
@@ -120,60 +120,43 @@ export function importRoot(label: string, importsDir?: string): string {
   return join(getImportsDir(importsDir), label);
 }
 
-// The ${CLAUDE_PLUGIN_DATA} template expands only in skill text and hook/MCP
-// subprocesses, never in Bash tool shells, so the scripts resolve the dir from
-// their own installed location: cache/<marketplace>/<plugin>/<hash>/... maps to
-// data/<plugin>-<marketplace>/. The env var remains as an override (tests,
-// hooks, dev checkouts).
-export async function getDataDir(): Promise<string> {
-  if (process.env.CLAUDE_PLUGIN_DATA != null && process.env.CLAUDE_PLUGIN_DATA !== "")
-    return process.env.CLAUDE_PLUGIN_DATA;
-
-  const segments = import.meta.dirname.split(sep);
-  const cacheIdx = segments.lastIndexOf("cache");
-  if (cacheIdx > 0 && segments[cacheIdx - 1] === "plugins" && segments.length > cacheIdx + 2) {
-    const marketplace = segments[cacheIdx + 1];
-    const plugin = segments[cacheIdx + 2];
-    const pluginsDir = segments.slice(0, cacheIdx).join(sep);
-    return join(pluginsDir, "data", `${plugin}-${marketplace}`);
-  }
-
-  const inPlace = await inPlaceDataDir(import.meta.dirname);
-  if (inPlace !== undefined) return inPlace;
-
-  throw new Error(
-    "Cannot locate plugin data directory: not running from an installed plugin. Set CLAUDE_PLUGIN_DATA.",
-  );
+// The index lives outside ~/.claude so the one folder can be granted to tools that
+// refuse ~/.claude, such as the desktop app's folder access for cloud sessions.
+// CLAUDE_SESSION_INDEX_DIR overrides it for tests and dev runs.
+export function getDataDir(): string {
+  const override = process.env.CLAUDE_SESSION_INDEX_DIR;
+  if (override != null && override !== "") return override;
+  return defaultDataDir();
 }
 
-const KnownMarketplaces = z.record(
-  z.string(),
-  z.looseObject({
-    source: z.looseObject({ source: z.string() }).optional().catch(undefined),
-    installLocation: z.string().optional().catch(undefined),
-  }),
-);
+function defaultDataDir(): string {
+  const xdg = process.env.XDG_DATA_HOME;
+  const root = xdg != null && xdg !== "" ? xdg : join(homedir(), ".local", "share");
+  return join(root, "claude-sessions");
+}
 
-// A relative-path plugin in a marketplace added from a local directory loads in
-// place, so its scripts run from inside the marketplace rather than under cache/.
-// Matching against the registered directory keeps a dev checkout, which is no
-// registered marketplace, failing as before instead of writing the live index.
-export async function inPlaceDataDir(
-  scriptDir: string,
-  pluginsDir = join(homedir(), ".claude", "plugins"),
-): Promise<string | undefined> {
-  const file = Bun.file(join(pluginsDir, "known_marketplaces.json"));
-  // No registry means no local marketplace to load from, so the caller's error stands.
-  if (!(await file.exists())) return undefined;
-  const registry = KnownMarketplaces.parse(await file.json());
-
-  for (const [marketplace, entry] of Object.entries(registry)) {
-    if (entry.source?.source !== "directory" || entry.installLocation === undefined) continue;
-    const segments = relative(entry.installLocation, scriptDir).split(sep);
-    if (segments[0] !== "plugins" || segments.length < 2 || segments[1] === "..") continue;
-    return join(pluginsDir, "data", `${segments[1]}-${marketplace}`);
+// Earlier releases kept the index in the plugin data dir. It moves rather than
+// rebuilds because telemetry rows outlive the files they came from.
+export async function migrateLegacyIndex(
+  dataDir: string,
+  pluginDataRoot = join(homedir(), ".claude", "plugins", "data"),
+): Promise<void> {
+  const candidates = (dirExists(pluginDataRoot) ? readdirSync(pluginDataRoot) : [])
+    .filter((name) => name.startsWith("observability-"))
+    .map((name) => join(pluginDataRoot, name));
+  const found = await Promise.all(candidates.map((dir) => Bun.file(sessionDbPath(dir)).exists()));
+  const legacy = candidates.filter((_, i) => found[i]);
+  const [source] = legacy;
+  if (source === undefined) return;
+  if (legacy.length > 1 || dirExists(dataDir)) {
+    console.error(
+      `session index: found ${[...legacy, dataDir].filter(dirExists).join(", ")}; moving none. Keep one and delete the rest.`,
+    );
+    return;
   }
-  return undefined;
+  mkdirSync(dirname(dataDir), { recursive: true });
+  await $`mv ${source} ${dataDir}`.quiet();
+  console.error(`session index: moved ${source} to ${dataDir}`);
 }
 
 export function sessionDbPath(dataDir: string): string {
@@ -419,6 +402,7 @@ async function rawMatchesProjection(db: Database): Promise<boolean> {
 }
 
 export async function getDb(dataDir: string): Promise<Database> {
+  if (dataDir === defaultDataDir()) await migrateLegacyIndex(dataDir);
   return createDatabase(sessionDbPath(dataDir));
 }
 

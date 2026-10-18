@@ -130,12 +130,8 @@ export function selectSample(candidates: Item[], limit: number): Item[] {
 
 function resolveDbPath(db: string | undefined): string {
   if (db != null && db !== "") return db;
-  const pluginData = process.env.CLAUDE_PLUGIN_DATA;
-  const tmp = process.env.TMPDIR;
-  const dataDir =
-    pluginData != null && pluginData !== ""
-      ? pluginData
-      : join(tmp != null && tmp !== "" ? tmp : "/tmp", "claude-session");
+  const dataHome = process.env.XDG_DATA_HOME ?? join(process.env.HOME ?? "", ".local", "share");
+  const dataDir = process.env.CLAUDE_SESSION_INDEX_DIR ?? join(dataHome, "claude-sessions");
   return join(dataDir, "session.duckdb");
 }
 

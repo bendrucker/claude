@@ -46,7 +46,7 @@ export function renderMap(rows: SurfaceColumns[]): string {
 // PATH, an index missing a surface) falls through to the committed map. It goes stale
 // only when `views.sql` changes, which db.test.ts catches.
 async function liveMap(): Promise<string> {
-  const adapter = cliAdapter(sessionDbPath(await getDataDir()), { timeoutMs: 5_000 });
+  const adapter = cliAdapter(sessionDbPath(getDataDir()), { timeoutMs: 5_000 });
   return renderMap(await runQuery(adapter, { sql: COLUMN_QUERY }, SurfaceColumns));
 }
 

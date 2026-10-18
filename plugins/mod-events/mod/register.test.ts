@@ -28,6 +28,7 @@ const CALLER: Plugin = {
   },
 };
 const WITH_CALLER = { plugins: [CALLER] };
+const HERDR = { options: { multiplexer: "herdr" } };
 
 const emit = ($: Engine, input: ModEventsInput) =>
   $.turn.start({ text: JSON.stringify(input), turnId: "t" });
@@ -182,7 +183,7 @@ describe("emit", () => {
 });
 
 describe("session.start", () => {
-  test("records the surface the session is reached from", async ($, on) => {
+  test("records the surface the session is reached from", HERDR, async ($, on) => {
     const w = world(on, HOME, PS_MOSH);
     await $.session.start({ surface: "terminal", isInteractive: true, cwd: "/work" });
     expect(w.lines(`${ROOT}/s1/mod-events.1000.0.jsonl`)).toEqual([
@@ -203,29 +204,47 @@ describe("session.start", () => {
     ]);
   });
 
-  test("later events carry the surface on their resource", WITH_CALLER, async ($, on) => {
-    const w = world(on, HOME, PS_MOSH);
+  test(
+    "later events carry the surface on their resource",
+    { ...WITH_CALLER, ...HERDR },
+    async ($, on) => {
+      const w = world(on, HOME, PS_MOSH);
+      await $.session.start({ surface: "terminal", isInteractive: true, cwd: "/work" });
+      await emit($, { mod: "herdr", event: "a" });
+      expect(w.lines(`${ROOT}/s1/herdr.1000.0.jsonl`)[0]?.resource).toEqual({
+        ...RESOURCE,
+        "claude_code.surface": "mosh",
+      });
+    },
+  );
+
+  test("skips ps without a multiplexer", async ($, on) => {
+    const w = world(on, { ...HOME, SSH_CONNECTION: "10.0.0.2 5000 10.0.0.1 22" }, PS_MOSH);
     await $.session.start({ surface: "terminal", isInteractive: true, cwd: "/work" });
-    await emit($, { mod: "herdr", event: "a" });
-    expect(w.lines(`${ROOT}/s1/herdr.1000.0.jsonl`)[0]?.resource).toEqual({
-      ...RESOURCE,
-      "claude_code.surface": "mosh",
-    });
+    const [line] = w.lines(`${ROOT}/s1/mod-events.1000.0.jsonl`);
+    expect(line?.attributes.clients).toEqual([]);
+    expect(line?.resource["claude_code.surface"]).toBe("ssh");
   });
 });
 
 describe("surfaceOf", () => {
   test("mosh wins when any herdr client descends from mosh-server", () => {
-    expect(surfaceOf(PS_MOSH, undefined)).toEqual({ surface: "mosh", clients: ["local", "mosh"] });
+    expect(surfaceOf(PS_MOSH, undefined, "herdr")).toEqual({
+      surface: "mosh",
+      clients: ["local", "mosh"],
+    });
   });
 
   test("a session under ssh with no herdr is ssh", () => {
-    expect(surfaceOf("", "10.0.0.2 5000 10.0.0.1 22")).toEqual({ surface: "ssh", clients: [] });
+    expect(surfaceOf("", "10.0.0.2 5000 10.0.0.1 22", "herdr")).toEqual({
+      surface: "ssh",
+      clients: [],
+    });
   });
 
   test("herdr's clients outrank an SSH_CONNECTION the server passed its panes", () => {
     const ps = ["    1     0 /sbin/launchd", " 1816     1 herdr", "16774  1405 herdr"].join("\n");
-    expect(surfaceOf(ps, "10.0.0.2 5000 10.0.0.1 22")).toEqual({
+    expect(surfaceOf(ps, "10.0.0.2 5000 10.0.0.1 22", "herdr")).toEqual({
       surface: "local",
       clients: ["local"],
     });
@@ -239,10 +258,10 @@ describe("surfaceOf", () => {
       "902 901 -zsh",
       "903 902 herdr",
     ].join("\n");
-    expect(surfaceOf(ps, undefined)).toEqual({ surface: "ssh", clients: ["ssh"] });
+    expect(surfaceOf(ps, undefined, "herdr")).toEqual({ surface: "ssh", clients: ["ssh"] });
   });
 
   test("no ps output and no SSH_CONNECTION is local", () => {
-    expect(surfaceOf(undefined, undefined)).toEqual({ surface: "local", clients: [] });
+    expect(surfaceOf(undefined, undefined, "")).toEqual({ surface: "local", clients: [] });
   });
 });

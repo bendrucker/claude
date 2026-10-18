@@ -5,5 +5,13 @@
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
   },
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "multiplexer": {
+      "type": "string",
+      "title": "Terminal multiplexer",
+      "description": "Process name of the multiplexer whose attached clients decide whether a session is local or reached over mosh or ssh. Empty classifies from SSH_CONNECTION alone and skips the ps scan.",
+      "default": ""
+    }
+  }
 }

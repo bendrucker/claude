@@ -431,6 +431,11 @@
       "options": {
         "overage": true
       }
+    },
+    "mod-events@bendrucker": {
+      "options": {
+        "multiplexer": "herdr"
+      }
     }
   },
   "enabledPlugins": {

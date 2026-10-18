@@ -182,9 +182,9 @@ describe("register", () => {
 
   const options = {
     caps: [String.raw`build:2:\b(?:vite|ladle)(?:\.js)? build\b`],
-    maxLoadPerCore: 3,
-    paceLoadPerCore: 1.5,
-    strainLoadPerCore: 3,
+    refuse: 3,
+    remind: 1.5,
+    warn: 3,
   };
 
   test(

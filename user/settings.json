@@ -403,9 +403,9 @@
           "build:4:\\bplaywright(?:/test/cli\\.js)? test\\b",
           "duckdb:4:(?:^|/)duckdb(?=\\s|$)"
         ],
-        "maxLoadPerCore": 4,
-        "paceLoadPerCore": 1.5,
-        "strainLoadPerCore": 3
+        "remind": 1.5,
+        "warn": 3,
+        "refuse": 4
       }
     }
   },

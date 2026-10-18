@@ -5,7 +5,9 @@
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
   },
-  "dependencies": ["mod-events"],
+  "dependencies": [
+    "mod-events"
+  ],
   "userConfig": {
     "caps": {
       "type": "string",
@@ -14,24 +16,24 @@
       "description": "pool:limit:regex entries. A Bash command matching the regex is refused while `limit` processes matching its pool already run. Entries sharing a pool share its limit. Empty caps nothing.",
       "default": []
     },
-    "maxLoadPerCore": {
+    "remind": {
       "type": "number",
-      "title": "Load cap per core",
+      "title": "Remind at load per core",
+      "description": "Remind the model to pace heavy work once the load average per core reaches this, or under memory pressure. 0 turns reminders off.",
+      "default": 0,
+      "min": 0
+    },
+    "warn": {
+      "type": "number",
+      "title": "Warn at load per core",
+      "description": "Tell the model to start no heavy work it doesn't need once the load average per core reaches this, or under critical memory pressure. 0 leaves only memory pressure.",
+      "default": 0,
+      "min": 0
+    },
+    "refuse": {
+      "type": "number",
+      "title": "Refuse above load per core",
       "description": "Refuse capped commands while the load average per core is above this. 0 turns it off.",
-      "default": 0,
-      "min": 0
-    },
-    "paceLoadPerCore": {
-      "type": "number",
-      "title": "Pacing threshold per core",
-      "description": "Remind the model to pace heavy work once load per core reaches this, or under memory pressure. 0 turns pacing off.",
-      "default": 0,
-      "min": 0
-    },
-    "strainLoadPerCore": {
-      "type": "number",
-      "title": "Strained threshold per core",
-      "description": "Tell the model to start no heavy work it doesn't need once load per core reaches this, or under critical memory pressure. 0 leaves only memory pressure.",
       "default": 0,
       "min": 0
     }

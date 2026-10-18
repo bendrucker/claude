@@ -30,7 +30,7 @@ const SAMPLE_MS = 15_000;
 interface Config {
   caps: Cap[];
   invalid: string[];
-  maxLoadPerCore: number;
+  refuse: number;
   pace: Thresholds;
 }
 
@@ -42,8 +42,8 @@ function configOf(options: PluginOptions): Config {
   };
   return {
     ...parseCaps(Array.isArray(entries) ? entries : []),
-    maxLoadPerCore: number("maxLoadPerCore"),
-    pace: { busy: number("paceLoadPerCore"), strained: number("strainLoadPerCore") },
+    refuse: number("refuse"),
+    pace: { remind: number("remind"), warn: number("warn") },
   };
 }
 
@@ -110,7 +110,7 @@ async function pace(
   config: Config,
   owner: string,
 ): Promise<string | undefined> {
-  if (config.pace.busy <= 0) return undefined;
+  if (config.pace.remind <= 0) return undefined;
   const now = await sampled($, state, config);
   const grade = level(now, config.pace);
   const told = state.told.get(owner) ?? 0;
@@ -280,7 +280,7 @@ export function register(on: On, options: PluginOptions): void {
       const probed = await machine($, config.caps);
       state.sample = { at: await $.clock.now(), machine: probed };
       const now = { ...probed, running: [...probed.running, ...state.starting] };
-      const verdict = judgeCaps(config.caps, plan, now, config.maxLoadPerCore);
+      const verdict = judgeCaps(config.caps, plan, now, config.refuse);
       void $.modEvents.emit({
         mod: MOD,
         event: verdict.deny === undefined ? "cap.start" : "cap.deny",

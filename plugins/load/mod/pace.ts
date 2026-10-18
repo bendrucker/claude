@@ -4,18 +4,18 @@ import { type Machine, PRESSURE_CRITICAL, PRESSURE_WARN } from "./caps";
 export type Level = 0 | 1 | 2;
 
 export interface Thresholds {
-  /** Load per core that makes the machine busy; 0 turns pacing off. */
-  busy: number;
+  /** Load per core that makes the machine busy; 0 turns reminders off. */
+  remind: number;
   /** Load per core that makes it strained; 0 leaves only memory pressure. */
-  strained: number;
+  warn: number;
 }
 
-export function level(machine: Machine, { busy, strained }: Thresholds): Level {
-  if (busy <= 0) return 0;
+export function level(machine: Machine, { remind, warn }: Thresholds): Level {
+  if (remind <= 0) return 0;
   const load = machine.loadPerCore ?? 0;
   const pressure = machine.pressure ?? 0;
-  if (pressure >= PRESSURE_CRITICAL || (strained > 0 && load >= strained)) return 2;
-  if (pressure >= PRESSURE_WARN || load >= busy) return 1;
+  if (pressure >= PRESSURE_CRITICAL || (warn > 0 && load >= warn)) return 2;
+  if (pressure >= PRESSURE_WARN || load >= remind) return 1;
   return 0;
 }
 

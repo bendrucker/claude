@@ -122,7 +122,7 @@ export function judge(
   caps: readonly Cap[],
   { pools, isParallel }: Plan,
   machine: Machine,
-  maxLoadPerCore: number,
+  refuse: number,
 ): Verdict {
   if (pools.length === 0) return {};
   const jobs = pools.join(", ");
@@ -149,7 +149,7 @@ export function judge(
     }
   }
   const load = machine.loadPerCore;
-  if (maxLoadPerCore > 0 && load !== undefined && load > maxLoadPerCore) {
+  if (refuse > 0 && load !== undefined && load > refuse) {
     return {
       reason: "load",
       deny: `The machine is saturated (load ${load.toFixed(1)}x its core count). Wait for running work to finish before starting a ${jobs} job.`,

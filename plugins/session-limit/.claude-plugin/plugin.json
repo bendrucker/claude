@@ -6,5 +6,13 @@
     "email": "bvdrucker@gmail.com"
   },
   "types": "./types/index.d.ts",
-  "dependencies": ["mod-events"]
+  "dependencies": ["mod-events"],
+  "userConfig": {
+    "overage": {
+      "type": "boolean",
+      "title": "Extra usage enabled",
+      "description": "Tell the model that requests past an exhausted 5-hour block spend overage credits. Leave off for accounts without extra usage.",
+      "default": false
+    }
+  }
 }

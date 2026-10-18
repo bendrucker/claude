@@ -1,10 +1,12 @@
-import type { On } from "claude-code";
+import type { On, PluginOptions } from "claude-code";
 import { evaluate, summarize } from "./bands";
 
 const MOD = "session-limit";
 const ANNOUNCED = { plugin: "session-limit", key: "announced" } as const;
 
-export function register(on: On): void {
+export function register(on: On, options: PluginOptions): void {
+  const overage = options.overage === true;
+
   on("session.start", ($, e, next) => {
     void $.modEvents.emit({ mod: MOD, event: "session.start" });
     return next(e);
@@ -20,7 +22,7 @@ export function register(on: On): void {
     if (!e.changed.includes("rateLimits")) return next(e);
 
     const { value: prev = {} } = await $.state.get(ANNOUNCED);
-    const { announced, crossings } = evaluate(e.rateLimits, prev, await $.clock.now());
+    const { announced, crossings } = evaluate(e.rateLimits, prev, await $.clock.now(), overage);
 
     if (crossings.length === 0) {
       await $.state.set(ANNOUNCED, announced);

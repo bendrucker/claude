@@ -94,6 +94,13 @@ describe("bands", () => {
     expect(message(past)).toContain("tell the user to return");
   });
 
+  test("the exhausted message claims overage spend only when overage is on", () => {
+    const message = (overage: boolean) =>
+      evaluate(limits(100), {}, NOW, overage).crossings[0]?.message ?? "";
+    expect(message(false)).not.toContain("overage");
+    expect(message(true)).toContain("spends overage credits");
+  });
+
   test("warns on the 7-day window alone", () => {
     const { crossings } = evaluate(limits(10, 95), {}, NOW);
     expect(crossings.map((c) => [c.kind, c.threshold])).toEqual([["seven_day", 95]]);

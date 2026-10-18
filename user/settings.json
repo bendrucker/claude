@@ -426,6 +426,11 @@
       "options": {
         "link_base": "https://things.bendrucker.me/show?id="
       }
+    },
+    "session-limit@bendrucker": {
+      "options": {
+        "overage": true
+      }
     }
   },
   "enabledPlugins": {

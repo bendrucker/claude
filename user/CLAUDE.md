@@ -36,7 +36,7 @@ Investigate in auto mode until the approach is settled, then enter plan mode to 
 
 ## Decisions
 
-Ask a simple decision (a confirmation, an approval, a multiple-choice pick) with `AskUserQuestion`, because it reaches my phone. When the decision lives inside a document I should read and mark up, write `tmp/<topic>.md` with one question block per decision and a recommendation, open it with Plannotator as the `plannotator` skill describes, and end the turn. Where Plannotator can't reach me, publish the file as an Artifact instead. Once I answer in chat while a gate is open, stop opening gates for the rest of the session.
+Ask a simple decision (a confirmation, an approval, a multiple-choice pick) with `AskUserQuestion`, because it reaches my phone.
 
 ## Check-ins
 

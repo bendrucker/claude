@@ -4,7 +4,6 @@ description: Real-browser automation via the `agent-browser` CLI. Use when a tas
 allowed-tools:
   - Bash(agent-browser:*)
   - Bash(npx agent-browser:*)
-hidden: true
 ---
 
 # agent-browser

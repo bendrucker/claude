@@ -62,6 +62,6 @@ A repo can be configured to review only on request, which changes an absent summ
 
 Common reviewers need no maintenance: GitHub reports `__typename: "Bot"` for App and bot accounts, and GitLab service accounts follow the `*-bot` / `*_bot` convention or the token service-account form `group_<id>_bot_<hash>` / `project_<id>_bot_<hash>` (CodeRabbit posts under a group token account). Whatever those signals catch is handled automatically.
 
-For an account they miss (a GitLab bot with an off-convention username) or a human reviewer you want the loop to triage, add one username per line to `reviewers.txt` in that plugin's data directory (`$CLAUDE_PLUGIN_DATA`, e.g. `~/.claude/plugins/data/github-bendrucker/reviewers.txt`). Blank lines and `#` comments are ignored; the list only adds to the structural detection.
+For an account they miss (a GitLab bot with an off-convention username) or a human reviewer you want the loop to triage, add the username to that plugin's comma-separated `reviewers` option (`pluginConfigs` under `github@bendrucker` or `gitlab@bendrucker`). The list only adds to the structural detection.
 
 Then add a satisfaction signal and re-trigger phrase for the new reviewer here.

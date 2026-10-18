@@ -7,6 +7,12 @@
   },
   "dependencies": ["git", "mod-events"],
   "userConfig": {
+    "reviewers": {
+      "type": "string",
+      "title": "Extra reviewers",
+      "description": "Comma-separated logins that --bots treats as review bots, beyond the structural bot detection. Empty adds none.",
+      "default": ""
+    },
     "watch": {
       "type": "boolean",
       "title": "Watch the pull request",

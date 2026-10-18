@@ -535,12 +535,18 @@ export async function dispatch(
     const remote = baseRemote(remotes, options.base);
     if (remote != null) {
       const url = await required(run, ["git", "-C", root, "remote", "get-url", remote], null);
-      await required(run, ["git", "-C", root, "fetch", ...fetchArgs(remote, url.stdout)], null, {
+      const fetchOptions: RunOptions = {
         timeoutMs: FETCH_TIMEOUT_MS,
         // Unattended, a credential prompt would wait for input nobody is there
         // to give. The timeout covers an SSH agent that waits on a hardware key.
         env: { GIT_TERMINAL_PROMPT: "0" },
-      });
+      };
+      const args = fetchArgs(remote, url.stdout);
+      // Without an HTTPS credential, a private repository is reachable only over the remote's own URL.
+      const https =
+        args.length > 1 ? await run(["git", "-C", root, "fetch", ...args], fetchOptions) : null;
+      if (https?.code !== 0)
+        await required(run, ["git", "-C", root, "fetch", remote], null, fetchOptions);
     }
 
     // herdr rejects an unknown base too, after paying for the worktree attempt.

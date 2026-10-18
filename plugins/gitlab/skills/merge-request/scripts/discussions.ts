@@ -14,7 +14,7 @@ import {
   readBody,
   validateLineInDiff,
 } from "./diff";
-import { isReviewTarget, loadExtraReviewers } from "./reviewers";
+import { isReviewTarget, parseReviewers } from "./reviewers";
 
 export { parseGlabPaginated } from "./diff";
 
@@ -174,17 +174,18 @@ export function deduplicateDiscussions(discussions: Discussion[]): Discussion[] 
   return [...seen.values()];
 }
 
-async function buildFilterOptions(flags: {
+function buildFilterOptions(flags: {
   author: string | undefined;
   resolvable: boolean;
   unresolved: boolean;
   bots: boolean;
-}): Promise<FilterOptions> {
+  reviewers: string | undefined;
+}): FilterOptions {
   const opts: FilterOptions = {};
   if (flags.author != null && flags.author !== "") opts.author = flags.author;
   if (flags.bots) {
     opts.bots = true;
-    opts.extra = await loadExtraReviewers();
+    opts.extra = parseReviewers(flags.reviewers);
   }
   if (flags.resolvable) opts.resolvable = true;
   if (flags.unresolved) opts.unresolved = true;
@@ -238,9 +239,12 @@ const listCmd = command(
       author: { type: String, description: "Filter by author username" },
       bots: {
         type: Boolean,
-        description:
-          "Only review-bot discussions (plus usernames in $CLAUDE_PLUGIN_DATA/reviewers.txt)",
+        description: "Only review-bot discussions (plus --reviewers usernames)",
         default: false,
+      },
+      reviewers: {
+        type: String,
+        description: "Comma-separated usernames --bots also matches",
       },
       resolvable: { type: Boolean, description: "Only resolvable discussions", default: false },
       unresolved: { type: Boolean, description: "Only unresolved discussions", default: false },
@@ -267,7 +271,7 @@ const listCmd = command(
     const raw = await $`glab api projects/:id/merge_requests/${iid}/discussions --paginate`.text();
     let discussions = Discussions.parse(parseGlabPaginated(raw));
 
-    discussions = filterDiscussions(discussions, await buildFilterOptions(parsed.flags));
+    discussions = filterDiscussions(discussions, buildFilterOptions(parsed.flags));
 
     if (parsed.flags.dedupe) {
       discussions = deduplicateDiscussions(discussions);

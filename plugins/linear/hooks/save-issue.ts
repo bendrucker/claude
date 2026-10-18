@@ -16,8 +16,14 @@ export interface CreateIssueInput {
   assignee?: string;
 }
 
-export function getDefaultState(assignee: string | undefined): string {
-  return assignee != null && assignee !== "" ? "Todo" : "Backlog";
+// Configured through the plugin's assigned_state and unassigned_state options.
+// Empty leaves the state untouched.
+export function getDefaultState(assignee: string | undefined): string | undefined {
+  const state =
+    assignee != null && assignee !== ""
+      ? process.env.CLAUDE_PLUGIN_OPTION_ASSIGNED_STATE
+      : process.env.CLAUDE_PLUGIN_OPTION_UNASSIGNED_STATE;
+  return state === "" ? undefined : state;
 }
 
 // Wrapper keys the connector tolerates inconsistently. A single one whose value
@@ -86,11 +92,12 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
     };
   }
 
-  // Preserve the original default-state behavior: inject a default only when
-  // creating and state is absent. Never override an explicitly set state.
-  const needsDefaultState = isCreate && (state == null || state === "");
+  // Inject a default only when creating and state is absent. Never override an
+  // explicitly set state.
+  const defaultState =
+    isCreate && (state == null || state === "") ? getDefaultState(assignee) : undefined;
 
-  if (!mutated && !needsDefaultState) {
+  if (!mutated && defaultState == null) {
     return null;
   }
 
@@ -98,8 +105,8 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
   // "allow" decision, which also bypasses the permission prompt. Echo back every
   // normalized field alongside any injected default state.
   const updatedInput: Record<string, unknown> = { ...normalized };
-  if (needsDefaultState) {
-    updatedInput.state = getDefaultState(assignee);
+  if (defaultState != null) {
+    updatedInput.state = defaultState;
   }
 
   return {

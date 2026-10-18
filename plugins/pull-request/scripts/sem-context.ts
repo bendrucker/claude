@@ -166,15 +166,16 @@ async function capture(command: string[]): Promise<string | null> {
   }
 }
 
-export function gitLookups(): BaseLookups {
+export function gitLookups(stackFile: string): BaseLookups {
   return {
     prBase: () => capture(["gh", "pr", "view", "--json", "baseRefName", "--jq", ".baseRefName"]),
     currentBranch: () => capture(["git", "branch", "--show-current"]),
     stackFile: async () => {
+      if (stackFile === "") return null;
       const commonDir = await capture(["git", "rev-parse", "--git-common-dir"]);
       if (commonDir === null) return null;
       try {
-        return await Bun.file(join(commonDir, "wt", "stack")).text();
+        return await Bun.file(join(commonDir, stackFile)).text();
       } catch (error) {
         if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") {
           throw error;
@@ -239,12 +240,18 @@ if (import.meta.main) {
       base: {
         type: String,
         description:
-          "Base ref to diff against. Default: the PR base, then the worktree stack parent, then the repo default branch.",
+          "Base ref to diff against. Default: the PR base, then the stack parent, then the repo default branch.",
+      },
+      stackFile: {
+        type: String,
+        default: "",
+        description:
+          "Stack file, relative to the git common dir: one branch per line, tab-indented under its parent. Empty skips the stack lookup.",
       },
     },
   });
 
-  const base = argv.flags.base ?? (await resolveBase(gitLookups()));
+  const base = argv.flags.base ?? (await resolveBase(gitLookups(argv.flags.stackFile)));
   const result = await runSem(await diffRef(base));
 
   if (result.kind === "missing") {

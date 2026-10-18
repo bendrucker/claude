@@ -339,14 +339,7 @@
         "/var/folders/*/*/T/**/*"
       ]
     },
-    "excludedCommands": [
-      "git:*",
-      "wt:*",
-      "claude:*",
-      "agent-browser:*",
-      "open:*",
-      "osascript:*"
-    ]
+    "excludedCommands": ["git:*", "wt:*", "claude:*", "agent-browser:*", "open:*", "osascript:*"]
   },
   "statusLine": {
     "type": "command",

@@ -7,7 +7,7 @@ This repository contains my personal Claude Code configuration and a plugin mark
 - `schemas/`: JSON Schemas for Claude Code config formats. Upstream-backed ones (`plugin`, `marketplace`, `settings`) keep only our edits as an RFC 6902 overlay in [`schemas/overlays/`](schemas/overlays/), merged with the live upstream base in memory at validation time; the rest are hand-authored
 - `user/`: User-level configuration, symlinked to `~/.claude` by the [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in dotfiles. `user/settings.json` is the Mac's user settings
 - `managed/settings.json`: Settings for every platform, installed as a managed-settings drop-in, so they outrank project settings
-- `platforms/<name>/`: What one platform adds. Dotfiles links `CLAUDE.md` to `~/.claude/platform.md`, which `user/CLAUDE.md` imports. `platforms/cloud/settings.json` is the cloud's user settings
+- `platforms/<name>/`: Entries dotfiles links into `~/.claude` on one platform beside `user/`'s, replacing any of the same name: `platform.md`, which `user/CLAUDE.md` imports, and the cloud's own `settings.json`
 - `docs/`: Reference material too long to auto-inject, linked from the rule that needs it
 
 ## Curation

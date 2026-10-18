@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { z } from "zod";
 
 export const Author = z.looseObject({
@@ -15,22 +14,13 @@ export function isBot(author: Author | null | undefined): boolean {
 }
 
 // Logins to triage beyond what the API types as a bot: a reviewer the API ever
-// surfaces as a User, or a human you want the autonomous loop to act on. One
-// login per line in `$CLAUDE_PLUGIN_DATA/reviewers.txt`; blank lines and `#`
-// comments are ignored. Absent file or unset env yields an empty set.
-export async function loadExtraReviewers(): Promise<Set<string>> {
-  const dataDir = process.env.CLAUDE_PLUGIN_DATA;
-  if (dataDir == null || dataDir === "") return new Set();
-  const file = Bun.file(join(dataDir, "reviewers.txt"));
-  if (!(await file.exists())) return new Set();
-  return parseReviewers(await file.text());
-}
-
-export function parseReviewers(contents: string): Set<string> {
+// surfaces as a User, or a human you want the autonomous loop to act on. The
+// skill passes the plugin's comma-separated `reviewers` option.
+export function parseReviewers(list = ""): Set<string> {
   return new Set(
-    contents
-      .split("\n")
-      .map((line) => line.replace(/#.*/, "").trim().toLowerCase())
+    list
+      .split(",")
+      .map((login) => login.trim().toLowerCase())
       .filter(Boolean),
   );
 }

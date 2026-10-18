@@ -408,9 +408,22 @@
         "refuse": 4
       }
     },
+    "linear@bendrucker": {
+      "options": {
+        "assigned_state": "Todo",
+        "unassigned_state": "Backlog"
+      }
+    },
     "pull-request@bendrucker": {
       "options": {
+        "auto_merge": true,
+        "stack_file": "wt/stack",
         "body_review_skill": "review:human"
+      }
+    },
+    "things@bendrucker": {
+      "options": {
+        "link_base": "https://things.bendrucker.me/show?id="
       }
     }
   },

@@ -185,7 +185,7 @@ describe("register", () => {
     world.ps = "node /r/node_modules/.bin/ladle build\nnode /r/node_modules/vite/bin/vite.js build";
 
     const denied = await bash($, "npx ladle build --outDir out");
-    expect(denied.deny).toContain("2 heavy builds");
+    expect(denied.deny).toContain("2 heavy build jobs");
     expect(world.ran).toEqual([]);
     expect(world.events.at(-1)).toEqual({
       mod: "load",
@@ -195,6 +195,7 @@ describe("register", () => {
         kinds: ["ladle"],
         running: ["ladle", "vite"],
         loadPerCore: 1 / 14,
+        pressure: null,
         agent: null,
       },
     });

@@ -1,6 +1,13 @@
 import type { EngineInterface, On } from "claude-code";
 import { type BrowserCall, type Census, browserCalls, judge } from "./browser";
-import { type Machine, judgeBuilds, loadPerCore, planBuilds, runningBuilds } from "./builds";
+import {
+  type Machine,
+  judgeBuilds,
+  loadPerCore,
+  planBuilds,
+  pressureLevel,
+  runningBuilds,
+} from "./builds";
 import { segments } from "./command";
 
 const MOD = "load";
@@ -46,9 +53,19 @@ async function liveSessions($: EngineInterface): Promise<Set<string>> {
 async function machine($: EngineInterface): Promise<Machine> {
   const [ps, sysctl] = await Promise.all([
     $.process.run(["ps", "-axo", "command="], { timeoutMs: 5000 }),
-    $.process.run(["sysctl", "-n", "vm.loadavg", "hw.ncpu"], { timeoutMs: 5000 }),
+    // The pressure level is hidden from `sysctl -a` but reads by name without root.
+    $.process.run(
+      ["sysctl", "-n", "vm.loadavg", "hw.ncpu", "kern.memorystatus_vm_pressure_level"],
+      {
+        timeoutMs: 5000,
+      },
+    ),
   ]);
-  return { running: runningBuilds(ps.stdout), loadPerCore: loadPerCore(sysctl.stdout) };
+  return {
+    running: runningBuilds(ps.stdout),
+    loadPerCore: loadPerCore(sysctl.stdout),
+    pressure: pressureLevel(sysctl.stdout),
+  };
 }
 
 function census(state: State, owner: string, isSubagent: boolean, live: Set<string>): Census {
@@ -183,6 +200,7 @@ export function register(on: On): void {
           kinds: plan.kinds,
           running: now.running,
           loadPerCore: now.loadPerCore ?? null,
+          pressure: now.pressure ?? null,
           agent,
         },
       });

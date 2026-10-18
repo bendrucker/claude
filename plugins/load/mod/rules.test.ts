@@ -1,6 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
 import { type Census, MAX_DAEMONS, browserCalls, judge } from "./browser";
-import { judgeBuilds, loadPerCore, planBuilds, runningBuilds } from "./builds";
+import { judgeBuilds, loadPerCore, planBuilds, pressureLevel, runningBuilds } from "./builds";
 import { segments } from "./command";
 
 const calls = (command: string) => browserCalls(segments(command));
@@ -174,6 +174,17 @@ describe("builds", () => {
       ],
       ["pytest serial", "uv run pytest tests/", { kinds: [], isParallel: false }],
       ["dev server", "npx ladle serve", { kinds: [], isParallel: false }],
+      ["vitest run", "bunx vitest run src", { kinds: ["vitest"], isParallel: false }],
+      ["vitest watch", "bunx vitest --watch", { kinds: [], isParallel: false }],
+      ["jest", "npx jest --ci", { kinds: ["jest"], isParallel: false }],
+      ["jest in band", "npx jest -i", { kinds: [], isParallel: false }],
+      ["playwright", "npx playwright test e2e", { kinds: ["playwright"], isParallel: false }],
+      ["duckdb cli", "duckdb -readonly s.db < q.sql", { kinds: ["duckdb"], isParallel: false }],
+      [
+        "session index",
+        "bun ~/.claude/plugins/marketplaces/bendrucker/plugins/observability/skills/session/scripts/query.ts tools",
+        { kinds: ["session-index"], isParallel: false },
+      ],
     ];
     for (const [name, command, expected] of cases) {
       expect({ name, plan: plan(command) }).toEqual({ name, plan: expected });
@@ -189,8 +200,12 @@ describe("builds", () => {
       "/usr/local/bin/node /repo/node_modules/vite/bin/vite.js build",
       "/repo/.venv/bin/python /repo/.venv/bin/pytest -n auto",
       "grep ladle build",
+      "node /repo/node_modules/vitest/vitest.mjs run",
+      "node /repo/node_modules/vitest/dist/workers/forks.js",
+      "node /repo/node_modules/jest-worker/build/processChild.js",
+      "/Users/b/.local/share/mise/installs/duckdb/1.5.6/duckdb -readonly s.db",
     ].join("\n");
-    expect(runningBuilds(ps)).toEqual(["ladle", "vite", "pytest-xdist"]);
+    expect(runningBuilds(ps)).toEqual(["ladle", "vite", "pytest-xdist", "vitest", "duckdb"]);
   });
 
   test("reads load per core from sysctl", () => {
@@ -198,17 +213,37 @@ describe("builds", () => {
     expect(loadPerCore("garbage")).toBeUndefined();
   });
 
+  test("reads the memory pressure level, absent off macOS", () => {
+    expect(pressureLevel("{ 1.00 1.00 1.00 }\n10\n4\n")).toBe(4);
+    expect(pressureLevel("{ 1.00 1.00 1.00 }\n10\n")).toBeUndefined();
+  });
+
   test("refuses parallel, overlapping, and saturated builds", () => {
     const one = plan("npx ladle build");
-    const idle = { running: [], loadPerCore: 0.5 };
+    const idle = { running: [], loadPerCore: 0.5, pressure: 1 };
     expect(judgeBuilds(plan("for s in a b; do npx ladle build & done"), idle).reason).toBe(
       "parallel",
     );
-    expect(judgeBuilds(one, { running: ["ladle", "vite"], loadPerCore: 0.5 }).reason).toBe(
-      "running",
-    );
-    expect(judgeBuilds(one, { running: [], loadPerCore: 41 }).reason).toBe("load");
+    expect(judgeBuilds(one, { ...idle, running: ["ladle", "vite"] }).reason).toBe("running");
+    expect(judgeBuilds(one, { ...idle, loadPerCore: 41 }).reason).toBe("load");
     expect(judgeBuilds(one, idle)).toEqual({});
-    expect(judgeBuilds(plan("ls"), { running: ["a", "b", "c"], loadPerCore: 41 })).toEqual({});
+    expect(judgeBuilds(plan("ls"), { ...idle, running: ["a", "b", "c"], loadPerCore: 41 })).toEqual(
+      {},
+    );
+  });
+
+  test("bounds DuckDB in its own pool and shrinks pools under memory pressure", () => {
+    const duckdb = plan("duckdb s.db < q.sql");
+    const idle = { running: [], loadPerCore: 0.5, pressure: 1 };
+    expect(judgeBuilds(duckdb, { ...idle, running: ["vite", "ladle"] })).toEqual({});
+    expect(judgeBuilds(duckdb, { ...idle, running: ["duckdb", "session-index"] })).toEqual({});
+    expect(
+      judgeBuilds(duckdb, { ...idle, running: ["duckdb", "duckdb", "session-index"] }).reason,
+    ).toBe("running");
+    const warn = judgeBuilds(duckdb, { ...idle, running: ["duckdb"], pressure: 2 });
+    expect(warn.reason).toBe("running");
+    expect(warn.deny).toContain("under pressure");
+    expect(judgeBuilds(duckdb, { ...idle, pressure: 2 })).toEqual({});
+    expect(judgeBuilds(duckdb, { ...idle, pressure: 4 }).reason).toBe("pressure");
   });
 });

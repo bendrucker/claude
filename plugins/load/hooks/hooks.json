@@ -1,4 +1,4 @@
 {
-  "description": "Caps agent-browser sessions per agent and machine-wide, closes an ended agent's sessions, and refuses parallel or overlapping heavy builds",
+  "description": "Caps agent-browser sessions per agent and machine-wide, closes an ended agent's sessions, and refuses heavy builds, test runs, and DuckDB started side by side, over a per-pool cap, or under memory pressure",
   "modules": ["../mod/register.ts"]
 }

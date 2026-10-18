@@ -340,34 +340,12 @@
       ]
     },
     "excludedCommands": [
-      "docker:*",
-      "ssh:*",
-      "scp:*",
-      "rsync:*",
-      "aws:*",
-      "vm:*",
-      "gcloud:*",
-      "az:*",
-      "pulumi:*",
+      "git:*",
       "wt:*",
       "claude:*",
       "agent-browser:*",
-      "pbcopy:*",
-      "pbpaste:*",
-      "security:*",
-      "defaults:*",
-      "screencapture:*",
-      "say:*",
-      "afplay:*",
-      "diskutil:*",
-      "networksetup:*",
       "open:*",
-      "osascript:*",
-      "shortcuts:*",
-      "dscl:*",
-      "git:*",
-      "linear:*",
-      "code:*"
+      "osascript:*"
     ]
   },
   "statusLine": {

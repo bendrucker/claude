@@ -251,7 +251,8 @@ const listCmd = command(
       },
       format: {
         type: String,
-        description: "Output format: json, table, or digest",
+        description:
+          "Output format: json, table, digest, or raw (full discussions with every note)",
         default: "json",
       },
       truncate: {
@@ -270,6 +271,11 @@ const listCmd = command(
 
     if (parsed.flags.dedupe) {
       discussions = deduplicateDiscussions(discussions);
+    }
+
+    if (parsed.flags.format === "raw") {
+      console.log(JSON.stringify(discussions, null, 2));
+      return;
     }
 
     const summaries = discussions.map(summarize).filter((s): s is DiscussionSummary => s !== null);

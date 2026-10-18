@@ -22,10 +22,8 @@ describe("isBotUsername", () => {
 });
 
 describe("parseReviewers", () => {
-  test("reads one username per line, lowercased, ignoring blanks and comments", () => {
-    expect(parseReviewers("# bots\nCodeRabbitAI\n\n jacob # human \n")).toEqual(
-      new Set(["coderabbitai", "jacob"]),
-    );
+  test("splits on commas, lowercased, ignoring blanks", () => {
+    expect(parseReviewers("CodeRabbitAI, jacob,")).toEqual(new Set(["coderabbitai", "jacob"]));
   });
 });
 

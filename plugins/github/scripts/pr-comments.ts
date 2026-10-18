@@ -2,7 +2,7 @@
 
 import { cli } from "cleye";
 import { z } from "zod";
-import { Author, isBot, isReviewTarget, loadExtraReviewers } from "./reviewers";
+import { Author, isBot, isReviewTarget, parseReviewers } from "./reviewers";
 
 const QUERY = `
 query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
@@ -298,8 +298,12 @@ async function main(): Promise<void> {
       },
       bots: {
         type: Boolean,
-        description: "Only review-bot threads (plus logins in $CLAUDE_PLUGIN_DATA/reviewers.txt)",
+        description: "Only review-bot threads (plus --reviewers logins)",
         default: false,
+      },
+      reviewers: {
+        type: String,
+        description: "Comma-separated logins --bots also matches",
       },
       includeResolved: {
         type: Boolean,
@@ -370,7 +374,7 @@ async function main(): Promise<void> {
     viewer,
     since,
     bots: argv.flags.bots,
-    extra: argv.flags.bots ? await loadExtraReviewers() : undefined,
+    extra: parseReviewers(argv.flags.reviewers),
     includeResolved: argv.flags.includeResolved,
   });
   const output = formatThreads(filtered, totalCount, {

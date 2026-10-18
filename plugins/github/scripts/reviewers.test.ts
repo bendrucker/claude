@@ -15,9 +15,8 @@ describe("isBot", () => {
 });
 
 describe("parseReviewers", () => {
-  test("reads one login per line, lowercased, ignoring blanks and comments", () => {
-    const set = parseReviewers("# extra reviewers\nJacob\n\n  greptileai  # trailing\n");
-    expect(set).toEqual(new Set(["jacob", "greptileai"]));
+  test("splits on commas, lowercased, ignoring blanks", () => {
+    expect(parseReviewers("Jacob, greptileai,,")).toEqual(new Set(["jacob", "greptileai"]));
   });
 });
 

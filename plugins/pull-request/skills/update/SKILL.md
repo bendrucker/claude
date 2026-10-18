@@ -28,7 +28,7 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/git-context.ts`
 
-!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/sem-context.ts`
+!`bun ${CLAUDE_PLUGIN_ROOT}/scripts/sem-context.ts --stack-file "${user_config.stack_file}"`
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts`
 

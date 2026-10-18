@@ -5,5 +5,13 @@
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
   },
-  "dependencies": ["git", "mod-events"]
+  "dependencies": ["git", "mod-events"],
+  "userConfig": {
+    "watch": {
+      "type": "boolean",
+      "title": "Watch the merge request",
+      "description": "Watch the current branch's merge request in interactive sessions and show its state in the prompt footer.",
+      "default": true
+    }
+  }
 }

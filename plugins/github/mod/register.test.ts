@@ -437,6 +437,16 @@ describe("register", () => {
     expect(w.views).toEqual([]);
   });
 
+  test("never polls with the watch option off", { options: { watch: false } }, async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("") });
+
+    await $.session.start(START);
+    await w.clock.advance(POLL_MS.idle * 3);
+
+    expect(w.named("session.start")[0]?.detail).toEqual({ active: false, reason: "watch off" });
+    expect(w.views).toEqual([]);
+  });
+
   test("a non-interactive session never polls", async ($, on) => {
     const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("") });
 

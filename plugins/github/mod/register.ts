@@ -1,4 +1,4 @@
-import type { EngineInterface, On } from "claude-code";
+import type { EngineInterface, On, PluginOptions } from "claude-code";
 import {
   STALE,
   type Promoted,
@@ -299,7 +299,7 @@ async function hasGh($: EngineInterface): Promise<boolean> {
  * to the model, along with a block already present when a PR is first seen.
  * Every other change is only shown and logged.
  */
-export function register(on: On): void {
+export function register(on: On, options: PluginOptions): void {
   const watch: Watch = {
     snapshot: undefined,
     me: undefined,
@@ -316,6 +316,10 @@ export function register(on: On): void {
     const started = await next(e);
     if (!e.isInteractive) {
       emit($, "session.start", { active: false, reason: "non-interactive" });
+      return started;
+    }
+    if (options.watch === false) {
+      emit($, "session.start", { active: false, reason: "watch off" });
       return started;
     }
     if (!(await hasGh($))) {

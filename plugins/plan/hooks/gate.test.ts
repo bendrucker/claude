@@ -134,42 +134,79 @@ describe("unchanged re-present", () => {
 });
 
 describe("append-only re-present", () => {
-  const basePlan = [
-    "# Add retry to the fetch client",
-    "## Approach",
-    "- Wrap the fetch call in a retry loop",
-    "- Back off exponentially between attempts",
-    "- Cap retries at 3",
-    "## Files",
-    "- src/client.ts",
-    "- src/client.test.ts",
-    "## Testing",
-    "- Add a test for the backoff schedule",
-  ].join("\n");
+  const lines = (count: number, prefix = "line") =>
+    Array.from({ length: count }, (_, i) => `${prefix} ${i}`);
+  const initial = lines(10).join("\n");
 
-  it("denies when the re-present keeps nearly all prior lines and only adds new ones", async () => {
-    await decision(basePlan);
-    const grown = `${basePlan}\n## Rollout\n- Ship behind a flag\n- Monitor error rates`;
+  /** Presents `plan` twice, so the gate's unchanged rule denies the second. */
+  async function denied(plan: string): Promise<void> {
+    await decision(plan);
+    expect((await decision(plan))?.permissionDecisionReason).toBe(DENY_REASON);
+  }
+
+  it("denies a denied plan patched with new lines", async () => {
+    await denied(initial);
+    expect(denialReason(await decision(`${initial}\nline 10`))).toBe(APPEND_ONLY_REASON);
+  });
+
+  it("allows an additive revision of a plan that reached the user", async () => {
+    await decision(initial);
+    expect(await decision(`${initial}\nline 10\nline 11`)).toBeNull();
+  });
+
+  it("denies a line swap that carries a denied plan at zero net growth", async () => {
+    const base = lines(50).join("\n");
+    await denied(base);
+    // Trade 3 lines for 3 new ones: carry-over 0.94, no net size change.
+    const swapped = [...lines(47), ...lines(3, "swapped")].join("\n");
+    expect(denialReason(await decision(swapped))).toBe(APPEND_ONLY_REASON);
+  });
+
+  it("allows a genuine revision with low carry-over", async () => {
+    await denied(initial);
+    expect(await decision(lines(10, "note").join("\n"))).toBeNull();
+  });
+
+  it("allows a re-present that adds no new lines", async () => {
+    await denied(initial);
+    // Same lines, reordered: full carry-over, nothing introduced.
+    expect(await decision(lines(10).toReversed().join("\n"))).toBeNull();
+  });
+
+  it("allows a re-present that removes more than the incidental-drop allowance", async () => {
+    const big = lines(100).join("\n");
+    await denied(big);
+    // Drop 4 prior lines and add 5 new ones: carry-over is still >= 0.9, but
+    // removal exceeds the incidental-drop allowance, so this is a real edit.
+    expect(await decision([...lines(96), ...lines(5, "new")].join("\n"))).toBeNull();
+  });
+
+  it("allows when the stored line set is corrupt", async () => {
+    await denied(initial);
+    await Bun.write(join(stateRoot, "session-1", "exit-plan-lines"), "not json");
+    expect(await decision(`${initial}\nline 10`)).toBeNull();
+  });
+
+  it("gives the unchanged-plan reason when the append-only re-present repeats", async () => {
+    await denied(initial);
+    await decision(`${initial}\nline 10`);
+    expect((await decision(`${initial}\nline 10`))?.permissionDecisionReason).toBe(DENY_REASON);
+  });
+
+  it("denies once for append-only, not size, when the re-present is also oversized", async () => {
+    const pad = "x".repeat(120);
+    const padded = (count: number, prefix: string) =>
+      Array.from({ length: count }, (_, i) => `${prefix} ${i} ${pad}`);
+    const base = padded(72, "line").join("\n");
+    expect(base.length).toBeLessThan(10_000);
+    await denied(base);
+
+    const grown = [...padded(72, "line"), ...padded(8, "new")].join("\n");
+    expect(grown.length).toBeGreaterThan(10_000);
     expect(denialReason(await decision(grown))).toBe(APPEND_ONLY_REASON);
-  });
-
-  it("allows a genuine revision that rewrites most of the plan", async () => {
-    await decision(basePlan);
-    const rewritten = [
-      "# Add retry to the fetch client",
-      "## Approach",
-      "- Use a circuit breaker instead of unbounded retries",
-      "- Fail fast after 2 consecutive errors",
-      "## Files",
-      "- src/circuit-breaker.ts",
-      "## Testing",
-      "- Add a test for the open/closed transitions",
-    ].join("\n");
-    expect(await decision(rewritten)).toBeNull();
-  });
-
-  it("stays silent on the first presentation of a plan that would otherwise qualify", async () => {
-    expect(await decision(basePlan)).toBeNull();
+    // Append-only denies before the size check, so the size branch never runs and
+    // records no marker: one prompt for append-only, no second prompt for size.
+    expect(readdirSync(join(stateRoot, "session-1"))).not.toContain("exit-plan-size-asked");
   });
 });
 
@@ -211,78 +248,6 @@ describe("size advisory", () => {
   it("gives the unchanged-plan reason when the oversized plan is also unchanged", async () => {
     expect((await decision(bigPlan("a")))?.permissionDecisionReason).toBe(sizeReason(0));
     expect((await decision(bigPlan("a")))?.permissionDecisionReason).toBe(DENY_REASON);
-  });
-});
-
-describe("append-only re-present", () => {
-  const lines = (count: number, prefix = "line") =>
-    Array.from({ length: count }, (_, i) => `${prefix} ${i}`);
-
-  const initial = lines(10).join("\n");
-
-  it("denies when a re-present keeps nearly all prior lines and only adds new ones", async () => {
-    await decision(initial);
-    const appended = `${initial}\nline 10`;
-    expect(denialReason(await decision(appended))).toBe(APPEND_ONLY_REASON);
-  });
-
-  it("denies a line swap that carries the document at zero net growth", async () => {
-    const base = lines(50).join("\n");
-    await decision(base);
-    // Trade 3 lines for 3 new ones: carry-over 0.94, no net size change.
-    const swapped = [...lines(47), ...lines(3, "swapped")].join("\n");
-    expect(denialReason(await decision(swapped))).toBe(APPEND_ONLY_REASON);
-  });
-
-  it("returns null for a genuine revision with low carry-over", async () => {
-    await decision(initial);
-    const revised = lines(10, "note").join("\n");
-    expect(await decision(revised)).toBeNull();
-  });
-
-  it("stays silent when the re-present adds no new lines", async () => {
-    await decision(initial);
-    // Same lines, reordered: full carry-over, nothing introduced.
-    const reordered = lines(10).toReversed().join("\n");
-    expect(await decision(reordered)).toBeNull();
-  });
-
-  it("stays silent when more than the incidental-drop allowance is removed", async () => {
-    const big = lines(100).join("\n");
-    await decision(big);
-    // Drop 4 prior lines and add 5 new ones: carry-over is still >= 0.9, but
-    // removal exceeds the incidental-drop allowance, so this is a real edit.
-    const trimmedAndGrown = [...lines(96), ...lines(5, "new")].join("\n");
-    expect(await decision(trimmedAndGrown)).toBeNull();
-  });
-
-  it("allows and skips state when the stored line set is corrupt", async () => {
-    await decision(initial);
-    await Bun.write(join(stateRoot, "session-1", "exit-plan-lines"), "not json");
-    // A one-line swap the append-only check would deny, at unchanged length.
-    expect(await decision(initial.replace("line 9", "line X"))).toBeNull();
-  });
-
-  it("gives the unchanged-plan reason when the append-only re-present repeats", async () => {
-    await decision(initial);
-    await decision(`${initial}\nline 10`);
-    expect((await decision(`${initial}\nline 10`))?.permissionDecisionReason).toBe(DENY_REASON);
-  });
-
-  it("denies once for append-only, not size, when the re-present is also oversized", async () => {
-    const pad = "x".repeat(120);
-    const padded = (count: number, prefix: string) =>
-      Array.from({ length: count }, (_, i) => `${prefix} ${i} ${pad}`);
-    const base = padded(72, "line").join("\n");
-    expect(base.length).toBeLessThan(10_000);
-    await decision(base);
-
-    const grown = [...padded(72, "line"), ...padded(8, "new")].join("\n");
-    expect(grown.length).toBeGreaterThan(10_000);
-    expect(denialReason(await decision(grown))).toBe(APPEND_ONLY_REASON);
-    // Append-only denies before the size check, so the size branch never runs and
-    // records no marker: one prompt for append-only, no second prompt for size.
-    expect(readdirSync(join(stateRoot, "session-1"))).not.toContain("exit-plan-size-asked");
   });
 });
 
@@ -355,17 +320,17 @@ describe("recorded re-presents", () => {
         "2026-07-10 a4b38156": [
           "allowed",
           "allowed",
-          "deny:append-only",
+          "allowed",
         ],
         "2026-07-19 dfdb8641": [
           "allowed",
-          "deny:append-only",
+          "allowed",
           "deny:unchanged",
           "deny:append-only",
         ],
         "2026-08-12 aeebf85d": [
           "allowed",
-          "deny:append-only",
+          "deny:size",
         ],
       }
     `);

@@ -14,6 +14,10 @@ export function statusText(chars: number): string | undefined {
   return `${Math.floor(chars / 100) / 10}k (${percent(chars)}%)`;
 }
 
+// A plan this large has slices worth delegating, so it gets the delegation guidance.
+export const DELEGATION_FROM = LIMIT / 2;
+const DELEGATION_HEADING = /^#{1,6}\s+Delegation\b/m;
+
 function basename(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }
@@ -23,6 +27,9 @@ export function register(on: On): void {
   let planning = false;
   let shown = false;
   let wasOver = false;
+  // Once per conversation: the guidelines stay in context until a compaction.
+  let injected = false;
+  let delegated = false;
 
   on("session.start", ($, e, next) => {
     void $.modEvents.emit({ mod: "plan", event: "session.start" });
@@ -35,6 +42,8 @@ export function register(on: On): void {
     planning = false;
     planFile = undefined;
     wasOver = false;
+    injected = false;
+    delegated = false;
     if (shown) {
       shown = false;
       $.ui.status(undefined);
@@ -42,17 +51,37 @@ export function register(on: On): void {
     return next(e);
   });
 
+  on("session.compact", async ($, e, next) => {
+    const result = await next(e);
+    if (e.agentId === undefined && result.skip === undefined) injected = false;
+    return result;
+  }).catch(($, e, next) => next(e));
+
   // The plan-mode reminder names the session's plan file, so sidecars beside it don't count.
-  on("prompt.attachment", { type: "plan_mode" }, ($, e, next) => {
+  // Its full wording opens every planning session and follows every compaction, whichever
+  // way plan mode was reached, so the guidelines ride on the first one.
+  on("prompt.attachment", { type: "plan_mode" }, async ($, e, next) => {
     if (e.agentId !== undefined) return next(e);
     planning = true;
     const path = e.detail?.planFilePath;
     if (path !== undefined && path !== planFile) {
       planFile = path;
       wasOver = false;
+      delegated = false;
     }
-    return next(e);
-  });
+    const result = await next(e);
+    if (injected || e.detail?.reminder !== "full" || result.text === null) return result;
+    injected = true;
+    let guidelines: string;
+    try {
+      guidelines = await $.fs.read(`${$.plugin.root}/references/guidelines.md`);
+    } catch {
+      void $.modEvents.emit({ mod: "plan", event: "inject", ok: false });
+      return result;
+    }
+    void $.modEvents.emit({ mod: "plan", event: "inject", ok: true });
+    return { text: `${result.text}\n\n${guidelines}` };
+  }).catch(($, e, next) => next(e));
 
   // Plan mode can end without ExitPlanMode, as when the user cycles out of it.
   on("prompt.attachment", { type: "plan_mode_exit" }, ($, e, next) => {
@@ -70,9 +99,9 @@ export function register(on: On): void {
     if (!planning || e.file_path !== planFile || result.deny !== undefined || result.isError)
       return result;
 
-    let chars: number;
+    let plan: string;
     try {
-      chars = (await $.fs.read(e.file_path)).length;
+      plan = await $.fs.read(e.file_path);
     } catch {
       if (shown) {
         shown = false;
@@ -81,6 +110,7 @@ export function register(on: On): void {
       return result;
     }
 
+    const chars = plan.length;
     const over = chars > LIMIT;
     const file = basename(e.file_path);
     const text = statusText(chars);
@@ -99,7 +129,23 @@ export function register(on: On): void {
       });
     }
     wasOver = over;
-    return result;
+
+    if (delegated || chars < DELEGATION_FROM || DELEGATION_HEADING.test(plan)) return result;
+    delegated = true;
+    let delegation: string;
+    try {
+      delegation = await $.fs.read(`${$.plugin.root}/references/delegation.md`);
+    } catch {
+      await $.modEvents.emit({
+        mod: "plan",
+        event: "delegation",
+        ok: false,
+        detail: { file, chars },
+      });
+      return result;
+    }
+    await $.modEvents.emit({ mod: "plan", event: "delegation", ok: true, detail: { file, chars } });
+    return { ...result, context: [...(result.context ?? []), delegation] };
   }).catch(($, e, next) => next(e));
 
   on("tool.call", { tool: "ExitPlanMode" }, async ($, e, next) => {

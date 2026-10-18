@@ -1,12 +1,15 @@
-import type { EngineInterface, On, ToolCallResult } from "claude-code";
+import type { EngineInterface, On, PromptAttachmentInput, ToolCallResult } from "claude-code";
 import { type Engine, describe, expect, test } from "claude-code/testing";
-import { LIMIT, statusText } from "./register.ts";
+import { DELEGATION_FROM, LIMIT, statusText } from "./register.ts";
 
 const PLAN = "/Users/u/.claude/plans/quiet-otter.md";
+const GUIDELINES = "# Planning Guidelines";
+const DELEGATION = "# Delegation";
 const DENIED: ToolCallResult = { result: "too long", isError: true };
 
 interface World {
   files: Record<string, string>;
+  references: Record<string, string>;
   status: (string | undefined)[];
   events: Parameters<EngineInterface["modEvents"]["emit"]>[0][];
 }
@@ -18,7 +21,12 @@ function worldOf(
     exit = result,
   }: { result?: ToolCallResult; exit?: ToolCallResult } = {},
 ): World {
-  const world: World = { files: {}, status: [], events: [] };
+  const world: World = {
+    files: {},
+    references: { "guidelines.md": GUIDELINES, "delegation.md": DELEGATION },
+    status: [],
+    events: [],
+  };
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
@@ -30,7 +38,8 @@ function worldOf(
   on("prompt.attachment", (_, e) => ({ text: e.text }));
   on("tool.call", (_, e) => (e.tool === "ExitPlanMode" ? exit : result));
   on("fs.read", (_, e) => {
-    const text = world.files[e.path];
+    const [, shipped] = /\/references\/([^/]+)$/.exec(e.path) ?? [];
+    const text = shipped === undefined ? world.files[e.path] : world.references[shipped];
     if (text === undefined) throw new Error("ENOENT");
     return { value: text };
   });
@@ -41,13 +50,21 @@ function worldOf(
   return world;
 }
 
-function planMode($: Engine, planFilePath = PLAN) {
-  return $.prompt.attachment({
+interface Reminder {
+  planFilePath?: string;
+  reminder?: "full" | "sparse";
+  agentId?: string;
+}
+
+function planMode($: Engine, { planFilePath = PLAN, reminder = "full", agentId }: Reminder = {}) {
+  const input: PromptAttachmentInput = {
     type: "plan_mode",
     text: "plan mode",
     origin: { kind: "engine" },
-    detail: { reminder: "full", planFilePath, hasPlan: false },
-  });
+    detail: { reminder, planFilePath, hasPlan: false },
+  };
+  if (agentId !== undefined) input.agentId = agentId;
+  return $.prompt.attachment(input);
 }
 
 function planModeExit($: Engine, planFilePath = PLAN) {
@@ -175,7 +192,8 @@ describe("register", () => {
     await write($, world, 11_000);
     await write($, world, 9_000);
     await write($, world, 9_500);
-    expect(world.events.map((e) => [e.event, e.detail?.chars, e.detail?.direction])).toEqual([
+    const counts = world.events.filter((e) => e.event === "count" || e.event === "crossed");
+    expect(counts.map((e) => [e.event, e.detail?.chars, e.detail?.direction])).toEqual([
       ["count", 12_000, undefined],
       ["crossed", 12_000, "over"],
       ["count", 11_000, undefined],
@@ -183,7 +201,7 @@ describe("register", () => {
       ["crossed", 9_000, "under"],
       ["count", 9_500, undefined],
     ]);
-    expect(world.events[0]).toEqual({
+    expect(counts[0]).toEqual({
       mod: "plan",
       event: "count",
       detail: { file: "quiet-otter.md", chars: 12_000, limit: LIMIT, over: true, tool: "Write" },
@@ -220,7 +238,7 @@ describe("register", () => {
     delete world.files[PLAN];
     await $.tool.call({ tool: "ExitPlanMode", tool_use_id: "t2" });
     expect(world.status).toEqual(["12k (120%)", undefined]);
-    expect(world.events.map((e) => e.event)).toEqual(["count", "crossed"]);
+    expect(world.events.map((e) => e.event)).not.toContain("present");
   });
 
   test("records that it was live at session start", async ($, on) => {
@@ -251,5 +269,84 @@ describe("register", () => {
     await $.session.end({ reason: "prompt_input_exit", sessionId: "s1", resume: { id: "s1" } });
     await write($, world, 11_800);
     expect(world.status).toEqual(["11.7k (117%)", "11.8k (118%)"]);
+  });
+});
+
+describe("guidelines", () => {
+  test("ride on the first full reminder, once per conversation", async ($, on) => {
+    const world = worldOf(on);
+    expect((await planMode($, { reminder: "sparse" })).text).toBe("plan mode");
+    expect((await planMode($)).text).toBe(`plan mode\n\n${GUIDELINES}`);
+    expect((await planMode($)).text).toBe("plan mode");
+    await planModeExit($);
+    expect((await planMode($)).text).toBe("plan mode");
+    expect(world.events).toEqual([{ mod: "plan", event: "inject", ok: true }]);
+  });
+
+  test("skip a subagent's reminder", async ($, on) => {
+    worldOf(on);
+    expect((await planMode($, { agentId: "a1" })).text).toBe("plan mode");
+    expect((await planMode($)).text).toBe(`plan mode\n\n${GUIDELINES}`);
+  });
+
+  test("return after a compaction of the main conversation", async ($, on) => {
+    worldOf(on);
+    on("session.compact", (_, e) =>
+      e.instructions === "skip" ? { skip: "no" } : { messages: e.messages },
+    );
+    const messages = [{ role: "user" as const, text: "summary", toolUses: [] }];
+    await planMode($);
+    await $.session.compact({ trigger: "auto", agentId: "a1", messages });
+    await $.session.compact({ trigger: "manual", instructions: "skip", messages });
+    expect((await planMode($)).text).toBe("plan mode");
+    await $.session.compact({ trigger: "auto", messages });
+    expect((await planMode($)).text).toBe(`plan mode\n\n${GUIDELINES}`);
+  });
+
+  test("leave the reminder as it was when the file cannot be read", async ($, on) => {
+    const world = worldOf(on);
+    delete world.references["guidelines.md"];
+    expect((await planMode($)).text).toBe("plan mode");
+    expect(world.events).toEqual([{ mod: "plan", event: "inject", ok: false }]);
+  });
+});
+
+describe("delegation", () => {
+  function writePlan($: Engine, world: World, plan: string) {
+    world.files[PLAN] = plan;
+    return $.tool.call({ tool: "Write", file_path: PLAN, content: "", tool_use_id: "t" });
+  }
+
+  test("attaches once a plan reaches its size, once per plan file", async ($, on) => {
+    const world = worldOf(on);
+    await planMode($);
+    expect((await writePlan($, world, "x".repeat(DELEGATION_FROM - 1))).context).toBeUndefined();
+    expect((await writePlan($, world, "x".repeat(DELEGATION_FROM))).context).toEqual([DELEGATION]);
+    expect((await writePlan($, world, "x".repeat(DELEGATION_FROM + 1))).context).toBeUndefined();
+    expect(world.events.filter((e) => e.event === "delegation")).toEqual([
+      {
+        mod: "plan",
+        event: "delegation",
+        ok: true,
+        detail: { file: "quiet-otter.md", chars: DELEGATION_FROM },
+      },
+    ]);
+
+    await planMode($, { planFilePath: "/Users/u/.claude/plans/brave-fox.md" });
+    world.files["/Users/u/.claude/plans/brave-fox.md"] = "x".repeat(DELEGATION_FROM);
+    const next = await $.tool.call({
+      tool: "Write",
+      file_path: "/Users/u/.claude/plans/brave-fox.md",
+      content: "",
+      tool_use_id: "t",
+    });
+    expect(next.context).toEqual([DELEGATION]);
+  });
+
+  test("skips a plan that already carries a Delegation section", async ($, on) => {
+    const world = worldOf(on);
+    await planMode($);
+    const plan = `# Plan\n\n## Delegation\n\n${"x".repeat(DELEGATION_FROM)}`;
+    expect((await writePlan($, world, plan)).context).toBeUndefined();
   });
 });

@@ -1,27 +1,8 @@
 {
-  "description": "Inject planning guidelines when a session reaches plan mode, gate plan re-presents, and show a plan's size against the gate's limit",
+  "description": "Inject planning guidelines when a session reaches plan mode and delegation guidance once a plan grows large, gate plan re-presents, and show a plan's size against the gate's limit",
   "modules": ["../mod/register.ts"],
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/context.sh\""
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
-      {
-        "matcher": "EnterPlanMode",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-inject.sh\""
-          }
-        ]
-      },
       {
         "matcher": "Edit|Write",
         "hooks": [
@@ -39,15 +20,6 @@
       }
     ],
     "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/plan-inject.sh\""
-          }
-        ]
-      },
       {
         "matcher": "ExitPlanMode",
         "hooks": [

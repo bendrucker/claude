@@ -407,6 +407,11 @@
         "warn": 3,
         "refuse": 4
       }
+    },
+    "pull-request@bendrucker": {
+      "options": {
+        "auto_merge": true
+      }
     }
   },
   "enabledPlugins": {

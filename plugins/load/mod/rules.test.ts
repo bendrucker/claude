@@ -1,5 +1,5 @@
 import { describe, expect, test } from "claude-code/testing";
-import { type Census, MAX_DAEMONS, browserCalls, judge } from "./browser";
+import { type Census, browserCalls, judge } from "./browser";
 import {
   type Machine,
   judge as judgeCaps,
@@ -95,12 +95,17 @@ describe("judge", () => {
   test("lets an agent reuse its own or another live session", () => {
     const live = new Set(["a", "b", "c"]);
     expect(
-      judge(calls("agent-browser --session a open x"), makeCensus({ live, mine: new Set(["a"]) })),
+      judge(
+        calls("agent-browser --session a open x"),
+        makeCensus({ live, mine: new Set(["a"]) }),
+        3,
+      ),
     ).toEqual({});
     expect(
       judge(
         calls("agent-browser --session b snapshot"),
         makeCensus({ live, mine: new Set(["a"]) }),
+        3,
       ),
     ).toEqual({});
   });
@@ -109,6 +114,7 @@ describe("judge", () => {
     const verdict = judge(
       calls("agent-browser --session mk-2 open x"),
       makeCensus({ live: new Set(["mk-1"]), mine: new Set(["mk-1"]) }),
+      3,
     );
     expect(verdict.reason).toBe("owned");
     expect(verdict.deny).toContain("--session mk-1");
@@ -118,6 +124,7 @@ describe("judge", () => {
     const verdict = judge(
       calls("agent-browser --session a open x; agent-browser --session b open y"),
       makeCensus(),
+      3,
     );
     expect(verdict.reason).toBe("owned");
   });
@@ -125,20 +132,21 @@ describe("judge", () => {
   test("refuses a launch at the machine-wide cap, pending launches included", () => {
     const live = new Set(["x", "y"]);
     const atCap = makeCensus({ live, pending: new Set(["z"]) });
-    expect(live.size + 1).toBe(MAX_DAEMONS);
-    expect(judge(calls("agent-browser --session new open x"), atCap).reason).toBe("cap");
-    expect(judge(calls("agent-browser --session new open x"), makeCensus({ live }))).toEqual({});
+    const launch = calls("agent-browser --session new open x");
+    expect(judge(launch, atCap, 3).reason).toBe("cap");
+    expect(judge(launch, makeCensus({ live }), 3)).toEqual({});
+    expect(judge(launch, atCap, 0)).toEqual({});
   });
 
   test("refuses a session named by a shell expansion", () => {
     const loop = calls("for i in 1 2 3; do agent-browser --session s$i open u; done");
-    expect(judge(loop, makeCensus()).reason).toBe("dynamic");
+    expect(judge(loop, makeCensus(), 0).reason).toBe("dynamic");
   });
 
   test("refuses close --all only while others' sessions are live", () => {
     const all = calls("agent-browser close --all");
-    expect(judge(all, makeCensus({ others: new Set(["theirs"]) })).reason).toBe("close-all");
-    expect(judge(all, makeCensus({ mine: new Set(["mine"]) }))).toEqual({});
+    expect(judge(all, makeCensus({ others: new Set(["theirs"]) }), 0).reason).toBe("close-all");
+    expect(judge(all, makeCensus({ mine: new Set(["mine"]) }), 0)).toEqual({});
   });
 });
 

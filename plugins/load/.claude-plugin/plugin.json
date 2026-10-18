@@ -7,6 +7,13 @@
   },
   "dependencies": ["mod-events"],
   "userConfig": {
+    "browserSessions": {
+      "type": "number",
+      "title": "Browser sessions",
+      "description": "Refuse to launch an agent-browser session while this many already run on the machine. 0 caps nothing.",
+      "default": 0,
+      "min": 0
+    },
     "caps": {
       "type": "string",
       "multiple": true,

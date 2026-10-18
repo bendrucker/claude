@@ -4,7 +4,7 @@ description: |
   Create a pull request, merge request, or change request (PR, MR, CR).
   Use when the user asks to open one, including right after committing changes.
 
-argument-hint: "[--draft] [--no-auto] [--base <ref>] [--label <name>] [--no-review] [--[no-]review-body]"
+argument-hint: "[--draft] [--[no-]auto] [--base <ref>] [--label <name>] [--no-review] [--[no-]review-body]"
 allowed-tools:
   - mcp__github
   - Agent
@@ -44,10 +44,10 @@ The commit log, PR template, CONTRIBUTING notes, and review-bot config in the co
 
 ## Arguments
 
-Parse `$ARGUMENTS` for these flags. With no flags, open a PR/MR ready for review, and set auto-merge on a repo you own.
+Parse `$ARGUMENTS` for these flags. With no flags, open a PR/MR ready for review.
 
 - `--draft`: open the PR/MR as a draft. Default: ready for review.
-- `--no-auto`: skip auto-merge. Default: auto-merge on a repo you own, off on a third-party repo and off under `--draft`.
+- `--[no-]auto`: set or skip auto-merge on a repo you own. Default: `${user_config.auto_merge}`. Always off on a third-party repo and under `--draft`.
 - `--base <ref>`: parent branch to target. Default: the repo's default branch. A branch whose parent is another topic branch is a stack layer, identified only by this flag or by the user. The upstream ref tracks the branch's own remote copy, so it cannot identify the parent.
 - `--label <name>`: apply a label, repeatable. Default: none.
 - `--no-review`: skip the hosted review request. Default: on a repo that gates its hosted bot on a label, request the review when the diff clears the metered-review gate and no local pass ran.
@@ -100,7 +100,7 @@ When the context above shows a detected PR template, follow the template's struc
    - Upload a screenshot or recording the body references by local path with the create command. GitHub: `--attach ./shot.png` per file on `gh pr create`, which rewrites the reference to the uploaded asset. Load `github:attach` first. GitLab: upload each file per the uploads section of `gitlab:api` and paste the returned markdown into the body before creating.
    - Put the branch name in the body filename so concurrent agents don't collide. Writing the file with a quoted heredoc (`cat > tmp/pr-body-<branch>.md <<'EOF'`) in the same call as the create command works, because the validation hook reads the heredoc directly.
 1. Chain a GitHub stack layer into its stack once the PR exists. Load `github:stack` for the `gh stack link` forms, the detection query that picks between them, and what an exit code 9 means.
-1. Enable auto-merge once the PR/MR exists, unless `--no-auto` or `--draft` is set. On a repo you own (the Remote URL above names the owner), run `gh pr merge --auto`. On a third-party repo, leave the merge to the maintainer. Load [`references/merge.md`](references/merge.md) for GitLab, for stacked PRs, and for a repo that rejects `--auto`.
+1. Enable auto-merge once the PR/MR exists, when `--[no-]auto` resolves on and `--draft` is not set. On a repo you own (the Remote URL above names the owner), run `gh pr merge --auto`. On a third-party repo, leave the merge to the maintainer. Load [`references/merge.md`](references/merge.md) for GitLab, for stacked PRs, and for a repo that rejects `--auto`.
 1. On a corporate or internal repo, suggest reviewers for the user to choose from and assign only the ones the user accepts. On OSS (a public repo you don't own), skip this step and leave triage to the maintainer. Load [`references/reviewers.md`](references/reviewers.md) for the visibility gate, the ranking script (`${CLAUDE_PLUGIN_ROOT}/scripts/suggest-reviewers.ts`), and username resolution.
 
 Done when the PR/MR exists on the remote, every step above has either run or been skipped for a condition that step names, and you have reported the URL to the user along with any step that did not complete and why.

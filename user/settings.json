@@ -410,6 +410,7 @@
     },
     "pull-request@bendrucker": {
       "options": {
+        "auto_merge": true,
         "stack_file": "wt/stack"
       }
     },

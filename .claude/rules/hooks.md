@@ -24,7 +24,7 @@ So every Bash-matched hook script must re-read `input.tool_input.command` and co
 
 The `plugin:hook` skill covers `async` and `asyncRewake`. Read it before marking a hook async here.
 
-Only the vibe-island bridge and the herdr state export in `user/settings.json` qualify. Everything else gates a call or emits `hookSpecificOutput`, including every hook in `plugins/*/hooks/hooks.json`. Three bridge entries stay synchronous: `Stop` and `StopFailure`, whose backgrounded processes are killed before they finish, and `PermissionRequest`, which blocks to return a remote `permissionDecision`.
+Only the herdr state export in `user/settings.json` qualifies, alongside the generated `moshi-hook` entries. Everything else gates a call or emits `hookSpecificOutput`, including every hook in `plugins/*/hooks/hooks.json`. Keep `Stop` and `StopFailure` synchronous, since Claude Code kills their backgrounded processes before they finish, and `PermissionRequest`, which blocks to return a decision.
 
 
 ## MCP Matchers

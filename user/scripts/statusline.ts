@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
-import { mkdirSync } from "node:fs";
-import { basename, dirname } from "node:path";
+import { basename } from "node:path";
 import { z } from "zod";
 import { decodeJson } from "../../packages/decode/index";
 import { effortMarker } from "./effort";
 import { dialGlyph } from "./glyphs";
 import { modelMarker } from "./model";
 import { type ContextToken, type DialReport, reportPaneMetadata } from "./pane-metadata";
-import { expandTilde, RateLimits } from "./rate-limits";
 import { styleText } from "./style";
 
 const num = z.number().optional().catch(undefined);
@@ -36,7 +34,6 @@ const StatusInput = z.looseObject({
     .looseObject({ total_lines_added: num, total_lines_removed: num })
     .optional()
     .catch(undefined),
-  rate_limits: RateLimits.nullish().catch(undefined),
 });
 type StatusInput = z.infer<typeof StatusInput>;
 
@@ -269,18 +266,6 @@ export function formatWorktree(data: WorktreeData, budget: number): string[] {
   return segments;
 }
 
-// Mirror the live `rate_limits` to a file so external readers (the menu-bar app)
-// can show usage without wrapping the status line command. Claude Code only pipes
-// rate limits through the status line, so this is the single place they surface.
-export async function emitRateLimits(input: StatusInput, target: string): Promise<void> {
-  const limits = input.rate_limits;
-  if (!limits) return;
-
-  const path = expandTilde(target);
-  mkdirSync(dirname(path), { recursive: true });
-  await Bun.write(path, `${JSON.stringify(limits)}\n`);
-}
-
 export function buildStatusLine(
   input: StatusInput,
   columns: number,
@@ -366,15 +351,6 @@ if (import.meta.main) {
     input = undefined;
   }
   if (input) {
-    const rateLimitsPath = process.env.CLAUDE_STATUSLINE_RATE_LIMITS_PATH;
-    if (rateLimitsPath != null && rateLimitsPath !== "") {
-      try {
-        await emitRateLimits(input, rateLimitsPath);
-      } catch {
-        // Emitting usage is best-effort; rendering the line takes priority.
-      }
-    }
-
     const parsed = Number(process.env.COLUMNS);
     const columns = Number.isInteger(parsed) && parsed > 0 ? parsed : 80;
     process.stdout.write(buildStatusLine(input, columns, resolveWorktree()));

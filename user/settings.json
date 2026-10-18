@@ -8,16 +8,6 @@
   "hooks": {
     "Notification": [
       {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      },
-      {
         "matcher": "permission_prompt",
         "hooks": [
           {
@@ -30,16 +20,6 @@
     ],
     "PermissionRequest": [
       {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "timeout": 86400
-          }
-        ]
-      },
-      {
         "hooks": [
           {
             "async": false,
@@ -49,29 +29,7 @@
         ]
       }
     ],
-    "PostCompact": [
-      {
-        "matcher": "manual|auto",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      },
       {
         "hooks": [
           {
@@ -93,29 +51,7 @@
         "matcher": "ExitPlanMode"
       }
     ],
-    "PreCompact": [
-      {
-        "matcher": "manual|auto",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      },
       {
         "hooks": [
           {
@@ -141,15 +77,6 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
             "async": true,
             "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
@@ -158,16 +85,6 @@
       }
     ],
     "SessionStart": [
-      {
-        "matcher": "startup|resume|clear",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      },
       {
         "matcher": "*",
         "hooks": [
@@ -193,14 +110,6 @@
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
             "async": true,
             "command": "~/.claude/hooks/unless-desktop.sh '/opt/homebrew/bin/moshi-hook' claude-hook",
             "type": "command"
@@ -208,59 +117,7 @@
         ]
       }
     ],
-    "StopFailure": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'"
-          }
-        ]
-      }
-    ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      }
-    ],
-    "TeammateIdle": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      }
-    ],
     "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/unless-desktop.sh /bin/sh -c '[ -x \"$HOME/.vibe-island/bin/vibe-island-bridge\" ] && \"$HOME/.vibe-island/bin/vibe-island-bridge\" --source claude; exit 0'",
-            "async": true
-          }
-        ]
-      },
       {
         "hooks": [
           {
@@ -533,7 +390,6 @@
   "agentPushNotifEnabled": true,
   "teammateMode": "in-process",
   "env": {
-    "CLAUDE_STATUSLINE_RATE_LIMITS_PATH": "~/.vibe-island/cache/rl.json",
     "TMPDIR": "/tmp",
     "TMPPREFIX": "/tmp/claude/zsh",
     "WORKTRUNK_WORKTREE_PATH": ".worktrees/{{ branch | sanitize }}",

@@ -19,7 +19,7 @@ A second model reads the diff. The point is a different reviewer rather than a b
 
 ## What It Costs
 
-The plan grants 1500 AI credits a month. It resets on the 1st and does not roll over. Four measured facts shape every choice:
+The plan grants a fixed monthly entitlement of AI credits, which `--status` prints. It resets on the 1st and does not roll over. Four measured facts shape every choice:
 
 - A terra call pays about 3.5 credits before it reads a line of your code, writing 14k tokens of system prompt and tool definitions to cache at 250 credits per million. That is half a median review. A second call is never a rounding error.
 - Output costs 6x input and 60x cache_read. Verbose answers run up a bill faster than large diffs.
@@ -30,7 +30,7 @@ The plan grants 1500 AI credits a month. It resets on the 1st and does not roll 
 
 `--status` prints the current tier and the bands, and spends nothing. Run it when you are unsure whether a change qualifies.
 
-The tier comes from `pace`, credits remaining divided by days to reset. Under 25 is constrained, over 60 is abundant, and everything between is normal. The nominal allowance of 48 a day (1500 over 31) is the yardstick `--status` prints `pace` against, and it decides nothing on its own. The tier sets how strict the bar is, never how much to spend. Manufacturing reviews to use up an allotment is the failure mode this guards against, so credits left unspent in a month where every qualifying change got a full review are the right outcome.
+The tier comes from `pace`, credits remaining divided by days to reset. Under 25 is constrained, over 60 is abundant, and everything between is normal. The nominal allowance, the entitlement over 31 days, is the yardstick `--status` prints `pace` against, and it decides nothing on its own. The tier sets how strict the bar is, never how much to spend. Manufacturing reviews to use up an allotment is the failure mode this guards against, so credits left unspent in a month where every qualifying change got a full review are the right outcome.
 
 | tier | gate |
 | --- | --- |

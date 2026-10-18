@@ -34,9 +34,6 @@ const CRITERIA_WIDTH = 62;
 // Below this, no shape is worth a terra call. Degrade rather than refuse.
 const DEGRADE_BELOW = 150;
 
-// The plan grants 1500/month and resets on the 1st, so this is the nominal daily allowance that `pace` is judged against.
-const NOMINAL_DAILY = 1500 / 31;
-
 // The prompt reaches Copilot on stdin, so the only thing this cap governs is spend: a bigger
 // prompt is more input tokens against a fixed plan budget. --force is what lifts it.
 const DEFAULT_MAX_BYTES = 120_000;
@@ -235,7 +232,7 @@ function printStatus(meter: Meter): void {
     `  resets     ${meter.resetDate} (${meter.days} day${meter.days === 1 ? "" : "s"})`,
   );
   console.error(
-    `  pace       ${meter.pace.toFixed(1)}/day against a nominal ${NOMINAL_DAILY.toFixed(1)}`,
+    `  pace       ${meter.pace.toFixed(1)}/day against a nominal ${(meter.entitlement / 31).toFixed(1)}`,
   );
   console.error(`${DIM}  gate       ${TIER_GATES[meter.tier]}${RESET}`);
   console.error("");

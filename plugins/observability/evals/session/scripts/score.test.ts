@@ -53,6 +53,8 @@ describe("processOf", () => {
     result("b", "Binder Error: column x not found"),
     use("c", { command: `duckdb -readonly db "SELECT 2"` }),
     result("c", "[{}]"),
+    // A permission notice carries its message as a string.
+    line({ type: "system", subtype: "permission_denied", message: "grep denied" }),
     use("d", { command: "ls" }),
     result("d", "Parser Error: not a query"),
     line({

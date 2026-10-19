@@ -78,7 +78,10 @@ export function overlap(reply: string, truth: Truth): { recall: number; precisio
 const Block = z.looseObject({ type: z.string() });
 const Line = z.looseObject({
   type: z.string(),
-  message: z.object({ content: z.union([z.string(), z.array(Block)]) }).optional(),
+  // A system notice such as permission_denied carries its message as a string.
+  message: z
+    .union([z.object({ content: z.union([z.string(), z.array(Block)]) }), z.string()])
+    .optional(),
   usage: z.record(z.string(), z.unknown()).nullish(),
   duration_ms: z.number().nullish(),
 });
@@ -109,7 +112,9 @@ export function processOf(trace: string, reference?: RegExp): Process {
     .split("\n")
     .filter((l) => l.trim() !== "")
     .map((l) => Line.parse(JSON.parse(l)));
-  const blocks = lines.flatMap((l) => (Array.isArray(l.message?.content) ? l.message.content : []));
+  const blocks = lines.flatMap((l) =>
+    typeof l.message === "object" && Array.isArray(l.message.content) ? l.message.content : [],
+  );
   const uses = blocks.flatMap((b) => (b.type === "tool_use" ? [Use.parse(b)] : []));
   const sql = new Map(
     uses.flatMap((u) => {

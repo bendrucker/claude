@@ -20,9 +20,8 @@
 --   corpus, so cross-host queries read a dead snapshot as an idle machine. `disk-not-indexed`
 --   is JSONL files on disk missing from the index, which also catches files created since
 --   the last refresh, so rerun `refresh.ts --refresh` before reading one as a refresh
---   failure or glob drift. `refresh-health` reads refresh.ts's own `session-index.refresh`
---   events and alerts on a slow p90 among runs that indexed, or on any lock-yield or error
---   run. Each run's event reaches the index on the next refresh, so the newest is absent.
+--   failure or glob drift. `refresh-health` is a slow indexing p90, or any lock-yield or
+--   error refresh.
 --
 --   Info. `stream-migrated` is the same silence with a registered successor field still
 --   arriving on another record type, named in `detail`, so the kind's zero is a rename
@@ -53,7 +52,7 @@
 --     meaning: refresh-health window
 --   - name: refresh_slow_ms
 --     default: 30000
---     meaning: refresh-health p90 ceiling for runs that indexed
+--     meaning: refresh-health p90 ceiling
 --   - name: projects_glob
 --     default: '~/.claude/projects/**/*.jsonl'
 --     meaning: >-

@@ -43,7 +43,7 @@ Debug logs and mod events carry a size cap (2 GB and 500 MB). After each sync, `
 
 `refresh.ts` prints the DB path to stdout (everything else goes to stderr). A `last-refresh` stamp file makes runs within `--max-age` (default 300s) print the path and exit before opening the database, so the fast path never takes a lock. `--refresh` bypasses the stamp. On a lock conflict it retries briefly, then defers to the concurrent refresher and exits 0 with the path.
 
-Every exit, the stamp fast path included, appends a `session-index.refresh` event through `events.ts` with its outcome (`stamp-fresh`, `lock-yield`, `indexed`, `compacted`, `error`), per-phase wall time, changed and removed files, and file size. Events land in `mod-events/<session>/`, or `mod-events/cli/` for a terminal or nightly run, so they reach `mod_events` on the next refresh. `index-health`'s `refresh-health` row reads them. `bun test` writes none.
+Every exit appends a `session-index.refresh` event (`events.ts`) with its outcome, phase timings, and file counts, under `mod-events/<session>/` or `mod-events/cli/`. `index-health` reads them as `refresh-health`.
 
 ### Migration
 
@@ -73,7 +73,7 @@ The four writers carry the `claude:dangerouslyDisableSandbox` marker after their
 
 - `db.ts`: orchestrates migration, schema, scan, per-file import, view rebuild and versioning, checkpoint, compaction.
 - `refresh.ts`: CLI entry point. Stamp fast-path, `ensureIndex`, compaction guard, prints DB path to stdout.
-- `query.ts`: the one path from a named query (or literal SQL) plus params to decoded rows. Two adapters share the variable binding: `nodeAdapter` binds on the read-write connection `db.ts` already holds, and `cliAdapter` spawns `duckdb -readonly -init limits.sql` with a timeout, rendering the same params as `SET VARIABLE` lines through one escaping function. `usage.ts` and `schema.ts` take the read-only adapter so they never wait on a refresh's write lock. `runQuery` appends a `session-index.query` event per read (name, adapter, calling script, ms, rows or error class), and `schema.ts` adds one when it falls back to the committed map. The eval miners and `find-scope/audit.ts` read through `cliAdapter` too, so every scripted read carries `limits.sql` and this telemetry. Plain `duckdb` CLI reads stay unwrapped and are measured from Bash tool calls by `cli-health`.
+- `query.ts`: the one path from a named query (or literal SQL) plus params to decoded rows. Two adapters share the variable binding: `nodeAdapter` binds on the read-write connection `db.ts` already holds, and `cliAdapter` spawns `duckdb -readonly -init limits.sql` with a timeout, rendering the same params as `SET VARIABLE` lines through one escaping function. `usage.ts` and `schema.ts` take the read-only adapter so they never wait on a refresh's write lock. `runQuery` appends a `session-index.query` event per read. Every scripted reader goes through `cliAdapter`.
 
 ### Development
 

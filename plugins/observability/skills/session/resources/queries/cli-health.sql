@@ -6,26 +6,11 @@
 --   Bash calls grouped by the program they run, with error rates that count SQL errors a
 --   zero exit hid, latency, retries, and the top error signatures.
 -- description: >-
---   One row per (`host`, `program`). `program` is the first command's basename after
---   leading `cd <dir>` hops (quoted or redirected, ended by `&&`, `||`, `;`, or a newline)
---   and `VAR=value` assignments are stripped, so `cd "$X" && D=y; duckdb ...` reads as
---   `duckdb`. That extraction is a heuristic: a command opening with a subshell, a loop, or
---   a quoted program path lands under whatever token comes first.
---
---   `error_pct` is the share of calls whose result carried `is_error`, a non-zero exit.
---   `hidden_error_pct` is the share that exited 0 but whose output opens with a DuckDB
---   `Binder`, `Parser`, `Catalog`, `Conversion`, or `IO` error, which `tool-failure-rates`
---   cannot see because it reads `is_error` alone. A pipe into `head` or `tail` is the usual cause.
---   `retry_pct` is the share of failed calls (either kind) followed by another call to the
---   same program in the same agent thread within two minutes, and `followup_pct` the same
---   share after a call that succeeded. Back-to-back calls are normal, so only the gap
---   between the two says anything about retries.
---
---   `p50_gap_s` and `p90_gap_s` are the gap from the call to its result. They include
---   permission prompts and approval time, so they bound latency from above.
---   `top_errors` lists the commonest signatures with counts: the output's first non-empty
---   line, past an `Exit code N` line, with digits and paths stripped and quoted identifiers
---   kept, so a guessed column or a reserved-word alias reads straight off the signature.
+--   One row per (`host`, `program`), the first command's basename after leading `cd` hops
+--   and `VAR=value` assignments. `hidden_error_pct` counts exit-0 results that open with a
+--   DuckDB error, which `tool-failure-rates` misses. Read `retry_pct` against
+--   `followup_pct`, the same two-minute rate after a success. Gaps include approval time.
+--   `top_errors` is the first output line past `Exit code N`, digits and paths stripped.
 -- params:
 --   - name: min_calls
 --     default: 30

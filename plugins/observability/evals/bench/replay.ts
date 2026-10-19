@@ -1,10 +1,11 @@
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
 import { median, medianAbsoluteDeviation, standardDeviation } from "simple-statistics";
 import { table } from "table";
 import { z } from "zod";
 import { pValue } from "../../../../packages/evals/stats";
-import { parseQueryHeader } from "../../skills/session/scripts/query-header";
+import { loadQueryHeaders, parseQueryHeader } from "../../skills/session/scripts/query-header";
 import { normalize, statements } from "./sql";
 
 export const SKILL = join(import.meta.dirname, "..", "..", "skills", "session");
@@ -110,7 +111,7 @@ export async function duckdbJson<T>(db: string, sql: string, schema: z.ZodType<T
 
 const MINE = String.raw`
 SELECT tc.timestamp::VARCHAR AS ts, tc.session_id, tc.command,
-  coalesce(CAST(r.content AS VARCHAR), '') ILIKE '%out of memory%' AS oom
+  (coalesce(CAST(r.content AS VARCHAR), '') ILIKE '%out of memory%')::INTEGER AS oom
 FROM tool_calls tc
 LEFT JOIN content_items r
   ON r.type = 'tool_result' AND r.host = tc.host AND r.tool_use_id = tc.tool_id
@@ -122,16 +123,19 @@ const Mined = z.object({
   ts: z.string(),
   session_id: z.string(),
   command: z.string(),
-  oom: z.boolean(),
+  oom: z.number(),
 });
 
 /** Every group that ran out of memory, the top group per hot surface, then the most frequent. */
 export async function replaySet(db: string, top: number): Promise<Query[]> {
   const rows = await duckdbJson(db, MINE, Mined);
+  // A named query the skill no longer ships cannot be replayed.
+  const known = new Set((await loadQueryHeaders()).map((h) => h.name));
   const groups = new Map<string, Query & { ids: Set<string> }>();
   const calls = rows
     .toSorted((a, b) => a.ts.localeCompare(b.ts))
-    .flatMap((row) => statements(row.command).map((s) => ({ row, s })));
+    .flatMap((row) => statements(row.command).map((s) => ({ row, s })))
+    .filter(({ s }) => s.name === undefined || known.has(s.name));
   for (const { row, s } of calls) {
     const key = s.name === undefined ? normalize(s.sql) : `named:${s.name}`;
     const g = groups.get(key) ?? {
@@ -147,7 +151,7 @@ export async function replaySet(db: string, top: number): Promise<Query[]> {
     };
     g.ids.add(row.session_id);
     g.count++;
-    g.ooms += Number(row.oom);
+    g.ooms += row.oom;
     g.sql = s.sql;
     g.last = row.ts;
     groups.set(key, g);
@@ -172,7 +176,7 @@ const Profile = z.looseObject({
 });
 
 // Built once per arm, query and limit: the schedule replays each thousands of times.
-const prepared = new Map<string, Promise<{ sql: string; init: string }>>();
+const prepared = new Map<string, Promise<{ sql: string; init: string; disk: boolean }>>();
 
 /** A named query's header says whether it reads from disk through extensions.sql. */
 async function prepare(q: Query, a: Arm, limits: Limits, dir: string) {
@@ -184,7 +188,7 @@ async function prepare(q: Query, a: Arm, limits: Limits, dir: string) {
   const limitsFile = join(a.skill, "resources", disk ? "extensions.sql" : "limits.sql");
   const init = join(dir, `init-${a.name}-${limits}-${disk ? "ext" : "idx"}.sql`);
   await Bun.write(init, (await Bun.file(limitsFile).text()) + LIMITS[limits]);
-  return { sql: named === undefined ? q.sql : `${q.sql}\n${named}`, init };
+  return { sql: named === undefined ? q.sql : `${q.sql}\n${named}`, init, disk };
 }
 
 /**
@@ -201,7 +205,7 @@ export async function replay(
   const key = `${q.id} ${a.name} ${limits}`;
   const ready = prepared.get(key) ?? prepare(q, a, limits, dir);
   prepared.set(key, ready);
-  const { sql, init } = await ready;
+  const { sql, init, disk } = await ready;
   const profile = Bun.file(join(dir, "profile.json"));
   await profile.delete().catch(() => undefined);
   const stdin = `PRAGMA enable_profiling = 'json';\nPRAGMA profiling_output = '${profile.name}';\n${sql}\n`;
@@ -211,6 +215,8 @@ export async function replay(
     {
       stdin: Buffer.from(stdin),
       stderr: "pipe",
+      // Disk queries read globs such as .claude/skills relative to where agents ran them.
+      cwd: disk ? homedir() : dir,
       signal,
     },
   );

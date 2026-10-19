@@ -83,7 +83,7 @@ duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql -cmd "SET 
   ~/.local/share/claude-sessions/session.duckdb < ${CLAUDE_SKILL_DIR}/resources/queries/search.sql
 ```
 
-Report every session it returns with its `matched_terms`, a passing mention included, and say which ones look central. Fall back to `ILIKE` only for text `search` leaves out: subagent turns, tool output, and skill bodies.
+Fall back to `ILIKE` only for text `search` leaves out: subagent turns, tool output, and skill bodies.
 
 The rest, by name:
 

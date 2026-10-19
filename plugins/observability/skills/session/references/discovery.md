@@ -25,8 +25,8 @@ This table and the Tier-2 list below are generated from the `-- ---` headers on 
 | Hook latency | `hook-origin-split` | `hooks` |
 | Hook blocks | `hook-block-then-retry-success` | `hook-blocks`, `hooks` |
 | Hook coverage | `hook-config-vs-observed` | `hooks` |
-| Permissions and sandbox | `already-allowed-still-prompting`, `sandbox-bypass-effective-command`, `sandbox-path-deny-recurrence` | `permissions`, `sandbox` |
-| Tool failures | `tool-failure-rates` | `errors` |
+| Permissions and sandbox | `already-allowed-still-prompting`, `sandbox-bypass-effective-command`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence` | `permissions`, `sandbox` |
+| Tool failures | `cli-health`, `tool-failure-rates` | `errors` |
 | Context tax | `catalog-reinjection-thrash-sessions` | `activity`, `hooks` (additionalContext) |
 | Tokens | `delegation`, `repeat-read-waste`, `top-sessions` | `stats`, `model-summary`, `skill-activity` |
 | Turns and compaction | `stop-hook-noop-detector` | `activity` (compactions, API errors) |
@@ -77,9 +77,11 @@ Additional queries in `resources/queries/`, aimed at the self-improvement loop r
 - `already-allowed-still-prompting`: Bash permission prompts whose command matches a `permissions.allow` pattern you pass as `allow_glob`.
 - `catalog-reinjection-thrash-sessions`: Sessions re-injecting the full skill catalog and deferred-tools delta, cumulatively re-billing the same context.
 - `classifier`: Auto-mode classifier volume and latency, the permission stall on every dispatched call, the allow rules auto mode dropped, and which calls the engine routed to the classifier.
+- `cli-health`: Bash calls grouped by the program they run, with error rates that count SQL errors a zero exit hid, latency, retries, and the top error signatures.
 - `hook-origin-split`: Hook wall-clock split between portable shared config and arbitrary per-repo project hooks.
 - `hook-self-timing`: Hook latency from the hooks' own clocks, read off `~/.claude/hook-metrics/*.jsonl` rather than the index.
 - `mods`: Whether each mod was live and healthy: the sessions it started in, the events it emitted, how many failed, and where the sessions were reached from.
+- `sandbox-bypass-scaffold`: Weekly share of `dangerouslyDisableSandbox` calls whose commands already escape through `excludedCommands`, the `sandbox` plugin's retirement signal.
 - `sandbox-path-deny-recurrence`: `Operation not permitted` and adjacent Bash failures bucketed into concrete sandbox config gaps, with recurrence and date span.
 - `stop-hook-noop-detector`: Stop hooks that cost wall-clock and produce nothing, ranked as removal candidates.
 - `tool-failure-rates`: Per-tool failure rates over calls that ran, with the failures grouped by normalized signature and dated so a fixed failure reads as stopped.

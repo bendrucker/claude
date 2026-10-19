@@ -13,6 +13,7 @@ import {
   rawRewritePending,
   sessionDbPath,
 } from "./db";
+import { emit, errorClass } from "./events";
 
 const argv = cli({
   name: "refresh",
@@ -51,8 +52,8 @@ async function stampAgeMs(): Promise<number> {
 }
 
 // Rewriting raw holds the write lock for minutes on a large index, so a refresh defers it
-// to the nightly --compact while the stamp is fresh. Deferring stops the stamp, so
-// without a nightly the rewrite runs inline once the stamp goes stale.
+// to the scheduled --compact while the stamp is fresh. Deferring stops the stamp, so
+// without one the rewrite runs inline once the stamp goes stale.
 const DEFER_MIN_BYTES = 1024 ** 3;
 const DEFER_MAX_STAMP_AGE_MS = 36 * 3600 * 1000;
 
@@ -85,55 +86,78 @@ async function openWithRetry(): Promise<Database | null> {
   }
 }
 
+const started = performance.now();
+
+function report(outcome: string, detail: Record<string, unknown> = {}): Promise<void> {
+  return emit({
+    event: "refresh",
+    ok: outcome !== "error",
+    ms: performance.now() - started,
+    detail: { outcome, ...detail },
+  });
+}
+
 if (
   !argv.flags.refresh &&
   !compact &&
   (await Bun.file(dbPath).exists()) &&
   (await stampAgeMs()) < argv.flags.maxAge * 1000
 ) {
+  await report("stamp-fresh");
   process.stdout.write(`${dbPath}\n`);
   process.exit(0);
 }
 
-mkdirSync(dataDir, { recursive: true });
-
-const db = await openWithRetry();
-if (db === null) {
-  console.error("refresh: another process holds the write lock, using the existing index");
-  process.stdout.write(`${dbPath}\n`);
-  process.exit(0);
-}
-
-let corpusBytes = 0;
-let deferred = false;
 try {
-  deferred = await deferRewrite(db);
-  if (!deferred) ({ corpusBytes } = await ensureIndex(db));
-} finally {
-  db.close();
-}
+  mkdirSync(dataDir, { recursive: true });
 
-if (deferred) {
-  console.error(
-    "refresh: deferring the raw rewrite to `refresh.ts --compact`; the index is unchanged",
-  );
+  const db = await openWithRetry();
+  if (db === null) {
+    console.error("refresh: another process holds the write lock, using the existing index");
+    await report("lock-yield");
+    process.stdout.write(`${dbPath}\n`);
+    process.exit(0);
+  }
+
+  if (await deferRewrite(db)) {
+    db.close();
+    console.error(
+      "refresh: deferring the raw rewrite to `refresh.ts --compact`; the index is unchanged",
+    );
+    await report("rewrite-deferred");
+    process.stdout.write(`${dbPath}\n`);
+    process.exit(0);
+  }
+
+  const result = await ensureIndex(db).finally(() => {
+    db.close();
+  });
+  const { corpusBytes, changedFiles, removedFiles } = result;
+  const phasesMs: Record<string, number> = { ...result.phasesMs };
+
+  // DuckDB never shrinks a file in place, so a bloated index (from the pre-v3
+  // full-table rewrites, or pathological churn) is recovered by copying into a
+  // fresh file. The 64 MiB floor keeps tiny corpora from churning on block overhead.
+  const dbSize = Bun.file(dbPath).size;
+  if (compact || (corpusBytes > 0 && dbSize > Math.max(4 * corpusBytes, 64 * 1024 * 1024))) {
+    console.error(
+      `refresh: compacting ${(dbSize / 1e9).toFixed(1)}GB index against ${(corpusBytes / 1e9).toFixed(1)}GB corpus`,
+    );
+    const compactStart = performance.now();
+    await compactDatabase(dataDir);
+    phasesMs.compaction = performance.now() - compactStart;
+  }
+
+  await Bun.write(stampPath, `${new Date().toISOString()}\n`);
+  await report(phasesMs.compaction === undefined ? "indexed" : "compacted", {
+    changed_files: changedFiles,
+    removed_files: removedFiles,
+    phases_ms: Object.fromEntries(Object.entries(phasesMs).map(([k, v]) => [k, Math.round(v)])),
+    db_bytes: Bun.file(dbPath).size,
+    corpus_bytes: corpusBytes,
+  });
   process.stdout.write(`${dbPath}\n`);
-  process.exit(0);
+} catch (error) {
+  await report("error", { error: errorClass(error) });
+  throw error;
 }
-
-// DuckDB never shrinks a file in place, so a bloated index (from the pre-v3
-// full-table rewrites, or pathological churn) is recovered by copying into a
-// fresh file. The 64 MiB floor keeps tiny corpora from churning on block overhead.
-const dbSize = Bun.file(dbPath).size;
-if (compact) {
-  console.error(`refresh: compacting ${(dbSize / 1e9).toFixed(1)}GB index`);
-  await compactDatabase(dataDir);
-} else if (corpusBytes > 0 && dbSize > Math.max(4 * corpusBytes, 64 * 1024 * 1024)) {
-  console.error(
-    `refresh: compacting ${(dbSize / 1e9).toFixed(1)}GB index against ${(corpusBytes / 1e9).toFixed(1)}GB corpus`,
-  );
-  await compactDatabase(dataDir);
-}
-
-await Bun.write(stampPath, `${new Date().toISOString()}\n`);
-process.stdout.write(`${dbPath}\n`);

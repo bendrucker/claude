@@ -4,16 +4,13 @@
 
 import { cli } from "cleye";
 import { z } from "zod";
-import { decodeJson } from "../../../packages/decode/index";
+import {
+  getDataDir,
+  sessionDbPath,
+} from "../../../plugins/observability/skills/session/scripts/db";
+import { cliAdapter, runQuery } from "../../../plugins/observability/skills/session/scripts/query";
 import { styleText } from "../../scripts/style";
 import { findsUnboundedFromBroadRoot } from "./index";
-
-// CLAUDE_SESSION_INDEX_DIR is the session skill's own override for where its index
-// lives, so an audit run against a copied corpus honors it too.
-const DATA_DIR =
-  process.env.CLAUDE_SESSION_INDEX_DIR ??
-  `${process.env.XDG_DATA_HOME ?? `${process.env.HOME}/.local/share`}/claude-sessions`;
-const DB = `${DATA_DIR}/session.duckdb`;
 
 // The date reaches DuckDB inside a SQL literal, so it is checked before it is
 // interpolated rather than after.
@@ -24,7 +21,6 @@ const BashCall = z.object({
   ms: z.number(),
   day: z.string(),
 });
-const BashCalls = z.array(BashCall);
 type BashCall = z.infer<typeof BashCall>;
 
 const SQL = (since: string) => `
@@ -39,15 +35,12 @@ LEFT JOIN (
 WHERE tc.tool_name = 'Bash' AND tc.command IS NOT NULL AND tc.timestamp >= DATE '${since}'
 `;
 
-export function readBashCalls(since: string): BashCall[] {
+export async function readBashCalls(since: string): Promise<BashCall[]> {
   if (!IsoDate.safeParse(since).success) {
     throw new Error(`--since expects a YYYY-MM-DD date, got ${JSON.stringify(since)}`);
   }
-  const proc = Bun.spawnSync(["duckdb", "-readonly", "-json", DB, "-c", SQL(since)]);
-  if (proc.exitCode !== 0) {
-    throw new Error(`duckdb failed: ${proc.stderr.toString().trim()}`);
-  }
-  return decodeJson(BashCalls, proc.stdout.toString(), "duckdb session index");
+  const adapter = cliAdapter(sessionDbPath(getDataDir()));
+  return runQuery(adapter, { sql: SQL(since) }, BashCall);
 }
 
 export interface Audit {
@@ -129,7 +122,7 @@ if (import.meta.main) {
   });
 
   try {
-    console.log(format(audit(readBashCalls(argv.flags.since))));
+    console.log(format(audit(await readBashCalls(argv.flags.since))));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

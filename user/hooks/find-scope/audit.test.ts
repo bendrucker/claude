@@ -95,8 +95,9 @@ describe("verdict", () => {
 describe("readBashCalls", () => {
   test.each(["2026-9-9", "yesterday", "2026-01-01'; DROP TABLE tool_calls; --"])(
     "refuses %p before it reaches the query",
-    (since) => {
-      expect(() => readBashCalls(since)).toThrow("--since expects a YYYY-MM-DD date");
+    async (since) => {
+      const message = await readBashCalls(since).then(() => "", String);
+      expect(message).toContain("--since expects a YYYY-MM-DD date");
     },
   );
 });

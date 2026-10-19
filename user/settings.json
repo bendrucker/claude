@@ -212,7 +212,8 @@
     "session-limit@bendrucker": true,
     "load@bendrucker": true,
     "performance@bendrucker": true,
-    "zsh@bendrucker": true
+    "zsh@bendrucker": true,
+    "sandbox@bendrucker": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -335,6 +336,7 @@
         "~/.coderabbit",
         "~/.agent-browser",
         "~/.claude/plans",
+        "~/.claude/mod-events",
         "/dev/fd",
         "/var/folders/*/*/T/**/*"
       ]

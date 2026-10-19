@@ -510,13 +510,31 @@ export interface IndexResult {
   corpusBytes: number;
   changedFiles: number;
   removedFiles: number;
+  /** Wall time per refresh phase, summed across hosts. */
+  phasesMs: Record<"schema" | "scan" | "import" | "telemetry" | "views" | "checkpoint", number>;
 }
 
 export async function ensureIndex(
   db: Database,
   options: { projectsDir?: string; importsDir?: string } = {},
 ): Promise<IndexResult> {
+  const phasesMs: IndexResult["phasesMs"] = {
+    schema: 0,
+    scan: 0,
+    import: 0,
+    telemetry: 0,
+    views: 0,
+    checkpoint: 0,
+  };
+  let mark = performance.now();
+  const lap = (phase: keyof typeof phasesMs): void => {
+    const now = performance.now();
+    phasesMs[phase] += now - mark;
+    mark = now;
+  };
+
   const pinnedRederived = await ensureSchema(db);
+  lap("schema");
 
   const importSql = await readSql(RESOURCES_DIR, "import");
   let corpusBytes = 0;
@@ -540,6 +558,7 @@ export async function ensureIndex(
       { host: entry.host },
     );
     const { changed, removed } = diffCatalog(scanned, indexed);
+    lap("scan");
 
     if (!derivedInvalidated && (changed.length > 0 || removed.length > 0)) {
       // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
@@ -572,9 +591,11 @@ export async function ensureIndex(
     }
     changedFiles += changed.length;
     removedFiles += removed.length;
+    lap("import");
   }
 
   const telemetryChanged = await ensureTelemetry(db, getLocalRoot(options.projectsDir), LOCAL_HOST);
+  lap("telemetry");
 
   // views_hash answers both "was views.sql edited" and "did raw change", because every
   // mutation clears it before writing. So it also covers a run that died partway: the
@@ -598,14 +619,16 @@ export async function ensureIndex(
   // Clear the per-host indexing variable so a query reusing this connection without
   // an explicit host param spans all hosts rather than inheriting the last one.
   await db.run("SET VARIABLE host = NULL");
+  lap("views");
 
   // Without an explicit CHECKPOINT the blocks freed by DELETE+INSERT and the
   // content_items rebuild are never reused and the file grows on every import.
   if (wrote || viewsChanged || derivedMissing || telemetryChanged > 0) {
     await db.run("CHECKPOINT");
   }
+  lap("checkpoint");
 
-  return { corpusBytes, changedFiles, removedFiles };
+  return { corpusBytes, changedFiles, removedFiles, phasesMs };
 }
 
 // Rewrites the database into a fresh file and swaps it in place. DuckDB never

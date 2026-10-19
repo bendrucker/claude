@@ -20,7 +20,9 @@ import {
   runQuery,
   sessionDbPath,
 } from "./db";
+import { emit } from "./events";
 import { FALLBACK_PATH, renderMap, schemaMap, SurfaceColumns, SURFACES } from "./schema";
+import { ensureTelemetry } from "./telemetry";
 
 async function backdate(target: string) {
   // Bun's shell builtin touch lacks -t, so use the system binary.
@@ -2744,6 +2746,151 @@ describe("index-health query", () => {
     expect(staleness.map((r) => r.subject)).toEqual(["stale"]);
     expect(staleness[0]?.status).toBe("alert");
     expect(staleness[0]?.detail).toContain("days behind the corpus");
+  });
+
+  async function refreshRuns(...runs: [string, number][]) {
+    const env = { CLAUDE_CONFIG_DIR: join(tmpDir, "config") };
+    for (const [outcome, ms] of runs) {
+      // oxlint-disable-next-line no-await-in-loop -- appends to one file in order.
+      await emit({ event: "refresh", ok: outcome !== "error", ms, detail: { outcome } }, env);
+    }
+    await ensureTelemetry(db, join(tmpDir, "config", "projects"), "local");
+    const rows = await runQuery(db, "index-health", Health, healthParams());
+    return rows.find((r) => r.check_name === "refresh-health");
+  }
+
+  it("alerts on a refresh that yielded the write lock", async () => {
+    const row = await refreshRuns(["indexed", 1200], ["lock-yield", 5], ["stamp-fresh", 2]);
+    expect(row).toMatchObject({ status: "alert", subject: "3 refreshes" });
+    expect(row?.detail).toContain("indexing p90 1200 ms");
+  });
+
+  it("alerts on a slow indexing p90 and reports fast runs as info", async () => {
+    expect((await refreshRuns(["indexed", 45_000]))?.status).toBe("alert");
+    await rm(join(tmpDir, "config"), { recursive: true });
+    await db.run("DELETE FROM mod_events");
+    expect((await refreshRuns(["indexed", 800], ["stamp-fresh", 2]))?.status).toBe("info");
+  });
+});
+
+describe("cli-health query", () => {
+  const Row = z.object({
+    program: z.string(),
+    calls: z.bigint(),
+    error_pct: z.number(),
+    hidden_error_pct: z.number(),
+    p50_gap_s: z.number(),
+    retry_pct: z.number().nullable(),
+    followup_pct: z.number().nullable(),
+    top_errors: z.array(z.string()).nullable(),
+  });
+
+  // One Bash call at `at` seconds past noon and its result two seconds later.
+  function bashCall(id: string, at: number, command: string, result: string, isError = false) {
+    const ts = (s: number) => new Date(Date.UTC(2026, 9, 1, 12, 0, s)).toISOString();
+    const base = { sessionId: "cli-session", cwd: "/Users/test/cli" };
+    return [
+      {
+        ...base,
+        type: "assistant",
+        uuid: `${id}-use`,
+        timestamp: ts(at),
+        message: {
+          role: "assistant",
+          content: [{ type: "tool_use", id, name: "Bash", input: { command } }],
+        },
+      },
+      {
+        ...base,
+        type: "user",
+        uuid: `${id}-result`,
+        timestamp: ts(at + 2),
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: id, content: result, is_error: isError }],
+        },
+      },
+    ];
+  }
+
+  async function health() {
+    const projects = join(importsDir, "cli", "projects", "-Users-test-cli");
+    mkdirSync(projects, { recursive: true });
+    const lines = [
+      {
+        type: "user",
+        sessionId: "cli-session",
+        cwd: "/Users/test/cli",
+        uuid: "cli-prompt",
+        timestamp: "2026-10-01T11:59:00.000Z",
+        message: { role: "user", content: "check" },
+      },
+      ...bashCall(
+        "b1",
+        0,
+        "cd /tmp && D=/x/session.duckdb; duckdb -readonly $D -c 'SELECT 1 AS first'",
+        'Parser Error: syntax error at or near "first"\nLINE 1: SELECT 1 AS first',
+      ),
+      ...bashCall("b2", 30, "duckdb -readonly /x/session.duckdb -c 'SELECT 1 AS n'", "1"),
+      ...bashCall("b3", 60, "FOO=1 /usr/bin/git status", "fatal: not a git repository", true),
+      ...bashCall("b4", 400, "cd /src 2>/dev/null && git log -1", "abc123"),
+      ...bashCall(
+        "b5",
+        500,
+        'cd "$HOME/src" && rg -n foo(',
+        "Exit code 2\nrg: regex parse error",
+        true,
+      ),
+      ...bashCall(
+        "b6",
+        600,
+        "cd '/a b'\ngrep -r x .",
+        "a.ts: IO Error: Failed to create directory",
+      ),
+    ];
+    await Bun.write(
+      join(projects, "cli.jsonl"),
+      `${lines.map((l) => JSON.stringify(l)).join("\n")}\n`,
+    );
+    await Bun.write(
+      join(importsDir, "cli", "manifest.json"),
+      `${JSON.stringify({ host: "cli", source: "cli:.claude/projects/", imported_at: "2026-10-02T00:00:00Z", policy: {} })}\n`,
+    );
+    await reindex();
+    const rows = await runQuery(
+      db,
+      "cli-health",
+      Row,
+      filterParams({ host: "cli", min_calls: "1" }),
+    );
+    return new Map(rows.map((r) => [r.program, r]));
+  }
+
+  it("counts an SQL error behind a zero exit as hidden, past cd hops and assignments", async () => {
+    const duckdb = (await health()).get("duckdb");
+    expect(duckdb).toMatchObject({
+      calls: 2n,
+      error_pct: 0,
+      hidden_error_pct: 50,
+      retry_pct: 100,
+      followup_pct: 0,
+    });
+    expect(duckdb?.top_errors).toEqual(['Parser Error: syntax error at or near "first" (1)']);
+    expect(duckdb?.p50_gap_s).toBe(2);
+  });
+
+  it("strips path prefixes and counts a retry only within two minutes", async () => {
+    const git = (await health()).get("git");
+    expect(git).toMatchObject({ calls: 2n, error_pct: 50, hidden_error_pct: 0, retry_pct: 0 });
+    expect(git?.top_errors).toEqual(["fatal: not a git repository (1)"]);
+  });
+
+  it("strips quoted and newline-ended cd hops and reads past an exit code line", async () => {
+    const programs = await health();
+    expect([...programs.keys()].toSorted()).toEqual(["duckdb", "git", "grep", "rg"]);
+    expect(programs.get("rg")?.top_errors).toEqual(["rg: regex parse error (1)"]);
+    // An error mid-output is a match, not a hidden failure.
+    expect(programs.get("grep")?.hidden_error_pct).toBe(0);
   });
 });
 

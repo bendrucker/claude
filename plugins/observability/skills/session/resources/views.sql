@@ -142,8 +142,7 @@ WITH src AS (
     r.attribution_agent,
     r.type AS role,
     r.model,
-    r.is_meta,
-    r.content_text
+    r.is_meta
   FROM raw r
   WHERE r.type IN ('user', 'assistant')
     AND (NOT scoped OR EXISTS (
@@ -156,10 +155,6 @@ WITH src AS (
          ORDER BY (r.source_file LIKE '%/subagents/%'), r.source_line DESC, r.source_file DESC
        ) = 1
 )
--- A typed prompt is a bare string rather than a block array, so it becomes one `prompt`
--- item, unnested as a NULL beside the blocks. The distinct type keeps counts over `text`
--- blocks meaning what they did. One pass, because a second read of `src` would make
--- DuckDB materialize it, every message's content held in memory at once.
 SELECT
   s.host,
   s.session_id,
@@ -167,14 +162,14 @@ SELECT
   s.project_path,
   s.source_file,
   s.source_line,
-  CASE WHEN item IS NULL THEN 'prompt' ELSE item->>'$.type' END AS type,
+  (item->>'$.type')        AS type,
   (item->>'$.name')        AS name,
   (item->>'$.id')          AS id,
   (item->>'$.tool_use_id') AS tool_use_id,
-  CASE WHEN item IS NULL THEN s.content_text ELSE item->>'$.text' END AS text,
+  (item->>'$.text')        AS text,
   (item->>'$.content')     AS content,
   TRY_CAST(item->>'$.is_error' AS BOOLEAN) AS is_error,
-  COALESCE(item, s.message_content) AS data,
+  item AS data,
   s.tool_use_result,
   s.tool_denial_kind,
   s.permission_decision,
@@ -185,14 +180,55 @@ SELECT
   s.model,
   s.is_meta
 FROM src s,
-LATERAL (SELECT unnest(list_concat(
-  CASE WHEN json_type(s.message_content) = 'ARRAY' THEN json_extract(s.message_content, '$[*]') END,
-  CASE WHEN s.role = 'user' AND s.content_text IS NOT NULL THEN [NULL::JSON] END
-)) AS item) t
+LATERAL (SELECT unnest(json_extract(s.message_content, '$[*]')) AS item) t
+WHERE json_type(s.message_content) = 'ARRAY'
 QUALIFY COALESCE(id, tool_use_id) IS NULL
   OR ROW_NUMBER() OVER (
        PARTITION BY s.host, s.session_id, type, COALESCE(id, tool_use_id)
        ORDER BY (s.source_file LIKE '%/subagents/%'), s.source_line DESC, s.source_file DESC
+     ) = 1
+
+UNION ALL
+
+-- A typed prompt is a bare string rather than a block array, so it becomes one `prompt`
+-- item. The distinct type keeps counts over `text` blocks meaning what they did. It reads
+-- `raw` rather than `src`: a second reader makes DuckDB materialize `src`, every
+-- message's content at once. A replayed line repeats its prompt verbatim, so deduping
+-- among prompt lines alone keeps the line `src` would.
+SELECT
+  r.host,
+  r.session_id,
+  r.timestamp,
+  r.project_path,
+  r.source_file,
+  r.source_line,
+  'prompt' AS type,
+  NULL AS name,
+  NULL AS id,
+  NULL AS tool_use_id,
+  r.content_text AS text,
+  NULL AS content,
+  NULL AS is_error,
+  json_extract(r.data, '$.message.content')    AS data,
+  json_extract(r.data, '$.toolUseResult')      AS tool_use_result,
+  r.data->>'$.toolDenialKind'                  AS tool_denial_kind,
+  json_extract(r.data, '$.permissionDecision') AS permission_decision,
+  r.attribution_skill,
+  r.attribution_plugin,
+  r.attribution_agent,
+  r.type AS role,
+  r.model,
+  r.is_meta
+FROM raw r
+WHERE r.type = 'user' AND r.content_text IS NOT NULL
+  AND (NOT scoped OR EXISTS (
+    SELECT 1 FROM content_item_scope c
+    WHERE c.host = r.host AND c.session_id IS NOT DISTINCT FROM r.session_id
+  ))
+QUALIFY r.uuid IS NULL
+  OR ROW_NUMBER() OVER (
+       PARTITION BY r.host, r.session_id, r.uuid
+       ORDER BY (r.source_file LIKE '%/subagents/%'), r.source_line DESC, r.source_file DESC
      ) = 1;
 
 CREATE OR REPLACE TABLE content_items AS SELECT * FROM content_item_rows(false);

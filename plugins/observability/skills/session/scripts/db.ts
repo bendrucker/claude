@@ -390,13 +390,6 @@ async function importHash(db: Database): Promise<string | null | undefined> {
   return row?.import_hash;
 }
 
-// Whether ensureIndex will rewrite raw. An index without import_hash is left to
-// reconcilePinned's seeding check.
-export async function rawRewritePending(db: Database): Promise<boolean> {
-  const hash = await importHash(db);
-  return hash != null && hash !== (await fileFingerprint(SCHEMA_DIR, "00_pinned"));
-}
-
 const ColumnName = z.object({ column_name: z.string() });
 
 async function columnNames(db: Database, sql: string): Promise<string> {

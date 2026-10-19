@@ -1,6 +1,6 @@
 ---
 name: observability:session
-description: Query Claude Code session history via a DuckDB index over `~/.claude/projects/`. Use when asked about Claude Code activity ("how many tokens today?", "what did I work on this week?") or instead of reading, grepping, or jq-ing session transcripts. Not for codebase search, git log queries, or arbitrary databases.
+description: Query Claude Code session history via a DuckDB index over `~/.claude/projects/`. Use when asked about Claude Code activity ("how many tokens today?", "what did I work on this week?", "which sessions discussed X?") or instead of reading, grepping, or jq-ing session transcripts. Not for codebase search, git log queries, or arbitrary databases.
 argument-hint: "[--refresh] [--host label] [--since date]"
 allowed-tools:
   - Bash
@@ -75,6 +75,15 @@ The eleven that carry most of the measured usage:
 - `delegation`: whether expensive parents push subagent spawns down to cheaper models.
 - `usage-timeline`: one session's token burn per time bucket, with estimated cost and a context-size proxy.
 - `outcomes`: session terminal states (shipped, abandoned-with-edits, handed off, no artifact), the outcome side the activity queries never measure.
+
+To find sessions about a topic, run `search` before writing SQL against `text_content`. Put the topic's synonyms, command names and API names in one `query`, since a session scores on every term it contains:
+
+```bash
+duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql -cmd "SET VARIABLE query = 'taskpolicy renice setpriority cpu priority'" \
+  ~/.local/share/claude-sessions/session.duckdb < ${CLAUDE_SKILL_DIR}/resources/queries/search.sql
+```
+
+Fall back to `ILIKE` only for text `search` leaves out: subagent turns, tool output, and skill bodies.
 
 The rest, by name:
 

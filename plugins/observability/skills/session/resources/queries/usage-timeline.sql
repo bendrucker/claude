@@ -1,6 +1,5 @@
 -- ---
 -- name: usage-timeline
--- tier: 1
 -- summary: >-
 --   One session's token burn per time bucket, with estimated cost and a context-size proxy.
 -- description: >-

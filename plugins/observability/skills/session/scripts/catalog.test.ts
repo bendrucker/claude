@@ -6,6 +6,8 @@ import {
   DISCOVERY_PATH,
   renderCatalog,
   renderDiscovery,
+  renderSkill,
+  SCOPE_PARAMS,
   SKILL_PATH,
   SURFACE_NAME,
 } from "./catalog";
@@ -13,7 +15,6 @@ import { loadQueryHeaders, parseQueryHeader, QUERIES_DIR, type QueryHeader } fro
 
 const VALID = `-- ---
 -- name: demo
--- tier: 2
 -- dimensions: [tokens]
 -- reads: disk
 -- extensions: [yaml]
@@ -42,12 +43,8 @@ SELECT 1;
 const MALFORMED: [string, string][] = [
   ["no fence on line 1", "SELECT 1;\n"],
   ["unterminated fence", "-- ---\n-- name: demo\nSELECT 1;\n"],
-  [
-    "a key outside the schema",
-    "-- ---\n-- name: demo\n-- tier: 1\n-- summary: s\n-- oops: x\n-- ---\n",
-  ],
-  ["no summary", "-- ---\n-- name: demo\n-- tier: 1\n-- ---\n"],
-  ["a tier that is not 1 or 2", "-- ---\n-- name: demo\n-- tier: 3\n-- summary: s\n-- ---\n"],
+  ["a key outside the schema", "-- ---\n-- name: demo\n-- summary: s\n-- oops: x\n-- ---\n"],
+  ["no summary", "-- ---\n-- name: demo\n-- ---\n"],
   ["unparseable YAML", "-- ---\n-- name: [demo\n-- ---\n"],
   ["a non-comment line inside the fence", "-- ---\nname: demo\n-- ---\n"],
 ];
@@ -61,9 +58,6 @@ const EXTENSION_FUNCTIONS = {
   markdown: ["read_markdown_sections", "md_to_text"],
   yaml: ["read_yaml_frontmatter"],
 } as const;
-
-// scoped_sessions() reads these on the query's behalf.
-const SCOPE_PARAMS = ["after_date", "before_date", "project", "host"];
 
 const alphabetical = (values: (string | undefined)[]) =>
   values.toSorted((a, b) => (a ?? "").localeCompare(b ?? ""));
@@ -85,7 +79,6 @@ describe("query header", () => {
   it("parses the fenced YAML and leaves the free prose alone", () => {
     expect(parseQueryHeader(VALID)).toEqual({
       name: "demo",
-      tier: 2,
       dimensions: ["tokens"],
       reads: "disk",
       extensions: ["yaml"],
@@ -155,6 +148,7 @@ describe("generated reference docs", () => {
   it.each([
     ["catalog.md", CATALOG_PATH, renderCatalog],
     ["discovery.md", DISCOVERY_PATH, renderDiscovery],
+    ["SKILL.md", SKILL_PATH, renderSkill],
   ] as const)("keeps %s in step with the query headers", async (_label, file, render) => {
     const committed = await Bun.file(file).text();
     const rendered = render(await loadQueryHeaders(), committed);
@@ -196,27 +190,10 @@ describe("generated reference docs", () => {
 });
 
 describe("SKILL.md name index", () => {
-  it("lists every tier-1 query and no tier-2 one", async () => {
+  it("curates only queries that exist", async () => {
     const skill = await Bun.file(SKILL_PATH).text();
-    const section = skill.slice(skill.indexOf("\n## Named Queries")).split("\n## ")[1] ?? "";
-    // Two bullet shapes carry names: "- `name`: prose", where only the leading token is a
-    // query, and "- Category: `a`, `b`", where every token is.
-    const listed = new Set(
-      section.split("\n").flatMap((line) => {
-        const named = /^- `([a-z-]+)`:/.exec(line)?.[1];
-        if (named !== undefined) return [named];
-        const grouped = /^- [^`]+: (.+)$/.exec(line)?.[1] ?? "";
-        return [...grouped.matchAll(/`([a-z-]+)`/g)].flatMap((match) => match[1] ?? []);
-      }),
-    );
-
-    const headers = await loadQueryHeaders();
-    const names = new Set(headers.map((header) => header.name));
-    const byTier = (tier: 1 | 2) =>
-      headers.filter((header) => header.tier === tier).map((header) => header.name);
-
-    expect(byTier(1).filter((name) => !listed.has(name))).toEqual([]);
-    expect(byTier(2).filter((name) => listed.has(name))).toEqual([]);
-    expect([...listed].filter((name) => !names.has(name))).toEqual([]);
+    const curated = [...skill.matchAll(/^- `([a-z][a-z-]*)`:/gm)].map((match) => match[1] ?? "");
+    const names = new Set((await loadQueryHeaders()).map((header) => header.name));
+    expect(curated.filter((name) => !names.has(name))).toEqual([]);
   });
 });

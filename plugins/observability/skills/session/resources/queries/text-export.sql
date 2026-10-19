@@ -1,6 +1,5 @@
 -- ---
 -- name: text-export
--- tier: 1
 -- summary: Dump cleaned prose from `text_content`, one row per text item, TSV-friendly.
 -- description: >-
 --   Fenced and inline-backtick code is stripped from `text`, with `raw_text` alongside for

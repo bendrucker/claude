@@ -42,51 +42,18 @@ function renderSurface(surface: string): string {
   return surface.replace(SURFACE_NAME, (name) => `\`${name}\``);
 }
 
-function renderExtensions(names: readonly string[]): string | null {
-  if (names.length === 0) return null;
-  const list = names.map((name) => `\`${name}\``).join(" and ");
-  const noun = names.length === 1 ? "extension" : "extensions";
-  return `Needs the ${list} community ${noun} (\`-cmd ".read resources/extensions.sql"\` after \`-init resources/limits.sql\`).`;
-}
-
-function renderParam(param: QueryHeader["params"][number]): string {
-  const notes = [
-    param.required === true ? "required" : null,
-    param.default === undefined ? null : `default \`${param.default}\``,
-    param.meaning ?? null,
-  ].filter((note) => note !== null);
-  return notes.length === 0 ? `\`${param.name}\`` : `\`${param.name}\` (${notes.join(", ")})`;
-}
-
-// Every line of a continuation block indents, so a fenced example stays inside the bullet.
-const indent = (block: string) => block.replaceAll(/^(?=.)/gm, "  ");
+// scoped_sessions() reads these on a query's behalf, and every query takes them, so the index
+// leaves them out.
+export const SCOPE_PARAMS = ["after_date", "before_date", "project", "host"];
 
 function renderEntry(header: QueryHeader): string {
-  const tail = [
-    renderExtensions(header.extensions),
-    header.params.length === 0 ? null : `Params: ${header.params.map(renderParam).join(", ")}.`,
-  ]
-    .filter((part) => part !== null)
-    .join(" ");
-
-  // Descriptions are folded YAML scalars, so a blank line in the header arrives as a single
-  // newline and marks a paragraph break.
-  const paragraphs = (header.description ?? "")
-    .split(/\n+/)
-    .map((part) => part.trim())
-    .filter((part) => part !== "");
-  const blocks = [
-    [header.summary, paragraphs[0]].filter((part) => part !== undefined).join(" "),
-    ...paragraphs.slice(1),
-  ];
-  if (header.example !== undefined) blocks.push(`\`\`\`sql\n${header.example}\n\`\`\``);
-  if (tail !== "") {
-    if (blocks.length > 1) blocks.push(tail);
-    else blocks[0] = `${blocks[0]} ${tail}`;
-  }
-
-  const [lead, ...rest] = blocks;
-  return `- \`${header.name}\`: ${lead}${rest.map((block) => `\n\n${indent(block)}`).join("")}`;
+  const params = header.params
+    .filter((param) => !SCOPE_PARAMS.includes(param.name))
+    .map((param) => `\`${param.name}\`${param.required === true ? " (required)" : ""}`);
+  const extensions = header.extensions.map((name) => `\`${name}\` extension`);
+  const notes = [...params, ...extensions];
+  const tail = notes.length === 0 ? "" : ` [${notes.join(", ")}]`;
+  return `- \`${header.name}\`${tail}: ${header.summary}`;
 }
 
 function replaceRegion(text: string, id: string, body: string): string {
@@ -134,14 +101,19 @@ function renderDimensionTable(headers: QueryHeader[]): string {
 }
 
 export function renderDiscovery(headers: QueryHeader[], current: string): string {
-  const tier2 = headers.filter((header) => header.tier === 2);
-  if (tier2.length === 0) throw new Error("no tier-2 queries; the section would render empty");
+  return replaceRegion(current, "dimensions", renderDimensionTable(headers));
+}
 
-  return replaceRegion(
-    replaceRegion(current, "dimensions", renderDimensionTable(headers)),
-    "tier-2",
-    tier2.map((header) => `- \`${header.name}\`: ${header.summary}`).join("\n"),
+// SKILL.md names its most-used queries by hand, above the region, and the region names the rest.
+const CURATED = /^- `([a-z-]+)`:/gm;
+
+export function renderSkill(headers: QueryHeader[], current: string): string {
+  const section = current.slice(current.indexOf("\n## Named Queries"));
+  const curated = new Set(
+    [...section.slice(0, section.indexOf("<!-- generated:")).matchAll(CURATED)].map((m) => m[1]),
   );
+  const rest = headers.filter((header) => !curated.has(header.name));
+  return replaceRegion(current, "queries", rest.map((header) => `\`${header.name}\``).join(", "));
 }
 
 if (import.meta.main) {
@@ -149,6 +121,7 @@ if (import.meta.main) {
   const targets = [
     [CATALOG_PATH, renderCatalog],
     [DISCOVERY_PATH, renderDiscovery],
+    [SKILL_PATH, renderSkill],
   ] as const;
   await Promise.all(
     targets.map(async ([file, render]) => {

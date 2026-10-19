@@ -1,6 +1,5 @@
 -- ---
 -- name: hooks
--- tier: 1
 -- summary: >-
 --   Per-hook runs, friction rate, and latency corrected for host-wide slowdowns, one row
 --   per hook keyed by command (or `hook_name` when no command is recorded).

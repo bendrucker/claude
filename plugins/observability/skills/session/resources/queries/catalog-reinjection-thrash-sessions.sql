@@ -1,6 +1,5 @@
 -- ---
 -- name: catalog-reinjection-thrash-sessions
--- tier: 2
 -- dimensions: [context-tax]
 -- summary: >-
 --   Sessions re-injecting the full skill catalog and deferred-tools delta, cumulatively

@@ -1,6 +1,5 @@
 -- ---
 -- name: plan-sections
--- tier: 1
 -- reads: disk
 -- extensions: [markdown]
 -- summary: >-

@@ -1,6 +1,5 @@
 -- ---
 -- name: repeat-read-waste
--- tier: 1
 -- dimensions: [tokens]
 -- summary: >-
 --   Repeat Reads split by cause, isolating the true context tax from pagination and

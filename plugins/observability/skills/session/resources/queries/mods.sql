@@ -1,6 +1,5 @@
 -- ---
 -- name: mods
--- tier: 2
 -- summary: >-
 --   Whether each mod was live and healthy: the sessions it started in, the events it
 --   emitted, how many failed, and where the sessions were reached from.

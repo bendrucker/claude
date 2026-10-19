@@ -1,6 +1,5 @@
 -- ---
 -- name: stop-hook-noop-detector
--- tier: 2
 -- dimensions: [turns-compaction]
 -- summary: >-
 --   Stop hooks that cost wall-clock and produce nothing, ranked as removal candidates.

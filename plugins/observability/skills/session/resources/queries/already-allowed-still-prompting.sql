@@ -1,6 +1,5 @@
 -- ---
 -- name: already-allowed-still-prompting
--- tier: 2
 -- dimensions: [permissions-sandbox]
 -- summary: >-
 --   Bash permission prompts whose command matches a `permissions.allow` pattern you pass

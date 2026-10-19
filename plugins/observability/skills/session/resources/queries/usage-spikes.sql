@@ -1,6 +1,5 @@
 -- ---
 -- name: usage-spikes
--- tier: 1
 -- summary: >-
 --   Ranked (session, time bucket) burn windows across the corpus, the same shape columns as
 --   `usage-timeline` plus `host`, `session_id`, and `repo` (the last path component).

@@ -1,6 +1,5 @@
 -- ---
 -- name: fields
--- tier: 1
 -- summary: >-
 --   Schema discovery by inference: the JSON keys present at a path across records of a
 --   kind, with each value's JSON type and an occurrence count.

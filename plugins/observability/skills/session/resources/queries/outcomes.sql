@@ -1,6 +1,5 @@
 -- ---
 -- name: outcomes
--- tier: 1
 -- dimensions: [outcomes]
 -- summary: >-
 --   Session terminal states (shipped, abandoned-with-edits, handed off, no artifact), the

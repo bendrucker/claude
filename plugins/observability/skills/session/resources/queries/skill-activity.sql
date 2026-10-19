@@ -1,6 +1,5 @@
 -- ---
 -- name: skill-activity
--- tier: 1
 -- summary: >-
 --   Work attributed to each skill: assistant turns, sessions, and input, output, and cache
 --   tokens.

@@ -1,6 +1,5 @@
 -- ---
 -- name: index-health
--- tier: 1
 -- summary: >-
 --   The index auditing itself. Run it first in any analysis pass, since its alerts cap what
 --   the rest can claim.

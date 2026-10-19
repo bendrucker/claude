@@ -1,6 +1,5 @@
 -- ---
 -- name: sandbox-path-deny-recurrence
--- tier: 2
 -- dimensions: [permissions-sandbox]
 -- summary: >-
 --   `Operation not permitted` and adjacent Bash failures bucketed into concrete sandbox

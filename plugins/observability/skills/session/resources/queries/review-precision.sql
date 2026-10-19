@@ -1,6 +1,5 @@
 -- ---
 -- name: review-precision
--- tier: 1
 -- summary: >-
 --   Per-angle precision for the code-review pipeline, one row per angle plus one per
 --   (angle, effort level), with the `level = 'all'` rollup first.

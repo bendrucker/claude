@@ -1,6 +1,5 @@
 -- ---
 -- name: sandbox-bypass-scaffold
--- tier: 2
 -- dimensions: [permissions-sandbox]
 -- summary: >-
 --   Weekly share of `dangerouslyDisableSandbox` calls whose commands already escape through

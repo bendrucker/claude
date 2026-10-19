@@ -1,6 +1,5 @@
 -- ---
 -- name: field-drift
--- tier: 1
 -- summary: >-
 --   Fields the harness started writing recently, on record kinds the corpus already
 --   carried.

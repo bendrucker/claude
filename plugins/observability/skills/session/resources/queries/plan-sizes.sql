@@ -1,6 +1,5 @@
 -- ---
 -- name: plan-sizes
--- tier: 1
 -- summary: >-
 --   Weekly trend of plan sizes, the steering metric for the plan plugin's ExitPlanMode size
 --   gate.

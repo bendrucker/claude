@@ -1,6 +1,5 @@
 -- ---
 -- name: sandbox-bypass-effective-command
--- tier: 1
 -- dimensions: [permissions-sandbox]
 -- summary: >-
 --   Bypassed commands by their real verb, ranked by frequency, with the split between

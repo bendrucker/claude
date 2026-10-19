@@ -1,6 +1,5 @@
 -- ---
 -- name: stats
--- tier: 1
 -- summary: Tool usage breakdown with error rates and aggregate totals.
 -- description: >-
 --   One row per tool with uses, errors, and error rate, and the window's total calls and

@@ -156,6 +156,10 @@ WITH src AS (
          ORDER BY (r.source_file LIKE '%/subagents/%'), r.source_line DESC, r.source_file DESC
        ) = 1
 )
+-- A typed prompt is a bare string rather than a block array, so it becomes one `prompt`
+-- item, unnested as a NULL beside the blocks. The distinct type keeps counts over `text`
+-- blocks meaning what they did. One pass, because a second read of `src` would make
+-- DuckDB materialize it, every message's content held in memory at once.
 SELECT
   s.host,
   s.session_id,
@@ -163,14 +167,14 @@ SELECT
   s.project_path,
   s.source_file,
   s.source_line,
-  (item->>'$.type')        AS type,
+  CASE WHEN item IS NULL THEN 'prompt' ELSE item->>'$.type' END AS type,
   (item->>'$.name')        AS name,
   (item->>'$.id')          AS id,
   (item->>'$.tool_use_id') AS tool_use_id,
-  (item->>'$.text')        AS text,
+  CASE WHEN item IS NULL THEN s.content_text ELSE item->>'$.text' END AS text,
   (item->>'$.content')     AS content,
   TRY_CAST(item->>'$.is_error' AS BOOLEAN) AS is_error,
-  item AS data,
+  COALESCE(item, s.message_content) AS data,
   s.tool_use_result,
   s.tool_denial_kind,
   s.permission_decision,
@@ -181,44 +185,15 @@ SELECT
   s.model,
   s.is_meta
 FROM src s,
-LATERAL (SELECT unnest(json_extract(s.message_content, '$[*]')) AS item) t
-WHERE json_type(s.message_content) = 'ARRAY'
+LATERAL (SELECT unnest(list_concat(
+  CASE WHEN json_type(s.message_content) = 'ARRAY' THEN json_extract(s.message_content, '$[*]') END,
+  CASE WHEN s.role = 'user' AND s.content_text IS NOT NULL THEN [NULL::JSON] END
+)) AS item) t
 QUALIFY COALESCE(id, tool_use_id) IS NULL
   OR ROW_NUMBER() OVER (
        PARTITION BY s.host, s.session_id, type, COALESCE(id, tool_use_id)
        ORDER BY (s.source_file LIKE '%/subagents/%'), s.source_line DESC, s.source_file DESC
-     ) = 1
-
-UNION ALL
-
--- A typed prompt is a bare string rather than a block array, so it becomes one
--- `prompt` item. The distinct type keeps counts over `text` blocks meaning what they did.
-SELECT
-  s.host,
-  s.session_id,
-  s.timestamp,
-  s.project_path,
-  s.source_file,
-  s.source_line,
-  'prompt' AS type,
-  NULL AS name,
-  NULL AS id,
-  NULL AS tool_use_id,
-  s.content_text AS text,
-  NULL AS content,
-  NULL AS is_error,
-  s.message_content AS data,
-  s.tool_use_result,
-  s.tool_denial_kind,
-  s.permission_decision,
-  s.attribution_skill,
-  s.attribution_plugin,
-  s.attribution_agent,
-  s.role,
-  s.model,
-  s.is_meta
-FROM src s
-WHERE s.role = 'user' AND s.content_text IS NOT NULL;
+     ) = 1;
 
 CREATE OR REPLACE TABLE content_items AS SELECT * FROM content_item_rows(false);
 

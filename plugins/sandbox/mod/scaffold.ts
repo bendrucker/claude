@@ -22,8 +22,8 @@ export type Scaffold =
 export type Pass = "unparsed" | "cd-elsewhere" | "env" | "unmatched" | "empty";
 
 export type Verdict =
-  | { deny: true; command: string; scaffolds: Scaffold[]; patterns: string[]; verbs: string[] }
-  | { deny: false; reason: Pass; verbs: string[] };
+  | { escapes: true; command: string; scaffolds: Scaffold[]; patterns: string[]; verbs: string[] }
+  | { escapes: false; reason: Pass; verbs: string[] };
 
 /**
  * Output filters the harness makes redundant: it truncates long output, so a
@@ -235,18 +235,19 @@ function withFlags(words: Word[], flags: Map<string, string>): string {
  */
 export function judge(command: string, patterns: string[], cwd: string | null): Verdict {
   const items = parse(command);
-  if (items === null) return { deny: false, reason: "unparsed", verbs: [] };
+  if (items === null) return { escapes: false, reason: "unparsed", verbs: [] };
   const walk: Walk = { scaffolds: [], flags: new Map(), patterns: new Set(), verbs: [], kept: [] };
   for (const { op, elements } of items) {
     const only = elements.length === 1 ? elements[0] : undefined;
     const set = only === undefined ? undefined : prelude(only, cwd, walk);
-    if (typeof set === "string") return { deny: false, reason: set, verbs: walk.verbs };
+    if (typeof set === "string") return { escapes: false, reason: set, verbs: walk.verbs };
     if (set === null) continue;
     const commands = pipeline(elements, patterns, walk);
-    if (typeof commands === "string") return { deny: false, reason: commands, verbs: walk.verbs };
+    if (typeof commands === "string")
+      return { escapes: false, reason: commands, verbs: walk.verbs };
     walk.kept.push({ op, elements: commands });
   }
-  if (walk.kept.length === 0) return { deny: false, reason: "empty", verbs: walk.verbs };
+  if (walk.kept.length === 0) return { escapes: false, reason: "empty", verbs: walk.verbs };
   const rewritten = walk.kept
     .map(({ op, elements }, index) => {
       const line = elements.map((words) => withFlags(words, walk.flags)).join(" | ");
@@ -254,7 +255,7 @@ export function judge(command: string, patterns: string[], cwd: string | null): 
     })
     .join("");
   return {
-    deny: true,
+    escapes: true,
     command: rewritten,
     scaffolds: walk.scaffolds,
     patterns: [...walk.patterns],
@@ -273,16 +274,16 @@ function note(scaffold: Scaffold): string {
   return `\`${scaffold.raw}\`: the harness truncates long output itself.`;
 }
 
-/** The deny text: the form that escapes, and why each dropped piece is safe to drop. */
-export function message(verdict: Extract<Verdict, { deny: true }>): string {
+/** The reminder: the form that escapes, and why each dropped piece is safe to drop. */
+export function message(verdict: Extract<Verdict, { escapes: true }>): string {
   const seen = new Set<string>();
   const notes = verdict.scaffolds.map(note).filter((text) => !seen.has(text) && seen.add(text));
   const entries = verdict.patterns.map((pattern) => `\`${pattern}\``).join(", ");
   const lines = [
-    `This call needs no \`dangerouslyDisableSandbox\`: every command in it matches \`sandbox.excludedCommands\` (${entries}), so it runs outside the sandbox on its own.`,
+    `That call needed no \`dangerouslyDisableSandbox\`: every command in it matches \`sandbox.excludedCommands\` (${entries}), so it runs outside the sandbox on its own.`,
     notes.length === 0
-      ? "It escapes as written. Rerun it without the flag."
-      : "Rerun it without the flag, and without the pieces that keep the chain from matching:",
+      ? "It escapes as written. Next time, leave the flag off."
+      : "Next time, leave the flag off, along with the pieces that keep the chain from matching:",
   ];
   if (notes.length > 0)
     lines.push("", `    ${verdict.command}`, "", ...notes.map((text) => `- ${text}`));

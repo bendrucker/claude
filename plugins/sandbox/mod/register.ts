@@ -44,6 +44,9 @@ export function register(on: On): void {
     return next(e);
   });
 
+  // Reminders already given per loop, so a repeat after one shows the note did not land.
+  const reminded = new Map<string, number>();
+
   on("tool.call", { tool: "Bash" }, async ($, e, next) => {
     if (e.dangerouslyDisableSandbox !== true) return next(e);
     const patterns = await excluded($);
@@ -53,18 +56,26 @@ export function register(on: On): void {
     // cwd does not name, so a `cd` there is never judged redundant.
     const cwd = e.agentId === undefined ? await $.session.cwd() : null;
     const verdict = judge(e.command, patterns, cwd);
+    const agent = e.agentId ?? null;
+    const repeat = reminded.get(agent ?? "") ?? 0;
+    if (verdict.escapes) reminded.set(agent ?? "", repeat + 1);
     void $.modEvents.emit({
       mod: MOD,
       event: "bypass",
       detail: {
-        verdict: verdict.deny ? "deny" : "allow",
-        reason: verdict.deny ? null : verdict.reason,
-        scaffolds: verdict.deny ? [...new Set(verdict.scaffolds.map((s) => s.kind))] : [],
+        verdict: verdict.escapes ? "remind" : "allow",
+        reason: verdict.escapes ? null : verdict.reason,
+        scaffolds: verdict.escapes ? [...new Set(verdict.scaffolds.map((s) => s.kind))] : [],
         verbs: verdict.verbs,
-        agent: e.agentId ?? null,
+        agent,
+        repeat: verdict.escapes ? repeat : null,
       },
     });
-    return verdict.deny ? { deny: message(verdict) } : next(e);
+    // A deny costs a turn on every call it fires on, so the bypass runs and
+    // the rewrite rides along for next time.
+    const result = await next(e);
+    if (!verdict.escapes || result.deny !== undefined) return result;
+    return { ...result, context: [...(result.context ?? []), message(verdict)] };
     // Fails open: a broken parse must never block a bypass the person allowed.
   }).catch(($, e, next) => {
     failed($, "tool.call", next.error.kind, next.error.message);

@@ -47,32 +47,43 @@ const bypass = ($: Engine, command: string, agentId?: string) =>
   });
 
 describe("register", () => {
-  test("denies a scaffolded bypass and records it", async ($, on) => {
+  test("runs a scaffolded bypass, reminds of the escaping form, and records it", async ($, on) => {
     const world = worldOf(on);
 
     const result = await bypass($, "cd /repo && git push 2>&1 | tail -5");
-    expect(result.deny).toContain("    git push");
-    expect(world.ran).toEqual([]);
+    expect(result.deny).toBeUndefined();
+    expect(result.context?.join("\n")).toContain("    git push");
+    expect(world.ran).toEqual(["cd /repo && git push 2>&1 | tail -5"]);
     expect(world.events).toEqual([
       {
         mod: "sandbox",
         event: "bypass",
         detail: {
-          verdict: "deny",
+          verdict: "remind",
           reason: null,
           scaffolds: ["cd", "redirect", "filter"],
           verbs: ["git"],
           agent: null,
+          repeat: 0,
         },
       },
     ]);
+  });
+
+  test("counts reminders per loop", async ($, on) => {
+    const world = worldOf(on);
+
+    await bypass($, "git status");
+    await bypass($, "git status");
+    await bypass($, "git status", "a1");
+    expect(world.events.map((e) => e.detail?.repeat)).toEqual([0, 1, 0]);
   });
 
   test("lets a bypass with no escaping form run and records why", async ($, on) => {
     const world = worldOf(on);
 
     const result = await bypass($, "git status && bun test");
-    expect(result.deny).toBeUndefined();
+    expect(result.context).toBeUndefined();
     expect(world.ran).toEqual(["git status && bun test"]);
     expect(world.events[0]?.detail).toMatchObject({ verdict: "allow", reason: "unmatched" });
   });
@@ -82,7 +93,7 @@ describe("register", () => {
 
     const command = "cd /repo && git status";
     const result = await bypass($, command, "a1");
-    expect(result.deny).toBeUndefined();
+    expect(result.context).toBeUndefined();
     expect(world.ran).toEqual([command]);
     expect(world.events[0]?.detail).toMatchObject({ reason: "cd-elsewhere", agent: "a1" });
   });
@@ -103,18 +114,19 @@ describe("register", () => {
       user: { sandbox: { excludedCommands: ["git:*"] } },
       project: { sandbox: { excludedCommands: ["ssh:*"] } },
     };
-    expect((await bypass($, "git status")).deny).toContain("`git:*`");
-    expect((await bypass($, "ssh vm uptime")).deny).toContain("`ssh:*`");
-    expect((await bypass($, "aws s3 ls")).deny).toBeUndefined();
+    const note = async (command: string) => (await bypass($, command)).context?.join("\n");
+    expect(await note("git status")).toContain("`git:*`");
+    expect(await note("ssh vm uptime")).toContain("`ssh:*`");
+    expect(await note("aws s3 ls")).toBeUndefined();
 
     world.settings = {
       user: { sandbox: { enabled: true, excludedCommands: ["ssh:*"] } },
       local: { sandbox: { enabled: false } },
     };
-    expect((await bypass($, "ssh vm uptime")).deny).toBeUndefined();
+    expect(await note("ssh vm uptime")).toBeUndefined();
     world.settings = { project: { sandbox: { excludedCommands: ["ssh:*"] } } };
-    expect((await bypass($, "ssh vm uptime")).deny).toBeUndefined();
-    expect(world.ran).toEqual(["aws s3 ls", "ssh vm uptime", "ssh vm uptime"]);
+    expect(await note("ssh vm uptime")).toBeUndefined();
+    expect(world.ran).toHaveLength(5);
   });
 
   test("fails open when the settings cannot be read", async ($, on) => {
@@ -122,7 +134,7 @@ describe("register", () => {
     world.settings = new Error("unreadable");
 
     const result = await bypass($, "git status");
-    expect(result.deny).toBeUndefined();
+    expect(result.context).toBeUndefined();
     expect(world.ran).toEqual(["git status"]);
     expect(world.events.map((e) => e.event)).toEqual(["error"]);
   });

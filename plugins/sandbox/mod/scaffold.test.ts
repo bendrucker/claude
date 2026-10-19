@@ -6,7 +6,7 @@ const CWD = "/repo";
 
 function denied(command: string) {
   const verdict = judge(command, GLOBAL, CWD);
-  if (!verdict.deny) throw new Error(`expected a deny, got ${verdict.reason}`);
+  if (!verdict.escapes) throw new Error(`expected an escape, got ${verdict.reason}`);
   return verdict;
 }
 
@@ -53,7 +53,7 @@ describe("parse", () => {
 });
 
 describe("judge", () => {
-  test("denies a lone excluded command that escapes as written", () => {
+  test("passes a lone excluded command that escapes as written", () => {
     const verdict = denied("git status");
     expect(verdict.scaffolds).toEqual([]);
     expect(verdict.command).toBe("git status");
@@ -97,12 +97,12 @@ describe("judge", () => {
       ["cd /repo", "empty"],
     ];
     for (const [command, reason] of cases)
-      expect(judge(command, GLOBAL, CWD)).toMatchObject({ deny: false, reason });
+      expect(judge(command, GLOBAL, CWD)).toMatchObject({ escapes: false, reason });
   });
 
   test("reads only the patterns it is given", () => {
-    expect(judge("ssh vm uptime", GLOBAL, CWD).deny).toBe(false);
-    expect(judge("ssh vm uptime", [...GLOBAL, "ssh:*"], CWD).deny).toBe(true);
+    expect(judge("ssh vm uptime", GLOBAL, CWD).escapes).toBe(false);
+    expect(judge("ssh vm uptime", [...GLOBAL, "ssh:*"], CWD).escapes).toBe(true);
   });
 });
 

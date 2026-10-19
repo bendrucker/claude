@@ -30,7 +30,7 @@ export const mirrors: Mirror[] = [
     ],
   },
   {
-    // The frozen index stays out: it is a copy of the live one, and score.ts reads it in place.
+    // The index stays out: bench.ts build regenerates it from the snapshot.
     local: join(evals, "session"),
     remote: `${BUCKET}/eval`,
     filters: [

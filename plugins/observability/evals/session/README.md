@@ -1,6 +1,6 @@
 # Session Skill Eval
 
-Asks the session skill questions about a frozen copy of the real index and scores the answers against reference SQL. It is the value-to-agents half of the session index's measurement setup. The [bench](../bench/) is the performance half.
+Asks the session skill questions about an index built from the bench's snapshot of my real transcripts and scores the answers against reference SQL. It is the value-to-agents half of the session index's measurement setup. The [bench](../bench/) is the performance half.
 
 ## Metrics
 
@@ -18,7 +18,7 @@ Asks the session skill questions about a frozen copy of the real index and score
 
 Each case directory holds `case.yaml`, `prompt.md`, a `fixture.sh` that runs [`index.sh`](index.sh), and `truth.sql`. `index.sh` copies `data/session.duckdb` to the skill's default path under the run's temporary home and stamps it fresh, so `refresh.ts` never rescans it.
 
-`truth.sql` runs after [`prelude.sql`](prelude.sql) and reads `raw` alone, so ground truth never passes through the views under test. It returns rows of `key` and `value`, either of which may be absent. A `-- tolerance: 0.05` header lets a value match within 5%, and `-- reference: <regex>` sets the reference check. Truth runs at scoring time against the same frozen index the sessions read, so no expected number is written down anywhere.
+`truth.sql` runs after [`prelude.sql`](prelude.sql) and reads `raw` alone, so ground truth never passes through the views under test. It returns rows of `key` and `value`, either of which may be absent. A `-- tolerance: 0.05` header lets a value match within 5%, and `-- reference: <regex>` sets the reference check. Truth runs at scoring time against the same index the sessions read, so no expected number is written down anywhere.
 
 The `drift-*` cases ask questions whose answer lives in a native harness field (permission decisions, attachment types, API error records) rather than in a heuristic the views apply. `scripts/truth.integration.ts` pins each one's truth query on a fixture transcript.
 
@@ -26,12 +26,11 @@ Tags split the cases into `dev` and `holdout`. Edit the skill against `dev` only
 
 ## Workflow
 
-Freeze the index after a refresh, with no writer running. On APFS the copy is an instant clone:
+Build the index from the bench snapshot, never the live index, so a commit plus the snapshot reproduces the truth any run was scored against. A case can only ask about sessions inside the snapshot's window, so a question about newer sessions waits for a newer snapshot:
 
 ```bash
-bun plugins/observability/skills/session/scripts/refresh.ts --refresh
-mkdir -p plugins/observability/evals/session/data
-cp -c ~/.local/share/claude-sessions/session.duckdb plugins/observability/evals/session/data/
+bun plugins/observability/evals/session/scripts/sync.ts pull
+bun plugins/observability/evals/bench/bench.ts build --snapshot plugins/observability/evals/bench/snap --out plugins/observability/evals/session/data
 ```
 
 Run, then score:
@@ -43,7 +42,7 @@ bun plugins/observability/evals/session/scripts/score.ts plugins/observability/e
 
 `score.ts` prints the metrics per case and arm, and writes every run's numbers to `<run>/scored.json`. Before judging a candidate, run the unchanged skill at the same `--runs` and use the spread of those runs as the bar a change has to clear.
 
-`data/` and `results/` hold my session text and are kept only in the eval bucket, under `session/eval/`, beside the bench's replay set, snapshot and results under `session/bench/`. Push after a run, and pull to start from another machine. The frozen index stays local, since it is a clone of the live one:
+`data/` and `results/` hold my session text and are kept only in the eval bucket, under `session/eval/`, beside the bench's replay set, snapshot and results under `session/bench/`. Push after a run, and pull to start from another machine. The index stays out, since `build` regenerates it:
 
 ```bash
 bun plugins/observability/evals/session/scripts/sync.ts push

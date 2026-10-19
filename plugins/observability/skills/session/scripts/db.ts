@@ -47,11 +47,8 @@ export interface HostEntry {
   policy: HostPolicy;
 }
 
-// The oldest storage format that compresses a string too long to inline (most of
-// raw.data and content_items' text) with ZSTD. Older formats store those uncompressed,
-// about 6x larger. Every reader opens it: CLI 1.5.6, @duckdb/node-api 1.5.0. It applies
-// to a file when the file is created, so an existing one adopts it through
-// compactDatabase.
+// The oldest storage version that compresses long strings (raw.data, content_items
+// text) with ZSTD. A file keeps the version it was created at until compactDatabase.
 export const STORAGE_VERSION = "v1.2.0";
 
 // The writer holds the file exclusively and runs alone, so it gets twice a
@@ -393,9 +390,8 @@ async function importHash(db: Database): Promise<string | null | undefined> {
   return row?.import_hash;
 }
 
-// Whether the next ensureIndex rewrites raw, read before it does. An index that predates
-// import_hash is left to reconcilePinned's own seeding check, which needs the projection
-// applySchema has not loaded yet.
+// Whether ensureIndex will rewrite raw. An index without import_hash is left to
+// reconcilePinned's seeding check.
 export async function rawRewritePending(db: Database): Promise<boolean> {
   const hash = await importHash(db);
   return hash != null && hash !== (await fileFingerprint(SCHEMA_DIR, "00_pinned"));

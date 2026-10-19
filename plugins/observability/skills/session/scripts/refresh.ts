@@ -50,10 +50,9 @@ async function stampAgeMs(): Promise<number> {
   return (await stamp.exists()) ? Date.now() - stamp.lastModified : Infinity;
 }
 
-// Rewriting raw copies the whole table under the write lock, minutes on a large index
-// during which every reader fails to open. A refresh leaves it to the nightly --compact
-// run while the stamp shows refreshes still landing, and it stops landing while deferred.
-// An index with no nightly owner thus rewrites inline once the stamp goes stale.
+// Rewriting raw holds the write lock for minutes on a large index, so a refresh defers it
+// to the nightly --compact while the stamp is fresh. Deferring stops the stamp, so
+// without a nightly the rewrite runs inline once the stamp goes stale.
 const DEFER_MIN_BYTES = 1024 ** 3;
 const DEFER_MAX_STAMP_AGE_MS = 36 * 3600 * 1000;
 
@@ -116,7 +115,7 @@ try {
 
 if (deferred) {
   console.error(
-    "refresh: 00_pinned.sql changed; raw's rewrite waits for the nightly `refresh.ts --compact`, so the index stays as of its last refresh",
+    "refresh: deferring the raw rewrite to `refresh.ts --compact`; the index is unchanged",
   );
   process.stdout.write(`${dbPath}\n`);
   process.exit(0);

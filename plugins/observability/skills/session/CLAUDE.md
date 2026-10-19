@@ -41,7 +41,7 @@ Debug logs and mod events carry a size cap (2 GB and 500 MB). After each sync, `
 
 ### Refresh Entry Point
 
-`refresh.ts` prints the DB path to stdout (everything else goes to stderr). A `last-refresh` stamp file makes runs within `--max-age` (default 300s) print the path and exit before opening the database, so the fast path never takes a lock. `--refresh` bypasses the stamp. `--compact`, which the dotfiles nightly passes, also bypasses it, applies a pending rewrite of `raw`, then compacts the database by copying it (`COPY FROM DATABASE`) into a fresh file at `STORAGE_VERSION`. A plain refresh defers a pending rewrite to that run while the index is over 1 GiB and the stamp is under 36 hours old, since the rewrite holds the write lock for minutes. Deferring stops the stamp, so an index no nightly compacts rewrites inline a day and a half later. On a lock conflict it retries briefly, then defers to the concurrent refresher and exits 0 with the path.
+`refresh.ts` prints the DB path to stdout (everything else goes to stderr). A `last-refresh` stamp file makes runs within `--max-age` (default 300s) print the path and exit before opening the database, so the fast path never takes a lock. `--refresh` bypasses the stamp. `--compact` (run nightly by dotfiles) applies a pending rewrite of `raw`, then compacts the database by copying it into a fresh file at `STORAGE_VERSION`. A plain refresh defers that rewrite while the index exceeds 1 GiB and the stamp is under 36 hours old; without a nightly, the stamp ages out and the rewrite runs inline. On a lock conflict it retries briefly, then defers to the concurrent refresher and exits 0 with the path.
 
 ### Migration
 

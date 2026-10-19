@@ -10,6 +10,7 @@ import {
   ensureIndex,
   getDataDir,
   getDb,
+  rawRewritePending,
   sessionDbPath,
 } from "./db";
 import { emit, errorClass } from "./events";
@@ -30,6 +31,12 @@ const argv = cli({
       description: "Seconds a prior refresh stays fresh (skipping the rescan)",
       default: 300,
     },
+    compact: {
+      type: Boolean,
+      description:
+        "Compact the database into a fresh copy at STORAGE_VERSION, applying a pending rewrite of raw first. Implies --refresh",
+      default: false,
+    },
   },
 });
 
@@ -37,10 +44,26 @@ const dataDir = getDataDir();
 const dbPath = sessionDbPath(dataDir);
 const stampPath = join(dataDir, "last-refresh");
 
-async function stampIsFresh(): Promise<boolean> {
+const compact = argv.flags.compact;
+
+async function stampAgeMs(): Promise<number> {
   const stamp = Bun.file(stampPath);
-  if (!(await stamp.exists())) return false;
-  return Date.now() - stamp.lastModified < argv.flags.maxAge * 1000;
+  return (await stamp.exists()) ? Date.now() - stamp.lastModified : Infinity;
+}
+
+// Rewriting raw holds the write lock for minutes on a large index, so a refresh defers it
+// to the scheduled --compact while the stamp is fresh. Deferring stops the stamp, so
+// without one the rewrite runs inline once the stamp goes stale.
+const DEFER_MIN_BYTES = 1024 ** 3;
+const DEFER_MAX_STAMP_AGE_MS = 36 * 3600 * 1000;
+
+async function deferRewrite(db: Database): Promise<boolean> {
+  return (
+    !compact &&
+    Bun.file(dbPath).size > DEFER_MIN_BYTES &&
+    (await stampAgeMs()) < DEFER_MAX_STAMP_AGE_MS &&
+    (await rawRewritePending(db))
+  );
 }
 
 // The write lock is held by a concurrent refresh (or a lingering reader). A brief
@@ -74,7 +97,12 @@ function report(outcome: string, detail: Record<string, unknown> = {}): Promise<
   });
 }
 
-if (!argv.flags.refresh && (await Bun.file(dbPath).exists()) && (await stampIsFresh())) {
+if (
+  !argv.flags.refresh &&
+  !compact &&
+  (await Bun.file(dbPath).exists()) &&
+  (await stampAgeMs()) < argv.flags.maxAge * 1000
+) {
   await report("stamp-fresh");
   process.stdout.write(`${dbPath}\n`);
   process.exit(0);
@@ -91,6 +119,16 @@ try {
     process.exit(0);
   }
 
+  if (await deferRewrite(db)) {
+    db.close();
+    console.error(
+      "refresh: deferring the raw rewrite to `refresh.ts --compact`; the index is unchanged",
+    );
+    await report("rewrite-deferred");
+    process.stdout.write(`${dbPath}\n`);
+    process.exit(0);
+  }
+
   const result = await ensureIndex(db).finally(() => {
     db.close();
   });
@@ -101,7 +139,7 @@ try {
   // full-table rewrites, or pathological churn) is recovered by copying into a
   // fresh file. The 64 MiB floor keeps tiny corpora from churning on block overhead.
   const dbSize = Bun.file(dbPath).size;
-  if (corpusBytes > 0 && dbSize > Math.max(4 * corpusBytes, 64 * 1024 * 1024)) {
+  if (compact || (corpusBytes > 0 && dbSize > Math.max(4 * corpusBytes, 64 * 1024 * 1024))) {
     console.error(
       `refresh: compacting ${(dbSize / 1e9).toFixed(1)}GB index against ${(corpusBytes / 1e9).toFixed(1)}GB corpus`,
     );

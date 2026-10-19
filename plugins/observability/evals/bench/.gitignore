@@ -1,0 +1,5 @@
+# Mined from the live index, so they carry transcripts and SQL agents wrote. README.md covers the eval bucket copy.
+/replay.json
+/results/
+/snap/
+/arms/

@@ -120,6 +120,13 @@ describe("refresh.ts", () => {
     expect(await countRows()).toBe(before + 1);
   });
 
+  it("runs past a fresh stamp under --compact and compacts the file", async () => {
+    await run();
+    const { stderr, exitCode } = await run("--compact");
+    expect(exitCode).toBe(0);
+    expect(stderr).toContain("compacting");
+  });
+
   it("bounds file growth across repeated reimports of the same corpus", async () => {
     await run();
     const dbPath = join(dataDir, "session.duckdb");

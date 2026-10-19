@@ -20,7 +20,7 @@
 --   corpus, so cross-host queries read a dead snapshot as an idle machine. `disk-not-indexed`
 --   is JSONL files on disk missing from the index, which also catches files created since
 --   the last refresh, so rerun `refresh.ts --refresh` before reading one as a refresh
---   failure or glob drift. `refresh-health` is a slow indexing p90, or any lock-yield, deferred-rewrite or
+--   failure or glob drift. `refresh-health` is a slow indexing p90, or any lock-yield or
 --   error refresh.
 --
 --   Info. `stream-migrated` is the same silence with a registered successor field still
@@ -320,7 +320,7 @@ refresh_health AS (
     'refresh-health' AS check_name,
     CASE WHEN quantile_cont(duration_ms, 0.9) FILTER (WHERE outcome IN ('indexed', 'compacted'))
               > COALESCE(TRY_CAST(getvariable('refresh_slow_ms') AS INTEGER), 30000)
-           OR COUNT(*) FILTER (WHERE outcome IN ('lock-yield', 'rewrite-deferred', 'error')) > 0
+           OR COUNT(*) FILTER (WHERE outcome IN ('lock-yield', 'error')) > 0
          THEN 'alert' ELSE 'info' END AS status,
     COUNT(*) || ' refreshes' AS subject,
     'indexing p90 ' || COALESCE(round(quantile_cont(duration_ms, 0.9) FILTER (WHERE outcome IN ('indexed', 'compacted')))::BIGINT || ' ms', 'n/a')

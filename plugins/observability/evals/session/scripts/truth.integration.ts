@@ -61,6 +61,12 @@ const lines = [
   use("ask", "AskUserQuestion", "2026-08-05T00:00:00Z"),
   use("ask-late", "AskUserQuestion", "2026-10-05T00:00:00Z"),
   text("bench", "profile it with pytest-benchmark", "2026-09-05T00:00:00Z"),
+  // An injected skill body names the tool without the session mentioning it.
+  {
+    ...text("skill-body", "references/python.md covers `pytest-benchmark`", "2026-09-06T00:00:00Z"),
+    sessionId: "skill-session",
+    isMeta: true,
+  },
   use("field", "Bash", "2026-10-01T00:00:00Z"),
   denied("field", "PreToolUse:Bash hook error: no", "2026-10-01T00:00:01Z", decision("hook")),
   // A replayed line repeats its uuid and tool id, and counts once.

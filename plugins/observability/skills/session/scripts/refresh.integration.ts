@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync } from "node:fs";
+import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -129,19 +129,11 @@ describe("refresh.ts", () => {
   });
 
   it("finishes the refresh after its caller's process group is killed", async () => {
-    const workerTmp = join(tmpDir, "tmp");
-    mkdirSync(workerTmp);
     const stamp = join(dataDir, "last-refresh");
-    const caller = spawn("bun", [refreshScript], {
-      detached: true,
-      env: { ...env(), TMPDIR: workerTmp },
-      stdio: "ignore",
-    });
-    // The worker's log appears once sh has redirected its stderr, so the worker is running.
-    const started = () =>
-      readdirSync(workerTmp).some((d) => readdirSync(join(workerTmp, d)).includes("log"));
+    const caller = spawn("bun", [refreshScript], { detached: true, env: env(), stdio: "ignore" });
+    // The database file appears once the worker has opened it.
     // oxlint-disable-next-line no-await-in-loop -- waits for the worker to start.
-    while (!started()) await Bun.sleep(10);
+    while (!(await Bun.file(join(dataDir, "session.duckdb")).exists())) await Bun.sleep(10);
     expect(await Bun.file(stamp).exists()).toBe(false);
     process.kill(-(caller.pid ?? 0), "SIGKILL");
 

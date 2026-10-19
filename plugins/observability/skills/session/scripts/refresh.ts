@@ -2,10 +2,8 @@
 // claude:dangerouslyDisableSandbox: prunes debug logs and mod events under ~/.claude
 // and moves a legacy index out of ~/.claude/plugins, both denied to the sandbox.
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync } from "node:fs";
-import { rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import type { Readable } from "node:stream";
+import { once } from "node:events";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { cli } from "cleye";
 import {
@@ -96,61 +94,18 @@ if (
   process.exit(0);
 }
 
-// A full rebuild after a projection or views.sql change runs for minutes, past an agent's
-// Bash timeout. Killing the caller would take the refresh with it, and the stale marker
-// would hand the same rebuild to the next caller, so no caller ever finishes it. The
-// work runs in a worker outside the caller's process group and tree, and the caller
-// waits on it.
-const WORKER_STATUS = "SESSION_REFRESH_STATUS";
-if (process.env[WORKER_STATUS] === undefined) process.exit(await runWorker());
-
-async function runWorker(): Promise<number> {
-  const dir = mkdtempSync(join(tmpdir(), "session-refresh-"));
-  const status = join(dir, "status");
-  const log = join(dir, "log");
-  // The detached sh leads a new session and exits after backgrounding the worker, which
-  // leaves the worker reparented away from the caller.
-  const sh = spawn(
-    "sh",
-    [
-      "-c",
-      '{ "$@"; echo $? >"$STATUS"; } >/dev/null 2>"$LOG" </dev/null & echo $!',
-      "sh",
-      process.execPath,
-      import.meta.path,
-      ...process.argv.slice(2),
-    ],
-    {
-      detached: true,
-      env: { ...process.env, [WORKER_STATUS]: "1", STATUS: status, LOG: log },
-      stdio: ["ignore", "pipe", "inherit"],
-    },
-  );
-  const pid = Number(await text(sh.stdout));
-  // The subshell writes the worker's exit status. Liveness covers the subshell itself dying.
-  // oxlint-disable-next-line no-await-in-loop -- polls a process that is not our child.
-  while (!(await Bun.file(status).exists()) && isAlive(pid)) await Bun.sleep(50);
-  process.stderr.write(await Bun.file(log).text());
-  const code = Number((await Bun.file(status).exists()) ? await Bun.file(status).text() : 1);
-  await rm(dir, { recursive: true, force: true });
-  if (code === 0) process.stdout.write(`${dbPath}\n`);
-  return code;
-}
-
-async function text(stream: Readable): Promise<string> {
-  let out = "";
-  for await (const chunk of stream) out += String(chunk);
-  return out;
-}
-
-function isAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) throw error;
-    return false;
-  }
+// A rebuild after a schema or views change outlasts an agent's Bash timeout, which kills
+// the caller's process group. The worker runs in its own group so the rebuild finishes.
+if (process.env.SESSION_REFRESH_WORKER === undefined) {
+  const worker = spawn(process.execPath, [import.meta.path, ...process.argv.slice(2)], {
+    detached: true,
+    env: { ...process.env, SESSION_REFRESH_WORKER: "1" },
+    stdio: "inherit",
+  });
+  await once(worker, "exit");
+  // A worker ended by a signal ends the caller the same way.
+  if (worker.signalCode !== null) process.kill(process.pid, worker.signalCode);
+  process.exit(worker.exitCode ?? undefined);
 }
 
 try {

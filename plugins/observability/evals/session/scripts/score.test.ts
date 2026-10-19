@@ -38,6 +38,15 @@ describe("overlap", () => {
     });
     expect(overlap("You interrupted Claude 1,100 times.", truth).recall).toBe(0);
   });
+
+  test("scores a set of sessions by the session ids the reply names", () => {
+    const id = "72ef9568-a0e0-436d-81d2-6b7bb450bc15";
+    const other = "de83e672-0000-4000-8000-000000000000";
+    const truth = { rows: [{ key: id }], tolerance: 0 };
+    const reply = `The best match is \`${id}\`.\n\n- **When:** 2026-08-28\n- **Score:** 22.2, 5 terms`;
+    expect(overlap(reply, truth)).toEqual({ recall: 1, precision: 1 });
+    expect(overlap(`${reply}\n- ${other}`, truth)).toEqual({ recall: 1, precision: 1 / 2 });
+  });
 });
 
 const line = (value: unknown) => JSON.stringify(value);

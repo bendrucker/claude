@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@duckdb/node-api": "1.5.0-r.1",
+    "@duckdb/node-api": "1.5.6-r.1",
     "ap-style-title-case": "^2.0.0",
     "cleye": "^2.2.1",
     "compromise": "^14.15.1",

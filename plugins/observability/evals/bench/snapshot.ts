@@ -50,10 +50,12 @@ export async function snapshot(db: string, out: string, bytes: number): Promise<
   mkdirSync(out, { recursive: true });
   const ids = files.map((f) => `(${f.id}, ${sqlLiteral(f.source_file)})`).join(",");
   // Lines go out unchanged: quoting and the header are off, and the delimiter never occurs in JSON.
-  // A low flush threshold keeps thousands of partition writers inside the memory cap.
+  // One thread and a low flush threshold keep the sort and thousands of partition writers inside
+  // the memory cap; with more threads, each sorts its own buffer and the sum overflows it.
   await duckdbJson(
     db,
-    `SET partitioned_write_flush_threshold = 1000;
+    `SET threads = 1;
+     SET partitioned_write_flush_threshold = 1000;
      SET partitioned_write_max_open_files = 16;
      COPY (SELECT r.data, f.id FROM raw r JOIN (VALUES ${ids}) f(id, source_file) USING (source_file)
            WHERE r.host = 'local' AND r.data IS NOT NULL ORDER BY f.id, r.source_line)

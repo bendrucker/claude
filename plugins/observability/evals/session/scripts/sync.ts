@@ -44,6 +44,11 @@ export const mirrors: Mirror[] = [
       "data/*.duckdb*",
     ],
   },
+  {
+    local: join(evals, "search"),
+    remote: `${BUCKET}/search`,
+    filters: ["--exclude", "*", "--include", "labels.jsonl"],
+  },
 ];
 
 export function syncArgs(
@@ -68,7 +73,7 @@ function sync(direction: "pull" | "push", profile: string) {
   return new Command(direction)
     .description(
       direction === "pull"
-        ? "Copy the bench replay set, snapshot and results, and the eval suite's mined data and runs, from the eval bucket."
+        ? "Copy the bench replay set, snapshot and results, the eval suite's mined data and runs, and the search labels, from the eval bucket."
         : "Upload the bench and eval suite's mined data and results to the eval bucket.",
     )
     .option("--profile <name>", "AWS profile", profile)

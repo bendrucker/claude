@@ -212,7 +212,10 @@ describe("search", () => {
       z.object({ session_id: z.string(), score: z.number(), matched_terms: z.bigint() }),
       { ...queryParams({ limit: "10" }), query: "retry policy" },
     );
-    expect(rows[0]).toMatchObject({ session_id: "plan-approve-variant-session", matched_terms: 2n });
+    expect(rows[0]).toMatchObject({
+      session_id: "plan-approve-variant-session",
+      matched_terms: 2n,
+    });
     const scores = rows.map((r) => r.score);
     expect(scores).toEqual(scores.toSorted((a, b) => b - a));
   });

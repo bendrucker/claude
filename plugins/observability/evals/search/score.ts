@@ -30,7 +30,7 @@ interface Run extends Scored {
   id: string;
   walls: number[];
   returned: number;
-  error?: string;
+  error: string | undefined;
 }
 
 export async function loadLabels(path: string, tag?: string): Promise<Labeled[]> {

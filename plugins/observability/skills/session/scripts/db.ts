@@ -21,7 +21,7 @@ export const LOCAL_HOST = "local";
 // views.sql changes, so neither needs a bump. migrateIfNeeded clears indexed_files when
 // the stored version is older, re-importing every file still on disk while leaving rows
 // whose file is gone in place. v2: raw ingests all record types, not just chat.
-// v3: per-file change catalog (indexed_files), incremental content_items.
+// v3: per-file change catalog (indexed_files).
 export const INDEX_VERSION = 3;
 
 export interface Database {
@@ -456,6 +456,20 @@ export async function rebuildViews(db: Database): Promise<void> {
   await db.run(await readSql(RESOURCES_DIR, "views"));
 }
 
+// Replaces the content_items rows of the sessions in content_item_scope with what a full
+// rebuild would produce for them, in one transaction.
+async function rebuildContentItems(db: Database): Promise<void> {
+  await db.run("BEGIN");
+  await db.run(
+    `DELETE FROM content_items ci WHERE EXISTS (
+       SELECT 1 FROM content_item_scope c
+       WHERE c.host = ci.host AND c.session_id IS NOT DISTINCT FROM ci.session_id
+     )`,
+  );
+  await db.run("INSERT INTO content_items SELECT * FROM content_item_rows(true)");
+  await db.run("COMMIT");
+}
+
 // One transaction: a partial forget that kept indexed_files rows would make a later
 // re-import of the same label skip every unchanged file while raw stays empty. The views
 // rebuild drops the host from content_items. CHECKPOINT cannot run inside a transaction.
@@ -488,6 +502,12 @@ export async function deleteHostRows(db: Database, host: string): Promise<void> 
 
 async function removeFile(db: Database, host: string, file: string): Promise<void> {
   await db.run("BEGIN");
+  await db.run(
+    `INSERT INTO content_item_scope
+     SELECT DISTINCT host, session_id FROM raw
+     WHERE host = $host AND source_file = $path AND type IN ('user', 'assistant')`,
+    { host, path: file },
+  );
   await db.run("DELETE FROM raw WHERE host = $host AND source_file = $path", {
     host,
     path: file,
@@ -527,6 +547,15 @@ export async function ensureIndex(
   };
 
   const pinnedRederived = await ensureSchema(db);
+  // Read before the import loop clears it: a hash that already disagrees means views.sql
+  // changed or an earlier run died before rebuilding, and either calls for a full rebuild.
+  const viewsFingerprint = await fileFingerprint(RESOURCES_DIR, "views");
+  const [metaRow] = await db.query(
+    "SELECT views_hash FROM index_meta",
+    z.object({ views_hash: z.string().nullable() }),
+  );
+  const viewsStale = metaRow?.views_hash !== viewsFingerprint;
+  await db.run("DELETE FROM content_item_scope");
   lap("schema");
 
   const importSql = await readSql(RESOURCES_DIR, "import");
@@ -590,23 +619,19 @@ export async function ensureIndex(
   const telemetryChanged = await ensureTelemetry(db, getLocalRoot(options.projectsDir), LOCAL_HOST);
   lap("telemetry");
 
-  // views_hash answers both "was views.sql edited" and "did raw change", because every
-  // mutation clears it before writing. So it also covers a run that died partway: the
-  // fingerprint it finds is null and the rebuild happens now.
+  // A stale views_hash, a re-derived raw, or a missing table rebuilds content_items in
+  // full. Otherwise only the sessions the imports touched are rebuilt. The one path that
+  // clears no fingerprint is an INDEX_VERSION bump against an empty corpus, which drops
+  // content_items and then imports no file, so the table's presence is checked too.
   const wrote = changedFiles > 0 || removedFiles > 0 || pinnedRederived;
-  const fingerprint = await fileFingerprint(RESOURCES_DIR, "views");
-  const [metaRow] = await db.query(
-    "SELECT views_hash FROM index_meta",
-    z.object({ views_hash: z.string().nullable() }),
-  );
-  const viewsChanged = metaRow?.views_hash !== fingerprint;
-  // The one path that clears no fingerprint is an INDEX_VERSION bump against an empty
-  // corpus, which drops content_items and then imports no file. Asking whether the table
-  // is there covers it.
-  const derivedMissing = !(await tableExists(db, "content_items"));
-  if (wrote || viewsChanged || derivedMissing) {
+  const viewsChanged = viewsStale || pinnedRederived || !(await tableExists(db, "content_items"));
+  if (viewsChanged) {
     await rebuildViews(db);
-    await db.run("UPDATE index_meta SET views_hash = $hash", { hash: fingerprint });
+  } else if (wrote) {
+    await rebuildContentItems(db);
+  }
+  if (viewsChanged || wrote) {
+    await db.run("UPDATE index_meta SET views_hash = $hash", { hash: viewsFingerprint });
   }
 
   // Clear the per-host indexing variable so a query reusing this connection without
@@ -616,7 +641,7 @@ export async function ensureIndex(
 
   // Without an explicit CHECKPOINT the blocks freed by DELETE+INSERT and the
   // content_items rebuild are never reused and the file grows on every import.
-  if (wrote || viewsChanged || derivedMissing || telemetryChanged > 0) {
+  if (wrote || viewsChanged || telemetryChanged > 0) {
     await db.run("CHECKPOINT");
   }
   lap("checkpoint");

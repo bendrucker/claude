@@ -99,16 +99,23 @@ GROUP BY host, session_id, message_id;
 
 -- Session rewind/resume replays JSONL lines verbatim (same uuid, usually later in the
 -- same file), so tool_use/tool_result rows would double-count without dedupe. Two
--- passes: drop replayed source lines (same record uuid, keep the latest copy), then
--- drop residual duplicate tool ids that arrive under fresh uuids (e.g. an Agent
--- tool_use echoed into its subagent transcript).
+-- passes: drop replayed source lines (same record uuid), then drop residual duplicate
+-- tool ids that arrive under fresh uuids (e.g. an Agent tool_use echoed into its
+-- subagent transcript).
 --
--- The cross-file pass keeps the main-thread copy when one exists. The only tool ids that
--- span two files are a parent's Agent call echoed into the transcript of the subagent it
+-- Both passes keep the main-thread copy when one exists, then the latest. The copies
+-- that span two files are a parent's lines echoed into the transcript of the subagent it
 -- spawned, and the parent's copy is the original. Ordering on source_line alone let the
 -- echo win for about one spawn in twelve, which hands `agent_id` the spawned agent's
 -- label for a call the parent made.
-CREATE OR REPLACE TABLE content_items AS
+--
+-- Both passes partition within (host, session_id), and a subagent's transcript carries
+-- its parent's session_id, so one session's rows depend only on that session's lines.
+-- That makes the session the unit of an incremental rebuild: `scoped` limits the scan
+-- to the sessions db.ts lists in content_item_scope, and the result equals what a full
+-- rebuild produces for them. `->` is spelled json_extract because a macro body parses
+-- it as a lambda.
+CREATE OR REPLACE MACRO content_item_rows(scoped) AS TABLE
 WITH src AS (
   SELECT
     r.host,
@@ -117,19 +124,23 @@ WITH src AS (
     r.project_path,
     r.source_file,
     r.source_line,
-    r.data->'$.message.content' AS message_content,
-    r.data->'$.toolUseResult'   AS tool_use_result,
-    r.data->>'$.toolDenialKind' AS tool_denial_kind,
-    r.data->'$.permissionDecision' AS permission_decision,
+    json_extract(r.data, '$.message.content')    AS message_content,
+    json_extract(r.data, '$.toolUseResult')      AS tool_use_result,
+    r.data->>'$.toolDenialKind'                  AS tool_denial_kind,
+    json_extract(r.data, '$.permissionDecision') AS permission_decision,
     r.attribution_skill,
     r.attribution_plugin,
     r.attribution_agent
   FROM raw r
   WHERE r.type IN ('user', 'assistant')
+    AND (NOT scoped OR EXISTS (
+      SELECT 1 FROM content_item_scope c
+      WHERE c.host = r.host AND c.session_id IS NOT DISTINCT FROM r.session_id
+    ))
   QUALIFY r.uuid IS NULL
     OR ROW_NUMBER() OVER (
          PARTITION BY r.host, r.session_id, r.uuid
-         ORDER BY r.source_line DESC, r.source_file DESC
+         ORDER BY (r.source_file LIKE '%/subagents/%'), r.source_line DESC, r.source_file DESC
        ) = 1
 )
 SELECT
@@ -158,9 +169,11 @@ LATERAL (SELECT unnest(json_extract(s.message_content, '$[*]')) AS item) t
 WHERE json_type(s.message_content) = 'ARRAY'
 QUALIFY COALESCE(id, tool_use_id) IS NULL
   OR ROW_NUMBER() OVER (
-       PARTITION BY s.host, type, COALESCE(id, tool_use_id)
+       PARTITION BY s.host, s.session_id, type, COALESCE(id, tool_use_id)
        ORDER BY (s.source_file LIKE '%/subagents/%'), s.source_line DESC, s.source_file DESC
      ) = 1;
+
+CREATE OR REPLACE TABLE content_items AS SELECT * FROM content_item_rows(false);
 
 -- `session_id` is the transcript's session id, which a subagent line inherits from its
 -- parent. `agent_id` names the subagent that actually made the call and is NULL on the

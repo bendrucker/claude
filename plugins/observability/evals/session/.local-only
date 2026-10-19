@@ -1,0 +1,1 @@
+The cases read a frozen copy of the private session index, which only exists on my machines.

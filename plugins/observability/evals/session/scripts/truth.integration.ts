@@ -53,6 +53,14 @@ const apiError = (uuid: string, error: Record<string, unknown>) => ({
 });
 
 const lines = [
+  use("zsh", "Bash", "2026-10-03T00:00:00Z"),
+  denied("zsh", "(eval):1: no matches found: *.ts", "2026-10-03T00:00:01Z"),
+  // Only a Bash call's failure counts.
+  use("grep", "Grep", "2026-10-03T00:00:02Z"),
+  denied("grep", "bad pattern: [", "2026-10-03T00:00:03Z"),
+  use("ask", "AskUserQuestion", "2026-08-05T00:00:00Z"),
+  use("ask-late", "AskUserQuestion", "2026-10-05T00:00:00Z"),
+  text("bench", "profile it with pytest-benchmark", "2026-09-05T00:00:00Z"),
   use("field", "Bash", "2026-10-01T00:00:00Z"),
   denied("field", "PreToolUse:Bash hook error: no", "2026-10-01T00:00:01Z", decision("hook")),
   // A replayed line repeats its uuid and tool id, and counts once.
@@ -123,6 +131,9 @@ test.each<[string, TruthRow[]]>([
       { key: "ECONNRESET", value: 1 },
     ],
   ],
+  ["question-zsh-failures", [{ key: "no matches found", value: 1 }]],
+  ["question-ask-user", [{ value: 1 }]],
+  ["question-pytest-benchmark", [{ key: "truth-session" }]],
 ])("%s reads the native fields", async (name, want) => {
   expect(byKey(await truth(name))).toEqual(byKey(want));
 });

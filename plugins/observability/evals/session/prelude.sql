@@ -1,7 +1,7 @@
 -- Relations the truth queries share, read from `raw` alone so ground truth never runs through
 -- the views under test. Temp views work on a read-only open.
 CREATE TEMP VIEW items AS
-SELECT host, timestamp, data, unnest(json_extract(data, '$.message.content[*]')) AS item
+SELECT host, session_id, timestamp, data, unnest(json_extract(data, '$.message.content[*]')) AS item
 FROM raw
 WHERE type IN ('user', 'assistant');
 

@@ -28,18 +28,13 @@ Never point the harness at the live index. Freeze a copy first, so the index und
 cp -c ~/.local/share/claude-sessions/session.duckdb /tmp/frozen.duckdb
 ```
 
-Mine the replay set from it. It keeps every query group that ran out of memory, the top group for each hot view and named query, then the most frequent groups up to `--top`:
+Mine the replay set from it. It keeps every query group that ran out of memory, the top group for each hot view and named query, then the most frequent groups up to `--top`. Named queries that read a file relative to the caller's cwd are left out, because a replay runs from no project:
 
 ```bash
 bun bench.ts replay-set --db /tmp/frozen.duckdb
 ```
 
-`replay.json` holds SQL agents wrote, so it stays out of git and lives in the eval bucket:
-
-```bash
-aws s3 cp replay.json s3://ben-drucker-agents-eval-corpus/session/bench/replay.json --profile agents-admin
-aws s3 cp s3://ben-drucker-agents-eval-corpus/session/bench/replay.json replay.json --profile agents
-```
+`replay.json`, `snap/` and `results/` hold SQL and transcripts agents wrote, so they stay out of git and live in the eval bucket. The eval suite's [`sync.ts`](../session/scripts/sync.ts) mirrors them with its own data, `push` after a run and `pull` before one.
 
 ### Arms
 
@@ -52,7 +47,7 @@ bun bench.ts build --snapshot snap --out arms/aa
 bun bench.ts build --snapshot snap --out arms/zstd --skill ../wt/plugins/observability/skills/session
 ```
 
-`build` records its wall time, peak RSS and index size in `build.json`. A full build of the whole corpus is the number a storage PR claims; the sample is for climbing.
+`build` records its wall time, peak RSS and index size in `build.json`. `run` and `refresh` refuse an arm whose index was last built by a different `views.sql` than its skill dir's, since its named queries would read another commit's views. A full build of the whole corpus is the number a storage PR claims; the sample is for climbing.
 
 ### Runs
 

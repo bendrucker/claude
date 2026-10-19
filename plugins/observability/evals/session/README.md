@@ -22,6 +22,8 @@ Each case directory holds `case.yaml`, `prompt.md`, a `fixture.sh` that runs [`i
 
 The `drift-*` cases ask questions whose answer lives in a native harness field (permission decisions, attachment types, API error records) rather than in a heuristic the views apply. `scripts/truth.integration.ts` pins each one's truth query on a fixture transcript.
 
+The `search-*` cases ask the agent to find sessions by topic. `scripts/search-cases.ts` writes one per query in the [search eval](../search/)'s `labels.jsonl` whose sessions the index holds, keeping the label's `known-item` or `topical` kind and its split. Their prompts and truth name my sessions, so they stay out of git: run the script after a pull and after a build.
+
 Tags split the cases into `dev` and `holdout`. Edit the skill against `dev` only, and run `holdout` to confirm a win. Cases mined from real sessions split by month: June to September is `dev`, October onward `holdout`. Mined prompts hold my session text, so they live in `s3://ben-drucker-agents-eval-corpus/session/` and never in the repo.
 
 ## Workflow
@@ -31,6 +33,7 @@ Build the index from the bench snapshot, never the live index, so a commit plus 
 ```bash
 bun plugins/observability/evals/session/scripts/sync.ts pull
 bun plugins/observability/evals/bench/bench.ts build --snapshot plugins/observability/evals/bench/snap --out plugins/observability/evals/session/data
+bun plugins/observability/evals/session/scripts/search-cases.ts
 ```
 
 Run, then score:

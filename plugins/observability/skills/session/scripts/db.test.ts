@@ -228,38 +228,6 @@ describe("stats", () => {
   });
 });
 
-describe("errors", () => {
-  it("returns error rows", async () => {
-    const rows = await runQuery(
-      db,
-      "errors",
-      z.object({ error_content: z.string(), tool_name: z.string(), session_id: z.string() }),
-      queryParams(),
-    );
-    expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) {
-      expect(row.error_content).toBeTruthy();
-      expect(row.tool_name).toBeTruthy();
-      expect(row.session_id).toBeTruthy();
-    }
-    expect(rows.some((r) => r.session_id === "tools-session")).toBe(true);
-  });
-
-  it("reports failures only, leaving every denial to the permissions query", async () => {
-    const rows = await runQuery(
-      db,
-      "errors",
-      z.object({ error_type: z.string(), denial_kind: z.string().nullable() }),
-      queryParams({ limit: "100" }),
-    );
-    expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) {
-      expect(row.error_type).toBe("failure");
-      expect(row.denial_kind).toBeNull();
-    }
-  });
-});
-
 describe("tool-failure-rates query", () => {
   const FailureRow = z.object({
     tool_name: z.string(),
@@ -419,21 +387,6 @@ describe("permissions query", () => {
   });
 });
 
-describe("sandbox query", () => {
-  it("returns sandbox bypasses with retry detection", async () => {
-    const rows = await runQuery(
-      db,
-      "sandbox",
-      z.object({ command: z.string(), is_retry: z.boolean(), prior_error: z.string().nullable() }),
-      queryParams(),
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.command).toContain("osascript");
-    expect(rows[0]?.is_retry).toBe(true);
-    expect(rows[0]?.prior_error).toContain("Connection Invalid");
-  });
-});
-
 describe("incremental refresh", () => {
   it("produces no duplicates on repeated indexing", async () => {
     const before = await db.query(
@@ -513,28 +466,6 @@ describe("type drift across imports", () => {
 });
 
 describe("discovery", () => {
-  it("returns column metadata via the schema query", async () => {
-    const rows = await runQuery(
-      db,
-      "schema",
-      z.object({ table_name: z.string(), column_name: z.string() }),
-    );
-    const tables = new Set(rows.map((r) => r.table_name));
-    expect(tables.has("raw")).toBe(true);
-    expect(tables.has("messages")).toBe(true);
-    expect(tables.has("content_items")).toBe(true);
-    expect(rows.some((r) => r.table_name === "raw" && r.column_name === "data")).toBe(true);
-  });
-
-  it("samples JSON keys from raw.data via the keys query", async () => {
-    const rows = await runQuery(db, "keys", z.object({ key: z.string(), occurrences: z.bigint() }));
-    expect(rows.length).toBeGreaterThan(0);
-    const keys = new Set(rows.map((r) => r.key));
-    expect(keys.has("sessionId")).toBe(true);
-    expect(keys.has("type")).toBe(true);
-    expect(keys.has("message")).toBe(true);
-  });
-
   it("describes messages with the expected pinned columns", async () => {
     const rows = await db.query("DESCRIBE messages", z.object({ column_name: z.string() }));
     const cols = new Set(rows.map((r) => r.column_name));
@@ -1159,13 +1090,15 @@ describe("hook-blocks query", () => {
   });
 });
 
-describe("hook-origin-split query", () => {
+describe("hook_events origin", () => {
   it("counts a project-dir .claude/hooks script as project_local, not shared config", async () => {
-    const rows = await runQuery(
-      db,
-      "hook-origin-split",
-      z.object({ origin: z.string(), fires: z.bigint(), total_s: z.number().nullable() }),
-      filterParams(),
+    const rows = await db.query(
+      "SELECT origin, COUNT(*) AS fires, SUM(duration_ms) / 1000.0 AS total_s FROM hook_events GROUP BY origin",
+      z.object({
+        origin: z.string().nullable(),
+        fires: z.bigint(),
+        total_s: z.number().nullable(),
+      }),
     );
     const local = rows.find((r) => r.origin === "project_local");
     const shared = rows.find((r) => r.origin === "shared_config");
@@ -1250,21 +1183,9 @@ describe("diagnostics view and query", () => {
     expect(rows[0]?.code).toBe("unresolved-import");
     expect(rows[0]?.file).toBe("/Users/test/project/app.py");
   });
-
-  it("groups recurring diagnostics by code", async () => {
-    const rows = await runQuery(
-      db,
-      "diagnostics",
-      z.object({ code: z.string(), occurrences: z.bigint(), files: z.bigint() }),
-      filterParams(),
-    );
-    const imp = rows.find((r) => r.code === "unresolved-import");
-    expect(Number(imp?.occurrences)).toBe(1);
-    expect(Number(imp?.files)).toBe(1);
-  });
 });
 
-describe("file_operations view and files query", () => {
+describe("file_operations view", () => {
   it("captures file edits with the attributed skill", async () => {
     const [row] = await db.query(
       "SELECT operation, attribution_skill FROM file_operations WHERE file_path = '/Users/test/project/doc.md' AND operation = 'Write'",
@@ -1272,17 +1193,6 @@ describe("file_operations view and files query", () => {
     );
     expect(row?.operation).toBe("Write");
     expect(row?.attribution_skill).toBe("writing:writing");
-  });
-
-  it("ranks files by edits", async () => {
-    const rows = await runQuery(
-      db,
-      "files",
-      z.object({ file_path: z.string(), edits: z.bigint() }),
-      filterParams({ limit: "20" }),
-    );
-    const doc = rows.find((r) => r.file_path === "/Users/test/project/doc.md");
-    expect(Number(doc?.edits)).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -2064,28 +1974,15 @@ describe("plan_calls view and plans query", () => {
     expect(Number(row?.approved_count)).toBe(1);
   });
 
-  it("reports the session via the plans query with replan_tier=replan", async () => {
-    const rows = await runQuery(
-      db,
-      "plans",
+  it("tiers the session as replan in plan_sessions", async () => {
+    const rows = await db.query(
+      "SELECT session_id, replan_tier, plan_count FROM plan_sessions",
       z.object({ session_id: z.string(), replan_tier: z.string(), plan_count: z.bigint() }),
-      { after_date: null, before_date: null, project: null, host: null, min_plans: null },
     );
     const row = rows.find((r) => r.session_id === "plan-session");
     expect(row).toBeDefined();
     expect(row?.replan_tier).toBe("replan");
     expect(Number(row?.plan_count)).toBe(2);
-  });
-
-  it("excludes sessions below min_plans threshold", async () => {
-    const rows = await runQuery(db, "plans", z.object({ session_id: z.string() }), {
-      after_date: null,
-      before_date: null,
-      project: null,
-      host: null,
-      min_plans: "3",
-    });
-    expect(rows.find((r) => r.session_id === "plan-session")).toBeUndefined();
   });
 
   it("classifies a terminal rejection with no edits after as outcome=handoff", async () => {
@@ -2130,11 +2027,9 @@ describe("plan_calls view and plans query", () => {
   });
 
   it("tiers a handoff-only session as single, keyed on mid-session redirects", async () => {
-    const rows = await runQuery(
-      db,
-      "plans",
+    const rows = await db.query(
+      "SELECT session_id, replan_tier, handoff_count FROM plan_sessions",
       z.object({ session_id: z.string(), replan_tier: z.string(), handoff_count: z.bigint() }),
-      { after_date: null, before_date: null, project: null, host: null, min_plans: null },
     );
     const handoff = rows.find((r) => r.session_id === "handoff-session");
     expect(handoff?.replan_tier).toBe("single");
@@ -2850,22 +2745,6 @@ describe("cli-health query", () => {
     expect(programs.get("rg")?.top_errors).toEqual(["rg: regex parse error (1)"]);
     // An error mid-output is a match, not a hidden failure.
     expect(programs.get("grep")?.hidden_error_pct).toBe(0);
-  });
-});
-
-describe("frontmatter query", () => {
-  it("parses name and description from a SKILL.md frontmatter", async () => {
-    await loadExtensions(db);
-    const skill = join(import.meta.dirname, "..", "SKILL.md");
-    const rows = await runQuery(
-      db,
-      "frontmatter",
-      z.object({ file_path: z.string(), name: z.string(), description: z.string() }),
-      { frontmatter_glob: skill },
-    );
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.name).toBe("observability:session");
-    expect(rows[0]?.description).toContain("DuckDB index");
   });
 });
 

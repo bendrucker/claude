@@ -245,20 +245,9 @@ describe("telemetry ingest", () => {
         outcome: "deny",
       },
     };
-    const denyBase = makeModRecord({ mod: "auto-mode", event_name: "auto-mode.classifier.deny" });
-    const deny = {
-      ...denyBase,
-      attributes: {
-        ...denyBase.attributes,
-        tool_use_id: "t2",
-        tool_name: "Bash",
-        permission_mode: "auto",
-        reason: "destroys the filesystem",
-      },
-    };
     await Bun.write(
       join(modEventsDir, "s1", "auto-mode.1.0.jsonl"),
-      `${JSON.stringify(verdict)}\n${JSON.stringify(deny)}\n`,
+      `${JSON.stringify(verdict)}\n`,
     );
     await reindex();
 
@@ -285,24 +274,6 @@ describe("telemetry ingest", () => {
         read_only: true,
         duration_ms: 40n,
         outcome: "deny",
-      },
-    ]);
-
-    const denials = await db.query(
-      "SELECT tool_use_id, tool_name, permission_mode, reason FROM classifier_denials",
-      z.object({
-        tool_use_id: z.string(),
-        tool_name: z.string(),
-        permission_mode: z.string().nullable(),
-        reason: z.string(),
-      }),
-    );
-    expect(denials).toEqual([
-      {
-        tool_use_id: "t2",
-        tool_name: "Bash",
-        permission_mode: "auto",
-        reason: "destroys the filesystem",
       },
     ]);
   });

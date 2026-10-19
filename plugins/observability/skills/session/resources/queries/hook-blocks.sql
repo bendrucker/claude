@@ -62,11 +62,8 @@ bl AS (
       ), 1, 80
     ) AS signature
   FROM blocks hb
-  JOIN sessions s USING (host, session_id)
-  WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
-    AND (getvariable('hook') IS NULL OR COALESCE(hb.command, hb.hook_name) GLOB getvariable('hook')::VARCHAR)
+  JOIN scoped_sessions() s USING (host, session_id)
+  WHERE (getvariable('hook') IS NULL OR COALESCE(hb.command, hb.hook_name) GLOB getvariable('hook')::VARCHAR)
 ),
 per_thread AS (
   SELECT hook, signature, host, session_id, agent_id, COUNT(*) AS n

@@ -3,53 +3,51 @@
 -- tier: 1
 -- dimensions: [permissions-sandbox]
 -- summary: >-
---   Bypassed commands normalized to their real verb, ranked by frequency: the
---   `excludedCommands` candidates.
+--   Bypassed commands by their real verb, ranked by frequency, with the split between
+--   bypasses that followed a failed sandboxed run (`justified`) and those that did not
+--   (`reflexive`): the `excludedCommands` candidates.
 -- description: >-
---   Normalization strips leading preamble from a `dangerouslyDisableSandbox` command,
---   `cd <path>` wrappers, `echo` lines, and `VAR=value` env assignments (optionally
---   exported, each followed by `&&`, a semicolon, a newline, or whitespace for
---   assignments), so the tool that actually needs the bypass surfaces. The normalization is
---   the reusable part, because it recurs across every permission and sandbox question:
---   compound commands otherwise hide the verb that needs an exemption.
+--   The verb is `sandbox_bypasses.verb`, the command with `cd`/`echo` wrappers and env
+--   assignments stripped, so compound commands surface the tool that needs the exemption.
+--   The operating rule is to bypass only after a sandboxed run of that command failed, so
+--   `justified_pct` measures adherence per verb and, in the `(all)` rollup row per host
+--   (sorted first, covering verbs under `min_count`), across the corpus.
+--
+--   A low percentage does not establish that the sandbox would have worked. The back-link
+--   requires a prior failure of the byte-identical command by the same agent in the same
+--   session, so a failure learned elsewhere or from a command differing by a path leaves no
+--   trace. Read a low-percentage verb as an `excludedCommands` candidate or a reflex.
 -- params:
 --   - name: min_count
 --     default: 5
---     meaning: floor on a command's total
+--     meaning: floor on a verb's total
 --   - after_date
 --   - before_date
 --   - project
 --   - host
 -- ---
-WITH stripped AS (
+WITH grouped AS (
   SELECT
     sb.host,
-    sb.session_id,
-    -- Strip repeated prefixes off the front, one per repetition, leaving the command.
-    regexp_replace(
-      trim(sb.command),
-      '^('
-        || '(cd [^&;\n]*|echo [^&;\n]*)(&&|;|\n)\s*'     -- a `cd ~/src &&` or `echo hi;` wrapper
-        || '|'                                           -- or
-        || '(export )?[A-Za-z_][A-Za-z0-9_]*='           -- an env assignment, optionally exported
-        || '(\$\([^)]*\)|"[^"]*"|''[^'']*''|[^\s;&|]*)'  -- whose value is `$(...)`, quoted, or bare
-        || '\s*(&&|;)?\s*'                               -- and whose trailing `&&` or `;` is optional
-      || ')+',
-      ''
-    ) AS eff
+    CASE WHEN GROUPING(sb.verb) = 1 THEN '(all)' ELSE sb.verb END AS cmd,
+    GROUPING(sb.verb) AS is_rollup,
+    COUNT(*)                                               AS bypasses,
+    COUNT(*) FILTER (WHERE sb.retried_tool_id IS NOT NULL) AS justified,
+    COUNT(*) FILTER (WHERE sb.retried_tool_id IS NULL)     AS reflexive,
+    COUNT(DISTINCT sb.session_id)                          AS sessions
   FROM sandbox_bypasses sb
-  JOIN sessions s USING (host, session_id)
-  WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
+  JOIN scoped_sessions() s USING (host, session_id)
+  WHERE sb.verb IS NOT NULL
+  GROUP BY GROUPING SETS ((sb.host), (sb.host, sb.verb))
 )
 SELECT
   host,
-  regexp_extract(trim(eff), '^[A-Za-z0-9_./-]+', 0) AS cmd,
-  COUNT(*)                   AS n,
-  COUNT(DISTINCT session_id) AS sessions
-FROM stripped
-WHERE eff <> ''
-GROUP BY host, cmd
-HAVING COUNT(*) >= COALESCE(getvariable('min_count'), 5)
-ORDER BY n DESC, host;
+  cmd,
+  bypasses,
+  justified,
+  reflexive,
+  ROUND(100.0 * justified / bypasses, 1) AS justified_pct,
+  sessions
+FROM grouped
+WHERE is_rollup = 1 OR bypasses >= COALESCE(getvariable('min_count'), 5)
+ORDER BY host, is_rollup DESC, bypasses DESC, cmd;

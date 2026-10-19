@@ -57,13 +57,10 @@ WITH reports AS (
     (ci.data->>'$.input.level') AS level,
     unnest(CAST(json_extract(ci.data, '$.input.findings') AS JSON[])) AS finding
   FROM content_items ci
-  JOIN sessions s USING (host, session_id)
+  JOIN scoped_sessions() s USING (host, session_id)
   WHERE ci.type = 'tool_use'
     AND ci.name = 'ReportFindings'
     AND (getvariable('skill') IS NULL OR ci.attribution_skill ILIKE getvariable('skill')::VARCHAR)
-    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
 ),
 findings AS (
   SELECT

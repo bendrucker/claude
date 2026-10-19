@@ -37,7 +37,7 @@ The per-file delete-then-insert (instead of the previous whole-table `CREATE OR 
 
 Two local-only sources sit beside the projects directory and are read by `telemetry.ts` after the host loop: debug logs (`debug/*.txt`, parsed in TypeScript into `debug_events`) and mod events (`mod-events/<session>/*.jsonl`, written by the mod-events plugin, into `mod_events`). Their catalog is `telemetry_files`, keyed per file. Neither table derives from `raw`, so they never touch `views_hash`.
 
-Debug logs and mod events carry a size cap (2 GB and 500 MB). After each sync, `prune` deletes the oldest files past the cap, choosing only among files whose catalog row matches the disk, so nothing is deleted before its rows land. Both sources keep their rows when a file disappears, so their tables archive what the disk no longer holds. The `classifier_verdicts` and `classifier_denials` views in `views.sql` read the auto-mode mod's `tool.verdict` and `classifier.deny` events from `mod_events`.
+Debug logs and mod events carry a size cap (2 GB and 500 MB). After each sync, `prune` deletes the oldest files past the cap, choosing only among files whose catalog row matches the disk, so nothing is deleted before its rows land. Both sources keep their rows when a file disappears, so their tables archive what the disk no longer holds. The `classifier_verdicts` view in `views.sql` reads the auto-mode mod's `tool.verdict` events from `mod_events`.
 
 ### Refresh Entry Point
 

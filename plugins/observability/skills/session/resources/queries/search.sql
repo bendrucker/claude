@@ -16,7 +16,7 @@
 --   - host
 -- ---
 SELECT s.*
-FROM sessions s
+FROM scoped_sessions() s
 WHERE (
   s.label ILIKE '%' || getvariable('query') || '%'
   OR EXISTS (
@@ -30,8 +30,5 @@ WHERE (
       AND ci.text ILIKE '%' || getvariable('query') || '%'
   )
 )
-  AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-  AND project_filter(s.project_path, getvariable('project'))
-  AND host_filter(s.host, getvariable('host'))
 ORDER BY s.start_time DESC
 LIMIT getvariable('limit');

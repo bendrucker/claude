@@ -123,10 +123,7 @@ keyed AS (
 observed AS (
   SELECT sc.skill_name, sc.host, sc.session_id, sc.timestamp
   FROM skill_calls sc
-  JOIN sessions s USING (host, session_id)
-  WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
+  JOIN scoped_sessions() s USING (host, session_id)
 ),
 -- Typed slash commands leave no Skill tool call, so they come from `command_markers`
 -- rather than `skill_calls`. The configured side bounds the rows, so built-in commands
@@ -134,10 +131,7 @@ observed AS (
 markers AS (
   SELECT cm.command
   FROM command_markers cm
-  JOIN sessions s USING (host, session_id)
-  WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
+  JOIN scoped_sessions() s USING (host, session_id)
 ),
 -- Counted per configured skill before the join so it stays one row per skill and cannot
 -- multiply the observed rows behind `calls`. Matching reuses `match_key`, so a marker

@@ -16,9 +16,9 @@ export const DIMENSIONS = [
   {
     slug: "permissions-sandbox",
     label: "Permissions and sandbox",
-    surfaces: ["permissions", "sandbox"],
+    surfaces: ["permissions", "sandbox_bypasses"],
   },
-  { slug: "tool-failures", label: "Tool failures", surfaces: ["errors"] },
+  { slug: "tool-failures", label: "Tool failures", surfaces: ["tool-failure-rates"] },
   {
     slug: "context-tax",
     label: "Context tax",
@@ -30,7 +30,7 @@ export const DIMENSIONS = [
     label: "Turns and compaction",
     surfaces: ["activity (compactions, API errors)"],
   },
-  { slug: "skill-economy", label: "Skill economy", surfaces: ["skills", "skill-activity"] },
+  { slug: "skill-economy", label: "Skill economy", surfaces: ["skill_calls", "skill-activity"] },
   { slug: "planning", label: "Planning", surfaces: ["plan_sessions", "plan_calls"] },
   { slug: "outcomes", label: "Outcomes", surfaces: ["pr_links", "plan_calls", "file_operations"] },
 ] as const;

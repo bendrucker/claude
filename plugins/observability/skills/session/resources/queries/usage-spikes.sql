@@ -29,27 +29,11 @@
 --   - host
 -- ---
 WITH priced AS (
-  SELECT
-    mu.*,
-    model_input_rate(mu.model)  AS in_rate,
-    model_output_rate(mu.model) AS out_rate,
-    COALESCE(mu.cache_1h_tokens, 0) AS w1h,
-    COALESCE(mu.cache_5m_tokens,
-             COALESCE(mu.cache_creation_tokens, 0) - COALESCE(mu.cache_1h_tokens, 0)) AS w5m
+  SELECT mu.*
   FROM message_usage mu
   WHERE date_filter(mu.timestamp, getvariable('after_date'), getvariable('before_date'))
     AND project_filter(mu.project_path, getvariable('project'))
     AND host_filter(mu.host, getvariable('host'))
-),
-costed AS (
-  SELECT
-    *,
-    (COALESCE(input_tokens, 0) * in_rate
-     + w5m * 1.25 * in_rate
-     + w1h * 2.0  * in_rate
-     + COALESCE(cache_read_tokens, 0) * 0.1 * in_rate
-     + COALESCE(output_tokens, 0) * out_rate) / 1e6 AS cost_usd
-  FROM priced
 )
 SELECT
   time_bucket(INTERVAL (COALESCE(getvariable('bucket_minutes'), 10) || ' minutes'), timestamp) AS bucket,
@@ -57,7 +41,7 @@ SELECT
   session_id,
   regexp_extract(ANY_VALUE(project_path), '[^/]+$') AS repo,
   COUNT(*)                                          AS msgs,
-  ROUND(SUM(cost_usd), 2)                           AS cost_usd_est,
+  ROUND(SUM(est_cost_usd), 2)                           AS cost_usd_est,
   SUM(COALESCE(input_tokens, 0))                    AS input_tokens,
   SUM(COALESCE(output_tokens, 0))                   AS output_tokens,
   SUM(COALESCE(cache_creation_tokens, 0))           AS cache_write_tokens,
@@ -71,7 +55,7 @@ SELECT
   MODE(model)                                       AS top_model,
   MODE(attribution_agent)                           AS top_agent,
   MODE(attribution_skill)                           AS top_skill
-FROM costed
+FROM priced
 GROUP BY bucket, host, session_id
 ORDER BY cost_usd_est DESC NULLS LAST
 LIMIT COALESCE(getvariable('limit'), 30);

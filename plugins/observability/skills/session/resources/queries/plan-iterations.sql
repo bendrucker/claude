@@ -1,6 +1,7 @@
 -- ---
 -- name: plan-iterations
 -- tier: 1
+-- dimensions: [planning]
 -- summary: >-
 --   One row per ExitPlanMode present, ordered within a session, measuring the append-only
 --   re-present signature.
@@ -27,11 +28,8 @@
 WITH filtered AS (
   SELECT ps.host, ps.session_id
   FROM plan_sessions ps
-  JOIN sessions s USING (host, session_id)
-  WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(ps.project_path, getvariable('project'))
-    AND host_filter(ps.host, getvariable('host'))
-    AND ps.plan_count >= COALESCE(TRY_CAST(getvariable('min_plans') AS INTEGER), 2)
+  JOIN scoped_sessions() s USING (host, session_id)
+  WHERE ps.plan_count >= COALESCE(TRY_CAST(getvariable('min_plans') AS INTEGER), 2)
 ),
 plans AS (
   SELECT

@@ -70,7 +70,7 @@ The eleven that carry most of the measured usage:
 - `hook-blocks`: hook overfiring, grouped by normalized reason signature, including the PreToolUse denies `hook_events` never records.
 - `skill-auto-vs-explicit`: per skill, model-routed vs chained vs typed. The `disable-model-invocation` lever.
 - `skill-config-vs-observed`: installed skills that never fire, the curation instrument (reads disk, needs `-init`).
-- `sandbox-bypass-effective-command`: bypassed commands normalized to their real verb, the `excludedCommands` candidates.
+- `sandbox-bypass-effective-command`: bypassed commands by their real verb, with how many followed a failed sandboxed run, the `excludedCommands` candidates.
 - `repeat-read-waste`: repeat Reads split by cause, isolating the true context tax from pagination and fan-out.
 - `delegation`: whether expensive parents push subagent spawns down to cheaper models.
 - `usage-timeline`: one session's token burn per time bucket, with estimated cost and a context-size proxy.
@@ -79,18 +79,18 @@ The eleven that carry most of the measured usage:
 The rest, by name, described in [`references/catalog.md`](references/catalog.md):
 
 - Sessions and prose: `search`, `text-export`, `model-summary`, `bare-refs`
-- Tool use and friction: `stats`, `errors`, `permissions`, `sandbox`, `sandbox-bypass-justification`
+- Tool use and friction: `stats`, `permissions`
 - Hooks: `hook-block-then-retry-success`, `hook-config-vs-observed`
-- Skills: `skills`, `skill-activity`
-- Files, tokens, activity: `files`, `diagnostics`, `usage-spikes`, `top-sessions`
-- Planning and review: `plans`, `plan-iterations`, `plan-sections`, `plan-sizes`, `review-precision`
-- Schema and index: `schema`, `keys`, `fields`, `field-drift`, `frontmatter`
+- Skills: `skill-activity`
+- Tokens and activity: `usage-spikes`, `top-sessions`
+- Planning and review: `plan-iterations`, `plan-sections`, `plan-sizes`, `review-precision`
+- Schema and index: `fields`, `field-drift`
 
 Load [`references/catalog.md`](references/catalog.md) before running a query you have not used. A further tier, aimed at the self-improvement loop, is listed in [`references/discovery.md`](references/discovery.md).
 
 ### Queries That Read Disk
 
-Four queries read files on disk instead of the index. Three of them (`plan-sections`, `frontmatter`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-init resources/extensions.sql` in place of `limits.sql`. It carries the same limits, loads both extensions in the same process before the piped query, and runs under `-readonly`. `hook-self-timing` reads JSONL and needs no extension. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
+Four queries read files on disk instead of the index. Two of them (`plan-sections`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-init resources/extensions.sql` in place of `limits.sql`. It carries the same limits, loads both extensions in the same process before the piped query, and runs under `-readonly`. `hook-self-timing` and `hook-config-vs-observed` read JSON and need no extension. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
 
 ```bash
 duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/extensions.sql ~/.local/share/claude-sessions/session.duckdb \

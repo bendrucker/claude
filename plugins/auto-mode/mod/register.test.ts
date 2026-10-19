@@ -320,30 +320,4 @@ describe("register", () => {
 
     expect(world.events).toEqual([{ mod: "auto-mode", event: "session.start" }]);
   });
-
-  test("records a classifier refusal with its reason and mode", async ($, on) => {
-    const world = worldOf(on);
-    on("classic.PermissionDenied", () => ({}));
-
-    await $.classic.PermissionDenied({
-      tool_name: "Bash",
-      tool_input: { command: "rm -rf /" },
-      tool_use_id: "toolu_9",
-      reason: "destroys the filesystem",
-      permission_mode: "auto",
-    });
-
-    expect(world.events).toEqual([
-      {
-        mod: "auto-mode",
-        event: "classifier.deny",
-        detail: {
-          tool_use_id: "toolu_9",
-          tool_name: "Bash",
-          permission_mode: "auto",
-          reason: "destroys the filesystem",
-        },
-      },
-    ]);
-  });
 });

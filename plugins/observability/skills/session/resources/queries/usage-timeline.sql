@@ -18,13 +18,7 @@
 --   - host
 -- ---
 WITH priced AS (
-  SELECT
-    mu.*,
-    model_input_rate(mu.model)  AS in_rate,
-    model_output_rate(mu.model) AS out_rate,
-    COALESCE(mu.cache_1h_tokens, 0) AS w1h,
-    COALESCE(mu.cache_5m_tokens,
-             COALESCE(mu.cache_creation_tokens, 0) - COALESCE(mu.cache_1h_tokens, 0)) AS w5m
+  SELECT mu.*
   FROM message_usage mu
   WHERE mu.session_id = getvariable('session')
     AND host_filter(mu.host, getvariable('host'))
@@ -32,13 +26,7 @@ WITH priced AS (
 SELECT
   time_bucket(INTERVAL (COALESCE(getvariable('bucket_minutes'), 10) || ' minutes'), timestamp) AS bucket,
   COUNT(*)                                        AS msgs,
-  ROUND(SUM(
-    (COALESCE(input_tokens, 0) * in_rate
-     + w5m * 1.25 * in_rate
-     + w1h * 2.0  * in_rate
-     + COALESCE(cache_read_tokens, 0) * 0.1 * in_rate
-     + COALESCE(output_tokens, 0) * out_rate) / 1e6
-  ), 2)                                           AS cost_usd_est,
+  ROUND(SUM(est_cost_usd), 2)                                           AS cost_usd_est,
   SUM(COALESCE(input_tokens, 0))                  AS input_tokens,
   SUM(COALESCE(output_tokens, 0))                 AS output_tokens,
   SUM(COALESCE(cache_creation_tokens, 0))         AS cache_write_tokens,

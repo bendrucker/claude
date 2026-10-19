@@ -22,20 +22,20 @@ This table and the Tier-2 list below are generated from the `-- ---` headers on 
 <!-- generated:dimensions -->
 | Dimension | Named queries | Survey surfaces |
 |-----------|---------------|-----------------|
-| Hook latency | `hook-origin-split` | `hooks` |
+| Hook latency | `hook-self-timing` | `hooks` |
 | Hook blocks | `hook-block-then-retry-success` | `hook-blocks`, `hooks` |
 | Hook coverage | `hook-config-vs-observed` | `hooks` |
-| Permissions and sandbox | `already-allowed-still-prompting`, `sandbox-bypass-effective-command`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence` | `permissions`, `sandbox` |
-| Tool failures | `cli-health`, `tool-failure-rates` | `errors` |
+| Permissions and sandbox | `already-allowed-still-prompting`, `sandbox-bypass-effective-command`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence` | `permissions`, `sandbox_bypasses` |
+| Tool failures | `cli-health`, `tool-failure-rates` | `tool-failure-rates` |
 | Context tax | `catalog-reinjection-thrash-sessions` | `activity`, `hooks` (additionalContext) |
 | Tokens | `delegation`, `repeat-read-waste`, `top-sessions` | `stats`, `model-summary`, `skill-activity` |
 | Turns and compaction | `stop-hook-noop-detector` | `activity` (compactions, API errors) |
-| Skill economy | `skill-auto-vs-explicit` | `skills`, `skill-activity` |
-| Planning | `plans` | `plan_sessions`, `plan_calls` |
+| Skill economy | `skill-auto-vs-explicit` | `skill_calls`, `skill-activity` |
+| Planning | `plan-iterations` | `plan_sessions`, `plan_calls` |
 | Outcomes | `outcomes` | `pr_links`, `plan_calls`, `file_operations` |
 <!-- /generated:dimensions -->
 
-Use `records`, `fields`, `schema`, and `keys` whenever a dimension needs a path that isn't pinned: `SELECT kind, COUNT(*) FROM records GROUP BY kind` is the full taxonomy, and `fields` infers the JSON keys under any path.
+Use `records` and `fields` whenever a dimension needs a path that isn't pinned: `SELECT kind, COUNT(*) FROM records GROUP BY kind` is the full taxonomy, and `fields` infers the JSON keys under any path.
 
 ## Grounding
 
@@ -46,7 +46,7 @@ Re-check every candidate against the live config repo, the git toplevel of `dirn
 - `grounded` (boolean): the finding survived the re-check against live config.
 - `confidence` (high/medium/low): how strong the grounded evidence is.
 
-- Hooks run in parallel. Never sum hook durations as wall-clock; the cost the user waits on is the single slowest hook plus a fixed per-process overhead, not the sum across matching hooks. `hook-origin-split`'s `total_s` is aggregate process work, not latency.
+- Hooks run in parallel. Never sum hook durations as wall-clock; the cost the user waits on is the single slowest hook plus a fixed per-process overhead, not the sum across matching hooks. A sum over `hook_events.duration_ms`, split by `origin` or otherwise, is aggregate process work, not latency.
 - `hook_events` never records a PreToolUse deny, so the `blocks` and `friction_pct` columns in `hooks` understate a denying hook, often to zero. Read `hook-blocks` (which unions the recovered `hook_denies` rows) before calling a hook low-friction, and check `index-health`'s `hook-deny-invisible` for how much of the deny channel is dark in the window you are mining.
 - A subagent's transcript lines carry the PARENT session's id, so `session_id` alone cannot separate a parent's own tool calls from its fan-out's. `hook_denies` is where this bites hardest, because a recovered deny comes from a tool_result and subagents produce those in volume: a discovery run's own mining subagents each hitting a hook once reads as one enormous burst by the orchestrator. Key any per-session claim over `tool_calls`, `tool_errors`, or `hook_denies` on `agent_id` as well (`hook-blocks` does), and read `subagent_blocks` before calling a hook a storm.
 - An aggregate spanning a fix reports a closed bug as current. Before citing a block or deny count, compare the signature's `first_seen`/`last_seen` against the git history of the hook that produced it: a count that stops at the commit that fixed the hook is evidence the fix worked, not evidence of friction. Split the window at that commit and re-run rather than reporting the total.
@@ -54,7 +54,7 @@ Re-check every candidate against the live config repo, the git toplevel of `dirn
 - A hook's `p95_ms` is not attributable until `excess_p95_ms` confirms it. Host-wide slowdowns inflate every hook in the same hour by the same factor, `bash` and `bun` alike, so the highest-volume hooks sample those windows most and look slow. Check `ambient_p50_ms` before filing a latency finding. Where a hook self-times its own work (the `writing` PreToolUse dispatcher writes `duration_ms` to `~/.claude/writing-hooks/log.jsonl`), that in-process figure beats the harness duration, which includes process spawn and interpreter start.
 - Split attachment and injection counts by `isSidechain` before making any per-session claim about them. Per-subagent context (the skill catalog, the deferred-tools delta) is injected once per subagent, so a session total scales with fan-out and any co-scaling variable will look causal.
 - Catalog and deferred-tools reinjection volume is not itself a finding. The harness controls when it reinjects, and no config change here reduces it. Injections fire on resume as well as at a `system:compact_boundary`, which is why a window's total runs large even when actual compaction is rare. Use the volume as an input to valuing catalog and skill-description tokens, since those pay repeatedly per session rather than once, and stop there rather than filing it as a candidate.
-- Split friction into the part a setting can change and the part it cannot. `ExitPlanMode` and `AskUserQuestion` rejections are not allowlistable; the named `permissions` and `errors` queries already exclude them, so only custom SQL over `permission_requests`/`tool_errors` needs that filter. A compound command escapes the sandbox only when every top-level command matches `excludedCommands`, so `cd <dir> && <exempt verb>` and an exempt verb piped into another command run sandboxed, and a bypass on either can have a real sandbox cause. Counting raw rejections without that split inflates the actionable set.
+- Split friction into the part a setting can change and the part it cannot. `ExitPlanMode` and `AskUserQuestion` rejections are not allowlistable; the named `permissions` query already excludes them, so only custom SQL over `permission_requests`/`tool_errors` needs that filter. A compound command escapes the sandbox only when every top-level command matches `excludedCommands`, so `cd <dir> && <exempt verb>` and an exempt verb piped into another command run sandboxed, and a bypass on either can have a real sandbox cause. Counting raw rejections without that split inflates the actionable set.
 - Sort a `tool-failure-rates` signature by what would fix it. `StructuredOutput` and `ReportFindings` failures are schema-validation retries, fixed in the schema or the prompt that fills it, and the model usually passes on its next call. A harness tool rejecting its input (`EnterWorktree` refusing a path, `TaskStop` on a finished task) points at the skill or instruction that issued the call.
 - A query studying the plan gate specifically cannot trust `denial_kind` on `ExitPlanMode`. The harness sets `$.toolDenialKind` to `permission-rule` for any PreToolUse-shaped deny, which covers plannotator's structured feedback block and plain freeform human rejections alongside an actual `plugins/plan/hooks/gate.ts` deny. Identify a genuine gate deny by matching `error_content` against the four rules the gate enforces, using substrings that survive its rewordings: `unchanged` or `byte-identical` for unchanged text, `nearly every` or `nearly all` for append-only, `is larger than any before it` for sustained growth, and `k characters` for size, which covers both the first-pass and the re-armed wording. The gate's phrasing has been rewritten repeatedly, so matching its current templates literally misses every earlier wording.
 - A `disable-model-invocation: true` proposal is breaking if any other skill invokes the target via the `Skill` tool. The current binary blocks `Skill()` on a disabled skill even when the caller grants `Skill(<name>)` in its `allowed-tools`. Before grounding such a finding, grep `plugins` and `user` for `Skill(<name>)` and for the skill's name in other skills' bodies; a single cross-skill consumer fails it. Confirming only that the frontmatter key is absent is not enough.
@@ -78,7 +78,6 @@ Additional queries in `resources/queries/`, aimed at the self-improvement loop r
 - `catalog-reinjection-thrash-sessions`: Sessions re-injecting the full skill catalog and deferred-tools delta, cumulatively re-billing the same context.
 - `classifier`: Auto-mode classifier volume and latency, the permission stall on every dispatched call, the allow rules auto mode dropped, and which calls the engine routed to the classifier.
 - `cli-health`: Bash calls grouped by the program they run, with error rates that count SQL errors a zero exit hid, latency, retries, and the top error signatures.
-- `hook-origin-split`: Hook wall-clock split between portable shared config and arbitrary per-repo project hooks.
 - `hook-self-timing`: Hook latency from the hooks' own clocks, read off `~/.claude/hook-metrics/*.jsonl` rather than the index.
 - `mods`: Whether each mod was live and healthy: the sessions it started in, the events it emitted, how many failed, and where the sessions were reached from.
 - `sandbox-bypass-scaffold`: Weekly share of `dangerouslyDisableSandbox` calls whose commands already escape through `excludedCommands`, the `sandbox` plugin's retirement signal.

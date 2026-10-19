@@ -47,11 +47,8 @@ WITH session_main AS (
     mu.session_id,
     mode(mu.model) AS main_model
   FROM message_usage mu
-  JOIN sessions s USING (host, session_id)
+  JOIN scoped_sessions() s USING (host, session_id)
   WHERE NOT mu.is_sidechain
-    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
   GROUP BY mu.host, mu.session_id
 ),
 -- Inner join to session_main both attaches the parent's main model and applies

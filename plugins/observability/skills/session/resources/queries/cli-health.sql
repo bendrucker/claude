@@ -7,8 +7,8 @@
 --   zero exit hid, latency, retries, and the top error signatures.
 -- description: >-
 --   One row per (`host`, `program`). `program` is the first command's basename after
---   leading `cd <dir>` hops (quoted or not, ended by `&&`, `;`, or a newline) and
---   `VAR=value` assignments are stripped, so `cd "$X" && D=y; duckdb ...` reads as
+--   leading `cd <dir>` hops (quoted or redirected, ended by `&&`, `||`, `;`, or a newline)
+--   and `VAR=value` assignments are stripped, so `cd "$X" && D=y; duckdb ...` reads as
 --   `duckdb`. That extraction is a heuristic: a command opening with a subshell, a loop, or
 --   a quoted program path lands under whatever token comes first.
 --
@@ -45,7 +45,7 @@ WITH calls AS (
       regexp_extract(
         regexp_replace(
           tc.command,
-          '^(\s*(cd\s+("[^"]*"|''[^'']*''|\S+)\s*(&&|;|\n)|[A-Za-z_][A-Za-z0-9_]*=(''[^'']*''|"[^"]*"|\S*)\s*;?))+\s*', ''),
+          '^(\s*(cd\s+("[^"]*"|''[^'']*''|\S+)(\s*\d?>\S+)*\s*(&&|\|\||;|\n)|[A-Za-z_][A-Za-z0-9_]*=(''[^'']*''|"[^"]*"|\S*)\s*;?))+\s*', ''),
         '^\S+'),
       '^.*/', '') AS program,
     COALESCE(tr.is_error, FALSE) AS failed,

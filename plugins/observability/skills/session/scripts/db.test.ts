@@ -2781,7 +2781,7 @@ describe("cli-health query", () => {
       ),
       ...bashCall("b2", 30, "duckdb -readonly /x/session.duckdb -c 'SELECT 1 AS n'", "1"),
       ...bashCall("b3", 60, "FOO=1 /usr/bin/git status", "fatal: not a git repository", true),
-      ...bashCall("b4", 400, "git log -1", "abc123"),
+      ...bashCall("b4", 400, "cd /src 2>/dev/null && git log -1", "abc123"),
       ...bashCall("b5", 500, 'cd "$HOME/src" && rg -n foo(', "Exit code 2\nrg: regex parse error", true),
       ...bashCall("b6", 600, "cd '/a b'\ngrep -r x .", "a.ts: IO Error: Failed to create directory"),
     ];

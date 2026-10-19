@@ -46,6 +46,24 @@ resource "aws_s3_bucket_lifecycle_configuration" "eval_corpus" {
       days_after_initiation = 7
     }
   }
+
+  # Scratch space for access checks and in-flight handoffs.
+  rule {
+    id     = "expire-tmp"
+    status = "Enabled"
+
+    filter {
+      prefix = "tmp/"
+    }
+
+    expiration {
+      days = 1
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 1
+    }
+  }
 }
 
 data "aws_iam_policy_document" "eval_corpus" {

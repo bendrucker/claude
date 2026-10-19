@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
 import { ensureIndex, getDb } from "../../../skills/session/scripts/db";
-import { loadTruth } from "./score";
+import { loadTruth, type TruthRow } from "./score";
 
 const dir = mkdtempSync(join(tmpdir(), "session-eval-truth-"));
 const index = join(dir, "index", "session.duckdb");
@@ -96,7 +96,10 @@ afterAll(async () => {
 const truth = async (name: string) =>
   (await loadTruth(join(import.meta.dirname, "..", name), index)).rows;
 
-test.each([
+const byKey = (rows: TruthRow[]) =>
+  rows.toSorted((a, b) => String(a.key).localeCompare(String(b.key)));
+
+test.each<[string, TruthRow[]]>([
   [
     "drift-hook-denies",
     [
@@ -121,8 +124,5 @@ test.each([
     ],
   ],
 ])("%s reads the native fields", async (name, want) => {
-  const got = await truth(name);
-  expect(got.toSorted((a, b) => String(a.key).localeCompare(String(b.key)))).toEqual(
-    want.toSorted((a, b) => String(a.key).localeCompare(String(b.key))),
-  );
+  expect(byKey(await truth(name))).toEqual(byKey(want));
 });

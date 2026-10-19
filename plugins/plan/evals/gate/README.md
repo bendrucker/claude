@@ -6,18 +6,22 @@ A **case** is one recorded presentation, identified by the session's eight-chara
 
 ## Privacy
 
-`mine.ts` pulls every presentation from the session index, work host included, because the replay needs each session's full history to reproduce state-dependent rules. `data/` is gitignored and never lands in this public repo.
+`mine.ts` pulls every presentation from the session index, work host included, because the replay needs each session's full history to reproduce state-dependent rules. `data/` is gitignored and never lands in this public repo. Its permanent copy lives in `s3://ben-drucker-agents-eval-corpus/plan-gate/data/` (the `agents` account).
 
 ## Workflow
 
 `mine.ts` shells out to the `duckdb` CLI and reads the session index the `observability:session` skill maintains. Refresh that index through the skill first if it is stale.
 
+From the repo root:
+
 ```bash
-bun run mine                              # session index -> data/presents.json
-bun test plugins/plan/hooks/replay.test.ts  # from the repo root
+bun run --cwd plugins/plan/evals/gate sync pull   # bucket -> data/, --profile agents
+bun run --cwd plugins/plan/evals/gate mine        # session index -> data/presents.json
+bun test plugins/plan/hooks/replay.test.ts
+bun run --cwd plugins/plan/evals/gate sync push   # data/ -> bucket, --profile agents-admin
 ```
 
-`mine` takes `--db` for another index path and `--since` for an earlier start date.
+`mine` takes `--db` for another index path and `--since` for an earlier start date. `sync` takes `--dry-run` to list changes without copying. Push after a run that writes a new `data/replay.json`, so the baseline outlives the checkout.
 
 ## Replay
 

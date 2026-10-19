@@ -46,7 +46,7 @@ function renderExtensions(names: readonly string[]): string | null {
   if (names.length === 0) return null;
   const list = names.map((name) => `\`${name}\``).join(" and ");
   const noun = names.length === 1 ? "extension" : "extensions";
-  return `Needs the ${list} community ${noun} (\`-init resources/extensions.sql\`).`;
+  return `Needs the ${list} community ${noun} (\`-cmd ".read resources/extensions.sql"\` after \`-init resources/limits.sql\`).`;
 }
 
 function renderParam(param: QueryHeader["params"][number]): string {

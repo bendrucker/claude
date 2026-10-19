@@ -7,22 +7,25 @@
 --   zero exit hid, latency, retries, and the top error signatures.
 -- description: >-
 --   One row per (`host`, `program`). `program` is the first command's basename after
---   leading `cd <dir> &&` hops and `VAR=value` assignments are stripped, so `cd x && D=y;
---   duckdb ...` reads as `duckdb`. That extraction is a heuristic: a command opening with a
---   subshell, a loop, or a quoted path lands under whatever token comes first.
+--   leading `cd <dir>` hops (quoted or not, ended by `&&`, `;`, or a newline) and
+--   `VAR=value` assignments are stripped, so `cd "$X" && D=y; duckdb ...` reads as
+--   `duckdb`. That extraction is a heuristic: a command opening with a subshell, a loop, or
+--   a quoted program path lands under whatever token comes first.
 --
 --   `error_pct` is the share of calls whose result carried `is_error`, a non-zero exit.
---   `hidden_error_pct` is the share that exited 0 but printed a DuckDB `Binder`, `Parser`,
---   `Catalog`, `Conversion`, or `IO` error, which `tool-failure-rates` cannot see because
---   it reads `is_error` alone. A pipe into `head` or `tail` is the usual cause.
+--   `hidden_error_pct` is the share that exited 0 but whose output opens with a DuckDB
+--   `Binder`, `Parser`, `Catalog`, `Conversion`, or `IO` error, which `tool-failure-rates`
+--   cannot see because it reads `is_error` alone. A pipe into `head` or `tail` is the usual cause.
 --   `retry_pct` is the share of failed calls (either kind) followed by another call to the
---   same program in the same agent thread within two minutes.
+--   same program in the same agent thread within two minutes, and `followup_pct` the same
+--   share after a call that succeeded. Back-to-back calls are normal, so only the gap
+--   between the two says anything about retries.
 --
 --   `p50_gap_s` and `p90_gap_s` are the gap from the call to its result. They include
 --   permission prompts and approval time, so they bound latency from above.
---   `top_errors` lists the commonest normalized signatures with counts, digits and paths
---   stripped and quoted identifiers kept, so a guessed column or a reserved-word alias
---   reads straight off the signature.
+--   `top_errors` lists the commonest signatures with counts: the output's first non-empty
+--   line, past an `Exit code N` line, with digits and paths stripped and quoted identifiers
+--   kept, so a guessed column or a reserved-word alias reads straight off the signature.
 -- params:
 --   - name: min_calls
 --     default: 30
@@ -42,12 +45,12 @@ WITH calls AS (
       regexp_extract(
         regexp_replace(
           tc.command,
-          '^(\s*(cd\s+\S+\s*(&&|;)|[A-Za-z_][A-Za-z0-9_]*=(''[^'']*''|"[^"]*"|\S*)\s*;?))+\s*', ''),
+          '^(\s*(cd\s+("[^"]*"|''[^'']*''|\S+)\s*(&&|;|\n)|[A-Za-z_][A-Za-z0-9_]*=(''[^'']*''|"[^"]*"|\S*)\s*;?))+\s*', ''),
         '^\S+'),
       '^.*/', '') AS program,
     COALESCE(tr.is_error, FALSE) AS failed,
     NOT COALESCE(tr.is_error, FALSE)
-      AND regexp_matches(tr.content, '(Binder|Parser|Catalog|Conversion|IO) Error') AS hidden,
+      AND regexp_matches(tr.content, '^\s*(Binder|Parser|Catalog|Conversion|IO) Error:') AS hidden,
     date_diff('millisecond', tc.timestamp, tr.timestamp) / 1000.0 AS gap_s,
     tr.content
   FROM tool_calls tc
@@ -72,9 +75,7 @@ sequenced AS (
 signatures AS (
   SELECT host, program,
     substr(trim(regexp_replace(regexp_replace(regexp_replace(
-      COALESCE(
-        NULLIF(regexp_extract(content, '\w+ Error: [^\n]*'), ''),
-        split_part(trim(content), chr(10), 1)),
+      regexp_extract(content, '^\s*(Exit code \d+\s*\n)?\s*([^\n]*)', 2),
       '(~|/(Users|home|private|tmp|var|opt|Volumes))/[^\s"''`:,;()]*', '<path>', 'g'),
       '\d+', 'N', 'g'),
       '\s+', ' ', 'g')), 1, 100) AS signature,
@@ -104,6 +105,8 @@ SELECT
   ROUND(quantile_cont(gap_s, 0.9), 1) AS p90_gap_s,
   ROUND(100.0 * COUNT(*) FILTER (WHERE errored AND next_ts <= timestamp + INTERVAL 2 MINUTE)
     / NULLIF(COUNT(*) FILTER (WHERE errored), 0), 1) AS retry_pct,
+  ROUND(100.0 * COUNT(*) FILTER (WHERE NOT errored AND next_ts <= timestamp + INTERVAL 2 MINUTE)
+    / NULLIF(COUNT(*) FILTER (WHERE NOT errored), 0), 1) AS followup_pct,
   ANY_VALUE(t.top_errors) AS top_errors
 FROM sequenced
 LEFT JOIN top_signatures t USING (host, program)

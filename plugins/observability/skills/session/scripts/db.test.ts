@@ -2729,6 +2729,7 @@ describe("cli-health query", () => {
     hidden_error_pct: z.number(),
     p50_gap_s: z.number(),
     retry_pct: z.number().nullable(),
+    followup_pct: z.number().nullable(),
     top_errors: z.array(z.string()).nullable(),
   });
 
@@ -2781,6 +2782,8 @@ describe("cli-health query", () => {
       ...bashCall("b2", 30, "duckdb -readonly /x/session.duckdb -c 'SELECT 1 AS n'", "1"),
       ...bashCall("b3", 60, "FOO=1 /usr/bin/git status", "fatal: not a git repository", true),
       ...bashCall("b4", 400, "git log -1", "abc123"),
+      ...bashCall("b5", 500, 'cd "$HOME/src" && rg -n foo(', "Exit code 2\nrg: regex parse error", true),
+      ...bashCall("b6", 600, "cd '/a b'\ngrep -r x .", "a.ts: IO Error: Failed to create directory"),
     ];
     await Bun.write(
       join(projects, "cli.jsonl"),
@@ -2802,7 +2805,13 @@ describe("cli-health query", () => {
 
   it("counts an SQL error behind a zero exit as hidden, past cd hops and assignments", async () => {
     const duckdb = (await health()).get("duckdb");
-    expect(duckdb).toMatchObject({ calls: 2n, error_pct: 0, hidden_error_pct: 50, retry_pct: 100 });
+    expect(duckdb).toMatchObject({
+      calls: 2n,
+      error_pct: 0,
+      hidden_error_pct: 50,
+      retry_pct: 100,
+      followup_pct: 0,
+    });
     expect(duckdb?.top_errors).toEqual(['Parser Error: syntax error at or near "first" (1)']);
     expect(duckdb?.p50_gap_s).toBe(2);
   });
@@ -2811,6 +2820,14 @@ describe("cli-health query", () => {
     const git = (await health()).get("git");
     expect(git).toMatchObject({ calls: 2n, error_pct: 50, hidden_error_pct: 0, retry_pct: 0 });
     expect(git?.top_errors).toEqual(["fatal: not a git repository (1)"]);
+  });
+
+  it("strips quoted and newline-ended cd hops and reads past an exit code line", async () => {
+    const programs = await health();
+    expect([...programs.keys()].toSorted()).toEqual(["duckdb", "git", "grep", "rg"]);
+    expect(programs.get("rg")?.top_errors).toEqual(["rg: regex parse error (1)"]);
+    // An error mid-output is a match, not a hidden failure.
+    expect(programs.get("grep")?.hidden_error_pct).toBe(0);
   });
 });
 

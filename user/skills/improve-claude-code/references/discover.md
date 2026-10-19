@@ -12,7 +12,7 @@ Launch one `Agent` call per dimension (hook latency, hook blocks, permissions an
 
 ## Grounding
 
-Mandatory. Grounding agents re-check every candidate against the live files under `/Users/ben/src/bendrucker/claude`. Drop anything the config already addresses. Downgrade anything thin or host-skewed. Apply the harmony test from the repo's `CLAUDE.md`: a candidate that would fight a native Claude Code behavior gets reframed as an accommodation or a light-touch experiment with forward evaluation and removal criteria. Carry `grounded` (boolean) and `confidence` (high/medium/low) per candidate. Raw query findings go stale within a week against a config that changes weekly: a prior run overturned four of its own headline findings. Follow the grounding rules in `references/discovery.md` (hooks run in parallel, so never sum durations as wall-clock, and split friction into what a setting can fix and what it cannot).
+Mandatory. Grounding agents re-check every candidate against the live config in `~/.claude-repo`. Drop anything the config already addresses. Downgrade anything thin or host-skewed. Apply the harmony test from the repo's `CLAUDE.md`: a candidate that would fight a native Claude Code behavior gets reframed as an accommodation or a light-touch experiment with forward evaluation and removal criteria. Carry `grounded` (boolean) and `confidence` (high/medium/low) per candidate. Raw query findings go stale within a week against a config that changes weekly: a prior run overturned four of its own headline findings. Follow the grounding rules in `references/discovery.md` (hooks run in parallel, so never sum durations as wall-clock, and split friction into what a setting can fix and what it cannot).
 
 ## Dedup
 

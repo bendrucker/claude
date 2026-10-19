@@ -35,7 +35,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/refresh.ts
 
 ### Querying
 
-After refresh, query with the `duckdb` CLI or any DuckDB client, always `-readonly`. Querying never writes, and a read-write open would block refreshes and other readers. Add `-init ${CLAUDE_SKILL_DIR}/resources/limits.sql`, which caps the process at 4 GiB and 4 threads. DuckDB's own defaults (80% of RAM, every core) apply per process, so a few concurrent readers over the index can freeze the machine. Add `-json` too: the default box format returns only 40 rows however many matched, and `-csv` emits the newlines embedded in `command` and `text` raw, so a row stops being one line. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works. `getvariable('limit')` is unaffected either way.
+After refresh, query with the `duckdb` CLI or any DuckDB client, always `-readonly`. Querying never writes, and a read-write open would block refreshes and other readers. Add `-init ${CLAUDE_SKILL_DIR}/resources/limits.sql`, which caps the process at 60% of RAM (at most 4 GiB) and 4 threads. DuckDB's own defaults (80% of RAM, every core) apply per process, so a few concurrent readers over the index can freeze the machine. Add `-json` too: the default box format returns only 40 rows however many matched, and `-csv` emits the newlines embedded in `command` and `text` raw, so a row stops being one line. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works. `getvariable('limit')` is unaffected either way.
 
 ```bash
 duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql ~/.local/share/claude-sessions/session.duckdb "SELECT model, SUM(output_tokens) FROM message_usage GROUP BY model"
@@ -90,10 +90,11 @@ Load [`references/catalog.md`](references/catalog.md) before running a query you
 
 ### Queries That Read Disk
 
-Four queries read files on disk instead of the index. Two of them (`plan-sections`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-init resources/extensions.sql` in place of `limits.sql`. It carries the same limits, loads both extensions in the same process before the piped query, and runs under `-readonly`. `hook-self-timing` and `hook-config-vs-observed` read JSON and need no extension. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
+Four queries read files on disk instead of the index. Two of them (`plan-sections`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-cmd ".read resources/extensions.sql"` after `-init resources/limits.sql`, which loads both extensions in the same process before the piped query. `hook-self-timing` and `hook-config-vs-observed` read JSON and need no extension. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
 
 ```bash
-duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/extensions.sql ~/.local/share/claude-sessions/session.duckdb \
+duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql \
+  -cmd ".read ${CLAUDE_SKILL_DIR}/resources/extensions.sql" ~/.local/share/claude-sessions/session.duckdb \
   < ${CLAUDE_SKILL_DIR}/resources/queries/plan-sections.sql
 ```
 

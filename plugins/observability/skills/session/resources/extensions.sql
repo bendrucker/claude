@@ -1,15 +1,10 @@
 -- Community extensions shared by the queries that read markdown/YAML from disk.
--- Pulled into a query process via `duckdb -readonly -init extensions.sql`, which
--- runs this before stdin so the piped query sees the extensions. Query files stay
+-- Pulled into a query process after limits.sql via
+-- `duckdb -readonly -init limits.sql -cmd ".read <dir>/extensions.sql"`, which runs
+-- both before stdin so the piped query sees the extensions. `-init` takes one file,
+-- and `.read` resolves against the cwd, so the caller names both paths. Query files stay
 -- pure SQL; never inline INSTALL/LOAD there. The schema/index path (refresh.ts,
 -- resources/schema/) is untouched and stays extension-free.
-
--- `-init` replaces ~/.duckdbrc and accepts one file, so this carries a copy of
--- limits.sql (kept identical by limits.test.ts).
-SET memory_limit = '4GiB';
-SET threads = 4;
-SET max_temp_directory_size = '16GiB';
-SET temp_directory = rtrim(coalesce(getenv('TMPDIR'), '/tmp'), '/') || '/duckdb-' || uuid();
 
 -- DuckDB cannot parse credentials in an `http_proxy` URL, which the Claude Code
 -- sandbox proxy carries, so a cold-cache INSTALL fails there. Split the URL into

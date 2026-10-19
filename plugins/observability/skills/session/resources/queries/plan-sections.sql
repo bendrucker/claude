@@ -38,7 +38,9 @@
 -- Example: plans whose section titles never include "Verification".
 WITH sections AS (
   SELECT
-    file_path,
+    -- The markdown extension renamed `filename=true`'s column from file_path to
+    -- filename. Matching either keeps the query working on both builds.
+    COLUMNS('^(file_path|filename)$') AS file_path,
     level,
     title,
     md_to_text(content) AS content_text,

@@ -2787,6 +2787,7 @@ describe("message_usage cost columns and usage queries", () => {
     session: string;
     id: string;
     ts: string;
+    sidechain: boolean;
     input: number;
     output: number;
     cacheRead: number;
@@ -2799,6 +2800,7 @@ describe("message_usage cost columns and usage queries", () => {
       sessionId: opts.session,
       cwd: "/Users/test/usage-proj",
       timestamp: `${opts.ts}.000Z`,
+      isSidechain: opts.sidechain,
       uuid: opts.id,
       message: {
         id: opts.id,
@@ -2851,16 +2853,9 @@ describe("message_usage cost columns and usage queries", () => {
       // oxlint-disable-next-line no-await-in-loop -- rows insert in fixture order on one connection so source_line stays deterministic.
       await db.run(
         `INSERT INTO raw
-           (host, session_id, type, project_path, is_sidechain, timestamp,
-            input_tokens, output_tokens, source_file, source_line, data)
-         VALUES ('local', $session, 'assistant', '/Users/test/usage-proj', $sidechain,
-                 $ts::TIMESTAMP, $input, $output, $source_file, $source_line, $line::JSON)`,
+         SELECT 'local', UNNEST(pinned_columns(line)), $source_file, $source_line, line
+         FROM (SELECT $line::JSON AS line)`,
         {
-          session,
-          sidechain: r.sidechain ? "true" : "false",
-          ts: r.ts,
-          input: String(r.input),
-          output: String(r.output),
           source_file: `/Users/test/usage-proj/${session}.jsonl`,
           source_line: String(line++),
           line: assistantLine({ session, ...r }),

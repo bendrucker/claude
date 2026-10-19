@@ -21,5 +21,21 @@ CREATE OR REPLACE MACRO pinned_columns(line) AS {
   'duration_ms':   TRY_CAST(line->>'$.durationMs' AS BIGINT),
   'timestamp':     TRY_CAST(line->>'$.timestamp'  AS TIMESTAMP),
   'input_tokens':  TRY_CAST(line->>'$.message.usage.input_tokens'  AS BIGINT),
-  'output_tokens': TRY_CAST(line->>'$.message.usage.output_tokens' AS BIGINT)
+  'output_tokens': TRY_CAST(line->>'$.message.usage.output_tokens' AS BIGINT),
+  'cache_read_tokens':     TRY_CAST(line->>'$.message.usage.cache_read_input_tokens'     AS BIGINT),
+  'cache_creation_tokens': TRY_CAST(line->>'$.message.usage.cache_creation_input_tokens' AS BIGINT),
+  'cache_1h_tokens': TRY_CAST(line->>'$.message.usage.cache_creation.ephemeral_1h_input_tokens' AS BIGINT),
+  'cache_5m_tokens': TRY_CAST(line->>'$.message.usage.cache_creation.ephemeral_5m_input_tokens' AS BIGINT),
+  'uuid':          line->>'$.uuid',
+  'message_id':    COALESCE(line->>'$.message.id', line->>'$.uuid'),
+  'model':         line->>'$.message.model',
+  'entrypoint':    line->>'$.entrypoint',
+  'attribution_skill':  line->>'$.attributionSkill',
+  'attribution_plugin': line->>'$.attributionPlugin',
+  'attribution_agent':  line->>'$.attributionAgent',
+  -- The display name a custom-title, ai-title or agent-name record carries.
+  'title':         COALESCE(line->>'$.customTitle', line->>'$.aiTitle', line->>'$.agentName'),
+  -- A typed prompt is a string; tool results and assistant turns are block arrays.
+  'content_text':  CASE WHEN json_type(line, '$.message.content') = 'VARCHAR'
+                        THEN line->>'$.message.content' END
 };

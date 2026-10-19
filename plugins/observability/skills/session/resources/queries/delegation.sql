@@ -95,7 +95,7 @@ subagent_models AS (
   SELECT
     host, session_id,
     regexp_extract(source_file, 'agent-([^/]+)\.jsonl$', 1) AS agent_id,
-    mode((data->>'$.message.model')) AS modal_model
+    mode(model) AS modal_model
   FROM raw
   WHERE type = 'assistant' AND source_file LIKE '%/subagents/%agent-%.jsonl'
   GROUP BY 1, 2, 3

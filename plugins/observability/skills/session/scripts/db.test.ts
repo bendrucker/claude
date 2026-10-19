@@ -15,6 +15,7 @@ import {
   forgetHost,
   getDb,
   invalidateDerived,
+  rawRewritePending,
   rebuildViews,
   runQuery,
   sessionDbPath,
@@ -1727,6 +1728,14 @@ describe("pinned column derivation", () => {
     expect(Number(row?.negative)).toBe(0);
   });
 
+  it("reports a pending rewrite only for a stamped index whose projection changed", async () => {
+    expect(await rawRewritePending(db)).toBe(false);
+    await db.run("UPDATE index_meta SET import_hash = 'stale'");
+    expect(await rawRewritePending(db)).toBe(true);
+    await db.run("UPDATE index_meta SET import_hash = NULL");
+    expect(await rawRewritePending(db)).toBe(false);
+  });
+
   it("rebuilds the tables derived from raw after a re-derivation", async () => {
     await db.run("DROP VIEW tool_calls");
     await db.run("UPDATE index_meta SET import_hash = 'stale'");
@@ -1914,6 +1923,49 @@ describe("compactDatabase", () => {
       z.object({ session_id: z.string() }),
     );
     expect(sessions.length).toBeGreaterThan(0);
+  });
+});
+
+describe("storage version", () => {
+  const storage = (table: string) =>
+    db.query(
+      `SELECT DISTINCT compression FROM pragma_storage_info('${table}') WHERE column_name = 'data'`,
+      z.object({ compression: z.string() }),
+    );
+
+  const version = async () =>
+    (
+      await db.query(
+        "SELECT tags['storage_version'] AS v FROM duckdb_databases() WHERE database_name = current_database()",
+        z.object({ v: z.string() }),
+      )
+    )[0]?.v;
+
+  it("compacts a file in an older format into one that stores long strings with ZSTD", async () => {
+    // Only long lines, since the compressor picks per segment and short ones favor
+    // dictionary encodings.
+    await db.run("DELETE FROM raw");
+    await db.run(
+      `INSERT INTO raw (host, source_file, source_line, data)
+       SELECT 'local', '/long.jsonl', i, json_object('text', repeat('long line ', 2000) || i)
+       FROM range(20) t(i)`,
+    );
+    await db.run(`ATTACH '${join(tmpDir, "legacy.duckdb")}' AS legacy (STORAGE_VERSION 'v1.0.0')`);
+    await db.run("COPY FROM DATABASE session TO legacy");
+    await db.run("DETACH legacy");
+    db.close();
+    await $`mv ${join(tmpDir, "legacy.duckdb")} ${sessionDbPath(tmpDir)}`.quiet();
+
+    db = await getDb(tmpDir);
+    expect(await version()).toBe("v1.0.0+");
+    expect((await storage("raw")).map((r) => r.compression)).not.toContain("ZSTD");
+    db.close();
+
+    await compactDatabase(tmpDir);
+
+    db = await getDb(tmpDir);
+    expect(await version()).toBe("v1.2.0+");
+    expect((await storage("raw")).map((r) => r.compression)).toContain("ZSTD");
   });
 });
 
@@ -2925,6 +2977,7 @@ describe("message_usage cost columns and usage queries", () => {
     session: string;
     id: string;
     ts: string;
+    sidechain: boolean;
     input: number;
     output: number;
     cacheRead: number;
@@ -2937,6 +2990,7 @@ describe("message_usage cost columns and usage queries", () => {
       sessionId: opts.session,
       cwd: "/Users/test/usage-proj",
       timestamp: `${opts.ts}.000Z`,
+      isSidechain: opts.sidechain,
       uuid: opts.id,
       message: {
         id: opts.id,
@@ -2989,16 +3043,9 @@ describe("message_usage cost columns and usage queries", () => {
       // oxlint-disable-next-line no-await-in-loop -- rows insert in fixture order on one connection so source_line stays deterministic.
       await db.run(
         `INSERT INTO raw
-           (host, session_id, type, project_path, is_sidechain, timestamp,
-            input_tokens, output_tokens, source_file, source_line, data)
-         VALUES ('local', $session, 'assistant', '/Users/test/usage-proj', $sidechain,
-                 $ts::TIMESTAMP, $input, $output, $source_file, $source_line, $line::JSON)`,
+         SELECT 'local', UNNEST(pinned_columns(line)), $source_file, $source_line, line
+         FROM (SELECT $line::JSON AS line)`,
         {
-          session,
-          sidechain: r.sidechain ? "true" : "false",
-          ts: r.ts,
-          input: String(r.input),
-          output: String(r.output),
           source_file: `/Users/test/usage-proj/${session}.jsonl`,
           source_line: String(line++),
           line: assistantLine({ session, ...r }),

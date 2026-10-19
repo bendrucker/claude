@@ -47,18 +47,23 @@ export interface HostEntry {
   policy: HostPolicy;
 }
 
+// The oldest storage version that compresses long strings (raw.data, content_items
+// text) with ZSTD. A file keeps the version it was created at until compactDatabase.
+export const STORAGE_VERSION = "v1.2.0";
+
 // The writer holds the file exclusively and runs alone, so it gets twice a
 // reader's budget. Insertion order stays off so bulk imports can spill instead
 // of pinning blocks up to the memory limit.
-const WRITER_LIMITS = {
+const WRITER_CONFIG = {
   memory_limit: "8GiB",
   threads: "4",
   max_temp_directory_size: "32GiB",
   preserve_insertion_order: "false",
+  storage_compatibility_version: STORAGE_VERSION,
 };
 
 async function createDatabase(dbPath: string): Promise<Database> {
-  const instance = await DuckDBInstance.create(dbPath, WRITER_LIMITS);
+  const instance = await DuckDBInstance.create(dbPath, WRITER_CONFIG);
   const connection = await instance.connect();
 
   return {
@@ -350,16 +355,13 @@ export async function invalidateDerived(db: Database): Promise<void> {
 // the file. Returns whether raw changed, since content_items is derived from it.
 async function reconcilePinned(db: Database): Promise<boolean> {
   const fingerprint = await fileFingerprint(SCHEMA_DIR, "00_pinned");
-  const [row] = await db.query(
-    "SELECT import_hash FROM index_meta",
-    z.object({ import_hash: z.string().nullable() }),
-  );
-  if (row?.import_hash === fingerprint) return false;
+  const hash = await importHash(db);
+  if (hash === fingerprint) return false;
 
   // A null hash is an index built before this check existed. The projection may have
   // changed between that build and the first run to stamp it, so the rewrite is skipped
   // only when raw's columns already match what the projection produces.
-  const seeding = row?.import_hash == null;
+  const seeding = hash == null;
   const rewrite = !seeding || !(await rawMatchesProjection(db));
 
   // Derived state is invalidated either way. An adopted index was built by code that
@@ -376,6 +378,23 @@ async function reconcilePinned(db: Database): Promise<boolean> {
   }
   await db.run("UPDATE index_meta SET import_hash = $hash", { hash: fingerprint });
   return rewrite;
+}
+
+async function importHash(db: Database): Promise<string | null | undefined> {
+  if (!(await tableExists(db, "index_meta"))) return undefined;
+  // SELECT * because an index_meta older than import_hash lacks the column.
+  const [row] = await db.query(
+    "SELECT * FROM index_meta",
+    z.looseObject({ import_hash: z.string().nullish() }),
+  );
+  return row?.import_hash;
+}
+
+// Whether ensureIndex will rewrite raw. An index without import_hash is left to
+// reconcilePinned's seeding check.
+export async function rawRewritePending(db: Database): Promise<boolean> {
+  const hash = await importHash(db);
+  return hash != null && hash !== (await fileFingerprint(SCHEMA_DIR, "00_pinned"));
 }
 
 const ColumnName = z.object({ column_name: z.string() });
@@ -623,7 +642,9 @@ export async function compactDatabase(dataDir: string): Promise<void> {
 
   const db = await createDatabase(dbPath);
   try {
-    await db.run(`ATTACH '${newPath.replaceAll("'", "''")}' AS compacted`);
+    await db.run(
+      `ATTACH '${newPath.replaceAll("'", "''")}' AS compacted (STORAGE_VERSION '${STORAGE_VERSION}')`,
+    );
     await db.run("COPY FROM DATABASE session TO compacted");
     await db.run("DETACH compacted");
   } finally {

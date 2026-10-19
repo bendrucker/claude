@@ -8,19 +8,8 @@ CREATE OR REPLACE VIEW messages AS
 SELECT
   r.* EXCLUDE (data),
   r.data,
-  CASE
-    WHEN json_type(r.data->'$.message.content') = 'VARCHAR'
-    THEN r.data->>'$.message.content'
-  END AS content_text,
-  (r.data->>'$.message.model') AS model,
-  TRY_CAST(r.data->>'$.message.usage.cache_read_input_tokens'     AS BIGINT) AS cache_read_tokens,
-  TRY_CAST(r.data->>'$.message.usage.cache_creation_input_tokens' AS BIGINT) AS cache_creation_tokens,
   (r.data->>'$.promptSource')         AS prompt_source,
   (r.data->>'$.interruptedMessageId') AS interrupted_message_id,
-  (r.data->>'$.entrypoint')           AS entrypoint,
-  (r.data->>'$.attributionSkill')     AS attribution_skill,
-  (r.data->>'$.attributionPlugin')    AS attribution_plugin,
-  (r.data->>'$.attributionAgent')     AS attribution_agent,
   (r.data->>'$.attributionMcpServer') AS attribution_mcp_server,
   (r.data->>'$.attributionMcpTool')   AS attribution_mcp_tool
 FROM raw r
@@ -47,9 +36,9 @@ WITH typed AS (
   WHERE m.type = 'user'
     AND m.content_text LIKE '%<command-name>%'
     AND (m.content_text LIKE '<command-name>%' OR m.content_text LIKE '<command-message>%')
-  QUALIFY (m.data->>'$.uuid') IS NULL
+  QUALIFY m.uuid IS NULL
     OR ROW_NUMBER() OVER (
-         PARTITION BY m.host, m.session_id, (m.data->>'$.uuid')
+         PARTITION BY m.host, m.session_id, m.uuid
          ORDER BY m.source_line DESC, m.source_file DESC
        ) = 1
 )
@@ -64,20 +53,11 @@ CREATE OR REPLACE VIEW session_labels AS
 SELECT
   host,
   session_id,
-  COALESCE(
-    data->>'$.customTitle',
-    data->>'$.aiTitle',
-    data->>'$.agentName'
-  ) AS label,
+  title AS label,
   type AS label_source
 FROM raw
 WHERE type IN ('custom-title', 'ai-title', 'agent-name')
-  AND length(trim(COALESCE(
-    data->>'$.customTitle',
-    data->>'$.aiTitle',
-    data->>'$.agentName',
-    ''
-  ))) > 0
+  AND length(trim(title)) > 0
 QUALIFY ROW_NUMBER() OVER (
   PARTITION BY host, session_id
   ORDER BY
@@ -95,7 +75,7 @@ CREATE OR REPLACE VIEW message_usage AS
 SELECT
   host,
   session_id,
-  COALESCE((data->>'$.message.id'), (data->>'$.uuid')) AS message_id,
+  message_id,
   ANY_VALUE(project_path) AS project_path,
   MIN(timestamp)          AS timestamp,
   ANY_VALUE(model)        AS model,
@@ -110,8 +90,8 @@ SELECT
   MAX(cache_creation_tokens)  AS cache_creation_tokens,
   -- Cache writes bill by TTL: 1h at 2x the input rate, 5m at 1.25x. Split them so cost
   -- estimates can weight each tier; both are subsets of cache_creation_tokens.
-  MAX(TRY_CAST(data->>'$.message.usage.cache_creation.ephemeral_1h_input_tokens' AS BIGINT)) AS cache_1h_tokens,
-  MAX(TRY_CAST(data->>'$.message.usage.cache_creation.ephemeral_5m_input_tokens' AS BIGINT)) AS cache_5m_tokens,
+  MAX(cache_1h_tokens)        AS cache_1h_tokens,
+  MAX(cache_5m_tokens)        AS cache_5m_tokens,
   COUNT(*)                    AS content_rows
 FROM messages
 WHERE type = 'assistant'
@@ -140,14 +120,14 @@ WITH src AS (
     r.data->'$.message.content' AS message_content,
     r.data->'$.toolUseResult'   AS tool_use_result,
     r.data->>'$.toolDenialKind' AS tool_denial_kind,
-    r.data->>'$.attributionSkill'  AS attribution_skill,
-    r.data->>'$.attributionPlugin' AS attribution_plugin,
-    r.data->>'$.attributionAgent'  AS attribution_agent
+    r.attribution_skill,
+    r.attribution_plugin,
+    r.attribution_agent
   FROM raw r
   WHERE r.type IN ('user', 'assistant')
-  QUALIFY (r.data->>'$.uuid') IS NULL
+  QUALIFY r.uuid IS NULL
     OR ROW_NUMBER() OVER (
-         PARTITION BY r.host, r.session_id, (r.data->>'$.uuid')
+         PARTITION BY r.host, r.session_id, r.uuid
          ORDER BY r.source_line DESC, r.source_file DESC
        ) = 1
 )
@@ -320,7 +300,7 @@ WITH unified AS (
     ci.timestamp,
     ci.project_path,
     m.type AS role,
-    CASE WHEN m.type = 'assistant' THEN (m.data->>'$.message.model') END AS model,
+    CASE WHEN m.type = 'assistant' THEN m.model END AS model,
     ci.text AS raw_text,
     ci.source_file,
     ci.source_line,
@@ -435,12 +415,12 @@ SELECT
   type
     || COALESCE(':' || (data->>'$.subtype'), '')
     || COALESCE(':' || (data->>'$.attachment.type'), '') AS kind,
-  (data->>'$.uuid')            AS uuid,
+  uuid,
   (data->>'$.parentUuid')      AS parent_uuid,
   (data->>'$.permissionMode')  AS permission_mode,
   (data->>'$.version')         AS version,
   (data->>'$.slug')            AS slug,
-  (data->>'$.entrypoint')      AS entrypoint,
+  entrypoint,
   data
 FROM raw;
 
@@ -466,9 +446,9 @@ SELECT
   data
 FROM raw
 WHERE type = 'attachment'
-QUALIFY (data->>'$.uuid') IS NULL
+QUALIFY uuid IS NULL
   OR ROW_NUMBER() OVER (
-       PARTITION BY host, session_id, (data->>'$.uuid')
+       PARTITION BY host, session_id, uuid
        ORDER BY source_line DESC, source_file DESC
      ) = 1;
 
@@ -483,7 +463,7 @@ SELECT
   timestamp,
   source_file,
   source_line,
-  (data->>'$.uuid')    AS uuid,
+  uuid,
   (data->>'$.subtype') AS subtype,
   (data->>'$.level')   AS level,
   (data->>'$.content') AS content,
@@ -556,9 +536,9 @@ WITH att AS (
   FROM raw
   WHERE type = 'attachment'
     AND (data->>'$.attachment.type') LIKE 'hook%'
-  QUALIFY (data->>'$.uuid') IS NULL
+  QUALIFY uuid IS NULL
     OR ROW_NUMBER() OVER (
-         PARTITION BY host, session_id, (data->>'$.uuid')
+         PARTITION BY host, session_id, uuid
          ORDER BY source_line DESC, source_file DESC
        ) = 1
 ),

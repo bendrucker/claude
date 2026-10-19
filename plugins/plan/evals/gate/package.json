@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "mine": "bun scripts/mine.ts"
+    "mine": "bun scripts/mine.ts",
+    "sync": "bun scripts/sync.ts"
   },
   "dependencies": {
     "@commander-js/extra-typings": "~15.0.0",

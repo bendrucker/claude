@@ -5,6 +5,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { SIDECAR_GUIDANCE } from "../mod/register";
 
 const ToolInput = z.looseObject({ plan: z.string().optional().catch(undefined) });
 
@@ -24,8 +25,10 @@ export const SIZE_THRESHOLD = 10_000;
 // loop impossible: past it, the presentation goes to the user's own approval.
 const SIZE_MAX_FIRES = 2;
 
-// A re-present that keeps nearly every prior line and drops almost none regrew
-// the document instead of consolidating superseded design and revising it.
+// A re-present that keeps nearly every line of a plan this gate just denied, and
+// drops almost none, patched the denied text to get past the gate instead of
+// reworking it. A plan the gate passed went to the user, so the next one answers
+// their feedback and may grow by what it asked for.
 const APPEND_ONLY_MIN_CARRYOVER = 0.9;
 // Count lines the re-present introduced, not net size. A swap that trades a few
 // lines for a few new ones nets zero while carrying the whole prior document.
@@ -45,12 +48,8 @@ export const DENY_REASON =
   "carried no feedback, ask what to change with AskUserQuestion.";
 
 export const APPEND_ONLY_REASON =
-  "This plan keeps nearly every line of the one that was just rejected. Rework it: " +
-  "delete the text the feedback superseded rather than adding new text around it.";
-
-export const SIDECAR_GUIDANCE =
-  "Move supporting detail into <plan>-<topic>.md files the plan links " +
-  "(<plan>-decisions.md is the common one), or split the work into smaller plans.";
+  "This plan keeps nearly every line of the one that was just denied. Rework it to " +
+  "address the denial rather than adding new text around it.";
 
 export function sizeReason(priorFires: number): string {
   const opening =
@@ -158,7 +157,7 @@ export async function processInput(
 
   const hashPath = join(dir, "exit-plan-hash");
   const linesPath = join(dir, "exit-plan-lines");
-  const askedPath = join(dir, "exit-plan-size-asked");
+  const deniedPath = join(dir, "exit-plan-denied");
 
   const hash = createHash("sha256").update(plan).digest("hex");
   const previous = await readState(hashPath);
@@ -168,26 +167,34 @@ export async function processInput(
   const previousLinesRaw = await readState(linesPath);
   await writeState(linesPath, JSON.stringify([...currentLines]));
 
-  if (previous !== null && previous === hash) {
-    return formatDecision(DENY_REASON);
-  }
+  const previousDenied = (await readState(deniedPath)) === "1";
+  const reason = await decide(dir, plan, {
+    unchanged: previous === hash,
+    appendOnly:
+      previousDenied &&
+      previousLinesRaw !== null &&
+      isAppendOnlyRevision(parseLineSet(previousLinesRaw) ?? new Set(), currentLines),
+  });
+  await writeState(deniedPath, reason === null ? "0" : "1");
+  return reason === null ? null : formatDecision(reason);
+}
 
-  const previousLines = previousLinesRaw === null ? null : parseLineSet(previousLinesRaw);
-  if (previousLines !== null && isAppendOnlyRevision(previousLines, currentLines)) {
-    return formatDecision(APPEND_ONLY_REASON);
-  }
+async function decide(
+  dir: string,
+  plan: string,
+  { unchanged, appendOnly }: { unchanged: boolean; appendOnly: boolean },
+): Promise<string | null> {
+  if (unchanged) return DENY_REASON;
+  if (appendOnly) return APPEND_ONLY_REASON;
+  if (plan.length <= SIZE_THRESHOLD) return null;
 
-  if (plan.length > SIZE_THRESHOLD) {
-    // A pre-count marker file holds "asked", which parses to NaN and fails the
-    // integer check: a session that already spent its one legacy fire stays spent.
-    const priorFires = Number((await readState(askedPath)) ?? 0);
-    if (Number.isInteger(priorFires) && priorFires < SIZE_MAX_FIRES) {
-      await writeState(askedPath, String(priorFires + 1));
-      return formatDecision(sizeReason(priorFires));
-    }
-  }
-
-  return null;
+  // A pre-count marker file holds "asked", which parses to NaN and fails the
+  // integer check: a session that already spent its one legacy fire stays spent.
+  const askedPath = join(dir, "exit-plan-size-asked");
+  const priorFires = Number((await readState(askedPath)) ?? 0);
+  if (!Number.isInteger(priorFires) || priorFires >= SIZE_MAX_FIRES) return null;
+  await writeState(askedPath, String(priorFires + 1));
+  return sizeReason(priorFires);
 }
 
 // Fail open, but never silently: exit 1 lets the ExitPlanMode call through while

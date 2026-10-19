@@ -28,27 +28,8 @@ terms AS (
   ), unnest(ts) AS u(term)
   WHERE length(term) >= 2
 ),
--- One row per prose item: typed prompts and main-thread assistant text, plus the label
--- counted three times. Skill bodies, harness text and subagent turns are left out.
-items AS (
-  SELECT m.host, m.session_id, lower(m.content_text) AS text, 1 AS weight
-  FROM messages m
-  WHERE m.type = 'user' AND NOT m.is_meta AND m.content_text IS NOT NULL
-    AND m.source_file NOT LIKE '%/subagents/%'
-    AND m.content_text NOT LIKE '<%'
-    AND m.content_text NOT LIKE 'This session is being continued%'
-  UNION ALL
-  SELECT ci.host, ci.session_id, lower(ci.text), 1
-  FROM content_items ci
-  WHERE ci.type = 'text' AND ci.text IS NOT NULL
-    AND ci.source_file NOT LIKE '%/subagents/%'
-    AND ci.text NOT LIKE '<%'
-    AND ci.text NOT LIKE 'Base directory for this skill:%'
-  UNION ALL
-  SELECT host, session_id, lower(label), 3 FROM sessions WHERE label IS NOT NULL
-),
 scoped AS (
-  SELECT i.* FROM items i SEMI JOIN scoped_sessions() s USING (host, session_id)
+  SELECT i.* FROM search_items i SEMI JOIN scoped_sessions() s USING (host, session_id)
 ),
 lengths AS (
   SELECT host, session_id, sum(length(text) * weight) AS len FROM scoped GROUP BY ALL

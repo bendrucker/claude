@@ -456,17 +456,21 @@ export async function rebuildViews(db: Database): Promise<void> {
   await db.run(await readSql(RESOURCES_DIR, "views"));
 }
 
-// Replaces the content_items rows of the sessions in content_item_scope with what a full
-// rebuild would produce for them, in one transaction.
+const deleteScoped = (table: string) =>
+  `DELETE FROM ${table} t WHERE EXISTS (
+     SELECT 1 FROM content_item_scope c
+     WHERE c.host = t.host AND c.session_id IS NOT DISTINCT FROM t.session_id
+   )`;
+
+// Replaces the content_items and search_items rows of the sessions in content_item_scope
+// with what a full rebuild would produce for them, in one transaction. search_items reads
+// content_items, so it goes second.
 async function rebuildContentItems(db: Database): Promise<void> {
   await db.run("BEGIN");
-  await db.run(
-    `DELETE FROM content_items ci WHERE EXISTS (
-       SELECT 1 FROM content_item_scope c
-       WHERE c.host = ci.host AND c.session_id IS NOT DISTINCT FROM ci.session_id
-     )`,
-  );
+  await db.run(deleteScoped("content_items"));
+  await db.run(deleteScoped("search_items"));
   await db.run("INSERT INTO content_items SELECT * FROM content_item_rows(true)");
+  await db.run("INSERT INTO search_items SELECT * FROM search_item_rows(true)");
   await db.run("COMMIT");
 }
 

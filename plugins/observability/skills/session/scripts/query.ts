@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { z } from "zod";
 import type { Database } from "./db";
+import { emit, errorClass } from "./events";
 
 const QUERIES_DIR = join(import.meta.dirname, "..", "resources", "queries");
 const LIMITS_FILE = join(import.meta.dirname, "..", "resources", "limits.sql");
@@ -15,6 +16,7 @@ export type QueryParams = Record<string, QueryValue>;
 export type QuerySource = { name: string } | { sql: string };
 
 export interface QueryAdapter {
+  kind: "node" | "cli";
   // Applies the params and returns SQL to prepend to the query.
   bind(params: QueryParams): Promise<string>;
   execute<T>(sql: string, schema: z.ZodType<T>): Promise<T[]>;
@@ -51,6 +53,8 @@ export function renderSetVariables(params: QueryParams): string {
 
 export function nodeAdapter(db: Database): QueryAdapter {
   return {
+    kind: "node",
+
     async bind(params) {
       for (const [name, value] of bindings(params)) {
         // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the query reads back.
@@ -96,6 +100,8 @@ export function cliAdapter(dbPath: string, options: CliOptions = {}): QueryAdapt
   const { timeoutMs = CLI_TIMEOUT_MS, spawn = spawnDuckdb } = options;
 
   return {
+    kind: "cli",
+
     bind(params) {
       return Promise.resolve(renderSetVariables(params));
     },
@@ -124,14 +130,44 @@ export function cliAdapter(dbPath: string, options: CliOptions = {}): QueryAdapt
   };
 }
 
+// The script that ran the query, like `session/usage.ts` or `gate/mine.ts`.
+function caller(): string {
+  return (process.argv[1] ?? "")
+    .split("/")
+    .filter((part) => part !== "scripts")
+    .slice(-2)
+    .join("/");
+}
+
 export async function runQuery<T>(
   adapter: QueryAdapter,
   source: QuerySource,
   schema: z.ZodType<T>,
   params: QueryParams = {},
 ): Promise<T[]> {
-  const sql =
-    "name" in source ? await Bun.file(join(QUERIES_DIR, `${source.name}.sql`)).text() : source.sql;
-  const prefix = await adapter.bind(params);
-  return adapter.execute(prefix + sql, schema);
+  const started = performance.now();
+  const detail = {
+    name: "name" in source ? source.name : "adhoc",
+    adapter: adapter.kind,
+    caller: caller(),
+  };
+  try {
+    const sql =
+      "name" in source
+        ? await Bun.file(join(QUERIES_DIR, `${source.name}.sql`)).text()
+        : source.sql;
+    const prefix = await adapter.bind(params);
+    const rows = await adapter.execute(prefix + sql, schema);
+    await emit({
+      event: "query",
+      ok: true,
+      ms: performance.now() - started,
+      detail: { ...detail, rows: rows.length },
+    });
+    return rows;
+  } catch (error) {
+    const ms = performance.now() - started;
+    await emit({ event: "query", ok: false, ms, detail: { ...detail, error: errorClass(error) } });
+    throw error;
+  }
 }

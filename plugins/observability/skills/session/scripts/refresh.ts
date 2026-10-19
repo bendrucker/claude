@@ -12,6 +12,7 @@ import {
   getDb,
   sessionDbPath,
 } from "./db";
+import { emit, errorClass } from "./events";
 
 const argv = cli({
   name: "refresh",
@@ -62,37 +63,63 @@ async function openWithRetry(): Promise<Database | null> {
   }
 }
 
+const started = performance.now();
+
+function report(outcome: string, detail: Record<string, unknown> = {}): Promise<void> {
+  return emit({
+    event: "refresh",
+    ok: outcome !== "error",
+    ms: performance.now() - started,
+    detail: { outcome, ...detail },
+  });
+}
+
 if (!argv.flags.refresh && (await Bun.file(dbPath).exists()) && (await stampIsFresh())) {
+  await report("stamp-fresh");
   process.stdout.write(`${dbPath}\n`);
   process.exit(0);
 }
 
-mkdirSync(dataDir, { recursive: true });
-
-const db = await openWithRetry();
-if (db === null) {
-  console.error("refresh: another process holds the write lock, using the existing index");
-  process.stdout.write(`${dbPath}\n`);
-  process.exit(0);
-}
-
-let corpusBytes = 0;
 try {
-  ({ corpusBytes } = await ensureIndex(db));
-} finally {
-  db.close();
-}
+  mkdirSync(dataDir, { recursive: true });
 
-// DuckDB never shrinks a file in place, so a bloated index (from the pre-v3
-// full-table rewrites, or pathological churn) is recovered by copying into a
-// fresh file. The 64 MiB floor keeps tiny corpora from churning on block overhead.
-const dbSize = Bun.file(dbPath).size;
-if (corpusBytes > 0 && dbSize > Math.max(4 * corpusBytes, 64 * 1024 * 1024)) {
-  console.error(
-    `refresh: compacting ${(dbSize / 1e9).toFixed(1)}GB index against ${(corpusBytes / 1e9).toFixed(1)}GB corpus`,
-  );
-  await compactDatabase(dataDir);
-}
+  const db = await openWithRetry();
+  if (db === null) {
+    console.error("refresh: another process holds the write lock, using the existing index");
+    await report("lock-yield");
+    process.stdout.write(`${dbPath}\n`);
+    process.exit(0);
+  }
 
-await Bun.write(stampPath, `${new Date().toISOString()}\n`);
-process.stdout.write(`${dbPath}\n`);
+  const result = await ensureIndex(db).finally(() => {
+    db.close();
+  });
+  const { corpusBytes, changedFiles, removedFiles } = result;
+  const phasesMs: Record<string, number> = { ...result.phasesMs };
+
+  // DuckDB never shrinks a file in place, so a bloated index (from the pre-v3
+  // full-table rewrites, or pathological churn) is recovered by copying into a
+  // fresh file. The 64 MiB floor keeps tiny corpora from churning on block overhead.
+  const dbSize = Bun.file(dbPath).size;
+  if (corpusBytes > 0 && dbSize > Math.max(4 * corpusBytes, 64 * 1024 * 1024)) {
+    console.error(
+      `refresh: compacting ${(dbSize / 1e9).toFixed(1)}GB index against ${(corpusBytes / 1e9).toFixed(1)}GB corpus`,
+    );
+    const compactStart = performance.now();
+    await compactDatabase(dataDir);
+    phasesMs.compaction = performance.now() - compactStart;
+  }
+
+  await Bun.write(stampPath, `${new Date().toISOString()}\n`);
+  await report(phasesMs.compaction === undefined ? "indexed" : "compacted", {
+    changed_files: changedFiles,
+    removed_files: removedFiles,
+    phases_ms: Object.fromEntries(Object.entries(phasesMs).map(([k, v]) => [k, Math.round(v)])),
+    db_bytes: Bun.file(dbPath).size,
+    corpus_bytes: corpusBytes,
+  });
+  process.stdout.write(`${dbPath}\n`);
+} catch (error) {
+  await report("error", { error: errorClass(error) });
+  throw error;
+}

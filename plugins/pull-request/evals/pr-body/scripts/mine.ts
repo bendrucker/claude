@@ -4,6 +4,8 @@ import { dirname, join } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
 import { decodeJson } from "../../../../../packages/decode/index";
+import { getDataDir, sessionDbPath } from "../../../../observability/skills/session/scripts/db";
+import { cliAdapter, runQuery } from "../../../../observability/skills/session/scripts/query";
 
 // Mine PR bodies authored via Claude Code sessions. The session index's
 // pr_links table maps sessions to the PRs they opened; the bodies themselves
@@ -129,27 +131,11 @@ export function selectSample(candidates: Item[], limit: number): Item[] {
 }
 
 function resolveDbPath(db: string | undefined): string {
-  if (db != null && db !== "") return db;
-  const dataHome = process.env.XDG_DATA_HOME ?? join(process.env.HOME ?? "", ".local", "share");
-  const dataDir = process.env.CLAUDE_SESSION_INDEX_DIR ?? join(dataHome, "claude-sessions");
-  return join(dataDir, "session.duckdb");
+  return db != null && db !== "" ? db : sessionDbPath(getDataDir());
 }
 
-async function queryMined(dbPath: string): Promise<MinedPr[]> {
-  const proc = Bun.spawn(["duckdb", "-readonly", "-json", dbPath], {
-    stdin: new TextEncoder().encode(SQL),
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  if (code !== 0) throw new Error(`duckdb failed (${code}): ${err.trim()}`);
-  const trimmed = out.trim();
-  if (trimmed === "") return [];
-  return decodeJson(z.array(MinedPr), trimmed, `duckdb ${dbPath}`);
+function queryMined(dbPath: string): Promise<MinedPr[]> {
+  return runQuery(cliAdapter(dbPath), { sql: SQL }, MinedPr);
 }
 
 async function fetchRepoPrs(repo: string): Promise<Map<number, FetchedPr>> {

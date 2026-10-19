@@ -575,6 +575,27 @@ describe("text_content view", () => {
     expect(rows[0]!.n).toBe(0n);
   });
 
+  it("reads a typed prompt once, even when resume replays its line", async () => {
+    await importFixtureHost("replay");
+    const target = join(importsDir, "replay", "projects", "-Users-test-project", "replay.jsonl");
+    const prompt = `${JSON.stringify({
+      type: "user",
+      sessionId: "replay-session",
+      cwd: "/Users/test/project",
+      timestamp: "2024-03-01T10:00:00.000Z",
+      uuid: "replay-prompt",
+      message: { role: "user", content: "replayed prompt text" },
+    })}\n`;
+    await Bun.write(target, prompt + prompt);
+    await reindex();
+
+    const rows = await db.query(
+      "SELECT role, is_system FROM text_content WHERE raw_text = 'replayed prompt text'",
+      z.object({ role: z.string(), is_system: z.boolean() }),
+    );
+    expect(rows).toEqual([{ role: "user", is_system: false }]);
+  });
+
   it("filters out empty text items", async () => {
     const rows = await db.query(
       "SELECT COUNT(*) AS n FROM text_content WHERE raw_text IS NULL OR length(trim(raw_text)) = 0",

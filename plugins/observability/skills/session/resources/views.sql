@@ -130,7 +130,11 @@ WITH src AS (
     json_extract(r.data, '$.permissionDecision') AS permission_decision,
     r.attribution_skill,
     r.attribution_plugin,
-    r.attribution_agent
+    r.attribution_agent,
+    r.type AS role,
+    r.model,
+    r.is_meta,
+    r.content_text
   FROM raw r
   WHERE r.type IN ('user', 'assistant')
     AND (NOT scoped OR EXISTS (
@@ -163,7 +167,10 @@ SELECT
   s.permission_decision,
   s.attribution_skill,
   s.attribution_plugin,
-  s.attribution_agent
+  s.attribution_agent,
+  s.role,
+  s.model,
+  s.is_meta
 FROM src s,
 LATERAL (SELECT unnest(json_extract(s.message_content, '$[*]')) AS item) t
 WHERE json_type(s.message_content) = 'ARRAY'
@@ -171,7 +178,38 @@ QUALIFY COALESCE(id, tool_use_id) IS NULL
   OR ROW_NUMBER() OVER (
        PARTITION BY s.host, s.session_id, type, COALESCE(id, tool_use_id)
        ORDER BY (s.source_file LIKE '%/subagents/%'), s.source_line DESC, s.source_file DESC
-     ) = 1;
+     ) = 1
+
+UNION ALL
+
+-- A typed prompt is a bare string rather than a block array, so it becomes one
+-- `prompt` item. The distinct type keeps counts over `text` blocks meaning what they did.
+SELECT
+  s.host,
+  s.session_id,
+  s.timestamp,
+  s.project_path,
+  s.source_file,
+  s.source_line,
+  'prompt' AS type,
+  NULL AS name,
+  NULL AS id,
+  NULL AS tool_use_id,
+  s.content_text AS text,
+  NULL AS content,
+  NULL AS is_error,
+  s.message_content AS data,
+  s.tool_use_result,
+  s.tool_denial_kind,
+  s.permission_decision,
+  s.attribution_skill,
+  s.attribution_plugin,
+  s.attribution_agent,
+  s.role,
+  s.model,
+  s.is_meta
+FROM src s
+WHERE s.role = 'user' AND s.content_text IS NOT NULL;
 
 CREATE OR REPLACE TABLE content_items AS SELECT * FROM content_item_rows(false);
 
@@ -316,75 +354,38 @@ LEFT JOIN LATERAL (
 ) prior ON true;
 
 CREATE OR REPLACE VIEW text_content AS
-WITH unified AS (
-  SELECT
-    ci.host,
-    ci.session_id,
-    ci.timestamp,
-    ci.project_path,
-    m.type AS role,
-    CASE WHEN m.type = 'assistant' THEN m.model END AS model,
-    ci.text AS raw_text,
-    ci.source_file,
-    ci.source_line,
-    subagent_id(ci.source_file) IS NOT NULL AS is_subagent,
-    ci.text LIKE '<%'
-      OR ci.text LIKE '[Request interrupted%'
-      OR ci.text LIKE 'Another Claude session sent a message:%'
-    AS is_system
-  FROM content_items ci
-  JOIN messages m USING (host, source_file, source_line)
-  WHERE ci.type = 'text'
-    AND ci.text IS NOT NULL
-    AND length(trim(ci.text)) > 0
-    AND NOT m.is_meta
-
-  UNION ALL
-
-  SELECT
-    m.host,
-    m.session_id,
-    m.timestamp,
-    m.project_path,
-    m.type AS role,
-    NULL AS model,
-    m.content_text AS raw_text,
-    m.source_file,
-    m.source_line,
-    subagent_id(m.source_file) IS NOT NULL AS is_subagent,
-    m.content_text LIKE '<%'
-      OR m.content_text LIKE '[Request interrupted%'
-      OR m.content_text LIKE 'Implement the following plan:%'
-      OR m.content_text LIKE 'This session is being continued from a previous conversation%'
-      OR m.content_text LIKE 'Goal set:%'
-      OR m.content_text LIKE 'Ultraplan %'
-      OR m.content_text LIKE '◇ %'
-      OR m.content_text LIKE '◆ %'
-      OR m.content_text LIKE 'Another Claude session sent a message:%'
-    AS is_system
-  FROM messages m
-  WHERE m.type = 'user'
-    AND m.content_text IS NOT NULL
-    AND length(trim(m.content_text)) > 0
-    AND NOT m.is_meta
-)
 SELECT
   host,
   session_id,
   timestamp,
   project_path,
   role,
-  model,
+  CASE WHEN role = 'assistant' THEN model END AS model,
   regexp_replace(
-    regexp_replace(raw_text, '```.*?```', '', 'gs'),
+    regexp_replace(text, '```.*?```', '', 'gs'),
     '`[^`\n]*`', '', 'g'
   ) AS text,
-  raw_text,
+  text AS raw_text,
   source_file,
   source_line,
-  is_subagent,
-  is_system
-FROM unified;
+  subagent_id(source_file) IS NOT NULL AS is_subagent,
+  text LIKE '<%'
+    OR text LIKE '[Request interrupted%'
+    OR text LIKE 'Another Claude session sent a message:%'
+    OR (type = 'prompt' AND (
+      text LIKE 'Implement the following plan:%'
+      OR text LIKE 'This session is being continued from a previous conversation%'
+      OR text LIKE 'Goal set:%'
+      OR text LIKE 'Ultraplan %'
+      OR text LIKE '◇ %'
+      OR text LIKE '◆ %'
+    ))
+  AS is_system
+FROM content_items
+WHERE type IN ('text', 'prompt')
+  AND text IS NOT NULL
+  AND length(trim(text)) > 0
+  AND NOT is_meta;
 
 -- `label` is the session's human-readable name, from session_labels. It replaces the
 -- `summary` this view used to carry: `summary` records are no longer written, so that

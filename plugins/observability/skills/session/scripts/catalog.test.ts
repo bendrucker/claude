@@ -62,6 +62,9 @@ const EXTENSION_FUNCTIONS = {
   yaml: ["read_yaml_frontmatter"],
 } as const;
 
+// scoped_sessions() reads these on the query's behalf.
+const SCOPE_PARAMS = ["after_date", "before_date", "project", "host"];
+
 const alphabetical = (values: (string | undefined)[]) =>
   values.toSorted((a, b) => (a ?? "").localeCompare(b ?? ""));
 
@@ -105,6 +108,7 @@ describe("query header", () => {
     const queries = await loadQueries();
     const used = queries.map(([header, sql]) => {
       const names = [...sql.matchAll(/getvariable\('([a-z_]+)'\)/g)].map((match) => match[1]);
+      if (sql.includes("scoped_sessions()")) names.push(...SCOPE_PARAMS);
       return [header.name, alphabetical([...new Set(names)])] as const;
     });
     const declared = queries.map(

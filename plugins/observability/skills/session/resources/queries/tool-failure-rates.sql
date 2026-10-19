@@ -34,12 +34,9 @@ WITH calls AS (
   SELECT tc.host, tc.session_id, tc.tool_name, te.agent_id, te.error_content, te.timestamp,
          te.tool_id IS NOT NULL AS failed
   FROM tool_calls tc
-  JOIN sessions s USING (host, session_id)
+  JOIN scoped_sessions() s USING (host, session_id)
   LEFT JOIN tool_errors te ON te.host = tc.host AND te.tool_id = tc.tool_id
-  WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
-    AND te.denial_kind IS NULL
+  WHERE te.denial_kind IS NULL
     AND tc.tool_name NOT IN ('ExitPlanMode', 'AskUserQuestion')
 ),
 per_tool AS (

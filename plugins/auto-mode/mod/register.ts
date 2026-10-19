@@ -99,20 +99,6 @@ export function register(on: On): void {
     return settled.result;
   }).catch(($, e, next) => next(e));
 
-  on("classic.PermissionDenied", ($, e, next) => {
-    void $.modEvents.emit({
-      mod: MOD,
-      event: "classifier.deny",
-      detail: {
-        tool_use_id: e.tool_use_id,
-        tool_name: e.tool_name,
-        permission_mode: e.permission_mode ?? null,
-        reason: e.reason,
-      },
-    });
-    return next(e);
-  }).catch(($, e, next) => next(e));
-
   on("turn.step", async function* ($, e, next) {
     const response = yield* next(e);
     const events: ModEventsInput[] = [];

@@ -21,11 +21,8 @@
 WITH errs AS (
   SELECT te.host, te.session_id, te.agent_id, te.error_content, te.timestamp
   FROM tool_errors te
-  JOIN sessions s USING (host, session_id)
+  JOIN scoped_sessions() s USING (host, session_id)
   WHERE te.error_type = 'failure'
-    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
 )
 SELECT
   host,

@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { $ } from "bun";
 import { z } from "zod";
 import type { Manifest } from "../../skills/session/scripts/db";
@@ -21,19 +21,33 @@ async function refreshOnce(a: Arm, dataDir: string, importsDir: string) {
   return { wall, exit, rss };
 }
 
+// Every transcript of the local session with the most rows, its largest first, so changing
+// one file of it times work that scales with the session rather than the file.
+const LARGEST_SESSION = `
+  SELECT source_file FROM raw
+  WHERE host = 'local' AND session_id = (
+    SELECT session_id FROM raw WHERE host = 'local' AND session_id IS NOT NULL
+    GROUP BY 1 ORDER BY count(*) DESC LIMIT 1
+  )
+  GROUP BY 1 ORDER BY count(*) DESC`;
+
 /**
  * Copies real transcripts near the target size under a throwaway import host, so a refresh
  * re-reads them while the local host's files stay out of reach: never scanned, reaped, or written.
+ * Rows of 0 stages the largest session instead, and only its largest transcript changes.
  */
 async function stage(db: string, rows: number, files: number, dir: string) {
   const picked = await duckdbJson(
     db,
-    `SELECT source_file FROM raw WHERE host = 'local' GROUP BY 1
+    rows === 0
+      ? LARGEST_SESSION
+      : `SELECT source_file FROM raw WHERE host = 'local' GROUP BY 1
      HAVING count(*) BETWEEN ${Math.floor(rows * 0.9)} AND ${Math.ceil(rows * 1.1)}
      ORDER BY hash(source_file) LIMIT ${files}`,
     z.object({ source_file: z.string() }),
   );
-  if (picked.length < files) throw new Error(`only ${picked.length} transcripts near ${rows} rows`);
+  if (rows > 0 && picked.length < files)
+    throw new Error(`only ${picked.length} transcripts near ${rows} rows`);
   const projects = join(dir, "bench", "projects", "bench");
   mkdirSync(projects, { recursive: true });
   const manifest: Manifest = {
@@ -43,14 +57,21 @@ async function stage(db: string, rows: number, files: number, dir: string) {
     policy: { block_egress: true },
   };
   await Bun.write(join(dir, "bench", "manifest.json"), JSON.stringify(manifest));
-  return Promise.all(
+  const staged = await Promise.all(
     picked.map(async (f, i) => {
-      const path = join(projects, `${i}.jsonl`);
+      // A subagent transcript keeps its directory, which the index reads its origin from.
+      const path = join(
+        projects,
+        f.source_file.includes("/subagents/") ? "subagents" : "",
+        `${i}.jsonl`,
+      );
+      mkdirSync(dirname(path), { recursive: true });
       const text = (await Bun.file(f.source_file).text()).trimEnd();
       await Bun.write(path, `${text}\n`);
       return { path, text: `${text}\n`, last: `${text.slice(text.lastIndexOf("\n") + 1)}\n` };
     }),
   );
+  return rows === 0 ? staged.slice(0, 1) : staged;
 }
 
 /** Times an incremental refresh after `files` transcripts of about `rows` rows change. */
@@ -89,7 +110,7 @@ export async function refresh(o: {
       // oxlint-disable-next-line no-await-in-loop -- refreshes are timed one at a time.
       const r = await refreshOnce(a, dir, imports);
       samples.push({
-        query: `refresh-${o.rows}x${o.files}`,
+        query: o.rows === 0 ? "refresh-largest-session" : `refresh-${o.rows}x${o.files}`,
         limits: "mac",
         arm: a.name,
         base,

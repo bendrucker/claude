@@ -83,6 +83,13 @@ test("refresh times a changed transcript against a clone", async () => {
   expect(await Bun.file(db).bytes()).toEqual(before);
 });
 
+test("refresh changes one transcript of the largest session", async () => {
+  const out = join(dir, "refresh-session");
+  await bench("refresh", "--arm", `base=${db}`, "--out", out, "--rows", "0", "--runs", "2");
+  const [row] = Rows.parse(await Bun.file(join(out, "refresh.summary.json")).json());
+  expect(row).toMatchObject({ group: "refresh-largest-session", arm: "base", n: 2, failures: 0 });
+});
+
 const count = (path: string) =>
   $`duckdb -readonly -csv -noheader ${path} -c ${"SELECT count(*) FROM raw WHERE host = 'local' AND data IS NOT NULL"}`.text();
 

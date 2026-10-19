@@ -19,6 +19,7 @@ import {
   type Sample,
   SKILL,
   summarize,
+  timed,
   writeExport,
 } from "./replay";
 
@@ -38,9 +39,13 @@ function count(value: string): number {
 // Lines this script wrote itself, so only their shape is checked.
 const SampleLine = z.custom<Sample>((v) => typeof v === "object" && v !== null && "wall" in v);
 
-const byQuery = (s: Sample) => `${s.query} ${s.limits}`;
+const KEYS = {
+  queries: (s: Sample) => `${s.query} ${s.limits}`,
+  refresh: (s: Sample) => s.query,
+};
 
-async function finish(out: string, name: string, samples: Sample[], key: (s: Sample) => string) {
+async function finish(out: string, name: keyof typeof KEYS, samples: Sample[]) {
+  const key = KEYS[name];
   const rows = summarize(samples, key);
   await Promise.all([
     Bun.write(join(out, `${name}.jsonl`), samples.map((s) => `${JSON.stringify(s)}\n`).join("")),
@@ -95,24 +100,23 @@ program
     if (await Bun.file(join(o.out, "session.duckdb")).exists())
       throw new Error(`${o.out} already holds an index`);
     const home = mkdtempSync(join(tmpdir(), "session-bench-home-"));
-    const start = performance.now();
     // A throwaway HOME keeps the refresh off this machine's debug logs and imported hosts.
-    const proc = Bun.spawn(["bun", join(o.skill, "scripts", "refresh.ts"), "--refresh"], {
-      env: {
-        ...process.env,
-        HOME: home,
-        CLAUDE_SESSION_INDEX_DIR: o.out,
-        CLAUDE_PROJECTS_DIR: join(o.snapshot, "projects"),
-        CLAUDE_SESSION_IMPORTS_DIR: join(home, "imports"),
+    const { wall, exit, rss } = await timed(
+      ["bun", join(o.skill, "scripts", "refresh.ts"), "--refresh"],
+      {
+        env: {
+          ...process.env,
+          HOME: home,
+          CLAUDE_SESSION_INDEX_DIR: o.out,
+          CLAUDE_PROJECTS_DIR: join(o.snapshot, "projects"),
+          CLAUDE_SESSION_IMPORTS_DIR: join(home, "imports"),
+        },
       },
-      stdout: "ignore",
-      stderr: "inherit",
-    });
-    const exit = await proc.exited;
+    );
     const build = {
-      wall: (performance.now() - start) / 1000,
+      wall,
       exit,
-      rss: proc.resourceUsage()?.maxRSS,
+      rss,
       size: Bun.file(join(o.out, "session.duckdb")).size,
     };
     await $`rm -rf ${home}`;
@@ -158,7 +162,7 @@ program
     }
     await $`rm -rf ${tmp}`;
     mkdirSync(o.out, { recursive: true });
-    await finish(o.out, "queries", samples, byQuery);
+    await finish(o.out, "queries", samples);
   });
 
 program
@@ -185,7 +189,7 @@ program
       samples.push(...(await refresh({ arms: o.arm, rows, files: o.files, runs: o.runs, dir })));
     }
     await $`rm -rf ${dir}`;
-    await finish(o.out, "refresh", samples, (s) => s.query);
+    await finish(o.out, "refresh", samples);
   });
 
 program
@@ -193,14 +197,14 @@ program
   .description("Reprint the tables of a results directory.")
   .argument("<dir>", "results directory")
   .action(async (dir) => {
-    for (const name of ["queries", "refresh"]) {
+    for (const name of ["queries", "refresh"] as const) {
       const file = Bun.file(join(dir, `${name}.jsonl`));
       // oxlint-disable-next-line no-await-in-loop -- two files, printed in order.
       if (!(await file.exists())) continue;
       // oxlint-disable-next-line no-await-in-loop -- two files, printed in order.
       const lines = (await file.text()).trim().split("\n");
       const samples = lines.map((l) => SampleLine.parse(JSON.parse(l)));
-      console.log(render(summarize(samples, name === "queries" ? byQuery : (s) => s.query)));
+      console.log(render(summarize(samples, KEYS[name])));
     }
   });
 

@@ -4,16 +4,17 @@ import { median, medianAbsoluteDeviation, standardDeviation } from "simple-stati
 import { table } from "table";
 import { z } from "zod";
 import { pValue } from "../../../../packages/evals/stats";
+import { parseQueryHeader } from "../../skills/session/scripts/query-header";
 import { normalize, statements } from "./sql";
 
 export const SKILL = join(import.meta.dirname, "..", "..", "skills", "session");
 
 /** Appended to limits.sql: the cloud VM readers' cap. */
-export const LIMITS = {
+const LIMITS = {
   mac: "",
   vm: "SET memory_limit = '450MB';\nSET threads = 1;\n",
 } as const;
-export type Limits = keyof typeof LIMITS;
+type Limits = keyof typeof LIMITS;
 
 /** Each gets its most frequent query into the replay set. */
 const COVER = [
@@ -55,29 +56,52 @@ export function rotate<T>(arms: T[], n: number): T[] {
   return [...arms.slice(k), ...arms.slice(0, k)];
 }
 
-export interface Sample {
+const METRICS = ["latency", "bytesRead", "rowsScanned", "peakBuffer", "rss", "size"] as const;
+type Metrics = Partial<Record<(typeof METRICS)[number], number | undefined>>;
+
+interface Measured extends Metrics {
+  wall: number;
+  exit: number;
+  oom?: boolean;
+  timeout?: boolean;
+  error?: string | undefined;
+}
+
+export interface Sample extends Measured {
   query: string;
   limits: Limits;
   arm: string;
   /** The first arm, which every other arm is compared against. */
   base: boolean;
   run: number;
-  wall: number;
-  exit: number;
-  oom: boolean;
-  timeout: boolean;
-  error?: string | undefined;
-  rss?: number | undefined;
-  latency?: number | undefined;
-  bytesRead?: number | undefined;
-  rowsScanned?: number | undefined;
-  peakBuffer?: number | undefined;
-  size?: number | undefined;
 }
-export type Measured = Omit<Sample, "query" | "limits" | "arm" | "base" | "run">;
+
+/** Runs a process to exit, timing it from outside and reading its peak memory. */
+export async function timed(
+  cmd: string[],
+  options: Parameters<typeof Bun.spawn>[1] = {},
+): Promise<{ wall: number; exit: number; rss: number | undefined; stderr: string }> {
+  const start = performance.now();
+  const proc = Bun.spawn(cmd, { stdout: "ignore", stderr: "inherit", ...options });
+  const [stderr, exit] = await Promise.all([
+    proc.stderr instanceof ReadableStream ? new Response(proc.stderr).text() : "",
+    proc.exited,
+  ]);
+  return {
+    wall: (performance.now() - start) / 1000,
+    exit,
+    rss: proc.resourceUsage()?.maxRSS,
+    stderr,
+  };
+}
+
+const byArm = (samples: Sample[]) =>
+  [...Map.groupBy(samples, (s) => s.arm)].toSorted(
+    ([, a], [, b]) => Number(b[0]?.base) - Number(a[0]?.base),
+  );
 
 export async function duckdbJson<T>(db: string, sql: string, schema: z.ZodType<T>): Promise<T[]> {
-  const init = "SET memory_limit = '1GB'; SET threads = 1;";
+  const init = "SET memory_limit = '1GB';";
   const out = await $`duckdb -readonly -json -cmd ${init} ${db} < ${Buffer.from(sql)}`.text();
   // The CLI renders an empty result as `[{]`.
   const rows = out.trim();
@@ -112,23 +136,20 @@ export async function replaySet(db: string, top: number): Promise<Query[]> {
     const key = s.name === undefined ? normalize(s.sql) : `named:${s.name}`;
     const g = groups.get(key) ?? {
       id: s.name ?? `q${new Bun.CryptoHasher("sha1").update(key).digest("hex").slice(0, 8)}`,
-      ...(s.name !== undefined && { name: s.name }),
-      sql: s.sql,
+      name: s.name,
+      sql: "",
       count: 0,
       sessions: 0,
       ooms: 0,
-      last: row.ts,
+      last: "",
       covers: COVER.filter((c) => s.name === c || new RegExp(`\\b${c}\\b`).test(key)),
       ids: new Set<string>(),
     };
     g.ids.add(row.session_id);
-    Object.assign(g, {
-      count: g.count + 1,
-      ooms: g.ooms + Number(row.oom),
-      sessions: g.ids.size,
-      sql: s.sql,
-      last: row.ts,
-    });
+    g.count++;
+    g.ooms += Number(row.oom);
+    g.sql = s.sql;
+    g.last = row.ts;
     groups.set(key, g);
   }
   const ranked = [...groups.values()].toSorted((a, b) => b.count - a.count);
@@ -138,7 +159,9 @@ export async function replaySet(db: string, top: number): Promise<Query[]> {
     if (g) picked.add(g);
   }
   for (const g of ranked) if (picked.size < top) picked.add(g);
-  return [...picked].map(({ ids: _, ...q }) => q).toSorted((a, b) => b.count - a.count);
+  return [...picked]
+    .map(({ ids, ...q }) => Object.assign(q, { sessions: ids.size }))
+    .toSorted((a, b) => b.count - a.count);
 }
 
 const Profile = z.looseObject({
@@ -148,9 +171,20 @@ const Profile = z.looseObject({
   system_peak_buffer_memory: z.number().optional(),
 });
 
-async function sqlFor(q: Query, skill: string): Promise<string> {
-  if (q.name === undefined) return q.sql;
-  return `${q.sql}\n${await Bun.file(join(skill, "resources", "queries", `${q.name}.sql`)).text()}`;
+// Built once per arm, query and limit: the schedule replays each thousands of times.
+const prepared = new Map<string, Promise<{ sql: string; init: string }>>();
+
+/** A named query's header says whether it reads from disk through extensions.sql. */
+async function prepare(q: Query, a: Arm, limits: Limits, dir: string) {
+  const named =
+    q.name === undefined
+      ? undefined
+      : await Bun.file(join(a.skill, "resources", "queries", `${q.name}.sql`)).text();
+  const disk = named !== undefined && parseQueryHeader(named).extensions.length > 0;
+  const limitsFile = join(a.skill, "resources", disk ? "extensions.sql" : "limits.sql");
+  const init = join(dir, `init-${a.name}-${limits}-${disk ? "ext" : "idx"}.sql`);
+  await Bun.write(init, (await Bun.file(limitsFile).text()) + LIMITS[limits]);
+  return { sql: named === undefined ? q.sql : `${q.sql}\n${named}`, init };
 }
 
 /**
@@ -164,24 +198,22 @@ export async function replay(
   dir: string,
   timeoutMs: number,
 ): Promise<Measured> {
-  const sql = await sqlFor(q, a.skill);
-  const disk = q.name !== undefined && /markdown|yaml/i.test(sql);
-  const limitsFile = join(a.skill, "resources", disk ? "extensions.sql" : "limits.sql");
-  const init = join(dir, `init-${a.name}-${limits}-${disk ? "ext" : "idx"}.sql`);
-  await Bun.write(init, (await Bun.file(limitsFile).text()) + LIMITS[limits]);
+  const key = `${q.id} ${a.name} ${limits}`;
+  const ready = prepared.get(key) ?? prepare(q, a, limits, dir);
+  prepared.set(key, ready);
+  const { sql, init } = await ready;
   const profile = Bun.file(join(dir, "profile.json"));
   await profile.delete().catch(() => undefined);
   const stdin = `PRAGMA enable_profiling = 'json';\nPRAGMA profiling_output = '${profile.name}';\n${sql}\n`;
   const signal = AbortSignal.timeout(timeoutMs);
-  const start = performance.now();
-  const proc = Bun.spawn(["duckdb", "-readonly", "-json", "-init", init, a.db], {
-    stdin: Buffer.from(stdin),
-    stdout: "ignore",
-    stderr: "pipe",
-    signal,
-  });
-  const [stderr, exit] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
-  const wall = (performance.now() - start) / 1000;
+  const { wall, exit, rss, stderr } = await timed(
+    ["duckdb", "-readonly", "-json", "-init", init, a.db],
+    {
+      stdin: Buffer.from(stdin),
+      stderr: "pipe",
+      signal,
+    },
+  );
   // The CLI can print an error and still exit 0.
   const error = /\b\w+ Error:.*/.exec(stderr)?.[0];
   const parsed = Profile.safeParse(await profile.json().catch(() => null));
@@ -192,7 +224,7 @@ export async function replay(
     oom: /out of memory/i.test(stderr),
     timeout: signal.aborted,
     error,
-    rss: proc.resourceUsage()?.maxRSS,
+    rss,
     latency: p?.latency,
     bytesRead: p?.total_bytes_read,
     rowsScanned: p?.cumulative_rows_scanned,
@@ -204,10 +236,7 @@ export async function replay(
 /** In hyperfine's export format, which `performance:benchmark`'s compare.ts reads. */
 export async function writeExport(path: string, samples: Sample[]): Promise<void> {
   // compare.ts takes the first result as its base.
-  const arms = [...Map.groupBy(samples, (s) => s.arm)].toSorted(
-    ([, a], [, b]) => Number(b[0]?.base) - Number(a[0]?.base),
-  );
-  const results = arms.map(([name, runs]) => ({
+  const results = byArm(samples).map(([name, runs]) => ({
     command: name,
     name,
     measurements: runs.map((s) => ({
@@ -225,7 +254,7 @@ const mid = (xs: (number | undefined)[]) => {
   return ns.length > 0 ? median(ns) : undefined;
 };
 
-export interface Row {
+interface Row extends Metrics {
   group: string;
   arm: string;
   n: number;
@@ -235,12 +264,6 @@ export interface Row {
   change?: number | undefined;
   p?: number | undefined;
   significant: boolean;
-  latency?: number | undefined;
-  bytesRead?: number | undefined;
-  rowsScanned?: number | undefined;
-  peakBuffer?: number | undefined;
-  rss?: number | undefined;
-  size?: number | undefined;
   ooms: number;
   failures: number;
 }
@@ -248,9 +271,7 @@ export interface Row {
 /** A change counts when p < 0.1 and it clears max(2σ of the base, 10% of its median). */
 export function summarize(samples: Sample[], key: (s: Sample) => string): Row[] {
   return [...Map.groupBy(samples, key)].flatMap(([group, rows]) => {
-    const arms = [...Map.groupBy(rows, (s) => s.arm)].toSorted(
-      ([, a], [, b]) => Number(b[0]?.base) - Number(a[0]?.base),
-    );
+    const arms = byArm(rows);
     const base = passing(arms[0]?.[1] ?? []);
     const baseMedian = base.length > 0 ? median(base) : Number.NaN;
     const floor = Math.max(base.length > 1 ? 2 * standardDeviation(base) : 0, 0.1 * baseMedian);
@@ -258,7 +279,8 @@ export function summarize(samples: Sample[], key: (s: Sample) => string): Row[] 
       const walls = passing(rs);
       const wall = walls.length > 0 ? median(walls) : Number.NaN;
       const p = i === 0 || walls.length === 0 ? undefined : pValue(base, walls);
-      return {
+      const metrics = Object.fromEntries(METRICS.map((k) => [k, mid(rs.map((s) => s[k]))]));
+      return Object.assign(metrics, {
         group,
         arm,
         n: walls.length,
@@ -268,15 +290,9 @@ export function summarize(samples: Sample[], key: (s: Sample) => string): Row[] 
         change: i === 0 ? undefined : (wall - baseMedian) / baseMedian,
         p,
         significant: p !== undefined && p < 0.1 && Math.abs(wall - baseMedian) >= floor,
-        latency: mid(rs.map((s) => s.latency)),
-        bytesRead: mid(rs.map((s) => s.bytesRead)),
-        rowsScanned: mid(rs.map((s) => s.rowsScanned)),
-        peakBuffer: mid(rs.map((s) => s.peakBuffer)),
-        rss: mid(rs.map((s) => s.rss)),
-        size: mid(rs.map((s) => s.size)),
         ooms: rs.filter((s) => s.oom).length,
         failures: rs.length - walls.length,
-      };
+      });
     });
   });
 }

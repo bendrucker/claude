@@ -73,7 +73,7 @@ function readBody(text: string, start: number, delim: string, strip: boolean): [
 }
 
 /** Shell tokens, with each heredoc body as the word after its `<<` operator. */
-export function tokenize(text: string): Token[] {
+function tokenize(text: string): Token[] {
   const tokens: Token[] = [];
   const pending: { delim: string; strip: boolean; index: number }[] = [];
   let word: string | undefined;

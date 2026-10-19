@@ -10,7 +10,5 @@ const { ensureIndex, getDb }: typeof import("../../skills/session/scripts/db") =
   join(skill, "scripts", "db.ts")
 );
 const db = await getDb(dataDir);
-const start = performance.now();
-const result = await ensureIndex(db, { projectsDir: join(dataDir, "no-local"), importsDir });
+await ensureIndex(db, { projectsDir: join(dataDir, "no-local"), importsDir });
 db.close();
-console.log(JSON.stringify({ ms: performance.now() - start, ...result }));

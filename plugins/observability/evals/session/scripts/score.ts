@@ -45,6 +45,7 @@ const DATE = /\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+Z?)?/g;
 const NUMBER = /-?\d[\d,]*(?:\.\d+)?/g;
 // A list item or table row, which is where a reply states one answer per line.
 const ITEM = /^\s*(?:[-*+]|\d+[.)]|\|)/;
+const SESSION = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 
 function numbers(line: string): number[] {
   return [...line.replaceAll(DATE, " ").matchAll(NUMBER)].map((m) =>
@@ -62,12 +63,19 @@ function matches(line: string, row: TruthRow, tolerance: number): boolean {
 /**
  * Recall is the share of truth rows some reply line states, key and value together. Precision is
  * the share of the reply's answer lines (list items and table rows carrying a number) that state a
- * truth row. A scalar answer has no list to be precise over, so its precision is its recall.
+ * truth row, or, when the truth is a set of sessions, the share of the sessions the reply names
+ * that are in it. A scalar answer has no list to be precise over, so its precision is its recall.
  */
 export function overlap(reply: string, truth: Truth): { recall: number; precision: number } {
   const lines = reply.split("\n");
   const hit = truth.rows.filter((row) => lines.some((l) => matches(l, row, truth.tolerance)));
   const recall = truth.rows.length === 0 ? 1 : hit.length / truth.rows.length;
+  const ids = truth.rows.map((row) => (row.value == null ? row.key?.toLowerCase() : undefined));
+  if (ids.length > 0 && ids.every((k) => k?.replace(SESSION, "") === "")) {
+    const named = new Set(reply.toLowerCase().match(SESSION));
+    if (named.size === 0) return { recall, precision: recall };
+    return { recall, precision: [...named].filter((s) => ids.includes(s)).length / named.size };
+  }
   const keyed = truth.rows.some((row) => row.key != null);
   const items = lines.filter((l) => ITEM.test(l) && numbers(l).length > 0);
   if (!keyed || items.length === 0) return { recall, precision: recall };

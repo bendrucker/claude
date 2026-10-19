@@ -5,6 +5,14 @@
 -- so the database file stays proportional to the corpus.
 BEGIN;
 
+-- The file's sessions before and after the re-read, whose content_items rows
+-- ensureIndex rebuilds once the import loop ends.
+INSERT INTO content_item_scope
+SELECT DISTINCT host, session_id FROM raw
+WHERE host = getvariable('host')
+  AND source_file = getvariable('source_path')
+  AND type IN ('user', 'assistant');
+
 DELETE FROM raw
 WHERE host = getvariable('host')
   AND source_file = getvariable('source_path');
@@ -30,6 +38,12 @@ FROM read_json_objects(
   ignore_errors=true,
   filename=true
 );
+
+INSERT INTO content_item_scope
+SELECT DISTINCT host, session_id FROM raw
+WHERE host = getvariable('host')
+  AND source_file = getvariable('source_path')
+  AND type IN ('user', 'assistant');
 
 DELETE FROM indexed_files
 WHERE host = getvariable('host')

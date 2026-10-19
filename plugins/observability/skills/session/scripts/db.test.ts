@@ -529,6 +529,27 @@ describe("text_content view", () => {
     expect(rows[0]!.n).toBe(0n);
   });
 
+  it("reads a typed prompt once, even when resume replays its line", async () => {
+    await importFixtureHost("replay");
+    const target = join(importsDir, "replay", "projects", "-Users-test-project", "replay.jsonl");
+    const prompt = `${JSON.stringify({
+      type: "user",
+      sessionId: "replay-session",
+      cwd: "/Users/test/project",
+      timestamp: "2024-03-01T10:00:00.000Z",
+      uuid: "replay-prompt",
+      message: { role: "user", content: "replayed prompt text" },
+    })}\n`;
+    await Bun.write(target, prompt + prompt);
+    await reindex();
+
+    const rows = await db.query(
+      "SELECT role, is_system FROM text_content WHERE raw_text = 'replayed prompt text'",
+      z.object({ role: z.string(), is_system: z.boolean() }),
+    );
+    expect(rows).toEqual([{ role: "user", is_system: false }]);
+  });
+
   it("filters out empty text items", async () => {
     const rows = await db.query(
       "SELECT COUNT(*) AS n FROM text_content WHERE raw_text IS NULL OR length(trim(raw_text)) = 0",
@@ -1576,6 +1597,80 @@ describe("change catalog", () => {
       expect(Number(after?.n)).toBe(Number(before?.n));
     },
   );
+});
+
+describe("incremental content_items", () => {
+  // Rows content_items holds that a full rebuild would not, plus the reverse.
+  async function driftFromFullRebuild(): Promise<number> {
+    const [row] = await db.query(
+      `SELECT COUNT(*) AS n FROM (
+         (SELECT * FROM content_items EXCEPT ALL SELECT * FROM content_item_rows(false))
+         UNION ALL
+         (SELECT * FROM content_item_rows(false) EXCEPT ALL SELECT * FROM content_items)
+       )`,
+      z.object({ n: z.bigint() }),
+    );
+    return Number(row?.n);
+  }
+
+  const line = (uuid: string, source: Record<string, unknown>) =>
+    `${JSON.stringify({
+      type: "assistant",
+      sessionId: "order-session",
+      cwd: "/Users/test/order",
+      timestamp: "2024-02-01T10:00:00.000Z",
+      uuid,
+      ...source,
+    })}\n`;
+  const spawn = (uuid: string, extra: Record<string, unknown> = {}) =>
+    line(uuid, {
+      message: {
+        role: "assistant",
+        content: [{ type: "tool_use", id: "order-spawn", name: "Agent", input: {} }],
+      },
+      ...extra,
+    });
+
+  it("matches a full rebuild after files are edited, added and removed", async () => {
+    await importFixtureHost("drift");
+    await reindex();
+    const project = join(importsDir, "drift", "projects", "-Users-test-project");
+    const basic = join(project, "basic.jsonl");
+    await Bun.write(basic, `${await Bun.file(basic).text()}${spawn("drift-appended")}`);
+    await Bun.write(join(project, "added.jsonl"), spawn("drift-added", { sessionId: "added" }));
+    await rm(join(project, "attribution.jsonl"));
+    await reindex();
+
+    expect(await driftFromFullRebuild()).toBe(0);
+  });
+
+  it.each([
+    ["parent", true],
+    ["subagent", false],
+  ])("keeps the parent's spawn when the %s imports first", async (_, parentFirst) => {
+    const projects = join(tmpDir, "order-projects");
+    const project = join(projects, "-Users-test-order");
+    const files = [
+      [join(project, "order.jsonl"), spawn("order-parent")],
+      [
+        join(project, "subagents", "agent-order.jsonl"),
+        spawn("order-echo", { isSidechain: true, timestamp: "2024-02-01T10:00:05.000Z" }),
+      ],
+    ] as const;
+    for (const [path, text] of parentFirst ? files : files.toReversed()) {
+      // oxlint-disable-next-line no-await-in-loop -- each file lands in its own refresh.
+      await Bun.write(path, text);
+      // oxlint-disable-next-line no-await-in-loop -- each file lands in its own refresh.
+      await ensureIndex(db, { projectsDir: projects, importsDir });
+    }
+
+    const rows = await db.query(
+      "SELECT agent_id FROM tool_calls WHERE tool_id = 'order-spawn'",
+      z.object({ agent_id: z.string().nullable() }),
+    );
+    expect(rows).toEqual([{ agent_id: null }]);
+    expect(await driftFromFullRebuild()).toBe(0);
+  });
 });
 
 describe("view versioning", () => {

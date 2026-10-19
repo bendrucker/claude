@@ -11,6 +11,13 @@ SELECT
   NULL::JSON    AS data
 WHERE false;
 
+-- The sessions a refresh touched, which ensureIndex rebuilds in content_items after
+-- the import loop. Filled per run and emptied before the next one.
+CREATE TABLE IF NOT EXISTS content_item_scope (
+  host       VARCHAR,
+  session_id VARCHAR
+);
+
 -- Per-file change catalog: one row per indexed JSONL file with the mtime (ms) and
 -- size observed at import. A file is re-imported when either differs, and its rows
 -- are dropped when the path disappears. Immune to the watermark race (a write landing

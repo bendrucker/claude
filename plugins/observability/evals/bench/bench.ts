@@ -174,7 +174,7 @@ program
   .requiredOption("--out <dir>", "results directory")
   .option(
     "--rows <list>",
-    "transcript sizes in rows, the corpus median and p90 by default",
+    "transcript sizes in rows, the corpus median and p90 by default; 0 changes one transcript of the largest session",
     "50,373",
   )
   .option("--files <n>", "transcripts changed per refresh", count, 1)

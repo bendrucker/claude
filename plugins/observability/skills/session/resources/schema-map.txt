@@ -1,4 +1,4 @@
-content_items: host session_id timestamp project_path source_file source_line type name id tool_use_id text content is_error data tool_use_result tool_denial_kind permission_decision attribution_skill attribution_plugin attribution_agent
+content_items: host session_id timestamp project_path source_file source_line type name id tool_use_id text content is_error data tool_use_result tool_denial_kind permission_decision attribution_skill attribution_plugin attribution_agent role model is_meta
 tool_calls: tool_name tool_id host session_id project_path timestamp file_path command attribution_skill attribution_plugin attribution_agent agent_id
 skill_calls: skill_name args tool_id host session_id project_path timestamp
 hook_events: host session_id project_path timestamp source_file source_line kind hook_event hook_name command origin tool_use_id exit_code duration_ms decision reason additional_context blocked stdout stderr content blocking_error attachment

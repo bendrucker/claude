@@ -35,10 +35,7 @@ WITH ev AS (
     he.kind,
     he.blocked
   FROM hook_events he
-  JOIN sessions s USING (host, session_id)
-  WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
+  JOIN scoped_sessions() s USING (host, session_id)
 ),
 filtered AS (
   SELECT * FROM ev

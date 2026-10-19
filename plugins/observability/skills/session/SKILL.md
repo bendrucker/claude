@@ -35,7 +35,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/refresh.ts
 
 ### Querying
 
-After refresh, query with the `duckdb` CLI or any DuckDB client, always `-readonly`. Querying never writes, and a read-write open would block refreshes and other readers. Add `-init ${CLAUDE_SKILL_DIR}/resources/limits.sql`, which caps the process at 4 GiB and 4 threads. DuckDB's own defaults (80% of RAM, every core) apply per process, so a few concurrent readers over the index can freeze the machine. Add `-json` too: the default box format returns only 40 rows however many matched, and `-csv` emits the newlines embedded in `command` and `text` raw, so a row stops being one line. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works. `getvariable('limit')` is unaffected either way.
+After refresh, query with the `duckdb` CLI or any DuckDB client, always `-readonly`. Querying never writes, and a read-write open would block refreshes and other readers. Add `-init ${CLAUDE_SKILL_DIR}/resources/limits.sql`, which caps the process at 60% of RAM (at most 4 GiB) and 4 threads. DuckDB's own defaults (80% of RAM, every core) apply per process, so a few concurrent readers over the index can freeze the machine. Add `-json` too: the default box format returns only 40 rows however many matched, and `-csv` emits the newlines embedded in `command` and `text` raw, so a row stops being one line. Named SQL files in `resources/queries/` provide common queries. Use `SET VARIABLE` for parameterization and `getvariable('key')` in SQL. Quote variable names that are reserved words: `SET VARIABLE limit = 5` is a parser error (`limit` is reserved), `SET VARIABLE "limit" = 5` works. `getvariable('limit')` is unaffected either way.
 
 ```bash
 duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql ~/.local/share/claude-sessions/session.duckdb "SELECT model, SUM(output_tokens) FROM message_usage GROUP BY model"
@@ -70,7 +70,7 @@ The eleven that carry most of the measured usage:
 - `hook-blocks`: hook overfiring, grouped by normalized reason signature, including the PreToolUse denies `hook_events` never records.
 - `skill-auto-vs-explicit`: per skill, model-routed vs chained vs typed. The `disable-model-invocation` lever.
 - `skill-config-vs-observed`: installed skills that never fire, the curation instrument (reads disk, needs `-init`).
-- `sandbox-bypass-effective-command`: bypassed commands normalized to their real verb, the `excludedCommands` candidates.
+- `sandbox-bypass-effective-command`: bypassed commands by their real verb, with how many followed a failed sandboxed run, the `excludedCommands` candidates.
 - `repeat-read-waste`: repeat Reads split by cause, isolating the true context tax from pagination and fan-out.
 - `delegation`: whether expensive parents push subagent spawns down to cheaper models.
 - `usage-timeline`: one session's token burn per time bucket, with estimated cost and a context-size proxy.
@@ -79,21 +79,22 @@ The eleven that carry most of the measured usage:
 The rest, by name, described in [`references/catalog.md`](references/catalog.md):
 
 - Sessions and prose: `search`, `text-export`, `model-summary`, `bare-refs`
-- Tool use and friction: `stats`, `errors`, `permissions`, `sandbox`, `sandbox-bypass-justification`
+- Tool use and friction: `stats`, `permissions`
 - Hooks: `hook-block-then-retry-success`, `hook-config-vs-observed`
-- Skills: `skills`, `skill-activity`
-- Files, tokens, activity: `files`, `diagnostics`, `usage-spikes`, `top-sessions`
-- Planning and review: `plans`, `plan-iterations`, `plan-sections`, `plan-sizes`, `review-precision`
-- Schema and index: `schema`, `keys`, `fields`, `field-drift`, `frontmatter`
+- Skills: `skill-activity`
+- Tokens and activity: `usage-spikes`, `top-sessions`
+- Planning and review: `plan-iterations`, `plan-sections`, `plan-sizes`, `review-precision`
+- Schema and index: `fields`, `field-drift`
 
 Load [`references/catalog.md`](references/catalog.md) before running a query you have not used. A further tier, aimed at the self-improvement loop, is listed in [`references/discovery.md`](references/discovery.md).
 
 ### Queries That Read Disk
 
-Four queries read files on disk instead of the index. Three of them (`plan-sections`, `frontmatter`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-init resources/extensions.sql` in place of `limits.sql`. It carries the same limits, loads both extensions in the same process before the piped query, and runs under `-readonly`. `hook-self-timing` reads JSONL and needs no extension. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
+Four queries read files on disk instead of the index. Two of them (`plan-sections`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-cmd ".read resources/extensions.sql"` after `-init resources/limits.sql`, which loads both extensions in the same process before the piped query. `hook-self-timing` and `hook-config-vs-observed` read JSON and need no extension. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
 
 ```bash
-duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/extensions.sql ~/.local/share/claude-sessions/session.duckdb \
+duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql \
+  -cmd ".read ${CLAUDE_SKILL_DIR}/resources/extensions.sql" ~/.local/share/claude-sessions/session.duckdb \
   < ${CLAUDE_SKILL_DIR}/resources/queries/plan-sections.sql
 ```
 

@@ -20,11 +20,8 @@
 WITH pr AS (
   SELECT p.host, p.command, p.session_id, p.timestamp
   FROM permission_requests p
-  JOIN sessions s USING (host, session_id)
+  JOIN scoped_sessions() s USING (host, session_id)
   WHERE p.tool_name = 'Bash'
-    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
     AND (getvariable('allow_glob') IS NULL OR p.command GLOB getvariable('allow_glob')::VARCHAR)
 )
 SELECT

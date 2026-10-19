@@ -27,10 +27,7 @@
 -- ---
 WITH base AS (
   SELECT *
-  FROM sessions
-  WHERE date_filter(start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(project_path, getvariable('project'))
-    AND host_filter(host, getvariable('host'))
+  FROM scoped_sessions()
 ),
 ship AS (
   SELECT DISTINCT host, session_id FROM pr_links

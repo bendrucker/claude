@@ -53,14 +53,11 @@ WITH reads AS (
   JOIN messages m USING (host, source_file, source_line)
   JOIN content_items tr
     ON tr.tool_use_id = tc.id AND tr.host = tc.host AND tr.type = 'tool_result'
-  JOIN sessions s ON s.host = tc.host AND s.session_id = tc.session_id
+  JOIN scoped_sessions() s ON s.host = tc.host AND s.session_id = tc.session_id
   WHERE tc.type = 'tool_use'
     AND tc.name = 'Read'
     AND (tc.data->>'$.input.file_path') IS NOT NULL
     AND tr.content IS NOT NULL
-    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
 ),
 ranked AS (
   SELECT

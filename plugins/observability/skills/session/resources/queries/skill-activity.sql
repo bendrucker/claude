@@ -19,11 +19,8 @@
 WITH m AS (
   SELECT mu.*
   FROM message_usage mu
-  JOIN sessions s USING (host, session_id)
-  WHERE date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
-    AND mu.attribution_skill IS NOT NULL
+  JOIN scoped_sessions() s USING (host, session_id)
+  WHERE mu.attribution_skill IS NOT NULL
 )
 SELECT
   attribution_skill AS skill,

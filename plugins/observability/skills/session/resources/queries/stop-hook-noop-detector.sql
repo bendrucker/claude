@@ -45,12 +45,9 @@ runs AS (
     SUM(r.duration_ms)                                  AS total_ms,
     COUNT(*) FILTER (WHERE g.tool_use_id IS NOT NULL)   AS gated_stops
   FROM stop_hook_runs r
-  JOIN sessions s USING (host, session_id)
+  JOIN scoped_sessions() s USING (host, session_id)
   LEFT JOIN gated g ON g.host = r.host AND g.tool_use_id = r.tool_use_id
   WHERE r.prompt_text IS NULL
-    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
   GROUP BY r.host, r.command
 ),
 observed AS (
@@ -63,11 +60,8 @@ observed AS (
     COUNT(*) FILTER (WHERE he.exit_code <> 0)                         AS nonzero_exit,
     COUNT(*) FILTER (WHERE he.kind = 'hook_blocking_error')           AS blocks
   FROM hook_events he
-  JOIN sessions s USING (host, session_id)
+  JOIN scoped_sessions() s USING (host, session_id)
   WHERE he.hook_event = 'Stop'
-    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
   GROUP BY 1, 2
 )
 SELECT

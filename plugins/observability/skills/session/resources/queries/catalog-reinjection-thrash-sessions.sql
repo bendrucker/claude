@@ -32,11 +32,8 @@ WITH att AS (
     a.attachment,
     a.is_sidechain
   FROM attachments a
-  JOIN sessions s USING (host, session_id)
+  JOIN scoped_sessions() s USING (host, session_id)
   WHERE a.kind IN ('skill_listing', 'deferred_tools_delta')
-    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
 ),
 per AS (
   SELECT

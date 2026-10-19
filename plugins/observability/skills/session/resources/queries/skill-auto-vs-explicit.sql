@@ -41,19 +41,16 @@
 --   - project
 --   - host
 -- ---
-WITH scoped_sessions AS (
+WITH scoped AS (
   SELECT host, session_id
-  FROM sessions
-  WHERE date_filter(start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(project_path, getvariable('project'))
-    AND host_filter(host, getvariable('host'))
+  FROM scoped_sessions()
 ),
 calls AS (
   SELECT
     sc.skill_name,
     tc.attribution_skill
   FROM skill_calls sc
-  JOIN scoped_sessions USING (host, session_id)
+  JOIN scoped USING (host, session_id)
   LEFT JOIN tool_calls tc ON tc.host = sc.host AND tc.tool_id = sc.tool_id
 ),
 call_agg AS (
@@ -67,7 +64,7 @@ call_agg AS (
 markers AS (
   SELECT cm.command
   FROM command_markers cm
-  JOIN scoped_sessions USING (host, session_id)
+  JOIN scoped USING (host, session_id)
 ),
 explicit_agg AS (
   SELECT ca.skill_name, COUNT(*) AS explicit

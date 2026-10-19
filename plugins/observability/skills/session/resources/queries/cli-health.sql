@@ -39,14 +39,11 @@ WITH calls AS (
     date_diff('millisecond', tc.timestamp, tr.timestamp) / 1000.0 AS gap_s,
     tr.content
   FROM tool_calls tc
-  JOIN sessions s USING (host, session_id)
+  JOIN scoped_sessions() s USING (host, session_id)
   LEFT JOIN content_items tr
     ON tr.tool_use_id = tc.tool_id AND tr.host = tc.host AND tr.type = 'tool_result'
   WHERE tc.tool_name = 'Bash'
     AND tc.command IS NOT NULL
-    AND date_filter(s.start_time, getvariable('after_date'), getvariable('before_date'))
-    AND project_filter(s.project_path, getvariable('project'))
-    AND host_filter(s.host, getvariable('host'))
 ),
 sequenced AS (
   SELECT *,

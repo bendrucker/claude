@@ -30,13 +30,7 @@
 --   - host
 -- ---
 WITH priced AS (
-  SELECT
-    mu.*,
-    model_input_rate(mu.model)  AS in_rate,
-    model_output_rate(mu.model) AS out_rate,
-    COALESCE(mu.cache_1h_tokens, 0) AS w1h,
-    COALESCE(mu.cache_5m_tokens,
-             COALESCE(mu.cache_creation_tokens, 0) - COALESCE(mu.cache_1h_tokens, 0)) AS w5m
+  SELECT mu.*
   FROM message_usage mu
   WHERE date_filter(mu.timestamp, getvariable('after_date'), getvariable('before_date'))
     AND project_filter(mu.project_path, getvariable('project'))
@@ -49,13 +43,7 @@ SELECT
   COUNT(*)                                          AS msgs,
   SUM(output_tokens)                                AS out_tokens,
   ROUND(AVG(output_tokens), 0)                      AS avg_out,
-  ROUND(SUM(
-    (COALESCE(input_tokens, 0) * in_rate
-     + w5m * 1.25 * in_rate
-     + w1h * 2.0  * in_rate
-     + COALESCE(cache_read_tokens, 0) * 0.1 * in_rate
-     + COALESCE(output_tokens, 0) * out_rate) / 1e6
-  ), 2)                                             AS cost_usd_est,
+  ROUND(SUM(est_cost_usd), 2)                                             AS cost_usd_est,
   strftime(MAX(timestamp), '%Y-%m-%d %H:%M:%S')     AS last_activity
 FROM priced
 GROUP BY session_id

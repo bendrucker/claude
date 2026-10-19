@@ -88,11 +88,20 @@ SELECT
   MAX(output_tokens)          AS output_tokens,
   MAX(cache_read_tokens)      AS cache_read_tokens,
   MAX(cache_creation_tokens)  AS cache_creation_tokens,
-  -- Cache writes bill by TTL: 1h at 2x the input rate, 5m at 1.25x. Split them so cost
-  -- estimates can weight each tier; both are subsets of cache_creation_tokens.
+  -- Cache writes bill by TTL: 1h at 2x the input rate, 5m at 1.25x; both are subsets of
+  -- cache_creation_tokens.
   MAX(cache_1h_tokens)        AS cache_1h_tokens,
   MAX(cache_5m_tokens)        AS cache_5m_tokens,
-  COUNT(*)                    AS content_rows
+  COUNT(*)                    AS content_rows,
+  -- Public per-MTok rates, cache reads at 0.1x input. A message with no 5m split bills its
+  -- non-1h writes at the 5m rate.
+  (COALESCE(MAX(input_tokens), 0) * model_input_rate(ANY_VALUE(model))
+   + COALESCE(MAX(cache_5m_tokens), COALESCE(MAX(cache_creation_tokens), 0)
+       - COALESCE(MAX(cache_1h_tokens), 0)) * 1.25 * model_input_rate(ANY_VALUE(model))
+   + COALESCE(MAX(cache_1h_tokens), 0) * 2.0 * model_input_rate(ANY_VALUE(model))
+   + COALESCE(MAX(cache_read_tokens), 0) * 0.1 * model_input_rate(ANY_VALUE(model))
+   + COALESCE(MAX(output_tokens), 0) * model_output_rate(ANY_VALUE(model))) / 1e6
+                              AS est_cost_usd
 FROM messages
 WHERE type = 'assistant'
 GROUP BY host, session_id, message_id;
@@ -320,9 +329,41 @@ WITH bypass AS (
   WHERE type = 'tool_use'
     AND name = 'Bash'
     AND (data->>'$.input.dangerouslyDisableSandbox') = 'true'
+),
+-- Sandboxed Bash calls that failed. Materializing them keeps the planner from pairing every
+-- error result with every bypass on host alone before the other conditions apply, a plan it
+-- picked whenever an index's sampled statistics shifted, costing several GB and seconds.
+failed AS MATERIALIZED (
+  SELECT
+    tc.id AS tool_id,
+    er.content AS error,
+    tc.host,
+    tc.session_id,
+    tc.timestamp,
+    subagent_id(tc.source_file) AS agent_id,
+    (tc.data->>'$.input.command') AS command
+  FROM content_items tc
+  JOIN content_items er
+    ON er.tool_use_id = tc.id AND er.host = tc.host
+       AND er.type = 'tool_result' AND er.is_error
+  WHERE tc.type = 'tool_use'
+    AND tc.name = 'Bash'
+    AND COALESCE((tc.data->>'$.input.dangerouslyDisableSandbox'), 'false') = 'false'
 )
 SELECT
   b.command,
+  -- The tool that needs the bypass: leading `cd`/`echo` wrappers and (exported) env
+  -- assignments stripped, then the first word. NULL when nothing is left.
+  NULLIF(regexp_extract(trim(regexp_replace(
+    trim(b.command),
+    '^('
+      || '(cd [^&;\n]*|echo [^&;\n]*)(&&|;|\n)\s*'
+      || '|(export )?[A-Za-z_][A-Za-z0-9_]*='
+      || '(\$\([^)]*\)|"[^"]*"|''[^'']*''|[^\s;&|]*)'
+      || '\s*(&&|;)?\s*'
+    || ')+',
+    ''
+  )), '^[A-Za-z0-9_./-]+', 0), '') AS verb,
   b.description,
   b.tool_id,
   b.host,
@@ -333,25 +374,17 @@ SELECT
   prior.tool_id AS retried_tool_id,
   prior.error   AS retried_error
 FROM bypass b
-LEFT JOIN LATERAL (
-  SELECT tc.id AS tool_id, er.content AS error
-  FROM content_items tc
-  JOIN content_items er
-    ON er.tool_use_id = tc.id AND er.host = tc.host
-       AND er.type = 'tool_result' AND er.is_error
-  WHERE tc.type = 'tool_use'
-    AND tc.name = 'Bash'
-    AND COALESCE((tc.data->>'$.input.dangerouslyDisableSandbox'), 'false') = 'false'
-    AND tc.host = b.host
-    AND tc.session_id = b.session_id
-    -- Sibling subagents share the parent's session id, so matching on session alone
-    -- pairs one agent's bypass with an unrelated agent's failure of the same command.
-    AND subagent_id(tc.source_file) IS NOT DISTINCT FROM b.agent_id
-    AND tc.timestamp  < b.timestamp
-    AND (tc.data->>'$.input.command') = b.command
-  ORDER BY tc.timestamp DESC
-  LIMIT 1
-) prior ON true;
+-- The latest earlier failure of the same command by the same agent.
+LEFT JOIN failed prior
+  ON prior.host = b.host
+  AND prior.session_id = b.session_id
+  -- Sibling subagents share the parent's session id, so matching on session alone
+  -- pairs one agent's bypass with an unrelated agent's failure of the same command.
+  AND prior.agent_id IS NOT DISTINCT FROM b.agent_id
+  AND prior.timestamp < b.timestamp
+  AND prior.command = b.command
+-- content_items keeps one row per tool id per host, so this keeps one row per bypass.
+QUALIFY ROW_NUMBER() OVER (PARTITION BY b.host, b.tool_id ORDER BY prior.timestamp DESC) = 1;
 
 CREATE OR REPLACE VIEW text_content AS
 SELECT
@@ -417,6 +450,16 @@ FROM (
   HAVING COUNT(*) FILTER (WHERE type = 'user' AND NOT is_meta) > 0
 ) m
 LEFT JOIN session_labels l USING (host, session_id);
+
+-- Sessions inside the caller's after_date, before_date, project and host variables, by
+-- session start. getvariable binds at call time, so a query joins this instead of
+-- repeating the three filters. It lives here, not in 03_macros.sql, because a table
+-- macro binds `sessions` when it is created.
+CREATE OR REPLACE MACRO scoped_sessions() AS TABLE
+  SELECT * FROM sessions
+  WHERE date_filter(start_time, getvariable('after_date'), getvariable('before_date'))
+    AND project_filter(project_path, getvariable('project'))
+    AND host_filter(host, getvariable('host'));
 
 -- Universal record union. One row per JSONL line of every type, with a normalized
 -- `kind` label (type, plus subtype/attachment kind when present) and the cross-cutting
@@ -608,6 +651,15 @@ SELECT
     (a->>'$.command'),
     TRY_CAST(a->>'$.blockingError' AS JSON)->>'$.command'
   ) AS command,
+  -- `shared_config` travels with you (plugin, skill, and user-level hooks). A
+  -- `.claude/hooks/` path under CLAUDE_PROJECT_DIR is a per-repo hook, `project_local`.
+  CASE
+    WHEN command IS NULL THEN NULL
+    WHEN command LIKE '%CLAUDE_PLUGIN_ROOT%' OR command LIKE '%CLAUDE_SKILL_DIR%'
+      OR command LIKE '%$HOME/.claude/hooks/%' OR command LIKE '%~/.claude/hooks/%'
+      THEN 'shared_config'
+    ELSE 'project_local'
+  END AS origin,
   (a->>'$.toolUseID') AS tool_use_id,
   TRY_CAST(a->>'$.exitCode'   AS INTEGER) AS exit_code,
   TRY_CAST(a->>'$.durationMs' AS BIGINT)  AS duration_ms,
@@ -868,6 +920,11 @@ SELECT
   COUNT(*) FILTER (WHERE outcome = 'handoff')            AS handoff_count,
   COUNT(*) FILTER (WHERE outcome = 'denied')             AS denied_count,
   COUNT(*) FILTER (WHERE outcome = 'unknown')            AS unknown_count,
+  CASE
+    WHEN COUNT(*) FILTER (WHERE outcome = 'redirected') >= 2 THEN 'off-rails'
+    WHEN COUNT(*) FILTER (WHERE outcome = 'redirected') >= 1 THEN 'replan'
+    ELSE 'single'
+  END                                                    AS replan_tier,
   MIN(timestamp)                                         AS first_plan_ts,
   MAX(timestamp)                                         AS last_plan_ts
 FROM plan_calls
@@ -898,16 +955,3 @@ SELECT
   attributes->>'outcome'                                  AS outcome
 FROM mod_events
 WHERE event_name = 'auto-mode.tool.verdict';
-
--- One row per call the auto-mode classifier refused, from the mod's `classifier.deny` events.
-CREATE OR REPLACE VIEW classifier_denials AS
-SELECT
-  host,
-  session_id,
-  ts,
-  attributes->>'tool_use_id'     AS tool_use_id,
-  attributes->>'tool_name'       AS tool_name,
-  attributes->>'permission_mode' AS permission_mode,
-  attributes->>'reason'          AS reason
-FROM mod_events
-WHERE event_name = 'auto-mode.classifier.deny';

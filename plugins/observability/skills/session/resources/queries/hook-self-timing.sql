@@ -1,6 +1,7 @@
 -- ---
 -- name: hook-self-timing
 -- tier: 2
+-- dimensions: [hook-latency]
 -- reads: disk
 -- summary: >-
 --   Hook latency from the hooks' own clocks, read off `~/.claude/hook-metrics/*.jsonl`

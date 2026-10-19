@@ -22,24 +22,30 @@ export async function untypedMods(root = ROOT): Promise<string[]> {
 }
 
 /**
- * The whole-tree lint and type check behind the commit gate. --quiet drops
+ * The lint and type check behind the commit gate, over the files given or the
+ * whole tree. Type errors a change causes in a file it did not touch surface
+ * only in CI, which runs it over the whole tree. --quiet drops
  * warnings, which run to dozens of lines a commit did not cause and never fail
  * it. --no-error-on-unmatched-pattern covers a tree whose config ignores
  * everything in it.
  */
-export async function typeCheckArgs(root = ROOT): Promise<string[]> {
+export async function typeCheckArgs(files: string[] = [], root = ROOT): Promise<string[]> {
   const skipped = await untypedMods(root);
   return [
     "--quiet",
     "--no-error-on-unmatched-pattern",
     ...skipped.flatMap((mod) => ["--ignore-pattern", `${mod}/**`]),
+    ...files,
   ];
 }
 
 if (import.meta.main) {
-  const proc = Bun.spawn(["bun", "run", "--silent", "build", ...(await typeCheckArgs())], {
-    cwd: ROOT,
-    stdio: ["inherit", "inherit", "inherit"],
-  });
+  const proc = Bun.spawn(
+    ["bun", "run", "--silent", "build", ...(await typeCheckArgs(process.argv.slice(2)))],
+    {
+      cwd: ROOT,
+      stdio: ["inherit", "inherit", "inherit"],
+    },
+  );
   process.exit(await proc.exited);
 }

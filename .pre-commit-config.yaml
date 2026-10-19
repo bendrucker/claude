@@ -57,7 +57,6 @@ repos:
         name: Markdown embedded code
         language: system
         files: \.md$
-        pass_filenames: false
         entry: bun scripts/check-md-code.ts
 
       - id: oxfmt
@@ -70,19 +69,16 @@ repos:
         name: Lint and type check
         language: system
         files: \.(ts|tsx|js|jsx|json|jsonc)$
-        pass_filenames: false
         entry: bun scripts/type-check.ts
 
       - id: plugin-imports
         name: Cross-plugin imports
         language: system
         files: ^plugins/.*\.tsx?$
-        pass_filenames: false
         entry: bun scripts/check-plugin-imports.ts
 
       - id: workspace-deps
         name: Workspace dependencies
         language: system
         files: (^|/)package\.json$|\.tsx?$
-        pass_filenames: false
         entry: bun scripts/check-workspace-deps.ts

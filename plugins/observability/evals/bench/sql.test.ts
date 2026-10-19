@@ -36,6 +36,34 @@ describe("statements", () => {
     expect(statements(command).map((s) => s.sql)).toEqual(["SELECT 1", "SELECT 2"]);
   });
 
+  test("ignores stream redirects and their file descriptors", () => {
+    const command = `duckdb ${DB} "DESCRIBE tool_calls" 2>/dev/null; duckdb ${DB} -c "SELECT 1" 2>&1 | head; duckdb ${DB} "SELECT 2" &>/tmp/x >>/tmp/y`;
+    expect(statements(command).map((s) => s.sql)).toEqual([
+      "DESCRIBE tool_calls",
+      "SELECT 1",
+      "SELECT 2",
+    ]);
+  });
+
+  test("terminates each -cmd and reads a named query from -f or a substitution", () => {
+    expect(
+      statements(
+        `duckdb -cmd "SET VARIABLE a=1" -cmd "SET VARIABLE b=2" ${DB} -f ~/s/resources/queries/search.sql`,
+      ),
+    ).toEqual([{ name: "search", sql: "SET VARIABLE a=1;\nSET VARIABLE b=2;" }]);
+    expect(statements(`duckdb ${DB} "SET VARIABLE a = 1;\n$(cat "$DIR/hooks.sql")"`)).toEqual([
+      { name: "hooks", sql: "SET VARIABLE a = 1;" },
+    ]);
+  });
+
+  test("skips SQL a replay cannot reproduce", () => {
+    expect(
+      statements(
+        `duckdb -cmd "SET VARIABLE a=1" ${DB} < "$Q"; duckdb ${DB} -c ".read /tmp/x.sql"; (echo "SET VARIABLE a=1;"; cat "$f") | duckdb ${DB}; duckdb ${DB} "SELECT * FROM t WHERE x = '$HOME'"`,
+      ),
+    ).toEqual([]);
+  });
+
   test("returns nothing for a bare open", () => {
     expect(statements(`duckdb -readonly ${DB}`)).toEqual([]);
   });

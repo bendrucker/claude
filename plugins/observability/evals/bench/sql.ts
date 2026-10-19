@@ -11,11 +11,42 @@ export interface Statement {
 
 type Token = { op: string } | { word: string };
 
-const OPS = ["<<<", "<<-", "&&", "||", "<<", "|", ";", "<", ">", "(", ")", "\n", "&"];
+const OPS = [
+  "<<<",
+  "<<-",
+  "&&",
+  "||",
+  "<<",
+  ">>",
+  ">&",
+  "&>",
+  "|",
+  ";",
+  "<",
+  ">",
+  "(",
+  ")",
+  "\n",
+  "&",
+];
 const SEPARATORS = new Set([";", "&&", "||", "\n", "&"]);
 // Flags of the duckdb CLI that take a value. Every other flag is a switch.
-const VALUE_FLAGS = new Set(["-init", "-cmd", "-c", "-s", "-separator", "-newline", "-nullvalue"]);
-const NAMED = /(?:^|\/)queries\/([\w-]+)\.sql$/;
+const VALUE_FLAGS = new Set([
+  "-init",
+  "-cmd",
+  "-c",
+  "-s",
+  "-f",
+  "-separator",
+  "-newline",
+  "-nullvalue",
+]);
+// A named query spliced in by command substitution, as in `$(cat "$DIR/search.sql")`.
+const SPLICED = /\$\(cat\s+"?[^)"]*?([\w-]+)\.sql"?\)/;
+// Text the shell would have expanded, or a script path, which a replay cannot reproduce.
+const UNREPLAYABLE = /\$\(|`|\$[A-Za-z_{]|^\S+\.sql$|^[~/]\S*$|^\.read\b/m;
+// Any .sql file fed in; replaySet keeps only the names the skill ships.
+const NAMED = /(?:^|\/)([\w-]+)\.sql$/;
 
 function isWord(t: Token | undefined): t is { word: string } {
   return t !== undefined && "word" in t;
@@ -96,6 +127,8 @@ function tokenize(text: string): Token[] {
       word = (word ?? "") + part;
       i = next;
     } else {
+      // A file descriptor before a redirect, as in `2>/dev/null`, is not an argument.
+      if (/^[<>]/.test(op) && word !== undefined && /^\d+$/.test(word)) word = undefined;
       flush();
       tokens.push({ op });
       i += op.length;
@@ -151,7 +184,14 @@ function upstream(tokens: Token[]): { text: string[]; name?: string } {
     const [prog, args] = program(words(command));
     if (prog === "echo") text.push(args.filter((a) => !/^-[neE]+$/.test(a)).join(" "));
     if (prog === "printf") text.push((args[0] ?? "").replaceAll(String.raw`\n`, "\n"));
-    if (prog === "cat") name = args.map((a) => NAMED.exec(a)?.[1]).find(Boolean) ?? name;
+    if (prog === "cat") {
+      for (const a of args) {
+        const named = NAMED.exec(a)?.[1];
+        // An unresolved file stays in the text, where UNREPLAYABLE rejects it.
+        if (named === undefined) text.push(a);
+        else name = named;
+      }
+    }
   }
   return name === undefined ? { text } : { text, name };
 }
@@ -163,20 +203,30 @@ function own(
   const prelude: string[] = [];
   const body: string[] = [];
   const positional: string[] = [];
+  let name: string | undefined;
   for (let a = 0; a < args.length; a++) {
     const arg = args[a] ?? "";
     if (VALUE_FLAGS.has(arg)) {
       const value = args[++a] ?? "";
-      if (arg === "-cmd") prelude.push(value);
+      // Each -cmd runs on its own, so it needs no terminator of its own.
+      if (arg === "-cmd") prelude.push(value.trim().endsWith(";") ? value : `${value};`);
+      if (arg === "-f") {
+        const named = NAMED.exec(value)?.[1];
+        if (named === undefined) body.push(value);
+        else name = named;
+      }
       if (arg === "-c" || arg === "-s") body.push(value);
     } else if (!arg.startsWith("-")) positional.push(arg);
   }
   body.push(...positional.slice(1));
-  let name: string | undefined;
   for (const [r, op] of redirects.entries()) {
     const target = redirects[r + 1];
     if (!isWord(target)) continue;
-    if (isOp(op, "<")) name = NAMED.exec(target.word)?.[1] ?? name;
+    if (isOp(op, "<")) {
+      const named = NAMED.exec(target.word)?.[1];
+      if (named === undefined) body.push(target.word);
+      else name = named;
+    }
     if (isOp(op, "<<", "<<-", "<<<")) body.push(target.word);
   }
   return name === undefined ? { prelude, body } : { prelude, body, name };
@@ -194,11 +244,14 @@ export function statements(command: string): Statement[] {
       if (prog !== "duckdb") continue;
       const call = own(args, lead === -1 ? [] : stage.slice(lead));
       const fed = upstream(stages.slice(0, n).flat());
-      const name = call.name ?? fed.name;
-      const sql = [...fed.text, ...call.prelude, ...call.body]
+      const text = [...fed.text, ...call.prelude, ...call.body]
         .map((s) => s.trim())
         .filter(Boolean)
         .join("\n");
+      const spliced = SPLICED.exec(text);
+      const name = call.name ?? fed.name ?? spliced?.[1];
+      const sql = (spliced === null ? text : text.replace(spliced[0], "")).trim();
+      if (UNREPLAYABLE.test(sql)) continue;
       if (name !== undefined) found.push({ name, sql });
       else if (sql !== "") found.push({ sql });
     }

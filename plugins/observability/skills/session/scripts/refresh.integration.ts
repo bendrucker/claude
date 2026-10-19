@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { mkdirSync, mkdtempSync, readdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -125,6 +126,29 @@ describe("refresh.ts", () => {
     const { stderr, exitCode } = await run("--compact");
     expect(exitCode).toBe(0);
     expect(stderr).toContain("compacting");
+  });
+
+  it("finishes the refresh after its caller's process group is killed", async () => {
+    const workerTmp = join(tmpDir, "tmp");
+    mkdirSync(workerTmp);
+    const stamp = join(dataDir, "last-refresh");
+    const caller = spawn("bun", [refreshScript], {
+      detached: true,
+      env: { ...env(), TMPDIR: workerTmp },
+      stdio: "ignore",
+    });
+    // The worker's log appears once sh has redirected its stderr, so the worker is running.
+    const started = () =>
+      readdirSync(workerTmp).some((d) => readdirSync(join(workerTmp, d)).includes("log"));
+    // oxlint-disable-next-line no-await-in-loop -- waits for the worker to start.
+    while (!started()) await Bun.sleep(10);
+    expect(await Bun.file(stamp).exists()).toBe(false);
+    process.kill(-(caller.pid ?? 0), "SIGKILL");
+
+    // oxlint-disable-next-line no-await-in-loop -- waits for the orphaned worker to finish.
+    for (let i = 0; i < 80 && !(await Bun.file(stamp).exists()); i++) await Bun.sleep(50);
+    expect(await Bun.file(stamp).exists()).toBe(true);
+    expect(await countRows()).toBeGreaterThan(0);
   });
 
   it("bounds file growth across repeated reimports of the same corpus", async () => {

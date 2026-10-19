@@ -83,6 +83,25 @@ const lines = [
   text("int-1", "[Request interrupted by user]", "2026-09-10T00:00:00Z"),
   text("int-2", "[Request interrupted by user for tool use]", "2026-09-11T00:00:00Z"),
   text("int-3", "[Request interrupted by user]", "2026-10-02T00:00:00Z"),
+  // A tool result quoting the marker, as a Read of the skill's source does, is not an interruption.
+  use("quote", "Read", "2026-09-12T00:00:00Z"),
+  {
+    ...denied(
+      "quote",
+      'const INTERRUPTED = "[Request interrupted by user";',
+      "2026-09-12T00:00:01Z",
+    ),
+    message: {
+      role: "user",
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: "quote",
+          content: 'const INTERRUPTED = "[Request interrupted by user";',
+        },
+      ],
+    },
+  },
   context("ctx-1", "PreToolUse:Bash"),
   context("ctx-2", "PreToolUse:Bash"),
   context("ctx-3", "SessionStart"),

@@ -1,0 +1,22 @@
+Plugin tests.........................................(no files to check)Skipped
+Plugin validation....................................(no files to check)Skipped
+Hooks validation.....................................(no files to check)Skipped
+Skill lint...........................................(no files to check)Skipped
+Skill invocability...................................(no files to check)Skipped
+Hook tests...........................................(no files to check)Skipped
+Settings validation..................................(no files to check)Skipped
+Marketplace completeness.............................(no files to check)Skipped
+Markdown embedded code...............................(no files to check)Skipped
+Format...................................................................Failed
+- hook id: oxfmt
+- duration: 0.18s
+- files were modified by this hook
+
+  Finished in 17ms on 1 files using 4 threads.
+Lint and type check......................................................Passed
+- hook id: oxlint
+- duration: 8.50s
+Cross-plugin imports.................................(no files to check)Skipped
+Workspace dependencies...................................................Passed
+- hook id: workspace-deps
+- duration: 0.12s

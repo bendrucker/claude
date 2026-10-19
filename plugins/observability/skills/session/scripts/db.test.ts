@@ -3395,6 +3395,7 @@ describe("native harness fields", () => {
 // point at fixtures, and hook-config-vs-observed reads fixed settings paths no param moves.
 const fixtureGlobs: Record<string, string> = {
   frontmatter_glob: join(import.meta.dirname, "..", "SKILL.md"),
+  metrics_glob: join(fixturesDir, "..", "hook-metrics", "*.jsonl"),
   plans_glob: join(plansFixtureDir, "*.md"),
   plugin_skill_glob: join(fixturesDir, "..", "skills", "cache/*/*/*/skills/*/SKILL.md"),
   user_skill_glob: join(fixturesDir, "..", "skills", "user/*/SKILL.md"),

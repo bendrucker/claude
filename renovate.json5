@@ -52,6 +52,13 @@
       groupName: "commander",
     },
     {
+      // Releases are `<duckdb>-r.<n>`, which npm semver reads as prereleases, so
+      // the default versioning never offers 1.5.0-r.1 → 1.5.6-r.1. Keep it on the
+      // DuckDB release dotfiles pins for the CLI (aqua:duckdb/duckdb).
+      matchPackageNames: ["@duckdb/node-api"],
+      versioning: "regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-r\\.(?<build>\\d+)$",
+    },
+    {
       matchManagers: ["custom.regex"],
       matchFileNames: ["user/settings.json"],
       commitMessagePrefix: "chore(plugins):",

@@ -23,12 +23,7 @@ Scores `search.sql` as a ranker: each labeled query runs through an arm's `searc
 
 Seed queries with `mine.sql`, which lists the terms agents passed to `search.sql` and the ILIKE patterns they wrote against session prose by hand. Pool each query's candidates from the top 10 of every arm being compared, then judge each candidate. A session is relevant when it is one the asker was looking for, not when it merely mentions the term. Split the queries into `dev` and `holdout` tags, and climb on `dev` only.
 
-```bash
-bun sync.ts pull labels.jsonl
-bun sync.ts push labels.jsonl
-```
-
-`sync.ts` takes `--prefix` so another harness can reuse it for its own files.
+`../session/scripts/sync.ts` mirrors this directory's `labels.jsonl` to and from `session/search/` in the bucket.
 
 ## Runs
 

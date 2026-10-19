@@ -1,0 +1,2 @@
+{"ts":"2026-10-01T12:00:00.000Z","session_id":"basic-session","hook_event":"PreToolUse","tool":"Bash","duration_ms":12.5,"outcome":"silent"}
+{"ts":"2026-10-01T12:01:00.000Z","session_id":"basic-session","hook_event":"PreToolUse","tool":"Bash","duration_ms":40.25,"outcome":"deny"}

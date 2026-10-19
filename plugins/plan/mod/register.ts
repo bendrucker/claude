@@ -14,6 +14,16 @@ export function statusText(chars: number): string | undefined {
   return `${Math.floor(chars / 100) / 10}k (${percent(chars)}%)`;
 }
 
+export const SIDECAR_GUIDANCE =
+  "Move supporting detail into <plan>-<topic>.md files the plan links " +
+  "(<plan>-decisions.md is the common one), or split the work into smaller plans.";
+
+// Sent after every write that leaves the plan over the limit, so a draft is trimmed before
+// the gate denies it at ExitPlanMode.
+export function overText(chars: number): string {
+  return `This plan file is ${chars} characters, over the ${LIMIT}-character presentation limit. ${SIDECAR_GUIDANCE}`;
+}
+
 // A plan this large has slices worth delegating, so it gets the delegation guidance.
 export const DELEGATION_FROM = LIMIT / 2;
 const DELEGATION_HEADING = /^#{1,6}\s+Delegation\b/m;
@@ -130,22 +140,29 @@ export function register(on: On): void {
     }
     wasOver = over;
 
-    if (delegated || chars < DELEGATION_FROM || DELEGATION_HEADING.test(plan)) return result;
-    delegated = true;
-    let delegation: string;
-    try {
-      delegation = await $.fs.read(`${$.plugin.root}/references/delegation.md`);
-    } catch {
-      await $.modEvents.emit({
-        mod: "plan",
-        event: "delegation",
-        ok: false,
-        detail: { file, chars },
-      });
-      return result;
+    const notes = over ? [overText(chars)] : [];
+    if (!delegated && chars >= DELEGATION_FROM && !DELEGATION_HEADING.test(plan)) {
+      delegated = true;
+      try {
+        notes.unshift(await $.fs.read(`${$.plugin.root}/references/delegation.md`));
+        await $.modEvents.emit({
+          mod: "plan",
+          event: "delegation",
+          ok: true,
+          detail: { file, chars },
+        });
+      } catch {
+        await $.modEvents.emit({
+          mod: "plan",
+          event: "delegation",
+          ok: false,
+          detail: { file, chars },
+        });
+      }
     }
-    await $.modEvents.emit({ mod: "plan", event: "delegation", ok: true, detail: { file, chars } });
-    return { ...result, context: [...(result.context ?? []), delegation] };
+    return notes.length === 0
+      ? result
+      : { ...result, context: [...(result.context ?? []), ...notes] };
   }).catch(($, e, next) => next(e));
 
   on("tool.call", { tool: "ExitPlanMode" }, async ($, e, next) => {

@@ -1,6 +1,6 @@
 import type { EngineInterface, On, PromptAttachmentInput, ToolCallResult } from "claude-code";
 import { type Engine, describe, expect, test } from "claude-code/testing";
-import { DELEGATION_FROM, LIMIT, statusText } from "./register.ts";
+import { DELEGATION_FROM, LIMIT, overText, statusText } from "./register.ts";
 
 const PLAN = "/Users/u/.claude/plans/quiet-otter.md";
 const GUIDELINES = "# Planning Guidelines";
@@ -343,10 +343,44 @@ describe("delegation", () => {
     expect(next.context).toEqual([DELEGATION]);
   });
 
+  test("rides ahead of the over-limit warning when one write crosses both", async ($, on) => {
+    const world = worldOf(on);
+    await planMode($);
+    expect((await writePlan($, world, "x".repeat(LIMIT + 1))).context).toEqual([
+      DELEGATION,
+      overText(LIMIT + 1),
+    ]);
+  });
+
   test("skips a plan that already carries a Delegation section", async ($, on) => {
     const world = worldOf(on);
     await planMode($);
     const plan = `# Plan\n\n## Delegation\n\n${"x".repeat(DELEGATION_FROM)}`;
     expect((await writePlan($, world, plan)).context).toBeUndefined();
+  });
+});
+
+describe("over-limit warning", () => {
+  test("follows every write that leaves the plan over the limit, and no other", async ($, on) => {
+    const world = worldOf(on);
+    await planMode($);
+    const plan = (chars: number) => `## Delegation\n${"x".repeat(chars)}`;
+    const contextOf = async (text: string, filePath = PLAN) => {
+      world.files[filePath] = text;
+      return (
+        await $.tool.call({
+          tool: "Edit",
+          file_path: filePath,
+          old_string: "",
+          new_string: "",
+          tool_use_id: "t",
+        })
+      ).context;
+    };
+    expect(await contextOf(plan(LIMIT - 20))).toBeUndefined();
+    const over = plan(LIMIT);
+    expect(await contextOf(over)).toEqual([overText(over.length)]);
+    expect(await contextOf(over)).toEqual([overText(over.length)]);
+    expect(await contextOf(over, "/repo/notes.md")).toBeUndefined();
   });
 });

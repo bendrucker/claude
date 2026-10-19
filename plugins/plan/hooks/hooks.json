@@ -1,24 +1,7 @@
 {
-  "description": "Inject planning guidelines when a session reaches plan mode and delegation guidance once a plan grows large, gate plan re-presents, and show a plan's size against the gate's limit",
+  "description": "Inject planning guidelines when a session reaches plan mode, attach delegation guidance once a plan grows large and a warning once it passes the gate's limit, gate plan re-presents, and show a plan's size against that limit",
   "modules": ["../mod/register.ts"],
   "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/write-warn.ts\"",
-            "if": "Edit(~/.claude/plans/**)"
-          },
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/write-warn.ts\"",
-            "if": "Write(~/.claude/plans/**)"
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "ExitPlanMode",

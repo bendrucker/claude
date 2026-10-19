@@ -5,6 +5,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { SIDECAR_GUIDANCE } from "../mod/register";
 
 const ToolInput = z.looseObject({ plan: z.string().optional().catch(undefined) });
 
@@ -49,10 +50,6 @@ export const DENY_REASON =
 export const APPEND_ONLY_REASON =
   "This plan keeps nearly every line of the one that was just denied. Rework it to " +
   "address the denial rather than adding new text around it.";
-
-export const SIDECAR_GUIDANCE =
-  "Move supporting detail into <plan>-<topic>.md files the plan links " +
-  "(<plan>-decisions.md is the common one), or split the work into smaller plans.";
 
 export function sizeReason(priorFires: number): string {
   const opening =

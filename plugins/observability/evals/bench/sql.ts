@@ -1,8 +1,6 @@
 /**
  * Recovers the SQL a Bash `duckdb` call sent to the session index, so the queries agents
- * actually ran can be replayed and counted. Agents reach the CLI many ways: SQL as an
- * argument or `-c`, a heredoc, a herestring, `echo` or `cat` piped in, or a named query
- * redirected from `resources/queries/`. An unrecognized command returns an empty list.
+ * actually ran can be replayed and counted. An unrecognized command returns an empty list.
  */
 
 /** A named query carries its `SET VARIABLE` prelude in `sql`; ad-hoc SQL carries the whole text. */
@@ -38,7 +36,6 @@ function readQuoted(text: string, start: number, quote: string): [string, number
   return [out, i + 1];
 }
 
-/** One piece of a word starting at `i`: a quoted span, an escape, or a plain character. */
 function readPart(text: string, i: number): [string, number] {
   const c = text[i] ?? "";
   if (c === "'" || c === '"') return readQuoted(text, i + 1, c);
@@ -50,7 +47,6 @@ function readPart(text: string, i: number): [string, number] {
   return [c, i + 1];
 }
 
-/** The delimiter word after `<<`, with its quotes removed. */
 function readDelimiter(text: string, start: number): [string, number] {
   let i = start;
   while (text[i] === " ") i++;
@@ -63,7 +59,6 @@ function readDelimiter(text: string, start: number): [string, number] {
   return [delim, i];
 }
 
-/** A heredoc body from `i` through its closing delimiter line. */
 function readBody(text: string, start: number, delim: string, strip: boolean): [string, number] {
   const lines: string[] = [];
   let i = start;
@@ -131,7 +126,6 @@ function program(argv: string[]): [string, string[]] {
   return [head.split("/").at(-1) ?? "", args];
 }
 
-/** Splits at the tokens `at` matches outside any `( )` or `{ }` group. */
 function split(tokens: Token[], at: (t: Token) => boolean): Token[][] {
   const parts: Token[][] = [[]];
   let depth = 0;
@@ -162,7 +156,6 @@ function upstream(tokens: Token[]): { text: string[]; name?: string } {
   return name === undefined ? { text } : { text, name };
 }
 
-/** What one `duckdb` stage reads from its own arguments and redirections. */
 function own(
   args: string[],
   redirects: Token[],

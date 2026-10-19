@@ -22,7 +22,7 @@ A change against the base is starred when its permutation p is below 0.1 and it 
 
 ## Workflow
 
-Freeze a snapshot first, so the index under test does not move between runs. On APFS the clone is instant and shares blocks:
+Never point the harness at the live index. Freeze a copy first, so the index under test does not move between runs. On APFS the clone is instant and shares blocks:
 
 ```bash
 cp -c ~/.local/share/claude-sessions/session.duckdb /tmp/frozen.duckdb
@@ -41,19 +41,34 @@ aws s3 cp replay.json s3://ben-drucker-agents-eval-corpus/session/bench/replay.j
 aws s3 cp s3://ben-drucker-agents-eval-corpus/session/bench/replay.json replay.json --profile agents
 ```
 
-Record the noise floor with an A/A run, two arms on the same index, then compare a candidate. An arm is `name=<index>[,<skill dir>]`; the skill dir defaults to this checkout's and supplies the named queries and limits, so a candidate worktree replays its own:
+### Arms
+
+A storage change rewrites the index, so every arm is built by its own `refresh.ts` from one JSONL snapshot. `snapshot` writes the index's local transcripts back out from `raw.data`, sampling whole sessions within each month up to `--mb`, so a machine without `~/.claude/projects` can still build arms:
 
 ```bash
-bun bench.ts run --arm main=/tmp/frozen.duckdb --arm aa=/tmp/frozen.duckdb --out results/aa
-bun bench.ts run --arm main=/tmp/frozen.duckdb --arm zstd=/tmp/zstd.duckdb,../wt/plugins/observability/skills/session --out results/zstd
+bun bench.ts snapshot --db /tmp/frozen.duckdb --out snap --mb 1200
+bun bench.ts build --snapshot snap --out arms/main
+bun bench.ts build --snapshot snap --out arms/aa
+bun bench.ts build --snapshot snap --out arms/zstd --skill ../wt/plugins/observability/skills/session
 ```
 
-Build a candidate index from the same JSONL snapshot as the base, since a storage change rewrites the file. Pass `--prepare 'sync && sudo purge'` for cold-cache runs on macOS.
+`build` records its wall time, peak RSS and index size in `build.json`. A full build of the whole corpus is the number a storage PR claims; the sample is for climbing.
 
-Time the refresh per changed transcript. Each run starts from a clone of the arm's index with real transcripts of the target size staged under a throwaway import host, so the live transcripts and the frozen index stay untouched:
+### Runs
+
+Record the noise floor with an A/A run, two arms built from the same snapshot, then compare a candidate. An arm is `name=<index>[,<skill dir>]`; the skill dir defaults to this checkout's and supplies the named queries and limits, so a candidate worktree replays its own:
 
 ```bash
-bun bench.ts refresh --arm main=/tmp/frozen.duckdb --out results/refresh
+bun bench.ts run --arm main=arms/main/session.duckdb --arm aa=arms/aa/session.duckdb --out results/aa
+bun bench.ts run --arm main=arms/main/session.duckdb --arm zstd=arms/zstd/session.duckdb,../wt/plugins/observability/skills/session --out results/zstd
+```
+
+Pass `--limits vm` to climb at the cloud readers' cap alone, and `--prepare 'sync && sudo purge'` for cold-cache runs on macOS.
+
+Time the refresh per changed transcript. Each run starts from a clone of the arm's index with real transcripts of the target size staged under a throwaway import host, so the frozen index stays untouched:
+
+```bash
+bun bench.ts refresh --arm main=arms/main/session.duckdb --out results/refresh
 ```
 
 `--rows` defaults to the corpus's median and p90 transcript sizes. `report <dir>` reprints a results directory, and `results/` stays out of git.

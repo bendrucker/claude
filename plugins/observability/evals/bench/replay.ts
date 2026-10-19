@@ -8,14 +8,14 @@ import { normalize, statements } from "./sql";
 
 export const SKILL = join(import.meta.dirname, "..", "..", "skills", "session");
 
-/** Per-process ceilings appended to limits.sql: the Mac keeps it unchanged, the VM gets its readers' cap. */
+/** Appended to limits.sql: the cloud VM readers' cap. */
 export const LIMITS = {
   mac: "",
   vm: "SET memory_limit = '450MB';\nSET threads = 1;\n",
 } as const;
 export type Limits = keyof typeof LIMITS;
 
-/** Surfaces the replay set must cover, so no hot path drops out for being less frequent. */
+/** Each gets its most frequent query into the replay set. */
 const COVER = [
   "sessions",
   "message_usage",
@@ -49,7 +49,7 @@ export interface Arm {
   skill: string;
 }
 
-/** The arms in round `n`'s order, so drift within a round lands on every arm alike. */
+/** Rotating arm order spreads drift within a round across every arm. */
 export function rotate<T>(arms: T[], n: number): T[] {
   const k = n % arms.length;
   return [...arms.slice(k), ...arms.slice(0, k)];
@@ -76,7 +76,6 @@ export interface Sample {
 }
 export type Measured = Omit<Sample, "query" | "limits" | "arm" | "base" | "run">;
 
-/** Runs SQL read-only under a 1 GB cap, small enough for a reader beside the VM's agents. */
 export async function duckdbJson<T>(db: string, sql: string, schema: z.ZodType<T>): Promise<T[]> {
   const init = "SET memory_limit = '1GB'; SET threads = 1;";
   const out = await $`duckdb -readonly -json -cmd ${init} ${db} < ${Buffer.from(sql)}`.text();
@@ -102,10 +101,7 @@ const Mined = z.object({
   oom: z.boolean(),
 });
 
-/**
- * Mines the index for the SQL agents ran against it, grouped by normalized text, and keeps the
- * most frequent groups after every group that ran out of memory and the top group per hot surface.
- */
+/** Every group that ran out of memory, the top group per hot surface, then the most frequent. */
 export async function replaySet(db: string, top: number): Promise<Query[]> {
   const rows = await duckdbJson(db, MINE, Mined);
   const groups = new Map<string, Query & { ids: Set<string> }>();
@@ -158,9 +154,8 @@ async function sqlFor(q: Query, skill: string): Promise<string> {
 }
 
 /**
- * One replay of one query in a fresh read-only process, as an agent's Bash call runs it. A named
- * query reads its SQL from the arm's skill directory, so a candidate checkout replays its own.
- * The profile covers the last statement, which is the query proper after any SET VARIABLE lines.
+ * A named query reads its SQL from the arm's skill directory, so a candidate checkout replays its
+ * own. The profile covers only the last statement, after any SET VARIABLE lines.
  */
 export async function replay(
   q: Query,
@@ -206,7 +201,7 @@ export async function replay(
   };
 }
 
-/** A hyperfine 2 export per group, so `performance:benchmark`'s compare.ts can pool and test it. */
+/** In hyperfine's export format, which `performance:benchmark`'s compare.ts reads. */
 export async function writeExport(path: string, samples: Sample[]): Promise<void> {
   // compare.ts takes the first result as its base.
   const arms = [...Map.groupBy(samples, (s) => s.arm)].toSorted(
@@ -250,11 +245,7 @@ export interface Row {
   failures: number;
 }
 
-/**
- * Per group and arm: medians and spread, and each arm's change against the base. A change counts
- * when its permutation p is below 0.1 and it clears the noise floor: 2σ of the base or 10% of its
- * median, whichever is larger.
- */
+/** A change counts when p < 0.1 and it clears max(2σ of the base, 10% of its median). */
 export function summarize(samples: Sample[], key: (s: Sample) => string): Row[] {
   return [...Map.groupBy(samples, key)].flatMap(([group, rows]) => {
     const arms = [...Map.groupBy(rows, (s) => s.arm)].toSorted(

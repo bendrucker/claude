@@ -6,7 +6,6 @@ import { type Arm, duckdbJson, rotate, type Sample } from "./replay";
 
 const ONCE = join(import.meta.dirname, "refresh-once.ts");
 
-/** Copies a database file as cheaply as the filesystem allows: a clone on APFS or btrfs. */
 async function clone(from: string, to: string): Promise<void> {
   await Bun.file(to)
     .delete()
@@ -68,11 +67,7 @@ export interface RefreshOptions {
   dir: string;
 }
 
-/**
- * Times an incremental refresh after `files` transcripts of about `rows` rows change. Each run
- * starts from a clone of a per-arm setup index that already holds the staged files, so the timed
- * refresh re-reads only the changed ones and rebuilds what derives from them.
- */
+/** Times an incremental refresh after `files` transcripts of about `rows` rows change. */
 export async function refresh(o: RefreshOptions): Promise<Sample[]> {
   const imports = join(o.dir, `imports-${o.rows}`);
   const paths = await stage(o.arms[0]?.db ?? "", o.rows, o.files, imports);

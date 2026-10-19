@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // Benchmarks the session index on the work agents wait through: the queries they run most and
-// the refresh after a transcript changes. README.md covers the workflow.
+// the refresh after a transcript changes.
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +8,7 @@ import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { z } from "zod";
 import { refresh } from "./refresh";
+import { snapshot } from "./snapshot";
 import {
   type Arm,
   Query,
@@ -39,7 +40,6 @@ const SampleLine = z.custom<Sample>((v) => typeof v === "object" && v !== null &
 
 const byQuery = (s: Sample) => `${s.query} ${s.limits}`;
 
-/** Writes the samples, one hyperfine export per group, and the summary, and prints the table. */
 async function finish(out: string, name: string, samples: Sample[], key: (s: Sample) => string) {
   const rows = summarize(samples, key);
   await Promise.all([
@@ -71,6 +71,54 @@ program
     console.log(
       `${o.out}: ${set.length} queries, ${set.filter((q) => q.ooms > 0).length} with OOMs`,
     );
+  });
+
+program
+  .command("snapshot")
+  .description(
+    "Write a month-stratified sample of an index's transcripts back out as JSONL to build arms from.",
+  )
+  .requiredOption("--db <path>", "index to sample, opened read-only")
+  .requiredOption("--out <dir>", "snapshot directory; transcripts land under projects/")
+  .option("--mb <n>", "JSONL to keep, in MB", count, 1200)
+  .action(async (o) => {
+    console.log(`${await snapshot(o.db, o.out, o.mb * 2 ** 20)} transcripts in ${o.out}`);
+  });
+
+program
+  .command("build")
+  .description("Build an arm's index from a snapshot with the arm's own refresh.ts, timing it.")
+  .requiredOption("--snapshot <dir>", "directory from the snapshot command")
+  .requiredOption("--out <dir>", "index directory to create")
+  .option("--skill <dir>", "the arm's session skill checkout", SKILL)
+  .action(async (o) => {
+    if (await Bun.file(join(o.out, "session.duckdb")).exists())
+      throw new Error(`${o.out} already holds an index`);
+    const home = mkdtempSync(join(tmpdir(), "session-bench-home-"));
+    const start = performance.now();
+    // A throwaway HOME keeps the refresh off this machine's debug logs and imported hosts.
+    const proc = Bun.spawn(["bun", join(o.skill, "scripts", "refresh.ts"), "--refresh"], {
+      env: {
+        ...process.env,
+        HOME: home,
+        CLAUDE_SESSION_INDEX_DIR: o.out,
+        CLAUDE_PROJECTS_DIR: join(o.snapshot, "projects"),
+        CLAUDE_SESSION_IMPORTS_DIR: join(home, "imports"),
+      },
+      stdout: "ignore",
+      stderr: "inherit",
+    });
+    const exit = await proc.exited;
+    const build = {
+      wall: (performance.now() - start) / 1000,
+      exit,
+      rss: proc.resourceUsage()?.maxRSS,
+      size: Bun.file(join(o.out, "session.duckdb")).size,
+    };
+    await $`rm -rf ${home}`;
+    await Bun.write(join(o.out, "build.json"), JSON.stringify(build, null, 2));
+    console.log(JSON.stringify(build));
+    if (exit !== 0) process.exit(exit);
   });
 
 program

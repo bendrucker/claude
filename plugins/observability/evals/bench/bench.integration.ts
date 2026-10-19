@@ -82,3 +82,14 @@ test("refresh times a changed transcript against a clone", async () => {
   expect(row).toMatchObject({ group: "refresh-20x1", arm: "base", n: 2, failures: 0 });
   expect(await Bun.file(db).bytes()).toEqual(before);
 });
+
+const count = (path: string) =>
+  $`duckdb -readonly -csv -noheader ${path} -c ${"SELECT count(*) FROM raw WHERE host = 'local' AND data IS NOT NULL"}`.text();
+
+test("snapshot round-trips the local transcripts into an index built from them", async () => {
+  const snap = join(dir, "snapshot");
+  const rebuilt = join(dir, "rebuilt");
+  await bench("snapshot", "--db", db, "--out", snap, "--mb", "100");
+  await bench("build", "--snapshot", snap, "--out", rebuilt);
+  expect(await count(join(rebuilt, "session.duckdb"))).toBe(await count(db));
+});

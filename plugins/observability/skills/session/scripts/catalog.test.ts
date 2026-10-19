@@ -1,9 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { mkdtempSync } from "node:fs";
-import { rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { describe, expect, it } from "bun:test";
 import { join } from "node:path";
-import { z } from "zod";
 import {
   CATALOG_PATH,
   DIMENSIONS,
@@ -13,10 +9,7 @@ import {
   SKILL_PATH,
   SURFACE_NAME,
 } from "./catalog";
-import { type Database, ensureIndex, getDb, runQuery } from "./db";
 import { loadQueryHeaders, parseQueryHeader, QUERIES_DIR, type QueryHeader } from "./query-header";
-
-const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 
 const VALID = `-- ---
 -- name: demo
@@ -221,35 +214,5 @@ describe("SKILL.md name index", () => {
     expect(byTier(1).filter((name) => !listed.has(name))).toEqual([]);
     expect(byTier(2).filter((name) => listed.has(name))).toEqual([]);
     expect([...listed].filter((name) => !names.has(name))).toEqual([]);
-  });
-});
-
-describe("a header-bearing query", () => {
-  let db: Database;
-  let tmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = mkdtempSync(join(tmpdir(), "session-catalog-"));
-    db = await getDb(tmpDir);
-    await ensureIndex(db, { projectsDir: fixturesDir, importsDir: join(tmpDir, "imports") });
-  });
-
-  afterEach(async () => {
-    db.close();
-    await rm(tmpDir, { recursive: true, force: true });
-  });
-
-  it("still runs, because DuckDB reads the fence as comments", async () => {
-    expect(parseQueryHeader(await Bun.file(join(QUERIES_DIR, "stats.sql")).text()).name).toBe(
-      "stats",
-    );
-
-    const rows = await runQuery(db, "stats", z.object({ tool_name: z.string() }), {
-      after_date: null,
-      before_date: null,
-      project: null,
-      host: null,
-    });
-    expect(rows.length).toBeGreaterThan(0);
   });
 });

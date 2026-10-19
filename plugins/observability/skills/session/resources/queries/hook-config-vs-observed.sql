@@ -1,6 +1,7 @@
 -- ---
 -- name: hook-config-vs-observed
 -- tier: 1
+-- reads: disk
 -- dimensions: [hook-coverage]
 -- summary: >-
 --   Hooks configured on disk but never observed firing in the index, left-joined so the

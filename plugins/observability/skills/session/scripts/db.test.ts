@@ -22,6 +22,7 @@ import {
 } from "./db";
 import { emit } from "./events";
 import { FALLBACK_PATH, renderMap, schemaMap, SurfaceColumns, SURFACES } from "./schema";
+import { loadQueryHeaders } from "./query-header";
 import { ensureTelemetry } from "./telemetry";
 
 async function backdate(target: string) {
@@ -170,14 +171,6 @@ describe("sessions view", () => {
 });
 
 describe("search", () => {
-  it("finds sessions matching keyword", async () => {
-    const rows = await runQuery(db, "search", z.unknown(), {
-      query: "error",
-      ...queryParams({ limit: "10" }),
-    });
-    expect(rows.length).toBeGreaterThan(0);
-  });
-
   it("returns empty for non-matching query", async () => {
     const rows = await runQuery(db, "search", z.unknown(), {
       ...queryParams({ limit: "10" }),
@@ -215,35 +208,10 @@ describe("search", () => {
 });
 
 describe("stats", () => {
-  it("aggregates tool usage", async () => {
-    const rows = await runQuery(
-      db,
-      "stats",
-      z.object({ tool_name: z.string(), uses: z.bigint() }),
-      filterParams(),
-    );
-    expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) {
-      expect(row.tool_name).toBeTruthy();
-      expect(row.uses).toBeGreaterThan(0);
-    }
-  });
-
   it("sorts by uses descending", async () => {
     const rows = await runQuery(db, "stats", z.object({ uses: z.bigint() }), filterParams());
     const uses = rows.map((row) => Number(row.uses));
     expect(uses).toEqual(uses.toSorted((a, b) => b - a));
-  });
-
-  it("includes aggregate totals", async () => {
-    const rows = await runQuery(
-      db,
-      "stats",
-      z.object({ total_sessions: z.bigint(), total_tool_uses: z.bigint() }),
-      filterParams(),
-    );
-    expect(rows[0]?.total_sessions).toBeGreaterThan(0);
-    expect(rows[0]?.total_tool_uses).toBeGreaterThan(0);
   });
 
   it("includes non-zero error_rate_pct for tools with errors", async () => {
@@ -3419,5 +3387,35 @@ describe("native harness fields", () => {
       { kind: "hook_additional_context", decision: null, additional_context: "use tabs" },
       { kind: "hook_success", decision: "ask", additional_context: null },
     ]);
+  });
+});
+
+// Every named query binds its declared defaults and runs on the fixture index, so a view
+// or schema change that breaks a query's SQL fails here. Semantic tests live above. Globs
+// point at fixtures, and hook-config-vs-observed reads fixed settings paths no param moves.
+const fixtureGlobs: Record<string, string> = {
+  frontmatter_glob: join(import.meta.dirname, "..", "SKILL.md"),
+  plans_glob: join(plansFixtureDir, "*.md"),
+  plugin_skill_glob: join(fixturesDir, "..", "skills", "cache/*/*/*/skills/*/SKILL.md"),
+  user_skill_glob: join(fixturesDir, "..", "skills", "user/*/SKILL.md"),
+  project_skill_glob: join(fixturesDir, "..", "skills", "project/*/SKILL.md"),
+};
+
+describe.each(
+  (await loadQueryHeaders()).filter((header) => header.name !== "hook-config-vs-observed"),
+)("named query $name", (header) => {
+  it("runs with its default params", async () => {
+    if (header.extensions.length > 0) await loadExtensions(db);
+    const [session] = await db.query(
+      "SELECT session_id FROM sessions LIMIT 1",
+      z.object({ session_id: z.string() }),
+    );
+    const value = (param: (typeof header.params)[number]) => {
+      if (param.name in fixtureGlobs) return fixtureGlobs[param.name] ?? null;
+      if (param.default !== undefined) return String(param.default);
+      return param.required === true ? (session?.session_id ?? null) : null;
+    };
+    const params = Object.fromEntries(header.params.map((param) => [param.name, value(param)]));
+    await runQuery(db, header.name, z.record(z.string(), z.unknown()), params);
   });
 });

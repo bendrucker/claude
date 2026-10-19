@@ -3240,3 +3240,184 @@ describe("schema map", () => {
     }
   });
 });
+
+describe("native harness fields", () => {
+  const base = { sessionId: "native-session", cwd: "/Users/test/native" };
+  let second = 0;
+  const ts = () => new Date(Date.UTC(2026, 9, 10, 12, 0, second++)).toISOString();
+
+  function use(id: string, name: string, input: Record<string, unknown>) {
+    return {
+      ...base,
+      type: "assistant",
+      uuid: `${id}-use`,
+      timestamp: ts(),
+      message: { role: "assistant", content: [{ type: "tool_use", id, name, input }] },
+    };
+  }
+
+  function result(id: string, content: string, extra: Record<string, unknown> = {}) {
+    return {
+      ...base,
+      type: "user",
+      uuid: `${id}-result`,
+      timestamp: ts(),
+      message: {
+        role: "user",
+        content: [
+          { type: "tool_result", tool_use_id: id, content, is_error: extra.is_error ?? true },
+        ],
+      },
+      ...extra,
+    };
+  }
+
+  function text(id: string, value: string) {
+    return {
+      ...base,
+      type: "user",
+      uuid: id,
+      timestamp: ts(),
+      message: { role: "user", content: [{ type: "text", text: value }] },
+    };
+  }
+
+  function hook(id: string, attachment: Record<string, unknown>) {
+    return { ...base, type: "attachment", uuid: id, timestamp: ts(), attachment };
+  }
+
+  const rejectHook = { decision: "reject", source: "hook", reasonType: "hook" };
+  const lines = [
+    text("n-prompt", "start"),
+    use("n1", "Bash", { command: "rm -rf build" }),
+    result("n1", "PreToolUse:Bash hook error: No deleting build output", {
+      toolDenialKind: "permission-rule",
+      permissionDecision: rejectHook,
+    }),
+    use("n2", "Bash", { command: "curl example.com" }),
+    result("n2", "Permission to use Bash has been denied.", {
+      toolDenialKind: "permission-rule",
+      permissionDecision: { decision: "reject", source: "config", reasonType: "rule" },
+    }),
+    use("n3", "Bash", { command: "git commit -m x" }),
+    result("n3", "PreToolUse:Bash hook error: Cannot commit directly to main", {
+      toolDenialKind: "permission-rule",
+    }),
+    use("n4", "Bash", { command: "make" }),
+    result("n4", "ok", {
+      is_error: false,
+      permissionDecision: { decision: "accept", source: "user_temporary" },
+    }),
+    use("n5", "ExitPlanMode", { plan: "do it" }),
+    result("n5", "PreToolUse:ExitPlanMode hook error: Plan too long", {
+      toolDenialKind: "permission-rule",
+      permissionDecision: rejectHook,
+    }),
+    text("n-peer", "Another Claude session sent a message: status?"),
+    text("n-int", "[Request interrupted by user]"),
+    use("n6", "Bash", { command: "cat log" }),
+    result("n6", "line\n[Request interrupted by user]", { is_error: false }),
+    hook("n-success", {
+      type: "hook_success",
+      hookName: "PreToolUse:Edit",
+      hookEvent: "PreToolUse",
+      toolUseID: "n7",
+      command: "lint.sh",
+      stdout:
+        '{\n  "hookSpecificOutput": {\n    "permissionDecision": "ask",\n    "additionalContext": "use tabs"\n  }\n}',
+    }),
+    hook("n-context", {
+      type: "hook_additional_context",
+      hookName: "PreToolUse:Edit",
+      hookEvent: "PreToolUse",
+      toolUseID: "n7",
+      content: ["use tabs"],
+    }),
+  ];
+
+  beforeEach(async () => {
+    const projects = join(importsDir, "native", "projects", "-Users-test-native");
+    mkdirSync(projects, { recursive: true });
+    await Bun.write(
+      join(projects, "native.jsonl"),
+      `${lines.map((l) => JSON.stringify(l)).join("\n")}\n`,
+    );
+    await Bun.write(
+      join(importsDir, "native", "manifest.json"),
+      `${JSON.stringify({ host: "native", source: "native:.claude/projects/", imported_at: "2026-10-11T00:00:00Z", policy: {} })}\n`,
+    );
+    await reindex();
+  });
+
+  it("finds hook denies by field, then prefix, and never a config reject", async () => {
+    const rows = await db.query(
+      "SELECT tool_use_id, hook_name, deny_source FROM hook_denies WHERE host = 'native' ORDER BY tool_use_id",
+      z.object({ tool_use_id: z.string(), hook_name: z.string(), deny_source: z.string() }),
+    );
+    expect(rows).toEqual([
+      { tool_use_id: "n1", hook_name: "(unmapped)", deny_source: "field" },
+      { tool_use_id: "n3", hook_name: "git:block-default-branch-commit", deny_source: "prefix" },
+      { tool_use_id: "n5", hook_name: "(unmapped)", deny_source: "field" },
+    ]);
+  });
+
+  it("carries the permission decision, approvals included", async () => {
+    const rows = await db.query(
+      "SELECT tool_id, denial_kind, decision, decision_source FROM permission_requests WHERE host = 'native' ORDER BY tool_id",
+      z.object({
+        tool_id: z.string(),
+        denial_kind: z.string().nullable(),
+        decision: z.string().nullable(),
+        decision_source: z.string().nullable(),
+      }),
+    );
+    expect(rows.find((r) => r.tool_id === "n4")).toEqual({
+      tool_id: "n4",
+      denial_kind: null,
+      decision: "accept",
+      decision_source: "user_temporary",
+    });
+    expect(rows.find((r) => r.tool_id === "n2")?.decision_source).toBe("config");
+  });
+
+  it("marks a plan the gate refused as denied", async () => {
+    const [row] = await db.query(
+      "SELECT outcome FROM plan_calls WHERE host = 'native'",
+      z.object({ outcome: z.string() }),
+    );
+    expect(row?.outcome).toBe("denied");
+  });
+
+  it("marks a peer session's message as system text", async () => {
+    const [row] = await db.query(
+      "SELECT is_system FROM text_content WHERE host = 'native' AND raw_text LIKE 'Another Claude%'",
+      z.object({ is_system: z.boolean() }),
+    );
+    expect(row?.is_system).toBe(true);
+  });
+
+  it("counts interruptions from text items, not tool results quoting them", async () => {
+    const rows = await runQuery(
+      db,
+      "activity",
+      z.object({ signal: z.string(), count: z.bigint() }),
+      filterParams({ host: "native" }),
+    );
+    expect(rows.find((r) => r.signal === "interruptions")?.count).toBe(1n);
+  });
+
+  it("parses pretty-printed stdout and counts injected context once", async () => {
+    const rows = await db.query(
+      "SELECT kind, decision, additional_context FROM hook_events WHERE host = 'native' ORDER BY kind",
+      z.object({
+        kind: z.string(),
+        decision: z.string().nullable(),
+        additional_context: z.string().nullable(),
+      }),
+    );
+    expect(rows).toEqual([
+      { kind: "hook_additional_context", decision: null, additional_context: "use tabs" },
+      { kind: "hook_success", decision: "ask", additional_context: null },
+    ]);
+  });
+});

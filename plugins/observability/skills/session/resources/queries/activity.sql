@@ -22,7 +22,8 @@
 -- snapshot the harness rewrites every turn, so counting its rows counts rewrites (55,592
 -- rows across 2,131 sessions when this was checked).
 --
--- Interruptions stay on the `[Request interrupted` marker text. `$.interruptedMessageId`
+-- Interruptions count text items opening with the `[Request interrupted` marker, so a tool
+-- result quoting it does not count. `$.interruptedMessageId`
 -- names the message that was cut off but is set on well under half the marked turns, so
 -- it identifies an interruption rather than counting them.
 --
@@ -56,9 +57,12 @@ FROM (
   UNION ALL
   SELECT 'interruptions',
          COUNT(*), 2
-    FROM base
-   WHERE type = 'user'
-     AND CAST(data->'$.message.content' AS VARCHAR) LIKE '%[Request interrupted%'
+    FROM content_items
+   WHERE type = 'text'
+     AND starts_with(text, '[Request interrupted')
+     AND date_filter(timestamp, getvariable('after_date'), getvariable('before_date'))
+     AND project_filter(project_path, getvariable('project'))
+     AND host_filter(host, getvariable('host'))
   UNION ALL
   -- `promptSource` flattens every queued turn to `queued`. The queued_command
   -- attachment names who queued it, so the breakdown keeps an auto-continuation

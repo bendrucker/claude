@@ -83,7 +83,7 @@ SELECT
   COUNT(*) FILTER (WHERE decision = 'ask')   AS asks,
   COUNT(*) FILTER (WHERE kind = 'hook_non_blocking_error') AS errors,
   COUNT(*) FILTER (WHERE kind = 'hook_cancelled')          AS cancelled,
-  COUNT(*) FILTER (WHERE additional_context IS NOT NULL OR kind = 'hook_additional_context') AS context_adds,
+  COUNT(*) FILTER (WHERE additional_context IS NOT NULL) AS context_adds,
   ROUND(100.0 * COUNT(*) FILTER (WHERE blocked OR decision = 'ask') / COUNT(*), 1) AS friction_pct,
   CAST(quantile_cont(duration_ms, 0.5)  AS BIGINT) AS p50_ms,
   CAST(quantile_cont(duration_ms, 0.95) AS BIGINT) AS p95_ms,

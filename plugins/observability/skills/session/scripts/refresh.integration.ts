@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -125,6 +126,21 @@ describe("refresh.ts", () => {
     const { stderr, exitCode } = await run("--compact");
     expect(exitCode).toBe(0);
     expect(stderr).toContain("compacting");
+  });
+
+  it("finishes the refresh after its caller's process group is killed", async () => {
+    const stamp = join(dataDir, "last-refresh");
+    const caller = spawn("bun", [refreshScript], { detached: true, env: env(), stdio: "ignore" });
+    // The database file appears once the worker has opened it.
+    // oxlint-disable-next-line no-await-in-loop -- waits for the worker to start.
+    while (!(await Bun.file(join(dataDir, "session.duckdb")).exists())) await Bun.sleep(10);
+    expect(await Bun.file(stamp).exists()).toBe(false);
+    process.kill(-(caller.pid ?? 0), "SIGKILL");
+
+    // oxlint-disable-next-line no-await-in-loop -- waits for the orphaned worker to finish.
+    for (let i = 0; i < 80 && !(await Bun.file(stamp).exists()); i++) await Bun.sleep(50);
+    expect(await Bun.file(stamp).exists()).toBe(true);
+    expect(await countRows()).toBeGreaterThan(0);
   });
 
   it("bounds file growth across repeated reimports of the same corpus", async () => {

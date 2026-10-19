@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: prunes debug logs and mod events under ~/.claude
 // and moves a legacy index out of ~/.claude/plugins, both denied to the sandbox.
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { cli } from "cleye";
@@ -90,6 +92,20 @@ if (
   await report("stamp-fresh");
   process.stdout.write(`${dbPath}\n`);
   process.exit(0);
+}
+
+// A rebuild after a schema or views change outlasts an agent's Bash timeout, which kills
+// the caller's process group. The worker runs in its own group so the rebuild finishes.
+if (process.env.SESSION_REFRESH_WORKER === undefined) {
+  const worker = spawn(process.execPath, [import.meta.path, ...process.argv.slice(2)], {
+    detached: true,
+    env: { ...process.env, SESSION_REFRESH_WORKER: "1" },
+    stdio: "inherit",
+  });
+  await once(worker, "exit");
+  // A worker ended by a signal ends the caller the same way.
+  if (worker.signalCode !== null) process.kill(process.pid, worker.signalCode);
+  process.exit(worker.exitCode ?? undefined);
 }
 
 try {

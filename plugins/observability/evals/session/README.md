@@ -43,6 +43,13 @@ bun plugins/observability/evals/session/scripts/score.ts plugins/observability/e
 
 `score.ts` prints the metrics per case and arm, and writes every run's numbers to `<run>/scored.json`. Before judging a candidate, run the unchanged skill at the same `--runs` and use the spread of those runs as the bar a change has to clear.
 
+`data/` and `results/` hold my session text and are kept only in the eval bucket, under `session/eval/`, beside the bench's replay set, snapshot and results under `session/bench/`. Push after a run, and pull to start from another machine. The frozen index stays local, since it is a clone of the live one:
+
+```bash
+bun plugins/observability/evals/session/scripts/sync.ts push
+bun plugins/observability/evals/session/scripts/sync.ts pull
+```
+
 ## Tests
 
 ```bash

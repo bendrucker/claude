@@ -34,12 +34,7 @@ Mine the replay set from it. It keeps every query group that ran out of memory, 
 bun bench.ts replay-set --db /tmp/frozen.duckdb
 ```
 
-`replay.json` holds SQL agents wrote, so it stays out of git and lives in the eval bucket:
-
-```bash
-aws s3 cp replay.json s3://ben-drucker-agents-eval-corpus/session/bench/replay.json --profile agents-admin
-aws s3 cp s3://ben-drucker-agents-eval-corpus/session/bench/replay.json replay.json --profile agents
-```
+`replay.json`, `snap/` and `results/` hold SQL and transcripts agents wrote, so they stay out of git and live in the eval bucket. The eval suite's [`sync.ts`](../session/scripts/sync.ts) mirrors them with its own data, `push` after a run and `pull` before one.
 
 ### Arms
 

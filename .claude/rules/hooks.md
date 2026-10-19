@@ -6,7 +6,7 @@ paths:
 
 # Hooks
 
-See the `plugin:hook` skill for hook documentation. An oxlint/oxfmt hook (`.claude/hooks/ox/`) reports lint errors after file edits, and gates Stop and `git commit` with formatting plus a type check.
+See the `plugin:hook` skill for hook documentation. An oxlint hook (`.claude/hooks/ox/`) reports lint errors after file edits. The commit gate (format, lint, type check, import checks) lives in `.pre-commit-config.yaml`: prek runs it as the git pre-commit hook, and `.claude/hooks/stop/` runs it over a turn's edited files before the session stops. Add a new gate to that file so both paths run it.
 
 Wrap `${CLAUDE_PLUGIN_ROOT}` in double quotes in shell-form hook commands: `bun "${CLAUDE_PLUGIN_ROOT}/scripts/foo.ts"`. Leave matcher fields unquoted. Run `bun scripts/check-hook-quoting.ts` to validate.
 

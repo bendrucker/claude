@@ -27,8 +27,8 @@ jobs:
       - name: Check
         run: bun run check
 
-      - name: Stop gate latency
-        run: bun test ./.claude/hooks/ox/perf.integration.ts
+      - name: Commit gate latency
+        run: bun test ./scripts/type-check.integration.ts
 
   build:
     runs-on: ubuntu-latest

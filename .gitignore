@@ -17,6 +17,8 @@ node_modules/
 !plugins/observability/skills/session/fixtures/
 # The ox hook's fixtures are committed test data, same as the two above.
 !.claude/hooks/ox/fixtures/
+# The Stop hook's captured prek output, same again.
+!.claude/hooks/stop/fixtures/
 # The plan gate's recorded ExitPlanMode presentations, same again.
 !plugins/plan/hooks/fixtures/
 

@@ -1,14 +1,12 @@
 #!/usr/bin/env bun
 
 import { execFile } from "node:child_process";
-import { readdir, realpath, rm } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
-import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { decode, decodeJson, decodeStdin } from "../../../packages/decode/index";
+import { decode, decodeStdin } from "../../../packages/decode/index";
 
 // oxlint-disable-next-line typescript/strict-void-return -- tsc resolves promisify(execFile) through Node's [util.promisify.custom] overload correctly; a cast narrow enough to satisfy this rule trips typescript/no-unsafe-type-assertion instead.
 const execFileAsync = promisify(execFile);
@@ -16,83 +14,18 @@ const execFileAsync = promisify(execFile);
 const OX_EXTENSIONS = new Set(["ts", "tsx", "js", "jsx", "json", "jsonc"]);
 
 const FilePathInput = z.looseObject({ file_path: z.string().optional() });
-const BashInput = z.looseObject({ command: z.string().optional() });
 
-const PreToolUseInput = z.looseObject({
-  hook_event_name: z.literal("PreToolUse"),
-  tool_input: z.unknown(),
-});
-
-const PostToolUseInput = z.looseObject({
+export const HookInput = z.looseObject({
   hook_event_name: z.literal("PostToolUse"),
   tool_name: z.string(),
   tool_input: z.unknown(),
 });
 
-const StopInput = z.looseObject({
-  hook_event_name: z.literal("Stop"),
-  session_id: z.string(),
-  transcript_path: z.string(),
-  cwd: z.string(),
-  stop_hook_active: z.boolean().optional(),
-});
-
-export const HookInput = z.discriminatedUnion("hook_event_name", [
-  PreToolUseInput,
-  PostToolUseInput,
-  StopInput,
-]);
-
-type PreToolUseInput = z.infer<typeof PreToolUseInput>;
-type PostToolUseInput = z.infer<typeof PostToolUseInput>;
-type StopInput = z.infer<typeof StopInput>;
 type HookInput = z.infer<typeof HookInput>;
-
-// Flags git accepts between the executable and its subcommand. Enumerated
-// rather than matched as a generic `-\S+` so that a value which happens to be
-// the word `commit` (`git log --grep commit`) cannot be read as the subcommand.
-// The git plugin's block-default-branch-commit hook keeps its own copy: it
-// ships to other machines and cannot import repo-internal code.
-const VALUE_FLAG = String.raw`(?:-[cC]|--(?:git-dir|work-tree|namespace|exec-path|config-env))(?:=\S+|\s+\S+)`;
-const BOOLEAN_FLAG =
-  "--(?:no-pager|paginate|bare|literal-pathspecs|no-replace-objects|no-optional-locks)";
-const GIT_COMMIT_PATTERN = new RegExp(
-  String.raw`\bgit\s+(?:(?:${VALUE_FLAG}|${BOOLEAN_FLAG})\s+)*commit(?![\w-])`,
-);
-
-// Quoted spans carry commit messages, grep patterns, and here-doc prose, where
-// the literal text `git commit` is data rather than an invocation.
-function stripQuoted(command: string): string {
-  return command.replaceAll(/'[^']*'|"(?:[^"\\]|\\.)*"/g, " ");
-}
-
-export function invokesGitCommit(command: string): boolean {
-  return GIT_COMMIT_PATTERN.test(stripQuoted(command));
-}
-
-const ContentBlock = z.looseObject({
-  type: z.string(),
-  name: z.string().optional(),
-  input: FilePathInput.optional(),
-});
-
-const TranscriptEntry = z.looseObject({
-  type: z.string().optional(),
-  message: z
-    .looseObject({ content: z.union([z.string(), z.array(ContentBlock)]).optional() })
-    .optional(),
-});
 
 const BinManifest = z.looseObject({
   bin: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
 });
-
-const DependencyManifest = z.looseObject({
-  dependencies: z.record(z.string(), z.string()).optional(),
-  devDependencies: z.record(z.string(), z.string()).optional(),
-});
-
-const BlockState = z.looseObject({ blocks: z.number().optional() });
 
 const CommandFailure = z.looseObject({
   stdout: z.string().optional(),
@@ -114,62 +47,7 @@ function isOxFile(filePath: string): boolean {
   if (filePath.includes(WORKFLOW_SCRIPT_SEGMENT)) {
     return false;
   }
-  const ext = getExtension(filePath);
-  return OX_EXTENSIONS.has(ext);
-}
-
-async function fileExists(filePath: string): Promise<boolean> {
-  return Bun.file(filePath).exists();
-}
-
-// A gitignored path (scratch under tmp/, a nested worktree) can never be
-// committed, so gating Stop on its lint errors blocks the session on throwaway
-// content. git check-ignore drops those while keeping new untracked source
-// files in scope, which `git ls-files` would not.
-async function isIgnored(filePath: string): Promise<boolean> {
-  try {
-    await execFileAsync("git", ["check-ignore", "-q", filePath], { cwd: dirname(filePath) });
-    return true;
-  } catch {
-    // git check-ignore exits non-zero for a tracked path, which this reads as "not ignored."
-    return false;
-  }
-}
-
-// A checkout nested under the session repo's tmp/ (`git worktree add tmp/x`) is
-// its own working tree, so check-ignore run inside it never sees the outer
-// ignore rule. The caller drops that subtree by path instead.
-async function sessionRepo(cwd: string): Promise<string | null> {
-  try {
-    const { stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], { cwd });
-    const toplevel = stdout.trim();
-    return toplevel !== "" ? await realPath(toplevel) : null;
-  } catch {
-    // Outside any repo, the caller falls back to cwd as the root.
-    return null;
-  }
-}
-
-// Containment is decided on real paths, since a link under the working
-// directory can name a file in another repo. Resolution doubles as the
-// existence check: a deleted file and a dangling link both fail it.
-async function realPath(filePath: string): Promise<string | null> {
-  try {
-    return await realpath(filePath);
-  } catch {
-    // A deleted file or dangling link must not fail the hook. Treat it as unresolvable.
-    return null;
-  }
-}
-
-// The gate speaks for one project, so it considers only what lies under the
-// directory the session is working in. A file edited elsewhere belongs to
-// another repo or to no repo at all, such as a scratch script under the
-// session's own temp directory, and its lint errors are not this project's to
-// block on. Both arguments arrive resolved.
-function withinCwd(filePath: string, cwd: string): boolean {
-  const rel = relative(cwd, filePath);
-  return rel !== "" && !isAbsolute(rel) && rel !== ".." && !rel.startsWith(`..${sep}`);
+  return OX_EXTENSIONS.has(getExtension(filePath));
 }
 
 // An argv array rather than a shell string, so a file path is never spliced
@@ -180,10 +58,10 @@ interface OxCommand {
   prefix: string[];
 }
 
-// oxlint and oxfmt ship as devDependencies, so their binaries live in the
-// module graph rather than on PATH (`bun run` adds node_modules/.bin, but
-// `bun test` and direct hook invocation do not). Neither package's `exports`
-// map declares its `bin/` entry as an importable subpath, so
+// oxlint ships as a devDependency, so its binary lives in the module graph
+// rather than on PATH (`bun run` adds node_modules/.bin, but direct hook
+// invocation does not). The package's `exports` map does not declare its
+// `bin/` entry as an importable subpath, so
 // `import.meta.resolve("oxlint/bin/oxlint")` throws even when the package is
 // installed. `package.json` is exported, so resolve that instead and rejoin
 // its directory with the `bin` path the manifest itself declares.
@@ -204,9 +82,9 @@ async function localBin(pkg: string, binName: string): Promise<string | null> {
 
 // A worktree nobody has installed into has no `node_modules` of its own. Bun's
 // auto-install cache covers that on a warm machine, but a cold cache with no
-// network leaves the resolve throwing and every gate silently off. The binaries
+// network leaves the resolve throwing and the pass silently off. The binaries
 // are identical across worktrees of one repository, so fall back to the main
-// checkout's copy rather than making the gates wait on an install here.
+// checkout's copy rather than waiting on an install here.
 async function binManifest(pkg: string): Promise<string | null> {
   try {
     return fileURLToPath(import.meta.resolve(`${pkg}/package.json`));
@@ -216,170 +94,50 @@ async function binManifest(pkg: string): Promise<string | null> {
       return null;
     }
     const fallback = join(checkout, "node_modules", pkg, "package.json");
-    return (await fileExists(fallback)) ? fallback : null;
+    return (await Bun.file(fallback).exists()) ? fallback : null;
   }
 }
-
-let mainCheckoutPromise: Promise<string | null> | undefined;
 
 // --git-common-dir points at the main checkout's .git from inside any linked
 // worktree, and at the current .git otherwise, so this resolves to the one
 // checkout that installs are shared from.
-function mainCheckout(): Promise<string | null> {
-  mainCheckoutPromise ??= (async () => {
-    try {
-      const { stdout } = await execFileAsync(
-        "git",
-        ["rev-parse", "--path-format=absolute", "--git-common-dir"],
-        { cwd: import.meta.dirname },
-      );
-      const gitDir = stdout.trim();
-      return gitDir !== "" ? dirname(gitDir) : null;
-    } catch {
-      // A missing git or a directory outside any repo must not fail the hook. The gate falls back
-      // to whatever `binManifest` finds locally.
-      return null;
-    }
-  })();
-  return mainCheckoutPromise;
-}
-
-// A single Stop asks for oxlint three times and oxfmt twice. Resolution cannot
-// change within one hook invocation, so it happens once per process.
-const commandCache = new Map<string, OxCommand | null>();
-
-async function resolveCommand(pkg: string, binName: string): Promise<OxCommand | null> {
-  const cached = commandCache.get(pkg);
-  if (cached !== undefined) {
-    return cached;
+async function mainCheckout(): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      "git",
+      ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+      { cwd: import.meta.dirname },
+    );
+    const gitDir = stdout.trim();
+    return gitDir !== "" ? dirname(gitDir) : null;
+  } catch {
+    // A missing git or a directory outside any repo must not fail the hook.
+    return null;
   }
-  const local = await localBin(pkg, binName);
-  const global = local == null ? Bun.which(binName) : null;
-  let resolved: OxCommand | null;
-  if (local != null) {
-    resolved = { bin: "bun", prefix: [local] };
-  } else if (global != null) {
-    resolved = { bin: global, prefix: [] };
-  } else {
-    resolved = null;
-  }
-  commandCache.set(pkg, resolved);
-  return resolved;
 }
 
 async function oxlintCommand(): Promise<OxCommand | null> {
-  return resolveCommand("oxlint", "oxlint");
-}
-
-async function oxfmtCommand(): Promise<OxCommand | null> {
-  return resolveCommand("oxfmt", "oxfmt");
-}
-
-async function runOx(
-  command: OxCommand,
-  args: string[],
-  cwd: string | undefined,
-): Promise<string | null> {
-  try {
-    await execFileAsync(
-      command.bin,
-      [...command.prefix, ...args],
-      cwd != null && cwd !== "" ? { cwd } : undefined,
-    );
-    return null;
-  } catch (error) {
-    return commandOutput(error);
+  const local = await localBin("oxlint", "oxlint");
+  if (local != null) {
+    return { bin: "bun", prefix: [local] };
   }
+  const global = Bun.which("oxlint");
+  return global != null ? { bin: global, prefix: [] } : null;
 }
 
-export async function parseTranscript(transcriptPath: string, cwd: string): Promise<string[]> {
-  if (!(await fileExists(transcriptPath))) {
-    return [];
-  }
-
-  const content = await Bun.file(transcriptPath).text();
-  const candidates = new Set<string>();
-
-  for (const line of content.split("\n")) {
-    if (line.trim() === "") continue;
-
-    try {
-      const entry = decodeJson(TranscriptEntry, line, transcriptPath);
-      const blocks = entry.message?.content;
-      if (entry.type !== "assistant" || !Array.isArray(blocks)) continue;
-
-      for (const block of blocks) {
-        if (block.type !== "tool_use") continue;
-        if (block.name !== "Edit" && block.name !== "Write") continue;
-
-        const filePath = block.input?.file_path;
-        if (filePath != null && filePath !== "" && isOxFile(filePath)) {
-          candidates.add(filePath);
-        }
-      }
-    } catch {
-      // must never break the hook: skip a transcript line that fails to decode
-    }
-  }
-
-  const root = (await realPath(cwd)) ?? cwd;
-  const scratch = join((await sessionRepo(root)) ?? root, "tmp");
-  const checks = [...candidates].map(async (path) => {
-    const real = await realPath(path);
-    const keep =
-      real != null &&
-      withinCwd(real, root) &&
-      !withinCwd(real, scratch) &&
-      !(await isIgnored(path));
-    return { path, keep };
-  });
-  const results = await Promise.all(checks);
-  return results.filter((result) => result.keep).map((result) => result.path);
-}
-
-// Keyed by directory: a turn's files usually share one, and the answer cannot
-// change while the hook runs.
-const workingTreeCache = new Map<string, string | undefined>();
-
-// oxlint and oxfmt both discover the nearest ancestor config per file they
-// process, so resolving cwd per file lets them lint and format a nested git
-// worktree correctly even when invoked from an ancestor directory. This also
-// keeps relative paths and any future tool-relative resolution anchored to
-// the file's own working tree.
+// oxlint discovers the nearest ancestor config per file, so running from the
+// file's own git toplevel lints a nested worktree against its own config.
 async function oxWorkingTree(filePath: string): Promise<string | undefined> {
-  const dir = dirname(filePath);
-  if (workingTreeCache.has(dir)) {
-    return workingTreeCache.get(dir);
-  }
-  let toplevel: string | undefined;
   try {
-    const { stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], { cwd: dir });
+    const { stdout } = await execFileAsync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: dirname(filePath),
+    });
     const root = stdout.trim();
-    toplevel = root !== "" ? root : undefined;
+    return root !== "" ? root : undefined;
   } catch {
-    toplevel = undefined;
+    // Outside any repo, oxlint runs from the hook's cwd with its default config.
+    return undefined;
   }
-  workingTreeCache.set(dir, toplevel);
-  return toplevel;
-}
-
-// Splits files by resolved working tree so a turn touching a single worktree
-// (the common case) becomes one batched process, while a turn spanning a
-// nested worktree still runs each group from the cwd that governs it.
-async function groupByWorkingTree(files: string[]): Promise<Map<string | undefined, string[]>> {
-  const resolved = await Promise.all(
-    files.map(async (file) => ({ file, cwd: await oxWorkingTree(file) })),
-  );
-  const groups = new Map<string | undefined, string[]>();
-  for (const { file, cwd } of resolved) {
-    const group = groups.get(cwd);
-    if (group) {
-      group.push(file);
-    } else {
-      groups.set(cwd, [file]);
-    }
-  }
-  return groups;
 }
 
 function commandOutput(error: unknown): string | null {
@@ -392,16 +150,15 @@ function commandOutput(error: unknown): string | null {
   return output !== "" ? output : null;
 }
 
-// --no-error-on-unmatched-pattern keeps oxlint/oxfmt from exiting non-zero on
-// files their config ignores (gitignored paths, fixtures). Without it, edits
-// to excluded files read as lint or format failures and block Stop.
+// --no-error-on-unmatched-pattern keeps oxlint from exiting non-zero on files
+// its config ignores (gitignored paths, fixtures).
 const LINT_ARGS = ["--no-error-on-unmatched-pattern", "-f", "agent"];
 
 // Loading oxlint's JS plugin host costs a fixed ~150ms on top of a per-file
 // pass, whatever rules it carries. A tree that keeps its JS-plugin rules in
 // .oxlintrc.json and mirrors the rest into .oxlintrc.fast.json pays that only
-// at the gate, where the batch and whole-tree passes below still read the
-// default config. A tree without the file lints against its default config.
+// in the prek commit gate, which reads the default config. A tree without the
+// file lints against its default config.
 const FAST_CONFIG = ".oxlintrc.fast.json";
 
 async function fastConfigArgs(cwd: string | undefined): Promise<string[]> {
@@ -410,150 +167,21 @@ async function fastConfigArgs(cwd: string | undefined): Promise<string[]> {
 }
 
 // The per-file pass runs without type information. tsgolint costs ~1s of CPU
-// per run however small the file, and the gate's whole-tree --type-aware
-// --type-check reports the same rules before the session stops.
+// per run however small the file, and the prek gate's whole-tree type check
+// reports the same rules before the session stops.
 export async function runOxlintAgent(filePath: string): Promise<string | null> {
   const command = await oxlintCommand();
   if (!command) {
     return null;
   }
   const cwd = await oxWorkingTree(filePath);
-  const config = await fastConfigArgs(cwd);
-  return runOx(command, [...config, ...LINT_ARGS, filePath], cwd);
-}
-
-async function runOxlintAgentBatch(files: string[]): Promise<string | null> {
-  const command = await oxlintCommand();
-  if (!command || files.length === 0) {
+  const args = [...command.prefix, ...(await fastConfigArgs(cwd)), ...LINT_ARGS, filePath];
+  try {
+    await execFileAsync(command.bin, args, cwd != null ? { cwd } : undefined);
     return null;
+  } catch (error) {
+    return commandOutput(error);
   }
-  const groups = await groupByWorkingTree(files);
-  const outputs = await Promise.all(
-    [...groups.entries()].map(([cwd, groupFiles]) =>
-      runOx(command, [...LINT_ARGS, ...groupFiles], cwd),
-    ),
-  );
-  const combined = outputs.filter((output): output is string => output != null).join("\n");
-  return combined !== "" ? combined : null;
-}
-
-// oxfmt --write exits non-zero when a file has a syntax error it cannot
-// format. The follow-up oxlint pass surfaces that separately, so its output is
-// discarded here rather than blocking on it twice.
-async function runOxfmtWrite(files: string[]): Promise<void> {
-  const command = await oxfmtCommand();
-  if (!command || files.length === 0) {
-    return;
-  }
-  const groups = await groupByWorkingTree(files);
-  await Promise.all(
-    [...groups.entries()].map(([cwd, groupFiles]) =>
-      runOx(command, ["--write", "--no-error-on-unmatched-pattern", ...groupFiles], cwd),
-    ),
-  );
-}
-
-// A checkout nobody has installed into has neither the tsgolint binary nor the
-// dependency type declarations tsgolint resolves imports against, so it reports
-// a missing executable, or every external import as missing plus the
-// implicit-any cascade that follows. Those diagnostics describe the
-// environment, and no edit the session can make will clear them, so the type
-// section is dropped instead of blocking. The presence of `node_modules`
-// decides it rather than the diagnostics themselves, so one typo'd package name
-// in an installed tree cannot silence the whole gate. A partial install can
-// carry `node_modules` without `@types/bun`, leaving every `Bun` global
-// unresolved, so a tree that declares it must also have it.
-export async function installed(cwd: string | undefined): Promise<boolean> {
-  const root = cwd ?? process.cwd();
-  try {
-    await readdir(join(root, "node_modules"));
-  } catch {
-    // Per the comment above: no node_modules means uninstalled, so the type section drops instead of blocking.
-    return false;
-  }
-  if (!(await declares(root, "@types/bun"))) {
-    return true;
-  }
-  return fileExists(join(root, "node_modules", "@types", "bun", "package.json"));
-}
-
-async function declares(root: string, pkg: string): Promise<boolean> {
-  const path = join(root, "package.json");
-  try {
-    const manifest = decode(DependencyManifest, await Bun.file(path).json(), path);
-    return pkg in { ...manifest.dependencies, ...manifest.devDependencies };
-  } catch {
-    // A missing or malformed manifest reads as undeclared.
-    return false;
-  }
-}
-
-interface TypeCheckResult {
-  output: string | null;
-  needsInstall: boolean;
-}
-
-// There is no useful per-file mode, so this runs whole-tree, once per working
-// tree the gated files resolve to. --quiet drops warnings: whole-tree they run
-// to dozens of lines the turn did not cause, and the batch lint pass above
-// already reports them for the files actually edited. --no-error-on-unmatched-pattern
-// covers a tree whose config ignores everything in it, which otherwise exits
-// non-zero with "No files found to lint" and reads as a type failure.
-// --disable-nested-config avoids a nested checkout under .worktrees/
-// re-registering the root's `local` JS plugin.
-export const TYPE_CHECK_ARGS = [
-  "--type-aware",
-  "--type-check",
-  "--quiet",
-  "--no-error-on-unmatched-pattern",
-  "--disable-nested-config",
-  "-f",
-  "agent",
-];
-
-// A mod type-checks against the engine declarations `bun run mod-types` writes
-// into its plugin, so a mod whose plugin lacks them is skipped rather than
-// failing on the missing module.
-export async function typeCheckArgs(cwd: string | undefined): Promise<string[]> {
-  const root = cwd ?? process.cwd();
-  const mods = await Array.fromAsync(
-    new Bun.Glob("plugins/*/mod").scan({ cwd: root, onlyFiles: false }),
-  );
-  const typed = await Promise.all(
-    mods.map((mod) =>
-      Bun.file(join(root, dirname(mod), ".claude-plugin/types/claude-code/index.d.ts")).exists(),
-    ),
-  );
-  const untyped = mods.filter((_, index) => !typed[index]).toSorted();
-  return [...TYPE_CHECK_ARGS, ...untyped.flatMap((mod) => ["--ignore-pattern", `${mod}/**`])];
-}
-
-async function runTypeCheck(files: string[]): Promise<TypeCheckResult> {
-  const command = await oxlintCommand();
-  if (!command || files.length === 0) {
-    return { output: null, needsInstall: false };
-  }
-  const groups = await groupByWorkingTree(files);
-  const results = await Promise.all(
-    [...groups.keys()].map(async (cwd) => {
-      if (!(await installed(cwd))) {
-        return { output: null, needsInstall: true };
-      }
-      const output = await runOx(command, await typeCheckArgs(cwd), cwd);
-      return output?.includes("Failed to find tsgolint executable")
-        ? { output: null, needsInstall: true }
-        : { output, needsInstall: false };
-    }),
-  );
-
-  const combined = results
-    .map((result) => result.output)
-    .filter((output): output is string => output != null)
-    .join("\n");
-  return {
-    output: combined !== "" ? combined : null,
-    needsInstall: results.some((result) => result.needsInstall),
-  };
 }
 
 // A file with a cascading error can report hundreds of lines on every edit, and
@@ -581,63 +209,8 @@ function capped(errors: string): string {
   ].join("\n");
 }
 
-// The type-check run reports lint errors alongside TypeScript diagnostics and
-// there is no flag to narrow it, so drop the lines the scoped lint pass already
-// reported rather than showing each one twice.
-function withoutRepeats(typeOutput: string, lintOutput: string | null): string {
-  if (lintOutput == null) {
-    return typeOutput;
-  }
-  const reported = new Set(lintOutput.split("\n"));
-  return typeOutput
-    .split("\n")
-    .filter((line) => !reported.has(line))
-    .join("\n");
-}
-
-function formatSections(lintOutput: string | null, typeCheck: TypeCheckResult): string {
-  const sections = [];
-  if (lintOutput != null) sections.push(`Lint:\n${lintOutput}`);
-  const types = typeCheck.output != null ? withoutRepeats(typeCheck.output, lintOutput) : "";
-  if (types !== "") sections.push(`Types:\n${types}`);
-  if (typeCheck.needsInstall) {
-    sections.push("Types: skipped, dependencies are not installed here (`bun install`).");
-  }
-  return sections.join("\n\n");
-}
-
-// The gate Stop and the pre-commit check share: reformat first so the lint pass
-// sees final text, then lint and type-check concurrently. Only oxlint is
-// required, so a missing oxfmt degrades to checking without reformatting. The
-// diagnostics come back unframed: the two callers say different things about
-// them, and Stop says two different things itself depending on whether it is
-// still willing to block.
-async function runOxGate(
-  files: string[],
-  timings: Record<string, number> = {},
-): Promise<string | null> {
-  if (files.length === 0) {
-    return null;
-  }
-
-  await timed(timings, "format_ms", () => runOxfmtWrite(files));
-
-  const [lintOutput, typeCheck] = await Promise.all([
-    timed(timings, "lint_ms", () => runOxlintAgentBatch(files)),
-    timed(timings, "type_check_ms", () => runTypeCheck(files)),
-  ]);
-  if (lintOutput == null && typeCheck.output == null) {
-    return null;
-  }
-
-  return formatSections(lintOutput, typeCheck);
-}
-
-export async function processPostToolUse(
-  input: PostToolUseInput,
-): Promise<SyncHookJSONOutput | null> {
-  const toolName = input.tool_name;
-  if (toolName !== "Edit" && toolName !== "Write") {
+export async function processPostToolUse(input: HookInput): Promise<SyncHookJSONOutput | null> {
+  if (input.tool_name !== "Edit" && input.tool_name !== "Write") {
     return null;
   }
 
@@ -646,273 +219,8 @@ export async function processPostToolUse(
     return null;
   }
 
-  if (!(await oxlintCommand())) {
-    return null;
-  }
-
   const errors = await runOxlintAgent(filePath);
-  if (errors == null) {
-    return null;
-  }
-
-  return formatPostToolUseOutput(filePath, errors);
-}
-
-// A blocked Stop wakes the model to repair, and the Stop that follows carries
-// stop_hook_active. Returning null there ends the session on text the gate never
-// saw: the repair can leave the original error standing, or introduce a
-// cross-file type error the per-edit lint pass cannot reach. So the re-entrant
-// Stop checks too, and a count of consecutive blocks bounds it, since an error
-// the model cannot clear would otherwise block every Stop forever.
-export const STOP_BLOCK_LIMIT = 2;
-
-const UNSAFE_SESSION = /[^A-Za-z0-9._-]+/g;
-
-export function blockCountPath(sessionId: string): string {
-  return join(tmpdir(), "claude-ox-gate", `${sessionId.replace(UNSAFE_SESSION, "-")}.json`);
-}
-
-async function priorBlocks(sessionId: string): Promise<number> {
-  try {
-    const path = blockCountPath(sessionId);
-    return decode(BlockState, await Bun.file(path).json(), path).blocks ?? 0;
-  } catch {
-    return 0;
-  }
-}
-
-async function recordBlocks(sessionId: string, blocks: number): Promise<boolean> {
-  try {
-    await Bun.write(blockCountPath(sessionId), JSON.stringify({ blocks }));
-    return true;
-  } catch {
-    // An unwritable count file must not fail the hook. The caller's compound
-    // check treats that as a signal to skip blocking this round entirely
-    // (see the comment above it).
-    return false;
-  }
-}
-
-async function clearBlocks(sessionId: string): Promise<void> {
-  try {
-    await rm(blockCountPath(sessionId), { force: true });
-  } catch {
-    // best-effort: a stale block-count file gets overwritten on the next write anyway
-  }
-}
-
-async function timed<T>(
-  timings: Record<string, number>,
-  key: string,
-  run: () => Promise<T>,
-): Promise<T> {
-  const start = performance.now();
-  try {
-    return await run();
-  } finally {
-    timings[key] = Math.round(performance.now() - start);
-  }
-}
-
-// Written in the mod-events layout so the session index reads it into
-// `mod_events` alongside the mods.
-export function stopEventsDir(sessionId: string): string {
-  const config = setEnv("CLAUDE_CONFIG_DIR") ?? join(homedir(), ".claude");
-  const root = setEnv("OX_EVENTS_DIR") ?? join(config, "mod-events");
-  return join(root, sessionId.replace(UNSAFE_SESSION, "-"));
-}
-
-function setEnv(name: string): string | undefined {
-  const value = process.env[name];
-  return value === undefined || value === "" ? undefined : value;
-}
-
-async function recordStop(
-  sessionId: string,
-  attributes: Record<string, number | string>,
-): Promise<void> {
-  const record = {
-    timestamp: new Date().toISOString(),
-    severity_text: "INFO",
-    severity_number: 9,
-    event_name: "ox.stop",
-    attributes: { "session.id": sessionId, ...attributes },
-    scope: { name: "ox" },
-  };
-  try {
-    const path = join(stopEventsDir(sessionId), `ox.${Date.now()}.${process.pid}.jsonl`);
-    await Bun.write(path, `${JSON.stringify(record)}\n`);
-  } catch {
-    // Telemetry must never fail the hook.
-  }
-}
-
-export async function processStop(input: StopInput): Promise<SyncHookJSONOutput | null> {
-  const start = performance.now();
-  const attributes: Record<string, number> = {};
-  let outcome = "error";
-  try {
-    const result = await gateStop(input, attributes);
-    if (result?.decision === "block") {
-      outcome = "block";
-    } else if (result == null) {
-      outcome = "pass";
-    } else {
-      outcome = "warn";
-    }
-    return result;
-  } finally {
-    await recordStop(input.session_id, {
-      ...attributes,
-      outcome,
-      duration_ms: Math.round(performance.now() - start),
-    });
-  }
-}
-
-async function gateStop(
-  input: StopInput,
-  attributes: Record<string, number>,
-): Promise<SyncHookJSONOutput | null> {
-  // Every exit that is not a block clears the count, so a stale one can never
-  // be read back as progress through a later round's budget.
-  if (!(await oxlintCommand())) {
-    await clearBlocks(input.session_id);
-    return null;
-  }
-
-  const files = await parseTranscript(input.transcript_path, input.cwd);
-  attributes.files = files.length;
-  const sections = await runOxGate(files, attributes);
-  if (sections == null || sections === "") {
-    await clearBlocks(input.session_id);
-    return null;
-  }
-
-  // A Stop the model did not arrive at through a block starts a fresh round.
-  const blocked = input.stop_hook_active ? await priorBlocks(input.session_id) : 0;
-
-  // Blocking is only safe once the count that will later release it is on disk.
-  // A state file that cannot be written would otherwise leave every re-entrant
-  // Stop reading zero and blocking again, forever.
-  if (blocked < STOP_BLOCK_LIMIT && (await recordBlocks(input.session_id, blocked + 1))) {
-    return {
-      decision: "block",
-      reason: `❌ Ox check failed. Formatting was auto-applied but issues remain:\n\n${sections}\n\nFix these issues before stopping.`,
-    };
-  }
-
-  await clearBlocks(input.session_id);
-  return {
-    systemMessage: `⚠️ Ox is no longer blocking on these issues, so this stop goes through with them in place:\n\n${sections}`,
-  };
-}
-
-interface StagedOxFiles {
-  paths: string[];
-  diverged: string[];
-}
-
-// The gate checks and reformats working-tree files while the commit records the
-// index. A staged file carrying further unstaged edits makes those two
-// different texts, so a pass would clear content oxlint never saw and a block
-// would name content git is not about to commit. Those files come back as
-// `diverged` for the caller to refuse on.
-async function getStagedOxFiles(): Promise<StagedOxFiles> {
-  try {
-    const [staged, unstaged] = await Promise.all([
-      execFileAsync("git", ["diff", "--cached", "--name-only", "--diff-filter=ACMR"]),
-      execFileAsync("git", ["diff", "--name-only"]),
-    ]);
-
-    const names = lines(staged.stdout).filter(isOxFile);
-    const modified = new Set(lines(unstaged.stdout));
-    const diverged = names.filter((name) => modified.has(name));
-
-    const cwd = process.cwd();
-    const existChecks = names.map(async (f) => {
-      const fullPath = f.startsWith("/") ? f : `${cwd}/${f}`;
-      return { path: fullPath, exists: await fileExists(fullPath) };
-    });
-
-    const results = await Promise.all(existChecks);
-    return { paths: results.filter((r) => r.exists).map((r) => r.path), diverged };
-  } catch {
-    return { paths: [], diverged: [] };
-  }
-}
-
-function lines(stdout: string): string[] {
-  return stdout.trim().split("\n").filter(Boolean);
-}
-
-export async function processPreToolUse(
-  input: PreToolUseInput,
-): Promise<SyncHookJSONOutput | null> {
-  // The `Bash(git commit:*)` matcher only narrows which calls spawn this hook.
-  // It fails open on shell metacharacters, and this path can return a `block`,
-  // so the command is re-read here rather than trusted from the matcher.
-  const { command } = decode(BashInput, input.tool_input, "PreToolUse tool_input");
-  if (command == null || command === "" || !invokesGitCommit(command)) {
-    return null;
-  }
-
-  if (!(await oxlintCommand())) {
-    return null;
-  }
-
-  const staged = await getStagedOxFiles();
-  if (staged.diverged.length > 0) {
-    return deny(
-      `These files are staged with further unstaged edits, so the commit would record text this check never saw:\n\n${staged.diverged
-        .map((f) => `  ${f}`)
-        .join("\n")}\n\nStage or stash the working-tree changes, then commit.`,
-    );
-  }
-
-  const sections = await runOxGate(staged.paths);
-  await restage(staged.paths);
-  if (sections == null || sections === "") {
-    return null;
-  }
-  return deny(
-    `Ox found issues in staged files after auto-formatting:\n\n${sections}\n\nFix these issues before committing.`,
-  );
-}
-
-// The gate reformats on disk, which would otherwise leave the index holding the
-// unformatted text the commit is about to record. The divergence check above
-// established that the two already matched, so re-adding carries the formatting
-// and nothing the user had not staged.
-async function restage(paths: string[]): Promise<void> {
-  if (paths.length === 0) {
-    return;
-  }
-  try {
-    await execFileAsync("git", ["add", "--", ...paths]);
-  } catch {
-    // Restaging is best-effort: a failure here leaves the working tree as it was.
-  }
-}
-
-function deny(reason: string): SyncHookJSONOutput {
-  return {
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: reason,
-    },
-  };
-}
-
-export async function processInput(input: HookInput): Promise<SyncHookJSONOutput | null> {
-  if (input.hook_event_name === "PreToolUse") {
-    return processPreToolUse(input);
-  }
-  if (input.hook_event_name === "PostToolUse") {
-    return processPostToolUse(input);
-  }
-  return processStop(input);
+  return errors == null ? null : formatPostToolUseOutput(filePath, errors);
 }
 
 async function main(): Promise<void> {
@@ -926,7 +234,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = await processInput(input);
+  const output = await processPostToolUse(input);
   if (output) {
     process.stdout.write(`${JSON.stringify(output)}\n`);
   }

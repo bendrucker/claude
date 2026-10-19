@@ -85,8 +85,10 @@ export async function checkFile(file: string): Promise<string[]> {
   return violations;
 }
 
-export async function findViolations(): Promise<string[]> {
-  const results = await Promise.all((await tracked("*.md", root)).map(checkFile));
+/** Checks the files given, or every tracked Markdown file. */
+export async function findViolations(files: string[] = []): Promise<string[]> {
+  const targets = files.length > 0 ? files : await tracked("*.md", root);
+  const results = await Promise.all(targets.map(checkFile));
   return results.flat();
 }
 
@@ -94,7 +96,7 @@ if (import.meta.main) {
   await runCheck(
     async () => ({
       header: "Fenced code blocks with syntax errors (tag the fence `fragment` to skip):",
-      violations: await findViolations(),
+      violations: await findViolations(process.argv.slice(2)),
     }),
     { success: "All fenced JS/TS/JSON code blocks parse" },
   );

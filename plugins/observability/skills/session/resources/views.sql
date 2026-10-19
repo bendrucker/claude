@@ -222,6 +222,34 @@ WHERE s.role = 'user' AND s.content_text IS NOT NULL;
 
 CREATE OR REPLACE TABLE content_items AS SELECT * FROM content_item_rows(false);
 
+-- The prose `search` ranks, lowercased once here so a query scans a few rows per session
+-- instead of every content block: typed prompts and main-thread assistant text, plus the
+-- label at weight 3. Skill bodies, harness text and subagent turns are left out. Rows are
+-- per session, so db.ts rebuilds the scoped sessions' rows beside content_items. BM25's
+-- document frequencies come from this table at query time and need no refresh of their own.
+CREATE OR REPLACE MACRO search_item_rows(scoped) AS TABLE
+SELECT ci.host, ci.session_id, lower(ci.text) AS text, 1 AS weight
+FROM content_items ci
+WHERE ci.text IS NOT NULL
+  AND ci.source_file NOT LIKE '%/subagents/%'
+  AND ((ci.type = 'prompt' AND NOT ci.is_meta) OR (ci.type = 'text' AND ci.role = 'assistant'))
+  AND ci.text NOT LIKE '<%'
+  AND ci.text NOT LIKE 'This session is being continued%'
+  AND ci.text NOT LIKE 'Base directory for this skill:%'
+  AND (NOT scoped OR EXISTS (
+    SELECT 1 FROM content_item_scope c
+    WHERE c.host = ci.host AND c.session_id IS NOT DISTINCT FROM ci.session_id
+  ))
+UNION ALL
+SELECT l.host, l.session_id, lower(l.label), 3
+FROM session_labels l
+WHERE NOT scoped OR EXISTS (
+  SELECT 1 FROM content_item_scope c
+  WHERE c.host = l.host AND c.session_id IS NOT DISTINCT FROM l.session_id
+);
+
+CREATE OR REPLACE TABLE search_items AS SELECT * FROM search_item_rows(false);
+
 -- `session_id` is the transcript's session id, which a subagent line inherits from its
 -- parent. `agent_id` names the subagent that actually made the call and is NULL on the
 -- main thread. Group by it alongside session_id wherever a per-session count would

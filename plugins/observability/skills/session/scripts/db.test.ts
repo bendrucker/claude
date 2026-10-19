@@ -1600,14 +1600,16 @@ describe("change catalog", () => {
 });
 
 describe("incremental content_items", () => {
-  // Rows content_items holds that a full rebuild would not, plus the reverse.
+  // Rows content_items or search_items holds that a full rebuild would not, plus the reverse.
   async function driftFromFullRebuild(): Promise<number> {
+    const drift = (table: string, rows: string) => `(SELECT COUNT(*) FROM (
+       (SELECT * FROM ${table} EXCEPT ALL SELECT * FROM ${rows}(false))
+       UNION ALL
+       (SELECT * FROM ${rows}(false) EXCEPT ALL SELECT * FROM ${table})
+     ))`;
     const [row] = await db.query(
-      `SELECT COUNT(*) AS n FROM (
-         (SELECT * FROM content_items EXCEPT ALL SELECT * FROM content_item_rows(false))
-         UNION ALL
-         (SELECT * FROM content_item_rows(false) EXCEPT ALL SELECT * FROM content_items)
-       )`,
+      `SELECT ${drift("content_items", "content_item_rows")}
+         + ${drift("search_items", "search_item_rows")} AS n`,
       z.object({ n: z.bigint() }),
     );
     return Number(row?.n);

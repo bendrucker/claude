@@ -41,7 +41,7 @@ Debug logs and mod events carry a size cap (2 GB and 500 MB). After each sync, `
 
 ### Refresh Entry Point
 
-`refresh.ts` prints the DB path to stdout (everything else goes to stderr). A `last-refresh` stamp file makes runs within `--max-age` (default 300s) print the path and exit before opening the database, so the fast path never takes a lock. `--refresh` bypasses the stamp. On a lock conflict it retries briefly, then defers to the concurrent refresher and exits 0 with the path.
+`refresh.ts` prints the DB path to stdout (everything else goes to stderr). A `last-refresh` stamp file makes runs within `--max-age` (default 300s) print the path and exit before opening the database, so the fast path never takes a lock. `--refresh` bypasses the stamp. `--compact`, which the dotfiles nightly passes, also bypasses it, applies a pending rewrite of `raw`, then compacts the database by copying it (`COPY FROM DATABASE`) into a fresh file. A plain refresh defers a pending rewrite to that run while the index is over 1 GiB and the stamp is under 36 hours old, since the rewrite holds the write lock for minutes. Deferring stops the stamp, so an index no nightly compacts rewrites inline a day and a half later. On a lock conflict it retries briefly, then defers to the concurrent refresher and exits 0 with the path.
 
 ### Migration
 
@@ -70,7 +70,7 @@ The four writers carry the `claude:dangerouslyDisableSandbox` marker after their
 ### Callers
 
 - `db.ts`: orchestrates migration, schema, scan, per-file import, view rebuild and versioning, checkpoint, compaction.
-- `refresh.ts`: CLI entry point. Stamp fast-path, `ensureIndex`, compaction guard, prints DB path to stdout.
+- `refresh.ts`: CLI entry point. Stamp fast-path, `ensureIndex`, `--compact`, compaction guard, prints DB path to stdout.
 - `query.ts`: the one path from a named query (or literal SQL) plus params to decoded rows. Two adapters share the variable binding: `nodeAdapter` binds on the read-write connection `db.ts` already holds, and `cliAdapter` spawns `duckdb -readonly -init limits.sql` with a timeout, rendering the same params as `SET VARIABLE` lines through one escaping function. `usage.ts` and `schema.ts` take the read-only adapter so they never wait on a refresh's write lock.
 
 ### Development

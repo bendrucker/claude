@@ -10,6 +10,7 @@ import {
   ensureIndex,
   getDataDir,
   getDb,
+  rawRewritePending,
   sessionDbPath,
 } from "./db";
 
@@ -29,6 +30,12 @@ const argv = cli({
       description: "Seconds a prior refresh stays fresh (skipping the rescan)",
       default: 300,
     },
+    compact: {
+      type: Boolean,
+      description:
+        "Compact the database into a fresh copy, applying a pending rewrite of raw first. Implies --refresh",
+      default: false,
+    },
   },
 });
 
@@ -36,10 +43,27 @@ const dataDir = getDataDir();
 const dbPath = sessionDbPath(dataDir);
 const stampPath = join(dataDir, "last-refresh");
 
-async function stampIsFresh(): Promise<boolean> {
+const compact = argv.flags.compact;
+
+async function stampAgeMs(): Promise<number> {
   const stamp = Bun.file(stampPath);
-  if (!(await stamp.exists())) return false;
-  return Date.now() - stamp.lastModified < argv.flags.maxAge * 1000;
+  return (await stamp.exists()) ? Date.now() - stamp.lastModified : Infinity;
+}
+
+// Rewriting raw copies the whole table under the write lock, minutes on a large index
+// during which every reader fails to open. A refresh leaves it to the nightly --compact
+// run while the stamp shows refreshes still landing, and it stops landing while deferred.
+// An index with no nightly owner thus rewrites inline once the stamp goes stale.
+const DEFER_MIN_BYTES = 1024 ** 3;
+const DEFER_MAX_STAMP_AGE_MS = 36 * 3600 * 1000;
+
+async function deferRewrite(db: Database): Promise<boolean> {
+  return (
+    !compact &&
+    Bun.file(dbPath).size > DEFER_MIN_BYTES &&
+    (await stampAgeMs()) < DEFER_MAX_STAMP_AGE_MS &&
+    (await rawRewritePending(db))
+  );
 }
 
 // The write lock is held by a concurrent refresh (or a lingering reader). A brief
@@ -62,7 +86,12 @@ async function openWithRetry(): Promise<Database | null> {
   }
 }
 
-if (!argv.flags.refresh && (await Bun.file(dbPath).exists()) && (await stampIsFresh())) {
+if (
+  !argv.flags.refresh &&
+  !compact &&
+  (await Bun.file(dbPath).exists()) &&
+  (await stampAgeMs()) < argv.flags.maxAge * 1000
+) {
   process.stdout.write(`${dbPath}\n`);
   process.exit(0);
 }
@@ -77,17 +106,30 @@ if (db === null) {
 }
 
 let corpusBytes = 0;
+let deferred = false;
 try {
-  ({ corpusBytes } = await ensureIndex(db));
+  deferred = await deferRewrite(db);
+  if (!deferred) ({ corpusBytes } = await ensureIndex(db));
 } finally {
   db.close();
+}
+
+if (deferred) {
+  console.error(
+    "refresh: 00_pinned.sql changed; raw's rewrite waits for the nightly `refresh.ts --compact`, so the index stays as of its last refresh",
+  );
+  process.stdout.write(`${dbPath}\n`);
+  process.exit(0);
 }
 
 // DuckDB never shrinks a file in place, so a bloated index (from the pre-v3
 // full-table rewrites, or pathological churn) is recovered by copying into a
 // fresh file. The 64 MiB floor keeps tiny corpora from churning on block overhead.
 const dbSize = Bun.file(dbPath).size;
-if (corpusBytes > 0 && dbSize > Math.max(4 * corpusBytes, 64 * 1024 * 1024)) {
+if (compact) {
+  console.error(`refresh: compacting ${(dbSize / 1e9).toFixed(1)}GB index`);
+  await compactDatabase(dataDir);
+} else if (corpusBytes > 0 && dbSize > Math.max(4 * corpusBytes, 64 * 1024 * 1024)) {
   console.error(
     `refresh: compacting ${(dbSize / 1e9).toFixed(1)}GB index against ${(corpusBytes / 1e9).toFixed(1)}GB corpus`,
   );

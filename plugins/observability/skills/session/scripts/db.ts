@@ -350,16 +350,13 @@ export async function invalidateDerived(db: Database): Promise<void> {
 // the file. Returns whether raw changed, since content_items is derived from it.
 async function reconcilePinned(db: Database): Promise<boolean> {
   const fingerprint = await fileFingerprint(SCHEMA_DIR, "00_pinned");
-  const [row] = await db.query(
-    "SELECT import_hash FROM index_meta",
-    z.object({ import_hash: z.string().nullable() }),
-  );
-  if (row?.import_hash === fingerprint) return false;
+  const hash = await importHash(db);
+  if (hash === fingerprint) return false;
 
   // A null hash is an index built before this check existed. The projection may have
   // changed between that build and the first run to stamp it, so the rewrite is skipped
   // only when raw's columns already match what the projection produces.
-  const seeding = row?.import_hash == null;
+  const seeding = hash == null;
   const rewrite = !seeding || !(await rawMatchesProjection(db));
 
   // Derived state is invalidated either way. An adopted index was built by code that
@@ -376,6 +373,24 @@ async function reconcilePinned(db: Database): Promise<boolean> {
   }
   await db.run("UPDATE index_meta SET import_hash = $hash", { hash: fingerprint });
   return rewrite;
+}
+
+async function importHash(db: Database): Promise<string | null | undefined> {
+  if (!(await tableExists(db, "index_meta"))) return undefined;
+  // SELECT * because an index_meta older than import_hash lacks the column.
+  const [row] = await db.query(
+    "SELECT * FROM index_meta",
+    z.looseObject({ import_hash: z.string().nullish() }),
+  );
+  return row?.import_hash;
+}
+
+// Whether the next ensureIndex rewrites raw, read before it does. An index that predates
+// import_hash is left to reconcilePinned's own seeding check, which needs the projection
+// applySchema has not loaded yet.
+export async function rawRewritePending(db: Database): Promise<boolean> {
+  const hash = await importHash(db);
+  return hash != null && hash !== (await fileFingerprint(SCHEMA_DIR, "00_pinned"));
 }
 
 const ColumnName = z.object({ column_name: z.string() });

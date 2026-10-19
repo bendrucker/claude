@@ -15,6 +15,7 @@ import {
   forgetHost,
   getDb,
   invalidateDerived,
+  rawRewritePending,
   rebuildViews,
   runQuery,
   sessionDbPath,
@@ -1723,6 +1724,14 @@ describe("pinned column derivation", () => {
     expect(Number(row?.n)).toBeGreaterThan(0);
     expect(Number(row?.clobbered)).toBe(0);
     expect(Number(row?.negative)).toBe(0);
+  });
+
+  it("reports a pending rewrite only for a stamped index whose projection changed", async () => {
+    expect(await rawRewritePending(db)).toBe(false);
+    await db.run("UPDATE index_meta SET import_hash = 'stale'");
+    expect(await rawRewritePending(db)).toBe(true);
+    await db.run("UPDATE index_meta SET import_hash = NULL");
+    expect(await rawRewritePending(db)).toBe(false);
   });
 
   it("rebuilds the tables derived from raw after a re-derivation", async () => {

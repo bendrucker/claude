@@ -1,0 +1,25 @@
+Plugin tests.........................................(no files to check)Skipped
+Plugin validation....................................(no files to check)Skipped
+Hooks validation.....................................(no files to check)Skipped
+Skill lint...........................................(no files to check)Skipped
+Skill invocability...................................(no files to check)Skipped
+Hook tests...........................................(no files to check)Skipped
+Settings validation..................................(no files to check)Skipped
+Marketplace completeness.............................(no files to check)Skipped
+Markdown embedded code...............................(no files to check)Skipped
+Format...................................................................Passed
+- hook id: oxfmt
+- duration: 0.18s
+
+  Finished in 9ms on 1 files using 4 threads.
+Lint and type check......................................................Failed
+- hook id: oxlint
+- duration: 9.72s
+- exit code: 1
+
+  scripts/example.ts:2:7: error eslint(no-unused-vars): Variable 'unused' is declared but never used. Unused variables should start with a '_'. help: Consider removing this declaration.
+  scripts/example.ts:3:1: error eslint(no-debugger): `debugger` statement is not allowed help: Remove the debugger statement
+Cross-plugin imports.................................(no files to check)Skipped
+Workspace dependencies...................................................Passed
+- hook id: workspace-deps
+- duration: 0.17s

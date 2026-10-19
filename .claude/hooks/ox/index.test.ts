@@ -1,48 +1,20 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  setDefaultTimeout,
-  test,
-} from "bun:test";
+import { afterAll, beforeAll, describe, expect, it, setDefaultTimeout, test } from "bun:test";
 import { exec } from "node:child_process";
-import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import type {
-  PostToolUseHookInput,
-  PreToolUseHookInput,
-  PreToolUseHookSpecificOutput,
-  StopHookInput,
-  SyncHookJSONOutput,
-} from "@anthropic-ai/claude-agent-sdk";
+import type { PostToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import {
-  blockCountPath,
   formatPostToolUseOutput,
   HookInput,
-  installed,
-  invokesGitCommit,
-  parseTranscript,
   POST_TOOL_USE_LINE_LIMIT,
-  processInput,
   processPostToolUse,
-  processPreToolUse,
-  processStop,
   runOxlintAgent,
-  STOP_BLOCK_LIMIT,
-  stopEventsDir,
-  TYPE_CHECK_ARGS,
-  typeCheckArgs,
 } from ".";
 
-// Every check here spawns oxlint and oxfmt over a real fixture, and the
-// type-aware pass alone outruns the 5s default on CI.
+// Every check here spawns oxlint over a real fixture.
 setDefaultTimeout(30_000);
 
 const Reported = z.looseObject({ additionalContext: z.string().optional() });
@@ -51,11 +23,6 @@ const Reported = z.looseObject({ additionalContext: z.string().optional() });
 const execAsync = promisify(exec);
 
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures");
-
-function deniedBy(result: SyncHookJSONOutput | null): PreToolUseHookSpecificOutput | undefined {
-  const output = result?.hookSpecificOutput;
-  return output?.hookEventName === "PreToolUse" ? output : undefined;
-}
 
 function contextFrom(result: SyncHookJSONOutput | null): string | undefined {
   const output = result?.hookSpecificOutput;
@@ -80,55 +47,6 @@ function mockPostToolUseInput(
   };
 }
 
-function mockPreToolUseInput(command: string): PreToolUseHookInput {
-  return {
-    session_id: "test-session",
-    hook_event_name: "PreToolUse",
-    tool_name: "Bash",
-    tool_input: { command },
-    transcript_path: "/tmp/transcript.json",
-    cwd: process.cwd(),
-    tool_use_id: "test",
-  };
-}
-
-const gateSessions = new Set<string>();
-
-function mockStopHookInput(
-  transcriptPath: string,
-  stopHookActive = false,
-  sessionId = "test-session",
-): StopHookInput {
-  gateSessions.add(sessionId);
-  return {
-    session_id: sessionId,
-    hook_event_name: "Stop",
-    transcript_path: transcriptPath,
-    // The gate reads only files under cwd, and these fixtures live in tempDir.
-    cwd: tempDir,
-    stop_hook_active: stopHookActive,
-  };
-}
-
-function createTranscriptContent(files: { path: string; tool: string }[]): string {
-  return files
-    .map((f) =>
-      JSON.stringify({
-        type: "assistant",
-        message: {
-          content: [
-            {
-              type: "tool_use",
-              name: f.tool,
-              input: { file_path: f.path },
-            },
-          ],
-        },
-      }),
-    )
-    .join("\n");
-}
-
 async function copyFixture(name: string, destDir: string): Promise<string> {
   const source = join(FIXTURES_DIR, name);
   const dest = join(destDir, `${Date.now()}-${Math.random()}-${name}`);
@@ -137,8 +55,8 @@ async function copyFixture(name: string, destDir: string): Promise<string> {
   return dest;
 }
 
-// A git repo whose ox config excludes ignored.ts. Checking that file must not
-// read as a lint or format failure. The git init matters: runOxlintAgent
+// A git repo whose oxlint config excludes ignored.ts. Checking that file must
+// not read as a lint failure. The git init matters: runOxlintAgent
 // resolves its cwd from the file's git toplevel, which is where oxlint
 // discovers this config.
 async function createIgnoredFixture(baseDir: string): Promise<string> {
@@ -146,10 +64,6 @@ async function createIgnoredFixture(baseDir: string): Promise<string> {
   await execAsync("git init", { cwd: repoDir });
   await Bun.write(
     join(repoDir, ".oxlintrc.json"),
-    JSON.stringify({ ignorePatterns: ["ignored.ts"] }),
-  );
-  await Bun.write(
-    join(repoDir, ".oxfmtrc.json"),
     JSON.stringify({ ignorePatterns: ["ignored.ts"] }),
   );
   const filePath = join(repoDir, "ignored.ts");
@@ -177,10 +91,9 @@ async function createFastConfigFixture(baseDir: string): Promise<string> {
   return filePath;
 }
 
-// The type-aware pass is skipped where node_modules is absent and falls back to
-// the plain pass where it is present without tsgolint, so `nodeModules` picks
-// which of the three shapes a fixture exercises. The empty tree stands in for a
-// partial install: node_modules exists, the checker is not in it.
+// The per-edit pass must stay type-unaware however the tree is installed, so
+// `nodeModules` picks which of three shapes a fixture exercises. The empty tree
+// stands in for a partial install: node_modules exists, the checker is not in it.
 type NodeModules = "linked" | "empty" | "absent";
 
 async function createTypeAwareFixture(
@@ -207,37 +120,13 @@ async function createTypeAwareFixture(
   return filePath;
 }
 
-// The stop gate type-checks the whole working tree each file resolves to, so a
-// fixture outside any repo would type-check this whole repository instead. Only
-// the checker is linked: oxlint walks a linked node_modules as source.
-async function createGateRepo(baseDir: string): Promise<string> {
-  const repoDir = await mkdtemp(join(baseDir, "gate-repo-"));
-  await execAsync("git init", { cwd: repoDir });
-  await Bun.write(
-    join(repoDir, ".oxlintrc.json"),
-    JSON.stringify({ rules: { "no-dupe-keys": "error" } }),
-  );
-  const tsgolint = join(import.meta.dirname, "..", "..", "..", "node_modules", ".bin", "tsgolint");
-  await mkdir(join(repoDir, "node_modules", ".bin"), { recursive: true });
-  await execAsync(`ln -s "${tsgolint}" node_modules/.bin/tsgolint`, { cwd: repoDir });
-  return repoDir;
-}
-
 describe("ox hook", () => {
   beforeAll(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "ox-test-"));
-    process.env.OX_EVENTS_DIR = join(tempDir, "mod-events");
   });
 
-  // A stop left blocking keeps its count file. Remove the ones these tests
-  // wrote by name: the directory holds live sessions' counts too.
   afterAll(async () => {
     await rm(tempDir, { recursive: true, force: true });
-    await Promise.all(
-      [...gateSessions].map((session) =>
-        rm(blockCountPath(session), { recursive: true, force: true }),
-      ),
-    );
   });
 
   describe("runOxlintAgent", () => {
@@ -264,219 +153,6 @@ describe("ox hook", () => {
     it("prefers the fast config over the default one", async () => {
       const filePath = await createFastConfigFixture(tempDir);
       expect(await runOxlintAgent(filePath)).toBeNull();
-    });
-  });
-
-  describe("parseTranscript", () => {
-    it("returns empty array for non-existent transcript", async () => {
-      expect(await parseTranscript("/nonexistent/path.jsonl", tempDir)).toEqual([]);
-    });
-
-    test.each(["Edit", "Write"])("extracts file paths from %s tool uses", async (tool) => {
-      const filePath = await copyFixture("valid.ts", tempDir);
-      const transcriptPath = join(tempDir, `transcript-${tool}-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool }]));
-
-      const files = await parseTranscript(transcriptPath, tempDir);
-      expect(files).toContain(filePath);
-    });
-
-    it("ignores non-ox files", async () => {
-      const mdPath = join(tempDir, "readme.md");
-      await Bun.write(mdPath, "# Test");
-      const transcriptPath = join(tempDir, `transcript-md-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: mdPath, tool: "Write" }]));
-
-      const files = await parseTranscript(transcriptPath, tempDir);
-      expect(files).toEqual([]);
-    });
-
-    it("ignores generated workflow scripts", async () => {
-      const wfDir = join(tempDir, "workflows", "scripts");
-      const wfPath = join(wfDir, "sweep-wf_123.js");
-      await Bun.write(wfPath, "export const meta = {};\nreturn { done: true };\n");
-      const transcriptPath = join(tempDir, `transcript-wf-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: wfPath, tool: "Edit" }]));
-
-      const files = await parseTranscript(transcriptPath, tempDir);
-      expect(files).toEqual([]);
-    });
-
-    it("ignores non-Edit/Write tools", async () => {
-      const filePath = await copyFixture("valid.ts", tempDir);
-      const transcriptPath = join(tempDir, `transcript-read-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Read" }]));
-
-      const files = await parseTranscript(transcriptPath, tempDir);
-      expect(files).toEqual([]);
-    });
-
-    it("deduplicates file paths", async () => {
-      const filePath = await copyFixture("valid.ts", tempDir);
-      const transcriptPath = join(tempDir, `transcript-dup-${Date.now()}.jsonl`);
-      await Bun.write(
-        transcriptPath,
-        createTranscriptContent([
-          { path: filePath, tool: "Edit" },
-          { path: filePath, tool: "Edit" },
-        ]),
-      );
-
-      const files = await parseTranscript(transcriptPath, tempDir);
-      expect(files).toHaveLength(1);
-    });
-
-    it("filters out deleted files", async () => {
-      const transcriptPath = join(tempDir, `transcript-deleted-${Date.now()}.jsonl`);
-      await Bun.write(
-        transcriptPath,
-        createTranscriptContent([{ path: "/nonexistent/deleted.ts", tool: "Write" }]),
-      );
-
-      const files = await parseTranscript(transcriptPath, tempDir);
-      expect(files).toEqual([]);
-    });
-
-    it("filters out gitignored files but keeps tracked siblings", async () => {
-      const repoDir = await mkdtemp(join(tempDir, "ignored-transcript-"));
-      await execAsync("git init", { cwd: repoDir });
-      await Bun.write(join(repoDir, ".gitignore"), "tmp/\n");
-      const tracked = join(repoDir, "kept.ts");
-      const ignored = join(repoDir, "tmp", "scratch.ts");
-      await Bun.write(tracked, "export const a = 1;\n");
-      await Bun.write(ignored, "export const b = 2;\n");
-
-      const transcriptPath = join(tempDir, `transcript-gitignored-${Date.now()}.jsonl`);
-      await Bun.write(
-        transcriptPath,
-        createTranscriptContent([
-          { path: tracked, tool: "Write" },
-          { path: ignored, tool: "Write" },
-        ]),
-      );
-
-      const files = await parseTranscript(transcriptPath, tempDir);
-      expect(files).toEqual([tracked]);
-    });
-
-    // The nested checkout is its own working tree, which the outer ignore rules can't reach.
-    it("drops a checkout nested under the session repo's tmp/", async () => {
-      const repoDir = await mkdtemp(join(tempDir, "scratch-host-"));
-      await execAsync("git init", { cwd: repoDir });
-      const nested = join(repoDir, "tmp", "probe");
-      await mkdir(nested, { recursive: true });
-      await execAsync("git init", { cwd: nested });
-      const scratch = join(nested, "scratch.ts");
-      const kept = join(repoDir, "kept.ts");
-      await Bun.write(scratch, "export const a = 1;\n");
-      await Bun.write(kept, "export const b = 2;\n");
-
-      const transcriptPath = join(tempDir, `transcript-nested-${Date.now()}.jsonl`);
-      await Bun.write(
-        transcriptPath,
-        createTranscriptContent([
-          { path: scratch, tool: "Write" },
-          { path: kept, tool: "Write" },
-        ]),
-      );
-
-      expect(await parseTranscript(transcriptPath, repoDir)).toEqual([kept]);
-    });
-
-    // The whole-tree type check reaches tmp/ whatever the transcript held, so
-    // the repo config must ignore it too.
-    it("keeps the repo's tmp/ out of the whole-tree type check", async () => {
-      const repoRoot = join(import.meta.dirname, "..", "..", "..");
-      await mkdir(join(repoRoot, "tmp"), { recursive: true });
-      const scratch = await mkdtemp(join(repoRoot, "tmp", "ox-type-check-"));
-      try {
-        const broken = join(scratch, "broken.ts");
-        await Bun.write(broken, 'export const a: number = "x";\n');
-        const result = Bun.spawnSync(
-          [join(repoRoot, "node_modules", ".bin", "oxlint"), ...TYPE_CHECK_ARGS, broken],
-          { cwd: repoRoot },
-        );
-        expect(result.stdout.toString()).toBe("");
-        expect(result.exitCode).toBe(0);
-      } finally {
-        await rm(scratch, { recursive: true, force: true });
-      }
-    });
-
-    it("drops a file edited outside the session's working directory", async () => {
-      const outside = await mkdtemp(join(tmpdir(), "ox-scratchpad-"));
-      const scratch = join(outside, "probe.ts");
-      await Bun.write(scratch, "const a: any = 1;\n");
-      const inside = join(tempDir, "kept.ts");
-      await Bun.write(inside, "export const b = 1;\n");
-
-      const transcriptPath = join(tempDir, `transcript-outside-${Date.now()}.jsonl`);
-      await Bun.write(
-        transcriptPath,
-        createTranscriptContent([
-          { path: scratch, tool: "Write" },
-          { path: inside, tool: "Write" },
-        ]),
-      );
-
-      expect(await parseTranscript(transcriptPath, tempDir)).toEqual([inside]);
-      await rm(outside, { recursive: true, force: true });
-    });
-
-    // Git commits the link, never the file it names, so an external target's
-    // lint errors are not this project's to answer for.
-    it("follows a symlink out of the working directory but not one that stays in", async () => {
-      const outside = await mkdtemp(join(tmpdir(), "ox-symlink-target-"));
-      const external = join(outside, "external.ts");
-      await Bun.write(external, "const a: any = 1;\n");
-      const target = join(tempDir, `symlink-target-${Date.now()}.ts`);
-      await Bun.write(target, "export const b = 1;\n");
-
-      const crossing = join(tempDir, `crossing-${Date.now()}.ts`);
-      const internal = join(tempDir, `internal-${Date.now()}.ts`);
-      await execAsync(`ln -s "${external}" "${crossing}"`);
-      await execAsync(`ln -s "${target}" "${internal}"`);
-
-      const transcriptPath = join(tempDir, `transcript-symlink-${Date.now()}.jsonl`);
-      await Bun.write(
-        transcriptPath,
-        createTranscriptContent([
-          { path: crossing, tool: "Write" },
-          { path: internal, tool: "Write" },
-        ]),
-      );
-
-      expect(await parseTranscript(transcriptPath, tempDir)).toEqual([internal]);
-      await rm(outside, { recursive: true, force: true });
-    });
-
-    it("drops a symlink whose target no longer exists", async () => {
-      const dangling = join(tempDir, `dangling-${Date.now()}.ts`);
-      await execAsync(`ln -s "${join(tempDir, "never-written.ts")}" "${dangling}"`);
-
-      const transcriptPath = join(tempDir, `transcript-dangling-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: dangling, tool: "Write" }]));
-
-      expect(await parseTranscript(transcriptPath, tempDir)).toEqual([]);
-    });
-
-    it("does not shell-evaluate a path containing a command substitution", async () => {
-      const repoDir = await mkdtemp(join(tempDir, "injection-repo-"));
-      await execAsync("git init", { cwd: repoDir });
-      // isIgnored runs git with cwd = the file's directory, so a bare relative
-      // name is where the injected `touch` would land if a shell evaluated it.
-      const malicious = join(repoDir, "$(touch pwned).ts");
-      await Bun.write(malicious, "export const a = 1;\n");
-
-      const transcriptPath = join(tempDir, `transcript-injection-${Date.now()}.jsonl`);
-      await Bun.write(
-        transcriptPath,
-        createTranscriptContent([{ path: malicious, tool: "Write" }]),
-      );
-
-      const files = await parseTranscript(transcriptPath, tempDir);
-      expect(files).toEqual([malicious]);
-      expect(await Bun.file(join(repoDir, "pwned")).exists()).toBe(false);
     });
   });
 
@@ -544,31 +220,6 @@ describe("ox hook", () => {
     );
   });
 
-  describe("installed", () => {
-    it.each<{
-      name: string;
-      declared: boolean;
-      contents: "absent" | "empty" | "bun-types";
-      expected: boolean;
-    }>([
-      { name: "no node_modules", declared: false, contents: "absent", expected: false },
-      { name: "types undeclared", declared: false, contents: "empty", expected: true },
-      { name: "declared types missing", declared: true, contents: "empty", expected: false },
-      { name: "declared types present", declared: true, contents: "bun-types", expected: true },
-    ])("$name", async ({ declared, contents, expected }) => {
-      const root = await mkdtemp(join(tempDir, "installed-"));
-      const devDependencies = declared ? { "@types/bun": "^1.3.0" } : {};
-      await Bun.write(join(root, "package.json"), JSON.stringify({ devDependencies }));
-      if (contents === "empty") {
-        await mkdir(join(root, "node_modules"));
-      } else if (contents === "bun-types") {
-        await Bun.write(join(root, "node_modules/@types/bun/package.json"), "{}");
-      }
-
-      expect(await installed(root)).toBe(expected);
-    });
-  });
-
   describe("formatPostToolUseOutput", () => {
     function diagnostics(count: number): string {
       return Array.from({ length: count }, (_, line) => `a.ts:${line + 1}:1: error`).join("\n");
@@ -590,347 +241,12 @@ describe("ox hook", () => {
     });
   });
 
-  it("disables nested config discovery for the type-check pass", () => {
-    expect(TYPE_CHECK_ARGS).toContain("--disable-nested-config");
-  });
-
-  it("type-checks mods only where the generated engine types exist", async () => {
-    await Bun.write(join(tempDir, "plugins/typed/mod/register.ts"), "");
-    await Bun.write(join(tempDir, "plugins/typed/.claude-plugin/types/claude-code/index.d.ts"), "");
-    await Bun.write(join(tempDir, "plugins/untyped/mod/register.ts"), "");
-    expect(await typeCheckArgs(tempDir)).toEqual([
-      ...TYPE_CHECK_ARGS,
-      "--ignore-pattern",
-      "plugins/untyped/mod/**",
-    ]);
-  });
-
-  describe("processStop", () => {
-    // A session holding one lint error oxfmt cannot fix, stopped repeatedly.
-    // Each block-budget test drives its own so the on-disk count stays its own.
-    async function unfixableSession(session: string): Promise<string> {
-      const filePath = await copyFixture("unfixable.ts", await createGateRepo(tempDir));
-      const transcriptPath = join(tempDir, `transcript-${session}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
-      return transcriptPath;
-    }
-
-    it("records the stop's phase timings for the session index", async () => {
-      const session = `events-${Date.now()}`;
-      const transcript = await unfixableSession(session);
-
-      await processStop(mockStopHookInput(transcript, false, session));
-
-      const dir = stopEventsDir(session);
-      const [name] = await readdir(dir);
-      const record = z
-        .looseObject({ event_name: z.string(), attributes: z.record(z.string(), z.unknown()) })
-        .parse(JSON.parse(await Bun.file(join(dir, name ?? "")).text()));
-      expect(record.event_name).toBe("ox.stop");
-      expect(Object.keys(record.attributes).toSorted()).toEqual([
-        "duration_ms",
-        "files",
-        "format_ms",
-        "lint_ms",
-        "outcome",
-        "session.id",
-        "type_check_ms",
-      ]);
-      expect(record.attributes.outcome).toBe("block");
-    });
-
-    // A blocked Stop wakes the model to repair, and the Stop that follows
-    // carries stop_hook_active. Skipping the gate there ends the session on a
-    // repair nothing checked.
-    it("checks the re-entrant stop rather than skipping it", async () => {
-      const session = `reentrant-${Date.now()}`;
-      const transcript = await unfixableSession(session);
-
-      const result = await processStop(mockStopHookInput(transcript, true, session));
-
-      expect(result?.decision).toBe("block");
-      expect(result?.reason).toContain("no-dupe-keys");
-    });
-
-    // An error the model cannot clear would otherwise block every Stop forever.
-    it("gives way once the issues survive the block limit", async () => {
-      const session = `limit-${Date.now()}`;
-      const transcript = await unfixableSession(session);
-
-      const budget: (SyncHookJSONOutput | null)[] = [];
-      for (let stop = 0; stop < STOP_BLOCK_LIMIT; stop++) {
-        // oxlint-disable-next-line no-await-in-loop -- each stop increments the persisted block count that the next stop reads.
-        budget.push(await processStop(mockStopHookInput(transcript, stop > 0, session)));
-      }
-      const past = await processStop(mockStopHookInput(transcript, true, session));
-
-      expect(budget.map((result) => result?.decision)).toEqual(
-        Array.from({ length: STOP_BLOCK_LIMIT }, () => "block"),
-      );
-      expect(past?.decision).toBeUndefined();
-      expect(past?.systemMessage).toContain("no-dupe-keys");
-    });
-
-    // Blocking without a recorded count is the runaway itself: every re-entrant
-    // Stop would read zero and block again, with nothing to release it.
-    it("declines to block when the count cannot be recorded", async () => {
-      const session = `unwritable-${Date.now()}`;
-      const transcript = await unfixableSession(session);
-      // A directory where the state file goes, so every write to it fails.
-      await mkdir(blockCountPath(session), { recursive: true });
-
-      const result = await processStop(mockStopHookInput(transcript, false, session));
-
-      expect(result?.decision).toBeUndefined();
-      expect(result?.systemMessage).toContain("no-dupe-keys");
-    });
-
-    // The budget is per round. A Stop the model did not reach through a block
-    // ends the previous round, so the next one starts with its full count.
-    it("restarts the count on a stop that did not follow a block", async () => {
-      const session = `restart-${Date.now()}`;
-      const transcript = await unfixableSession(session);
-
-      await processStop(mockStopHookInput(transcript, false, session));
-      await processStop(mockStopHookInput(transcript, true, session));
-      const fresh = await processStop(mockStopHookInput(transcript, false, session));
-
-      expect(fresh?.decision).toBe("block");
-    });
-
-    it("returns null when no files were modified", async () => {
-      const transcriptPath = join(tempDir, `transcript-empty-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, "");
-
-      const input = mockStopHookInput(transcriptPath);
-      expect(await processStop(input)).toBeNull();
-    });
-
-    it("returns null when all files pass", async () => {
-      const filePath = await copyFixture("valid.ts", await createGateRepo(tempDir));
-      const transcriptPath = join(tempDir, `transcript-valid-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
-
-      const input = mockStopHookInput(transcriptPath);
-      expect(await processStop(input)).toBeNull();
-    });
-
-    it("auto-formats fixable deviations and allows stop", async () => {
-      const filePath = await copyFixture("fixable.ts", await createGateRepo(tempDir));
-      const transcriptPath = join(tempDir, `transcript-fixable-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
-
-      const input = mockStopHookInput(transcriptPath);
-      const result = await processStop(input);
-
-      expect(result).toBeNull();
-      expect(await Bun.file(filePath).text()).toContain("return a + b;");
-    });
-
-    it("returns block decision when issues cannot be auto-fixed", async () => {
-      const filePath = await copyFixture("unfixable.ts", await createGateRepo(tempDir));
-      const transcriptPath = join(tempDir, `transcript-unfixable-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
-
-      const input = mockStopHookInput(transcriptPath);
-      const result = await processStop(input);
-
-      expect(result).not.toBeNull();
-      expect(result?.decision).toBe("block");
-      expect(result?.reason).toContain("Ox check failed");
-      expect(result?.reason).toContain("no-dupe-keys");
-    });
-
-    it("returns null when the only modified file is ignored by ox config", async () => {
-      const filePath = await createIgnoredFixture(tempDir);
-      const transcriptPath = join(tempDir, `transcript-ignored-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
-
-      const input = mockStopHookInput(transcriptPath);
-      expect(await processStop(input)).toBeNull();
-    });
-
-    it("processes multiple files together", async () => {
-      const [validPath, fixablePath, unfixablePath] = await Promise.all([
-        copyFixture("valid.ts", tempDir),
-        copyFixture("fixable.ts", tempDir),
-        copyFixture("unfixable.ts", tempDir),
-      ]);
-
-      const transcriptPath = join(tempDir, `transcript-multi-${Date.now()}.jsonl`);
-      await Bun.write(
-        transcriptPath,
-        createTranscriptContent([
-          { path: validPath, tool: "Edit" },
-          { path: fixablePath, tool: "Write" },
-          { path: unfixablePath, tool: "Edit" },
-        ]),
-      );
-
-      const input = mockStopHookInput(transcriptPath);
-      const result = await processStop(input);
-
-      expect(result).not.toBeNull();
-      expect(result?.decision).toBe("block");
-      expect(result?.reason).toContain(unfixablePath);
-      expect(result?.reason).not.toContain(validPath);
-      expect(result?.reason).not.toContain(fixablePath);
-    });
-  });
-
-  describe("processPreToolUse", () => {
-    let repoDir: string;
-    let outerCwd: string;
-
-    beforeEach(async () => {
-      outerCwd = process.cwd();
-      repoDir = await mkdtemp(join(tempDir, "staged-"));
-      await execAsync("git init -q", { cwd: repoDir });
-      // Correctness rules are warnings by default, and the gate only sees a
-      // non-zero exit. This mirrors the repo's own .oxlintrc.json.
-      await Bun.write(
-        join(repoDir, ".oxlintrc.json"),
-        JSON.stringify({ categories: { correctness: "error" } }),
-      );
-      process.chdir(repoDir);
-    });
-
-    afterEach(() => {
-      process.chdir(outerCwd);
-    });
-
-    async function stage(name: string, content: string): Promise<string> {
-      const path = join(repoDir, name);
-      await Bun.write(path, content);
-      await execAsync(`git add ${name}`, { cwd: repoDir });
-      return path;
-    }
-
-    it("returns null when no staged files", async () => {
-      expect(await processPreToolUse(mockPreToolUseInput("git commit -m 'test'"))).toBeNull();
-    });
-
-    it("returns null when the staged files are clean", async () => {
-      await stage("clean.ts", "export const a = 1;\n");
-      expect(await processPreToolUse(mockPreToolUseInput("git commit -m x"))).toBeNull();
-    });
-
-    it("denies a commit whose staged files carry lint errors", async () => {
-      await stage("bad.ts", await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text());
-
-      const denial = deniedBy(await processPreToolUse(mockPreToolUseInput("git commit -m x")));
-      expect(denial?.permissionDecision).toBe("deny");
-      expect(denial?.permissionDecisionReason).toContain("no-dupe-keys");
-      // This repo has no node_modules, so the type pass has nothing to resolve
-      // imports against and drops out rather than blocking the commit.
-      expect(denial?.permissionDecisionReason).toContain(
-        "Types: skipped, dependencies are not installed here",
-      );
-    });
-
-    // The gate reads working-tree files, so a staged blob the working copy has
-    // moved on from would be committed unchecked.
-    it("denies a commit whose staged file has further unstaged edits", async () => {
-      const path = await stage("drift.ts", "export const a = 1;\n");
-      await Bun.write(path, "export const a = 2;\n");
-
-      const denial = deniedBy(await processPreToolUse(mockPreToolUseInput("git commit -m x")));
-      expect(denial?.permissionDecision).toBe("deny");
-      expect(denial?.permissionDecisionReason).toContain("drift.ts");
-      expect(denial?.permissionDecisionReason).toContain("Stage or stash");
-    });
-
-    // Reformatting on disk without restaging would leave the index holding the
-    // unformatted text the commit is about to record.
-    it("restages the formatting it applied", async () => {
-      await stage("messy.ts", "export const a = {  b:1 };\n");
-
-      expect(await processPreToolUse(mockPreToolUseInput("git commit -m x"))).toBeNull();
-
-      const { stdout } = await execAsync("git diff --name-only", { cwd: repoDir });
-      expect(stdout.trim()).toBe("");
-    });
-
-    // The Bash matcher fails open on shell metacharacters, so these reach the
-    // hook and must not be able to deny.
-    test.each<[string]>([
-      ["echo hi > $TMPDIR/probe.txt"],
-      ["{ echo one; echo two; }"],
-      ["for f in *.ts; do wc -l $f; done"],
-      ["cat <<'EOF' > notes.md\nnothing here\nEOF"],
-    ])("returns null for %p", async (command) => {
-      expect(await processPreToolUse(mockPreToolUseInput(command))).toBeNull();
-    });
-  });
-
-  // Stop and the commit gate share one pipeline, so these cover what differs:
-  // the closing verb, and the fact that both batch file paths into a command.
-  describe("runOxGate", () => {
-    it("names the blocked action in the reason", async () => {
-      const filePath = await copyFixture("unfixable.ts", await createGateRepo(tempDir));
-      const transcriptPath = join(tempDir, `transcript-verb-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
-
-      const result = await processStop(mockStopHookInput(transcriptPath));
-      expect(result?.reason).toContain("Fix these issues before stopping.");
-    });
-
-    it("does not shell-evaluate a batched path containing a command substitution", async () => {
-      const filePath = join(tempDir, "$(touch pwned)", "unfixable.ts");
-      await Bun.write(filePath, await Bun.file(join(FIXTURES_DIR, "unfixable.ts")).text());
-
-      const transcriptPath = join(tempDir, `transcript-hostile-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
-
-      const result = await processStop(mockStopHookInput(transcriptPath));
-
-      expect(await Bun.file(join(tempDir, "pwned")).exists()).toBe(false);
-      expect(result?.reason).toContain("no-dupe-keys");
-    });
-  });
-
-  describe("invokesGitCommit", () => {
-    test.each<[string, boolean]>([
-      ["git commit", true],
-      ["git -C /repo commit -m x", true],
-      ["git -c user.name=x commit", true],
-      ["git add . && git commit -m x", true],
-      ["echo hi > $TMPDIR/probe.txt", false],
-      ["git log --grep commit", false],
-      ["echo 'run git commit next'", false],
-    ])("%p → %p", (command, expected) => {
-      expect(invokesGitCommit(command)).toBe(expected);
-    });
-  });
-
-  describe("processInput", () => {
-    it("routes PostToolUse events correctly", async () => {
-      const filePath = await copyFixture("unfixable.ts", tempDir);
-      const input = mockPostToolUseInput("Write", { file_path: filePath });
-      const result = await processInput(input);
-
-      expect(result?.hookSpecificOutput).toBeDefined();
-    });
-
-    it("routes Stop events correctly", async () => {
-      const filePath = await copyFixture("unfixable.ts", await createGateRepo(tempDir));
-      const transcriptPath = join(tempDir, `transcript-route-${Date.now()}.jsonl`);
-      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Write" }]));
-
-      const input = mockStopHookInput(transcriptPath);
-      const result = await processInput(input);
-
-      expect(result?.decision).toBe("block");
-    });
-
-    test.each([
-      { title: "an unrecognized event", value: { hook_event_name: "Unknown" } },
-      { title: "a missing event name", value: {} },
-      { title: "PostToolUse without a tool name", value: { hook_event_name: "PostToolUse" } },
-      { title: "Stop without a transcript path", value: { hook_event_name: "Stop" } },
-      { title: "a non-object payload", value: "Stop" },
-    ])("the boundary rejects $title", ({ value }) => {
-      expect(HookInput.safeParse(value).success).toBe(false);
-    });
+  test.each([
+    { title: "an unrecognized event", value: { hook_event_name: "Unknown" } },
+    { title: "a missing event name", value: {} },
+    { title: "PostToolUse without a tool name", value: { hook_event_name: "PostToolUse" } },
+    { title: "a non-object payload", value: "PostToolUse" },
+  ])("the boundary rejects $title", ({ value }) => {
+    expect(HookInput.safeParse(value).success).toBe(false);
   });
 });

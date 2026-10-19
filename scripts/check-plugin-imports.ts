@@ -14,33 +14,38 @@ const VIOLATION_EXIT = 2;
 const rootDir = join(import.meta.dirname, "..");
 const pluginsDir = join(rootDir, "plugins");
 
-async function getPluginDirs(): Promise<string[]> {
-  const args = process.argv.slice(2);
-  if (args.length > 0) {
-    return args.map((arg) => resolve(arg));
-  }
-
-  const plugins = await loadPlugins();
-  return plugins.flatMap((p) => (p.dir != null && p.dir !== "" ? [p.dir] : []));
+/** Plugin-relative paths of the files given under one plugin, or all of its sources. */
+async function sources(pluginDir: string, files: string[] | undefined): Promise<string[]> {
+  const paths =
+    files ?? (await Array.fromAsync(new Glob("**/*.{ts,tsx}").scan({ cwd: pluginDir })));
+  return paths.filter(
+    (path) =>
+      !path.includes("node_modules") &&
+      !path.includes(".bun-cache") &&
+      // Eval harnesses only ever run from the repo checkout, so they may
+      // import packages/ like any other repo script.
+      !path.split("/").includes("evals"),
+  );
 }
 
-async function checkPlugin(pluginDir: string): Promise<string[]> {
+async function checkPlugin(pluginDir: string, files?: string[]): Promise<string[]> {
   const violations: string[] = [];
   const pluginName = relative(pluginsDir, pluginDir);
-  const glob = new Glob("**/*.{ts,tsx}");
 
-  for await (const path of glob.scan({ cwd: pluginDir })) {
-    if (path.includes("node_modules") || path.includes(".bun-cache")) continue;
-    // Eval harnesses only ever run from the repo checkout, so they may
-    // import packages/ like any other repo script.
-    if (path.split("/").includes("evals")) continue;
+  const read = await Promise.all(
+    (await sources(pluginDir, files)).map(async (path) => ({
+      path,
+      text: await Bun.file(join(pluginDir, path))
+        .text()
+        .catch(() => null),
+    })),
+  );
 
+  for (const { path, text } of read) {
+    if (text === null) continue;
     const filePath = join(pluginDir, path);
 
-    for (const specifier of scanImports(
-      await Bun.file(filePath).text(),
-      path.endsWith(".tsx") ? "tsx" : "ts",
-    )) {
+    for (const specifier of scanImports(text, path.endsWith(".tsx") ? "tsx" : "ts")) {
       if (!specifier.startsWith(".")) continue;
 
       const resolved = resolve(dirname(filePath), specifier);
@@ -57,14 +62,36 @@ async function checkPlugin(pluginDir: string): Promise<string[]> {
   return violations;
 }
 
-export async function findViolations(): Promise<string[]> {
-  const pluginDirs = await getPluginDirs();
-  const results = await Promise.all(pluginDirs.map(checkPlugin));
+/** Checks the source files given, or every plugin's sources. */
+export async function findViolations(files: string[] = []): Promise<string[]> {
+  if (files.length === 0) {
+    const plugins = await loadPlugins();
+    const dirs = plugins.flatMap((p) => (p.dir != null && p.dir !== "" ? [p.dir] : []));
+    return (await Promise.all(dirs.map((dir) => checkPlugin(dir)))).flat();
+  }
+
+  const byPlugin = Map.groupBy(
+    files.flatMap((file) => {
+      const [name, ...rest] = relative(pluginsDir, resolve(rootDir, file)).split("/");
+      return name === undefined || name === ".." || rest.length === 0
+        ? []
+        : [{ dir: join(pluginsDir, name), path: rest.join("/") }];
+    }),
+    ({ dir }) => dir,
+  );
+  const results = await Promise.all(
+    [...byPlugin].map(([dir, entries]) =>
+      checkPlugin(
+        dir,
+        entries.map(({ path }) => path),
+      ),
+    ),
+  );
   return results.flat();
 }
 
 if (import.meta.main) {
-  await runCheck(findViolations, {
+  await runCheck(() => findViolations(process.argv.slice(2)), {
     stream: "stderr",
     indent: false,
     failureExit: VIOLATION_EXIT,

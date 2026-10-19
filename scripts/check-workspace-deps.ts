@@ -84,7 +84,12 @@ export function protectedWorkspaces(dirs: string[]): string[] {
   return dirs.filter((dir) => dir === ".claude" || dir.startsWith(".claude/"));
 }
 
-export async function findViolations(): Promise<string[]> {
+/**
+ * Checks the files given, or every tracked source. A manifest among them widens
+ * the check to every source in its workspace, since dropping a dependency can
+ * break a file that did not change.
+ */
+export async function findViolations(changed: string[] = []): Promise<string[]> {
   const cwd = join(import.meta.dirname, "..");
   const [root, trackedManifests, sources] = await Promise.all([
     decodeFile(PackageJson, join(cwd, "package.json")),
@@ -110,9 +115,17 @@ export async function findViolations(): Promise<string[]> {
     }),
   );
 
+  const widened = new Set(
+    changed.filter((file) => basename(file) === "package.json").map((file) => dirname(file)),
+  );
+  const targets = new Set(changed);
+  const inScope = (file: string): boolean =>
+    changed.length === 0 || targets.has(file) || widened.has(owningWorkspace(file, dirs));
+
   // A mod imports only its own files and the engine-supplied `claude-code`.
   const files = sources.filter(
     (file) =>
+      inScope(file) &&
       !file.endsWith(".d.ts") &&
       !/(^|\/)(fixtures\/|evals\/.*\/examples\/)/.test(file) &&
       !/^plugins\/[^/]+\/mod\//.test(file),
@@ -161,7 +174,7 @@ export async function findViolations(): Promise<string[]> {
 }
 
 if (import.meta.main) {
-  await runCheck(findViolations, {
+  await runCheck(() => findViolations(process.argv.slice(2)), {
     stream: "stderr",
     indent: false,
     failureExit: VIOLATION_EXIT,

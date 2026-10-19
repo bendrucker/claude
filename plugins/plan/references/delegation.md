@@ -1,24 +1,16 @@
 # Delegation
 
-A subagent inherits the orchestrator's model unless the spawn or the agent definition sets one, so an expensive orchestrator spawns expensive subagents by default.
-
-When the orchestrator runs on an expensive model (Opus, Fable, Mythos), the plan must carry a Delegation section that lays out the agent/model/effort DAG:
+This plan is large enough to split across agents. A subagent inherits the orchestrator's model unless the spawn or its definition sets one, so give the plan a `## Delegation` section that lays out the agent/model/effort DAG:
 
 - Which slices delegate to which `model` and `effort`, and which stay on the orchestrator.
-- Where checkpoints sit. A checkpoint is a slice whose output the orchestrator reads before the next slice starts.
-- What runs in sequence versus parallel.
+- Where checkpoints sit: slices whose output the orchestrator reads before the next starts.
+- What runs in sequence and what runs in parallel.
 
-## Defaults
+Match the model to the work:
 
-Match the model to the work, not to the orchestrator:
+- Narrow, high-token, low-reasoning work (logs, mechanical edits, grep sweeps): **Haiku**, `effort: low` for a bounded tool task, `medium` for agentic work.
+- Bounded implementation or research on a settled question: **Sonnet**.
+- Coding under a Fable orchestrator: **Opus**.
+- The orchestrator's own model: design forks, cross-slice synthesis, judgment a subagent cannot hold.
 
-- Narrow, well-specified, high-token, low-reasoning work (reading logs, mechanical edits, grep sweeps) goes to **Haiku**, at `effort: low` for a bounded tool task and `medium` for agentic work.
-- General-purpose work (bounded implementation, research with a settled question) goes to **Sonnet**.
-- Coding under a Fable orchestrator goes to **Opus**.
-- Reserve the orchestrator's own model for genuine reasoning: design forks, cross-slice synthesis, judgment a subagent cannot hold.
-
-## Levers
-
-- **Task-tool `model` override**: set `model` on the spawn. It wins over the subagent's frontmatter.
-- **Subagent frontmatter** `model:` (`haiku`/`sonnet`/`opus`/`fable`) and `effort:` (`low`/`medium`/`high`/`xhigh`/`max`): the default when a spawn sets neither.
-- **`subagent_type`**: a purpose-built agent that already pins a cheaper model (for example `github:logs` on Haiku) delegates down with no per-spawn override.
+Set `model` on the spawn (it beats the agent's frontmatter), or pick a `subagent_type` that already pins a cheaper model, such as `github:logs` on Haiku.

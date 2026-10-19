@@ -36,7 +36,7 @@ Every tool keys on that directory. The root tsconfig and `bun test` skip it, and
 { "extends": "../../../tsconfig.mod.json", "include": ["../.claude-plugin/types", "../../mod-events/types", "."] }
 ```
 
-The declarations override Bun's web globals, so mod files stay out of the root program. The `ox` hook skips a mod whose plugin has no types yet.
+The declarations override Bun's web globals, so mod files stay out of the root program. The commit gate (`scripts/type-check.ts`) skips a mod whose plugin has no types yet.
 
 A mod that draws UI through `ui.render` is written in `.tsx`, and its tsconfig adds `"jsx": "react"`, `"jsxFactory": "h"`, and `"jsxFragmentFactory": "Fragment"` to match the engine's JSX globals. It also adds `"allowImportingTsExtensions": true` so its tests can import `./register.tsx`. [`plugins/run-command/mod/tsconfig.json`](../../plugins/run-command/mod/tsconfig.json) is the example.
 

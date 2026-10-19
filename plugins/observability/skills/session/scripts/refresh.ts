@@ -33,7 +33,7 @@ const argv = cli({
     compact: {
       type: Boolean,
       description:
-        "Compact the database into a fresh copy, applying a pending rewrite of raw first. Implies --refresh",
+        "Compact the database into a fresh copy at STORAGE_VERSION, applying a pending rewrite of raw first. Implies --refresh",
       default: false,
     },
   },

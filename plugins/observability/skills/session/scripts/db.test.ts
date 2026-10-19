@@ -1924,6 +1924,49 @@ describe("compactDatabase", () => {
   });
 });
 
+describe("storage version", () => {
+  const storage = (table: string) =>
+    db.query(
+      `SELECT DISTINCT compression FROM pragma_storage_info('${table}') WHERE column_name = 'data'`,
+      z.object({ compression: z.string() }),
+    );
+
+  const version = async () =>
+    (
+      await db.query(
+        "SELECT tags['storage_version'] AS v FROM duckdb_databases() WHERE database_name = current_database()",
+        z.object({ v: z.string() }),
+      )
+    )[0]?.v;
+
+  it("compacts a file in an older format into one that stores long strings with ZSTD", async () => {
+    // Only long lines, since the compressor picks per segment and short ones favor
+    // dictionary encodings.
+    await db.run("DELETE FROM raw");
+    await db.run(
+      `INSERT INTO raw (host, source_file, source_line, data)
+       SELECT 'local', '/long.jsonl', i, json_object('text', repeat('long line ', 2000) || i)
+       FROM range(20) t(i)`,
+    );
+    await db.run(`ATTACH '${join(tmpDir, "legacy.duckdb")}' AS legacy (STORAGE_VERSION 'v1.0.0')`);
+    await db.run("COPY FROM DATABASE session TO legacy");
+    await db.run("DETACH legacy");
+    db.close();
+    await $`mv ${join(tmpDir, "legacy.duckdb")} ${sessionDbPath(tmpDir)}`.quiet();
+
+    db = await getDb(tmpDir);
+    expect(await version()).toBe("v1.0.0+");
+    expect((await storage("raw")).map((r) => r.compression)).not.toContain("ZSTD");
+    db.close();
+
+    await compactDatabase(tmpDir);
+
+    db = await getDb(tmpDir);
+    expect(await version()).toBe("v1.2.0+");
+    expect((await storage("raw")).map((r) => r.compression)).toContain("ZSTD");
+  });
+});
+
 describe("source_line", () => {
   it("numbers ingested rows 1..N per file", async () => {
     const rows = await db.query(

@@ -47,18 +47,26 @@ export interface HostEntry {
   policy: HostPolicy;
 }
 
+// The oldest storage format that compresses a string too long to inline (most of
+// raw.data and content_items' text) with ZSTD. Older formats store those uncompressed,
+// about 6x larger. Every reader opens it: CLI 1.5.6, @duckdb/node-api 1.5.0. It applies
+// to a file when the file is created, so an existing one adopts it through
+// compactDatabase.
+export const STORAGE_VERSION = "v1.2.0";
+
 // The writer holds the file exclusively and runs alone, so it gets twice a
 // reader's budget. Insertion order stays off so bulk imports can spill instead
 // of pinning blocks up to the memory limit.
-const WRITER_LIMITS = {
+const WRITER_CONFIG = {
   memory_limit: "8GiB",
   threads: "4",
   max_temp_directory_size: "32GiB",
   preserve_insertion_order: "false",
+  storage_compatibility_version: STORAGE_VERSION,
 };
 
 async function createDatabase(dbPath: string): Promise<Database> {
-  const instance = await DuckDBInstance.create(dbPath, WRITER_LIMITS);
+  const instance = await DuckDBInstance.create(dbPath, WRITER_CONFIG);
   const connection = await instance.connect();
 
   return {
@@ -615,7 +623,9 @@ export async function compactDatabase(dataDir: string): Promise<void> {
 
   const db = await createDatabase(dbPath);
   try {
-    await db.run(`ATTACH '${newPath.replaceAll("'", "''")}' AS compacted`);
+    await db.run(
+      `ATTACH '${newPath.replaceAll("'", "''")}' AS compacted (STORAGE_VERSION '${STORAGE_VERSION}')`,
+    );
     await db.run("COPY FROM DATABASE session TO compacted");
     await db.run("DETACH compacted");
   } finally {

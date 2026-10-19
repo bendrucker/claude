@@ -2,7 +2,7 @@
 
 Retire memories that have graduated or gone stale: enumerate the memory store, classify each memory by type, and propose deletions for approval.
 
-The store is not under version control, so every deletion is irreversible, and both classification signals are fuzzy heuristics: a merged PR does not prove a project is finished, and a nearby rule does not prove a lesson is enforced. Every verdict is a proposal, never an automatic delete. Sweep never runs in the `discover --scheduled` path or any other unattended path, and never deletes or files without asking. Cadence is monthly and on-demand.
+The store is not under version control, so every deletion is irreversible, and both classification signals are fuzzy heuristics: a merged PR does not prove a project is finished, and a nearby rule does not prove a lesson is enforced. Every verdict is a proposal, never an automatic delete. Sweep never runs unattended, and never deletes or files without asking. Cadence is monthly and on-demand.
 
 ## Enumerate
 

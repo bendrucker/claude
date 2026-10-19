@@ -10,7 +10,7 @@ Match the model and effort to the work. Name both for every delegated slice, sin
 
 - Narrow, high-token, low-reasoning work (logs, mechanical edits, grep sweeps): **Haiku**, `effort: low` for a bounded tool task, `medium` for agentic work.
 - Bounded implementation or research on a settled question: **Sonnet**, `effort: medium`, or `high` when the slice must weigh options.
-- Coding under a Fable orchestrator: **Opus**, `effort: high`, or `xhigh` for a hard bug or a cross-module change.
-- The orchestrator's own model: design forks, cross-slice synthesis, judgment a subagent cannot hold. A same-model subagent takes `high` unless the slice is mechanical.
+- Coding under a Fable orchestrator: **Opus**, `effort: medium` for a slice the plan already specifies, `high` for a hard bug or a cross-module change.
+- The orchestrator's own model: design forks, cross-slice synthesis, judgment a subagent cannot hold. A same-model subagent takes `medium`, or `high` when the slice carries a judgment call.
 
 Set `model` and `effort` on the spawn (they beat the agent's frontmatter), or pick a `subagent_type` that already pins both, such as `github:logs` on Haiku at `low`.

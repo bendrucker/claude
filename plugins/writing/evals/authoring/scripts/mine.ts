@@ -8,6 +8,8 @@ import { visit } from "unist-util-visit";
 import { z } from "zod";
 import { decodeJson } from "../../../../../packages/decode/index";
 import { mapPool } from "../../../../../packages/evals/pool";
+import { getDataDir, sessionDbPath } from "../../../../observability/skills/session/scripts/db";
+import { cliAdapter, runQuery } from "../../../../observability/skills/session/scripts/query";
 
 // GitHub's secondary rate limit penalizes concurrent requests from one token.
 const GITHUB_CONCURRENCY = 1;
@@ -401,21 +403,8 @@ const ToolCall = z.looseObject({
   file_path: z.string().nullable(),
 });
 
-async function queryDuckdb<T>(dbPath: string, sql: string, schema: z.ZodType<T>): Promise<T[]> {
-  const proc = Bun.spawn(["duckdb", "-readonly", "-json", dbPath], {
-    stdin: new TextEncoder().encode(sql),
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [out, err, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  if (code !== 0) throw new Error(`duckdb failed (${code}): ${err.trim()}`);
-  const trimmed = out.trim();
-  if (trimmed === "") return [];
-  return decodeJson(z.array(schema), trimmed, `duckdb ${dbPath}`);
+function queryDuckdb<T>(dbPath: string, sql: string, schema: z.ZodType<T>): Promise<T[]> {
+  return runQuery(cliAdapter(dbPath), { sql }, schema);
 }
 
 async function queryLinkedPrKeys(dbPath: string): Promise<Set<string>> {
@@ -826,10 +815,7 @@ async function writeOriginals(dataDir: string, items: SplitCandidate[]): Promise
 }
 
 function resolveDbPath(db: string | undefined): string {
-  if (db != null && db !== "") return db;
-  const dataHome = process.env.XDG_DATA_HOME ?? join(process.env.HOME ?? "", ".local", "share");
-  const dataDir = process.env.CLAUDE_SESSION_INDEX_DIR ?? join(dataHome, "claude-sessions");
-  return join(dataDir, "session.duckdb");
+  return db != null && db !== "" ? db : sessionDbPath(getDataDir());
 }
 
 interface MineFlags {
@@ -846,7 +832,7 @@ async function main(flags: MineFlags) {
   const dbPath = resolveDbPath(flags.db);
   if (!(await Bun.file(dbPath).exists())) {
     console.error(`No session index at ${dbPath}.`);
-    console.error("Build it first: bun plugins/claude-code/skills/session/scripts/refresh.ts");
+    console.error("Build it first: bun plugins/observability/skills/session/scripts/refresh.ts");
     process.exit(1);
   }
 

@@ -2,6 +2,7 @@
 import { join } from "node:path";
 import { z } from "zod";
 import { getDataDir, sessionDbPath } from "./db";
+import { emit, errorClass } from "./events";
 import { cliAdapter, runQuery } from "./query";
 
 // The surfaces ad-hoc SQL actually reads, most-used first. Ten covers 81% of measured
@@ -53,7 +54,13 @@ async function liveMap(): Promise<string> {
 export async function schemaMap(): Promise<string> {
   try {
     return await liveMap();
-  } catch {
+  } catch (error) {
+    await emit({
+      event: "query",
+      ok: false,
+      ms: 0,
+      detail: { name: "schema-map", fallback: true, error: errorClass(error) },
+    });
     return (await Bun.file(FALLBACK_PATH).text()).trim();
   }
 }

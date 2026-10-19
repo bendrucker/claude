@@ -336,6 +336,7 @@
         "~/.coderabbit",
         "~/.agent-browser",
         "~/.claude/plans",
+        "~/.claude/mod-events",
         "/dev/fd",
         "/var/folders/*/*/T/**/*"
       ]

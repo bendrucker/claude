@@ -83,6 +83,7 @@ The rest are tool caches and state directories holding no credential material:
 - `~/Library/Caches/golangci-lint`: the analysis cache. Without it `golangci-lint run` warns on every facts-cache write and reanalyzes from scratch. **Drop it** when no Go repo is in rotation.
 - `~/Library/Caches/com.apple.python`: where Apple's `/usr/bin/python3` writes bytecode, through a `pycache_prefix` it sets itself. Without it each import of a script under the session tree fails its `.pyc` write. Setting `PYTHONPYCACHEPREFIX` in `env` cannot replace this, because `env` values are not expanded and the path needs the home directory. **Drop it** when no script runs under the system Python.
 - `~/.claude/plans`: saved plan files, which copying one in fails without. No injected deny shadows it, unlike the `~/.claude` paths below. Permanent unless plan files move out of `~/.claude`.
+- `~/.claude/mod-events`: `session-index.query` events from the session skill's sandboxed readers (`usage.ts`, `schema.ts`, eval miners). **Drop it** when no sandboxed script emits them.
 
 ## Sockets and Local Binding
 

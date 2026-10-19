@@ -6,7 +6,8 @@
 --   emitted, how many failed, and where the sessions were reached from.
 -- description: >-
 --   One row per (`mod`, `week`, `event_name`), read from `mod_events`, which the mod-events
---   plugin writes for every mod that depends on it.
+--   plugin writes for every mod that depends on it. `session-index` rows are this skill's
+--   own refresh and query events.
 --
 --   Each mod emits `<mod>.session.start` once per session it loads in, so `sessions` on that
 --   row is the mod's reach and a mod missing from a week was not loaded. `failed` counts

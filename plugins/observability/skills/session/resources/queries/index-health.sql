@@ -20,7 +20,8 @@
 --   corpus, so cross-host queries read a dead snapshot as an idle machine. `disk-not-indexed`
 --   is JSONL files on disk missing from the index, which also catches files created since
 --   the last refresh, so rerun `refresh.ts --refresh` before reading one as a refresh
---   failure or glob drift.
+--   failure or glob drift. `refresh-health` is a slow indexing p90, or any lock-yield or
+--   error refresh.
 --
 --   Info. `stream-migrated` is the same silence with a registered successor field still
 --   arriving on another record type, named in `detail`, so the kind's zero is a rename
@@ -46,6 +47,12 @@
 --   - name: deny_window_days
 --     default: 30
 --     meaning: hook-deny-invisible window
+--   - name: refresh_days
+--     default: 7
+--     meaning: refresh-health window
+--   - name: refresh_slow_ms
+--     default: 30000
+--     meaning: refresh-health p90 ceiling
 --   - name: projects_glob
 --     default: '~/.claude/projects/**/*.jsonl'
 --     meaning: >-
@@ -307,6 +314,25 @@ disk_vanished AS (
   WHERE d.file IS NULL
   HAVING COUNT(*) > 0
 ),
+refresh_health AS (
+  SELECT
+    'refresh-health' AS check_name,
+    CASE WHEN quantile_cont(duration_ms, 0.9) FILTER (WHERE outcome IN ('indexed', 'compacted'))
+              > COALESCE(TRY_CAST(getvariable('refresh_slow_ms') AS INTEGER), 30000)
+           OR COUNT(*) FILTER (WHERE outcome IN ('lock-yield', 'error')) > 0
+         THEN 'alert' ELSE 'info' END AS status,
+    COUNT(*) || ' refreshes' AS subject,
+    'indexing p90 ' || COALESCE(round(quantile_cont(duration_ms, 0.9) FILTER (WHERE outcome IN ('indexed', 'compacted')))::BIGINT || ' ms', 'n/a')
+      || '; outcomes ' || histogram(outcome)::VARCHAR
+      || COALESCE('; errors: ' || string_agg(DISTINCT attributes->>'error', ', '), '') AS detail
+  FROM (
+    SELECT attributes->>'outcome' AS outcome, duration_ms, attributes
+    FROM mod_events, corpus c
+    WHERE event_name = 'session-index.refresh'
+      AND ts >= c.max_ts - INTERVAL (COALESCE(TRY_CAST(getvariable('refresh_days') AS INTEGER), 7)) DAY
+  )
+  HAVING COUNT(*) > 0
+),
 window_info AS (
   SELECT
     'corpus-window' AS check_name,
@@ -323,6 +349,7 @@ combined AS (
   UNION ALL SELECT * FROM deny_visibility
   UNION ALL SELECT * FROM new_kinds
   UNION ALL SELECT * FROM null_ts_summary
+  UNION ALL SELECT * FROM refresh_health
   UNION ALL SELECT * FROM disk_vanished
   UNION ALL SELECT * FROM window_info
 )

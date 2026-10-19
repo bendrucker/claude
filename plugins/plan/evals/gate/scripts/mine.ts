@@ -3,7 +3,8 @@ import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
-import { decodeJson } from "../../../../../packages/decode/index";
+import { getDataDir, sessionDbPath } from "../../../../observability/skills/session/scripts/db";
+import { cliAdapter, runQuery } from "../../../../observability/skills/session/scripts/query";
 import { classifyResponse, type Present } from "../../../hooks/decisions";
 
 // Mine every ExitPlanMode presentation since the gate switched to deny (#1216,
@@ -88,26 +89,12 @@ export function toPresent(row: z.infer<typeof MinedRow>): Present {
 }
 
 function resolveDbPath(db: string | undefined): string {
-  if (db != null && db !== "") return db;
-  const dataHome = process.env.XDG_DATA_HOME ?? join(process.env.HOME ?? "", ".local", "share");
-  const dataDir = process.env.CLAUDE_SESSION_INDEX_DIR ?? join(dataHome, "claude-sessions");
-  return join(dataDir, "session.duckdb");
+  return db != null && db !== "" ? db : sessionDbPath(getDataDir());
 }
 
 async function queryPresents(dbPath: string, since: string): Promise<Present[]> {
-  const proc = Bun.spawn(["duckdb", "-readonly", "-json", dbPath, "-c", sql(since)], {
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [stdout, stderr, code] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  if (code !== 0) throw new Error(`duckdb failed (exit ${code})\n${stderr}`);
-  const text = stdout.trim();
-  if (text === "") return [];
-  return decodeJson(z.array(MinedRow), text, `duckdb ${dbPath}`).map(toPresent);
+  const rows = await runQuery(cliAdapter(dbPath), { sql: sql(since) }, MinedRow);
+  return rows.map(toPresent);
 }
 
 export const program = new Command("mine")

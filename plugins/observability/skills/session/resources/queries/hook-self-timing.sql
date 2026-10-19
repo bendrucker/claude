@@ -1,6 +1,5 @@
 -- ---
 -- name: hook-self-timing
--- tier: 2
 -- dimensions: [hook-latency]
 -- reads: disk
 -- summary: >-

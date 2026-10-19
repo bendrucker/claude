@@ -1,6 +1,5 @@
 -- ---
 -- name: classifier
--- tier: 2
 -- summary: >-
 --   Auto-mode classifier volume and latency, the permission stall on every dispatched call,
 --   the allow rules auto mode dropped, and which calls the engine routed to the classifier.

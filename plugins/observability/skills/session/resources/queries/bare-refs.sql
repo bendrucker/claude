@@ -1,6 +1,5 @@
 -- ---
 -- name: bare-refs
--- tier: 1
 -- summary: >-
 --   How often main-thread assistant prose cites a PR, issue, or ticket as a bare ID
 --   (`#N`, `repo#N`, `!N`, `ENG-123`) instead of a markdown link or URL.

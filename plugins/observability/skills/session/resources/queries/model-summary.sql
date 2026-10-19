@@ -1,6 +1,5 @@
 -- ---
 -- name: model-summary
--- tier: 1
 -- summary: Assistant text item, message, session, and character counts per model.
 -- description: >-
 --   Reads `text_content`, so it measures prose volume rather than tokens. Use

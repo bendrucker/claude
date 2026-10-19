@@ -1,6 +1,5 @@
 -- ---
 -- name: skill-config-vs-observed
--- tier: 1
 -- reads: disk
 -- extensions: [yaml]
 -- summary: >-

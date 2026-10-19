@@ -1,6 +1,5 @@
 -- ---
 -- name: plan-iterations
--- tier: 1
 -- dimensions: [planning]
 -- summary: >-
 --   One row per ExitPlanMode present, ordered within a session, measuring the append-only

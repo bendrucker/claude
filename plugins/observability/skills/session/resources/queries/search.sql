@@ -1,6 +1,5 @@
 -- ---
 -- name: search
--- tier: 1
 -- summary: >-
 --   Find sessions by keyword, ranked by BM25 over each session's label, typed prompts and
 --   main-thread assistant prose.

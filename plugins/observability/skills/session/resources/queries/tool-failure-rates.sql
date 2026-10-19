@@ -1,6 +1,5 @@
 -- ---
 -- name: tool-failure-rates
--- tier: 2
 -- dimensions: [tool-failures]
 -- summary: >-
 --   Per-tool failure rates over calls that ran, with the failures grouped by normalized

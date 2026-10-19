@@ -1,6 +1,5 @@
 -- ---
 -- name: activity
--- tier: 1
 -- summary: >-
 --   Session interaction profile: one row per prompt source, plus interruptions, queued
 --   goals, scheduled fires, compactions, API retries, hook friction, and the distribution

@@ -1,6 +1,5 @@
 -- ---
 -- name: hook-blocks
--- tier: 1
 -- summary: >-
 --   Hook overfiring, blocking events grouped by hook and normalized reason signature,
 --   including the PreToolUse denies `hook_events` never records.

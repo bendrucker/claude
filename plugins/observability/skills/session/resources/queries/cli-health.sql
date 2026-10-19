@@ -1,6 +1,5 @@
 -- ---
 -- name: cli-health
--- tier: 2
 -- dimensions: [tool-failures]
 -- summary: >-
 --   Bash calls grouped by the program they run, with error rates that count SQL errors a

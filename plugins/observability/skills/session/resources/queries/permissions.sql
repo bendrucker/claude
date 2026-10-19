@@ -1,6 +1,5 @@
 -- ---
 -- name: permissions
--- tier: 1
 -- summary: >-
 --   Denied tool calls, one row per denial, with the mechanism that stopped it and the
 --   signal that answered.

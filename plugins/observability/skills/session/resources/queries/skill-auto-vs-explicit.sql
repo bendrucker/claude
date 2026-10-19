@@ -1,6 +1,5 @@
 -- ---
 -- name: skill-auto-vs-explicit
--- tier: 1
 -- dimensions: [skill-economy]
 -- summary: >-
 --   Per skill, how invocations split between the model choosing it (`model_auto`), another

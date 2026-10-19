@@ -1,6 +1,5 @@
 -- ---
 -- name: hook-block-then-retry-success
--- tier: 1
 -- dimensions: [hook-blocks]
 -- summary: >-
 --   Per hook, blocks that were retried away by a same-hook success in the same session

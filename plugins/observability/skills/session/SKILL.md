@@ -76,21 +76,17 @@ The eleven that carry most of the measured usage:
 - `usage-timeline`: one session's token burn per time bucket, with estimated cost and a context-size proxy.
 - `outcomes`: session terminal states (shipped, abandoned-with-edits, handed off, no artifact), the outcome side the activity queries never measure.
 
-The rest, by name, described in [`references/catalog.md`](references/catalog.md):
+The rest, by name:
 
-- Sessions and prose: `search`, `text-export`, `model-summary`, `bare-refs`
-- Tool use and friction: `stats`, `permissions`
-- Hooks: `hook-block-then-retry-success`, `hook-config-vs-observed`
-- Skills: `skill-activity`
-- Tokens and activity: `usage-spikes`, `top-sessions`
-- Planning and review: `plan-iterations`, `plan-sections`, `plan-sizes`, `review-precision`
-- Schema and index: `fields`, `field-drift`
+<!-- generated:queries -->
+`already-allowed-still-prompting`, `bare-refs`, `catalog-reinjection-thrash-sessions`, `classifier`, `cli-health`, `field-drift`, `fields`, `hook-block-then-retry-success`, `hook-config-vs-observed`, `hook-self-timing`, `model-summary`, `mods`, `permissions`, `plan-iterations`, `plan-sections`, `plan-sizes`, `review-precision`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence`, `search`, `skill-activity`, `stats`, `stop-hook-noop-detector`, `text-export`, `tool-failure-rates`, `top-sessions`, `usage-spikes`
+<!-- /generated:queries -->
 
-Load [`references/catalog.md`](references/catalog.md) before running a query you have not used. A further tier, aimed at the self-improvement loop, is listed in [`references/discovery.md`](references/discovery.md).
+[`references/catalog.md`](references/catalog.md) gives each one's purpose and params in a line. Before running a query you have not used, read the YAML header at the top of its `resources/queries/<name>.sql` for what it returns, its caveats, and its params' defaults.
 
 ### Queries That Read Disk
 
-Four queries read files on disk instead of the index. Two of them (`plan-sections`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-cmd ".read resources/extensions.sql"` after `-init resources/limits.sql`, which loads both extensions in the same process before the piped query. `hook-self-timing` and `hook-config-vs-observed` read JSON and need no extension. Params and per-query notes are in [`references/catalog.md`](references/catalog.md).
+Four queries read files on disk instead of the index. Two of them (`plan-sections`, `skill-config-vs-observed`) parse structure through the `markdown`/`yaml` community extensions, so run those with `-cmd ".read resources/extensions.sql"` after `-init resources/limits.sql`, which loads both extensions in the same process before the piped query. `hook-self-timing` and `hook-config-vs-observed` read JSON and need no extension. Each one's header names its glob param and default.
 
 ```bash
 duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql \

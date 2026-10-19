@@ -27,7 +27,6 @@ const QueryParamEntry = z.union([
 
 export const QueryHeader = z.strictObject({
   name: z.string().min(1),
-  tier: z.union([z.literal(1), z.literal(2)]),
   summary: z.string().min(1),
   description: z.string().optional(),
   // A literal YAML block (`|-`), so the SQL keeps its own line breaks and indentation.

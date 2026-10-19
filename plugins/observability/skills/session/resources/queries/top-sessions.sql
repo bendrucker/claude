@@ -1,6 +1,5 @@
 -- ---
 -- name: top-sessions
--- tier: 1
 -- dimensions: [tokens]
 -- summary: >-
 --   Sessions ranked by spend, one row per session, carrying `msgs`, `out_tokens`,

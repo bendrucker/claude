@@ -1,6 +1,5 @@
 -- ---
 -- name: delegation
--- tier: 1
 -- dimensions: [tokens]
 -- summary: >-
 --   Whether expensive orchestrator sessions push work down to cheaper models on Agent/Task

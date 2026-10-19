@@ -43,7 +43,7 @@ The bands reuse ship's Bot Review Gate criteria, so one set of rules decides bot
 | band | criteria | shape | cost |
 | --- | --- | --- | --- |
 | skip | bot bumps, prose, lockfiles, reverts, config away from the risk surfaces | none | 0 |
-| deep | a runtime surface, auth, sandbox, permissions, secrets, or egress; over ~200 lines or 8 files excluding tests, docs, and lockfiles; a bug `review:code` confirmed; a session that drifted | terra, 1 angle | 7.6-12.4 |
+| deep | a runtime surface, auth, sandbox, permissions, secrets, or egress; over ~200 lines or 8 files excluding tests, docs, and lockfiles; a bug `code-review` confirmed; a session that drifted | terra, 1 angle | 7.6-12.4 |
 | deep+ | risk-surface hits, abundant tier only | terra, 3 angles | ~22.7 |
 | agentic | destructive, concurrent, or auth changes, abundant tier only | capped session | up to 60 |
 

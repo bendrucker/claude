@@ -11,7 +11,7 @@ allowed-tools:
   - Skill(things:url)
   - Skill(observability:session)
   - Skill(pull-request:create)
-  - Skill(review:code)
+  - Skill(code-review)
   - Skill(github:actions-monitor)
   - Skill(github:pr-comments)
 ---
@@ -59,11 +59,11 @@ Each agent returns a structured plan:
 { thingsId, todoTitle, plan, proposedEffort ('low'|'medium'|'high'), filesTouched[] }
 ```
 
-The workflow returns the plans to the main loop. Present them there and collect approval plus a per-plan `review:code` effort (typically `low`; `medium` for changes touching multiple plugins) via `AskUserQuestion`. This gate is interactive, so it stays in the main loop and cannot move into a workflow.
+The workflow returns the plans to the main loop. Present them there and collect approval plus a per-plan `code-review` effort (typically `low`; `medium` for changes touching multiple plugins) via `AskUserQuestion`. This gate is interactive, so it stays in the main loop and cannot move into a workflow.
 
 ## Implement
 
-Feed the approved plans into a pipeline Workflow: `implement` (a worktree `general-purpose` agent implements the plan, runs `bun test` and `review:code <effort>` at the approved level, commits, and opens the PR via `pull-request:create` with an `Original Task` backlink) then `ciGate` (a fast initial CI check with one trivial-failure fix pass). Do not hold worktree agents open on long CI waits: the gate catches trivial breakage, then Watch handles the rest. Back in the main loop, [Annotate Things](#annotate-things) and [Summary](#summary) consume the pipeline results unchanged. Pipeline shape, stage schemas, and the PR body format: [references/implement.md](references/implement.md).
+Feed the approved plans into a pipeline Workflow: `implement` (a worktree `general-purpose` agent implements the plan, runs `bun test` and `code-review <effort>` at the approved level, commits, and opens the PR via `pull-request:create` with an `Original Task` backlink) then `ciGate` (a fast initial CI check with one trivial-failure fix pass). Do not hold worktree agents open on long CI waits: the gate catches trivial breakage, then Watch handles the rest. Back in the main loop, [Annotate Things](#annotate-things) and [Summary](#summary) consume the pipeline results unchanged. Pipeline shape, stage schemas, and the PR body format: [references/implement.md](references/implement.md).
 
 ## Monitor CI and Fix Failures
 

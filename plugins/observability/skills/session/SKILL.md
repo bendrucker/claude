@@ -79,7 +79,7 @@ The eleven that carry most of the measured usage:
 The rest, by name:
 
 <!-- generated:queries -->
-`already-allowed-still-prompting`, `bare-refs`, `catalog-reinjection-thrash-sessions`, `classifier`, `cli-health`, `field-drift`, `fields`, `hook-block-then-retry-success`, `hook-config-vs-observed`, `hook-self-timing`, `model-summary`, `mods`, `permissions`, `plan-iterations`, `plan-sections`, `plan-sizes`, `review-precision`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence`, `search`, `skill-activity`, `stats`, `stop-hook-noop-detector`, `text-export`, `tool-failure-rates`, `top-sessions`, `usage-spikes`
+`already-allowed-still-prompting`, `bare-refs`, `catalog-reinjection-thrash-sessions`, `classifier`, `cli-health`, `field-drift`, `fields`, `hook-block-then-retry-success`, `hook-config-vs-observed`, `hook-self-timing`, `model-summary`, `mods`, `permissions`, `plan-iterations`, `plan-sections`, `plan-sizes`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence`, `search`, `skill-activity`, `stats`, `stop-hook-noop-detector`, `text-export`, `tool-failure-rates`, `top-sessions`, `usage-spikes`
 <!-- /generated:queries -->
 
 [`references/catalog.md`](references/catalog.md) gives each one's purpose and params in a line. Before running a query you have not used, read the YAML header at the top of its `resources/queries/<name>.sql` for what it returns, its caveats, and its params' defaults.

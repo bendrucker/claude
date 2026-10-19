@@ -53,7 +53,7 @@ Create one todo per candidate. Report how many todos landed. The main loop's tri
 
 ## Direct Implementation
 
-An opt-in alternative to filing, chosen explicitly by the user per run. Dispatch one background `general-purpose` agent with `isolation: "worktree"` for each grounded finding as soon as it lands, while the rest of the run continues. Each agent folds grounding in: it verifies the finding against the live config first, and if the config already addresses it, reports "not grounded" and changes nothing. Otherwise it implements, tests, runs `review:code`, and opens a PR via `pull-request:create`. Collect the PR links at the end.
+An opt-in alternative to filing, chosen explicitly by the user per run. Dispatch one background `general-purpose` agent with `isolation: "worktree"` for each grounded finding as soon as it lands, while the rest of the run continues. Each agent folds grounding in: it verifies the finding against the live config first, and if the config already addresses it, reports "not grounded" and changes nothing. Otherwise it implements, tests, runs `code-review`, and opens a PR via `pull-request:create`. Collect the PR links at the end.
 
 These PRs have no backing Things todo, so skip the `Original Task` link. The body carries an Evidence section (local-host evidence only, never content from an egress-blocked host) plus one `Discovery: <fingerprint>` line per finding, which is what lets [Dedup](#dedup) suppress it instead of resurfacing it as `new`.
 

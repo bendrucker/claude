@@ -1,6 +1,6 @@
 # Requirement Fulfillment
 
-`review:code` reviews the diff alone and cannot judge the change against the ticket. That judgment is the peer reviewer's. Evaluate it as its own axis so a polished diff never hides a requirement it missed.
+`code-review` reviews the diff alone and cannot judge the change against the ticket. That judgment is the peer reviewer's. Evaluate it as its own axis so a polished diff never hides a requirement it missed.
 
 ## Locate the Spec
 

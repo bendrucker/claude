@@ -6,7 +6,7 @@ Diffed the branch against its base and gated the passes.
 <out>
 Plan: simplify → writing:review → comments:audit, then create and babysit.
 in: simplify, writing:review, comments:audit.
-out: review:code, review:human.
+out: code-review, review:human.
 </out>
 
 Stopping here as asked.

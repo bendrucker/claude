@@ -4,8 +4,8 @@ fail: [in-review-human, not-in-writing-review, not-in-review-code, not-in-commen
 Diffed the branch against its base and gated the passes.
 
 <out>
-Plan: writing:review → review:code → comments:audit, then create and babysit.
-in: writing:review, review:code medium --fix, comments:audit.
+Plan: writing:review → code-review → comments:audit, then create and babysit.
+in: writing:review, code-review medium --fix, comments:audit.
 out: review:human.
 </out>
 

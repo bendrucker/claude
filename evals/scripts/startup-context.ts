@@ -9,7 +9,7 @@ import { gfmTable } from "micromark-extension-gfm-table";
 import { z } from "zod";
 import { expectSuccess, runCommand } from "./command";
 
-export const PROBE_AGENTS = ["general-purpose", "analyst", "Explore", "review:angle"] as const;
+export const PROBE_AGENTS = ["general-purpose", "analyst", "Explore", "review:review"] as const;
 
 export interface Candidate {
   addDir: string[];

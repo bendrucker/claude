@@ -6,7 +6,6 @@ Code review workflows for Claude Code.
 
 ### Skills
 
-- **`code`**: Review the working diff for correctness bugs and reuse/simplification/efficiency cleanups at a chosen effort level. A model-invocable port of Claude Code's built-in `/code-review`, which is user-invocable only.
 - **`peer`**: Review PRs when requested by a peer (GitHub or GitLab). Maps proposed comments to platform positions with an in-diff pre-check, then posts them as a batch.
 - **`follow-up`**: Follow up on a PR/MR you reviewed: check if your comments were addressed, find silent resolves, decide whether to re-approve
 - **`meat-proxy`**: Draft a short reply that hands an AI-relayed PR, MR, or doc back to its author with motivation and scope questions, holding line-level findings in private notes. Drafts only, never posts
@@ -20,8 +19,6 @@ Code review workflows for Claude Code.
 ### Agents
 
 - **`review`**: Reviews a pushed PR with fresh eyes in an isolated worktree, never editing it. Runs `peer` on a peer's PR and a cold audit on Ben's own. The agent `inbox` dispatches.
-- **`angle`**: Runs one finder angle over a diff and returns candidates. The unit of `code`'s find fan-out and its sweep pass.
-- **`verifier`**: Judges candidates against the code as CONFIRMED, PLAUSIBLE, or REFUTED. The unit of `code`'s verify 
 
 ## Testing
 

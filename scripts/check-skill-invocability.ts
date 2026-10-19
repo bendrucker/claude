@@ -5,11 +5,10 @@ import { z } from "zod";
 import { frontmatter, readAll, root, SKILL_GLOBS, skillName } from "./assets";
 import { runCheck } from "./check";
 
-// Bundled built-ins registered with `disableModelInvocation: true`, per section
-// 8.3 of plugins/review/skills/code/references/upstream-2.1.215.md. Only
-// `code-review` has a drift probe (scripts/check-review-drift.ts), so an entry
-// upstream later makes model-invocable goes stale as a false positive here.
-const USER_INVOCABLE_BUILTINS = new Set(["code-review", "verify", "batch"]);
+// Bundled built-ins registered with `disableModelInvocation: true`. Nothing
+// probes upstream for these, so an entry upstream later makes model-invocable
+// goes stale as a false positive here.
+const USER_INVOCABLE_BUILTINS = new Set(["verify", "batch"]);
 
 export interface SkillFile {
   path: string;

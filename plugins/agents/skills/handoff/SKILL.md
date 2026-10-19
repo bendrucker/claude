@@ -24,7 +24,7 @@ Synthesize the conversation into a prompt that lets an agent with zero prior con
 - **Decisions**: choices already made and the reasoning, so the agent does not relitigate them.
 - **Next steps**: the concrete actions to take, in order.
 - **Anchors**: the branch, PR, issue, plan doc, or key files by path or URL. Point at these rather than restating them.
-- **Suggested skills**: a short list of skills the agent should invoke for this work (e.g. `pull-request:create`, `review:code`, a project skill). This is the biggest lever on whether the agent picks up your conventions.
+- **Suggested skills**: a short list of skills the agent should invoke for this work (e.g. `pull-request:create`, `code-review`, a project skill). This is the biggest lever on whether the agent picks up your conventions.
 - **Constraints**: anything that would surprise a fresh agent, such as test commands, gotchas, or things not to touch.
 
 Keep it dense and specific. If the user passed an argument, treat it as the focus for the next session and shape the summary around it. With no argument, summarize the conversation as a whole.

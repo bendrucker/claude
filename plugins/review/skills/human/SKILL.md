@@ -1,7 +1,7 @@
 ---
 name: review:human
 description: >-
-  Request Ben's own review of the working diff or a document before it leaves the machine, for architecture and slop rather than bugs. Runs after the mechanical passes (review:code or simplify, comments:audit). Use for "get my review", "let me look at this first", or as the last pre-PR pass.
+  Request Ben's own review of the working diff or a document before it leaves the machine, for architecture and slop rather than bugs. Runs after the mechanical passes (code-review or simplify, comments:audit). Use for "get my review", "let me look at this first", or as the last pre-PR pass.
 argument-hint: "[--doc <file>] [--kind <kind>] [--browser] [--summary <text>]"
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts:*)"

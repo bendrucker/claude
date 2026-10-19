@@ -22,7 +22,7 @@
       "Skill(pull-request:create)",
       "Skill(pull-request:follow-up)",
       "Skill(pull-request:update)",
-      "Skill(review:code)",
+      "Skill(code-review)",
       "Skill(review:inbox)",
       "Skill(review:peer)",
       "Skill(update-config)",

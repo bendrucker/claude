@@ -204,6 +204,26 @@ describe("search", () => {
     });
     expect(rows.map((r) => r.session_id)).toEqual(["labeled-session"]);
   });
+
+  it("ranks the session matching every term first, then partial matches by score", async () => {
+    const rows = await runQuery(
+      db,
+      "search",
+      z.object({ session_id: z.string(), score: z.number(), matched_terms: z.bigint() }),
+      { ...queryParams({ limit: "10" }), query: "retry policy" },
+    );
+    expect(rows[0]).toMatchObject({ session_id: "plan-approve-variant-session", matched_terms: 2n });
+    const scores = rows.map((r) => r.score);
+    expect(scores).toEqual(scores.toSorted((a, b) => b - a));
+  });
+
+  it("keeps a quoted query whole", async () => {
+    const rows = await runQuery(db, "search", z.object({ session_id: z.string() }), {
+      ...queryParams({ limit: "10" }),
+      query: '"retry budget"',
+    });
+    expect(rows.map((r) => r.session_id)).toEqual(["ai-titled-session"]);
+  });
 });
 
 describe("stats", () => {

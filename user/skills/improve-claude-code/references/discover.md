@@ -1,6 +1,6 @@
 # Discover
 
-Mine session history for improvement candidates, ground them against the live config, write a digest, and file the keepers as `claude-code` todos. Interactive runs never auto-file: filing is an explicit user choice, and only [Scheduled](#scheduled) files without asking. Implementing is a separate run of the main loop unless the user opts into [Direct Implementation](#direct-implementation) for the run. The engine is the `observability:session` skill's fan-out, whose `references/discovery.md` carries the recipe (dimension cheat sheet, grounding mandate, host safety, Tier-2 catalog). Load that skill to read it.
+Mine session history for improvement candidates, ground them against the live config, write a digest, and file the keepers as `claude-code` todos. Filing is always an explicit user choice. Implementing is a separate run of the main loop unless the user opts into [Direct Implementation](#direct-implementation) for the run. The engine is the `observability:session` skill's fan-out, whose `references/discovery.md` carries the recipe (dimension cheat sheet, grounding mandate, host safety, Tier-2 catalog). Load that skill to read it.
 
 ## Refresh
 
@@ -56,14 +56,6 @@ Create one todo per candidate. Report how many todos landed. The main loop's tri
 An opt-in alternative to filing, chosen explicitly by the user per run. Dispatch one background `general-purpose` agent with `isolation: "worktree"` for each grounded finding as soon as it lands, while the rest of the run continues. Each agent folds grounding in: it verifies the finding against the live config first, and if the config already addresses it, reports "not grounded" and changes nothing. Otherwise it implements, tests, runs `review:code`, and opens a PR via `pull-request:create`. Collect the PR links at the end.
 
 These PRs have no backing Things todo, so skip the `Original Task` link. The body carries an Evidence section (local-host evidence only, never content from an egress-blocked host) plus one `Discovery: <fingerprint>` line per finding, which is what lets [Dedup](#dedup) suppress it instead of resurfacing it as `new`.
-
-## Scheduled
-
-`discover --scheduled` is the unattended weekly variant. It runs the same refresh, fan-out, grounding, dedup, and digest pipeline, then auto-files every candidate that is `new`, `grounded`, and `confidence == high`, using the exact format from [File the Keepers](#file-the-keepers). Medium and low confidence candidates land in the digest only. Dismissal is not tracked, so they resurface as `new` on the next run, where an interactive pass can file them.
-
-A scheduled run never prompts, never implements ([Direct Implementation](#direct-implementation) is interactive-only), and ends after reporting how many todos it filed.
-
-On-demand is primary. A scheduled run must run locally on the always-on Mac Studio, because the session DB and the `duckdb` CLI live on that machine.
 
 ## Fingerprint
 

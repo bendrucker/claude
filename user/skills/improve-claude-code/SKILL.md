@@ -4,7 +4,7 @@ disable-model-invocation: true
 description: |
   Triage and batch-implement Claude-tagged Things todos as PRs for the claude config repo, discover improvement candidates from session history, or watch open PRs to implement review feedback and close shipped todos.
   Use when the user wants to work on their Claude Code improvement backlog, process Things todos tagged claude-code, batch-implement configuration changes, mine session history for grounded config-change candidates (Discover mode), or watch this skill's open PRs for review feedback and merges (Watch mode).
-argument-hint: "[discover [--scheduled] | watch | sweep]"
+argument-hint: "[discover | watch | sweep]"
 allowed-tools:
   - Read(${CLAUDE_SKILL_DIR}/references/*)
   - Skill(things:jxa)
@@ -30,7 +30,7 @@ All Things interaction goes through the `things:jxa` and `things:url` skills (ne
 
 `$0` (optional mode) routes to a workflow. With no mode, run the default backlog loop: [Fetch and Triage](#fetch-and-triage) the `claude-code` todos, then plan and implement the selection as PRs.
 
-- `discover`: mine session history for grounded improvement candidates, write a digest, and file the keepers as todos. Interactive runs never auto-file. `--scheduled` is the unattended weekly variant. Read [references/discover.md](references/discover.md).
+- `discover`: mine session history for grounded improvement candidates, write a digest, and file the keepers as todos. It never files without asking. Read [references/discover.md](references/discover.md).
 - `watch`: track the open PRs this skill opened, implement review feedback, and close each backing todo on merge. Run it under `/loop /improve-claude-code watch`. Read [references/watch.md](references/watch.md).
 - `sweep`: propose stale or graduated memories for retirement and delete only what you approve. Interactive only, never unattended. Read [references/sweep.md](references/sweep.md).
 

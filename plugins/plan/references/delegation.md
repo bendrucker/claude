@@ -6,11 +6,11 @@ This plan is large enough to split across agents. A subagent inherits the orches
 - Where checkpoints sit: slices whose output the orchestrator reads before the next starts.
 - What runs in sequence and what runs in parallel.
 
-Match the model to the work:
+Match the model and effort to the work. Name both for every delegated slice, since an unset effort inherits the orchestrator's:
 
 - Narrow, high-token, low-reasoning work (logs, mechanical edits, grep sweeps): **Haiku**, `effort: low` for a bounded tool task, `medium` for agentic work.
-- Bounded implementation or research on a settled question: **Sonnet**.
-- Coding under a Fable orchestrator: **Opus**.
-- The orchestrator's own model: design forks, cross-slice synthesis, judgment a subagent cannot hold.
+- Bounded implementation or research on a settled question: **Sonnet**, `effort: medium`, or `high` when the slice must weigh options.
+- Coding under a Fable orchestrator: **Opus**, `effort: high`, or `xhigh` for a hard bug or a cross-module change.
+- The orchestrator's own model: design forks, cross-slice synthesis, judgment a subagent cannot hold. A same-model subagent takes `high` unless the slice is mechanical.
 
-Set `model` on the spawn (it beats the agent's frontmatter), or pick a `subagent_type` that already pins a cheaper model, such as `github:logs` on Haiku.
+Set `model` and `effort` on the spawn (they beat the agent's frontmatter), or pick a `subagent_type` that already pins both, such as `github:logs` on Haiku at `low`.

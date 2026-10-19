@@ -165,7 +165,7 @@ These read files rather than the index, each through a self-defaulting glob that
   SELECT file_path FROM s WHERE NOT has_verification;
   ```
 
-  Needs the `markdown` community extension (`-init resources/extensions.sql`). Params: `plans_glob` (default `~/.claude/plans/*.md`, the local plans dir).
+  Needs the `markdown` community extension (`-cmd ".read resources/extensions.sql"` after `-init resources/limits.sql`). Params: `plans_glob` (default `~/.claude/plans/*.md`, the local plans dir).
 - `skill-config-vs-observed`: Installed skills that never fire, the curation instrument: SKILL.md frontmatter on disk left-joined against observed `skill_calls` and typed slash commands, zero-fire first. `skills` counts what fired and never sees a skill that is installed but silent, even though every model-invocable skill pays its description into context on every session. Rows carry `description_chars`, which approximates that always-on cost, and `disable_model_invocation`, where a zero in calls is normal: those skills load no description into context and fire only via explicit slash use.
 
   `typed` counts that slash use, so a `disable-model-invocation` skill can be judged at all. A typed invocation produces no Skill tool call, so `calls` alone reads every such skill as dead: `job`, `improve-codebase-architecture`, and `review:self` each sit at zero calls against 22, 11, and 7 typed. Retire on `calls` and `typed` both at zero. It reads `command_markers`, so a transcript quoted in a tool result or mid-message is not read as an invocation, and it resolves a marker the same way an observed call resolves, meaning a bare `/<plugin>` credits that plugin's entry skill alone.
@@ -176,7 +176,7 @@ These read files rather than the index, each through a self-defaulting glob that
 
   Treat a 0 in calls as a lead to investigate rather than proof. The observed side only spans the index, and a newly added skill has no history.
 
-  Needs the `yaml` community extension (`-init resources/extensions.sql`). Params: `skill` (GLOB on configured name), `plugin_skill_glob` (default `~/.claude/plugins/cache/*/*/*/skills/*/SKILL.md`, the plugin-cache source), `user_skill_glob` (default `~/.claude/skills/*/SKILL.md`, the personal-skills source), `project_skill_glob` (default `.claude/skills/*/SKILL.md`, the project-skills source), `after_date`, `before_date`, `project`, `host` (scopes the observed side only, since the configured side always reflects this machine's disk, so pass `local` when grounding a finding).
+  Needs the `yaml` community extension (`-cmd ".read resources/extensions.sql"` after `-init resources/limits.sql`). Params: `skill` (GLOB on configured name), `plugin_skill_glob` (default `~/.claude/plugins/cache/*/*/*/skills/*/SKILL.md`, the plugin-cache source), `user_skill_glob` (default `~/.claude/skills/*/SKILL.md`, the personal-skills source), `project_skill_glob` (default `.claude/skills/*/SKILL.md`, the project-skills source), `after_date`, `before_date`, `project`, `host` (scopes the observed side only, since the configured side always reflects this machine's disk, so pass `local` when grounding a finding).
 <!-- /generated:on-disk-queries -->
 
 ## Tables and Views

@@ -13,12 +13,12 @@ Search and analyze Claude Code conversation history using a DuckDB index over JS
 - `resources/schema/` - Table and view definitions (ordered, run on startup)
 - `resources/queries/` - Parameterized SQL for built-in queries
 - `resources/limits.sql` - Per-process memory, thread, and spill caps for read-only query processes, pulled in via `-init`
-- `resources/extensions.sql` - Community extension setup (`markdown`, `yaml`), pulled into a query process via `-init`
+- `resources/extensions.sql` - Community extension setup (`markdown`, `yaml`), pulled into a query process via `-cmd ".read ..."`
 - `resources/import.sql` - JSONL parsing and flattening
 
 ## Community Extensions
 
-The `plan-sections` and `skill-config-vs-observed` queries read markdown and YAML from disk through DuckDB's `markdown` and `yaml` community extensions. Run them with `duckdb -readonly -json -init resources/extensions.sql`, which loads both before the piped query. The index/refresh path needs no extensions.
+The `plan-sections` and `skill-config-vs-observed` queries read markdown and YAML from disk through DuckDB's `markdown` and `yaml` community extensions. Run them with `duckdb -readonly -json -init resources/limits.sql -cmd ".read resources/extensions.sql"`, which loads both before the piped query. The index/refresh path needs no extensions.
 
 DuckDB fetches these from `community-extensions.duckdb.org` on the first `INSTALL ... FROM community` per DuckDB version, then caches them under `~/.duckdb/extensions/<version>/`, where a later `INSTALL` and `LOAD` work offline. A DuckDB upgrade starts a cold cache. The sandbox allowlists that host in `user/settings.json`, and its proxy URL carries credentials DuckDB cannot parse, so `extensions.sql` splits the URL into DuckDB's `http_proxy` settings before installing. `scripts/extensions.integration.ts` covers that split.
 

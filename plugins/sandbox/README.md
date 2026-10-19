@@ -6,9 +6,9 @@ Teaches Claude to drop `dangerouslyDisableSandbox` when the command would escape
 
 With `git:*` and `agent-browser:*` excluded:
 
-**Before:** `cd /repo && git push -u origin HEAD 2>&1 | tail -5`, with the flag set
+### Scaffolding around an excluded command
 
-**Injected:**
+The call: `cd /repo && git push -u origin HEAD 2>&1 | tail -5`, with the flag set. What comes back with its result:
 
 ```text
 That call needed no `dangerouslyDisableSandbox`: every command in it matches `sandbox.excludedCommands` (`git:*`), so it runs outside the sandbox on its own.
@@ -21,9 +21,9 @@ Next time, leave the flag off, along with the pieces that keep the chain from ma
 - `| tail -5`: the harness truncates long output itself.
 ```
 
-**Before:** `export AGENT_BROWSER_SESSION=docs; agent-browser open https://example.com`, with the flag set
+### An exported session variable
 
-**Injected:**
+The call: `export AGENT_BROWSER_SESSION=docs; agent-browser open https://example.com`, with the flag set. What comes back with its result:
 
 ```text
 That call needed no `dangerouslyDisableSandbox`: every command in it matches `sandbox.excludedCommands` (`agent-browser:*`), so it runs outside the sandbox on its own.
@@ -34,16 +34,18 @@ Next time, leave the flag off, along with the pieces that keep the chain from ma
 - `export AGENT_BROWSER_SESSION=docs`: pass `--session docs` to `agent-browser` instead.
 ```
 
-**Before:** `git status`, with the flag set
+### A bare excluded command
 
-**Injected:**
+The call: `git status`, with the flag set. What comes back with its result:
 
 ```text
 That call needed no `dangerouslyDisableSandbox`: every command in it matches `sandbox.excludedCommands` (`git:*`), so it runs outside the sandbox on its own.
 It escapes as written. Next time, leave the flag off.
 ```
 
-**No reminder:** `git status && bun test`, because `bun` matches no entry. It also stays quiet for a `cd` elsewhere or in a subagent, any other variable, `$(...)`, another redirection, `||`, and `&`.
+### No reminder
+
+`git status && bun test` gets nothing back, because `bun` matches no entry. It also stays quiet for a `cd` elsewhere or in a subagent, any other variable, `$(...)`, another redirection, `||`, and `&`.
 
 ## Contents
 

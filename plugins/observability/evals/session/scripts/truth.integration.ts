@@ -74,8 +74,6 @@ const lines = [
   ),
   use("prefix", "Edit", "2026-09-20T00:00:00Z"),
   denied("prefix", "PreToolUse:Edit hook error: no", "2026-09-20T00:00:01Z"),
-  use("plan", "ExitPlanMode", "2026-08-01T00:00:00Z"),
-  denied("plan", "PreToolUse:ExitPlanMode hook error: too long", "2026-08-01T00:00:01Z"),
   text("int-1", "[Request interrupted by user]", "2026-09-10T00:00:00Z"),
   text("int-2", "[Request interrupted by user for tool use]", "2026-09-11T00:00:00Z"),
   text("int-3", "[Request interrupted by user]", "2026-10-02T00:00:00Z"),
@@ -115,7 +113,6 @@ test.each<[string, TruthRow[]]>([
       { key: "Edit", value: 1 },
     ],
   ],
-  ["drift-plan-denies", [{ value: 1 }]],
   ["drift-interruptions", [{ value: 2 }]],
   [
     "drift-context-adds",

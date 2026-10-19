@@ -253,6 +253,15 @@
         "zod": "^4.4.3",
       },
     },
+    "plugins/observability/evals/search": {
+      "name": "session-search-eval",
+      "dependencies": {
+        "@commander-js/extra-typings": "^15.0.0",
+        "commander": "^15.0.0",
+        "table": "^6.9.0",
+        "zod": "^4.4.3",
+      },
+    },
     "plugins/performance": {
       "name": "performance",
       "dependencies": {
@@ -1751,6 +1760,8 @@
     "serve-static": ["serve-static@2.2.1", "", { "dependencies": { "encodeurl": "^2.0.0", "escape-html": "^1.0.3", "parseurl": "^1.3.3", "send": "^1.2.0" } }, "sha512-xRXBn0pPqQTVQiC8wyQrKs2MOlX24zQ0POGaj0kultvoOCstBQM5yvOhAVSUwOMjQtTvsPWoNCHfPGwaaQJhTw=="],
 
     "session-bench": ["session-bench@workspace:plugins/observability/evals/bench"],
+
+    "session-search-eval": ["session-search-eval@workspace:plugins/observability/evals/search"],
 
     "setprototypeof": ["setprototypeof@1.2.0", "", {}, "sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw=="],
 

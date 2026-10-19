@@ -140,6 +140,7 @@ WITH src AS (
     r.data->'$.message.content' AS message_content,
     r.data->'$.toolUseResult'   AS tool_use_result,
     r.data->>'$.toolDenialKind' AS tool_denial_kind,
+    r.data->'$.permissionDecision' AS permission_decision,
     r.data->>'$.attributionSkill'  AS attribution_skill,
     r.data->>'$.attributionPlugin' AS attribution_plugin,
     r.data->>'$.attributionAgent'  AS attribution_agent
@@ -168,6 +169,7 @@ SELECT
   item AS data,
   s.tool_use_result,
   s.tool_denial_kind,
+  s.permission_decision,
   s.attribution_skill,
   s.attribution_plugin,
   s.attribution_agent
@@ -245,6 +247,10 @@ WHERE type = 'tool_use'
 -- `kind_source` says whether the kind came from the record or was inferred from the
 -- result string on a row predating the field, so a window spanning 2026-07-02 reads as
 -- coverage rather than as a change in what a denial is.
+--
+-- Since 2026-10-07 the harness also records `permissionDecision` on the result, so
+-- `decision`, `decision_source`, and `reason_type` carry it, and a prompt the user approved
+-- (`user_temporary`, `user_permanent`) lands here with a NULL `denial_kind`.
 CREATE OR REPLACE VIEW permission_requests AS
 SELECT
   tc.name AS tool_name,
@@ -254,6 +260,9 @@ SELECT
   (tc.data->>'$.input.description') AS description,
   denial_kind(er.tool_denial_kind, er.tool_use_result)        AS denial_kind,
   denial_kind_source(er.tool_denial_kind, er.tool_use_result) AS kind_source,
+  (er.permission_decision->>'$.decision')   AS decision,
+  (er.permission_decision->>'$.source')     AS decision_source,
+  (er.permission_decision->>'$.reasonType') AS reason_type,
   tc.host,
   tc.session_id,
   tc.project_path,
@@ -262,7 +271,8 @@ SELECT
 FROM content_items er
 JOIN content_items tc ON er.tool_use_id = tc.id AND er.host = tc.host
 WHERE er.type = 'tool_result'
-  AND denial_kind(er.tool_denial_kind, er.tool_use_result) IS NOT NULL;
+  AND (denial_kind(er.tool_denial_kind, er.tool_use_result) IS NOT NULL
+    OR (er.permission_decision->>'$.source') IN ('user_temporary', 'user_permanent'));
 
 CREATE OR REPLACE VIEW sandbox_bypasses AS
 WITH bypass AS (
@@ -327,6 +337,7 @@ WITH unified AS (
     subagent_id(ci.source_file) IS NOT NULL AS is_subagent,
     ci.text LIKE '<%'
       OR ci.text LIKE '[Request interrupted%'
+      OR ci.text LIKE 'Another Claude session sent a message:%'
     AS is_system
   FROM content_items ci
   JOIN messages m USING (host, source_file, source_line)
@@ -356,6 +367,7 @@ WITH unified AS (
       OR m.content_text LIKE 'Ultraplan %'
       OR m.content_text LIKE '◇ %'
       OR m.content_text LIKE '◆ %'
+      OR m.content_text LIKE 'Another Claude session sent a message:%'
     AS is_system
   FROM messages m
   WHERE m.type = 'user'
@@ -566,7 +578,12 @@ parsed AS (
   SELECT
     att.*,
     (a->>'$.type') AS kind,
-    TRY_CAST(regexp_extract(COALESCE(a->>'$.stdout', ''), '\{.*\}') AS JSON) AS sj
+    -- Pretty-printed JSON spans lines, so a whole-stdout cast comes first and the `(?s)`
+    -- extract only catches JSON with log lines around it.
+    COALESCE(
+      TRY_CAST(trim(a->>'$.stdout') AS JSON),
+      TRY_CAST(regexp_extract(a->>'$.stdout', '(?s)\{.*\}') AS JSON)
+    ) AS sj
   FROM att
 ),
 -- Resolve the permission decision once: a PreToolUse deny/ask lands in the stdout
@@ -609,7 +626,14 @@ SELECT
     NULLIF(a->>'$.blockingError', ''),
     NULLIF(a->>'$.stderr', '')
   ) AS reason,
-  sj->>'$.hookSpecificOutput.additionalContext' AS additional_context,
+  -- The harness's own record of injected context. Stdout repeats it on the hook_success
+  -- row, so reading both counted every injection twice.
+  CASE WHEN kind = 'hook_additional_context' THEN
+    CASE json_type(a->'$.content')
+      WHEN 'ARRAY' THEN array_to_string(from_json(a->'$.content', '["VARCHAR"]'), chr(10))
+      ELSE (a->>'$.content')
+    END
+  END AS additional_context,
   kind = 'hook_blocking_error' OR decision = 'deny' AS blocked,
   (a->>'$.stdout')        AS stdout,
   (a->>'$.stderr')        AS stderr,
@@ -642,33 +666,16 @@ FROM hook_events
 WHERE blocked OR decision IN ('ask', 'deny');
 
 -- Hook denies recovered from the denied call's tool_result, because hook_blocks cannot
--- see them. A PreToolUse hook returning permissionDecision "deny" writes no hook record
--- at all: the surviving trace is a tool_result with is_error set and the
--- permissionDecisionReason as its entire content. `ask` decisions and exit-2 blocks are
--- recorded normally, so this view covers denies only and hook_blocks stays authoritative
--- for the rest.
+-- see them: a PreToolUse hook returning permissionDecision "deny" writes no hook record.
+-- Each row is identified by the strongest signal its era carries, named in `deny_source`:
+-- `field` is the harness's `permissionDecision` reject from a hook (2026-10-07 on),
+-- `prefix` is the `PreToolUse:<Tool> hook error:` text it prepends (2026-09-19 on), and
+-- `pattern` is the hand-kept map below, the only signal before 09-19. The map also names
+-- the hook, since no native field does, and an unmatched deny reads `(unmapped)`. Rows whose
+-- tool_use_id already appears in hook_blocks are dropped: a declined `ask` leaves both.
 --
--- A denied tool_result is structurally identical to any other failed call, so recovery is
--- text matching and `patterns` is MAINTAINED BY HAND. Hook scripts build their reason at
--- runtime (`permissionDecisionReason: reason`), so the strings cannot be extracted from
--- source, and they drift as hooks are reworded. To extend the map, group `tool_errors` by
--- the head of `error_content` and look for messages that read as guidance rather than tool
--- output (a genuine failure carries an `Exit code N` or `<tool_use_error>` prefix), then
--- confirm the string against the hook script that emits it. Patterns anchor at the start
--- of the message, so a scanner printing the same phrase inside its own output does not
--- register as a deny. Since 2026-09-19 the harness prepends `PreToolUse:<Tool> hook error: `
--- to the reason before it reaches the tool_result, so `stripped` peels that off before
--- matching and before exposing the text as `reason`, keeping both formats on one pattern
--- and one grouping signature. Rows whose tool_use_id already appears in hook_blocks are
--- dropped: an `ask` the user declined leaves both a hook record and an error, and counting
--- both would inflate every hook that asks. `hook_name` is the map's label rather than a
--- command string, since the deny path records no command.
---
--- Denies recovered this way are the one blocking channel a subagent contributes to,
--- because a subagent's tool_results land in its own transcript while carrying the parent
--- session's id. `agent_id` says which context was denied, so a burst count can key on
--- the agent instead of crediting a whole fan-out's denies to the parent. Rows are kept
--- rather than filtered, so a caller wanting every deny ignores the column.
+-- `agent_id` says which context was denied, since a subagent's tool_results carry the
+-- parent session's id.
 CREATE OR REPLACE VIEW hook_denies AS
 WITH patterns(hook_name, pattern) AS (
   VALUES
@@ -679,31 +686,45 @@ WITH patterns(hook_name, pattern) AS (
     ('pull-request:validate-body',      'Fix the PR body before retrying%'),
     ('linear:cli-create',               '`linear issue create` without%')
 ),
-stripped AS (
+results AS (
   SELECT
-    te.*,
-    regexp_replace(te.error_content, '^\s*PreToolUse:\w+ hook error:\s*', '') AS stripped_content
-  FROM tool_errors te
+    er.*,
+    regexp_replace(er.content, '^\s*PreToolUse:\w+ hook error:\s*', '') AS stripped_content,
+    CASE
+      WHEN json_extract(er.permission_decision, '$.decision') IS NOT NULL THEN 'field'
+      WHEN regexp_matches(er.content, '^\s*PreToolUse:\w+ hook error:') THEN 'prefix'
+      ELSE 'pattern'
+    END AS deny_source
+  FROM content_items er
+  WHERE er.type = 'tool_result'
+    AND er.is_error
+    AND denial_kind(er.tool_denial_kind, er.tool_use_result) IS DISTINCT FROM 'user-rejected'
 )
 SELECT
-  te.host,
-  te.session_id,
-  te.project_path,
-  te.timestamp,
-  'PreToolUse'          AS hook_event,
-  p.hook_name,
-  te.tool_id            AS tool_use_id,
-  tc.tool_name          AS denied_tool,
-  tc.command            AS denied_command,
-  te.stripped_content   AS reason,
-  te.agent_id
-FROM stripped te
-JOIN patterns p ON te.stripped_content LIKE p.pattern
-JOIN tool_calls tc ON tc.host = te.host AND tc.tool_id = te.tool_id
-WHERE te.error_type = 'failure'
+  r.host,
+  r.session_id,
+  tc.project_path,
+  r.timestamp,
+  'PreToolUse'                          AS hook_event,
+  COALESCE(p.hook_name, '(unmapped)')   AS hook_name,
+  r.tool_use_id,
+  tc.tool_name                          AS denied_tool,
+  tc.command                            AS denied_command,
+  r.stripped_content                    AS reason,
+  r.deny_source,
+  subagent_id(r.source_file)            AS agent_id
+FROM results r
+LEFT JOIN patterns p ON r.stripped_content LIKE p.pattern
+JOIN tool_calls tc ON tc.host = r.host AND tc.tool_id = r.tool_use_id
+WHERE CASE r.deny_source
+        WHEN 'field' THEN (r.permission_decision->>'$.decision') = 'reject'
+                      AND (r.permission_decision->>'$.source') = 'hook'
+        WHEN 'prefix' THEN TRUE
+        ELSE p.hook_name IS NOT NULL
+      END
   AND NOT EXISTS (
     SELECT 1 FROM hook_blocks hb
-    WHERE hb.host = te.host AND hb.tool_use_id = te.tool_id
+    WHERE hb.host = r.host AND hb.tool_use_id = r.tool_use_id
   );
 
 -- LSP / type-checker / linter diagnostics surfaced in-session, one row per diagnostic.
@@ -783,12 +804,14 @@ WITH calls AS (
     ci.id AS tool_use_id,
     (ci.data->>'$.input.planFilePath') AS plan_file,
     length(json_extract_string(ci.data, '$.input.plan')) AS plan_chars,
-    r.content AS result_content
+    r.content AS result_content,
+    te.denial_kind
   FROM content_items ci
   LEFT JOIN content_items r
     ON r.tool_use_id = ci.id
    AND r.host = ci.host
    AND r.type = 'tool_result'
+  LEFT JOIN tool_errors te ON te.host = ci.host AND te.tool_id = ci.id
   WHERE ci.type = 'tool_use'
     AND ci.name = 'ExitPlanMode'
 ),
@@ -816,6 +839,8 @@ SELECT
   CASE
     WHEN (result_content) LIKE '%approved your plan%'
       OR (result_content) LIKE '%approved exiting plan mode%'      THEN 'approved'
+    -- A PreToolUse hook (the plan gate) refused the call before anyone saw the plan.
+    WHEN denial_kind = 'permission-rule'                           THEN 'denied'
     WHEN (result_content) LIKE '%want to proceed%'
       OR (result_content) LIKE '%was rejected%'                    THEN
       CASE
@@ -847,6 +872,7 @@ SELECT
   COUNT(*) FILTER (WHERE outcome = 'redirected')         AS redirect_count,
   COUNT(*) FILTER (WHERE outcome = 'approved')           AS approved_count,
   COUNT(*) FILTER (WHERE outcome = 'handoff')            AS handoff_count,
+  COUNT(*) FILTER (WHERE outcome = 'denied')             AS denied_count,
   COUNT(*) FILTER (WHERE outcome = 'unknown')            AS unknown_count,
   MIN(timestamp)                                         AS first_plan_ts,
   MAX(timestamp)                                         AS last_plan_ts

@@ -10,7 +10,7 @@
 --   session kept going: `single` for none, `replan` for one, `off-rails` for two or more. A
 --   terminal rejection with no file edits afterward is a deliberate handoff, planning here
 --   and implementing from the plan file in a fresh session. It lands in `handoff_count` and
---   never counts as churn. Sorted by `plan_count` descending.
+--   never counts as churn. `denied_count` is presents a PreToolUse hook refused. Sorted by `plan_count` descending.
 -- params:
 --   - name: min_plans
 --     default: 1
@@ -37,6 +37,7 @@ SELECT
   f.redirect_count,
   f.approved_count,
   f.handoff_count,
+  f.denied_count,
   f.unknown_count,
   CASE
     WHEN f.redirect_count >= 2 THEN 'off-rails'

@@ -14,10 +14,6 @@ Claude Code persists thinking blocks as signature-only stubs. `content_items` ro
 
 claude.ai web/mobile chats and cloud routines write no local JSONL. A `bridge-session` record marks only that a cloud bridge existed. The cloud side's content stays remote.
 
-## Approved Permission Prompts
-
-Only denials leave a trace. `$.toolDenialKind` names which mechanism stopped a call (see `permission_requests`), so the denial side is fully classified, but a prompt the user approved is indistinguishable from a call that never prompted. Prompting friction stays undercountable.
-
 ## Offloaded Tool Results
 
 Large outputs are truncated to a `<persisted-output>` preview pointing at a sidecar file under `tool-results/`. The full output never enters the index, but it is recoverable rather than gone: `$.toolUseResult.persistedOutputPath` records the sidecar's path (838 rows, 351MB), and spot-checks found the files still on disk. Read one directly when an analysis turns on what a truncated result actually said.

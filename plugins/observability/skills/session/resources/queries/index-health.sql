@@ -63,8 +63,7 @@
 -- bursty by nature do not false-positive.
 --
 -- hook-deny-invisible emits a row even when the recovered count is zero, because zero is
--- itself ambiguous: either nothing was denied, or the hand-maintained pattern map in
--- views.sql has fallen behind a reworded hook.
+-- itself ambiguous: either nothing was denied, or the harness changed how it marks one.
 --
 -- The disk checks cover the local host only. Imported hosts' files live under
 -- session-imports/ and are covered by their own refresh watermark.
@@ -226,6 +225,7 @@ deny_recovered AS (
   SELECT
     (SELECT COALESCE(SUM(cnt), 0) FROM deny_by_hook) AS n,
     (SELECT COALESCE(SUM(subagent_cnt), 0) FROM deny_by_hook) AS subagent_n,
+    (SELECT COALESCE(SUM(cnt), 0) FROM deny_by_hook WHERE hook_name = '(unmapped)') AS unmapped_n,
     (SELECT string_agg(hook_name || ' (' || cnt || ')', ', ' ORDER BY cnt DESC)
      FROM (SELECT hook_name, cnt FROM deny_by_hook ORDER BY cnt DESC LIMIT 5)) AS top_hooks
 ),
@@ -247,7 +247,8 @@ deny_visibility AS (
       || 'permissionDecision deny writes no hook record, so a hook_events-only reading '
       || 'under-reports blocking by the recovered count. Read the hook_denies view '
       || 'alongside hook_blocks (hook-blocks.sql does). A zero here means either no '
-      || 'denies or a stale pattern map in views.sql. '
+      || 'denies or a broken deny signal. ' || r.unmapped_n || ' match no pattern in '
+      || 'views.sql, so their hook is unnamed. '
       || r.subagent_n || ' of the recovered denies were a subagent being denied, carried '
       || 'on the parent session id. hook_blocks sees none of those either, so they belong '
       || 'in this count, while a per-session reading has to key on agent_id'

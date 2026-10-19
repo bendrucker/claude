@@ -124,7 +124,7 @@ The `index-health` query detects drift the corpus can show. These absences are s
 - **Thinking text**: persisted as signature-only stubs, unsearchable from transcripts.
 - **Retention floor**: `cleanupPeriodDays` deletes old sessions, so the corpus floor ratchets forward. `~/.claude/history.jsonl` goes further back but isn't ingested.
 - **Cloud and mobile sessions**: claude.ai web/mobile and cloud routines write no local JSONL.
-- **Approved permission prompts**: only rejections leave a trace, so prompting friction is undercountable.
+- **Approved permission prompts before 2026-10-07**: only rejections left a trace. Later approvals are in `permission_requests`.
 - **Offloaded tool results**: large outputs truncate to a sidecar preview. The full output never enters the index.
 - **Other machines**: only imported hosts exist, so a never-imported or stale host is invisible rather than empty.
 

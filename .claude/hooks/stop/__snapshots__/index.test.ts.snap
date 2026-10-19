@@ -1,0 +1,57 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`processStop on captured prek output summarizes a lint failure 1`] = `
+"Lint and type check......................................................Failed
+- hook id: oxlint
+- duration: 9.72s
+- exit code: 1
+
+  scripts/example.ts:2:7: error eslint(no-unused-vars): Variable 'unused' is declared but never used. Unused variables should start with a '_'. help: Consider removing this declaration.
+  scripts/example.ts:3:1: error eslint(no-debugger): \`debugger\` statement is not allowed help: Remove the debugger statement"
+`;
+
+exports[`processStop on captured prek output stops on lint-failure 1`] = `
+{
+  "attributes": {
+    "blocks": 1,
+    "duration_ms": 0,
+    "failed": "oxlint",
+    "files": 1,
+    "outcome": "block",
+    "oxfmt_ms": 180,
+    "oxlint_ms": 9720,
+    "session.id": "session",
+    "workspace-deps_ms": 170,
+  },
+  "result": {
+    "decision": "block",
+    "reason": 
+"Check failures:
+
+Lint and type check......................................................Failed
+- hook id: oxlint
+- duration: 9.72s
+- exit code: 1
+
+  scripts/example.ts:2:7: error eslint(no-unused-vars): Variable 'unused' is declared but never used. Unused variables should start with a '_'. help: Consider removing this declaration.
+  scripts/example.ts:3:1: error eslint(no-debugger): \`debugger\` statement is not allowed help: Remove the debugger statement"
+,
+  },
+}
+`;
+
+exports[`processStop on captured prek output stops on fixer-only 1`] = `
+{
+  "attributes": {
+    "duration_ms": 0,
+    "failed": "oxfmt",
+    "files": 1,
+    "outcome": "pass",
+    "oxfmt_ms": 180,
+    "oxlint_ms": 8500,
+    "session.id": "session",
+    "workspace-deps_ms": 120,
+  },
+  "result": null,
+}
+`;

@@ -526,28 +526,6 @@ describe("processStop", () => {
     expect(results.map((result) => result?.decision)).toEqual(["block", "block", "block"]);
   });
 
-  it("passes a run whose only failures are files a fixer rewrote", async () => {
-    const formatted = [
-      "Format...................................................................Failed",
-      "- hook id: oxfmt",
-      "- duration: 0.14s",
-      "- files were modified by this hook",
-      "Lint and type check......................................................Passed",
-      "- hook id: oxlint",
-      "- duration: 11.65s",
-    ].join("\n");
-    const { results, session } = await stopsWhileFailing([false], formatted);
-    expect(results).toEqual([null]);
-
-    const dir = stopEventsDir(session);
-    const [name] = await readdir(dir);
-    const record: unknown = await Bun.file(join(dir, name ?? "")).json();
-    expect(record).toMatchObject({
-      event_name: "prek.stop",
-      attributes: { outcome: "pass", files: 1, oxfmt_ms: 140, oxlint_ms: 11_650, failed: "oxfmt" },
-    });
-  });
-
   it("warns without blocking when prek is missing", async () => {
     const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
     const filePath = join(cwd, "touched.ts");
@@ -565,5 +543,47 @@ describe("processStop", () => {
       process.env.PATH = originalPath;
       await rm(cwd, { recursive: true, force: true });
     }
+  });
+
+  // Output captured from prek 0.5.5 against this repo's config, so a prek
+  // upgrade that reshapes its report shows up as a snapshot diff.
+  describe("on captured prek output", () => {
+    const attributesOf = (record: unknown): object =>
+      typeof record === "object" &&
+      record !== null &&
+      "attributes" in record &&
+      typeof record.attributes === "object" &&
+      record.attributes !== null
+        ? record.attributes
+        : {};
+    const fixture = (name: string): Promise<string> =>
+      Bun.file(join(import.meta.dirname, "fixtures", `${name}.txt`)).text();
+
+    test("summarizes a lint failure", async () => {
+      expect(summarizePrekOutput(await fixture("lint-failure"))).toMatchSnapshot();
+    });
+
+    test.each(["lint-failure", "fixer-only"])("stops on %s", async (name) => {
+      const cwd = await mkdtemp(join(tmpdir(), "stop-hook-cwd-"));
+      const filePath = join(cwd, "touched.ts");
+      await Bun.write(filePath, "export {}");
+      const transcriptPath = join(cwd, "transcript.jsonl");
+      await Bun.write(transcriptPath, createTranscriptContent([{ path: filePath, tool: "Edit" }]));
+      const input = stopInput({ transcript_path: transcriptPath, cwd });
+
+      try {
+        const result = await withStubbedCommands({ prek: 1 }, () => processStop(input), {
+          prek: { stdout: await fixture(name) },
+        });
+        const dir = stopEventsDir(input.session_id);
+        const [file] = await readdir(dir);
+        const record: unknown = await Bun.file(join(dir, file ?? "")).json();
+        // The run's own duration and session id vary, so the snapshot pins the rest.
+        const attributes = { ...attributesOf(record), duration_ms: 0, "session.id": "session" };
+        expect({ result, attributes }).toMatchSnapshot();
+      } finally {
+        await rm(cwd, { recursive: true, force: true });
+      }
+    });
   });
 });

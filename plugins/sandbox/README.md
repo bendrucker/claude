@@ -1,17 +1,63 @@
 # Sandbox
 
-Lets a `dangerouslyDisableSandbox` Bash call run, and when its commands already escape the sandbox through `sandbox.excludedCommands`, reminds the model of the form that escapes without the flag.
+Teaches Claude to drop `dangerouslyDisableSandbox` when the command would escape the sandbox anyway through `sandbox.excludedCommands`. The call still runs. The reminder is attached to its result.
+
+## Examples
+
+With `git:*` and `agent-browser:*` excluded:
+
+**Before:** `cd /repo && git push -u origin HEAD 2>&1 | tail -5`, with the flag set
+
+**Injected:**
+
+```text
+That call needed no `dangerouslyDisableSandbox`: every command in it matches `sandbox.excludedCommands` (`git:*`), so it runs outside the sandbox on its own.
+Next time, leave the flag off, along with the pieces that keep the chain from matching:
+
+    git push -u origin HEAD
+
+- `cd /repo`: the command already runs in the session's directory.
+- `2>&1`: the harness already captures stderr.
+- `| tail -5`: the harness truncates long output itself.
+```
+
+**Before:** `export AGENT_BROWSER_SESSION=docs; agent-browser open https://example.com`, with the flag set
+
+**Injected:**
+
+```text
+That call needed no `dangerouslyDisableSandbox`: every command in it matches `sandbox.excludedCommands` (`agent-browser:*`), so it runs outside the sandbox on its own.
+Next time, leave the flag off, along with the pieces that keep the chain from matching:
+
+    agent-browser --session docs open https://example.com
+
+- `export AGENT_BROWSER_SESSION=docs`: pass `--session docs` to `agent-browser` instead.
+```
+
+**Before:** `git status`, with the flag set
+
+**Injected:**
+
+```text
+That call needed no `dangerouslyDisableSandbox`: every command in it matches `sandbox.excludedCommands` (`git:*`), so it runs outside the sandbox on its own.
+It escapes as written. Next time, leave the flag off.
+```
+
+**No reminder:** `git status && bun test`, because `bun` matches no entry. It also stays quiet for a `cd` elsewhere or in a subagent, any other variable, `$(...)`, another redirection, `||`, and `&`.
 
 ## Contents
 
-- **Mod**: [`hooks/hooks.json`](hooks/hooks.json) loads [`register.ts`](mod/register.ts), which watches `Bash` calls that set the flag while the sandbox is on. It reads `excludedCommands` from every settings source and unions them, the way the engine merges the list.
-  - [`scaffold.ts`](mod/scaffold.ts) splits the command and drops the scaffolding that keeps a chain from matching: a `cd` to the session directory in the main loop (a subagent's shell may start in its own worktree), `export AGENT_BROWSER_SESSION=<name>` or the inline form (rewritten to `agent-browser --session <name>`), `2>&1`, and a trailing pipe into `tail`, `head`, `grep`, `wc`, `sort`, `uniq`, `cut`, or `jq`. When every remaining command matches an entry, the call runs and the rewritten command rides along as context for next time. A deny would cost a turn on every call it fires on. Nothing is said for anything else: a `cd` elsewhere, any other variable, `$(...)`, other redirections, `||`, a background job, or a command that matches none of the entries.
-- **Events**: `session.start`, `bypass` (one per flagged call, `verdict` `remind` or `allow`, with the scaffolds dropped or the reason no reminder applied, and `repeat`, the reminders already given in that loop), and `error` go to [`mod-events`](../mod-events/README.md). The mod fails open, so a hook failure lets the bypass run.
+- [`mod/register.ts`](mod/register.ts): a `tool.call` hook on Bash calls that set the flag while the sandbox is on. It unions `excludedCommands` across settings sources and fails open.
+- [`mod/scaffold.ts`](mod/scaffold.ts): the parser that strips the scaffolding and writes the reminder.
+- Events: `sandbox.bypass` per flagged call (`verdict` `remind` or `allow`, `scaffolds`, `reason`, `repeat`) through [`mod-events`](../mod-events/README.md).
 
 ## Tests
 
-`bun scripts/mod-test.ts sandbox` runs the mod's tests.
+`bun scripts/mod-test.ts sandbox`
 
 ## Removal
 
-The `sandbox-bypass-scaffold` query in `observability:session` reports the weekly share of flagged calls the mod reminded on (`scaffolded_pct`) and how many of those followed an earlier reminder in the same loop (`repeat_pct`). Retire the plugin once `scaffolded_pct` stays under 10% for four consecutive weeks, or when Claude Code's own `excludedCommands` matching ignores these scaffolds. A `repeat_pct` that stays high means the reminder doesn't land, and the case for a deny.
+The `sandbox-bypass-scaffold` query in `observability:session` reports `scaffolded_pct` and `repeat_pct`.
+
+- **Retire the plugin** once `scaffolded_pct` stays under 10% for four weeks, or once Claude Code's own matching ignores these scaffolds.
+- **Switch it to deny** if `repeat_pct` stays high.

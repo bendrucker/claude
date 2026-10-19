@@ -269,6 +269,26 @@ WITH bypass AS (
   WHERE type = 'tool_use'
     AND name = 'Bash'
     AND (data->>'$.input.dangerouslyDisableSandbox') = 'true'
+),
+-- Sandboxed Bash calls that failed. Materializing them keeps the planner from pairing every
+-- error result with every bypass on host alone before the other conditions apply, a plan it
+-- picked whenever an index's sampled statistics shifted, costing several GB and seconds.
+failed AS MATERIALIZED (
+  SELECT
+    tc.id AS tool_id,
+    er.content AS error,
+    tc.host,
+    tc.session_id,
+    tc.timestamp,
+    subagent_id(tc.source_file) AS agent_id,
+    (tc.data->>'$.input.command') AS command
+  FROM content_items tc
+  JOIN content_items er
+    ON er.tool_use_id = tc.id AND er.host = tc.host
+       AND er.type = 'tool_result' AND er.is_error
+  WHERE tc.type = 'tool_use'
+    AND tc.name = 'Bash'
+    AND COALESCE((tc.data->>'$.input.dangerouslyDisableSandbox'), 'false') = 'false'
 )
 SELECT
   b.command,
@@ -282,25 +302,17 @@ SELECT
   prior.tool_id AS retried_tool_id,
   prior.error   AS retried_error
 FROM bypass b
-LEFT JOIN LATERAL (
-  SELECT tc.id AS tool_id, er.content AS error
-  FROM content_items tc
-  JOIN content_items er
-    ON er.tool_use_id = tc.id AND er.host = tc.host
-       AND er.type = 'tool_result' AND er.is_error
-  WHERE tc.type = 'tool_use'
-    AND tc.name = 'Bash'
-    AND COALESCE((tc.data->>'$.input.dangerouslyDisableSandbox'), 'false') = 'false'
-    AND tc.host = b.host
-    AND tc.session_id = b.session_id
-    -- Sibling subagents share the parent's session id, so matching on session alone
-    -- pairs one agent's bypass with an unrelated agent's failure of the same command.
-    AND subagent_id(tc.source_file) IS NOT DISTINCT FROM b.agent_id
-    AND tc.timestamp  < b.timestamp
-    AND (tc.data->>'$.input.command') = b.command
-  ORDER BY tc.timestamp DESC
-  LIMIT 1
-) prior ON true;
+-- The latest earlier failure of the same command by the same agent.
+LEFT JOIN failed prior
+  ON prior.host = b.host
+  AND prior.session_id = b.session_id
+  -- Sibling subagents share the parent's session id, so matching on session alone
+  -- pairs one agent's bypass with an unrelated agent's failure of the same command.
+  AND prior.agent_id IS NOT DISTINCT FROM b.agent_id
+  AND prior.timestamp < b.timestamp
+  AND prior.command = b.command
+-- content_items keeps one row per tool id per host, so this keeps one row per bypass.
+QUALIFY ROW_NUMBER() OVER (PARTITION BY b.host, b.tool_id ORDER BY prior.timestamp DESC) = 1;
 
 CREATE OR REPLACE VIEW text_content AS
 WITH unified AS (

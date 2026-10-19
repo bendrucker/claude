@@ -63,6 +63,8 @@ bun bench.ts run --arm main=arms/main/session.duckdb --arm aa=arms/aa/session.du
 bun bench.ts run --arm main=arms/main/session.duckdb --arm zstd=arms/zstd/session.duckdb,../wt/plugins/observability/skills/session --out results/zstd
 ```
 
+Two builds of one snapshot hold the same rows in a different physical order, because `content_items` is rebuilt by a parallel window. DuckDB samples its distinct-count statistics in that order, so cardinality estimates shift between builds. A query whose join order hinges on them shows up as an A/A difference past the noise floor. That is a fragile plan in the query or view, not a storage effect: fix its shape, as `sandbox_bypasses` materializes its failure set, rather than averaging builds.
+
 Pass `--limits vm` to climb at the cloud readers' cap alone, and `--prepare 'sync && sudo purge'` for cold-cache runs on macOS.
 
 Time the refresh per changed transcript. Each run starts from a clone of the arm's index with real transcripts of the target size staged under a throwaway import host, so the frozen index stays untouched:

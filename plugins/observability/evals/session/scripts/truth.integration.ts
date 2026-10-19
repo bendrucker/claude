@@ -52,7 +52,34 @@ const apiError = (uuid: string, error: Record<string, unknown>) => ({
   error,
 });
 
+// Streaming writes a record per content block, each repeating the message's usage.
+const reply = (uuid: string, id: string, model: string, output: number, extra = {}) => ({
+  ...base,
+  type: "assistant",
+  uuid,
+  timestamp: "2026-09-15T00:00:00Z",
+  message: { id, model, role: "assistant", content: [], usage: { output_tokens: output } },
+  ...extra,
+});
+const skill = (id: string, name: string) => ({
+  ...base,
+  type: "assistant",
+  uuid: `${id}-skill`,
+  timestamp: "2026-10-04T00:00:00Z",
+  message: {
+    role: "assistant",
+    content: [{ type: "tool_use", id, name: "Skill", input: { skill: name } }],
+  },
+});
+
 const lines = [
+  reply("m1-a", "m1", "claude-opus-5", 10),
+  reply("m1-b", "m1", "claude-opus-5", 40),
+  reply("m2", "m2", "claude-sonnet-5", 5),
+  reply("m3", "m3", "claude-opus-5", 7, { isSidechain: true }),
+  ...Array.from({ length: 10 }, (_, i) => skill(`ship-${i}`, "ship")),
+  skill("rare", "rare"),
+  text("cpu", "run it under taskpolicy -c utility", "2026-09-29T00:00:00Z"),
   use("zsh", "Bash", "2026-10-03T00:00:00Z"),
   denied("zsh", "(eval):1: no matches found: *.ts", "2026-10-03T00:00:01Z"),
   // Only a Bash call's failure counts.
@@ -61,6 +88,12 @@ const lines = [
   use("ask", "AskUserQuestion", "2026-08-05T00:00:00Z"),
   use("ask-late", "AskUserQuestion", "2026-10-05T00:00:00Z"),
   text("bench", "profile it with pytest-benchmark", "2026-09-05T00:00:00Z"),
+  // An injected skill body names the tool without the session mentioning it.
+  {
+    ...text("skill-body", "references/python.md covers `pytest-benchmark`", "2026-09-06T00:00:00Z"),
+    sessionId: "skill-session",
+    isMeta: true,
+  },
   use("field", "Bash", "2026-10-01T00:00:00Z"),
   denied("field", "PreToolUse:Bash hook error: no", "2026-10-01T00:00:01Z", decision("hook")),
   // A replayed line repeats its uuid and tool id, and counts once.
@@ -77,6 +110,25 @@ const lines = [
   text("int-1", "[Request interrupted by user]", "2026-09-10T00:00:00Z"),
   text("int-2", "[Request interrupted by user for tool use]", "2026-09-11T00:00:00Z"),
   text("int-3", "[Request interrupted by user]", "2026-10-02T00:00:00Z"),
+  // A tool result quoting the marker, as a Read of the skill's source does, is not an interruption.
+  use("quote", "Read", "2026-09-12T00:00:00Z"),
+  {
+    ...denied(
+      "quote",
+      'const INTERRUPTED = "[Request interrupted by user";',
+      "2026-09-12T00:00:01Z",
+    ),
+    message: {
+      role: "user",
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: "quote",
+          content: 'const INTERRUPTED = "[Request interrupted by user";',
+        },
+      ],
+    },
+  },
   context("ctx-1", "PreToolUse:Bash"),
   context("ctx-2", "PreToolUse:Bash"),
   context("ctx-3", "SessionStart"),
@@ -131,6 +183,16 @@ test.each<[string, TruthRow[]]>([
   ["question-zsh-failures", [{ key: "no matches found", value: 1 }]],
   ["question-ask-user", [{ value: 1 }]],
   ["question-pytest-benchmark", [{ key: "truth-session" }]],
+  [
+    "question-output-tokens-by-model",
+    [
+      { key: "claude-opus-5", value: 47 },
+      { key: "claude-sonnet-5", value: 5 },
+    ],
+  ],
+  ["question-top-sessions-output", [{ key: "truth-session", value: 45 }]],
+  ["question-skills-october", [{ key: "ship", value: 10 }]],
+  ["question-cpu-priority-search", [{ key: "truth-session" }]],
 ])("%s reads the native fields", async (name, want) => {
   expect(byKey(await truth(name))).toEqual(byKey(want));
 });

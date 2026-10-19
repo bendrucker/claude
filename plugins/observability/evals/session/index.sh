@@ -3,7 +3,7 @@
 # A refresh stamp dated ahead of the run makes refresh.ts read the copy as current, so a session
 # never rescans or rewrites it.
 set -euo pipefail
-suite="$(cd "$(dirname "$0")/.." && pwd)"
+suite="$(cd "$(dirname "$0")" && pwd)"
 dir="$HOME/.local/share/claude-sessions"
 mkdir -p "$dir"
 # An APFS clone is instant; elsewhere it falls back to a full copy.

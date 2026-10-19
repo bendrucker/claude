@@ -145,10 +145,12 @@ test("keepCases prunes staged cases to those any glob matches", async () => {
       Bun.write(join(dir, d, "case.yaml"), ""),
     ),
   );
+  await Bun.write(join(dir, "data", "index.duckdb"), "");
   expect(await keepCases(dir, ["quiet-*", "{loud,none}"])).toEqual(["loud", "quiet-a", "quiet-b"]);
   expect(await keepCases(dir, ["quiet-[a]"])).toEqual(["quiet-a"]);
   expect(await Bun.file(join(dir, "quiet-b/case.yaml")).exists()).toBe(false);
   expect(await Bun.file(join(dir, "examples/case.yaml")).exists()).toBe(true);
+  expect(await Bun.file(join(dir, "data/index.duckdb")).exists()).toBe(true);
   expect(keepCases(dir, ["nope"])).rejects.toThrow("No case matches");
 });
 

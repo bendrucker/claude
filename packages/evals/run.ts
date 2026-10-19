@@ -1,4 +1,4 @@
-import { globSync, mkdtempSync, readdirSync } from "node:fs";
+import { existsSync, globSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
 import { $ } from "bun";
@@ -105,7 +105,11 @@ export function splitCases(args: string[]): [cases: string[], rest: string[]] {
 export async function keepCases(dir: string, globs: string[]): Promise<string[]> {
   const patterns = globs.map((g) => new Bun.Glob(g));
   const cases = readdirSync(dir, { withFileTypes: true }).filter(
-    (e) => e.isDirectory() && e.name !== "examples" && e.name !== "results",
+    (e) =>
+      e.isDirectory() &&
+      e.name !== "examples" &&
+      e.name !== "results" &&
+      existsSync(join(dir, e.name, "case.yaml")),
   );
   const kept = cases.filter((e) => patterns.some((p) => p.match(e.name))).map((e) => e.name);
   if (kept.length === 0) throw new Error(`No case matches --case ${globs.join(", ")}`);

@@ -74,6 +74,15 @@ test("run replays each query at both limits and leaves the index unchanged", asy
   expect(await Bun.file(db).bytes()).toEqual(before);
 });
 
+test("run refuses an arm whose index another views.sql built", async () => {
+  const skill = join(dir, "stale-skill");
+  await Bun.write(join(skill, "resources", "views.sql"), "-- another commit's views\n");
+  const out = join(dir, "stale");
+  const replay = join(dir, "replay.json");
+  const run = bench("run", "--arm", `stale=${db},${skill}`, "--replay", replay, "--out", out);
+  expect((await run.nothrow()).stderr.toString()).toContain("different views.sql");
+});
+
 test("refresh times a changed transcript against a clone", async () => {
   const before = await Bun.file(db).bytes();
   const out = join(dir, "refresh");

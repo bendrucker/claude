@@ -126,11 +126,39 @@ const Mined = z.object({
   oom: z.number(),
 });
 
+const CWD_RELATIVE = /\bread_\w+\(\s*'[^~/']/;
+
+/**
+ * Throws unless the arm's index was last built by the arm's own `views.sql`. A named query run
+ * against another commit's views measures neither commit, and can fail outright on a column
+ * the views it expects add.
+ */
+export async function checkViews(a: Arm): Promise<void> {
+  const views = await Bun.file(join(a.skill, "resources", "views.sql")).text();
+  const want = new Bun.CryptoHasher("sha256").update(views).digest("hex");
+  const [row] = await duckdbJson(
+    a.db,
+    "SELECT views_hash FROM index_meta",
+    z.object({ views_hash: z.string().nullable() }),
+  );
+  if (row?.views_hash !== want)
+    throw new Error(
+      `arm ${a.name}: ${a.db} was built with a different views.sql than ${a.skill}. Rebuild it with \`bench.ts build --skill ${a.skill}\`.`,
+    );
+}
+
 /** Every group that ran out of memory, the top group per hot surface, then the most frequent. */
 export async function replaySet(db: string, top: number): Promise<Query[]> {
   const rows = await duckdbJson(db, MINE, Mined);
-  // A named query the skill no longer ships cannot be replayed.
-  const known = new Set((await loadQueryHeaders()).map((h) => h.name));
+  // A named query the skill no longer ships cannot be replayed, nor one that reads a file
+  // relative to the caller's cwd, since a replay runs from no project.
+  const shipped = await Promise.all(
+    (await loadQueryHeaders()).map(async (h) => {
+      const sql = await Bun.file(join(SKILL, "resources", "queries", `${h.name}.sql`)).text();
+      return CWD_RELATIVE.test(sql) ? [] : [h.name];
+    }),
+  );
+  const known = new Set(shipped.flat());
   const groups = new Map<string, Query & { ids: Set<string> }>();
   const calls = rows
     .toSorted((a, b) => a.ts.localeCompare(b.ts))

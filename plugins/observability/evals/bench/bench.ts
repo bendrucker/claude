@@ -11,6 +11,7 @@ import { refresh } from "./refresh";
 import { snapshot } from "./snapshot";
 import {
   type Arm,
+  checkViews,
   Query,
   render,
   replay,
@@ -141,6 +142,7 @@ program
     const set = z.array(Query).parse(await Bun.file(o.replay).json());
     const queries = set.filter((q) => o.only === undefined || new RegExp(o.only).test(q.id));
     const limits = z.array(z.enum(["mac", "vm"])).parse(o.limits.split(","));
+    await Promise.all(o.arm.map(checkViews));
     const tmp = mkdtempSync(join(tmpdir(), "session-bench-"));
     const schedule = Array.from({ length: o.warmup + o.runs }, (_, r) =>
       queries.flatMap((q, i) =>
@@ -180,6 +182,7 @@ program
   .option("--files <n>", "transcripts changed per refresh", count, 1)
   .option("--runs <n>", "refreshes per size and arm", count, 10)
   .action(async (o) => {
+    await Promise.all(o.arm.map(checkViews));
     mkdirSync(o.out, { recursive: true });
     // Beside the results, on the volume that holds the clones, so APFS can clone instead of copy.
     const dir = mkdtempSync(join(o.out, ".work-"));

@@ -43,8 +43,10 @@ export async function loadTruth(caseDir: string, index: string): Promise<Truth> 
 // Dates and times read as numbers otherwise, and a count never takes their shape.
 const DATE = /\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+Z?)?/g;
 const NUMBER = /-?\d[\d,]*(?:\.\d+)?/g;
-// A list item or table row, which is where a reply states one answer per line.
+// A list item or table row, which is where a reply states one answer per line. A reply
+// with a table puts its answer there and its notes in the list, so then only rows count.
 const ITEM = /^\s*(?:[-*+]|\d+[.)]|\|)/;
+const ROW = /^\s*\|/;
 const SESSION = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 
 function numbers(line: string): number[] {
@@ -77,7 +79,9 @@ export function overlap(reply: string, truth: Truth): { recall: number; precisio
     return { recall, precision: [...named].filter((s) => ids.includes(s)).length / named.size };
   }
   const keyed = truth.rows.some((row) => row.key != null);
-  const items = lines.filter((l) => ITEM.test(l) && numbers(l).length > 0);
+  const answers = lines.filter((l) => ITEM.test(l) && numbers(l).length > 0);
+  const rows = answers.filter((l) => ROW.test(l));
+  const items = rows.length > 0 ? rows : answers;
   if (!keyed || items.length === 0) return { recall, precision: recall };
   const right = items.filter((l) => truth.rows.some((row) => matches(l, row, truth.tolerance)));
   return { recall, precision: right.length / items.length };

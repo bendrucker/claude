@@ -994,3 +994,123 @@ SELECT
   attributes->>'outcome'                                  AS outcome
 FROM mod_events
 WHERE event_name = 'auto-mode.tool.verdict';
+
+-- The field registry: which JSON paths each record type carries, when they were first and
+-- last written, and by which harness version. Paths stop two levels down (`$.key`, and
+-- `$.key.child` under each top-level object) plus `$.message.usage`'s children. A child that
+-- is not a name, such as the tool id, model, or UUID keying a map, collapses to `*`. Rows
+-- are per file, so a refresh replaces only the rows of the files listed in field_scope, and
+-- a line with no timestamp of its own takes its file's earliest. Each line is parsed once
+-- into a map, and each of its values once more.
+CREATE OR REPLACE MACRO field_rows(scoped) AS TABLE
+WITH lines AS (
+  SELECT
+    r.host,
+    r.source_file,
+    r.type,
+    COALESCE(r.timestamp, MIN(r.timestamp) OVER (PARTITION BY r.host, r.source_file)) AS ts,
+    from_json(r.data, '"MAP(VARCHAR, JSON)"') AS top
+  FROM raw r
+  WHERE NOT scoped OR EXISTS (
+    SELECT 1 FROM field_scope s WHERE s.host = r.host AND s.source_file = r.source_file
+  )
+),
+entries AS (
+  SELECT host, source_file, type, ts, top['version']->>'$' AS version,
+    list_transform(map_entries(top), lambda e: {
+      'key': e.key, 'sub': json_keys(e.value, ['$', '$.usage'])
+    }) AS entries
+  FROM lines
+),
+paths AS (
+  SELECT host, source_file, type, ts, version,
+    unnest(list_distinct(flatten(list_transform(entries, lambda e:
+      ['$.' || e.key]
+      || list_transform(COALESCE(e.sub[1], []), lambda c: '$.' || e.key || '.' || CASE
+           WHEN regexp_full_match(c, '[A-Za-z_]\w*') AND NOT regexp_matches(c, '(\d\D*){4}')
+           THEN c ELSE '*' END)
+      || CASE WHEN e.key = 'message'
+           THEN list_transform(COALESCE(e.sub[2], []), lambda c: '$.message.usage.' || c)
+           ELSE [] END
+    )))) AS path
+  FROM entries
+)
+SELECT
+  host,
+  source_file,
+  type,
+  path,
+  MIN(ts)              AS first_ts,
+  MAX(ts)              AS last_ts,
+  arg_min(version, ts) AS first_version,
+  arg_max(version, ts) AS last_version,
+  COUNT(*)             AS n
+FROM paths
+GROUP BY ALL;
+
+CREATE OR REPLACE TABLE file_fields AS SELECT * FROM field_rows(false);
+
+-- `n` counts lines, so a replayed line counts again, as it does in `raw`.
+CREATE OR REPLACE VIEW fields AS
+SELECT
+  host,
+  type,
+  path,
+  MIN(first_ts)                    AS first_ts,
+  MAX(last_ts)                     AS last_ts,
+  arg_min(first_version, first_ts) AS first_version,
+  arg_max(last_version, last_ts)   AS last_version,
+  SUM(n)::BIGINT                   AS n
+FROM file_fields
+GROUP BY host, type, path;
+
+-- Paths already judged, as GLOBs over `fields.path`, which field_drift leaves out.
+CREATE OR REPLACE VIEW field_triage AS
+SELECT * FROM (VALUES
+  ('$.toolUseResult.*', 'one shape per tool; content_items carries it whole'),
+  ('$.wireToolInputs.*', 'map keyed by tool id'),
+  ('$.wireIngestContext.*', 'map keyed by tool id'),
+  ('$.modelUsage.*', 'map keyed by model'),
+  ('$.artifacts.*', 'map keyed by artifact id')
+) t(path, note);
+
+-- The `raw.data` paths that the views and table macros reading `raw` extract by literal.
+CREATE OR REPLACE VIEW view_paths AS
+SELECT DISTINCT unnest(
+  regexp_extract_all(sql, '"data" ->>? ''(\$\.[^'']+)''', 1)
+  || regexp_extract_all(sql, 'json_extract(?:_string)?\((?:\w+\.)?"data", ''(\$\.[^'']+)''', 1)
+) AS path
+FROM (
+  SELECT sql FROM duckdb_views() WHERE NOT internal
+  UNION ALL
+  SELECT macro_definition FROM duckdb_functions() WHERE function_type = 'table_macro'
+)
+WHERE regexp_matches(sql, '\bFROM raw\b');
+
+-- Fields that started or stopped at `since`, on a record type written on both sides of it:
+-- `new` is absent before, `dead` is absent since while its type is not. A brand-new type is
+-- index-health's `stream-new`, and a new path a view already reads is consumed, so only
+-- `dead` reports one.
+CREATE OR REPLACE MACRO field_drift(since, host_val) AS TABLE
+WITH f AS (
+  SELECT
+    type,
+    path,
+    MIN(first_ts)                    AS first_ts,
+    MAX(last_ts)                     AS last_ts,
+    arg_min(first_version, first_ts) AS first_version,
+    SUM(n)::BIGINT                   AS n
+  FROM file_fields
+  WHERE host_filter(host, host_val)
+  GROUP BY type, path
+),
+kinds AS (
+  SELECT type, MIN(first_ts) AS born, MAX(last_ts) AS seen FROM f GROUP BY type
+)
+SELECT CASE WHEN f.first_ts >= since THEN 'new' ELSE 'dead' END AS change, f.*
+FROM f
+JOIN kinds k USING (type)
+WHERE k.born < since
+  AND ((f.first_ts >= since AND f.path NOT IN (SELECT path FROM view_paths))
+       OR (f.last_ts < since AND k.seen >= since))
+  AND NOT EXISTS (SELECT 1 FROM field_triage t WHERE f.path GLOB t.path);

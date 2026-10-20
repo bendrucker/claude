@@ -16,4 +16,4 @@ SQL
 
 ## Breadth-First Leads
 
-Breadth-first leads come from the survey surfaces (`records` taxonomy, `fields` for schema inference, `activity`, `hooks`, `diagnostics`, `skill-activity`). A depth pass is then custom read-only SQL over whatever table or view the survey pointed at.
+Breadth-first leads come from the survey surfaces (`records` taxonomy, the `fields` registry, `activity`, `hooks`, `diagnostics`, `skill-activity`). A depth pass is then custom read-only SQL over whatever table or view the survey pointed at.

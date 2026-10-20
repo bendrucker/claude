@@ -1167,21 +1167,6 @@ describe("hook_events origin", () => {
   });
 });
 
-describe("fields discovery query", () => {
-  it("enumerates the keys of an attachment kind via schema inference", async () => {
-    const rows = await runQuery(
-      db,
-      "fields",
-      z.object({ field: z.string(), json_type: z.string() }),
-      filterParams({ kind: "attachment:hook_success", path: "$.attachment" }),
-    );
-    const fields = new Set(rows.map((r) => r.field));
-    for (const f of ["command", "exitCode", "stdout", "hookEvent"]) {
-      expect(fields).toContain(f);
-    }
-  });
-});
-
 describe("activity query", () => {
   it("counts human and automated interaction signals", async () => {
     const rows = await runQuery(
@@ -2590,6 +2575,15 @@ describe("index-health query", () => {
     expect(fresh[0]?.status).toBe("info");
   });
 
+  it("alerts on a path a view reads that no indexed line carries", async () => {
+    const rows = await runQuery(db, "index-health", Health, healthParams());
+    const dead = rows.filter((r) => r.check_name === "path-dead").map((r) => r.subject);
+    // The fixtures carry no `slug`, which `records` reads, and do carry `promptSource`.
+    expect(dead).toContain("$.slug");
+    expect(dead).not.toContain("$.promptSource");
+    expect(rows.find((r) => r.subject === "$.slug")?.status).toBe("alert");
+  });
+
   it("summarizes kinds whose rows carry no timestamp", async () => {
     const rows = await runQuery(db, "index-health", Health, healthParams());
     const nullTs = rows.find((r) => r.check_name === "null-timestamp-kinds");
@@ -3045,51 +3039,169 @@ describe("message_usage cost columns and usage queries", () => {
   });
 });
 
-describe("field-drift query", () => {
-  const DriftRow = z.object({
-    field: z.string(),
-    recent_rows: z.bigint(),
-    first_seen: z.string(),
-    last_seen: z.string(),
-  });
+describe("field registry", () => {
+  let projects: string;
+  const at = (day: number) => new Date(Date.UTC(2026, 0, day, 12)).toISOString();
+  const line = (day: number, extra: Record<string, unknown> = {}) =>
+    `${JSON.stringify({
+      type: "user",
+      sessionId: "field-session",
+      cwd: "/Users/test/fields",
+      timestamp: at(day),
+      version: day < 10 ? "2.1.1" : "2.1.2",
+      message: { role: "user", content: "hi" },
+      ...extra,
+    })}\n`;
+  const file = (name: string) => join(projects, "-Users-test-fields", name);
+  const refresh = () => ensureIndex(db, { projectsDir: projects, importsDir });
 
-  // The fixture corpus stands in for the real one: `toolDenialKind` appears only on and
-  // after 2024-01-20, `promptSource` straddles that date. `cutoff_date` pins the boundary
-  // so the case does not decay as wall-clock time moves past `new_days`.
-  function driftParams(overrides: Record<string, string | null> = {}) {
-    return {
-      new_days: null,
-      cutoff_date: "2024-01-20",
-      min_rows: "1",
-      sample_pct: "100",
-      host: null,
-      ...overrides,
-    };
+  async function paths(where: string) {
+    return db.query(
+      `SELECT type, path, n, first_ts, first_version FROM fields WHERE ${where} ORDER BY type, path`,
+      z.object({
+        type: z.string(),
+        path: z.string(),
+        n: z.bigint(),
+        first_ts: z.date(),
+        first_version: z.string().nullable(),
+      }),
+    );
   }
 
-  it("reports a field that arrived on an existing record kind", async () => {
-    const rows = await runQuery(db, "field-drift", DriftRow, driftParams());
-    const denial = rows.find((r) => r.field === "user:$.toolDenialKind");
-    expect(denial).toBeDefined();
-    expect(Number(denial?.recent_rows)).toBe(5);
-    expect(denial?.first_seen).toBe("2024-01-20");
+  // Rows file_fields holds that a full rebuild would not, plus the reverse.
+  async function driftFromFullRebuild(): Promise<number> {
+    const [row] = await db.query(
+      `SELECT COUNT(*) AS n FROM (
+         (FROM file_fields EXCEPT ALL FROM field_rows(false))
+         UNION ALL
+         (FROM field_rows(false) EXCEPT ALL FROM file_fields)
+       )`,
+      z.object({ n: z.bigint() }),
+    );
+    return Number(row?.n);
+  }
+
+  beforeEach(() => {
+    projects = join(tmpDir, "field-projects");
   });
 
-  it("stays silent on a field that predates the cutoff", async () => {
-    const rows = await runQuery(db, "field-drift", DriftRow, driftParams());
-    expect(rows.map((r) => r.field)).not.toContain("user:$.promptSource");
+  it("records each path two levels down, with message.usage and maps collapsed", async () => {
+    await Bun.write(
+      file("shapes.jsonl"),
+      [
+        line(1),
+        `${JSON.stringify({ type: "custom-title", sessionId: "field-session", customTitle: "t" })}\n`,
+        line(12, {
+          type: "assistant",
+          message: { role: "assistant", content: [], usage: { input_tokens: 1, speed: "fast" } },
+          wireToolInputs: { toolu_01AbC1234567890xyz: { command: "ls" } },
+        }),
+      ].join(""),
+    );
+    await refresh();
+
+    const rows = await paths("path LIKE '$.message.usage.%' OR path LIKE '$.wire%'");
+    expect(rows.map((r) => r.path)).toEqual([
+      "$.message.usage.input_tokens",
+      "$.message.usage.speed",
+      "$.wireToolInputs",
+      "$.wireToolInputs.*",
+    ]);
+    expect(rows[0]).toMatchObject({ n: 1n, first_version: "2.1.2" });
+    // A line with no timestamp takes its file's earliest.
+    const [title] = await paths("path = '$.customTitle'");
+    expect(title?.first_ts).toEqual(new Date(at(1)));
   });
 
-  it("honors min_rows", async () => {
-    const rows = await runQuery(db, "field-drift", DriftRow, driftParams({ min_rows: "500" }));
-    expect(rows).toEqual([]);
+  it("replaces only a changed file's rows, matching a full rebuild", async () => {
+    await Bun.write(file("a.jsonl"), line(1));
+    await Bun.write(file("b.jsonl"), line(2, { onlyInB: true }));
+    await refresh();
+
+    await Bun.write(file("a.jsonl"), line(1) + line(3, { brandNew: 1 }));
+    const result = await refresh();
+    const scope = await db.query(
+      "SELECT source_file FROM field_scope",
+      z.object({ source_file: z.string() }),
+    );
+    expect(scope).toEqual([{ source_file: file("a.jsonl") }]);
+    expect(result.fieldsNew).toBe(1);
+    expect((await paths("path = '$.brandNew'")).map((r) => r.n)).toEqual([1n]);
+    expect((await paths("path = '$.sessionId'")).map((r) => r.n)).toEqual([3n]);
+    expect(await driftFromFullRebuild()).toBe(0);
   });
 
-  it("samples deterministically, so a rerun walks the same rows", async () => {
-    const params = driftParams({ sample_pct: "50" });
-    const first = await runQuery(db, "field-drift", DriftRow, params);
-    const second = await runQuery(db, "field-drift", DriftRow, params);
-    expect(first).toEqual(second);
+  it("drops a removed file's counts and the paths only it carried", async () => {
+    await Bun.write(file("a.jsonl"), line(1));
+    await Bun.write(file("b.jsonl"), line(2, { onlyInB: true }));
+    await refresh();
+
+    await rm(file("b.jsonl"));
+    const result = await refresh();
+    expect(result.fieldsGone).toBe(1);
+    expect(await paths("path = '$.onlyInB'")).toEqual([]);
+    expect((await paths("path = '$.sessionId'")).map((r) => r.n)).toEqual([1n]);
+    expect(await driftFromFullRebuild()).toBe(0);
+  });
+
+  describe("field-drift query", () => {
+    const Drift = z.object({
+      change: z.string(),
+      field: z.string(),
+      n: z.bigint(),
+      first_seen: z.string(),
+      last_seen: z.string(),
+      first_version: z.string().nullable(),
+    });
+    const params = (overrides: Record<string, string | null> = {}) => ({
+      new_days: null,
+      cutoff_date: "2026-01-10",
+      min_rows: "1",
+      host: null,
+      ...overrides,
+    });
+
+    beforeEach(async () => {
+      await Bun.write(
+        file("drift.jsonl"),
+        [
+          line(1, { oldField: 1, toolUseResult: { a: 1 } }),
+          line(12, {
+            effortHint: "high",
+            toolDenialKind: "rule",
+            toolUseResult: { fooBar: 1 },
+            wireToolInputs: { toolu_01AbC1234567890xyz: {} },
+          }),
+          line(13, { effortHint: "low" }),
+          // A kind first written after the cutoff is stream-new's, not one new field each.
+          line(12, { type: "api-request", params: { model: "m" } }),
+        ].join(""),
+      );
+      await refresh();
+    });
+
+    it("reports fields that started and stopped on a kind written on both sides", async () => {
+      const rows = await runQuery(db, "field-drift", Drift, params());
+      expect(rows.map((r) => [r.change, r.field])).toEqual([
+        ["new", "user:$.effortHint"],
+        ["new", "user:$.wireToolInputs"],
+        ["dead", "user:$.oldField"],
+      ]);
+      expect(rows[0]).toMatchObject({ n: 2n, first_seen: "2026-01-12", first_version: "2.1.2" });
+    });
+
+    it("skips triaged paths and new paths a view already reads", async () => {
+      const fields = (await runQuery(db, "field-drift", Drift, params())).map((r) => r.field);
+      expect(fields).not.toContain("user:$.toolDenialKind");
+      expect(fields).not.toContain("user:$.toolUseResult.fooBar");
+      expect(fields).not.toContain("user:$.toolUseResult.a");
+      expect(fields).not.toContain("user:$.wireToolInputs.*");
+    });
+
+    it("honors min_rows", async () => {
+      const rows = await runQuery(db, "field-drift", Drift, params({ min_rows: "2" }));
+      expect(rows.map((r) => r.field)).toEqual(["user:$.effortHint"]);
+    });
   });
 });
 

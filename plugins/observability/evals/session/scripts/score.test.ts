@@ -25,6 +25,11 @@ describe("overlap", () => {
     expect(overlap(reply, keyed)).toEqual({ recall: 1, precision: 2 / 3 });
   });
 
+  test("reads only the table when a reply has one, leaving its notes out", () => {
+    const reply = "| tool | denies |\n|---|---|\n| Bash | 25 |\n| Edit | 4 |\n\n- Backoff ran 620 ms, then 1219 ms.";
+    expect(overlap(reply, keyed)).toEqual({ recall: 1, precision: 1 });
+  });
+
   test("never reads a date as a count", () => {
     const truth = { rows: [{ value: 2026 }], tolerance: 0 };
     expect(overlap("Nothing since 2026-09-19.", truth).recall).toBe(0);

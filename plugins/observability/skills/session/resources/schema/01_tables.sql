@@ -1,15 +1,5 @@
--- `raw` is the only durable table: `data` holds the verbatim JSONL line, and `host`,
--- `source_file` and `source_line` identify where it came from. Its remaining columns are
--- projections declared once in `00_pinned.sql`, so the shape is taken from that macro
--- rather than restated here and the two cannot drift.
-CREATE TABLE IF NOT EXISTS raw AS
-SELECT
-  NULL::VARCHAR AS host,
-  UNNEST(pinned_columns(NULL::JSON)),
-  NULL::VARCHAR AS source_file,
-  NULL::BIGINT  AS source_line,
-  NULL::JSON    AS data
-WHERE false;
+-- `raw`, the only durable table, is created by db.ts (rawDdl): its shape comes from
+-- `pinned_columns`, and a CREATE TABLE AS cannot carry `data`'s compression.
 
 -- The sessions a refresh touched, which ensureIndex rebuilds in content_items after
 -- the import loop. Filled per run and emptied before the next one.

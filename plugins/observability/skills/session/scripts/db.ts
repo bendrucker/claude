@@ -51,11 +51,12 @@ export interface HostEntry {
 // text) with ZSTD. A file keeps the version it was created at until compactDatabase.
 export const STORAGE_VERSION = "v1.2.0";
 
-// The writer holds the file exclusively and runs alone, so it gets twice a
-// reader's budget. Insertion order stays off so bulk imports can spill instead
+// memory_limit bounds only DuckDB's buffer manager, and the views rebuild
+// allocates up to half as much again outside it, so the cap leaves that headroom
+// below what the writer may use. Insertion order stays off so bulk imports can spill instead
 // of pinning blocks up to the memory limit.
 const WRITER_CONFIG = {
-  memory_limit: "8GiB",
+  memory_limit: "4GiB",
   threads: "4",
   max_temp_directory_size: "32GiB",
   preserve_insertion_order: "false",
@@ -270,6 +271,57 @@ async function applySchema(db: Database): Promise<void> {
     // oxlint-disable-next-line no-await-in-loop -- schema files apply in sorted order; later DDL depends on tables earlier DDL created.
     await db.run(sql);
   }
+  if (!(await tableExists(db, "raw"))) await db.run(await rawDdl(db, "raw"));
+}
+
+// raw's shape: the projected columns come from pinned_columns (00_pinned.sql), the
+// single source of their names, order and types.
+const RAW_SHAPE = `SELECT NULL::VARCHAR AS host, UNNEST(pinned_columns(NULL::JSON)),
+  NULL::VARCHAR AS source_file, NULL::BIGINT AS source_line, NULL::JSON AS data`;
+
+// raw.data is most of the file, and queries rarely read it since its hot paths were
+// pinned, so it is stored with ZSTD. DuckDB's own pick skips ZSTD for strings averaging
+// under zstd_min_string_length (4096), and a transcript line averages about 3.7 KB.
+// Compression is set only in CREATE TABLE, which a CREATE TABLE AS cannot carry.
+async function rawDdl(db: Database, name: string): Promise<string> {
+  const columns = await db.query(
+    `SELECT column_name, column_type FROM (DESCRIBE ${RAW_SHAPE})`,
+    z.object({ column_name: z.string(), column_type: z.string() }),
+  );
+  const defs = columns.map(
+    (c) =>
+      `"${c.column_name}" ${c.column_type}${c.column_name === "data" ? " USING COMPRESSION zstd" : ""}`,
+  );
+  return `CREATE TABLE ${name} (${defs.join(", ")})`;
+}
+
+// Replaces raw with its rows re-derived through the current projection, into a table
+// created by rawDdl so the copy keeps raw.data's compression.
+async function rewriteRaw(db: Database): Promise<void> {
+  await db.run("BEGIN");
+  await db.run(await rawDdl(db, "raw_next"));
+  await db.run(
+    "INSERT INTO raw_next SELECT host, UNNEST(pinned_columns(data)), source_file, source_line, data FROM raw",
+  );
+  await db.run("DROP TABLE raw");
+  await db.run("ALTER TABLE raw_next RENAME TO raw");
+  await db.run("COMMIT");
+  await db.run("CHECKPOINT");
+}
+
+// A raw created before rawDdl stores data as DuckDB chose. Older storage versions have no
+// ZSTD for strings, so they are never reported as needing it.
+async function rawDataUncompressed(db: Database): Promise<boolean> {
+  const [row] = await db.query(
+    `SELECT COUNT(*) FILTER (WHERE compression NOT IN ('ZSTD', 'Constant')) > 0
+         AND (SELECT tags['storage_version'] FROM duckdb_databases()
+              WHERE database_name = current_database()) = $version AS stale
+     FROM pragma_storage_info('raw')
+     WHERE column_name = 'data' AND segment_type <> 'VALIDITY'`,
+    z.object({ stale: z.boolean() }),
+    { version: `${STORAGE_VERSION}+` },
+  );
+  return row?.stale ?? false;
 }
 
 // content_items is a table built by views.sql out of raw, so it is discarded and rebuilt
@@ -356,7 +408,11 @@ export async function invalidateDerived(db: Database): Promise<void> {
 async function reconcilePinned(db: Database): Promise<boolean> {
   const fingerprint = await fileFingerprint(SCHEMA_DIR, "00_pinned");
   const hash = await importHash(db);
-  if (hash === fingerprint) return false;
+  if (hash === fingerprint) {
+    // The same rows re-encoded, so nothing derived from raw goes stale.
+    if (await rawDataUncompressed(db)) await rewriteRaw(db);
+    return false;
+  }
 
   // A null hash is an index built before this check existed. The projection may have
   // changed between that build and the first run to stamp it, so the rewrite is skipped
@@ -369,13 +425,7 @@ async function reconcilePinned(db: Database): Promise<boolean> {
   // recoverable, so the run that adopts it rebuilds once rather than inheriting the
   // question.
   await invalidateDerived(db);
-  if (rewrite) {
-    await db.run(`
-      CREATE OR REPLACE TABLE raw AS
-      SELECT host, UNNEST(pinned_columns(data)), source_file, source_line, data FROM raw
-    `);
-    await db.run("CHECKPOINT");
-  }
+  if (rewrite) await rewriteRaw(db);
   await db.run("UPDATE index_meta SET import_hash = $hash", { hash: fingerprint });
   return rewrite;
 }

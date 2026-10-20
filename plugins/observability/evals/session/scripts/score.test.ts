@@ -26,7 +26,8 @@ describe("overlap", () => {
   });
 
   test("reads only the table when a reply has one, leaving its notes out", () => {
-    const reply = "| tool | denies |\n|---|---|\n| Bash | 25 |\n| Edit | 4 |\n\n- Backoff ran 620 ms, then 1219 ms.";
+    const reply =
+      "| tool | denies |\n|---|---|\n| Bash | 25 |\n| Edit | 4 |\n\n- Backoff ran 620 ms, then 1219 ms.";
     expect(overlap(reply, keyed)).toEqual({ recall: 1, precision: 1 });
   });
 

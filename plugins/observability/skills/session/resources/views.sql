@@ -1011,9 +1011,10 @@ WITH lines AS (
     COALESCE(r.timestamp, MIN(r.timestamp) OVER (PARTITION BY r.host, r.source_file)) AS ts,
     from_json(r.data, '"MAP(VARCHAR, JSON)"') AS top
   FROM raw r
-  WHERE NOT scoped OR EXISTS (
+  -- The IN prefilter lets the scan skip row groups; the EXISTS alone reads every row's data.
+  WHERE NOT scoped OR (r.source_file IN (SELECT source_file FROM field_scope) AND EXISTS (
     SELECT 1 FROM field_scope s WHERE s.host = r.host AND s.source_file = r.source_file
-  )
+  ))
 ),
 entries AS (
   SELECT host, source_file, type, ts, top['version']->>'$' AS version,

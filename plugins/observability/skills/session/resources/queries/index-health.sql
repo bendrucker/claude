@@ -25,7 +25,10 @@
 --   Info. `stream-migrated` is the same silence with a registered successor field still
 --   arriving on another record type, named in `detail`, so the kind's zero is a rename
 --   rather than an absence. `stream-new` is kinds first seen recently, shipping unconsumed,
---   each a triage prompt. `hook-deny-invisible` measures denies recovered from tool_results
+--   each a triage prompt. `field-new` and `field-dead` are the same for fields on kinds
+--   that predate the window, from the field registry; `field-drift` lists them in full.
+--   `path-dead` alerts on a `raw.data` path a view reads that no indexed line carries, so
+--   that view returns NULL for it everywhere. `hook-deny-invisible` measures denies recovered from tool_results
 --   against the PreToolUse blocks `hook_events` actually recorded over the same window,
 --   sizing how much blocking a `hook_events`-only reading misses, and alerts when recovery
 --   exceeds what was recorded. Its detail breaks out how many were a subagent being denied.
@@ -39,7 +42,7 @@
 --     meaning: stream-silent eligibility
 --   - name: new_days
 --     default: 14
---     meaning: stream-new window
+--     meaning: stream-new, field-new and field-dead window
 --   - name: stale_days
 --     default: 2
 --     meaning: host-staleness threshold
@@ -178,6 +181,40 @@ new_kinds AS (
     -- itself, not new; without this, a young corpus reports every kind as new.
     AND DATE_DIFF('day', c.min_ts, ks.first_seen::TIMESTAMP)
         > COALESCE(TRY_CAST(getvariable('new_days') AS INTEGER), 14)
+),
+field_summary AS (
+  SELECT
+    'field-' || change AS check_name,
+    'info' AS status,
+    COUNT(*) || ' fields' AS subject,
+    CASE change WHEN 'new' THEN 'first written' ELSE 'last written' END
+      || ' within the window on a kind written before it; read it in a view or add it to '
+      || 'field_triage. Largest: '
+      || string_agg(type || ':' || path || ' (' || n || ')', ', ' ORDER BY n DESC)
+           FILTER (WHERE rank <= 5) AS detail
+  FROM (
+    SELECT *, row_number() OVER (PARTITION BY change ORDER BY n DESC) AS rank
+    FROM field_drift(
+      (SELECT max_ts FROM corpus)
+        - COALESCE(TRY_CAST(getvariable('new_days') AS INTEGER), 14) * INTERVAL 1 DAY,
+      NULL
+    )
+  )
+  GROUP BY change
+),
+-- The registry stops two levels down (three under message.usage), so a deeper path is
+-- checked by its ancestor at that depth.
+dead_paths AS (
+  SELECT
+    'path-dead' AS check_name,
+    'alert' AS status,
+    path AS subject,
+    'a view reads it, but no indexed line carries ' || ancestor AS detail
+  FROM (
+    SELECT path, regexp_extract(path, '^\$\.(message\.usage\.)?[^.\[]+(\.[^.\[]+)?') AS ancestor
+    FROM view_paths
+  )
+  WHERE ancestor NOT IN (SELECT path FROM fields)
 ),
 host_span AS (
   SELECT
@@ -348,6 +385,8 @@ combined AS (
   UNION ALL SELECT * FROM disk_missing
   UNION ALL SELECT * FROM deny_visibility
   UNION ALL SELECT * FROM new_kinds
+  UNION ALL SELECT * FROM field_summary
+  UNION ALL SELECT * FROM dead_paths
   UNION ALL SELECT * FROM null_ts_summary
   UNION ALL SELECT * FROM refresh_health
   UNION ALL SELECT * FROM disk_vanished

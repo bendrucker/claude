@@ -45,6 +45,8 @@ WHERE host = getvariable('host')
   AND source_file = getvariable('source_path')
   AND type IN ('user', 'assistant');
 
+INSERT INTO field_scope VALUES (getvariable('host'), getvariable('source_path'));
+
 DELETE FROM indexed_files
 WHERE host = getvariable('host')
   AND path = getvariable('source_path');

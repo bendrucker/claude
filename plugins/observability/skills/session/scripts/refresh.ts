@@ -126,7 +126,7 @@ try {
   const result = await ensureIndex(db).finally(() => {
     db.close();
   });
-  const { corpusBytes, changedFiles, removedFiles } = result;
+  const { corpusBytes, changedFiles, removedFiles, fieldsNew, fieldsGone } = result;
   const phasesMs: Record<string, number> = { ...result.phasesMs };
 
   // DuckDB never shrinks a file in place, so a bloated index (from the pre-v3
@@ -149,6 +149,7 @@ try {
     phases_ms: Object.fromEntries(Object.entries(phasesMs).map(([k, v]) => [k, Math.round(v)])),
     db_bytes: Bun.file(dbPath).size,
     corpus_bytes: corpusBytes,
+    ...(fieldsNew + fieldsGone > 0 && { fields_new: fieldsNew, fields_gone: fieldsGone }),
   });
   process.stdout.write(`${dbPath}\n`);
 } catch (error) {

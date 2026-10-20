@@ -512,16 +512,33 @@ const deleteScoped = (table: string) =>
      WHERE c.host = t.host AND c.session_id IS NOT DISTINCT FROM t.session_id
    )`;
 
-// Replaces the content_items and search_items rows of the sessions in content_item_scope
-// with what a full rebuild would produce for them, in one transaction. search_items reads
-// content_items, so it goes second.
-async function rebuildContentItems(db: Database): Promise<void> {
+const FieldChanges = z.object({ added: z.bigint(), removed: z.bigint() });
+
+// Replaces the content_items and search_items rows of the sessions in content_item_scope,
+// and the file_fields rows of the files in field_scope, with what a full rebuild would
+// produce for them, in one transaction. search_items reads content_items, so it goes
+// second. Returns how many (host, type, path) keys the registry gained and lost.
+async function rebuildScoped(db: Database): Promise<z.infer<typeof FieldChanges>> {
   await db.run("BEGIN");
   await db.run(deleteScoped("content_items"));
   await db.run(deleteScoped("search_items"));
   await db.run("INSERT INTO content_items SELECT * FROM content_item_rows(true)");
   await db.run("INSERT INTO search_items SELECT * FROM search_item_rows(true)");
+  await db.run(
+    "CREATE OR REPLACE TEMP TABLE field_keys AS SELECT DISTINCT host, type, path FROM file_fields",
+  );
+  await db.run(`DELETE FROM file_fields f WHERE EXISTS (
+    SELECT 1 FROM field_scope s WHERE s.host = f.host AND s.source_file = f.source_file
+  )`);
+  await db.run("INSERT INTO file_fields SELECT * FROM field_rows(true)");
   await db.run("COMMIT");
+  const [changes] = await db.query(
+    `WITH now AS (SELECT DISTINCT host, type, path FROM file_fields)
+     SELECT (SELECT COUNT(*) FROM (FROM now EXCEPT FROM field_keys)) AS added,
+            (SELECT COUNT(*) FROM (FROM field_keys EXCEPT FROM now)) AS removed`,
+    FieldChanges,
+  );
+  return changes ?? { added: 0n, removed: 0n };
 }
 
 // One transaction: a partial forget that kept indexed_files rows would make a later
@@ -562,6 +579,7 @@ async function removeFile(db: Database, host: string, file: string): Promise<voi
      WHERE host = $host AND source_file = $path AND type IN ('user', 'assistant')`,
     { host, path: file },
   );
+  await db.run("INSERT INTO field_scope VALUES ($host, $path)", { host, path: file });
   await db.run("DELETE FROM raw WHERE host = $host AND source_file = $path", {
     host,
     path: file,
@@ -577,6 +595,9 @@ export interface IndexResult {
   corpusBytes: number;
   changedFiles: number;
   removedFiles: number;
+  /** (host, type, path) keys an incremental refresh added to and dropped from `fields`. */
+  fieldsNew: number;
+  fieldsGone: number;
   /** Wall time per refresh phase, summed across hosts. */
   phasesMs: Record<"schema" | "scan" | "import" | "telemetry" | "views" | "checkpoint", number>;
 }
@@ -610,6 +631,7 @@ export async function ensureIndex(
   );
   const viewsStale = metaRow?.views_hash !== viewsFingerprint;
   await db.run("DELETE FROM content_item_scope");
+  await db.run("DELETE FROM field_scope");
   lap("schema");
 
   const importSql = await readSql(RESOURCES_DIR, "import");
@@ -679,10 +701,11 @@ export async function ensureIndex(
   // content_items and then imports no file, so the table's presence is checked too.
   const wrote = changedFiles > 0 || removedFiles > 0 || pinnedRederived;
   const viewsChanged = viewsStale || pinnedRederived || !(await tableExists(db, "content_items"));
+  let fields = { added: 0n, removed: 0n };
   if (viewsChanged) {
     await rebuildViews(db);
   } else if (wrote) {
-    await rebuildContentItems(db);
+    fields = await rebuildScoped(db);
   }
   if (viewsChanged || wrote) {
     await db.run("UPDATE index_meta SET views_hash = $hash", { hash: viewsFingerprint });
@@ -700,7 +723,14 @@ export async function ensureIndex(
   }
   lap("checkpoint");
 
-  return { corpusBytes, changedFiles, removedFiles, phasesMs };
+  return {
+    corpusBytes,
+    changedFiles,
+    removedFiles,
+    fieldsNew: Number(fields.added),
+    fieldsGone: Number(fields.removed),
+    phasesMs,
+  };
 }
 
 // Rewrites the database into a fresh file and swaps it in place. DuckDB never

@@ -120,5 +120,7 @@ export async function refresh(o: {
       });
     }
   }
+  // Without reflinks each clone is a full copy, so a size frees its clones before the next.
+  await Promise.all(arms.map(({ a }) => $`rm -rf ${join(o.dir, a.name)}`));
   return samples;
 }

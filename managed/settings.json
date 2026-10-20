@@ -5,6 +5,7 @@
     "dataviz": "user-invocable-only"
   },
   "fallbackModel": ["sonnet"],
+  "prependPlugins": [],
   "cleanupPeriodDays": 90,
   "autoMode": {
     "hard_deny": [

@@ -24,5 +24,14 @@
       "maximum": 1000000,
       "description": "Auto-compact window size in tokens"
     }
+  },
+  {
+    "op": "add",
+    "path": "/properties/prependPlugins",
+    "value": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Managed plugins whose hooks run first, outermost, in the listed order. When set, sec-default@builtin seats only where listed"
+    }
   }
 ]

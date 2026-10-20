@@ -19,9 +19,9 @@ execution:
     Reply with the plan between a line holding only <out> and a line holding only
     </out>. Inside, write the one-line plan first, then a line starting `in:` with
     the passes gated in, comma-separated, then a line starting `out:` with the
-    passes gated out, comma-separated. Name passes only as plan:review, review:code,
+    passes gated out, comma-separated. Name passes only as plan:review, code-review,
     simplify, comments:audit, pull-request:follow-up, github:copilot,
-    writing:review, run, review:human, writing review:code with its effort as
-    `review:code <effort>`. Anything else you say goes outside the tags.
+    writing:review, run, review:human, writing code-review with its effort as
+    `code-review <effort>`. Anything else you say goes outside the tags.
 context:
   scaffold_script: fixture.sh

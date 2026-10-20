@@ -22,7 +22,7 @@ One seam, one test, one minimal implementation per cycle.
 2. Write only enough code to pass it. Anticipate no later test and add no speculative feature.
 3. Return to step 1 with what the cycle taught.
 
-Refactoring belongs to review, outside the loop: `review:code` for correctness, `simplify` for reuse and shape.
+Refactoring belongs to review, outside the loop: `code-review` for correctness, `simplify` for reuse and shape.
 
 The work is done when every confirmed seam has a test that failed before its implementation existed.
 

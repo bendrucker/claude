@@ -27,7 +27,6 @@ The query lines are generated from those headers. Edit the header, then regenera
 - `plan-iterations` [`min_plans`]: One row per ExitPlanMode present, ordered within a session, measuring the append-only re-present signature.
 - `plan-sizes` [`threshold`]: Weekly trend of plan sizes, the steering metric for the plan plugin's ExitPlanMode size gate.
 - `repeat-read-waste`: Repeat Reads split by cause, isolating the true context tax from pagination and fan-out.
-- `review-precision` [`skill`, `min_findings`]: Per-angle precision for the code-review pipeline, one row per angle plus one per (angle, effort level), with the `level = 'all'` rollup first.
 - `sandbox-bypass-effective-command` [`min_count`]: Bypassed commands by their real verb, ranked by frequency, with the split between bypasses that followed a failed sandboxed run (`justified`) and those that did not (`reflexive`): the `excludedCommands` candidates.
 - `sandbox-bypass-scaffold`: Weekly share of `dangerouslyDisableSandbox` calls whose commands already escape through `excludedCommands`, the `sandbox` plugin's retirement signal.
 - `sandbox-path-deny-recurrence`: `Operation not permitted` and adjacent Bash failures bucketed into concrete sandbox config gaps, with recurrence and date span.

@@ -15,7 +15,7 @@ test.each<{ name: string; files: string[]; expected: string[] }>([
   },
   {
     name: "a plugin's own files",
-    files: ["plugins/review/skills/code/SKILL.md"],
+    files: ["plugins/review/skills/peer/SKILL.md"],
     expected: ["review"],
   },
   {

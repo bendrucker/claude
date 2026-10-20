@@ -10,8 +10,8 @@
 --   re-derivable from the `model` column of `bun run inventory agents` plus the built-in
 --   `claude-code-guide`) from `generic` (`general-purpose`, `Plan`, bare `claude`,
 --   `Explore`, any subagent type off that list). A purpose-built agent with no frontmatter
---   `model:` (`review:angle`, `review:verifier`) counts as generic, because its spawn site
---   still has to supply the model. `Explore` counts as generic, not pinned: since CLI
+--   `model:` counts as generic, because its spawn site still has to supply the model.
+--   `Explore` counts as generic, not pinned: since CLI
 --   v2.1.198 it inherits the parent model (capped at Opus) rather than pinning Haiku, so an
 --   Explore spawn under an expensive parent is a real delegation miss. Unrecognized types
 --   default to generic, so the split undercounts `pinned` rather than overstating the

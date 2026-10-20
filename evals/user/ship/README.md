@@ -6,18 +6,18 @@ Each case's `fixture.sh` builds a repository whose branch carries a diff against
 
 The diff kinds, each with a `dev` and a `holdout` case:
 
-- docs-only: no `review:code`, `simplify`, or `run`
-- a pure refactor: `simplify` over `review:code`
+- docs-only: no `code-review`, `simplify`, or `run`
+- a pure refactor: `simplify` over `code-review`
 - added code comments: `comments:audit`
 - prose alongside code: `writing:review`
 - a runtime surface: `run`
 - tests-only: no `run`
 - `--skip` flags, including the old `verify` and `code-review` aliases
 - a stack `--base`, whose parent layer carries prose and comments the top layer does not
-- a refactor that hides a behavior change: `review:code`, not `simplify`
+- a refactor that hides a behavior change: `code-review`, not `simplify`
 - prose edited but not committed, which only the plain `git diff` shows: `writing:review`
 - effort: `high` on auth-shaped code, `medium` on an ordinary multi-file feature
-- config-only with a review bot available: no `review:code` and no bot pass
+- config-only with a review bot available: no `code-review` and no bot pass
 - a trivial diff (a dependency bump, a two-line config change): no `review:human`
 - dependency declarations past the bound for other repos but under the bound for a repo I own: no `review:human`
 - a small code change on a repo I own: `review:human`

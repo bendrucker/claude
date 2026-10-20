@@ -199,7 +199,7 @@ const BANDS: Band[] = [
   {
     band: "deep",
     criteria:
-      "runtime surface, auth/sandbox/permissions/secrets/egress, >~200 lines or 8 files excl. tests/docs/lockfiles, a bug review:code confirmed, session drift",
+      "runtime surface, auth/sandbox/permissions/secrets/egress, >~200 lines or 8 files excl. tests/docs/lockfiles, a bug code-review confirmed, session drift",
     shape: "terra, 1 angle",
     cost: "7.6-12.4",
   },

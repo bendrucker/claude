@@ -4,7 +4,7 @@ The mechanics behind [Implement](../SKILL.md#implement): the pipeline Workflow s
 
 Feed the approved plans into a second Workflow shaped as `pipeline(approvedPlans, implement, ciGate)`:
 
-- `implement`: an `agent` with `agentType: 'general-purpose'` and `isolation: "worktree"` implements the plan, runs `bun test`, runs `review:code <effort>` at the approved level, commits, and opens the PR via `pull-request:create` with the [PR body](#pr-body) backlink. Returns `{ thingsId, prUrl, branch }`.
+- `implement`: an `agent` with `agentType: 'general-purpose'` and `isolation: "worktree"` implements the plan, runs `bun test`, runs `code-review <effort>` at the approved level, commits, and opens the PR via `pull-request:create` with the [PR body](#pr-body) backlink. Returns `{ thingsId, prUrl, branch }`.
 - `ciGate`: a fast initial CI check with one trivial-failure fix pass. Returns `{ thingsId, prUrl, ciStatus }`.
 
 Do not hold worktree agents open on long CI waits: the gate catches trivial breakage, then Watch handles the rest.

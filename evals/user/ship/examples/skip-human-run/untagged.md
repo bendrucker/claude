@@ -1,7 +1,7 @@
 ---
 fail: [format, in-review-code]
 ---
-Plan: review:code.
+Plan: code-review.
 
-in: review:code
+in: code-review
 out: review:human, run, writing:review

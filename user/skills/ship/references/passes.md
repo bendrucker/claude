@@ -1,6 +1,6 @@
 # Ship Passes
 
-Gating decisions for ship's pre-PR reviews: which pass runs, `review:code` effort, `review:code` versus `simplify`, and why comment trims land the way they do.
+Gating decisions for ship's pre-PR reviews: which pass runs, `code-review` effort, `code-review` versus `simplify`, and why comment trims land the way they do.
 
 ## Gating Matrix
 
@@ -9,7 +9,7 @@ Most passes gate on the diff against the resolved base (the upstream tracking re
 | Trigger | Pass | Notes |
 |---|---|---|
 | A substantial plan in context (`~/.claude/plans/` file) and a long or redirected session | `plan:review` | Read-only, non-blocking: background dispatch, joined before create |
-| Code changes | `review:code <effort> --fix` or `simplify` | Exactly one. Skip on docs/config-only |
+| Code changes | `code-review <effort> --fix` or `simplify` | Exactly one. Skip on docs/config-only |
 | New code comments | `comments:audit` | See [Comment Trims](#comment-trims) |
 | A supported review bot is available for the repo and the diff clears the [Bot Review Gate](#bot-review-gate) | `pull-request:follow-up --local` | Reviews committed work, commits its fixes. Runs before the fix passes dirty the tree |
 | Code changes on a repo whose remote owner is `bendrucker`, clearing the [Cross-Model Gate](#cross-model-gate) | `github:copilot` | Same slot as the local bot pass. Findings fix in-branch |
@@ -18,7 +18,7 @@ Most passes gate on the diff against the resolved base (the upstream tracking re
 | A runtime surface | `run` | Ship declines docs-only and tests-only |
 | A diff that is not trivial, or `--human` | `review:human` | Last pre-PR pass. Ends the turn until the review comes back. See [Human Review Gate](#human-review-gate) |
 
-Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `review:code`, `simplify`, `comments`, `bot`, `copilot`, `prompting`, `writing`, `run`, `human`). `code-review` is still accepted for `review:code`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
+Gating is the cost lever: never run a reviewer the change does not warrant. `--skip <pass>` drops any of them (`plan`, `code-review`, `simplify`, `comments`, `bot`, `copilot`, `prompting`, `writing`, `run`, `human`). `review:code` is still accepted for `code-review`, and `verify` for `run`, so an old invocation does not silently run the pass it meant to skip.
 
 ## Bot Review Gate
 
@@ -31,7 +31,7 @@ Then spend a review when any of these hold:
 - the diff touches auth, permissions, sandbox config, secret handling, or network egress
 - it adds or changes a runtime surface: a hook, a script entry point, a CLI command, an API
 - it is over roughly 100 changed lines or 4 files, excluding tests, docs, and lockfiles
-- `review:code` confirmed a real bug, or the session redirected enough that the diff wandered
+- `code-review` confirmed a real bug, or the session redirected enough that the diff wandered
 
 Nothing else qualifies. Prose, dependency bumps, and reverts never do, and neither does a config diff that stays clear of the risk surfaces in the first bullet. Editing sandbox or permissions config is the strongest reason on the list to spend, so "config" alone decides nothing.
 
@@ -70,11 +70,11 @@ It is read-only and writes nothing, so it runs as a background dispatch rather t
 ```mermaid
 flowchart TD
     S([ship start]) --> G{plan:review gated in?}
-    G -->|no| F1[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, prompting, writing, run]
+    G -->|no| F1[fix passes: comments:audit, local bot, github:copilot, code-review or simplify, prompting, writing, run]
     F1 --> H[review:human when gated in, ends the turn until the review returns]
     H --> C([create PR])
     G -->|yes| D[dispatch plan:review in background]
-    D --> F2[fix passes: comments:audit, local bot, github:copilot, review:code or simplify, prompting, writing, run]
+    D --> F2[fix passes: comments:audit, local bot, github:copilot, code-review or simplify, prompting, writing, run]
     D -. concurrent .-> R[plan:review reasons over plan + diff]
     F2 --> J{join: findings?}
     R -.-> J
@@ -85,7 +85,7 @@ flowchart TD
 
 ## Effort Inference
 
-Infer `review:code` effort from the diff unless `--effort` overrides. `high` is routine for risky work. Reserve `xhigh` for explicit requests.
+Infer `code-review` effort from the diff unless `--effort` overrides. `high` is routine for risky work. Reserve `xhigh` for explicit requests.
 
 | Diff shape | Effort |
 |---|---|
@@ -94,11 +94,11 @@ Infer `review:code` effort from the diff unless `--effort` overrides. `high` is 
 | Risky: multiple plugins, hooks, permissions, sandbox, or auth-shaped code | `high` |
 | Explicit request only | `xhigh` |
 
-`review:code` picks its fan-out shape from its own cell table, keyed on model family as well as effort level, which is why the same `--effort` can mean one inline pass in one family and a fleet of finders plus per-candidate verifiers in another. Do not infer cost from the effort name.
+`code-review` picks its fan-out shape from its own cell table, keyed on model family as well as effort level, which is why the same `--effort` can mean one inline pass in one family and a fleet of finders plus per-candidate verifiers in another. Do not infer cost from the effort name.
 
 ## Code-Review Versus Simplify
 
-Alternatives, not a pair. Pick `simplify` for a pure refactor or cleanup with no new behavior: extraction, renaming, dedup, dead-code removal, moving code. It covers reuse, simplification, efficiency, and altitude, and does not hunt bugs. Pick `review:code` for anything with new behavior, a bug fix, or a feature, which need the correctness coverage `simplify` skips. `--simplify` forces the `simplify` path.
+Alternatives, not a pair. Pick `simplify` for a pure refactor or cleanup with no new behavior: extraction, renaming, dedup, dead-code removal, moving code. It covers reuse, simplification, efficiency, and altitude, and does not hunt bugs. Pick `code-review` for anything with new behavior, a bug fix, or a feature, which need the correctness coverage `simplify` skips. `--simplify` forces the `simplify` path.
 
 ## Human Review Gate
 
@@ -129,5 +129,5 @@ A bot review often lands after the green push with no CI event to key off. `--re
 Rejected:
 
 - **`--report` plus inline apply**: pulls the full findings into ship's context, defeating the point of keeping bulk verdicts off the conversation.
-- **Running it after `review:code --fix`**: the fix pass dirties the tree, failing `comments:audit`'s clean-tree check.
-- **Invoking the audit's scripts directly from ship**: ship cannot resolve the comments plugin's install path, it would duplicate the three-step runbook, and it would widen ship's tool grant past `git diff` and `git status`. `comments:audit` was made model-invocable instead, the same remedy `review:code` applies to the built-in `/code-review`.
+- **Running it after `code-review --fix`**: the fix pass dirties the tree, failing `comments:audit`'s clean-tree check.
+- **Invoking the audit's scripts directly from ship**: ship cannot resolve the comments plugin's install path, it would duplicate the three-step runbook, and it would widen ship's tool grant past `git diff` and `git status`. `comments:audit` was made model-invocable instead.

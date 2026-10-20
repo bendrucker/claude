@@ -319,7 +319,7 @@ refresh_health AS (
     'refresh-health' AS check_name,
     CASE WHEN quantile_cont(duration_ms, 0.9) FILTER (WHERE outcome IN ('indexed', 'compacted'))
               > COALESCE(TRY_CAST(getvariable('refresh_slow_ms') AS INTEGER), 30000)
-           OR COUNT(*) FILTER (WHERE outcome IN ('lock-yield', 'error')) > 0
+           OR COUNT(*) FILTER (WHERE outcome IN ('lock-yield', 'error', 'killed')) > 0
          THEN 'alert' ELSE 'info' END AS status,
     COUNT(*) || ' refreshes' AS subject,
     'indexing p90 ' || COALESCE(round(quantile_cont(duration_ms, 0.9) FILTER (WHERE outcome IN ('indexed', 'compacted')))::BIGINT || ' ms', 'n/a')

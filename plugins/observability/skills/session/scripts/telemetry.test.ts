@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { z } from "zod";
 import { type Database, type ScannedFile, ensureIndex, ensureSchema, getDb, runQuery } from "./db";
 import { MiB, overCap } from "./retention";
-import { type Source, parseDebugLog, prune, syncSource } from "./telemetry";
+import { type Source, syncSource } from "./file-catalog";
+import { parseDebugLog, prune } from "./telemetry";
 
 const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 
@@ -282,10 +283,10 @@ describe("telemetry ingest", () => {
 describe("syncSource", () => {
   function sourceOf(root: string, beforeFailing: (path: string) => Promise<void>): Source {
     return {
-      name: "stub",
+      catalog: "telemetry_files",
+      key: "stub",
       root,
-      scan: (entries) =>
-        entries.map((entry) => ({ path: join(root, entry.name), mtime: 1, size: 1 })),
+      scan: () => readdirSync(root).map((name) => ({ path: join(root, name), mtime: 1, size: 1 })),
       async import(_db, file) {
         await beforeFailing(file.path);
         throw new Error("import failed");
@@ -455,14 +456,15 @@ describe("prune", () => {
 
   function sourceOf(root: string, cap: number): Source {
     return {
-      name: "capped",
+      catalog: "telemetry_files",
+      key: "capped",
       root,
       cap,
-      scan: (entries) =>
-        entries.map((entry) => ({
-          path: join(root, entry.name),
-          mtime: AGES[entry.name] ?? 0,
-          size: Bun.file(join(root, entry.name)).size,
+      scan: () =>
+        readdirSync(root).map((name) => ({
+          path: join(root, name),
+          mtime: AGES[name] ?? 0,
+          size: Bun.file(join(root, name)).size,
         })),
       import: () => Promise.resolve(),
       remove: () => Promise.resolve(),

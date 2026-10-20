@@ -1,10 +1,8 @@
--- Imports one file: getvariable('source_path') for getvariable('host'), with the
--- scanned stat carried in source_mtime/source_size. Runs once per changed file.
+-- Imports one file: getvariable('source_path') for getvariable('host'). Runs once per
+-- changed file, inside the transaction that records the file in indexed_files.
 -- Deleting and re-inserting exactly the file's rows (instead of rewriting the whole
 -- table) keeps freed blocks reusable after the CHECKPOINT that ends the import run,
 -- so the database file stays proportional to the corpus.
-BEGIN;
-
 -- The file's sessions before and after the re-read, whose content_items rows
 -- ensureIndex rebuilds once the import loop ends.
 INSERT INTO content_item_scope
@@ -46,17 +44,3 @@ WHERE host = getvariable('host')
   AND type IN ('user', 'assistant');
 
 INSERT INTO field_scope VALUES (getvariable('host'), getvariable('source_path'));
-
-DELETE FROM indexed_files
-WHERE host = getvariable('host')
-  AND path = getvariable('source_path');
-
-INSERT INTO indexed_files
-VALUES (
-  getvariable('host'),
-  getvariable('source_path'),
-  TRY_CAST(getvariable('source_mtime') AS BIGINT),
-  TRY_CAST(getvariable('source_size')  AS BIGINT)
-);
-
-COMMIT;

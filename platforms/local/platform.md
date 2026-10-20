@@ -30,4 +30,6 @@ Edit `bendrucker/claude` at `~/src/bendrucker/claude`. `claude-sync` updates `~/
 
 When work in another repo needs a change in either repo, hand it to a sibling agent through `herdr:herdr` and report the PR back to me. Where herdr is unavailable, queue it with `spawn_task`, or tell me the change.
 
+When an `aws --profile` call fails on an expired SSO session, run `aws sso login --profile <name> --use-device-code` in the background and send me the URL and code it prints. I approve it on my phone and the command exits. The default flow redirects to localhost, which a phone never reaches.
+
 Reach secrets through 1Password `op run`. SSH keys live in Secretive, which refuses to sign while the Mac is locked.

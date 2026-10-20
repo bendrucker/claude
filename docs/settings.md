@@ -245,3 +245,9 @@ Git working-tree discards were the largest denial cluster common to every machin
 Two `allow` entries narrow it where nothing can be lost. Conflict Side Selection covers `--ours`/`--theirs` during an in-progress operation. Own Stash Drop covers the tagged push, apply, and drop sequence the harness itself prescribes for shared stashes. The global CLAUDE.md line on `git merge --ff-only` and per-path `git restore` handles the resets, which have no safe classifier-side exception.
 
 Retire each entry when the session index shows it inert. Count `automode-blocked` rows whose command starts with the matching verb, before and after the merge. If `reset --hard` denials hold steady three weeks out, the CLAUDE.md line is not steering and comes out.
+
+#### AWS SSO Login
+
+An expired SSO session strands every sandboxed `aws --profile` call, and only Ben can approve the login that fixes it. The local platform notes tell Claude to run `aws sso login --use-device-code` and relay the URL, because the default PKCE flow redirects to `localhost` and a phone that finishes it never reaches the CLI. The sandbox already covers the login through the `oidc` and `portal.sso` hosts and the `~/.aws/sso/cache` write grant.
+
+**Add an `allow` entry** if the session index shows `automode-blocked` rows for `aws sso login`. **Retire the line** if four weeks after the merge no session has run `aws sso login`, since it would not be steering.

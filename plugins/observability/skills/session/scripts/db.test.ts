@@ -1875,6 +1875,19 @@ describe("storage version", () => {
     expect(await version()).toBe("v1.2.0+");
     expect((await storage("raw")).map((r) => r.compression)).toContain("ZSTD");
   });
+
+  it("stores lines shorter than DuckDB's default ZSTD threshold with ZSTD", async () => {
+    // About 2 KB each: a typical transcript line, under the 4096 default.
+    await db.run("DELETE FROM raw");
+    await db.run(
+      `INSERT INTO raw (host, source_file, source_line, data)
+       SELECT 'local', '/mid.jsonl', i,
+              json_object('text', (SELECT string_agg(md5((i * 64 + j)::VARCHAR), ' ') FROM range(60) r(j)))
+       FROM range(2000) t(i)`,
+    );
+    await db.run("CHECKPOINT");
+    expect((await storage("raw")).map((r) => r.compression)).toContain("ZSTD");
+  });
 });
 
 describe("source_line", () => {

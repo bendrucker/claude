@@ -53,13 +53,16 @@ export const STORAGE_VERSION = "v1.2.0";
 
 // The writer holds the file exclusively and runs alone, so it gets twice a
 // reader's budget. Insertion order stays off so bulk imports can spill instead
-// of pinning blocks up to the memory limit.
+// of pinning blocks up to the memory limit. ZSTD applies to a string segment only
+// when its average length reaches zstd_min_string_length, and the default (4096)
+// sits above a typical transcript line, which left raw.data uncompressed.
 const WRITER_CONFIG = {
   memory_limit: "8GiB",
   threads: "4",
   max_temp_directory_size: "32GiB",
   preserve_insertion_order: "false",
   storage_compatibility_version: STORAGE_VERSION,
+  zstd_min_string_length: "1024",
 };
 
 async function createDatabase(dbPath: string): Promise<Database> {

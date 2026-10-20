@@ -307,6 +307,19 @@ describe("tool-failure-rates query", () => {
   });
 });
 
+describe("system_events", () => {
+  it("codes an API error by its HTTP status, or its connection error when it has none", async () => {
+    const rows = await db.query(
+      "SELECT uuid, error_code FROM system_events WHERE error_code IS NOT NULL ORDER BY uuid",
+      z.object({ uuid: z.string(), error_code: z.string() }),
+    );
+    expect(rows).toEqual([
+      { uuid: "ha-1", error_code: "429" },
+      { uuid: "hk-13", error_code: "ECONNRESET" },
+    ]);
+  });
+});
+
 describe("permission_requests", () => {
   it("reports every denial kind, not just the ones the result string names", async () => {
     const rows = await db.query(

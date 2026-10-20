@@ -583,7 +583,7 @@ SELECT
   (data->>'$.compactMetadata.trigger') AS compact_trigger,
   TRY_CAST(data->>'$.compactMetadata.preTokens'  AS BIGINT) AS compact_pre_tokens,
   TRY_CAST(data->>'$.compactMetadata.durationMs' AS BIGINT) AS compact_duration_ms,
-  (data->>'$.cause.code')                  AS error_code,
+  COALESCE((data->>'$.error.status'), (data->>'$.error.connection.code')) AS error_code,
   TRY_CAST(data->>'$.retryAttempt' AS INTEGER) AS retry_attempt,
   (data->'$.hookInfos') AS hook_infos,
   data

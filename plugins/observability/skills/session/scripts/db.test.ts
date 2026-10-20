@@ -1888,6 +1888,42 @@ describe("storage version", () => {
     expect(await version()).toBe("v1.2.0+");
     expect((await storage("raw")).map((r) => r.compression)).toContain("ZSTD");
   });
+
+  const rawDataCompressions = async () =>
+    (
+      await db.query(
+        `SELECT DISTINCT compression FROM pragma_storage_info('raw')
+         WHERE column_name = 'data' AND segment_type <> 'VALIDITY'`,
+        z.object({ compression: z.string() }),
+      )
+    ).map((r) => r.compression);
+
+  it("stores raw.data with ZSTD at any line length", async () => {
+    await db.run("CHECKPOINT");
+    expect(await rawDataCompressions()).toEqual(["ZSTD"]);
+  });
+
+  it("re-encodes a raw built without ZSTD, keeping its rows and derived tables", async () => {
+    const count = async () =>
+      (await db.query("SELECT COUNT(*) AS n FROM raw", z.object({ n: z.bigint() })))[0]?.n;
+    const viewsHash = async () =>
+      (
+        await db.query(
+          "SELECT views_hash FROM index_meta",
+          z.object({ views_hash: z.string().nullable() }),
+        )
+      )[0]?.views_hash;
+    const before = await count();
+    const hash = await viewsHash();
+    await db.run("CREATE OR REPLACE TABLE raw AS SELECT * FROM raw");
+    await db.run("CHECKPOINT");
+    expect(await rawDataCompressions()).not.toEqual(["ZSTD"]);
+
+    expect(await ensureSchema(db)).toBe(false);
+    expect(await rawDataCompressions()).toEqual(["ZSTD"]);
+    expect(await count()).toBe(before);
+    expect(await viewsHash()).toBe(hash);
+  });
 });
 
 describe("source_line", () => {

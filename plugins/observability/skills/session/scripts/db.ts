@@ -6,7 +6,7 @@ import { DuckDBInstance } from "@duckdb/node-api";
 import { $ } from "bun";
 import { z } from "zod";
 import { nodeAdapter, runQuery as runOnAdapter } from "./query";
-import { CatalogRow, diffCatalog } from "./file-catalog";
+import { type Source, applyDiff, diffSource, dirExists } from "./file-catalog";
 import { ensureTelemetry } from "./telemetry";
 
 const RESOURCES_DIR = join(import.meta.dirname, "..", "resources");
@@ -169,17 +169,6 @@ export function sessionDbPath(dataDir: string): string {
   return join(dataDir, "session.duckdb");
 }
 
-export function dirExists(target: string): boolean {
-  try {
-    readdirSync(target);
-    return true;
-  } catch (error) {
-    const code = error instanceof Error && "code" in error ? error.code : undefined;
-    if (code !== "ENOENT" && code !== "ENOTDIR") throw error;
-    return false;
-  }
-}
-
 export interface ImportedHost {
   label: string;
   root: string;
@@ -249,7 +238,7 @@ export interface ScannedFile {
 // Scan errors must propagate, never degrade to an empty listing: ensureIndex
 // reads a missing path as a deleted file, so a swallowed error (e.g. an
 // unreadable subdirectory) would delete every indexed row for the host. The
-// missing-root case is handled by the dirExists guard before the scan.
+// missing-root case is handled by diffSource's guard before the scan.
 export function scanJsonlFiles(root: string): ScannedFile[] {
   const files: ScannedFile[] = [];
   for (const entry of readdirSync(root, { withFileTypes: true, recursive: true })) {
@@ -572,7 +561,6 @@ export async function deleteHostRows(db: Database, host: string): Promise<void> 
 }
 
 async function removeFile(db: Database, host: string, file: string): Promise<void> {
-  await db.run("BEGIN");
   await db.run(
     `INSERT INTO content_item_scope
      SELECT DISTINCT host, session_id FROM raw
@@ -584,12 +572,22 @@ async function removeFile(db: Database, host: string, file: string): Promise<voi
     host,
     path: file,
   });
-  await db.run("DELETE FROM indexed_files WHERE host = $host AND path = $path", {
-    host,
-    path: file,
-  });
-  await db.run("COMMIT");
 }
+
+// import.sql reads the file and its host back through SET VARIABLE, which is
+// connection-global, so imports on the one connection run one at a time.
+const transcripts = (host: string, root: string, importSql: string): Source => ({
+  catalog: "indexed_files",
+  key: host,
+  root,
+  scan: scanJsonlFiles,
+  async import(db, file) {
+    await db.run("SET VARIABLE host = $host", { host });
+    await db.run("SET VARIABLE source_path = $path", { path: file.path });
+    await db.run(importSql);
+  },
+  remove: (db, path) => removeFile(db, host, path),
+});
 
 export interface IndexResult {
   corpusBytes: number;
@@ -642,53 +640,27 @@ export async function ensureIndex(
   let derivedInvalidated = pinnedRederived;
 
   for (const entry of await enumerateHosts(options)) {
-    // A missing root is a transient or misconfigured mount (or a typo'd
-    // CLAUDE_PROJECTS_DIR), never "every file was deleted": skip the host
-    // rather than dropping all its rows. forget.ts deletes rows explicitly.
-    if (!dirExists(entry.root)) continue;
-    const scanned = scanJsonlFiles(entry.root);
-    corpusBytes += scanned.reduce((sum, f) => sum + f.size, 0);
-
+    const source = transcripts(entry.host, entry.root, importSql);
     // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
-    const indexed = await db.query(
-      "SELECT path, mtime, size FROM indexed_files WHERE host = $host",
-      CatalogRow,
-      { host: entry.host },
-    );
-    const { changed, removed } = diffCatalog(scanned, indexed);
+    const diff = await diffSource(db, source);
     lap("scan");
+    if (diff === undefined) continue;
+    corpusBytes += diff.scanned.reduce((sum, f) => sum + f.size, 0);
+    if (diff.changed.length === 0 && diff.removed.length === 0) continue;
 
-    if (!derivedInvalidated && (changed.length > 0 || removed.length > 0)) {
+    if (!derivedInvalidated) {
       // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
       await invalidateDerived(db);
       derivedInvalidated = true;
     }
-
-    // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the per-file import below reads back.
-    await db.run("SET VARIABLE host = $host", { host: entry.host });
-    for (const file of changed) {
-      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the import statement below reads back.
-      await db.run("SET VARIABLE source_path = $path", { path: file.path });
-      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the import statement below reads back.
-      await db.run("SET VARIABLE source_mtime = $mtime", { mtime: String(file.mtime) });
-      // oxlint-disable-next-line no-await-in-loop -- SET VARIABLE is connection-global state the import statement below reads back.
-      await db.run("SET VARIABLE source_size = $size", { size: String(file.size) });
-      // oxlint-disable-next-line no-await-in-loop -- reads the SET VARIABLE state set just above; overlapping imports would cross files.
-      await db.run(importSql);
-    }
-    for (const file of removed) {
-      // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
-      await removeFile(db, entry.host, file.path);
-    }
-
-    if (changed.length > 0 || removed.length > 0) {
-      // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
-      await db.run("DELETE FROM meta WHERE host = $host", { host: entry.host });
-      // oxlint-disable-next-line no-await-in-loop -- the insert must follow the delete above on the same connection.
-      await db.run("INSERT INTO meta VALUES ($host, CURRENT_TIMESTAMP)", { host: entry.host });
-    }
-    changedFiles += changed.length;
-    removedFiles += removed.length;
+    // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
+    await applyDiff(db, source, diff);
+    // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh; concurrent statements on it interleave.
+    await db.run("DELETE FROM meta WHERE host = $host", { host: entry.host });
+    // oxlint-disable-next-line no-await-in-loop -- the insert must follow the delete above on the same connection.
+    await db.run("INSERT INTO meta VALUES ($host, CURRENT_TIMESTAMP)", { host: entry.host });
+    changedFiles += diff.changed.length;
+    removedFiles += diff.removed.length;
     lap("import");
   }
 

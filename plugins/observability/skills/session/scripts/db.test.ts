@@ -9,7 +9,6 @@ import {
   compactDatabase,
   type Database,
   deleteHostRows,
-  dirExists,
   ensureIndex,
   ensureSchema,
   forgetHost,
@@ -19,6 +18,7 @@ import {
   runQuery,
   sessionDbPath,
 } from "./db";
+import { dirExists } from "./file-catalog";
 import { emit } from "./events";
 import { FALLBACK_PATH, renderMap, schemaMap, SurfaceColumns, SURFACES } from "./schema";
 import { loadQueryHeaders } from "./query-header";

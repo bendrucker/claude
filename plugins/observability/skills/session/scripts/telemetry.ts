@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type { Database, ScannedFile } from "./db";
-import { CatalogRow, diffCatalog } from "./file-catalog";
+import { type Source, dirExists, indexedFiles, reap, syncSource } from "./file-catalog";
 import { MiB, overCap } from "./retention";
 
 interface Entry {
@@ -61,16 +61,6 @@ export function parseDebugLog(text: string): DebugEvent[] {
   return events;
 }
 
-export interface Source {
-  name: string;
-  root: string;
-  scan(entries: Entry[], root: string): ScannedFile[] | Promise<ScannedFile[]>;
-  import(db: Database, file: ScannedFile): Promise<void>;
-  remove(db: Database, path: string): Promise<void>;
-  /** Bytes the source's files may total before the oldest indexed ones are deleted. */
-  cap?: number;
-}
-
 const keepRows = () => Promise.resolve();
 
 const fileOf = (path: string): ScannedFile => {
@@ -78,14 +68,14 @@ const fileOf = (path: string): ScannedFile => {
   return { path, mtime: Math.trunc(file.lastModified), size: file.size };
 };
 
-function scanDebugLogs(entries: Entry[], root: string): ScannedFile[] {
-  return entries
+function scanDebugLogs(root: string): ScannedFile[] {
+  return (listRoot(root) ?? [])
     .filter((entry) => entry.isFile() && entry.name.endsWith(".txt"))
     .map((entry) => fileOf(join(root, entry.name)));
 }
 
-function scanModEvents(entries: Entry[], root: string): ScannedFile[] {
-  return entries
+function scanModEvents(root: string): ScannedFile[] {
+  return (listRoot(root) ?? [])
     .filter((entry) => entry.isDirectory())
     .flatMap((dir) =>
       (listRoot(join(root, dir.name)) ?? [])
@@ -95,7 +85,8 @@ function scanModEvents(entries: Entry[], root: string): ScannedFile[] {
 }
 
 const debugLogs = (root: string, host: string): Source => ({
-  name: "debug",
+  catalog: "telemetry_files",
+  key: "debug",
   root,
   cap: 2048 * MiB,
   scan: scanDebugLogs,
@@ -120,7 +111,8 @@ const debugLogs = (root: string, host: string): Source => ({
 });
 
 const modEvents = (root: string, host: string): Source => ({
-  name: "mod-events",
+  catalog: "telemetry_files",
+  key: "mod-events",
   root,
   cap: 500 * MiB,
   scan: scanModEvents,
@@ -156,33 +148,8 @@ const modEvents = (root: string, host: string): Source => ({
   remove: keepRows,
 });
 
-async function reimport(db: Database, source: Source, file: ScannedFile): Promise<void> {
-  await db.run("BEGIN");
-  await source.import(db, file);
-  await db.run("DELETE FROM telemetry_files WHERE source = $source AND path = $path", {
-    source: source.name,
-    path: file.path,
-  });
-  await db.run("INSERT INTO telemetry_files VALUES ($source, $path, $mtime, $size)", {
-    source: source.name,
-    path: file.path,
-    mtime: String(file.mtime),
-    size: String(file.size),
-  });
-  await db.run("COMMIT");
-}
-
-async function reap(db: Database, source: Source, path: string): Promise<void> {
-  await db.run("BEGIN");
-  await source.remove(db, path);
-  await db.run("DELETE FROM telemetry_files WHERE source = $source AND path = $path", {
-    source: source.name,
-    path,
-  });
-  await db.run("COMMIT");
-}
-
-// Like a host root, a missing directory is skipped rather than read as every file deleted.
+// A missing directory lists as empty. diffSource checks the root first, so this covers a
+// session directory removed mid-scan.
 function listRoot(root: string): Entry[] | undefined {
   try {
     return readdirSync(root, { withFileTypes: true });
@@ -192,55 +159,14 @@ function listRoot(root: string): Entry[] | undefined {
   }
 }
 
-async function stillScans(source: Source, path: string): Promise<boolean> {
-  const scanned = await source.scan(listRoot(source.root) ?? [], source.root);
-  return scanned.some((file) => file.path === path);
-}
-
-export async function syncSource(db: Database, source: Source): Promise<number> {
-  const entries = listRoot(source.root);
-  if (entries === undefined) return 0;
-  const scanned = await source.scan(entries, source.root);
-  const indexed = await db.query(
-    "SELECT path, mtime, size FROM telemetry_files WHERE source = $source",
-    CatalogRow,
-    { source: source.name },
-  );
-  const { changed, removed } = diffCatalog(scanned, indexed);
-
-  for (const file of changed) {
-    try {
-      // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh, and each file commits as its own transaction.
-      await reimport(db, source, file);
-    } catch (error) {
-      // oxlint-disable-next-line no-await-in-loop -- the rollback must land before the next file's BEGIN.
-      await db.run("ROLLBACK");
-      // A file deleted since the scan is reaped on the next pass.
-      // oxlint-disable-next-line no-await-in-loop -- a rare path, rescanned only on failure.
-      if (await stillScans(source, file.path)) throw error;
-    }
-  }
-  for (const file of removed) {
-    // oxlint-disable-next-line no-await-in-loop -- one DuckDB connection serves the refresh, and each file commits as its own transaction.
-    await reap(db, source, file.path);
-  }
-  return changed.length + removed.length;
-}
-
 /**
  * Deletes the oldest files past the source's cap, among those indexed as they stand, and
  * drops their catalog rows. The source's `remove` decides whether their rows stay.
  */
 export async function prune(db: Database, source: Source): Promise<number> {
-  if (source.cap === undefined) return 0;
-  const entries = listRoot(source.root);
-  if (entries === undefined) return 0;
-  const scanned = await source.scan(entries, source.root);
-  const indexed = await db.query(
-    "SELECT path, mtime, size FROM telemetry_files WHERE source = $source",
-    CatalogRow,
-    { source: source.name },
-  );
+  if (source.cap === undefined || !dirExists(source.root)) return 0;
+  const scanned = await source.scan(source.root);
+  const indexed = await indexedFiles(db, source);
   const current = new Set(indexed.map((row) => `${row.path}\0${row.mtime}\0${row.size}`));
   const doomed = overCap(scanned, source.cap, (file) =>
     current.has(`${file.path}\0${file.mtime}\0${file.size}`),

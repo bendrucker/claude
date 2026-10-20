@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import {
-  dirExists,
   ensureIndex,
   getDataDir,
   getDb,
@@ -16,6 +15,7 @@ import {
   listImportedHosts,
   type Manifest,
 } from "./db";
+import { dirExists } from "./file-catalog";
 
 const argv = cli({
   name: "import",

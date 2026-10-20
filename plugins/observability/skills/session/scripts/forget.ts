@@ -3,15 +3,8 @@
 // ~/.claude/session-imports, which the sandbox denies.
 import { rm } from "node:fs/promises";
 import { cli } from "cleye";
-import {
-  dirExists,
-  ensureSchema,
-  forgetHost,
-  getDataDir,
-  getDb,
-  importRoot,
-  LOCAL_HOST,
-} from "./db";
+import { ensureSchema, forgetHost, getDataDir, getDb, importRoot, LOCAL_HOST } from "./db";
+import { dirExists } from "./file-catalog";
 
 const argv = cli({
   name: "forget",

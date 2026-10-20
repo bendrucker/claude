@@ -77,7 +77,7 @@ const started = performance.now();
 function report(outcome: string, detail: Record<string, unknown> = {}): Promise<void> {
   return emit({
     event: "refresh",
-    ok: outcome !== "error",
+    ok: outcome !== "error" && outcome !== "killed",
     ms: performance.now() - started,
     detail: { outcome, ...detail },
   });
@@ -103,8 +103,12 @@ if (process.env.SESSION_REFRESH_WORKER === undefined) {
     stdio: "inherit",
   });
   await once(worker, "exit");
-  // A worker ended by a signal ends the caller the same way.
-  if (worker.signalCode !== null) process.kill(process.pid, worker.signalCode);
+  // A worker ended by a signal ends the caller the same way. A killed worker records
+  // nothing itself, so the caller records it.
+  if (worker.signalCode !== null) {
+    await report("killed", { signal: worker.signalCode });
+    process.kill(process.pid, worker.signalCode);
+  }
   process.exit(worker.exitCode ?? undefined);
 }
 

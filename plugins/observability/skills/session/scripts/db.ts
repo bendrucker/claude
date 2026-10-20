@@ -51,11 +51,12 @@ export interface HostEntry {
 // text) with ZSTD. A file keeps the version it was created at until compactDatabase.
 export const STORAGE_VERSION = "v1.2.0";
 
-// The writer holds the file exclusively and runs alone, so it gets twice a
-// reader's budget. Insertion order stays off so bulk imports can spill instead
+// memory_limit bounds only DuckDB's buffer manager, and the views rebuild
+// allocates up to half as much again outside it, so the cap leaves that headroom
+// below what the writer may use. Insertion order stays off so bulk imports can spill instead
 // of pinning blocks up to the memory limit.
 const WRITER_CONFIG = {
-  memory_limit: "8GiB",
+  memory_limit: "4GiB",
   threads: "4",
   max_temp_directory_size: "32GiB",
   preserve_insertion_order: "false",

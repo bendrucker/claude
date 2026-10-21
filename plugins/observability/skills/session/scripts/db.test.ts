@@ -243,6 +243,17 @@ describe("search", () => {
     expect(rows).toEqual([{ session_id: "search-surfaces-session", matched_surfaces: [surface] }]);
   });
 
+  it("ranks a prose match above the same match in tool output", async () => {
+    const score = async (query: string) => {
+      const rows = await runQuery(db, "search", z.object({ score: z.number() }), {
+        ...queryParams({ limit: "10" }),
+        query,
+      });
+      return rows[0]?.score ?? 0;
+    };
+    expect(await score("prosetoken")).toBeGreaterThan(await score("aardvarkoutput"));
+  });
+
   it.each([
     "readcontenttoken",
     "writecontenttoken",
@@ -250,6 +261,7 @@ describe("search", () => {
     "skillbodytoken",
     "subagentprosetoken",
     "subagentcmdtoken",
+    "pastcaptoken",
   ])("leaves %s out", async (query) => {
     const rows = await runQuery(db, "search", z.unknown(), {
       ...queryParams({ limit: "10" }),

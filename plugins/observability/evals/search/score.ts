@@ -97,12 +97,14 @@ const f = (n: number) => n.toFixed(3);
 function summarize(runs: Run[], arms: Arm[]) {
   const byArm = Map.groupBy(runs, (r) => r.arm);
   const base = byArm.get(arms[0]?.name ?? "") ?? [];
-  return arms.map(({ name }) => {
+  return arms.map(({ name, skill, index }) => {
     const rs = byArm.get(name) ?? [];
     const walls = rs.flatMap((r) => r.walls);
     const p90 = walls.toSorted((a, b) => a - b)[Math.floor(walls.length * 0.9)] ?? 0;
     return {
       arm: name,
+      skill,
+      index,
       queries: rs.length,
       p5: mean(rs.map((r) => r.p5)),
       recall10: mean(rs.map((r) => r.recall10)),
@@ -138,7 +140,9 @@ const program = new Command()
   .option("--timeout <s>", "seconds per run", count, 120)
   .option("--out <dir>", "write runs.json and summary.json here")
   .action(async (o) => {
-    const arms = o.arm ?? [{ name: "main", skill: SKILL, index: undefined }];
+    const arms = (o.arm ?? [{ name: "main", skill: SKILL, index: undefined }]).map(
+      ({ name, skill, index }) => ({ name, skill, index: index ?? o.index }),
+    );
     const labels = await loadLabels(o.labels, o.tag);
     const runs: Run[] = [];
     for (const l of labels) {
@@ -147,7 +151,7 @@ const program = new Command()
         let last: Awaited<ReturnType<typeof search>> | undefined;
         for (let i = 0; i < o.runs; i++) {
           // oxlint-disable-next-line no-await-in-loop -- runs are timed one at a time so they do not contend.
-          last = await search(a, a.index ?? o.index, l.query, o.timeout * 1000);
+          last = await search(a, a.index, l.query, o.timeout * 1000);
           walls.push(last.wall);
         }
         const ranked = last?.ranked ?? [];

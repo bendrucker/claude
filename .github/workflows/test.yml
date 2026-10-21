@@ -66,11 +66,12 @@ jobs:
       - uses: ./.github/actions/bun-install
 
       # evals/scripts/duckdb.ts shells out to the duckdb CLI, so the report tests
-      # need it on PATH. Same installer the plugin job uses.
+      # need it on PATH. Same installer and version the plugin job uses.
       - name: Install DuckDB
         run: |
+          export DUCKDB_VERSION="$(jq -r '.dependencies["@duckdb/node-api"]' plugins/observability/package.json | cut -d- -f1)"
           curl -fsSL https://install.duckdb.org | bash
-          echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
+          echo "$HOME/.duckdb/cli/$DUCKDB_VERSION" >> "$GITHUB_PATH"
 
       - name: Run tests
         run: bun test evals/
@@ -272,8 +273,10 @@ jobs:
             bun "$plugin/node_modules/.bin/playwright" install --only-shell chromium
           fi
           if echo "$deps" | grep -q '^@duckdb/node-api$'; then
+            # The CLI must match the node-api that wrote the index it reads.
+            export DUCKDB_VERSION="$(jq -r '.dependencies["@duckdb/node-api"]' "$plugin/package.json" | cut -d- -f1)"
             curl -fsSL https://install.duckdb.org | bash
-            echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
+            echo "$HOME/.duckdb/cli/$DUCKDB_VERSION" >> "$GITHUB_PATH"
           fi
 
       - name: Install plugin tools

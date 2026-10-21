@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { objectKey, parseTarget, sessionFiles } from "./upload";
+import { due, objectKey, parseTarget, STOP_INTERVAL_MS, sessionFiles } from "./upload";
 
 describe("parseTarget", () => {
   test("uses the regional endpoint when a region is set", () => {
@@ -31,6 +31,7 @@ describe("sessionFiles", () => {
     await Bun.write(transcript, "{}\n");
     mkdirSync(join(root, "abc", "subagents"), { recursive: true });
     await Bun.write(join(root, "abc", "subagents", "agent-1.jsonl"), "{}\n");
+    await Bun.write(join(root, "abc", "subagents", "agent-1.meta.json"), "{}");
     expect(sessionFiles(transcript)).toEqual([
       transcript,
       join(root, "abc", "subagents", "agent-1.jsonl"),
@@ -43,9 +44,15 @@ describe("sessionFiles", () => {
   });
 });
 
-test("objectKey nests files under session and container", () => {
+test("objectKey nests files under the session", () => {
   const target = { base: "https://b", prefix: "transcripts/cloud" };
-  expect(objectKey(target, "cse_1", "container_1", "/p", "/p/abc/subagents/agent-1.jsonl")).toBe(
-    "transcripts/cloud/cse_1/container_1/abc/subagents/agent-1.jsonl",
+  expect(objectKey(target, "cse_1", "/p", "/p/abc/subagents/agent-1.jsonl")).toBe(
+    "transcripts/cloud/cse_1/abc/subagents/agent-1.jsonl",
   );
+});
+
+test("due throttles Stop and never SessionEnd", () => {
+  expect(due("Stop", 0, STOP_INTERVAL_MS)).toBe(true);
+  expect(due("Stop", 1, STOP_INTERVAL_MS)).toBe(false);
+  expect(due("SessionEnd", 1, STOP_INTERVAL_MS)).toBe(true);
 });

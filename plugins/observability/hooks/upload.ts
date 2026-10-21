@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
-// Copies a cloud session's transcript to S3 at the end of every turn, so the
-// Mac's index can import cloud sessions as a host. It runs on Stop because a
-// reclaimed VM never runs SessionEnd.
+// Copies a cloud session's transcripts to S3, one object per file overwritten
+// in place, so the Mac's index can import cloud sessions as a host. A reclaimed
+// VM never runs SessionEnd, so Stop uploads too, at most once per interval:
+// a session abandoned mid-interval loses at most that much of its tail.
 
 import { readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -9,12 +10,22 @@ import { basename, dirname, join, relative } from "node:path";
 import { z } from "zod";
 
 const HookInput = z.looseObject({
+  hook_event_name: z.string().catch(""),
   transcript_path: z.string().catch(""),
   session_id: z.string().catch("unknown"),
 });
 
-// Sizes already uploaded, so a turn re-sends only the files that grew.
-const State = z.record(z.string(), z.number()).catch({});
+export const STOP_INTERVAL_MS = 15 * 60 * 1000;
+
+// When the last upload ran, and the size each file had then, so an upload
+// skips the files that did not grow.
+const State = z
+  .object({ uploadedAt: z.number(), sizes: z.record(z.string(), z.number()) })
+  .catch({ uploadedAt: 0, sizes: {} });
+
+export function due(event: string, uploadedAt: number, now: number): boolean {
+  return event !== "Stop" || now - uploadedAt >= STOP_INTERVAL_MS;
+}
 
 export interface Target {
   base: string;
@@ -34,30 +45,24 @@ export function parseTarget(url: string, region: string | undefined): Target | u
   return { base: `https://${host}`, prefix: prefix ?? "" };
 }
 
-// The main transcript plus its subagents' transcripts and metadata.
+// The main transcript plus its subagents' transcripts.
 export function sessionFiles(transcript: string): string[] {
   const subagents = join(dirname(transcript), basename(transcript, ".jsonl"), "subagents");
   let entries: string[] = [];
   try {
-    entries = readdirSync(subagents).map((name) => join(subagents, name));
+    entries = readdirSync(subagents)
+      .filter((name) => name.endsWith(".jsonl"))
+      .map((name) => join(subagents, name));
   } catch {
     // No subagents ran.
   }
   return [transcript, ...entries];
 }
 
-// Keyed by remote session and container: a reopened session lands in a fresh
-// container with its history restored, and a separate key keeps that restore
-// from overwriting the copy it was restored from. The index dedupes the
-// replayed lines by uuid.
-export function objectKey(
-  t: Target,
-  session: string,
-  container: string,
-  root: string,
-  file: string,
-): string {
-  return [t.prefix, session, container, relative(root, file)].filter((p) => p !== "").join("/");
+// Keyed by remote session. A reopened session restores its full history into a
+// fresh container, so its first upload overwrites the object with a superset.
+export function objectKey(t: Target, session: string, root: string, file: string): string {
+  return [t.prefix, session, relative(root, file)].filter((p) => p !== "").join("/");
 }
 
 async function main(): Promise<void> {
@@ -73,7 +78,6 @@ async function main(): Promise<void> {
   const input = HookInput.parse(await Bun.stdin.json());
   if (input.transcript_path === "") return;
   const session = env.CLAUDE_CODE_REMOTE_SESSION_ID ?? input.session_id;
-  const container = env.CLAUDE_CODE_CONTAINER_ID ?? "unknown";
   const root = dirname(input.transcript_path);
 
   const statePath = join(
@@ -85,13 +89,16 @@ async function main(): Promise<void> {
       .json()
       .catch(() => ({})),
   );
+  const now = Date.now();
+  if (!due(input.hook_event_name, state.uploadedAt, now)) return;
+  state.uploadedAt = now;
 
   const failures: string[] = [];
   await Promise.all(
     sessionFiles(input.transcript_path).map(async (file) => {
       const body = Bun.file(file);
-      if (!(await body.exists()) || state[file] === body.size) return;
-      const key = `${target.base}/${objectKey(target, session, container, root, file)}`;
+      if (!(await body.exists()) || state.sizes[file] === body.size) return;
+      const key = `${target.base}/${objectKey(target, session, root, file)}`;
       const res = await fetch(key, { method: "PUT", body }).catch((error: unknown) =>
         error instanceof Error ? error : new Error(String(error)),
       );
@@ -101,7 +108,7 @@ async function main(): Promise<void> {
         );
         return;
       }
-      state[file] = body.size;
+      state.sizes[file] = body.size;
     }),
   );
   await Bun.write(statePath, JSON.stringify(state));

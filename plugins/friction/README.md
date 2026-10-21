@@ -1,22 +1,22 @@
 # Friction
 
-Counts recurring friction across the development setup and surfaces a fix only for a symptom that keeps coming back.
+Counts recurring friction across the development setup. Mid-week it opens a PR only for a blocker with a small fix. Everything else goes to a weekly list, ranked by how many days it persisted.
 
 ## Before and After
 
 Without it, a run over a day of telemetry reports everything it notices:
 
-> Load spiked to 216 on Oct 18. DuckDB jobs were running during 60% of overload minutes. Each session-index refresh writes 6.6 to 28 GB. herdr uses 0.05 cores. Consider reviewing your background processes.
+> Load spiked to 67 on Oct 20. DuckDB jobs were running during 67% of overload minutes. Session-index refreshes wrote 70 GB. `cloudsmith auth` failed 9 of 11 times. herdr uses 0.05 cores. Consider reviewing your background processes.
 
-With it, the same day's run reads the ledger first, so it acts on the one symptom that persisted and has a small fix:
+With it, the same day's run reads the ledger first, so it changes only the blocker and lists the rest:
 
-> Opened a draft PR adding a 10 s per-name thread snapshot to `osquery.conf` (`Friction: 7cb7391c9fcf`): overload without a tracked cause on 3 of the last 3 days.
+> Opened a draft PR fixing `cloudsmith auth` (`Friction: 51330ae96d0e`): 9 of 11 runs failed across 25 minutes of retries.
 >
 > **Below the cut**
-> - `a41f…` session-index DuckDB jobs, 3 days: 60% of load>30 minutes vs 4% quiet. Rebuild views per touched session.
-> - `9e02…` session-index refresh, 2 days: 6.6 to 28 GB written. Same fix.
+> - `363d8b49f935` `bun, duckdb`, 3 days: 67% of load>30 minutes vs 7% quiet. Make the scheduled job incremental.
+> - `8bb15044b0cc` session-index refresh, 3 days: 70 GB written. Rebuild views per changed session.
 
-A day where nothing persisted produces one line.
+A day with no blocker produces one line.
 
 ## Contents
 

@@ -27,7 +27,6 @@ type Outcome = (typeof OUTCOMES)[number];
 type Window = (typeof WINDOWS)[number];
 
 // Days a symptom must recur in the trailing week before the daily run acts on it.
-export const PERSISTENCE_DAYS = 3;
 const TRAILING_DAYS = 7;
 const SUPPRESS_DAYS = 30;
 const BELOW_CUT = 5;
@@ -197,7 +196,10 @@ export function decide(entries: Map<string, Entry>, window: Window, day: string)
 
   const promote =
     window === "1d"
-      ? visible.filter((e) => e.daysSeen >= PERSISTENCE_DAYS && e.latest.small).slice(0, 1)
+      ? // Only a blocker seen today with a small fix is worth a mid-week change.
+        visible
+          .filter((e) => e.latest.day === day && e.latest.impact === "high" && e.latest.small)
+          .slice(0, 1)
       : visible.slice(0, WEEKLY_TOP);
   const belowCut = visible.filter((e) => !promote.includes(e)).slice(0, BELOW_CUT);
 

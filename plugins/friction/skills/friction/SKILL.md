@@ -12,7 +12,7 @@ allowed-tools:
 
 # Friction
 
-Find what keeps slowing the setup down, and act only on what persists. Every symptom here recurs. The question each run answers is whether one has recurred enough, and has a small enough fix, to be worth a change.
+Find what keeps slowing the setup down. Every symptom here recurs. Mid-week, only a blocker with a small fix is worth a change. Everything else waits for the weekly list, ranked by how many days it persisted.
 
 The output budget is the point of this skill. A run that surfaces nothing is a correct run. Never pad.
 
@@ -64,7 +64,12 @@ One JSON object per symptom seen in the window, including ones you expect to sta
 
 - `type`: `contention`, `slow-command`, `failing-command`, `tool-gap`, `upstream-change`, `config-drift`.
 - `target`: the object the symptom is about, named the same way every run: a process name, a command head (`gh pr view`, not its arguments), a tool, a hook script. The fingerprint is `type|target`, so a renamed target restarts its count.
-- `impact`: `high` blocks or stalls work for minutes, `moderate` costs noticeable time or attention every day, `low` is measurable but unnoticed. Low never surfaces. Record it so growth shows.
+- `impact`: decides what surfaces, so grade it by what the symptom costs Ben, not by how often it fires.
+  - `high`: blocks work. A command keeps failing through retries until someone works around it, or work stalls for minutes. Example: an auth command failing 9 of 11 runs across 25 minutes of retries.
+  - `moderate`: costs time or attention, but work recovers on its own. Examples: a hook rejection that costs Claude one retry turn, a minute added to each turn, commit signing failures that a retry clears.
+  - `low`: measurable but unnoticed. Low never surfaces. Record it so growth shows.
+
+  Skip a guard firing as designed (a write-block hook stopping a write it should stop). It is not friction.
 - `metric`: the one number behind the finding, with its query named.
 - `small`: true only when the fix is one PR of a handful of lines in one topic, with no new dependency, and reverts cleanly.
 
@@ -80,7 +85,7 @@ echo "$FINDINGS" | bun "${CLAUDE_SKILL_DIR}/scripts/ledger.ts" record --window 1
 
 Do not count, rank, or override the decision yourself. The rules it applies:
 
-- Daily: promotes at most one entry seen on 3+ of the last 7 days, with `small: true` and impact above low.
+- Daily: promotes at most one entry seen today with `impact: high` and `small: true`. Moderate never promotes mid-week, however often it recurs.
 - Weekly: ranks every open entry by days seen, then impact, and promotes the top 5.
 - Filed and picked fingerprints wait for their outcome. Dismissed ones stay quiet for 30 days. A resolved one that returns is flagged `regression`.
 

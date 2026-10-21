@@ -18,31 +18,39 @@ function ledger(): string {
 
 const AT = "2026-10-20T13:00:00Z";
 
-// The Studio reference set, Oct 18 to 20. A correct daily run on Oct 20 opens one
-// PR (unattributed load), lists the DuckDB and refresh symptoms below the cut,
-// keeps background CPU in the ledger, and stays silent about memory.
-const unattributed: FindingInput = {
-  type: "contention",
-  target: "unattributed load",
+// Ben's calibration labels, Oct 21. Only the blocker was labeled same-day: a
+// small daily fix that costs a retry turn was labeled weekly, and so was every
+// persistent symptom whose fix is not small.
+const cloudsmith: FindingInput = {
+  type: "failing-command",
+  target: "cloudsmith auth",
+  impact: "high",
+  metric: "9 of 11 runs failed across 25 minutes of retries",
+  fix: "save the working auth invocation",
+  small: true,
+};
+const validateBody: FindingInput = {
+  type: "tool-gap",
+  target: "validate-body hook",
   impact: "moderate",
-  metric: "load1 minus tracked cores during load>30 minutes",
-  fix: "osquery.conf: 10 s per-name process and thread snapshot",
+  metric: "1 rejection a day, each costing a retry turn",
+  fix: "skip a body file the same command creates",
   small: true,
 };
 const duckdb: FindingInput = {
   type: "contention",
   target: "bun, duckdb",
   impact: "high",
-  metric: "60% of load>30 minutes have a bun/duckdb job within 2 min, vs 4% baseline",
-  fix: "rebuild session-index views per touched session",
+  metric: "67% of load>30 minutes have a bun/duckdb job within 2 min, vs 7% baseline",
+  fix: "make the scheduled session-index job incremental",
   small: false,
 };
 const refresh: FindingInput = {
-  type: "slow-command",
+  type: "contention",
   target: "session-index refresh",
   impact: "moderate",
-  metric: "6.6 to 28 GB written per refresh",
-  fix: "rebuild session-index views per touched session",
+  metric: "36 to 72 GB written a day",
+  fix: "rebuild session-index views per changed session",
   small: false,
 };
 const background: FindingInput = {
@@ -54,31 +62,39 @@ const background: FindingInput = {
   small: true,
 };
 
-describe("reference set", () => {
-  test("daily run on the third day", async () => {
+describe("calibration labels", () => {
+  test("the daily run changes only the blocker", async () => {
     const path = ledger();
-    await record(path, [unattributed, duckdb, background], "1d", "2026-10-18", AT);
-    await record(path, [unattributed, duckdb, refresh, background], "1d", "2026-10-19", AT);
+    await record(path, [validateBody, duckdb, refresh, background], "1d", "2026-10-18", AT);
+    await record(path, [validateBody, duckdb, refresh, background], "1d", "2026-10-19", AT);
     const decision = await record(
       path,
-      [unattributed, duckdb, refresh, background],
+      [cloudsmith, validateBody, duckdb, refresh, background],
       "1d",
       "2026-10-20",
       AT,
     );
 
-    expect(decision.promote.map((e) => e.latest.target)).toEqual(["unattributed load"]);
+    expect(decision.promote.map((e) => e.latest.target)).toEqual(["cloudsmith auth"]);
     expect(decision.belowCut.map((e) => e.latest.target)).toEqual([
       "bun, duckdb",
+      "validate-body hook",
       "session-index refresh",
     ]);
     expect(decision.ledgerOnly).toBe(1);
   });
 
-  test("nothing promotes before the third day", async () => {
+  test("a persistent moderate symptom never promotes mid-week", async () => {
     const path = ledger();
-    await record(path, [unattributed], "1d", "2026-10-18", AT);
-    expect((await record(path, [unattributed], "1d", "2026-10-19", AT)).promote).toEqual([]);
+    await record(path, [validateBody], "1d", "2026-10-18", AT);
+    await record(path, [validateBody], "1d", "2026-10-19", AT);
+    expect((await record(path, [validateBody], "1d", "2026-10-20", AT)).promote).toEqual([]);
+  });
+
+  test("a blocker not seen today does not promote", async () => {
+    const path = ledger();
+    await record(path, [cloudsmith], "1d", "2026-10-19", AT);
+    expect((await record(path, [], "1d", "2026-10-20", AT)).promote).toEqual([]);
   });
 
   test("a quiet day surfaces nothing", async () => {
@@ -91,17 +107,17 @@ describe("reference set", () => {
 describe("outcomes", () => {
   async function seenThreeDays(path: string): Promise<string> {
     // Sequential: each day's record reads the ledger the previous one wrote.
-    await record(path, [unattributed], "1d", "2026-10-18", AT);
-    await record(path, [unattributed], "1d", "2026-10-19", AT);
-    await record(path, [unattributed], "1d", "2026-10-20", AT);
-    return fingerprint(unattributed.type, unattributed.target);
+    await record(path, [cloudsmith], "1d", "2026-10-18", AT);
+    await record(path, [cloudsmith], "1d", "2026-10-19", AT);
+    await record(path, [cloudsmith], "1d", "2026-10-20", AT);
+    return fingerprint(cloudsmith.type, cloudsmith.target);
   }
 
   test("a filed fingerprint is not filed again", async () => {
     const path = ledger();
     const fp = await seenThreeDays(path);
     await recordOutcome(path, fp, "filed", "2026-10-20", AT);
-    expect((await record(path, [unattributed], "1d", "2026-10-21", AT)).promote).toEqual([]);
+    expect((await record(path, [cloudsmith], "1d", "2026-10-21", AT)).promote).toEqual([]);
   });
 
   test("a dismissed fingerprint stays quiet for 30 days", async () => {
@@ -118,7 +134,7 @@ describe("outcomes", () => {
     await recordOutcome(path, fp, "resolved", "2026-10-20", AT);
     expect(reduce(await readLedger(path), "2026-10-20").get(fp)?.status).toBe("resolved");
 
-    await record(path, [unattributed], "1d", "2026-10-21", AT);
+    await record(path, [cloudsmith], "1d", "2026-10-21", AT);
     const entry = reduce(await readLedger(path), "2026-10-21").get(fp);
     expect(entry?.daysSeen).toBe(1);
     expect(entry?.regression).toBe(true);

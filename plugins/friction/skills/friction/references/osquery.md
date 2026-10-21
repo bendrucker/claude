@@ -58,7 +58,7 @@ Each returns one row per day, so the run reads days seen directly. The 10 cores 
 
 ```sql
 SELECT strftime(to_timestamp(t), '%Y-%m-%d') AS day,
-  count(*) FILTER (WHERE load1 > 20) / 6 AS mins_gt2x, count(*) FILTER (WHERE load1 > 30) / 6 AS mins_gt3x,
+  count(*) FILTER (WHERE load1 > 20) // 6 AS mins_gt2x, count(*) FILTER (WHERE load1 > 30) // 6 AS mins_gt3x,
   round(max(load1)) AS peak
 FROM pressure GROUP BY 1 ORDER BY 1;
 ```
@@ -88,10 +88,12 @@ WHERE p.load1 > 30 GROUP BY 1, 2 ORDER BY 1, cpu_minutes DESC;
 
 ### Heavy writers
 
+Bytes written per process per day. Name the target by what the process was doing (the `cwd` tells a session-index refresh from a bench run), never by the path itself.
+
 ```sql
-SELECT strftime(to_timestamp(st), '%Y-%m-%d') AS day, pname, any_value(cwd) AS cwd,
+SELECT strftime(to_timestamp(t), '%Y-%m-%d') AS day, pname, any_value(cwd) AS cwd,
   round(max(fp) / 2^30, 1) AS fp_gb, round(sum(ddw) / 2^30, 1) AS written_gb
-FROM cpu GROUP BY pname, pid, st HAVING sum(ddw) > 2^30 ORDER BY written_gb DESC;
+FROM cpu GROUP BY 1, pname, pid, st HAVING sum(ddw) > 2^30 ORDER BY 1, written_gb DESC;
 ```
 
 ### Memory

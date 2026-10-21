@@ -12,7 +12,7 @@ ATTACH '$HOME/.local/share/atuin/history.db' AS atuin (TYPE sqlite, READ_ONLY);
 
 ## Slow Commands
 
-Command heads whose median run is over 30 s, per day:
+Command heads whose median run is over 30 s, per day. Interactive sessions (`ssh`, `claude`, `herdr`, editors, pagers, `tail -f`) run until you leave them, so their duration is not a wait. Skip them.
 
 ```sql
 SELECT strftime(to_timestamp(timestamp / 1e9), '%Y-%m-%d') AS day,

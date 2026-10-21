@@ -1,0 +1,16 @@
+{
+  "description": "Copy a cloud session's transcripts to CLAUDE_SESSION_UPLOAD_URL after each turn, for import into the session index as a host",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/upload.ts\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

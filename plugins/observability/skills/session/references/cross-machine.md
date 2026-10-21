@@ -41,3 +41,14 @@ bun <skill-dir>/scripts/forget.ts --host <label>
 ```
 
 Deletes the host's rows from the index and removes its synced files. `local` cannot be forgotten.
+
+## Cloud Sessions
+
+Cloud sessions (claude.ai/code, project threads) run in containers the Mac never sees. The plugin's `Stop` hook copies each cloud session's transcript and its subagents' transcripts to `CLAUDE_SESSION_UPLOAD_URL` (`s3://bucket/prefix`) after every turn, keyed `<prefix>/<remote-session-id>/<container-id>/...`. It does nothing unless that variable is set in the cloud environment and `CLAUDE_CODE_REMOTE` is `true`, and it sends only the files that grew since the last turn. Import the prefix as a host:
+
+```bash
+aws s3 sync s3://<bucket>/<prefix>/ ~/.claude/session-imports/cloud/projects/
+bun <skill-dir>/scripts/import.ts --host cloud --source 's3://<bucket>/<prefix>/' --egress
+```
+
+`--egress` fits because these rows came from the cloud in the first place. A reopened session restores its history into a new container, so the same lines arrive under two keys. `content_items` dedupes them by uuid, while `raw` keeps both copies.

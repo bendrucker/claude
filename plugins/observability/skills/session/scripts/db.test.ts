@@ -1747,6 +1747,8 @@ describe("pinned column derivation", () => {
 });
 
 describe("index version migration", () => {
+  // The tests that re-import every fixture can run past bun's 5s default on a CI runner under DuckDB 2.0.
+
   // A run that drops content_items and dies before rebuilding it leaves the catalog
   // current and views_hash unchanged, so nothing else would ask for the rebuild.
   it("rebuilds a derived table an interrupted run left behind", async () => {
@@ -1775,7 +1777,7 @@ describe("index version migration", () => {
     );
     expect(after?.n).toBe(before?.n);
     expect(Number(after?.clobbered)).toBe(0);
-  });
+  }, 30_000);
 
   // The old migration dropped raw outright, so a host that happened to be unreachable
   // during the bump lost its whole corpus: ensureIndex skips a missing root, so nothing
@@ -1798,7 +1800,7 @@ describe("index version migration", () => {
       z.object({ n: z.bigint() }),
     );
     expect(after?.n).toBe(before?.n);
-  });
+  }, 30_000);
 
   it("still drops rows for files deleted from disk", async () => {
     await importFixtureHost("archived");
@@ -1816,7 +1818,7 @@ describe("index version migration", () => {
       z.object({ n: z.bigint() }),
     );
     expect(Number(row?.n)).toBe(0);
-  });
+  }, 30_000);
 });
 
 describe("compactDatabase", () => {

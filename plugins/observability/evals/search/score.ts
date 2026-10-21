@@ -23,6 +23,7 @@ const Row = z.object({ host: z.string(), session_id: z.string() });
 interface Arm {
   name: string;
   skill: string;
+  index: string | undefined;
 }
 
 interface Run extends Scored {
@@ -78,9 +79,11 @@ async function search(arm: Arm, index: string, query: string, timeoutMs: number)
 }
 
 function parseArm(value: string, previous: Arm[] = []): Arm[] {
-  const m = /^([\w.-]+)(?:=(.+))?$/.exec(value);
-  if (m?.[1] === undefined) throw new InvalidArgumentError("Expected name[=<skill dir>].");
-  return [...previous, { name: m[1], skill: m[2] ?? SKILL }];
+  const m = /^([\w.-]+)(?:=([^@]+))?(?:@(.+))?$/.exec(value);
+  if (m?.[1] === undefined) {
+    throw new InvalidArgumentError("Expected name[=<skill dir>][@<index>].");
+  }
+  return [...previous, { name: m[1], skill: m[2] ?? SKILL, index: m[3] }];
 }
 
 function count(value: string): number {
@@ -125,13 +128,17 @@ const program = new Command()
   .description("Score session search arms against labeled queries on a frozen index.")
   .requiredOption("--labels <file>", "labels JSONL, as sync.ts pull writes it")
   .option("--index <db>", "frozen index; never the live one", INDEX)
-  .option("--arm <name[=skill dir]>", "repeatable; the first is the base", parseArm)
+  .option(
+    "--arm <name[=skill dir][@index]>",
+    "repeatable; the first is the base. @index scores that arm on its own index",
+    parseArm,
+  )
   .option("--tag <tag>", "only queries carrying this tag, such as dev or holdout")
   .option("--runs <n>", "timed runs per query and arm", count, 3)
   .option("--timeout <s>", "seconds per run", count, 120)
   .option("--out <dir>", "write runs.json and summary.json here")
   .action(async (o) => {
-    const arms = o.arm ?? [{ name: "main", skill: SKILL }];
+    const arms = o.arm ?? [{ name: "main", skill: SKILL, index: undefined }];
     const labels = await loadLabels(o.labels, o.tag);
     const runs: Run[] = [];
     for (const l of labels) {
@@ -140,7 +147,7 @@ const program = new Command()
         let last: Awaited<ReturnType<typeof search>> | undefined;
         for (let i = 0; i < o.runs; i++) {
           // oxlint-disable-next-line no-await-in-loop -- runs are timed one at a time so they do not contend.
-          last = await search(a, o.index, l.query, o.timeout * 1000);
+          last = await search(a, a.index ?? o.index, l.query, o.timeout * 1000);
           walls.push(last.wall);
         }
         const ranked = last?.ranked ?? [];

@@ -71,7 +71,7 @@ DuckDB parses `data->>'$.x' = 'y'` as `data->>('$.x' = 'y')` because `=` binds t
 
 Every open this skill makes or documents is resource-capped, because DuckDB's defaults (80% of RAM, every core, spill up to 90% of free disk) apply per process and a fan-out of readers multiplies them past the machine. Readers load `resources/limits.sql` through `-init` (60% of RAM up to 4 GiB, 4 threads, a per-process spill dir under `$TMPDIR`), and queries that need extensions add `-cmd ".read extensions.sql"`. The writer passes `WRITER_CONFIG` to `DuckDBInstance.create`. A query that outgrows its cap spills or fails with an out-of-memory error instead of swapping the machine.
 
-The four writers carry the `claude:dangerouslyDisableSandbox` marker after their shebang. Each writes somewhere the sandbox denies: `refresh.ts` prunes `~/.claude/debug` and `~/.claude/mod-events`, `import.ts` and `forget.ts` change `~/.claude/session-imports`, `hosts.ts` opens the index read-write, and the first open moves the old index out of `~/.claude/plugins`. See [`plugins/mac/README.md`](../../../mac/README.md) for the marker.
+The writers carry the `claude:dangerouslyDisableSandbox` marker after their shebang. Each writes somewhere the sandbox denies: `refresh.ts` prunes `~/.claude/debug` and `~/.claude/mod-events`, `import.ts`, `forget.ts` and `pull.ts` change `~/.claude/session-imports`, `hosts.ts` opens the index read-write, and the first open moves the old index out of `~/.claude/plugins`. See [`plugins/mac/README.md`](../../../mac/README.md) for the marker.
 
 ### Callers
 

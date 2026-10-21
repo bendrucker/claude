@@ -44,11 +44,12 @@ Deletes the host's rows from the index and removes its synced files. `local` can
 
 ## Cloud Sessions
 
-Cloud sessions (claude.ai/code, project threads) run in containers the Mac never sees. The plugin's `SessionEnd` hook, and its `Stop` hook at most every 15 minutes, copy each cloud session's transcript and its subagents' transcripts to `CLAUDE_SESSION_UPLOAD_URL` (`s3://bucket/prefix`), one object per file at `<prefix>/<remote-session-id>/...`, overwritten as it grows. A VM reclaimed without `SessionEnd` loses at most the last interval, unless the session is reopened, since its first upload in the new container carries the restored history. The hooks do nothing unless that variable is set in the cloud environment and `CLAUDE_CODE_REMOTE` is `true`. Import the prefix as a host:
+Cloud sessions (claude.ai/code, project threads) run in containers the Mac never sees. The plugin's `SessionEnd` hook, and its `Stop` hook at most every 15 minutes, copy each cloud session's transcript and its subagents' transcripts to `CLAUDE_SESSION_UPLOAD_URL` (`s3://bucket/prefix`), one object per file at `<prefix>/<remote-session-id>/...`, overwritten as it grows. A VM reclaimed without `SessionEnd` loses at most the last interval, unless the session is reopened, since its first upload in the new container carries the restored history. The hooks do nothing unless that variable is set in the cloud environment and `CLAUDE_CODE_REMOTE` is `true`. Register the prefix as a host once, then pull:
 
 ```bash
-aws s3 sync --delete s3://<bucket>/<prefix>/ ~/.claude/session-imports/cloud/projects/
+mkdir -p ~/.claude/session-imports/cloud/projects
 bun <skill-dir>/scripts/import.ts --host cloud --source 's3://<bucket>/<prefix>/' --egress
+bun <skill-dir>/scripts/pull.ts --host cloud
 ```
 
-`--egress` fits because these rows came from the cloud in the first place. Retention is the bucket's lifecycle rule on the prefix: `--delete` drops a local file once its object expires, and the next refresh reaps its rows, the way `cleanupPeriodDays` works for `local`.
+`--egress` fits because these rows came from the cloud in the first place. The bucket keeps every session. `pull.ts` keeps the local copy to the sessions uploaded within `--days` (default 90, matching `cleanupPeriodDays`), fetching any whose objects grew and deleting the rest, so the next refresh imports the new ones and reaps the rows of the old, the way `cleanupPeriodDays` works for `local`. It shells out to the `aws` CLI with whatever credentials the environment provides.

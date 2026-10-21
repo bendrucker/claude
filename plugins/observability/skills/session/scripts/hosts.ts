@@ -54,7 +54,7 @@ if (imported.length > 0) {
     const dest = `${join(root, "projects")}/`;
     console.log(
       source.startsWith("s3://")
-        ? `    aws s3 sync --delete ${source} ${dest}`
+        ? `    bun ${join(import.meta.dir, "pull.ts")} --host ${label}`
         : `    rsync -av --update ${source} ${dest}`,
     );
   }

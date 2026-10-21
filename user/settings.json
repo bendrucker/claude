@@ -205,6 +205,7 @@
     "typescript-lsp@claude-plugins-official": true,
     "gopls-lsp@claude-plugins-official": true,
     "atuin@bendrucker": true,
+    "friction@bendrucker": true,
     "comments@bendrucker": true,
     "plannotator@plannotator": true,
     "herdr@bendrucker": true,

@@ -1,0 +1,92 @@
+---
+name: friction
+disable-model-invocation: true
+description: Find persistent friction in the development setup (contention, slow or failing commands, tool gaps) from machine telemetry, count each symptom across days in a ledger, and surface only small fixes for symptoms that keep recurring. Use for the scheduled daily or weekly friction run, or to pick an item from a run's below-the-cut list.
+argument-hint: "[--window 1d|7d] [pick <fingerprint>]"
+allowed-tools:
+  - Bash
+  - Read
+  - Skill(observability:session)
+  - Skill(pull-request:create)
+---
+
+# Friction
+
+Find what keeps slowing the setup down, and act only on what persists. Every symptom here recurs. The question each run answers is whether one has recurred enough, and has a small enough fix, to be worth a change.
+
+The output budget is the point of this skill. A run that surfaces nothing is a correct run. Never pad.
+
+## Arguments
+
+- `--window 1d` (default): the daily run. Last 24 hours, osquery and Atuin only, about 5 minutes, offline.
+- `--window 7d`: the weekly run. Last 7 days, plus the session index and upstream changelogs, 20 to 30 minutes.
+- `pick <fingerprint>`: Ben asked for a below-the-cut item. Run `scripts/ledger.ts outcome <fingerprint> picked`, then implement it as in [Deliver](#deliver).
+
+The window sets lookback, sources, and budget. The steps and the ledger rules are identical for both.
+
+## Steps
+
+### 1. Collect
+
+Run named queries over the window. Each source returns rows, not prose.
+
+| Source | Window | How |
+| --- | --- | --- |
+| osquery | both | DuckDB over the snapshot log. Load and queries: [references/osquery.md](references/osquery.md) |
+| Atuin | both | DuckDB over the history db: slow and failing command heads. [references/atuin.md](references/atuin.md) |
+| Session index | `7d` | `observability:session` named queries. It sees only local transcripts, so a quiet index means work moved to cloud sessions, not that friction stopped |
+| Changelogs | `7d` | Release notes since the last run for tools in the Brewfiles and mise pins that the window's data shows in use |
+
+Normalize every metric to a rate: per active hour, per call, or a share of minutes. Activity swings 200x day to day, so a raw count compares nothing.
+
+### 2. Ground
+
+Check each candidate against the live config in `~/.dotfiles` and `~/.claude-repo`. Drop any the config already addresses. A fix that does less work (skip a job, lower a limit) is not a fix here. Look for the change that makes the same work faster or attributes it.
+
+### 3. Emit Findings
+
+One JSON object per symptom seen in the window, including ones you expect to stay quiet:
+
+```json
+{"type": "contention", "target": "session-index duckdb jobs", "impact": "high",
+ "metric": "60% of load>30 minutes had a bun/duckdb job within 2 min, vs 4% of quiet minutes",
+ "fix": "rebuild session-index views per touched session", "small": false}
+```
+
+- `type`: `contention`, `slow-command`, `failing-command`, `tool-gap`, `upstream-change`, `config-drift`.
+- `target`: the object the symptom is about, named the same way every run: a process name, a command head (`gh pr view`, not its arguments), a tool, a hook script. The fingerprint is `type|target`, so a renamed target restarts its count.
+- `impact`: `high` blocks or stalls work for minutes, `moderate` costs noticeable time or attention every day, `low` is measurable but unnoticed. Low never surfaces. Record it so growth shows.
+- `metric`: the one number behind the finding, with its query named.
+- `small`: true only when the fix is one PR of a handful of lines in one topic, with no new dependency, and reverts cleanly.
+
+Never put command arguments, paths under a work directory, or file contents in a finding. The ledger may leave the machine.
+
+### 4. Record
+
+Pipe the array to the ledger. It appends the day's findings, counts distinct days per fingerprint, and prints the decision:
+
+```bash
+echo "$FINDINGS" | bun "${CLAUDE_SKILL_DIR}/scripts/ledger.ts" record --window 1d
+```
+
+Do not count, rank, or override the decision yourself. The rules it applies:
+
+- Daily: promotes at most one entry seen on 3+ of the last 7 days, with `small: true` and impact above low.
+- Weekly: ranks every open entry by days seen, then impact, and promotes the top 5.
+- Filed and picked fingerprints wait for their outcome. Dismissed ones stay quiet for 30 days. A resolved one that returns is flagged `regression`.
+
+### 5. Deliver
+
+Daily, when `promote` holds an entry: implement the fix and open a draft PR through `pull-request:create`, with `Friction: <fp>` on its own line in the body and the metric as evidence. Then record it:
+
+```bash
+bun "${CLAUDE_SKILL_DIR}/scripts/ledger.ts" outcome <fp> filed --ref <pr-url>
+```
+
+Weekly: write one ranked list, highest first. Each entry gives the target, days seen, the metric, the proposed change, and whether it is small.
+
+Both windows end the run's output with **Below the cut**: each `belowCut` entry as one line with its fingerprint, days seen, metric, and proposed change. Ben picks from it with `pick <fingerprint>`. When the decision is empty, the whole output is one line saying the run found nothing to surface.
+
+## Outcomes
+
+When a filed PR merges or a picked to-do completes, record `resolved`. When Ben closes one unmerged or cancels it, record `dismissed`. Check the open `Friction:` PRs at the start of each run and record any outcome the ledger lacks.

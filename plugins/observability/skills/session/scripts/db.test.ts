@@ -17,6 +17,7 @@ import {
   rebuildViews,
   runQuery,
   sessionDbPath,
+  STORAGE_VERSION,
 } from "./db";
 import { dirExists } from "./file-catalog";
 import { emit } from "./events";
@@ -34,8 +35,13 @@ const resourcesDir = join(import.meta.dirname, "..", "resources");
 const plansFixtureDir = join(import.meta.dirname, "..", "fixtures", "plans");
 
 async function loadExtensions(database: Database) {
-  // `getenv` exists only in the duckdb CLI, so stub it for the node binding.
-  await database.run("CREATE OR REPLACE TEMP MACRO getenv(name) AS NULL");
+  // `getenv` exists only in the duckdb CLI, so stub it for the node binding with the
+  // proxy variables extensions.sql reads, letting a cold cache install under the sandbox.
+  const literal = (name: string) => `'${(process.env[name] ?? "").replaceAll("'", "''")}'`;
+  await database.run(
+    `CREATE OR REPLACE TEMP MACRO getenv(name) AS
+       MAP {'http_proxy': ${literal("http_proxy")}, 'HTTP_PROXY': ${literal("HTTP_PROXY")}}[name]`,
+  );
   await database.run(await Bun.file(join(resourcesDir, "extensions.sql")).text());
 }
 
@@ -1847,6 +1853,10 @@ describe("storage version", () => {
       )
     )[0]?.v;
 
+  it("creates the index at STORAGE_VERSION, which a CLI older than the writer can open", async () => {
+    expect(await version()).toBe(`${STORAGE_VERSION}+`);
+  });
+
   it("compacts a file in an older format into one that stores long strings with ZSTD", async () => {
     // Only long lines, since the compressor picks per segment and short ones favor
     // dictionary encodings.
@@ -1856,6 +1866,9 @@ describe("storage version", () => {
        SELECT 'local', '/long.jsonl', i, json_object('text', repeat('long line ', 2000) || i)
        FROM range(20) t(i)`,
     );
+    // A legacy raw predates rawDdl's forced ZSTD, which v1.0.0 storage rejects, and
+    // CREATE TABLE AS drops it.
+    await db.run("CREATE OR REPLACE TABLE raw AS SELECT * FROM raw");
     await db.run(`ATTACH '${join(tmpDir, "legacy.duckdb")}' AS legacy (STORAGE_VERSION 'v1.0.0')`);
     await db.run("COPY FROM DATABASE session TO legacy");
     await db.run("DETACH legacy");

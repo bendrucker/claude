@@ -48,7 +48,9 @@ export interface HostEntry {
 }
 
 // The oldest storage version that compresses long strings (raw.data, content_items
-// text) with ZSTD. A file keeps the version it was created at until compactDatabase.
+// text) with ZSTD. Pinning below the writer's own default keeps the index readable by
+// the duckdb CLI agents run, which may trail node-api by a major version. A file keeps
+// the version it was created at until compactDatabase.
 export const STORAGE_VERSION = "v1.2.0";
 
 // memory_limit bounds only DuckDB's buffer manager, and the views rebuild

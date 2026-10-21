@@ -7,9 +7,9 @@ Measures the session index on the work agents wait through: the queries they run
 | Column | Source |
 |---|---|
 | wall | process start to exit, what an agent's Bash call waits |
-| engine | the profile's `latency` for the last statement |
-| MB read, rows scanned | the profile's `total_bytes_read` and `cumulative_rows_scanned` |
-| buffer MB | the profile's `system_peak_buffer_memory` |
+| engine | the profile's `query.total_time` for the last statement |
+| MB read, rows scanned | the profile's `io.total_bytes_read` and `query.total_rows_scanned` |
+| buffer MB | the profile's `system.peak_buffer_memory` |
 | RSS MB | the process's peak resident memory |
 | index MB | the index file's size |
 | OOM, failed | runs that ran out of memory, and runs that errored, timed out, or exited non-zero |

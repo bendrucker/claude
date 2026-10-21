@@ -227,6 +227,36 @@ describe("search", () => {
     });
     expect(rows.map((r) => r.session_id)).toEqual(["ai-titled-session"]);
   });
+
+  const Hit = z.object({ session_id: z.string(), matched_surfaces: z.array(z.string()) });
+
+  it.each([
+    ["zebrafinch", "tool_input"],
+    ["dictation-recordings", "tool_input"],
+    ["readpathtoken", "tool_input"],
+    ["aardvarkoutput", "tool_output"],
+    ["arrayoutputtoken", "tool_output"],
+    ["quokkathink", "thinking"],
+    ["queuedprompttoken", "queued_prompt"],
+  ])("matches %s on its %s surface", async (query, surface) => {
+    const rows = await runQuery(db, "search", Hit, { ...queryParams({ limit: "10" }), query });
+    expect(rows).toEqual([{ session_id: "search-surfaces-session", matched_surfaces: [surface] }]);
+  });
+
+  it.each([
+    "readcontenttoken",
+    "writecontenttoken",
+    "tasknotiftoken",
+    "skillbodytoken",
+    "subagentprosetoken",
+    "subagentcmdtoken",
+  ])("leaves %s out", async (query) => {
+    const rows = await runQuery(db, "search", z.unknown(), {
+      ...queryParams({ limit: "10" }),
+      query,
+    });
+    expect(rows).toHaveLength(0);
+  });
 });
 
 describe("stats", () => {
@@ -1268,7 +1298,7 @@ describe("outcomes query", () => {
       "sessions: shipped": 2,
       "sessions: ongoing": 1,
       "sessions: handed-off": 2,
-      "sessions: abandoned-with-edits": 3,
+      "sessions: abandoned-with-edits": 4,
       "sessions: no-artifact": 19,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
@@ -1286,7 +1316,7 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 25,
+      "sessions: ongoing": 26,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });

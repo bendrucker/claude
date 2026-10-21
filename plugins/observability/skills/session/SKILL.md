@@ -83,7 +83,7 @@ duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql -cmd "SET 
   ~/.local/share/claude-sessions/session.duckdb < ${CLAUDE_SKILL_DIR}/resources/queries/search.sql
 ```
 
-Fall back to `ILIKE` only for text `search` leaves out: subagent turns, tool output, and skill bodies.
+`search` covers prompts, assistant prose, tool calls and their output, so a command or a path it printed finds the session. Each row's `matched_surfaces` names where the terms hit. Fall back to `ILIKE` only for text `search` leaves out: Read output, file contents in Write and Edit calls, tool text past 2,000 characters per call, subagent turns, skill bodies, and hook output.
 
 The rest, by name:
 

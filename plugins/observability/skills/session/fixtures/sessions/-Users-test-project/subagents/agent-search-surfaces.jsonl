@@ -1,0 +1,1 @@
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Found subagentprosetoken."},{"type":"tool_use","id":"ss-sub-t1","name":"Bash","input":{"command":"grep -r subagentcmdtoken ."}}]},"sessionId":"search-surfaces-session","cwd":"/Users/test/project","timestamp":"2024-01-25T10:10:00.000Z","uuid":"ss-sub-1","isSidechain":true}

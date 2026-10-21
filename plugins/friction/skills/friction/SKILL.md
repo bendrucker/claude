@@ -2,7 +2,7 @@
 name: friction
 disable-model-invocation: true
 description: Find persistent friction in the development setup (contention, slow or failing commands, tool gaps) from machine telemetry, count each symptom across days in a ledger, and surface only small fixes for symptoms that keep recurring. Use for the scheduled daily or weekly friction run, or to pick an item from a run's below-the-cut list.
-argument-hint: "[--window 1d|7d] [pick <fingerprint>]"
+argument-hint: "[--window 1d|7d] [--day YYYY-MM-DD] [pick <fingerprint>]"
 allowed-tools:
   - Bash
   - Read
@@ -20,6 +20,7 @@ The output budget is the point of this skill. A run that surfaces nothing is a c
 
 - `--window 1d` (default): the daily run. Last 24 hours, osquery and Atuin only, about 5 minutes, offline.
 - `--window 7d`: the weekly run. Last 7 days, plus the session index and upstream changelogs, 20 to 30 minutes.
+- `--day YYYY-MM-DD`: run as of a past day, to backfill the ledger or replay a calibration day. Bound every query to the window ending that day, pass `--day` to every ledger command, and print the decision without delivering it.
 - `pick <fingerprint>`: Ben asked for a below-the-cut item. Run `scripts/ledger.ts outcome <fingerprint> picked`, then implement it as in [Deliver](#deliver).
 
 The window sets lookback, sources, and budget. The steps and the ledger rules are identical for both.

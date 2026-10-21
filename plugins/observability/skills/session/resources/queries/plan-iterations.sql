@@ -104,17 +104,17 @@ SELECT
   w.plan_chars,
   w.plan_chars - w.prev_chars         AS chars_delta,
   CASE WHEN d.prev_lines IS NULL THEN NULL
-       ELSE len(list_filter(d.lines, x -> NOT list_contains(d.prev_lines, x)))
+       ELSE len(list_filter(d.lines, lambda x: NOT list_contains(d.prev_lines, x)))
   END                                  AS lines_added,
   CASE WHEN d.prev_lines IS NULL THEN NULL
-       ELSE len(list_filter(d.prev_lines, x -> NOT list_contains(d.lines, x)))
+       ELSE len(list_filter(d.prev_lines, lambda x: NOT list_contains(d.lines, x)))
   END                                  AS lines_removed,
   CASE WHEN d.prev_lines IS NULL THEN NULL
-       ELSE len(list_filter(d.lines, x -> list_contains(d.prev_lines, x)))
+       ELSE len(list_filter(d.lines, lambda x: list_contains(d.prev_lines, x)))
   END                                  AS lines_carried,
   CASE WHEN d.prev_lines IS NULL THEN NULL
        ELSE ROUND(
-         len(list_filter(d.lines, x -> list_contains(d.prev_lines, x)))::DOUBLE
+         len(list_filter(d.lines, lambda x: list_contains(d.prev_lines, x)))::DOUBLE
            / NULLIF(d.distinct_lines, 0),
          2
        )

@@ -73,10 +73,21 @@ Every open this skill makes or documents is resource-capped, because DuckDB's de
 
 The four writers carry the `claude:dangerouslyDisableSandbox` marker after their shebang. Each writes somewhere the sandbox denies: `refresh.ts` prunes `~/.claude/debug` and `~/.claude/mod-events`, `import.ts` and `forget.ts` change `~/.claude/session-imports`, `hosts.ts` opens the index read-write, and the first open moves the old index out of `~/.claude/plugins`. See [`plugins/mac/README.md`](../../../mac/README.md) for the marker.
 
+### Lake
+
+`lake.ts` publishes the index to a DuckLake (a DuckDB-file catalog plus Parquet) under `CLAUDE_SESSION_LAKE_URL`, an `s3://` prefix or a directory, so remote readers query it in place instead of downloading the index. The local index stays the only writer's source, and the lake is a cache of it.
+
+- **Publish** diffs `indexed_files` against the lake's `published_files`, then in one DuckLake transaction replaces `raw` and `file_fields` per changed file, and `content_items`, `search_items`, and every view per touched session. Views key on `(host, session_id)` and read only that session's rows, which is what makes the per-session replace exact. Only the hosts passed with `--host` (default `local`) are published, and a host imported without `--egress` is refused.
+- **Views become tables.** A view that parses `data` at query time costs a reader the JSON in its whole window, and the JSON columns are almost all of the lake's bytes. Materialized, a query reads only the columns it selects. The views over `file_fields` stay views, and `classifier_verdicts` (local `mod_events`) is not published.
+- **Layout.** Rows sort by `type`, then `timestamp`, in 8,192-row row groups, so a window filter or a rare-type filter skips most row groups. The replay dedupes partition by `uuid` and `timestamp`: a replayed line is a verbatim copy, so adding the timestamp changes no result and lets a window filter push below the window function.
+- **Catalog.** The writer keeps the catalog at `<index dir>/lake/catalog.ducklake` and uploads it with `aws s3 cp` after each commit. Parquet files are immutable, so a reader sees the previous snapshot or the new one. `checkpoint` runs DuckLake's `CHECKPOINT` (flush inlined data, merge files, expire snapshots, clean up files) with a 7-day window, which must outlast the longest reader.
+- **Readers** run `duckdb -init "$(bun lake.ts init)"`. The init file carries `limits.sql`, the S3 secret, the read-only attach, the macros, and the views that stay views, with `search_path` resolving every other name to the lake.
+
 ### Callers
 
 - `db.ts`: orchestrates migration, schema, scan, per-file import, view rebuild and versioning, checkpoint, compaction.
 - `refresh.ts`: CLI entry point. Stamp fast-path, `ensureIndex`, `--compact`, compaction guard, prints DB path to stdout.
+- `lake.ts`: publish to the lake, its `CHECKPOINT`, and the reader init.
 - `query.ts`: the one path from a named query (or literal SQL) plus params to decoded rows. Two adapters share the variable binding: `nodeAdapter` binds on the read-write connection `db.ts` already holds, and `cliAdapter` spawns `duckdb -readonly -init limits.sql` with a timeout, rendering the same params as `SET VARIABLE` lines through one escaping function. `usage.ts` and `schema.ts` take the read-only adapter so they never wait on a refresh's write lock. `runQuery` appends a `session-index.query` event per read. Every scripted reader goes through `cliAdapter`.
 
 ### Development

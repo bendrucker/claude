@@ -28,7 +28,11 @@ function arm(value: string, previous: Arm[] = []): Arm[] {
   const m = /^([\w.-]+)=([^,]+)(?:,(.+))?$/.exec(value);
   if (m?.[1] === undefined || m[2] === undefined)
     throw new InvalidArgumentError("Expected name=<db>[,<skill dir>].");
-  return [...previous, { name: m[1], db: m[2], skill: m[3] ?? SKILL }];
+  const lake = m[2].startsWith("ducklake:") ? m[2].slice("ducklake:".length) : undefined;
+  return [
+    ...previous,
+    { name: m[1], db: lake === undefined ? m[2] : ":memory:", skill: m[3] ?? SKILL, lake },
+  ];
 }
 
 function count(value: string): number {
@@ -59,7 +63,7 @@ async function finish(out: string, name: keyof typeof KEYS, samples: Sample[]) {
 }
 
 const ARM_HELP =
-  "name=<index>[,<skill dir>], once per arm; the first is the base. The skill dir defaults to this checkout's";
+  "name=<index>[,<skill dir>], once per arm; the first is the base. <index> may be ducklake:<url> to read a published lake in place. The skill dir defaults to this checkout's";
 
 const program = new Command("bench.ts").description(
   "Benchmark the session index: replay the queries agents run most, and time a refresh per changed transcript.",

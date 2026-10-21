@@ -11,7 +11,8 @@ SELECT
   (r.data->>'$.promptSource')         AS prompt_source,
   (r.data->>'$.interruptedMessageId') AS interrupted_message_id,
   (r.data->>'$.attributionMcpServer') AS attribution_mcp_server,
-  (r.data->>'$.attributionMcpTool')   AS attribution_mcp_tool
+  (r.data->>'$.attributionMcpTool')   AS attribution_mcp_tool,
+  TRY_CAST(r.data->>'$.isApiErrorMessage' AS BOOLEAN) AS is_api_error
 FROM raw r
 WHERE r.type IN ('user', 'assistant');
 
@@ -38,7 +39,7 @@ WITH typed AS (
     AND (m.content_text LIKE '<command-name>%' OR m.content_text LIKE '<command-message>%')
   QUALIFY m.uuid IS NULL
     OR ROW_NUMBER() OVER (
-         PARTITION BY m.host, m.session_id, m.uuid
+         PARTITION BY m.host, m.session_id, m.uuid, m.timestamp
          ORDER BY m.source_line DESC, m.source_file DESC
        ) = 1
 )
@@ -151,7 +152,7 @@ WITH src AS (
     ))
   QUALIFY r.uuid IS NULL
     OR ROW_NUMBER() OVER (
-         PARTITION BY r.host, r.session_id, r.uuid
+         PARTITION BY r.host, r.session_id, r.uuid, r.timestamp
          ORDER BY (r.source_file LIKE '%/subagents/%'), r.source_line DESC, r.source_file DESC
        ) = 1
 )
@@ -227,7 +228,7 @@ WHERE r.type = 'user' AND r.content_text IS NOT NULL
   ))
 QUALIFY r.uuid IS NULL
   OR ROW_NUMBER() OVER (
-       PARTITION BY r.host, r.session_id, r.uuid
+       PARTITION BY r.host, r.session_id, r.uuid, r.timestamp
        ORDER BY (r.source_file LIKE '%/subagents/%'), r.source_line DESC, r.source_file DESC
      ) = 1;
 
@@ -556,7 +557,7 @@ FROM raw
 WHERE type = 'attachment'
 QUALIFY uuid IS NULL
   OR ROW_NUMBER() OVER (
-       PARTITION BY host, session_id, uuid
+       PARTITION BY host, session_id, uuid, timestamp
        ORDER BY source_line DESC, source_file DESC
      ) = 1;
 
@@ -610,7 +611,7 @@ WITH summaries AS (
     AND json_type(hook_infos) = 'ARRAY'
   QUALIFY uuid IS NULL
     OR ROW_NUMBER() OVER (
-         PARTITION BY host, session_id, uuid
+         PARTITION BY host, session_id, uuid, timestamp
          ORDER BY source_line DESC, source_file DESC
        ) = 1
 )
@@ -646,7 +647,7 @@ WITH att AS (
     AND (data->>'$.attachment.type') LIKE 'hook%'
   QUALIFY uuid IS NULL
     OR ROW_NUMBER() OVER (
-         PARTITION BY host, session_id, uuid
+         PARTITION BY host, session_id, uuid, timestamp
          ORDER BY source_line DESC, source_file DESC
        ) = 1
 ),

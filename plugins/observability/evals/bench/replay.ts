@@ -209,35 +209,12 @@ export async function replaySet(db: string, top: number): Promise<Query[]> {
     .toSorted((a, b) => b.count - a.count);
 }
 
-const metric = z.number().optional();
-// DuckDB 2.0 nests the profile's metrics in groups; 1.x keeps them flat at the root.
-const Profile = z.union([
-  z
-    .looseObject({
-      query: z.looseObject({ total_time: z.number(), total_rows_scanned: metric }),
-      io: z.looseObject({ total_bytes_read: metric }).optional(),
-      system: z.looseObject({ peak_buffer_memory: metric }).optional(),
-    })
-    .transform((p) => ({
-      latency: p.query.total_time,
-      bytesRead: p.io?.total_bytes_read,
-      rowsScanned: p.query.total_rows_scanned,
-      peakBuffer: p.system?.peak_buffer_memory,
-    })),
-  z
-    .looseObject({
-      latency: z.number(),
-      total_bytes_read: metric,
-      cumulative_rows_scanned: metric,
-      system_peak_buffer_memory: metric,
-    })
-    .transform((p) => ({
-      latency: p.latency,
-      bytesRead: p.total_bytes_read,
-      rowsScanned: p.cumulative_rows_scanned,
-      peakBuffer: p.system_peak_buffer_memory,
-    })),
-]);
+const Profile = z.looseObject({
+  latency: z.number(),
+  total_bytes_read: z.number().optional(),
+  cumulative_rows_scanned: z.number().optional(),
+  system_peak_buffer_memory: z.number().optional(),
+});
 
 /**
  * A lake arm's init is the skill's reader init, which carries limits.sql, with HTTP logging
@@ -298,8 +275,8 @@ export async function replay(
   const stats =
     a.lake === undefined
       ? ""
-      : `RESET enable_profiling;\nCOPY (${HTTP_STATS}) TO '${http.name}' (FORMAT json);\n`;
-  const stdin = `SET enable_profiling = 'json';\nSET profiling_output = '${profile.name}';\n${sql}\n${stats}`;
+      : `PRAGMA disable_profiling;\nCOPY (${HTTP_STATS}) TO '${http.name}' (FORMAT json);\n`;
+  const stdin = `PRAGMA enable_profiling = 'json';\nPRAGMA profiling_output = '${profile.name}';\n${sql}\n${stats}`;
   const signal = AbortSignal.timeout(timeoutMs);
   const target =
     a.lake === undefined ? ["-readonly", "-json", "-init", init, a.db] : ["-json", "-init", init];
@@ -323,9 +300,9 @@ export async function replay(
     error,
     rss,
     latency: p?.latency,
-    bytesRead: p?.bytesRead,
-    rowsScanned: p?.rowsScanned,
-    peakBuffer: p?.peakBuffer,
+    bytesRead: p?.total_bytes_read,
+    rowsScanned: p?.cumulative_rows_scanned,
+    peakBuffer: p?.system_peak_buffer_memory,
     size: a.lake === undefined ? Bun.file(a.db).size : undefined,
     gets: h.success ? h.data.gets : undefined,
     httpBytes: h.success ? h.data.bytes : undefined,

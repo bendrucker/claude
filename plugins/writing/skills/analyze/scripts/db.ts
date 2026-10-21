@@ -23,7 +23,7 @@ export interface Database {
 export function proxyConfig(env: Record<string, string | undefined>): Record<string, string> {
   const raw = [env.http_proxy, env.HTTP_PROXY].find((value) => value !== undefined && value !== "");
   if (raw === undefined) return {};
-  const url = new URL(raw);
+  const url = new URL(raw.includes("://") ? raw : `http://${raw}`);
   return {
     http_proxy: url.host,
     http_proxy_username: decodeURIComponent(url.username),

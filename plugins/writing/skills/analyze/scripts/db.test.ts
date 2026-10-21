@@ -15,6 +15,16 @@ describe("proxyConfig", () => {
       },
     },
     {
+      name: "bare IP address",
+      env: { http_proxy: "127.0.0.1:8080" },
+      expected: { http_proxy: "127.0.0.1:8080", http_proxy_username: "", http_proxy_password: "" },
+    },
+    {
+      name: "bare hostname",
+      env: { http_proxy: "proxy.test:8080" },
+      expected: { http_proxy: "proxy.test:8080", http_proxy_username: "", http_proxy_password: "" },
+    },
+    {
       name: "uppercase fallback with encoded password",
       env: { HTTP_PROXY: "http://user:p%40ss@proxy.example:3128/" },
       expected: {

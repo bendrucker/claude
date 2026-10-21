@@ -117,6 +117,19 @@ HAVING max(t) - min(t) > 72000 AND sum(dcpu) / 1000 / (max(t) - min(t)) > 0.03
 ORDER BY avg_cores DESC;
 ```
 
+## Targets
+
+The fingerprint is `type|target`, so each query names its symptom the same way every run.
+
+| Query | Type | Target |
+| --- | --- | --- |
+| Overload, a suspect active in most overload minutes | `contention` | the suspects in the `IN` list, as written: `bun, duckdb` |
+| Overload, no suspect or `groups` empty | `contention` | `unattributed load` |
+| Thread hogs | `contention` | the process name |
+| Heavy writers | `contention` | the activity from this list, else the process name: `session-index refresh`, `agent worktree build`, `benchmark run` |
+| Memory | `contention` | `memory pressure` |
+| Steady background CPU | `contention` | the process name |
+
 ## Session Attribution
 
 Join `proc_tags` from the results log on `(pid, start_time)` to tie a process to a Claude session or herdr pane. Only about a third of `bun`/`duckdb` pids carry a tag, so treat an untagged process as unknown, not as unrelated to Claude.

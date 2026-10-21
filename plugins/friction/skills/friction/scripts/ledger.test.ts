@@ -31,7 +31,7 @@ const unattributed: FindingInput = {
 };
 const duckdb: FindingInput = {
   type: "contention",
-  target: "session-index duckdb jobs",
+  target: "bun, duckdb",
   impact: "high",
   metric: "60% of load>30 minutes have a bun/duckdb job within 2 min, vs 4% baseline",
   fix: "rebuild session-index views per touched session",
@@ -69,7 +69,7 @@ describe("reference set", () => {
 
     expect(decision.promote.map((e) => e.latest.target)).toEqual(["unattributed load"]);
     expect(decision.belowCut.map((e) => e.latest.target)).toEqual([
-      "session-index duckdb jobs",
+      "bun, duckdb",
       "session-index refresh",
     ]);
     expect(decision.ledgerOnly).toBe(1);
@@ -133,7 +133,7 @@ describe("weekly", () => {
     const decision = await record(path, [refresh, duckdb, background], "7d", "2026-10-19", AT);
     expect(decision.promote.map((e) => e.latest.target)).toEqual([
       "session-index refresh",
-      "session-index duckdb jobs",
+      "bun, duckdb",
     ]);
   });
 

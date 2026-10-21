@@ -46,10 +46,18 @@ Check each candidate against the live config in `~/.dotfiles` and `~/.claude-rep
 
 ### 3. Emit Findings
 
+First read the open targets, so a symptom seen before keeps its fingerprint:
+
+```bash
+bun "${CLAUDE_SKILL_DIR}/scripts/ledger.ts" status
+```
+
+Reuse an entry's exact `type` and `target` when it describes the same symptom, even when you would word it differently. Otherwise take the target from the query's row in [references/osquery.md](references/osquery.md#targets).
+
 One JSON object per symptom seen in the window, including ones you expect to stay quiet:
 
 ```json
-{"type": "contention", "target": "session-index duckdb jobs", "impact": "high",
+{"type": "contention", "target": "bun, duckdb", "impact": "high",
  "metric": "60% of load>30 minutes had a bun/duckdb job within 2 min, vs 4% of quiet minutes",
  "fix": "rebuild session-index views per touched session", "small": false}
 ```

@@ -309,6 +309,7 @@
         "~/src/*/*/.worktrees/**/*",
         "~/.terraform.d/plugin-cache",
         "~/.cache",
+        "~/.local/state/friction",
         "~/Library/Caches/go-build",
         "~/Library/Caches/ms-playwright",
         "~/Library/Caches/golangci-lint",

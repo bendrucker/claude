@@ -10,6 +10,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Match the DuckDB in @duckdb/node-api: the CLI's profiling output changed shape in 2.0.
+  DUCKDB_VERSION: 1.5.6
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -70,7 +74,7 @@ jobs:
       - name: Install DuckDB
         run: |
           curl -fsSL https://install.duckdb.org | bash
-          echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
+          echo "$HOME/.duckdb/cli/$DUCKDB_VERSION" >> "$GITHUB_PATH"
 
       - name: Run tests
         run: bun test evals/
@@ -273,7 +277,7 @@ jobs:
           fi
           if echo "$deps" | grep -q '^@duckdb/node-api$'; then
             curl -fsSL https://install.duckdb.org | bash
-            echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
+            echo "$HOME/.duckdb/cli/$DUCKDB_VERSION" >> "$GITHUB_PATH"
           fi
 
       - name: Install plugin tools

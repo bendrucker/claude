@@ -51,9 +51,14 @@ jobs:
       - uses: oven-sh/setup-bun@v2
 
       - name: Install the DuckDB and AWS CLIs
+        # DuckDB matches the version dotfiles pins on the Mac, so the bench
+        # times what agents run.
+        env:
+          DUCKDB_VERSION: 1.5.6
         run: |
-          curl -fsSL https://install.duckdb.org | bash
-          echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
+          arch=$(uname -m | sed 's/x86_64/amd64/')
+          curl -fsSL "https://github.com/duckdb/duckdb/releases/download/v$DUCKDB_VERSION/duckdb_cli-linux-$arch.zip" -o "$RUNNER_TEMP/duckdb.zip"
+          sudo unzip -q "$RUNNER_TEMP/duckdb.zip" -d /usr/local/bin
           curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "$RUNNER_TEMP/awscli.zip"
           unzip -q "$RUNNER_TEMP/awscli.zip" -d "$RUNNER_TEMP"
           sudo "$RUNNER_TEMP/aws/install"

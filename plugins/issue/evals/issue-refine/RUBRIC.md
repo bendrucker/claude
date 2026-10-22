@@ -96,6 +96,74 @@ was typed as a bug and read wrong.
 - Skill location: `SKILL.md` Issue Types lists Spike, with its guide in `spike.md`.
 - Confidence: one data point.
 
+### 8. Length Sized to What the Reader Needs
+
+The most frequent correction on drafts: cut by half, "tighter", "wall of text".
+A speculative issue stays short on purpose. Graded as a word-count ladder on the
+body above Agent Context, so a climb sees partial progress.
+
+- Evidence: Plannotator annotations and chat revisions across the refine
+  sessions in the session index ("cut length 50%", "too much excessive detail",
+  "intentionally vague and concise since they're speculative").
+
+### 9. Written for the Team, Not the Drafter
+
+No scratch or tmp paths, home paths, the drafter's machine, or the drafter's own
+skills and tools. Agent Context included: a teammate's agent can't open them either.
+
+- Evidence: "no refs to tmp paths" (twice), "dont talk about my machine this is
+  for a linear issue not personal notes", "compare.ts is detail of my skills".
+
+### 10. Structure Over Prose for Data
+
+Numbers go in tables, attribute and option definitions in a table, schema, or
+list, and step-by-step flows in a diagram rather than paragraphs.
+
+- Evidence: "numerical information should be expressed in tabular form",
+  "bullets using prose to describe options for a given attribute", "compress
+  info into visuals, eg mermaid sequence diagram".
+
+### 11. Open Questions Only for Real Investigations
+
+An open question is for a deep investigation with cross-cutting consequences
+that a quick prototype can't settle. An implementation detail the refiner could
+have decided, left open, is the model dodging the work. Something a short test
+answers becomes a check for the assignee. Spikes keep their Questions section.
+
+- Evidence: "too many open questions", "having any open questions is
+  unacceptable ... set this issue up so the person who works on it can
+  autonomously resolve the full scope".
+
+### 12. Acceptance Shows the Behavior
+
+Acceptance criteria and requested tests show the user-visible bug, not the
+intermediate cause, and a list of tests is not acceptance criteria.
+
+- Evidence: "why are tests the acceptance criteria", "an example of a cause
+  based test, we should prefer integration style tests".
+
+### 13. Claims Match the State of the World
+
+Nothing pending is described as existing: an unmerged PR's tool is not "the
+existing harness".
+
+- Evidence: "existing? i think an existing pr is adding but this isnt landed",
+  "pg doesn't have an existing materialized shape as claimed".
+
+### 14. Titles Name the Task
+
+The title identifies the problem or outcome without prescribing the
+implementation: no env vars, file names, or function calls.
+
+- Evidence: "The titles are overly prescriptive about implementation details."
+
+### 15. No Agent Context Upstream
+
+An issue filed in a repository the team doesn't maintain drops Agent Context.
+
+- Evidence: "Get rid of this whole section" on an upstream issue, confirmed by
+  Ben as the rule for repositories he doesn't own.
+
 ## How the Suite Scores
 
 Title graders read the frontmatter, and body graders stop at Agent Context, so
@@ -103,3 +171,9 @@ relation links in the frontmatter never register as bare references. Findings 1,
 2, 3, and 6 check by pattern. Findings 4 and 5 approximate the reviewer's judgment
 with a word list and a heading count. Finding 7 is the
 `type-spike` grader on the spike cases.
+
+Findings 8, 9, 14, and 15 check by pattern: `body-words-*`, `no-leak`,
+`title-no-code`, and `no-agent-context`. Findings 10 through 13 are one-criterion
+`llm` judges (`events-structured`, `oq-justified`, `decided-not-open`,
+`ac-observable`, `harness-not-existing`) plus the `numbers-table` pattern, each
+paired with a `keeps-*` grader for the fact a cut must not lose.

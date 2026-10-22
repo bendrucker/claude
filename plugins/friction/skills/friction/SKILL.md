@@ -18,14 +18,18 @@ The output budget is the point of this skill. A run that surfaces nothing is a c
 
 ## Arguments
 
-- `--window 1d` (default): the daily run. Last 24 hours of osquery, Atuin, and the session index, about 5 minutes, offline.
+- `--window 1d` (default): the daily run. Last 24 hours of osquery, Atuin, and the session index, about 5 minutes, offline. Reading the session index runs its incremental refresh first, so schedule the run after the day's other refreshes.
 - `--window 7d`: the weekly run. Last 7 days of the same sources, plus upstream changelogs, 20 to 30 minutes.
 - `--day YYYY-MM-DD`: run as of a past day, to backfill the ledger or replay a calibration day. Bound every query to the window ending that day, pass `--day` to every ledger command, and print the decision without delivering it.
-- `pick <fingerprint>`: Ben asked for a below-the-cut item. Run `scripts/ledger.ts outcome <fingerprint> picked`, then implement it as in [Deliver](#deliver).
+- `pick <fingerprint>`: Ben asked for a below-the-cut item. Run `scripts/ledger.ts outcome <fingerprint> picked`, then open its draft PR as daily promotion does in [Deliver](#5-deliver), which records it `filed`.
 
 The window sets lookback, sources, and budget. The steps and the ledger rules are identical for both.
 
 ## Steps
+
+### 0. Outcomes
+
+Check the open `Friction:` PRs and record any outcome the ledger lacks (see [Outcomes](#outcomes)). A `--day` replay skips this step.
 
 ### 1. Collect
 
@@ -40,7 +44,7 @@ Run named queries over the window. Each source returns rows, not prose. For osqu
 | --- | --- | --- |
 | osquery | both | `collect.sh osquery`. How to read each query and name its target: [references/osquery.md](references/osquery.md) |
 | Atuin | both | `collect.sh atuin`: slow and failing command heads. [references/atuin.md](references/atuin.md) |
-| Session index | both | `observability:session` named queries with `after_date` at the window start. Daily: `tool-failure-rates`, `hook-blocks`, `hook-block-then-retry-success`, `sandbox-bypass-scaffold`, `cli-health`, `stop-hook-noop-detector`. Weekly adds the rest. It sees only local transcripts, so a quiet index means work moved to cloud sessions, not that friction stopped |
+| Session index | both | `observability:session` named queries with `after_date` at the window start. Daily: `tool-failure-rates`, `hook-blocks`, `hook-block-then-retry-success`, `sandbox-bypass-scaffold`, `cli-health`, `stop-hook-noop-detector`. Weekly runs every named query. It sees only local transcripts, so a quiet index means work moved to cloud sessions, not that friction stopped |
 | Changelogs | `7d` | Release notes since the last run for tools in the Brewfiles and mise pins that the window's data shows in use |
 
 Normalize every metric to a rate: per active hour, per call, or a share of minutes. Activity swings 200x day to day, so a raw count compares nothing.
@@ -57,7 +61,7 @@ First read the open targets, so a symptom seen before keeps its fingerprint:
 bun "${CLAUDE_SKILL_DIR}/scripts/ledger.ts" status
 ```
 
-Reuse an entry's exact `type` and `target` when it describes the same symptom, even when you would word it differently. Otherwise take the target from the query's row in [references/osquery.md](references/osquery.md#targets).
+Reuse an entry's exact `type` and `target` when it describes the same symptom, even when you would word it differently. Otherwise take the target from the query's row in [osquery.md](references/osquery.md#targets) or [atuin.md](references/atuin.md#targets). For a session-index finding, the target is the hook script, tool, or command head the query names.
 
 One JSON object per symptom seen in the window, including ones you expect to stay quiet:
 
@@ -68,7 +72,7 @@ One JSON object per symptom seen in the window, including ones you expect to sta
 ```
 
 - `type`: `contention`, `slow-command`, `failing-command`, `tool-gap`, `upstream-change`, `config-drift`.
-- `target`: the object the symptom is about, named the same way every run: a process name, a command head (`gh pr view`, not its arguments), a tool, a hook script. The fingerprint is `type|target`, so a renamed target restarts its count.
+- `target`: the object the symptom is about, named the same way every run: a process name, a command head (its first two words, `g pull`, never its arguments), a tool, a hook script. The fingerprint is `type|target`, so a renamed target restarts its count.
 - `impact`: decides what surfaces, so grade it by what the symptom costs Ben, not by how often it fires.
   - `high`: blocks work. A command keeps failing through retries until someone works around it, or work stalls for minutes. Example: an auth command failing 9 of 11 runs across 25 minutes of retries.
   - `moderate`: costs time or attention, but work recovers on its own. Examples: a hook rejection that costs Claude one retry turn, a minute added to each turn, commit signing failures that a retry clears.
@@ -108,4 +112,4 @@ Both windows end the run's output with **Below the cut**: each `belowCut` entry 
 
 ## Outcomes
 
-When a filed PR merges or a picked to-do completes, record `resolved`. When Ben closes one unmerged or cancels it, record `dismissed`. Check the open `Friction:` PRs at the start of each run and record any outcome the ledger lacks.
+When a `Friction:` PR merges, record `resolved`. When Ben closes one unmerged, record `dismissed`.

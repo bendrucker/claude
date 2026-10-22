@@ -1,6 +1,6 @@
 # osquery Source
 
-osqueryd runs as a user agent on each Mac, configured by the dotfiles `osquery` topic. Its snapshot log is the daily run's main source for contention.
+osqueryd runs as a user agent on each Mac, configured by the dotfiles `osquery` topic. Its snapshot log is the main source for contention. The thresholds below assume the Studio, Ben's 10-core Mac Studio.
 
 ```bash
 "${CLAUDE_SKILL_DIR}/scripts/collect.sh" osquery <day> <days>
@@ -17,11 +17,11 @@ It loads `~/.local/state/osquery/osqueryd.snapshots.log*` (rotated files are zst
 
 ## Reading the Queries
 
-- `overload` and `attribution` use the Studio's 10 cores. Read `sysctl -n hw.ncpu` on any other machine.
+- `overload` counts minutes with `load1` over 20 and over 30 (2x and 3x the Studio's 10 cores), and `attribution` calls a minute overloaded above 30. Read `sysctl -n hw.ncpu` on any other machine and scale.
 - macOS load counts runnable threads, so a load of 200 is about 200 waiting threads. `thread-hogs` names who held them.
 - `thread-hogs` is empty on a machine whose config predates `proc_groups`. Report overload there as unattributed rather than guessing a cause.
 - `heavy-writers` returns the `cwd`. Name the target by what the process was doing (a session-index refresh, a bench run), never by the path.
-- `memory`: record a finding only for a level-2 run longer than a minute.
+- `memory`: `lvl` is macOS's memory pressure level, where 2 is warn and 4 is critical. Record a finding only for a stretch at 2 or above longer than a minute.
 - `background-cpu` needs 20 hours of one process, so it fires only on the weekly window. Record it at `low`.
 - Only about a third of `bun`/`duckdb` pids carry a `proc_tags` session tag, so treat an untagged process as unknown, not as unrelated to Claude.
 

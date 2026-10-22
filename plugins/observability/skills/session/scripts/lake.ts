@@ -137,7 +137,7 @@ export async function readerInit(url: string): Promise<string> {
 }
 
 const Count = z.object({ n: z.union([z.bigint(), z.number()]) });
-const Column = z.object({ name: z.string(), col: z.string() });
+const Column = z.object({ db: z.string(), name: z.string(), col: z.string(), type: z.string() });
 
 async function connect(o: LakeOptions) {
   // An in-memory instance has no spill dir by default.
@@ -205,10 +205,27 @@ export async function publish(o: LakeOptions): Promise<PublishResult> {
   const allowed = `host IN (${o.hosts.map(quote).join(", ")})`;
   try {
     const columns = await db.rows(
-      "SELECT table_name AS name, column_name AS col FROM duckdb_columns() WHERE database_name = 'idx'",
+      `SELECT database_name AS db, table_name AS name, column_name AS col, data_type AS type
+        FROM duckdb_columns() WHERE database_name IN ('idx', 'lake') ORDER BY column_index`,
       Column,
     );
-    const has = (t: string, col: string) => columns.some((c) => c.name === t && c.col === col);
+    const shape = (d: string, t: string) =>
+      columns
+        .filter((c) => c.db === d && c.name === t)
+        .map((c) => `${c.col} ${c.type}`)
+        .join(", ");
+    const has = (t: string, col: string) =>
+      columns.some((c) => c.db === "idx" && c.name === t && c.col === col);
+    const tables = [...FILE_TABLES, ...SESSION_TABLES, ...WHOLE_TABLES, ...views];
+    // When any table's columns no longer match the index's, the whole lake is rebuilt,
+    // so no table keeps rows of files the index has since dropped.
+    const all = ["published_files", ...tables];
+    const drift = all.some(
+      (t) =>
+        shape("lake", t) !== "" &&
+        shape("lake", t) !== shape("idx", t === "published_files" ? "indexed_files" : t),
+    );
+    const drifted = drift ? all.filter((t) => shape("lake", t) !== "") : [];
     // Clustering by record type first lets a filter on a rare type skip the row groups
     // of every other type, and a window still prunes within each type's run.
     const order = (t: string) => {
@@ -224,11 +241,10 @@ export async function publish(o: LakeOptions): Promise<PublishResult> {
     const inSessions = `${session} IN (SELECT (host, coalesce(session_id, '')) FROM touched)`;
 
     await db.script([
-      "CREATE TABLE IF NOT EXISTS lake.published_files AS FROM idx.indexed_files WITH NO DATA",
-      ...[...FILE_TABLES, ...SESSION_TABLES, ...WHOLE_TABLES, ...views].map(
-        (t) => `CREATE TABLE IF NOT EXISTS lake.${t} AS FROM idx.${t} WITH NO DATA`,
-      ),
       "BEGIN",
+      ...drifted.map((t) => `DROP TABLE lake.${t}`),
+      "CREATE TABLE IF NOT EXISTS lake.published_files AS FROM idx.indexed_files WITH NO DATA",
+      ...tables.map((t) => `CREATE TABLE IF NOT EXISTS lake.${t} AS FROM idx.${t} WITH NO DATA`),
       `CREATE TEMP TABLE changed AS
         WITH now AS (FROM idx.indexed_files WHERE ${allowed})
         SELECT host, path AS source_file FROM (FROM now EXCEPT FROM lake.published_files)

@@ -120,6 +120,25 @@ describe("publish", () => {
     expect(await drift(ts)).toEqual(clean(ts));
   }, 120_000);
 
+  test("a table whose columns drifted from the index rebuilds the lake", async () => {
+    const [view] = materializedViews(viewStatements(await Bun.file(viewsSql).text()));
+    const instance = await DuckDBInstance.create(":memory:");
+    const c = await instance.connect();
+    try {
+      await c.run("LOAD ducklake");
+      await c.run(`ATTACH 'ducklake:${join(options.url, "catalog.ducklake")}' AS lake`);
+      await c.run(`ALTER TABLE lake.${view} ADD COLUMN stale INTEGER`);
+    } finally {
+      c.closeSync();
+      instance.closeSync();
+    }
+
+    const result = await publish(options);
+    expect(result.files).toBeGreaterThan(2);
+    const ts = await tables();
+    expect(await drift(ts)).toEqual(clean(ts));
+  }, 120_000);
+
   test("refuses a host imported without --egress", async () => {
     const manifest = join(imports, "work", "manifest.json");
     const original = await Bun.file(manifest).text();

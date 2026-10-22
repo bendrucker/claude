@@ -23,7 +23,7 @@ Routing fields (team, assignee, state) are not in the file. Take them from the u
 
 ## Saving
 
-The connector `save_issue` handles the whole file in one call, relations included. Pass the title, the body as `description`, the labels, the routing fields, and the relation params from the table above, per [Creating vs Updating](../SKILL.md#creating-vs-updating). This is the default.
+The connector `save_issue` handles the whole file in one call, relations included. Pass the title, the body as `description`, the labels, the routing fields, and the relation params from the table above, per [Saving an Issue](../SKILL.md#saving-an-issue). This is the default.
 
 ```json
 {

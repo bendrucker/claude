@@ -8,6 +8,9 @@ graders:
   no-h1: "!{query,update,comment,quiet}-*"
   no-issue-url: ["refined-*", "invoked-*", flow-race]
   no-headings: ["quick-*"]
+  log-collapsed: ["log-*"]
+  short-log-inline: [raw-materials]
+  no-mermaid: ["quick-*", "log-*", raw-materials]
   collapsible-open: ["refined-*", "invoked-*"]
   collapsible-closed: ["refined-*", "invoked-*"]
   no-agent-heading: ["refined-*", "invoked-*"]
@@ -17,5 +20,5 @@ graders:
   words-200: ["raw-*", "flow-*"]
   bullet-words-20: "!{query,update,comment,quiet}-*"
   no-invented-priority: ["quick-*", "raw-*", "flow-*"]
-  no-invented-sections: ["quick-*", "raw-*", "flow-*"]
+  no-invented-sections: ["quick-*", "raw-*", "flow-*", "log-*"]
   title-words-10: "!{query,update,comment,quiet}-*"

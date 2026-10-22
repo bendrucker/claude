@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: bug-partial-success
-tags: [bug, full, seeded]
+tags: [bug, full, seeded, dev]
 plugins: ["../../..", "../../../../pull-request"]
 execution:
   model: claude-sonnet-5-5

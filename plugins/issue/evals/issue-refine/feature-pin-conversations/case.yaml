@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: feature-pin-conversations
-tags: [feature, full]
+tags: [feature, full, dev]
 plugins: ["../../..", "../../../../pull-request"]
 execution:
   model: claude-sonnet-5-5

@@ -38,7 +38,7 @@ The connector `save_issue` handles the whole file in one call, relations include
 
 ## CLI Fallback
 
-When the connector is unavailable and the Environment block shows the `linear` CLI installed, fall back to it: create the issue with the body by file, then add one relation per entry from the parsed frontmatter.
+When the connector is unavailable and `linear --version` succeeds, fall back to it: create the issue with the body by file, then add one relation per entry from the parsed frontmatter.
 
 ```bash
 new_id=$(linear issue create --title "$title" --description-file "$body_file" \

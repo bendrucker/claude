@@ -51,6 +51,11 @@ if (imported.length > 0) {
   for (const { label, root, manifest } of imported) {
     const source = manifest.source !== "" ? manifest.source : "<source>";
     console.log(`  ${label}:`);
-    console.log(`    rsync -av --update ${source} ${join(root, "projects")}/`);
+    const dest = `${join(root, "projects")}/`;
+    console.log(
+      source.startsWith("s3://")
+        ? `    bun ${join(import.meta.dir, "pull.ts")} --host ${label}`
+        : `    rsync -av --update ${source} ${dest}`,
+    );
   }
 }

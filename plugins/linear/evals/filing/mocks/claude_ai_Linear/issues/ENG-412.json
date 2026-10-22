@@ -1,0 +1,9 @@
+{
+  "id": "uuid-eng-412",
+  "identifier": "ENG-412",
+  "title": "Add retry with backoff to object retrieval",
+  "url": "https://linear.app/acme/issue/ENG-412",
+  "state": { "name": "Todo" },
+  "team": { "key": "ENG" },
+  "relations": []
+}

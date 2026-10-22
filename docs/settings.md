@@ -118,6 +118,8 @@ Go CLIs need no entry. `sandbox.network.allowMachLookup` lets Go's `crypto/x509`
 
 `com.apple.nehelper` and `com.apple.nesessionmanager` let the standalone Tailscale app's CLI load its NetworkExtension configuration. Without them every `tailscale` command exits `Failed to load preferences`, which breaks `plannotator --tailscale`. Past that, the CLI reaches the daemon's local API over loopback TCP at the port `/Library/Tailscale/ipnport` names, authenticated by the `sameuserproof-<port>` token beside it. `allowLocalBinding` and default reads cover both. `nesessionmanager` can start and stop VPN sessions, the same reach `tailscale up` and `down` already have through the local API. **Drop both** when no skill drives `tailscale` sandboxed.
 
+`com.apple.SecurityServer` lets sandboxed commands reach `securityd`, and through it the login keychain. The Cloudsmith CLI and the `cloudsmith-keyring` backend keep their Okta session there. Without it `cloudsmith whoami` reports an anonymous user, and every `uv sync` against a Cloudsmith index fails or starts a fresh SSO login that cannot complete. Keychain item ACLs still gate which items a caller may read. **Drop it** when no sandboxed tool reads its credentials from the keychain.
+
 ## Environment
 
 The `env` block exports into every session. `NODE_USE_ENV_PROXY` is covered under Hosts.

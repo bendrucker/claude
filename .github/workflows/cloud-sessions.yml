@@ -1,0 +1,44 @@
+name: cloud-sessions
+
+# Pulls cloud session transcripts from S3 into the Studio's `cloud` host, on
+# the actions-sandbox runner. The launcher mounts the host's import dir, here
+# ~/.claude/session-imports/cloud at /mnt/session-imports/cloud, and nothing
+# else. The next refresh on the Mac imports what arrived.
+
+on:
+  schedule:
+    - cron: "30 9 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  pull:
+    runs-on: [self-hosted, actions-sandbox]
+    # The role's trust admits only this environment, which only main deploys to.
+    environment: actions-sandbox
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CLAUDE_SESSION_IMPORTS_DIR: /mnt/session-imports
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/bun-install
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: Install the AWS CLI
+        run: |
+          curl -fsSLo awscliv2.zip "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip"
+          unzip -q awscliv2.zip
+          sudo ./aws/install
+      # Tells a missing mount apart from a manifest the runner user can't read.
+      - name: Show the mounted host
+        run: |
+          id
+          mount | grep session-imports || echo "no session-imports mount"
+          ls -lan /mnt/session-imports /mnt/session-imports/cloud || true
+      - run: bun plugins/observability/skills/session/scripts/pull.ts --host cloud

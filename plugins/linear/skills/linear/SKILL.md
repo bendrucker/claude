@@ -1,6 +1,6 @@
 ---
 name: linear
-description: Interacting with Linear issues, projects, and teams. Use when creating issues, updating issues, querying issues, managing projects, working on tasks, discussing backlogs, or any interaction with Linear.
+description: Load before any Linear write or query, whether through the connector tools (save_issue, create_comment, list_issues) or the linear CLI. Direct calls get Linear-specific formatting wrong (issue references that chip, collapsible markers, relations as params). Use when filing, updating, commenting on, or listing Linear issues, projects, or backlogs.
 argument-hint: "[create | update | list | view | comment] [issue ...]"
 allowed-tools:
   - mcp__linear
@@ -15,9 +15,7 @@ Tools and workflows for managing issues, projects, and teams in Linear.
 
 ## Environment
 
-- **`linear` CLI**: !`linear --version 2>/dev/null || echo "not installed"`
-
-The connector and MCP paths need no CLI. The CLI-only operations (relations, bulk work) require `linear`; when it reads "not installed", stay on the connector. The version above tells you which CLI is installed. Confirm its exact subcommands and flags with `linear <cmd> --help` or the `linear-cli:linear-cli` skill rather than assuming them.
+The connector and MCP paths need no CLI. Before a CLI-only operation (relations without the connector, bulk work), run `linear --version`. When it fails, stay on the connector. Confirm the installed CLI's subcommands and flags with `linear <cmd> --help` or the `linear-cli:linear-cli` skill rather than assuming them.
 
 ## Arguments
 
@@ -72,7 +70,13 @@ Update (`id` present, change only what you need):
 
 The local and plugin MCP variants split these into `create_issue` and `update_issue` with the same flat field shapes. The create precondition (`title` required) applies to both paths.
 
-The `description` body is GFM and renders Linear's first-class constructs directly: mermaid diagrams, collapsibles, fenced code blocks, and check lists. Author them inline instead of using a workaround.
+The `description` body is GFM and renders Linear's first-class constructs directly. Author them inline instead of using a workaround:
+
+- Fence commands, code, and traces. Fold a pasted log or trace over about 15 lines into a [collapsible](references/conventions.md#collapsible-sections) titled for its source, and keep shorter ones inline.
+- Draw a mermaid sequence diagram when the report describes several actors interleaving, such as a race or a handoff. A bug in one component doesn't need one.
+- Turn criteria or tasks the request supplies into a check list (`- [ ]`).
+
+Size the body to the request. A one-line report gets one or two sentences under 40 words, with no headings and no sections the request never supplied.
 
 ## Saving a Structured Issue File
 

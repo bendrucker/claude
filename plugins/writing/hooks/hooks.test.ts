@@ -6,6 +6,7 @@ import {
   BODY_FILE_FLAGS,
   FIELD_FILE_GUARD,
   GIT_MESSAGE_FILE_GUARD,
+  MCP_PROSE_GUARD,
   PROSE_FLAGS,
 } from "./check-tropes";
 import config from "./hooks.json";
@@ -49,7 +50,13 @@ describe("PreToolUse gating", () => {
       Edit: [{ script: "pretooluse", guarded: false }],
       MultiEdit: [{ script: "pretooluse", guarded: false }],
       Bash: [{ script: "pretooluse", guarded: true }],
+      "mcp__.*": [{ script: "pretooluse", guarded: true }],
     });
+  });
+
+  test("MCP guard grep is the one check-tropes exports", () => {
+    const command = findCommand("mcp__.*", "pretooluse");
+    expect(command).toContain(`grep -qE '${MCP_PROSE_GUARD}'`);
   });
 
   test("Bash guard alternation is derived from the flags check-tropes extracts", () => {
@@ -133,6 +140,27 @@ describe("inline guard behavior", () => {
       tool_name: "Bash",
       tool_input: { command },
     });
+    expect(result.exitCode).toBe(0);
+    expect(result.calls).toEqual(runs ? ["bun /plugin/hooks/pretooluse.ts"] : []);
+  });
+
+  test.each<{ name: string; input: Record<string, unknown>; runs: boolean }>([
+    {
+      name: "thread reply",
+      input: { text: "The sweep ran overnight and found two stale entries." },
+      runs: true,
+    },
+    { name: "tab-separated sentence", input: { text: "It\tadds\tno\ttests." }, runs: true },
+    { name: "words joined by code spans", input: { text: "Set`x`to`y`for`z`today." }, runs: true },
+    {
+      name: "PR lookup",
+      input: { owner: "bendrucker", repo: "claude", pullNumber: 1886 },
+      runs: false,
+    },
+    { name: "short search", input: { query: "negation hook" }, runs: false },
+  ])("dispatcher mcp: $name", async ({ input, runs }) => {
+    const hookCommand = findCommand("mcp__.*", "pretooluse");
+    const result = await runGuard(hookCommand, { tool_name: "mcp__x__y", tool_input: input });
     expect(result.exitCode).toBe(0);
     expect(result.calls).toEqual(runs ? ["bun /plugin/hooks/pretooluse.ts"] : []);
   });

@@ -1,0 +1,61 @@
+name: session-lake
+
+# Publishes the Studio's session index to the DuckLake that remote readers
+# query, on the actions-sandbox runner. The launcher mounts the index dir
+# read-only at /mnt/claude-sessions, so the job can read the index but never
+# write it. The catalog copy and spill files live in the VM and go with it.
+# Sundays also run DuckLake's CHECKPOINT after the publish.
+
+on:
+  schedule:
+    - cron: "30 10 * * 1-6"
+    - cron: "30 10 * * 0"
+  workflow_dispatch:
+    inputs:
+      checkpoint:
+        description: Run CHECKPOINT after the publish
+        type: boolean
+        default: false
+
+concurrency:
+  group: actions-sandbox
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: [self-hosted, actions-sandbox]
+    # The role's trust admits only this environment, which only main deploys to.
+    environment: actions-sandbox
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CLAUDE_SESSION_INDEX_DIR: /mnt/claude-sessions
+      CLAUDE_SESSION_LAKE_URL: s3://ben-drucker-agents-eval-corpus/sessions/index
+      SCRIPTS: plugins/observability/skills/session/scripts
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/bun-install
+      - name: Install the AWS CLI
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/awscliv2.zip" "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip"
+          unzip -q "$RUNNER_TEMP/awscliv2.zip" -d "$RUNNER_TEMP"
+          sudo "$RUNNER_TEMP/aws/install"
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: Show the mounted index
+        run: |
+          mount | grep claude-sessions || echo "no claude-sessions mount"
+          ls -lan "$CLAUDE_SESSION_INDEX_DIR" || true
+      - name: Publish
+        # publish prints {files, sessions} to stderr.
+        run: |
+          start=$(date +%s)
+          bun "$SCRIPTS/lake.ts" publish --state-dir "$RUNNER_TEMP/lake" 2>&1 | tee "$RUNNER_TEMP/publish.log"
+          echo "session-lake publish: $(grep '^{' "$RUNNER_TEMP/publish.log") in $(( $(date +%s) - start ))s" >> "$GITHUB_STEP_SUMMARY"
+      - name: Checkpoint
+        if: github.event.schedule == '30 10 * * 0' || inputs.checkpoint
+        run: bun "$SCRIPTS/lake.ts" checkpoint --state-dir "$RUNNER_TEMP/lake"

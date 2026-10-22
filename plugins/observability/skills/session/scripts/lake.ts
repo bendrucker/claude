@@ -365,6 +365,11 @@ if (import.meta.main) {
         type: [String],
         description: `Host to publish, repeatable (default: ${LOCAL_HOST})`,
       },
+      stateDir: {
+        type: String,
+        description:
+          "Where the writer keeps its catalog copy and spill files (default: the index dir)",
+      },
     },
   });
   const url = argv.flags.url;
@@ -374,7 +379,7 @@ if (import.meta.main) {
     url,
     hosts: argv.flags.host.length > 0 ? argv.flags.host : [LOCAL_HOST],
     index: sessionDbPath(dataDir),
-    stateDir: dataDir,
+    stateDir: argv.flags.stateDir ?? dataDir,
   };
   switch (argv._.command) {
     case "publish":

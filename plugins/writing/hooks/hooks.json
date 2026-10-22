@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "IFS= read -r in; if printf '%s' \"$in\" | grep -qE '([A-Za-z]+ ){4}' && printf '%s' \"$in\" | grep -qE '[A-Za-z][.!?]'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\"; fi"
+            "command": "IFS= read -r in; if printf '%s' \"$in\" | grep -qE '([ `]|\\\\t).*([ `]|\\\\t).*([ `]|\\\\t)'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\"; fi"
           }
         ]
       }

@@ -54,9 +54,9 @@ describe("PreToolUse gating", () => {
     });
   });
 
-  test("MCP guard greps are the ones check-tropes exports", () => {
+  test("MCP guard grep is the one check-tropes exports", () => {
     const command = findCommand("mcp__.*", "pretooluse");
-    for (const pattern of MCP_PROSE_GUARD) expect(command).toContain(`grep -qE '${pattern}'`);
+    expect(command).toContain(`grep -qE '${MCP_PROSE_GUARD}'`);
   });
 
   test("Bash guard alternation is derived from the flags check-tropes extracts", () => {
@@ -150,7 +150,13 @@ describe("inline guard behavior", () => {
       input: { text: "The sweep ran overnight and found two stale entries." },
       runs: true,
     },
-    { name: "SQL query", input: { sql: "SELECT id FROM runs WHERE state = 'done'" }, runs: false },
+    { name: "tab-separated sentence", input: { text: "It\tadds\tno\ttests." }, runs: true },
+    { name: "words joined by code spans", input: { text: "Set`x`to`y`for`z`today." }, runs: true },
+    {
+      name: "PR lookup",
+      input: { owner: "bendrucker", repo: "claude", pullNumber: 1886 },
+      runs: false,
+    },
     { name: "short search", input: { query: "negation hook" }, runs: false },
   ])("dispatcher mcp: $name", async ({ input, runs }) => {
     const hookCommand = findCommand("mcp__.*", "pretooluse");

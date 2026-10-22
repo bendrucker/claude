@@ -33,22 +33,24 @@ export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 // MCP tools carry prose the same way `gh` does (PR bodies, thread replies,
 // task notes) under any server and field name. Rather than list tools, the hook
 // takes every string in an MCP call's input with one sentence of mostly plain
-// words ending in a terminator, which queries, SQL, paths, and JSON lack. The
-// hooks.json guard ships these two greps so a call with neither a word run nor
-// a terminator skips the bun spawn, and hooks.test.ts enforces the sync.
-export const MCP_PROSE_GUARD = ["([A-Za-z]+ ){4}", "[A-Za-z][.!?]"] as const;
+// words ending in a terminator, which queries, SQL, paths, and JSON lack.
+// Tokens split on spaces and tabs, and a stripped code span reads as spaces, so
+// any prose value puts three spaces, backticks, or JSON-escaped tabs on the
+// hook's stdin. hooks.json ships this grep so other calls skip the bun spawn;
+// hooks.test.ts enforces the sync and check-tropes.test.ts the implication.
+export const MCP_PROSE_GUARD = "([ `]|\\\\t).*([ `]|\\\\t).*([ `]|\\\\t)";
 
-const PROSE_WORD = /^[("'*_]*[A-Za-z][a-z'’-]*[)"'*_.,;:!?]*$/;
-const MIN_SENTENCE_TOKENS = 5;
+const PROSE_WORD = /^[("'*_]*(?:[A-Za-z][A-Za-z'’-]*|\d[\d,.%]*)[)"'*_.,;:!?]*$/;
+const MIN_SENTENCE_TOKENS = 4;
 const MIN_WORD_SHARE = 0.8;
 
 export function isProse(value: string): boolean {
   // A sentence that ends on a code span keeps its terminator.
-  const text = stripCode(value).replaceAll(/[ \t]+([.!?])/g, "$1");
+  const text = stripCode(value).replaceAll(/[ \t]+([.!?:])/g, "$1");
   for (const sentence of text.split(/(?<=\w[.!?])\s+|\n+/)) {
     const trimmed = sentence.trim();
-    const tokens = trimmed.split(/\s+/);
-    if (tokens.length < MIN_SENTENCE_TOKENS || !/[\w)"'’*][.!?]$/.test(trimmed)) continue;
+    const tokens = trimmed.split(/[ \t]+/);
+    if (tokens.length < MIN_SENTENCE_TOKENS || !/[\w)"'’*][.!?:][)"'’*_]*$/.test(trimmed)) continue;
     const words = tokens.filter((token) => PROSE_WORD.test(token)).length;
     if (words / tokens.length >= MIN_WORD_SHARE) return true;
   }

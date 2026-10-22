@@ -1,0 +1,21 @@
+graders:
+  skill-fired: "!{invoked,quiet}-*"
+  linear-quiet: ["quiet-*"]
+  skill-load-error: "*"
+  saved-once: "!{query,comment,quiet}-*"
+  create-no-id: "!{query,update,comment,quiet}-*"
+  team-eng: "!{query,update,comment,quiet}-*"
+  no-h1: "!{query,update,comment,quiet}-*"
+  no-issue-url: ["refined-*", "invoked-*", flow-race]
+  no-headings: ["quick-*"]
+  collapsible-open: ["refined-*", "invoked-*"]
+  collapsible-closed: ["refined-*", "invoked-*"]
+  no-agent-heading: ["refined-*", "invoked-*"]
+  no-frontmatter: ["refined-*", "invoked-*"]
+  words-40: ["quick-*"]
+  words-120: ["quick-*", "raw-*", "flow-*"]
+  words-200: ["raw-*", "flow-*"]
+  bullet-words-20: "!{query,update,comment,quiet}-*"
+  no-invented-priority: ["quick-*", "raw-*", "flow-*"]
+  no-invented-sections: ["quick-*", "raw-*", "flow-*"]
+  title-words-10: "!{query,update,comment,quiet}-*"

@@ -1,1 +1,9 @@
-{"id":"uuid-eng-330","identifier":"ENG-330","title":"Duplicate webhook deliveries after deploy","url":"https://linear.app/acme/issue/ENG-330","state":{"name":"Todo"},"team":{"key":"ENG"},"relations":[]}
+{
+  "id": "uuid-eng-330",
+  "identifier": "ENG-330",
+  "title": "Duplicate webhook deliveries after deploy",
+  "url": "https://linear.app/acme/issue/ENG-330",
+  "state": { "name": "Todo" },
+  "team": { "key": "ENG" },
+  "relations": []
+}

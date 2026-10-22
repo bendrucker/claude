@@ -101,10 +101,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "url",
-                "title"
-              ]
+              "required": ["url", "title"]
             }
           }
         },
@@ -122,9 +119,7 @@
             "description": "Issue ID or identifier"
           }
         },
-        "required": [
-          "id"
-        ]
+        "required": ["id"]
       }
     },
     {
@@ -192,9 +187,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "team"
-        ]
+        "required": ["team"]
       }
     }
   ]

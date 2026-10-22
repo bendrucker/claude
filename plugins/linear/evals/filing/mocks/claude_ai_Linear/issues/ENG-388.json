@@ -1,1 +1,9 @@
-{"id":"uuid-eng-388","identifier":"ENG-388","title":"Export job timeouts","url":"https://linear.app/acme/issue/ENG-388","state":{"name":"Todo"},"team":{"key":"ENG"},"relations":[]}
+{
+  "id": "uuid-eng-388",
+  "identifier": "ENG-388",
+  "title": "Export job timeouts",
+  "url": "https://linear.app/acme/issue/ENG-388",
+  "state": { "name": "Todo" },
+  "team": { "key": "ENG" },
+  "relations": []
+}

@@ -54,16 +54,28 @@ const localCatalog = (o: LakeOptions) =>
 const quote = (s: string) => `'${s.replaceAll("'", "''")}'`;
 
 /**
- * httpfs on the ambient AWS credentials, trusting a proxy's CA bundle when one is set. The
- * proxy settings are extensions.sql's: DuckDB cannot parse the sandbox's credentialed
- * `http_proxy`, so they split it first.
+ * DuckDB cannot parse the sandbox's credentialed `http_proxy`, so split it into the settings
+ * it does accept. The writer splits it here, since the node API lacks the CLI's `getenv`.
  */
-async function s3Setup(): Promise<string> {
+function proxySettings(): string[] {
+  const raw = [process.env.http_proxy, process.env.HTTP_PROXY].find(
+    (v) => v !== undefined && v !== "",
+  );
+  if (raw === undefined) return [];
+  const u = new URL(raw.includes("://") ? raw : `http://${raw}`);
+  return [
+    `SET http_proxy = ${quote(u.host)};`,
+    `SET http_proxy_username = ${quote(decodeURIComponent(u.username))};`,
+    `SET http_proxy_password = ${quote(decodeURIComponent(u.password))};`,
+  ];
+}
+
+/** httpfs on the ambient AWS credentials, trusting a proxy's CA bundle when one is set. */
+function s3Setup(proxy: string[]): string {
   const ca = process.env.AWS_CA_BUNDLE ?? process.env.SSL_CERT_FILE;
   const region = process.env.AWS_REGION ?? "us-east-1";
-  const extensions = await Bun.file(join(RESOURCES_DIR, "extensions.sql")).text();
   return [
-    ...extensions.split("\n").filter((l) => /^SET (VARIABLE proxy_url|http_proxy)/.test(l)),
+    ...proxy,
     "INSTALL httpfs; LOAD httpfs;",
     ca === undefined ? "" : `SET ca_cert_file = ${quote(ca)};`,
     `CREATE OR REPLACE SECRET lake_s3 (TYPE s3, PROVIDER credential_chain, REGION ${quote(region)});`,
@@ -105,9 +117,14 @@ export async function readerInit(url: string): Promise<string> {
     s.kind === "MACRO" ? !WRITER_MACROS.has(s.name) : KEPT_VIEWS.has(s.name),
   );
   const read = (name: string) => Bun.file(join(RESOURCES_DIR, name)).text();
+  // extensions.sql's split reads the proxy when the reader starts, so no credential lands in
+  // the init file.
+  const proxy = (await read("extensions.sql"))
+    .split("\n")
+    .filter((l) => /^SET (VARIABLE proxy_url|http_proxy)/.test(l));
   return [
     await read("limits.sql"),
-    isRemote(url) ? await s3Setup() : "",
+    isRemote(url) ? s3Setup(proxy) : "",
     "LOAD ducklake;",
     `ATTACH ${quote(`ducklake:${catalogUrl(url)}`)} AS lake (READ_ONLY);`,
     "SET search_path = 'memory.main,lake.main';",
@@ -128,7 +145,7 @@ async function connect(o: LakeOptions) {
   };
   const rows = async <T>(sql: string, schema: z.ZodType<T>) =>
     z.array(schema).parse((await c.runAndReadAll(sql)).getRowObjectsJS());
-  if (isRemote(o.url)) await run(await s3Setup());
+  if (isRemote(o.url)) await run(s3Setup(proxySettings()));
   else mkdirSync(join(o.url, "data"), { recursive: true });
   mkdirSync(dirname(localCatalog(o)), { recursive: true });
   await run("INSTALL ducklake; LOAD ducklake;");

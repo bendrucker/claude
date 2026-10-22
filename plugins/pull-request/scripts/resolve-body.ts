@@ -86,7 +86,8 @@ function flagValue(argv: Word[], flags: string[]): Word | undefined {
 
 export type BodyPart =
   | { kind: "literal"; text: string }
-  | { kind: "file"; path: string }
+  /** `writer` is the earlier command in the call that leaves the file as the CLI reads it. */
+  | { kind: "file"; path: string; writer?: string }
   /** A same-call heredoc: no file backs it yet, but its span in the command can be spliced. */
   | { kind: "heredoc"; text: string; span: Span; dash: boolean };
 
@@ -123,12 +124,77 @@ function sameFile(target: string | null, path: string): boolean {
   return target !== null && name !== "" && basename(target) === name;
 }
 
-// The redirect lands on a pipeline's last stage while the content comes from
-// its first, so the last write to `path` is followed back to its source.
-function lastWriteTo(preceding: ShellCommand[], path: string): ShellCommand | undefined {
-  const write = preceding.findLast((command) => sameFile(writeTarget(command), path));
-  if (write === undefined) return undefined;
-  return preceding.find((command) => command.pipeline === write.pipeline);
+// What an earlier command does to the body file. `stdout` points at the first
+// stage of the pipeline, since the redirect lands on the last stage while the
+// content comes from the first.
+type Write =
+  | { kind: "stdout"; head: ShellCommand }
+  | { kind: "copy"; from: string; preceding: ShellCommand[] }
+  | { kind: "edit"; command: ShellCommand; preceding: ShellCommand[] };
+
+const IN_PLACE_FLAG: Record<string, RegExp> = {
+  sed: /^(-[a-zA-Z]*i|--in-place)/,
+  gsed: /^(-[a-zA-Z]*i|--in-place)/,
+  perl: /^-[a-z]*i/,
+};
+
+// Operands of a command that takes no option values, or null when one of them
+// is an expansion.
+function operands(command: ShellCommand): string[] | null {
+  const texts: string[] = [];
+  for (const word of command.argv.slice(1)) {
+    const text = literal(word);
+    if (text === null) return null;
+    if (!text.startsWith("-")) texts.push(text);
+  }
+  return texts;
+}
+
+function soleOperand(command: ShellCommand): string | null {
+  const found = operands(command);
+  return command.heredocs.length === 0 && found?.length === 1 ? (found[0] ?? null) : null;
+}
+
+// `cp`, `mv`, and `cat src > dst` leave the body file holding their one
+// source. An in-place editor leaves it holding text the hook cannot know until
+// the edit runs.
+function writeOf(preceding: ShellCommand[], index: number, path: string): Write | null {
+  const command = preceding[index];
+  if (command === undefined) return null;
+  const name = literal(command.argv[0]) ?? "";
+  if (sameFile(writeTarget(command), path)) {
+    const head = preceding.find((stage) => stage.pipeline === command.pipeline) ?? command;
+    const from = head === command && name === "cat" ? soleOperand(command) : null;
+    if (from === null) return { kind: "stdout", head };
+    return { kind: "copy", from, preceding: preceding.slice(0, index) };
+  }
+  const args = command.argv.slice(1).map((word) => literal(word) ?? "");
+  if (name === "cp" || name === "mv") {
+    const [from, to, ...rest] = operands(command) ?? [];
+    if (from === undefined || to === undefined || rest.length > 0 || !sameFile(to, path)) {
+      return null;
+    }
+    return { kind: "copy", from, preceding: preceding.slice(0, index) };
+  }
+  const flag = IN_PLACE_FLAG[name];
+  const edits =
+    flag !== undefined &&
+    args.some((arg) => flag.test(arg)) &&
+    args.some((arg) => sameFile(arg, path));
+  return edits ? { kind: "edit", command, preceding: preceding.slice(0, index) } : null;
+}
+
+function lastWriteTo(preceding: ShellCommand[], path: string): Write | null {
+  for (let index = preceding.length - 1; index >= 0; index--) {
+    const write = writeOf(preceding, index, path);
+    if (write !== null) return write;
+  }
+  return null;
+}
+
+function fileWrittenBy(path: string, command: ShellCommand): BodySpec {
+  const writer = command.argv.map((word) => word.source).join(" ");
+  return { kind: "parts", parts: [{ kind: "file", path, writer }] };
 }
 
 // The shell leaves the last of several heredocs on the command's stdin.
@@ -168,14 +234,21 @@ function readsBackSamePr(invocation: PrInvocation, write: ShellCommand): boolean
 }
 
 // What a path holds by the time the CLI reads it. A body written and passed in
-// one call resolves to its heredoc, since the file does not exist yet.
-function pathSpec(invocation: PrInvocation, path: string): BodySpec {
-  const asFile: BodySpec = { kind: "parts", parts: [{ kind: "file", path }] };
-  const write = lastWriteTo(invocation.preceding, path);
-  if (write === undefined) return asFile;
-  if (readsBackSamePr(invocation, write)) return { kind: "none" };
-  const written = heredocSpec(write);
-  return written.kind === "none" ? asFile : written;
+// one call resolves to its heredoc or its copy's source, since the file does
+// not exist yet. Any other write leaves the file as it stands now, the best
+// guess the hook has before the shell runs.
+function pathSpec(invocation: PrInvocation, preceding: ShellCommand[], path: string): BodySpec {
+  const write = lastWriteTo(preceding, path);
+  if (write === null) return { kind: "parts", parts: [{ kind: "file", path }] };
+  if (write.kind === "copy") return pathSpec(invocation, write.preceding, write.from);
+  // Editing a PR's own body after reading it back is still a round trip.
+  if (write.kind === "edit") {
+    const before = pathSpec(invocation, write.preceding, path);
+    return before.kind === "none" ? before : fileWrittenBy(path, write.command);
+  }
+  if (readsBackSamePr(invocation, write.head)) return { kind: "none" };
+  const written = heredocSpec(write.head);
+  return written.kind === "none" ? fileWrittenBy(path, write.head) : written;
 }
 
 function fileSpec(invocation: PrInvocation, value: Word): BodySpec {
@@ -186,7 +259,7 @@ function fileSpec(invocation: PrInvocation, value: Word): BodySpec {
     if (fed.kind !== "none") return fed;
     return { kind: "unreadable", detail: `a body piped in on standard input (\`${path}\`)` };
   }
-  return pathSpec(invocation, path);
+  return pathSpec(invocation, invocation.preceding, path);
 }
 
 function inlineSpec(invocation: PrInvocation, value: Word): BodySpec {
@@ -200,7 +273,7 @@ function inlineSpec(invocation: PrInvocation, value: Word): BodySpec {
       if (segment.text !== "") parts.push({ kind: "literal", text: segment.text });
       continue;
     }
-    const held = pathSpec(invocation, segment.path);
+    const held = pathSpec(invocation, invocation.preceding, segment.path);
     if (held.kind !== "parts") return held;
     parts.push(...held.parts);
   }
@@ -329,6 +402,20 @@ function rewritableHeredoc(parts: BodyPart[]): { span: Span } | null {
   return { span: part.span };
 }
 
+function unreadableFile(part: { path: string; writer?: string }): BodyResolution {
+  if (part.writer === undefined) {
+    return {
+      kind: "unreadable",
+      detail: `body file \`${part.path}\`, which does not exist yet or could not be read`,
+    };
+  }
+  const writer = part.writer.length > 60 ? `${part.writer.slice(0, 57)}...` : part.writer;
+  return {
+    kind: "unreadable",
+    detail: `body file \`${part.path}\`, which \`${writer}\` writes after the hook runs`,
+  };
+}
+
 export async function resolveBody(command: string, cwd: string): Promise<BodyResolution> {
   const invocation = findPrCommand(command);
   if (invocation === null) return { kind: "none" };
@@ -345,12 +432,7 @@ export async function resolveBody(command: string, cwd: string): Promise<BodyRes
     const path = isAbsolute(part.path) ? part.path : join(base, part.path);
     // oxlint-disable-next-line no-await-in-loop -- returns on the first unreadable part, and a command carries at most a few.
     const read = await readBodyFile(path);
-    if (read === null) {
-      return {
-        kind: "unreadable",
-        detail: `body file \`${part.path}\`, which does not exist yet or could not be read`,
-      };
-    }
+    if (read === null) return unreadableFile(part);
     files.push(read.path);
     chunks.push(read.text);
   }

@@ -16,7 +16,7 @@ osqueryd's snapshot log is the main source for contention. The loader expects th
 
 - `saturation` counts minutes where every sample had under 5% of CPU ticks idle. `attribution` and `thread-hogs` use the same test. `load1` is not a symptom: on macOS it spikes without any rise in threads or CPU.
 - `thread-hogs` names the groups using the CPU during saturated minutes. It is empty on a machine whose config predates `proc_groups`. Report saturation there as unattributed rather than guessing a cause.
-- `write-rate` counts minutes in which one process name wrote over 1 GiB, from per-process deltas in `procs`. `proc_groups` totals jump as members come and go, so they can't give a rate.
+- `write-rate` returns the 3 names with the highest one-minute writes each day, from per-process deltas in `procs`, and `heavy_mins` counts their minutes over 1 GiB. Only a name with `heavy_mins` above 0 is a finding. `proc_groups` totals jump as members come and go, so they can't give a rate.
 - osquery reports -1 threads for a process it can't read, so `thread-hogs` undercounts names owned by other users.
 - `heavy-writers` returns the `cwd`. Name the target by what the process was doing (a session-index refresh, a bench run), never by the path.
 - `memory`: `lvl` is macOS's memory pressure level, where 2 is warn and 4 is critical. Record a finding only for a stretch at 2 or above longer than a minute.

@@ -108,7 +108,7 @@ bun "${CLAUDE_SKILL_DIR}/scripts/ledger.ts" outcome <fp> filed --ref <pr-url>
 
 Weekly: write one ranked list, highest first. Each entry gives the target, days seen, the metric, the proposed change, and whether it is small.
 
-Both windows end the run's output with **Below the cut**: each `belowCut` entry as one line with its fingerprint, days seen, metric, and proposed change. The user picks from it with `pick <fingerprint>`. When the decision is empty, the whole output is one line saying the run found nothing to surface.
+Both windows end the run's output with **Below the cut**: each `belowCut` entry as one line with its fingerprint, days seen, metric, and proposed change. The user picks from it with `pick <fingerprint>`. When the decision is empty, the whole output is one line saying the run found nothing to surface, plus how close the contention checks came: `saturation`'s `min_idle_pct` and the top `write-rate` name with its `peak_gb_per_min`.
 
 ## Outcomes
 

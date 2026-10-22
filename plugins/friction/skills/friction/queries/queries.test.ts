@@ -173,7 +173,7 @@ describe("osquery", () => {
     expect(await osquery(every10s(T0, 1, hostCpu(1)), "thread-hogs")).toEqual([]);
   });
 
-  test("write rate flags names over 1 GiB in a minute, per process", async () => {
+  test("write rate reports the top writers and their minutes over 1 GiB", async () => {
     const GiB = 2 ** 30;
     const rows = await osquery(
       [
@@ -183,10 +183,16 @@ describe("osquery", () => {
         proc(T0 + 60, 8, "bun", 0, 0),
         proc(T0 + 120, 7, "bun", 0, 2 * GiB),
         proc(T0 + 120, 8, "bun", 0, GiB / 2),
+        // Quiet writers still report their peak, so a run shows how close it came.
+        proc(T0, 9, "git", 0, 0),
+        proc(T0 + 60, 9, "git", 0, GiB / 4),
       ],
       "write-rate",
     );
-    expect(rows).toEqual([{ day: DAY, pname: "bun", heavy_mins: "1", peak_gb_per_min: 1.5 }]);
+    expect(rows).toEqual([
+      { day: DAY, pname: "bun", heavy_mins: "1", peak_gb_per_min: 1.5 },
+      { day: DAY, pname: "git", heavy_mins: "0", peak_gb_per_min: 0.25 },
+    ]);
   });
 
   test("thread hogs ignore threads osquery could not read", async () => {

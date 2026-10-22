@@ -6,7 +6,7 @@ execution:
   model: claude-sonnet-5-5
   max_turns: 12
   timeout_seconds: 300
-  allowed_tools: [Read, Glob, Grep, Skill, Bash]
+  allowed_tools: [Read, Glob, Grep, Skill]
   append_system_prompt: >-
     The Linear workspace is acme. No user will answer questions or approve
     anything. Finish the request with the tools you have.

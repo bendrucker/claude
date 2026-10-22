@@ -1,6 +1,6 @@
-allow_tools: [Bash]
 graders:
-  skill-fired: "*"
+  skill-fired: "!invoked-*"
+  skill-load-error: "*"
   saved-once: "!query-*"
   create-no-id: "!{query,update}-*"
   team-eng: "!{query,update}-*"

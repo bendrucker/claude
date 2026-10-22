@@ -14,11 +14,12 @@ Graders read the call input with `tool_used` and `input_match`, against the JSON
 | --- | --- | --- |
 | `quick` | `quick-bug`, `quick-assigned` | A one-line report filed without headings, assignee `me`, labels by name |
 | `raw`, `formatting` | `raw-materials`, `flow-race` | Pasted material turned into Linear constructs: fenced trace, check list, mermaid, relation params |
-| `refined` | `refined-relations`, `refined-duplicate` | An `issue:refine` file saved in one call: frontmatter mapped to params, Agent Context as a `>>>` collapsible, bare-identifier references |
+| `refined` | `refined-relations`, `refined-duplicate` | An `issue:refine` file saved in one call from a natural prompt: frontmatter mapped to params, Agent Context as a `>>>` collapsible, bare-identifier references |
+| `invoked` | `invoked-relations`, `invoked-duplicate` | The same files through `/linear:linear`, which loads the skill without relying on its trigger |
 | `update` | `update-blocked` | An update by `id` that sends only the changed fields |
 | `query` | `query-mine` | A terse, linked list of assigned issues |
 
-`skill-fired` is a with-only indicator of whether the skill loaded.
+`skill-fired` is a with-only indicator that the model called the skill. It can't see a `/linear:linear` expansion, so the `invoked-*` cases skip it. `skill-load-error` fails a run whose skill load hit a shell injection error, which the skill's `!` line raises wherever Bash is denied or the eval sandbox can't start. The cases grant no Bash, so they run in a cloud container.
 
 ## Running
 

@@ -14,6 +14,7 @@ Graders read the call input with `tool_used` and `input_match`, against the JSON
 | --- | --- | --- |
 | `quick` | `quick-bug`, `quick-assigned` | A one-line report filed without headings, assignee `me`, labels by name |
 | `raw`, `formatting` | `raw-materials`, `flow-race` | Pasted material turned into Linear constructs: fenced trace, check list, mermaid, relation params |
+| `log`, `formatting` | `log-panic`, `log-migrate` | A long pasted log folded into a `>>>` collapsible, its decisive lines kept |
 | `refined` | `refined-relations`, `refined-duplicate` | An `issue:refine` file saved in one call from a natural prompt: frontmatter mapped to params, Agent Context as a `>>>` collapsible, bare-identifier references |
 | `invoked` | `invoked-relations`, `invoked-duplicate` | The same files through `/linear:linear`, which loads the skill without relying on its trigger |
 | `update` | `update-blocked` | An update by `id` that sends only the changed fields |
@@ -21,7 +22,7 @@ Graders read the call input with `tool_used` and `input_match`, against the JSON
 
 `skill-fired` is a with-only indicator that the model called the skill. It can't see a `/linear:linear` expansion, so the `invoked-*` cases skip it. `skill-load-error` fails a run whose skill load hit a shell injection error, which the skill's `!` line raises wherever Bash is denied or the eval sandbox can't start. The cases grant no Bash, so they run in a cloud container.
 
-Beyond the skill's own rules, a second set of graders measures what a filed issue should look like, borrowed from the `issue:refine` suite. Word ceilings form a ladder per case size (`words-40` quick, `words-120`, `words-200` raw), `bullet-words-20` caps each bullet, `no-invented-priority` and `no-invented-sections` fail a priority or a fix, next-steps, or criteria heading the request never supplied, `title-words-10` caps the title, `body-verbatim` holds a refined file's prose unedited, and `repro-fenced` wants the repro command in a shell block. Every one is a `regex` over the trace, so `regrade.ts` re-scores stored runs when one changes.
+Beyond the skill's own rules, a second set of graders measures what a filed issue should look like, borrowed from the `issue:refine` suite. Word ceilings form a ladder per case size (`words-40` quick, `words-120`, `words-200` raw), `bullet-words-20` caps each bullet, `no-invented-priority` and `no-invented-sections` fail a priority or a fix, next-steps, or criteria heading the request never supplied, `title-words-10` caps the title, `body-verbatim` holds a refined file's prose unedited, `repro-fenced` wants the repro command in a shell block, `short-log-inline` keeps a short trace out of a collapsible, and `no-mermaid` keeps diagrams out of issues without a multi-actor flow. Every one is a `regex` over the trace, so `regrade.ts` re-scores stored runs when one changes.
 
 ## Running
 

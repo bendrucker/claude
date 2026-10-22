@@ -1,7 +1,6 @@
--- Loads the snapshot logs and keeps the window ending on `day` (default today) and spanning `days` (default 1).
+-- Loads the snapshot logs and keeps the window, in the session time zone (the machine's by default), ending on `day` (default today) and spanning `days` (default 1).
 -- `osquery_dir` is the log directory.
 -- CPU and bytes are cumulative per process, so deltas are taken before the window filter.
-SET TimeZone = 'America/Los_Angeles';
 CREATE MACRO win_start() AS epoch((coalesce(getvariable('day'), current_date)::DATE - (coalesce(getvariable('days'), 1) - 1))::TIMESTAMPTZ);
 CREATE MACRO win_end() AS epoch((coalesce(getvariable('day'), current_date)::DATE + 1)::TIMESTAMPTZ);
 

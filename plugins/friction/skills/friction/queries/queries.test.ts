@@ -9,8 +9,8 @@ import { type DuckDBConnection, DuckDBInstance } from "@duckdb/node-api";
 // query exactly as collect.sh does, and compares the rows.
 
 const DAY = "2026-10-20";
-// 10:00 local on DAY, and the same time the day before.
-const T0 = Date.parse("2026-10-20T10:00:00-07:00") / 1000;
+// 10:00 on DAY, and the same time the day before. Cases pin the session to UTC.
+const T0 = Date.parse("2026-10-20T10:00:00Z") / 1000;
 const YESTERDAY = T0 - 86_400;
 
 interface Snapshot {
@@ -77,7 +77,10 @@ async function run(source: string, query: string, vars: Record<string, string>) 
       ...tables.map((t) => `DROP TABLE IF EXISTS ${t}`),
     ].join(";\n"),
   );
-  const sets = Object.entries(vars).map(([k, v]) => `SET VARIABLE ${k} = ${v};`);
+  const sets = [
+    "SET TimeZone = 'UTC';",
+    ...Object.entries(vars).map(([k, v]) => `SET VARIABLE ${k} = ${v};`),
+  ];
   const dir = join(import.meta.dirname, source);
   await conn.run(sets.join("\n") + (await Bun.file(join(dir, "load.sql")).text()));
   const reader = await conn.runAndReadAll(await Bun.file(join(dir, `${query}.sql`)).text());

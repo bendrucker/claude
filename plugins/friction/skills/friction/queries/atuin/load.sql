@@ -3,7 +3,6 @@
 -- timestamp and duration are nanoseconds. Imported rows carry exit = -1 and duration = 0.
 INSTALL sqlite;
 LOAD sqlite;
-SET TimeZone = 'America/Los_Angeles';
 
 CREATE TABLE runs AS
 SELECT strftime(to_timestamp(timestamp / 1e9), '%Y-%m-%d') AS day,

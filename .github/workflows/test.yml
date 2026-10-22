@@ -278,7 +278,7 @@ jobs:
           fi
           if echo "$deps" | grep -q '^@duckdb/node-api$'; then
             # The CLI must match the node-api that wrote the index it reads.
-            export DUCKDB_VERSION="$(jq -r '.dependencies["@duckdb/node-api"]' "$plugin/package.json" | cut -d- -f1)"
+            export DUCKDB_VERSION="$(jq -r '(.dependencies + .devDependencies)["@duckdb/node-api"]' "$plugin/package.json" | cut -d- -f1)"
             curl -fsSL https://install.duckdb.org | bash
             echo "$HOME/.duckdb/cli/$DUCKDB_VERSION" >> "$GITHUB_PATH"
           fi

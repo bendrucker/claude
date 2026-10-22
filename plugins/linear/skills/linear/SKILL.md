@@ -1,6 +1,6 @@
 ---
 name: linear
-description: Interacting with Linear issues, projects, and teams. Use when creating issues, updating issues, querying issues, managing projects, working on tasks, discussing backlogs, or any interaction with Linear.
+description: Load before any Linear write or query, whether through the connector tools (save_issue, create_comment, list_issues) or the linear CLI. Direct calls get Linear-specific formatting wrong (issue references that chip, collapsible markers, relations as params). Use when filing, updating, commenting on, or listing Linear issues, projects, or backlogs.
 argument-hint: "[create | update | list | view | comment] [issue ...]"
 allowed-tools:
   - mcp__linear

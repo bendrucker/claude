@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import { z } from "zod";
-import { listImportedHosts } from "./db";
+import { getImportsDir, listImportedHosts } from "./db";
 
 export interface S3Object {
   key: string;
@@ -95,11 +95,13 @@ if (import.meta.main) {
     },
   });
 
-  const host = (await listImportedHosts()).find((h) => h.label === argv.flags.host);
+  const hosts = await listImportedHosts();
+  const host = hosts.find((h) => h.label === argv.flags.host);
   const match = /^s3:\/\/([^/]+)\/(.*?)\/?$/.exec(host?.manifest.source ?? "");
   if (host === undefined || match === null) {
+    const found = hosts.map((h) => `${h.label} (${h.manifest.source})`).join(", ") || "none";
     console.error(
-      `No imported host "${argv.flags.host}" with an s3:// source. Run import.ts first.`,
+      `No imported host "${argv.flags.host}" with an s3:// source in ${getImportsDir()}; found ${found}. Run import.ts first.`,
     );
     process.exit(1);
   }

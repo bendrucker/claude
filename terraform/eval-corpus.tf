@@ -47,6 +47,27 @@ resource "aws_s3_bucket_lifecycle_configuration" "eval_corpus" {
     }
   }
 
+  # Session transcripts and the DuckLake index under sessions/ are
+  # overwritten in place (a growing transcript, the catalog on each publish),
+  # so their old versions are churn rather than history. A delete leaves only
+  # a marker, which expires once no version is left behind it.
+  rule {
+    id     = "expire-sessions-noncurrent"
+    status = "Enabled"
+
+    filter {
+      prefix = "sessions/"
+    }
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 7
+    }
+  }
+
   # Scratch space for access checks and in-flight handoffs.
   rule {
     id     = "expire-tmp"

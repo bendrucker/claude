@@ -37,6 +37,15 @@
             "command": "IFS= read -r in; case $in in *--body*|*--message*|*--description*|*--title*|*=@*|*-F*|*--file*) if printf '%s' \"$in\" | grep -qE -- '--(body|message|description|title)[-= ]|(-F|--field)[= ][^ ]*=@|git (commit|tag).* (-F|--file)[= ]'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\"; fi ;; esac"
           }
         ]
+      },
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "IFS= read -r in; if printf '%s' \"$in\" | grep -qE '([ `]|\\\\t).*([ `]|\\\\t).*([ `]|\\\\t)'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\"; fi"
+          }
+        ]
       }
     ]
   }

@@ -217,7 +217,7 @@ const RULES = [
     tier: "deny",
     detect: (_body, context) => context.unreadable,
     message: (detail) =>
-      `The hook cannot read ${detail}, so none of the body checks ran. Write the body to a file with a quoted heredoc (\`cat > <path> <<'EOF'\`), in the same call or its own, then pass that path: \`--body-file <path>\` on \`gh\`, \`--description-file <path>\` on \`glab\`.`,
+      `The hook cannot read ${detail}, so none of the body checks ran. Write the body to a file with a quoted heredoc (\`cat > <path> <<'EOF'\`), in the same call or its own, then pass that path: \`--body-file <path>\` on \`gh\`, \`--description-file <path>\` on \`glab\`. When another command in the call writes or edits the body file, run it in its own call first.`,
   }),
   rule({
     id: "test-count",

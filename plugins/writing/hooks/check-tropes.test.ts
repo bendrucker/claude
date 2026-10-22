@@ -4,7 +4,9 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { check, collectText, pathCandidates } from "./check-tropes";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
+import { check, collectText, isProse, MCP_PROSE_GUARD, pathCandidates } from "./check-tropes";
 
 async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   return (await check(input))?.output ?? null;
@@ -79,6 +81,10 @@ function mockBash(command: string): PreToolUseHookInput {
     tool_input: { command },
     tool_use_id: "test",
   };
+}
+
+function mockMcp(tool_name: string, tool_input: Record<string, unknown>): PreToolUseHookInput {
+  return { ...mockBash(""), tool_name, tool_input };
 }
 
 describe("wordlist files", () => {
@@ -538,5 +544,183 @@ describe("Bash processInput", () => {
 
   it("returns null for non-text Bash commands", async () => {
     expect(await processInput(mockBash("git push origin main"))).toBeNull();
+  });
+});
+
+describe("MCP calls", () => {
+  it("denies a GitHub PR body that negates the noun", async () => {
+    const result = await processInput(
+      mockMcp("mcp__github__create_pull_request", {
+        owner: "o",
+        repo: "r",
+        title: "Cache the lookup",
+        body: "The handler reads the cache, so the event costs no extra query.",
+      }),
+    );
+    const denial = denialOf(result);
+    expect(denial.decision).toBe("deny");
+    expect(denial.reason).toContain("costs no extra");
+  });
+
+  it("denies a thread reply that negates the noun", async () => {
+    const result = await processInput(
+      mockMcp("mcp__hearthbot__post_message", { text: "The sweep ran, and I filed nothing." }),
+    );
+    expect(denialOf(result).decision).toBe("deny");
+  });
+
+  it("reads prose at any depth and under any field name", async () => {
+    const texts = await collectText(
+      mockMcp("mcp__any__tool", {
+        question: "Ship the fix?",
+        options: [{ label: "Ship", consequence: "The PR merges and adds no tests." }],
+        recommended: 0,
+      }),
+    );
+    expect(texts).toEqual(["The PR merges and adds no tests."]);
+  });
+
+  it("leaves a query that negates the noun alone", async () => {
+    expect(
+      await processInput(mockMcp("mcp__github__search_code", { query: "costs no extra" })),
+    ).toBeNull();
+  });
+});
+
+describe("isProse", () => {
+  it.each([
+    "The sweep ran overnight and found two stale entries.",
+    "Done. The handler now reads the cache before it calls the API.",
+    "| a | b |\n\nThe table above lists every run that timed out.",
+    "The plugin comes out of the list under `enabledPlugins`.",
+  ])("reads %p as prose", (text) => {
+    expect(isProse(text)).toBe(true);
+  });
+
+  it.each([
+    "SELECT id FROM runs WHERE state = 'done';",
+    "negation hook latency",
+    '{"type": "none", "value": "x"}',
+    "/Users/ben/tmp/negation-escapes/cand.jsonl",
+    "Run `bun test plugins/writing/hooks/check-tropes.test.ts --timeout 15000`.",
+  ])("reads %p as not prose", (text) => {
+    expect(isProse(text)).toBe(false);
+  });
+});
+
+describe("isProse properties", () => {
+  const word = gs.text({ alphabet: "abcdefghijklmnopqrstuvwxyz", minSize: 1, maxSize: 12 });
+  const capitalized = word.map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+  const number = gs.integers({ minValue: 0, maxValue: 100_000 }).map(String);
+  const terminator = gs.sampledFrom([".", "!", "?", ":"]);
+  const separator = gs.sampledFrom([" ", "  ", "\t", " \t "]);
+  const sentence = gs.composite((tc) => {
+    const words = tc.draw(
+      gs.arrays(gs.oneOf(word, word, word, number), { minSize: 3, maxSize: 30 }),
+    );
+    let text = tc.draw(capitalized);
+    for (const w of words) text += tc.draw(separator) + w;
+    return text + tc.draw(terminator);
+  });
+  const noise = gs.text({
+    alphabet: "aZ09 _-./:;,'\"`*#>|()[]{}=<>!?$@~\t\n\\é’—",
+    maxSize: 200,
+  });
+
+  test("a capitalized run of words ending in a terminator is prose", () => {
+    hegel.test((tc) => {
+      const text = tc.draw(sentence);
+      if (!isProse(text)) throw new Error(`not prose: ${JSON.stringify(text)}`);
+    });
+  });
+
+  test("markdown list, quote, heading, and emphasis wrappers keep prose", () => {
+    hegel.test((tc) => {
+      const text = tc.draw(sentence);
+      const [open, close] = tc.draw(
+        gs.sampledFrom([
+          ["- ", ""],
+          ["* ", ""],
+          ["1. ", ""],
+          ["> ", ""],
+          ["## ", ""],
+          ["**", "**"],
+          ["_", "_"],
+          ["(", ")"],
+          ['"', '"'],
+        ]),
+      );
+      const wrapped = open + text + close;
+      if (!isProse(wrapped)) throw new Error(`not prose: ${JSON.stringify(wrapped)}`);
+    });
+  });
+
+  test("a trailing code span before the terminator keeps prose", () => {
+    hegel.test((tc) => {
+      const text = tc.draw(sentence);
+      const code = tc.draw(gs.text({ alphabet: "abc-_./ ={}$", minSize: 1, maxSize: 40 }));
+      const spanned = `${text.slice(0, -1)} \`${code}\`${text.slice(-1)}`;
+      if (!isProse(spanned)) throw new Error(`not prose: ${JSON.stringify(spanned)}`);
+    });
+  });
+
+  test("a line of anything else never hides a prose line", () => {
+    hegel.test((tc) => {
+      const text = tc.draw(sentence);
+      const other = tc.draw(noise);
+      for (const joined of [`${text}\n${other}`, `${other}\n${text}`]) {
+        if (!isProse(joined)) throw new Error(`not prose: ${JSON.stringify(joined)}`);
+      }
+    });
+  });
+
+  test("text without three separated tokens is never prose", () => {
+    hegel.test((tc) => {
+      const parts = tc.draw(
+        gs.arrays(gs.text({ alphabet: "aZ09_-./:'\"*#()!?é’", maxSize: 40 }), { maxSize: 3 }),
+      );
+      const text = parts.join(tc.draw(separator));
+      if (isProse(text)) throw new Error(`prose: ${JSON.stringify(text)}`);
+    });
+  });
+
+  test("JSON, SQL, and shell commands are never prose", () => {
+    hegel.test((tc) => {
+      const ident = gs.fromRegex("[a-z_][a-z0-9_]{0,15}");
+      const value = gs.oneOf(ident, number, gs.booleans().map(String));
+      const text = tc.draw(
+        gs.oneOf(
+          gs
+            .arrays(gs.tuples(ident, value), { maxSize: 8 })
+            .map((kv) => JSON.stringify(Object.fromEntries(kv), null, 2)),
+          gs
+            .tuples(gs.arrays(ident, { minSize: 1, maxSize: 6 }), ident, ident, value)
+            .map(
+              ([cols, table, col, v]) =>
+                `SELECT ${cols.join(", ")} FROM ${table} WHERE ${col} = '${v}' ORDER BY ${col} LIMIT 10;`,
+            ),
+          gs
+            .tuples(ident, gs.arrays(gs.tuples(ident, value), { maxSize: 6 }))
+            .map(
+              ([cmd, flags]) =>
+                `${cmd} ${flags.map(([f, v]) => `--${f}=${v}`).join(" ")} ./src/${cmd}.ts`,
+            ),
+        ),
+      );
+      if (isProse(text)) throw new Error(`prose: ${JSON.stringify(text)}`);
+    });
+  });
+
+  test("the hooks.json grep matches every call that holds prose", () => {
+    const guard = new RegExp(MCP_PROSE_GUARD);
+    hegel.test(
+      (tc) => {
+        const parts = tc.draw(gs.arrays(gs.oneOf(sentence, noise), { minSize: 1, maxSize: 4 }));
+        const text = parts.join(tc.draw(gs.sampledFrom(["", " ", "\n", "`"])));
+        const stdin = JSON.stringify({ tool_name: "mcp__x__y", tool_input: { body: text } });
+        if (isProse(text) && !guard.test(stdin)) throw new Error(`guard skips prose: ${stdin}`);
+      },
+      { testCases: 1000 },
+    );
   });
 });

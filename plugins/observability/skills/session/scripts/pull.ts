@@ -99,7 +99,10 @@ if (import.meta.main) {
   const host = hosts.find((h) => h.label === argv.flags.host);
   const match = /^s3:\/\/([^/]+)\/(.*?)\/?$/.exec(host?.manifest.source ?? "");
   if (host === undefined || match === null) {
-    const found = hosts.map((h) => `${h.label} (${h.manifest.source})`).join(", ") || "none";
+    const found =
+      hosts.length === 0
+        ? "none"
+        : hosts.map((h) => `${h.label} (${h.manifest.source})`).join(", ");
     console.error(
       `No imported host "${argv.flags.host}" with an s3:// source in ${getImportsDir()}; found ${found}. Run import.ts first.`,
     );

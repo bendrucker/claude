@@ -30,13 +30,13 @@ WHERE t >= win_start();
 CREATE TABLE groups AS
 WITH g AS (
   SELECT DISTINCT t, j->>'name' AS pname, (j->>'processes')::INT AS n,
-    (j->>'threads')::INT AS thr, (j->>'cpu_time')::BIGINT AS cpu_ms,
-    (j->>'disk_bytes_written')::BIGINT AS dw
+    -- osquery reports -1 for a process it can't read, so a negative total is unknown.
+    CASE WHEN (j->>'threads')::INT >= 0 THEN (j->>'threads')::INT END AS thr,
+    (j->>'cpu_time')::BIGINT AS cpu_ms
   FROM snaps WHERE name = 'proc_groups')
 -- A group's totals drop when a member exits, so a negative delta is unknown, not zero.
-SELECT * REPLACE (CASE WHEN dcpu >= 0 THEN dcpu END AS dcpu, CASE WHEN ddw >= 0 THEN ddw END AS ddw) FROM (
-  SELECT *, cpu_ms - lag(cpu_ms) OVER w AS dcpu, dw - lag(dw) OVER w AS ddw
-  FROM g WINDOW w AS (PARTITION BY pname ORDER BY t))
+SELECT * REPLACE (CASE WHEN dcpu >= 0 THEN dcpu END AS dcpu) FROM (
+  SELECT *, cpu_ms - lag(cpu_ms) OVER (PARTITION BY pname ORDER BY t) AS dcpu FROM g)
 WHERE t >= win_start();
 
 -- Share of CPU ticks idle since the previous sample, across all cores.

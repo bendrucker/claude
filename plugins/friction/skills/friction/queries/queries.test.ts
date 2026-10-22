@@ -57,13 +57,7 @@ const hostCpu = (idle: number) => {
   };
 };
 
-const group = (
-  t: number,
-  name: string,
-  threads: number,
-  cpuMs: number,
-  written: number,
-): Snapshot => ({
+const group = (t: number, name: string, threads: number, cpuMs: number): Snapshot => ({
   name: "proc_groups",
   t,
   rows: [
@@ -72,8 +66,6 @@ const group = (
       processes: 5,
       threads,
       cpu_time: cpuMs,
-      disk_bytes_read: 0,
-      disk_bytes_written: written,
     },
   ],
 });
@@ -170,7 +162,7 @@ describe("osquery", () => {
     const rows = await osquery(
       [
         ...every10s(T0, 2, hostCpu(1)),
-        ...every10s(T0, 2, (t) => group(t, "duckdb", 400, (t - T0) * 1000, 0)),
+        ...every10s(T0, 2, (t) => group(t, "duckdb", 400, (t - T0) * 1000)),
       ],
       "thread-hogs",
     );
@@ -181,19 +173,28 @@ describe("osquery", () => {
     expect(await osquery(every10s(T0, 1, hostCpu(1)), "thread-hogs")).toEqual([]);
   });
 
-  test("write rate flags names over 1 GiB in a minute, skipping exits", async () => {
+  test("write rate flags names over 1 GiB in a minute, per process", async () => {
     const GiB = 2 ** 30;
     const rows = await osquery(
       [
-        group(T0, "bun", 10, 0, 0),
-        group(T0 + 30, "bun", 10, 0, 2 * GiB),
-        // A member exited, so the group total fell.
-        group(T0 + 70, "bun", 10, 0, GiB),
-        group(T0 + 130, "bun", 10, 0, GiB + GiB / 2),
+        proc(T0, 7, "bun", 0, 0),
+        proc(T0 + 60, 7, "bun", 0, GiB),
+        // Two pids under one name add up within the minute.
+        proc(T0 + 60, 8, "bun", 0, 0),
+        proc(T0 + 120, 7, "bun", 0, 2 * GiB),
+        proc(T0 + 120, 8, "bun", 0, GiB / 2),
       ],
       "write-rate",
     );
-    expect(rows).toEqual([{ day: DAY, pname: "bun", heavy_mins: "1", peak_gb_per_min: 2 }]);
+    expect(rows).toEqual([{ day: DAY, pname: "bun", heavy_mins: "1", peak_gb_per_min: 1.5 }]);
+  });
+
+  test("thread hogs ignore threads osquery could not read", async () => {
+    const rows = await osquery(
+      [...every10s(T0, 1, hostCpu(1)), ...every10s(T0, 1, (t) => group(t, "distnoted", -18, 0))],
+      "thread-hogs",
+    );
+    expect(rows.map((r) => r.avg_threads)).toEqual([null]);
   });
 
   test("heavy writers count only bytes written inside the window", async () => {

@@ -3,6 +3,7 @@ import { exceedsLineLimit, extractComments } from "../detection/comments";
 import { isProseFile } from "../detection/paths";
 import {
   firstByTier,
+  stripCode,
   type PatternMatch,
   scan,
   scanIntroduced,
@@ -29,59 +30,36 @@ export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 // not trigger file reads. Guard fragment shipped to hooks.json like the above.
 export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 
-// MCP tools that publish prose: GitHub PR, issue, and review bodies, and the
-// replies and decision cards a cloud thread posts. In a cloud session these
-// replace `gh` and chat text, so they get the Bash egress tier. The hooks.json
-// matcher is derived from this table, and hooks.test.ts enforces the sync.
-export const MCP_PROSE_TOOLS = {
-  github: {
-    servers: ".*github.*",
-    tools: [
-      "create_pull_request",
-      "update_pull_request",
-      "issue_write",
-      "add_issue_comment",
-      "update_issue_comment",
-      "add_reply_to_pull_request_comment",
-      "add_comment_to_pending_review",
-      "pull_request_review_write",
-    ],
-    fields: ["title", "body"],
-  },
-  hearthbot: {
-    servers: ".*hearthbot",
-    tools: ["post_message", "edit_message", "request_decision"],
-    fields: ["text", "question", "context", "reason", "options"],
-  },
-} as const;
+// MCP tools carry prose the same way `gh` does (PR bodies, thread replies,
+// task notes) under any server and field name. Rather than list tools, the hook
+// takes every string in an MCP call's input with one sentence of mostly plain
+// words ending in a terminator, which queries, SQL, paths, and JSON lack. The
+// hooks.json guard ships these two greps so a call with neither a word run nor
+// a terminator skips the bun spawn, and hooks.test.ts enforces the sync.
+export const MCP_PROSE_GUARD = ["([A-Za-z]+ ){4}", "[A-Za-z][.!?]"] as const;
 
-const MCP_PROSE_PATTERNS = Object.values(MCP_PROSE_TOOLS).map(({ servers, tools, fields }) => ({
-  pattern: new RegExp(`^mcp__${servers}__(?:${tools.join("|")})$`),
-  fields: new Set<string>(fields),
-}));
+const PROSE_WORD = /^[("'*_]*[A-Za-z][a-z'’-]*[)"'*_.,;:!?]*$/;
+const MIN_SENTENCE_TOKENS = 5;
+const MIN_WORD_SHARE = 0.8;
 
-export const MCP_PROSE_MATCHER = `^mcp__(?:${Object.values(MCP_PROSE_TOOLS)
-  .map(({ servers, tools }) => `${servers}__(?:${tools.join("|")})`)
-  .join("|")})$`;
-
-/** Every string under the named fields, so a decision card's option labels count too. */
-function proseStrings(value: unknown): string[] {
-  if (typeof value === "string") return [value];
-  if (Array.isArray(value)) return value.flatMap(proseStrings);
-  if (value !== null && typeof value === "object")
-    return Object.values(value).flatMap(proseStrings);
-  return [];
+export function isProse(value: string): boolean {
+  // A sentence that ends on a code span keeps its terminator.
+  const text = stripCode(value).replaceAll(/[ \t]+([.!?])/g, "$1");
+  for (const sentence of text.split(/(?<=\w[.!?])\s+|\n+/)) {
+    const trimmed = sentence.trim();
+    const tokens = trimmed.split(/\s+/);
+    if (tokens.length < MIN_SENTENCE_TOKENS || !/[\w)"'’*][.!?]$/.test(trimmed)) continue;
+    const words = tokens.filter((token) => PROSE_WORD.test(token)).length;
+    if (words / tokens.length >= MIN_WORD_SHARE) return true;
+  }
+  return false;
 }
 
-function mcpProse(input: PreToolUseHookInput): string[] | null {
-  const surface = MCP_PROSE_PATTERNS.find(({ pattern }) => pattern.test(input.tool_name));
-  if (surface === undefined) return null;
-  const toolInput = input.tool_input;
-  if (toolInput === null || typeof toolInput !== "object") return [];
-  return Object.entries(toolInput)
-    .filter(([key]) => surface.fields.has(key))
-    .flatMap(([, value]) => proseStrings(value))
-    .filter((text) => text.trim() !== "");
+function strings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(strings);
+  if (value !== null && typeof value === "object") return Object.values(value).flatMap(strings);
+  return [];
 }
 
 const BODY_FILE_PATTERN = new RegExp(`(?:${BODY_FILE_FLAGS.join("|")})[=\\s](\\S+)`);
@@ -202,8 +180,7 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     return pair ? [pair.newText] : [];
   }
 
-  const mcp = mcpProse(input);
-  if (mcp !== null) return mcp;
+  if (toolName.startsWith("mcp__")) return strings(input.tool_input).filter(isProse);
 
   if (toolName === "Bash" && toolInput.command !== undefined) {
     const command = toolInput.command;

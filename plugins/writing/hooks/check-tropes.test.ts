@@ -4,7 +4,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { check, collectText, pathCandidates } from "./check-tropes";
+import { check, collectText, isProse, pathCandidates } from "./check-tropes";
 
 async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
   return (await check(input))?.output ?? null;
@@ -545,7 +545,7 @@ describe("Bash processInput", () => {
   });
 });
 
-describe("MCP prose tools", () => {
+describe("MCP calls", () => {
   it("denies a GitHub PR body that negates the noun", async () => {
     const result = await processInput(
       mockMcp("mcp__github__create_pull_request", {
@@ -567,27 +567,41 @@ describe("MCP prose tools", () => {
     expect(denialOf(result).decision).toBe("deny");
   });
 
-  it("reads a decision card's option text", async () => {
+  it("reads prose at any depth and under any field name", async () => {
     const texts = await collectText(
-      mockMcp("mcp__hearthbot__request_decision", {
+      mockMcp("mcp__any__tool", {
         question: "Ship the fix?",
         options: [{ label: "Ship", consequence: "The PR merges and adds no tests." }],
         recommended: 0,
       }),
     );
-    expect(texts).toEqual(["Ship the fix?", "Ship", "The PR merges and adds no tests."]);
+    expect(texts).toEqual(["The PR merges and adds no tests."]);
   });
 
-  it("skips fields outside the prose list", async () => {
-    const texts = await collectText(
-      mockMcp("mcp__github__create_pull_request", { owner: "nothing", repo: "none", head: "x" }),
-    );
-    expect(texts).toEqual([]);
-  });
-
-  it("leaves other MCP tools alone", async () => {
+  it("leaves a query that negates the noun alone", async () => {
     expect(
-      await processInput(mockMcp("mcp__github__get_file_contents", { path: "costs no extra" })),
+      await processInput(mockMcp("mcp__github__search_code", { query: "costs no extra" })),
     ).toBeNull();
+  });
+});
+
+describe("isProse", () => {
+  it.each([
+    "The sweep ran overnight and found two stale entries.",
+    "Done. The handler now reads the cache before it calls the API.",
+    "| a | b |\n\nThe table above lists every run that timed out.",
+    "The plugin comes out of the list under `enabledPlugins`.",
+  ])("reads %p as prose", (text) => {
+    expect(isProse(text)).toBe(true);
+  });
+
+  it.each([
+    "SELECT id FROM runs WHERE state = 'done';",
+    "negation hook latency",
+    '{"type": "none", "value": "x"}',
+    "/Users/ben/tmp/negation-escapes/cand.jsonl",
+    "Run `bun test plugins/writing/hooks/check-tropes.test.ts --timeout 15000`.",
+  ])("reads %p as not prose", (text) => {
+    expect(isProse(text)).toBe(false);
   });
 });

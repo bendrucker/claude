@@ -290,7 +290,8 @@
       "allowMachLookup": [
         "com.apple.trustd.agent",
         "com.apple.nehelper",
-        "com.apple.nesessionmanager"
+        "com.apple.nesessionmanager",
+        "com.apple.SecurityServer"
       ],
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",

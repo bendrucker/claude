@@ -11,6 +11,7 @@ graders:
   log-collapsed: ["log-*"]
   short-log-inline: [raw-materials]
   no-mermaid: ["quick-*", "log-*", raw-materials]
+  no-invented-checklist: ["quick-*", "log-*", "flow-*"]
   collapsible-open: ["refined-*", "invoked-*"]
   collapsible-closed: ["refined-*", "invoked-*"]
   no-agent-heading: ["refined-*", "invoked-*"]

@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: refined-duplicate
-tags: [refined, create, relations]
+tags: [holdout, refined, create, relations]
 plugins: ["../../.."]
 context:
   scaffold_script: fixture.sh

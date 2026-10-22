@@ -1,10 +1,11 @@
 graders:
-  skill-fired: "!invoked-*"
+  skill-fired: "!{invoked,quiet}-*"
+  linear-quiet: ["quiet-*"]
   skill-load-error: "*"
-  saved-once: "!query-*"
-  create-no-id: "!{query,update}-*"
-  team-eng: "!{query,update}-*"
-  no-h1: "!{query,update}-*"
+  saved-once: "!{query,comment,quiet}-*"
+  create-no-id: "!{query,update,comment,quiet}-*"
+  team-eng: "!{query,update,comment,quiet}-*"
+  no-h1: "!{query,update,comment,quiet}-*"
   no-issue-url: ["refined-*", "invoked-*", flow-race]
   no-headings: ["quick-*"]
   collapsible-open: ["refined-*", "invoked-*"]
@@ -14,7 +15,7 @@ graders:
   words-40: ["quick-*"]
   words-120: ["quick-*", "raw-*", "flow-*"]
   words-200: ["raw-*", "flow-*"]
-  bullet-words-20: "!{query,update}-*"
+  bullet-words-20: "!{query,update,comment,quiet}-*"
   no-invented-priority: ["quick-*", "raw-*", "flow-*"]
   no-invented-sections: ["quick-*", "raw-*", "flow-*"]
-  title-words-10: "!{query,update}-*"
+  title-words-10: "!{query,update,comment,quiet}-*"

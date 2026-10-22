@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: quick-assigned
-tags: [quick, create, assignee]
+tags: [holdout, quick, create, assignee]
 plugins: ["../../.."]
 execution:
   model: claude-sonnet-5-5

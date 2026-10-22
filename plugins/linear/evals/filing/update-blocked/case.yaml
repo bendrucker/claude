@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: update-blocked
-tags: [update, relations]
+tags: [dev, update, relations]
 plugins: ["../../.."]
 execution:
   model: claude-sonnet-5-5

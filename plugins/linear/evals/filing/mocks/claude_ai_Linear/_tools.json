@@ -189,6 +189,28 @@
         },
         "required": ["team"]
       }
+    },
+    {
+      "name": "create_comment",
+      "description": "Create a comment on a Linear issue.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "description": "Issue ID or identifier"
+          },
+          "body": {
+            "type": "string",
+            "description": "Comment content in Markdown"
+          },
+          "parentId": {
+            "type": "string",
+            "description": "Parent comment ID to reply to"
+          }
+        },
+        "required": ["issueId", "body"]
+      }
     }
   ]
 }

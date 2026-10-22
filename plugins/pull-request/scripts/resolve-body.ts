@@ -307,13 +307,14 @@ export type BodyResolution =
   | { kind: "unreadable"; detail: string };
 
 // The hook's own TMPDIR differs from the sandbox a `gh`/`glab` call actually
-// runs under, which writes to `/tmp/claude-<uid>` instead.
+// runs under, which writes to `/tmp/claude-<uid>` on macOS and to
+// `$TMPDIR/claude-<uid>` on Linux.
 function tmpdirCandidates(path: string): string[] {
-  const hookTmpdir = process.env.TMPDIR;
+  const hookTmpdir = process.env.TMPDIR?.replace(/\/$/, "");
   if (hookTmpdir === undefined || hookTmpdir === "" || !path.startsWith(hookTmpdir)) return [path];
-  const uid = process.getuid?.() ?? 0;
-  const sandboxed = `/tmp/claude-${uid}${path.slice(hookTmpdir.length)}`;
-  return [...new Set([path, sandboxed])];
+  const sandbox = `claude-${process.getuid?.() ?? 0}`;
+  const rest = path.slice(hookTmpdir.length);
+  return [...new Set([path, `/tmp/${sandbox}${rest}`, `${hookTmpdir}/${sandbox}${rest}`])];
 }
 
 interface ReadCandidate {

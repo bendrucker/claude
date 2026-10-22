@@ -159,6 +159,12 @@ describe("extractBodySpec", () => {
       String.raw`printf 'Prose.\n' > body.md && gh pr edit 12 --body-file body.md`,
       parts(file("body.md", String.raw`printf 'Prose.\n'`)),
     ],
+    // Claude Code's default inline body: the substitution drops trailing newlines.
+    [
+      "gh pr create --title T --body \"$(cat <<'EOF'\n## Summary\n\nProse.\nEOF\n)\"",
+      parts(literal("## Summary\n\nProse.")),
+    ],
+    ["glab mr create --description \"$(cat <<'EOF'\nProse.\n\nEOF\n)\"", parts(literal("Prose."))],
     // A copy made in the same call holds its source.
     [
       "cp tmp/pr-body.md tmp/pr-body-x.md && gh pr create --body-file tmp/pr-body-x.md",
@@ -204,6 +210,7 @@ describe("extractBodySpec", () => {
       "unquoted heredoc",
     ],
     ["gh pr create --body-file - <<EOF\nRelease $VERSION\nEOF", "$VERSION"],
+    ['gh pr create --body "$(cat <<EOF\nRelease $VERSION\nEOF\n)"', "$(cat <<EOF"],
   ])("extractBodySpec(%p) reports it cannot read %p", (command, fragment) => {
     const spec = extractBodySpec(command);
     expect(spec.kind).toBe("unreadable");
@@ -322,6 +329,23 @@ describe("resolveBody $TMPDIR candidates", () => {
       if (originalTmpdir === undefined) delete process.env.TMPDIR;
       else process.env.TMPDIR = originalTmpdir;
       await rm(sandboxDir, { recursive: true, force: true });
+    }
+  });
+
+  it("finds the Linux sandbox's TMPDIR nested under the hook's own", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "resolve-body-nested-"));
+    const body = "## Summary\n\nFrom the nested sandbox TMPDIR.\n";
+    await Bun.write(join(dir, `claude-${process.getuid?.() ?? 0}`, "body.md"), body);
+    const originalTmpdir = process.env.TMPDIR;
+    try {
+      process.env.TMPDIR = dir;
+      expect(
+        await resolveBody('gh pr create --body-file "$TMPDIR/body.md"', "/repo"),
+      ).toMatchObject({ kind: "text", text: body });
+    } finally {
+      if (originalTmpdir === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmpdir;
+      await rm(dir, { recursive: true, force: true });
     }
   });
 

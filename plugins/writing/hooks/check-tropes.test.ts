@@ -610,7 +610,7 @@ describe("isProse", () => {
 
 describe("isProse properties", () => {
   const word = gs.text({ alphabet: "abcdefghijklmnopqrstuvwxyz", minSize: 1, maxSize: 12 });
-  const capitalized = word.map((w) => w[0].toUpperCase() + w.slice(1));
+  const capitalized = word.map((w) => w.charAt(0).toUpperCase() + w.slice(1));
   const number = gs.integers({ minValue: 0, maxValue: 100_000 }).map(String);
   const terminator = gs.sampledFrom([".", "!", "?", ":"]);
   const separator = gs.sampledFrom([" ", "  ", "\t", " \t "]);

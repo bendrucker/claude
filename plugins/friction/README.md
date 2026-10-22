@@ -22,10 +22,11 @@ A day with no blocker produces one line.
 
 - **Skill `friction`**: the daily (`--window 1d`) and weekly (`--window 7d`) run, and `pick <fingerprint>` for a below-the-cut item.
   - [`ledger.ts`](skills/friction/scripts/ledger.ts) records findings, counts distinct days per fingerprint, and decides what surfaces.
-  - [`osquery.md`](skills/friction/references/osquery.md) and [`atuin.md`](skills/friction/references/atuin.md) hold the named queries over each source.
+  - [`queries/`](skills/friction/queries/) holds each source's loader and named queries, and [`collect.sh`](skills/friction/scripts/collect.sh) runs them over a window in one call.
+  - [`osquery.md`](skills/friction/references/osquery.md) and [`atuin.md`](skills/friction/references/atuin.md) say how to read each query and name its target.
 
 The ledger lives at `$XDG_STATE_HOME/friction/ledger.jsonl`, or `FRICTION_LEDGER`.
 
 ## Tests
 
-`bun test plugins/friction` runs the ledger tests, which encode the Studio reference set from Oct 18 to 20.
+`bun test plugins/friction` runs the ledger tests, which encode Ben's calibration labels, and the query tests, which run each named query over synthetic osquery snapshots and Atuin history and check its rows.

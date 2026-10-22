@@ -29,12 +29,17 @@ The window sets lookback, sources, and budget. The steps and the ledger rules ar
 
 ### 1. Collect
 
-Run named queries over the window. Each source returns rows, not prose.
+Run named queries over the window. Each source returns rows, not prose. For osquery and Atuin, run the source's queries in one call, with the run's day and the window length in days (1 or 7). Never retype the SQL.
+
+```bash
+"${CLAUDE_SKILL_DIR}/scripts/collect.sh" osquery 2026-10-20 1
+"${CLAUDE_SKILL_DIR}/scripts/collect.sh" atuin 2026-10-20 1
+```
 
 | Source | Window | How |
 | --- | --- | --- |
-| osquery | both | DuckDB over the snapshot log. Load and queries: [references/osquery.md](references/osquery.md) |
-| Atuin | both | DuckDB over the history db: slow and failing command heads. [references/atuin.md](references/atuin.md) |
+| osquery | both | `collect.sh osquery`. How to read each query and name its target: [references/osquery.md](references/osquery.md) |
+| Atuin | both | `collect.sh atuin`: slow and failing command heads. [references/atuin.md](references/atuin.md) |
 | Session index | both | `observability:session` named queries with `after_date` at the window start. Daily: `tool-failure-rates`, `hook-blocks`, `hook-block-then-retry-success`, `sandbox-bypass-scaffold`, `cli-health`, `stop-hook-noop-detector`. Weekly adds the rest. It sees only local transcripts, so a quiet index means work moved to cloud sessions, not that friction stopped |
 | Changelogs | `7d` | Release notes since the last run for tools in the Brewfiles and mise pins that the window's data shows in use |
 

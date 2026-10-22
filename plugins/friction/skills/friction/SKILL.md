@@ -21,7 +21,7 @@ The output budget is the point of this skill. A run that surfaces nothing is a c
 - `--window 1d` (default): the daily run. Last 24 hours of osquery, Atuin, and the session index, about 5 minutes, offline. Reading the session index runs its incremental refresh first, so schedule the run after the day's other refreshes.
 - `--window 7d`: the weekly run. Last 7 days of the same sources, plus upstream changelogs, 20 to 30 minutes.
 - `--day YYYY-MM-DD`: run as of a past day, to backfill the ledger or replay a calibration day. Bound every query to the window ending that day, pass `--day` to every ledger command, and print the decision without delivering it.
-- `pick <fingerprint>`: Ben asked for a below-the-cut item. Run `scripts/ledger.ts outcome <fingerprint> picked`, then open its draft PR as daily promotion does in [Deliver](#5-deliver), which records it `filed`.
+- `pick <fingerprint>`: the user asked for a below-the-cut item. Run `scripts/ledger.ts outcome <fingerprint> picked`, then open its draft PR as daily promotion does in [Deliver](#5-deliver), which records it `filed`.
 
 The window sets lookback, sources, and budget. The steps and the ledger rules are identical for both.
 
@@ -36,8 +36,8 @@ Check the open `Friction:` PRs and record any outcome the ledger lacks (see [Out
 Run named queries over the window. Each source returns rows, not prose. For osquery and Atuin, run the source's queries in one call, with the run's day and the window length in days (1 or 7). Never retype the SQL.
 
 ```bash
-"${CLAUDE_SKILL_DIR}/scripts/collect.sh" osquery 2026-10-20 1
-"${CLAUDE_SKILL_DIR}/scripts/collect.sh" atuin 2026-10-20 1
+FRICTION_OSQUERY_DIR="${user_config.osquery_dir}" "${CLAUDE_SKILL_DIR}/scripts/collect.sh" osquery 2026-10-20 1
+FRICTION_ATUIN_DB="${user_config.atuin_db}" "${CLAUDE_SKILL_DIR}/scripts/collect.sh" atuin 2026-10-20 1
 ```
 
 | Source | Window | How |
@@ -45,13 +45,13 @@ Run named queries over the window. Each source returns rows, not prose. For osqu
 | osquery | both | `collect.sh osquery`. How to read each query and name its target: [references/osquery.md](references/osquery.md) |
 | Atuin | both | `collect.sh atuin`: slow and failing command heads. [references/atuin.md](references/atuin.md) |
 | Session index | both | `observability:session` named queries with `after_date` at the window start. Daily: `tool-failure-rates`, `hook-blocks`, `hook-block-then-retry-success`, `sandbox-bypass-scaffold`, `cli-health`, `stop-hook-noop-detector`. Weekly runs every named query. It sees only local transcripts, so a quiet index means work moved to cloud sessions, not that friction stopped |
-| Changelogs | `7d` | Release notes since the last run for tools in the Brewfiles and mise pins that the window's data shows in use |
+| Changelogs | `7d` | Release notes since the last run for tools the config repos install that the window's data shows in use |
 
 Normalize every metric to a rate: per active hour, per call, or a share of minutes. Activity swings 200x day to day, so a raw count compares nothing.
 
 ### 2. Ground
 
-Check each candidate against the live config in `~/.dotfiles` and `~/.claude-repo`. Drop any the config already addresses. A fix that does less work (skip a job, lower a limit) is not a fix here. Look for the change that makes the same work faster or attributes it.
+Check each candidate against the live config in the config repos (`${user_config.config_repos}`), or the config files the tool reads when none are set. Drop any the config already addresses. A fix that does less work (skip a job, lower a limit) is not a fix here. Look for the change that makes the same work faster or attributes it.
 
 ### 3. Emit Findings
 
@@ -73,7 +73,7 @@ One JSON object per symptom seen in the window, including ones you expect to sta
 
 - `type`: `contention`, `slow-command`, `failing-command`, `tool-gap`, `upstream-change`, `config-drift`.
 - `target`: the object the symptom is about, named the same way every run: a process name, a command head (its first two words, `g pull`, never its arguments), a tool, a hook script. The fingerprint is `type|target`, so a renamed target restarts its count.
-- `impact`: decides what surfaces, so grade it by what the symptom costs Ben, not by how often it fires.
+- `impact`: decides what surfaces, so grade it by what the symptom costs the user, not by how often it fires.
   - `high`: blocks work. A command keeps failing through retries until someone works around it, or work stalls for minutes. Example: an auth command failing 9 of 11 runs across 25 minutes of retries.
   - `moderate`: costs time or attention, but work recovers on its own. Examples: a hook rejection that costs Claude one retry turn, a minute added to each turn, commit signing failures that a retry clears.
   - `low`: measurable but unnoticed. Low never surfaces. Record it so growth shows.
@@ -100,7 +100,7 @@ Do not count, rank, or override the decision yourself. The rules it applies:
 
 ### 5. Deliver
 
-Daily, when `promote` holds an entry: implement the fix and open a draft PR through `pull-request:create`, with `Friction: <fp>` on its own line in the body and the metric as evidence. Then record it:
+Daily, when `promote` holds an entry: implement the fix in the config repo that owns it and open a draft PR through `pull-request:create`, with `Friction: <fp>` on its own line in the body and the metric as evidence. Then record it:
 
 ```bash
 bun "${CLAUDE_SKILL_DIR}/scripts/ledger.ts" outcome <fp> filed --ref <pr-url>
@@ -108,8 +108,8 @@ bun "${CLAUDE_SKILL_DIR}/scripts/ledger.ts" outcome <fp> filed --ref <pr-url>
 
 Weekly: write one ranked list, highest first. Each entry gives the target, days seen, the metric, the proposed change, and whether it is small.
 
-Both windows end the run's output with **Below the cut**: each `belowCut` entry as one line with its fingerprint, days seen, metric, and proposed change. Ben picks from it with `pick <fingerprint>`. When the decision is empty, the whole output is one line saying the run found nothing to surface.
+Both windows end the run's output with **Below the cut**: each `belowCut` entry as one line with its fingerprint, days seen, metric, and proposed change. The user picks from it with `pick <fingerprint>`. When the decision is empty, the whole output is one line saying the run found nothing to surface.
 
 ## Outcomes
 
-When a `Friction:` PR merges, record `resolved`. When Ben closes one unmerged, record `dismissed`.
+When a `Friction:` PR merges, record `resolved`. When the user closes one unmerged, record `dismissed`.

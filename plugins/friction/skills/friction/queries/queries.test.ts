@@ -56,6 +56,7 @@ async function osquery(snapshots: Snapshot[], query: string, days = 1) {
     osquery_dir: `'${dir}'`,
     day: `DATE '${DAY}'`,
     days: `${days}`,
+    cores: "10",
   });
 }
 

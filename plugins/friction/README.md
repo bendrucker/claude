@@ -20,10 +20,18 @@ A day with no blocker produces one line.
 
 ## Requirements
 
-- osqueryd configured by the dotfiles `osquery` topic, and Atuin
+- osqueryd logging the snapshots [osquery.md](skills/friction/references/osquery.md) lists, and Atuin
 - `duckdb` and `bun` on `PATH`
 - `~/.local/state/friction` in the sandbox `allowWrite`, which `user/settings.json` sets
 - For the tests only, `@duckdb/node-api`, a devDependency the plugin cache omits
+
+## Options
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `config_repos` | none | Local clones holding the setup's config. Findings are checked against them, and fixes open there |
+| `osquery_dir` | `~/.local/state/osquery` | Where osqueryd writes its snapshot log |
+| `atuin_db` | `~/.local/share/atuin/history.db` | Atuin's history database |
 
 ## Contents
 

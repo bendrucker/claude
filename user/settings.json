@@ -173,6 +173,11 @@
       "options": {
         "multiplexer": "herdr"
       }
+    },
+    "friction@bendrucker": {
+      "options": {
+        "config_repos": ["~/.dotfiles", "~/.claude-repo"]
+      }
     }
   },
   "enabledPlugins": {

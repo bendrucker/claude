@@ -15,9 +15,7 @@ Tools and workflows for managing issues, projects, and teams in Linear.
 
 ## Environment
 
-- **`linear` CLI**: !`linear --version 2>/dev/null || echo "not installed"`
-
-The connector and MCP paths need no CLI. The CLI-only operations (relations, bulk work) require `linear`; when it reads "not installed", stay on the connector. The version above tells you which CLI is installed. Confirm its exact subcommands and flags with `linear <cmd> --help` or the `linear-cli:linear-cli` skill rather than assuming them.
+The connector and MCP paths need no CLI. Before a CLI-only operation (relations without the connector, bulk work), run `linear --version`. When it fails, stay on the connector. Confirm the installed CLI's subcommands and flags with `linear <cmd> --help` or the `linear-cli:linear-cli` skill rather than assuming them.
 
 ## Arguments
 

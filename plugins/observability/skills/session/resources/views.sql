@@ -521,6 +521,8 @@ SELECT
   type,
   (data->>'$.subtype')         AS subtype,
   (data->>'$.attachment.type') AS attachment_kind,
+  (data->>'$.attachment.origin.kind') AS attachment_origin,
+  (data->>'$.operation')       AS queue_operation,
   type
     || COALESCE(':' || (data->>'$.subtype'), '')
     || COALESCE(':' || (data->>'$.attachment.type'), '') AS kind,

@@ -77,14 +77,14 @@ FROM (
   -- `promptSource` flattens every queued turn to `queued`. The queued_command
   -- attachment names who queued it, so the breakdown keeps an auto-continuation
   -- distinguishable from a prompt the user typed ahead.
-  SELECT 'queued command: ' || COALESCE((data->>'$.attachment.origin.kind'), 'unattributed'),
+  SELECT 'queued command: ' || COALESCE(attachment_origin, 'unattributed'),
          COUNT(*), 3
     FROM scoped WHERE attachment_kind = 'queued_command'
    GROUP BY 1
   UNION ALL
   SELECT 'queued goals/commands',
          COUNT(*), 4
-    FROM scoped WHERE type = 'queue-operation' AND (data->>'$.operation') = 'enqueue'
+    FROM scoped WHERE type = 'queue-operation' AND queue_operation = 'enqueue'
   UNION ALL
   SELECT 'scheduled fires (loop/cron)',
          COUNT(*), 5

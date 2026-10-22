@@ -39,6 +39,10 @@ The `description` body is GFM and renders Linear's first-class constructs direct
 
 Size the body to the request. A one-line report gets one or two sentences under 40 words, with no headings and no sections the request never supplied.
 
+## Answering a Query
+
+Answer a list query with one line per issue, each its linked identifier, title, and state, with no grouping headers, blank lines, or closing summary.
+
 ## Saving a Structured Issue File
 
 Skills that emit a Markdown file with YAML frontmatter (issue refinement, project planning) hand off here. [references/structured-file.md](references/structured-file.md) maps that frontmatter onto connector `save_issue` params, relations included, covers routing fields taken from the user at save time, and keeps the `linear` CLI as the fallback when the connector is unavailable.

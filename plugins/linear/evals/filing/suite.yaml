@@ -1,0 +1,13 @@
+allow_tools: [Bash]
+graders:
+  skill-fired: "*"
+  saved-once: "!query-*"
+  create-no-id: "!{query,update}-*"
+  team-eng: "!{query,update}-*"
+  no-h1: "!{query,update}-*"
+  no-issue-url: ["refined-*", "invoked-*", flow-race]
+  no-headings: ["quick-*"]
+  collapsible-open: ["refined-*", "invoked-*"]
+  collapsible-closed: ["refined-*", "invoked-*"]
+  no-agent-heading: ["refined-*", "invoked-*"]
+  no-frontmatter: ["refined-*", "invoked-*"]

@@ -1,0 +1,1 @@
+{"statuses":[{"name":"Triage","type":"triage"},{"name":"Backlog","type":"backlog"},{"name":"Todo","type":"unstarted"},{"name":"In Progress","type":"started"},{"name":"In Review","type":"started"},{"name":"Done","type":"completed"},{"name":"Canceled","type":"canceled"}]}

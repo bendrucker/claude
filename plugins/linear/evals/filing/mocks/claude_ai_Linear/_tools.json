@@ -1,0 +1,201 @@
+{
+  "tools": [
+    {
+      "name": "save_issue",
+      "description": "Create or update a Linear issue. Pass id to update; omit id to create, which requires title and team. Relation fields are append-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Issue ID or identifier to update. Omit to create."
+          },
+          "title": {
+            "type": "string",
+            "description": "Issue title. Required when creating."
+          },
+          "description": {
+            "type": "string",
+            "description": "Issue description in Markdown."
+          },
+          "team": {
+            "type": "string",
+            "description": "Team name, key, or ID. Required when creating."
+          },
+          "assignee": {
+            "type": "string",
+            "description": "User ID, name, email, or \"me\". Null to unassign."
+          },
+          "state": {
+            "type": "string",
+            "description": "State name, type, or ID."
+          },
+          "priority": {
+            "type": "number",
+            "description": "0 = none, 1 = urgent, 2 = high, 3 = medium, 4 = low"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Label names or IDs."
+          },
+          "project": {
+            "type": "string",
+            "description": "Project name or ID. Null to remove."
+          },
+          "milestone": {
+            "type": "string",
+            "description": "Project milestone name or ID."
+          },
+          "cycle": {
+            "type": "string",
+            "description": "Cycle name, number, or ID. Null to remove."
+          },
+          "estimate": {
+            "type": "number"
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "ISO date."
+          },
+          "parentId": {
+            "type": "string",
+            "description": "Parent issue ID or identifier. Null to remove."
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Issues this issue blocks. Append-only."
+          },
+          "blockedBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Issues blocking this issue. Append-only."
+          },
+          "relatedTo": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Related issues. Append-only."
+          },
+          "duplicateOf": {
+            "type": "string",
+            "description": "Issue this duplicates. Null to remove."
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "title"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_issue",
+      "description": "Retrieve a Linear issue by ID or identifier.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Issue ID or identifier"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    {
+      "name": "list_issues",
+      "description": "List issues with filters.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "assignee": {
+            "type": "string",
+            "description": "User ID, name, email, or \"me\""
+          },
+          "team": {
+            "type": "string",
+            "description": "Team name or ID"
+          },
+          "state": {
+            "type": "string",
+            "description": "State name or type"
+          },
+          "query": {
+            "type": "string",
+            "description": "Search title and description"
+          },
+          "limit": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_teams",
+      "description": "List teams in the workspace.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_issue_labels",
+      "description": "List labels in the workspace or a team.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "list_issue_statuses",
+      "description": "List workflow states for a team.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "team": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "team"
+        ]
+      }
+    }
+  ]
+}

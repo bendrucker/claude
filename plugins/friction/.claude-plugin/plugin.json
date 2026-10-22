@@ -1,0 +1,30 @@
+{
+  "name": "friction",
+  "description": "Count recurring friction across the development setup and surface only small fixes for symptoms that persist",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  },
+  "dependencies": ["pull-request"],
+  "userConfig": {
+    "config_repos": {
+      "type": "string",
+      "multiple": true,
+      "title": "Config repos",
+      "description": "Local clones that hold the setup's config. A run checks each finding against them and opens its fixes there. Empty grounds findings against the config files the tools read.",
+      "default": []
+    },
+    "osquery_dir": {
+      "type": "string",
+      "title": "osquery log directory",
+      "description": "Directory holding osqueryd.snapshots.log. Empty uses ~/.local/state/osquery.",
+      "default": ""
+    },
+    "atuin_db": {
+      "type": "string",
+      "title": "Atuin database",
+      "description": "Path to Atuin's history.db. Empty uses ~/.local/share/atuin/history.db.",
+      "default": ""
+    }
+  }
+}

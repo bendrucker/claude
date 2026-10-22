@@ -1,0 +1,103 @@
+name: session-bench
+
+# Benchmarks a session index change against main on the actions-sandbox
+# runner, in a throwaway Linux VM. Both arms build from the bench snapshot in
+# the eval bucket, so the job never touches a live index. Results go back to
+# the bucket under session/bench/results/actions-<run id>.
+
+on:
+  workflow_dispatch:
+    inputs:
+      head:
+        description: Ref whose session skill is the candidate arm
+        type: string
+        required: true
+      args:
+        description: Extra arguments for bench.ts run, such as --runs 5 --only <regex>
+        type: string
+        default: ""
+
+# One job at a time on the runner, and a queued bench waits rather than
+# cancelling the one in progress.
+concurrency:
+  group: actions-sandbox
+  cancel-in-progress: false
+
+jobs:
+  bench:
+    runs-on: [self-hosted, actions-sandbox]
+    # Only main can deploy here, and only this environment can assume the
+    # bucket role, so a dispatch from any other ref fails before it starts.
+    environment: actions-sandbox
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BENCH: base/plugins/observability/evals/bench
+      PREFIX: s3://ben-drucker-agents-eval-corpus/session/bench
+      HEAD_REF: ${{ inputs.head }}
+      ARGS: ${{ inputs.args }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: base
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.head }}
+          path: head
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install the DuckDB and AWS CLIs
+        run: |
+          curl -fsSL https://install.duckdb.org | bash
+          echo "$HOME/.duckdb/cli/latest" >> "$GITHUB_PATH"
+          curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "$RUNNER_TEMP/awscli.zip"
+          unzip -q "$RUNNER_TEMP/awscli.zip" -d "$RUNNER_TEMP"
+          sudo "$RUNNER_TEMP/aws/install"
+
+      - uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Install dependencies
+        run: |
+          (cd base && bun install --frozen-lockfile)
+          (cd head && bun install --frozen-lockfile)
+
+      - name: Pull the replay set and snapshot
+        run: aws s3 sync "$PREFIX" "$BENCH" --exclude '*' --include replay.json --include 'snap/*' --only-show-errors
+
+      - name: Build arms
+        run: |
+          bun "$BENCH/bench.ts" build --snapshot "$BENCH/snap" --out arms/main --skill base/plugins/observability/skills/session
+          bun "$BENCH/bench.ts" build --snapshot "$BENCH/snap" --out arms/head --skill head/plugins/observability/skills/session
+
+      - name: Run
+        # ARGS is a list of flags, so it splits on purpose.
+        run: |
+          bun "$BENCH/bench.ts" run \
+            --arm main=arms/main/session.duckdb,base/plugins/observability/skills/session \
+            --arm head=arms/head/session.duckdb,head/plugins/observability/skills/session \
+            --out "results/actions-$GITHUB_RUN_ID" $ARGS
+          for arm in main head; do cp "arms/$arm/build.json" "results/actions-$GITHUB_RUN_ID/build-$arm.json"; done
+
+      - name: Push results
+        if: always()
+        run: aws s3 sync results "$PREFIX/results" --only-show-errors
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## session-bench: main vs $HEAD_REF"
+            echo
+            echo '```'
+            bun "$BENCH/bench.ts" report "results/actions-$GITHUB_RUN_ID"
+            echo '```'
+            echo
+            echo "Results: \`$PREFIX/results/actions-$GITHUB_RUN_ID\`"
+          } >> "$GITHUB_STEP_SUMMARY"

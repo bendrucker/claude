@@ -15,6 +15,7 @@ node_modules/
 # before the global `fixtures` ignore stayed tracked, so a new one silently did
 # not. Re-include the directory so it is tracked like the rest.
 !plugins/observability/skills/session/fixtures/
+!plugins/observability/fixtures/
 # The ox hook's fixtures are committed test data, same as the two above.
 !.claude/hooks/ox/fixtures/
 # The Stop hook's captured prek output, same again.

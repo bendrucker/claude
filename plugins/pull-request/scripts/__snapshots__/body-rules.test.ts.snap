@@ -24,7 +24,7 @@ exports[`decide carries a title warn into an unreadable-body deny 1`] = `
     "permissionDecision": "deny",
     "permissionDecisionReason": 
 "Fix the PR body before retrying:
-- The hook cannot read standard input, so none of the body checks ran. Write the body to a file with a quoted heredoc (\`cat > <path> <<'EOF'\`), in the same call or its own, then pass that path: \`--body-file <path>\` on \`gh\`, \`--description-file <path>\` on \`glab\`.
+- The hook cannot read standard input, so none of the body checks ran. Write the body to a file with a quoted heredoc (\`cat > <path> <<'EOF'\`), in the same call or its own, then pass that path: \`--body-file <path>\` on \`gh\`, \`--description-file <path>\` on \`glab\`. When another command in the call writes or edits the body file, run it in its own call first.
 Also worth addressing in the same edit:
 - The title runs 52 characters. Under 50 keeps it readable in a PR list and in \`git log --oneline\`."
 ,

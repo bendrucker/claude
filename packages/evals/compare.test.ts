@@ -210,7 +210,7 @@ test("marks cells too small to star", async () => {
   const base = await result({ c: { with: [fail(), fail()] } });
   const next = await result({ c: { with: [pass(), pass()] } });
   const columns = await Promise.all([loadColumn([base]), loadColumn([next])]);
-  expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain("1.00†");
+  expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain("1.00 (p=0.33)†");
 });
 
 test("marks a case whose errored runs left the pool", async () => {

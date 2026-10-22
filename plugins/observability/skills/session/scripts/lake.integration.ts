@@ -7,7 +7,9 @@ import { $ } from "bun";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { z } from "zod";
 import { ensureIndex, getDb, sessionDbPath } from "./db";
-import { type LakeOptions, materializedViews, publish, viewStatements } from "./lake";
+import { publish } from "./lake/publish";
+import type { LakeOptions } from "./lake/store";
+import { materializedViews, viewStatements } from "./lake/views";
 
 const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 const viewsSql = join(import.meta.dirname, "..", "resources", "views.sql");

@@ -88,7 +88,7 @@ The writers carry the `claude:dangerouslyDisableSandbox` marker after their sheb
 
 - `db.ts`: orchestrates migration, schema, scan, per-file import, view rebuild and versioning, checkpoint, compaction.
 - `refresh.ts`: CLI entry point. Stamp fast-path, `ensureIndex`, `--compact`, compaction guard, prints DB path to stdout.
-- `lake.ts`: publish to the lake, its `CHECKPOINT`, and the reader init.
+- `lake.ts`: CLI for the lake. `lake/publish.ts` holds the publish, `lake/writer.ts` the writer's connection and `CHECKPOINT`, `lake/views.ts` which views materialize and the reader init, and `lake/store.ts` the URLs, S3 setup and catalog transfer.
 - `query.ts`: the one path from a named query (or literal SQL) plus params to decoded rows. Two adapters share the variable binding: `nodeAdapter` binds on the read-write connection `db.ts` already holds, and `cliAdapter` spawns `duckdb -readonly -init limits.sql` with a timeout, rendering the same params as `SET VARIABLE` lines through one escaping function. `usage.ts` and `schema.ts` take the read-only adapter so they never wait on a refresh's write lock. `runQuery` appends a `session-index.query` event per read. Every scripted reader goes through `cliAdapter`.
 
 ### Development

@@ -128,7 +128,8 @@ describe("classifier query", () => {
         "verdict | ask | user-rejected | 1 | 1600 | 1600 | 1600",
       ]
     `);
-  });
+    // Indexing from empty can download the community extensions on a cold runner.
+  }, 60_000);
 });
 
 describe("telemetry ingest", () => {

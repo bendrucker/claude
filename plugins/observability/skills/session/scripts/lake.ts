@@ -1,8 +1,6 @@
 #!/usr/bin/env bun
 // Publishes the session index to a DuckLake that remote readers query in place, and
-// writes the init file those readers open it with. The local index stays the source of
-// truth: each publish copies only the files that changed since the last one, and
-// replaces the rows of every session those files touch.
+// writes the init file those readers open it with.
 import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -32,9 +30,8 @@ const WHOLE_TABLES = ["meta", "index_meta"];
 // Rows sorted by time in small row groups, so a window filter skips most of a file.
 const ROW_GROUP_SIZE = "8192";
 /**
- * Raw bytes of the sessions one batch of inserts covers. Each insert evaluates its view and
- * sorts its rows in memory, so a first publish of a large index goes in batches of sessions
- * by start time, the layout nightly publishes leave anyway.
+ * Raw bytes of the sessions one batch of inserts covers. Each insert evaluates its view
+ * and sorts its rows in memory.
  */
 const BATCH_BYTES = 512 * 1024 * 1024;
 
@@ -47,7 +44,7 @@ export interface LakeOptions {
   index: string;
   /** Where the writer keeps its copy of a remote catalog between publishes. */
   stateDir: string;
-  /** Imported hosts' root, for their egress policy. Defaults as in db.ts. */
+  /** Imported hosts' root, for their egress policy. */
   importsDir?: string;
 }
 
@@ -76,7 +73,6 @@ function proxySettings(): string[] {
   ];
 }
 
-/** httpfs on the ambient AWS credentials, trusting a proxy's CA bundle when one is set. */
 function s3Setup(proxy: string[]): string {
   const ca = process.env.AWS_CA_BUNDLE ?? process.env.SSL_CERT_FILE;
   const region = process.env.AWS_REGION ?? "us-east-1";
@@ -191,9 +187,9 @@ export interface PublishResult {
 
 /**
  * One DuckLake commit: the files whose (mtime, size) differ from the last publish, and
- * every session they touch, before or after the change. A first publish is the same diff
- * against an empty lake. A remote catalog is uploaded only after the commit, and its
- * Parquet files are immutable, so a reader sees the previous snapshot or this one.
+ * every session they touch, before or after the change. A remote catalog is uploaded
+ * only after the commit, and its Parquet files are immutable, so a reader sees the
+ * previous snapshot or this one.
  */
 export async function publish(o: LakeOptions): Promise<PublishResult> {
   const blocked = (

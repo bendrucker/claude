@@ -1,0 +1,4 @@
+---
+type: llm
+---
+Read only the issue between the <issue> lines, above any "Agent Context" heading. Every question the issue leaves open needs a real investigation with cross-cutting consequences that reading the code or a quick prototype can't settle, such as a performance study or a decision other teams depend on. An implementation detail the author could have decided while refining (a timeout value, a field name, where a result is stored, which of two internal functions to call) left open fails. So does a question a short test would answer, unless the issue frames it as a check for the assignee to run rather than an open question. An issue with no open questions passes. For example, "Before choosing the probe, call a restricted-policy connection through both `call_tool` and `health` and use whichever reports the failure" passes, and "Timeout: none has been chosen yet" fails.

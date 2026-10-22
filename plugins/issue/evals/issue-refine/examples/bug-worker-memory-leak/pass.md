@@ -12,7 +12,7 @@ Under sustained load the `JobWorker` heap climbs steadily and the process is OOM
 
 ## Suspects
 
-- `JobRegistry` keeps in-flight jobs in a dict keyed by job id. If completion never removes the entry, every job stays reachable.
+- `JobRegistry` may never drop completed jobs from its dict.
 - `MetricsCollector` appends a record per completed job with no bound.
 
 ## Expected Behavior

@@ -41,7 +41,10 @@ describe("prVerb", () => {
 });
 
 const literal = (text: string): BodyPart => ({ kind: "literal", text });
-const file = (filePath: string): BodyPart => ({ kind: "file", path: filePath });
+const file = (filePath: string, writer?: string): BodyPart =>
+  writer === undefined
+    ? { kind: "file", path: filePath }
+    : { kind: "file", path: filePath, writer };
 const parts = (...items: BodyPart[]): BodySpec => ({ kind: "parts", parts: items });
 
 // A same-call heredoc's `text` is what these cases assert on. Its `span` and
@@ -146,7 +149,7 @@ describe("extractBodySpec", () => {
     // business, because the body is not a copy of what is already published.
     [
       "gh pr view 12 --json body -q .body > body.md && gh pr edit 34 --body-file body.md",
-      parts(file("body.md")),
+      parts(file("body.md", "gh pr view 12 --json body -q .body")),
     ],
     [
       "gh pr view 12 --json body -q .body > other.md && gh pr edit 12 --body-file body.md",
@@ -154,8 +157,37 @@ describe("extractBodySpec", () => {
     ],
     [
       String.raw`printf 'Prose.\n' > body.md && gh pr edit 12 --body-file body.md`,
-      parts(file("body.md")),
+      parts(file("body.md", String.raw`printf 'Prose.\n'`)),
     ],
+    // Claude Code's default inline body: the substitution drops trailing newlines.
+    [
+      "gh pr create --title T --body \"$(cat <<'EOF'\n## Summary\n\nProse.\nEOF\n)\"",
+      parts(literal("## Summary\n\nProse.")),
+    ],
+    ["glab mr create --description \"$(cat <<'EOF'\nProse.\n\nEOF\n)\"", parts(literal("Prose."))],
+    // A copy made in the same call holds its source.
+    [
+      "cp tmp/pr-body.md tmp/pr-body-x.md && gh pr create --body-file tmp/pr-body-x.md",
+      parts(file("tmp/pr-body.md")),
+    ],
+    ["mv -f a.md b.md && gh pr create --body-file b.md", parts(file("a.md"))],
+    ["cat a.md > b.md && gh pr create --body-file b.md", parts(file("a.md"))],
+    [
+      "cat > a.md <<'EOF'\nProse.\nEOF\ncp a.md b.md && gh pr create --body-file b.md",
+      parts(literal("Prose.\n")),
+    ],
+    ["cp a.md c.md dir/b.md && gh pr create --body-file b.md", parts(file("b.md"))],
+    ["cat a.md c.md > b.md && gh pr create --body-file b.md", parts(file("b.md", "cat a.md c.md"))],
+    // An in-place edit leaves text the hook cannot know before it runs.
+    [
+      "sed -i '' 's/a/b/' tmp/pr-body-y.md && gh pr create --body-file tmp/pr-body-y.md",
+      parts(file("tmp/pr-body-y.md", "sed -i '' 's/a/b/' tmp/pr-body-y.md")),
+    ],
+    [
+      "perl -pi -e 's/a/b/' body.md && gh pr create --body-file body.md",
+      parts(file("body.md", "perl -pi -e 's/a/b/' body.md")),
+    ],
+    ["sed 's/a/b/' body.md && gh pr create --body-file body.md", parts(file("body.md"))],
     [
       "gh pr view 12 --json body -q .body > body.md && cat > body.md <<'EOF'\nProse.\nEOF\ngh pr edit 12 --body-file body.md",
       parts(literal("Prose.\n")),
@@ -178,6 +210,7 @@ describe("extractBodySpec", () => {
       "unquoted heredoc",
     ],
     ["gh pr create --body-file - <<EOF\nRelease $VERSION\nEOF", "$VERSION"],
+    ['gh pr create --body "$(cat <<EOF\nRelease $VERSION\nEOF\n)"', "$(cat <<EOF"],
   ])("extractBodySpec(%p) reports it cannot read %p", (command, fragment) => {
     const spec = extractBodySpec(command);
     expect(spec.kind).toBe("unreadable");
@@ -299,6 +332,23 @@ describe("resolveBody $TMPDIR candidates", () => {
     }
   });
 
+  it("finds the Linux sandbox's TMPDIR nested under the hook's own", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "resolve-body-nested-"));
+    const body = "## Summary\n\nFrom the nested sandbox TMPDIR.\n";
+    await Bun.write(join(dir, `claude-${process.getuid?.() ?? 0}`, "body.md"), body);
+    const originalTmpdir = process.env.TMPDIR;
+    try {
+      process.env.TMPDIR = dir;
+      expect(
+        await resolveBody('gh pr create --body-file "$TMPDIR/body.md"', "/repo"),
+      ).toMatchObject({ kind: "text", text: body });
+    } finally {
+      if (originalTmpdir === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = originalTmpdir;
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("reads the hook's own TMPDIR when the file is there", async () => {
     const dir = mkdtempSync(join(tmpdir(), "resolve-body-tmpdir-"));
     const body = "## Summary\n\nFrom the hook's own TMPDIR.\n";
@@ -336,6 +386,28 @@ describe("resolveBody $TMPDIR candidates", () => {
       await rm(sandboxDir, { recursive: true, force: true });
       await rm(hookDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("resolveBody same-call writes", () => {
+  it("reads a copy's source when the copy does not exist yet", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "resolve-body-copy-"));
+    const body = "## Summary\n\nCopied in the same call.\n";
+    await Bun.write(join(dir, "pr-body.md"), body);
+    const command = `cp ${dir}/pr-body.md ${dir}/pr-body-x.md && gh pr create --body-file ${dir}/pr-body-x.md`;
+    expect(await resolveBody(command, "/repo")).toMatchObject({
+      kind: "text",
+      text: body,
+      file: null,
+    });
+  });
+
+  it("names the step that writes a body file it cannot read yet", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "resolve-body-edit-"));
+    const command = `sed -i '' 's/a/b/' ${dir}/body.md && gh pr create --body-file ${dir}/body.md`;
+    const resolved = await resolveBody(command, "/repo");
+    expect(resolved.kind).toBe("unreadable");
+    expect(resolved.kind === "unreadable" ? resolved.detail : "").toContain("which `sed -i ''");
   });
 });
 

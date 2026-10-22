@@ -5,7 +5,6 @@
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"
   },
-  "types": "./types/index.d.ts",
   "dependencies": ["mod-events"],
   "userConfig": {
     "overage": {

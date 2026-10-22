@@ -29,7 +29,7 @@ The query lines are generated from those headers. Edit the header, then regenera
 - `sandbox-bypass-effective-command` [`min_count`]: Bypassed commands by their real verb, ranked by frequency, with the split between bypasses that followed a failed sandboxed run (`justified`) and those that did not (`reflexive`): the `excludedCommands` candidates.
 - `sandbox-bypass-scaffold`: Weekly share of `dangerouslyDisableSandbox` calls whose commands already escape through `excludedCommands`, the `sandbox` plugin's retirement signal.
 - `sandbox-path-deny-recurrence`: `Operation not permitted` and adjacent Bash failures bucketed into concrete sandbox config gaps, with recurrence and date span.
-- `search` [`query`, `limit`]: Find sessions by keyword, ranked by BM25 over each session's label, typed prompts and main-thread assistant prose.
+- `search` [`query`, `limit`]: Find sessions by keyword, ranked by BM25 over each session's label, prompts, assistant prose, thinking, and tool calls with their output.
 - `skill-activity`: Work attributed to each skill: assistant turns, sessions, and input, output, and cache tokens.
 - `skill-auto-vs-explicit` [`min_calls`]: Per skill, how invocations split between the model choosing it (`model_auto`), another skill chaining into it (`chained`), and the user typing its slash command (`explicit`).
 - `stats`: Tool usage breakdown with error rates and aggregate totals.

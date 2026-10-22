@@ -1,24 +1,24 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`render stars rows that moved and leads the markdown with them 1`] = `
-"* marks p < 0.1 against base (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.
+"Each cell shows its two-sided permutation p-value against base, and * marks p < 0.1. all/<arm> pools every case's runs. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.
 
 | measure | row | base | next |
 | --- | --- | --- | --- |
-| Case score | c/with | 1.00 | 0.00* |
-| Reply words | c/with | 3 | 6* |
-| Turns per run | c/with | 2.0 | 5.0* |
-| Seconds per run | c/with | 10.0 | 30.0* |
-| Output tokens per run | c/with | 500 | 900* |
-| Cost per run (USD) | c/with | 0.100 | 0.300* |
-| Grader pass rate | c/with · fact | 1.00 | 0.00* |
-| Grader pass rate | c/with · fired (indicator) | 1.00 | 0.00* |
+| Case score | c/with | 1.00 | 0.00 (p=0.001)* |
+| Reply words | c/with | 3 | 6 (p=0.001)* |
+| Turns per run | c/with | 2.0 | 5.0 (p=0.001)* |
+| Seconds per run | c/with | 10.0 | 30.0 (p=0.001)* |
+| Output tokens per run | c/with | 500 | 900 (p=0.001)* |
+| Cost per run (USD) | c/with | 0.100 | 0.300 (p=0.001)* |
+| Grader pass rate | c/with · fact | 1.00 | 0.00 (p=0.001)* |
+| Grader pass rate | c/with · fired (indicator) | 1.00 | 0.00 (p=0.001)* |
 
 <details><summary>Case score</summary>
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 1.00 | 0.00* |
+| c/with | 1.00 | 0.00 (p=0.001)* |
 
 </details>
 
@@ -34,7 +34,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 3 | 6* |
+| c/with | 3 | 6 (p=0.001)* |
 
 </details>
 
@@ -42,7 +42,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 2.0 | 5.0* |
+| c/with | 2.0 | 5.0 (p=0.001)* |
 
 </details>
 
@@ -50,7 +50,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 10.0 | 30.0* |
+| c/with | 10.0 | 30.0 (p=0.001)* |
 
 </details>
 
@@ -58,7 +58,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 500 | 900* |
+| c/with | 500 | 900 (p=0.001)* |
 
 </details>
 
@@ -66,7 +66,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 0.100 | 0.300* |
+| c/with | 0.100 | 0.300 (p=0.001)* |
 
 </details>
 
@@ -74,8 +74,8 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | grader | base | next |
 | --- | --- | --- | --- |
-| c/with | fact | 1.00 | 0.00* |
-| c/with | fired (indicator) | 1.00 | 0.00* |
+| c/with | fact | 1.00 | 0.00 (p=0.001)* |
+| c/with | fired (indicator) | 1.00 | 0.00 (p=0.001)* |
 
 </details>"
 `;
@@ -85,6 +85,8 @@ exports[`render reports a lone column with its scores open and nothing starred 1
 
 | case/arm | run |
 | --- | --- |
+| all/with | 0.50 |
+| all/without | 0.00 |
 | c/with | 0.50 |
 | c/without | 0.00 |
 
@@ -146,6 +148,10 @@ exports[`render reports a lone column with its scores open and nothing starred 1
 
 | case/arm | grader | run |
 | --- | --- | --- |
+| all/with | fact | 0.50 |
+| all/without | fact | 0.00 |
+| all/with | fired (indicator) | 0.50 |
+| all/without | fired (indicator) | 0.00 |
 | c/with | fact | 0.50 |
 | c/with | fired (indicator) | 0.50 |
 | c/without | fact | 0.00 |
@@ -170,17 +176,21 @@ exports[`render rolls case scores up by tag 1`] = `
 ╚═════════════════╧══════╝
 
 Case score
-╔═══════════╤══════╗
-║ case/arm  │ base ║
-╟───────────┼──────╢
-║ a/with    │ 0.75 ║
-╟───────────┼──────╢
-║ a/without │ 0.00 ║
-╟───────────┼──────╢
-║ b/with    │ 0.00 ║
-╟───────────┼──────╢
-║ b/without │ 0.00 ║
-╚═══════════╧══════╝
+╔═════════════╤══════╗
+║ case/arm    │ base ║
+╟─────────────┼──────╢
+║ all/with    │ 0.50 ║
+╟─────────────┼──────╢
+║ all/without │ 0.00 ║
+╟─────────────┼──────╢
+║ a/with      │ 0.75 ║
+╟─────────────┼──────╢
+║ a/without   │ 0.00 ║
+╟─────────────┼──────╢
+║ b/with      │ 0.00 ║
+╟─────────────┼──────╢
+║ b/without   │ 0.00 ║
+╚═════════════╧══════╝
 
 Case minimum
 ╔═══════════╤══════╗
@@ -261,24 +271,32 @@ Cost per run (USD)
 ╚═══════════╧═══════╝
 
 Grader pass rate
-╔═══════════╤═══════════════════╤══════╗
-║ case/arm  │ grader            │ base ║
-╟───────────┼───────────────────┼──────╢
-║ a/with    │ fact              │ 1.00 ║
-╟───────────┼───────────────────┼──────╢
-║ a/with    │ fired (indicator) │ 1.00 ║
-╟───────────┼───────────────────┼──────╢
-║ a/without │ fact              │ 0.00 ║
-╟───────────┼───────────────────┼──────╢
-║ a/without │ fired (indicator) │ 0.00 ║
-╟───────────┼───────────────────┼──────╢
-║ b/with    │ fact              │ 0.00 ║
-╟───────────┼───────────────────┼──────╢
-║ b/with    │ fired (indicator) │ 0.00 ║
-╟───────────┼───────────────────┼──────╢
-║ b/without │ fact              │ 0.00 ║
-╟───────────┼───────────────────┼──────╢
-║ b/without │ fired (indicator) │ 0.00 ║
-╚═══════════╧═══════════════════╧══════╝
+╔═════════════╤═══════════════════╤══════╗
+║ case/arm    │ grader            │ base ║
+╟─────────────┼───────────────────┼──────╢
+║ all/with    │ fact              │ 0.67 ║
+╟─────────────┼───────────────────┼──────╢
+║ all/without │ fact              │ 0.00 ║
+╟─────────────┼───────────────────┼──────╢
+║ all/with    │ fired (indicator) │ 0.67 ║
+╟─────────────┼───────────────────┼──────╢
+║ all/without │ fired (indicator) │ 0.00 ║
+╟─────────────┼───────────────────┼──────╢
+║ a/with      │ fact              │ 1.00 ║
+╟─────────────┼───────────────────┼──────╢
+║ a/with      │ fired (indicator) │ 1.00 ║
+╟─────────────┼───────────────────┼──────╢
+║ a/without   │ fact              │ 0.00 ║
+╟─────────────┼───────────────────┼──────╢
+║ a/without   │ fired (indicator) │ 0.00 ║
+╟─────────────┼───────────────────┼──────╢
+║ b/with      │ fact              │ 0.00 ║
+╟─────────────┼───────────────────┼──────╢
+║ b/with      │ fired (indicator) │ 0.00 ║
+╟─────────────┼───────────────────┼──────╢
+║ b/without   │ fact              │ 0.00 ║
+╟─────────────┼───────────────────┼──────╢
+║ b/without   │ fired (indicator) │ 0.00 ║
+╚═════════════╧═══════════════════╧══════╝
 "
 `;

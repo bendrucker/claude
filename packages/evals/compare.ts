@@ -25,11 +25,29 @@ const perRun: Record<Measure, [title: string, digits: number]> = {
 
 const fmt = (xs: number[], digits: number) => (xs.length > 0 ? mean(xs).toFixed(digits) : "-");
 
-/** A cell's mark: `*` when it moved, `†` when too few runs could ever star it. */
+/**
+ * A cell's p-value against the baseline and its mark: `*` when it moved, `†` when too few runs
+ * could ever star it.
+ */
 function mark(base: number[], xs: number[], alpha: number): string {
   if (base.length === 0 || xs.length === 0) return "";
-  if (pFloor(base.length, xs.length) >= alpha) return "†";
-  return pValue(base, xs) < alpha ? "*" : "";
+  const p = pValue(base, xs);
+  if (pFloor(base.length, xs.length) >= alpha) return ` (p=${p.toFixed(2)})†`;
+  return ` (p=${p.toFixed(3)})${p < alpha ? "*" : ""}`;
+}
+
+const ARMS = ["with", "without"];
+
+/** Every case's runs on one arm, pooled, so a suite-wide shift can star where no case can. */
+function poolArm(columns: Column[], keys: string[], arm: string, pick: (cell: Cell) => number[]) {
+  return columns.map((c) =>
+    keys
+      .filter((key) => key.endsWith(`/${arm}`))
+      .flatMap((key) => {
+        const cell = c.get(key);
+        return cell === undefined ? [] : pick(cell);
+      }),
+  );
 }
 
 function sections({ columns, alpha, tags }: RenderOptions): Section[] {
@@ -54,6 +72,10 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
       2,
     ),
   );
+  const poolRows = (pick: (cell: Cell) => number[], prefix: string[] = []) =>
+    ARMS.filter((arm) => keys.some((key) => key.endsWith(`/${arm}`))).map((arm) =>
+      row([`all/${arm}`, ...prefix], poolArm(columns, keys, arm, pick), 2),
+    );
   // A lone collapsed run drags a mean without starring it. The minimum shows it.
   const minRows = keys.map((key) => [
     key,
@@ -84,15 +106,30 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
     );
   });
 
+  const graderNames = new Set<string>();
+  for (const column of columns) {
+    for (const cell of column.values())
+      for (const name of cell.graders.keys()) graderNames.add(name);
+  }
+  const graderPoolRows =
+    keys.length > 1
+      ? [...graderNames]
+          .toSorted()
+          .flatMap((name) => poolRows((c) => (c.graders.get(name) ?? []).map(Number), [name]))
+      : [];
   const result: Section[] = [
-    ["Case score", ["case/arm"], scoreRows],
+    [
+      "Case score",
+      ["case/arm"],
+      keys.length > 1 ? [...poolRows((c) => c.scores), ...scoreRows] : scoreRows,
+    ],
     ["Case minimum", ["case/arm"], minRows],
     ...measureSections,
-    ["Grader pass rate", ["case/arm", "grader"], graderRows],
+    ["Grader pass rate", ["case/arm", "grader"], [...graderPoolRows, ...graderRows]],
   ];
   if (tags !== undefined) {
     const names = [...new Set([...tags.values()].flat())].toSorted();
-    const tagRows = ["with", "without"].flatMap((arm) =>
+    const tagRows = ARMS.flatMap((arm) =>
       names.map((tag) => {
         const cases = [...tags].filter(([, t]) => t.includes(tag)).map(([c]) => c);
         const pooled = columns.map((c) =>
@@ -125,7 +162,7 @@ export function render(options: RenderOptions): string {
   const out = single
     ? []
     : [
-        `* marks p < ${alpha} against ${labels[0]} (permutation test, pooled runs). † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.\n`,
+        `Each cell shows its two-sided permutation p-value against ${labels[0]}, and * marks p < ${alpha}. all/<arm> pools every case's runs. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.\n`,
       ];
   if (!options.markdown) {
     for (const [title, head, rows] of all) out.push(title, table([[...head, ...labels], ...rows]));

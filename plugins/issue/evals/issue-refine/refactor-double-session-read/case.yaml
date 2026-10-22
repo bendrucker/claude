@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: refactor-double-session-read
-tags: [refactor, compact]
+tags: [refactor, compact, dev]
 plugins: ["../../..", "../../../../pull-request"]
 execution:
   model: claude-sonnet-5-5

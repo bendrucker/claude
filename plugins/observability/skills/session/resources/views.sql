@@ -234,31 +234,104 @@ QUALIFY r.uuid IS NULL
 
 CREATE OR REPLACE TABLE content_items AS SELECT * FROM content_item_rows(false);
 
--- The prose `search` ranks, lowercased once here so a query scans a few rows per session
--- instead of every content block: typed prompts and main-thread assistant text, plus the
--- label at weight 3. Skill bodies, harness text and subagent turns are left out. Rows are
--- per session, so db.ts rebuilds the scoped sessions' rows beside content_items. BM25's
--- document frequencies come from this table at query time and need no refresh of their own.
+-- The text `search` ranks, lowercased once here so a query scans a few rows per session
+-- instead of every content block. Every main-thread content block is classified into a
+-- `surface` by its type, and `policy` sets each surface's weight and per-item cap, so a
+-- new tool or MCP server is searchable without naming it. Read output and the bulk fields
+-- of Write and Edit input are left out because they hold file contents rather than what
+-- the session did. Skill bodies and harness `<...>` text repeat across sessions. A
+-- subagent's brief and report already reach the parent as Agent input and output, so its
+-- own turns are left out too. Rows are per session, so db.ts rebuilds the scoped sessions' rows beside
+-- content_items. BM25's document frequencies come from this table at query time and need
+-- no refresh of their own.
 CREATE OR REPLACE MACRO search_item_rows(scoped) AS TABLE
-SELECT ci.host, ci.session_id, lower(ci.text) AS text, 1 AS weight
-FROM content_items ci
-WHERE ci.text IS NOT NULL
-  AND ci.source_file NOT LIKE '%/subagents/%'
-  AND ((ci.type = 'prompt' AND NOT ci.is_meta) OR (ci.type = 'text' AND ci.role = 'assistant'))
-  AND ci.text NOT LIKE '<%'
-  AND ci.text NOT LIKE 'This session is being continued%'
-  AND ci.text NOT LIKE 'Base directory for this skill:%'
-  AND (NOT scoped OR EXISTS (
+-- Tool text runs about five times the volume of prose, and at full weight a common term
+-- in it ranks every session alike, so it counts a quarter as much as prose.
+WITH policy(surface, weight, cap) AS (
+  VALUES
+    ('label', 3.0, NULL),
+    ('prompt', 1.0, NULL),
+    ('queued_prompt', 1.0, NULL),
+    ('assistant', 1.0, NULL),
+    ('thinking', 1.0, NULL),
+    ('tool_input', 0.25, 2000),
+    ('tool_output', 0.25, 2000)
+),
+blocks AS (
+  SELECT
+    ci.host,
+    ci.session_id,
+    CASE
+      WHEN ci.type = 'prompt' AND NOT ci.is_meta THEN 'prompt'
+      WHEN ci.type = 'text' AND ci.role = 'assistant' THEN 'assistant'
+      WHEN ci.type = 'thinking' THEN 'thinking'
+      WHEN ci.type = 'tool_use' THEN 'tool_input'
+      WHEN ci.type = 'tool_result' THEN 'tool_output'
+    END AS surface,
+    CASE ci.type
+      WHEN 'thinking' THEN ci.data->>'$.thinking'
+      WHEN 'tool_use' THEN concat_ws(' ', ci.name, array_to_string(
+        [json_extract_string(ci.data, '$.input."' || k || '"')
+          FOR k IN json_keys(ci.data, '$.input')
+          IF k NOT IN ('content', 'old_string', 'new_string', 'edits', 'new_source', 'script')],
+        ' '))
+      WHEN 'tool_result' THEN CASE json_type(json_extract(ci.data, '$.content'))
+        WHEN 'ARRAY' THEN array_to_string(json_extract_string(ci.data, '$.content[*].text'), ' ')
+        ELSE ci.content END
+      ELSE ci.text
+    END AS text
+  FROM content_items ci
+  WHERE ci.source_file NOT LIKE '%/subagents/%'
+    AND NOT (ci.type = 'tool_result' AND EXISTS (
+      SELECT 1 FROM content_items u
+      WHERE u.host = ci.host AND u.session_id = ci.session_id
+        AND u.type = 'tool_use' AND u.id = ci.tool_use_id AND u.name = 'Read'
+    ))
+    AND (NOT scoped OR EXISTS (
+      SELECT 1 FROM content_item_scope c
+      WHERE c.host = ci.host AND c.session_id IS NOT DISTINCT FROM ci.session_id
+    ))
+),
+surfaced AS (
+  SELECT * FROM blocks
+  WHERE surface NOT IN ('prompt', 'assistant')
+    OR (text NOT LIKE '<%'
+      AND text NOT LIKE 'This session is being continued%'
+      AND text NOT LIKE 'Base directory for this skill:%')
+  UNION ALL
+  -- A message typed while a turn runs lands as a queued_command attachment, never as a
+  -- prompt row.
+  SELECT r.host, r.session_id, 'queued_prompt', r.data->>'$.attachment.prompt'
+  FROM raw r
+  WHERE r.type = 'attachment'
+    AND (r.data->>'$.attachment.type') = 'queued_command'
+    AND coalesce(r.data->>'$.attachment.commandMode', 'prompt') = 'prompt'
+    AND json_type(json_extract(r.data, '$.attachment.prompt')) = 'VARCHAR'
+    AND (r.data->>'$.attachment.prompt') NOT LIKE '<%'
+    AND r.source_file NOT LIKE '%/subagents/%'
+    AND (NOT scoped OR EXISTS (
+      SELECT 1 FROM content_item_scope c
+      WHERE c.host = r.host AND c.session_id IS NOT DISTINCT FROM r.session_id
+    ))
+  QUALIFY r.uuid IS NULL
+    OR ROW_NUMBER() OVER (
+         PARTITION BY r.host, r.session_id, r.uuid
+         ORDER BY r.source_line DESC, r.source_file DESC
+       ) = 1
+  UNION ALL
+  SELECT l.host, l.session_id, 'label', l.label
+  FROM session_labels l
+  WHERE NOT scoped OR EXISTS (
     SELECT 1 FROM content_item_scope c
-    WHERE c.host = ci.host AND c.session_id IS NOT DISTINCT FROM ci.session_id
-  ))
-UNION ALL
-SELECT l.host, l.session_id, lower(l.label), 3
-FROM session_labels l
-WHERE NOT scoped OR EXISTS (
-  SELECT 1 FROM content_item_scope c
-  WHERE c.host = l.host AND c.session_id IS NOT DISTINCT FROM l.session_id
-);
+    WHERE c.host = l.host AND c.session_id IS NOT DISTINCT FROM l.session_id
+  )
+)
+SELECT s.host, s.session_id, s.surface,
+  lower(CASE WHEN p.cap IS NULL THEN s.text ELSE left(s.text, p.cap) END) AS text,
+  CAST(p.weight AS DOUBLE) AS weight
+FROM surfaced s
+JOIN policy p USING (surface)
+WHERE s.text IS NOT NULL AND s.text <> '';
 
 CREATE OR REPLACE TABLE search_items AS SELECT * FROM search_item_rows(false);
 

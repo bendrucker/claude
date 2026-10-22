@@ -29,7 +29,6 @@ const IN_TOUCHED = inSessions("touched");
 
 const Column = z.object({ db: z.string(), name: z.string(), col: z.string(), type: z.string() });
 type Column = z.infer<typeof Column>;
-// The lake's record of published files mirrors the index's indexed_files.
 const source = (t: string) => (t === "published_files" ? "indexed_files" : t);
 
 export interface PublishResult {
@@ -37,7 +36,6 @@ export interface PublishResult {
   sessions: number;
 }
 
-/** The tables a publish writes, how each sorts, and which to drop first. */
 function plan(columns: Column[], views: string[]) {
   const shape = (db: string, t: string) =>
     columns
@@ -69,7 +67,6 @@ function plan(columns: Column[], views: string[]) {
 }
 type Plan = ReturnType<typeof plan>;
 
-/** Opens the transaction and clears every row the publish replaces. */
 function stage(p: Plan, allowed: string): string[] {
   return [
     "BEGIN",
@@ -98,7 +95,6 @@ function stage(p: Plan, allowed: string): string[] {
   ];
 }
 
-/** Inserts one batch of touched sessions into every session-keyed table. */
 function insertBatch(p: Plan, allowed: string, batch: number): string[] {
   const inBatch = inSessions(`batches WHERE coalesce(batch, 0) = ${batch}`);
   return [
@@ -113,7 +109,6 @@ function insertBatch(p: Plan, allowed: string, batch: number): string[] {
   ];
 }
 
-/** Replaces the small whole tables and records which files this publish covered. */
 function finish(allowed: string): string[] {
   return [
     ...WHOLE_TABLES.flatMap((t) => [

@@ -42,8 +42,8 @@ export function materializedViews(statements: Statement[]): string[] {
 }
 
 /**
- * What a reader runs before its query: limits, the attach, and every macro and view the
- * lake does not hold as a table. Unqualified names resolve to the lake's tables.
+ * The SQL a reader runs before its query. Unqualified names resolve to the lake's
+ * tables.
  */
 export async function readerInit(url: string): Promise<string> {
   const kept = (await loadViews()).filter((s) =>

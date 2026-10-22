@@ -25,8 +25,8 @@ export const localCatalog = (o: LakeOptions): string =>
 export const quote = (s: string): string => `'${s.replaceAll("'", "''")}'`;
 
 /**
- * DuckDB cannot parse the sandbox's credentialed `http_proxy`, so split it into the settings
- * it does accept. The writer splits it here, since the node API lacks the CLI's `getenv`.
+ * DuckDB cannot parse the sandbox's credentialed `http_proxy`, so split it into the
+ * settings it does accept.
  */
 export function proxySettings(): string[] {
   const raw = [process.env.http_proxy, process.env.HTTP_PROXY].find(

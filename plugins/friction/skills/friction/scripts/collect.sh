@@ -7,7 +7,6 @@ src=$1 day=${2:-$(date +%F)} days=${3:-1}
 dir=$(dirname "$0")/../queries/$src
 {
   echo "SET VARIABLE day = DATE '$day'; SET VARIABLE days = $days;"
-  echo "SET VARIABLE cores = $(getconf _NPROCESSORS_ONLN);"
   echo "SET VARIABLE osquery_dir = '${FRICTION_OSQUERY_DIR:-$HOME/.local/state/osquery}';"
   echo "SET VARIABLE atuin_db = '${FRICTION_ATUIN_DB:-$HOME/.local/share/atuin/history.db}';"
   cat "$dir/load.sql"

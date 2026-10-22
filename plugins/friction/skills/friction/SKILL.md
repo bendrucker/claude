@@ -67,7 +67,7 @@ One JSON object per symptom seen in the window, including ones you expect to sta
 
 ```json
 {"type": "contention", "target": "bun, duckdb", "impact": "high",
- "metric": "60% of load>30 minutes had a bun/duckdb job within 2 min, vs 4% of quiet minutes",
+ "metric": "60% of saturated minutes had a bun/duckdb job within 2 min, vs 4% of other minutes",
  "fix": "rebuild session-index views per touched session", "small": false}
 ```
 

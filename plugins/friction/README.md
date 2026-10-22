@@ -5,7 +5,7 @@ Counts recurring friction across the development setup. Mid-week it opens a PR o
 > Opened a draft PR fixing `cloudsmith auth` (`Friction: 51330ae96d0e`): 9 of 11 runs failed across 25 minutes of retries.
 >
 > **Below the cut**
-> - `363d8b49f935` `bun, duckdb`, 3 days: 67% of load>30 minutes vs 7% quiet. Make the scheduled job incremental.
+> - `363d8b49f935` `bun, duckdb`, 3 days: 67% of saturated minutes vs 7% of others. Make the scheduled job incremental.
 > - `8bb15044b0cc` session-index refresh, 3 days: 70 GB written. Rebuild views per changed session.
 
 ## Requirements

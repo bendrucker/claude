@@ -42,6 +42,42 @@ const proc = (t: number, pid: number, name: string, cpuMs: number, written: numb
   ],
 });
 
+// Cumulative CPU ticks summed over cores. Each sample adds 100 ticks, `idle` of them idle.
+const hostCpu = (idle: number) => {
+  let total = 0;
+  let idleTicks = 0;
+  return (t: number): Snapshot => {
+    total += 100;
+    idleTicks += idle;
+    return {
+      name: "host_cpu",
+      t,
+      rows: [{ user: total - idleTicks, nice: 0, system: 0, idle: idleTicks }],
+    };
+  };
+};
+
+const group = (
+  t: number,
+  name: string,
+  threads: number,
+  cpuMs: number,
+  written: number,
+): Snapshot => ({
+  name: "proc_groups",
+  t,
+  rows: [
+    {
+      name,
+      processes: 5,
+      threads,
+      cpu_time: cpuMs,
+      disk_bytes_read: 0,
+      disk_bytes_written: written,
+    },
+  ],
+});
+
 // One sample every 10 s for `minutes`, starting at `t`.
 const every10s = (t: number, minutes: number, make: (t: number) => Snapshot) =>
   Array.from({ length: minutes * 6 }, (_, i) => make(t + i * 10));
@@ -56,7 +92,6 @@ async function osquery(snapshots: Snapshot[], query: string, days = 1) {
     osquery_dir: `'${dir}'`,
     day: `DATE '${DAY}'`,
     days: `${days}`,
-    cores: "10",
   });
 }
 
@@ -70,7 +105,7 @@ afterAll(() => {
 
 async function run(source: string, query: string, vars: Record<string, string>) {
   // Cases share one in-memory instance, so drop what the last case loaded.
-  const tables = ["snaps", "pressure", "cpu", "groups", "runs"];
+  const tables = ["snaps", "pressure", "cpu", "groups", "host", "runs"];
   await conn.run(
     [
       "DROP MACRO IF EXISTS win_start",
@@ -89,47 +124,76 @@ async function run(source: string, query: string, vars: Record<string, string>) 
 }
 
 describe("osquery", () => {
-  test("overload counts minutes over 3x cores in the window only", async () => {
+  test("saturation counts minutes with no idle sample over 5%, in the window only", async () => {
+    const busy = hostCpu(2);
     const rows = await osquery(
       [
-        ...every10s(YESTERDAY, 30, (t) => pressure(t, 40)),
-        ...every10s(T0, 10, (t) => pressure(t, 35)),
-        ...every10s(T0 + 3600, 20, (t) => pressure(t, 5)),
+        ...every10s(YESTERDAY, 30, busy),
+        ...every10s(T0, 10, busy),
+        ...every10s(T0 + 600, 20, hostCpu(50)),
       ],
-      "overload",
+      "saturation",
     );
-    expect(rows).toEqual([{ day: DAY, mins_gt2x: "10", mins_gt3x: "10", peak: 35 }]);
+    // The first sample has no delta, so minute 0 is saturated from five samples.
+    expect(rows).toEqual([{ day: DAY, saturated_mins: "10", min_idle_pct: 2 }]);
   });
 
-  test("overload spans every day in a multi-day window", async () => {
+  test("saturation spans every day in a multi-day window", async () => {
     const rows = await osquery(
-      [
-        ...every10s(YESTERDAY, 1, (t) => pressure(t, 40)),
-        ...every10s(T0, 1, (t) => pressure(t, 25)),
-      ],
-      "overload",
+      [...every10s(YESTERDAY, 2, hostCpu(1)), ...every10s(T0, 2, hostCpu(40))],
+      "saturation",
       2,
     );
-    expect(rows.map((r) => [r.day, r.mins_gt3x])).toEqual([
-      ["2026-10-19", "1"],
+    expect(rows.map((r) => [r.day, r.saturated_mins])).toEqual([
+      ["2026-10-19", "2"],
       [DAY, "0"],
     ]);
   });
 
-  test("attribution counts overload minutes within 2 minutes of a job", async () => {
+  test("attribution counts saturated minutes within 2 minutes of a job", async () => {
     const rows = await osquery(
       [
-        ...every10s(T0, 5, (t) => pressure(t, 35)),
-        ...every10s(T0 + 3600, 5, (t) => pressure(t, 5)),
+        ...every10s(T0, 5, hostCpu(1)),
+        ...every10s(T0 + 3600, 5, hostCpu(60)),
         proc(T0 + 60, 100, "bun", 1000, 0),
       ],
       "attribution",
     );
     expect(rows).toEqual([
-      { day: DAY, overloaded: false, mins: "5", pct_with_job: 0 },
+      { day: DAY, saturated: false, mins: "5", pct_with_job: 0 },
       // The job's one sample in minute 1 covers minutes 0 to 3, not 4.
-      { day: DAY, overloaded: true, mins: "5", pct_with_job: 80 },
+      { day: DAY, saturated: true, mins: "5", pct_with_job: 80 },
     ]);
+  });
+
+  test("thread hogs name groups using CPU while it is saturated", async () => {
+    const rows = await osquery(
+      [
+        ...every10s(T0, 2, hostCpu(1)),
+        ...every10s(T0, 2, (t) => group(t, "duckdb", 400, (t - T0) * 1000, 0)),
+      ],
+      "thread-hogs",
+    );
+    expect(rows).toEqual([{ day: DAY, pname: "duckdb", avg_threads: 400, cpu_minutes: 1.8 }]);
+  });
+
+  test("thread hogs are empty before proc_groups exists", async () => {
+    expect(await osquery(every10s(T0, 1, hostCpu(1)), "thread-hogs")).toEqual([]);
+  });
+
+  test("write rate flags names over 1 GiB in a minute, skipping exits", async () => {
+    const GiB = 2 ** 30;
+    const rows = await osquery(
+      [
+        group(T0, "bun", 10, 0, 0),
+        group(T0 + 30, "bun", 10, 0, 2 * GiB),
+        // A member exited, so the group total fell.
+        group(T0 + 70, "bun", 10, 0, GiB),
+        group(T0 + 130, "bun", 10, 0, GiB + GiB / 2),
+      ],
+      "write-rate",
+    );
+    expect(rows).toEqual([{ day: DAY, pname: "bun", heavy_mins: "1", peak_gb_per_min: 2 }]);
   });
 
   test("heavy writers count only bytes written inside the window", async () => {
@@ -152,15 +216,6 @@ describe("osquery", () => {
       "memory",
     );
     expect(rows).toEqual([{ day: DAY, warn_s: "60", max_swap_mb: 0, min_avail_pct: 50 }]);
-  });
-
-  test("thread hogs are empty before proc_groups exists", async () => {
-    expect(
-      await osquery(
-        every10s(T0, 1, (t) => pressure(t, 35)),
-        "thread-hogs",
-      ),
-    ).toEqual([]);
   });
 });
 

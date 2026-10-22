@@ -164,6 +164,56 @@ An issue filed in a repository the team doesn't maintain drops Agent Context.
 - Evidence: "Get rid of this whole section" on an upstream issue, confirmed by
   Ben as the rule for repositories he doesn't own.
 
+### 16. Lists With the Substance of Concision
+
+Lists earn their place only when each item is one terse point. Following the
+shape (bullets) without the substance (short, distinct items) fails, and so does
+a list with more items than distinct points.
+
+- Evidence: Ben's direction for this suite; "make decisions into bullet,
+  conciser", "a pull request body should emphasize bulleted lists rather than
+  large paragraphs".
+
+### 17. Inline Links to Sources
+
+Docs, upstream reports, changelogs, and dashboards the investigation used are
+linked inline where the body relies on them.
+
+- Evidence: Ben's direction for this suite; "add those citations", "focus more
+  on links, less on a million code identifiers".
+
+### 18. Code for Reproduction
+
+Show the config, commands, or input that reproduce the problem as code rather
+than describing them in prose.
+
+- Evidence: Ben's direction for this suite ("too many words and not enough
+  examples of code"), "give a very brief example of what's needed to trigger
+  the issue".
+
+### 19. Acceptance Criteria Verify the Requirements
+
+Requirements say what must be true. Acceptance criteria are the checks an agent
+runs to confirm it: an action and the result to observe. A criterion that
+rephrases a requirement, or a list of tests to write, fails.
+
+- Evidence: Ben's direction for this suite, on top of finding 12.
+
+### 20. Density Ceilings
+
+Paragraphs stay short, inline identifiers stay few above Agent Context, and
+Agent Context itself stays a short list of pointers.
+
+- Evidence: "these paragraphs are too dense", "a million code identifiers".
+
+### 21. No Provenance Narration
+
+The issue states facts. It doesn't narrate where they came from ("taken from
+the planning notes") or disclaim what the drafter didn't check.
+
+- Evidence: the `writing:no-diary` rules applied to issues; "reads too clearly
+  as AI".
+
 ## How the Suite Scores
 
 Title graders read the frontmatter, and body graders stop at Agent Context, so
@@ -177,3 +227,10 @@ Findings 8, 9, 14, and 15 check by pattern: `body-words-*`, `no-leak`,
 `llm` judges (`events-structured`, `oq-justified`, `decided-not-open`,
 `ac-observable`, `harness-not-existing`) plus the `numbers-table` pattern, each
 paired with a `keeps-*` grader for the fact a cut must not lose.
+
+Findings 16 through 21 add ladders that give partial credit: `bullet-words-{20,25,40}`,
+`bullets-{6,10}`, `headings-3`, `para-words-60`, `identifiers-{10,20}`, and
+`context-words-{100,200}`, plus the `no-provenance` and `no-tests-as-ac` patterns,
+`links-source` and `repro-code` on the cases that supply a source or a repro, and
+the `ac-verifies` and `bullets-concise` judges. Body patterns skip fenced code
+blocks, so a repro is never read as a heading, URL, or bare reference.

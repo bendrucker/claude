@@ -37,7 +37,7 @@ The `description` body is GFM and renders Linear's first-class constructs direct
 - Draw a mermaid sequence diagram when the report describes several actors interleaving, such as a race or a handoff. A bug in one component doesn't need one.
 - Turn criteria or tasks the request supplies into a check list (`- [ ]`). Leave next steps, fix plans, and verification tasks to whoever picks the issue up unless the request lists them.
 
-Size the body to the request. A one-line report gets one or two sentences under 40 words, with no headings and no sections the request never supplied.
+Keep the title under 10 words. Size the body to the request. A one-line report gets one or two sentences under 40 words, with no headings and no sections the request never supplied.
 
 ## Answering a Query
 

@@ -3,7 +3,7 @@
 // the refresh after a transcript changes.
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { z } from "zod";
@@ -28,7 +28,8 @@ function arm(value: string, previous: Arm[] = []): Arm[] {
   const m = /^([\w.-]+)=([^,]+)(?:,(.+))?$/.exec(value);
   if (m?.[1] === undefined || m[2] === undefined)
     throw new InvalidArgumentError("Expected name=<db>[,<skill dir>].");
-  return [...previous, { name: m[1], db: m[2], skill: m[3] ?? SKILL }];
+  // Absolute, since replays run duckdb from a scratch dir or the home dir.
+  return [...previous, { name: m[1], db: resolve(m[2]), skill: resolve(m[3] ?? SKILL) }];
 }
 
 function count(value: string): number {
@@ -186,6 +187,7 @@ program
     await $`rm -rf ${tmp}`;
     mkdirSync(o.out, { recursive: true });
     await finish(o.out, "queries", samples);
+    if (samples.every((s) => s.exit !== 0)) throw new Error("every replay failed");
   });
 
 program

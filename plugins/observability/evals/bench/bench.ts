@@ -58,6 +58,24 @@ async function finish(out: string, name: keyof typeof KEYS, samples: Sample[]) {
   console.log(render(rows));
 }
 
+// A replay set outlives the named queries it was mined from, so a query some arm's skill no
+// longer ships is dropped from every arm rather than failing the run.
+async function replayable(queries: Query[], arms: Arm[]): Promise<Query[]> {
+  const missing = new Set<string>();
+  await Promise.all(
+    queries.flatMap((q) =>
+      q.name === undefined
+        ? []
+        : arms.map(async (a) => {
+            const path = join(a.skill, "resources", "queries", `${q.name}.sql`);
+            if (!(await Bun.file(path).exists())) missing.add(q.id);
+          }),
+    ),
+  );
+  for (const id of missing) console.error(`skipping ${id}: an arm no longer ships its named query`);
+  return queries.filter((q) => !missing.has(q.id));
+}
+
 const ARM_HELP =
   "name=<index>[,<skill dir>], once per arm; the first is the base. The skill dir defaults to this checkout's";
 
@@ -140,7 +158,10 @@ program
   .option("--timeout <s>", "seconds before a query is killed", count, 300)
   .action(async (o) => {
     const set = z.array(Query).parse(await Bun.file(o.replay).json());
-    const queries = set.filter((q) => o.only === undefined || new RegExp(o.only).test(q.id));
+    const queries = await replayable(
+      set.filter((q) => o.only === undefined || new RegExp(o.only).test(q.id)),
+      o.arm,
+    );
     const limits = z.array(z.enum(["mac", "vm"])).parse(o.limits.split(","));
     await Promise.all(o.arm.map(checkViews));
     const tmp = mkdtempSync(join(tmpdir(), "session-bench-"));

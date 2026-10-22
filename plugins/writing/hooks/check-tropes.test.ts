@@ -81,6 +81,10 @@ function mockBash(command: string): PreToolUseHookInput {
   };
 }
 
+function mockMcp(tool_name: string, tool_input: Record<string, unknown>): PreToolUseHookInput {
+  return { ...mockBash(""), tool_name, tool_input };
+}
+
 describe("wordlist files", () => {
   const wordlistPath = "/Users/test/plugins/writing/wordlists/vocabulary.txt";
 
@@ -538,5 +542,52 @@ describe("Bash processInput", () => {
 
   it("returns null for non-text Bash commands", async () => {
     expect(await processInput(mockBash("git push origin main"))).toBeNull();
+  });
+});
+
+describe("MCP prose tools", () => {
+  it("denies a GitHub PR body that negates the noun", async () => {
+    const result = await processInput(
+      mockMcp("mcp__github__create_pull_request", {
+        owner: "o",
+        repo: "r",
+        title: "Cache the lookup",
+        body: "The handler reads the cache, so the event costs no extra query.",
+      }),
+    );
+    const denial = denialOf(result);
+    expect(denial.decision).toBe("deny");
+    expect(denial.reason).toContain("costs no extra");
+  });
+
+  it("denies a thread reply that negates the noun", async () => {
+    const result = await processInput(
+      mockMcp("mcp__hearthbot__post_message", { text: "The sweep ran, and I filed nothing." }),
+    );
+    expect(denialOf(result).decision).toBe("deny");
+  });
+
+  it("reads a decision card's option text", async () => {
+    const texts = await collectText(
+      mockMcp("mcp__hearthbot__request_decision", {
+        question: "Ship the fix?",
+        options: [{ label: "Ship", consequence: "The PR merges and adds no tests." }],
+        recommended: 0,
+      }),
+    );
+    expect(texts).toEqual(["Ship the fix?", "Ship", "The PR merges and adds no tests."]);
+  });
+
+  it("skips fields outside the prose list", async () => {
+    const texts = await collectText(
+      mockMcp("mcp__github__create_pull_request", { owner: "nothing", repo: "none", head: "x" }),
+    );
+    expect(texts).toEqual([]);
+  });
+
+  it("leaves other MCP tools alone", async () => {
+    expect(
+      await processInput(mockMcp("mcp__github__get_file_contents", { path: "costs no extra" })),
+    ).toBeNull();
   });
 });

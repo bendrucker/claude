@@ -37,6 +37,15 @@
             "command": "IFS= read -r in; case $in in *--body*|*--message*|*--description*|*--title*|*=@*|*-F*|*--file*) if printf '%s' \"$in\" | grep -qE -- '--(body|message|description|title)[-= ]|(-F|--field)[= ][^ ]*=@|git (commit|tag).* (-F|--file)[= ]'; then printf '%s' \"$in\" | bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\"; fi ;; esac"
           }
         ]
+      },
+      {
+        "matcher": "^mcp__(?:.*github.*__(?:create_pull_request|update_pull_request|issue_write|add_issue_comment|update_issue_comment|add_reply_to_pull_request_comment|add_comment_to_pending_review|pull_request_review_write)|.*hearthbot__(?:post_message|edit_message|request_decision))$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse.ts\""
+          }
+        ]
       }
     ]
   }

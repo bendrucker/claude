@@ -29,6 +29,61 @@ export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 // not trigger file reads. Guard fragment shipped to hooks.json like the above.
 export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 
+// MCP tools that publish prose: GitHub PR, issue, and review bodies, and the
+// replies and decision cards a cloud thread posts. In a cloud session these
+// replace `gh` and chat text, so they get the Bash egress tier. The hooks.json
+// matcher is derived from this table, and hooks.test.ts enforces the sync.
+export const MCP_PROSE_TOOLS = {
+  github: {
+    servers: ".*github.*",
+    tools: [
+      "create_pull_request",
+      "update_pull_request",
+      "issue_write",
+      "add_issue_comment",
+      "update_issue_comment",
+      "add_reply_to_pull_request_comment",
+      "add_comment_to_pending_review",
+      "pull_request_review_write",
+    ],
+    fields: ["title", "body"],
+  },
+  hearthbot: {
+    servers: ".*hearthbot",
+    tools: ["post_message", "edit_message", "request_decision"],
+    fields: ["text", "question", "context", "reason", "options"],
+  },
+} as const;
+
+const MCP_PROSE_PATTERNS = Object.values(MCP_PROSE_TOOLS).map(({ servers, tools, fields }) => ({
+  pattern: new RegExp(`^mcp__${servers}__(?:${tools.join("|")})$`),
+  fields: new Set<string>(fields),
+}));
+
+export const MCP_PROSE_MATCHER = `^mcp__(?:${Object.values(MCP_PROSE_TOOLS)
+  .map(({ servers, tools }) => `${servers}__(?:${tools.join("|")})`)
+  .join("|")})$`;
+
+/** Every string under the named fields, so a decision card's option labels count too. */
+function proseStrings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(proseStrings);
+  if (value !== null && typeof value === "object")
+    return Object.values(value).flatMap(proseStrings);
+  return [];
+}
+
+function mcpProse(input: PreToolUseHookInput): string[] | null {
+  const surface = MCP_PROSE_PATTERNS.find(({ pattern }) => pattern.test(input.tool_name));
+  if (surface === undefined) return null;
+  const toolInput = input.tool_input;
+  if (toolInput === null || typeof toolInput !== "object") return [];
+  return Object.entries(toolInput)
+    .filter(([key]) => surface.fields.has(key))
+    .flatMap(([, value]) => proseStrings(value))
+    .filter((text) => text.trim() !== "");
+}
+
 const BODY_FILE_PATTERN = new RegExp(`(?:${BODY_FILE_FLAGS.join("|")})[=\\s](\\S+)`);
 const FIELD_FILE_PATTERN = /(?:^|\s)['"]?(?:-F|--field)[= ]([^\s=]+)=@(\S+)/g;
 const GIT_MESSAGE_FILE_PATTERN = /\bgit\s+(?:commit|tag)\b[^|;&]*?\s(?:-F|--file)[= ](\S+)/g;
@@ -146,6 +201,9 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     const pair = await collectFileOpPair(input);
     return pair ? [pair.newText] : [];
   }
+
+  const mcp = mcpProse(input);
+  if (mcp !== null) return mcp;
 
   if (toolName === "Bash" && toolInput.command !== undefined) {
     const command = toolInput.command;

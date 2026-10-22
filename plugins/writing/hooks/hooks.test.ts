@@ -6,6 +6,7 @@ import {
   BODY_FILE_FLAGS,
   FIELD_FILE_GUARD,
   GIT_MESSAGE_FILE_GUARD,
+  MCP_PROSE_MATCHER,
   PROSE_FLAGS,
 } from "./check-tropes";
 import config from "./hooks.json";
@@ -49,7 +50,20 @@ describe("PreToolUse gating", () => {
       Edit: [{ script: "pretooluse", guarded: false }],
       MultiEdit: [{ script: "pretooluse", guarded: false }],
       Bash: [{ script: "pretooluse", guarded: true }],
+      [MCP_PROSE_MATCHER]: [{ script: "pretooluse", guarded: false }],
     });
+  });
+
+  test.each<[string, boolean]>([
+    ["mcp__github__create_pull_request", true],
+    ["mcp__plugin_github_github__add_issue_comment", true],
+    ["mcp__hearthbot__post_message", true],
+    ["mcp__hearthbot__request_decision", true],
+    ["mcp__github__get_file_contents", false],
+    ["mcp__hearthbot__update_progress_checklist", false],
+    ["mcp__github__create_pull_request_with_copilot", false],
+  ])("MCP matcher on %p is %p", (tool, matches) => {
+    expect(new RegExp(MCP_PROSE_MATCHER).test(tool)).toBe(matches);
   });
 
   test("Bash guard alternation is derived from the flags check-tropes extracts", () => {

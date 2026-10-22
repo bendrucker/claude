@@ -8,3 +8,6 @@ Files:
 - components/viewer/ViewerMenu.tsx (kebab DropdownMenu renders DeleteDialog inside its content)
 - components/dialogs/DeleteDialog.tsx (AlertDialog with Cancel and Delete)
 - e2e/viewer.spec.ts (existing viewer specs)
+
+Sources:
+- Upstream report of the same nested menu and dialog bug: https://github.com/example-ui/primitives/issues/1241

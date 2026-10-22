@@ -1,5 +1,5 @@
 ---
-fail: [no-agent-context]
+fail: [repro-code, no-agent-context]
 ---
 <issue>
 ---

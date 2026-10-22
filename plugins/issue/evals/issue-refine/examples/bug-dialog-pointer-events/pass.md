@@ -7,7 +7,7 @@ title: Page stops responding after cancelling the viewer delete dialog
 type: bug
 ---
 
-Cancelling the delete dialog opened from the viewer's kebab menu leaves the page unclickable until reload. The menu and the dialog both set `pointer-events: none` on the body, and the dialog cleans up first. Render the dialog outside the menu.
+Cancelling the delete dialog opened from the viewer's kebab menu leaves the page unclickable until reload. The menu and the dialog both set `pointer-events: none` on the body, and the dialog cleans up first ([same bug upstream](https://github.com/example-ui/primitives/issues/1241)). Render the dialog outside the menu.
 
 A Playwright spec cancels the dialog from the viewer kebab, then opens another document from the list.
 

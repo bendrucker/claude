@@ -1,5 +1,5 @@
 ---
-fail: [body-words-80]
+fail: [para-words-60, links-source, body-words-80]
 ---
 <issue>
 ---

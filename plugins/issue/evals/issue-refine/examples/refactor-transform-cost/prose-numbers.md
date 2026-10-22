@@ -1,5 +1,5 @@
 ---
-fail: [numbers-table]
+fail: [links-source, numbers-table]
 ---
 <issue>
 ---

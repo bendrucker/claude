@@ -14,3 +14,7 @@ Files:
 - ingest/transform.py (convert_page reads with read_csv_page and writes NDJSON with json.dumps)
 - ingest/loader.py (load_ndjson; the warehouse COPY also takes FORMAT csv HEADER)
 - ingest/objects.py (ObjectSpec.method is "bulk" or "rest")
+
+Sources:
+- Warehouse COPY reference, CSV options: https://docs.example-warehouse.com/sql/copy#csv-format
+- Nightly run dashboard for Acme: https://grafana.example.com/d/ingest-nightly?var-tenant=acme

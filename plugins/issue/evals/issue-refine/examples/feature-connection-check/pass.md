@@ -14,7 +14,7 @@ A broken connection surfaces only when a chat fails mid-answer. Add `POST /api/o
 
 Out of scope: scheduled reprobing, and writing chat failures back to integration status.
 
-Before choosing the probe, call a restricted-policy connection through both `call_tool` and `health`, and use whichever reports the failure.
+The vendor [access policy](https://docs.example-vendor.com/access-policies#scopes) may filter per tool. Before choosing the probe, call a restricted-policy connection through both `call_tool` and `health`, and use whichever reports the failure.
 
 ## 🤖 Agent Context
 

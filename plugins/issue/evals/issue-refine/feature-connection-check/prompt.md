@@ -16,5 +16,8 @@ Files:
 - api/oauth/client.py (VendorClient.call_tool and VendorClient.health)
 - api/integrations/status.py (IntegrationStatus enum and the status column)
 
+Sources:
+- Vendor docs on access policies: https://docs.example-vendor.com/access-policies#scopes
+
 Related issues:
 - TEAM-2440 — PKCE state expires before slow users finish consent — https://tracker.example.com/issue/TEAM-2440

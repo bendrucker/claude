@@ -8,7 +8,7 @@ type: refactor
 labels: [ingest, performance]
 ---
 
-The transform step converts every bulk-export CSV page to NDJSON, and on the largest tenants it dominates the nightly run. The conversion adds no types, since `read_csv_page` yields strings, and the warehouse `COPY` already takes CSV with a header row. Load bulk-export objects as CSV and skip `convert_page` for them. REST objects keep their JSON path.
+The transform step converts every bulk-export CSV page to NDJSON, and on the largest tenants it dominates the nightly run. The conversion adds no types, since `read_csv_page` yields strings, and the warehouse [`COPY`](https://docs.example-warehouse.com/sql/copy#csv-format) already takes CSV with a header row. Load bulk-export objects as CSV and skip `convert_page` for them. REST objects keep their JSON path.
 
 | Tenant | Transform share of wall clock |
 |---|---|

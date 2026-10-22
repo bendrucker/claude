@@ -1,5 +1,5 @@
 ---
-fail: [no-leak]
+fail: [links-source, repro-code, no-leak]
 ---
 <issue>
 ---

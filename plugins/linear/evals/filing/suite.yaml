@@ -11,3 +11,10 @@ graders:
   collapsible-closed: ["refined-*", "invoked-*"]
   no-agent-heading: ["refined-*", "invoked-*"]
   no-frontmatter: ["refined-*", "invoked-*"]
+  words-40: ["quick-*"]
+  words-120: ["quick-*", "raw-*", "flow-*"]
+  words-200: ["raw-*", "flow-*"]
+  bullet-words-20: "!{query,update}-*"
+  no-invented-priority: ["quick-*", "raw-*", "flow-*"]
+  no-invented-sections: ["quick-*", "raw-*", "flow-*"]
+  title-words-10: "!{query,update}-*"

@@ -26,4 +26,6 @@ Cases are tagged by type (`bug`, `feature`, `refactor`, `spike`), size (`trivial
 
 `bun evals/native/run.ts plugins/issue/evals/issue-refine -- --tag dev` runs the dev split locally, and `gh workflow run eval.yml --ref <branch> -f suite=plugins/issue/evals/issue-refine -f args='--tag dev'` in CI. Results land in the gitignored `results/`. `bun plugins/issue/evals/issue-refine/scripts/sync.ts push` mirrors them to `s3://ben-drucker-agents-eval-corpus/issue-refine/results/` (`--profile agents-admin` by default, `--no-profile` in a cloud session), and `pull` brings them back for `compare.ts`.
 
+Cases run on Sonnet, the climb model. Real refines run on Opus, which writes longer and more structured issues, so the density graders score it lower. Confirm a candidate that wins on Sonnet with one Opus run of the dev split against the Opus baseline before it ships: `-- --tag dev --model claude-opus-5-5`. The judge stays on Opus there, so treat a confirmation that moves only on `llm` graders with suspicion.
+
 `examples/<case>/` holds, per case, an issue every grader accepts, plus issues that trip each grader. `bun evals/native/check.ts plugins/issue/evals/issue-refine` tests every regex grader against them.

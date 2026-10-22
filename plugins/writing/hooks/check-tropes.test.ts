@@ -622,8 +622,6 @@ describe("isProse properties", () => {
     for (const w of words) text += tc.draw(separator) + w;
     return text + tc.draw(terminator);
   });
-  // Anything a tool input might hold: identifiers, paths, flags, JSON, markdown
-  // punctuation, code spans, fences, tabs, newlines, and non-ASCII.
   const noise = gs.text({
     alphabet: "aZ09 _-./:;,'\"`*#>|()[]{}=<>!?$@~\t\n\\é’—",
     maxSize: 200,

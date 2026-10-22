@@ -30,14 +30,9 @@ export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 // not trigger file reads. Guard fragment shipped to hooks.json like the above.
 export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 
-// MCP tools carry prose the same way `gh` does (PR bodies, thread replies,
-// task notes) under any server and field name. Rather than list tools, the hook
-// takes every string in an MCP call's input with one sentence of mostly plain
-// words ending in a terminator, which queries, SQL, paths, and JSON lack.
-// Tokens split on spaces and tabs, and a stripped code span reads as spaces, so
-// any prose value puts three spaces, backticks, or JSON-escaped tabs on the
-// hook's stdin. hooks.json ships this grep so other calls skip the bun spawn;
-// hooks.test.ts enforces the sync and check-tropes.test.ts the implication.
+// Any prose value in an MCP call puts three spaces, backticks, or JSON-escaped
+// tabs on the hook's stdin, since a stripped code span reads as spaces.
+// hooks.json ships this grep so other calls skip the bun spawn.
 export const MCP_PROSE_GUARD = "([ `]|\\\\t).*([ `]|\\\\t).*([ `]|\\\\t)";
 
 const PROSE_WORD = /^[("'*_]*(?:[A-Za-z][A-Za-z'’-]*|\d[\d,.%]*)[)"'*_.,;:!?]*$/;

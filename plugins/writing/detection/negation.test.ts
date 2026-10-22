@@ -43,9 +43,20 @@ describe("noNegationHits", () => {
     "Absolute paths need neither.",
     "The audit found no defects.",
     "The rebase made no difference.",
+    "It adds no tests.",
+    "The hook fetches nothing over SSH.",
+    "The live index has ingested nothing since the restart.",
   ];
 
   const allow = [
+    "The VM has 3.9 GB of RAM, no swap.",
+    "The option defaults to unlimited (no cap).",
+    "Verification: no paid evals ran.",
+    "**Load errors:** none in any trace.",
+    "When the Mac hangs, nothing records the processes.",
+    "The sandbox never runs it, so no settings layer reaches it.",
+    "Both tools enumerate through git, so neither can see one.",
+    "No paid evals ran: no    , no    , and no API calls.",
     "The fallbacks have none.",
     "The build has no tests.",
     "There is no lock on the guard.",

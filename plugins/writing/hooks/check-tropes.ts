@@ -3,6 +3,7 @@ import { exceedsLineLimit, extractComments } from "../detection/comments";
 import { isProseFile } from "../detection/paths";
 import {
   firstByTier,
+  stripCode,
   type PatternMatch,
   scan,
   scanIntroduced,
@@ -28,6 +29,35 @@ export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 // `key=@` marker. Scoped to git so a bare `-F` in unrelated CLIs (curl) does
 // not trigger file reads. Guard fragment shipped to hooks.json like the above.
 export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
+
+// Any prose value in an MCP call puts three spaces, backticks, or JSON-escaped
+// tabs on the hook's stdin, since a stripped code span reads as spaces.
+// hooks.json ships this grep so other calls skip the bun spawn.
+export const MCP_PROSE_GUARD = "([ `]|\\\\t).*([ `]|\\\\t).*([ `]|\\\\t)";
+
+const PROSE_WORD = /^[("'*_]*(?:[A-Za-z][A-Za-z'’-]*|\d[\d,.%]*)[)"'*_.,;:!?]*$/;
+const MIN_SENTENCE_TOKENS = 4;
+const MIN_WORD_SHARE = 0.8;
+
+export function isProse(value: string): boolean {
+  // A sentence that ends on a code span keeps its terminator.
+  const text = stripCode(value).replaceAll(/[ \t]+([.!?:])/g, "$1");
+  for (const sentence of text.split(/(?<=\w[.!?])\s+|\n+/)) {
+    const trimmed = sentence.trim();
+    const tokens = trimmed.split(/[ \t]+/);
+    if (tokens.length < MIN_SENTENCE_TOKENS || !/[\w)"'’*][.!?:][)"'’*_]*$/.test(trimmed)) continue;
+    const words = tokens.filter((token) => PROSE_WORD.test(token)).length;
+    if (words / tokens.length >= MIN_WORD_SHARE) return true;
+  }
+  return false;
+}
+
+function strings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(strings);
+  if (value !== null && typeof value === "object") return Object.values(value).flatMap(strings);
+  return [];
+}
 
 const BODY_FILE_PATTERN = new RegExp(`(?:${BODY_FILE_FLAGS.join("|")})[=\\s](\\S+)`);
 const FIELD_FILE_PATTERN = /(?:^|\s)['"]?(?:-F|--field)[= ]([^\s=]+)=@(\S+)/g;
@@ -146,6 +176,8 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     const pair = await collectFileOpPair(input);
     return pair ? [pair.newText] : [];
   }
+
+  if (toolName.startsWith("mcp__")) return strings(input.tool_input).filter(isProse);
 
   if (toolName === "Bash" && toolInput.command !== undefined) {
     const command = toolInput.command;

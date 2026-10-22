@@ -1,8 +1,9 @@
 # Conjunctions that open a new clause inside the not-form window ("does not
 # apply, but anyone can run it"), so an indefinite past one is not licensed by
 # the negation. Coordinators inside a verb phrase ("read or write anything")
-# are not clause openers. Read by detection/negation.ts, not by the analyze
-# audit.
+# are not clause openers. One before a no-form starts its clause rather than
+# governing it ("so no layer reaches it"). Read by detection/negation.ts, not
+# by the analyze audit.
 but
 so
 because

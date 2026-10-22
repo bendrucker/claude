@@ -2418,7 +2418,6 @@ describe("plan-sections query", () => {
 });
 
 describe("skill-config-vs-observed query", () => {
-
   const SkillRow = z.object({
     source: z.string(),
     skill_name: z.string(),

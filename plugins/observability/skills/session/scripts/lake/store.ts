@@ -26,7 +26,8 @@ export const quote = (s: string): string => `'${s.replaceAll("'", "''")}'`;
 
 /**
  * DuckDB cannot parse the sandbox's credentialed `http_proxy`, so split it into the
- * settings it does accept.
+ * settings it does accept. The node API lacks the CLI's `getenv`, so the writer splits
+ * it here rather than in SQL.
  */
 export function proxySettings(): string[] {
   const raw = [process.env.http_proxy, process.env.HTTP_PROXY].find(

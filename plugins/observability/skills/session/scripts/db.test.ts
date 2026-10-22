@@ -32,6 +32,8 @@ async function backdate(target: string) {
 const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 const resourcesDir = join(import.meta.dirname, "..", "resources");
 const plansFixtureDir = join(import.meta.dirname, "..", "fixtures", "plans");
+// Outside skills/, where a plugin load would register these as the plugin's own skills.
+const skillsFixtureDir = join(import.meta.dirname, "..", "..", "..", "fixtures", "skills");
 
 async function loadExtensions(database: Database) {
   // `getenv` exists only in the duckdb CLI, so stub it for the node binding.
@@ -2416,7 +2418,6 @@ describe("plan-sections query", () => {
 });
 
 describe("skill-config-vs-observed query", () => {
-  const skillsFixtureDir = join(import.meta.dirname, "..", "fixtures", "skills");
 
   const SkillRow = z.object({
     source: z.string(),
@@ -3467,9 +3468,9 @@ const fixtureGlobs: Record<string, string> = {
   frontmatter_glob: join(import.meta.dirname, "..", "SKILL.md"),
   metrics_glob: join(fixturesDir, "..", "hook-metrics", "*.jsonl"),
   plans_glob: join(plansFixtureDir, "*.md"),
-  plugin_skill_glob: join(fixturesDir, "..", "skills", "cache/*/*/*/skills/*/SKILL.md"),
-  user_skill_glob: join(fixturesDir, "..", "skills", "user/*/SKILL.md"),
-  project_skill_glob: join(fixturesDir, "..", "skills", "project/*/SKILL.md"),
+  plugin_skill_glob: join(skillsFixtureDir, "cache/*/*/*/skills/*/SKILL.md"),
+  user_skill_glob: join(skillsFixtureDir, "user/*/SKILL.md"),
+  project_skill_glob: join(skillsFixtureDir, "project/*/SKILL.md"),
 };
 
 describe.each(

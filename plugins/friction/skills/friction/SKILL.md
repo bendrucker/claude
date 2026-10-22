@@ -18,8 +18,8 @@ The output budget is the point of this skill. A run that surfaces nothing is a c
 
 ## Arguments
 
-- `--window 1d` (default): the daily run. Last 24 hours, osquery and Atuin only, about 5 minutes, offline.
-- `--window 7d`: the weekly run. Last 7 days, plus the session index and upstream changelogs, 20 to 30 minutes.
+- `--window 1d` (default): the daily run. Last 24 hours of osquery, Atuin, and the session index, about 5 minutes, offline.
+- `--window 7d`: the weekly run. Last 7 days of the same sources, plus upstream changelogs, 20 to 30 minutes.
 - `--day YYYY-MM-DD`: run as of a past day, to backfill the ledger or replay a calibration day. Bound every query to the window ending that day, pass `--day` to every ledger command, and print the decision without delivering it.
 - `pick <fingerprint>`: Ben asked for a below-the-cut item. Run `scripts/ledger.ts outcome <fingerprint> picked`, then implement it as in [Deliver](#deliver).
 
@@ -35,7 +35,7 @@ Run named queries over the window. Each source returns rows, not prose.
 | --- | --- | --- |
 | osquery | both | DuckDB over the snapshot log. Load and queries: [references/osquery.md](references/osquery.md) |
 | Atuin | both | DuckDB over the history db: slow and failing command heads. [references/atuin.md](references/atuin.md) |
-| Session index | `7d` | `observability:session` named queries. It sees only local transcripts, so a quiet index means work moved to cloud sessions, not that friction stopped |
+| Session index | both | `observability:session` named queries with `after_date` at the window start. Daily: `tool-failure-rates`, `hook-blocks`, `hook-block-then-retry-success`, `sandbox-bypass-scaffold`, `cli-health`, `stop-hook-noop-detector`. Weekly adds the rest. It sees only local transcripts, so a quiet index means work moved to cloud sessions, not that friction stopped |
 | Changelogs | `7d` | Release notes since the last run for tools in the Brewfiles and mise pins that the window's data shows in use |
 
 Normalize every metric to a rate: per active hour, per call, or a share of minutes. Activity swings 200x day to day, so a raw count compares nothing.

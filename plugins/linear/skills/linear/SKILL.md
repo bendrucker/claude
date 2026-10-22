@@ -33,7 +33,7 @@ The connector and MCP paths need no CLI. Before a CLI-only operation (relations 
 
 The `description` body is GFM and renders Linear's first-class constructs directly. Author them inline instead of using a workaround:
 
-- Fence commands, code, and traces. Fold a pasted log or trace over about 15 lines into a [collapsible](references/conventions.md#collapsible-sections) titled for its source, and keep shorter ones inline.
+- Fence code and traces, and put a repro command in a `sh` block even when it is one line. Fold a pasted log or trace over about 15 lines into a [collapsible](references/conventions.md#collapsible-sections) titled for its source, and keep shorter ones inline.
 - Draw a mermaid sequence diagram when the report describes several actors interleaving, such as a race or a handoff. A bug in one component doesn't need one.
 - Turn criteria or tasks the request supplies into a check list (`- [ ]`). Leave next steps, fix plans, and verification tasks to whoever picks the issue up unless the request lists them.
 

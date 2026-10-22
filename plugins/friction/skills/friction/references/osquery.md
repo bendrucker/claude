@@ -2,11 +2,7 @@
 
 osqueryd runs as a user agent on each Mac, configured by the dotfiles `osquery` topic. Its snapshot log is the main source for contention. The thresholds below assume the Studio, Ben's 10-core Mac Studio.
 
-```bash
-"${CLAUDE_SKILL_DIR}/scripts/collect.sh" osquery <day> <days>
-```
-
-It loads `~/.local/state/osquery/osqueryd.snapshots.log*` (rotated files are zstd and load with the live one), keeps the window, and runs each file in [`queries/osquery/`](../queries/osquery/). Times bucket by local day. CPU and bytes are cumulative per process, so the loader takes deltas over `(pid, start_time)` before filtering.
+`collect.sh osquery` (see SKILL.md's Collect step) loads `~/.local/state/osquery/osqueryd.snapshots.log*` (rotated files are zstd and load with the live one), keeps the window, and runs each file in [`queries/osquery/`](../queries/osquery/). Times bucket by local day. CPU and bytes are cumulative per process, so the loader takes deltas over `(pid, start_time)` before filtering.
 
 | Snapshot | Interval | What it records |
 | --- | --- | --- |

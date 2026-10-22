@@ -1,5 +1,6 @@
 ---
 type: regex
-pattern: '(?i)lock'
+pattern: 'lock'
+flags: i
 ---
 The reply drafts the issue.

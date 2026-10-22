@@ -31,6 +31,12 @@ const WHOLE_TABLES = ["meta", "index_meta"];
 
 // Rows sorted by time in small row groups, so a window filter skips most of a file.
 const ROW_GROUP_SIZE = "8192";
+/**
+ * Raw bytes of the sessions one batch of inserts covers. Each insert evaluates its view and
+ * sorts its rows in memory, so a first publish of a large index goes in batches of sessions
+ * by start time, the layout nightly publishes leave anyway.
+ */
+const BATCH_BYTES = 512 * 1024 * 1024;
 
 export interface LakeOptions {
   /** `s3://bucket/prefix` or a local directory, holding `catalog.ducklake` and `data/`. */
@@ -138,7 +144,15 @@ const Count = z.object({ n: z.union([z.bigint(), z.number()]) });
 const Column = z.object({ name: z.string(), col: z.string() });
 
 async function connect(o: LakeOptions) {
-  const instance = await DuckDBInstance.create(":memory:", { memory_limit: "4GiB", threads: "4" });
+  // An in-memory instance has no spill dir by default.
+  const spill = join(o.stateDir, "lake", "tmp");
+  mkdirSync(spill, { recursive: true });
+  const instance = await DuckDBInstance.create(":memory:", {
+    memory_limit: "4GiB",
+    threads: "4",
+    temp_directory: spill,
+    max_temp_directory_size: "32GiB",
+  });
   const c = await instance.connect();
   const run = async (sql: string) => {
     await c.run(sql);
@@ -207,8 +221,11 @@ export async function publish(o: LakeOptions): Promise<PublishResult> {
       return has(t, "session_id") ? "host, session_id" : "host, source_file";
     };
     const inFiles = "(host, source_file) IN (SELECT (host, source_file) FROM changed)";
-    const inSessions = `EXISTS (SELECT 1 FROM touched s
-      WHERE s.host = t.host AND s.session_id IS NOT DISTINCT FROM t.session_id)`;
+    // A correlated EXISTS plans as a delim join that buffers every row of the outer table,
+    // payload included, so the session filters are uncorrelated IN lists. coalesce keeps
+    // records without a session in their own group.
+    const session = "(t.host, coalesce(t.session_id, ''))";
+    const inSessions = `${session} IN (SELECT (host, coalesce(session_id, '')) FROM touched)`;
 
     await db.script([
       "CREATE TABLE IF NOT EXISTS lake.published_files AS FROM idx.indexed_files WITH NO DATA",
@@ -225,15 +242,37 @@ export async function publish(o: LakeOptions): Promise<PublishResult> {
         SELECT DISTINCT host, session_id FROM idx.raw JOIN changed USING (host, source_file)
         UNION
         SELECT DISTINCT host, session_id FROM lake.raw JOIN changed USING (host, source_file)`,
-      ...FILE_TABLES.flatMap((t) => [
-        `DELETE FROM lake.${t} WHERE ${inFiles}`,
-        `INSERT INTO lake.${t} FROM idx.${t} WHERE ${inFiles} ORDER BY ${order(t)}`,
-      ]),
-      ...[...SESSION_TABLES, ...views].flatMap((t) => [
-        `DELETE FROM lake.${t} t WHERE ${inSessions}`,
-        `INSERT INTO lake.${t}
-          FROM idx.${t} t WHERE ${allowed} AND ${inSessions} ORDER BY ${order(t)}`,
-      ]),
+      `CREATE TEMP TABLE batches AS
+        SELECT host, session_id,
+          floor(sum(bytes) OVER (ORDER BY first_ts NULLS FIRST, host, session_id) / ${BATCH_BYTES}) AS batch
+        FROM (SELECT host, session_id, min(timestamp) AS first_ts, sum(strlen(data::VARCHAR)) AS bytes
+          FROM idx.raw t WHERE ${allowed} AND ${inSessions} GROUP BY ALL)`,
+      ...FILE_TABLES.map((t) => `DELETE FROM lake.${t} WHERE ${inFiles}`),
+      ...[...SESSION_TABLES, ...views].map((t) => `DELETE FROM lake.${t} t WHERE ${inSessions}`),
+      ...FILE_TABLES.filter((t) => !has(t, "session_id")).map(
+        (t) => `INSERT INTO lake.${t} FROM idx.${t} WHERE ${inFiles} ORDER BY ${order(t)}`,
+      ),
+    ]);
+    const batches = await db.rows(
+      "SELECT DISTINCT coalesce(batch, 0)::INTEGER AS batch FROM batches ORDER BY batch",
+      z.object({ batch: z.number() }),
+    );
+    for (const { batch } of batches) {
+      const inBatch = `${session} IN (SELECT (host, coalesce(session_id, '')) FROM batches
+        WHERE coalesce(batch, 0) = ${batch})`;
+      // oxlint-disable-next-line no-await-in-loop -- one connection inside one transaction.
+      await db.script([
+        ...FILE_TABLES.filter((t) => has(t, "session_id")).map(
+          (t) =>
+            `INSERT INTO lake.${t} FROM idx.${t} t WHERE ${inFiles} AND ${inBatch} ORDER BY ${order(t)}`,
+        ),
+        ...[...SESSION_TABLES, ...views].map(
+          (t) =>
+            `INSERT INTO lake.${t} FROM idx.${t} t WHERE ${allowed} AND ${inBatch} ORDER BY ${order(t)}`,
+        ),
+      ]);
+    }
+    await db.script([
       ...WHOLE_TABLES.flatMap((t) => [
         `DELETE FROM lake.${t}`,
         `INSERT INTO lake.${t} FROM idx.${t}${t === "meta" ? ` WHERE ${allowed}` : ""}`,

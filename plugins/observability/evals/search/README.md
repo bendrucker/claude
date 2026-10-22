@@ -33,6 +33,12 @@ Seed queries with `mine.sql`, which lists the terms agents passed to `search.sql
 bun score.ts --labels labels.jsonl --tag dev --arm main --arm bm25=../wt/plugins/observability/skills/session --out results/bm25
 ```
 
+A change to what the index stores, such as `search_item_rows`, needs each arm scored on an index its own code built. Append `@<index>` to an arm to override `--index` for it:
+
+```bash
+bun score.ts --labels labels.jsonl --arm main@before/session.duckdb --arm surfaces=../wt/plugins/observability/skills/session@after/session.duckdb
+```
+
 An A/A run of the same skill twice records the latency noise floor. A ranking change ships only when its P@5 gain clears the permutation test.
 
 ## Tests

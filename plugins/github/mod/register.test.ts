@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { describe, expect, mock, test, type Engine } from "claude-code/testing";
-import { MAX_ATTEMPTS, POLL_MS } from "./register.ts";
+import { IDLE_CAP_MS, MAX_ATTEMPTS, POLL_MS, QUIET_MS, TICK_MS } from "./register.ts";
 
 interface Recorded {
   event: string;
@@ -9,6 +9,14 @@ interface Recorded {
 }
 
 const START = { surface: "terminal", isInteractive: true, cwd: "/work" } as const;
+
+const COMPLETE = {
+  answer: "",
+  durationMs: 1,
+  isAborted: false,
+  turnId: "t1",
+  reason: "answer",
+} as const;
 
 const check = (conclusion: string) => ({
   __typename: "CheckRun",
@@ -42,14 +50,44 @@ interface World {
   foreign?: string[];
   /** A token that cannot read `/user`. */
   noLogin?: boolean;
+  /** A sleep of the host that the ticker's next period waits out first. */
+  sleptMs?: number;
+  /** Refuses the ticker's periods, which ends it. */
+  isTickRefused?: boolean;
+  /** The current ETag of each REST path the gate probes; one left out answers 200 bare. */
+  etags?: Record<string, string>;
+  /** The GraphQL pull request the extras query reads. */
+  extras?: Record<string, unknown>;
+  /** The extras query fails, as a GraphQL rate limit makes it. */
+  isExtrasFailing?: boolean;
 }
+
+// GitHub types the review app's login as a bot.
+const EXTRAS = {
+  comments: { nodes: [{ author: { __typename: "Bot", login: "review-app" } }] },
+  isMergeQueueEnabled: false,
+  autoMergeRequest: null,
+  mergeQueueEntry: null,
+  reviewThreads: { nodes: [] },
+};
 
 function worldOf(on: On, world: World) {
   const events: Recorded[] = [];
   const tails: (string | undefined)[] = [];
   const submits: string[] = [];
   const views: string[] = [];
+  on("clock.every", { ms: TICK_MS }, async ($, e, next) => {
+    if (world.isTickRefused === true) throw new Error("refused");
+    const slept = world.sleptMs ?? 0;
+    delete world.sleptMs;
+    // Timers stand still while the host sleeps, so the period ends late by the clock.
+    if (slept > 0) await clock.sleep(slept);
+    return next(e);
+  });
+  const probes: string[] = [];
   const clock = mock.clock(on);
+  on("turn.start", ($, e) => ({ turnId: e.turnId }));
+  on("turn.complete", () => ({ text: "" }));
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
@@ -59,6 +97,8 @@ function worldOf(on: On, world: World) {
     return { value: undefined };
   });
   on("session.start", ($, e) => ({ cwd: e.cwd }));
+  on("command.register", () => ({ value: { command: "pr" } }));
+  on("ui.open", () => ({ value: { isPlaced: true } }));
   on("session.end", ($, e) => ({ sessionId: e.sessionId }));
   on("session.cwd", () => ({ value: "/work" }));
   on("ui.render", { component: "PromptHint" }, ($, e) => {
@@ -106,6 +146,44 @@ function worldOf(on: On, world: World) {
         },
       };
     }
+    if (argv.startsWith("gh api graphql") && world.isExtrasFailing === true) {
+      return {
+        value: {
+          exitCode: 1,
+          stdout: "",
+          stderr: "API rate limit exceeded\n",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
+    if (argv.startsWith("gh api graphql")) {
+      const pullRequest = { ...EXTRAS, ...world.extras };
+      return {
+        value: {
+          exitCode: 0,
+          stdout: JSON.stringify({ data: { repository: { pullRequest } } }),
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
+    if (argv.startsWith("gh api -i")) {
+      const path = e.argv[6] ?? "";
+      probes.push(path);
+      const etag = world.etags?.[path];
+      const status = etag !== undefined && e.argv.at(-1) === `If-None-Match: ${etag}` ? 304 : 200;
+      return {
+        value: {
+          exitCode: status === 200 ? 0 : 1,
+          stdout: `HTTP/1.1 ${status} X\r\n${etag === undefined ? "" : `Etag: ${etag}\r\n`}\r\n`,
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
     if (argv.startsWith("git ")) {
       return {
         value: {
@@ -147,7 +225,7 @@ function worldOf(on: On, world: World) {
     });
     return tails.at(-1);
   };
-  return { events, named, shown, submits, views, clock };
+  return { events, named, shown, submits, views, probes, clock };
 }
 
 const HINT = { isDraft: false, isWorking: false, hint: "? for shortcuts" };
@@ -167,7 +245,7 @@ describe("register", () => {
       phase: "pending",
       state: "OPEN",
     });
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1");
+    expect(await w.shown($)).toBe("ci      │ \u{f444} 0/1");
 
     world.view = pr("FAILURE");
     await w.clock.advance(POLL_MS.pending);
@@ -180,7 +258,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(await w.shown($)).toBe("\u{f52f} ci / test");
+    expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -189,7 +267,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(await w.shown($)).toBe("\u{f49e} CI");
+    expect(await w.shown($)).toBe("you     │ \u{f49e}");
   });
 
   test("every new review wakes the model with its state", async ($, on) => {
@@ -199,16 +277,119 @@ describe("register", () => {
     await $.session.start(START);
     await w.clock.settle();
     world.view = pr("SUCCESS", [
-      { id: "r1", state: "COMMENTED", author: { login: "greptile" } },
+      { id: "r1", state: "COMMENTED", author: { login: "carol" } },
       { id: "r2", state: "CHANGES_REQUESTED", author: { login: "alice" } },
     ]);
     await w.clock.advance(POLL_MS.settled);
 
     expect(w.submits.length).toBe(1);
-    expect(w.submits[0]).toContain("@greptile reviewed PR #7 (COMMENTED)");
+    expect(w.submits[0]).toContain("@carol reviewed PR #7 (COMMENTED)");
     expect(w.submits[0]).toContain("@alice reviewed PR #7 (CHANGES_REQUESTED)");
     expect(w.named("drop")).toEqual([]);
   });
+
+  test(
+    "a review bot's check arrives with its review, and chatter only logs",
+    { options: { ignore: "vercel[bot]" } },
+    async ($, on) => {
+      const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+      const w = worldOf(on, world);
+      const verdict = {
+        __typename: "CheckRun",
+        name: "Review App",
+        status: "COMPLETED",
+        conclusion: "FAILURE",
+        startedAt: "2026-10-06T10:05:00Z",
+      };
+
+      await $.session.start(START);
+      await w.clock.settle();
+      world.view = {
+        ...pr("SUCCESS", [
+          { id: "r1", state: "COMMENTED", author: { login: "review-app" }, body: "Summary" },
+        ]),
+        statusCheckRollup: [check("SUCCESS"), verdict],
+        comments: [{ id: "c1", author: { login: "vercel[bot]" }, body: "Preview ready" }],
+      };
+      await w.clock.advance(POLL_MS.settled);
+      await w.clock.advance(POLL_MS.settled);
+
+      expect(w.submits.length).toBe(1);
+      expect(w.submits[0]).toContain("@review-app reviewed PR #7 (COMMENTED)");
+      expect(w.submits[0]).not.toContain("CI failed");
+      expect(w.named("muted").map((e) => e.detail)).toEqual([
+        {
+          pr: 7,
+          head: "aaaaaaa1111",
+          id: "aaaaaaa1111:Review App",
+          author: "review-app",
+          reason: "review.check",
+        },
+        { pr: 7, head: "aaaaaaa1111", id: "c1", author: "vercel[bot]", reason: "author" },
+      ]);
+      expect(w.named("inject")[0]?.detail?.muted).toEqual(["aaaaaaa1111:Review App", "c1"]);
+      expect(await w.shown($)).toBe("you     │ \u{f49e}");
+    },
+  );
+
+  test("whose turn the review is shows in the footer and logs on each change", async ($, on) => {
+    const asked = { id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } };
+    const world: World = {
+      branch: "topic",
+      gh: GH_OK,
+      view: { ...pr("SUCCESS"), latestReviews: [asked] },
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f4a8}");
+
+    const pushed = { ...pr("SUCCESS"), headRefOid: "bbbbbbb2222", latestReviews: [asked] };
+    world.view = pushed;
+    await w.clock.advance(POLL_MS.settled);
+    world.view = { ...pushed, reviewRequests: [{ login: "alice" }] };
+    await w.clock.advance(POLL_MS.settled);
+    expect(await w.shown($)).toBe("review  │ \u{f49e}  \u{f4e3} 1");
+    expect(w.named("review.turn").map((e) => e.detail)).toEqual([
+      { pr: 7, head: "aaaaaaa1111", turn: "author", waiting: ["alice"] },
+      { pr: 7, head: "bbbbbbb2222", turn: "reviewer", waiting: ["alice"] },
+    ]);
+  });
+
+  test("chatter already on a PR first seen is logged as the baseline", async ($, on) => {
+    const ack = "<!-- reply marker -->\nActions performed";
+    const view = {
+      ...pr("SUCCESS"),
+      comments: [{ id: "c1", author: { login: "review-app" }, body: ack }],
+    };
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.named("muted").map((e) => e.detail)).toEqual([
+      {
+        pr: 7,
+        head: "aaaaaaa1111",
+        baseline: true,
+        id: "c1",
+        author: "review-app",
+        reason: "marked",
+      },
+    ]);
+    expect(await w.shown($)).toBe("you     │ \u{f49e}");
+  });
+
+  test(
+    "an invalid body pattern is reported at start",
+    { options: { ignoreBody: "(" } },
+    async ($, on) => {
+      const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("SUCCESS") });
+      await $.session.start(START);
+      await w.clock.settle();
+      expect(w.named("ignoreBody.invalid")[0]).toMatchObject({ ok: false });
+    },
+  );
 
   test("a conflict wakes the model once, through a mergeability recompute", async ($, on) => {
     const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
@@ -227,10 +408,10 @@ describe("register", () => {
     expect(w.submits.length).toBe(1);
     expect(w.submits[0]).toContain("PR #7 has merge conflicts with `main` at aaaaaaa.");
     expect(w.submits[0]).toContain("`git:conflicts`");
-    expect(await w.shown($)).toBe("\u{f47f} conflicts · \u{f49e} CI");
+    expect(await w.shown($)).toBe("you     │ \u{f419}\u{f467}  \u{f49e}");
 
     world.view = merging("MERGEABLE");
-    await w.clock.advance(POLL_MS.settled);
+    await w.clock.advance(QUIET_MS[1] ?? 0);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["unblocked"]);
   });
 
@@ -409,7 +590,7 @@ describe("register", () => {
     expect(w.submits.length).toBe(2);
     expect(w.submits[1]).toContain("@bot reviewed PR #7 (COMMENTED)");
     expect(w.submits[1]).not.toContain("CI failed");
-    expect(await w.shown($)).toBe("\u{f52f} ci / test");
+    expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
   });
 
   test("stays idle without gh", async ($, on) => {
@@ -477,6 +658,10 @@ describe("register", () => {
     expect(w.views.length).toBe(1);
     expect(await w.shown($)).toBe(undefined);
     expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("pr.none").map((e) => [e.detail?.reason, e.detail?.branch])).toEqual([
+      ["default branch", "main"],
+      ["no pr", "topic"],
+    ]);
   });
 
   test("origin/HEAD names the default branch, so a PR from master is still watched", async ($, on) => {
@@ -490,7 +675,7 @@ describe("register", () => {
     world.branch = "master";
     await w.clock.advance(POLL_MS.idle);
     expect(w.views.length).toBe(1);
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1");
+    expect(await w.shown($)).toBe("ci      │ \u{f444} 0/1");
   });
 
   test("a repeated gh failure is logged once and backs off", async ($, on) => {
@@ -531,7 +716,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.pending);
 
     expect(w.views.length).toBe(3);
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1");
+    expect(await w.shown($)).toBe("ci      │ \u{f444} 0/1");
   });
 
   test("logout stops the watch and clears the status", async ($, on) => {
@@ -555,7 +740,7 @@ describe("register", () => {
     world.view = pr("FAILURE");
     await w.clock.advance(POLL_MS.pending);
     expect(w.submits.length).toBe(1);
-    expect(await w.shown($)).toBe("\u{f52f} ci / test");
+    expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.views.length).toBe(3);
@@ -600,6 +785,101 @@ describe("register", () => {
     await w.clock.advance(10_000 + POLL_MS.pending);
 
     expect(w.views.length).toBe(3);
+  });
+
+  test("a poll from before a restart that fails leaves the new chain alone", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr(""), slowMs: 20_000 };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.slowMs = 1_000;
+    await $.session.end({ reason: "other", sessionId: "s1", resume: { id: "s1" } });
+    await $.session.start(START);
+    await w.clock.advance(1_000);
+    world.view = "HTTP 502: Bad Gateway";
+    await w.clock.advance(19_000);
+    world.view = pr("");
+    await w.clock.advance(POLL_MS.pending);
+
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.views.length).toBe(3);
+  });
+
+  test("unchanged ETags skip the full read until one resource moves", async ($, on) => {
+    const etags: Record<string, string> = {
+      "repos/o/r/pulls/7": 'W/"p1"',
+      "repos/o/r/pulls/7/reviews?per_page=100": 'W/"r1"',
+      "repos/o/r/commits/aaaaaaa1111/check-runs?per_page=100": 'W/"c1"',
+      "repos/o/r/commits/aaaaaaa1111/status?per_page=100": 'W/"s1"',
+    };
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS"), etags };
+    const w = worldOf(on, world);
+    const reads = () => w.named("poll").map((e) => [e.detail?.read, e.detail?.changed]);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.probes).toEqual([]);
+    await w.clock.advance(POLL_MS.settled);
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.views.length).toBe(2);
+    expect(w.probes.length).toBe(8);
+
+    world.view = pr("FAILURE");
+    etags["repos/o/r/commits/aaaaaaa1111/check-runs?per_page=100"] = 'W/"c2"';
+    await w.clock.advance(QUIET_MS[1] ?? 0);
+    expect(w.views.length).toBe(3);
+    expect(w.submits[0]).toContain("CI failed on PR #7 at aaaaaaa: ci / test.");
+    expect(reads()).toEqual([
+      ["full", undefined],
+      ["miss", ["pull", "reviews", "checks", "statuses"]],
+      ["hit", []],
+      ["miss", ["checks"]],
+    ]);
+
+    world.branch = "other";
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.probes.length).toBe(12);
+    expect(w.views.length).toBe(4);
+  });
+
+  test("a probe miss whose full read fails probes as a miss again", async ($, on) => {
+    const checks = "repos/o/r/commits/aaaaaaa1111/check-runs?per_page=100";
+    const etags: Record<string, string> = {
+      "repos/o/r/pulls/7": 'W/"p1"',
+      "repos/o/r/pulls/7/reviews?per_page=100": 'W/"r1"',
+      [checks]: 'W/"c1"',
+      "repos/o/r/commits/aaaaaaa1111/status?per_page=100": 'W/"s1"',
+    };
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS"), etags };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled);
+    etags[checks] = 'W/"c2"';
+    world.view = "HTTP 502: Bad Gateway";
+    await w.clock.advance(QUIET_MS[0] ?? 0);
+    expect(w.named("poll.error").length).toBe(1);
+
+    world.view = pr("FAILURE");
+    await w.clock.advance(POLL_MS.error);
+    expect(w.submits[0]).toContain("CI failed on PR #7 at aaaaaaa: ci / test.");
+  });
+
+  test("an undecided mergeability or a closed PR is always read in full", async ($, on) => {
+    const etags: Record<string, string> = { "repos/o/r/pulls/7": 'W/"p1"' };
+    const view = { ...pr("SUCCESS"), mergeable: "UNKNOWN" };
+    const world: World = { branch: "topic", gh: GH_OK, view, etags };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled);
+    world.view = { ...pr("SUCCESS"), state: "MERGED" };
+    await w.clock.advance(POLL_MS.settled + POLL_MS.closed);
+    expect(w.probes).toEqual([]);
+    expect(w.named("poll").map((e) => e.detail?.read)).toEqual(["full", "full", "full", "full"]);
   });
 
   test("an injection the engine drops is logged as dropped", async ($, on) => {
@@ -663,7 +943,7 @@ describe("register", () => {
     expect(w.submits.length).toBe(1);
   });
 
-  test("a PR with no checks and no review leaves the footer as it was", async ($, on) => {
+  test("a PR with no checks and no review waits on its author", async ($, on) => {
     const w = worldOf(on, {
       branch: "topic",
       gh: GH_OK,
@@ -673,7 +953,101 @@ describe("register", () => {
     await $.session.start(START);
     await w.clock.settle();
 
-    expect(await w.shown($)).toBe(undefined);
+    expect(await w.shown($)).toBe("you");
+  });
+
+  test("a running turn shows the agent at work on the author's move", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("FAILURE") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
+
+    await $.turn.start({ text: "fix it", turnId: "t1" });
+    expect(await w.shown($)).toBe("agent   │ \u{f52f} 1");
+
+    await $.turn.complete(COMPLETE);
+    expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
+  });
+
+  test("the pane lists every check and the muted chatter it hides until opened", async ($, on) => {
+    const ack = "<!-- reply marker -->\n✅ Actions performed";
+    const w = worldOf(on, {
+      branch: "topic",
+      gh: GH_OK,
+      view: {
+        ...pr("FAILURE"),
+        statusCheckRollup: [check("FAILURE"), { ...check("SUCCESS"), name: "lint" }],
+        comments: [{ id: "c1", author: { login: "review-app" }, body: ack }],
+      },
+    });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const pane = await $.ui.mount({
+      plugin: "github",
+      surface: "terminal",
+      component: "Pane",
+      requestId: "pr",
+      props: {
+        title: "PR",
+        isFocused: false,
+        bodyColumns: 60,
+        placement: "dock",
+        scroll: { offset: 0, bodyRows: 30 },
+        view: {},
+      },
+    });
+
+    expect((await pane.find({ type: "Text", text: /✗ ci \/ test/ }))?.text).toContain(
+      "✗ ci / test",
+    );
+    expect(await pane.find({ type: "Text", text: /✓ ci \/ lint/ })).toBeDefined();
+    expect(await pane.find({ type: "Text", text: /review-app · marked/ })).toBeUndefined();
+
+    await pane.press({ key: "muted" });
+    expect((await pane.find({ type: "Text", text: /review-app/ }))?.text).toContain(
+      "review-app · marked",
+    );
+    expect(w.named("pane.muted").map((e) => e.detail)).toEqual([{ open: true, count: 1 }]);
+    await pane.unmount();
+  });
+
+  test("a failed extras read keeps the PR's last threads and merge state", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      gh: GH_OK,
+      view: pr("SUCCESS"),
+      extras: { autoMergeRequest: { enabledAt: "2026-10-23T10:00:00Z" } },
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(await w.shown($)).toBe("merging │ \u{f49e}  \u{f419}");
+
+    world.isExtrasFailing = true;
+    world.view = { ...pr("SUCCESS"), reviewDecision: "APPROVED" };
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(await w.shown($)).toBe("merging │ \u{f49e}  \u{f42e}  \u{f419}");
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("extras.read").map((e) => e.detail?.error)).toEqual(["API rate limit exceeded"]);
+    expect(w.submits).toEqual([]);
+  });
+
+  test("a failed check beside one still running keeps the fast poll", async ($, on) => {
+    const view = {
+      ...pr(""),
+      statusCheckRollup: [check("FAILURE"), { ...check(""), name: "slow" }],
+    };
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.pending * 3);
+
+    expect(w.views.length).toBe(4);
   });
 
   test("a failing poll marks the last status stale", async ($, on) => {
@@ -685,6 +1059,136 @@ describe("register", () => {
     world.view = "HTTP 401: Bad credentials";
     await w.clock.advance(POLL_MS.settled);
 
-    expect(await w.shown($)).toBe("\u{f52f} ci / test · \u{f421} stale");
+    expect(await w.shown($)).toBe("you     │ \u{f52f} 1  \u{f421}");
+  });
+
+  test("a checkout on another forge reads as no PR, not an error", async ($, on) => {
+    const view =
+      "none of the git remotes configured for this repository point to a known GitHub host.";
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("pr.none").map((e) => e.detail?.reason)).toEqual(["not github"]);
+  });
+
+  test("failing polls wait longer each time, up to the backoff cap", async ($, on) => {
+    const view = "GraphQL: API rate limit already exceeded for user ID 1.";
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const minute = 60_000;
+    await w.clock.advance(5 * minute - TICK_MS);
+    expect(w.views.length).toBe(1);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(2);
+    await w.clock.advance((10 + 20 + 40 + 80 + 120) * minute);
+    expect(w.views.length).toBe(7);
+    await w.clock.advance(120 * minute - TICK_MS);
+    expect(w.views.length).toBe(7);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(8);
+    expect(w.named("poll.error").length).toBe(1);
+  });
+
+  test("an unchanged PR backs off until a turn or a change resets it", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled + QUIET_MS.reduce((sum, ms) => sum + ms));
+    expect(w.views.length).toBe(8);
+    expect(w.named("poll.backoff").map((e) => e.detail?.delayMs)).toEqual(QUIET_MS.slice(1));
+
+    await w.clock.advance(30 * 60_000);
+    expect(w.views.length).toBe(8);
+
+    await $.turn.complete(COMPLETE);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(9);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn"]);
+
+    await w.clock.advance(POLL_MS.settled * 2);
+    world.view = pr("FAILURE");
+    await w.clock.advance(QUIET_MS[1] ?? 0);
+    expect(w.submits.length).toBe(1);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn", "change"]);
+  });
+
+  test("a merged PR backs off to hourly and beyond", async ($, on) => {
+    const view = { ...pr("SUCCESS"), state: "MERGED" };
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(4 * 3_600_000);
+    expect(w.views.length).toBe(7);
+    expect(w.named("poll.backoff").at(-1)?.detail?.delayMs).toBe(QUIET_MS.at(-1));
+  });
+
+  test("a turn soon after a poll brings the next one in to the unbacked wait", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("SUCCESS") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled + (QUIET_MS[0] ?? 0));
+    await $.turn.complete(COMPLETE);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(3);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn"]);
+    await w.clock.advance(POLL_MS.settled - TICK_MS);
+    expect(w.views.length).toBe(4);
+  });
+
+  test("with no PR the backoff stops at the idle cap", async ($, on) => {
+    const w = worldOf(on, {
+      branch: "topic",
+      gh: GH_OK,
+      view: 'no pull requests found for branch "topic"',
+    });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(3 * 3_600_000);
+    const delays = w.named("poll.backoff").map((e) => e.detail?.delayMs);
+    expect(delays).toEqual([QUIET_MS[0], QUIET_MS[1], IDLE_CAP_MS]);
+  });
+
+  test("a poll due during a sleep runs on the first tick after the wake", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr(""), sleptMs: 30 * 60_000 });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(30 * 60_000 + TICK_MS);
+
+    expect(w.views.length).toBe(2);
+    expect(w.named("poll.late")[0]?.detail).toEqual({
+      gapMs: TICK_MS + 30 * 60_000,
+      delayMs: POLL_MS.pending,
+      lateMs: 30 * 60_000,
+    });
+  });
+
+  test("a turn revives a ticker the engine stopped", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr(""), isTickRefused: true };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(TICK_MS * 10);
+    expect(w.views.length).toBe(1);
+
+    world.isTickRefused = false;
+    await $.turn.complete(COMPLETE);
+    await w.clock.settle();
+    expect(w.views.length).toBe(2);
+    expect(w.named("watch.revived")[0]?.detail).toEqual({ silentMs: TICK_MS * 10, pr: 7 });
+    expect(w.named("poll.late")).toEqual([]);
+    await w.clock.advance(POLL_MS.pending);
+    expect(w.views.length).toBe(3);
   });
 });

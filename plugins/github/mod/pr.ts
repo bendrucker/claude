@@ -141,6 +141,57 @@ export function parseView(stdout: string): PrView | undefined {
   };
 }
 
+/** What `gh pr view` leaves out, read with one GraphQL query. */
+export interface Extras {
+  /** Unresolved review threads, each with its latest comment. */
+  threads: CommentNode[];
+  hasQueue: boolean;
+  isAutoMerge: boolean;
+  /** Position in the merge queue, counted from 1, or undefined when not queued. */
+  queued: number | undefined;
+}
+
+export const EXTRAS_QUERY = `query($owner: String!, $name: String!, $pr: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $pr) {
+      isMergeQueueEnabled
+      autoMergeRequest { enabledAt }
+      mergeQueueEntry { position }
+      reviewThreads(first: 100) {
+        nodes { isResolved comments(last: 1) { nodes { id author { login } body createdAt } } }
+      }
+    }
+  }
+}`;
+
+/** Narrows the EXTRAS_QUERY response, or undefined when it is not one. */
+export function parseExtras(stdout: string): Extras | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(stdout);
+  } catch {
+    // The caller reports malformed output as an unexpected shape.
+    return undefined;
+  }
+  const data = isRecord(value) && isRecord(value.data) ? value.data : undefined;
+  const repo = isRecord(data?.repository) ? data.repository : undefined;
+  const pr = isRecord(repo?.pullRequest) ? repo.pullRequest : undefined;
+  if (pr === undefined) return undefined;
+  const nodes = isRecord(pr.reviewThreads) ? pr.reviewThreads.nodes : undefined;
+  const threads = listOf(nodes, (thread) => {
+    if (!isRecord(thread) || thread.isResolved === true) return undefined;
+    const comments = isRecord(thread.comments) ? thread.comments.nodes : undefined;
+    return listOf(comments, commentOf).at(-1);
+  });
+  const entry = isRecord(pr.mergeQueueEntry) ? pr.mergeQueueEntry : undefined;
+  return {
+    threads,
+    hasQueue: pr.isMergeQueueEnabled === true,
+    isAutoMerge: isRecord(pr.autoMergeRequest),
+    queued: typeof entry?.position === "number" ? entry.position : undefined,
+  };
+}
+
 export type Phase = "none" | "pending" | "passing" | "failing";
 
 /** What stands between the branch and a merge that the session can fix. */
@@ -169,7 +220,16 @@ export interface Snapshot {
   comments: { id: string; author: string }[];
   /** Comments and checks kept from the model as noise, with why. */
   muted: { id: string; author: string; reason: string }[];
+  /** Unresolved review threads whose latest comment is not the session's own. */
+  threads: number;
+  merging: Merging;
 }
+
+/** How the PR merges itself: auto-merge waiting on its checks, or a merge queue. */
+export type Merging =
+  | { kind: "none"; hasQueue: boolean }
+  | { kind: "auto"; hasQueue: boolean }
+  | { kind: "queued"; position: number };
 
 /** What counts as noise beyond the built-in chatter rules. */
 export interface Noise {
@@ -259,6 +319,7 @@ export interface Local {
   noise?: Noise;
   /** Wall-clock spans of this session's turns, the last one open while a turn runs. */
   turns?: Span[];
+  extras?: Extras;
 }
 
 export type Span = [start: number, end: number | undefined];
@@ -285,6 +346,8 @@ export type Decision =
   | { action: "promote"; kind: "push.foreign"; from: string }
   | { action: "promote"; kind: "ci.failed"; failed: string[] }
   | { action: "promote"; kind: "feedback"; author: string; states: string[]; comments: number }
+  | { action: "promote"; kind: "merge.dropped"; from: "auto" | "queued" }
+  | { action: "drop"; kind: "merging"; to: Merging["kind"] }
   | { action: "drop"; kind: "unblocked" }
   | { action: "drop"; kind: "ci.passing" | "ci.pending" | "ci.none" }
   | { action: "drop"; kind: "push"; from: string };
@@ -353,13 +416,14 @@ function blockOf(view: PrView): Block | undefined {
 }
 
 export function snapshotOf(view: PrView, local: Local): Snapshot {
+  const { extras, turns = [] } = local;
   const noise = local.noise ?? NO_NOISE;
   const muted: Snapshot["muted"] = [];
   // A reply to a review thread is itself a review, so the session's own replies come back here.
   const reviews: Snapshot["reviews"] = [];
   for (const r of view.reviews ?? []) {
     const author = r.author?.login ?? "someone";
-    if (author === local.me && isOwn(r.body ?? "", r.submittedAt, local.turns ?? [])) continue;
+    if (author === local.me && isOwn(r.body ?? "", r.submittedAt, turns)) continue;
     // A bot's bodiless comment review is its reply in a thread, such as an acknowledgement.
     const isReply = r.state === "COMMENTED" && (r.body ?? "").trim() === "" && isBot(author, noise);
     if (isReply) muted.push({ id: r.id, author, reason: "review.reply" });
@@ -387,7 +451,7 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
   const comments: Snapshot["comments"] = [];
   for (const c of view.comments ?? []) {
     const isMine = c.viewerDidAuthor === true || c.author?.login === local.me;
-    if (c.isMinimized || (isMine && isOwn(c.body ?? "", c.createdAt, local.turns ?? []))) continue;
+    if (c.isMinimized || (isMine && isOwn(c.body ?? "", c.createdAt, turns))) continue;
     const author = c.author?.login ?? "someone";
     const reason = chatterOf(author, c.body ?? "", noise);
     if (reason === undefined) comments.push({ id: c.id, author });
@@ -415,6 +479,18 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     reviews,
     comments,
     muted,
+    threads: (extras?.threads ?? []).filter(
+      (c) => !(c.author?.login === local.me && isOwn(c.body ?? "", c.createdAt, turns)),
+    ).length,
+    merging: mergingOf(extras),
+  };
+}
+
+function mergingOf(extras: Extras | undefined): Merging {
+  if (extras?.queued !== undefined) return { kind: "queued", position: extras.queued };
+  return {
+    kind: extras?.isAutoMerge === true ? "auto" : "none",
+    hasQueue: extras?.hasQueue === true,
   };
 }
 
@@ -503,6 +579,13 @@ export function decide(prev: Snapshot, next: Snapshot): Decision[] {
     else if (next.phase === "none") decisions.push({ action: "drop", kind: "ci.none" });
   }
 
+  const from = prev.merging.kind;
+  if (from !== "none" && next.merging.kind === "none") {
+    decisions.push({ action: "promote", kind: "merge.dropped", from });
+  } else if (from !== next.merging.kind) {
+    decisions.push({ action: "drop", kind: "merging", to: next.merging.kind });
+  }
+
   decisions.push(...feedbackOf(prev, next));
   return decisions;
 }
@@ -520,6 +603,8 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
   if (block !== undefined) out.push(block);
   const push = all.find((d) => d.kind === "push.foreign");
   if (push !== undefined) out.push(push);
+  const dropped = all.findLast((d) => d.kind === "merge.dropped");
+  if (dropped !== undefined) out.push(dropped);
   const failed = all.flatMap((d) => (d.kind === "ci.failed" ? d.failed : []));
   if (failed.length > 0) {
     out.push({ action: "promote", kind: "ci.failed", failed: [...new Set(failed)].toSorted() });
@@ -540,19 +625,6 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
 }
 
 const short = (sha: string) => sha.slice(0, 7);
-
-const FOOTER_LABEL_MAX = 20;
-
-// The footer names the first item and counts the rest, so one long name or a
-// crowd of reviewers cannot push the line past a terminal's width.
-function listed(labels: string[]): string {
-  const first = labels[0] ?? "";
-  const name = first.length > FOOTER_LABEL_MAX ? `${first.slice(0, FOOTER_LABEL_MAX - 1)}…` : first;
-  return labels.length > 1 ? `${name} +${labels.length - 1}` : name;
-}
-
-// A check's job name is what tells it apart; its workflow rarely does.
-const jobOf = (label: string) => label.split(" / ").at(-1) ?? label;
 
 function counted(states: string[]): string[] {
   const counts = new Map<string, number>();
@@ -588,6 +660,15 @@ function paragraphOf(
       `Update the branch from ${base}, resolve any conflicts with the \`git:conflicts\` skill, and push.`,
     ].join("\n");
   }
+  if (decision.kind === "merge.dropped" && decision.from === "queued") {
+    return [
+      `${pr} left the merge queue without merging: ${snapshot.url}`,
+      "The queue tests a merge group, whose checks the PR does not show. Read them with `gh run list --event merge_group`.",
+    ].join("\n");
+  }
+  if (decision.kind === "merge.dropped") {
+    return `${pr}'s auto-merge was turned off before it merged: ${snapshot.url}`;
+  }
   if (decision.kind === "push.foreign") {
     return [
       `${pr}'s branch moved from ${short(decision.from)} to ${short(snapshot.head)}, a commit this checkout does not have.`,
@@ -622,28 +703,59 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   return paragraphs.join("\n\n");
 }
 
+/** Whom the PR waits on, which leads the footer. */
+export type Ball = "author" | "reviewer" | "merging" | "ci" | "none";
+
+// Anything the author can fix outranks a reviewer, who outranks a merge that
+// would wait on them anyway. A required review nobody was asked for, or a green
+// PR nothing will merge, is the author's.
+export function ballOf(snapshot: Snapshot): Ball {
+  if (snapshot.state !== "OPEN") return "none";
+  const { turn } = turnOf(snapshot);
+  const isFixable = isBlocked(snapshot.block) || snapshot.phase === "failing";
+  const isUnasked = turn === "none" && snapshot.reviewDecision === "REVIEW_REQUIRED";
+  if (isFixable || isUnasked || turn === "author" || snapshot.threads > 0) return "author";
+  if (turn === "reviewer") return "reviewer";
+  if (snapshot.merging.kind !== "none") return "merging";
+  return snapshot.phase === "pending" ? "ci" : "author";
+}
+
 // Nerd Font Octicons, the icons GitHub draws for each state, keyed by glyph
 // name: nf-oct-git_merge is gitMerge.
 const OCT = {
   alert: "\u{f421}",
+  arrowDown: "\u{f433}",
   check: "\u{f42e}",
   checkCircle: "\u{f49e}",
+  commentDiscussion: "\u{f442}",
   dotFill: "\u{f444}",
   eye: "\u{f441}",
   gitCompare: "\u{f47f}",
   gitMerge: "\u{f419}",
+  gitMergeQueue: "\u{f4db}",
   gitPullRequestClosed: "\u{f4dc}",
   hourglass: "\u{f4e3}",
-  hubot: "\u{f477}",
   reply: "\u{f4a8}",
   xCircle: "\u{f52f}",
 };
 
-export const STALE = `${OCT.alert} stale`;
+export const STALE = OCT.alert;
+
+/** Between footer segments: a glyph and its count sit one space apart, segments two. */
+export const SEP = "  ";
+
+// `isBusy` is a turn running, which is the agent at work on the author's move.
+const LEADS: Record<Ball, (isBusy: boolean) => string | undefined> = {
+  author: (isBusy) => (isBusy ? "agent" : "you"),
+  reviewer: () => "review",
+  merging: () => "merging",
+  ci: () => "ci",
+  none: () => undefined,
+};
 
 const BLOCKS: Record<Block, string | undefined> = {
-  conflict: `${OCT.gitCompare} conflicts`,
-  behind: `${OCT.gitCompare} behind`,
+  conflict: OCT.gitCompare,
+  behind: OCT.arrowDown,
   none: undefined,
 };
 
@@ -654,33 +766,36 @@ const ENDED: Partial<Record<string, string>> = {
 
 const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
   none: () => undefined,
-  pending: (s) => `${OCT.dotFill} CI ${s.total - s.pending}/${s.total}`,
-  passing: () => `${OCT.checkCircle} CI`,
-  failing: (s) => `${OCT.xCircle} ${listed(s.failed.map(jobOf))}`,
+  pending: (s) => `${OCT.dotFill} ${s.total - s.pending}/${s.total}`,
+  passing: () => OCT.checkCircle,
+  failing: (s) => `${OCT.xCircle} ${s.failed.length}`,
 };
-
-const mention = (name: string) => `@${name}`;
 
 const TURNS: Record<Turn["turn"], (snapshot: Snapshot, waiting: string[]) => string | undefined> = {
-  author: (_, waiting) =>
-    `${OCT.reply} ${waiting.length > 0 ? listed(waiting.map(mention)) : "changes requested"}`,
-  reviewer: (_, waiting) => `${OCT.hourglass} ${listed(waiting.map(mention))}`,
-  ready: () => `${OCT.check} approved`,
-  none: (s) => (s.reviewDecision === "REVIEW_REQUIRED" ? `${OCT.eye} review needed` : undefined),
+  author: () => OCT.reply,
+  reviewer: (_, waiting) => `${OCT.hourglass} ${waiting.length}`,
+  ready: () => OCT.check,
+  none: (s) => (s.reviewDecision === "REVIEW_REQUIRED" ? OCT.eye : undefined),
 };
 
+function mergingPart(merging: Merging): string | undefined {
+  if (merging.kind === "queued") return `${OCT.gitMergeQueue} ${merging.position}`;
+  return merging.kind === "auto" ? OCT.gitMerge : undefined;
+}
+
 // The footer already links the PR, so the state rides after it on that line.
-// `muted` counts what was kept from the model since the head last moved.
-export function statusOf(snapshot: Snapshot, muted = 0): string {
+export function statusOf(snapshot: Snapshot, isBusy = false): string {
   const ended = ENDED[snapshot.state];
   if (ended !== undefined) return ended;
   const turn = turnOf(snapshot);
   return [
+    LEADS[ballOf(snapshot)](isBusy),
     BLOCKS[snapshot.block ?? "none"],
     CHECKS[snapshot.phase](snapshot),
     TURNS[turn.turn](snapshot, turn.waiting),
-    muted > 0 ? `${OCT.hubot} ${muted}` : undefined,
+    snapshot.threads > 0 ? `${OCT.commentDiscussion} ${snapshot.threads}` : undefined,
+    mergingPart(snapshot.merging),
   ]
     .filter((part) => part !== undefined)
-    .join(" · ");
+    .join(SEP);
 }

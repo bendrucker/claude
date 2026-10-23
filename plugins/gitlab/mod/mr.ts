@@ -142,23 +142,68 @@ const readReviewers = map(
   (r) => r.data.project.mergeRequest.reviewers.nodes,
 );
 
+const readDiscussion = map(
+  obj({
+    notes: list(
+      obj({
+        author: or(readUsername, "someone"),
+        body: or(str, ""),
+        created_at: or(str, ""),
+        resolvable: or(bool, false),
+        resolved: or(bool, false),
+      }),
+    ),
+  }),
+  (d) => ({
+    isOpen: d.notes.some((n) => n.resolvable && !n.resolved),
+    last: d.notes.at(-1),
+  }),
+);
+
+const readMerge = map(
+  obj({
+    data: obj({
+      project: obj({
+        ciCdSettings: or(obj({ mergeTrainsEnabled: or(bool, false) }), {
+          mergeTrainsEnabled: false,
+        }),
+        mergeRequest: obj({
+          autoMergeEnabled: or(bool, false),
+          mergeTrainIndex: or(num, null),
+        }),
+      }),
+    }),
+  }),
+  ({ data: { project } }): Merging => {
+    const index = project.mergeRequest.mergeTrainIndex;
+    if (index !== null) return { kind: "queued", position: index + 1 };
+    const hasQueue = project.ciCdSettings.mergeTrainsEnabled;
+    return { kind: project.mergeRequest.autoMergeEnabled ? "auto" : "none", hasQueue };
+  },
+);
+
 export type MrView = Out<typeof readView>;
 export type Approvals = Out<typeof readApprovals>;
 export type Note = Out<typeof readNote>;
 export type Job = Out<typeof readJob>;
 export type Reviewer = Out<typeof readReviewer>;
+export type Discussion = Out<typeof readDiscussion>;
 
 /** Narrows `glab mr view -F json` output to an MrView, or undefined when it is not one. */
 export const parseView = (stdout: string): MrView | undefined => decoded(stdout, readView);
 export const parseApprovals = (stdout: string): Approvals | undefined =>
   decoded(stdout, readApprovals);
 export const parseNotes = (stdout: string): Note[] | undefined => decoded(stdout, list(readNote));
-// `glab api --paginate --output ndjson` prints one job per line across every page.
+// `glab api --paginate --output ndjson` prints one item per line across every page.
+const ndjson = (stdout: string) => `[${stdout.split("\n").filter(Boolean).join(",")}]`;
 export const parseJobs = (stdout: string): Job[] | undefined =>
-  decoded(`[${stdout.split("\n").filter(Boolean).join(",")}]`, list(readJob));
+  decoded(ndjson(stdout), list(readJob));
 export const parseUser = (stdout: string): string | undefined => decoded(stdout, readUsername);
 export const parseReviewers = (stdout: string): Reviewer[] | undefined =>
   decoded(stdout, readReviewers);
+export const parseDiscussions = (stdout: string): Discussion[] | undefined =>
+  decoded(ndjson(stdout), list(readDiscussion));
+export const parseMerge = (stdout: string): Merging | undefined => decoded(stdout, readMerge);
 
 export type Phase = "none" | "pending" | "passing" | "failing";
 
@@ -193,7 +238,16 @@ export interface Snapshot {
   notes: { id: number; author: string }[];
   /** Notes kept from the model as noise, with why. */
   muted: { id: string; author: string; reason: string }[];
+  /** Unresolved threads whose latest note is not the session's own. */
+  threads: number;
+  merging: Merging;
 }
+
+/** How the MR merges itself: auto-merge waiting on its pipeline, or a merge train. */
+export type Merging =
+  | { kind: "none"; hasQueue: boolean }
+  | { kind: "auto"; hasQueue: boolean }
+  | { kind: "queued"; position: number };
 
 /** What counts as noise beyond the built-in chatter rules. */
 export interface Noise {
@@ -275,6 +329,8 @@ export type Decision =
   | { action: "promote"; kind: "ci.failed"; failed: string[] }
   | { action: "promote"; kind: "changes_requested" }
   | { action: "promote"; kind: "feedback"; author: string; approval: Approval; notes: number }
+  | { action: "promote"; kind: "merge.dropped"; from: "auto" | "queued" }
+  | { action: "drop"; kind: "merging"; to: Merging["kind"] }
   | { action: "drop"; kind: "unblocked" }
   | { action: "drop"; kind: "ci.passing" | "ci.pending" | "ci.none" }
   | { action: "drop"; kind: "push"; from: string }
@@ -320,6 +376,8 @@ export interface Read {
   notes: Note[];
   jobs: Job[];
   reviewers: Reviewer[];
+  discussions?: Discussion[];
+  merging?: Merging;
   me: string;
   isHeadKnown: boolean;
   noise?: Noise;
@@ -371,7 +429,7 @@ const reviewersIn = ({ reviewers, me }: Read, states: Set<string>) =>
     .toSorted();
 
 export function snapshotOf(read: Read): Snapshot {
-  const { view, approvals, notes, jobs, me } = read;
+  const { view, approvals, notes, jobs, me, turns = [] } = read;
   const failed: string[] = [];
   let pending = 0;
   const isManual = view.pipeline?.status === "manual";
@@ -387,7 +445,7 @@ export function snapshotOf(read: Read): Snapshot {
   const muted: Snapshot["muted"] = [];
   for (const note of notes) {
     const { id, author } = note;
-    if (note.isSystem || (author === me && isOwn(note.body, note.createdAt, read.turns ?? []))) {
+    if (note.isSystem || (author === me && isOwn(note.body, note.createdAt, turns))) {
       continue;
     }
     const reason = chatterOf(note, noise);
@@ -418,6 +476,10 @@ export function snapshotOf(read: Read): Snapshot {
     noteCursor: Math.max(0, ...notes.map((n) => n.id)),
     notes: kept,
     muted,
+    threads: (read.discussions ?? []).filter(
+      (d) => d.isOpen && !(d.last?.author === me && isOwn(d.last.body, d.last.created_at, turns)),
+    ).length,
+    merging: read.merging ?? { kind: "none", hasQueue: false },
   };
 }
 
@@ -523,6 +585,13 @@ export function decide(prev: Snapshot, next: Snapshot): Decision[] {
     else if (next.phase === "none") decisions.push({ action: "drop", kind: "ci.none" });
   }
 
+  const from = prev.merging.kind;
+  if (from !== "none" && next.merging.kind === "none") {
+    decisions.push({ action: "promote", kind: "merge.dropped", from });
+  } else if (from !== next.merging.kind) {
+    decisions.push({ action: "drop", kind: "merging", to: next.merging.kind });
+  }
+
   decisions.push(...feedbackOf(prev, next, isSameHead));
   return decisions;
 }
@@ -548,6 +617,8 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
   if (block !== undefined) out.push(block);
   const push = all.find((d) => d.kind === "push.foreign");
   if (push !== undefined) out.push(push);
+  const dropped = all.findLast((d) => d.kind === "merge.dropped");
+  if (dropped !== undefined) out.push(dropped);
   const failed = all.flatMap((d) => (d.kind === "ci.failed" ? d.failed : []));
   if (failed.length > 0) {
     out.push({ action: "promote", kind: "ci.failed", failed: [...new Set(failed)].toSorted() });
@@ -571,19 +642,6 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
 
 const short = (sha: string) => sha.slice(0, 7);
 
-const FOOTER_LABEL_MAX = 20;
-
-// The footer names the first item and counts the rest, so one long name or a
-// crowd of reviewers cannot push the line past a terminal's width.
-function listed(labels: string[]): string {
-  const first = labels[0] ?? "";
-  const name = first.length > FOOTER_LABEL_MAX ? `${first.slice(0, FOOTER_LABEL_MAX - 1)}…` : first;
-  return labels.length > 1 ? `${name} +${labels.length - 1}` : name;
-}
-
-// A check's job name is what tells it apart; its workflow rarely does.
-const jobOf = (label: string) => label.split(" / ").at(-1) ?? label;
-
 function feedbackLineOf(mr: string, decision: Feedback): string {
   const { author, approval, notes } = decision;
   const comments = notes === 1 ? "1 new comment" : `${notes} new comments`;
@@ -603,6 +661,15 @@ function paragraphOf(
   const target = snapshot.target === "" ? "its target branch" : `\`${snapshot.target}\``;
   if (decision.kind === "mr.merged") return `${mr} merged: ${snapshot.url}`;
   if (decision.kind === "mr.closed") return `${mr} closed without merging: ${snapshot.url}`;
+  if (decision.kind === "merge.dropped" && decision.from === "queued") {
+    return [
+      `${mr} left the merge train without merging: ${snapshot.url}`,
+      `Read why in its system notes with \`glab mr view ${snapshot.mr} --comments --system-logs\`.`,
+    ].join("\n");
+  }
+  if (decision.kind === "merge.dropped") {
+    return `${mr}'s auto-merge was turned off before it merged: ${snapshot.url}`;
+  }
   if (decision.kind === "conflict") {
     return [
       `${mr} has merge conflicts with ${target} at ${short(snapshot.head)}.`,
@@ -653,27 +720,59 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   return paragraphs.join("\n\n");
 }
 
+/** Whom the MR waits on, which leads the footer. */
+export type Ball = "author" | "reviewer" | "merging" | "ci" | "none";
+
+// Anything the author can fix outranks a reviewer, who outranks a merge that
+// would wait on them anyway. An approval nobody was asked for, or a green MR
+// nothing will merge, is the author's.
+export function ballOf(snapshot: Snapshot): Ball {
+  if (!isOpen(snapshot)) return "none";
+  if (snapshot.state === "locked") return "merging";
+  const { turn } = turnOf(snapshot);
+  const isFixable = isBlocked(snapshot.block) || snapshot.phase === "failing";
+  const isUnasked = turn === "none" && snapshot.approvalsLeft > 0;
+  if (isFixable || isUnasked || turn === "author" || snapshot.threads > 0) return "author";
+  if (turn === "reviewer") return "reviewer";
+  if (snapshot.merging.kind !== "none") return "merging";
+  return snapshot.phase === "pending" ? "ci" : "author";
+}
+
 // Nerd Font Octicons, keyed by glyph name: nf-oct-git_merge is gitMerge.
 const OCT = {
   alert: "\u{f421}",
+  arrowDown: "\u{f433}",
   check: "\u{f42e}",
   checkCircle: "\u{f49e}",
+  commentDiscussion: "\u{f442}",
   dotFill: "\u{f444}",
   eye: "\u{f441}",
   gitCompare: "\u{f47f}",
   gitMerge: "\u{f419}",
+  gitMergeQueue: "\u{f4db}",
   gitPullRequestClosed: "\u{f4dc}",
   hourglass: "\u{f4e3}",
-  hubot: "\u{f477}",
   reply: "\u{f4a8}",
   xCircle: "\u{f52f}",
 };
 
-export const STALE = `${OCT.alert} stale`;
+export const STALE = OCT.alert;
+
+/** Between footer segments: a glyph and its count sit one space apart, segments two. */
+export const SEP = "  ";
+
+// `isBusy` is a turn running, which is the agent at work on the author's move.
+const LEADS: Record<Ball, (isBusy: boolean) => string | undefined> = {
+  author: (isBusy) => (isBusy ? "agent" : "you"),
+  reviewer: () => "review",
+  merging: () => "merging",
+  ci: () => "ci",
+  none: () => undefined,
+};
 
 const BLOCKS: Record<Block, string | undefined> = {
-  conflict: `${OCT.gitCompare} conflicts`,
-  behind: `${OCT.gitCompare} behind`,
+  conflict: OCT.gitCompare,
+  behind: OCT.arrowDown,
   none: undefined,
 };
 
@@ -684,34 +783,36 @@ const ENDED: Partial<Record<string, string>> = {
 
 const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
   none: () => undefined,
-  pending: (s) => `${OCT.dotFill} CI ${s.total - s.pending}/${s.total}`,
-  passing: () => `${OCT.checkCircle} CI`,
-  failing: (s) => `${OCT.xCircle} ${listed(s.failed.map(jobOf))}`,
+  pending: (s) => `${OCT.dotFill} ${s.total - s.pending}/${s.total}`,
+  passing: () => OCT.checkCircle,
+  failing: (s) => `${OCT.xCircle} ${s.failed.length}`,
 };
-
-const mention = (name: string) => `@${name}`;
 
 const TURNS: Record<Turn["turn"], (snapshot: Snapshot, waiting: string[]) => string | undefined> = {
-  author: (_, waiting) =>
-    `${OCT.reply} ${waiting.length > 0 ? listed(waiting.map(mention)) : "changes requested"}`,
-  reviewer: (_, waiting) => `${OCT.hourglass} ${listed(waiting.map(mention))}`,
-  ready: () => `${OCT.check} approved`,
-  none: ({ approvalsLeft: left }) =>
-    left > 0 ? `${OCT.eye} ${left} ${left === 1 ? "approval" : "approvals"}` : undefined,
+  author: () => OCT.reply,
+  reviewer: (_, waiting) => `${OCT.hourglass} ${waiting.length}`,
+  ready: () => OCT.check,
+  none: ({ approvalsLeft: left }) => (left > 0 ? `${OCT.eye} ${left}` : undefined),
 };
 
+function mergingPart(merging: Merging): string | undefined {
+  if (merging.kind === "queued") return `${OCT.gitMergeQueue} ${merging.position}`;
+  return merging.kind === "auto" ? OCT.gitMerge : undefined;
+}
+
 // The footer already links the MR, so the state rides after it on that line.
-// `muted` counts what was kept from the model since the head last moved.
-export function statusOf(snapshot: Snapshot, muted = 0): string {
+export function statusOf(snapshot: Snapshot, isBusy = false): string {
   const ended = ENDED[snapshot.state];
   if (ended !== undefined) return ended;
   const turn = turnOf(snapshot);
   return [
+    LEADS[ballOf(snapshot)](isBusy),
     BLOCKS[snapshot.block ?? "none"],
     CHECKS[snapshot.phase](snapshot),
     TURNS[turn.turn](snapshot, turn.waiting),
-    muted > 0 ? `${OCT.hubot} ${muted}` : undefined,
+    snapshot.threads > 0 ? `${OCT.commentDiscussion} ${snapshot.threads}` : undefined,
+    mergingPart(snapshot.merging),
   ]
     .filter((part) => part !== undefined)
-    .join(" · ");
+    .join(SEP);
 }

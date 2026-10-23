@@ -1,15 +1,19 @@
 import type { EngineInterface, On, PluginOptions, Timer } from "claude-code";
 import {
   type Noise,
+  SEP,
   STALE,
   type Promoted,
   type Snapshot,
   type Span,
+  EXTRAS_QUERY,
+  type Extras,
   VIEW_FIELDS,
   baselineOf,
   combine,
   decide,
   messageOf,
+  parseExtras,
   noiseOf,
   parseView,
   snapshotOf,
@@ -66,8 +70,8 @@ interface Watch {
   me: string | undefined;
   noise: Noise;
   undelivered: Undelivered | undefined;
-  /** What was muted since the head last moved, and since the last send. */
-  muted: { head: string; count: number; held: string[] };
+  /** What was muted since the last send, which the next send logs beside it. */
+  held: string[];
   error: string | undefined;
   /** Failed polls in a row, which stretch the wait so a rate limit can reset. */
   errors: number;
@@ -103,6 +107,18 @@ function show($: EngineInterface, watch: Watch, text: string | undefined) {
   $.ui.invalidate("ui.render");
 }
 
+// Any running turn, the main agent's or a subagent's, is the agent at work.
+const isBusy = (watch: Watch) => [...watch.turns.values()].some(([, end]) => end === undefined);
+
+function render($: EngineInterface, watch: Watch) {
+  if (watch.snapshot === undefined) {
+    show($, watch, undefined);
+    return;
+  }
+  const line = statusOf(watch.snapshot, isBusy(watch));
+  show($, watch, watch.error === undefined ? line : [line, STALE].filter(Boolean).join(SEP));
+}
+
 function emit($: EngineInterface, event: string, detail: Record<string, unknown>, ok = true) {
   void $.modEvents.emit({ mod: MOD, event, ok, detail });
 }
@@ -131,6 +147,21 @@ async function meOf(
   if (user.exitCode !== 0 || login === "") return undefined;
   watch.me = login;
   return login;
+}
+
+async function extrasOf($: EngineInterface, cwd: string, url: string): Promise<Extras> {
+  const { hostname, pathname } = new URL(url);
+  const [, owner = "", name = "", , pr = ""] = pathname.split("/");
+  const argv = ["gh", "api", "graphql", "--hostname", hostname, "-f", `query=${EXTRAS_QUERY}`];
+  argv.push("-f", `owner=${owner}`, "-f", `name=${name}`, "-F", `pr=${pr}`);
+  const result = await $.process.run(argv, { cwd, timeoutMs: 20_000 });
+  if (result.exitCode !== 0) {
+    const line = result.stderr.trim().split("\n")[0] ?? "";
+    throw new Error(line === "" ? `gh api graphql exited ${result.exitCode}` : line);
+  }
+  const extras = parseExtras(result.stdout);
+  if (extras === undefined) throw new Error("gh api graphql returned an unexpected shape");
+  return extras;
 }
 
 // Every worktree of the repository shares one object store, so only a push from
@@ -242,12 +273,13 @@ async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
   }
   const parsed = parseView(view.stdout);
   if (parsed === undefined) throw new Error("gh pr view returned an unexpected shape");
-  const [me, isHeadKnown] = await Promise.all([
+  const [me, isHeadKnown, extras] = await Promise.all([
     meOf($, watch, cwd, parsed.url),
     isHeadKnownOf($, watch, cwd, parsed.headRefOid),
+    extrasOf($, cwd, parsed.url),
   ]);
   const turns = [...watch.turns.values()];
-  const snapshot = snapshotOf(parsed, { me, isHeadKnown, noise: watch.noise, turns });
+  const snapshot = snapshotOf(parsed, { me, isHeadKnown, noise: watch.noise, turns, extras });
   watch.last = { branch, snapshot };
   if (probed !== undefined) watch.etags = probed.etags;
   return { kind: "pr", snapshot, read: changed === undefined ? "full" : "miss", changed };
@@ -364,17 +396,13 @@ function schedule($: EngineInterface, watch: Watch, streak: number, cause: strin
   watch.due = watch.polledAt + delay;
 }
 
-// Logs each newly muted item. Those already there when the PR is first seen are
-// logged but not counted in the footer.
+// Logs each newly muted item, marking those already there when the PR is first seen.
 function mute($: EngineInterface, watch: Watch, prev: Snapshot | undefined, next: Snapshot) {
   const seen = new Set(prev?.muted.map((m) => m.id));
   const fresh = next.muted.filter((m) => !seen.has(m.id));
   const baseline = prev === undefined ? { baseline: true } : {};
   for (const m of fresh) emit($, "muted", { pr: next.pr, head: next.head, ...baseline, ...m });
-  if (watch.muted.head !== next.head) watch.muted = { ...watch.muted, head: next.head, count: 0 };
-  if (prev === undefined) return;
-  watch.muted.count += fresh.length;
-  watch.muted.held.push(...fresh.map((m) => m.id));
+  if (prev !== undefined) watch.held.push(...fresh.map((m) => m.id));
 }
 
 interface Applied {
@@ -391,7 +419,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
     show($, watch, undefined);
     watch.none = none;
     watch.snapshot = undefined;
-    watch.muted = { head: "", count: 0, held: [] };
+    watch.held = [];
     watch.undelivered = undefined;
     return { isTracked: false, isChanged };
   }
@@ -408,7 +436,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   if (!isSamePr) {
     emit($, "pr.tracked", { pr: next.pr, head: next.head, phase: next.phase, state: next.state });
     watch.undelivered = undefined;
-    watch.muted = { head: next.head, count: 0, held: [] };
+    watch.held = [];
     mute($, watch, undefined, next);
     due = baselineOf(next);
     for (const { action, ...detail } of due) {
@@ -435,11 +463,11 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
     emit($, "review.turn", { pr: next.pr, head: next.head, ...turn });
   }
   watch.snapshot = next;
-  show($, watch, statusOf(next, watch.muted.count));
+  render($, watch);
   // The send waits for an idle session, so the next poll is not held on it.
   if (due.length > 0) {
-    void send($, watch, next, due, watch.muted.held, attempt, isCurrent);
-    watch.muted.held = [];
+    void send($, watch, next, due, watch.held, attempt, isCurrent);
+    watch.held = [];
   }
   return { isTracked: !isSamePr, isChanged };
 }
@@ -456,6 +484,8 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     }
     // A session.end that landed while gh ran has already cleared the status.
     if (!isCurrent() || seq !== watch.polls) return;
+    watch.error = undefined;
+    watch.errors = 0;
     const { isTracked, isChanged } = apply($, watch, read, isCurrent);
     let streak = isChanged ? 0 : watch.streak + 1;
     if (isTracked && watch.snapshot !== undefined) {
@@ -464,8 +494,6 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     }
     watch.polledAt = now;
     schedule($, watch, streak, "change");
-    watch.error = undefined;
-    watch.errors = 0;
   } catch (error) {
     if (!isCurrent() || seq !== watch.polls) return;
     const message = error instanceof Error ? error.message : String(error);
@@ -474,10 +502,7 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     watch.errors += 1;
     watch.polledAt = now;
     watch.due = now + Math.min(POLL_MS.error * 2 ** (watch.errors - 1), BACKOFF_CAP_MS);
-    if (watch.snapshot !== undefined) {
-      const line = statusOf(watch.snapshot, watch.muted.count);
-      show($, watch, line === "" ? STALE : `${line} · ${STALE}`);
-    }
+    render($, watch);
   }
 }
 
@@ -551,7 +576,7 @@ export function register(on: On, options: PluginOptions): void {
     me: undefined,
     noise,
     undelivered: undefined,
-    muted: { head: "", count: 0, held: [] },
+    held: [],
     error: undefined,
     errors: 0,
     ticker: undefined,
@@ -621,13 +646,19 @@ export function register(on: On, options: PluginOptions): void {
       if (end !== undefined && now - end > TURNS_KEPT_MS) watch.turns.delete(id);
     }
     watch.turns.set(e.turnId, [now, undefined]);
+    render($, watch);
     return next(e);
   }).catch(($, e, next) => next(e));
 
   on("turn.complete", async ($, e, next) => {
     const span = watch.turns.get(e.turnId);
     if (span !== undefined) span[1] = await $.clock.now();
-    if (e.agentId === undefined) void wake($, watch);
+    render($, watch);
+    if (e.agentId === undefined) {
+      // No probed resource moves when a thread is resolved, which a turn often does.
+      watch.etags.clear();
+      void wake($, watch);
+    }
     return next(e);
   }).catch(($, e, next) => next(e));
 }

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "claude-code/testing";
 import {
+  parseMerge,
   type Approval,
   type Decision,
   type Promoted,
@@ -261,6 +262,39 @@ describe("snapshotOf", () => {
     ];
     expect(snap({ notes, noise }).muted).toEqual([{ id: "1", author: "renovate", reason: "body" }]);
     expect(noiseOf("", "", "(").error).toContain("SyntaxError");
+  });
+});
+
+describe("merging", () => {
+  const open = snap({ jobs: [job("test", "success")] }, "success");
+  const queued: Snapshot = { ...open, merging: { kind: "queued", position: 1 } };
+
+  test("leaving the train without merging wakes the model; joining only logs", () => {
+    expect(decide(open, queued)).toEqual([{ action: "drop", kind: "merging", to: "queued" }]);
+    expect(decide(queued, open)).toEqual([
+      { action: "promote", kind: "merge.dropped", from: "queued" },
+    ]);
+    expect(decide(queued, { ...open, state: "merged" })).toEqual([
+      { action: "promote", kind: "mr.merged" },
+    ]);
+  });
+
+  test("parses the train position, counted from 1, and auto-merge", () => {
+    const merge = (mergeRequest: object) =>
+      parseMerge(
+        JSON.stringify({
+          data: { project: { ciCdSettings: { mergeTrainsEnabled: true }, mergeRequest } },
+        }),
+      );
+    expect(merge({ autoMergeEnabled: true, mergeTrainIndex: 0 })).toEqual({
+      kind: "queued",
+      position: 1,
+    });
+    expect(merge({ autoMergeEnabled: true, mergeTrainIndex: null })).toEqual({
+      kind: "auto",
+      hasQueue: true,
+    });
+    expect(merge({ autoMergeEnabled: false })).toEqual({ kind: "none", hasQueue: true });
   });
 });
 
@@ -576,18 +610,25 @@ describe("messageOf", () => {
 
 describe("statusOf", () => {
   const passed = [job("a", "success")];
+  const latest = (author: string, body = "") => ({
+    author,
+    body,
+    created_at: "2026-10-06T10:00:00Z",
+    resolvable: true,
+    resolved: false,
+  });
   const cases: [string, Snapshot, string][] = [
-    ["running", snap({ jobs: [job("b", "running"), ...passed] }), "\u{f444} CI 1/2"],
-    ["failing", snap({ jobs: [job("a", "failed")] }, "failed"), "\u{f52f} a"],
+    ["running", snap({ jobs: [job("b", "running"), ...passed] }), "ci  \u{f444} 1/2"],
+    ["failing", snap({ jobs: [job("a", "failed")] }, "failed"), "you  \u{f52f} 1"],
     [
       "blocked on a manual job",
       snap({ jobs: [job("deploy", "manual"), ...passed] }, "manual"),
-      "\u{f444} CI 1/2",
+      "ci  \u{f444} 1/2",
     ],
     [
       "no pipeline and no approvals",
       snapshotOf({ ...read(), view: { ...read().view, pipeline: null } }),
-      "",
+      "you",
     ],
     [
       "approvals outstanding",
@@ -595,7 +636,7 @@ describe("statusOf", () => {
         { jobs: passed, approvals: { approvalsRequired: 2, approvalsLeft: 2, approvedBy: [] } },
         "success",
       ),
-      "\u{f49e} CI · \u{f441} 2 approvals",
+      "you  \u{f49e}  \u{f441} 2",
     ],
     [
       "approved",
@@ -606,7 +647,7 @@ describe("statusOf", () => {
         },
         "success",
       ),
-      "\u{f49e} CI · \u{f42e} approved",
+      "you  \u{f49e}  \u{f42e}",
     ],
     [
       "changes requested",
@@ -614,7 +655,7 @@ describe("statusOf", () => {
         ...read({ jobs: passed }, "success"),
         view: { ...read().view, pipeline: null, detailedMergeStatus: "requested_changes" },
       }),
-      "\u{f4a8} changes requested",
+      "you  \u{f4a8}",
     ],
     [
       "re-requested after changes",
@@ -630,7 +671,7 @@ describe("statusOf", () => {
         }),
         view: { ...read().view, pipeline: null, detailedMergeStatus: "requested_changes" },
       }),
-      "\u{f4e3} @alice +2",
+      "review  \u{f4e3} 3",
     ],
     [
       "a reviewer's request for changes outranks another's pending review",
@@ -643,7 +684,7 @@ describe("statusOf", () => {
         }),
         view: { ...read().view, pipeline: null },
       }),
-      "\u{f4a8} @alice",
+      "you  \u{f4a8}",
     ],
     ["merged", { ...snap({ jobs: [job("a", "running")] }), state: "merged" }, "\u{f419} merged"],
     ["closed", { ...snap(), state: "closed" }, "\u{f4dc} closed"],
@@ -653,7 +694,7 @@ describe("statusOf", () => {
         ...read({ jobs: passed }, "success"),
         view: { ...read({}, "success").view, detailedMergeStatus: "conflict" },
       }),
-      "\u{f47f} conflicts · \u{f49e} CI",
+      "you  \u{f47f}  \u{f49e}",
     ],
     [
       "needs a rebase",
@@ -661,7 +702,7 @@ describe("statusOf", () => {
         ...read({ jobs: passed }, "success"),
         view: { ...read({}, "success").view, detailedMergeStatus: "need_rebase" },
       }),
-      "\u{f47f} behind · \u{f49e} CI",
+      "you  \u{f433}  \u{f49e}",
     ],
     [
       "undecided mergeability shows no conflict",
@@ -669,7 +710,40 @@ describe("statusOf", () => {
         ...read({ jobs: passed }, "success"),
         view: { ...read({}, "success").view, detailedMergeStatus: "checking" },
       }),
-      "\u{f49e} CI",
+      "you  \u{f49e}",
+    ],
+    [
+      "threads waiting on the author, not those it answered",
+      snap(
+        {
+          jobs: passed,
+          discussions: [
+            { isOpen: true, last: latest("alice") },
+            {
+              isOpen: true,
+              last: latest("ben", "Fixed.\n\n_Generated by [Claude Code](https://claude.ai/code)_"),
+            },
+            { isOpen: false, last: latest("carol") },
+          ],
+        },
+        "success",
+      ),
+      "you  \u{f49e}  \u{f442} 1",
+    ],
+    [
+      "auto-merge waiting on the pipeline",
+      snap({ jobs: [job("b", "running"), ...passed], merging: { kind: "auto", hasQueue: false } }),
+      "merging  \u{f444} 1/2  \u{f419}",
+    ],
+    [
+      "on a merge train",
+      snap({ jobs: passed, merging: { kind: "queued", position: 3 } }, "success"),
+      "merging  \u{f49e}  \u{f4db} 3",
+    ],
+    [
+      "locked mid-merge",
+      { ...snap({ jobs: passed }, "success"), state: "locked" },
+      "merging  \u{f49e}",
     ],
   ];
   test("formats each state", () => {

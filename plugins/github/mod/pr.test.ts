@@ -1,5 +1,7 @@
 import { describe, expect, test } from "claude-code/testing";
 import {
+  parseExtras,
+  type Extras,
   type CheckNode,
   type Decision,
   type PrView,
@@ -288,6 +290,33 @@ describe("snapshotOf", () => {
   });
 });
 
+describe("parseExtras", () => {
+  test("keeps unresolved threads' latest comments and the merge state", () => {
+    const pullRequest = {
+      isMergeQueueEnabled: true,
+      autoMergeRequest: { enabledAt: "2026-10-23T10:00:00Z" },
+      mergeQueueEntry: { position: 2 },
+      reviewThreads: {
+        nodes: [
+          { isResolved: true, comments: { nodes: [{ id: "c1", author: { login: "alice" } }] } },
+          {
+            isResolved: false,
+            comments: {
+              nodes: [{ id: "c2", author: { login: "bob" }, body: "nit", createdAt: "x" }],
+            },
+          },
+        ],
+      },
+    };
+    const extras = parseExtras(JSON.stringify({ data: { repository: { pullRequest } } }));
+    expect(extras?.threads.map((c) => c.id)).toEqual(["c2"]);
+    expect(extras?.queued).toBe(2);
+    expect(extras?.hasQueue).toBe(true);
+    expect(extras?.isAutoMerge).toBe(true);
+    expect(parseExtras(JSON.stringify({ data: { repository: null } }))).toBeUndefined();
+  });
+});
+
 describe("decide", () => {
   const pending = snapOf(view({ statusCheckRollup: [run("test", "IN_PROGRESS")] }));
   const failing = snapOf(view({ statusCheckRollup: [run("test", "COMPLETED", "FAILURE")] }));
@@ -419,6 +448,31 @@ describe("decide", () => {
   });
 });
 
+describe("merging", () => {
+  const open = snapOf(view({ statusCheckRollup: [run("test", "COMPLETED", "SUCCESS")] }));
+  const queued: Snapshot = { ...open, merging: { kind: "queued", position: 1 } };
+  const auto: Snapshot = { ...open, merging: { kind: "auto", hasQueue: false } };
+
+  test("leaving the queue or auto-merge without merging wakes the model; joining only logs", () => {
+    expect(decide(open, queued)).toEqual([{ action: "drop", kind: "merging", to: "queued" }]);
+    expect(decide(queued, open)).toEqual([
+      { action: "promote", kind: "merge.dropped", from: "queued" },
+    ]);
+    expect(decide(auto, open)).toEqual([
+      { action: "promote", kind: "merge.dropped", from: "auto" },
+    ]);
+    expect(decide(queued, { ...open, state: "MERGED" })).toEqual([
+      { action: "promote", kind: "pr.merged" },
+    ]);
+  });
+
+  test("a dropped queue entry points at the merge group's runs", () => {
+    const text = messageOf(open, [{ action: "promote", kind: "merge.dropped", from: "queued" }]);
+    expect(text).toContain("left the merge queue without merging");
+    expect(text).toContain("gh run list --event merge_group");
+  });
+});
+
 describe("combine", () => {
   const feedback = (author: string, states: string[], comments = 0): Promoted => ({
     action: "promote",
@@ -547,50 +601,68 @@ describe("labels", () => {
 
 describe("statusOf", () => {
   const passed = [run("a", "COMPLETED", "SUCCESS")];
-  const cases: [string, Partial<PrView>, string][] = [
-    ["running", { statusCheckRollup: [run("b", "IN_PROGRESS"), ...passed] }, "\u{f444} CI 1/2"],
-    ["failing", { statusCheckRollup: [run("a", "COMPLETED", "FAILURE")] }, "\u{f52f} a"],
+  const pending = [run("b", "IN_PROGRESS"), ...passed];
+  const thread = (login: string, body = "") => ({
+    id: `c-${login}`,
+    author: { login },
+    body,
+    createdAt: "2026-10-06T10:00:00Z",
+  });
+  const extras = (over: Partial<Extras> = {}): Extras => ({
+    threads: [],
+    hasQueue: false,
+    isAutoMerge: false,
+    queued: undefined,
+    ...over,
+  });
+  const cases: [string, Partial<PrView>, Extras | undefined, string][] = [
+    ["running", { statusCheckRollup: pending }, undefined, "ci  \u{f444} 1/2"],
     [
-      "failing several, one long",
+      "failing",
+      { statusCheckRollup: [run("a", "COMPLETED", "FAILURE")] },
+      undefined,
+      "you  \u{f52f} 1",
+    ],
+    [
+      "failing several",
       {
         statusCheckRollup: [
           run("bootstrap (macos-15-arm64, full install)", "COMPLETED", "FAILURE"),
           run("lint", "COMPLETED", "FAILURE"),
         ],
       },
-      "\u{f52f} bootstrap (macos-15… +1",
+      undefined,
+      "you  \u{f52f} 2",
     ],
-    ["no checks and no review", {}, ""],
+    ["no checks and no review", {}, undefined, "you"],
     [
-      "review needed",
+      "review needed and nobody asked",
       { statusCheckRollup: passed, reviewDecision: "REVIEW_REQUIRED" },
-      "\u{f49e} CI · \u{f441} review needed",
+      undefined,
+      "you  \u{f49e}  \u{f441}",
     ],
     [
       "approved",
       { statusCheckRollup: passed, reviewDecision: "APPROVED" },
-      "\u{f49e} CI · \u{f42e} approved",
+      undefined,
+      "you  \u{f49e}  \u{f42e}",
     ],
-    ["changes requested", { reviewDecision: "CHANGES_REQUESTED" }, "\u{f4a8} changes requested"],
+    ["changes requested", { reviewDecision: "CHANGES_REQUESTED" }, undefined, "you  \u{f4a8}"],
     [
       "re-requested after changes",
       { reviewDecision: "CHANGES_REQUESTED", reviewRequests: ["ben", "carol", "alice", "dave"] },
-      "\u{f4e3} @alice +2",
+      undefined,
+      "review  \u{f4e3} 3",
     ],
-    ["requested without required reviews", { reviewRequests: ["alice"] }, "\u{f4e3} @alice"],
-    ["only the session's own login requested", { reviewRequests: ["ben"] }, ""],
-    [
-      "changes requested without required reviews",
-      { latestReviews: [{ id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } }] },
-      "\u{f4a8} @alice",
-    ],
+    ["only the session's own login requested", { reviewRequests: ["ben"] }, undefined, "you"],
     [
       "a standing request for changes outranks another reviewer's request",
       {
         reviewRequests: ["bob"],
         latestReviews: [{ id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } }],
       },
-      "\u{f4a8} @alice",
+      undefined,
+      "you  \u{f4a8}",
     ],
     [
       "a re-request hands the turn back",
@@ -598,29 +670,75 @@ describe("statusOf", () => {
         reviewRequests: ["alice"],
         latestReviews: [{ id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } }],
       },
-      "\u{f4e3} @alice",
+      undefined,
+      "review  \u{f4e3} 1",
+    ],
+    [
+      "threads waiting on the author, not those it answered",
+      { statusCheckRollup: passed, reviewRequests: ["alice"] },
+      extras({
+        threads: [
+          thread("alice"),
+          thread("carol"),
+          thread("ben", "Fixed.\n\n_Generated by [Claude Code](https://claude.ai/code)_"),
+        ],
+      }),
+      "you  \u{f49e}  \u{f4e3} 1  \u{f442} 2",
+    ],
+    [
+      "auto-merge waiting on checks",
+      { statusCheckRollup: pending },
+      extras({ isAutoMerge: true }),
+      "merging  \u{f444} 1/2  \u{f419}",
+    ],
+    [
+      "auto-merge waiting on a review",
+      { statusCheckRollup: passed, reviewRequests: ["alice"] },
+      extras({ isAutoMerge: true }),
+      "review  \u{f49e}  \u{f4e3} 1  \u{f419}",
+    ],
+    [
+      "queued",
+      { statusCheckRollup: passed },
+      extras({ hasQueue: true, queued: 2 }),
+      "merging  \u{f49e}  \u{f4db} 2",
     ],
     [
       "merged",
       { state: "MERGED", statusCheckRollup: [run("a", "IN_PROGRESS")] },
+      undefined,
       "\u{f419} merged",
     ],
-    ["closed", { state: "CLOSED" }, "\u{f4dc} closed"],
+    ["closed", { state: "CLOSED" }, undefined, "\u{f4dc} closed"],
     [
       "conflicting",
       { statusCheckRollup: passed, mergeable: "CONFLICTING" },
-      "\u{f47f} conflicts · \u{f49e} CI",
+      undefined,
+      "you  \u{f47f}  \u{f49e}",
     ],
     [
       "behind",
       { statusCheckRollup: passed, mergeStateStatus: "BEHIND" },
-      "\u{f47f} behind · \u{f49e} CI",
+      undefined,
+      "you  \u{f433}  \u{f49e}",
     ],
   ];
+
   test("formats each state", () => {
     const shown = Object.fromEntries(
-      cases.map(([name, over]) => [name, statusOf(snapOf(view(over)))]),
+      cases.map(([name, over, more]) => [
+        name,
+        statusOf(
+          snapshotOf(view(over), { me: "ben", isHeadKnown: true, ...(more && { extras: more }) }),
+        ),
+      ]),
     );
-    expect(shown).toEqual(Object.fromEntries(cases.map(([name, , expected]) => [name, expected])));
+    expect(shown).toEqual(Object.fromEntries(cases.map((entry) => [entry[0], entry[3]])));
+  });
+
+  test("a running turn on the author's move reads as the agent at work", () => {
+    const snapshot = snapOf(view({ reviewDecision: "CHANGES_REQUESTED" }));
+    expect(statusOf(snapshot, true)).toBe("agent  \u{f4a8}");
+    expect(statusOf(snapOf(view({ reviewRequests: ["alice"] })), true)).toBe("review  \u{f4e3} 1");
   });
 });

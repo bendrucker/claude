@@ -56,7 +56,16 @@ interface World {
   isTickRefused?: boolean;
   /** The current ETag of each REST path the gate probes; one left out answers 200 bare. */
   etags?: Record<string, string>;
+  /** The GraphQL pull request the extras query reads. */
+  extras?: Record<string, unknown>;
 }
+
+const EXTRAS = {
+  isMergeQueueEnabled: false,
+  autoMergeRequest: null,
+  mergeQueueEntry: null,
+  reviewThreads: { nodes: [] },
+};
 
 function worldOf(on: On, world: World) {
   const events: Recorded[] = [];
@@ -73,6 +82,7 @@ function worldOf(on: On, world: World) {
   });
   const probes: string[] = [];
   const clock = mock.clock(on);
+  on("turn.start", ($, e) => ({ turnId: e.turnId }));
   on("turn.complete", () => ({ text: "" }));
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
@@ -124,6 +134,18 @@ function worldOf(on: On, world: World) {
         value: {
           exitCode: world.noLogin === true ? 1 : 0,
           stdout: world.noLogin === true ? "" : "ben\n",
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
+    if (argv.startsWith("gh api graphql")) {
+      const pullRequest = { ...EXTRAS, ...world.extras };
+      return {
+        value: {
+          exitCode: 0,
+          stdout: JSON.stringify({ data: { repository: { pullRequest } } }),
           stderr: "",
           isStdoutTruncated: false,
           isStderrTruncated: false,
@@ -206,7 +228,7 @@ describe("register", () => {
       phase: "pending",
       state: "OPEN",
     });
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1");
+    expect(await w.shown($)).toBe("ci  \u{f444} 0/1");
 
     world.view = pr("FAILURE");
     await w.clock.advance(POLL_MS.pending);
@@ -219,7 +241,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(await w.shown($)).toBe("\u{f52f} test");
+    expect(await w.shown($)).toBe("you  \u{f52f} 1");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -228,7 +250,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(await w.shown($)).toBe("\u{f49e} CI");
+    expect(await w.shown($)).toBe("you  \u{f49e}");
   });
 
   test("every new review wakes the model with its state", async ($, on) => {
@@ -289,7 +311,7 @@ describe("register", () => {
         { pr: 7, head: "aaaaaaa1111", id: "c1", author: "vercel[bot]", reason: "author" },
       ]);
       expect(w.named("inject")[0]?.detail?.muted).toEqual(["aaaaaaa1111:Greptile Review", "c1"]);
-      expect(await w.shown($)).toBe("\u{f49e} CI · \u{f477} 2");
+      expect(await w.shown($)).toBe("you  \u{f49e}");
     },
   );
 
@@ -304,21 +326,21 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4a8} @alice");
+    expect(await w.shown($)).toBe("you  \u{f49e}  \u{f4a8}");
 
     const pushed = { ...pr("SUCCESS"), headRefOid: "bbbbbbb2222", latestReviews: [asked] };
     world.view = pushed;
     await w.clock.advance(POLL_MS.settled);
     world.view = { ...pushed, reviewRequests: [{ login: "alice" }] };
     await w.clock.advance(POLL_MS.settled);
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4e3} @alice");
+    expect(await w.shown($)).toBe("review  \u{f49e}  \u{f4e3} 1");
     expect(w.named("review.turn").map((e) => e.detail)).toEqual([
       { pr: 7, head: "aaaaaaa1111", turn: "author", waiting: ["alice"] },
       { pr: 7, head: "bbbbbbb2222", turn: "reviewer", waiting: ["alice"] },
     ]);
   });
 
-  test("chatter already on a PR first seen is logged but not counted", async ($, on) => {
+  test("chatter already on a PR first seen is logged as the baseline", async ($, on) => {
     const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\nActions performed";
     const view = {
       ...pr("SUCCESS"),
@@ -338,7 +360,7 @@ describe("register", () => {
         reason: "coderabbit.ack",
       },
     ]);
-    expect(await w.shown($)).toBe("\u{f49e} CI");
+    expect(await w.shown($)).toBe("you  \u{f49e}");
   });
 
   test(
@@ -369,7 +391,7 @@ describe("register", () => {
     expect(w.submits.length).toBe(1);
     expect(w.submits[0]).toContain("PR #7 has merge conflicts with `main` at aaaaaaa.");
     expect(w.submits[0]).toContain("`git:conflicts`");
-    expect(await w.shown($)).toBe("\u{f47f} conflicts · \u{f49e} CI");
+    expect(await w.shown($)).toBe("you  \u{f47f}  \u{f49e}");
 
     world.view = merging("MERGEABLE");
     await w.clock.advance(QUIET_MS[1] ?? 0);
@@ -551,7 +573,7 @@ describe("register", () => {
     expect(w.submits.length).toBe(2);
     expect(w.submits[1]).toContain("@bot reviewed PR #7 (COMMENTED)");
     expect(w.submits[1]).not.toContain("CI failed");
-    expect(await w.shown($)).toBe("\u{f52f} test");
+    expect(await w.shown($)).toBe("you  \u{f52f} 1");
   });
 
   test("stays idle without gh", async ($, on) => {
@@ -636,7 +658,7 @@ describe("register", () => {
     world.branch = "master";
     await w.clock.advance(POLL_MS.idle);
     expect(w.views.length).toBe(1);
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1");
+    expect(await w.shown($)).toBe("ci  \u{f444} 0/1");
   });
 
   test("a repeated gh failure is logged once and backs off", async ($, on) => {
@@ -677,7 +699,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.pending);
 
     expect(w.views.length).toBe(3);
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1");
+    expect(await w.shown($)).toBe("ci  \u{f444} 0/1");
   });
 
   test("logout stops the watch and clears the status", async ($, on) => {
@@ -701,7 +723,7 @@ describe("register", () => {
     world.view = pr("FAILURE");
     await w.clock.advance(POLL_MS.pending);
     expect(w.submits.length).toBe(1);
-    expect(await w.shown($)).toBe("\u{f52f} test");
+    expect(await w.shown($)).toBe("you  \u{f52f} 1");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.views.length).toBe(3);
@@ -904,7 +926,7 @@ describe("register", () => {
     expect(w.submits.length).toBe(1);
   });
 
-  test("a PR with no checks and no review leaves the footer as it was", async ($, on) => {
+  test("a PR with no checks and no review waits on its author", async ($, on) => {
     const w = worldOf(on, {
       branch: "topic",
       gh: GH_OK,
@@ -914,7 +936,21 @@ describe("register", () => {
     await $.session.start(START);
     await w.clock.settle();
 
-    expect(await w.shown($)).toBe(undefined);
+    expect(await w.shown($)).toBe("you");
+  });
+
+  test("a running turn shows the agent at work on the author's move", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("FAILURE") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(await w.shown($)).toBe("you  \u{f52f} 1");
+
+    await $.turn.start({ text: "fix it", turnId: "t1" });
+    expect(await w.shown($)).toBe("agent  \u{f52f} 1");
+
+    await $.turn.complete(COMPLETE);
+    expect(await w.shown($)).toBe("you  \u{f52f} 1");
   });
 
   test("a failing poll marks the last status stale", async ($, on) => {
@@ -926,7 +962,7 @@ describe("register", () => {
     world.view = "HTTP 401: Bad credentials";
     await w.clock.advance(POLL_MS.settled);
 
-    expect(await w.shown($)).toBe("\u{f52f} test · \u{f421} stale");
+    expect(await w.shown($)).toBe("you  \u{f52f} 1  \u{f421}");
   });
 
   test("a checkout on another forge reads as no PR, not an error", async ($, on) => {

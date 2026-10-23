@@ -55,6 +55,9 @@ interface World {
   notes?: unknown;
   /** GraphQL reviewer nodes, or a string for a failed read. */
   reviewers?: unknown;
+  /** The merge request fields the merge query reads. */
+  merge?: Record<string, unknown>;
+  discussions?: unknown[];
   // Runs after each read of the MR by branch, to move the MR mid-poll.
   afterView?: () => void;
   slowMs?: number;
@@ -145,6 +148,11 @@ function worldOf(on: On, world: World) {
       return view;
     }
     if (argv === "glab api user") return reply({ username: "ben" });
+    if (argv.startsWith("glab api graphql") && argv.includes("mergeTrainIndex")) {
+      const mergeRequest = { autoMergeEnabled: false, mergeTrainIndex: null, ...world.merge };
+      const ciCdSettings = { mergeTrainsEnabled: false };
+      return reply({ data: { project: { ciCdSettings, mergeRequest } } });
+    }
     if (argv.startsWith("glab api graphql")) {
       graphql.push(argv);
       const nodes = world.reviewers ?? [];
@@ -154,6 +162,9 @@ function worldOf(on: On, world: World) {
     apis.push(argv);
     if (argv.endsWith("/approvals")) return reply(world.approvals ?? approvals());
     if (argv.includes("/notes?")) return reply(world.notes ?? []);
+    if (argv.includes("/discussions?")) {
+      return result((world.discussions ?? []).map((row) => JSON.stringify(row)).join("\n"));
+    }
     if (argv.startsWith("glab api --paginate --output ndjson projects/1/pipelines/50/jobs?")) {
       return result((world.jobs ?? job("running")).map((row) => JSON.stringify(row)).join("\n"));
     }
@@ -193,7 +204,7 @@ describe("register", () => {
       phase: "pending",
       state: "opened",
     });
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1 · \u{f441} 1 approval");
+    expect(await w.shown($)).toBe("you  \u{f444} 0/1  \u{f441} 1");
 
     world.view = mr("failed");
     world.jobs = job("failed");
@@ -208,7 +219,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(await w.shown($)).toBe("\u{f52f} test · \u{f441} 1 approval");
+    expect(await w.shown($)).toBe("you  \u{f52f} 1  \u{f441} 1");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -218,7 +229,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f441} 1 approval");
+    expect(await w.shown($)).toBe("you  \u{f49e}  \u{f441} 1");
   });
 
   test("an MR already conflicting when first seen is announced once, through a recheck", async ($, on) => {
@@ -305,7 +316,7 @@ describe("register", () => {
     world.approvals = approvals("alice");
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits[1]).toContain("@alice approved MR !7");
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f42e} approved");
+    expect(await w.shown($)).toBe("you  \u{f49e}  \u{f42e}");
 
     world.approvals = approvals();
     await w.clock.advance(POLL_MS.settled);
@@ -341,7 +352,7 @@ describe("register", () => {
         { mr: 7, head: "aaaaaaa1111", id: "3", author: "deploy-bot", reason: "author" },
         { mr: 7, head: "aaaaaaa1111", id: "2", author: "coderabbitai", reason: "coderabbit.ack" },
       ]);
-      expect(await w.shown($)).toContain("\u{f477} 2");
+      expect(await w.shown($)).toBe("you  \u{f49e}  \u{f441} 1");
     },
   );
 
@@ -362,14 +373,14 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4a8} @alice");
+    expect(await w.shown($)).toBe("you  \u{f49e}  \u{f4a8}");
     await w.clock.advance(POLL_MS.settled);
     expect(w.graphql.length).toBe(1);
 
     world.notes = [note(5, "ben", true), note(4, "alice", true)];
     world.reviewers = state("UNREVIEWED");
     await w.clock.advance(POLL_MS.settled);
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4e3} @alice");
+    expect(await w.shown($)).toBe("review  \u{f49e}  \u{f4e3} 1");
 
     world.notes = [note(6, "ben", true), note(5, "ben", true), note(4, "alice", true)];
     world.reviewers = "HTTP 500";
@@ -377,7 +388,7 @@ describe("register", () => {
     expect(w.graphql.length).toBe(3);
     expect(w.named("poll.error")).toEqual([]);
     expect(w.named("review.read").map((e) => e.ok)).toEqual([true, true, false]);
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4e3} @alice");
+    expect(await w.shown($)).toBe("review  \u{f49e}  \u{f4e3} 1");
     expect(w.named("review.turn").map((e) => e.detail)).toEqual([
       { mr: 7, head: "aaaaaaa1111", turn: "author", waiting: ["alice"] },
       { mr: 7, head: "aaaaaaa1111", turn: "reviewer", waiting: ["alice"] },
@@ -457,7 +468,7 @@ describe("register", () => {
     await $.session.start(START);
     await w.clock.settle();
     await w.clock.advance(POLL_MS.settled);
-    expect(w.apis.length).toBe(3);
+    expect(w.apis.length).toBe(4);
 
     world.view = at("2026-10-23T10:05:00Z");
     world.notes = [note(11, "alice")];
@@ -469,7 +480,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     await w.clock.advance(POLL_MS.pending);
     expect(reads()).toEqual(["full", "hit", "miss", "miss", "full"]);
-    expect(w.apis.length).toBe(12);
+    expect(w.apis.length).toBe(16);
   });
 
   test("a merged MR is read back by IID, sent to the model, shown as merged, and read no further", async ($, on) => {
@@ -601,7 +612,7 @@ describe("register", () => {
     expect(w.named("poll.error")).toEqual([
       expect.objectContaining({ ok: false, detail: { error: KEYRING } }),
     ]);
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1 · \u{f441} 1 approval · \u{f421} stale");
+    expect(await w.shown($)).toBe("you  \u{f444} 0/1  \u{f441} 1  \u{f421}");
   });
 
   test("an unexpected payload is a poll error", async ($, on) => {
@@ -768,7 +779,7 @@ describe("register", () => {
     expect(w.submits.length).toBe(1);
   });
 
-  test("an MR with no pipeline and no approval rule leaves the footer as it was", async ($, on) => {
+  test("an MR with no pipeline and no approval rule waits on its author", async ($, on) => {
     const w = worldOf(on, {
       branch: "topic",
       glab: GLAB_OK,
@@ -779,7 +790,7 @@ describe("register", () => {
     await $.session.start(START);
     await w.clock.settle();
 
-    expect(await w.shown($)).toBe(undefined);
+    expect(await w.shown($)).toBe("you");
   });
 
   test("an unchanged MR backs off until a turn or a change resets it", async ($, on) => {

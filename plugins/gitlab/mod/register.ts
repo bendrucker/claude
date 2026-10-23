@@ -1,9 +1,12 @@
 import type { EngineInterface, On, PluginOptions, Timer } from "claude-code";
 import {
   type Noise,
+  SEP,
   STALE,
   type Approvals,
+  type Discussion,
   type Job,
+  type Merging,
   type MrView,
   type Note,
   type Promoted,
@@ -17,7 +20,9 @@ import {
   messageOf,
   noiseOf,
   parseApprovals,
+  parseDiscussions,
   parseJobs,
+  parseMerge,
   parseNotes,
   parseReviewers,
   parseUser,
@@ -70,7 +75,14 @@ interface Feedback {
   gate: string;
   approvals: Approvals;
   notes: Note[];
+  discussions: Discussion[];
   jobs: Job[];
+}
+
+/** The last answer to a GraphQL read, and the key that refetches it. */
+interface Held<T> {
+  key?: string;
+  value?: T;
 }
 
 interface Watch {
@@ -78,12 +90,12 @@ interface Watch {
   branch: string | undefined;
   feedback: Feedback | undefined;
   /** The last review state read, refetched only when `key` changes. */
-  reviewers: { key: string; reviewers: Reviewer[] } | undefined;
+  graphs: { reviewers: Held<Reviewer[]>; merging: Held<Merging> };
   me: string | undefined;
   noise: Noise;
   undelivered: Undelivered | undefined;
-  /** What was muted since the head last moved, and since the last send. */
-  muted: { head: string; count: number; held: string[] };
+  /** What was muted since the last send, which the next send logs beside it. */
+  held: string[];
   error: string | undefined;
   /** Failed polls in a row, which stretch the wait so a rate limit can reset. */
   errors: number;
@@ -117,6 +129,18 @@ function show($: EngineInterface, watch: Watch, text: string | undefined) {
   if (line === watch.line) return;
   watch.line = line;
   $.ui.invalidate("ui.render");
+}
+
+// Any running turn, the main agent's or a subagent's, is the agent at work.
+const isBusy = (watch: Watch) => [...watch.turns.values()].some(([, end]) => end === undefined);
+
+function render($: EngineInterface, watch: Watch) {
+  if (watch.snapshot === undefined) {
+    show($, watch, undefined);
+    return;
+  }
+  const line = statusOf(watch.snapshot, isBusy(watch));
+  show($, watch, watch.error === undefined ? line : [line, STALE].filter(Boolean).join(SEP));
 }
 
 function emit($: EngineInterface, event: string, detail: Record<string, unknown>, ok = true) {
@@ -185,9 +209,10 @@ async function feedbackOf(
 ): Promise<Feedback> {
   const mr = `projects/${view.projectId}/merge_requests/${view.iid}`;
   const pipeline = view.pipeline;
-  const [approvals, notes, jobs] = await Promise.all([
+  const [approvals, notes, discussions, jobs] = await Promise.all([
     glab($, cwd, ["api", `${mr}/approvals`]),
     glab($, cwd, ["api", `${mr}/notes?sort=desc&order_by=created_at&per_page=100`]),
+    glab($, cwd, ["api", "--paginate", "--output", "ndjson", `${mr}/discussions?per_page=100`]),
     pipeline === null
       ? Promise.resolve<Job[]>([])
       : jobsOf($, cwd, pipeline.projectId, pipeline.id),
@@ -196,6 +221,7 @@ async function feedbackOf(
     gate,
     approvals: parsed(parseApprovals(approvals), "MR approvals"),
     notes: parsed(parseNotes(notes), "MR notes"),
+    discussions: parsed(parseDiscussions(discussions), "MR discussions"),
     jobs,
   };
 }
@@ -208,45 +234,65 @@ const REVIEWERS_QUERY = `query($path: ID!, $iid: String!) {
   }
 }`;
 
-// A review, re-request, or reviewer change leaves a note, so review state is
-// refetched only when the newest note or the head changes. Only the footer reads
-// it, so a failure keeps the last answer rather than failing the poll.
-async function reviewersOf(
+const MERGE_QUERY = `query($path: ID!, $iid: String!) {
+  project(fullPath: $path) {
+    ciCdSettings { mergeTrainsEnabled }
+    mergeRequest(iid: $iid) { autoMergeEnabled mergeTrainIndex }
+  }
+}`;
+
+interface Graph<T> {
+  query: string;
+  event: string;
+  parse: (stdout: string) => T | undefined;
+  fallback: T;
+}
+
+const REVIEWERS: Graph<Reviewer[]> = {
+  query: REVIEWERS_QUERY,
+  event: "review.read",
+  parse: parseReviewers,
+  fallback: [],
+};
+
+const MERGING: Graph<Merging> = {
+  query: MERGE_QUERY,
+  event: "merge.read",
+  parse: parseMerge,
+  fallback: { kind: "none", hasQueue: false },
+};
+
+// A review, re-request, reviewer change, auto-merge, or train join leaves a note,
+// so GraphQL state is refetched only when the newest note or the head changes.
+// A train position can lag until then, as the MRs ahead merge. Only the footer
+// reads it, so a failure keeps the last answer rather than failing the poll.
+async function graphOf<T>(
   $: EngineInterface,
-  watch: Watch,
   cwd: string,
   view: MrView,
   notes: Note[],
-): Promise<Reviewer[]> {
+  graph: Graph<T>,
+  held: Held<T>,
+): Promise<T> {
   const key = `${view.projectId}/${view.iid} ${view.sha} ${Math.max(0, ...notes.map((n) => n.id))}`;
-  if (watch.reviewers?.key === key) return watch.reviewers.reviewers;
+  if (held.key === key && held.value !== undefined) return held.value;
   const path = new URL(view.url).pathname.split("/-/")[0]?.slice(1) ?? "";
-  const argv = ["api", "graphql", "-f", `query=${REVIEWERS_QUERY}`, "-f", `path=${path}`];
+  const argv = ["api", "graphql", "-f", `query=${graph.query}`, "-f", `path=${path}`];
   const started = await $.clock.now();
   try {
     const stdout = await glab($, cwd, [...argv, "-f", `iid=${view.iid}`]);
-    const reviewers = parsed(parseReviewers(stdout), "MR reviewers");
+    const value = parsed(graph.parse(stdout), graph.event);
     const ms = (await $.clock.now()) - started;
-    void $.modEvents.emit({
-      mod: MOD,
-      event: "review.read",
-      ok: true,
-      ms,
-      detail: { mr: view.iid, reviewers: reviewers.length },
-    });
-    watch.reviewers = { key, reviewers };
-    return reviewers;
+    void $.modEvents.emit({ mod: MOD, event: graph.event, ok: true, ms, detail: { mr: view.iid } });
+    held.key = key;
+    held.value = value;
+    return value;
   } catch (error) {
     const ms = (await $.clock.now()) - started;
     const message = error instanceof Error ? error.message : String(error);
-    void $.modEvents.emit({
-      mod: MOD,
-      event: "review.read",
-      ok: false,
-      ms,
-      detail: { mr: view.iid, error: message },
-    });
-    return watch.reviewers?.reviewers ?? [];
+    const detail = { mr: view.iid, error: message };
+    void $.modEvents.emit({ mod: MOD, event: graph.event, ok: false, ms, detail });
+    return held.value ?? graph.fallback;
   }
 }
 
@@ -308,11 +354,15 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
     isHeadKnownOf($, watch, cwd, view.sha),
   ]);
   watch.feedback = feedback;
-  const reviewers = await reviewersOf($, watch, cwd, view, feedback.notes);
+  const [reviewers, merging] = await Promise.all([
+    graphOf($, cwd, view, feedback.notes, REVIEWERS, watch.graphs.reviewers),
+    graphOf($, cwd, view, feedback.notes, MERGING, watch.graphs.merging),
+  ]);
   const read = snapshotOf({
     view,
     ...feedback,
     reviewers,
+    merging,
     me,
     isHeadKnown,
     noise: watch.noise,
@@ -453,17 +503,13 @@ function schedule($: EngineInterface, watch: Watch, streak: number, cause: strin
   watch.due = watch.polledAt + delay;
 }
 
-// Logs each newly muted item. Those already there when the MR is first seen are
-// logged but not counted in the footer.
+// Logs each newly muted item, marking those already there when the MR is first seen.
 function mute($: EngineInterface, watch: Watch, prev: Snapshot | undefined, next: Snapshot) {
   const seen = new Set(prev?.muted.map((m) => m.id));
   const fresh = next.muted.filter((m) => !seen.has(m.id));
   const baseline = prev === undefined ? { baseline: true } : {};
   for (const m of fresh) emit($, "muted", { mr: next.mr, head: next.head, ...baseline, ...m });
-  if (watch.muted.head !== next.head) watch.muted = { ...watch.muted, head: next.head, count: 0 };
-  if (prev === undefined) return;
-  watch.muted.count += fresh.length;
-  watch.muted.held.push(...fresh.map((m) => m.id));
+  if (prev !== undefined) watch.held.push(...fresh.map((m) => m.id));
 }
 
 interface Applied {
@@ -480,7 +526,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
     show($, watch, undefined);
     watch.none = none;
     watch.snapshot = undefined;
-    watch.muted = { head: "", count: 0, held: [] };
+    watch.held = [];
     watch.branch = undefined;
     watch.undelivered = undefined;
     return { isTracked: false, isChanged };
@@ -501,7 +547,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   if (!isSameMr) {
     emit($, "mr.tracked", { mr: next.mr, head: next.head, phase: next.phase, state: next.state });
     watch.undelivered = undefined;
-    watch.muted = { head: next.head, count: 0, held: [] };
+    watch.held = [];
     mute($, watch, undefined, next);
     due = baselineOf(next);
     for (const { action, ...detail } of due) {
@@ -529,11 +575,11 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   }
   watch.snapshot = next;
   watch.branch = read.branch;
-  show($, watch, statusOf(next, watch.muted.count));
+  render($, watch);
   // The send waits for an idle session, so the next poll is not held on it.
   if (due.length > 0) {
-    void send($, watch, next, due, watch.muted.held, attempt, isCurrent);
-    watch.muted.held = [];
+    void send($, watch, next, due, watch.held, attempt, isCurrent);
+    watch.held = [];
   }
   return { isTracked: !isSameMr, isChanged };
 }
@@ -550,6 +596,8 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     }
     // A session.end that landed while glab ran has already cleared the status.
     if (!isCurrent() || seq !== watch.polls) return;
+    watch.error = undefined;
+    watch.errors = 0;
     const { isTracked, isChanged } = apply($, watch, read, isCurrent);
     let streak = isChanged ? 0 : watch.streak + 1;
     if (isTracked && watch.snapshot !== undefined) {
@@ -558,8 +606,6 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     }
     watch.polledAt = now;
     schedule($, watch, streak, "change");
-    watch.error = undefined;
-    watch.errors = 0;
   } catch (error) {
     if (!isCurrent() || seq !== watch.polls) return;
     const message = error instanceof Error ? error.message : String(error);
@@ -568,10 +614,7 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     watch.errors += 1;
     watch.polledAt = now;
     watch.due = now + Math.min(POLL_MS.error * 2 ** (watch.errors - 1), BACKOFF_CAP_MS);
-    if (watch.snapshot !== undefined) {
-      const line = statusOf(watch.snapshot, watch.muted.count);
-      show($, watch, line === "" ? STALE : `${line} · ${STALE}`);
-    }
+    render($, watch);
   }
 }
 
@@ -642,11 +685,11 @@ export function register(on: On, options: PluginOptions): void {
     snapshot: undefined,
     branch: undefined,
     feedback: undefined,
-    reviewers: undefined,
+    graphs: { reviewers: {}, merging: {} },
     me: undefined,
     noise,
     undelivered: undefined,
-    muted: { head: "", count: 0, held: [] },
+    held: [],
     error: undefined,
     errors: 0,
     ticker: undefined,
@@ -716,13 +759,19 @@ export function register(on: On, options: PluginOptions): void {
       if (end !== undefined && now - end > TURNS_KEPT_MS) watch.turns.delete(id);
     }
     watch.turns.set(e.turnId, [now, undefined]);
+    render($, watch);
     return next(e);
   }).catch(($, e, next) => next(e));
 
   on("turn.complete", async ($, e, next) => {
     const span = watch.turns.get(e.turnId);
     if (span !== undefined) span[1] = await $.clock.now();
-    if (e.agentId === undefined) void wake($, watch);
+    render($, watch);
+    if (e.agentId === undefined) {
+      // Resolving a thread leaves updated_at alone, and a turn often resolves one.
+      watch.feedback = undefined;
+      void wake($, watch);
+    }
     return next(e);
   }).catch(($, e, next) => next(e));
 }

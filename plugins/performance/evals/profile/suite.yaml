@@ -1,0 +1,4 @@
+allow_tools: [Bash, Write]
+judge_model: claude-opus-5-5
+graders:
+  samply: "*"

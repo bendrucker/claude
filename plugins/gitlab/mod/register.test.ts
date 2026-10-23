@@ -36,9 +36,10 @@ const approvals = (...names: string[]) => ({
   approved_by: names.map((username) => ({ user: { username } })),
 });
 
-const note = (id: number, username: string, system = false) => ({
+const note = (id: number, username: string, system = false, body = "") => ({
   id,
   system,
+  body,
   author: { username },
 });
 
@@ -306,6 +307,45 @@ describe("register", () => {
       "unapproved",
     ]);
   });
+
+  test(
+    "bot chatter stays quiet and is logged once",
+    { options: { ignore: "deploy-bot" } },
+    async ($, on) => {
+      const world: World = {
+        branch: "topic",
+        glab: GLAB_OK,
+        view: mr("success"),
+        jobs: job("success"),
+      };
+      const w = worldOf(on, world);
+      const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\n✅ Actions performed";
+
+      await $.session.start(START);
+      await w.clock.settle();
+      world.notes = [note(3, "deploy-bot"), note(2, "coderabbitai", false, ack)];
+      await w.clock.advance(POLL_MS.settled);
+      await w.clock.advance(POLL_MS.settled);
+
+      expect(w.submits).toEqual([]);
+      expect(w.named("muted").map((e) => e.detail)).toEqual([
+        { mr: 7, head: "aaaaaaa1111", id: "3", author: "deploy-bot", reason: "author" },
+        { mr: 7, head: "aaaaaaa1111", id: "2", author: "coderabbitai", reason: "coderabbit.ack" },
+      ]);
+      expect(await w.shown($)).toContain("\u{f477} 2 muted");
+    },
+  );
+
+  test(
+    "an invalid body pattern is reported at start",
+    { options: { ignoreBody: "(" } },
+    async ($, on) => {
+      const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr("success") });
+      await $.session.start(START);
+      await w.clock.settle();
+      expect(w.named("ignoreBody.invalid")[0]).toMatchObject({ ok: false });
+    },
+  );
 
   test("a note back in the window after deletions stays quiet", async ($, on) => {
     const world: World = {

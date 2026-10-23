@@ -101,8 +101,14 @@ const readApprovals = map(
 );
 
 const readNote = map(
-  obj({ id: num, author: or(readUsername, "someone"), system: or(bool, false) }),
-  (n) => ({ id: n.id, author: n.author, isSystem: n.system }),
+  obj({
+    id: num,
+    author: or(readUsername, "someone"),
+    body: or(str, ""),
+    system: or(bool, false),
+    type: or(str, ""),
+  }),
+  (n) => ({ id: n.id, author: n.author, body: n.body, isSystem: n.system, type: n.type }),
 );
 
 const readJob = map(
@@ -152,6 +158,77 @@ export interface Snapshot {
   approvers: string[];
   noteCursor: number;
   notes: { id: number; author: string }[];
+  /** Notes kept from the model as noise, with why. */
+  muted: { id: string; author: string; reason: string }[];
+}
+
+/** What counts as noise beyond the built-in chatter rules. */
+export interface Noise {
+  /** Usernames taken as bots beyond the service-account conventions. */
+  bots: Set<string>;
+  /** Usernames whose notes are never sent. */
+  authors: Set<string>;
+  /** A bot note body that carries nothing to act on. */
+  body: RegExp | undefined;
+}
+
+const usernamesOf = (names: string) =>
+  names
+    .split(",")
+    .map((username) => username.trim().toLowerCase())
+    .filter(Boolean);
+
+/** Reads the plugin's `reviewers`, `ignore`, and `ignoreBody` options. */
+export function noiseOf(
+  reviewers: string,
+  ignore: string,
+  ignoreBody: string,
+): { noise: Noise; error?: string } {
+  const noise: Noise = {
+    bots: new Set(["coderabbitai", "linear", ...usernamesOf(reviewers)]),
+    authors: new Set(usernamesOf(ignore)),
+    body: undefined,
+  };
+  if (ignoreBody === "") return { noise };
+  try {
+    return { noise: { ...noise, body: new RegExp(ignoreBody) } };
+  } catch (error) {
+    return { noise, error: String(error) };
+  }
+}
+
+export const NO_NOISE = noiseOf("", "", "").noise;
+
+// Service accounts end in `-bot` or `_bot`, and token accounts are `group_<id>_bot_<hash>`.
+const SERVICE_ACCOUNT = /[_-]bot$|^(?:group|project)_\d+_bot_[0-9a-f]+$/;
+
+const isBot = (username: string, noise: Noise) => {
+  const name = username.toLowerCase();
+  return SERVICE_ACCOUNT.test(name) || noise.bots.has(name);
+};
+
+const ACK =
+  /^(?=[\s\S]*<!-- This is an auto-generated reply by CodeRabbit -->)[\s\S]*Actions performed/;
+
+// Bot notes with nothing to act on, by what the bot writes.
+const CHATTER: [reason: string, body: RegExp][] = [
+  // CodeRabbit's walkthrough, edited in place. Its findings arrive as diff notes.
+  ["coderabbit.summary", /<!-- This is an auto-generated comment: [^>]* by coderabbit\.ai -->/],
+  ["coderabbit.ack", ACK],
+  [
+    "linkback",
+    /^[^\n]{0,300}(linear\.app\/[^/\s]+\/issue\/|\.atlassian\.net\/browse\/)[^\n]{0,300}$/,
+  ],
+];
+
+function chatterOf(note: Note, noise: Noise): string | undefined {
+  if (noise.authors.has(note.author.toLowerCase())) return "author";
+  if (!isBot(note.author, noise)) return undefined;
+  const text = note.body.trim();
+  // A bot's note on a diff line is a finding, unless it is CodeRabbit's marked ack.
+  if (note.type === "DiffNote") return ACK.test(text) ? "coderabbit.ack" : undefined;
+  if (noise.body?.test(text) === true) return "body";
+  return CHATTER.find(([, pattern]) => pattern.test(text))?.[0];
 }
 
 export type Approval = "approved" | "unapproved" | null;
@@ -211,6 +288,7 @@ export interface Read {
   jobs: Job[];
   me: string;
   isHeadKnown: boolean;
+  noise?: Noise;
 }
 
 function phaseOf(read: Read, failed: string[], pending: number): Phase {
@@ -244,6 +322,16 @@ export function snapshotOf(read: Read): Snapshot {
   // A failed downstream pipeline fails its trigger job, which the jobs list leaves out.
   if (view.pipeline?.status === "failed" && failed.length === 0) failed.push("pipeline");
   failed.sort();
+  const noise = read.noise ?? NO_NOISE;
+  const kept: Snapshot["notes"] = [];
+  const muted: Snapshot["muted"] = [];
+  for (const note of notes) {
+    const { id, author } = note;
+    if (note.isSystem || author === me) continue;
+    const reason = chatterOf(note, noise);
+    if (reason === undefined) kept.push({ id, author });
+    else muted.push({ id: String(id), author, reason });
+  }
   return {
     mr: view.iid,
     projectId: view.projectId,
@@ -263,9 +351,8 @@ export function snapshotOf(read: Read): Snapshot {
     approvalsLeft: approvals.approvalsLeft,
     approvers: approvals.approvedBy.filter((name) => name !== me).toSorted(),
     noteCursor: Math.max(0, ...notes.map((n) => n.id)),
-    notes: notes
-      .filter((n) => !n.isSystem && n.author !== me)
-      .map(({ id, author }) => ({ id, author })),
+    notes: kept,
+    muted,
   };
 }
 
@@ -489,6 +576,7 @@ const OCT = {
   gitCompare: "\u{f47f}",
   gitMerge: "\u{f419}",
   gitPullRequestClosed: "\u{f4dc}",
+  hubot: "\u{f477}",
   xCircle: "\u{f52f}",
 };
 
@@ -522,10 +610,16 @@ function reviewOf(snapshot: Snapshot): string | undefined {
 }
 
 // The footer already links the MR, so the state rides after it on that line.
-export function statusOf(snapshot: Snapshot): string {
+// `muted` counts what was kept from the model since the head last moved.
+export function statusOf(snapshot: Snapshot, muted = 0): string {
   const ended = ENDED[snapshot.state];
   if (ended !== undefined) return ended;
-  return [BLOCKS[snapshot.block ?? "none"], CHECKS[snapshot.phase](snapshot), reviewOf(snapshot)]
+  return [
+    BLOCKS[snapshot.block ?? "none"],
+    CHECKS[snapshot.phase](snapshot),
+    reviewOf(snapshot),
+    muted > 0 ? `${OCT.hubot} ${muted} muted` : undefined,
+  ]
     .filter((part) => part !== undefined)
     .join(" · ");
 }

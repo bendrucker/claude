@@ -16,11 +16,13 @@ export interface ReviewNode {
   id: string;
   author?: { login?: string } | null;
   state: string;
+  body?: string | null;
 }
 
 export interface CommentNode {
   id: string;
   author?: { login?: string } | null;
+  body?: string | null;
   isMinimized?: boolean;
   viewerDidAuthor?: boolean;
 }
@@ -67,7 +69,12 @@ function reviewOf(value: unknown): ReviewNode | undefined {
   if (!isRecord(value) || typeof value.id !== "string" || typeof value.state !== "string") {
     return undefined;
   }
-  return { id: value.id, state: value.state, author: loginOf(value.author) };
+  return {
+    id: value.id,
+    state: value.state,
+    author: loginOf(value.author),
+    body: textOf(value.body),
+  };
 }
 
 function commentOf(value: unknown): CommentNode | undefined {
@@ -75,6 +82,7 @@ function commentOf(value: unknown): CommentNode | undefined {
   return {
     id: value.id,
     author: loginOf(value.author),
+    body: textOf(value.body),
     isMinimized: value.isMinimized === true,
     viewerDidAuthor: value.viewerDidAuthor === true,
   };
@@ -140,12 +148,96 @@ export interface Snapshot {
   reviewDecision: string;
   reviews: { id: string; author: string; state: string }[];
   comments: { id: string; author: string }[];
+  /** Comments and checks kept from the model as noise, with why. */
+  muted: { id: string; author: string; reason: string }[];
+}
+
+/** What counts as noise beyond the built-in chatter rules. */
+export interface Noise {
+  /** Logins taken as bots beyond the naming conventions. */
+  bots: Set<string>;
+  /** Logins whose comments are never sent. */
+  authors: Set<string>;
+  /** A bot comment body that carries nothing to act on. */
+  body: RegExp | undefined;
+}
+
+const loginsOf = (list: string) =>
+  list
+    .split(",")
+    .map((login) => login.trim().toLowerCase())
+    .filter(Boolean);
+
+/** Reads the plugin's `reviewers`, `ignore`, and `ignoreBody` options. */
+export function noiseOf(
+  reviewers: string,
+  ignore: string,
+  ignoreBody: string,
+): { noise: Noise; error?: string } {
+  const noise: Noise = {
+    bots: new Set(loginsOf(reviewers)),
+    authors: new Set(loginsOf(ignore)),
+    body: undefined,
+  };
+  if (ignoreBody === "") return { noise };
+  try {
+    return { noise: { ...noise, body: new RegExp(ignoreBody) } };
+  } catch (error) {
+    return { noise, error: String(error) };
+  }
+}
+
+export const NO_NOISE = noiseOf("", "", "").noise;
+
+// `gh pr view` names an author by login alone, which drops an app's `[bot]` suffix,
+// so review apps named like people are listed.
+const BOT =
+  /\[bot\]$|^app\/|[-_]bot$|-apps$|^(coderabbitai|greptileai|copilot-pull-request-reviewer|chatgpt-codex-connector|linear)$/i;
+
+const isBot = (login: string, noise: Noise) =>
+  BOT.test(login) || noise.bots.has(login.toLowerCase());
+
+// Bot comments with nothing to act on, by what the bot writes.
+const CHATTER: [reason: string, body: RegExp][] = [
+  // CodeRabbit's walkthrough, edited in place. Its findings arrive as a review.
+  ["coderabbit.summary", /<!-- This is an auto-generated comment: [^>]* by coderabbit\.ai -->/],
+  [
+    "coderabbit.ack",
+    /^(?=[\s\S]*<!-- This is an auto-generated reply by CodeRabbit -->)[\s\S]*Actions performed/,
+  ],
+  [
+    "linkback",
+    /^[^\n]{0,300}(linear\.app\/[^/\s]+\/issue\/|\.atlassian\.net\/browse\/)[^\n]{0,300}$/,
+  ],
+];
+
+function chatterOf(login: string, body: string, noise: Noise): string | undefined {
+  if (noise.authors.has(login.toLowerCase())) return "author";
+  if (!isBot(login, noise)) return undefined;
+  const text = body.trim();
+  if (noise.body?.test(text) === true) return "body";
+  return CHATTER.find(([, pattern]) => pattern.test(text))?.[0];
+}
+
+const stem = (text: string) => /[a-z]+/.exec(text.toLowerCase())?.[0] ?? "";
+
+const REVIEW_CHECK = /review|coderabbit|greptile|copilot|codex/i;
+
+// A review bot also reports its verdict as a check, which its review already carries.
+function reviewerOf(label: string, bots: string[]): string | undefined {
+  const word = stem(label);
+  if (word.length < 4 || !REVIEW_CHECK.test(label)) return undefined;
+  return bots.find((login) => {
+    const name = stem(login);
+    return name.length >= 4 && (name.startsWith(word) || word.startsWith(name));
+  });
 }
 
 /** The session's own login and whether the PR head commit exists locally. */
 export interface Local {
   me: string | undefined;
   isHeadKnown: boolean;
+  noise?: Noise;
 }
 
 export type Decision =
@@ -224,26 +316,45 @@ function blockOf(view: PrView): Block | undefined {
 }
 
 export function snapshotOf(view: PrView, local: Local): Snapshot {
+  const noise = local.noise ?? NO_NOISE;
+  const muted: Snapshot["muted"] = [];
+  // A reply to a review thread is itself a review, so the session's own replies come back here.
+  const reviews: Snapshot["reviews"] = [];
+  for (const r of view.reviews ?? []) {
+    const author = r.author?.login ?? "someone";
+    if (author === local.me) continue;
+    // A bot's bodiless comment review is its reply in a thread, such as an acknowledgement.
+    const isReply = r.state === "COMMENTED" && (r.body ?? "").trim() === "" && isBot(author, noise);
+    if (isReply) muted.push({ id: r.id, author, reason: "review.reply" });
+    else reviews.push({ id: r.id, author, state: r.state });
+  }
+  const authors = (view.reviews ?? []).map((r) => r.author?.login ?? "someone");
+  const bots = [...new Set(authors.filter((login) => login !== local.me && isBot(login, noise)))];
   const checks = latest(view.statusCheckRollup ?? []);
   const failed: string[] = [];
   let pending = 0;
   for (const node of checks) {
     const outcome = outcomeOf(node);
-    if (outcome === "failed") failed.push(labelOf(node));
-    else if (outcome === "pending") pending += 1;
+    if (outcome === "pending") pending += 1;
+    if (outcome !== "failed") continue;
+    const label = labelOf(node);
+    const author = reviewerOf(label, bots);
+    if (author === undefined) failed.push(label);
+    else muted.push({ id: `${view.headRefOid}:${label}`, author, reason: "review.check" });
   }
   failed.sort();
   let phase: Phase = "passing";
   if (checks.length === 0) phase = "none";
   else if (failed.length > 0) phase = "failing";
   else if (pending > 0) phase = "pending";
-  // A reply to a review thread is itself a review, so the session's own replies come back here.
-  const reviews = (view.reviews ?? [])
-    .map((r) => ({ id: r.id, author: r.author?.login ?? "someone", state: r.state }))
-    .filter((r) => r.author !== local.me);
-  const comments = (view.comments ?? [])
-    .filter((c) => !c.isMinimized && !c.viewerDidAuthor && c.author?.login !== local.me)
-    .map((c) => ({ id: c.id, author: c.author?.login ?? "someone" }));
+  const comments: Snapshot["comments"] = [];
+  for (const c of view.comments ?? []) {
+    if (c.isMinimized || c.viewerDidAuthor || c.author?.login === local.me) continue;
+    const author = c.author?.login ?? "someone";
+    const reason = chatterOf(author, c.body ?? "", noise);
+    if (reason === undefined) comments.push({ id: c.id, author });
+    else muted.push({ id: c.id, author, reason });
+  }
   return {
     pr: view.number,
     url: view.url,
@@ -259,6 +370,7 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     reviewDecision: view.reviewDecision ?? "",
     reviews,
     comments,
+    muted,
   };
 }
 
@@ -455,6 +567,7 @@ const OCT = {
   gitCompare: "\u{f47f}",
   gitMerge: "\u{f419}",
   gitPullRequestClosed: "\u{f4dc}",
+  hubot: "\u{f477}",
   xCircle: "\u{f52f}",
 };
 
@@ -485,13 +598,15 @@ const REVIEWS: Partial<Record<string, string>> = {
 };
 
 // The footer already links the PR, so the state rides after it on that line.
-export function statusOf(snapshot: Snapshot): string {
+// `muted` counts what was kept from the model since the head last moved.
+export function statusOf(snapshot: Snapshot, muted = 0): string {
   const ended = ENDED[snapshot.state];
   if (ended !== undefined) return ended;
   return [
     BLOCKS[snapshot.block ?? "none"],
     CHECKS[snapshot.phase](snapshot),
     REVIEWS[snapshot.reviewDecision],
+    muted > 0 ? `${OCT.hubot} ${muted} muted` : undefined,
   ]
     .filter((part) => part !== undefined)
     .join(" · ");

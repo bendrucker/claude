@@ -9,6 +9,7 @@ import {
   combine,
   decide,
   messageOf,
+  noiseOf,
   parseView,
   snapshotOf,
   statusOf,
@@ -52,9 +53,11 @@ describe("parseView", () => {
     );
     expect(parsed?.statusCheckRollup?.length).toBe(1);
     expect(parsed?.comments).toEqual([
-      { id: "c1", author: { login: "bot" }, isMinimized: true, viewerDidAuthor: false },
+      { id: "c1", author: { login: "bot" }, body: null, isMinimized: true, viewerDidAuthor: false },
     ]);
-    expect(parsed?.reviews).toEqual([{ id: "r1", state: "COMMENTED", author: { login: "bot" } }]);
+    expect(parsed?.reviews).toEqual([
+      { id: "r1", state: "COMMENTED", author: { login: "bot" }, body: null },
+    ]);
     expect(parseView("not json")).toBe(undefined);
     expect(parseView(JSON.stringify({ number: "7" }))).toBe(undefined);
   });
@@ -126,6 +129,110 @@ describe("snapshotOf", () => {
     );
     expect(snapshot.reviews.map((r) => r.id)).toEqual(["r2"]);
     expect(snapshot.comments.map((c) => c.id)).toEqual(["c4"]);
+  });
+
+  test("bot chatter is muted with its reason, and a human or a bot finding is kept", () => {
+    const comment = (id: string, login: string, body: string) => ({
+      id,
+      author: { login },
+      body,
+    });
+    const linkback =
+      '<p><a href="https://linear.app/acme/issue/ENG-1/fix-login">ENG-1 Fix login</a></p>';
+    const snapshot = snapshotOf(
+      view({
+        comments: [
+          comment(
+            "c1",
+            "coderabbitai",
+            "<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\nWalkthrough",
+          ),
+          comment(
+            "c2",
+            "coderabbitai",
+            "<!-- This is an auto-generated reply by CodeRabbit -->\n<details>\n<summary>✅ Actions performed</summary>\n\nReview triggered.\n</details>",
+          ),
+          comment("c3", "linear", linkback),
+          comment("c4", "alice", linkback),
+          comment("c5", "coderabbitai", "This call can throw when `user` is null."),
+          comment("c6", "vercel[bot]", "Preview ready"),
+        ],
+      }),
+      { me: "ben", isHeadKnown: true, noise: noiseOf("", "vercel[bot]", "").noise },
+    );
+    expect(snapshot.comments.map((c) => c.id)).toEqual(["c4", "c5"]);
+    expect(snapshot.muted).toEqual([
+      { id: "c1", author: "coderabbitai", reason: "coderabbit.summary" },
+      { id: "c2", author: "coderabbitai", reason: "coderabbit.ack" },
+      { id: "c3", author: "linear", reason: "linkback" },
+      { id: "c6", author: "vercel[bot]", reason: "author" },
+    ]);
+  });
+
+  test("the body option mutes matching bot comments and reports a bad pattern", () => {
+    const { noise } = noiseOf("", "", "^Rebased");
+    const snapshot = snapshotOf(
+      view({
+        comments: [
+          { id: "c1", author: { login: "renovate[bot]" }, body: "Rebased onto main" },
+          { id: "c2", author: { login: "alice" }, body: "Rebased onto main" },
+        ],
+      }),
+      { me: "ben", isHeadKnown: true, noise },
+    );
+    expect(snapshot.muted).toEqual([{ id: "c1", author: "renovate[bot]", reason: "body" }]);
+    expect(noiseOf("", "", "(").error).toContain("SyntaxError");
+  });
+
+  test("a bot's bodiless thread reply is muted, and a human's or a bot's review is kept", () => {
+    const review = (id: string, login: string, body: string) => ({
+      id,
+      state: "COMMENTED",
+      author: { login },
+      body,
+    });
+    const snapshot = snapOf(
+      view({
+        reviews: [
+          review("r1", "coderabbitai", ""),
+          review("r2", "copilot-pull-request-reviewer", " "),
+          review("r3", "alice", ""),
+          review("r4", "greptile-apps", "2 issues found"),
+        ],
+      }),
+    );
+    expect(snapshot.reviews.map((r) => r.id)).toEqual(["r3", "r4"]);
+    expect(snapshot.muted).toEqual([
+      { id: "r1", author: "coderabbitai", reason: "review.reply" },
+      { id: "r2", author: "copilot-pull-request-reviewer", reason: "review.reply" },
+    ]);
+  });
+
+  test("a bot named like a check that is no review keeps that check in CI", () => {
+    const lint = { ...run("lint", "COMPLETED", "FAILURE"), workflowName: null };
+    const reviews = [
+      { id: "r1", state: "COMMENTED", author: { login: "linter-bot" }, body: "Style notes" },
+    ];
+    expect(snapOf(view({ statusCheckRollup: [lint], reviews })).failed).toEqual(["lint"]);
+  });
+
+  test("a review bot's failing check belongs to its review, not to CI", () => {
+    const greptile = { ...run("Greptile Review", "COMPLETED", "FAILURE"), workflowName: null };
+    const checks = [run("test", "COMPLETED", "SUCCESS"), greptile];
+    const reviewed = [
+      { id: "r1", state: "COMMENTED", author: { login: "greptile-apps" }, body: "Summary" },
+    ];
+    const absorbed = snapOf(view({ statusCheckRollup: checks, reviews: reviewed }));
+    expect(absorbed.phase).toBe("passing");
+    expect(absorbed.failed).toEqual([]);
+    expect(absorbed.muted).toEqual([
+      { id: "aaaaaaa1111:Greptile Review", author: "greptile-apps", reason: "review.check" },
+    ]);
+    expect(snapOf(view({ statusCheckRollup: checks })).failed).toEqual(["Greptile Review"]);
+    const human = [{ id: "r1", state: "COMMENTED", author: { login: "greptile" } }];
+    expect(snapOf(view({ statusCheckRollup: checks, reviews: human })).failed).toEqual([
+      "Greptile Review",
+    ]);
   });
 
   test("a queued rerun outranks the failure it replaces", () => {

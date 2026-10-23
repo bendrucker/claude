@@ -249,6 +249,84 @@ describe("register", () => {
     expect(w.named("drop")).toEqual([]);
   });
 
+  test(
+    "a review bot's check arrives with its review, and chatter only logs",
+    { options: { ignore: "vercel[bot]" } },
+    async ($, on) => {
+      const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+      const w = worldOf(on, world);
+      const greptile = {
+        __typename: "CheckRun",
+        name: "Greptile Review",
+        status: "COMPLETED",
+        conclusion: "FAILURE",
+        startedAt: "2026-10-06T10:05:00Z",
+      };
+
+      await $.session.start(START);
+      await w.clock.settle();
+      world.view = {
+        ...pr("SUCCESS", [
+          { id: "r1", state: "COMMENTED", author: { login: "greptile-apps" }, body: "Summary" },
+        ]),
+        statusCheckRollup: [check("SUCCESS"), greptile],
+        comments: [{ id: "c1", author: { login: "vercel[bot]" }, body: "Preview ready" }],
+      };
+      await w.clock.advance(POLL_MS.settled);
+      await w.clock.advance(POLL_MS.settled);
+
+      expect(w.submits.length).toBe(1);
+      expect(w.submits[0]).toContain("@greptile-apps reviewed PR #7 (COMMENTED)");
+      expect(w.submits[0]).not.toContain("CI failed");
+      expect(w.named("muted").map((e) => e.detail)).toEqual([
+        {
+          pr: 7,
+          head: "aaaaaaa1111",
+          id: "aaaaaaa1111:Greptile Review",
+          author: "greptile-apps",
+          reason: "review.check",
+        },
+        { pr: 7, head: "aaaaaaa1111", id: "c1", author: "vercel[bot]", reason: "author" },
+      ]);
+      expect(w.named("inject")[0]?.detail?.muted).toEqual(["aaaaaaa1111:Greptile Review", "c1"]);
+      expect(await w.shown($)).toBe("\u{f49e} CI · \u{f477} 2 muted");
+    },
+  );
+
+  test("chatter already on a PR first seen is logged but not counted", async ($, on) => {
+    const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\nActions performed";
+    const view = {
+      ...pr("SUCCESS"),
+      comments: [{ id: "c1", author: { login: "coderabbitai" }, body: ack }],
+    };
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.named("muted").map((e) => e.detail)).toEqual([
+      {
+        pr: 7,
+        head: "aaaaaaa1111",
+        baseline: true,
+        id: "c1",
+        author: "coderabbitai",
+        reason: "coderabbit.ack",
+      },
+    ]);
+    expect(await w.shown($)).toBe("\u{f49e} CI");
+  });
+
+  test(
+    "an invalid body pattern is reported at start",
+    { options: { ignoreBody: "(" } },
+    async ($, on) => {
+      const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("SUCCESS") });
+      await $.session.start(START);
+      await w.clock.settle();
+      expect(w.named("ignoreBody.invalid")[0]).toMatchObject({ ok: false });
+    },
+  );
+
   test("a conflict wakes the model once, through a mergeability recompute", async ($, on) => {
     const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
     const w = worldOf(on, world);

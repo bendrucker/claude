@@ -14,6 +14,7 @@ import {
   parseView,
   baselineOf,
   combine,
+  noiseOf,
   snapshotOf,
   statusOf,
 } from "./mr.ts";
@@ -95,8 +96,8 @@ describe("parsers", () => {
         ]),
       ),
     ).toEqual([
-      { id: 3, author: "alice", isSystem: true },
-      { id: 4, author: "someone", isSystem: false },
+      { id: 3, author: "alice", body: "", isSystem: true, type: "" },
+      { id: 4, author: "someone", body: "", isSystem: false, type: "" },
     ]);
     expect(parseNotes("{}")).toBe(undefined);
 
@@ -129,14 +130,77 @@ describe("snapshotOf", () => {
     const snapshot = snap({
       approvals: { approvalsRequired: 1, approvalsLeft: 0, approvedBy: ["ben", "alice"] },
       notes: [
-        { id: 9, author: "alice", isSystem: true },
-        { id: 8, author: "ben", isSystem: false },
-        { id: 6, author: "bob", isSystem: false },
+        { id: 9, author: "alice", body: "", isSystem: true, type: "" },
+        { id: 8, author: "ben", body: "", isSystem: false, type: "" },
+        { id: 6, author: "bob", body: "", isSystem: false, type: "" },
       ],
     });
     expect(snapshot.approvers).toEqual(["alice"]);
     expect(snapshot.notes).toEqual([{ id: 6, author: "bob" }]);
     expect(snapshot.noteCursor).toBe(9);
+  });
+
+  test("bot chatter is muted with its reason, and a human or a bot finding is kept", () => {
+    const note = (id: number, author: string, body: string) => ({
+      id,
+      author,
+      body,
+      isSystem: false,
+      type: "",
+    });
+    const linkback = "[ENG-1 Fix login](https://linear.app/acme/issue/ENG-1/fix-login)";
+    const snapshot = snap({
+      notes: [
+        note(
+          1,
+          "project_5_bot_ab12",
+          "<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\nWalkthrough",
+        ),
+        note(
+          2,
+          "coderabbitai",
+          "<!-- This is an auto-generated reply by CodeRabbit -->\n✅ Actions performed\n\nReview triggered.",
+        ),
+        note(3, "linear", linkback),
+        note(4, "alice", linkback),
+        note(5, "coderabbitai", "This call can throw when `user` is null."),
+        note(6, "deploy-bot", "Preview ready"),
+      ],
+      noise: noiseOf("", "deploy-bot", "").noise,
+    });
+    expect(snapshot.notes.map((n) => n.id)).toEqual([4, 5]);
+    expect(snapshot.muted).toEqual([
+      { id: "1", author: "project_5_bot_ab12", reason: "coderabbit.summary" },
+      { id: "2", author: "coderabbitai", reason: "coderabbit.ack" },
+      { id: "3", author: "linear", reason: "linkback" },
+      { id: "6", author: "deploy-bot", reason: "author" },
+    ]);
+    expect(snapshot.noteCursor).toBe(6);
+  });
+
+  test("a bot's diff note is kept unless it is CodeRabbit's marked ack", () => {
+    const diff = (id: number, body: string) => ({
+      id,
+      author: "coderabbitai",
+      body,
+      isSystem: false,
+      type: "DiffNote",
+    });
+    const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\n✅ Actions performed";
+    const linkback = "[ENG-1 Fix login](https://linear.app/acme/issue/ENG-1/fix-login)";
+    const snapshot = snap({ notes: [diff(1, ack), diff(2, linkback)] });
+    expect(snapshot.notes.map((n) => n.id)).toEqual([2]);
+    expect(snapshot.muted).toEqual([{ id: "1", author: "coderabbitai", reason: "coderabbit.ack" }]);
+  });
+
+  test("the body option mutes matching bot notes and reports a bad pattern", () => {
+    const { noise } = noiseOf("renovate", "", "^Rebased");
+    const notes = [
+      { id: 1, author: "renovate", body: "Rebased onto main", isSystem: false, type: "" },
+      { id: 2, author: "alice", body: "Rebased onto main", isSystem: false, type: "" },
+    ];
+    expect(snap({ notes, noise }).muted).toEqual([{ id: "1", author: "renovate", reason: "body" }]);
+    expect(noiseOf("", "", "(").error).toContain("SyntaxError");
   });
 });
 
@@ -148,7 +212,7 @@ describe("decide", () => {
     approvals: { approvalsRequired: 1, approvalsLeft: 0, approvedBy: names },
   });
   const noted = (...notes: [number, string][]) =>
-    notes.map(([id, author]) => ({ id, author, isSystem: false }));
+    notes.map(([id, author]) => ({ id, author, body: "", isSystem: false, type: "" }));
   const pushed = (s: Snapshot): Snapshot => ({ ...s, head: "bbbbbbb2222" });
 
   const blocked = (block: Snapshot["block"]): Snapshot => ({ ...passing, block });

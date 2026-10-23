@@ -1,5 +1,6 @@
 import type { EngineInterface, On, PluginOptions, Timer } from "claude-code";
 import {
+  type Noise,
   STALE,
   type Promoted,
   type Snapshot,
@@ -8,6 +9,7 @@ import {
   combine,
   decide,
   messageOf,
+  noiseOf,
   parseView,
   snapshotOf,
   statusOf,
@@ -56,7 +58,10 @@ interface Watch {
   /** The last ETag per REST path the gate probes. */
   etags: Map<string, string>;
   me: string | undefined;
+  noise: Noise;
   undelivered: Undelivered | undefined;
+  /** What was muted since the head last moved, and since the last send. */
+  muted: { head: string; count: number; held: string[] };
   error: string | undefined;
   ticker: Timer | undefined;
   tickedAt: number | undefined;
@@ -227,7 +232,7 @@ async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
     meOf($, watch, cwd, parsed.url),
     isHeadKnownOf($, watch, cwd, parsed.headRefOid),
   ]);
-  const snapshot = snapshotOf(parsed, { me, isHeadKnown });
+  const snapshot = snapshotOf(parsed, { me, isHeadKnown, noise: watch.noise });
   watch.last = { branch, snapshot };
   return { kind: "pr", snapshot, read: changed === undefined ? "full" : "miss", changed };
 }
@@ -236,11 +241,19 @@ async function inject(
   $: EngineInterface,
   snapshot: Snapshot,
   promoted: Promoted[],
+  muted: string[],
   attempt: number,
 ): Promise<boolean> {
   const text = messageOf(snapshot, promoted);
   const kinds = promoted.map((d) => d.kind);
-  const detail = { pr: snapshot.pr, head: snapshot.head, kinds, chars: text.length, attempt };
+  const detail = {
+    pr: snapshot.pr,
+    head: snapshot.head,
+    kinds,
+    muted,
+    chars: text.length,
+    attempt,
+  };
   try {
     const result = await $.prompt.submit({ text });
     if (result.drop !== undefined) {
@@ -292,10 +305,11 @@ async function send(
   watch: Watch,
   next: Snapshot,
   due: Promoted[],
+  muted: string[],
   attempt: number,
   isCurrent: () => boolean,
 ): Promise<void> {
-  const isSent = await inject($, next, due, attempt);
+  const isSent = await inject($, next, due, muted, attempt);
   if (!isCurrent() || isSent || attempt >= MAX_ATTEMPTS) return;
   const pending = watch.undelivered;
   watch.undelivered = {
@@ -334,6 +348,19 @@ function schedule($: EngineInterface, watch: Watch, streak: number, cause: strin
   watch.due = watch.polledAt + delay;
 }
 
+// Logs each newly muted item. Those already there when the PR is first seen are
+// logged but not counted in the footer.
+function mute($: EngineInterface, watch: Watch, prev: Snapshot | undefined, next: Snapshot) {
+  const seen = new Set(prev?.muted.map((m) => m.id));
+  const fresh = next.muted.filter((m) => !seen.has(m.id));
+  const baseline = prev === undefined ? { baseline: true } : {};
+  for (const m of fresh) emit($, "muted", { pr: next.pr, head: next.head, ...baseline, ...m });
+  if (watch.muted.head !== next.head) watch.muted = { ...watch.muted, head: next.head, count: 0 };
+  if (prev === undefined) return;
+  watch.muted.count += fresh.length;
+  watch.muted.held.push(...fresh.map((m) => m.id));
+}
+
 interface Applied {
   isTracked: boolean;
   isChanged: boolean;
@@ -348,6 +375,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
     show($, watch, undefined);
     watch.none = none;
     watch.snapshot = undefined;
+    watch.muted = { head: "", count: 0, held: [] };
     watch.undelivered = undefined;
     return { isTracked: false, isChanged };
   }
@@ -364,11 +392,14 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   if (!isSamePr) {
     emit($, "pr.tracked", { pr: next.pr, head: next.head, phase: next.phase, state: next.state });
     watch.undelivered = undefined;
+    watch.muted = { head: next.head, count: 0, held: [] };
+    mute($, watch, undefined, next);
     due = baselineOf(next);
     for (const { action, ...detail } of due) {
       emit($, action, { pr: next.pr, head: next.head, baseline: true, ...detail });
     }
   } else {
+    mute($, watch, prev, next);
     const decisions = decide(prev, next);
     for (const { action, ...detail } of decisions) {
       emit($, action, { pr: next.pr, head: next.head, ...detail });
@@ -384,9 +415,12 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
     due = combine(still.due, fresh);
   }
   watch.snapshot = next;
-  show($, watch, statusOf(next));
+  show($, watch, statusOf(next, watch.muted.count));
   // The send waits for an idle session, so the next poll is not held on it.
-  if (due.length > 0) void send($, watch, next, due, attempt, isCurrent);
+  if (due.length > 0) {
+    void send($, watch, next, due, watch.muted.held, attempt, isCurrent);
+    watch.muted.held = [];
+  }
   return { isTracked: !isSamePr, isChanged };
 }
 
@@ -418,7 +452,7 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     watch.polledAt = now;
     watch.due = now + POLL_MS.error;
     if (watch.snapshot !== undefined && isCurrent()) {
-      const line = statusOf(watch.snapshot);
+      const line = statusOf(watch.snapshot, watch.muted.count);
       show($, watch, line === "" ? STALE : `${line} · ${STALE}`);
     }
   }
@@ -483,12 +517,19 @@ async function hasGh($: EngineInterface): Promise<boolean> {
  * Every other change is only shown and logged.
  */
 export function register(on: On, options: PluginOptions): void {
+  const { noise, error: noiseError } = noiseOf(
+    String(options.reviewers ?? ""),
+    String(options.ignore ?? ""),
+    String(options.ignoreBody ?? ""),
+  );
   const watch: Watch = {
     snapshot: undefined,
     last: undefined,
     etags: new Map(),
     me: undefined,
+    noise,
     undelivered: undefined,
+    muted: { head: "", count: 0, held: [] },
     error: undefined,
     ticker: undefined,
     tickedAt: undefined,
@@ -521,6 +562,7 @@ export function register(on: On, options: PluginOptions): void {
     // A session.end while this start was in flight has moved the generation on.
     if (watch.generation !== generation) return started;
     emit($, "session.start", { active: true });
+    if (noiseError !== undefined) emit($, "ignoreBody.invalid", { error: noiseError }, false);
     if (watch.isStopped) {
       watch.isStopped = false;
       watch.me = undefined;

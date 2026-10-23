@@ -1,6 +1,6 @@
 # Other Harnesses
 
-For a Claude API application with no suite yet, `/claude-api build-eval` builds one and `/claude-api hillclimb` climbs it. This file adapts a suite that already exists to `compare.ts`.
+For a pydantic-evals suite, see [pydantic-evals.md](../../design/references/pydantic-evals.md), which compares in Python. For a Claude API application with no suite yet, `/claude-api build-eval` builds one and `/claude-api hillclimb` climbs it. This file adapts a suite that already exists to `compare.ts`.
 
 The loop needs these from any harness:
 

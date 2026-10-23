@@ -5,6 +5,7 @@ Design eval suites, hill-climb a skill, agent, rule, or prompt against one, and 
 ## Contents
 
 - **Skills**:
+  - `evals:design`: designs an eval suite (frame, cases, split, graders), with references for native `claude plugin eval` and pydantic-evals
   - `evals:hill-climb`: climbs a skill, agent, rule, or `CLAUDE.md` against its eval suite
 
 ## Evals

@@ -60,7 +60,6 @@ const NO_NATIVE = touched(String.raw`evals/native`);
 
 const EVALUATOR = String.raw`\b(?:Contains|Equals|EqualsExpected|IsInstance|MaxDuration|HasMatchingSpan)\(|\(Evaluator\)`;
 
-/** Graders every case in the suite shares, by name. */
 export const SHARED: Record<string, { cases: (c: CaseSpec) => boolean; grader: Grader }> = {
   "holdout-share": {
     cases: () => true,
@@ -234,7 +233,6 @@ export function perCase(c: CaseSpec): Record<string, Grader> {
   return out;
 }
 
-/** Shared grader names that apply to a case. */
 export function sharedFor(c: CaseSpec): string[] {
   return Object.entries(SHARED)
     .filter(([, s]) => s.cases(c))

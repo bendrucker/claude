@@ -13,7 +13,7 @@ Commands for a suite run by `claude plugin eval` through this repo's `evals/nati
 
 ## Running
 
-`bun evals/native/run.ts <suite> --ref <ref> -- <args>` runs a suite locally against the artifacts as they stand at `<ref>`, with the cases read from the working tree, so the base and every candidate face the same suite. Arguments after `--` go to `claude plugin eval`: `--tag dev`, `--case <glob>`, `--runs <n>`, `--concurrency <n>`, `--max-cost-usd <usd>`. Results land in `<suite>/results/`, with `aggregate-result.json` and `traces/<case>-<arm>-<n>.jsonl`, whose last `result` line is the reply. A fresh worktree needs `bun install` before `compare.ts` resolves its dependencies.
+`bun evals/native/run.ts <suite> --ref <ref> -- <args>` runs a suite locally against the artifacts as they stand at `<ref>`, with the cases read from the working tree, so the base and every candidate face the same suite. Arguments after `--` go to `claude plugin eval`: `--tag dev`, `--case <glob>`, `--runs <n>`, `--concurrency <n>`, `--max-cost-usd <usd>`. Results land in `<suite>/results/`, with `aggregate-result.json` and `traces/<case>-<arm>-<n>.jsonl`, whose last `result` line is the reply. Local runs need the Bash sandbox disabled, and a fresh worktree needs `bun install` before `compare.ts` resolves its dependencies.
 
 On CI, `gh workflow run eval.yml --ref <branch> -f suite=<suite> -f args='--tag dev'` runs one replicate. `-f ref=<sha>` tests another commit against the branch's cases, and `-f baseline=<run id>,<run id>` adds the pooled comparison to the job summary. `gh run download <id>` fetches a run's results for pooling locally. For a `holdout` pair, dispatch the final branch for both sides, adding `-f ref=<base sha>` for the base, so both read the same cases.
 

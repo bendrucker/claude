@@ -455,12 +455,13 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     schedule($, watch, streak, "change");
     watch.error = undefined;
   } catch (error) {
+    if (!isCurrent() || seq !== watch.polls) return;
     const message = error instanceof Error ? error.message : String(error);
     if (message !== watch.error) emit($, "poll.error", { error: message }, false);
     watch.error = message;
     watch.polledAt = now;
     watch.due = now + POLL_MS.error;
-    if (watch.snapshot !== undefined && isCurrent()) {
+    if (watch.snapshot !== undefined) {
       const line = statusOf(watch.snapshot, watch.muted.count);
       show($, watch, line === "" ? STALE : `${line} · ${STALE}`);
     }

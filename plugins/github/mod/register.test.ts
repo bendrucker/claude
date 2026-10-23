@@ -748,6 +748,25 @@ describe("register", () => {
     expect(w.views.length).toBe(3);
   });
 
+  test("a poll from before a restart that fails leaves the new chain alone", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr(""), slowMs: 20_000 };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.slowMs = 1_000;
+    await $.session.end({ reason: "other", sessionId: "s1", resume: { id: "s1" } });
+    await $.session.start(START);
+    await w.clock.advance(1_000);
+    world.view = "HTTP 502: Bad Gateway";
+    await w.clock.advance(19_000);
+    world.view = pr("");
+    await w.clock.advance(POLL_MS.pending);
+
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.views.length).toBe(3);
+  });
+
   test("unchanged ETags skip the full read until one resource moves", async ($, on) => {
     const etags: Record<string, string> = {
       "repos/o/r/pulls/7": 'W/"p1"',

@@ -689,6 +689,25 @@ describe("register", () => {
     expect(w.views.length).toBe(3);
   });
 
+  test("a poll from before a restart that fails leaves the new chain alone", async ($, on) => {
+    const world: World = { branch: "topic", glab: GLAB_OK, view: mr(), slowMs: 20_000 };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.slowMs = 1_000;
+    await $.session.end({ reason: "other", sessionId: "s1", resume: { id: "s1" } });
+    await $.session.start(START);
+    await w.clock.advance(1_000);
+    world.view = "HTTP 502: Bad Gateway";
+    await w.clock.advance(19_000);
+    world.view = mr();
+    await w.clock.advance(POLL_MS.pending);
+
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.views.length).toBe(3);
+  });
+
   test("a dropped injection is retried until the engine takes it", async ($, on) => {
     const world: World = { branch: "topic", glab: GLAB_OK, view: mr(), drop: "busy" };
     const w = worldOf(on, world);

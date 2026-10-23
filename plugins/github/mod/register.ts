@@ -497,14 +497,13 @@ function start($: EngineInterface, watch: Watch): void {
 }
 
 // A turn proves the session is awake, so a ticker silent past a few periods has
-// died and is started again. A turn also ends a backoff, once the unbacked wait
-// has passed since the last poll.
+// died and is started again. A turn also ends a backoff, so the next poll comes
+// the unbacked wait after the last one, which sees a push the turn just made.
 async function wake($: EngineInterface, watch: Watch): Promise<void> {
   const now = await $.clock.now();
   if (watch.isStopped) return;
   const silentMs = now - (watch.tickedAt ?? now);
-  const isOverdue = now - watch.polledAt >= delayOf(watch.snapshot, 0);
-  if (watch.error === undefined && watch.streak > 0 && isOverdue) schedule($, watch, 0, "turn");
+  if (watch.error === undefined && watch.streak > 0) schedule($, watch, 0, "turn");
   if (silentMs > LATE_MS) {
     emit($, "watch.revived", { silentMs, pr: watch.snapshot?.pr });
     start($, watch);

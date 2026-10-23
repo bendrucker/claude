@@ -965,7 +965,7 @@ describe("register", () => {
     expect(w.named("poll.backoff").at(-1)?.detail?.delayMs).toBe(QUIET_MS.at(-1));
   });
 
-  test("a turn soon after a poll leaves the backoff in place", async ($, on) => {
+  test("a turn soon after a poll brings the next one in to the unbacked wait", async ($, on) => {
     const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("SUCCESS") });
 
     await $.session.start(START);
@@ -974,7 +974,9 @@ describe("register", () => {
     await $.turn.complete(COMPLETE);
     await w.clock.advance(TICK_MS);
     expect(w.views.length).toBe(3);
-    expect(w.named("poll.reset")).toEqual([]);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn"]);
+    await w.clock.advance(POLL_MS.settled - TICK_MS);
+    expect(w.views.length).toBe(4);
   });
 
   test("with no PR the backoff stops at the idle cap", async ($, on) => {

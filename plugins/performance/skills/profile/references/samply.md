@@ -13,6 +13,8 @@ samply record --save-only --unstable-presymbolicate -o tmp/profile/<name>.json.g
 - `--rate <hz>` raises the sampling rate (default 1000) for a short command.
 - `--iteration-count <n>` repeats the command into one profile, which fills in a command that runs for well under a second.
 
+On macOS, samply cannot attach to a binary signed with the hardened runtime, as shipped and vendored binaries often are, and fails with "Could not obtain the root task". Before recording a binary you did not build, look for `runtime` in the flags `codesign -dv <binary>` prints. If it is there, record a copy re-signed ad hoc without it: `cp <binary> tmp/profile/<name> && codesign --force -s - tmp/profile/<name>`.
+
 ## Summarize
 
 Run the bundled script for a ranking:

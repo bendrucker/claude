@@ -10,3 +10,7 @@ Design eval suites, hill-climb a skill, agent, rule, or prompt against one, and 
 ## Evals
 
 `evals/hill-climb` scores the climb's judgment steps (the Decide verdict and the error-analysis bucket) over frozen results. It is `.local-only`. Its README covers the loop.
+
+## Tests
+
+`bun test plugins/evals/evals/hill-climb` tests the case generators, and `bun evals/native/check.ts plugins/evals/evals/hill-climb` tests the regex graders against `examples/`.

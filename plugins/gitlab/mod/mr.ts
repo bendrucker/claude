@@ -274,7 +274,7 @@ export function noiseOf(
   ignoreBody: string,
 ): { noise: Noise; error?: string } {
   const noise: Noise = {
-    bots: new Set(["coderabbitai", "linear", ...usernamesOf(reviewers)]),
+    bots: new Set(usernamesOf(reviewers)),
     authors: new Set(usernamesOf(ignore)),
     body: undefined,
   };
@@ -296,28 +296,30 @@ const isBot = (username: string, noise: Noise) => {
   return SERVICE_ACCOUNT.test(name) || noise.bots.has(name);
 };
 
-const ACK =
-  /^(?=[\s\S]*<!-- This is an auto-generated reply by CodeRabbit -->)[\s\S]*Actions performed/;
+// What a note shows once its hidden markup and tags are gone.
+const visibleOf = (body: string) =>
+  body
+    .replaceAll(/<!--[\s\S]*?-->/g, "")
+    .replaceAll(/<[^>]*>/g, "")
+    .trim();
 
-// Bot notes with nothing to act on, by what the bot writes.
-const CHATTER: [reason: string, body: RegExp][] = [
-  // CodeRabbit's walkthrough, edited in place. Its findings arrive as diff notes.
-  ["coderabbit.summary", /<!-- This is an auto-generated comment: [^>]* by coderabbit\.ai -->/],
-  ["coderabbit.ack", ACK],
-  [
-    "linkback",
-    /^[^\n]{0,300}(linear\.app\/[^/\s]+\/issue\/|\.atlassian\.net\/browse\/)[^\n]{0,300}$/,
-  ],
+// A bot's note with nothing to act on, by its shape alone: links to a tracker,
+// and summaries and acknowledgements led by the hidden marker a bot finds its
+// note again by.
+const CHATTER: [reason: string, test: (body: string, visible: string) => boolean][] = [
+  ["link", (body, visible) => !visible.includes("\n") && /https?:\/\//.test(body)],
+  ["marked", (body) => body.startsWith("<!--")],
 ];
 
 function chatterOf(note: Note, noise: Noise): string | undefined {
   if (noise.authors.has(note.author.toLowerCase())) return "author";
   if (!isBot(note.author, noise)) return undefined;
+  // A bot's note on a diff line is a finding.
+  if (note.type === "DiffNote") return undefined;
   const text = note.body.trim();
-  // A bot's note on a diff line is a finding, unless it is CodeRabbit's marked ack.
-  if (note.type === "DiffNote") return ACK.test(text) ? "coderabbit.ack" : undefined;
   if (noise.body?.test(text) === true) return "body";
-  return CHATTER.find(([, pattern]) => pattern.test(text))?.[0];
+  const visible = visibleOf(text);
+  return CHATTER.find(([, test]) => test(text, visible))?.[0];
 }
 
 export type Approval = "approved" | "unapproved" | null;

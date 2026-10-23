@@ -62,7 +62,9 @@ interface World {
   isExtrasFailing?: boolean;
 }
 
+// GitHub types the review app's login as a bot.
 const EXTRAS = {
+  comments: { nodes: [{ author: { __typename: "Bot", login: "review-app" } }] },
   isMergeQueueEnabled: false,
   autoMergeRequest: null,
   mergeQueueEntry: null,
@@ -275,13 +277,13 @@ describe("register", () => {
     await $.session.start(START);
     await w.clock.settle();
     world.view = pr("SUCCESS", [
-      { id: "r1", state: "COMMENTED", author: { login: "greptile" } },
+      { id: "r1", state: "COMMENTED", author: { login: "carol" } },
       { id: "r2", state: "CHANGES_REQUESTED", author: { login: "alice" } },
     ]);
     await w.clock.advance(POLL_MS.settled);
 
     expect(w.submits.length).toBe(1);
-    expect(w.submits[0]).toContain("@greptile reviewed PR #7 (COMMENTED)");
+    expect(w.submits[0]).toContain("@carol reviewed PR #7 (COMMENTED)");
     expect(w.submits[0]).toContain("@alice reviewed PR #7 (CHANGES_REQUESTED)");
     expect(w.named("drop")).toEqual([]);
   });
@@ -292,9 +294,9 @@ describe("register", () => {
     async ($, on) => {
       const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
       const w = worldOf(on, world);
-      const greptile = {
+      const verdict = {
         __typename: "CheckRun",
-        name: "Greptile Review",
+        name: "Review App",
         status: "COMPLETED",
         conclusion: "FAILURE",
         startedAt: "2026-10-06T10:05:00Z",
@@ -304,28 +306,28 @@ describe("register", () => {
       await w.clock.settle();
       world.view = {
         ...pr("SUCCESS", [
-          { id: "r1", state: "COMMENTED", author: { login: "greptile-apps" }, body: "Summary" },
+          { id: "r1", state: "COMMENTED", author: { login: "review-app" }, body: "Summary" },
         ]),
-        statusCheckRollup: [check("SUCCESS"), greptile],
+        statusCheckRollup: [check("SUCCESS"), verdict],
         comments: [{ id: "c1", author: { login: "vercel[bot]" }, body: "Preview ready" }],
       };
       await w.clock.advance(POLL_MS.settled);
       await w.clock.advance(POLL_MS.settled);
 
       expect(w.submits.length).toBe(1);
-      expect(w.submits[0]).toContain("@greptile-apps reviewed PR #7 (COMMENTED)");
+      expect(w.submits[0]).toContain("@review-app reviewed PR #7 (COMMENTED)");
       expect(w.submits[0]).not.toContain("CI failed");
       expect(w.named("muted").map((e) => e.detail)).toEqual([
         {
           pr: 7,
           head: "aaaaaaa1111",
-          id: "aaaaaaa1111:Greptile Review",
-          author: "greptile-apps",
+          id: "aaaaaaa1111:Review App",
+          author: "review-app",
           reason: "review.check",
         },
         { pr: 7, head: "aaaaaaa1111", id: "c1", author: "vercel[bot]", reason: "author" },
       ]);
-      expect(w.named("inject")[0]?.detail?.muted).toEqual(["aaaaaaa1111:Greptile Review", "c1"]);
+      expect(w.named("inject")[0]?.detail?.muted).toEqual(["aaaaaaa1111:Review App", "c1"]);
       expect(await w.shown($)).toBe("you     │ \u{f49e}");
     },
   );
@@ -356,10 +358,10 @@ describe("register", () => {
   });
 
   test("chatter already on a PR first seen is logged as the baseline", async ($, on) => {
-    const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\nActions performed";
+    const ack = "<!-- reply marker -->\nActions performed";
     const view = {
       ...pr("SUCCESS"),
-      comments: [{ id: "c1", author: { login: "coderabbitai" }, body: ack }],
+      comments: [{ id: "c1", author: { login: "review-app" }, body: ack }],
     };
     const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
 
@@ -371,8 +373,8 @@ describe("register", () => {
         head: "aaaaaaa1111",
         baseline: true,
         id: "c1",
-        author: "coderabbitai",
-        reason: "coderabbit.ack",
+        author: "review-app",
+        reason: "marked",
       },
     ]);
     expect(await w.shown($)).toBe("you     │ \u{f49e}");
@@ -969,14 +971,14 @@ describe("register", () => {
   });
 
   test("the pane lists every check and the muted chatter it hides until opened", async ($, on) => {
-    const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\n✅ Actions performed";
+    const ack = "<!-- reply marker -->\n✅ Actions performed";
     const w = worldOf(on, {
       branch: "topic",
       gh: GH_OK,
       view: {
         ...pr("FAILURE"),
         statusCheckRollup: [check("FAILURE"), { ...check("SUCCESS"), name: "lint" }],
-        comments: [{ id: "c1", author: { login: "coderabbitai" }, body: ack }],
+        comments: [{ id: "c1", author: { login: "review-app" }, body: ack }],
       },
     });
 
@@ -1001,11 +1003,11 @@ describe("register", () => {
       "✗ ci / test",
     );
     expect(await pane.find({ type: "Text", text: /✓ ci \/ lint/ })).toBeDefined();
-    expect(await pane.find({ type: "Text", text: /coderabbit\.ack/ })).toBeUndefined();
+    expect(await pane.find({ type: "Text", text: /review-app · marked/ })).toBeUndefined();
 
     await pane.press({ key: "github:muted" });
-    expect((await pane.find({ type: "Text", text: /coderabbit/ }))?.text).toContain(
-      "coderabbitai · coderabbit.ack",
+    expect((await pane.find({ type: "Text", text: /review-app/ }))?.text).toContain(
+      "review-app · marked",
     );
     expect(w.named("pane.muted").map((e) => e.detail)).toEqual([{ open: true, count: 1 }]);
     await pane.unmount();

@@ -145,6 +145,8 @@ export function parseView(stdout: string): PrView | undefined {
 export interface Extras {
   /** Unresolved review threads, each with its latest comment. */
   threads: CommentNode[];
+  /** Logins GitHub types as bots among the PR's commenters and reviewers. */
+  bots: string[];
   hasQueue: boolean;
   isAutoMerge: boolean;
   /** Position in the merge queue, counted from 1, or undefined when not queued. */
@@ -157,6 +159,8 @@ export const EXTRAS_QUERY = `query($owner: String!, $name: String!, $pr: Int!) {
       isMergeQueueEnabled
       autoMergeRequest { enabledAt }
       mergeQueueEntry { position }
+      comments(last: 100) { nodes { author { __typename login } } }
+      reviews(last: 100) { nodes { author { __typename login } } }
       reviewThreads(first: 100) {
         nodes { isResolved comments(last: 1) { nodes { id author { login } body createdAt } } }
       }
@@ -184,8 +188,15 @@ export function parseExtras(stdout: string): Extras | undefined {
     return listOf(comments, commentOf).at(-1);
   });
   const entry = isRecord(pr.mergeQueueEntry) ? pr.mergeQueueEntry : undefined;
+  const authors = [pr.comments, pr.reviews].flatMap((connection) =>
+    listOf(isRecord(connection) ? connection.nodes : undefined, (node) => {
+      const author = isRecord(node) && isRecord(node.author) ? node.author : undefined;
+      return author?.__typename === "Bot" ? (textOf(author.login) ?? undefined) : undefined;
+    }),
+  );
   return {
     threads,
+    bots: [...new Set(authors)],
     hasQueue: pr.isMergeQueueEnabled === true,
     isAutoMerge: isRecord(pr.autoMergeRequest),
     queued: typeof entry?.position === "number" ? entry.position : undefined,
@@ -271,25 +282,25 @@ export function noiseOf(
 export const NO_NOISE = noiseOf("", "", "").noise;
 
 // `gh pr view` names an author by login alone, which drops an app's `[bot]` suffix,
-// so review apps named like people are listed.
-const BOT =
-  /\[bot\]$|^app\/|[-_]bot$|-apps$|^(coderabbitai|greptileai|copilot-pull-request-reviewer|chatgpt-codex-connector|linear)$/i;
+// so the extras query's author types name the rest.
+const BOT = /\[bot\]$|^app\/|[-_]bot$/i;
 
 const isBot = (login: string, noise: Noise) =>
   BOT.test(login) || noise.bots.has(login.toLowerCase());
 
-// Bot comments with nothing to act on, by what the bot writes.
-const CHATTER: [reason: string, body: RegExp][] = [
-  // CodeRabbit's walkthrough, edited in place. Its findings arrive as a review.
-  ["coderabbit.summary", /<!-- This is an auto-generated comment: [^>]* by coderabbit\.ai -->/],
-  [
-    "coderabbit.ack",
-    /^(?=[\s\S]*<!-- This is an auto-generated reply by CodeRabbit -->)[\s\S]*Actions performed/,
-  ],
-  [
-    "linkback",
-    /^[^\n]{0,300}(linear\.app\/[^/\s]+\/issue\/|\.atlassian\.net\/browse\/)[^\n]{0,300}$/,
-  ],
+// What a comment shows once its hidden markup and tags are gone.
+const visibleOf = (body: string) =>
+  body
+    .replaceAll(/<!--[\s\S]*?-->/g, "")
+    .replaceAll(/<[^>]*>/g, "")
+    .trim();
+
+// A bot's top-level comment with nothing to act on, by its shape alone: a bot's
+// findings arrive as a review, so these are links to a tracker, and summaries and
+// acknowledgements led by the hidden marker a bot finds its comment again by.
+const CHATTER: [reason: string, test: (body: string, visible: string) => boolean][] = [
+  ["link", (body, visible) => !visible.includes("\n") && /https?:\/\//.test(body)],
+  ["marked", (body) => body.startsWith("<!--")],
 ];
 
 function chatterOf(login: string, body: string, noise: Noise): string | undefined {
@@ -297,17 +308,17 @@ function chatterOf(login: string, body: string, noise: Noise): string | undefine
   if (!isBot(login, noise)) return undefined;
   const text = body.trim();
   if (noise.body?.test(text) === true) return "body";
-  return CHATTER.find(([, pattern]) => pattern.test(text))?.[0];
+  const visible = visibleOf(text);
+  return CHATTER.find(([, test]) => test(text, visible))?.[0];
 }
 
 const stem = (text: string) => /[a-z]+/.exec(text.toLowerCase())?.[0] ?? "";
 
-const REVIEW_CHECK = /review|coderabbit|greptile|copilot|codex/i;
-
-// A review bot also reports its verdict as a check, which its review already carries.
+// A review bot also reports its verdict as a check named for it, which its review
+// already carries.
 function reviewerOf(label: string, bots: string[]): string | undefined {
   const word = stem(label);
-  if (word.length < 4 || !REVIEW_CHECK.test(label)) return undefined;
+  if (word.length < 4) return undefined;
   return bots.find((login) => {
     const name = stem(login);
     return name.length >= 4 && (name.startsWith(word) || word.startsWith(name));
@@ -434,7 +445,11 @@ function askedOf(view: PrView): string[] {
 
 export function snapshotOf(view: PrView, local: Local): Snapshot {
   const { extras, turns = [] } = local;
-  const noise = local.noise ?? NO_NOISE;
+  const base = local.noise ?? NO_NOISE;
+  const noise = {
+    ...base,
+    bots: new Set([...base.bots, ...(extras?.bots ?? []).map((l) => l.toLowerCase())]),
+  };
   const muted: Snapshot["muted"] = [];
   // A reply to a review thread is itself a review, so the session's own replies come back here.
   const reviews: Snapshot["reviews"] = [];
@@ -458,7 +473,8 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     listed.push({ label, outcome });
     if (outcome === "pending") pending += 1;
     if (outcome !== "failed") continue;
-    const author = reviewerOf(label, bots);
+    // An Actions job is never a review app's verdict.
+    const author = node.workflowName ? undefined : reviewerOf(label, bots);
     if (author === undefined) failed.push(label);
     else muted.push({ id: `${view.headRefOid}:${label}`, author, reason: "review.check" });
   }

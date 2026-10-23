@@ -310,10 +310,10 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    world.notes = [note(4, "ben"), note(3, "alice", true), note(2, "greptile"), note(1, "alice")];
+    world.notes = [note(4, "ben"), note(3, "alice", true), note(2, "carol"), note(1, "alice")];
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
-    expect(w.submits[0]).toContain("@greptile commented on MR !7 (1 new comment)");
+    expect(w.submits[0]).toContain("@carol commented on MR !7 (1 new comment)");
 
     world.approvals = approvals("alice");
     await w.clock.advance(POLL_MS.settled);
@@ -341,18 +341,18 @@ describe("register", () => {
         jobs: job("success"),
       };
       const w = worldOf(on, world);
-      const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\n✅ Actions performed";
+      const ack = "<!-- reply marker -->\n✅ Actions performed";
 
       await $.session.start(START);
       await w.clock.settle();
-      world.notes = [note(3, "deploy-bot"), note(2, "coderabbitai", false, ack)];
+      world.notes = [note(3, "deploy-bot"), note(2, "review-bot", false, ack)];
       await w.clock.advance(POLL_MS.settled);
       await w.clock.advance(POLL_MS.settled);
 
       expect(w.submits).toEqual([]);
       expect(w.named("muted").map((e) => e.detail)).toEqual([
         { mr: 7, head: "aaaaaaa1111", id: "3", author: "deploy-bot", reason: "author" },
-        { mr: 7, head: "aaaaaaa1111", id: "2", author: "coderabbitai", reason: "coderabbit.ack" },
+        { mr: 7, head: "aaaaaaa1111", id: "2", author: "review-bot", reason: "marked" },
       ]);
       expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f441} 1");
     },
@@ -782,13 +782,13 @@ describe("register", () => {
   });
 
   test("the pane lists every job and the muted notes it hides until opened", async ($, on) => {
-    const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\n✅ Actions performed";
+    const ack = "<!-- reply marker -->\n✅ Actions performed";
     const w = worldOf(on, {
       branch: "topic",
       glab: GLAB_OK,
       view: mr("failed"),
       jobs: [...job("failed"), { id: 901, name: "lint", status: "success", allow_failure: false }],
-      notes: [note(2, "coderabbitai", false, ack)],
+      notes: [note(2, "review-bot", false, ack)],
     });
 
     await $.session.start(START);
@@ -810,11 +810,11 @@ describe("register", () => {
 
     expect(await pane.find({ type: "Text", text: /✗ test/ })).toBeDefined();
     expect(await pane.find({ type: "Text", text: /✓ lint/ })).toBeDefined();
-    expect(await pane.find({ type: "Text", text: /coderabbit\.ack/ })).toBeUndefined();
+    expect(await pane.find({ type: "Text", text: /review-bot · marked/ })).toBeUndefined();
 
     await pane.press({ key: "gitlab:muted" });
-    expect((await pane.find({ type: "Text", text: /coderabbit/ }))?.text).toContain(
-      "coderabbitai · coderabbit.ack",
+    expect((await pane.find({ type: "Text", text: /review-bot/ }))?.text).toContain(
+      "review-bot · marked",
     );
     await pane.unmount();
   });

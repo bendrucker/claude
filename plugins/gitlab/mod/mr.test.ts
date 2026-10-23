@@ -194,50 +194,49 @@ describe("snapshotOf", () => {
       type: "",
       createdAt: "",
     });
-    const linkback = "[ENG-1 Fix login](https://linear.app/acme/issue/ENG-1/fix-login)";
+    const linkback = "[ENG-1 Fix login](https://tracker.example/issue/ENG-1)";
     const snapshot = snap({
       notes: [
-        note(
-          1,
-          "project_5_bot_ab12",
-          "<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\nWalkthrough",
-        ),
-        note(
-          2,
-          "coderabbitai",
-          "<!-- This is an auto-generated reply by CodeRabbit -->\n✅ Actions performed\n\nReview triggered.",
-        ),
-        note(3, "linear", linkback),
+        note(1, "project_5_bot_ab12", "<!-- summary marker -->\n## Walkthrough\nLong summary."),
+        note(2, "review-bot", "<!-- reply marker -->\nActions performed\n\nReview triggered."),
+        note(3, "tracker-bot", linkback),
         note(4, "alice", linkback),
-        note(5, "coderabbitai", "This call can throw when `user` is null."),
+        note(5, "review-bot", "This call can throw when `user` is null."),
         note(6, "deploy-bot", "Preview ready"),
+        note(7, "review-app", "<!-- marker -->\nAn integration posting as a user."),
       ],
       noise: noiseOf("", "deploy-bot", "").noise,
     });
-    expect(snapshot.notes.map((n) => n.id)).toEqual([4, 5]);
+    expect(snapshot.notes.map((n) => n.id)).toEqual([4, 5, 7]);
     expect(snapshot.muted).toEqual([
-      { id: "1", author: "project_5_bot_ab12", reason: "coderabbit.summary" },
-      { id: "2", author: "coderabbitai", reason: "coderabbit.ack" },
-      { id: "3", author: "linear", reason: "linkback" },
+      { id: "1", author: "project_5_bot_ab12", reason: "marked" },
+      { id: "2", author: "review-bot", reason: "marked" },
+      { id: "3", author: "tracker-bot", reason: "link" },
       { id: "6", author: "deploy-bot", reason: "author" },
     ]);
-    expect(snapshot.noteCursor).toBe(6);
+    expect(
+      snap({
+        notes: [note(7, "review-app", "<!-- marker -->\nHi")],
+        noise: noiseOf("review-app", "", "").noise,
+      }).muted,
+    ).toEqual([{ id: "7", author: "review-app", reason: "marked" }]);
+    expect(snapshot.noteCursor).toBe(7);
   });
 
-  test("a bot's diff note is kept unless it is CodeRabbit's marked ack", () => {
+  test("a bot's diff note is a finding, whatever its shape", () => {
     const diff = (id: number, body: string) => ({
       id,
-      author: "coderabbitai",
+      author: "review-bot",
       body,
       isSystem: false,
       type: "DiffNote",
       createdAt: "",
     });
-    const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\n✅ Actions performed";
-    const linkback = "[ENG-1 Fix login](https://linear.app/acme/issue/ENG-1/fix-login)";
-    const snapshot = snap({ notes: [diff(1, ack), diff(2, linkback)] });
-    expect(snapshot.notes.map((n) => n.id)).toEqual([2]);
-    expect(snapshot.muted).toEqual([{ id: "1", author: "coderabbitai", reason: "coderabbit.ack" }]);
+    const snapshot = snap({
+      notes: [diff(1, "<!-- marker -->\nNull check."), diff(2, "https://x.example")],
+    });
+    expect(snapshot.notes.map((n) => n.id)).toEqual([1, 2]);
+    expect(snapshot.muted).toEqual([]);
   });
 
   test("the body option mutes matching bot notes and reports a bad pattern", () => {
@@ -458,8 +457,8 @@ describe("decide", () => {
     [
       "new comments promote once per author",
       snap({ notes: noted([3, "alice"]) }),
-      snap({ notes: noted([6, "greptile"], [5, "alice"], [4, "greptile"], [3, "alice"]) }),
-      [fb("greptile", null, 2), fb("alice", null, 1)],
+      snap({ notes: noted([6, "carol"], [5, "alice"], [4, "carol"], [3, "alice"]) }),
+      [fb("carol", null, 2), fb("alice", null, 1)],
     ],
     [
       "an older note back in the window after a deletion stays quiet",

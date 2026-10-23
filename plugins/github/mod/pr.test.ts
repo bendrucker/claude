@@ -42,7 +42,17 @@ const view = (over: Partial<PrView> = {}): PrView => ({
   ...over,
 });
 
-const snapOf = (v: PrView, isHeadKnown = true) => snapshotOf(v, { me: "ben", isHeadKnown });
+// GitHub types each app's login as a bot.
+const BOTS = ["review-app", "helper-app", "tracker-app"];
+const extrasOf = (bots: string[]): Extras => ({
+  threads: [],
+  bots,
+  hasQueue: false,
+  isAutoMerge: false,
+  queued: undefined,
+});
+const snapOf = (v: PrView, isHeadKnown = true) =>
+  snapshotOf(v, { me: "ben", isHeadKnown, extras: extrasOf(BOTS) });
 
 describe("parseView", () => {
   test("narrows gh output and rejects anything else", () => {
@@ -133,7 +143,7 @@ describe("snapshotOf", () => {
           { id: "c1", author: { login: "ben" } },
           { id: "c2", author: { login: "ben-alt" }, viewerDidAuthor: true },
           { id: "c3", author: { login: "spam" }, isMinimized: true },
-          { id: "c4", author: { login: "greptile-apps" } },
+          { id: "c4", author: { login: "review-app" } },
         ],
       }),
     );
@@ -179,35 +189,36 @@ describe("snapshotOf", () => {
       author: { login },
       body,
     });
-    const linkback =
-      '<p><a href="https://linear.app/acme/issue/ENG-1/fix-login">ENG-1 Fix login</a></p>';
+    const linkback = '<p><a href="https://tracker.example/issue/ENG-1">ENG-1 Fix login</a></p>';
     const snapshot = snapshotOf(
       view({
         comments: [
-          comment(
-            "c1",
-            "coderabbitai",
-            "<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\nWalkthrough",
-          ),
+          comment("c1", "review-app", "<!-- summary marker -->\n## Walkthrough\nLong summary."),
           comment(
             "c2",
-            "coderabbitai",
-            "<!-- This is an auto-generated reply by CodeRabbit -->\n<details>\n<summary>✅ Actions performed</summary>\n\nReview triggered.\n</details>",
+            "review-app",
+            "<!-- reply marker -->\n<summary>Actions performed</summary>",
           ),
-          comment("c3", "linear", linkback),
+          comment("c3", "tracker-app", linkback),
           comment("c4", "alice", linkback),
-          comment("c5", "coderabbitai", "This call can throw when `user` is null."),
-          comment("c6", "vercel[bot]", "Preview ready"),
+          comment("c5", "review-app", "This call can throw when `user` is null."),
+          comment("c6", "preview[bot]", "Preview ready"),
+          comment("c7", "plain-user", "<!-- a person's marker -->\nPlease look."),
         ],
       }),
-      { me: "ben", isHeadKnown: true, noise: noiseOf("", "vercel[bot]", "").noise },
+      {
+        me: "ben",
+        isHeadKnown: true,
+        noise: noiseOf("", "preview[bot]", "").noise,
+        extras: extrasOf(BOTS),
+      },
     );
-    expect(snapshot.comments.map((c) => c.id)).toEqual(["c4", "c5"]);
+    expect(snapshot.comments.map((c) => c.id)).toEqual(["c4", "c5", "c7"]);
     expect(snapshot.muted).toEqual([
-      { id: "c1", author: "coderabbitai", reason: "coderabbit.summary" },
-      { id: "c2", author: "coderabbitai", reason: "coderabbit.ack" },
-      { id: "c3", author: "linear", reason: "linkback" },
-      { id: "c6", author: "vercel[bot]", reason: "author" },
+      { id: "c1", author: "review-app", reason: "marked" },
+      { id: "c2", author: "review-app", reason: "marked" },
+      { id: "c3", author: "tracker-app", reason: "link" },
+      { id: "c6", author: "preview[bot]", reason: "author" },
     ]);
   });
 
@@ -236,44 +247,44 @@ describe("snapshotOf", () => {
     const snapshot = snapOf(
       view({
         reviews: [
-          review("r1", "coderabbitai", ""),
-          review("r2", "copilot-pull-request-reviewer", " "),
+          review("r1", "review-app", ""),
+          review("r2", "helper-app", " "),
           review("r3", "alice", ""),
-          review("r4", "greptile-apps", "2 issues found"),
+          review("r4", "review-app", "2 issues found"),
         ],
       }),
     );
     expect(snapshot.reviews.map((r) => r.id)).toEqual(["r3", "r4"]);
     expect(snapshot.muted).toEqual([
-      { id: "r1", author: "coderabbitai", reason: "review.reply" },
-      { id: "r2", author: "copilot-pull-request-reviewer", reason: "review.reply" },
+      { id: "r1", author: "review-app", reason: "review.reply" },
+      { id: "r2", author: "helper-app", reason: "review.reply" },
     ]);
   });
 
-  test("a bot named like a check that is no review keeps that check in CI", () => {
-    const lint = { ...run("lint", "COMPLETED", "FAILURE"), workflowName: null };
+  test("a bot named like an Actions job keeps that job in CI", () => {
+    const lint = { ...run("lint", "COMPLETED", "FAILURE"), workflowName: "lint" };
     const reviews = [
       { id: "r1", state: "COMMENTED", author: { login: "linter-bot" }, body: "Style notes" },
     ];
-    expect(snapOf(view({ statusCheckRollup: [lint], reviews })).failed).toEqual(["lint"]);
+    expect(snapOf(view({ statusCheckRollup: [lint], reviews })).failed).toEqual(["lint / lint"]);
   });
 
   test("a review bot's failing check belongs to its review, not to CI", () => {
-    const greptile = { ...run("Greptile Review", "COMPLETED", "FAILURE"), workflowName: null };
-    const checks = [run("test", "COMPLETED", "SUCCESS"), greptile];
+    const bot = { ...run("Review App", "COMPLETED", "FAILURE"), workflowName: null };
+    const checks = [run("test", "COMPLETED", "SUCCESS"), bot];
     const reviewed = [
-      { id: "r1", state: "COMMENTED", author: { login: "greptile-apps" }, body: "Summary" },
+      { id: "r1", state: "COMMENTED", author: { login: "review-app" }, body: "Summary" },
     ];
     const absorbed = snapOf(view({ statusCheckRollup: checks, reviews: reviewed }));
     expect(absorbed.phase).toBe("passing");
     expect(absorbed.failed).toEqual([]);
     expect(absorbed.muted).toEqual([
-      { id: "aaaaaaa1111:Greptile Review", author: "greptile-apps", reason: "review.check" },
+      { id: "aaaaaaa1111:Review App", author: "review-app", reason: "review.check" },
     ]);
-    expect(snapOf(view({ statusCheckRollup: checks })).failed).toEqual(["Greptile Review"]);
-    const human = [{ id: "r1", state: "COMMENTED", author: { login: "greptile" } }];
+    expect(snapOf(view({ statusCheckRollup: checks })).failed).toEqual(["Review App"]);
+    const human = [{ id: "r1", state: "COMMENTED", author: { login: "review" } }];
     expect(snapOf(view({ statusCheckRollup: checks, reviews: human })).failed).toEqual([
-      "Greptile Review",
+      "Review App",
     ]);
   });
 
@@ -405,10 +416,10 @@ describe("decide", () => {
         [
           ["r0", "alice", "COMMENTED"],
           ["r1", "alice", "CHANGES_REQUESTED"],
-          ["r2", "greptile-apps", "COMMENTED"],
+          ["r2", "review-app", "COMMENTED"],
         ],
         [
-          ["c1", "greptile-apps"],
+          ["c1", "review-app"],
           ["c2", "bob"],
         ],
       ),
@@ -423,7 +434,7 @@ describe("decide", () => {
         {
           action: "promote",
           kind: "feedback",
-          author: "greptile-apps",
+          author: "review-app",
           states: ["COMMENTED"],
           comments: 1,
         },
@@ -610,6 +621,7 @@ describe("statusOf", () => {
   });
   const extras = (over: Partial<Extras> = {}): Extras => ({
     threads: [],
+    bots: [],
     hasQueue: false,
     isAutoMerge: false,
     queued: undefined,

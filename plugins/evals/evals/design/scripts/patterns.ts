@@ -5,6 +5,8 @@ export const STR = String.raw`(?:[^"\\]|\\.)*`;
 const KEYS = String.raw`(?:"[a-z_]+":(?:"${STR}"|true|false),)*?`;
 
 const FLOW_TAGS = String.raw`(?:[^\]"\\]|\\.)*`;
+/** The characters of a bare flow list: tags, commas, brackets, and spaces. */
+const LIST_TEXT = String.raw`[\w ,'\[\]-]*`;
 const BLOCK_ITEM = String.raw`(?:\\n *- *["']?[\w-]+["']?)*?\\n *- *["']?`;
 
 /** Lookaheads that each search a JSON string value from its start. */
@@ -55,6 +57,17 @@ export function tagged(...tokens: string[]): string {
 }
 
 /**
+ * A case whose tag list names every token: a `Write` or `Edit` carrying `tags:`, or an `Edit`
+ * to a `case.yaml` whose new text is only a flow list, brackets optional.
+ */
+export function taggedCase(...tokens: string[]): string {
+  const ahead = tokens.map((t) => `(?=${LIST_TEXT}\\b${t}\\b)`).join("");
+  const path = String.raw`(?=${KEYS}"file_path":"${STR}case\.yaml")`;
+  const edit = String.raw`"name":"Edit","input":\{${path}${KEYS}"new_string":"${ahead}${LIST_TEXT}"`;
+  return `(?:${written(tagged(...tokens))})|(?:${edit})`;
+}
+
+/**
  * A line of the reply's case list whose tags, after the first `|`, name every token in any order.
  * Read with the `m` flag.
  */
@@ -69,7 +82,7 @@ export const JUDGE_MODEL = String.raw`judge_model: ?\\?["']?claude-(?!sonnet-5-5
 const CALL_ARG = String.raw`(?:[^()]|\([^()]*\))`;
 
 /** An `LLMJudge` call with no `model=` or the model under test. */
-export const PYDANTIC_JUDGE_UNSET = String.raw`LLMJudge\((?:(?!\bmodel=)${CALL_ARG})*\)|LLMJudge\(${CALL_ARG}*?\bmodel=\\?["']anthropic:claude-sonnet-5-5`;
+export const PYDANTIC_JUDGE_UNSET = String.raw`LLMJudge\((?:(?!\bmodel *=)${CALL_ARG})*\)|LLMJudge\(${CALL_ARG}*?\bmodel *= *\\?["']anthropic:claude-sonnet-5-5`;
 
 /** An `LLMJudge` call whose arguments never state a pass bar. */
 export const PYDANTIC_JUDGE_NO_BAR = String.raw`LLMJudge\((?:(?!pass)${CALL_ARG})*\)`;

@@ -8,7 +8,7 @@ import {
   PYDANTIC_JUDGE_UNSET,
   REMOVAL,
   survival,
-  tagged,
+  taggedCase,
   toPath,
   touched,
   written,
@@ -85,16 +85,16 @@ export const SHARED: Record<string, { cases: (c: CaseSpec) => boolean; grader: G
   },
   "tag-holdout": {
     cases: (c) => c.harness === "native",
-    grader: trace(written(tagged("holdout")), "The session tagged a case `holdout`.", "contains"),
+    grader: trace(taggedCase("holdout"), "The session tagged a case `holdout`.", "contains"),
   },
   "tag-dev": {
     cases: (c) => c.harness === "native" && c.brief !== "extend",
-    grader: trace(written(tagged("dev")), "The session tagged a case `dev`.", "contains"),
+    grader: trace(taggedCase("dev"), "The session tagged a case `dev`.", "contains"),
   },
   "quiet-tag": {
     cases: (c) => c.harness === "native",
     grader: trace(
-      written(tagged("quiet")),
+      taggedCase("quiet"),
       "A case where the artifact should stay quiet is tagged `quiet`.",
       "contains",
     ),
@@ -102,7 +102,7 @@ export const SHARED: Record<string, { cases: (c: CaseSpec) => boolean; grader: G
   "balance-tag": {
     cases: (c) => c.harness === "native",
     grader: trace(
-      written(tagged("balance")),
+      taggedCase("balance"),
       "A case where the artifact should change little is tagged `balance`.",
       "contains",
     ),
@@ -219,7 +219,7 @@ export function perCase(c: CaseSpec): Record<string, Grader> {
       const body = `A \`${kind}\` case is tagged \`${split}\`.`;
       out[`kind-${kind}-${split}`] =
         c.harness === "native"
-          ? trace(written(tagged(kind, split)), body, "contains")
+          ? trace(taggedCase(kind, split), body, "contains")
           : reply(listed(kind, split), body);
     }
   }

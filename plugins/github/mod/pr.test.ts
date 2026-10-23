@@ -521,7 +521,35 @@ describe("statusOf", () => {
       { statusCheckRollup: passed, reviewDecision: "APPROVED" },
       "\u{f49e} CI · \u{f42e} approved",
     ],
-    ["changes requested", { reviewDecision: "CHANGES_REQUESTED" }, "\u{f4d2} changes requested"],
+    ["changes requested", { reviewDecision: "CHANGES_REQUESTED" }, "\u{f4a8} changes requested"],
+    [
+      "re-requested after changes",
+      { reviewDecision: "CHANGES_REQUESTED", reviewRequests: ["ben", "carol", "alice", "dave"] },
+      "\u{f4e3} @alice, @carol (+1)",
+    ],
+    ["requested without required reviews", { reviewRequests: ["alice"] }, "\u{f4e3} @alice"],
+    ["only the session's own login requested", { reviewRequests: ["ben"] }, ""],
+    [
+      "changes requested without required reviews",
+      { latestReviews: [{ id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } }] },
+      "\u{f4a8} changes requested",
+    ],
+    [
+      "a standing request for changes outranks another reviewer's request",
+      {
+        reviewRequests: ["bob"],
+        latestReviews: [{ id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } }],
+      },
+      "\u{f4a8} changes requested",
+    ],
+    [
+      "a re-request hands the turn back",
+      {
+        reviewRequests: ["alice"],
+        latestReviews: [{ id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } }],
+      },
+      "\u{f4e3} @alice",
+    ],
     [
       "merged",
       { state: "MERGED", statusCheckRollup: [run("a", "IN_PROGRESS")] },

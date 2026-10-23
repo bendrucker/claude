@@ -11,6 +11,7 @@ import {
   parseApprovals,
   parseJobs,
   parseNotes,
+  parseReviewers,
   parseView,
   baselineOf,
   combine,
@@ -43,6 +44,7 @@ const read = (over: Partial<Read> = {}, pipelineStatus = "running"): Read => ({
   approvals: { approvalsRequired: 0, approvalsLeft: 0, approvedBy: [] },
   notes: [],
   jobs: [],
+  reviewers: [],
   me: "ben",
   isHeadKnown: true,
   ...over,
@@ -75,6 +77,22 @@ describe("parsers", () => {
     expect(view?.pipeline).toEqual({ id: 50, projectId: 2, status: "running" });
     expect(parseView(JSON.stringify({ iid: 7, head_pipeline: null }))).toBe(undefined);
     expect(parseView("not json")).toBe(undefined);
+
+    const reviewers = (nodes: unknown[]) =>
+      JSON.stringify({ data: { project: { mergeRequest: { reviewers: { nodes } } } } });
+    expect(
+      parseReviewers(
+        reviewers([
+          { username: "alice", mergeRequestInteraction: { reviewState: "UNREVIEWED" } },
+          { username: "bob", mergeRequestInteraction: null },
+          { mergeRequestInteraction: { reviewState: "APPROVED" } },
+        ]),
+      ),
+    ).toEqual([
+      { user: "alice", state: "UNREVIEWED" },
+      { user: "bob", state: "" },
+    ]);
+    expect(parseReviewers(JSON.stringify({ errors: [] }))).toBe(undefined);
 
     expect(
       parseApprovals(
@@ -547,7 +565,36 @@ describe("statusOf", () => {
         ...read({ jobs: passed }, "success"),
         view: { ...read().view, pipeline: null, detailedMergeStatus: "requested_changes" },
       }),
-      "\u{f4d2} changes requested",
+      "\u{f4a8} changes requested",
+    ],
+    [
+      "re-requested after changes",
+      snapshotOf({
+        ...read({
+          reviewers: [
+            { user: "ben", state: "UNREVIEWED" },
+            { user: "carol", state: "UNREVIEWED" },
+            { user: "alice", state: "REVIEW_STARTED" },
+            { user: "dave", state: "UNREVIEWED" },
+            { user: "erin", state: "APPROVED" },
+          ],
+        }),
+        view: { ...read().view, pipeline: null, detailedMergeStatus: "requested_changes" },
+      }),
+      "\u{f4e3} @alice, @carol (+1)",
+    ],
+    [
+      "a reviewer's request for changes outranks another's pending review",
+      snapshotOf({
+        ...read({
+          reviewers: [
+            { user: "alice", state: "REQUESTED_CHANGES" },
+            { user: "bob", state: "UNREVIEWED" },
+          ],
+        }),
+        view: { ...read().view, pipeline: null },
+      }),
+      "\u{f4a8} changes requested",
     ],
     ["merged", { ...snap({ jobs: [job("a", "running")] }), state: "merged" }, "\u{f419} merged"],
     ["closed", { ...snap(), state: "closed" }, "\u{f4dc} closed"],

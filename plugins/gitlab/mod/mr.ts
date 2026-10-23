@@ -116,10 +116,29 @@ const readJob = map(
   (j) => ({ id: j.id, name: j.name, status: j.status, allowFailure: j.allow_failure }),
 );
 
+const readReviewer = map(
+  obj({
+    username: str,
+    mergeRequestInteraction: or(obj({ reviewState: or(str, "") }), { reviewState: "" }),
+  }),
+  (r) => ({ user: r.username, state: r.mergeRequestInteraction.reviewState }),
+);
+
+// REST reports every reviewer as active, so review state comes from GraphQL.
+const readReviewers = map(
+  obj({
+    data: obj({
+      project: obj({ mergeRequest: obj({ reviewers: obj({ nodes: list(readReviewer) }) }) }),
+    }),
+  }),
+  (r) => r.data.project.mergeRequest.reviewers.nodes,
+);
+
 export type MrView = Out<typeof readView>;
 export type Approvals = Out<typeof readApprovals>;
 export type Note = Out<typeof readNote>;
 export type Job = Out<typeof readJob>;
+export type Reviewer = Out<typeof readReviewer>;
 
 /** Narrows `glab mr view -F json` output to an MrView, or undefined when it is not one. */
 export const parseView = (stdout: string): MrView | undefined => decoded(stdout, readView);
@@ -130,6 +149,8 @@ export const parseNotes = (stdout: string): Note[] | undefined => decoded(stdout
 export const parseJobs = (stdout: string): Job[] | undefined =>
   decoded(`[${stdout.split("\n").filter(Boolean).join(",")}]`, list(readJob));
 export const parseUser = (stdout: string): string | undefined => decoded(stdout, readUsername);
+export const parseReviewers = (stdout: string): Reviewer[] | undefined =>
+  decoded(stdout, readReviewers);
 
 export type Phase = "none" | "pending" | "passing" | "failing";
 
@@ -156,6 +177,10 @@ export interface Snapshot {
   isApproved: boolean;
   approvalsLeft: number;
   approvers: string[];
+  /** Reviewers other than the session's own user yet to review, sorted. */
+  requested: string[];
+  /** Reviewers other than the session's own user who requested changes, sorted. */
+  asked: string[];
   noteCursor: number;
   notes: { id: number; author: string }[];
   /** Notes kept from the model as noise, with why. */
@@ -286,6 +311,7 @@ export interface Read {
   approvals: Approvals;
   notes: Note[];
   jobs: Job[];
+  reviewers: Reviewer[];
   me: string;
   isHeadKnown: boolean;
   noise?: Noise;
@@ -309,6 +335,14 @@ function blockOf(view: MrView): Block | undefined {
   if (UNDECIDED.has(view.detailedMergeStatus ?? "")) return undefined;
   return view.detailedMergeStatus === "need_rebase" ? "behind" : "none";
 }
+
+const WAITING = new Set(["UNREVIEWED", "REVIEW_STARTED"]);
+
+const reviewersIn = ({ reviewers, me }: Read, states: Set<string>) =>
+  reviewers
+    .filter((r) => states.has(r.state) && r.user !== me)
+    .map((r) => r.user)
+    .toSorted();
 
 export function snapshotOf(read: Read): Snapshot {
   const { view, approvals, notes, jobs, me } = read;
@@ -350,10 +384,28 @@ export function snapshotOf(read: Read): Snapshot {
     isApproved: approvals.approvedBy.length > 0 && approvals.approvalsLeft === 0,
     approvalsLeft: approvals.approvalsLeft,
     approvers: approvals.approvedBy.filter((name) => name !== me).toSorted(),
+    // A re-request resets a reviewer to unreviewed.
+    requested: reviewersIn(read, WAITING),
+    asked: reviewersIn(read, new Set(["REQUESTED_CHANGES"])),
     noteCursor: Math.max(0, ...notes.map((n) => n.id)),
     notes: kept,
     muted,
   };
+}
+
+/** Whose move the review waits on, and on whom. */
+export interface Turn {
+  turn: "author" | "reviewer" | "ready" | "none";
+  waiting: string[];
+}
+
+// A request for changes holds the turn until its reviewer is asked again, which
+// resets them to unreviewed. A pending request otherwise follows handled feedback.
+export function turnOf(snapshot: Snapshot): Turn {
+  if (snapshot.asked.length > 0) return { turn: "author", waiting: snapshot.asked };
+  if (snapshot.requested.length > 0) return { turn: "reviewer", waiting: snapshot.requested };
+  if (snapshot.isChangesRequested) return { turn: "author", waiting: [] };
+  return { turn: snapshot.isApproved ? "ready" : "none", waiting: [] };
 }
 
 const isBlocked = (block: Block | undefined): block is "conflict" | "behind" =>
@@ -572,11 +624,12 @@ const OCT = {
   checkCircle: "\u{f49e}",
   dotFill: "\u{f444}",
   eye: "\u{f441}",
-  fileDiff: "\u{f4d2}",
   gitCompare: "\u{f47f}",
   gitMerge: "\u{f419}",
   gitPullRequestClosed: "\u{f4dc}",
+  hourglass: "\u{f4e3}",
   hubot: "\u{f477}",
+  reply: "\u{f4a8}",
   xCircle: "\u{f52f}",
 };
 
@@ -600,24 +653,26 @@ const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
   failing: (s) => `${OCT.xCircle} ${listed(s.failed)}`,
 };
 
-function reviewOf(snapshot: Snapshot): string | undefined {
-  if (snapshot.isChangesRequested) return `${OCT.fileDiff} changes requested`;
-  if (snapshot.approvalsLeft > 0) {
-    const left = snapshot.approvalsLeft;
-    return `${OCT.eye} ${left} ${left === 1 ? "approval" : "approvals"} needed`;
-  }
-  return snapshot.isApproved ? `${OCT.check} approved` : undefined;
-}
+const mention = (name: string) => `@${name}`;
+
+const TURNS: Record<Turn["turn"], (snapshot: Snapshot, waiting: string[]) => string | undefined> = {
+  author: () => `${OCT.reply} changes requested`,
+  reviewer: (_, waiting) => `${OCT.hourglass} ${listed(waiting.map(mention), 2)}`,
+  ready: () => `${OCT.check} approved`,
+  none: ({ approvalsLeft: left }) =>
+    left > 0 ? `${OCT.eye} ${left} ${left === 1 ? "approval" : "approvals"} needed` : undefined,
+};
 
 // The footer already links the MR, so the state rides after it on that line.
 // `muted` counts what was kept from the model since the head last moved.
 export function statusOf(snapshot: Snapshot, muted = 0): string {
   const ended = ENDED[snapshot.state];
   if (ended !== undefined) return ended;
+  const turn = turnOf(snapshot);
   return [
     BLOCKS[snapshot.block ?? "none"],
     CHECKS[snapshot.phase](snapshot),
-    reviewOf(snapshot),
+    TURNS[turn.turn](snapshot, turn.waiting),
     muted > 0 ? `${OCT.hubot} ${muted} muted` : undefined,
   ]
     .filter((part) => part !== undefined)

@@ -7,6 +7,7 @@ import {
   type MrView,
   type Note,
   type Promoted,
+  type Reviewer,
   type Snapshot,
   baselineOf,
   combine,
@@ -17,10 +18,12 @@ import {
   parseApprovals,
   parseJobs,
   parseNotes,
+  parseReviewers,
   parseUser,
   parseView,
   snapshotOf,
   statusOf,
+  turnOf,
 } from "./mr.ts";
 
 const MOD = "gitlab";
@@ -71,6 +74,8 @@ interface Watch {
   snapshot: Snapshot | undefined;
   branch: string | undefined;
   feedback: Feedback | undefined;
+  /** The last review state read, refetched only when `key` changes. */
+  reviewers: { key: string; reviewers: Reviewer[] } | undefined;
   me: string | undefined;
   noise: Noise;
   undelivered: Undelivered | undefined;
@@ -185,6 +190,56 @@ async function feedbackOf(
   };
 }
 
+const REVIEWERS_QUERY = `query($path: ID!, $iid: String!) {
+  project(fullPath: $path) {
+    mergeRequest(iid: $iid) {
+      reviewers { nodes { username mergeRequestInteraction { reviewState } } }
+    }
+  }
+}`;
+
+// A review, re-request, or reviewer change leaves a note, so review state is
+// refetched only when the newest note or the head changes. Only the footer reads
+// it, so a failure keeps the last answer rather than failing the poll.
+async function reviewersOf(
+  $: EngineInterface,
+  watch: Watch,
+  cwd: string,
+  view: MrView,
+  notes: Note[],
+): Promise<Reviewer[]> {
+  const key = `${view.projectId}/${view.iid} ${view.sha} ${Math.max(0, ...notes.map((n) => n.id))}`;
+  if (watch.reviewers?.key === key) return watch.reviewers.reviewers;
+  const path = new URL(view.url).pathname.split("/-/")[0]?.slice(1) ?? "";
+  const argv = ["api", "graphql", "-f", `query=${REVIEWERS_QUERY}`, "-f", `path=${path}`];
+  const started = await $.clock.now();
+  try {
+    const stdout = await glab($, cwd, [...argv, "-f", `iid=${view.iid}`]);
+    const reviewers = parsed(parseReviewers(stdout), "MR reviewers");
+    const ms = (await $.clock.now()) - started;
+    void $.modEvents.emit({
+      mod: MOD,
+      event: "review.read",
+      ok: true,
+      ms,
+      detail: { mr: view.iid, reviewers: reviewers.length },
+    });
+    watch.reviewers = { key, reviewers };
+    return reviewers;
+  } catch (error) {
+    const ms = (await $.clock.now()) - started;
+    const message = error instanceof Error ? error.message : String(error);
+    void $.modEvents.emit({
+      mod: MOD,
+      event: "review.read",
+      ok: false,
+      ms,
+      detail: { mr: view.iid, error: message },
+    });
+    return watch.reviewers?.reviewers ?? [];
+  }
+}
+
 async function meOf($: EngineInterface, watch: Watch, cwd: string): Promise<string> {
   if (watch.me !== undefined) return watch.me;
   watch.me = parsed(parseUser(await glab($, cwd, ["api", "user"])), "glab api user");
@@ -242,7 +297,8 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
     isHeadKnownOf($, watch, cwd, view.sha),
   ]);
   watch.feedback = feedback;
-  const read = snapshotOf({ view, ...feedback, me, isHeadKnown, noise: watch.noise });
+  const reviewers = await reviewersOf($, watch, cwd, view, feedback.notes);
+  const read = snapshotOf({ view, ...feedback, reviewers, me, isHeadKnown, noise: watch.noise });
   // A deleted note can lower the newest id seen, which would re-admit older notes.
   const snapshot =
     prev?.mr === read.mr
@@ -448,6 +504,10 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
         : undefined;
     due = combine(still.due, fresh);
   }
+  const turn = turnOf(next);
+  if (!isSameMr || JSON.stringify(turn) !== JSON.stringify(turnOf(prev))) {
+    emit($, "review.turn", { mr: next.mr, head: next.head, ...turn });
+  }
   watch.snapshot = next;
   watch.branch = read.branch;
   show($, watch, statusOf(next, watch.muted.count));
@@ -561,6 +621,7 @@ export function register(on: On, options: PluginOptions): void {
     snapshot: undefined,
     branch: undefined,
     feedback: undefined,
+    reviewers: undefined,
     me: undefined,
     noise,
     undelivered: undefined,

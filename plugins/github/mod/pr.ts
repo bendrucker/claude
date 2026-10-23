@@ -1,5 +1,5 @@
 export const VIEW_FIELDS =
-  "number,url,state,headRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,reviews,comments";
+  "number,url,state,headRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,reviewRequests,latestReviews,statusCheckRollup,reviews,comments";
 
 export interface CheckNode {
   __typename?: string;
@@ -36,6 +36,10 @@ export interface PrView {
   mergeable?: string | null;
   mergeStateStatus?: string | null;
   reviewDecision?: string | null;
+  /** Requested reviewers yet to review: a user's login, or a team's slug. */
+  reviewRequests?: string[] | null;
+  /** Each reviewer's latest review. */
+  latestReviews?: ReviewNode[] | null;
   statusCheckRollup?: CheckNode[] | null;
   reviews?: ReviewNode[] | null;
   comments?: CommentNode[] | null;
@@ -88,6 +92,11 @@ function commentOf(value: unknown): CommentNode | undefined {
   };
 }
 
+function requestOf(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  return textOf(value.login) ?? textOf(value.slug) ?? textOf(value.name) ?? undefined;
+}
+
 function listOf<T>(value: unknown, item: (v: unknown) => T | undefined): T[] {
   if (!Array.isArray(value)) return [];
   return value.map(item).filter((v): v is T => v !== undefined);
@@ -120,6 +129,8 @@ export function parseView(stdout: string): PrView | undefined {
     mergeable: textOf(value.mergeable),
     mergeStateStatus: textOf(value.mergeStateStatus),
     reviewDecision: textOf(value.reviewDecision),
+    reviewRequests: listOf(value.reviewRequests, requestOf),
+    latestReviews: listOf(value.latestReviews, reviewOf),
     statusCheckRollup: listOf(value.statusCheckRollup, checkOf),
     reviews: listOf(value.reviews, reviewOf),
     comments: listOf(value.comments, commentOf),
@@ -146,6 +157,10 @@ export interface Snapshot {
   pending: number;
   failed: string[];
   reviewDecision: string;
+  /** Requested reviewers other than the session's own login, sorted. */
+  requested: string[];
+  /** Reviewers whose latest review requests changes and who were not asked again, sorted. */
+  asked: string[];
   reviews: { id: string; author: string; state: string }[];
   comments: { id: string; author: string }[];
   /** Comments and checks kept from the model as noise, with why. */
@@ -368,10 +383,31 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     pending,
     failed,
     reviewDecision: view.reviewDecision ?? "",
+    requested: (view.reviewRequests ?? []).filter((login) => login !== local.me).toSorted(),
+    asked: (view.latestReviews ?? [])
+      .filter((r) => r.state === "CHANGES_REQUESTED")
+      .map((r) => r.author?.login ?? "someone")
+      .filter((login) => login !== local.me && !view.reviewRequests?.includes(login))
+      .toSorted(),
     reviews,
     comments,
     muted,
   };
+}
+
+/** Whose move the review waits on, and on whom. */
+export interface Turn {
+  turn: "author" | "reviewer" | "ready" | "none";
+  waiting: string[];
+}
+
+// A request for changes holds the turn until its reviewer is asked again, which a
+// push alone does not do. A pending request otherwise follows handled feedback.
+export function turnOf(snapshot: Snapshot): Turn {
+  if (snapshot.asked.length > 0) return { turn: "author", waiting: snapshot.asked };
+  if (snapshot.requested.length > 0) return { turn: "reviewer", waiting: snapshot.requested };
+  if (snapshot.reviewDecision === "CHANGES_REQUESTED") return { turn: "author", waiting: [] };
+  return { turn: snapshot.reviewDecision === "APPROVED" ? "ready" : "none", waiting: [] };
 }
 
 const isBlocked = (block: Block | undefined): block is "conflict" | "behind" =>
@@ -563,11 +599,12 @@ const OCT = {
   checkCircle: "\u{f49e}",
   dotFill: "\u{f444}",
   eye: "\u{f441}",
-  fileDiff: "\u{f4d2}",
   gitCompare: "\u{f47f}",
   gitMerge: "\u{f419}",
   gitPullRequestClosed: "\u{f4dc}",
+  hourglass: "\u{f4e3}",
   hubot: "\u{f477}",
+  reply: "\u{f4a8}",
   xCircle: "\u{f52f}",
 };
 
@@ -591,10 +628,13 @@ const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
   failing: (s) => `${OCT.xCircle} ${listed(s.failed)}`,
 };
 
-const REVIEWS: Partial<Record<string, string>> = {
-  APPROVED: `${OCT.check} approved`,
-  CHANGES_REQUESTED: `${OCT.fileDiff} changes requested`,
-  REVIEW_REQUIRED: `${OCT.eye} review needed`,
+const mention = (name: string) => `@${name}`;
+
+const TURNS: Record<Turn["turn"], (snapshot: Snapshot, waiting: string[]) => string | undefined> = {
+  author: () => `${OCT.reply} changes requested`,
+  reviewer: (_, waiting) => `${OCT.hourglass} ${listed(waiting.map(mention), 2)}`,
+  ready: () => `${OCT.check} approved`,
+  none: (s) => (s.reviewDecision === "REVIEW_REQUIRED" ? `${OCT.eye} review needed` : undefined),
 };
 
 // The footer already links the PR, so the state rides after it on that line.
@@ -602,10 +642,11 @@ const REVIEWS: Partial<Record<string, string>> = {
 export function statusOf(snapshot: Snapshot, muted = 0): string {
   const ended = ENDED[snapshot.state];
   if (ended !== undefined) return ended;
+  const turn = turnOf(snapshot);
   return [
     BLOCKS[snapshot.block ?? "none"],
     CHECKS[snapshot.phase](snapshot),
-    REVIEWS[snapshot.reviewDecision],
+    TURNS[turn.turn](snapshot, turn.waiting),
     muted > 0 ? `${OCT.hubot} ${muted} muted` : undefined,
   ]
     .filter((part) => part !== undefined)

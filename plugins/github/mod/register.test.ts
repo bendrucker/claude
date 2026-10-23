@@ -293,6 +293,31 @@ describe("register", () => {
     },
   );
 
+  test("whose turn the review is shows in the footer and logs on each change", async ($, on) => {
+    const asked = { id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } };
+    const world: World = {
+      branch: "topic",
+      gh: GH_OK,
+      view: { ...pr("SUCCESS"), latestReviews: [asked] },
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4a8} changes requested");
+
+    const pushed = { ...pr("SUCCESS"), headRefOid: "bbbbbbb2222", latestReviews: [asked] };
+    world.view = pushed;
+    await w.clock.advance(POLL_MS.settled);
+    world.view = { ...pushed, reviewRequests: [{ login: "alice" }] };
+    await w.clock.advance(POLL_MS.settled);
+    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4e3} @alice");
+    expect(w.named("review.turn").map((e) => e.detail)).toEqual([
+      { pr: 7, head: "aaaaaaa1111", turn: "author", waiting: ["alice"] },
+      { pr: 7, head: "bbbbbbb2222", turn: "reviewer", waiting: ["alice"] },
+    ]);
+  });
+
   test("chatter already on a PR first seen is logged but not counted", async ($, on) => {
     const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\nActions performed";
     const view = {

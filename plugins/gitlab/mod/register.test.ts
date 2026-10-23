@@ -53,6 +53,8 @@ interface World {
   jobs?: unknown[];
   approvals?: unknown;
   notes?: unknown;
+  /** GraphQL reviewer nodes, or a string for a failed read. */
+  reviewers?: unknown;
   // Runs after each read of the MR by branch, to move the MR mid-poll.
   afterView?: () => void;
   slowMs?: number;
@@ -88,6 +90,7 @@ function worldOf(on: On, world: World) {
     return next(e);
   });
   const apis: string[] = [];
+  const graphql: string[] = [];
   const clock = mock.clock(on);
   on("turn.complete", () => ({ text: "" }));
   on("engine.create", async ($, e, next) => ({
@@ -142,6 +145,12 @@ function worldOf(on: On, world: World) {
       return view;
     }
     if (argv === "glab api user") return reply({ username: "ben" });
+    if (argv.startsWith("glab api graphql")) {
+      graphql.push(argv);
+      const nodes = world.reviewers ?? [];
+      if (typeof nodes === "string") return reply(nodes);
+      return reply({ data: { project: { mergeRequest: { reviewers: { nodes } } } } });
+    }
     apis.push(argv);
     if (argv.endsWith("/approvals")) return reply(world.approvals ?? approvals());
     if (argv.includes("/notes?")) return reply(world.notes ?? []);
@@ -161,7 +170,7 @@ function worldOf(on: On, world: World) {
     });
     return tails.at(-1);
   };
-  return { events, named, shown, submits, views, apis, clock };
+  return { events, named, shown, submits, views, apis, graphql, clock };
 }
 
 const HINT = { isDraft: false, isWorking: false, hint: "? for shortcuts" };
@@ -335,6 +344,45 @@ describe("register", () => {
       expect(await w.shown($)).toContain("\u{f477} 2 muted");
     },
   );
+
+  test("whose turn the review is is read when a note lands, and a failed read keeps it", async ($, on) => {
+    const state = (reviewState: string) => [
+      { username: "alice", mergeRequestInteraction: { reviewState } },
+    ];
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+      approvals: approvals(),
+      notes: [note(4, "alice", true)],
+      reviewers: state("REQUESTED_CHANGES"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4a8} changes requested");
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.graphql.length).toBe(1);
+
+    world.notes = [note(5, "ben", true), note(4, "alice", true)];
+    world.reviewers = state("UNREVIEWED");
+    await w.clock.advance(POLL_MS.settled);
+    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4e3} @alice");
+
+    world.notes = [note(6, "ben", true), note(5, "ben", true), note(4, "alice", true)];
+    world.reviewers = "HTTP 500";
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.graphql.length).toBe(3);
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("review.read").map((e) => e.ok)).toEqual([true, true, false]);
+    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4e3} @alice");
+    expect(w.named("review.turn").map((e) => e.detail)).toEqual([
+      { mr: 7, head: "aaaaaaa1111", turn: "author", waiting: ["alice"] },
+      { mr: 7, head: "aaaaaaa1111", turn: "reviewer", waiting: ["alice"] },
+    ]);
+  });
 
   test(
     "an invalid body pattern is reported at start",

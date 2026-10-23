@@ -13,6 +13,7 @@ import {
   parseView,
   snapshotOf,
   statusOf,
+  turnOf,
 } from "./pr.ts";
 
 const MOD = "github";
@@ -413,6 +414,10 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
         ? { head: next.head, decisions: still.held, attempts: attempt - 1 }
         : undefined;
     due = combine(still.due, fresh);
+  }
+  const turn = turnOf(next);
+  if (!isSamePr || JSON.stringify(turn) !== JSON.stringify(turnOf(prev))) {
+    emit($, "review.turn", { pr: next.pr, head: next.head, ...turn });
   }
   watch.snapshot = next;
   show($, watch, statusOf(next, watch.muted.count));

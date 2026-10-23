@@ -1,0 +1,8 @@
+{
+  "name": "evals",
+  "description": "Design eval suites, hill-climb against them, and review climbs for overfitting",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

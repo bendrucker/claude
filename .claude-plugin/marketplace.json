@@ -230,6 +230,11 @@
       "name": "friction",
       "description": "Count recurring friction across the development setup and surface only small fixes for symptoms that persist",
       "source": "./plugins/friction"
+    },
+    {
+      "name": "evals",
+      "description": "Design eval suites, hill-climb against them, and review climbs for overfitting",
+      "source": "./plugins/evals"
     }
   ]
 }

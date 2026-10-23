@@ -3,7 +3,7 @@ name: performance:hill-climb
 description: >-
   Use when asked to make software faster or leaner (runtime, startup,
   throughput, memory, bundle size) through repeated measured changes. For
-  prompts or skills scored by an eval suite, use prompting:hill-climb.
+  prompts or skills scored by an eval suite, use evals:hill-climb.
 argument-hint: "<target> [<notes file>]"
 ---
 

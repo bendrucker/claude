@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { describe, expect, mock, test, type Engine } from "claude-code/testing";
-import { MAX_ATTEMPTS, POLL_MS } from "./register.ts";
+import { IDLE_CAP_MS, MAX_ATTEMPTS, POLL_MS, QUIET_MS, TICK_MS } from "./register.ts";
 
 interface Recorded {
   event: string;
@@ -9,6 +9,14 @@ interface Recorded {
 }
 
 const START = { surface: "terminal", isInteractive: true, cwd: "/work" } as const;
+
+const COMPLETE = {
+  answer: "",
+  durationMs: 1,
+  isAborted: false,
+  turnId: "t1",
+  reason: "answer",
+} as const;
 
 const check = (conclusion: string) => ({
   __typename: "CheckRun",
@@ -42,6 +50,10 @@ interface World {
   foreign?: string[];
   /** A token that cannot read `/user`. */
   noLogin?: boolean;
+  /** A sleep of the host that the ticker's next period waits out first. */
+  sleptMs?: number;
+  /** Refuses the ticker's periods, which ends it. */
+  isTickRefused?: boolean;
 }
 
 function worldOf(on: On, world: World) {
@@ -49,7 +61,16 @@ function worldOf(on: On, world: World) {
   const tails: (string | undefined)[] = [];
   const submits: string[] = [];
   const views: string[] = [];
+  on("clock.every", { ms: TICK_MS }, async ($, e, next) => {
+    if (world.isTickRefused === true) throw new Error("refused");
+    const slept = world.sleptMs ?? 0;
+    delete world.sleptMs;
+    // Timers stand still while the host sleeps, so the period ends late by the clock.
+    if (slept > 0) await clock.sleep(slept);
+    return next(e);
+  });
   const clock = mock.clock(on);
+  on("turn.complete", () => ({ text: "" }));
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
@@ -230,7 +251,7 @@ describe("register", () => {
     expect(await w.shown($)).toBe("\u{f47f} conflicts · \u{f49e} CI");
 
     world.view = merging("MERGEABLE");
-    await w.clock.advance(POLL_MS.settled);
+    await w.clock.advance(QUIET_MS[1] ?? 0);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["unblocked"]);
   });
 
@@ -477,6 +498,10 @@ describe("register", () => {
     expect(w.views.length).toBe(1);
     expect(await w.shown($)).toBe(undefined);
     expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("pr.none").map((e) => [e.detail?.reason, e.detail?.branch])).toEqual([
+      ["default branch", "main"],
+      ["no pr", "topic"],
+    ]);
   });
 
   test("origin/HEAD names the default branch, so a PR from master is still watched", async ($, on) => {
@@ -686,5 +711,101 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
 
     expect(await w.shown($)).toBe("\u{f52f} ci / test · \u{f421} stale");
+  });
+
+  test("an unchanged PR backs off until a turn or a change resets it", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled + QUIET_MS.reduce((sum, ms) => sum + ms));
+    expect(w.views.length).toBe(8);
+    expect(w.named("poll.backoff").map((e) => e.detail?.delayMs)).toEqual(QUIET_MS.slice(1));
+
+    await w.clock.advance(30 * 60_000);
+    expect(w.views.length).toBe(8);
+
+    await $.turn.complete(COMPLETE);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(9);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn"]);
+
+    await w.clock.advance(POLL_MS.settled * 2);
+    world.view = pr("FAILURE");
+    await w.clock.advance(QUIET_MS[1] ?? 0);
+    expect(w.submits.length).toBe(1);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn", "change"]);
+  });
+
+  test("a merged PR backs off to hourly and beyond", async ($, on) => {
+    const view = { ...pr("SUCCESS"), state: "MERGED" };
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(4 * 3_600_000);
+    expect(w.views.length).toBe(7);
+    expect(w.named("poll.backoff").at(-1)?.detail?.delayMs).toBe(QUIET_MS.at(-1));
+  });
+
+  test("a turn soon after a poll leaves the backoff in place", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("SUCCESS") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled + (QUIET_MS[0] ?? 0));
+    await $.turn.complete(COMPLETE);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(3);
+    expect(w.named("poll.reset")).toEqual([]);
+  });
+
+  test("with no PR the backoff stops at the idle cap", async ($, on) => {
+    const w = worldOf(on, {
+      branch: "topic",
+      gh: GH_OK,
+      view: 'no pull requests found for branch "topic"',
+    });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(3 * 3_600_000);
+    const delays = w.named("poll.backoff").map((e) => e.detail?.delayMs);
+    expect(delays).toEqual([QUIET_MS[0], QUIET_MS[1], IDLE_CAP_MS]);
+  });
+
+  test("a poll due during a sleep runs on the first tick after the wake", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr(""), sleptMs: 30 * 60_000 });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(30 * 60_000 + TICK_MS);
+
+    expect(w.views.length).toBe(2);
+    expect(w.named("poll.late")[0]?.detail).toEqual({
+      gapMs: TICK_MS + 30 * 60_000,
+      delayMs: POLL_MS.pending,
+      lateMs: 30 * 60_000,
+    });
+  });
+
+  test("a turn revives a ticker the engine stopped", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr(""), isTickRefused: true };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(TICK_MS * 10);
+    expect(w.views.length).toBe(1);
+
+    world.isTickRefused = false;
+    await $.turn.complete(COMPLETE);
+    await w.clock.settle();
+    expect(w.views.length).toBe(2);
+    expect(w.named("watch.revived")[0]?.detail).toEqual({ silentMs: TICK_MS * 10, pr: 7 });
+    expect(w.named("poll.late")).toEqual([]);
+    await w.clock.advance(POLL_MS.pending);
+    expect(w.views.length).toBe(3);
   });
 });

@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { describe, expect, mock, test, type Engine } from "claude-code/testing";
-import { MAX_ATTEMPTS, POLL_MS } from "./register.ts";
+import { IDLE_CAP_MS, MAX_ATTEMPTS, POLL_MS, QUIET_MS, TICK_MS } from "./register.ts";
 
 interface Recorded {
   event: string;
@@ -9,6 +9,14 @@ interface Recorded {
 }
 
 const START = { surface: "terminal", isInteractive: true, cwd: "/work" } as const;
+
+const COMPLETE = {
+  answer: "",
+  durationMs: 1,
+  isAborted: false,
+  turnId: "t1",
+  reason: "answer",
+} as const;
 
 const mr = (pipeline: string | null = "running", state = "opened") => ({
   iid: 7,
@@ -52,6 +60,10 @@ interface World {
   /** Heads this checkout lacks, as a push from elsewhere leaves them. */
   foreign?: string[];
   drop?: string;
+  /** A sleep of the host that the ticker's next period waits out first. */
+  sleptMs?: number;
+  /** Refuses the ticker's periods, which ends it. */
+  isTickRefused?: boolean;
 }
 
 const result = (stdout: string, stderr = "", exitCode = stderr === "" ? 0 : 1) => ({
@@ -66,7 +78,16 @@ function worldOf(on: On, world: World) {
   const tails: (string | undefined)[] = [];
   const submits: string[] = [];
   const views: string[] = [];
+  on("clock.every", { ms: TICK_MS }, async ($, e, next) => {
+    if (world.isTickRefused === true) throw new Error("refused");
+    const slept = world.sleptMs ?? 0;
+    delete world.sleptMs;
+    // Timers stand still while the host sleeps, so the period ends late by the clock.
+    if (slept > 0) await clock.sleep(slept);
+    return next(e);
+  });
   const clock = mock.clock(on);
+  on("turn.complete", () => ({ text: "" }));
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
@@ -413,6 +434,10 @@ describe("register", () => {
     expect(w.views.length).toBe(1);
     expect(await w.shown($)).toBe(undefined);
     expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("mr.none").map((e) => [e.detail?.reason, e.detail?.branch])).toEqual([
+      ["default branch", "main"],
+      ["no mr", "topic"],
+    ]);
   });
 
   test("origin/HEAD names the default branch, so an MR from master is still watched", async ($, on) => {
@@ -605,5 +630,97 @@ describe("register", () => {
     await w.clock.settle();
 
     expect(await w.shown($)).toBe(undefined);
+  });
+
+  test("an unchanged MR backs off until a turn or a change resets it", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled + QUIET_MS.reduce((sum, ms) => sum + ms));
+    expect(w.views.length).toBe(8);
+    expect(w.named("poll.backoff").map((e) => e.detail?.delayMs)).toEqual(QUIET_MS.slice(1));
+
+    await w.clock.advance(30 * 60_000);
+    await $.turn.complete(COMPLETE);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(9);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn"]);
+
+    await w.clock.advance(POLL_MS.settled * 2);
+    world.view = mr("failed");
+    world.jobs = job("failed");
+    await w.clock.advance(QUIET_MS[1] ?? 0);
+    expect(w.submits.length).toBe(1);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn", "change"]);
+  });
+
+  test("a turn soon after a poll leaves the backoff in place", async ($, on) => {
+    const w = worldOf(on, {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+    });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled + (QUIET_MS[0] ?? 0));
+    await $.turn.complete(COMPLETE);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(3);
+    expect(w.named("poll.reset")).toEqual([]);
+  });
+
+  test("with no MR the backoff stops at the idle cap", async ($, on) => {
+    const w = worldOf(on, {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: 'no open merge request available for "topic"',
+    });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(3 * 3_600_000);
+    const delays = w.named("poll.backoff").map((e) => e.detail?.delayMs);
+    expect(delays).toEqual([QUIET_MS[0], QUIET_MS[1], IDLE_CAP_MS]);
+  });
+
+  test("a poll due during a sleep runs on the first tick after the wake", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr(), sleptMs: 30 * 60_000 });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(30 * 60_000 + TICK_MS);
+
+    expect(w.views.length).toBe(2);
+    expect(w.named("poll.late")[0]?.detail).toEqual({
+      gapMs: TICK_MS + 30 * 60_000,
+      delayMs: POLL_MS.pending,
+      lateMs: 30 * 60_000,
+    });
+  });
+
+  test("a turn revives a ticker the engine stopped", async ($, on) => {
+    const world: World = { branch: "topic", glab: GLAB_OK, view: mr(), isTickRefused: true };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(TICK_MS * 10);
+    expect(w.views.length).toBe(1);
+
+    world.isTickRefused = false;
+    await $.turn.complete(COMPLETE);
+    await w.clock.settle();
+    expect(w.views.length).toBe(2);
+    expect(w.named("watch.revived")[0]?.detail).toEqual({ silentMs: TICK_MS * 10, mr: 7 });
+    expect(w.named("poll.late")).toEqual([]);
   });
 });

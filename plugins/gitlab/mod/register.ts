@@ -1,4 +1,4 @@
-import type { EngineInterface, On, PluginOptions } from "claude-code";
+import type { EngineInterface, On, PluginOptions, Timer } from "claude-code";
 import {
   STALE,
   type Job,
@@ -28,6 +28,19 @@ export const POLL_MS = {
   error: 300_000,
 } as const;
 
+// One ticker polls whenever the wall-clock due time has passed, so a sleep or a
+// lost dispatch delays the watch by at most a tick instead of ending it.
+export const TICK_MS = 60_000;
+// The wait after each further unchanged poll, until a change or a turn.
+export const QUIET_MS = [3, 6, 12, 30, 60, 120].map((minutes) => minutes * 60_000);
+export const BACKOFF_CAP_MS = QUIET_MS.at(-1) ?? 0;
+// An MR opened elsewhere shows up within this long, even on an idle session.
+export const IDLE_CAP_MS = 10 * 60_000;
+// A gap this long between ticks means the host slept or the ticker died.
+const LATE_MS = 3 * TICK_MS;
+// A poll in flight this long lost a dispatch, so the next tick polls anyway.
+const STUCK_MS = 5 * 60_000;
+
 // A dropped injection is retried on later polls, up to this many attempts.
 export const MAX_ATTEMPTS = 3;
 // Fallback default branches when origin/HEAD is unset.
@@ -47,13 +60,25 @@ interface Watch {
   me: string | undefined;
   undelivered: Undelivered | undefined;
   error: string | undefined;
-  timer: { cancel(): void } | undefined;
+  ticker: Timer | undefined;
+  tickedAt: number | undefined;
+  polledAt: number;
+  due: number;
+  pollingSince: number | undefined;
+  /** Counts polls started, so one that a stuck poll's successor overtook is discarded. */
+  polls: number;
+  /** Unchanged polls in a row. */
+  streak: number;
+  /** Why the last poll found no MR, and on which branch. */
+  none: string | undefined;
   line: string | undefined;
   generation: number;
   isStopped: boolean;
 }
 
-type Read = { kind: "none" } | { kind: "mr"; snapshot: Snapshot; branch: string };
+type Read =
+  | { kind: "none"; reason: string; branch: string }
+  | { kind: "mr"; snapshot: Snapshot; branch: string };
 
 function show($: EngineInterface, watch: Watch, text: string | undefined) {
   const line = text === "" ? undefined : text;
@@ -148,11 +173,13 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
   const cwd = await $.session.cwd();
   const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
   const branch = head.stdout.trim();
-  if (head.exitCode !== 0 || branch === "HEAD" || (await isDefaultBranch($, cwd, branch))) {
-    return { kind: "none" };
+  if (head.exitCode !== 0) return { kind: "none", reason: "no git", branch };
+  if (branch === "HEAD") return { kind: "none", reason: "detached", branch };
+  if (await isDefaultBranch($, cwd, branch)) {
+    return { kind: "none", reason: "default branch", branch };
   }
   const stdout = await viewMr($, watch, cwd, branch);
-  if (stdout === undefined) return { kind: "none" };
+  if (stdout === undefined) return { kind: "none", reason: "no mr", branch };
   const view = parsed(parseView(stdout), "glab mr view");
   const prev = watch.snapshot;
   // A merged or closed MR changes nothing else the watch shows.
@@ -274,25 +301,54 @@ async function send(
   };
 }
 
-function delayOf(snapshot: Snapshot): number {
-  if (!isOpen(snapshot)) return POLL_MS.closed;
-  return snapshot.phase === "pending" ? POLL_MS.pending : POLL_MS.settled;
+function delayOf(snapshot: Snapshot | undefined, streak: number): number {
+  const quiet = QUIET_MS[Math.min(streak, QUIET_MS.length) - 1] ?? 0;
+  if (snapshot === undefined) return Math.max(POLL_MS.idle, Math.min(quiet, IDLE_CAP_MS));
+  if (!isOpen(snapshot)) return Math.max(POLL_MS.closed, quiet);
+  return snapshot.phase === "pending" ? POLL_MS.pending : Math.max(POLL_MS.settled, quiet);
+}
+
+// The streak is kept per MR in session state, so a hot reload resumes the backoff.
+async function streakOf($: EngineInterface, snapshot: Snapshot): Promise<number> {
+  const { value } = await $.state.get({ plugin: "gitlab", key: "quiet", id: snapshot.url });
+  return value ?? 0;
+}
+
+function schedule($: EngineInterface, watch: Watch, streak: number, cause: string): void {
+  const was = delayOf(watch.snapshot, watch.streak);
+  const delay = delayOf(watch.snapshot, streak);
+  if (delay !== was) {
+    const detail = { mr: watch.snapshot?.mr, streak, delayMs: delay };
+    if (streak > 0) emit($, "poll.backoff", detail);
+    else emit($, "poll.reset", { ...detail, cause, fromMs: was });
+  }
+  const url = watch.snapshot?.url;
+  if (url !== undefined && streak !== watch.streak) {
+    void $.state.set({ plugin: "gitlab", key: "quiet", id: url }, streak);
+  }
+  watch.streak = streak;
+  watch.due = watch.polledAt + delay;
 }
 
 interface Applied {
-  delay: number;
-  /** The send, which waits for an idle session, so the next poll is not held on it. */
-  delivery: Promise<void> | undefined;
+  isTracked: boolean;
+  isChanged: boolean;
 }
 
 function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => boolean): Applied {
   if (read.kind === "none") {
+    const prev = watch.snapshot;
+    const none = `${read.reason} ${read.branch}`;
+    const isChanged = prev !== undefined || none !== watch.none;
+    if (isChanged) emit($, "mr.none", { reason: read.reason, branch: read.branch, from: prev?.mr });
     show($, watch, undefined);
+    watch.none = none;
     watch.snapshot = undefined;
     watch.branch = undefined;
     watch.undelivered = undefined;
-    return { delay: POLL_MS.idle, delivery: undefined };
+    return { isTracked: false, isChanged };
   }
+  watch.none = undefined;
   const prev = watch.snapshot;
   const isSameMr =
     prev !== undefined &&
@@ -304,6 +360,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
     isSameMr && decided === undefined ? { ...read.snapshot, block: prev.block } : read.snapshot;
   let due: Promoted[];
   let attempt = 1;
+  let isChanged = true;
   if (!isSameMr) {
     emit($, "mr.tracked", { mr: next.mr, head: next.head, phase: next.phase, state: next.state });
     watch.undelivered = undefined;
@@ -316,6 +373,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
     for (const { action, ...detail } of decisions) {
       emit($, action, { mr: next.mr, head: next.head, ...detail });
     }
+    isChanged = decisions.length > 0 || statusOf(next) !== statusOf(prev);
     const fresh = decisions.filter((d): d is Promoted => d.action === "promote");
     const still = stillDue(watch.undelivered, next, decided);
     attempt = fresh.length > 0 ? 1 : (watch.undelivered?.attempts ?? 0) + 1;
@@ -328,34 +386,81 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   watch.snapshot = next;
   watch.branch = read.branch;
   show($, watch, statusOf(next));
-  const delivery = due.length > 0 ? send($, watch, next, due, attempt, isCurrent) : undefined;
-  return { delay: delayOf(next), delivery };
+  // The send waits for an idle session, so the next poll is not held on it.
+  if (due.length > 0) void send($, watch, next, due, attempt, isCurrent);
+  return { isTracked: !isSameMr, isChanged };
 }
 
-async function poll($: EngineInterface, watch: Watch, generation: number): Promise<void> {
+async function poll($: EngineInterface, watch: Watch, generation: number, now: number) {
   const isCurrent = () => !watch.isStopped && watch.generation === generation;
-  if (!isCurrent()) return;
-  let delay: number;
-  let delivery: Promise<void> | undefined;
+  const seq = ++watch.polls;
   try {
     const read = await readMr($, watch);
     // A session.end that landed while glab ran has already cleared the status.
-    if (!isCurrent()) return;
-    ({ delay, delivery } = apply($, watch, read, isCurrent));
+    if (!isCurrent() || seq !== watch.polls) return;
+    const { isTracked, isChanged } = apply($, watch, read, isCurrent);
+    let streak = isChanged ? 0 : watch.streak + 1;
+    if (isTracked && watch.snapshot !== undefined) {
+      streak = await streakOf($, watch.snapshot);
+      watch.streak = streak;
+    }
+    watch.polledAt = now;
+    schedule($, watch, streak, "change");
     watch.error = undefined;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (message !== watch.error) emit($, "poll.error", { error: message }, false);
     watch.error = message;
-    delay = POLL_MS.error;
+    watch.polledAt = now;
+    watch.due = now + POLL_MS.error;
     if (watch.snapshot !== undefined && isCurrent()) {
       const line = statusOf(watch.snapshot);
       show($, watch, line === "" ? STALE : `${line} · ${STALE}`);
     }
   }
-  if (!isCurrent()) return;
-  watch.timer = $.clock.after(delay, () => void poll($, watch, generation));
-  await delivery;
+}
+
+async function tick($: EngineInterface, watch: Watch, generation: number): Promise<void> {
+  const now = await $.clock.now();
+  if (watch.isStopped || watch.generation !== generation) return;
+  const gapMs = now - (watch.tickedAt ?? now);
+  watch.tickedAt = now;
+  if (gapMs > LATE_MS) {
+    const delayMs = watch.due - watch.polledAt;
+    emit($, "poll.late", { gapMs, delayMs, lateMs: Math.max(0, now - watch.due) });
+  }
+  if (watch.pollingSince !== undefined) {
+    if (now - watch.pollingSince < STUCK_MS) return;
+    emit($, "poll.stuck", { ms: now - watch.pollingSince }, false);
+  }
+  if (now < watch.due - TICK_MS / 2) return;
+  watch.pollingSince = now;
+  await poll($, watch, generation, now);
+  if (watch.pollingSince === now) watch.pollingSince = undefined;
+}
+
+function start($: EngineInterface, watch: Watch): void {
+  const generation = watch.generation;
+  watch.ticker?.cancel();
+  // A restarted ticker's first tick is not late, however long the old one was silent.
+  watch.tickedAt = undefined;
+  watch.ticker = $.clock.every(TICK_MS, () => void tick($, watch, generation));
+  void tick($, watch, generation);
+}
+
+// A turn proves the session is awake, so a ticker silent past a few periods has
+// died and is started again. A turn also ends a backoff, once the unbacked wait
+// has passed since the last poll.
+async function wake($: EngineInterface, watch: Watch): Promise<void> {
+  const now = await $.clock.now();
+  if (watch.isStopped) return;
+  const silentMs = now - (watch.tickedAt ?? now);
+  const isOverdue = now - watch.polledAt >= delayOf(watch.snapshot, 0);
+  if (watch.error === undefined && watch.streak > 0 && isOverdue) schedule($, watch, 0, "turn");
+  if (silentMs > LATE_MS) {
+    emit($, "watch.revived", { silentMs, mr: watch.snapshot?.mr });
+    start($, watch);
+  }
 }
 
 async function hasGlab($: EngineInterface): Promise<boolean> {
@@ -380,7 +485,14 @@ export function register(on: On, options: PluginOptions): void {
     me: undefined,
     undelivered: undefined,
     error: undefined,
-    timer: undefined,
+    ticker: undefined,
+    tickedAt: undefined,
+    polledAt: 0,
+    due: 0,
+    pollingSince: undefined,
+    polls: 0,
+    streak: 0,
+    none: undefined,
     line: undefined,
     generation: 0,
     isStopped: true,
@@ -408,7 +520,10 @@ export function register(on: On, options: PluginOptions): void {
       watch.isStopped = false;
       watch.me = undefined;
       watch.generation += 1;
-      void poll($, watch, watch.generation);
+      Object.assign(watch, { tickedAt: undefined, due: 0, pollingSince: undefined, streak: 0 });
+      start($, watch);
+    } else {
+      void wake($, watch);
     }
     return started;
   });
@@ -423,9 +538,14 @@ export function register(on: On, options: PluginOptions): void {
     if (!CONTINUING.has(e.reason)) {
       watch.isStopped = true;
       watch.generation += 1;
-      watch.timer?.cancel();
+      watch.ticker?.cancel();
       show($, watch, undefined);
     }
     return next(e);
   });
+
+  on("turn.complete", ($, e, next) => {
+    if (e.agentId === undefined) void wake($, watch);
+    return next(e);
+  }).catch(($, e, next) => next(e));
 }

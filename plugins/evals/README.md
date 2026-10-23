@@ -5,7 +5,7 @@ Design eval suites, hill-climb a skill, agent, rule, or prompt against one, and 
 ## Contents
 
 - **Skills**:
-  - `evals:hill-climb`: climbs a skill, agent, rule, or `CLAUDE.md` against its eval suite, with `references/suite.md` for readying the suite
+  - `evals:hill-climb`: climbs a skill, agent, rule, or `CLAUDE.md` against its eval suite
 
 ## Evals
 

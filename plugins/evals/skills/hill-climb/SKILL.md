@@ -1,5 +1,5 @@
 ---
-name: prompting:hill-climb
+name: evals:hill-climb
 description: >-
   Hill-climb a skill, agent, rule, or CLAUDE.md against its eval suite. Use
   when changing one to raise an eval score, when judging whether a score change

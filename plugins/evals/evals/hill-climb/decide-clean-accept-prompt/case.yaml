@@ -1,0 +1,18 @@
+schema_version: "1.1"
+name: decide-clean-accept-prompt
+tags: [decide, holdout, native]
+plugins: ["../../.."]
+execution:
+  model: claude-sonnet-5-5
+  max_turns: 4
+  timeout_seconds: 300
+  allowed_tools: [Skill]
+  append_system_prompt: >-
+    Nothing can be built or run in this session, and nobody answers while you
+    work, so reply once. End the reply with one line naming your decision on the
+    candidate: `Decision: accept`, `Decision: reject`, `Decision: more-runs`,
+    `Decision: stall`, `Decision: stop`, `Decision: re-baseline`. The names
+    mean: accept the candidate and open its PR, reject it and close with the
+    evidence, more-runs to add runs before reading the rows, stall to stop
+    editing and run the Stall review, stop to end the climb, re-baseline to
+    re-run the baseline before comparing again.

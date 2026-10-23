@@ -196,6 +196,7 @@
     "plugin@bendrucker": true,
     "agents@bendrucker": true,
     "prompting@bendrucker": true,
+    "evals@bendrucker": true,
     "pull-request@bendrucker": true,
     "x-callback-url@bendrucker": true,
     "research@bendrucker": true,

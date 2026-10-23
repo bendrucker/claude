@@ -321,7 +321,7 @@ export interface Local {
   noise?: Noise;
   /** Wall-clock spans of this session's turns, the last one open while a turn runs. */
   turns?: Span[];
-  extras?: Extras;
+  extras?: Extras | undefined;
 }
 
 export type Span = [start: number, end: number | undefined];
@@ -417,6 +417,21 @@ function blockOf(view: PrView): Block | undefined {
   return "none";
 }
 
+const VERDICTS = new Set(["APPROVED", "CHANGES_REQUESTED", "DISMISSED"]);
+
+// A comment after a request for changes leaves it standing, and `latestReviews`
+// keeps only the comment, so each reviewer's last verdict decides.
+function askedOf(view: PrView): string[] {
+  const verdicts = new Map<string, string>();
+  for (const r of [...(view.latestReviews ?? []), ...(view.reviews ?? [])]) {
+    if (VERDICTS.has(r.state)) verdicts.set(r.author?.login ?? "someone", r.state);
+  }
+  return [...verdicts]
+    .filter(([, state]) => state === "CHANGES_REQUESTED")
+    .map(([login]) => login)
+    .toSorted();
+}
+
 export function snapshotOf(view: PrView, local: Local): Snapshot {
   const { extras, turns = [] } = local;
   const noise = local.noise ?? NO_NOISE;
@@ -476,11 +491,9 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     checks: listed.toSorted((a, b) => a.label.localeCompare(b.label)),
     reviewDecision: view.reviewDecision ?? "",
     requested: (view.reviewRequests ?? []).filter((login) => login !== local.me).toSorted(),
-    asked: (view.latestReviews ?? [])
-      .filter((r) => r.state === "CHANGES_REQUESTED")
-      .map((r) => r.author?.login ?? "someone")
-      .filter((login) => login !== local.me && !view.reviewRequests?.includes(login))
-      .toSorted(),
+    asked: askedOf(view).filter(
+      (login) => login !== local.me && !view.reviewRequests?.includes(login),
+    ),
     reviews,
     comments,
     muted,

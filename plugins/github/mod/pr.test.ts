@@ -665,6 +665,19 @@ describe("statusOf", () => {
       "you     │ \u{f4a8}",
     ],
     [
+      "a comment after a request for changes leaves it standing",
+      {
+        reviewRequests: ["bob"],
+        latestReviews: [{ id: "r2", state: "COMMENTED", author: { login: "alice" } }],
+        reviews: [
+          { id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } },
+          { id: "r2", state: "COMMENTED", author: { login: "alice" } },
+        ],
+      },
+      undefined,
+      "you     │ \u{f4a8}",
+    ],
+    [
       "a re-request hands the turn back",
       {
         reviewRequests: ["alice"],

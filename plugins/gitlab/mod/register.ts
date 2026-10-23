@@ -53,8 +53,8 @@ export const IDLE_CAP_MS = 10 * 60_000;
 const LATE_MS = 3 * TICK_MS;
 // A poll in flight this long lost a dispatch, so the next tick polls anyway.
 const STUCK_MS = 5 * 60_000;
-// A post lands within seconds of its turn, so older spans only grow the scan.
-const TURNS_KEPT_MS = 60 * 60_000;
+// A resolved thread may leave updated_at alone, so a full read runs this often.
+const FULL_EVERY_MS = 30 * 60_000;
 
 // A dropped injection is retried on later polls, up to this many attempts.
 export const MAX_ATTEMPTS = 3;
@@ -88,6 +88,8 @@ interface Watch {
   snapshot: Snapshot | undefined;
   branch: string | undefined;
   feedback: Feedback | undefined;
+  /** When approvals, notes, and jobs were last read in full. */
+  fullAt: number;
   /** The last review state read, refetched only when `key` changes. */
   graphs: { reviewers: Held<Reviewer[]>; merging: Held<Merging> };
   me: string | undefined;
@@ -124,7 +126,14 @@ type Via = "hit" | "miss" | "full";
 
 type Read =
   | { kind: "none"; reason: string; branch: string }
-  | { kind: "mr"; snapshot: Snapshot; branch: string; read: Via };
+  | {
+      kind: "mr";
+      snapshot: Snapshot;
+      branch: string;
+      read: Via;
+      /** What the read caches, kept only if no newer poll overtook it. */
+      feedback?: Feedback;
+    };
 
 function show($: EngineInterface, watch: Watch, text: string | undefined) {
   const line = text === "" ? undefined : text;
@@ -293,7 +302,8 @@ async function graphOf<T>(
     const message = error instanceof Error ? error.message : String(error);
     const detail = { mr: view.iid, error: message };
     void $.modEvents.emit({ mod: MOD, event: graph.event, ok: false, ms, detail });
-    return held.value ?? graph.fallback;
+    const isSameMr = held.key?.startsWith(`${view.projectId}/${view.iid} `) === true;
+    return isSameMr && held.value !== undefined ? held.value : graph.fallback;
   }
 }
 
@@ -324,7 +334,12 @@ async function isHeadKnownOf(
   return isKnown($, cwd, sha);
 }
 
-async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promise<Read> {
+async function readMr(
+  $: EngineInterface,
+  watch: Watch,
+  now: number,
+  isRetry = false,
+): Promise<Read> {
   const cwd = await $.session.cwd();
   const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
   const branch = head.stdout.trim();
@@ -344,17 +359,21 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
   }
   // A note, an approval, or a push moves updated_at, so while it and the pipeline
   // hold, the last approvals, notes, and jobs do too. A job can fail before its
-  // pipeline does, so a pending one is read in full.
+  // pipeline does, so one with jobs still running is read in full.
   const gate = `${view.projectId}/${view.iid}@${view.updatedAt} ${view.pipeline?.id}:${view.pipeline?.status}`;
   const held = watch.feedback;
-  const isGated = held !== undefined && view.updatedAt !== "" && prev?.phase !== "pending";
+  const isGated =
+    held !== undefined &&
+    view.updatedAt !== "" &&
+    prev?.phase !== "pending" &&
+    prev?.pending === 0 &&
+    now - watch.fullAt < FULL_EVERY_MS;
   const isCheap = isGated && held.gate === gate;
   const [feedback, me, isHeadKnown] = await Promise.all([
     isCheap ? held : feedbackOf($, cwd, view, gate),
     meOf($, watch, cwd),
     isHeadKnownOf($, watch, cwd, view.sha),
   ]);
-  watch.feedback = feedback;
   const [reviewers, merging] = await Promise.all([
     graphOf($, cwd, view, feedback.notes, REVIEWERS, watch.graphs.reviewers),
     graphOf($, cwd, view, feedback.notes, MERGING, watch.graphs.merging),
@@ -386,10 +405,10 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
       parseView(await glab($, cwd, ["mr", "view", String(view.iid), "-F", "json"])),
       "glab mr view",
     );
-    if (recheck.sha !== view.sha) return readMr($, watch, true);
+    if (recheck.sha !== view.sha) return readMr($, watch, now, true);
   }
   const via: Via = isGated ? "miss" : "full";
-  return { kind: "mr", snapshot, branch, read: isCheap ? "hit" : via };
+  return { kind: "mr", snapshot, branch, read: isCheap ? "hit" : via, feedback };
 }
 
 async function inject(
@@ -479,7 +498,10 @@ function delayOf(snapshot: Snapshot | undefined, streak: number): number {
   const quiet = QUIET_MS[Math.min(streak, QUIET_MS.length) - 1] ?? 0;
   if (snapshot === undefined) return Math.max(POLL_MS.idle, Math.min(quiet, IDLE_CAP_MS));
   if (!isOpen(snapshot)) return Math.max(POLL_MS.closed, quiet);
-  return snapshot.phase === "pending" ? POLL_MS.pending : Math.max(POLL_MS.settled, quiet);
+  // A job still running or a merge in flight lands soon, whatever came before it.
+  if (snapshot.phase === "pending" || snapshot.pending > 0) return POLL_MS.pending;
+  if (snapshot.merging.kind !== "none" || snapshot.state === "locked") return POLL_MS.settled;
+  return Math.max(POLL_MS.settled, quiet);
 }
 
 // The streak is kept per MR in session state, so a hot reload resumes the backoff.
@@ -589,7 +611,7 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
   const isCurrent = () => !watch.isStopped && watch.generation === generation;
   const seq = ++watch.polls;
   try {
-    const read = await readMr($, watch);
+    const read = await readMr($, watch, now);
     if (read.kind === "mr") {
       const ms = (await $.clock.now()) - now;
       const detail = { mr: read.snapshot.mr, read: read.read };
@@ -600,6 +622,10 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     watch.error = undefined;
     watch.errors = 0;
     watch.via = read.kind === "mr" ? read.read : undefined;
+    if (read.kind === "mr" && read.feedback !== undefined) {
+      if (read.feedback !== watch.feedback) watch.fullAt = now;
+      watch.feedback = read.feedback;
+    }
     const { isTracked, isChanged } = apply($, watch, read, isCurrent);
     let streak = isChanged ? 0 : watch.streak + 1;
     if (isTracked && watch.snapshot !== undefined) {
@@ -658,6 +684,9 @@ async function wake($: EngineInterface, watch: Watch): Promise<void> {
   if (watch.isStopped) return;
   const silentMs = now - (watch.tickedAt ?? now);
   if (watch.error === undefined && watch.streak > 0) schedule($, watch, 0, "turn");
+  // A failing watch retries at the first error wait, not its stretched one.
+  else if (watch.error !== undefined)
+    watch.due = Math.min(watch.due, watch.polledAt + POLL_MS.error);
   if (silentMs > LATE_MS) {
     emit($, "watch.revived", { silentMs, mr: watch.snapshot?.mr });
     start($, watch);
@@ -689,6 +718,7 @@ export function register(on: On, options: PluginOptions): void {
     snapshot: undefined,
     branch: undefined,
     feedback: undefined,
+    fullAt: 0,
     graphs: { reviewers: {}, merging: {} },
     me: undefined,
     noise,
@@ -784,11 +814,8 @@ export function register(on: On, options: PluginOptions): void {
   });
 
   on("turn.start", async ($, e, next) => {
-    const now = await $.clock.now();
-    for (const [id, [, end]] of watch.turns) {
-      if (end !== undefined && now - end > TURNS_KEPT_MS) watch.turns.delete(id);
-    }
-    watch.turns.set(e.turnId, [now, undefined]);
+    // Every span is kept: a full read rescans every note, old ones included.
+    watch.turns.set(e.turnId, [await $.clock.now(), undefined]);
     render($, watch);
     return next(e);
   }).catch(($, e, next) => next(e));

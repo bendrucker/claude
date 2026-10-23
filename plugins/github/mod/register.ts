@@ -42,8 +42,8 @@ export const IDLE_CAP_MS = 10 * 60_000;
 const LATE_MS = 3 * TICK_MS;
 // A poll in flight this long lost a dispatch, so the next tick polls anyway.
 const STUCK_MS = 5 * 60_000;
-// A post lands within seconds of its turn, so older spans only grow the scan.
-const TURNS_KEPT_MS = 60 * 60_000;
+// Probes miss a resolved thread and a merge queue's progress, so a full read runs this often.
+const FULL_EVERY_MS = 30 * 60_000;
 
 // A dropped injection is retried on later polls, up to this many attempts.
 export const MAX_ATTEMPTS = 3;
@@ -63,9 +63,12 @@ interface Undelivered {
 interface Watch {
   snapshot: Snapshot | undefined;
   /** The last full read, before any carry-forward, which an unchanged probe repeats. */
-  last: { branch: string; snapshot: Snapshot } | undefined;
+  last: { cwd: string; branch: string; snapshot: Snapshot } | undefined;
   /** The last ETag per REST path the gate probes. */
   etags: Map<string, string>;
+  /** When the last full read ran, which the gate forces again after a while. */
+  fullAt: number;
+  extras: { url: string; extras: Extras } | undefined;
   me: string | undefined;
   noise: Noise;
   undelivered: Undelivered | undefined;
@@ -100,7 +103,14 @@ type Via = "hit" | "miss" | "full";
 
 type Read =
   | { kind: "none"; reason: string; branch: string }
-  | { kind: "pr"; snapshot: Snapshot; read: Via; changed: string[] | undefined };
+  | {
+      kind: "pr";
+      snapshot: Snapshot;
+      read: Via;
+      changed: string[] | undefined;
+      /** What the read caches, kept only if no newer poll overtook it. */
+      cache: Pick<Watch, "last" | "etags">;
+    };
 
 function show($: EngineInterface, watch: Watch, text: string | undefined) {
   const line = text === "" ? undefined : text;
@@ -150,7 +160,30 @@ async function meOf(
   return login;
 }
 
-async function extrasOf($: EngineInterface, cwd: string, url: string): Promise<Extras> {
+// Only the footer and the pane read the extras, so a failed read keeps the
+// last answer for the same PR rather than failing the poll.
+async function extrasOf(
+  $: EngineInterface,
+  watch: Watch,
+  cwd: string,
+  url: string,
+): Promise<Extras | undefined> {
+  try {
+    const extras = await readExtras($, cwd, url);
+    watch.extras = { url, extras };
+    return extras;
+  } catch (error) {
+    emit(
+      $,
+      "extras.read",
+      { error: error instanceof Error ? error.message : String(error) },
+      false,
+    );
+    return watch.extras?.url === url ? watch.extras.extras : undefined;
+  }
+}
+
+async function readExtras($: EngineInterface, cwd: string, url: string): Promise<Extras> {
   const { hostname, pathname } = new URL(url);
   const [, owner = "", name = "", , pr = ""] = pathname.split("/");
   const argv = ["gh", "api", "graphql", "--hostname", hostname, "-f", `query=${EXTRAS_QUERY}`];
@@ -237,7 +270,7 @@ async function changedOf(
   return { changed: probes.filter((p) => !p.isSame).map((p) => p.name), etags };
 }
 
-async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
+async function readPr($: EngineInterface, watch: Watch, now: number): Promise<Read> {
   const cwd = await $.session.cwd();
   const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
   const branch = head.stdout.trim();
@@ -251,14 +284,16 @@ async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
   const last = watch.last;
   const isProbed =
     watch.snapshot !== undefined &&
-    last?.branch === branch &&
+    now - watch.fullAt < FULL_EVERY_MS &&
+    last?.cwd === cwd &&
+    last.branch === branch &&
     last.snapshot.state === "OPEN" &&
     last.snapshot.block !== undefined;
   const probed = isProbed ? await changedOf($, watch, cwd, last.snapshot) : undefined;
   const changed = probed?.changed;
   if (isProbed && probed?.changed.length === 0) {
-    watch.etags = probed.etags;
-    return { kind: "pr", snapshot: last.snapshot, read: "hit", changed };
+    const cache = { last, etags: probed.etags };
+    return { kind: "pr", snapshot: last.snapshot, read: "hit", changed, cache };
   }
   const view = await $.process.run(["gh", "pr", "view", "--json", VIEW_FIELDS], {
     cwd,
@@ -277,13 +312,13 @@ async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
   const [me, isHeadKnown, extras] = await Promise.all([
     meOf($, watch, cwd, parsed.url),
     isHeadKnownOf($, watch, cwd, parsed.headRefOid),
-    extrasOf($, cwd, parsed.url),
+    extrasOf($, watch, cwd, parsed.url),
   ]);
   const turns = [...watch.turns.values()];
   const snapshot = snapshotOf(parsed, { me, isHeadKnown, noise: watch.noise, turns, extras });
-  watch.last = { branch, snapshot };
-  if (probed !== undefined) watch.etags = probed.etags;
-  return { kind: "pr", snapshot, read: changed === undefined ? "full" : "miss", changed };
+  const cache = { last: { cwd, branch, snapshot }, etags: probed?.etags ?? watch.etags };
+  const read = changed === undefined ? "full" : "miss";
+  return { kind: "pr", snapshot, read, changed, cache };
 }
 
 async function inject(
@@ -372,7 +407,10 @@ function delayOf(snapshot: Snapshot | undefined, streak: number): number {
   const quiet = QUIET_MS[Math.min(streak, QUIET_MS.length) - 1] ?? 0;
   if (snapshot === undefined) return Math.max(POLL_MS.idle, Math.min(quiet, IDLE_CAP_MS));
   if (snapshot.state !== "OPEN") return Math.max(POLL_MS.closed, quiet);
-  return snapshot.phase === "pending" ? POLL_MS.pending : Math.max(POLL_MS.settled, quiet);
+  // A job still running or a merge in flight lands soon, whatever came before it.
+  if (snapshot.phase === "pending" || snapshot.pending > 0) return POLL_MS.pending;
+  if (snapshot.merging.kind !== "none") return POLL_MS.settled;
+  return Math.max(POLL_MS.settled, quiet);
 }
 
 // The streak is kept per PR in session state, so a hot reload resumes the backoff.
@@ -477,7 +515,7 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
   const isCurrent = () => !watch.isStopped && watch.generation === generation;
   const seq = ++watch.polls;
   try {
-    const read = await readPr($, watch);
+    const read = await readPr($, watch, now);
     if (read.kind === "pr") {
       const ms = (await $.clock.now()) - now;
       const detail = { pr: read.snapshot.pr, read: read.read, changed: read.changed };
@@ -488,6 +526,10 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     watch.error = undefined;
     watch.errors = 0;
     watch.via = read.kind === "pr" ? read.read : undefined;
+    if (read.kind === "pr") {
+      Object.assign(watch, read.cache);
+      if (read.read !== "hit") watch.fullAt = now;
+    }
     const { isTracked, isChanged } = apply($, watch, read, isCurrent);
     let streak = isChanged ? 0 : watch.streak + 1;
     if (isTracked && watch.snapshot !== undefined) {
@@ -546,6 +588,9 @@ async function wake($: EngineInterface, watch: Watch): Promise<void> {
   if (watch.isStopped) return;
   const silentMs = now - (watch.tickedAt ?? now);
   if (watch.error === undefined && watch.streak > 0) schedule($, watch, 0, "turn");
+  // A failing watch retries at the first error wait, not its stretched one.
+  else if (watch.error !== undefined)
+    watch.due = Math.min(watch.due, watch.polledAt + POLL_MS.error);
   if (silentMs > LATE_MS) {
     emit($, "watch.revived", { silentMs, pr: watch.snapshot?.pr });
     start($, watch);
@@ -577,6 +622,8 @@ export function register(on: On, options: PluginOptions): void {
     snapshot: undefined,
     last: undefined,
     etags: new Map(),
+    fullAt: 0,
+    extras: undefined,
     me: undefined,
     noise,
     undelivered: undefined,
@@ -671,11 +718,8 @@ export function register(on: On, options: PluginOptions): void {
   });
 
   on("turn.start", async ($, e, next) => {
-    const now = await $.clock.now();
-    for (const [id, [, end]] of watch.turns) {
-      if (end !== undefined && now - end > TURNS_KEPT_MS) watch.turns.delete(id);
-    }
-    watch.turns.set(e.turnId, [now, undefined]);
+    // Every span is kept: a full read rescans every post, old ones included.
+    watch.turns.set(e.turnId, [await $.clock.now(), undefined]);
     render($, watch);
     return next(e);
   }).catch(($, e, next) => next(e));

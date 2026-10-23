@@ -58,6 +58,8 @@ interface World {
   etags?: Record<string, string>;
   /** The GraphQL pull request the extras query reads. */
   extras?: Record<string, unknown>;
+  /** The extras query fails, as a GraphQL rate limit makes it. */
+  isExtrasFailing?: boolean;
 }
 
 const EXTRAS = {
@@ -137,6 +139,17 @@ function worldOf(on: On, world: World) {
           exitCode: world.noLogin === true ? 1 : 0,
           stdout: world.noLogin === true ? "" : "ben\n",
           stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
+    if (argv.startsWith("gh api graphql") && world.isExtrasFailing === true) {
+      return {
+        value: {
+          exitCode: 1,
+          stdout: "",
+          stderr: "API rate limit exceeded\n",
           isStdoutTruncated: false,
           isStderrTruncated: false,
         },
@@ -996,6 +1009,43 @@ describe("register", () => {
     );
     expect(w.named("pane.muted").map((e) => e.detail)).toEqual([{ open: true, count: 1 }]);
     await pane.unmount();
+  });
+
+  test("a failed extras read keeps the PR's last threads and merge state", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      gh: GH_OK,
+      view: pr("SUCCESS"),
+      extras: { autoMergeRequest: { enabledAt: "2026-10-23T10:00:00Z" } },
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(await w.shown($)).toBe("merging │ \u{f49e}  \u{f419}");
+
+    world.isExtrasFailing = true;
+    world.view = { ...pr("SUCCESS"), reviewDecision: "APPROVED" };
+    await w.clock.advance(POLL_MS.settled);
+
+    expect(await w.shown($)).toBe("merging │ \u{f49e}  \u{f42e}  \u{f419}");
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("extras.read").map((e) => e.detail?.error)).toEqual(["API rate limit exceeded"]);
+    expect(w.submits).toEqual([]);
+  });
+
+  test("a failed check beside one still running keeps the fast poll", async ($, on) => {
+    const view = {
+      ...pr(""),
+      statusCheckRollup: [check("FAILURE"), { ...check(""), name: "slow" }],
+    };
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.pending * 3);
+
+    expect(w.views.length).toBe(4);
   });
 
   test("a failing poll marks the last status stale", async ($, on) => {

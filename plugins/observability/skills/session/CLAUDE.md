@@ -73,10 +73,23 @@ Every open this skill makes or documents is resource-capped, because DuckDB's de
 
 The writers carry the `claude:dangerouslyDisableSandbox` marker after their shebang. Each writes somewhere the sandbox denies: `refresh.ts` prunes `~/.claude/debug` and `~/.claude/mod-events`, `import.ts`, `forget.ts` and `pull.ts` change `~/.claude/session-imports`, `hosts.ts` opens the index read-write, and the first open moves the old index out of `~/.claude/plugins`. See [`plugins/mac/README.md`](../../../mac/README.md) for the marker.
 
+### Lake
+
+`lake.ts` publishes the index to a DuckLake (a DuckDB-file catalog plus Parquet) under `CLAUDE_SESSION_LAKE_URL`, an `s3://` prefix or a directory, so remote readers query it in place instead of downloading the index. The local index stays the only writer's source, and the lake is a cache of it. The SQL in `resources/lake/` does the work in the DuckDB CLI. `lake.ts` checks egress, moves the catalog to and from S3, attaches the index and lake, and runs it.
+
+- **Publish** (`publish.sql`) diffs `indexed_files` against the lake's `published_files`, then in one DuckLake transaction replaces `raw` and `file_fields` per changed file, every table and view with a `session_id` per touched session, and the few without one whole. The table list comes from the index's own catalog, so the lake mirrors the plugin version that built the index. Only the hosts passed with `--host` (default `local`) are published, and a host other than `local` must have been imported with `--egress`.
+- **Rebuilds.** When the lake is missing a table the index has, a table's columns differ, or `index_meta`'s stamp moved, the publish drops and rebuilds the whole lake in the same commit. It refuses an index whose `views_hash` is NULL, the mark of a refresh that died mid-rebuild.
+- **Views become tables.** A view that parses `data` at query time costs a reader the JSON in its whole window, and the JSON columns are almost all of the lake's bytes. Materialized, a query reads only the columns it selects. `classifier_verdicts` (local `mod_events`) is not published.
+- **Layout.** Rows sort by `type`, then `timestamp`, in 8,192-row row groups, so a window filter or a rare-type filter skips most row groups. The replay dedupes partition by `uuid` and `timestamp`: a replayed line is a verbatim copy, so adding the timestamp changes no result and lets a window filter push below the window function.
+- **Catalog.** The writer downloads the remote catalog before every run, keeping its copy under `<state dir>/lake/<url hash>/`, and uploads it with `aws s3 cp` after a commit that changed something. Parquet files are immutable, so a reader sees the previous snapshot or the new one. One writer at a time: two concurrent publishes would each push a catalog without the other's snapshot. `checkpoint.sql` runs DuckLake's `CHECKPOINT` with a 7-day window, which must outlast the longest reader.
+- **Schedule.** `.github/workflows/session-lake.yml` publishes nightly on the Studio's actions-sandbox runner, from the index dir mounted read-only, and runs `checkpoint` on Sundays.
+- **Readers** run `duckdb -init "$(bun lake.ts init)"`. The init file carries `limits.sql`, `lake/s3.sql`, the read-only attach, and the macros, with `search_path` resolving every other name to the lake. The writer's and readers' CLI must match `@duckdb/node-api`'s version, or the catalog file is unreadable.
+
 ### Callers
 
 - `db.ts`: orchestrates migration, schema, scan, per-file import, view rebuild and versioning, checkpoint, compaction.
 - `refresh.ts`: CLI entry point. Stamp fast-path, `ensureIndex`, `--compact`, compaction guard, prints DB path to stdout.
+- `lake.ts`: publish to the lake and its `CHECKPOINT`, running `resources/lake/*.sql` in the DuckDB CLI, and the reader init.
 - `query.ts`: the one path from a named query (or literal SQL) plus params to decoded rows. Two adapters share the variable binding: `nodeAdapter` binds on the read-write connection `db.ts` already holds, and `cliAdapter` spawns `duckdb -readonly -init limits.sql` with a timeout, rendering the same params as `SET VARIABLE` lines through one escaping function. `usage.ts` and `schema.ts` take the read-only adapter so they never wait on a refresh's write lock. `runQuery` appends a `session-index.query` event per read. Every scripted reader goes through `cliAdapter`.
 
 ### Development

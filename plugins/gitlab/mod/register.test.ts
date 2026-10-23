@@ -86,6 +86,7 @@ function worldOf(on: On, world: World) {
     if (slept > 0) await clock.sleep(slept);
     return next(e);
   });
+  const apis: string[] = [];
   const clock = mock.clock(on);
   on("turn.complete", () => ({ text: "" }));
   on("engine.create", async ($, e, next) => ({
@@ -140,6 +141,7 @@ function worldOf(on: On, world: World) {
       return view;
     }
     if (argv === "glab api user") return reply({ username: "ben" });
+    apis.push(argv);
     if (argv.endsWith("/approvals")) return reply(world.approvals ?? approvals());
     if (argv.includes("/notes?")) return reply(world.notes ?? []);
     if (argv.startsWith("glab api --paginate --output ndjson projects/1/pipelines/50/jobs?")) {
@@ -158,7 +160,7 @@ function worldOf(on: On, world: World) {
     });
     return tails.at(-1);
   };
-  return { events, named, shown, submits, views, clock };
+  return { events, named, shown, submits, views, apis, clock };
 }
 
 const HINT = { isDraft: false, isWorking: false, hint: "? for shortcuts" };
@@ -351,6 +353,35 @@ describe("register", () => {
       "ci.passing",
       "approvals.reset",
     ]);
+  });
+
+  test("an unchanged updated_at and pipeline reuse the last approvals, notes, and jobs", async ($, on) => {
+    const at = (updated_at: string, pipeline = "success") => ({ ...mr(pipeline), updated_at });
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: at("2026-10-23T10:00:00Z"),
+      jobs: job("success"),
+    };
+    const w = worldOf(on, world);
+    const reads = () => w.named("poll").map((e) => e.detail?.read);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.apis.length).toBe(3);
+
+    world.view = at("2026-10-23T10:05:00Z");
+    world.notes = [note(11, "alice")];
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits[0]).toContain("@alice commented on MR !7");
+
+    world.view = at("2026-10-23T10:05:00Z", "running");
+    world.jobs = job("running");
+    await w.clock.advance(POLL_MS.settled);
+    await w.clock.advance(POLL_MS.pending);
+    expect(reads()).toEqual(["full", "hit", "miss", "miss", "full"]);
+    expect(w.apis.length).toBe(12);
   });
 
   test("a merged MR is read back by IID, sent to the model, shown as merged, and read no further", async ($, on) => {

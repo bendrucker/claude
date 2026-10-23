@@ -1,7 +1,10 @@
 import type { EngineInterface, On, PluginOptions, Timer } from "claude-code";
 import {
   STALE,
+  type Approvals,
   type Job,
+  type MrView,
+  type Note,
   type Promoted,
   type Snapshot,
   baselineOf,
@@ -54,9 +57,18 @@ interface Undelivered {
   attempts: number;
 }
 
+/** The reads beside the MR view, kept while the gate on that view holds. */
+interface Feedback {
+  gate: string;
+  approvals: Approvals;
+  notes: Note[];
+  jobs: Job[];
+}
+
 interface Watch {
   snapshot: Snapshot | undefined;
   branch: string | undefined;
+  feedback: Feedback | undefined;
   me: string | undefined;
   undelivered: Undelivered | undefined;
   error: string | undefined;
@@ -76,9 +88,12 @@ interface Watch {
   isStopped: boolean;
 }
 
+/** A gate that matched the last read, one that missed and read in full, or no gate. */
+type Via = "hit" | "miss" | "full";
+
 type Read =
   | { kind: "none"; reason: string; branch: string }
-  | { kind: "mr"; snapshot: Snapshot; branch: string };
+  | { kind: "mr"; snapshot: Snapshot; branch: string; read: Via };
 
 function show($: EngineInterface, watch: Watch, text: string | undefined) {
   const line = text === "" ? undefined : text;
@@ -142,6 +157,29 @@ async function jobsOf($: EngineInterface, cwd: string, projectId: number, pipeli
   return parsed(parseJobs(stdout), "pipeline jobs");
 }
 
+async function feedbackOf(
+  $: EngineInterface,
+  cwd: string,
+  view: MrView,
+  gate: string,
+): Promise<Feedback> {
+  const mr = `projects/${view.projectId}/merge_requests/${view.iid}`;
+  const pipeline = view.pipeline;
+  const [approvals, notes, jobs] = await Promise.all([
+    glab($, cwd, ["api", `${mr}/approvals`]),
+    glab($, cwd, ["api", `${mr}/notes?sort=desc&order_by=created_at&per_page=100`]),
+    pipeline === null
+      ? Promise.resolve<Job[]>([])
+      : jobsOf($, cwd, pipeline.projectId, pipeline.id),
+  ]);
+  return {
+    gate,
+    approvals: parsed(parseApprovals(approvals), "MR approvals"),
+    notes: parsed(parseNotes(notes), "MR notes"),
+    jobs,
+  };
+}
+
 async function meOf($: EngineInterface, watch: Watch, cwd: string): Promise<string> {
   if (watch.me !== undefined) return watch.me;
   watch.me = parsed(parseUser(await glab($, cwd, ["api", "user"])), "glab api user");
@@ -184,27 +222,22 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
   const prev = watch.snapshot;
   // A merged or closed MR changes nothing else the watch shows.
   if (prev?.mr === view.iid && !isOpen(prev) && view.state === prev.state) {
-    return { kind: "mr", snapshot: prev, branch };
+    return { kind: "mr", snapshot: prev, branch, read: "hit" };
   }
-  const mr = `projects/${view.projectId}/merge_requests/${view.iid}`;
-  const pipeline = view.pipeline;
-  const [approvals, notes, jobs, me, isHeadKnown] = await Promise.all([
-    glab($, cwd, ["api", `${mr}/approvals`]),
-    glab($, cwd, ["api", `${mr}/notes?sort=desc&order_by=created_at&per_page=100`]),
-    pipeline === null
-      ? Promise.resolve<Job[]>([])
-      : jobsOf($, cwd, pipeline.projectId, pipeline.id),
+  // A note, an approval, or a push moves updated_at, so while it and the pipeline
+  // hold, the last approvals, notes, and jobs do too. A job can fail before its
+  // pipeline does, so a pending one is read in full.
+  const gate = `${view.projectId}/${view.iid}@${view.updatedAt} ${view.pipeline?.id}:${view.pipeline?.status}`;
+  const held = watch.feedback;
+  const isGated = held !== undefined && view.updatedAt !== "" && prev?.phase !== "pending";
+  const isCheap = isGated && held.gate === gate;
+  const [feedback, me, isHeadKnown] = await Promise.all([
+    isCheap ? held : feedbackOf($, cwd, view, gate),
     meOf($, watch, cwd),
     isHeadKnownOf($, watch, cwd, view.sha),
   ]);
-  const read = snapshotOf({
-    view,
-    approvals: parsed(parseApprovals(approvals), "MR approvals"),
-    notes: parsed(parseNotes(notes), "MR notes"),
-    jobs,
-    me,
-    isHeadKnown,
-  });
+  watch.feedback = feedback;
+  const read = snapshotOf({ view, ...feedback, me, isHeadKnown });
   // A deleted note can lower the newest id seen, which would re-admit older notes.
   const snapshot =
     prev?.mr === read.mr
@@ -224,7 +257,8 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
     );
     if (recheck.sha !== view.sha) return readMr($, watch, true);
   }
-  return { kind: "mr", snapshot, branch };
+  const via: Via = isGated ? "miss" : "full";
+  return { kind: "mr", snapshot, branch, read: isCheap ? "hit" : via };
 }
 
 async function inject(
@@ -396,6 +430,11 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
   const seq = ++watch.polls;
   try {
     const read = await readMr($, watch);
+    if (read.kind === "mr") {
+      const ms = (await $.clock.now()) - now;
+      const detail = { mr: read.snapshot.mr, read: read.read };
+      void $.modEvents.emit({ mod: MOD, event: "poll", ms, detail });
+    }
     // A session.end that landed while glab ran has already cleared the status.
     if (!isCurrent() || seq !== watch.polls) return;
     const { isTracked, isChanged } = apply($, watch, read, isCurrent);
@@ -482,6 +521,7 @@ export function register(on: On, options: PluginOptions): void {
   const watch: Watch = {
     snapshot: undefined,
     branch: undefined,
+    feedback: undefined,
     me: undefined,
     undelivered: undefined,
     error: undefined,

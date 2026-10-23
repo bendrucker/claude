@@ -54,6 +54,8 @@ interface World {
   sleptMs?: number;
   /** Refuses the ticker's periods, which ends it. */
   isTickRefused?: boolean;
+  /** The current ETag of each REST path the gate probes; one left out answers 200 bare. */
+  etags?: Record<string, string>;
 }
 
 function worldOf(on: On, world: World) {
@@ -69,6 +71,7 @@ function worldOf(on: On, world: World) {
     if (slept > 0) await clock.sleep(slept);
     return next(e);
   });
+  const probes: string[] = [];
   const clock = mock.clock(on);
   on("turn.complete", () => ({ text: "" }));
   on("engine.create", async ($, e, next) => ({
@@ -127,6 +130,21 @@ function worldOf(on: On, world: World) {
         },
       };
     }
+    if (argv.startsWith("gh api -i")) {
+      const path = e.argv[6] ?? "";
+      probes.push(path);
+      const etag = world.etags?.[path];
+      const status = etag !== undefined && e.argv.at(-1) === `If-None-Match: ${etag}` ? 304 : 200;
+      return {
+        value: {
+          exitCode: status === 200 ? 0 : 1,
+          stdout: `HTTP/1.1 ${status} X\r\n${etag === undefined ? "" : `Etag: ${etag}\r\n`}\r\n`,
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    }
     if (argv.startsWith("git ")) {
       return {
         value: {
@@ -168,7 +186,7 @@ function worldOf(on: On, world: World) {
     });
     return tails.at(-1);
   };
-  return { events, named, shown, submits, views, clock };
+  return { events, named, shown, submits, views, probes, clock };
 }
 
 const HINT = { isDraft: false, isWorking: false, hint: "? for shortcuts" };
@@ -625,6 +643,58 @@ describe("register", () => {
     await w.clock.advance(10_000 + POLL_MS.pending);
 
     expect(w.views.length).toBe(3);
+  });
+
+  test("unchanged ETags skip the full read until one resource moves", async ($, on) => {
+    const etags: Record<string, string> = {
+      "repos/o/r/pulls/7": 'W/"p1"',
+      "repos/o/r/pulls/7/reviews?per_page=100": 'W/"r1"',
+      "repos/o/r/commits/aaaaaaa1111/check-runs?per_page=100": 'W/"c1"',
+      "repos/o/r/commits/aaaaaaa1111/status?per_page=100": 'W/"s1"',
+    };
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS"), etags };
+    const w = worldOf(on, world);
+    const reads = () => w.named("poll").map((e) => [e.detail?.read, e.detail?.changed]);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.probes).toEqual([]);
+    await w.clock.advance(POLL_MS.settled);
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.views.length).toBe(2);
+    expect(w.probes.length).toBe(8);
+
+    world.view = pr("FAILURE");
+    etags["repos/o/r/commits/aaaaaaa1111/check-runs?per_page=100"] = 'W/"c2"';
+    await w.clock.advance(QUIET_MS[1] ?? 0);
+    expect(w.views.length).toBe(3);
+    expect(w.submits[0]).toContain("CI failed on PR #7 at aaaaaaa: ci / test.");
+    expect(reads()).toEqual([
+      ["full", undefined],
+      ["miss", ["pull", "reviews", "checks", "statuses"]],
+      ["hit", []],
+      ["miss", ["checks"]],
+    ]);
+
+    world.branch = "other";
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.probes.length).toBe(12);
+    expect(w.views.length).toBe(4);
+  });
+
+  test("an undecided mergeability or a closed PR is always read in full", async ($, on) => {
+    const etags: Record<string, string> = { "repos/o/r/pulls/7": 'W/"p1"' };
+    const view = { ...pr("SUCCESS"), mergeable: "UNKNOWN" };
+    const world: World = { branch: "topic", gh: GH_OK, view, etags };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled);
+    world.view = { ...pr("SUCCESS"), state: "MERGED" };
+    await w.clock.advance(POLL_MS.settled + POLL_MS.closed);
+    expect(w.probes).toEqual([]);
+    expect(w.named("poll").map((e) => e.detail?.read)).toEqual(["full", "full", "full", "full"]);
   });
 
   test("an injection the engine drops is logged as dropped", async ($, on) => {

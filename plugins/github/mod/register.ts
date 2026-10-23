@@ -51,6 +51,10 @@ interface Undelivered {
 
 interface Watch {
   snapshot: Snapshot | undefined;
+  /** The last full read, before any carry-forward, which an unchanged probe repeats. */
+  last: { branch: string; snapshot: Snapshot } | undefined;
+  /** The last ETag per REST path the gate probes. */
+  etags: Map<string, string>;
   me: string | undefined;
   undelivered: Undelivered | undefined;
   error: string | undefined;
@@ -70,7 +74,12 @@ interface Watch {
   isStopped: boolean;
 }
 
-type Read = { kind: "none"; reason: string; branch: string } | { kind: "pr"; snapshot: Snapshot };
+/** A probe that matched the last read, one that missed and read in full, or no probe. */
+type Via = "hit" | "miss" | "full";
+
+type Read =
+  | { kind: "none"; reason: string; branch: string }
+  | { kind: "pr"; snapshot: Snapshot; read: Via; changed: string[] | undefined };
 
 function show($: EngineInterface, watch: Watch, text: string | undefined) {
   const line = text === "" ? undefined : text;
@@ -130,6 +139,56 @@ async function isHeadKnownOf(
   return isKnown($, cwd, sha);
 }
 
+interface Probe {
+  name: string;
+  path: string;
+  etag: string | undefined;
+  isSame: boolean;
+}
+
+// gh exits 1 on a 304, so the status line decides rather than the exit code.
+async function probe(
+  $: EngineInterface,
+  cwd: string,
+  host: string,
+  [name, path]: [string, string],
+  sent: string | undefined,
+): Promise<Probe> {
+  const argv = ["gh", "api", "-i", "--silent", "--hostname", host, path];
+  if (sent !== undefined) argv.push("-H", `If-None-Match: ${sent}`);
+  const { stdout } = await $.process.run(argv, { cwd, timeoutMs: 20_000 });
+  const isSame = /^HTTP\/\S+ 304\b/.test(stdout);
+  // A 304 carries the strong form of a weak ETag, so the one sent is kept.
+  const etag = isSame ? sent : /^etag:\s*(.+?)\s*$/im.exec(stdout)?.[1];
+  return { name, path, etag, isSame };
+}
+
+/**
+ * Which of the REST resources behind a snapshot changed since the last probe.
+ * A 304 spends no rate limit, and together they move on a push, a check, a
+ * review, a comment, a mergeability answer, and a merge or close.
+ */
+async function changedOf(
+  $: EngineInterface,
+  watch: Watch,
+  cwd: string,
+  prev: Snapshot,
+): Promise<string[]> {
+  const { hostname, pathname } = new URL(prev.url);
+  const repo = `repos${pathname.split("/pull/")[0]}`;
+  const paths: [string, string][] = [
+    ["pull", `${repo}/pulls/${prev.pr}`],
+    ["reviews", `${repo}/pulls/${prev.pr}/reviews?per_page=100`],
+    ["checks", `${repo}/commits/${prev.head}/check-runs?per_page=100`],
+    ["statuses", `${repo}/commits/${prev.head}/status?per_page=100`],
+  ];
+  const probes = await Promise.all(
+    paths.map((entry) => probe($, cwd, hostname, entry, watch.etags.get(entry[1]))),
+  );
+  watch.etags = new Map(probes.flatMap((p) => (p.etag === undefined ? [] : [[p.path, p.etag]])));
+  return probes.filter((p) => !p.isSame).map((p) => p.name);
+}
+
 async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
   const cwd = await $.session.cwd();
   const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
@@ -138,6 +197,18 @@ async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
   if (branch === "HEAD") return { kind: "none", reason: "detached", branch };
   if (await isDefaultBranch($, cwd, branch)) {
     return { kind: "none", reason: "default branch", branch };
+  }
+  // A merged or closed PR keeps answering 304, so a new PR on its branch needs the
+  // full read, as does a mergeability GitHub has yet to decide.
+  const last = watch.last;
+  const isProbed =
+    watch.snapshot !== undefined &&
+    last?.branch === branch &&
+    last.snapshot.state === "OPEN" &&
+    last.snapshot.block !== undefined;
+  const changed = isProbed ? await changedOf($, watch, cwd, last.snapshot) : undefined;
+  if (isProbed && changed?.length === 0) {
+    return { kind: "pr", snapshot: last.snapshot, read: "hit", changed };
   }
   const view = await $.process.run(["gh", "pr", "view", "--json", VIEW_FIELDS], {
     cwd,
@@ -156,7 +227,9 @@ async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
     meOf($, watch, cwd, parsed.url),
     isHeadKnownOf($, watch, cwd, parsed.headRefOid),
   ]);
-  return { kind: "pr", snapshot: snapshotOf(parsed, { me, isHeadKnown }) };
+  const snapshot = snapshotOf(parsed, { me, isHeadKnown });
+  watch.last = { branch, snapshot };
+  return { kind: "pr", snapshot, read: changed === undefined ? "full" : "miss", changed };
 }
 
 async function inject(
@@ -322,6 +395,11 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
   const seq = ++watch.polls;
   try {
     const read = await readPr($, watch);
+    if (read.kind === "pr") {
+      const ms = (await $.clock.now()) - now;
+      const detail = { pr: read.snapshot.pr, read: read.read, changed: read.changed };
+      void $.modEvents.emit({ mod: MOD, event: "poll", ms, detail });
+    }
     // A session.end that landed while gh ran has already cleared the status.
     if (!isCurrent() || seq !== watch.polls) return;
     const { isTracked, isChanged } = apply($, watch, read, isCurrent);
@@ -407,6 +485,8 @@ async function hasGh($: EngineInterface): Promise<boolean> {
 export function register(on: On, options: PluginOptions): void {
   const watch: Watch = {
     snapshot: undefined,
+    last: undefined,
+    etags: new Map(),
     me: undefined,
     undelivered: undefined,
     error: undefined,

@@ -54,14 +54,6 @@ const EVALUATOR = String.raw`\b(?:Contains|Equals|EqualsExpected|IsInstance|MaxD
 
 /** Graders every case in the suite shares, by name. */
 export const SHARED: Record<string, { cases: (c: CaseSpec) => boolean; grader: Grader }> = {
-  "skill-fired": {
-    cases: () => true,
-    grader: {
-      type: "tool_used",
-      fields: ["tool: Skill", "input_match: 'evals:design'", "arm: with-only"],
-      body: "The design skill loaded. It reports as an unscored indicator under ablation.",
-    },
-  },
   "holdout-share": {
     cases: () => true,
     grader: {

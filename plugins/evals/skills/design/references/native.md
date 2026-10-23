@@ -6,6 +6,7 @@ Commands for a suite run by `claude plugin eval` through this repo's `evals/nati
 
 - Write each case as `<case>/case.yaml`. The runner, `check.ts`, and CI find cases by that file.
 - A suite testing skills, agents, or context files outside a plugin wraps them through `suite.yaml`, because the runner ignores a `CLAUDE.md` or `.claude/rules` in the case's working directory.
+- A session reads only inside its working directory, so it cannot open the files a skill links, even in the plugin under test. Set `inline_references: true` in `suite.yaml` to append them to the staged skill body. A copy scaffolded into the working directory reaches the without arm too.
 - Put graders shared across cases in the suite's `graders/` and select them by glob.
 - Test every regex grader against `examples/<case>/` replies with `bun evals/native/check.ts <suite>`.
 - Add a `.local-only` file to a suite CI must skip.

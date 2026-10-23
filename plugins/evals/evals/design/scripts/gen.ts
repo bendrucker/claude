@@ -53,7 +53,7 @@ export function suiteYaml(): string {
     `  ${name}:`,
     cases.map((c) => `    - ${c}`).join("\n"),
   ]);
-  return `${["allow_tools: [Write, Edit]", `judge_model: ${JUDGE_MODEL}`, "graders:", ...graders].join("\n")}\n`;
+  return `${["allow_tools: [Write, Edit]", "inline_references: true", `judge_model: ${JUDGE_MODEL}`, "graders:", ...graders].join("\n")}\n`;
 }
 
 /** Every generated file by path relative to the suite. */

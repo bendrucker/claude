@@ -20,13 +20,16 @@ Each case is tagged `design`, its split, and its brief kind. The fixture is a sh
 
 The seeds are real misses, rewritten into invented artifacts. No transcript or work-repo text is in the suite.
 
+## References
+
+The runner denies reads outside a case's working directory, the plugin's own files included, so a session cannot open the files `evals:design` links. `inline_references: true` in `suite.yaml` has `run.ts` append each linked file to the staged `SKILL.md`. The with arm gets the references in context and the without arm gets nothing. A copy in the working directory would leak to the without arm, whose `**/*` glob found and read one in a probe. The suite therefore measures the skill's content and cannot test whether a session opens a reference when it should.
+
 ## Graders
 
 All but one grader are deterministic. The regexes read the trace of the session's `Write` and `Edit` calls, anchored on the tool call so the injected skill text and the prompt never match, and independent of the serialized key order. Their patterns come from [`scripts/patterns.ts`](scripts/patterns.ts).
 
 | Rule | Grader | Kind |
 | --- | --- | --- |
-| the skill loaded | `skill-fired` | `tool_used` on `Skill`, `with-only` (an unscored indicator) |
 | a third of the cases are `holdout` | `holdout-share` | `llm`, the only one, one criterion with a 25% to 45% pass bar over the reply's case list |
 | both splits exist | `tag-holdout`, `tag-dev` (native), `split-holdout`, `split-dev` (pydantic) | `regex` |
 | every request kind has a case in both splits | `kind-<kind>-<split>` per case | `regex` |

@@ -37,8 +37,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/bun-install
-      - name: Install the AWS CLI
+      - name: Install the DuckDB and AWS CLIs
+        # DuckDB matches the plugin's @duckdb/node-api, so the catalog stays readable by
+        # every reader on that version.
         run: |
+          version=$(bun -p 'require("./plugins/observability/package.json").dependencies["@duckdb/node-api"].split("-")[0]')
+          curl -fsSLo "$RUNNER_TEMP/duckdb.zip" "https://github.com/duckdb/duckdb/releases/download/v$version/duckdb_cli-linux-$(dpkg --print-architecture).zip"
+          sudo unzip -q "$RUNNER_TEMP/duckdb.zip" -d /usr/local/bin
           curl -fsSLo "$RUNNER_TEMP/awscliv2.zip" "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip"
           unzip -q "$RUNNER_TEMP/awscliv2.zip" -d "$RUNNER_TEMP"
           sudo "$RUNNER_TEMP/aws/install"
@@ -51,7 +56,9 @@ jobs:
           mount | grep claude-sessions || echo "no claude-sessions mount"
           ls -lan "$CLAUDE_SESSION_INDEX_DIR" || true
       - name: Publish
-        # publish prints {files, sessions} to stderr.
+        # bash, not the default shell, so pipefail fails the step when publish does.
+        # publish prints {files, sessions, rebuilt} to stderr.
+        shell: bash
         run: |
           start=$(date +%s)
           bun "$SCRIPTS/lake.ts" publish --state-dir "$RUNNER_TEMP/lake" 2>&1 | tee "$RUNNER_TEMP/publish.log"

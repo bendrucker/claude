@@ -26,10 +26,9 @@
 -- names the message that was cut off but is set on well under half the marked turns, so
 -- it identifies an interruption rather than counting them.
 --
--- Several signal kinds (queue-operation, permission-mode) carry no timestamp of their
--- own, which date_filter would silently exclude (NULL >= x is NULL); those rows borrow
--- their session's last timestamp so a date window scopes them by when the session ran
--- instead of dropping them.
+-- Of the signals counted here, only permission-mode records carry no timestamp, which
+-- date_filter would silently exclude (NULL >= x is NULL); `modes` gives them their
+-- session's last timestamp so a date window scopes them by when the session ran.
 WITH scoped AS NOT MATERIALIZED (
   SELECT * FROM records
   WHERE date_filter(timestamp, getvariable('after_date'), getvariable('before_date'))

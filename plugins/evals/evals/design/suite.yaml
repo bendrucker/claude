@@ -1,0 +1,119 @@
+allow_tools: [Write, Edit]
+judge_model: claude-opus-5-5
+graders:
+  skill-fired:
+    - skill-changelog
+    - skill-branch-name
+    - agent-dep-review
+    - agent-ticket-triage
+    - rule-sql-style
+    - quiet-commit-scope
+    - removal-error-copy
+    - extend-rollback-note
+    - pydantic-support-agent
+  holdout-share:
+    - skill-changelog
+    - skill-branch-name
+    - agent-dep-review
+    - agent-ticket-triage
+    - rule-sql-style
+    - quiet-commit-scope
+    - removal-error-copy
+    - extend-rollback-note
+    - pydantic-support-agent
+  fixture-clean:
+    - skill-changelog
+    - skill-branch-name
+    - agent-dep-review
+    - agent-ticket-triage
+    - rule-sql-style
+    - quiet-commit-scope
+    - removal-error-copy
+    - extend-rollback-note
+    - pydantic-support-agent
+  tag-holdout:
+    - skill-changelog
+    - skill-branch-name
+    - agent-dep-review
+    - agent-ticket-triage
+    - rule-sql-style
+    - quiet-commit-scope
+    - removal-error-copy
+    - extend-rollback-note
+  tag-dev:
+    - skill-changelog
+    - skill-branch-name
+    - agent-dep-review
+    - agent-ticket-triage
+    - rule-sql-style
+    - quiet-commit-scope
+    - removal-error-copy
+  quiet-tag:
+    - skill-changelog
+    - skill-branch-name
+    - agent-dep-review
+    - agent-ticket-triage
+    - rule-sql-style
+    - quiet-commit-scope
+    - removal-error-copy
+    - extend-rollback-note
+  balance-tag:
+    - skill-changelog
+    - skill-branch-name
+    - agent-dep-review
+    - agent-ticket-triage
+    - rule-sql-style
+    - quiet-commit-scope
+    - removal-error-copy
+    - extend-rollback-note
+  judge-model:
+    - skill-changelog
+    - skill-branch-name
+    - agent-dep-review
+    - agent-ticket-triage
+    - rule-sql-style
+    - quiet-commit-scope
+    - removal-error-copy
+    - extend-rollback-note
+  pass-bar:
+    - skill-changelog
+    - skill-branch-name
+    - agent-dep-review
+    - agent-ticket-triage
+    - rule-sql-style
+    - quiet-commit-scope
+    - removal-error-copy
+    - extend-rollback-note
+  examples-exist:
+    - skill-changelog
+    - skill-branch-name
+    - agent-dep-review
+    - agent-ticket-triage
+    - rule-sql-style
+    - quiet-commit-scope
+    - removal-error-copy
+    - extend-rollback-note
+  split-holdout:
+    - pydantic-support-agent
+  split-dev:
+    - pydantic-support-agent
+  quiet-case:
+    - pydantic-support-agent
+  balance-case:
+    - pydantic-support-agent
+  dataset-written:
+    - pydantic-support-agent
+  deterministic-evaluator:
+    - pydantic-support-agent
+  judge-model-py:
+    - pydantic-support-agent
+  pass-bar-py:
+    - pydantic-support-agent
+  no-ts-write:
+    - pydantic-support-agent
+  no-native-ref:
+    - pydantic-support-agent
+  no-native-files:
+    - pydantic-support-agent
+  removal-grader:
+    - removal-error-copy

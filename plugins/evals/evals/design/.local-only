@@ -1,0 +1,1 @@
+Each case is a session that writes a whole suite, so a labeled-PR run of all nine cases would pass the monthly eval budget. Dispatch it with `--tag dev` or `--tag holdout` instead.

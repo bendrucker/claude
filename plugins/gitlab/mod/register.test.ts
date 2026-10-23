@@ -797,7 +797,7 @@ describe("register", () => {
       plugin: "gitlab",
       surface: "terminal",
       component: "Pane",
-      requestId: "gitlab:mr",
+      requestId: "mr",
       props: {
         title: "MR",
         isFocused: false,
@@ -812,7 +812,7 @@ describe("register", () => {
     expect(await pane.find({ type: "Text", text: /✓ lint/ })).toBeDefined();
     expect(await pane.find({ type: "Text", text: /review-bot · marked/ })).toBeUndefined();
 
-    await pane.press({ key: "gitlab:muted" });
+    await pane.press({ key: "muted" });
     expect((await pane.find({ type: "Text", text: /review-bot/ }))?.text).toContain(
       "review-bot · marked",
     );

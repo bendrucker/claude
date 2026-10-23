@@ -700,10 +700,13 @@ export function register(on: On, options: PluginOptions): void {
   });
 
   on("command.run", { command: "pr" }, async ($) => {
-    const { isPlaced } = await $.ui.open({ id: PANE, title: "PR" });
-    emit($, "pane.open", { placed: isPlaced, pr: watch.snapshot?.pr });
-    return {};
-  }).catch(($, e, next) => next(e));
+    const opened = await $.ui.open({ id: PANE, title: "PR" });
+    emit($, "pane.open", { placed: opened.isPlaced, pr: watch.snapshot?.pr });
+    return opened.isPlaced ? {} : { text: `/pr: the pane is not drawn (${opened.reason})` };
+  }).catch(($, e, next) => {
+    emit($, "pane.open", { error: next.error.message }, false);
+    return { text: `/pr failed: ${next.error.message ?? next.error.kind}` };
+  });
 
   on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) =>
     drawPane($, e, watch, await $.clock.now()),

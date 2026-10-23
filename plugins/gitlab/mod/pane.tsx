@@ -1,8 +1,8 @@
 import type { EngineInterface, RenderElement, RenderInput } from "claude-code";
 import { type Snapshot, turnOf } from "./mr.ts";
 
-export const PANE = "gitlab:mr";
-export const MUTED = "gitlab:muted";
+export const PANE = "mr";
+export const MUTED = "muted";
 
 /** What the watch holds that the pane shows. */
 export interface Seen {

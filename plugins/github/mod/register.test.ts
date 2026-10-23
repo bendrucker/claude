@@ -988,7 +988,7 @@ describe("register", () => {
       plugin: "github",
       surface: "terminal",
       component: "Pane",
-      requestId: "github:pr",
+      requestId: "pr",
       props: {
         title: "PR",
         isFocused: false,
@@ -1005,7 +1005,7 @@ describe("register", () => {
     expect(await pane.find({ type: "Text", text: /✓ ci \/ lint/ })).toBeDefined();
     expect(await pane.find({ type: "Text", text: /review-app · marked/ })).toBeUndefined();
 
-    await pane.press({ key: "github:muted" });
+    await pane.press({ key: "muted" });
     expect((await pane.find({ type: "Text", text: /review-app/ }))?.text).toContain(
       "review-app · marked",
     );

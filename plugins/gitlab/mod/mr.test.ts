@@ -590,12 +590,12 @@ describe("statusOf", () => {
       "",
     ],
     [
-      "approvals needed",
+      "approvals outstanding",
       snap(
         { jobs: passed, approvals: { approvalsRequired: 2, approvalsLeft: 2, approvedBy: [] } },
         "success",
       ),
-      "\u{f49e} CI · \u{f441} 2 approvals needed",
+      "\u{f49e} CI · \u{f441} 2 approvals",
     ],
     [
       "approved",
@@ -630,7 +630,7 @@ describe("statusOf", () => {
         }),
         view: { ...read().view, pipeline: null, detailedMergeStatus: "requested_changes" },
       }),
-      "\u{f4e3} @alice, @carol (+1)",
+      "\u{f4e3} @alice +2",
     ],
     [
       "a reviewer's request for changes outranks another's pending review",
@@ -643,7 +643,7 @@ describe("statusOf", () => {
         }),
         view: { ...read().view, pipeline: null },
       }),
-      "\u{f4a8} changes requested",
+      "\u{f4a8} @alice",
     ],
     ["merged", { ...snap({ jobs: [job("a", "running")] }), state: "merged" }, "\u{f419} merged"],
     ["closed", { ...snap(), state: "closed" }, "\u{f4dc} closed"],

@@ -571,10 +571,18 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
 
 const short = (sha: string) => sha.slice(0, 7);
 
-function listed(labels: string[], max = 3): string {
-  const head = labels.slice(0, max).map(shown).join(", ");
-  return labels.length > max ? `${head} (+${labels.length - max})` : head;
+const FOOTER_LABEL_MAX = 20;
+
+// The footer names the first item and counts the rest, so one long name or a
+// crowd of reviewers cannot push the line past a terminal's width.
+function listed(labels: string[]): string {
+  const first = labels[0] ?? "";
+  const name = first.length > FOOTER_LABEL_MAX ? `${first.slice(0, FOOTER_LABEL_MAX - 1)}…` : first;
+  return labels.length > 1 ? `${name} +${labels.length - 1}` : name;
 }
+
+// A check's job name is what tells it apart; its workflow rarely does.
+const jobOf = (label: string) => label.split(" / ").at(-1) ?? label;
 
 function feedbackLineOf(mr: string, decision: Feedback): string {
   const { author, approval, notes } = decision;
@@ -678,17 +686,18 @@ const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
   none: () => undefined,
   pending: (s) => `${OCT.dotFill} CI ${s.total - s.pending}/${s.total}`,
   passing: () => `${OCT.checkCircle} CI`,
-  failing: (s) => `${OCT.xCircle} ${listed(s.failed)}`,
+  failing: (s) => `${OCT.xCircle} ${listed(s.failed.map(jobOf))}`,
 };
 
 const mention = (name: string) => `@${name}`;
 
 const TURNS: Record<Turn["turn"], (snapshot: Snapshot, waiting: string[]) => string | undefined> = {
-  author: () => `${OCT.reply} changes requested`,
-  reviewer: (_, waiting) => `${OCT.hourglass} ${listed(waiting.map(mention), 2)}`,
+  author: (_, waiting) =>
+    `${OCT.reply} ${waiting.length > 0 ? listed(waiting.map(mention)) : "changes requested"}`,
+  reviewer: (_, waiting) => `${OCT.hourglass} ${listed(waiting.map(mention))}`,
   ready: () => `${OCT.check} approved`,
   none: ({ approvalsLeft: left }) =>
-    left > 0 ? `${OCT.eye} ${left} ${left === 1 ? "approval" : "approvals"} needed` : undefined,
+    left > 0 ? `${OCT.eye} ${left} ${left === 1 ? "approval" : "approvals"}` : undefined,
 };
 
 // The footer already links the MR, so the state rides after it on that line.
@@ -701,7 +710,7 @@ export function statusOf(snapshot: Snapshot, muted = 0): string {
     BLOCKS[snapshot.block ?? "none"],
     CHECKS[snapshot.phase](snapshot),
     TURNS[turn.turn](snapshot, turn.waiting),
-    muted > 0 ? `${OCT.hubot} ${muted} muted` : undefined,
+    muted > 0 ? `${OCT.hubot} ${muted}` : undefined,
   ]
     .filter((part) => part !== undefined)
     .join(" · ");

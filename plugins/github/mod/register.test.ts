@@ -219,7 +219,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(await w.shown($)).toBe("\u{f52f} ci / test");
+    expect(await w.shown($)).toBe("\u{f52f} test");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -289,7 +289,7 @@ describe("register", () => {
         { pr: 7, head: "aaaaaaa1111", id: "c1", author: "vercel[bot]", reason: "author" },
       ]);
       expect(w.named("inject")[0]?.detail?.muted).toEqual(["aaaaaaa1111:Greptile Review", "c1"]);
-      expect(await w.shown($)).toBe("\u{f49e} CI · \u{f477} 2 muted");
+      expect(await w.shown($)).toBe("\u{f49e} CI · \u{f477} 2");
     },
   );
 
@@ -304,7 +304,7 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4a8} changes requested");
+    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4a8} @alice");
 
     const pushed = { ...pr("SUCCESS"), headRefOid: "bbbbbbb2222", latestReviews: [asked] };
     world.view = pushed;
@@ -551,7 +551,7 @@ describe("register", () => {
     expect(w.submits.length).toBe(2);
     expect(w.submits[1]).toContain("@bot reviewed PR #7 (COMMENTED)");
     expect(w.submits[1]).not.toContain("CI failed");
-    expect(await w.shown($)).toBe("\u{f52f} ci / test");
+    expect(await w.shown($)).toBe("\u{f52f} test");
   });
 
   test("stays idle without gh", async ($, on) => {
@@ -701,7 +701,7 @@ describe("register", () => {
     world.view = pr("FAILURE");
     await w.clock.advance(POLL_MS.pending);
     expect(w.submits.length).toBe(1);
-    expect(await w.shown($)).toBe("\u{f52f} ci / test");
+    expect(await w.shown($)).toBe("\u{f52f} test");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.views.length).toBe(3);
@@ -926,7 +926,7 @@ describe("register", () => {
     world.view = "HTTP 401: Bad credentials";
     await w.clock.advance(POLL_MS.settled);
 
-    expect(await w.shown($)).toBe("\u{f52f} ci / test · \u{f421} stale");
+    expect(await w.shown($)).toBe("\u{f52f} test · \u{f421} stale");
   });
 
   test("an unchanged PR backs off until a turn or a change resets it", async ($, on) => {

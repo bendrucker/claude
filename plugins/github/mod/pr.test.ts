@@ -549,7 +549,17 @@ describe("statusOf", () => {
   const passed = [run("a", "COMPLETED", "SUCCESS")];
   const cases: [string, Partial<PrView>, string][] = [
     ["running", { statusCheckRollup: [run("b", "IN_PROGRESS"), ...passed] }, "\u{f444} CI 1/2"],
-    ["failing", { statusCheckRollup: [run("a", "COMPLETED", "FAILURE")] }, "\u{f52f} ci / a"],
+    ["failing", { statusCheckRollup: [run("a", "COMPLETED", "FAILURE")] }, "\u{f52f} a"],
+    [
+      "failing several, one long",
+      {
+        statusCheckRollup: [
+          run("bootstrap (macos-15-arm64, full install)", "COMPLETED", "FAILURE"),
+          run("lint", "COMPLETED", "FAILURE"),
+        ],
+      },
+      "\u{f52f} bootstrap (macos-15… +1",
+    ],
     ["no checks and no review", {}, ""],
     [
       "review needed",
@@ -565,14 +575,14 @@ describe("statusOf", () => {
     [
       "re-requested after changes",
       { reviewDecision: "CHANGES_REQUESTED", reviewRequests: ["ben", "carol", "alice", "dave"] },
-      "\u{f4e3} @alice, @carol (+1)",
+      "\u{f4e3} @alice +2",
     ],
     ["requested without required reviews", { reviewRequests: ["alice"] }, "\u{f4e3} @alice"],
     ["only the session's own login requested", { reviewRequests: ["ben"] }, ""],
     [
       "changes requested without required reviews",
       { latestReviews: [{ id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } }] },
-      "\u{f4a8} changes requested",
+      "\u{f4a8} @alice",
     ],
     [
       "a standing request for changes outranks another reviewer's request",
@@ -580,7 +590,7 @@ describe("statusOf", () => {
         reviewRequests: ["bob"],
         latestReviews: [{ id: "r1", state: "CHANGES_REQUESTED", author: { login: "alice" } }],
       },
-      "\u{f4a8} changes requested",
+      "\u{f4a8} @alice",
     ],
     [
       "a re-request hands the turn back",

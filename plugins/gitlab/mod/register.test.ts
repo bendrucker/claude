@@ -193,7 +193,7 @@ describe("register", () => {
       phase: "pending",
       state: "opened",
     });
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1 · \u{f441} 1 approval needed");
+    expect(await w.shown($)).toBe("\u{f444} CI 0/1 · \u{f441} 1 approval");
 
     world.view = mr("failed");
     world.jobs = job("failed");
@@ -208,7 +208,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(await w.shown($)).toBe("\u{f52f} test · \u{f441} 1 approval needed");
+    expect(await w.shown($)).toBe("\u{f52f} test · \u{f441} 1 approval");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -218,7 +218,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f441} 1 approval needed");
+    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f441} 1 approval");
   });
 
   test("an MR already conflicting when first seen is announced once, through a recheck", async ($, on) => {
@@ -341,7 +341,7 @@ describe("register", () => {
         { mr: 7, head: "aaaaaaa1111", id: "3", author: "deploy-bot", reason: "author" },
         { mr: 7, head: "aaaaaaa1111", id: "2", author: "coderabbitai", reason: "coderabbit.ack" },
       ]);
-      expect(await w.shown($)).toContain("\u{f477} 2 muted");
+      expect(await w.shown($)).toContain("\u{f477} 2");
     },
   );
 
@@ -362,7 +362,7 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4a8} changes requested");
+    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f4a8} @alice");
     await w.clock.advance(POLL_MS.settled);
     expect(w.graphql.length).toBe(1);
 
@@ -589,7 +589,7 @@ describe("register", () => {
     expect(w.named("poll.error")).toEqual([
       expect.objectContaining({ ok: false, detail: { error: KEYRING } }),
     ]);
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1 · \u{f441} 1 approval needed · \u{f421} stale");
+    expect(await w.shown($)).toBe("\u{f444} CI 0/1 · \u{f441} 1 approval · \u{f421} stale");
   });
 
   test("an unexpected payload is a poll error", async ($, on) => {

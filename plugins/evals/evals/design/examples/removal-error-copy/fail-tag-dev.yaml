@@ -1,0 +1,1 @@
+fail: [tag-dev, kind-rewrite-dev, kind-fresh-dev]

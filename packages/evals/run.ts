@@ -8,6 +8,7 @@ import { shareGraders } from "./graders";
 import { readResult } from "./result";
 import { stage } from "./stage";
 import { casePlugins, listedPlugins, readSuite, type SuiteFile, withDependencies } from "./suite";
+import { inlineSkills } from "./inline";
 import { wrap } from "./wrap";
 
 export interface Staged {
@@ -84,6 +85,7 @@ export async function prepare(
       ? await stagePlugins(repo, suite, ref, root)
       : await stageWrapped(repo, suite, ref, root, config.wrap);
   await stage(repo, undefined, config.stage, root);
+  if (config.inline_references) await inlineSkills(staged.target);
   await shareGraders(join(staged.target, staged.evalDir), config.graders);
   return staged;
 }

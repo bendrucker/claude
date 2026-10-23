@@ -131,6 +131,13 @@
         "zod": "^4.4.3",
       },
     },
+    "plugins/evals/evals/design": {
+      "name": "evals-design-eval",
+      "dependencies": {
+        "@commander-js/extra-typings": "~15.0.0",
+        "commander": "~15.0.0",
+      },
+    },
     "plugins/evals/evals/hill-climb": {
       "name": "evals-hill-climb-eval",
       "dependencies": {
@@ -1294,6 +1301,8 @@
     "esprima": ["esprima@4.0.1", "", { "bin": { "esparse": "./bin/esparse.js", "esvalidate": "./bin/esvalidate.js" } }, "sha512-eGuFFw7Upda+g4p+QHvnW0RyTX/SVeJBDM/gCtMARO0cLuT2HcEKnTPvhjV6aGeqrCB/sbNop0Kszm0jsaWU4A=="],
 
     "etag": ["etag@1.8.1", "", {}, "sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg=="],
+
+    "evals-design-eval": ["evals-design-eval@workspace:plugins/evals/evals/design"],
 
     "evals-hill-climb-eval": ["evals-hill-climb-eval@workspace:plugins/evals/evals/hill-climb"],
 

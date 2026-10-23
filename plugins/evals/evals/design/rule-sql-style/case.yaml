@@ -1,0 +1,16 @@
+schema_version: "1.1"
+name: rule-sql-style
+tags: [design, dev, rule]
+plugins: ["../../.."]
+context:
+  scaffold_script: fixture.sh
+execution:
+  model: claude-sonnet-5-5
+  max_turns: 60
+  timeout_seconds: 1200
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Skill]
+  append_system_prompt: >-
+    Nobody answers while you work, so decide and write the suite without asking.
+    The artifact runs on claude-sonnet-5-5.
+    Write only the suite's files.
+    Finish with a list of every case in the suite, one per line as `name | tags`.

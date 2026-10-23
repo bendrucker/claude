@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '^(?=[^\n]*compact_log)(?=[^\n]*(memmove|shift|cop(y|ies)))(?=[^\n]*\b(39|4\d|50)(\.\d+)?\s?%)'
+pattern: '^(?=[^\n]*compact_log)(?=[^\n]*(memmove|shift|cop(y|ies)))(?=[^\n]*\b(3[4-9]|4\d|50)(\.\d+)?\s?%)'
 flags: im
 match: contains
 ---

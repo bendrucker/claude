@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: '^(?=[^\n]*(at most|upper bound|ceiling|\bbound|\bcap\b|no more than|up to|\bmax))(?=[^\n]*(\b(39|4\d|50)(\.\d+)?\s?%|\b(1\.[6-9]|2\.0)\d*\s?(x|×)))'
+pattern: '^(?=[^\n]*(at most|upper bound|ceiling|\bbound|\bcap\b|no more than|up to|\bmax))(?=[^\n]*(\b(3[4-9]|4\d|50)(\.\d+)?\s?%|\b(1\.[5-9]|2\.0)\d*\s?(x|×)))'
 flags: im
 match: contains
 ---

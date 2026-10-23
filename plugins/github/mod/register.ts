@@ -170,16 +170,17 @@ async function probe(
 }
 
 /**
- * Which of the REST resources behind a snapshot changed since the last probe.
- * A 304 spends no rate limit, and together they move on a push, a check, a
- * review, a comment, a mergeability answer, and a merge or close.
+ * Which of the REST resources behind a snapshot changed since the last probe,
+ * and their ETags, kept only once a read has seen what they describe. A 304
+ * spends no rate limit, and together they move on a push, a check, a review, a
+ * comment, a mergeability answer, and a merge or close.
  */
 async function changedOf(
   $: EngineInterface,
   watch: Watch,
   cwd: string,
   prev: Snapshot,
-): Promise<string[]> {
+): Promise<{ changed: string[]; etags: Map<string, string> }> {
   const { hostname, pathname } = new URL(prev.url);
   const repo = `repos${pathname.split("/pull/")[0]}`;
   const paths: [string, string][] = [
@@ -191,8 +192,8 @@ async function changedOf(
   const probes = await Promise.all(
     paths.map((entry) => probe($, cwd, hostname, entry, watch.etags.get(entry[1]))),
   );
-  watch.etags = new Map(probes.flatMap((p) => (p.etag === undefined ? [] : [[p.path, p.etag]])));
-  return probes.filter((p) => !p.isSame).map((p) => p.name);
+  const etags = new Map(probes.flatMap((p) => (p.etag === undefined ? [] : [[p.path, p.etag]])));
+  return { changed: probes.filter((p) => !p.isSame).map((p) => p.name), etags };
 }
 
 async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
@@ -212,8 +213,10 @@ async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
     last?.branch === branch &&
     last.snapshot.state === "OPEN" &&
     last.snapshot.block !== undefined;
-  const changed = isProbed ? await changedOf($, watch, cwd, last.snapshot) : undefined;
-  if (isProbed && changed?.length === 0) {
+  const probed = isProbed ? await changedOf($, watch, cwd, last.snapshot) : undefined;
+  const changed = probed?.changed;
+  if (isProbed && probed?.changed.length === 0) {
+    watch.etags = probed.etags;
     return { kind: "pr", snapshot: last.snapshot, read: "hit", changed };
   }
   const view = await $.process.run(["gh", "pr", "view", "--json", VIEW_FIELDS], {
@@ -235,6 +238,7 @@ async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
   ]);
   const snapshot = snapshotOf(parsed, { me, isHeadKnown, noise: watch.noise });
   watch.last = { branch, snapshot };
+  if (probed !== undefined) watch.etags = probed.etags;
   return { kind: "pr", snapshot, read: changed === undefined ? "full" : "miss", changed };
 }
 

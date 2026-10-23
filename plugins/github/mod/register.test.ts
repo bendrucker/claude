@@ -785,6 +785,30 @@ describe("register", () => {
     expect(w.views.length).toBe(4);
   });
 
+  test("a probe miss whose full read fails probes as a miss again", async ($, on) => {
+    const checks = "repos/o/r/commits/aaaaaaa1111/check-runs?per_page=100";
+    const etags: Record<string, string> = {
+      "repos/o/r/pulls/7": 'W/"p1"',
+      "repos/o/r/pulls/7/reviews?per_page=100": 'W/"r1"',
+      [checks]: 'W/"c1"',
+      "repos/o/r/commits/aaaaaaa1111/status?per_page=100": 'W/"s1"',
+    };
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS"), etags };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled);
+    etags[checks] = 'W/"c2"';
+    world.view = "HTTP 502: Bad Gateway";
+    await w.clock.advance(QUIET_MS[0] ?? 0);
+    expect(w.named("poll.error").length).toBe(1);
+
+    world.view = pr("FAILURE");
+    await w.clock.advance(POLL_MS.error);
+    expect(w.submits[0]).toContain("CI failed on PR #7 at aaaaaaa: ci / test.");
+  });
+
   test("an undecided mergeability or a closed PR is always read in full", async ($, on) => {
     const etags: Record<string, string> = { "repos/o/r/pulls/7": 'W/"p1"' };
     const view = { ...pr("SUCCESS"), mergeable: "UNKNOWN" };

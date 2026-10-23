@@ -105,6 +105,8 @@ function worldOf(on: On, world: World) {
     return { value: undefined };
   });
   on("session.start", ($, e) => ({ cwd: e.cwd }));
+  on("command.register", () => ({ value: { command: "mr" } }));
+  on("ui.open", () => ({ value: { isPlaced: true } }));
   on("session.end", ($, e) => ({ sessionId: e.sessionId }));
   on("session.cwd", () => ({ value: "/work" }));
   on("ui.render", { component: "PromptHint" }, ($, e) => {
@@ -204,7 +206,7 @@ describe("register", () => {
       phase: "pending",
       state: "opened",
     });
-    expect(await w.shown($)).toBe("you  \u{f444} 0/1  \u{f441} 1");
+    expect(await w.shown($)).toBe("you     │ \u{f444} 0/1  \u{f441} 1");
 
     world.view = mr("failed");
     world.jobs = job("failed");
@@ -219,7 +221,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(await w.shown($)).toBe("you  \u{f52f} 1  \u{f441} 1");
+    expect(await w.shown($)).toBe("you     │ \u{f52f} 1  \u{f441} 1");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -229,7 +231,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(await w.shown($)).toBe("you  \u{f49e}  \u{f441} 1");
+    expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f441} 1");
   });
 
   test("an MR already conflicting when first seen is announced once, through a recheck", async ($, on) => {
@@ -316,7 +318,7 @@ describe("register", () => {
     world.approvals = approvals("alice");
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits[1]).toContain("@alice approved MR !7");
-    expect(await w.shown($)).toBe("you  \u{f49e}  \u{f42e}");
+    expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f42e}");
 
     world.approvals = approvals();
     await w.clock.advance(POLL_MS.settled);
@@ -352,7 +354,7 @@ describe("register", () => {
         { mr: 7, head: "aaaaaaa1111", id: "3", author: "deploy-bot", reason: "author" },
         { mr: 7, head: "aaaaaaa1111", id: "2", author: "coderabbitai", reason: "coderabbit.ack" },
       ]);
-      expect(await w.shown($)).toBe("you  \u{f49e}  \u{f441} 1");
+      expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f441} 1");
     },
   );
 
@@ -373,14 +375,14 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    expect(await w.shown($)).toBe("you  \u{f49e}  \u{f4a8}");
+    expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f4a8}");
     await w.clock.advance(POLL_MS.settled);
     expect(w.graphql.length).toBe(1);
 
     world.notes = [note(5, "ben", true), note(4, "alice", true)];
     world.reviewers = state("UNREVIEWED");
     await w.clock.advance(POLL_MS.settled);
-    expect(await w.shown($)).toBe("review  \u{f49e}  \u{f4e3} 1");
+    expect(await w.shown($)).toBe("review  │ \u{f49e}  \u{f4e3} 1");
 
     world.notes = [note(6, "ben", true), note(5, "ben", true), note(4, "alice", true)];
     world.reviewers = "HTTP 500";
@@ -388,7 +390,7 @@ describe("register", () => {
     expect(w.graphql.length).toBe(3);
     expect(w.named("poll.error")).toEqual([]);
     expect(w.named("review.read").map((e) => e.ok)).toEqual([true, true, false]);
-    expect(await w.shown($)).toBe("review  \u{f49e}  \u{f4e3} 1");
+    expect(await w.shown($)).toBe("review  │ \u{f49e}  \u{f4e3} 1");
     expect(w.named("review.turn").map((e) => e.detail)).toEqual([
       { mr: 7, head: "aaaaaaa1111", turn: "author", waiting: ["alice"] },
       { mr: 7, head: "aaaaaaa1111", turn: "reviewer", waiting: ["alice"] },
@@ -612,7 +614,7 @@ describe("register", () => {
     expect(w.named("poll.error")).toEqual([
       expect.objectContaining({ ok: false, detail: { error: KEYRING } }),
     ]);
-    expect(await w.shown($)).toBe("you  \u{f444} 0/1  \u{f441} 1  \u{f421}");
+    expect(await w.shown($)).toBe("you     │ \u{f444} 0/1  \u{f441} 1  \u{f421}");
   });
 
   test("an unexpected payload is a poll error", async ($, on) => {
@@ -777,6 +779,44 @@ describe("register", () => {
     world.jobs = job("success");
     await w.clock.advance(POLL_MS.settled * 2);
     expect(w.submits.length).toBe(1);
+  });
+
+  test("the pane lists every job and the muted notes it hides until opened", async ($, on) => {
+    const ack = "<!-- This is an auto-generated reply by CodeRabbit -->\n✅ Actions performed";
+    const w = worldOf(on, {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("failed"),
+      jobs: [...job("failed"), { id: 901, name: "lint", status: "success", allow_failure: false }],
+      notes: [note(2, "coderabbitai", false, ack)],
+    });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const pane = await $.ui.mount({
+      plugin: "gitlab",
+      surface: "terminal",
+      component: "Pane",
+      requestId: "gitlab:mr",
+      props: {
+        title: "MR",
+        isFocused: false,
+        bodyColumns: 60,
+        placement: "dock",
+        scroll: { offset: 0, bodyRows: 30 },
+        view: {},
+      },
+    });
+
+    expect(await pane.find({ type: "Text", text: /✗ test/ })).toBeDefined();
+    expect(await pane.find({ type: "Text", text: /✓ lint/ })).toBeDefined();
+    expect(await pane.find({ type: "Text", text: /coderabbit\.ack/ })).toBeUndefined();
+
+    await pane.press({ key: "gitlab:muted" });
+    expect((await pane.find({ type: "Text", text: /coderabbit/ }))?.text).toContain(
+      "coderabbitai · coderabbit.ack",
+    );
+    await pane.unmount();
   });
 
   test("an MR with no pipeline and no approval rule waits on its author", async ($, on) => {

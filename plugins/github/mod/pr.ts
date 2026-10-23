@@ -211,6 +211,8 @@ export interface Snapshot {
   total: number;
   pending: number;
   failed: string[];
+  /** Every check by its latest run, sorted, as the pane lists them. */
+  checks: { label: string; outcome: Outcome }[];
   reviewDecision: string;
   /** Requested reviewers other than the session's own login, sorted. */
   requested: string[];
@@ -358,7 +360,7 @@ export type Promoted = Extract<Decision, { action: "promote" }>;
 const FAILED = new Set(["FAILURE", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "ERROR"]);
 const PENDING_STATES = new Set(["PENDING", "EXPECTED"]);
 
-type Outcome = "pending" | "passed" | "failed";
+export type Outcome = "pending" | "passed" | "failed";
 
 function outcomeOf(node: CheckNode): Outcome {
   if (node.__typename === "StatusContext") {
@@ -434,11 +436,13 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
   const checks = latest(view.statusCheckRollup ?? []);
   const failed: string[] = [];
   let pending = 0;
+  const listed: Snapshot["checks"] = [];
   for (const node of checks) {
     const outcome = outcomeOf(node);
+    const label = labelOf(node);
+    listed.push({ label, outcome });
     if (outcome === "pending") pending += 1;
     if (outcome !== "failed") continue;
-    const label = labelOf(node);
     const author = reviewerOf(label, bots);
     if (author === undefined) failed.push(label);
     else muted.push({ id: `${view.headRefOid}:${label}`, author, reason: "review.check" });
@@ -469,6 +473,7 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     total: checks.length,
     pending,
     failed,
+    checks: listed.toSorted((a, b) => a.label.localeCompare(b.label)),
     reviewDecision: view.reviewDecision ?? "",
     requested: (view.reviewRequests ?? []).filter((login) => login !== local.me).toSorted(),
     asked: (view.latestReviews ?? [])
@@ -730,19 +735,20 @@ const OCT = {
   commentDiscussion: "\u{f442}",
   dotFill: "\u{f444}",
   eye: "\u{f441}",
-  gitCompare: "\u{f47f}",
   gitMerge: "\u{f419}",
   gitMergeQueue: "\u{f4db}",
   gitPullRequestClosed: "\u{f4dc}",
   hourglass: "\u{f4e3}",
   reply: "\u{f4a8}",
+  x: "\u{f467}",
   xCircle: "\u{f52f}",
 };
 
-export const STALE = OCT.alert;
-
 /** Between footer segments: a glyph and its count sit one space apart, segments two. */
-export const SEP = "  ";
+const SEP = "  ";
+
+// The lead is padded to its longest word, so the glyphs after it hold still as it changes.
+const LEAD_WIDTH = "merging".length;
 
 // `isBusy` is a turn running, which is the agent at work on the author's move.
 const LEADS: Record<Ball, (isBusy: boolean) => string | undefined> = {
@@ -754,7 +760,7 @@ const LEADS: Record<Ball, (isBusy: boolean) => string | undefined> = {
 };
 
 const BLOCKS: Record<Block, string | undefined> = {
-  conflict: OCT.gitCompare,
+  conflict: `${OCT.gitMerge}${OCT.x}`,
   behind: OCT.arrowDown,
   none: undefined,
 };
@@ -784,18 +790,21 @@ function mergingPart(merging: Merging): string | undefined {
 }
 
 // The footer already links the PR, so the state rides after it on that line.
-export function statusOf(snapshot: Snapshot, isBusy = false): string {
+export function statusOf(snapshot: Snapshot, isBusy = false, isStale = false): string {
   const ended = ENDED[snapshot.state];
   if (ended !== undefined) return ended;
   const turn = turnOf(snapshot);
-  return [
-    LEADS[ballOf(snapshot)](isBusy),
+  const details = [
     BLOCKS[snapshot.block ?? "none"],
     CHECKS[snapshot.phase](snapshot),
     TURNS[turn.turn](snapshot, turn.waiting),
     snapshot.threads > 0 ? `${OCT.commentDiscussion} ${snapshot.threads}` : undefined,
     mergingPart(snapshot.merging),
+    isStale ? OCT.alert : undefined,
   ]
     .filter((part) => part !== undefined)
     .join(SEP);
+  const lead = LEADS[ballOf(snapshot)](isBusy);
+  if (lead === undefined) return details;
+  return details === "" ? lead : `${lead.padEnd(LEAD_WIDTH)} │ ${details}`;
 }

@@ -1,8 +1,7 @@
 import type { EngineInterface, On, PluginOptions, Timer } from "claude-code";
+import { drawPane, MUTED, PANE } from "./pane.tsx";
 import {
   type Noise,
-  SEP,
-  STALE,
   type Approvals,
   type Discussion,
   type Job,
@@ -113,6 +112,9 @@ interface Watch {
   /** This session's turns by id, any agent's, to tell its notes from the person's. */
   turns: Map<string, Span>;
   line: string | undefined;
+  /** How the last successful poll read the MR. */
+  via: Via | undefined;
+  isMutedOpen: boolean;
   generation: number;
   isStopped: boolean;
 }
@@ -139,8 +141,7 @@ function render($: EngineInterface, watch: Watch) {
     show($, watch, undefined);
     return;
   }
-  const line = statusOf(watch.snapshot, isBusy(watch));
-  show($, watch, watch.error === undefined ? line : [line, STALE].filter(Boolean).join(SEP));
+  show($, watch, statusOf(watch.snapshot, isBusy(watch), watch.error !== undefined));
 }
 
 function emit($: EngineInterface, event: string, detail: Record<string, unknown>, ok = true) {
@@ -598,6 +599,7 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     if (!isCurrent() || seq !== watch.polls) return;
     watch.error = undefined;
     watch.errors = 0;
+    watch.via = read.kind === "mr" ? read.read : undefined;
     const { isTracked, isChanged } = apply($, watch, read, isCurrent);
     let streak = isChanged ? 0 : watch.streak + 1;
     if (isTracked && watch.snapshot !== undefined) {
@@ -606,6 +608,8 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     }
     watch.polledAt = now;
     schedule($, watch, streak, "change");
+    // The pane shows the poll times, which move on every poll.
+    $.ui.invalidate("ui.render");
   } catch (error) {
     if (!isCurrent() || seq !== watch.polls) return;
     const message = error instanceof Error ? error.message : String(error);
@@ -701,6 +705,8 @@ export function register(on: On, options: PluginOptions): void {
     streak: 0,
     none: undefined,
     turns: new Map(),
+    via: undefined,
+    isMutedOpen: false,
     line: undefined,
     generation: 0,
     isStopped: true,
@@ -724,6 +730,12 @@ export function register(on: On, options: PluginOptions): void {
     // A session.end while this start was in flight has moved the generation on.
     if (watch.generation !== generation) return started;
     emit($, "session.start", { active: true });
+    // The watch runs without the command, so a refusal only logs.
+    $.command
+      .register({ name: "mr", description: "Show what the MR watcher sees" })
+      .catch((error: unknown) => {
+        emit($, "command.register", { error: String(error) }, false);
+      });
     if (noiseError !== undefined) emit($, "ignoreBody.invalid", { error: noiseError }, false);
     if (watch.isStopped) {
       watch.isStopped = false;
@@ -751,6 +763,24 @@ export function register(on: On, options: PluginOptions): void {
       show($, watch, undefined);
     }
     return next(e);
+  });
+
+  on("command.run", { command: "mr" }, async ($) => {
+    const { isPlaced } = await $.ui.open({ id: PANE, title: "MR" });
+    emit($, "pane.open", { placed: isPlaced, mr: watch.snapshot?.mr });
+    return {};
+  }).catch(($, e, next) => next(e));
+
+  on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) =>
+    drawPane($, e, watch, await $.clock.now()),
+  );
+
+  on("ui.press", { plugin: "gitlab" }, ($, e, next) => {
+    if (e.element !== MUTED) return next(e);
+    watch.isMutedOpen = !watch.isMutedOpen;
+    emit($, "pane.muted", { open: watch.isMutedOpen, count: watch.snapshot?.muted.length });
+    $.ui.invalidate("ui.render");
+    return { element: e.element };
   });
 
   on("turn.start", async ($, e, next) => {

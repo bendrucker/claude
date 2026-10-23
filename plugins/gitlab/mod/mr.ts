@@ -226,6 +226,8 @@ export interface Snapshot {
   total: number;
   pending: number;
   failed: string[];
+  /** Every job, sorted, as the pane lists them. */
+  checks: { label: string; outcome: "pending" | "passed" | "failed" }[];
   isChangesRequested: boolean;
   isApproved: boolean;
   approvalsLeft: number;
@@ -433,9 +435,18 @@ export function snapshotOf(read: Read): Snapshot {
   const failed: string[] = [];
   let pending = 0;
   const isManual = view.pipeline?.status === "manual";
+  const checks: Snapshot["checks"] = [];
   for (const job of jobs) {
-    if (job.status === "failed" && !job.allowFailure) failed.push(flatten(job.name));
-    else if (PENDING.has(job.status) || (isManual && job.status === "manual")) pending += 1;
+    const label = flatten(job.name);
+    if (job.status === "failed" && !job.allowFailure) {
+      failed.push(label);
+      checks.push({ label, outcome: "failed" });
+    } else if (PENDING.has(job.status) || (isManual && job.status === "manual")) {
+      pending += 1;
+      checks.push({ label, outcome: "pending" });
+    } else {
+      checks.push({ label, outcome: "passed" });
+    }
   }
   // A failed downstream pipeline fails its trigger job, which the jobs list leaves out.
   if (view.pipeline?.status === "failed" && failed.length === 0) failed.push("pipeline");
@@ -466,6 +477,7 @@ export function snapshotOf(read: Read): Snapshot {
     total: jobs.length,
     pending,
     failed: [...new Set(failed)],
+    checks: checks.toSorted((a, b) => a.label.localeCompare(b.label)),
     isChangesRequested: view.detailedMergeStatus === "requested_changes",
     isApproved: approvals.approvedBy.length > 0 && approvals.approvalsLeft === 0,
     approvalsLeft: approvals.approvalsLeft,
@@ -747,19 +759,20 @@ const OCT = {
   commentDiscussion: "\u{f442}",
   dotFill: "\u{f444}",
   eye: "\u{f441}",
-  gitCompare: "\u{f47f}",
   gitMerge: "\u{f419}",
   gitMergeQueue: "\u{f4db}",
   gitPullRequestClosed: "\u{f4dc}",
   hourglass: "\u{f4e3}",
   reply: "\u{f4a8}",
+  x: "\u{f467}",
   xCircle: "\u{f52f}",
 };
 
-export const STALE = OCT.alert;
-
 /** Between footer segments: a glyph and its count sit one space apart, segments two. */
-export const SEP = "  ";
+const SEP = "  ";
+
+// The lead is padded to its longest word, so the glyphs after it hold still as it changes.
+const LEAD_WIDTH = "merging".length;
 
 // `isBusy` is a turn running, which is the agent at work on the author's move.
 const LEADS: Record<Ball, (isBusy: boolean) => string | undefined> = {
@@ -771,7 +784,7 @@ const LEADS: Record<Ball, (isBusy: boolean) => string | undefined> = {
 };
 
 const BLOCKS: Record<Block, string | undefined> = {
-  conflict: OCT.gitCompare,
+  conflict: `${OCT.gitMerge}${OCT.x}`,
   behind: OCT.arrowDown,
   none: undefined,
 };
@@ -801,18 +814,21 @@ function mergingPart(merging: Merging): string | undefined {
 }
 
 // The footer already links the MR, so the state rides after it on that line.
-export function statusOf(snapshot: Snapshot, isBusy = false): string {
+export function statusOf(snapshot: Snapshot, isBusy = false, isStale = false): string {
   const ended = ENDED[snapshot.state];
   if (ended !== undefined) return ended;
   const turn = turnOf(snapshot);
-  return [
-    LEADS[ballOf(snapshot)](isBusy),
+  const details = [
     BLOCKS[snapshot.block ?? "none"],
     CHECKS[snapshot.phase](snapshot),
     TURNS[turn.turn](snapshot, turn.waiting),
     snapshot.threads > 0 ? `${OCT.commentDiscussion} ${snapshot.threads}` : undefined,
     mergingPart(snapshot.merging),
+    isStale ? OCT.alert : undefined,
   ]
     .filter((part) => part !== undefined)
     .join(SEP);
+  const lead = LEADS[ballOf(snapshot)](isBusy);
+  if (lead === undefined) return details;
+  return details === "" ? lead : `${lead.padEnd(LEAD_WIDTH)} │ ${details}`;
 }

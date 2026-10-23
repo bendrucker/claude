@@ -85,6 +85,8 @@ interface Watch {
   /** What was muted since the head last moved, and since the last send. */
   muted: { head: string; count: number; held: string[] };
   error: string | undefined;
+  /** Failed polls in a row, which stretch the wait so a rate limit can reset. */
+  errors: number;
   ticker: Timer | undefined;
   tickedAt: number | undefined;
   polledAt: number;
@@ -131,6 +133,8 @@ async function isDefaultBranch($: EngineInterface, cwd: string, branch: string):
 }
 
 const NO_MR = /no (open )?merge request/i;
+// glab's answer in a checkout whose remotes are on another forge.
+const FOREIGN = /none of the git remotes .* known GitLab host/i;
 
 // glab resolves the host from the git remote, which covers self-managed instances.
 async function glab($: EngineInterface, cwd: string, args: string[]): Promise<string> {
@@ -160,6 +164,7 @@ async function viewMr(
   try {
     return await glab($, cwd, ["mr", "view", "-F", "json"]);
   } catch (error) {
+    if (error instanceof Error && FOREIGN.test(error.message)) return "not gitlab";
     if (!(error instanceof Error && NO_MR.test(error.message))) throw error;
     if (watch.snapshot === undefined || watch.branch !== branch) return undefined;
     return glab($, cwd, ["mr", "view", String(watch.snapshot.mr), "-F", "json"]);
@@ -283,6 +288,7 @@ async function readMr($: EngineInterface, watch: Watch, isRetry = false): Promis
   }
   const stdout = await viewMr($, watch, cwd, branch);
   if (stdout === undefined) return { kind: "none", reason: "no mr", branch };
+  if (stdout === "not gitlab") return { kind: "none", reason: stdout, branch };
   const view = parsed(parseView(stdout), "glab mr view");
   const prev = watch.snapshot;
   // A merged or closed MR changes nothing else the watch shows.
@@ -553,13 +559,15 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     watch.polledAt = now;
     schedule($, watch, streak, "change");
     watch.error = undefined;
+    watch.errors = 0;
   } catch (error) {
     if (!isCurrent() || seq !== watch.polls) return;
     const message = error instanceof Error ? error.message : String(error);
     if (message !== watch.error) emit($, "poll.error", { error: message }, false);
     watch.error = message;
+    watch.errors += 1;
     watch.polledAt = now;
-    watch.due = now + POLL_MS.error;
+    watch.due = now + Math.min(POLL_MS.error * 2 ** (watch.errors - 1), BACKOFF_CAP_MS);
     if (watch.snapshot !== undefined) {
       const line = statusOf(watch.snapshot, watch.muted.count);
       show($, watch, line === "" ? STALE : `${line} · ${STALE}`);
@@ -640,6 +648,7 @@ export function register(on: On, options: PluginOptions): void {
     undelivered: undefined,
     muted: { head: "", count: 0, held: [] },
     error: undefined,
+    errors: 0,
     ticker: undefined,
     tickedAt: undefined,
     polledAt: 0,

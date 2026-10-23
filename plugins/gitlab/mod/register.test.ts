@@ -559,6 +559,18 @@ describe("register", () => {
     ]);
   });
 
+  test("a checkout on another forge reads as no MR, not an error", async ($, on) => {
+    const view =
+      "None of the git remotes configured for this repository point to a known GitLab host.";
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("mr.none").map((e) => e.detail?.reason)).toEqual(["not gitlab"]);
+  });
+
   test("origin/HEAD names the default branch, so an MR from master is still watched", async ($, on) => {
     const world: World = { branch: "main", originHead: "origin/main", glab: GLAB_OK, view: mr() };
     const w = worldOf(on, world);

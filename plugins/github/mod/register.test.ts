@@ -929,6 +929,38 @@ describe("register", () => {
     expect(await w.shown($)).toBe("\u{f52f} test · \u{f421} stale");
   });
 
+  test("a checkout on another forge reads as no PR, not an error", async ($, on) => {
+    const view =
+      "none of the git remotes configured for this repository point to a known GitHub host.";
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("pr.none").map((e) => e.detail?.reason)).toEqual(["not github"]);
+  });
+
+  test("failing polls wait longer each time, up to the backoff cap", async ($, on) => {
+    const view = "GraphQL: API rate limit already exceeded for user ID 1.";
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const minute = 60_000;
+    await w.clock.advance(5 * minute - TICK_MS);
+    expect(w.views.length).toBe(1);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(2);
+    await w.clock.advance((10 + 20 + 40 + 80 + 120) * minute);
+    expect(w.views.length).toBe(7);
+    await w.clock.advance(120 * minute - TICK_MS);
+    expect(w.views.length).toBe(7);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(8);
+    expect(w.named("poll.error").length).toBe(1);
+  });
+
   test("an unchanged PR backs off until a turn or a change resets it", async ($, on) => {
     const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
     const w = worldOf(on, world);

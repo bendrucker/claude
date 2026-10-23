@@ -45,6 +45,8 @@ const TURNS_KEPT_MS = 60 * 60_000;
 // A dropped injection is retried on later polls, up to this many attempts.
 export const MAX_ATTEMPTS = 3;
 // Skipped when origin/HEAD is unset and the real default branch is unknown.
+// gh's answer in a checkout whose remotes are on another forge.
+const FOREIGN = /none of the git remotes .* known GitHub host/i;
 const DEFAULT_BRANCHES = new Set(["main", "master"]);
 // /clear and /resume keep the process running, so the watch continues.
 const CONTINUING = new Set(["clear", "resume"]);
@@ -67,6 +69,8 @@ interface Watch {
   /** What was muted since the head last moved, and since the last send. */
   muted: { head: string; count: number; held: string[] };
   error: string | undefined;
+  /** Failed polls in a row, which stretch the wait so a rate limit can reset. */
+  errors: number;
   ticker: Timer | undefined;
   tickedAt: number | undefined;
   polledAt: number;
@@ -232,6 +236,7 @@ async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
     if (/no pull requests found/i.test(view.stderr)) {
       return { kind: "none", reason: "no pr", branch };
     }
+    if (FOREIGN.test(view.stderr)) return { kind: "none", reason: "not github", branch };
     const line = view.stderr.trim().split("\n")[0] ?? "";
     throw new Error(line === "" ? `gh exited ${view.exitCode}` : line);
   }
@@ -460,13 +465,15 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     watch.polledAt = now;
     schedule($, watch, streak, "change");
     watch.error = undefined;
+    watch.errors = 0;
   } catch (error) {
     if (!isCurrent() || seq !== watch.polls) return;
     const message = error instanceof Error ? error.message : String(error);
     if (message !== watch.error) emit($, "poll.error", { error: message }, false);
     watch.error = message;
+    watch.errors += 1;
     watch.polledAt = now;
-    watch.due = now + POLL_MS.error;
+    watch.due = now + Math.min(POLL_MS.error * 2 ** (watch.errors - 1), BACKOFF_CAP_MS);
     if (watch.snapshot !== undefined) {
       const line = statusOf(watch.snapshot, watch.muted.count);
       show($, watch, line === "" ? STALE : `${line} · ${STALE}`);
@@ -546,6 +553,7 @@ export function register(on: On, options: PluginOptions): void {
     undelivered: undefined,
     muted: { head: "", count: 0, held: [] },
     error: undefined,
+    errors: 0,
     ticker: undefined,
     tickedAt: undefined,
     polledAt: 0,

@@ -17,12 +17,14 @@ export interface ReviewNode {
   author?: { login?: string } | null;
   state: string;
   body?: string | null;
+  submittedAt?: string | null;
 }
 
 export interface CommentNode {
   id: string;
   author?: { login?: string } | null;
   body?: string | null;
+  createdAt?: string | null;
   isMinimized?: boolean;
   viewerDidAuthor?: boolean;
 }
@@ -78,6 +80,7 @@ function reviewOf(value: unknown): ReviewNode | undefined {
     state: value.state,
     author: loginOf(value.author),
     body: textOf(value.body),
+    submittedAt: textOf(value.submittedAt),
   };
 }
 
@@ -87,6 +90,7 @@ function commentOf(value: unknown): CommentNode | undefined {
     id: value.id,
     author: loginOf(value.author),
     body: textOf(value.body),
+    createdAt: textOf(value.createdAt),
     isMinimized: value.isMinimized === true,
     viewerDidAuthor: value.viewerDidAuthor === true,
   };
@@ -253,6 +257,24 @@ export interface Local {
   me: string | undefined;
   isHeadKnown: boolean;
   noise?: Noise;
+  /** Wall-clock spans of this session's turns, the last one open while a turn runs. */
+  turns?: Span[];
+}
+
+export type Span = [start: number, end: number | undefined];
+
+// The person shares the session's login, so a post under it is the session's own
+// when it carries Claude Code's footer or lands while one of its turns runs.
+const FOOTER = /Generated (by|with) \[Claude Code\]/;
+const SLACK_MS = 10_000;
+
+function isOwn(body: string, at: string | null | undefined, turns: Span[]): boolean {
+  if (FOOTER.test(body)) return true;
+  const time = Date.parse(at ?? "");
+  if (Number.isNaN(time)) return true;
+  return turns.some(
+    ([start, end]) => time >= start - SLACK_MS && time <= (end ?? Infinity) + SLACK_MS,
+  );
 }
 
 export type Decision =
@@ -337,7 +359,7 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
   const reviews: Snapshot["reviews"] = [];
   for (const r of view.reviews ?? []) {
     const author = r.author?.login ?? "someone";
-    if (author === local.me) continue;
+    if (author === local.me && isOwn(r.body ?? "", r.submittedAt, local.turns ?? [])) continue;
     // A bot's bodiless comment review is its reply in a thread, such as an acknowledgement.
     const isReply = r.state === "COMMENTED" && (r.body ?? "").trim() === "" && isBot(author, noise);
     if (isReply) muted.push({ id: r.id, author, reason: "review.reply" });
@@ -364,7 +386,8 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
   else if (pending > 0) phase = "pending";
   const comments: Snapshot["comments"] = [];
   for (const c of view.comments ?? []) {
-    if (c.isMinimized || c.viewerDidAuthor || c.author?.login === local.me) continue;
+    const isMine = c.viewerDidAuthor === true || c.author?.login === local.me;
+    if (c.isMinimized || (isMine && isOwn(c.body ?? "", c.createdAt, local.turns ?? []))) continue;
     const author = c.author?.login ?? "someone";
     const reason = chatterOf(author, c.body ?? "", noise);
     if (reason === undefined) comments.push({ id: c.id, author });

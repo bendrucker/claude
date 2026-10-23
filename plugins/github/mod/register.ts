@@ -4,6 +4,7 @@ import {
   STALE,
   type Promoted,
   type Snapshot,
+  type Span,
   VIEW_FIELDS,
   baselineOf,
   combine,
@@ -38,6 +39,8 @@ export const IDLE_CAP_MS = 10 * 60_000;
 const LATE_MS = 3 * TICK_MS;
 // A poll in flight this long lost a dispatch, so the next tick polls anyway.
 const STUCK_MS = 5 * 60_000;
+// A post lands within seconds of its turn, so older spans only grow the scan.
+const TURNS_KEPT_MS = 60 * 60_000;
 
 // A dropped injection is retried on later polls, up to this many attempts.
 export const MAX_ATTEMPTS = 3;
@@ -75,6 +78,8 @@ interface Watch {
   streak: number;
   /** Why the last poll found no PR, and on which branch. */
   none: string | undefined;
+  /** This session's turns by id, any agent's, to tell its posts from the person's. */
+  turns: Map<string, Span>;
   line: string | undefined;
   generation: number;
   isStopped: boolean;
@@ -236,7 +241,8 @@ async function readPr($: EngineInterface, watch: Watch): Promise<Read> {
     meOf($, watch, cwd, parsed.url),
     isHeadKnownOf($, watch, cwd, parsed.headRefOid),
   ]);
-  const snapshot = snapshotOf(parsed, { me, isHeadKnown, noise: watch.noise });
+  const turns = [...watch.turns.values()];
+  const snapshot = snapshotOf(parsed, { me, isHeadKnown, noise: watch.noise, turns });
   watch.last = { branch, snapshot };
   if (probed !== undefined) watch.etags = probed.etags;
   return { kind: "pr", snapshot, read: changed === undefined ? "full" : "miss", changed };
@@ -548,6 +554,7 @@ export function register(on: On, options: PluginOptions): void {
     polls: 0,
     streak: 0,
     none: undefined,
+    turns: new Map(),
     line: undefined,
     generation: 0,
     isStopped: true,
@@ -600,7 +607,18 @@ export function register(on: On, options: PluginOptions): void {
     return next(e);
   });
 
-  on("turn.complete", ($, e, next) => {
+  on("turn.start", async ($, e, next) => {
+    const now = await $.clock.now();
+    for (const [id, [, end]] of watch.turns) {
+      if (end !== undefined && now - end > TURNS_KEPT_MS) watch.turns.delete(id);
+    }
+    watch.turns.set(e.turnId, [now, undefined]);
+    return next(e);
+  }).catch(($, e, next) => next(e));
+
+  on("turn.complete", async ($, e, next) => {
+    const span = watch.turns.get(e.turnId);
+    if (span !== undefined) span[1] = await $.clock.now();
     if (e.agentId === undefined) void wake($, watch);
     return next(e);
   }).catch(($, e, next) => next(e));

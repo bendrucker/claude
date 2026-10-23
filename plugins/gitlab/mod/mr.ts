@@ -107,8 +107,16 @@ const readNote = map(
     body: or(str, ""),
     system: or(bool, false),
     type: or(str, ""),
+    created_at: or(str, ""),
   }),
-  (n) => ({ id: n.id, author: n.author, body: n.body, isSystem: n.system, type: n.type }),
+  (n) => ({
+    id: n.id,
+    author: n.author,
+    body: n.body,
+    isSystem: n.system,
+    type: n.type,
+    createdAt: n.created_at,
+  }),
 );
 
 const readJob = map(
@@ -315,6 +323,24 @@ export interface Read {
   me: string;
   isHeadKnown: boolean;
   noise?: Noise;
+  /** Wall-clock spans of this session's turns, the last one open while a turn runs. */
+  turns?: Span[];
+}
+
+export type Span = [start: number, end: number | undefined];
+
+// The person shares the session's username, so a note under it is the session's own
+// when it carries Claude Code's footer or lands while one of its turns runs.
+const FOOTER = /Generated (by|with) \[Claude Code\]/;
+const SLACK_MS = 10_000;
+
+function isOwn(body: string, at: string, turns: Span[]): boolean {
+  if (FOOTER.test(body)) return true;
+  const time = Date.parse(at);
+  if (Number.isNaN(time)) return true;
+  return turns.some(
+    ([start, end]) => time >= start - SLACK_MS && time <= (end ?? Infinity) + SLACK_MS,
+  );
 }
 
 function phaseOf(read: Read, failed: string[], pending: number): Phase {
@@ -361,7 +387,9 @@ export function snapshotOf(read: Read): Snapshot {
   const muted: Snapshot["muted"] = [];
   for (const note of notes) {
     const { id, author } = note;
-    if (note.isSystem || author === me) continue;
+    if (note.isSystem || (author === me && isOwn(note.body, note.createdAt, read.turns ?? []))) {
+      continue;
+    }
     const reason = chatterOf(note, noise);
     if (reason === undefined) kept.push({ id, author });
     else muted.push({ id: String(id), author, reason });

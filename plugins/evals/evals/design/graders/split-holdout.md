@@ -1,7 +1,8 @@
 ---
 type: regex
-target: trace
-pattern: '(?:"name":"Write","input":\{"file_path":"(?:[^"\\]|\\.)*(?:\.py)","content":"(?=(?:[^"\\]|\\.)*(?:metadata=(?:dict\(|\{)(?:[^}"\\]|\\.)*\bholdout\b)))|(?:"name":"Write","input":\{"content":"(?=(?:[^"\\]|\\.)*(?:metadata=(?:dict\(|\{)(?:[^}"\\]|\\.)*\bholdout\b))(?:[^"\\]|\\.)*","file_path":"(?:[^"\\]|\\.)*(?:\.py)")'
+target: last_message
+pattern: '^[^|\n]*\|(?=[^\n]*\bholdout\b)'
+flags: m
 match: contains
 ---
-A `Case` in the dataset carries `holdout` in its metadata.
+The reply lists a case tagged `holdout`.

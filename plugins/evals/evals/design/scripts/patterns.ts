@@ -6,7 +6,6 @@ const KEYS = String.raw`(?:"[a-z_]+":(?:"${STR}"|true|false),)*?`;
 
 const FLOW_TAGS = String.raw`(?:[^\]"\\]|\\.)*`;
 const BLOCK_ITEM = String.raw`(?:\\n *- *["']?[\w-]+["']?)*?\\n *- *["']?`;
-const META = String.raw`(?:[^}"\\]|\\.)*`;
 
 /** Lookaheads that each search a JSON string value from its start. */
 function within(checks: string[]): string {
@@ -55,19 +54,12 @@ export function tagged(...tokens: string[]): string {
   return `tags:(?: ?\\[${flow}${FLOW_TAGS}\\b${last}\\b|${block}${BLOCK_ITEM}${last}\\b)`;
 }
 
-/** The `metadata` of a pydantic-evals `Case` names every token. */
-export function metadata(...tokens: string[]): string {
-  const ahead = tokens
-    .slice(0, -1)
-    .map((t) => `(?=${META}\\b${t}\\b)`)
-    .join("");
-  const last = tokens.at(-1) ?? "";
-  return `metadata=(?:dict\\(|\\{)${ahead}${META}\\b${last}\\b`;
-}
-
-/** A pydantic-evals `Case` named for a role, such as `quiet`. */
-export function namedCase(role: string): string {
-  return String.raw`(?:${metadata(role)}|name=\\?["'][\w-]*${role})`;
+/**
+ * A line of the reply's case list whose tags, after the first `|`, name every token in any order.
+ * Read with the `m` flag.
+ */
+export function listed(...tokens: string[]): string {
+  return `^[^|\\n]*\\|${tokens.map((t) => `(?=[^\\n]*\\b${t}\\b)`).join("")}`;
 }
 
 /** The judge model of a `suite.yaml`, anything but the model under test. */

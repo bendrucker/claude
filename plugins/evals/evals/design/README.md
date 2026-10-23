@@ -31,9 +31,9 @@ All but one grader are deterministic. The regexes read the trace of the session'
 | Rule | Grader | Kind |
 | --- | --- | --- |
 | a third of the cases are `holdout` | `holdout-share` | `llm`, the only one, one criterion with a 25% to 45% pass bar over the reply's case list |
-| both splits exist | `tag-holdout`, `tag-dev` (native), `split-holdout`, `split-dev` (pydantic) | `regex` |
-| every request kind has a case in both splits | `kind-<kind>-<split>` per case | `regex` |
-| a quiet case and a balance case | `quiet-tag`, `balance-tag` (native), `quiet-case`, `balance-case` (pydantic) | `regex` |
+| both splits exist | `tag-holdout`, `tag-dev` (native), `split-holdout`, `split-dev` (pydantic, from the reply's list) | `regex` |
+| every request kind has a case in both splits | `kind-<kind>-<split>` per case (pydantic: from the reply's list) | `regex` |
+| a quiet case and a balance case | `quiet-tag`, `balance-tag` (native), `quiet-case`, `balance-case` (pydantic, from the reply's list) | `regex` |
 | the judge differs from the model under test | `judge-model` (native `suite.yaml`), `judge-model-py` (no `LLMJudge` without `model=` or with the agent's model) | `regex` |
 | each `llm` grader states a pass bar | `pass-bar`, `pass-bar-py` | `regex`, `not_contains` |
 | `examples/` exist | `examples-exist` | `file_exists` |
@@ -48,7 +48,8 @@ The runner has no script or command grader, so a regex over the trace stands in 
 - The holdout share is a count, which no regex expresses. `tag-holdout` and `tag-dev` only require both splits to exist, and `holdout-share` judges the reply's own list of cases and splits. A session that lists a case list it did not write passes the judge. The trace shows the truth.
 - "Random within each kind" and "never by baseline score" are not observable. The kind graders check coverage and nothing about how the split was drawn.
 - "Source from real corrected turns" and "one criterion per `llm` judge" need a reader. The pass-bar graders only fail an `llm` grader with no `pass` anywhere in it.
-- The graders find a tag list written as a flow list (`tags: [fix, holdout]`) or a block list, and a case in the dataset's `metadata`. A suite that names splits some other way scores 0 on the tag graders.
+- The native graders find a tag list written as a flow list (`tags: [fix, holdout]`) or a block list. A suite that names splits some other way scores 0 on them.
+- A Python dataset can build its cases through helpers, such as `_refund(name, question, "holdout")`, which no regex over the file follows. The pydantic split, kind, and role graders read the reply's `name | tags` list instead, so like `holdout-share` they trust what the session reports.
 - The judge graders compare against the model the prompt names for the artifact (`claude-sonnet-5-5`). A pydantic `LLMJudge` whose model comes from a variable fails `judge-model-py` unless it also appears as a literal in the call.
 
 ## Regenerate

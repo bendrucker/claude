@@ -3,8 +3,7 @@ import {
   GRADER_TEXT,
   JUDGE_MODEL,
   LLM_NO_BAR,
-  metadata,
-  namedCase,
+  listed,
   PYDANTIC_JUDGE_NO_BAR,
   PYDANTIC_JUDGE_UNSET,
   REMOVAL,
@@ -42,6 +41,15 @@ function trace(pattern: string, body: string, match: "contains" | "not_contains"
       ...(flags === "" ? [] : [`flags: ${flags}`]),
       `match: ${match}`,
     ],
+    body,
+  } satisfies Grader;
+}
+
+/** The reply's own case list, the one place a dataset built through helpers states each case's tags. */
+function reply(pattern: string, body: string) {
+  return {
+    type: "regex",
+    fields: ["target: last_message", `pattern: ${quote(pattern)}`, "flags: m", "match: contains"],
     body,
   } satisfies Grader;
 }
@@ -126,35 +134,19 @@ export const SHARED: Record<string, { cases: (c: CaseSpec) => boolean; grader: G
   },
   "split-holdout": {
     cases: (c) => c.harness === "pydantic",
-    grader: trace(
-      writtenTo(String.raw`\.py`, metadata("holdout")),
-      "A `Case` in the dataset carries `holdout` in its metadata.",
-      "contains",
-    ),
+    grader: reply(listed("holdout"), "The reply lists a case tagged `holdout`."),
   },
   "split-dev": {
     cases: (c) => c.harness === "pydantic",
-    grader: trace(
-      writtenTo(String.raw`\.py`, metadata("dev")),
-      "A `Case` in the dataset carries `dev` in its metadata.",
-      "contains",
-    ),
+    grader: reply(listed("dev"), "The reply lists a case tagged `dev`."),
   },
   "quiet-case": {
     cases: (c) => c.harness === "pydantic",
-    grader: trace(
-      writtenTo(String.raw`\.py`, namedCase("quiet")),
-      "The dataset has a `quiet` case, named or marked in its metadata.",
-      "contains",
-    ),
+    grader: reply(listed("quiet"), "The reply lists a case tagged `quiet`."),
   },
   "balance-case": {
     cases: (c) => c.harness === "pydantic",
-    grader: trace(
-      writtenTo(String.raw`\.py`, namedCase("balance")),
-      "The dataset has a `balance` case, named or marked in its metadata.",
-      "contains",
-    ),
+    grader: reply(listed("balance"), "The reply lists a case tagged `balance`."),
   },
   "dataset-written": {
     cases: (c) => c.harness === "pydantic",
@@ -224,15 +216,11 @@ export function perCase(c: CaseSpec): Record<string, Grader> {
   const out: Record<string, Grader> = {};
   for (const kind of c.kinds) {
     for (const split of c.splits) {
-      const check =
+      const body = `A \`${kind}\` case is tagged \`${split}\`.`;
+      out[`kind-${kind}-${split}`] =
         c.harness === "native"
-          ? written(tagged(kind, split))
-          : writtenTo(String.raw`\.py`, metadata(kind, split));
-      out[`kind-${kind}-${split}`] = trace(
-        check,
-        `A \`${kind}\` case is tagged \`${split}\`.`,
-        "contains",
-      );
+          ? trace(written(tagged(kind, split)), body, "contains")
+          : reply(listed(kind, split), body);
     }
   }
   if (c.fact !== undefined) {

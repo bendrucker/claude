@@ -1,7 +1,8 @@
 ---
 type: regex
-target: trace
-pattern: '(?:"name":"Write","input":\{"file_path":"(?:[^"\\]|\\.)*(?:\.py)","content":"(?=(?:[^"\\]|\\.)*(?:metadata=(?:dict\(|\{)(?=(?:[^}"\\]|\\.)*\brefund\b)(?:[^}"\\]|\\.)*\bholdout\b)))|(?:"name":"Write","input":\{"content":"(?=(?:[^"\\]|\\.)*(?:metadata=(?:dict\(|\{)(?=(?:[^}"\\]|\\.)*\brefund\b)(?:[^}"\\]|\\.)*\bholdout\b))(?:[^"\\]|\\.)*","file_path":"(?:[^"\\]|\\.)*(?:\.py)")'
+target: last_message
+pattern: '^[^|\n]*\|(?=[^\n]*\brefund\b)(?=[^\n]*\bholdout\b)'
+flags: m
 match: contains
 ---
 A `refund` case is tagged `holdout`.

@@ -5,6 +5,7 @@ import { buildAttribution } from "../../scripts/inbox";
 import { REORDER_MECHANISM, reorder } from "../../scripts/reorder";
 import {
   buildJsonPayload,
+  coerceAttributes,
   DEFAULT_LINK_BASE,
   type DispatchResult,
   dispatch,
@@ -170,6 +171,7 @@ export type WriteArgs = {
   area?: string | undefined;
   area_id?: string | undefined;
   heading?: string | undefined;
+  heading_id?: string | undefined;
   todos?: string[] | undefined;
   completed?: boolean | undefined;
   canceled?: boolean | undefined;
@@ -207,6 +209,7 @@ export const ATTRIBUTES: Record<keyof WriteArgs, Attribute> &
   area: { param: "area" },
   area_id: { param: "area-id" },
   heading: { param: "heading" },
+  heading_id: { param: "heading-id" },
   todos: { param: "to-dos" },
   completed: { param: "completed" },
   canceled: { param: "canceled" },
@@ -223,6 +226,34 @@ export function writeParams(args: WriteArgs): Map<string, string> {
     );
   }
   return params;
+}
+
+interface HeadingArgs {
+  title: string;
+  todos?: string[] | undefined;
+}
+
+function todoItems(titles: string[]) {
+  return titles.map((title) => ({ type: "to-do" as const, attributes: { title } }));
+}
+
+/**
+ * The JSON command's payload for a project created with headings. A heading
+ * exists only as an entry in a project's `items`, and the todos after it up to
+ * the next heading are the ones filed under it.
+ */
+export function buildProjectPayload(params: Map<string, string>, headings: HeadingArgs[]): string {
+  const { "to-dos": todos, ...attributes } = Object.fromEntries(params);
+  const items = [
+    ...todoItems(todos?.split("\n") ?? []),
+    ...headings.flatMap((heading) => [
+      { type: "heading" as const, attributes: { title: heading.title } },
+      ...todoItems(heading.todos ?? []),
+    ]),
+  ];
+  return JSON.stringify([
+    { type: "project", attributes: { ...coerceAttributes(attributes), items } },
+  ]);
 }
 
 /**
@@ -281,6 +312,11 @@ const listDescription =
   "Move the todo into this project or area, named exactly as Things holds it. Prefer list_id when an id is at hand: a name Things does not match is ignored without comment.";
 
 const listIdDescription = "Move the todo into the project or area with this id";
+
+const headingDescription =
+  "Heading title within the target project, matched exactly. Things ignores a heading it does not find and files the todo at the project's top level without comment, so prefer heading_id when an id is at hand.";
+
+const headingIdDescription = "Heading id within the target project. Takes precedence over heading.";
 
 /** Checklist additions leave the existing items alone, unlike `checklist_items`. */
 function checklistAdditions(position: "top" | "bottom") {
@@ -483,7 +519,8 @@ export function registerTools(server: McpServer, client: ThingsClient = defaultC
         checklist_items: z.array(z.string()).optional().describe("Max 100"),
         list: z.string().optional().describe("Project name to file under (projects only)"),
         list_id: z.string().optional().describe("Project or area ID (required for areas)"),
-        heading: z.string().optional().describe("Heading within the target project"),
+        heading: z.string().optional().describe(headingDescription),
+        heading_id: z.string().optional().describe(headingIdDescription),
       },
     },
     async (args) => {
@@ -500,7 +537,8 @@ export function registerTools(server: McpServer, client: ThingsClient = defaultC
     "add_project",
     {
       title: "Create a project",
-      description: "Create a project, optionally with initial todos.",
+      description:
+        "Create a project, optionally with initial todos and headings. Headings can only be created here: Things offers no way to add one to an existing project.",
       inputSchema: {
         title: z.string().trim().min(1),
         notes: z.string().optional(),
@@ -510,20 +548,39 @@ export function registerTools(server: McpServer, client: ThingsClient = defaultC
         area_id: z.string().optional(),
         tags: z.array(z.string()).optional().describe(tagsDescription),
         create_tags: z.boolean().optional().describe(createTagsDescription),
-        todos: z.array(z.string()).optional().describe("Initial todo titles"),
+        todos: z
+          .array(z.string())
+          .optional()
+          .describe("Initial todo titles, filed above the first heading"),
+        headings: z
+          .array(
+            z.object({
+              title: z.string().trim().min(1),
+              todos: z.array(z.string()).optional().describe("Todo titles under this heading"),
+            }),
+          )
+          .optional()
+          .describe("Headings in order, each with the todos filed under it"),
       },
     },
-    async (args) => {
+    async ({ headings, ...args }) => {
       if (args.todos) validateNonBlank(args.todos, "todos");
+      for (const [index, heading] of (headings ?? []).entries()) {
+        if (heading.todos) validateNonBlank(heading.todos, `headings[${index}].todos`);
+      }
       await client.ensureRunning();
       const params = writeParams({
         ...args,
         tags: args.tags && (await client.requireTags(args.tags, args.create_tags ?? false)),
       });
-      return writeResult(
-        await client.dispatch("add-project", params),
-        `Created project "${args.title}"`,
-      );
+      const action = `Created project "${args.title}"`;
+      if (headings === undefined || headings.length === 0) {
+        return writeResult(await client.dispatch("add-project", params), action);
+      }
+      // add-project has no heading param, so a project with headings goes
+      // through the JSON command, the only write that creates one.
+      const data = new Map([["data", buildProjectPayload(params, headings)]]);
+      return writeResult(await client.dispatch("json", data), action);
     },
   );
 
@@ -581,7 +638,7 @@ export function registerTools(server: McpServer, client: ThingsClient = defaultC
     {
       title: "Update todos",
       description:
-        "Update one or more todos: retitle, edit notes, reschedule (when), set deadline, retag, complete, or cancel. Multiple IDs batch through the JSON command, rate-limited to 250 operations per 10 seconds. Repeating todos cannot have when/deadline updated.",
+        "Update one or more todos: retitle, edit notes, reschedule (when), set deadline, retag, move to another project, area, or heading, complete, or cancel. A heading applies only within the todo's project, so pair it with list or list_id to move a todo under a heading in another project. Multiple IDs batch through the JSON command, rate-limited to 250 operations per 10 seconds. Repeating todos cannot have when/deadline updated.",
       inputSchema: {
         ids: todoIds,
         title: z.string().optional(),
@@ -601,6 +658,8 @@ export function registerTools(server: McpServer, client: ThingsClient = defaultC
         append_checklist_items: checklistAdditions("bottom"),
         list: z.string().optional().describe(listDescription),
         list_id: z.string().optional().describe(listIdDescription),
+        heading: z.string().optional().describe(headingDescription),
+        heading_id: z.string().optional().describe(headingIdDescription),
         completed: z.boolean().optional(),
         canceled: z.boolean().optional(),
       },

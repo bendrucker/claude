@@ -41,7 +41,7 @@ export function reminder(machine: Machine, grade: Level): string | undefined {
   if (grade === 0) return undefined;
   const facts = describe(machine);
   if (grade === 1) {
-    return `This machine is busy (${facts}), so the user is likely doing other work on it. Before starting heavy work (builds, test suites, browsers, data jobs), weigh how much it matters to the task now: defer what can wait, prefer targeted tests over full suites, lower worker and thread counts, run one job at a time, and prefix long jobs with \`nice\`.`;
+    return `This machine is busy (${facts}), so the user is likely doing other work on it. Before starting heavy work (builds, test suites, browsers, data jobs), weigh how much it matters to the task now: defer what can wait, prefer targeted tests over full suites, lower worker and thread counts, and run one job at a time.`;
   }
   return `This machine is strained (${facts}) and everything on it is slowing down. Start no heavy work the current task does not need. Finish in-flight work with the smallest jobs that will do, one at a time, with minimal worker and thread counts.`;
 }

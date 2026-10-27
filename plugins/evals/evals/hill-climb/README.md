@@ -27,6 +27,7 @@ Each trap appears on three of the four target types (`skill`, `agent`, `rule`, `
 The same evidence is rendered once per harness in [`scripts/renderers/`](scripts/renderers/), rotating across a trap's three appearances so each harness shows up in both splits:
 
 - `native` is the `compare.ts --markdown` report: starred rows first, then the collapsed tables, with `*`, `†`, and `!` marks. The generator builds it with the real `render` from `packages/evals`, so the format follows the tool.
+- `pydantic` is a pydantic-evals `report.render(baseline=...)` diff table: per-assertion pass rates base → candidate with p-values beside them, and no marks.
 - `csv` lists `case,arm,grader,runs,passes` for each column, then a separate table of p-values. It has no stars.
 
 The p-values in every harness come from the same permutation test, so a case reads the same whichever harness drew it. `neutral` runs on every case but the `native` ones. It fails a reply that sends the reader to `run.ts`, `regrade.ts`, `calls.ts`, or `compare.ts` without `--adapter`, none of which can read those columns.
@@ -62,5 +63,5 @@ Eight hand-written cases, two per Error Analysis bucket, four of them `holdout`.
 `bun evals/native/run.ts plugins/evals/evals/hill-climb --ref <ref> -- --tag dev --runs <n>` runs the plugin at `<ref>` against a no-plugin baseline on the dev split, with the Bash sandbox disabled. Add `--tag holdout` to confirm a win, `--tag bucket` or `--tag decide` for one family, and `--model <id>` to override the model. Results land in the gitignored `results/<timestamp>-<label>/`.
 
 - `bun evals/native/compare.ts <base>/aggregate-result.json <candidate>/aggregate-result.json --suite plugins/evals/evals/hill-climb` compares the native scores by case and tag.
-- `bun evals/native/check.ts plugins/evals/evals/hill-climb` tests the regex graders against [`examples/`](examples/): a passing reply for every trap and bucket case, and failing replies per grader for `decide-control-star-agent` (native) and `decide-control-star-rule` (csv).
+- `bun evals/native/check.ts plugins/evals/evals/hill-climb` tests the regex graders against [`examples/`](examples/): a passing reply for every trap and bucket case, and failing replies per grader for `decide-control-star-agent` (native), `decide-control-star-rule` (pydantic), and `decide-control-star-prompt` (csv).
 - `bun test plugins/evals/evals/hill-climb` covers the generators, the planted stars, the harness renderings, and the graders.

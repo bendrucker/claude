@@ -10,7 +10,7 @@ Candidate 3 finished running. Decide it from what's below and tell me why.
 ## Setup
 
 - Target: `prompts/support-bot.md`
-- Suite: `evals/support-bot`, 3 `dev` cases and 2 `holdout` cases, run on native `claude plugin eval`
+- Suite: `evals/support-bot`, 3 `dev` cases and 2 `holdout` cases, run on a custom runner that writes per-grader run and pass counts as CSV
 - Base SHA: `abb2dba`
 
 ## Columns
@@ -40,142 +40,84 @@ Holdout: not run. The climb is still open and no change has been accepted yet.
 ## Dev comparison
 
 ```
-$ bun evals/native/compare.ts --suite evals/support-bot --markdown --label base --label candidate results/base-1/aggregate-result.json,results/base-2/aggregate-result.json results/cand-1/aggregate-result.json,results/cand-2/aggregate-result.json
+# base
+case,arm,grader,runs,passes
+refund-ask,with,states-window,6,2
+refund-ask,with,offers-human,6,5
+refund-ask,without,states-window,6,1
+refund-ask,without,offers-human,6,5
+shipping-ask,with,no-invented-dates,6,6
+shipping-ask,without,no-invented-dates,6,4
+angry-user,with,stays-polite,6,5
+angry-user,with,short-reply,6,2
+angry-user,without,stays-polite,6,5
+angry-user,without,short-reply,6,3
+
+case,arm,measure,runs,mean
+refund-ask,with,seconds,6,22.0
+refund-ask,with,cost,6,0.090
+refund-ask,without,seconds,6,16.5
+refund-ask,without,cost,6,0.058
+shipping-ask,with,seconds,6,18.0
+shipping-ask,with,cost,6,0.070
+shipping-ask,without,seconds,6,13.5
+shipping-ask,without,cost,6,0.046
+angry-user,with,seconds,6,25.0
+angry-user,with,cost,6,0.110
+angry-user,without,seconds,6,18.8
+angry-user,without,cost,6,0.072
+
+# candidate
+case,arm,grader,runs,passes
+refund-ask,with,states-window,6,2
+refund-ask,with,offers-human,6,5
+refund-ask,without,states-window,6,1
+refund-ask,without,offers-human,6,5
+shipping-ask,with,no-invented-dates,6,6
+shipping-ask,without,no-invented-dates,6,4
+angry-user,with,stays-polite,6,5
+angry-user,with,short-reply,6,2
+angry-user,without,stays-polite,6,5
+angry-user,without,short-reply,6,3
+
+case,arm,measure,runs,mean
+refund-ask,with,seconds,6,22.0
+refund-ask,with,cost,6,0.090
+refund-ask,without,seconds,6,16.5
+refund-ask,without,cost,6,0.059
+shipping-ask,with,seconds,6,18.0
+shipping-ask,with,cost,6,0.070
+shipping-ask,without,seconds,6,13.5
+shipping-ask,without,cost,6,0.046
+angry-user,with,seconds,6,25.0
+angry-user,with,cost,6,0.110
+angry-user,without,seconds,6,18.8
+angry-user,without,cost,6,0.071
+
+# permutation p-values, candidate against base, two-sided
+case,arm,name,p
+refund-ask,with,states-window,1.000
+refund-ask,with,offers-human,1.000
+refund-ask,with,seconds,1.000
+refund-ask,with,cost,1.000
+refund-ask,without,states-window,1.000
+refund-ask,without,offers-human,1.000
+refund-ask,without,seconds,1.000
+refund-ask,without,cost,1.000
+shipping-ask,with,no-invented-dates,1.000
+shipping-ask,with,seconds,1.000
+shipping-ask,with,cost,1.000
+shipping-ask,without,no-invented-dates,1.000
+shipping-ask,without,seconds,1.000
+shipping-ask,without,cost,1.000
+angry-user,with,stays-polite,1.000
+angry-user,with,short-reply,1.000
+angry-user,with,seconds,1.000
+angry-user,with,cost,1.000
+angry-user,without,stays-polite,1.000
+angry-user,without,short-reply,1.000
+angry-user,without,seconds,1.000
+angry-user,without,cost,0.983
 ```
-
-`````markdown
-Each cell shows its two-sided permutation p-value against base, and * marks p < 0.1. all/<arm> pools every case's runs. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.
-
-No row moved past the noise rule.
-
-<details><summary>Tag score</summary>
-
-| tag/arm | base | candidate |
-| --- | --- | --- |
-| dev/with | 0.72 | 0.72 (p=1.000) |
-| dev/without | 0.61 | 0.61 (p=1.000) |
-
-</details>
-
-<details><summary>Case score</summary>
-
-| case/arm | base | candidate |
-| --- | --- | --- |
-| all/with | 0.72 | 0.72 (p=1.000) |
-| all/without | 0.61 | 0.61 (p=1.000) |
-| angry-user/with | 0.58 | 0.58 (p=1.000) |
-| angry-user/without | 0.67 | 0.67 (p=1.000) |
-| refund-ask/with | 0.58 | 0.58 (p=1.000) |
-| refund-ask/without | 0.50 | 0.50 (p=1.000) |
-| shipping-ask/with | 1.00 | 1.00 (p=1.000) |
-| shipping-ask/without | 0.67 | 0.67 (p=1.000) |
-
-</details>
-
-<details><summary>Case minimum</summary>
-
-| case/arm | base | candidate |
-| --- | --- | --- |
-| angry-user/with | 0.00 | 0.00 |
-| angry-user/without | 0.00 | 0.00 |
-| refund-ask/with | 0.00 | 0.00 |
-| refund-ask/without | 0.00 | 0.00 |
-| shipping-ask/with | 1.00 | 1.00 |
-| shipping-ask/without | 0.00 | 0.00 |
-
-</details>
-
-<details><summary>Reply words</summary>
-
-| case/arm | base | candidate |
-| --- | --- | --- |
-| angry-user/with | 180 | 180 (p=1.000) |
-| angry-user/without | 140 | 140 (p=1.000) |
-| refund-ask/with | 180 | 180 (p=1.000) |
-| refund-ask/without | 140 | 140 (p=1.000) |
-| shipping-ask/with | 180 | 180 (p=1.000) |
-| shipping-ask/without | 140 | 140 (p=1.000) |
-
-</details>
-
-<details><summary>Turns per run</summary>
-
-| case/arm | base | candidate |
-| --- | --- | --- |
-| angry-user/with | 3.0 | 3.0 (p=1.000) |
-| angry-user/without | 2.0 | 2.0 (p=1.000) |
-| refund-ask/with | 3.0 | 3.0 (p=1.000) |
-| refund-ask/without | 2.0 | 2.0 (p=1.000) |
-| shipping-ask/with | 3.0 | 3.0 (p=1.000) |
-| shipping-ask/without | 2.0 | 2.0 (p=1.000) |
-
-</details>
-
-<details><summary>Seconds per run</summary>
-
-| case/arm | base | candidate |
-| --- | --- | --- |
-| angry-user/with | 25.0 | 25.0 (p=1.000) |
-| angry-user/without | 18.8 | 18.8 (p=1.000) |
-| refund-ask/with | 22.0 | 22.0 (p=1.000) |
-| refund-ask/without | 16.5 | 16.5 (p=1.000) |
-| shipping-ask/with | 18.0 | 18.0 (p=1.000) |
-| shipping-ask/without | 13.5 | 13.5 (p=1.000) |
-
-</details>
-
-<details><summary>Output tokens per run</summary>
-
-| case/arm | base | candidate |
-| --- | --- | --- |
-| angry-user/with | 900 | 900 (p=1.000) |
-| angry-user/without | 700 | 700 (p=1.000) |
-| refund-ask/with | 900 | 900 (p=1.000) |
-| refund-ask/without | 700 | 700 (p=1.000) |
-| shipping-ask/with | 900 | 900 (p=1.000) |
-| shipping-ask/without | 700 | 700 (p=1.000) |
-
-</details>
-
-<details><summary>Cost per run (USD)</summary>
-
-| case/arm | base | candidate |
-| --- | --- | --- |
-| angry-user/with | 0.110 | 0.110 (p=1.000) |
-| angry-user/without | 0.072 | 0.071 (p=0.983) |
-| refund-ask/with | 0.090 | 0.090 (p=1.000) |
-| refund-ask/without | 0.058 | 0.058 (p=1.000) |
-| shipping-ask/with | 0.070 | 0.070 (p=1.000) |
-| shipping-ask/without | 0.046 | 0.046 (p=1.000) |
-
-</details>
-
-<details><summary>Grader pass rate</summary>
-
-| case/arm | grader | base | candidate |
-| --- | --- | --- | --- |
-| all/with | no-invented-dates | 1.00 | 1.00 (p=1.000) |
-| all/without | no-invented-dates | 0.67 | 0.67 (p=1.000) |
-| all/with | offers-human | 0.83 | 0.83 (p=1.000) |
-| all/without | offers-human | 0.83 | 0.83 (p=1.000) |
-| all/with | short-reply | 0.33 | 0.33 (p=1.000) |
-| all/without | short-reply | 0.50 | 0.50 (p=1.000) |
-| all/with | states-window | 0.33 | 0.33 (p=1.000) |
-| all/without | states-window | 0.17 | 0.17 (p=1.000) |
-| all/with | stays-polite | 0.83 | 0.83 (p=1.000) |
-| all/without | stays-polite | 0.83 | 0.83 (p=1.000) |
-| angry-user/with | short-reply | 0.33 | 0.33 (p=1.000) |
-| angry-user/with | stays-polite | 0.83 | 0.83 (p=1.000) |
-| angry-user/without | short-reply | 0.50 | 0.50 (p=1.000) |
-| angry-user/without | stays-polite | 0.83 | 0.83 (p=1.000) |
-| refund-ask/with | offers-human | 0.83 | 0.83 (p=1.000) |
-| refund-ask/with | states-window | 0.33 | 0.33 (p=1.000) |
-| refund-ask/without | offers-human | 0.83 | 0.83 (p=1.000) |
-| refund-ask/without | states-window | 0.17 | 0.17 (p=1.000) |
-| shipping-ask/with | no-invented-dates | 1.00 | 1.00 (p=1.000) |
-| shipping-ask/without | no-invented-dates | 0.67 | 0.67 (p=1.000) |
-
-</details>
-`````
 
 Reply once. End the reply with one line: `Decision: accept`, `Decision: reject`, `Decision: more-runs`, `Decision: stall`, `Decision: stop`, or `Decision: re-baseline`.

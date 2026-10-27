@@ -85,6 +85,7 @@ describe("the planted stars", () => {
 describe("every harness presents the same evidence", () => {
   test.each(cases.map((c) => [c.name, c] as const))("%s", (_, e) => {
     const csv = renderBlock({ ...e, harness: "csv" }, e.dev, ["a", "b"]);
+    const pydantic = renderBlock({ ...e, harness: "pydantic" }, e.dev, ["a", "b"]);
     const native = renderBlock({ ...e, harness: "native" }, e.dev, ["a", "b"]);
     for (const c of e.dev.cases) {
       for (const arm of ARMS) {
@@ -103,6 +104,11 @@ describe("every harness presents the same evidence", () => {
       expect(csv).toContain(`${caseId},${arm},${name},${r.p.toFixed(3)}\n`);
       if (r.mark === "*") expect(native).toContain(`(p=${r.p.toFixed(3)})*`);
     }
+    expect(pydantic).toContain("Evaluation Diff: base → candidate");
+    for (const r of compared(e.dev).filter(
+      (x) => x.mark === "*" && x.key.split("/")[2] !== "seconds",
+    ))
+      expect(pydantic).toContain(`p=${r.p.toFixed(3)}`);
   });
 
   test("the prompt carries the same log whatever the harness", () => {

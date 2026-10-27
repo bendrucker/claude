@@ -10,7 +10,7 @@ Candidate 1 finished running. Decide it from what's below and tell me why.
 ## Setup
 
 - Target: `rules/log-fields.md`
-- Suite: `evals/log-fields`, 3 `dev` cases and 2 `holdout` cases, run on a custom runner that writes per-grader run and pass counts as CSV
+- Suite: `evals/log-fields`, 3 `dev` cases and 2 `holdout` cases, run on native `claude plugin eval`
 - Base SHA: `e24fdef`
 
 ## Columns
@@ -42,84 +42,142 @@ Noise runs (two unchanged dev replicates of 3 runs a side): dev score 1.00 on th
 ## Dev comparison
 
 ```
-# base
-case,arm,grader,runs,passes
-add-handler,with,includes-request-id,6,6
-add-handler,with,uses-logger,6,6
-add-handler,without,includes-request-id,6,6
-add-handler,without,uses-logger,6,6
-cli-script,with,plain-print-ok,6,6
-cli-script,without,plain-print-ok,6,6
-error-path,with,logs-once,6,6
-error-path,with,redacts-token,6,6
-error-path,without,logs-once,6,6
-error-path,without,redacts-token,6,6
-
-case,arm,measure,runs,mean
-add-handler,with,seconds,6,22.0
-add-handler,with,cost,6,0.090
-add-handler,without,seconds,6,16.5
-add-handler,without,cost,6,0.058
-cli-script,with,seconds,6,18.0
-cli-script,with,cost,6,0.070
-cli-script,without,seconds,6,13.5
-cli-script,without,cost,6,0.046
-error-path,with,seconds,6,25.0
-error-path,with,cost,6,0.110
-error-path,without,seconds,6,18.8
-error-path,without,cost,6,0.072
-
-# candidate
-case,arm,grader,runs,passes
-add-handler,with,includes-request-id,6,6
-add-handler,with,uses-logger,6,6
-add-handler,without,includes-request-id,6,6
-add-handler,without,uses-logger,6,6
-cli-script,with,plain-print-ok,6,6
-cli-script,without,plain-print-ok,6,6
-error-path,with,logs-once,6,6
-error-path,with,redacts-token,6,6
-error-path,without,logs-once,6,6
-error-path,without,redacts-token,6,6
-
-case,arm,measure,runs,mean
-add-handler,with,seconds,6,22.0
-add-handler,with,cost,6,0.090
-add-handler,without,seconds,6,16.5
-add-handler,without,cost,6,0.059
-cli-script,with,seconds,6,18.0
-cli-script,with,cost,6,0.070
-cli-script,without,seconds,6,13.5
-cli-script,without,cost,6,0.046
-error-path,with,seconds,6,25.0
-error-path,with,cost,6,0.110
-error-path,without,seconds,6,18.8
-error-path,without,cost,6,0.071
-
-# permutation p-values, candidate against base, two-sided
-case,arm,name,p
-add-handler,with,includes-request-id,1.000
-add-handler,with,uses-logger,1.000
-add-handler,with,seconds,1.000
-add-handler,with,cost,1.000
-add-handler,without,includes-request-id,1.000
-add-handler,without,uses-logger,1.000
-add-handler,without,seconds,1.000
-add-handler,without,cost,1.000
-cli-script,with,plain-print-ok,1.000
-cli-script,with,seconds,1.000
-cli-script,with,cost,1.000
-cli-script,without,plain-print-ok,1.000
-cli-script,without,seconds,1.000
-cli-script,without,cost,1.000
-error-path,with,logs-once,1.000
-error-path,with,redacts-token,1.000
-error-path,with,seconds,1.000
-error-path,with,cost,1.000
-error-path,without,logs-once,1.000
-error-path,without,redacts-token,1.000
-error-path,without,seconds,1.000
-error-path,without,cost,0.983
+$ bun evals/native/compare.ts --suite evals/log-fields --markdown --label base --label candidate results/base-1/aggregate-result.json,results/base-2/aggregate-result.json results/cand-1/aggregate-result.json,results/cand-2/aggregate-result.json
 ```
+
+`````markdown
+Each cell shows its two-sided permutation p-value against base, and * marks p < 0.1. all/<arm> pools every case's runs. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.
+
+No row moved past the noise rule.
+
+<details><summary>Tag score</summary>
+
+| tag/arm | base | candidate |
+| --- | --- | --- |
+| dev/with | 1.00 | 1.00 (p=1.000) |
+| dev/without | 1.00 | 1.00 (p=1.000) |
+
+</details>
+
+<details><summary>Case score</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| all/with | 1.00 | 1.00 (p=1.000) |
+| all/without | 1.00 | 1.00 (p=1.000) |
+| add-handler/with | 1.00 | 1.00 (p=1.000) |
+| add-handler/without | 1.00 | 1.00 (p=1.000) |
+| cli-script/with | 1.00 | 1.00 (p=1.000) |
+| cli-script/without | 1.00 | 1.00 (p=1.000) |
+| error-path/with | 1.00 | 1.00 (p=1.000) |
+| error-path/without | 1.00 | 1.00 (p=1.000) |
+
+</details>
+
+<details><summary>Case minimum</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| add-handler/with | 1.00 | 1.00 |
+| add-handler/without | 1.00 | 1.00 |
+| cli-script/with | 1.00 | 1.00 |
+| cli-script/without | 1.00 | 1.00 |
+| error-path/with | 1.00 | 1.00 |
+| error-path/without | 1.00 | 1.00 |
+
+</details>
+
+<details><summary>Reply words</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| add-handler/with | 180 | 180 (p=1.000) |
+| add-handler/without | 140 | 140 (p=1.000) |
+| cli-script/with | 180 | 180 (p=1.000) |
+| cli-script/without | 140 | 140 (p=1.000) |
+| error-path/with | 180 | 180 (p=1.000) |
+| error-path/without | 140 | 140 (p=1.000) |
+
+</details>
+
+<details><summary>Turns per run</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| add-handler/with | 3.0 | 3.0 (p=1.000) |
+| add-handler/without | 2.0 | 2.0 (p=1.000) |
+| cli-script/with | 3.0 | 3.0 (p=1.000) |
+| cli-script/without | 2.0 | 2.0 (p=1.000) |
+| error-path/with | 3.0 | 3.0 (p=1.000) |
+| error-path/without | 2.0 | 2.0 (p=1.000) |
+
+</details>
+
+<details><summary>Seconds per run</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| add-handler/with | 22.0 | 22.0 (p=1.000) |
+| add-handler/without | 16.5 | 16.5 (p=1.000) |
+| cli-script/with | 18.0 | 18.0 (p=1.000) |
+| cli-script/without | 13.5 | 13.5 (p=1.000) |
+| error-path/with | 25.0 | 25.0 (p=1.000) |
+| error-path/without | 18.8 | 18.8 (p=1.000) |
+
+</details>
+
+<details><summary>Output tokens per run</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| add-handler/with | 900 | 900 (p=1.000) |
+| add-handler/without | 700 | 700 (p=1.000) |
+| cli-script/with | 900 | 900 (p=1.000) |
+| cli-script/without | 700 | 700 (p=1.000) |
+| error-path/with | 900 | 900 (p=1.000) |
+| error-path/without | 700 | 700 (p=1.000) |
+
+</details>
+
+<details><summary>Cost per run (USD)</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| add-handler/with | 0.090 | 0.090 (p=1.000) |
+| add-handler/without | 0.058 | 0.058 (p=1.000) |
+| cli-script/with | 0.070 | 0.070 (p=1.000) |
+| cli-script/without | 0.046 | 0.046 (p=1.000) |
+| error-path/with | 0.110 | 0.110 (p=1.000) |
+| error-path/without | 0.072 | 0.071 (p=0.983) |
+
+</details>
+
+<details><summary>Grader pass rate</summary>
+
+| case/arm | grader | base | candidate |
+| --- | --- | --- | --- |
+| all/with | includes-request-id | 1.00 | 1.00 (p=1.000) |
+| all/without | includes-request-id | 1.00 | 1.00 (p=1.000) |
+| all/with | logs-once | 1.00 | 1.00 (p=1.000) |
+| all/without | logs-once | 1.00 | 1.00 (p=1.000) |
+| all/with | plain-print-ok | 1.00 | 1.00 (p=1.000) |
+| all/without | plain-print-ok | 1.00 | 1.00 (p=1.000) |
+| all/with | redacts-token | 1.00 | 1.00 (p=1.000) |
+| all/without | redacts-token | 1.00 | 1.00 (p=1.000) |
+| all/with | uses-logger | 1.00 | 1.00 (p=1.000) |
+| all/without | uses-logger | 1.00 | 1.00 (p=1.000) |
+| add-handler/with | includes-request-id | 1.00 | 1.00 (p=1.000) |
+| add-handler/with | uses-logger | 1.00 | 1.00 (p=1.000) |
+| add-handler/without | includes-request-id | 1.00 | 1.00 (p=1.000) |
+| add-handler/without | uses-logger | 1.00 | 1.00 (p=1.000) |
+| cli-script/with | plain-print-ok | 1.00 | 1.00 (p=1.000) |
+| cli-script/without | plain-print-ok | 1.00 | 1.00 (p=1.000) |
+| error-path/with | logs-once | 1.00 | 1.00 (p=1.000) |
+| error-path/with | redacts-token | 1.00 | 1.00 (p=1.000) |
+| error-path/without | logs-once | 1.00 | 1.00 (p=1.000) |
+| error-path/without | redacts-token | 1.00 | 1.00 (p=1.000) |
+
+</details>
+`````
 
 Reply once. End the reply with one line: `Decision: accept`, `Decision: reject`, `Decision: more-runs`, `Decision: stall`, `Decision: stop`, or `Decision: re-baseline`.

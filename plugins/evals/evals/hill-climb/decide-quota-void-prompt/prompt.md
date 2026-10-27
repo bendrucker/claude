@@ -10,7 +10,7 @@ Candidate 1 finished running. Decide it from what's below and tell me why.
 ## Setup
 
 - Target: `prompts/support-bot.md`
-- Suite: `evals/support-bot`, 3 `dev` cases and 2 `holdout` cases, run on a custom runner that writes per-grader run and pass counts as CSV
+- Suite: `evals/support-bot`, 3 `dev` cases and 2 `holdout` cases, run on pydantic-evals, diffed with `report.render(baseline=...)`
 - Base SHA: `7515d85`
 
 ## Columns
@@ -42,84 +42,46 @@ Candidate results `cand-2` stopped at the session limit during `refund-ask` and 
 ## Dev comparison
 
 ```
-# base
-case,arm,grader,runs,passes
-refund-ask,with,states-window,6,1
-refund-ask,with,offers-human,6,5
-refund-ask,without,states-window,6,1
-refund-ask,without,offers-human,6,5
-shipping-ask,with,no-invented-dates,6,6
-shipping-ask,without,no-invented-dates,6,4
-angry-user,with,stays-polite,6,5
-angry-user,with,short-reply,6,2
-angry-user,without,stays-polite,6,5
-angry-user,without,short-reply,6,3
+Evaluation Diff: base → candidate
+╔════════════════════════╤══════════════════════════════════════╤═══════════════╤═════════════════╤════════════════════════════════════════╗
+║ Case ID                │ Assertions                           │ Duration      │ Cost            │ Runs and permutation p-value           ║
+╟────────────────────────┼──────────────────────────────────────┼───────────────┼─────────────────┼────────────────────────────────────────╢
+║ refund-ask (with)      │ states-window: 17% → 100% (+83%)     │ 22.0s → 22.4s │ $0.090 → $0.092 │ states-window: 6 → 3 runs, p=0.050     ║
+║                        │ offers-human: 83% → 100% (+17%)      │               │                 │ offers-human: 6 → 3 runs, p=1.000      ║
+║                        │                                      │               │                 │ duration: p=0.773                      ║
+║                        │                                      │               │                 │ cost: p=0.773                          ║
+╟────────────────────────┼──────────────────────────────────────┼───────────────┼─────────────────┼────────────────────────────────────────╢
+║ refund-ask (without)   │ states-window: 17% → 33% (+17%)      │ 16.5s → 16.8s │ $0.058 → $0.059 │ states-window: 6 → 3 runs, p=1.000     ║
+║                        │ offers-human: 83% → 100% (+17%)      │               │                 │ offers-human: 6 → 3 runs, p=1.000      ║
+║                        │                                      │               │                 │ duration: p=0.773                      ║
+║                        │                                      │               │                 │ cost: p=0.773                          ║
+╟────────────────────────┼──────────────────────────────────────┼───────────────┼─────────────────┼────────────────────────────────────────╢
+║ shipping-ask (with)    │ no-invented-dates: 100% → 100% (+0%) │ 18.0s → 18.0s │ $0.070 → $0.070 │ no-invented-dates: 6 → 6 runs, p=1.000 ║
+║                        │                                      │               │                 │ duration: p=1.000                      ║
+║                        │                                      │               │                 │ cost: p=1.000                          ║
+╟────────────────────────┼──────────────────────────────────────┼───────────────┼─────────────────┼────────────────────────────────────────╢
+║ shipping-ask (without) │ no-invented-dates: 67% → 67% (+0%)   │ 13.5s → 13.5s │ $0.046 → $0.046 │ no-invented-dates: 6 → 6 runs, p=1.000 ║
+║                        │                                      │               │                 │ duration: p=1.000                      ║
+║                        │                                      │               │                 │ cost: p=1.000                          ║
+╟────────────────────────┼──────────────────────────────────────┼───────────────┼─────────────────┼────────────────────────────────────────╢
+║ angry-user (with)      │ stays-polite: 83% → 100% (+17%)      │ 25.0s → 25.4s │ $0.110 → $0.112 │ stays-polite: 6 → 3 runs, p=1.000      ║
+║                        │ short-reply: 33% → 33% (+0%)         │               │                 │ short-reply: 6 → 3 runs, p=1.000       ║
+║                        │                                      │               │                 │ duration: p=0.773                      ║
+║                        │                                      │               │                 │ cost: p=0.773                          ║
+╟────────────────────────┼──────────────────────────────────────┼───────────────┼─────────────────┼────────────────────────────────────────╢
+║ angry-user (without)   │ stays-polite: 83% → 100% (+17%)      │ 18.8s → 19.1s │ $0.072 → $0.073 │ stays-polite: 6 → 3 runs, p=1.000      ║
+║                        │ short-reply: 50% → 67% (+17%)        │               │                 │ short-reply: 6 → 3 runs, p=1.000       ║
+║                        │                                      │               │                 │ duration: p=0.773                      ║
+║                        │                                      │               │                 │ cost: p=0.773                          ║
+╚════════════════════════╧══════════════════════════════════════╧═══════════════╧═════════════════╧════════════════════════════════════════╝
 
-case,arm,measure,runs,mean
-refund-ask,with,seconds,6,22.0
-refund-ask,with,cost,6,0.090
-refund-ask,without,seconds,6,16.5
-refund-ask,without,cost,6,0.058
-shipping-ask,with,seconds,6,18.0
-shipping-ask,with,cost,6,0.070
-shipping-ask,without,seconds,6,13.5
-shipping-ask,without,cost,6,0.046
-angry-user,with,seconds,6,25.0
-angry-user,with,cost,6,0.110
-angry-user,without,seconds,6,18.8
-angry-user,without,cost,6,0.072
+p-values are two-sided permutation tests of the candidate runs against the baseline runs.
 
-# candidate
-case,arm,grader,runs,passes
-refund-ask,with,states-window,3,3
-refund-ask,with,offers-human,3,3
-refund-ask,without,states-window,3,1
-refund-ask,without,offers-human,3,3
-shipping-ask,with,no-invented-dates,6,6
-shipping-ask,without,no-invented-dates,6,4
-angry-user,with,stays-polite,3,3
-angry-user,with,short-reply,3,1
-angry-user,without,stays-polite,3,3
-angry-user,without,short-reply,3,2
-
-case,arm,measure,runs,mean
-refund-ask,with,seconds,3,22.4
-refund-ask,with,cost,3,0.092
-refund-ask,without,seconds,3,16.8
-refund-ask,without,cost,3,0.059
-shipping-ask,with,seconds,6,18.0
-shipping-ask,with,cost,6,0.070
-shipping-ask,without,seconds,6,13.5
-shipping-ask,without,cost,6,0.046
-angry-user,with,seconds,3,25.4
-angry-user,with,cost,3,0.112
-angry-user,without,seconds,3,19.1
-angry-user,without,cost,3,0.073
-
-# permutation p-values, candidate against base, two-sided
-case,arm,name,p
-refund-ask,with,states-window,0.050
-refund-ask,with,offers-human,1.000
-refund-ask,with,seconds,0.773
-refund-ask,with,cost,0.773
-refund-ask,without,states-window,1.000
-refund-ask,without,offers-human,1.000
-refund-ask,without,seconds,0.773
-refund-ask,without,cost,0.773
-shipping-ask,with,no-invented-dates,1.000
-shipping-ask,with,seconds,1.000
-shipping-ask,with,cost,1.000
-shipping-ask,without,no-invented-dates,1.000
-shipping-ask,without,seconds,1.000
-shipping-ask,without,cost,1.000
-angry-user,with,stays-polite,1.000
-angry-user,with,short-reply,1.000
-angry-user,with,seconds,0.773
-angry-user,with,cost,0.773
-angry-user,without,stays-polite,1.000
-angry-user,without,short-reply,1.000
-angry-user,without,seconds,0.773
-angry-user,without,cost,0.773
+Case Failures
+- refund-ask (with): 3 runs errored, session limit
+- refund-ask (without): 3 runs errored, session limit
+- angry-user (with): 3 runs errored, session limit
+- angry-user (without): 3 runs errored, session limit
 ```
 
 Reply once. End the reply with one line: `Decision: accept`, `Decision: reject`, `Decision: more-runs`, `Decision: stall`, `Decision: stop`, or `Decision: re-baseline`.

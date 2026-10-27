@@ -10,7 +10,7 @@ Candidate 1 finished running. Decide it from what's below and tell me why.
 ## Setup
 
 - Target: `rules/log-fields.md`
-- Suite: `evals/log-fields`, 3 `dev` cases and 2 `holdout` cases, run on a custom runner that writes per-grader run and pass counts as CSV
+- Suite: `evals/log-fields`, 3 `dev` cases and 2 `holdout` cases, run on pydantic-evals, diffed with `report.render(baseline=...)`
 - Base SHA: `51d0715`
 
 ## Columns
@@ -40,84 +40,40 @@ Holdout: not run. The climb is still open and no change has been accepted yet.
 ## Dev comparison
 
 ```
-# base
-case,arm,grader,runs,passes
-add-handler,with,includes-request-id,6,2
-add-handler,with,uses-logger,6,5
-add-handler,without,includes-request-id,6,1
-add-handler,without,uses-logger,6,5
-cli-script,with,plain-print-ok,6,6
-cli-script,without,plain-print-ok,6,4
-error-path,with,logs-once,6,5
-error-path,with,redacts-token,6,2
-error-path,without,logs-once,6,5
-error-path,without,redacts-token,6,3
+Evaluation Diff: base → candidate
+╔═══════════════════════╤════════════════════════════════════════╤═══════════════╤═════════════════╤══════════════════════════════════════════╗
+║ Case ID               │ Assertions                             │ Duration      │ Cost            │ Runs and permutation p-value             ║
+╟───────────────────────┼────────────────────────────────────────┼───────────────┼─────────────────┼──────────────────────────────────────────╢
+║ add-handler (with)    │ includes-request-id: 33% → 100% (+67%) │ 22.0s → 22.0s │ $0.090 → $0.090 │ includes-request-id: 6 → 6 runs, p=0.060 ║
+║                       │ uses-logger: 83% → 83% (+0%)           │               │                 │ uses-logger: 6 → 6 runs, p=1.000         ║
+║                       │                                        │               │                 │ duration: p=1.000                        ║
+║                       │                                        │               │                 │ cost: p=1.000                            ║
+╟───────────────────────┼────────────────────────────────────────┼───────────────┼─────────────────┼──────────────────────────────────────────╢
+║ add-handler (without) │ includes-request-id: 17% → 83% (+67%)  │ 16.5s → 16.5s │ $0.058 → $0.059 │ includes-request-id: 6 → 6 runs, p=0.080 ║
+║                       │ uses-logger: 83% → 83% (+0%)           │               │                 │ uses-logger: 6 → 6 runs, p=1.000         ║
+║                       │                                        │               │                 │ duration: p=1.000                        ║
+║                       │                                        │               │                 │ cost: p=1.000                            ║
+╟───────────────────────┼────────────────────────────────────────┼───────────────┼─────────────────┼──────────────────────────────────────────╢
+║ cli-script (with)     │ plain-print-ok: 100% → 100% (+0%)      │ 18.0s → 18.0s │ $0.070 → $0.070 │ plain-print-ok: 6 → 6 runs, p=1.000      ║
+║                       │                                        │               │                 │ duration: p=1.000                        ║
+║                       │                                        │               │                 │ cost: p=1.000                            ║
+╟───────────────────────┼────────────────────────────────────────┼───────────────┼─────────────────┼──────────────────────────────────────────╢
+║ cli-script (without)  │ plain-print-ok: 67% → 67% (+0%)        │ 13.5s → 13.5s │ $0.046 → $0.046 │ plain-print-ok: 6 → 6 runs, p=1.000      ║
+║                       │                                        │               │                 │ duration: p=1.000                        ║
+║                       │                                        │               │                 │ cost: p=1.000                            ║
+╟───────────────────────┼────────────────────────────────────────┼───────────────┼─────────────────┼──────────────────────────────────────────╢
+║ error-path (with)     │ logs-once: 83% → 83% (+0%)             │ 25.0s → 25.0s │ $0.110 → $0.110 │ logs-once: 6 → 6 runs, p=1.000           ║
+║                       │ redacts-token: 33% → 33% (+0%)         │               │                 │ redacts-token: 6 → 6 runs, p=1.000       ║
+║                       │                                        │               │                 │ duration: p=1.000                        ║
+║                       │                                        │               │                 │ cost: p=1.000                            ║
+╟───────────────────────┼────────────────────────────────────────┼───────────────┼─────────────────┼──────────────────────────────────────────╢
+║ error-path (without)  │ logs-once: 83% → 83% (+0%)             │ 18.8s → 18.8s │ $0.072 → $0.071 │ logs-once: 6 → 6 runs, p=1.000           ║
+║                       │ redacts-token: 50% → 50% (+0%)         │               │                 │ redacts-token: 6 → 6 runs, p=1.000       ║
+║                       │                                        │               │                 │ duration: p=1.000                        ║
+║                       │                                        │               │                 │ cost: p=0.983                            ║
+╚═══════════════════════╧════════════════════════════════════════╧═══════════════╧═════════════════╧══════════════════════════════════════════╝
 
-case,arm,measure,runs,mean
-add-handler,with,seconds,6,22.0
-add-handler,with,cost,6,0.090
-add-handler,without,seconds,6,16.5
-add-handler,without,cost,6,0.058
-cli-script,with,seconds,6,18.0
-cli-script,with,cost,6,0.070
-cli-script,without,seconds,6,13.5
-cli-script,without,cost,6,0.046
-error-path,with,seconds,6,25.0
-error-path,with,cost,6,0.110
-error-path,without,seconds,6,18.8
-error-path,without,cost,6,0.072
-
-# candidate
-case,arm,grader,runs,passes
-add-handler,with,includes-request-id,6,6
-add-handler,with,uses-logger,6,5
-add-handler,without,includes-request-id,6,5
-add-handler,without,uses-logger,6,5
-cli-script,with,plain-print-ok,6,6
-cli-script,without,plain-print-ok,6,4
-error-path,with,logs-once,6,5
-error-path,with,redacts-token,6,2
-error-path,without,logs-once,6,5
-error-path,without,redacts-token,6,3
-
-case,arm,measure,runs,mean
-add-handler,with,seconds,6,22.0
-add-handler,with,cost,6,0.090
-add-handler,without,seconds,6,16.5
-add-handler,without,cost,6,0.059
-cli-script,with,seconds,6,18.0
-cli-script,with,cost,6,0.070
-cli-script,without,seconds,6,13.5
-cli-script,without,cost,6,0.046
-error-path,with,seconds,6,25.0
-error-path,with,cost,6,0.110
-error-path,without,seconds,6,18.8
-error-path,without,cost,6,0.071
-
-# permutation p-values, candidate against base, two-sided
-case,arm,name,p
-add-handler,with,includes-request-id,0.060
-add-handler,with,uses-logger,1.000
-add-handler,with,seconds,1.000
-add-handler,with,cost,1.000
-add-handler,without,includes-request-id,0.080
-add-handler,without,uses-logger,1.000
-add-handler,without,seconds,1.000
-add-handler,without,cost,1.000
-cli-script,with,plain-print-ok,1.000
-cli-script,with,seconds,1.000
-cli-script,with,cost,1.000
-cli-script,without,plain-print-ok,1.000
-cli-script,without,seconds,1.000
-cli-script,without,cost,1.000
-error-path,with,logs-once,1.000
-error-path,with,redacts-token,1.000
-error-path,with,seconds,1.000
-error-path,with,cost,1.000
-error-path,without,logs-once,1.000
-error-path,without,redacts-token,1.000
-error-path,without,seconds,1.000
-error-path,without,cost,0.983
+p-values are two-sided permutation tests of the candidate runs against the baseline runs.
 ```
 
 Reply once. End the reply with one line: `Decision: accept`, `Decision: reject`, `Decision: more-runs`, `Decision: stall`, `Decision: stop`, or `Decision: re-baseline`.

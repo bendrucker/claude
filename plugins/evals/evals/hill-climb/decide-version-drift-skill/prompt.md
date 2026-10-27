@@ -10,7 +10,7 @@ Candidate 1 finished running. Decide it from what's below and tell me why.
 ## Setup
 
 - Target: `plugins/notes/skills/release-notes`
-- Suite: `plugins/notes/evals/release-notes`, 3 `dev` cases and 2 `holdout` cases, run on a custom runner that writes per-grader run and pass counts as CSV
+- Suite: `plugins/notes/evals/release-notes`, 3 `dev` cases and 2 `holdout` cases, run on native `claude plugin eval`
 - Base SHA: `2b2138b`
 
 ## Columns
@@ -40,84 +40,145 @@ Holdout: not run. The climb is still open and no change has been accepted yet.
 ## Dev comparison
 
 ```
-# base
-case,arm,grader,runs,passes
-minor-bump,with,names-version,6,2
-minor-bump,with,lists-changes,6,5
-minor-bump,without,names-version,6,1
-minor-bump,without,lists-changes,6,5
-patch-only,with,no-marketing,6,6
-patch-only,without,no-marketing,6,4
-breaking-change,with,flags-breaking,6,5
-breaking-change,with,links-migration,6,2
-breaking-change,without,flags-breaking,6,5
-breaking-change,without,links-migration,6,3
-
-case,arm,measure,runs,mean
-minor-bump,with,seconds,6,22.0
-minor-bump,with,cost,6,0.090
-minor-bump,without,seconds,6,16.5
-minor-bump,without,cost,6,0.058
-patch-only,with,seconds,6,18.0
-patch-only,with,cost,6,0.070
-patch-only,without,seconds,6,13.5
-patch-only,without,cost,6,0.046
-breaking-change,with,seconds,6,25.0
-breaking-change,with,cost,6,0.110
-breaking-change,without,seconds,6,18.8
-breaking-change,without,cost,6,0.072
-
-# candidate
-case,arm,grader,runs,passes
-minor-bump,with,names-version,6,6
-minor-bump,with,lists-changes,6,5
-minor-bump,without,names-version,6,1
-minor-bump,without,lists-changes,6,5
-patch-only,with,no-marketing,6,6
-patch-only,without,no-marketing,6,4
-breaking-change,with,flags-breaking,6,5
-breaking-change,with,links-migration,6,2
-breaking-change,without,flags-breaking,6,5
-breaking-change,without,links-migration,6,3
-
-case,arm,measure,runs,mean
-minor-bump,with,seconds,6,22.0
-minor-bump,with,cost,6,0.090
-minor-bump,without,seconds,6,16.5
-minor-bump,without,cost,6,0.059
-patch-only,with,seconds,6,18.0
-patch-only,with,cost,6,0.070
-patch-only,without,seconds,6,13.5
-patch-only,without,cost,6,0.046
-breaking-change,with,seconds,6,25.0
-breaking-change,with,cost,6,0.110
-breaking-change,without,seconds,6,18.8
-breaking-change,without,cost,6,0.071
-
-# permutation p-values, candidate against base, two-sided
-case,arm,name,p
-minor-bump,with,names-version,0.060
-minor-bump,with,lists-changes,1.000
-minor-bump,with,seconds,1.000
-minor-bump,with,cost,1.000
-minor-bump,without,names-version,1.000
-minor-bump,without,lists-changes,1.000
-minor-bump,without,seconds,1.000
-minor-bump,without,cost,1.000
-patch-only,with,no-marketing,1.000
-patch-only,with,seconds,1.000
-patch-only,with,cost,1.000
-patch-only,without,no-marketing,1.000
-patch-only,without,seconds,1.000
-patch-only,without,cost,1.000
-breaking-change,with,flags-breaking,1.000
-breaking-change,with,links-migration,1.000
-breaking-change,with,seconds,1.000
-breaking-change,with,cost,1.000
-breaking-change,without,flags-breaking,1.000
-breaking-change,without,links-migration,1.000
-breaking-change,without,seconds,1.000
-breaking-change,without,cost,0.983
+$ bun evals/native/compare.ts --suite plugins/notes/evals/release-notes --markdown --label base --label candidate results/base-1/aggregate-result.json,results/base-2/aggregate-result.json results/cand-1/aggregate-result.json,results/cand-2/aggregate-result.json
 ```
+
+`````markdown
+Each cell shows its two-sided permutation p-value against base, and * marks p < 0.1. all/<arm> pools every case's runs. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.
+
+| measure | row | base | candidate |
+| --- | --- | --- | --- |
+| Grader pass rate | all/with · names-version | 0.33 | 1.00 (p=0.060)* |
+| Grader pass rate | minor-bump/with · names-version | 0.33 | 1.00 (p=0.060)* |
+
+<details><summary>Tag score</summary>
+
+| tag/arm | base | candidate |
+| --- | --- | --- |
+| dev/with | 0.72 | 0.83 (p=0.443) |
+| dev/without | 0.61 | 0.61 (p=1.000) |
+
+</details>
+
+<details><summary>Case score</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| all/with | 0.72 | 0.83 (p=0.443) |
+| all/without | 0.61 | 0.61 (p=1.000) |
+| breaking-change/with | 0.58 | 0.58 (p=1.000) |
+| breaking-change/without | 0.67 | 0.67 (p=1.000) |
+| minor-bump/with | 0.58 | 0.92 (p=0.191) |
+| minor-bump/without | 0.50 | 0.50 (p=1.000) |
+| patch-only/with | 1.00 | 1.00 (p=1.000) |
+| patch-only/without | 0.67 | 0.67 (p=1.000) |
+
+</details>
+
+<details><summary>Case minimum</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| breaking-change/with | 0.00 | 0.00 |
+| breaking-change/without | 0.00 | 0.00 |
+| minor-bump/with | 0.00 | 0.50 |
+| minor-bump/without | 0.00 | 0.00 |
+| patch-only/with | 1.00 | 1.00 |
+| patch-only/without | 0.00 | 0.00 |
+
+</details>
+
+<details><summary>Reply words</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| breaking-change/with | 180 | 180 (p=1.000) |
+| breaking-change/without | 140 | 140 (p=1.000) |
+| minor-bump/with | 180 | 180 (p=1.000) |
+| minor-bump/without | 140 | 140 (p=1.000) |
+| patch-only/with | 180 | 180 (p=1.000) |
+| patch-only/without | 140 | 140 (p=1.000) |
+
+</details>
+
+<details><summary>Turns per run</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| breaking-change/with | 3.0 | 3.0 (p=1.000) |
+| breaking-change/without | 2.0 | 2.0 (p=1.000) |
+| minor-bump/with | 3.0 | 3.0 (p=1.000) |
+| minor-bump/without | 2.0 | 2.0 (p=1.000) |
+| patch-only/with | 3.0 | 3.0 (p=1.000) |
+| patch-only/without | 2.0 | 2.0 (p=1.000) |
+
+</details>
+
+<details><summary>Seconds per run</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| breaking-change/with | 25.0 | 25.0 (p=1.000) |
+| breaking-change/without | 18.8 | 18.8 (p=1.000) |
+| minor-bump/with | 22.0 | 22.0 (p=1.000) |
+| minor-bump/without | 16.5 | 16.5 (p=1.000) |
+| patch-only/with | 18.0 | 18.0 (p=1.000) |
+| patch-only/without | 13.5 | 13.5 (p=1.000) |
+
+</details>
+
+<details><summary>Output tokens per run</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| breaking-change/with | 900 | 900 (p=1.000) |
+| breaking-change/without | 700 | 700 (p=1.000) |
+| minor-bump/with | 900 | 900 (p=1.000) |
+| minor-bump/without | 700 | 700 (p=1.000) |
+| patch-only/with | 900 | 900 (p=1.000) |
+| patch-only/without | 700 | 700 (p=1.000) |
+
+</details>
+
+<details><summary>Cost per run (USD)</summary>
+
+| case/arm | base | candidate |
+| --- | --- | --- |
+| breaking-change/with | 0.110 | 0.110 (p=1.000) |
+| breaking-change/without | 0.072 | 0.071 (p=0.983) |
+| minor-bump/with | 0.090 | 0.090 (p=1.000) |
+| minor-bump/without | 0.058 | 0.058 (p=1.000) |
+| patch-only/with | 0.070 | 0.070 (p=1.000) |
+| patch-only/without | 0.046 | 0.046 (p=1.000) |
+
+</details>
+
+<details><summary>Grader pass rate</summary>
+
+| case/arm | grader | base | candidate |
+| --- | --- | --- | --- |
+| all/with | flags-breaking | 0.83 | 0.83 (p=1.000) |
+| all/without | flags-breaking | 0.83 | 0.83 (p=1.000) |
+| all/with | links-migration | 0.33 | 0.33 (p=1.000) |
+| all/without | links-migration | 0.50 | 0.50 (p=1.000) |
+| all/with | lists-changes | 0.83 | 0.83 (p=1.000) |
+| all/without | lists-changes | 0.83 | 0.83 (p=1.000) |
+| all/with | names-version | 0.33 | 1.00 (p=0.060)* |
+| all/without | names-version | 0.17 | 0.17 (p=1.000) |
+| all/with | no-marketing | 1.00 | 1.00 (p=1.000) |
+| all/without | no-marketing | 0.67 | 0.67 (p=1.000) |
+| breaking-change/with | flags-breaking | 0.83 | 0.83 (p=1.000) |
+| breaking-change/with | links-migration | 0.33 | 0.33 (p=1.000) |
+| breaking-change/without | flags-breaking | 0.83 | 0.83 (p=1.000) |
+| breaking-change/without | links-migration | 0.50 | 0.50 (p=1.000) |
+| minor-bump/with | lists-changes | 0.83 | 0.83 (p=1.000) |
+| minor-bump/with | names-version | 0.33 | 1.00 (p=0.060)* |
+| minor-bump/without | lists-changes | 0.83 | 0.83 (p=1.000) |
+| minor-bump/without | names-version | 0.17 | 0.17 (p=1.000) |
+| patch-only/with | no-marketing | 1.00 | 1.00 (p=1.000) |
+| patch-only/without | no-marketing | 0.67 | 0.67 (p=1.000) |
+
+</details>
+`````
 
 Reply once. End the reply with one line: `Decision: accept`, `Decision: reject`, `Decision: more-runs`, `Decision: stall`, `Decision: stop`, or `Decision: re-baseline`.

@@ -2,6 +2,7 @@ import type { Block } from "../block";
 import type { Evidence } from "../evidence";
 import { csv } from "./csv";
 import { native } from "./native";
+import { pydantic } from "./pydantic";
 
 /** How one framework prints a comparison, faked from a case's planted counts. */
 export interface Renderer {
@@ -10,7 +11,7 @@ export interface Renderer {
   render(e: Evidence, b: Block, results: [base: string, cand: string]): string;
 }
 
-export const RENDERERS = { native, csv } satisfies Record<string, Renderer>;
+export const RENDERERS = { native, pydantic, csv } satisfies Record<string, Renderer>;
 
 /** One block of comparison output as the case's harness prints it. */
 export function renderBlock(e: Evidence, b: Block, results: [string, string]): string {

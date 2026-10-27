@@ -10,7 +10,7 @@ Candidate 3 finished running. Decide it from what's below and tell me why.
 ## Setup
 
 - Target: `plugins/billing/agents/invoice-checker.md`
-- Suite: `plugins/billing/evals/invoice-checker`, 3 `dev` cases and 2 `holdout` cases, run on a custom runner that writes per-grader run and pass counts as CSV
+- Suite: `plugins/billing/evals/invoice-checker`, 3 `dev` cases and 2 `holdout` cases, run on pydantic-evals, diffed with `report.render(baseline=...)`
 - Base SHA: `997e853`
 
 ## Columns
@@ -40,84 +40,40 @@ Holdout: not run. The climb is still open and no change has been accepted yet.
 ## Dev comparison
 
 ```
-# base
-case,arm,grader,runs,passes
-missing-total,with,cites-line,6,2
-missing-total,with,names-vendor,6,5
-missing-total,without,cites-line,6,1
-missing-total,without,names-vendor,6,5
-clean-invoice,with,no-false-alarm,6,6
-clean-invoice,without,no-false-alarm,6,4
-duplicate-line,with,asks-before-fix,6,5
-duplicate-line,with,lists-both-lines,6,2
-duplicate-line,without,asks-before-fix,6,5
-duplicate-line,without,lists-both-lines,6,3
+Evaluation Diff: base → candidate
+╔══════════════════════════╤═══════════════════════════════════╤═══════════════╤═════════════════╤═══════════════════════════════════════╗
+║ Case ID                  │ Assertions                        │ Duration      │ Cost            │ Runs and permutation p-value          ║
+╟──────────────────────────┼───────────────────────────────────┼───────────────┼─────────────────┼───────────────────────────────────────╢
+║ missing-total (with)     │ cites-line: 33% → 33% (+0%)       │ 22.0s → 22.0s │ $0.090 → $0.090 │ cites-line: 6 → 6 runs, p=1.000       ║
+║                          │ names-vendor: 83% → 83% (+0%)     │               │                 │ names-vendor: 6 → 6 runs, p=1.000     ║
+║                          │                                   │               │                 │ duration: p=1.000                     ║
+║                          │                                   │               │                 │ cost: p=1.000                         ║
+╟──────────────────────────┼───────────────────────────────────┼───────────────┼─────────────────┼───────────────────────────────────────╢
+║ missing-total (without)  │ cites-line: 17% → 17% (+0%)       │ 16.5s → 16.5s │ $0.058 → $0.059 │ cites-line: 6 → 6 runs, p=1.000       ║
+║                          │ names-vendor: 83% → 83% (+0%)     │               │                 │ names-vendor: 6 → 6 runs, p=1.000     ║
+║                          │                                   │               │                 │ duration: p=1.000                     ║
+║                          │                                   │               │                 │ cost: p=1.000                         ║
+╟──────────────────────────┼───────────────────────────────────┼───────────────┼─────────────────┼───────────────────────────────────────╢
+║ clean-invoice (with)     │ no-false-alarm: 100% → 100% (+0%) │ 18.0s → 18.0s │ $0.070 → $0.070 │ no-false-alarm: 6 → 6 runs, p=1.000   ║
+║                          │                                   │               │                 │ duration: p=1.000                     ║
+║                          │                                   │               │                 │ cost: p=1.000                         ║
+╟──────────────────────────┼───────────────────────────────────┼───────────────┼─────────────────┼───────────────────────────────────────╢
+║ clean-invoice (without)  │ no-false-alarm: 67% → 67% (+0%)   │ 13.5s → 13.5s │ $0.046 → $0.046 │ no-false-alarm: 6 → 6 runs, p=1.000   ║
+║                          │                                   │               │                 │ duration: p=1.000                     ║
+║                          │                                   │               │                 │ cost: p=1.000                         ║
+╟──────────────────────────┼───────────────────────────────────┼───────────────┼─────────────────┼───────────────────────────────────────╢
+║ duplicate-line (with)    │ asks-before-fix: 83% → 83% (+0%)  │ 25.0s → 25.0s │ $0.110 → $0.110 │ asks-before-fix: 6 → 6 runs, p=1.000  ║
+║                          │ lists-both-lines: 33% → 33% (+0%) │               │                 │ lists-both-lines: 6 → 6 runs, p=1.000 ║
+║                          │                                   │               │                 │ duration: p=1.000                     ║
+║                          │                                   │               │                 │ cost: p=1.000                         ║
+╟──────────────────────────┼───────────────────────────────────┼───────────────┼─────────────────┼───────────────────────────────────────╢
+║ duplicate-line (without) │ asks-before-fix: 83% → 83% (+0%)  │ 18.8s → 18.8s │ $0.072 → $0.071 │ asks-before-fix: 6 → 6 runs, p=1.000  ║
+║                          │ lists-both-lines: 50% → 50% (+0%) │               │                 │ lists-both-lines: 6 → 6 runs, p=1.000 ║
+║                          │                                   │               │                 │ duration: p=1.000                     ║
+║                          │                                   │               │                 │ cost: p=0.983                         ║
+╚══════════════════════════╧═══════════════════════════════════╧═══════════════╧═════════════════╧═══════════════════════════════════════╝
 
-case,arm,measure,runs,mean
-missing-total,with,seconds,6,22.0
-missing-total,with,cost,6,0.090
-missing-total,without,seconds,6,16.5
-missing-total,without,cost,6,0.058
-clean-invoice,with,seconds,6,18.0
-clean-invoice,with,cost,6,0.070
-clean-invoice,without,seconds,6,13.5
-clean-invoice,without,cost,6,0.046
-duplicate-line,with,seconds,6,25.0
-duplicate-line,with,cost,6,0.110
-duplicate-line,without,seconds,6,18.8
-duplicate-line,without,cost,6,0.072
-
-# candidate
-case,arm,grader,runs,passes
-missing-total,with,cites-line,6,2
-missing-total,with,names-vendor,6,5
-missing-total,without,cites-line,6,1
-missing-total,without,names-vendor,6,5
-clean-invoice,with,no-false-alarm,6,6
-clean-invoice,without,no-false-alarm,6,4
-duplicate-line,with,asks-before-fix,6,5
-duplicate-line,with,lists-both-lines,6,2
-duplicate-line,without,asks-before-fix,6,5
-duplicate-line,without,lists-both-lines,6,3
-
-case,arm,measure,runs,mean
-missing-total,with,seconds,6,22.0
-missing-total,with,cost,6,0.090
-missing-total,without,seconds,6,16.5
-missing-total,without,cost,6,0.059
-clean-invoice,with,seconds,6,18.0
-clean-invoice,with,cost,6,0.070
-clean-invoice,without,seconds,6,13.5
-clean-invoice,without,cost,6,0.046
-duplicate-line,with,seconds,6,25.0
-duplicate-line,with,cost,6,0.110
-duplicate-line,without,seconds,6,18.8
-duplicate-line,without,cost,6,0.071
-
-# permutation p-values, candidate against base, two-sided
-case,arm,name,p
-missing-total,with,cites-line,1.000
-missing-total,with,names-vendor,1.000
-missing-total,with,seconds,1.000
-missing-total,with,cost,1.000
-missing-total,without,cites-line,1.000
-missing-total,without,names-vendor,1.000
-missing-total,without,seconds,1.000
-missing-total,without,cost,1.000
-clean-invoice,with,no-false-alarm,1.000
-clean-invoice,with,seconds,1.000
-clean-invoice,with,cost,1.000
-clean-invoice,without,no-false-alarm,1.000
-clean-invoice,without,seconds,1.000
-clean-invoice,without,cost,1.000
-duplicate-line,with,asks-before-fix,1.000
-duplicate-line,with,lists-both-lines,1.000
-duplicate-line,with,seconds,1.000
-duplicate-line,with,cost,1.000
-duplicate-line,without,asks-before-fix,1.000
-duplicate-line,without,lists-both-lines,1.000
-duplicate-line,without,seconds,1.000
-duplicate-line,without,cost,0.983
+p-values are two-sided permutation tests of the candidate runs against the baseline runs.
 ```
 
 Reply once. End the reply with one line: `Decision: accept`, `Decision: reject`, `Decision: more-runs`, `Decision: stall`, `Decision: stop`, or `Decision: re-baseline`.

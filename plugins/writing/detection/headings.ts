@@ -1,7 +1,7 @@
 import type { Heading, Paragraph, PhrasingContent, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
-import { headingCaseViolations } from "../hooks/heading-case";
+import { headingCaseViolations } from "./heading-case";
 import { classifyHeadingBaseline } from "../linguistics/heading";
 
 export interface HeadingFinding {

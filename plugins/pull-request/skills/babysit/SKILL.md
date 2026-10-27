@@ -43,6 +43,8 @@ Parse `$ARGUMENTS` for an optional PR positional and two optional flags, both fl
 - `--reviews`: after the first green, triage AI-reviewer threads. See [Reviews Hand-off](#reviews-hand-off).
 - `--merge`: don't stop at green; drive the PR to merged. See [Merge Mode](#merge-mode).
 
+On GitHub, a PR whose auto-merge is already enabled (`gh pr view <pr> --json autoMergeRequest` is non-null) runs as if `--merge` were passed: whoever enabled it approved the merge.
+
 ## Bounds
 
 Every wait babysit performs runs through a watcher, including the post-submit merge wait ([Merge Mode](#merge-mode)); babysit has no poll loop of its own. The watcher enforces the wall clock (`--max-minutes`, default 60), poll interval, and dedup, so pass `--max-minutes` through when the user supplies one. After a watcher emits `max-time-reached` it has exited: report and stop, never re-arm a fresh watcher. If babysit runs under `/loop`, the loop owns repetition, not babysit.
@@ -89,7 +91,7 @@ With `--reviews`, after the first green, hand off to `pull-request:follow-up --a
 
 ## Merge Mode
 
-With `--merge`, don't stop at green; drive the PR to **merged**. Load [`merge-mode.md`](merge-mode.md) for the merge-submission paths, the re-arm-after-every-push rule, and the oscillation guard.
+With `--merge`, or on a GitHub PR with auto-merge already enabled, don't stop at green; drive the PR to **merged**. Load [`merge-mode.md`](merge-mode.md) for the merge-submission paths, conflict resolution, the re-arm-after-every-push rule, and the oscillation guard.
 
 ## Gotchas
 

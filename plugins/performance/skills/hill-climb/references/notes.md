@@ -7,6 +7,8 @@ The notes file is the climb's single record. A reader who was not in the session
 ````markdown
 # <Target> Performance Climb
 
+Climbed with `/performance:hill-climb`. A session resuming this climb invokes that skill before its next candidate.
+
 <One paragraph: what is being climbed, on which branch, and where accepted changes land.>
 
 ## Rules

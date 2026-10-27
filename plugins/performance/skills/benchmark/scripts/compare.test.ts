@@ -117,6 +117,40 @@ describe("compare", () => {
     expect(row).toMatchObject({ lowN: true, significant: false });
   });
 
+  it("compares peak memory when asked, ignoring wall time", () => {
+    const memory = [50e6, 50.5e6, 49.5e6, 50.2e6, 49.8e6, 50e6];
+    const leaner = { ...base, name: "leaner", memory: memory.map((m) => m * 0.8) };
+    const [, row] = compare([{ ...base, memory }, leaner], "base", 0.1, 0.03, seeded(2), "memory");
+    expect(row).toMatchObject({ n: 6, median: 40e6, significant: true });
+    expect(row?.change).toBeCloseTo(-0.2);
+  });
+
+  it("stars a deterministic difference between constant arms", () => {
+    const flat = { ...base, memory: [50e6, 50e6, 50e6, 50e6] };
+    const [, row] = compare(
+      [flat, { ...flat, name: "leaner", memory: [40e6, 40e6, 40e6, 40e6] }],
+      "base",
+      0.1,
+      0.03,
+      seeded(2),
+      "memory",
+    );
+    expect(row).toMatchObject({ p: 0, significant: true });
+  });
+
+  it("does not star constant arms that repeat the same value", () => {
+    const flat = { ...base, memory: [50e6, 50e6, 50e6, 50e6] };
+    const [, row] = compare([flat, { ...flat, name: "same" }], "base", 0.1, 0, seeded(2), "memory");
+    expect(row).toMatchObject({ significant: false });
+    expect(row?.p).toBeGreaterThan(0.1);
+  });
+
+  it("rejects a memory comparison when an arm has no memory samples", () => {
+    expect(() =>
+      compare([base, { ...base, name: "cand" }], "base", 0.1, 0.03, seeded(2), "memory"),
+    ).toThrow("no memory samples for base, cand");
+  });
+
   it("rejects an unknown base", () => {
     expect(() => compare([base], "missing", 0.1, 0.03)).toThrow("no arm named missing");
   });

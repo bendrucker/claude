@@ -1,8 +1,9 @@
 ---
 name: performance:hill-climb
 description: >-
-  Use when asked to make software faster or leaner (runtime, startup,
-  throughput, memory, bundle size) through repeated measured changes. For
+  Use when asked to hill-climb a program, or to make software faster or
+  leaner (runtime, startup, throughput, memory, bundle size) through repeated
+  measured changes, including resuming a climb from its notes file. For
   prompts or skills scored by an eval suite, use evals:hill-climb.
 argument-hint: "<target> [<notes file>]"
 ---
@@ -16,7 +17,7 @@ This skill is the workflow. Load `performance:benchmark` to build the harness an
 ## Arguments
 
 - `<target>`: the program or command to climb. Required.
-- `<notes file>`: where the climb log lives. Default: `CLIMB.md` beside the benchmark harness, or `tmp/climb.md` when the repo has no harness directory.
+- `<notes file>`: where the climb log lives. Default: `CLIMB.md` beside the benchmark harness, or `tmp/climb.md` when the repo has no harness directory. When it already exists, resume from it: skip the Frame items its Rules settle, and keep the line under its title that tells a later session to load this skill.
 
 ## Frame
 
@@ -32,6 +33,7 @@ Interview the user until each item below is settled and none rests on your assum
   - Start from who waits on the result and when: a person after a change, a CI job, a scheduled run. Measure the run the user waits through, even when the code handles another run more often.
   - A scheduled run nobody waits on can take on work that speeds the waited-on one.
   - Ask where the real workload spends its time. A benchmark input can skip the phase users wait through.
+  - A memory metric is peak RSS of the scenario, compared with `compare.ts report --metric memory`. Allocation volume can be a fast signal only after the baseline shows it tracks the peak.
 - **Ceiling.** The value past which further gains stop mattering to the user. The climb stops there.
 - **Fast signal.** A cheaper or lower-noise number that moves with the metric: CPU time, instructions retired, work per tick, bytes. Accept on it only after the baseline shows it tracks the metric.
 - **Guard.** What must stay identical: output, final state, exit code. Name the check that proves it.

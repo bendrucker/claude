@@ -239,7 +239,14 @@ const WRITE_TOOLS = new Set([
 ]);
 
 /** Arguments a write tool reads itself rather than passing to `writeParams`. */
-const STEERING_ARGUMENTS = new Set(["id", "ids", "create_tags", "session_id", "directory"]);
+const STEERING_ARGUMENTS = new Set([
+  "id",
+  "ids",
+  "create_tags",
+  "session_id",
+  "directory",
+  "headings",
+]);
 
 /** Connects a client to a server carrying only the fake, over an in-memory pair. */
 async function connect(client: ThingsClient): Promise<Client> {
@@ -275,6 +282,7 @@ describe("write tools", () => {
           list: "Errands",
           list_id: "PID",
           heading: "Groceries",
+          heading_id: "HID",
         },
         command: "add",
         params: {
@@ -287,6 +295,7 @@ describe("write tools", () => {
           list: "Errands",
           "list-id": "PID",
           heading: "Groceries",
+          "heading-id": "HID",
         },
         tags: [{ requested: ["Bug"], createMissing: false }],
       },
@@ -361,6 +370,8 @@ describe("write tools", () => {
           append_checklist_items: ["last"],
           list: "Errands",
           list_id: "PID",
+          heading: "Packing",
+          heading_id: "HID",
           canceled: false,
         },
         command: "update",
@@ -373,6 +384,8 @@ describe("write tools", () => {
           "append-checklist-items": "last",
           list: "Errands",
           "list-id": "PID",
+          heading: "Packing",
+          "heading-id": "HID",
           canceled: "false",
         },
         tags: [{ requested: ["Bug"], createMissing: false }],
@@ -440,6 +453,68 @@ describe("write tools", () => {
     expect(
       z.array(z.unknown()).parse(JSON.parse(calls.dispatch[0]?.params.data ?? "")),
     ).toHaveLength(250);
+    await mcp.close();
+  });
+
+  test("creates a project with headings through the JSON command", async () => {
+    const { calls, client } = fakeClient();
+    const mcp = await connect(client);
+
+    await mcp.callTool({
+      name: "add_project",
+      arguments: {
+        title: "Move house",
+        area_id: "AID",
+        tags: ["Bug"],
+        todos: ["decide date"],
+        headings: [{ title: "Packing", todos: ["boxes", "tape"] }, { title: "Utilities" }],
+      },
+    });
+
+    expect(calls.dispatch.map((call) => call.command)).toEqual(["json"]);
+    expect(JSON.parse(calls.dispatch[0]?.params.data ?? "")).toEqual([
+      {
+        type: "project",
+        attributes: {
+          title: "Move house",
+          "area-id": "AID",
+          tags: ["bug"],
+          items: [
+            { type: "to-do", attributes: { title: "decide date" } },
+            { type: "heading", attributes: { title: "Packing" } },
+            { type: "to-do", attributes: { title: "boxes" } },
+            { type: "to-do", attributes: { title: "tape" } },
+            { type: "heading", attributes: { title: "Utilities" } },
+          ],
+        },
+      },
+    ]);
+    await mcp.close();
+  });
+
+  test("carries a heading move into a batched update", async () => {
+    const { calls, client } = fakeClient();
+    const mcp = await connect(client);
+
+    await mcp.callTool({
+      name: "update_todos",
+      arguments: { ids: ["T1", "T2"], list_id: "PID", heading: "Packing" },
+    });
+
+    expect(JSON.parse(calls.dispatch[0]?.params.data ?? "")).toEqual([
+      {
+        type: "to-do",
+        operation: "update",
+        id: "T1",
+        attributes: { "list-id": "PID", heading: "Packing" },
+      },
+      {
+        type: "to-do",
+        operation: "update",
+        id: "T2",
+        attributes: { "list-id": "PID", heading: "Packing" },
+      },
+    ]);
     await mcp.close();
   });
 

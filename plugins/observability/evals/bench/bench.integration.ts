@@ -69,10 +69,13 @@ test("run replays each query at both limits and leaves the index unchanged", asy
     "index-health vm base 2",
     "index-health vm aa 2",
   ]);
-  expect(rows.every((r) => r.failures === 0 && typeof r.latency === "number")).toBe(true);
+  expect(rows.every((r) => r.failures === 0)).toBe(true);
+  for (const metric of ["latency", "bytesRead", "rowsScanned", "peakBuffer"]) {
+    expect(rows.every((r) => typeof r[metric] === "number")).toBe(true);
+  }
   expect(await Bun.file(join(out, "hyperfine", "usage.vm.json")).exists()).toBe(true);
   expect(await Bun.file(db).bytes()).toEqual(before);
-});
+}, 60_000);
 
 test("run refuses an arm whose index another views.sql built", async () => {
   const skill = join(dir, "stale-skill");

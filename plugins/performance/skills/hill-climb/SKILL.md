@@ -23,7 +23,7 @@ This skill is the workflow. Load `performance:benchmark` to build the harness an
 
 Interview the user until each item below is settled and none rests on your assumption:
 
-- Ask in rounds with `AskUserQuestion`, one question per open decision. Load a `grilling` skill when one is installed.
+- Ask in rounds with `AskUserQuestion`, one question per open decision.
 - Settle every item before building anything.
 - Write the answers into the notes file's Rules section ([references/notes.md](references/notes.md) has the template), then confirm the section with the user.
 - A dispatching brief settles only the items it states. Ask the rest.
@@ -87,8 +87,6 @@ Write the change for the workload, never for a `dev` input's specifics (its size
 
 A candidate without a profile entry behind it ranks last, unless a measurement sizes the time it targets: the gap between wall and CPU time, or a cold run against the warm one profiled. Rank that candidate at its measured size.
 
-Pass the same hypothesis to `compare.ts run --hypothesis`, which stores it with the comparison's load record.
-
 Record every lead you do not climb in the notes file's Set Aside table with its reason. Drop a lead the user put in scope only after asking.
 
 #### Measure
@@ -132,6 +130,6 @@ Then run `holdout` once on the original base and the final commit. The climb hol
 ## Report
 
 - **Notes.** Finish the Where It Stands section: base against final on every scenario, starred where significant, and the stop reason.
-- **PR or maintainer comment.** Lead with the metric's before and after in plain words, naming the base commit measured against. Then list the accepted changes with each one's gain. Put one metric per table column.
-- **External repo.** On a repo the user does not own, ship the code changes alone. Add the harness or notes only when the user asks. Summarize each rejected candidate in a few lines, without links to files that do not ship.
+- **PR or maintainer comment.** Lead with the metric's before and after in plain words, naming the base commit measured against. Round the numbers in prose, and give exact figures in the tables. Then list the accepted changes with each one's gain. Put one metric per table column.
+- **Artifacts.** Ship the code changes alone. Add the harness, notes, or generated data (timings, caches) only when the user asks. On a repo the user does not own, summarize each rejected candidate in a few lines, without links to files that do not ship.
 - **Artifact.** Offer to publish the notes when others will read them.

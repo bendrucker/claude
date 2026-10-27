@@ -19,7 +19,7 @@ Climbed with `/performance:hill-climb`. A session resuming this climb invokes th
 - Guard: <the check that proves behavior is unchanged, and how to run it>.
 - Side effects: <each thing a run touches and whether it is stubbed, fixed, or reset>.
 - Scope: <which changes are allowed>.
-- Inputs: `dev` <scenarios>, `holdout` <scenarios>.
+- Inputs: `dev` <scenarios>, every one run to confirm an accept. `holdout` <scenarios>, scored once at the end.
 - Acceptance: <run count per side, interleaving, test and threshold, guard condition>.
 - Stop: <ceiling, three rejections in a row, or budget>.
 

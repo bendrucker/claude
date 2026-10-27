@@ -10,7 +10,9 @@ The loop needs these from any harness:
 - A way to load the artifact from a git ref while the cases come from the working tree.
 - The final reply per run, for error analysis.
 
-Run the suite with the harness's own command. `compare.ts` reads each stored run through an adapter, which turns it into the native result shape:
+Run the suite with the harness's own command. To compare, write an adapter for whatever the harness stores: a TypeScript module that reads one stored run into the native result shape. Read one stored run first to learn its shape, then write the module beside the climb log, so every later column reads through the same file. A suite that already ships an adapter names it in its `README.md`. Use that one.
+
+A minimal adapter:
 
 ```ts
 import type { Adapter } from "<repo>/packages/evals/adapter";
@@ -41,7 +43,7 @@ export default adapter;
 bun evals/native/compare.ts --adapter ./my-adapter.ts --suite <suite> <base1>,<base2> <cand1>,<cand2>
 ```
 
-Bun loads the `.ts` module directly, without a build step. Record the adapter path in the climb log beside the harness version. Re-score with the harness's own tooling and read the result back through the adapter.
+Bun loads the `.ts` module directly, without a build step. Before reading any comparison, check the adapter against the harness: compare one column alone and match its pass counts for a few cases to the harness's own report. A mismatch means the adapter misread the format. Record the adapter path in the climb log beside the harness version, and keep the file unchanged for the rest of the climb, since an edit can move every column it reads. Re-score with the harness's own tooling and read the result back through the adapter.
 
 A harness that would rather emit native files can call `writeResult` from `packages/evals/result.ts`, which writes `aggregate-result.json` and a trace per run and scores each run the way the runner does. Pass `--suite` only when the cases live in `<suite>/<case>/case.yaml` with a `tags` list.
 

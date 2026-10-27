@@ -69,7 +69,7 @@ Run the candidate on the `dev` tag as many times as the baseline. When the budge
 
 #### Compare
 
-Pool each side's replicates into one column, then compare per case, arm, and grader. A star marks a cell whose two-sided permutation p-value against the base column falls below 0.1. A cell needs at least 4 runs a side to star at that threshold. When the harness reports pass rates without p-values, compute the permutation test from the per-run results and treat p < 0.1 as the star. A case whose errored runs left the pool is not comparable. Re-run it before reading its row.
+Pool each side's replicates into one column, then compare per case, arm, and grader. A star marks a cell whose two-sided permutation p-value against the base column falls below 0.1. A cell needs at least 4 runs a side to star at that threshold. On a harness other than native, write an adapter for its stored runs before the first comparison, per [harnesses.md](references/harnesses.md), and compare every column through it. A case whose errored runs left the pool is not comparable. Re-run it before reading its row.
 
 Read the stars in this order:
 

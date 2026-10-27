@@ -29,7 +29,7 @@ The same evidence is rendered once per harness in [`scripts/renderers/`](scripts
 - `native` is the `compare.ts --markdown` report: starred rows first, then the collapsed tables, with `*`, `†`, and `!` marks. The generator builds it with the real `render` from `packages/evals`, so the format follows the tool.
 - `csv` lists `case,arm,grader,runs,passes` for each column, then a separate table of p-values. It has no stars.
 
-The p-values in every harness come from the same permutation test, so a case reads the same whichever harness drew it. `neutral` runs on every case but the `native` ones. It fails a reply that sends the reader to `compare.ts`, `regrade.ts`, `evals/native`, or `run.ts`, which cannot read those columns.
+The p-values in every harness come from the same permutation test, so a case reads the same whichever harness drew it. `neutral` runs on every case but the `native` ones. It fails a reply that sends the reader to `run.ts`, `regrade.ts`, `calls.ts`, or `compare.ts` without `--adapter`, none of which can read those columns.
 
 #### Graders
 

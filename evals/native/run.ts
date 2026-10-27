@@ -2,13 +2,13 @@
 import { dirname, join, relative, resolve } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
-import { subscriptionEnv } from "../../packages/eval-judge/env";
 import { erroredRuns, readResult } from "../../packages/evals/result";
 import {
   collectTraces,
   keepCases,
   pluginErrors,
   prepare,
+  sessionEnv,
   splitCases,
   strayArgs,
 } from "../../packages/evals/run";
@@ -37,8 +37,7 @@ export const program = new Command("run.ts")
     const output = join(repo, suite, "results", label === undefined ? stamp : `${stamp}-${label}`);
     const allow = config.allow_tools.length > 0 ? ["--allow-tools", ...config.allow_tools] : [];
 
-    // An API key in the environment would bill the API instead of the subscription.
-    const env = subscriptionEnv();
+    const env = sessionEnv();
     const proc = Bun.spawn(
       [
         "claude",

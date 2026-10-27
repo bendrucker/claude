@@ -27,7 +27,7 @@ Interview the user until each item below is settled and none rests on your assum
 - Settle every item before building anything.
 - Write the answers into the notes file's Rules section ([references/notes.md](references/notes.md) has the template), then confirm the section with the user.
 - A dispatching brief settles only the items it states. Ask the rest.
-- When the user does not answer, send a push notification and continue. Record each unanswered item in Rules as `assumed: <value>`, and name every assumed item in the first decision report.
+- When the session is unattended (a dispatched brief, or the user said they are away), settle each open item yourself. Record it in Rules as `assumed: <value>`, and name every assumed item in the first decision report.
 
 - **Metric.** The number the user cares about, on an exact scenario: the command, its input state, and the machine state. "Wall time of a sync run by hand right after one upstream commit" is a metric. "Make it faster" is not.
   - Start from who waits on the result and when: a person after a change, a CI job, a scheduled run. Measure the run the user waits through, even when the code handles another run more often.
@@ -47,7 +47,8 @@ Interview the user until each item below is settled and none rests on your assum
 ## Workspace
 
 - **herdr.** Under `HERDR_ENV=1`, run the whole climb in one herdr workspace so the user can watch every run. On a cloud VM, create it on the VM's herdr machine and add `--machine <label>` to the same commands. Load `herdr:herdr` for them.
-- **Progress.** `tee` every long run into a log beside the notes file. `compare.ts run` prints each round's per-arm medians. Relay the latest round to the user at the cadence the Budget set.
+- **Runs.** Build arms per `performance:benchmark`. Launch a run longer than a few minutes detached, in the herdr pane or under `nohup`, so a session reload leaves it running. Run timed commands in the herdr pane when there is one, since the sandbox breaks ptys and skews timing.
+- **Progress.** `tee` every long run into a log beside the notes file. `compare.ts run` prints each round's per-arm medians. Report each decision with its numbers as it lands, and stay quiet between decisions unless an estimate slips.
 
 ## Harness
 
@@ -70,9 +71,7 @@ Build the benchmark per `performance:benchmark`, or adopt the project's own when
 
 #### Checkpoint
 
-Show the user the baseline table, the noise floor, the profile's top entries, a candidate list ranked by the share of the metric each one targets, and the Set Aside leads. Wait for the user's review before the first candidate.
-
-When the user does not answer, write the checkpoint into the notes file and continue.
+Show the user the baseline table, the noise floor, the profile's top entries, a candidate list ranked by the share of the metric each one targets, and the Set Aside leads. When the user is present, wait for the review before the first candidate. When the session is unattended, write the checkpoint into the notes file and continue.
 
 ## Loop
 
@@ -111,6 +110,7 @@ After each decision:
 
 - Re-profile after an accept, since the ranking shifts.
 - Report the first decision to the user in one line, and continue unless the user redirects.
+- Past the Checkpoint, ask with `AskUserQuestion` only to change the Scope, a Guard, or the Ceiling. Decide anything else, record it in the notes as `assumed: <value>`, and name it in the next report.
 - Commit a mid-climb harness change separately, re-run the baseline and the A/A, and note it in the notes file. A new input family, inputs at a new scale, and a new runtime or dependency version are harness changes.
 - After two rejections in a row, re-run the A/A and re-profile before the next candidate. A stall often means the noise floor rose or the profile ranks work the scenario does not wait on.
 

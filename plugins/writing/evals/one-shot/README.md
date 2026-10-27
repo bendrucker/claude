@@ -15,3 +15,7 @@ Drafts land in the gitignored `data/drafts.jsonl`. `bun scripts/sync.ts push` co
 ## Report
 
 `bun scripts/report.ts <run>` prints, per category, the drafts it fired on, the share of its instances the rewrite fixed, the instances left, the instances it introduced into drafts that lacked it, and the share of its drafts whose rewrite lost meaning. `--base <run>` sets a base run's figures beside each, over the drafts both runs share, which is how a rule or prompt edit is judged. The lossy column counts co-occurrence: a draft with several findings charges a loss to each of them.
+
+## Dogfood
+
+`bun scripts/dogfood.ts --name <run> --cwd <repo> <globs...>` runs the same rewrite and judge over markdown files that trip a rule. With `--apply` it writes back each rewrite the judge passes and lists the losses of the rest, so the diff on a branch is the review surface.

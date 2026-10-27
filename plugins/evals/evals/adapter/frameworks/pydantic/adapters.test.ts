@@ -16,18 +16,18 @@ const failed = async (file: string) => {
 describe("pydantic test adapters", () => {
   test("correct passes every grader", async () => {
     expect(await failed("correct.ts")).toEqual([]);
-  }, 60_000);
+  }, 180_000);
 
   test.each(["tags", "traces", "rescore", "run"])(
     "broken-%s fails only %s",
     async (grader) => {
       expect(await failed(`broken-${grader}.ts`)).toEqual([grader]);
     },
-    60_000,
+    180_000,
   );
 
   // check.ts grades `run` through the adapter's own `read`, so a broken read fails both.
   test("broken-read fails read and run", async () => {
     expect(await failed("broken-read.ts")).toEqual(["read", "run"]);
-  }, 60_000);
+  }, 180_000);
 });

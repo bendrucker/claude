@@ -5,6 +5,7 @@
 // writes the init file those readers open it with. The SQL under resources/lake/ does
 // the work in the DuckDB CLI. This wrapper checks egress, moves the catalog to and from
 // S3, and attaches the index and lake.
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -139,7 +140,8 @@ export async function readerInit(url: string): Promise<string> {
 
 /**
  * Writes the reader init for `url` and returns its path. duckdb -init runs the file, so it
- * lives in a directory only this user can write, and is rewritten on every call.
+ * lives in a directory only this user can write, named by its content so readers of
+ * different lakes never share one.
  */
 async function writeReaderInit(url: string): Promise<string> {
   const dir = join(tmpdir(), `claude-session-lake-${process.getuid?.() ?? "user"}`);
@@ -147,8 +149,9 @@ async function writeReaderInit(url: string): Promise<string> {
   const st = await Bun.file(dir).stat();
   if (st.uid !== process.getuid?.() || (st.mode & 0o077) !== 0)
     throw new Error(`${dir} is not private to this user; remove it and retry.`);
-  const path = join(dir, "init.sql");
-  await Bun.write(path, await readerInit(url));
+  const sql = await readerInit(url);
+  const path = join(dir, `${createHash("sha256").update(sql).digest("hex").slice(0, 12)}.sql`);
+  if (!(await Bun.file(path).exists())) await Bun.write(path, sql);
   return path;
 }
 

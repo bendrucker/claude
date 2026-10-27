@@ -56,7 +56,7 @@ export function caseYaml(e: Evidence): string {
 }
 
 /** Native-only tooling. `compare.ts` reads another harness only through `--adapter`. */
-const NEUTRAL = String.raw`compare\.ts(?![^\n\x60]*--adapter)|regrade\.ts|calls\.ts|run\.ts`;
+const NEUTRAL = String.raw`(?:compare|regrade|calls|run)\.ts(?![^\n\x60]*--adapter)`;
 
 /** The grader files a case carries, by file name. */
 export function graders(e: Evidence): Record<string, string> {
@@ -98,7 +98,7 @@ export function graders(e: Evidence): Record<string, string> {
       "flags: i",
       "match: not_contains",
       "---",
-      "The reply does not send anyone to native-only tooling. This case's columns come from another harness, which `compare.ts` reads only through `--adapter`.",
+      "The reply does not send anyone to native-only tooling. This case's columns come from another harness, which the eval scripts reach only through `--adapter`.",
       "",
     ].join("\n");
   }

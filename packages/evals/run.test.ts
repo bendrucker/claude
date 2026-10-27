@@ -184,7 +184,7 @@ test.each<{ name: string; args: string[]; stray: string[] }>([
   { name: "runner args after --", args: ["s", "--", "--case", "a"], stray: [] },
   {
     name: "run.ts flags before --",
-    args: ["--ref", "main", "s", "--label=x", "--", "--runs", "2"],
+    args: ["--ref", "main", "s", "--label=x", "--adapter", "./a.ts", "--", "--runs", "2"],
     stray: [],
   },
   {

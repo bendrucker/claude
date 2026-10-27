@@ -4,7 +4,6 @@ import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { resolveAdapter } from "../../packages/evals/adapter";
 import { loadColumn } from "../../packages/evals/column";
 import { render } from "../../packages/evals/compare";
-import { loadTags } from "../../packages/evals/suite";
 
 function float(value: string): number {
   const n = Number(value);
@@ -33,10 +32,10 @@ export const program = new Command("compare.ts")
     collect,
     [],
   )
-  .option("--suite <dir>", "suite directory whose case.yaml tags roll case scores up by tag")
+  .option("--suite <dir>", "suite directory whose case tags roll case scores up by tag")
   .option(
     "--adapter <name|path>",
-    "adapter that reads each result path: a built-in name, or a module whose default or `adapter` export implements Adapter",
+    "adapter that reads each result path and the suite's tags: a built-in name, or a module whose default or `adapter` export implements Adapter",
     "native",
   )
   .option("--markdown", "print markdown with the starred rows first and the full tables collapsed")
@@ -51,7 +50,7 @@ export const program = new Command("compare.ts")
         columns: await Promise.all(paths.map((p) => loadColumn(p, adapter))),
         labels: paths.map((p, i) => options.label[i] ?? label(p[0] ?? "")),
         alpha: options.alpha,
-        tags: options.suite === undefined ? undefined : await loadTags(options.suite),
+        tags: options.suite === undefined ? undefined : await adapter.tags(options.suite),
         markdown: options.markdown,
       }),
     );

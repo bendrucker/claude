@@ -176,12 +176,18 @@ export function strayArgs(args: string[]): string[] {
   return stray;
 }
 
+/** Whether a path exists, as a file or a directory. */
+async function exists(path: string): Promise<boolean> {
+  return (await $`test -e ${path}`.nothrow().quiet()).exitCode === 0;
+}
+
 /**
- * Copies each run's trace into `<output>/traces/<case>-<arm>-<n>.jsonl`. The runner writes
- * traces inside its temp directories and deletes them unless run with `--keep-temp`, so this
- * copies them out and then removes those directories.
+ * Copies each run's trace into `<output>/traces/<case>-<arm>-<n>.jsonl`, and each `collect` path
+ * from its working directory into `<output>/artifacts/<case>-<arm>-<n>/`. The runner writes both
+ * inside its temp directories and deletes them unless run with `--keep-temp`, so this copies them
+ * out and then removes those directories.
  */
-export async function collectTraces(output: string): Promise<void> {
+export async function collectTraces(output: string, collect: string[] = []): Promise<void> {
   const path = join(output, "aggregate-result.json");
   if (!(await Bun.file(path).exists())) return;
   const { cases } = await readResult(path);
@@ -189,11 +195,21 @@ export async function collectTraces(output: string): Promise<void> {
     Object.entries(c.arms).flatMap(([arm, runs]) =>
       runs.map(async ({ tracePath }, i) => {
         if (tracePath == null || !(await Bun.file(tracePath).exists())) return;
-        await Bun.write(join(output, "traces", `${c.name}-${arm}-${i}.jsonl`), Bun.file(tracePath));
+        const run = `${c.name}-${arm}-${i}`;
+        await Bun.write(join(output, "traces", `${run}.jsonl`), Bun.file(tracePath));
         const out = dirname(tracePath);
         if (basename(out) !== "out") return;
-        // The runner leaves a write-only `sealed` directory that blocks a plain rm.
         const kept = dirname(out);
+        // The session's working directory sits at `home/cwd` beside the trace's `out/`.
+        await Promise.all(
+          collect.map(async (p) => {
+            const from = join(kept, "home/cwd", p);
+            if (!(await exists(from))) return;
+            const to = join(output, "artifacts", run, p);
+            await $`mkdir -p ${dirname(to)} && cp -R ${from} ${to}`.quiet();
+          }),
+        );
+        // The runner leaves a write-only `sealed` directory that blocks a plain rm.
         await $`chmod -R u+rwx ${kept}/sealed ${kept}; rm -rf ${kept}`.nothrow().quiet();
       }),
     ),

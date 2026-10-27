@@ -6,6 +6,7 @@ import type { Adapter, Transcript } from "../adapter";
 import { regrade } from "../regrade";
 import { erroredRuns, readResult } from "../result";
 import { collectTraces, keepCases, pluginErrors, prepare, splitCases } from "../run";
+import { scoreSuite } from "../score";
 import { loadTags, readSuite } from "../suite";
 import { calls, type Measured, traceMeasures, traceReply } from "../trace";
 
@@ -63,8 +64,10 @@ export const native: Adapter = {
       { env: subscriptionEnv(), stdio: ["inherit", "inherit", "inherit"] },
     );
     const code = await proc.exited;
-    await collectTraces(output);
+    await collectTraces(output, config.collect);
     await $`rm -rf ${dirname(target)}`.quiet();
+    if (await Bun.file(join(output, "aggregate-result.json")).exists())
+      await scoreSuite(join(repo, suite), output);
     const loadErrors = await pluginErrors(output);
     if (loadErrors.length > 0)
       throw new Error(

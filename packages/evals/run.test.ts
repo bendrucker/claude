@@ -92,7 +92,7 @@ describe("prepare", () => {
   });
 });
 
-test("collectTraces copies kept traces beside the results and removes the runner's temp dirs", async () => {
+test("collectTraces copies kept traces and collected files beside the results and removes the runner's temp dirs", async () => {
   const output = mkdtempSync(join(tmpdir(), "run-output-"));
   const kept = mkdtempSync(join(tmpdir(), "e-"));
   const trace = join(kept, "out/trace.jsonl");
@@ -102,8 +102,13 @@ test("collectTraces copies kept traces beside the results and removes the runner
     join(output, "aggregate-result.json"),
     JSON.stringify({ cases: [{ name: "one", arms: { with: runs } }] }),
   );
-  await collectTraces(output);
+  await Bun.write(join(kept, "home/cwd/adapter.ts"), "export default {}");
+  await collectTraces(output, ["adapter.ts", "never-written.ts"]);
   expect(await read(join(output, "traces/one-with-0.jsonl"))).toContain("reply");
+  expect(await read(join(output, "artifacts/one-with-0/adapter.ts"))).toBe("export default {}");
+  expect(await Bun.file(join(output, "artifacts/one-with-0/never-written.ts")).exists()).toBe(
+    false,
+  );
   expect(await Bun.file(join(output, "traces/one-with-1.jsonl")).exists()).toBe(false);
   expect(await Bun.file(trace).exists()).toBe(false);
 });

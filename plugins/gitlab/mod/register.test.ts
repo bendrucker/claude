@@ -223,7 +223,7 @@ describe("register", () => {
       phase: "pending",
       state: "opened",
     });
-    expect(await w.shown($)).toBe("you     │ \u{f444} 0/1  \u{f441} 1");
+    expect(await w.shown($)).toBe("author  │ \u{f444} 0/1  \u{f441} 1");
 
     world.view = mr("failed");
     world.jobs = job("failed");
@@ -238,7 +238,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(await w.shown($)).toBe("you     │ \u{f52f} 1  \u{f441} 1");
+    expect(await w.shown($)).toBe("author  │ \u{f52f} 1  \u{f441} 1");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -248,7 +248,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f441} 1");
+    expect(await w.shown($)).toBe("author  │ \u{f49e}  \u{f441} 1");
   });
 
   test("an MR already conflicting when first seen is announced once, through a recheck", async ($, on) => {
@@ -335,7 +335,7 @@ describe("register", () => {
     world.approvals = approvals("alice");
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits[1]).toContain("@alice approved MR !7");
-    expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f42e}");
+    expect(await w.shown($)).toBe("author  │ \u{f49e}  \u{f42e}");
 
     world.approvals = approvals();
     await w.clock.advance(POLL_MS.settled);
@@ -371,7 +371,7 @@ describe("register", () => {
         { mr: 7, head: "aaaaaaa1111", id: "3", author: "deploy-bot", reason: "author" },
         { mr: 7, head: "aaaaaaa1111", id: "2", author: "review-bot", reason: "marked" },
       ]);
-      expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f441} 1");
+      expect(await w.shown($)).toBe("author  │ \u{f49e}  \u{f441} 1");
     },
   );
 
@@ -392,7 +392,7 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f4a8}");
+    expect(await w.shown($)).toBe("author  │ \u{f49e}  \u{f4a8}");
     await w.clock.advance(POLL_MS.settled);
     expect(w.graphql.length).toBe(1);
 
@@ -631,7 +631,7 @@ describe("register", () => {
     expect(w.named("poll.error")).toEqual([
       expect.objectContaining({ ok: false, detail: { error: KEYRING } }),
     ]);
-    expect(await w.shown($)).toBe("you     │ \u{f444} 0/1  \u{f441} 1  \u{f421}");
+    expect(await w.shown($)).toBe("author  │ \u{f444} 0/1  \u{f441} 1  \u{f421}");
   });
 
   test("an unexpected payload is a poll error", async ($, on) => {
@@ -815,7 +815,33 @@ describe("register", () => {
     expect(w.named("pane.close")).toHaveLength(1);
   });
 
-  test("the pane lists every job and the muted notes it hides until opened", async ($, on) => {
+  test("refresh reads the MR in full at once", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr("success") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const pane = await $.ui.mount({
+      plugin: "gitlab",
+      surface: "terminal",
+      component: "Pane",
+      requestId: "mr",
+      props: {
+        title: "MR",
+        isFocused: true,
+        bodyColumns: 60,
+        placement: "dock",
+        scroll: { offset: 0, bodyRows: 30 },
+        view: {},
+      },
+    });
+    await pane.press({ key: "refresh" });
+    await w.clock.settle();
+    expect(w.named("pane.refresh")).toHaveLength(1);
+    expect(w.named("poll").at(-1)?.detail?.read).toBe("full");
+    await pane.unmount();
+  });
+
+  test("the pane lists failing jobs, counts the passing, and hides muted notes until opened", async ($, on) => {
     const ack = "<!-- reply marker -->\n✅ Actions performed";
     const w = worldOf(on, {
       branch: "topic",
@@ -842,8 +868,9 @@ describe("register", () => {
       },
     });
 
-    expect(await pane.find({ type: "Text", text: /✗ test/ })).toBeDefined();
-    expect(await pane.find({ type: "Text", text: /✓ lint/ })).toBeDefined();
+    expect(await pane.find({ type: "Text", text: /\u{f52f} test/u })).toBeDefined();
+    expect(await pane.find({ type: "Text", text: /lint/ })).toBeUndefined();
+    expect(await pane.find({ type: "Text", text: /1 passed/ })).toBeDefined();
     expect(await pane.find({ type: "Text", text: /review-bot · marked/ })).toBeUndefined();
 
     await pane.press({ key: "muted" });
@@ -864,7 +891,7 @@ describe("register", () => {
     await $.session.start(START);
     await w.clock.settle();
 
-    expect(await w.shown($)).toBe("you");
+    expect(await w.shown($)).toBe("author");
   });
 
   test("an unchanged MR backs off until a turn or a change resets it", async ($, on) => {

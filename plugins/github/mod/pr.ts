@@ -1,5 +1,5 @@
 export const VIEW_FIELDS =
-  "number,url,state,headRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,reviewRequests,latestReviews,statusCheckRollup,reviews,comments";
+  "number,title,url,state,headRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,reviewRequests,latestReviews,statusCheckRollup,reviews,comments";
 
 export interface CheckNode {
   __typename?: string;
@@ -31,6 +31,7 @@ export interface CommentNode {
 
 export interface PrView {
   number: number;
+  title?: string | null;
   url: string;
   state: string;
   headRefOid: string;
@@ -126,6 +127,7 @@ export function parseView(stdout: string): PrView | undefined {
   }
   return {
     number: value.number,
+    title: textOf(value.title),
     url: value.url,
     state: value.state,
     headRefOid: value.headRefOid,
@@ -210,6 +212,7 @@ export type Block = "conflict" | "behind" | "none";
 
 export interface Snapshot {
   pr: number;
+  title: string;
   url: string;
   state: string;
   head: string;
@@ -494,6 +497,7 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
   }
   return {
     pr: view.number,
+    title: view.title ?? "",
     url: view.url,
     state: view.state,
     head: view.headRefOid,
@@ -756,7 +760,7 @@ export function ballOf(snapshot: Snapshot): Ball {
 
 // Nerd Font Octicons, the icons GitHub draws for each state, keyed by glyph
 // name: nf-oct-git_merge is gitMerge.
-const OCT = {
+export const OCT = {
   alert: "\u{f421}",
   arrowDown: "\u{f433}",
   check: "\u{f42e}",
@@ -779,61 +783,83 @@ const SEP = "  ";
 // The lead is padded to its longest word, so the glyphs after it hold still as it changes.
 const LEAD_WIDTH = "merging".length;
 
+/** A theme color the pane draws a status part in; the footer tail is dim text only. */
+export type Tone = "success" | "error" | "warning" | "merged" | "suggestion" | "claude" | "subtle";
+
+export interface Part {
+  text: string;
+  tone: Tone;
+}
+
+/** The footer status, split so the pane can color each part. */
+export interface Status {
+  lead: Part | undefined;
+  parts: Part[];
+}
+
 // `isBusy` is a turn running, which is the agent at work on the author's move.
-const LEADS: Record<Ball, (isBusy: boolean) => string | undefined> = {
-  author: (isBusy) => (isBusy ? "agent" : "you"),
-  reviewer: () => "review",
-  merging: () => "merging",
-  ci: () => "ci",
+const LEADS: Record<Ball, (isBusy: boolean) => Part | undefined> = {
+  author: (isBusy) =>
+    isBusy ? { text: "agent", tone: "claude" } : { text: "author", tone: "warning" },
+  reviewer: () => ({ text: "review", tone: "suggestion" }),
+  merging: () => ({ text: "merging", tone: "merged" }),
+  ci: () => ({ text: "ci", tone: "subtle" }),
   none: () => undefined,
 };
 
-const BLOCKS: Record<Block, string | undefined> = {
-  conflict: `${OCT.gitMerge}${OCT.x}`,
-  behind: OCT.arrowDown,
+const BLOCKS: Record<Block, Part | undefined> = {
+  conflict: { text: `${OCT.gitMerge}${OCT.x}`, tone: "error" },
+  behind: { text: OCT.arrowDown, tone: "warning" },
   none: undefined,
 };
 
-const ENDED: Partial<Record<string, string>> = {
-  MERGED: `${OCT.gitMerge} merged`,
-  CLOSED: `${OCT.gitPullRequestClosed} closed`,
+const ENDED: Partial<Record<string, Part>> = {
+  MERGED: { text: `${OCT.gitMerge} merged`, tone: "merged" },
+  CLOSED: { text: `${OCT.gitPullRequestClosed} closed`, tone: "error" },
 };
 
-const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
+const CHECKS: Record<Phase, (snapshot: Snapshot) => Part | undefined> = {
   none: () => undefined,
-  pending: (s) => `${OCT.dotFill} ${s.total - s.pending}/${s.total}`,
-  passing: () => OCT.checkCircle,
-  failing: (s) => `${OCT.xCircle} ${s.failed.length}`,
+  pending: (s) => ({ text: `${OCT.dotFill} ${s.total - s.pending}/${s.total}`, tone: "warning" }),
+  passing: () => ({ text: OCT.checkCircle, tone: "success" }),
+  failing: (s) => ({ text: `${OCT.xCircle} ${s.failed.length}`, tone: "error" }),
 };
 
-const TURNS: Record<Turn["turn"], (snapshot: Snapshot, waiting: string[]) => string | undefined> = {
-  author: () => OCT.reply,
-  reviewer: (_, waiting) => `${OCT.hourglass} ${waiting.length}`,
-  ready: () => OCT.check,
-  none: (s) => (s.reviewDecision === "REVIEW_REQUIRED" ? OCT.eye : undefined),
+const TURNS: Record<Turn["turn"], (snapshot: Snapshot, waiting: string[]) => Part | undefined> = {
+  author: () => ({ text: OCT.reply, tone: "warning" }),
+  reviewer: (_, waiting) => ({ text: `${OCT.hourglass} ${waiting.length}`, tone: "suggestion" }),
+  ready: () => ({ text: OCT.check, tone: "success" }),
+  none: (s) =>
+    s.reviewDecision === "REVIEW_REQUIRED" ? { text: OCT.eye, tone: "subtle" } : undefined,
 };
 
-function mergingPart(merging: Merging): string | undefined {
-  if (merging.kind === "queued") return `${OCT.gitMergeQueue} ${merging.position}`;
-  return merging.kind === "auto" ? OCT.gitMerge : undefined;
+function mergingPart(merging: Merging): Part | undefined {
+  if (merging.kind === "queued")
+    return { text: `${OCT.gitMergeQueue} ${merging.position}`, tone: "merged" };
+  return merging.kind === "auto" ? { text: OCT.gitMerge, tone: "merged" } : undefined;
+}
+
+export function statusPartsOf(snapshot: Snapshot, isBusy = false, isStale = false): Status {
+  const ended = ENDED[snapshot.state];
+  if (ended !== undefined) return { lead: undefined, parts: [ended] };
+  const turn = turnOf(snapshot);
+  const parts = [
+    BLOCKS[snapshot.block ?? "none"],
+    CHECKS[snapshot.phase](snapshot),
+    TURNS[turn.turn](snapshot, turn.waiting),
+    snapshot.threads > 0
+      ? { text: `${OCT.commentDiscussion} ${snapshot.threads}`, tone: "suggestion" as const }
+      : undefined,
+    mergingPart(snapshot.merging),
+    isStale ? { text: OCT.alert, tone: "warning" as const } : undefined,
+  ].filter((part) => part !== undefined);
+  return { lead: LEADS[ballOf(snapshot)](isBusy), parts };
 }
 
 // The footer already links the PR, so the state rides after it on that line.
 export function statusOf(snapshot: Snapshot, isBusy = false, isStale = false): string {
-  const ended = ENDED[snapshot.state];
-  if (ended !== undefined) return ended;
-  const turn = turnOf(snapshot);
-  const details = [
-    BLOCKS[snapshot.block ?? "none"],
-    CHECKS[snapshot.phase](snapshot),
-    TURNS[turn.turn](snapshot, turn.waiting),
-    snapshot.threads > 0 ? `${OCT.commentDiscussion} ${snapshot.threads}` : undefined,
-    mergingPart(snapshot.merging),
-    isStale ? OCT.alert : undefined,
-  ]
-    .filter((part) => part !== undefined)
-    .join(SEP);
-  const lead = LEADS[ballOf(snapshot)](isBusy);
+  const { lead, parts } = statusPartsOf(snapshot, isBusy, isStale);
+  const details = parts.map((part) => part.text).join(SEP);
   if (lead === undefined) return details;
-  return details === "" ? lead : `${lead.padEnd(LEAD_WIDTH)} │ ${details}`;
+  return details === "" ? lead.text : `${lead.text.padEnd(LEAD_WIDTH)} │ ${details}`;
 }

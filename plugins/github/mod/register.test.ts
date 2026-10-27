@@ -275,7 +275,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
+    expect(await w.shown($)).toBe("author  │ \u{f52f} 1");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -284,7 +284,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(await w.shown($)).toBe("you     │ \u{f49e}");
+    expect(await w.shown($)).toBe("author  │ \u{f49e}");
   });
 
   test("every new review wakes the model with its state", async ($, on) => {
@@ -345,7 +345,7 @@ describe("register", () => {
         { pr: 7, head: "aaaaaaa1111", id: "c1", author: "vercel[bot]", reason: "author" },
       ]);
       expect(w.named("inject")[0]?.detail?.muted).toEqual(["aaaaaaa1111:Review App", "c1"]);
-      expect(await w.shown($)).toBe("you     │ \u{f49e}");
+      expect(await w.shown($)).toBe("author  │ \u{f49e}");
     },
   );
 
@@ -360,7 +360,7 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    expect(await w.shown($)).toBe("you     │ \u{f49e}  \u{f4a8}");
+    expect(await w.shown($)).toBe("author  │ \u{f49e}  \u{f4a8}");
 
     const pushed = { ...pr("SUCCESS"), headRefOid: "bbbbbbb2222", latestReviews: [asked] };
     world.view = pushed;
@@ -394,7 +394,7 @@ describe("register", () => {
         reason: "marked",
       },
     ]);
-    expect(await w.shown($)).toBe("you     │ \u{f49e}");
+    expect(await w.shown($)).toBe("author  │ \u{f49e}");
   });
 
   test(
@@ -425,7 +425,7 @@ describe("register", () => {
     expect(w.submits.length).toBe(1);
     expect(w.submits[0]).toContain("PR #7 has merge conflicts with `main` at aaaaaaa.");
     expect(w.submits[0]).toContain("`git:conflicts`");
-    expect(await w.shown($)).toBe("you     │ \u{f419}\u{f467}  \u{f49e}");
+    expect(await w.shown($)).toBe("author  │ \u{f419}\u{f467}  \u{f49e}");
 
     world.view = merging("MERGEABLE");
     await w.clock.advance(QUIET_MS[1] ?? 0);
@@ -607,7 +607,7 @@ describe("register", () => {
     expect(w.submits.length).toBe(2);
     expect(w.submits[1]).toContain("@bot reviewed PR #7 (COMMENTED)");
     expect(w.submits[1]).not.toContain("CI failed");
-    expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
+    expect(await w.shown($)).toBe("author  │ \u{f52f} 1");
   });
 
   test("stays idle without gh", async ($, on) => {
@@ -757,7 +757,7 @@ describe("register", () => {
     world.view = pr("FAILURE");
     await w.clock.advance(POLL_MS.pending);
     expect(w.submits.length).toBe(1);
-    expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
+    expect(await w.shown($)).toBe("author  │ \u{f52f} 1");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.views.length).toBe(3);
@@ -970,7 +970,7 @@ describe("register", () => {
     await $.session.start(START);
     await w.clock.settle();
 
-    expect(await w.shown($)).toBe("you");
+    expect(await w.shown($)).toBe("author");
   });
 
   test("a running turn shows the agent at work on the author's move", async ($, on) => {
@@ -978,13 +978,13 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
+    expect(await w.shown($)).toBe("author  │ \u{f52f} 1");
 
     await $.turn.start({ text: "fix it", turnId: "t1" });
     expect(await w.shown($)).toBe("agent   │ \u{f52f} 1");
 
     await $.turn.complete(COMPLETE);
-    expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
+    expect(await w.shown($)).toBe("author  │ \u{f52f} 1");
   });
 
   test("a second /pr closes the pane", async ($, on) => {
@@ -1004,7 +1004,7 @@ describe("register", () => {
     expect(w.named("pane.close")).toHaveLength(1);
   });
 
-  test("the pane lists every check and the muted chatter it hides until opened", async ($, on) => {
+  test("the pane lists failing checks, counts the passing, and hides muted chatter until opened", async ($, on) => {
     const ack = "<!-- reply marker -->\n✅ Actions performed";
     const w = worldOf(on, {
       branch: "topic",
@@ -1033,10 +1033,9 @@ describe("register", () => {
       },
     });
 
-    expect((await pane.find({ type: "Text", text: /✗ ci \/ test/ }))?.text).toContain(
-      "✗ ci / test",
-    );
-    expect(await pane.find({ type: "Text", text: /✓ ci \/ lint/ })).toBeDefined();
+    expect(await pane.find({ type: "Text", text: /\u{f52f} ci \/ test/u })).toBeDefined();
+    expect(await pane.find({ type: "Text", text: /ci \/ lint/ })).toBeUndefined();
+    expect(await pane.find({ type: "Text", text: /1 passed/ })).toBeDefined();
     expect(await pane.find({ type: "Text", text: /review-app · marked/ })).toBeUndefined();
 
     await pane.press({ key: "muted" });
@@ -1044,6 +1043,38 @@ describe("register", () => {
       "review-app · marked",
     );
     expect(w.named("pane.muted").map((e) => e.detail)).toEqual([{ open: true, count: 1 }]);
+    await pane.unmount();
+  });
+
+  test("refresh reads the PR in full at once", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("SUCCESS") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const polls = w.named("poll").length;
+    const pane = await $.ui.mount({
+      plugin: "github",
+      surface: "terminal",
+      component: "Pane",
+      requestId: "pr",
+      props: {
+        title: "PR",
+        isFocused: true,
+        bodyColumns: 60,
+        placement: "dock",
+        scroll: { offset: 0, bodyRows: 30 },
+        view: {},
+      },
+    });
+    await pane.press({ key: "refresh" });
+    await w.clock.settle();
+    expect(w.named("pane.refresh")).toHaveLength(1);
+    expect(
+      w
+        .named("poll")
+        .slice(polls)
+        .map((e) => e.detail?.read),
+    ).toEqual(["full"]);
     await pane.unmount();
   });
 
@@ -1093,7 +1124,7 @@ describe("register", () => {
     world.view = "HTTP 401: Bad credentials";
     await w.clock.advance(POLL_MS.settled);
 
-    expect(await w.shown($)).toBe("you     │ \u{f52f} 1  \u{f421}");
+    expect(await w.shown($)).toBe("author  │ \u{f52f} 1  \u{f421}");
   });
 
   test("a checkout on another forge reads as no PR, not an error", async ($, on) => {

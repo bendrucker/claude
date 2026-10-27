@@ -1,5 +1,5 @@
 import type { EngineInterface, On, PluginOptions, Timer } from "claude-code";
-import { drawPane, MUTED, PANE } from "./pane.tsx";
+import { drawPane, MUTED, PANE, REFRESH } from "./pane.tsx";
 import {
   type Noise,
   type Approvals,
@@ -667,6 +667,19 @@ async function tick($: EngineInterface, watch: Watch, generation: number): Promi
   if (watch.pollingSince === now) watch.pollingSince = undefined;
 }
 
+// A refresh skips the cached reads, so it reads everything GitLab has now.
+async function refresh($: EngineInterface, watch: Watch): Promise<void> {
+  if (watch.isStopped || watch.pollingSince !== undefined) return;
+  const now = await $.clock.now();
+  emit($, "pane.refresh", { mr: watch.snapshot?.mr });
+  watch.fullAt = Number.NEGATIVE_INFINITY;
+  watch.pollingSince = now;
+  $.ui.invalidate("ui.render");
+  await poll($, watch, watch.generation, now);
+  if (watch.pollingSince === now) watch.pollingSince = undefined;
+  $.ui.invalidate("ui.render");
+}
+
 function start($: EngineInterface, watch: Watch): void {
   const generation = watch.generation;
   watch.ticker?.cancel();
@@ -811,10 +824,19 @@ export function register(on: On, options: PluginOptions): void {
   });
 
   on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) =>
-    drawPane($, e, watch, await $.clock.now()),
+    drawPane(
+      $,
+      e,
+      { ...watch, isBusy: isBusy(watch), isPolling: watch.pollingSince !== undefined },
+      await $.clock.now(),
+    ),
   );
 
   on("ui.press", { plugin: "gitlab" }, ($, e, next) => {
+    if (e.element === REFRESH) {
+      void refresh($, watch);
+      return { element: e.element };
+    }
     if (e.element !== MUTED) return next(e);
     watch.isMutedOpen = !watch.isMutedOpen;
     emit($, "pane.muted", { open: watch.isMutedOpen, count: watch.snapshot?.muted.length });

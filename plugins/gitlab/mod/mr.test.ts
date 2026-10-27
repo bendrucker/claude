@@ -33,6 +33,7 @@ const read = (over: Partial<Read> = {}, pipelineStatus = "running"): Read => ({
   view: {
     iid: 7,
     projectId: 1,
+    title: "",
     url: "https://gitlab.com/g/r/-/merge_requests/7",
     state: "opened",
     sha: "aaaaaaa1111",
@@ -618,7 +619,7 @@ describe("statusOf", () => {
   });
   const cases: [string, Snapshot, string][] = [
     ["running", snap({ jobs: [job("b", "running"), ...passed] }), "ci      │ \u{f444} 1/2"],
-    ["failing", snap({ jobs: [job("a", "failed")] }, "failed"), "you     │ \u{f52f} 1"],
+    ["failing", snap({ jobs: [job("a", "failed")] }, "failed"), "author  │ \u{f52f} 1"],
     [
       "blocked on a manual job",
       snap({ jobs: [job("deploy", "manual"), ...passed] }, "manual"),
@@ -627,7 +628,7 @@ describe("statusOf", () => {
     [
       "no pipeline and no approvals",
       snapshotOf({ ...read(), view: { ...read().view, pipeline: null } }),
-      "you",
+      "author",
     ],
     [
       "approvals outstanding",
@@ -635,7 +636,7 @@ describe("statusOf", () => {
         { jobs: passed, approvals: { approvalsRequired: 2, approvalsLeft: 2, approvedBy: [] } },
         "success",
       ),
-      "you     │ \u{f49e}  \u{f441} 2",
+      "author  │ \u{f49e}  \u{f441} 2",
     ],
     [
       "approved",
@@ -646,7 +647,7 @@ describe("statusOf", () => {
         },
         "success",
       ),
-      "you     │ \u{f49e}  \u{f42e}",
+      "author  │ \u{f49e}  \u{f42e}",
     ],
     [
       "changes requested",
@@ -654,7 +655,7 @@ describe("statusOf", () => {
         ...read({ jobs: passed }, "success"),
         view: { ...read().view, pipeline: null, detailedMergeStatus: "requested_changes" },
       }),
-      "you     │ \u{f4a8}",
+      "author  │ \u{f4a8}",
     ],
     [
       "re-requested after changes",
@@ -683,7 +684,7 @@ describe("statusOf", () => {
         }),
         view: { ...read().view, pipeline: null },
       }),
-      "you     │ \u{f4a8}",
+      "author  │ \u{f4a8}",
     ],
     ["merged", { ...snap({ jobs: [job("a", "running")] }), state: "merged" }, "\u{f419} merged"],
     ["closed", { ...snap(), state: "closed" }, "\u{f4dc} closed"],
@@ -693,7 +694,7 @@ describe("statusOf", () => {
         ...read({ jobs: passed }, "success"),
         view: { ...read({}, "success").view, detailedMergeStatus: "conflict" },
       }),
-      "you     │ \u{f419}\u{f467}  \u{f49e}",
+      "author  │ \u{f419}\u{f467}  \u{f49e}",
     ],
     [
       "needs a rebase",
@@ -701,7 +702,7 @@ describe("statusOf", () => {
         ...read({ jobs: passed }, "success"),
         view: { ...read({}, "success").view, detailedMergeStatus: "need_rebase" },
       }),
-      "you     │ \u{f433}  \u{f49e}",
+      "author  │ \u{f433}  \u{f49e}",
     ],
     [
       "undecided mergeability shows no conflict",
@@ -709,7 +710,7 @@ describe("statusOf", () => {
         ...read({ jobs: passed }, "success"),
         view: { ...read({}, "success").view, detailedMergeStatus: "checking" },
       }),
-      "you     │ \u{f49e}",
+      "author  │ \u{f49e}",
     ],
     [
       "threads waiting on the author, not those it answered",
@@ -727,7 +728,7 @@ describe("statusOf", () => {
         },
         "success",
       ),
-      "you     │ \u{f49e}  \u{f442} 1",
+      "author  │ \u{f49e}  \u{f442} 1",
     ],
     [
       "auto-merge waiting on the pipeline",

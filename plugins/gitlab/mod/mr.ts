@@ -64,6 +64,7 @@ const readView = map(
   obj({
     iid: num,
     project_id: num,
+    title: or(str, ""),
     web_url: str,
     state: str,
     sha: str,
@@ -76,6 +77,7 @@ const readView = map(
   (v) => ({
     iid: v.iid,
     projectId: v.project_id,
+    title: v.title,
     url: v.web_url,
     state: v.state,
     sha: v.sha,
@@ -213,6 +215,7 @@ export type Block = "conflict" | "behind" | "none";
 export interface Snapshot {
   mr: number;
   projectId: number;
+  title: string;
   url: string;
   state: string;
   head: string;
@@ -468,6 +471,7 @@ export function snapshotOf(read: Read): Snapshot {
   return {
     mr: view.iid,
     projectId: view.projectId,
+    title: view.title,
     url: view.url,
     state: view.state,
     head: view.sha,
@@ -753,7 +757,7 @@ export function ballOf(snapshot: Snapshot): Ball {
 }
 
 // Nerd Font Octicons, keyed by glyph name: nf-oct-git_merge is gitMerge.
-const OCT = {
+export const OCT = {
   alert: "\u{f421}",
   arrowDown: "\u{f433}",
   check: "\u{f42e}",
@@ -776,61 +780,83 @@ const SEP = "  ";
 // The lead is padded to its longest word, so the glyphs after it hold still as it changes.
 const LEAD_WIDTH = "merging".length;
 
+/** A theme color the pane draws a status part in; the footer tail is dim text only. */
+export type Tone = "success" | "error" | "warning" | "merged" | "suggestion" | "claude" | "subtle";
+
+export interface Part {
+  text: string;
+  tone: Tone;
+}
+
+/** The footer status, split so the pane can color each part. */
+export interface Status {
+  lead: Part | undefined;
+  parts: Part[];
+}
+
 // `isBusy` is a turn running, which is the agent at work on the author's move.
-const LEADS: Record<Ball, (isBusy: boolean) => string | undefined> = {
-  author: (isBusy) => (isBusy ? "agent" : "you"),
-  reviewer: () => "review",
-  merging: () => "merging",
-  ci: () => "ci",
+const LEADS: Record<Ball, (isBusy: boolean) => Part | undefined> = {
+  author: (isBusy) =>
+    isBusy ? { text: "agent", tone: "claude" } : { text: "author", tone: "warning" },
+  reviewer: () => ({ text: "review", tone: "suggestion" }),
+  merging: () => ({ text: "merging", tone: "merged" }),
+  ci: () => ({ text: "ci", tone: "subtle" }),
   none: () => undefined,
 };
 
-const BLOCKS: Record<Block, string | undefined> = {
-  conflict: `${OCT.gitMerge}${OCT.x}`,
-  behind: OCT.arrowDown,
+const BLOCKS: Record<Block, Part | undefined> = {
+  conflict: { text: `${OCT.gitMerge}${OCT.x}`, tone: "error" },
+  behind: { text: OCT.arrowDown, tone: "warning" },
   none: undefined,
 };
 
-const ENDED: Partial<Record<string, string>> = {
-  merged: `${OCT.gitMerge} merged`,
-  closed: `${OCT.gitPullRequestClosed} closed`,
+const ENDED: Partial<Record<string, Part>> = {
+  merged: { text: `${OCT.gitMerge} merged`, tone: "merged" },
+  closed: { text: `${OCT.gitPullRequestClosed} closed`, tone: "error" },
 };
 
-const CHECKS: Record<Phase, (snapshot: Snapshot) => string | undefined> = {
+const CHECKS: Record<Phase, (snapshot: Snapshot) => Part | undefined> = {
   none: () => undefined,
-  pending: (s) => `${OCT.dotFill} ${s.total - s.pending}/${s.total}`,
-  passing: () => OCT.checkCircle,
-  failing: (s) => `${OCT.xCircle} ${s.failed.length}`,
+  pending: (s) => ({ text: `${OCT.dotFill} ${s.total - s.pending}/${s.total}`, tone: "warning" }),
+  passing: () => ({ text: OCT.checkCircle, tone: "success" }),
+  failing: (s) => ({ text: `${OCT.xCircle} ${s.failed.length}`, tone: "error" }),
 };
 
-const TURNS: Record<Turn["turn"], (snapshot: Snapshot, waiting: string[]) => string | undefined> = {
-  author: () => OCT.reply,
-  reviewer: (_, waiting) => `${OCT.hourglass} ${waiting.length}`,
-  ready: () => OCT.check,
-  none: ({ approvalsLeft: left }) => (left > 0 ? `${OCT.eye} ${left}` : undefined),
+const TURNS: Record<Turn["turn"], (snapshot: Snapshot, waiting: string[]) => Part | undefined> = {
+  author: () => ({ text: OCT.reply, tone: "warning" }),
+  reviewer: (_, waiting) => ({ text: `${OCT.hourglass} ${waiting.length}`, tone: "suggestion" }),
+  ready: () => ({ text: OCT.check, tone: "success" }),
+  none: ({ approvalsLeft: left }) =>
+    left > 0 ? { text: `${OCT.eye} ${left}`, tone: "subtle" } : undefined,
 };
 
-function mergingPart(merging: Merging): string | undefined {
-  if (merging.kind === "queued") return `${OCT.gitMergeQueue} ${merging.position}`;
-  return merging.kind === "auto" ? OCT.gitMerge : undefined;
+function mergingPart(merging: Merging): Part | undefined {
+  if (merging.kind === "queued")
+    return { text: `${OCT.gitMergeQueue} ${merging.position}`, tone: "merged" };
+  return merging.kind === "auto" ? { text: OCT.gitMerge, tone: "merged" } : undefined;
+}
+
+export function statusPartsOf(snapshot: Snapshot, isBusy = false, isStale = false): Status {
+  const ended = ENDED[snapshot.state];
+  if (ended !== undefined) return { lead: undefined, parts: [ended] };
+  const turn = turnOf(snapshot);
+  const parts = [
+    BLOCKS[snapshot.block ?? "none"],
+    CHECKS[snapshot.phase](snapshot),
+    TURNS[turn.turn](snapshot, turn.waiting),
+    snapshot.threads > 0
+      ? { text: `${OCT.commentDiscussion} ${snapshot.threads}`, tone: "suggestion" as const }
+      : undefined,
+    mergingPart(snapshot.merging),
+    isStale ? { text: OCT.alert, tone: "warning" as const } : undefined,
+  ].filter((part) => part !== undefined);
+  return { lead: LEADS[ballOf(snapshot)](isBusy), parts };
 }
 
 // The footer already links the MR, so the state rides after it on that line.
 export function statusOf(snapshot: Snapshot, isBusy = false, isStale = false): string {
-  const ended = ENDED[snapshot.state];
-  if (ended !== undefined) return ended;
-  const turn = turnOf(snapshot);
-  const details = [
-    BLOCKS[snapshot.block ?? "none"],
-    CHECKS[snapshot.phase](snapshot),
-    TURNS[turn.turn](snapshot, turn.waiting),
-    snapshot.threads > 0 ? `${OCT.commentDiscussion} ${snapshot.threads}` : undefined,
-    mergingPart(snapshot.merging),
-    isStale ? OCT.alert : undefined,
-  ]
-    .filter((part) => part !== undefined)
-    .join(SEP);
-  const lead = LEADS[ballOf(snapshot)](isBusy);
+  const { lead, parts } = statusPartsOf(snapshot, isBusy, isStale);
+  const details = parts.map((part) => part.text).join(SEP);
   if (lead === undefined) return details;
-  return details === "" ? lead : `${lead.padEnd(LEAD_WIDTH)} │ ${details}`;
+  return details === "" ? lead.text : `${lead.text.padEnd(LEAD_WIDTH)} │ ${details}`;
 }

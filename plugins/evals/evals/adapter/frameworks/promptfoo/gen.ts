@@ -148,14 +148,12 @@ async function flips(dir: string, stored: Output) {
   const regrade = { prompts: ["{{logged_output}}"], providers: ["echo"], tests };
   await Bun.write(join(dir, "regrade.json"), JSON.stringify(regrade));
   await evaluate(dir, {}, "-c", "regrade.json", "--output", "regraded.json");
-  const regraded = (await Bun.file(join(dir, "regraded.json")).text()).replaceAll(dir, "/project");
-  const after = verdicts(Output.parse(JSON.parse(regraded)));
-  const changed = before.flatMap((b, i) =>
+  const after = verdicts(Output.parse(await Bun.file(join(dir, "regraded.json")).json()));
+  return before.flatMap((b, i) =>
     Object.entries(b.graders)
       .filter(([metric, passed]) => after[i]?.graders[metric] !== passed)
       .map(([grader]) => ({ case: b.row.testCase.description, arm: b.arm, run: b.index, grader })),
   );
-  return { changed, regraded };
 }
 
 await record("seen");
@@ -172,11 +170,7 @@ if (
 
 const edited = await project("rescore");
 const patchText = await patch(edited);
-const [seenRegrade, heldRegrade] = [await flips(edited, seen), await flips(edited, held)];
-const [seenFlips, heldFlips] = [seenRegrade.changed, heldRegrade.changed];
-const pretty = (text: string) => `${JSON.stringify(JSON.parse(text), null, 2)}\n`;
-await Bun.write(join(here, "fixtures/seen/regraded.json"), pretty(seenRegrade.regraded));
-await Bun.write(join(here, "fixtures/held/regraded.json"), pretty(heldRegrade.regraded));
+const [seenFlips, heldFlips] = [await flips(edited, seen), await flips(edited, held)];
 if (heldFlips.length === 0) throw new Error("the rescore edit flips no held verdict");
 
 await Bun.write(join(here, "fixtures/held/rescore.patch"), patchText);

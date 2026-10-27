@@ -7,7 +7,7 @@ index 564bd1d..d642ff7 100644
      """The reply stays within a word budget."""
  
 -    max_words: int = 12
-+    max_words: int = 4
++    max_words: int = 2
  
      def evaluate(self, ctx: EvaluatorContext[str, str]) -> bool:
          return len(ctx.output.split()) <= self.max_words

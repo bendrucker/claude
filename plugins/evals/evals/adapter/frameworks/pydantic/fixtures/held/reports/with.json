@@ -49,8 +49,8 @@
           "evaluator_version": null
         }
       },
-      "task_duration": 0.035393791971728206,
-      "total_duration": 0.03897213935852051,
+      "task_duration": 0.0048813329776749015,
+      "total_duration": 0.006598949432373047,
       "source_case_name": "capital-france",
       "trace_id": "00000000000000000000000000000000",
       "span_id": "0000000000000000",
@@ -104,8 +104,8 @@
           "evaluator_version": null
         }
       },
-      "task_duration": 0.013959834002889693,
-      "total_duration": 0.015752077102661133,
+      "task_duration": 0.0023130420595407486,
+      "total_duration": 0.0027930736541748047,
       "source_case_name": "capital-france",
       "trace_id": "00000000000000000000000000000000",
       "span_id": "0000000000000000",
@@ -159,8 +159,8 @@
           "evaluator_version": null
         }
       },
-      "task_duration": 0.008226625039242208,
-      "total_duration": 0.009156942367553711,
+      "task_duration": 0.001693582977168262,
+      "total_duration": 0.0020978450775146484,
       "source_case_name": "sum",
       "trace_id": "00000000000000000000000000000000",
       "span_id": "0000000000000000",
@@ -214,8 +214,8 @@
           "evaluator_version": null
         }
       },
-      "task_duration": 0.016833917004987597,
-      "total_duration": 0.022693872451782227,
+      "task_duration": 0.0015955830458551645,
+      "total_duration": 0.0020401477813720703,
       "source_case_name": "sum",
       "trace_id": "00000000000000000000000000000000",
       "span_id": "0000000000000000",
@@ -269,8 +269,8 @@
           "evaluator_version": null
         }
       },
-      "task_duration": 0.06895479094237089,
-      "total_duration": 0.08521389961242676,
+      "task_duration": 0.0016474589938297868,
+      "total_duration": 0.0020749568939208984,
       "source_case_name": "chemical-symbol",
       "trace_id": "00000000000000000000000000000000",
       "span_id": "0000000000000000",
@@ -324,8 +324,8 @@
           "evaluator_version": null
         }
       },
-      "task_duration": 0.023936833022162318,
-      "total_duration": 0.025591135025024414,
+      "task_duration": 0.0015811669873073697,
+      "total_duration": 0.002017974853515625,
       "source_case_name": "chemical-symbol",
       "trace_id": "00000000000000000000000000000000",
       "span_id": "0000000000000000",
@@ -379,8 +379,8 @@
           "evaluator_version": null
         }
       },
-      "task_duration": 0.010625625029206276,
-      "total_duration": 0.011705160140991211,
+      "task_duration": 0.0016665409784764051,
+      "total_duration": 0.0020589828491210938,
       "source_case_name": "moon-landing",
       "trace_id": "00000000000000000000000000000000",
       "span_id": "0000000000000000",
@@ -434,8 +434,8 @@
           "evaluator_version": null
         }
       },
-      "task_duration": 0.008982416940853,
-      "total_duration": 0.010497093200683594,
+      "task_duration": 0.0016050420235842466,
+      "total_duration": 0.0020198822021484375,
       "source_case_name": "moon-landing",
       "trace_id": "00000000000000000000000000000000",
       "span_id": "0000000000000000",

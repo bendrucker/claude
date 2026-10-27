@@ -175,7 +175,26 @@
     }
   },
   "rescore": {
-    "supported": false,
-    "reason": "pydantic-evals has no API to re-run evaluators over a stored report, only Dataset.evaluate, which runs the task"
+    "supported": true,
+    "flips": [
+      {
+        "case": "sum",
+        "arm": "without",
+        "run": 0,
+        "grader": "ShortReply"
+      },
+      {
+        "case": "sum",
+        "arm": "without",
+        "run": 1,
+        "grader": "ShortReply"
+      },
+      {
+        "case": "chemical-symbol",
+        "arm": "without",
+        "run": 1,
+        "grader": "ShortReply"
+      }
+    ]
   }
 }

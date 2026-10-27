@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { $ } from "bun";
 import { z } from "zod";
 import type { Truth } from "../../scripts/truth";
@@ -33,6 +33,31 @@ async function record(mode: string): Promise<string> {
   return reports;
 }
 
+const Rescored = z.array(
+  z.object({
+    arm: z.string(),
+    case: z.string(),
+    run: z.number(),
+    graders: z.record(z.string(), z.boolean()),
+  }),
+);
+
+/** The verdicts that change when the stored outputs are graded by the patched evaluators. */
+async function flipsOf(reports: string, cases: Truth["cases"]) {
+  const project = join(scratch, `rescore-${basename(join(reports, ".."))}`);
+  await $`bash ${join(here, "setup.sh")} ${project}`.quiet();
+  await $`git apply ${join(here, "fixtures/held/rescore.patch")}`.cwd(project).quiet();
+  const out =
+    await $`uv run --no-project --with pydantic-evals --with pydantic-ai python ${join(here, "rescore.py")} ${reports}`
+      .cwd(project)
+      .text();
+  return Rescored.parse(JSON.parse(out)).flatMap((r) =>
+    Object.entries(r.graders)
+      .filter(([grader, passed]) => cases[r.case]?.arms[r.arm]?.[r.run]?.graders[grader] !== passed)
+      .map(([grader]) => ({ case: r.case, arm: r.arm, run: r.run, grader })),
+  );
+}
+
 async function truthOf(reports: string): Promise<Truth> {
   const parsed = await Promise.all(
     ["with", "without"].map(async (arm) =>
@@ -51,11 +76,7 @@ async function truthOf(reports: string): Promise<Truth> {
   return {
     result: "reports",
     cases,
-    rescore: {
-      supported: false,
-      reason:
-        "pydantic-evals has no API to re-run evaluators over a stored report, only Dataset.evaluate, which runs the task",
-    },
+    rescore: { supported: true, flips: await flipsOf(reports, cases) },
   };
 }
 
@@ -67,6 +88,8 @@ await Promise.all(
     await $`rm -rf ${join(dest, "reports")}`.quiet();
     await $`cp -R ${reports} ${join(dest, "reports")}`.quiet();
     const truth = await truthOf(reports);
+    if (mode === "held" && truth.rescore.supported && truth.rescore.flips.length === 0)
+      throw new Error("rescore.patch flips nothing in the held run");
     await Bun.write(join(dest, "truth.json"), `${JSON.stringify(truth, null, 2)}\n`);
   }),
 );

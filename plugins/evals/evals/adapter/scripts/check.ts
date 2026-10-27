@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
@@ -13,7 +13,10 @@ export const GRADERS = ["loads", "read", "tags", "traces", "rescore", "run"] as 
 const suite = join(import.meta.dirname, "..");
 const evals = join(suite, "../../../../packages/evals");
 
-const temp = (prefix: string) => mkdtempSync(join(tmpdir(), `adapter-${prefix}-`));
+const OPERATION_TIMEOUT_MS = 120_000;
+
+// macOS links its temp dir through /private, and git reports the resolved path.
+const temp = (prefix: string) => realpathSync(mkdtempSync(join(tmpdir(), `adapter-${prefix}-`)));
 
 /** A fresh `setup.sh` copy of the framework's project. */
 async function project(framework: string): Promise<string> {
@@ -75,7 +78,11 @@ const OPERATIONS: Record<Exclude<(typeof GRADERS)[number], "loads">, Operation> 
     if (outcome.flips.length !== want.length)
       return `want ${want.length} flips, got ${outcome.flips.length}`;
     const unmatched = want.find(
-      (w) => !outcome.flips.some((f) => f.grader.includes(w.grader) && f.grader.includes(w.case)),
+      // `Flip` leaves the naming open, so the case may sit in either field.
+      (w) =>
+        !outcome.flips.some(
+          (f) => f.grader.includes(w.grader) && `${f.grader} ${f.run}`.includes(w.case),
+        ),
     );
     return unmatched === undefined
       ? undefined
@@ -84,8 +91,7 @@ const OPERATIONS: Record<Exclude<(typeof GRADERS)[number], "loads">, Operation> 
 
   async run(adapter, truth, framework) {
     const dir = await project(framework);
-    const log = join(temp("log"), "stub.jsonl");
-    process.env.ADAPTER_STUB_LOG = log;
+    const log = process.env.ADAPTER_STUB_LOG ?? "";
     const path = await adapter.run(dir, { ref: "base", label: "score", args: [] });
     const { result } = await adapter.read(path);
     const differ = countsDiffer(truthCounts(truth), resultCounts(result));
@@ -97,8 +103,21 @@ const OPERATIONS: Record<Exclude<(typeof GRADERS)[number], "loads">, Operation> 
   },
 };
 
+/** The stub on PATH, the held fixture, and the stub's log. `Bun.spawn` resolves commands against the PATH its process started with, so `score.ts` passes this to the check process too. */
+export function stubEnv(framework: string): Record<string, string> {
+  return {
+    PATH: `${join(suite, "frameworks", framework, "stub/bin")}:${process.env.PATH ?? ""}`,
+    ADAPTER_FIXTURE: "held",
+    ADAPTER_STUB_LOG: join(temp("log"), "stub.jsonl"),
+  };
+}
+
 /** Grades an adapter module for one framework against its held run. */
-export async function check(adapterPath: string, framework: string): Promise<Verdicts> {
+export async function check(
+  adapterPath: string,
+  framework: string,
+  { inherit = false } = {},
+): Promise<Verdicts> {
   const verdicts: Verdicts = {};
   const fail = (explanation: string) => {
     for (const g of GRADERS) verdicts[g] ??= { passed: false, explanation };
@@ -114,13 +133,15 @@ export async function check(adapterPath: string, framework: string): Promise<Ver
   // A pre-commit hook exports GIT_DIR and GIT_INDEX_FILE, which would point setup.sh's git at the outer repo.
   for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key];
   const truth = await readTruth(join(suite, "frameworks", framework, "fixtures/held"));
-  process.env.PATH = `${join(suite, "frameworks", framework, "stub/bin")}:${process.env.PATH ?? ""}`;
-  process.env.ADAPTER_FIXTURE = "held";
+  if (!inherit) Object.assign(process.env, stubEnv(framework));
   const reasons = await Promise.all(
     Object.entries(OPERATIONS).map(async ([name, operation]) => {
-      const reason = await operation(adapter, truth, framework).catch(
-        (error: unknown) => `threw: ${String(error).split("\n")[0] ?? ""}`,
-      );
+      const reason = await Promise.race([
+        operation(adapter, truth, framework),
+        Bun.sleep(OPERATION_TIMEOUT_MS).then(
+          () => `timed out after ${OPERATION_TIMEOUT_MS / 1000}s`,
+        ),
+      ]).catch((error: unknown) => `threw: ${String(error).split("\n")[0] ?? ""}`);
       return [name, reason] as const;
     }),
   );
@@ -133,6 +154,10 @@ if (import.meta.main) {
   const [dir, framework] = process.argv.slice(2);
   if (dir === undefined || framework === undefined)
     throw new Error("usage: check.ts <artifacts dir> <framework>");
-  await $`ln -sfn ${evals} ${join(dir, "evals")}`.quiet();
-  console.log(JSON.stringify(await check(join(dir, "adapter.ts"), framework)));
+  // The adapter imports ./evals/adapter. Linking it beside a copy keeps the link out of uploaded artifacts.
+  const copy = temp("module");
+  await $`cp ${join(dir, "adapter.ts")} ${copy}/ && ln -s ${evals} ${join(copy, "evals")}`.quiet();
+  console.log(JSON.stringify(await check(join(copy, "adapter.ts"), framework, { inherit: true })));
+  // A timed-out operation can leave a child running, which would hold the process open.
+  process.exit(0);
 }

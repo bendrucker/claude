@@ -20,6 +20,43 @@ const Report = z.object({
 type Report = z.output<typeof Report>;
 type Arms = Loaded["result"]["cases"][number]["arms"];
 
+/** Grades each stored output with the project's evaluators and prints the verdicts that changed. */
+const RESCORE = `
+import asyncio, inspect, json, sys
+from pathlib import Path
+from types import SimpleNamespace
+sys.path.insert(0, ".")
+from cases import dataset
+
+async def verdict(evaluator, ctx):
+    result = evaluator.evaluate(ctx)
+    if inspect.isawaitable(result):
+        result = await result
+    return bool(getattr(result, "value", result))
+
+async def main():
+    cases = {c.name: c for c in dataset.cases}
+    flips = []
+    for file in sorted(Path(sys.argv[1]).glob("*.json")):
+        report = json.loads(file.read_text())
+        runs = {}
+        for stored in report["cases"]:
+            name = stored["source_case_name"]
+            run = runs[name] = runs.get(name, -1) + 1
+            ctx = SimpleNamespace(inputs=stored["inputs"], metadata=stored["metadata"],
+                                  expected_output=stored["expected_output"], output=stored["output"])
+            for e in [*dataset.evaluators, *cases[name].evaluators]:
+                grader = e.get_serialization_name()
+                passed = await verdict(e, ctx)
+                if passed != stored["assertions"][grader]["value"]:
+                    flips.append({"grader": f"{name}/{report['name']}/{grader}", "run": str(run), "passed": passed})
+    print(json.dumps(flips))
+
+asyncio.run(main())
+`;
+
+const Flips = z.array(z.object({ grader: z.string(), run: z.string(), passed: z.boolean() }));
+
 /** One report per variant, named for its experiment, which is the arm. */
 async function reports(dir: string): Promise<Report[]> {
   const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
@@ -81,12 +118,12 @@ export const adapter: Adapter = {
     return tags;
   },
 
-  rescore() {
-    return Promise.reject(
-      new Error(
-        "pydantic-evals can't re-run evaluators over a stored report: Dataset.evaluate runs the task",
-      ),
-    );
+  async rescore(suite, path) {
+    const out =
+      await $`uv run --no-project --with pydantic-evals --with pydantic-ai python -c ${RESCORE} ${path}`
+        .cwd(suite)
+        .text();
+    return { path, flips: Flips.parse(JSON.parse(out)) };
   },
 
   async traces(path) {

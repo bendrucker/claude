@@ -481,6 +481,14 @@
         "seedrandom": "^3.0.5",
       },
     },
+    "plugins/writing/evals/one-shot": {
+      "name": "writing-one-shot-eval",
+      "dependencies": {
+        "@commander-js/extra-typings": "~15.0.0",
+        "commander": "~15.0.0",
+        "zod": "^4.4.3",
+      },
+    },
   },
   "overrides": {
     "@apidevtools/json-schema-ref-parser": "^16.0.0",
@@ -1965,6 +1973,8 @@
     "wrappy": ["wrappy@1.0.2", "", {}, "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ=="],
 
     "writing-authoring-eval": ["writing-authoring-eval@workspace:plugins/writing/evals/authoring"],
+
+    "writing-one-shot-eval": ["writing-one-shot-eval@workspace:plugins/writing/evals/one-shot"],
 
     "xml-name-validator": ["xml-name-validator@5.0.0", "", {}, "sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg=="],
 

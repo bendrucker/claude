@@ -706,20 +706,18 @@ describe("scan", () => {
     }
 
     it.each([
-      "The global list keeps six:\n\n- a\n- b",
-      "Sandboxed git failures fall into three groups:\n\n- a",
-      "Five notes:\n- a",
-      "It reads the following three files:\n- a",
+      "The global list keeps four:\n\n- a\n- b\n- c\n- d",
+      "Five notes:\n- a\n- b\n- c\n- d\n- e",
+      "It reads the following three files: `a.ts`, `b.ts`, and `c.ts`.",
     ])("flags: %j", async (text) => {
       expect(await leadIn(text)).toBeDefined();
     });
 
     it.each([
-      "The global list keeps:\n\n- a\n- b",
-      "Two notes:\n- a",
+      "The global list keeps:\n\n- a\n- b\n- c\n- d",
+      "Two notes:\n- a\n- b",
       "Phase three: migrate the readers.",
-      "Four runs per arm:\n\n| Case | With |",
-      "Two reviewers approved the change.",
+      "Four runs per arm:\n\n| Case | With |\n| --- | --- |\n| a | 1 |",
       "The `three:` key is ignored.",
     ])("allows: %j", async (text) => {
       expect(await leadIn(text)).toBeUndefined();

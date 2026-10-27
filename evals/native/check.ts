@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "@commander-js/extra-typings";
 import { check } from "../../packages/evals/check";
+import { generate } from "../../packages/evals/generate";
 
 export const program = new Command("check.ts")
   .description(
@@ -8,6 +9,7 @@ export const program = new Command("check.ts")
   )
   .argument("<suite>", "suite directory")
   .action(async (suite) => {
+    await generate(suite);
     const { mismatches, unchecked, prompts, shadowed, earlyClose } = await check(suite);
     for (const m of mismatches) console.log(`${m.example}: ${m.grader} should ${m.expected}`);
     for (const c of prompts) console.log(`${c}/prompt.md: empty prompt`);

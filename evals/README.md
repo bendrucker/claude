@@ -36,6 +36,8 @@ graders:                        # <suite>/graders/<name>.md to the case-name glo
 
 A case's scaffold runs from the staged tree, which holds only the plugins and the suite, so a scaffold that reads shared code names it under `stage`, at the same repo-relative path. [`packages/eval-stubs`](../packages/eval-stubs/) is the shared case: offline `gh` and `glab` stand-ins and the git-init fixture preamble.
 
+A suite that generates its cases can keep them out of git by naming its generator as the `generate` script in the suite's `package.json`. `run.ts`, `check.ts`, and `compare.ts --suite` run it before they read any `case.yaml`.
+
 A grader two or more cases repeat byte for byte lives once in `<suite>/graders/`, joined by globs (`!quiet-*` for every case but the quiet ones) or an explicit case list. `run.ts` copies it into each matching case as it stages the suite, skipping a case that holds a grader by that name, and `check.ts` and `regrade.ts` read the same merged set. A bare `claude plugin eval` run never sees these graders. `check.ts` names any case grader that shadows one `suite.yaml` shares in.
 
 The runner ignores a `CLAUDE.md` or `.claude/rules` in the scaffolded working directory, so wrapped context reaches the session through a `SessionStart` hook instead. It injects every context file whatever its `paths:` frontmatter says. A wrapped skill keeps the files it links to beside it, such as a sibling skill's reference, and loses `disable-model-invocation`, so a user-invoked skill can load from a natural-language prompt on the with arm.

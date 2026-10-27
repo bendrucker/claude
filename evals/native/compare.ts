@@ -4,6 +4,7 @@ import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { resolveAdapter } from "../../packages/evals/adapter";
 import { loadColumn } from "../../packages/evals/column";
 import { render } from "../../packages/evals/compare";
+import { generate } from "../../packages/evals/generate";
 
 function float(value: string): number {
   const n = Number(value);
@@ -40,6 +41,7 @@ export const program = new Command("compare.ts")
   )
   .option("--markdown", "print markdown with the starred rows first and the full tables collapsed")
   .action(async (columns, options) => {
+    if (options.suite !== undefined) await generate(options.suite);
     const paths = columns.map((c) => c.split(","));
     const adapter = await resolveAdapter(options.adapter).catch((error: unknown) =>
       program.error(error instanceof Error ? error.message : String(error)),

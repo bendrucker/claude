@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "@commander-js/extra-typings";
 import { resolveAdapter } from "../../packages/evals/adapter";
+import { generate } from "../../packages/evals/generate";
 import { strayArgs } from "../../packages/evals/run";
 
 export const program = new Command("run.ts")
@@ -13,6 +14,7 @@ export const program = new Command("run.ts")
   .option("--label <label>", "suffix for the stored result's name")
   .option("--adapter <name|path>", "adapter that runs the suite", "native")
   .action(async (suite, args, options) => {
+    await generate(suite);
     const adapter = await resolveAdapter(options.adapter).catch(fail);
     const path = await adapter
       .run(suite, { ref: options.ref, label: options.label, args })

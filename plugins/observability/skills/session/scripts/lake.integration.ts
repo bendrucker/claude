@@ -7,7 +7,7 @@ import { $ } from "bun";
 import { type DuckDBConnection, DuckDBInstance } from "@duckdb/node-api";
 import { z } from "zod";
 import { ensureIndex, getDb, sessionDbPath } from "./db";
-import { type LakeOptions, publish } from "./lake";
+import { type LakeOptions, publish, readerInit } from "./lake";
 
 const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 
@@ -116,13 +116,24 @@ describe("publish", () => {
 
     const result = await publish(options);
     expect(result.files).toBeGreaterThan(0);
+    expect(result.macros).toBeGreaterThan(0);
     const ts = await tables();
     expect(ts).toContain("messages");
     expect(await drift(ts)).toEqual(clean(ts));
   }, 120_000);
 
+  test("a reader's init resolves the index's tables and macros in the lake", async () => {
+    const init = join(dir, "reader.sql");
+    await Bun.write(init, await readerInit(options.url));
+    const sql = `SET VARIABLE after_date = NULL; SET VARIABLE before_date = NULL;
+      SET VARIABLE project = NULL; SET VARIABLE host = NULL;
+      SELECT (SELECT count(*) FROM scoped_sessions()) = (SELECT count(*) FROM sessions) AS same;`;
+    const out = await $`duckdb -json -init ${init} -c ${sql}`.cwd(dir).text();
+    expect(JSON.parse(out)).toEqual([{ same: true }]);
+  }, 60_000);
+
   test("an unchanged index publishes nothing", async () => {
-    expect(await publish(options)).toEqual({ files: 0, sessions: 0, rebuilt: false });
+    expect(await publish(options)).toEqual({ files: 0, sessions: 0, macros: 0, rebuilt: false });
   }, 60_000);
 
   test("a changed and a removed file republish only their sessions", async () => {

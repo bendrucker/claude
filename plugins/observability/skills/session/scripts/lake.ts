@@ -5,21 +5,17 @@
 // writes the init file those readers open it with. The SQL under resources/lake/ does
 // the work in the DuckDB CLI. This wrapper checks egress, moves the catalog to and from
 // S3, and attaches the index and lake.
-import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
-import { cli } from "cleye";
 import { z } from "zod";
 import { enumerateHosts, getDataDir, LOCAL_HOST, sessionDbPath } from "./db";
 
 const RESOURCES_DIR = join(import.meta.dirname, "..", "resources");
 const LAKE_SQL = join(RESOURCES_DIR, "lake");
-// Table macros that read the refresh's scope tables bind them when created, so a
-// reader cannot define them.
-const WRITER_MACROS = new Set(["content_item_rows", "search_item_rows", "field_rows"]);
 
 export interface LakeOptions {
   /** `s3://bucket/prefix` or a local directory, holding `catalog.ducklake` and `data/`. */
@@ -68,7 +64,14 @@ async function pullCatalog(o: LakeOptions): Promise<void> {
 }
 
 /** Runs `script` in the DuckDB CLI with the index and lake attached, and returns stdout. */
-async function runWriter(o: LakeOptions, script: string): Promise<string> {
+async function runWriter(options: LakeOptions, script: string): Promise<string> {
+  // The CLI runs from a scratch dir, so every local path must be absolute.
+  const o = {
+    ...options,
+    url: isRemote(options.url) ? options.url : resolve(options.url),
+    index: resolve(options.index),
+    stateDir: resolve(options.stateDir),
+  };
   if (isRemote(o.url)) await pullCatalog(o);
   else mkdirSync(join(o.url, "data"), { recursive: true });
   mkdirSync(join(o.stateDir, "lake"), { recursive: true });
@@ -94,7 +97,12 @@ async function pushCatalog(o: LakeOptions): Promise<void> {
     await $`aws s3 cp --only-show-errors ${localCatalog(o)} ${catalogUrl(o.url)}`;
 }
 
-const PublishResult = z.object({ files: z.number(), sessions: z.number(), rebuilt: z.boolean() });
+const PublishResult = z.object({
+  files: z.number(),
+  sessions: z.number(),
+  macros: z.number(),
+  rebuilt: z.boolean(),
+});
 export type PublishResult = z.infer<typeof PublishResult>;
 
 /**
@@ -106,7 +114,7 @@ export async function publish(o: LakeOptions): Promise<PublishResult> {
   await refuseBlockedHosts(o);
   const out = (await runWriter(o, "publish.sql")).trim().split("\n").at(-1) ?? "";
   const result = PublishResult.parse(JSON.parse(out));
-  if (result.files > 0 || result.rebuilt) await pushCatalog(o);
+  if (result.files > 0 || result.macros > 0 || result.rebuilt) await pushCatalog(o);
   return result;
 }
 
@@ -116,84 +124,73 @@ export async function checkpoint(o: LakeOptions): Promise<void> {
 }
 
 /**
- * What a reader runs before its query: limits, the read-only attach, and the macros.
- * Every table and view the index has is a lake table, which unqualified names resolve to.
+ * What a reader runs before its query: limits and the read-only attach. Tables and macros
+ * all live in the lake, which unqualified names resolve to.
  */
 export async function readerInit(url: string): Promise<string> {
-  const views = await read("views.sql");
-  // views.sql cut at each top-level CREATE, keeping the macros a reader can define.
-  const starts = [...views.matchAll(/^CREATE OR REPLACE (VIEW|MACRO|TABLE) (\w+)/gm)];
-  const macros = starts
-    .map((m, i) => ({ m, sql: views.slice(m.index, starts[i + 1]?.index ?? views.length) }))
-    .filter(({ m }) => m[1] === "MACRO" && !WRITER_MACROS.has(m[2] ?? ""))
-    .map(({ sql }) => sql.trim());
   return [
     await read("limits.sql"),
     isRemote(url) ? await read("lake/s3.sql") : "",
     "INSTALL ducklake; LOAD ducklake;",
     `ATTACH ${quote(`ducklake:${catalogUrl(url)}`)} AS lake (READ_ONLY);`,
     "SET search_path = 'memory.main,lake.main';",
-    await read("schema/00_pinned.sql"),
-    await read("schema/03_macros.sql"),
-    ...macros,
   ].join("\n");
 }
 
-/** Writes the reader init for `url` under $TMPDIR, keyed by its content, and returns the path. */
+/**
+ * Writes the reader init for `url` and returns its path. duckdb -init runs the file, so it
+ * lives in a directory only this user can write, and is rewritten on every call.
+ */
 async function writeReaderInit(url: string): Promise<string> {
-  const sql = await readerInit(url);
-  const hash = createHash("sha256").update(sql).digest("hex").slice(0, 12);
-  const path = join(tmpdir(), "claude-session-lake", `${hash}.sql`);
-  if (!(await Bun.file(path).exists())) await Bun.write(path, sql);
+  const dir = join(tmpdir(), `claude-session-lake-${process.getuid?.() ?? "user"}`);
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const st = await Bun.file(dir).stat();
+  if (st.uid !== process.getuid?.() || (st.mode & 0o077) !== 0)
+    throw new Error(`${dir} is not private to this user; remove it and retry.`);
+  const path = join(dir, "init.sql");
+  await Bun.write(path, await readerInit(url));
   return path;
 }
 
 if (import.meta.main) {
-  const argv = cli({
-    name: "lake",
-    parameters: ["<command>"],
-    help: {
-      description:
-        "publish: copy what changed in the local index to the lake. checkpoint: run DuckLake maintenance. init: print the path of a reader init file, for `duckdb -init`.",
-    },
-    flags: {
-      url: {
-        type: String,
-        description:
-          "Lake location, s3://bucket/prefix or a directory (default: $CLAUDE_SESSION_LAKE_URL)",
-        default: process.env.CLAUDE_SESSION_LAKE_URL ?? "",
-      },
-      host: {
-        type: [String],
-        description: `Host to publish, repeatable (default: ${LOCAL_HOST})`,
-      },
-      stateDir: {
-        type: String,
-        description:
-          "Where the writer keeps its catalog copy and spill files (default: the index dir)",
-      },
-    },
-  });
-  const url = argv.flags.url;
-  if (url === "") throw new Error("Set --url or CLAUDE_SESSION_LAKE_URL.");
-  const dataDir = getDataDir();
-  const options: LakeOptions = {
-    url,
-    hosts: argv.flags.host.length > 0 ? argv.flags.host : [LOCAL_HOST],
-    index: sessionDbPath(dataDir),
-    stateDir: argv.flags.stateDir ?? dataDir,
+  const program = new Command("lake.ts")
+    .description("Publish the session index to a DuckLake that remote readers query in place.")
+    .option(
+      "--url <url>",
+      "Lake location, s3://bucket/prefix or a directory (default: $CLAUDE_SESSION_LAKE_URL)",
+    )
+    .option("--host <host...>", "Hosts to publish", [LOCAL_HOST])
+    .option(
+      "--state-dir <dir>",
+      "Where the writer keeps its catalog copy and spill files (default: the index dir)",
+    );
+  const options = (): LakeOptions => {
+    const o = program.opts();
+    const url = o.url ?? process.env.CLAUDE_SESSION_LAKE_URL ?? "";
+    if (url === "") throw new Error("Set --url or CLAUDE_SESSION_LAKE_URL.");
+    const dataDir = getDataDir();
+    return {
+      url,
+      hosts: o.host,
+      index: sessionDbPath(dataDir),
+      stateDir: o.stateDir ?? dataDir,
+    };
   };
-  switch (argv._.command) {
-    case "publish":
-      console.error(JSON.stringify(await publish(options)));
-      break;
-    case "checkpoint":
-      await checkpoint(options);
-      break;
-    case "init":
-      console.log(await writeReaderInit(url));
-      break;
-    default:
-      throw new Error(`Unknown command: ${argv._.command}`);
-  }
+  program
+    .command("publish")
+    .description("Copy what changed in the local index to the lake")
+    .action(async () => {
+      console.error(JSON.stringify(await publish(options())));
+    });
+  program
+    .command("checkpoint")
+    .description("Run DuckLake's CHECKPOINT")
+    .action(() => checkpoint(options()));
+  program
+    .command("init")
+    .description("Print the path of a reader init file, for duckdb -init")
+    .action(async () => {
+      console.log(await writeReaderInit(options().url));
+    });
+  await program.parseAsync();
 }

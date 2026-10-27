@@ -141,7 +141,9 @@ WITH
     UNION ALL
     SELECT 5, 0, name, format('DELETE FROM lake.{0}; INSERT INTO lake.{0} FROM idx.{0}{1};',
       name, CASE WHEN has_host THEN ' WHERE ' || allowed ELSE '' END)
-    FROM plan, h WHERE kind = 'whole' AND (SELECT count(*) > 0 FROM changed)
+    FROM plan, h
+    WHERE kind = 'whole'
+      AND ((SELECT count(*) > 0 FROM changed) OR getvariable('rebuild') OR NOT getvariable('existed'))
   )
 SELECT sql FROM steps ORDER BY step, batch, name;
 .read dml.sql
@@ -151,9 +153,27 @@ INSERT INTO lake.published_files
 SELECT f.* FROM idx.indexed_files f JOIN changed c ON c.host = f.host AND c.source_file = f.path
 WHERE list_contains(getvariable('hosts'), f.host);
 
+-- Macros live in the lake's catalog, so a reader needs only the attach. The table macros
+-- that read the refresh's scope tables stay local.
+CREATE TEMP TABLE macros AS
+SELECT format('CREATE OR REPLACE MACRO lake.{}({}) AS {}{};', i.function_name,
+  array_to_string(i.parameters, ', '), CASE WHEN i.function_type = 'table_macro' THEN 'TABLE ' ELSE '' END,
+  i.macro_definition) AS sql
+FROM duckdb_functions() i
+LEFT JOIN duckdb_functions() l ON l.database_name = 'lake' AND l.function_name = i.function_name
+WHERE i.database_name = 'idx' AND i.function_type IN ('macro', 'table_macro') AND NOT i.internal
+  AND i.function_name NOT IN ('content_item_rows', 'search_item_rows', 'field_rows')
+  AND l.macro_definition IS DISTINCT FROM i.macro_definition;
+-- A table macro binds its tables when created, so these resolve names in the lake.
+USE lake;
+.once macros.sql
+FROM macros;
+.read macros.sql
+
 SET VARIABLE result = json_object(
   'files', (SELECT count(*) FROM changed),
   'sessions', (SELECT count(*) FROM touched),
+  'macros', (SELECT count(*) FROM macros),
   'rebuilt', getvariable('rebuild')
 );
 COMMIT;

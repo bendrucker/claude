@@ -83,7 +83,8 @@ The writers carry the `claude:dangerouslyDisableSandbox` marker after their sheb
 - **Layout.** Rows sort by `type`, then `timestamp`, in 8,192-row row groups, so a window filter or a rare-type filter skips most row groups. The replay dedupes partition by `uuid` and `timestamp`: a replayed line is a verbatim copy, so adding the timestamp changes no result and lets a window filter push below the window function.
 - **Catalog.** The writer downloads the remote catalog before every run, keeping its copy under `<state dir>/lake/`, and uploads it with `aws s3 cp` after a commit that changed something. Parquet files are immutable, so a reader sees the previous snapshot or the new one. One writer at a time: two concurrent publishes would each push a catalog without the other's snapshot. `checkpoint.sql` runs DuckLake's `CHECKPOINT` with a 7-day window, which must outlast the longest reader.
 - **Schedule.** `.github/workflows/session-lake.yml` publishes nightly on the Studio's actions-sandbox runner, from the index dir mounted read-only, and runs `checkpoint` on Sundays.
-- **Readers** run `duckdb -init "$(bun lake.ts init)"`. The init file carries `limits.sql`, `lake/s3.sql`, the read-only attach, and the macros, with `search_path` resolving every other name to the lake. The writer's and readers' CLI must match `@duckdb/node-api`'s version, or the catalog file is unreadable.
+- **Macros** publish into the lake's catalog, recreated when the index's definition differs, so a reader defines nothing. The table macros that read the refresh's scope tables stay local.
+- **Readers** run `duckdb -init "$(bun lake.ts init)"`. The init file carries `limits.sql`, `lake/s3.sql` and the read-only attach, with `search_path` resolving every other name to the lake. The writer's and readers' CLI must match `@duckdb/node-api`'s version, or the catalog file is unreadable.
 
 ### Callers
 

@@ -32,6 +32,7 @@ Interview the user until each item below is settled and none rests on your assum
   - Start from who waits on the result and when: a person after a change, a CI job, a scheduled run. Measure the run the user waits through, even when the code handles another run more often.
   - A scheduled run nobody waits on can take on work that speeds the waited-on one.
   - Ask where the real workload spends its time. A benchmark input can skip the phase users wait through.
+  - A memory metric is peak RSS of the scenario, compared with `compare.ts report --metric memory`. Allocation volume can be a fast signal only after the baseline shows it tracks the peak.
 - **Ceiling.** The value past which further gains stop mattering to the user. The climb stops there.
 - **Fast signal.** A cheaper or lower-noise number that moves with the metric: CPU time, instructions retired, work per tick, bytes. Accept on it only after the baseline shows it tracks the metric.
 - **Guard.** What must stay identical: output, final state, exit code. Name the check that proves it.

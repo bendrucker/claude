@@ -1,0 +1,32 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`summary renders tables 1`] = `
+"High-water heap 32.0 MB of 40.0 MB peak footprint (80.0% covered). Tree attributes 32.0 MB.
+8.0 MB (25.0%) live at peak under /parse/.
+Allocation sites (deepest frame outside the allocator):
+╔═══════════════════════════════════╤══════╤═══════╗
+║ function                          │ MB   │ share ║
+╟───────────────────────────────────┼──────┼───────╢
+║ Arena::grow(unsigned long) (demo) │ 24.0 │ 75.0% ║
+╟───────────────────────────────────┼──────┼───────╢
+║ parse (demo)                      │ 8.0  │ 25.0% ║
+╚═══════════════════════════════════╧══════╧═══════╝
+
+Inclusive:
+╔═══════════════════════════════════╤══════╤════════╗
+║ function                          │ MB   │ share  ║
+╟───────────────────────────────────┼──────┼────────╢
+║ start (dyld)                      │ 32.0 │ 100.0% ║
+╟───────────────────────────────────┼──────┼────────╢
+║ main (demo)                       │ 32.0 │ 100.0% ║
+╟───────────────────────────────────┼──────┼────────╢
+║ load (demo)                       │ 24.0 │ 75.0%  ║
+╟───────────────────────────────────┼──────┼────────╢
+║ Arena::grow(unsigned long) (demo) │ 24.0 │ 75.0%  ║
+╟───────────────────────────────────┼──────┼────────╢
+║ parse (demo)                      │ 8.0  │ 25.0%  ║
+╚═══════════════════════════════════╧══════╧════════╝
+"
+`;
+
+exports[`summary renders JSON 1`] = `"{"highWaterMb":32,"footprintPeakMb":40,"coveragePercent":80,"attributedMb":32,"sites":[{"function":"Arena::grow(unsigned long) (demo)","mb":24,"percent":75},{"function":"parse (demo)","mb":8,"percent":25}],"inclusive":[{"function":"start (dyld)","mb":32,"percent":100},{"function":"main (demo)","mb":32,"percent":100},{"function":"load (demo)","mb":24,"percent":75},{"function":"Arena::grow(unsigned long) (demo)","mb":24,"percent":75},{"function":"parse (demo)","mb":8,"percent":25}],"match":{"pattern":"parse","mb":8,"percent":25}}"`;

@@ -4,7 +4,7 @@ Each case hands the session a frozen climb PR from this repo and asks whether it
 
 ## Cases
 
-A case's `fixture.sh` rebuilds a seed from [`seeds/`](seeds/): the base tree, a head branch carrying the PR's patch, the PR body served through the `packages/eval-stubs` `gh`, and every run the body links under `runs/<run id>/aggregate-result.json`. [`scripts/plant.ts`](scripts/plant.ts) then plants the case's flaw in the head tree, the body, or the runs.
+A case's `fixture.sh` rebuilds a seed from `seeds/`: the base tree, a head branch carrying the PR's patch, the PR body served through the `packages/eval-stubs` `gh`, and every run the body links under `runs/<run id>/aggregate-result.json`. [`scripts/plant.ts`](scripts/plant.ts) then plants the case's flaw in the head tree, the body, or the runs.
 
 - `dev` is #1506, a climb whose gain held, as `stop-clean` plus one planted variant per check:
   - `stop-noise`: the two baseline replicates disagree by about the size of the gain.
@@ -36,7 +36,9 @@ The seeds hold each PR's body, patch, the suite's cases and graders at its base 
 
 ## Running
 
-The suite is `.local-only`. Edit [`scripts/spec.ts`](scripts/spec.ts) or [`scripts/plant.ts`](scripts/plant.ts) and run `bun plugins/evals/evals/review/scripts/gen.ts`, since every case file and example is generated.
+The suite is `.local-only`. The seeds live in the eval bucket under `review/seeds/`, and `seeds/` is gitignored. Run `bun plugins/evals/evals/review/scripts/sync.ts pull` before generating, running, or testing, and `push` (on the `agents-admin` profile) after changing a seed. Without them, `gen.ts` and each `fixture.sh` exit naming the pull, and the tests that read a seed skip.
+
+Edit [`scripts/spec.ts`](scripts/spec.ts) or [`scripts/plant.ts`](scripts/plant.ts) and run `bun plugins/evals/evals/review/scripts/gen.ts`, since every case file and example is generated.
 
 - `bun evals/native/run.ts plugins/evals/evals/review --ref <ref> -- --tag dev --runs <n>` runs the plugin at `<ref>` against the no-plugin arm. A case runs up to 60 turns.
 - `bun evals/native/check.ts plugins/evals/evals/review` tests the `verdict` regex against [`examples/`](examples/).

@@ -8,10 +8,14 @@ import { CASES, type Plant } from "./spec";
 
 const suite = join(import.meta.dir, "..");
 const seed = join(suite, "seeds/show-me-stop");
+// The seeds live in the eval bucket, so a checkout without them skips every test that reads one.
+const seeded = await Bun.file(join(seed, "pr.json")).exists();
+const pulled = describe.skipIf(!seeded);
+if (!seeded) console.warn(`${seed} is absent, so these tests skip: run scripts/sync.ts pull`);
 
-const generated = await files();
+const generated = seeded ? await files() : {};
 
-describe("committed files match the generator", () => {
+pulled("committed files match the generator", () => {
   test.each(Object.entries(generated))("%s", async (path, text) => {
     expect(await Bun.file(join(suite, path)).text()).toBe(text);
   });
@@ -25,7 +29,7 @@ describe("committed files match the generator", () => {
   });
 });
 
-describe("the suite's own design", () => {
+pulled("the suite's own design", () => {
   test("the holdout is the real flawed PRs, and dev holds one clean case", () => {
     expect(CASES.filter((c) => c.split === "holdout").map((c) => c.plant)).toEqual([
       "none",
@@ -63,9 +67,9 @@ async function planted(plant: Plant): Promise<Record<string, string>> {
   return Object.fromEntries(paths.map((p, i) => [p, (texts[i] ?? "").replaceAll(dir, "<root>")]));
 }
 
-const clean = await planted("none");
+const clean = seeded ? await planted("none") : {};
 
-describe("plants", () => {
+pulled("plants", () => {
   const plants = [...new Set(CASES.map((c) => c.plant))].filter((p) => p !== "none");
 
   test.each(plants)("%s changes only the evidence it plants in", async (plant) => {

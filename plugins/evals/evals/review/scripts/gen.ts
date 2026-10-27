@@ -21,7 +21,9 @@ function isPullFile(v: unknown): v is PullFile {
 }
 
 async function pull(seed: string): Promise<PullFile> {
-  const pr: unknown = await Bun.file(join(suite, "seeds", seed, "pr.json")).json();
+  const file = Bun.file(join(suite, "seeds", seed, "pr.json"));
+  if (!(await file.exists())) throw new Error(`seeds/${seed} is missing: run scripts/sync.ts pull`);
+  const pr: unknown = await file.json();
   if (!isPullFile(pr)) throw new Error(`seeds/${seed}/pr.json lacks a title or headRefName`);
   return { title: pr.title, headRefName: pr.headRefName };
 }
@@ -75,6 +77,7 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 stubs="$here/../../../../../packages/eval-stubs"
 seed="$here/../seeds/${c.seed}"
+[ -d "$seed" ] || { echo "$seed is missing: run scripts/sync.ts pull" >&2; exit 1; }
 bash "$stubs/install.sh"
 source "$stubs/preamble.sh" https://github.com/bendrucker/claude.git
 tar --extract --file "$seed/tree.tar"

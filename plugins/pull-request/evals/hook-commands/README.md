@@ -14,7 +14,7 @@ The `gh` and `glab` stand-ins from [`eval-stubs`](../../../../packages/eval-stub
 - `body-readable` fails when the hook denied a body it could not read.
 - `body-sent` fails when no create or edit call reached the stand-in.
 
-The without arm doesn't load the hook, so it has nothing to measure, so run with `--ablation none`:
+The without arm doesn't load the hook, so it has nothing to measure. Run with `--ablation none`:
 
 ```bash
 bun evals/native/run.ts plugins/pull-request/evals/hook-commands -- --ablation none --runs 3

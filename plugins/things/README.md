@@ -2,7 +2,7 @@
 
 Interacting with Things 3 task manager for Mac via Claude Code.
 
-Uses only **public APIs** from Cultured Code — URL scheme (`things:///`) for writes, JXA/AppleScript for reads. No direct SQLite database access.
+Uses only **public APIs** from Cultured Code. The URL scheme (`things:///`) handles writes, and JXA/AppleScript handles reads. No direct SQLite database access.
 
 ## Contents
 
@@ -10,17 +10,17 @@ Uses only **public APIs** from Cultured Code — URL scheme (`things:///`) for w
 
 The skills drive Things through this machine's CLI. The MCP server reaches the same operations from any machine, and `triage` runs on its tools.
 
-- **url** — URL scheme operations (add, update, json, show, search, reorder) plus quick inbox capture, with xcall verification
-- **jxa** — JXA/AppleScript read operations, queries, filtering, logbook analysis
-- **triage** — Today list triage: group, prioritize, defer, reorder, over the MCP tools
+- **url**: URL scheme operations (add, update, json, show, search, reorder) plus quick inbox capture, with xcall verification.
+- **jxa**: JXA/AppleScript read operations, queries, filtering, logbook analysis.
+- **triage**: Today list triage: group, prioritize, defer, reorder, over the MCP tools.
 
 ### Scripts
 
-- `scripts/jxa/` — JXA scripts (`osascript`) returning JSON: `find-todos.js`, `get-todo.js`, `query-list.js`, `search-todos.js`, `query-logbook.js`, `query-metadata.js`, and `create-tags.js`, the one write the URL scheme cannot express
-- `scripts/format-output.ts` — Generic stdin JSON → table formatter with `--json`, `--columns`, `--count-prefix`
-- `scripts/url.ts` — URL scheme wrapper with auth token, encoding, and bulk update via JSON command
-- `scripts/reorder.ts` — List reordering via URL scheme (bun TypeScript, reuses `url.ts` exports)
-- `scripts/mcp-setup.ts` — Configures the MCP server at user scope and logs in, taking the URL from an argument or `THINGS_MCP_URL`
+- `scripts/jxa/`: JXA scripts (`osascript`) returning JSON: `find-todos.js`, `get-todo.js`, `query-list.js`, `search-todos.js`, `query-logbook.js`, `query-metadata.js`, and `create-tags.js`, the one write the URL scheme cannot express.
+- `scripts/format-output.ts`: Generic stdin JSON → table formatter with `--json`, `--columns`, `--count-prefix`.
+- `scripts/url.ts`: URL scheme wrapper with auth token, encoding, and bulk update via JSON command.
+- `scripts/reorder.ts`: List reordering via URL scheme (bun TypeScript, reuses `url.ts` exports).
+- `scripts/mcp-setup.ts`: Configures the MCP server at user scope and logs in, taking the URL from an argument or `THINGS_MCP_URL`.
 
 Write verification uses the `x-callback-url` plugin's `xcall` skill.
 

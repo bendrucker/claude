@@ -25,7 +25,7 @@ git -c credential.helper= -c 'credential.helper=!gh auth git-credential' -c 'url
 
 The hook suggests, it does not retry. Rewriting the URL through `insteadOf` rather than substituting the remote with a bare URL keeps the remote name, its refspecs, and its remote-tracking ref updates identical to the SSH attempt. The provider CLI's `auth git-credential` helper supplies the token for the duration of that one command, so nothing is written to the repository's config and no credential is stored or echoed. The leading `credential.helper=` resets the helper list so a stale keychain entry cannot win.
 
-A host outside `https_hosts` gets no suggestion, since no known CLI could authenticate the retry. Add a self-hosted forge or enterprise domain as another `host=cli` pair whose CLI provides `auth git-credential`.
+A host outside `https_hosts` doesn't get a suggestion, since no known CLI could authenticate the retry. Add a self-hosted forge or enterprise domain as another `host=cli` pair whose CLI provides `auth git-credential`.
 
 Commit and tag signing go through `ssh-keygen -Y sign` instead, and HTTPS cannot replace a signature. The fallback stays silent on them, and the signing refusal hook handles them.
 
@@ -41,7 +41,7 @@ When signing is required, the hook tells the model to stop and ask the user to u
 
 ## Enter Worktree
 
-The `PreToolUse` hook on `EnterWorktree` denies a `path` call the harness is certain to reject. Claude Code enters only a worktree of the session's own repository, refuses the current directory, and after the session's first switch it enters only paths under the main checkout's `.claude/worktrees/`. Worktrees made outside the harness, by `git worktree add` or a worktree manager, usually live elsewhere, so a skill that enters one hits these rejections on every cross-repo or worktree-to-worktree switch before it falls back to `cd`. Repository identity comes from `git rev-parse --git-common-dir`. Whether the session has switched comes from the newest `worktree-state` record in the transcript, the harness's own record of it. A session that merely started in a linked worktree can still switch once, and the hook allows that. Anything it cannot resolve, including subagent calls, passes through to the harness.
+The `PreToolUse` hook on `EnterWorktree` denies a `path` call the harness is certain to reject. Claude Code enters only a worktree of the session's own repository, refuses the current directory, and after the session's first switch it enters only paths under the main checkout's `.claude/worktrees/`. Worktrees made outside the harness, by `git worktree add` or a worktree manager, usually live elsewhere. A skill that enters one hits these rejections on every cross-repo or worktree-to-worktree switch before it falls back to `cd`. Repository identity comes from `git rev-parse --git-common-dir`. Whether the session has switched comes from the newest `worktree-state` record in the transcript, the harness's own record of it. A session that merely started in a linked worktree can still switch once, and the hook allows that. Anything it cannot resolve, including subagent calls, passes through to the harness.
 
 **Delete it** once the `tool-failure-rates` session query shows the "is not a registered worktree", "is not under", "does not exist, so", and "is the current working directory" `EnterWorktree` signatures gone, and the skills that call the tool make the same check first.
 

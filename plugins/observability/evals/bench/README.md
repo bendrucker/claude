@@ -22,7 +22,7 @@ A change against the base is starred when its permutation p is below 0.1 and it 
 
 ## Workflow
 
-Never point the harness at the live index. Freeze a copy first, so the index under test does not move between runs. On APFS the clone is instant and shares blocks:
+Never point the harness at the live index. Freeze a copy first. The index under test then does not move between runs. On APFS the clone is instant and shares blocks:
 
 ```bash
 cp -c ~/.local/share/claude-sessions/session.duckdb /tmp/frozen.duckdb
@@ -34,11 +34,11 @@ Mine the replay set from it. It keeps every query group that ran out of memory, 
 bun bench.ts replay-set --db /tmp/frozen.duckdb
 ```
 
-`replay.json`, `snap/` and `results/` hold SQL and transcripts agents wrote, so they stay out of git and live in the eval bucket. The eval suite's [`sync.ts`](../session/scripts/sync.ts) mirrors them with its own data, `push` after a run and `pull` before one.
+`replay.json`, `snap/` and `results/` hold SQL and transcripts agents wrote. They stay out of git and live in the eval bucket. The eval suite's [`sync.ts`](../session/scripts/sync.ts) mirrors them with its own data, `push` after a run and `pull` before one.
 
 ### Arms
 
-A storage change rewrites the index, so every arm is built by its own `refresh.ts` from one JSONL snapshot. `snapshot` writes the index's local transcripts back out from `raw.data`, sampling whole sessions within each month up to `--mb`, so a machine without `~/.claude/projects` can still build arms:
+A storage change rewrites the index. Every arm is built by its own `refresh.ts` from one JSONL snapshot. `snapshot` writes the index's local transcripts back out from `raw.data`, sampling whole sessions within each month up to `--mb`, so a machine without `~/.claude/projects` can still build arms:
 
 ```bash
 bun bench.ts snapshot --db /tmp/frozen.duckdb --out snap --mb 1200
@@ -51,7 +51,7 @@ bun bench.ts build --snapshot snap --out arms/zstd --skill ../wt/plugins/observa
 
 ### Runs
 
-Record the noise floor with an A/A run, two arms built from the same snapshot, then compare a candidate. An arm is `name=<index>[,<skill dir>]`; the skill dir defaults to this checkout's and supplies the named queries and limits, so a candidate worktree replays its own:
+Record the noise floor with an A/A run, two arms built from the same snapshot, then compare a candidate. An arm is `name=<index>[,<skill dir>]`; the skill dir defaults to this checkout's and supplies the named queries and limits. A candidate worktree thus replays its own:
 
 ```bash
 bun bench.ts run --arm main=arms/main/session.duckdb --arm aa=arms/aa/session.duckdb --out results/aa
@@ -62,7 +62,7 @@ Two builds of one snapshot hold the same rows in a different physical order, bec
 
 Pass `--limits vm` to climb at the cloud readers' cap alone, and `--prepare 'sync && sudo purge'` for cold-cache runs on macOS.
 
-Time the refresh per changed transcript. Each run starts from a clone of the arm's index with real transcripts of the target size staged under a throwaway import host, so the frozen index stays untouched:
+Time the refresh per changed transcript. Each run starts from a clone of the arm's index with real transcripts of the target size staged under a throwaway import host. The frozen index stays untouched:
 
 ```bash
 bun bench.ts refresh --arm main=arms/main/session.duckdb --out results/refresh

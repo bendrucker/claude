@@ -7,9 +7,12 @@ import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/clau
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
 import { check, collectText, isProse, MCP_PROSE_GUARD, pathCandidates } from "./check-tropes";
+import { toolInputOf } from "./io";
+import { report } from "./report";
 
 async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
-  return (await check(input))?.output ?? null;
+  const target = { toolName: input.tool_name, filePath: toolInputOf(input).file_path };
+  return report(await check(input), target)?.output ?? null;
 }
 
 function contextOf(output: SyncHookJSONOutput | null): string | undefined {

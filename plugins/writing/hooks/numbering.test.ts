@@ -9,6 +9,7 @@ import type {
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { formatDecision } from "./io";
+import { report } from "./report";
 import { check, checkCode, checkMarkdown, hasNumberingHint } from "./numbering";
 
 function hasSg(): boolean {
@@ -49,7 +50,7 @@ async function getOutput(
   input: PreToolUseHookInput,
   mode: "write" | "edit" = "write",
 ): Promise<PreToolUseHookSpecificOutput | null> {
-  const result = await check(input, mode);
+  const result = report(await check(input, mode), { toolName: input.tool_name });
   if (!result) return null;
   const output = result.output.hookSpecificOutput;
   if (output?.hookEventName !== "PreToolUse") return null;

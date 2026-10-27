@@ -3,6 +3,7 @@ import { isProseFile } from "./paths";
 import {
   PATTERNS,
   type PatternDef,
+  type PatternTier,
   stripCode,
   WEIGHTED_PATTERNS,
   type WeightedPatternGroup,
@@ -20,6 +21,8 @@ export interface ScanResult {
   line: number;
   col: number;
   category: string;
+  tier: PatternTier;
+  structural: boolean;
   matched: string;
   message: string;
 }
@@ -44,7 +47,7 @@ function positionAt(text: string, index: number): Position {
 // Best-effort position for a sample string the matcher reported without an
 // index. Cross-sentence detectors join sentence excerpts with " / ", so when
 // the joined sample is absent from the text, fall back to its first segment.
-function positionOfSample(text: string, sample: string): Position {
+export function positionOfSample(text: string, sample: string): Position {
   const lower = text.toLowerCase();
   for (const candidate of [sample, sample.split(" / ")[0] ?? ""]) {
     if (candidate.length === 0) continue;
@@ -59,7 +62,15 @@ async function regexResults(stripped: string, def: PatternDef): Promise<ScanResu
     if (def.spans) {
       return (await def.spans(stripped)).map(({ index, matched }) => {
         const { line, col } = positionAt(stripped, index);
-        return { line, col, category: def.category, matched, message: def.message(matched) };
+        return {
+          line,
+          col,
+          category: def.category,
+          tier: def.tier,
+          structural: def.structural ?? false,
+          matched,
+          message: def.message(matched),
+        };
       });
     }
     const hits = await def.test(stripped);
@@ -70,6 +81,8 @@ async function regexResults(stripped: string, def: PatternDef): Promise<ScanResu
         line,
         col,
         category: def.category,
+        tier: def.tier,
+        structural: def.structural ?? false,
         matched: hits.sample,
         message: def.message(hits.sample),
       },
@@ -86,6 +99,8 @@ async function regexResults(stripped: string, def: PatternDef): Promise<ScanResu
       line,
       col,
       category: def.category,
+      tier: def.tier,
+      structural: def.structural ?? false,
       matched: match[0],
       message: def.message(match[0]),
     });
@@ -103,19 +118,34 @@ function weightedResults(stripped: string, group: WeightedPatternGroup): ScanRes
       line,
       col,
       category: group.category,
+      tier: group.tier,
+      structural: false,
       matched: hits.samples[0] ?? "",
       message: group.message(hits.samples, hits.totalWeight),
     },
   ];
 }
 
+export interface ScanOptions {
+  /** Include `sideEffectOnly` patterns: the rules for a message sent once. */
+  message?: boolean;
+  /** Include `BATCH_PATTERNS`. Defaults to true, the scan and score surfaces. */
+  batch?: boolean;
+}
+
 // Report every trope match in `text`, without per-tier dedup or diff-awareness.
-// Patterns run in `file` context: `fileOnly` patterns apply, `sideEffectOnly` do not.
-export async function scanAll(text: string, filePath?: string): Promise<ScanResult[]> {
+// Patterns run in file context unless `message` is set: `fileOnly` patterns
+// apply to prose files, `sideEffectOnly` patterns only to messages.
+export async function scanAll(
+  text: string,
+  filePath?: string,
+  options: ScanOptions = {},
+): Promise<ScanResult[]> {
+  const { message = false, batch = true } = options;
   const stripped = stripCode(text);
   const prose = filePath === undefined || isProseFile(filePath);
-  const defs = [...PATTERNS, ...BATCH_PATTERNS].filter(
-    (def) => !def.sideEffectOnly && (prose || !def.fileOnly),
+  const defs = [...PATTERNS, ...(batch ? BATCH_PATTERNS : [])].filter(
+    (def) => (message || !def.sideEffectOnly) && (prose || !def.fileOnly),
   );
   const results = (await Promise.all(defs.map((def) => regexResults(stripped, def)))).flat();
 

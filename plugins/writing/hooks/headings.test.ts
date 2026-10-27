@@ -3,6 +3,7 @@ import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
+import { report } from "./report";
 import { check, checkBoldAsHeading, checkSentenceHeading, checkTitleCase } from "./headings";
 
 function mockWriteInput(filePath: string, content: string): PreToolUseHookInput {
@@ -18,7 +19,7 @@ function mockWriteInput(filePath: string, content: string): PreToolUseHookInput 
 }
 
 function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
-  const result = check(input);
+  const result = report(check(input), { toolName: input.tool_name });
   if (!result) return null;
   const output = result.output.hookSpecificOutput;
   if (output?.hookEventName !== "PreToolUse") return null;

@@ -29,6 +29,14 @@ function classify(message: string): Hit | undefined {
       short: "zsh glob with no match. Quote the pattern or use `fd`.",
     };
   }
+  // Under `cshnullglob`, zsh drops a pattern with no match and fails only when every one in the command missed.
+  if (message === "no match") {
+    return {
+      class: "glob",
+      full: "zsh skipped the command because none of its globs matched a file. A pattern meant literally needs quotes.",
+      short: "zsh: no glob in the command matched. Quote literal patterns.",
+    };
+  }
 
   const equals = /^(\S+) not found$/.exec(message);
   if (equals) {

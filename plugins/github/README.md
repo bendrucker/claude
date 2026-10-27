@@ -16,7 +16,7 @@ GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
   - `logs`: Extracts relevant lines from failing-job logs (invoked by `actions-monitor`)
 - **Hooks**:
   - Intercepts WebFetch for efficient GitHub data access
-  - [`runner-queue.ts`](scripts/runner-queue.ts) follows `gh workflow run` with the new run's place in line when it waits on a self-hosted runner, so the model knows why the run has not started and how long to wait before checking. Silent when the job starts at once or runs on a GitHub-hosted runner. Self-timed to `~/.claude/hook-metrics/github-runner-queue.jsonl`
+  - [`runner-queue.ts`](scripts/runner-queue.ts) follows `gh workflow run` with the new run's place in line when it waits on a self-hosted runner. The model then knows why the run has not started and how long to wait before checking. Silent when the job starts at once or runs on a GitHub-hosted runner. Self-timed to `~/.claude/hook-metrics/github-runner-queue.jsonl`
 
     ```text
     [github/runner-queue] Run 39817210542 is queued for a self-hosted runner labeled actions-sandbox: 0 job(s) ahead, 1 matching job(s) running.

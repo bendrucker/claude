@@ -12,7 +12,7 @@ concurrency:
 
 # The duckdb CLI opens indexes that @duckdb/node-api writes, so it stays on that package's version.
 env:
-  DUCKDB_VERSION: 1.5.6
+  DUCKDB_VERSION: 2.0.0
 
 jobs:
   lint:
@@ -70,12 +70,14 @@ jobs:
       - uses: ./.github/actions/bun-install
 
       # evals/scripts/duckdb.ts shells out to the duckdb CLI, so the report tests
-      # need it on PATH. Same installer and version the plugin job uses.
+      # need it on PATH. Same installer the plugin job uses.
       - name: Install DuckDB
         run: |
-          export DUCKDB_VERSION="$(jq -r '.dependencies["@duckdb/node-api"]' plugins/observability/package.json | cut -d- -f1)"
           curl -fsSL https://install.duckdb.org | bash
           echo "$HOME/.duckdb/cli/$DUCKDB_VERSION" >> "$GITHUB_PATH"
+
+      # The adapter suite's tests hand rescore calls to the real uv.
+      - uses: astral-sh/setup-uv@v10.3.2
 
       - name: Run tests
         run: bun test evals/
@@ -228,6 +230,10 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
+      # The evals adapter suite's tests hand rescore calls to the real uv.
+      - if: matrix.plugin.name == 'evals'
+        uses: astral-sh/setup-uv@v10.3.2
+
       - name: Validate plugin
         run: claude plugin validate "plugins/${{ matrix.plugin.name }}"
 
@@ -277,8 +283,6 @@ jobs:
             bun "$plugin/node_modules/.bin/playwright" install --only-shell chromium
           fi
           if echo "$deps" | grep -q '^@duckdb/node-api$'; then
-            # The CLI must match the node-api that wrote the index it reads.
-            export DUCKDB_VERSION="$(jq -r '(.dependencies + .devDependencies)["@duckdb/node-api"]' "$plugin/package.json" | cut -d- -f1)"
             curl -fsSL https://install.duckdb.org | bash
             echo "$HOME/.duckdb/cli/$DUCKDB_VERSION" >> "$GITHUB_PATH"
           fi

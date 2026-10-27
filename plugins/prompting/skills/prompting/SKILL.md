@@ -114,7 +114,7 @@ Cache what the model cannot find by looking: the unwritten convention, the reaso
 
 #### No-ops
 
-Delete instructions the model already follows by default. Test each sentence against the model's default: does this line change behavior? Settle a disagreement by running the document, through `prompting:hill-climb` when it has an eval suite. When a sentence fails, delete the whole sentence.
+Delete instructions the model already follows by default. Test each sentence against the model's default: does this line change behavior? Settle a disagreement by running the document, through `evals:hill-climb` when it has an eval suite. When a sentence fails, delete the whole sentence.
 
 Prune instructions, and keep context: the audience, the quality bar, a tool's contract, and the reason behind a constraint are what only the author knows.
 

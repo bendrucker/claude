@@ -59,6 +59,15 @@ A write that returns a todo id links to it under `THINGS_LINK_BASE`, defaulting 
 
 `capture_inbox` accepts an optional `session_id` and `directory`. Given a `session_id` it appends a resume command to the todo's notes. `directory` is a parameter because this process runs as tailgate's child, whose working directory has nothing to do with the session being attributed.
 
+## Headings
+
+Things exposes headings through the URL scheme alone. Its scripting dictionary has no heading class, so no JXA read can list a project's headings or report which heading a todo sits under.
+
+- `add_project` takes `headings`, each with the todos filed under it. A project carrying any goes through the `json` command, since `add-project` has no heading param and a heading exists only as an entry in a JSON project's `items`.
+- `add_todo` and `update_todos` take `heading` or `heading_id`. Things applies either only within the todo's project and ignores one it does not find, filing the todo at the project's top level and reporting success. Pairing a heading with `list` or `list_id` moves a todo under a heading in another project.
+
+The URL scheme cannot add a heading to an existing project, rename one, archive one, or reorder them. The JSON command updates only to-dos and projects, and a project's `items` is create-only.
+
 ## Tags
 
 Things refuses to apply a tag that does not already exist and reports success anyway, so a write naming an unknown tag lands with that tag missing and nothing said about it. Every tag-carrying write (`add_todo`, `add_project`, `update_todos`, `capture_inbox`) therefore resolves its tags against Things before dispatching:

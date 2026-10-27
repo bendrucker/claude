@@ -1,0 +1,452 @@
+{
+  "name": "without",
+  "cases": [
+    {
+      "name": "capital-france [1/2]",
+      "inputs": "What is the capital of France?",
+      "metadata": {
+        "tags": [
+          "dev"
+        ]
+      },
+      "expected_output": null,
+      "output": "The capital of France is Paris, the capital and largest city of France, on the Seine river in the north",
+      "metrics": {},
+      "attributes": {},
+      "scores": {},
+      "labels": {},
+      "assertions": {
+        "Contains": {
+          "name": "Contains",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "Contains",
+            "arguments": [
+              "Paris"
+            ]
+          },
+          "evaluator_version": null
+        },
+        "StartsWithAnswer": {
+          "name": "StartsWithAnswer",
+          "value": false,
+          "reason": null,
+          "source": {
+            "name": "StartsWithAnswer",
+            "arguments": null
+          },
+          "evaluator_version": null
+        },
+        "ShortReply": {
+          "name": "ShortReply",
+          "value": false,
+          "reason": null,
+          "source": {
+            "name": "ShortReply",
+            "arguments": null
+          },
+          "evaluator_version": null
+        }
+      },
+      "task_duration": 0.0018803330603986979,
+      "total_duration": 0.002328157424926758,
+      "source_case_name": "capital-france",
+      "trace_id": "00000000000000000000000000000000",
+      "span_id": "0000000000000000",
+      "evaluator_failures": []
+    },
+    {
+      "name": "capital-france [2/2]",
+      "inputs": "What is the capital of France?",
+      "metadata": {
+        "tags": [
+          "dev"
+        ]
+      },
+      "expected_output": null,
+      "output": "Paris.",
+      "metrics": {},
+      "attributes": {},
+      "scores": {},
+      "labels": {},
+      "assertions": {
+        "Contains": {
+          "name": "Contains",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "Contains",
+            "arguments": [
+              "Paris"
+            ]
+          },
+          "evaluator_version": null
+        },
+        "StartsWithAnswer": {
+          "name": "StartsWithAnswer",
+          "value": false,
+          "reason": null,
+          "source": {
+            "name": "StartsWithAnswer",
+            "arguments": null
+          },
+          "evaluator_version": null
+        },
+        "ShortReply": {
+          "name": "ShortReply",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "ShortReply",
+            "arguments": null
+          },
+          "evaluator_version": null
+        }
+      },
+      "task_duration": 0.001614707987755537,
+      "total_duration": 0.0020737648010253906,
+      "source_case_name": "capital-france",
+      "trace_id": "00000000000000000000000000000000",
+      "span_id": "0000000000000000",
+      "evaluator_failures": []
+    },
+    {
+      "name": "sum [1/2]",
+      "inputs": "What is 17 + 25?",
+      "metadata": {
+        "tags": [
+          "dev"
+        ]
+      },
+      "expected_output": null,
+      "output": "17 + 25 = 42.",
+      "metrics": {},
+      "attributes": {},
+      "scores": {},
+      "labels": {},
+      "assertions": {
+        "Contains": {
+          "name": "Contains",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "Contains",
+            "arguments": [
+              "42"
+            ]
+          },
+          "evaluator_version": null
+        },
+        "StartsWithAnswer": {
+          "name": "StartsWithAnswer",
+          "value": false,
+          "reason": null,
+          "source": {
+            "name": "StartsWithAnswer",
+            "arguments": null
+          },
+          "evaluator_version": null
+        },
+        "ShortReply": {
+          "name": "ShortReply",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "ShortReply",
+            "arguments": null
+          },
+          "evaluator_version": null
+        }
+      },
+      "task_duration": 0.0015921670710667968,
+      "total_duration": 0.002023935317993164,
+      "source_case_name": "sum",
+      "trace_id": "00000000000000000000000000000000",
+      "span_id": "0000000000000000",
+      "evaluator_failures": []
+    },
+    {
+      "name": "sum [2/2]",
+      "inputs": "What is 17 + 25?",
+      "metadata": {
+        "tags": [
+          "dev"
+        ]
+      },
+      "expected_output": null,
+      "output": "It is 42",
+      "metrics": {},
+      "attributes": {},
+      "scores": {},
+      "labels": {},
+      "assertions": {
+        "Contains": {
+          "name": "Contains",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "Contains",
+            "arguments": [
+              "42"
+            ]
+          },
+          "evaluator_version": null
+        },
+        "StartsWithAnswer": {
+          "name": "StartsWithAnswer",
+          "value": false,
+          "reason": null,
+          "source": {
+            "name": "StartsWithAnswer",
+            "arguments": null
+          },
+          "evaluator_version": null
+        },
+        "ShortReply": {
+          "name": "ShortReply",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "ShortReply",
+            "arguments": null
+          },
+          "evaluator_version": null
+        }
+      },
+      "task_duration": 0.0016431669937446713,
+      "total_duration": 0.0020589828491210938,
+      "source_case_name": "sum",
+      "trace_id": "00000000000000000000000000000000",
+      "span_id": "0000000000000000",
+      "evaluator_failures": []
+    },
+    {
+      "name": "chemical-symbol [1/2]",
+      "inputs": "What is the chemical symbol for gold?",
+      "metadata": {
+        "tags": [
+          "holdout"
+        ]
+      },
+      "expected_output": null,
+      "output": "Au",
+      "metrics": {},
+      "attributes": {},
+      "scores": {},
+      "labels": {},
+      "assertions": {
+        "Contains": {
+          "name": "Contains",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "Contains",
+            "arguments": [
+              "Au"
+            ]
+          },
+          "evaluator_version": null
+        },
+        "StartsWithAnswer": {
+          "name": "StartsWithAnswer",
+          "value": false,
+          "reason": null,
+          "source": {
+            "name": "StartsWithAnswer",
+            "arguments": null
+          },
+          "evaluator_version": null
+        },
+        "ShortReply": {
+          "name": "ShortReply",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "ShortReply",
+            "arguments": null
+          },
+          "evaluator_version": null
+        }
+      },
+      "task_duration": 0.001623125048354268,
+      "total_duration": 0.002045154571533203,
+      "source_case_name": "chemical-symbol",
+      "trace_id": "00000000000000000000000000000000",
+      "span_id": "0000000000000000",
+      "evaluator_failures": []
+    },
+    {
+      "name": "chemical-symbol [2/2]",
+      "inputs": "What is the chemical symbol for gold?",
+      "metadata": {
+        "tags": [
+          "holdout"
+        ]
+      },
+      "expected_output": null,
+      "output": "Gold's symbol is Au.",
+      "metrics": {},
+      "attributes": {},
+      "scores": {},
+      "labels": {},
+      "assertions": {
+        "Contains": {
+          "name": "Contains",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "Contains",
+            "arguments": [
+              "Au"
+            ]
+          },
+          "evaluator_version": null
+        },
+        "StartsWithAnswer": {
+          "name": "StartsWithAnswer",
+          "value": false,
+          "reason": null,
+          "source": {
+            "name": "StartsWithAnswer",
+            "arguments": null
+          },
+          "evaluator_version": null
+        },
+        "ShortReply": {
+          "name": "ShortReply",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "ShortReply",
+            "arguments": null
+          },
+          "evaluator_version": null
+        }
+      },
+      "task_duration": 0.001588999992236495,
+      "total_duration": 0.002017974853515625,
+      "source_case_name": "chemical-symbol",
+      "trace_id": "00000000000000000000000000000000",
+      "span_id": "0000000000000000",
+      "evaluator_failures": []
+    },
+    {
+      "name": "moon-landing [1/2]",
+      "inputs": "In what year did Apollo 11 land on the Moon?",
+      "metadata": {
+        "tags": [
+          "holdout"
+        ]
+      },
+      "expected_output": null,
+      "output": "1969",
+      "metrics": {},
+      "attributes": {},
+      "scores": {},
+      "labels": {},
+      "assertions": {
+        "Contains": {
+          "name": "Contains",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "Contains",
+            "arguments": [
+              "1969"
+            ]
+          },
+          "evaluator_version": null
+        },
+        "StartsWithAnswer": {
+          "name": "StartsWithAnswer",
+          "value": false,
+          "reason": null,
+          "source": {
+            "name": "StartsWithAnswer",
+            "arguments": null
+          },
+          "evaluator_version": null
+        },
+        "ShortReply": {
+          "name": "ShortReply",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "ShortReply",
+            "arguments": null
+          },
+          "evaluator_version": null
+        }
+      },
+      "task_duration": 0.0016248750034719706,
+      "total_duration": 0.0020492076873779297,
+      "source_case_name": "moon-landing",
+      "trace_id": "00000000000000000000000000000000",
+      "span_id": "0000000000000000",
+      "evaluator_failures": []
+    },
+    {
+      "name": "moon-landing [2/2]",
+      "inputs": "In what year did Apollo 11 land on the Moon?",
+      "metadata": {
+        "tags": [
+          "holdout"
+        ]
+      },
+      "expected_output": null,
+      "output": "Apollo 11 landed on the Moon in 1969 during the first crewed lunar mission, watched by millions",
+      "metrics": {},
+      "attributes": {},
+      "scores": {},
+      "labels": {},
+      "assertions": {
+        "Contains": {
+          "name": "Contains",
+          "value": true,
+          "reason": null,
+          "source": {
+            "name": "Contains",
+            "arguments": [
+              "1969"
+            ]
+          },
+          "evaluator_version": null
+        },
+        "StartsWithAnswer": {
+          "name": "StartsWithAnswer",
+          "value": false,
+          "reason": null,
+          "source": {
+            "name": "StartsWithAnswer",
+            "arguments": null
+          },
+          "evaluator_version": null
+        },
+        "ShortReply": {
+          "name": "ShortReply",
+          "value": false,
+          "reason": null,
+          "source": {
+            "name": "ShortReply",
+            "arguments": null
+          },
+          "evaluator_version": null
+        }
+      },
+      "task_duration": 0.0016400410095229745,
+      "total_duration": 0.0020418167114257812,
+      "source_case_name": "moon-landing",
+      "trace_id": "00000000000000000000000000000000",
+      "span_id": "0000000000000000",
+      "evaluator_failures": []
+    }
+  ],
+  "failures": [],
+  "analyses": [],
+  "report_evaluator_failures": [],
+  "experiment_metadata": null,
+  "trace_id": "00000000000000000000000000000000",
+  "span_id": "0000000000000000",
+  "dataset_name": "trivia"
+}

@@ -6,13 +6,13 @@ Case graders cover only what a regex decides: the skill fired, the draft kept ea
 
 ## Cases
 
-Briefs come from [`scripts/mine.ts`](scripts/mine.ts). A brief qualifies when its original predates Claude Code (before 2025-02-24) and comes from a public repo. Skill cases are the exception. Their originals were AI-assisted, so they replay as briefs and never serve as anchors. `dev` holds 16 cases and `holdout` 8, each split carrying every surface. `pr-002` and `pr-014` are balance cases, where the right body is short.
+Briefs come from [`scripts/mine.ts`](scripts/mine.ts). A brief qualifies when its original predates Claude Code (before 2025-02-24) and comes from a public repo. Skill cases are the exception. Their originals were AI-assisted. They replay as briefs and never serve as anchors. `dev` holds 16 cases and `holdout` 8, each split carrying every surface. `pr-002` and `pr-014` are balance cases, where the right body is short.
 
-Every reply carries its deliverable inside `<out>` tags. Doc and skill cases also write the file, so the trope hook sees the edit.
+Every reply carries its deliverable inside `<out>` tags. Doc and skill cases also write the file. The trope hook then sees the edit.
 
 ## Running
 
-`bun evals/native/run.ts plugins/writing/evals/authoring --ref <ref> -- --tag dev --runs <n>` runs the suite locally with the Bash sandbox disabled. `bun evals/native/check.ts plugins/writing/evals/authoring` checks every regex grader against `examples/`, where `pass.md` is Ben's original and `fail.md` a reply that keeps none of the brief's facts.
+`bun evals/native/run.ts plugins/writing/evals/authoring --ref <ref> -- --tag dev --runs <n>` runs the suite locally with the Bash sandbox disabled. `bun evals/native/check.ts plugins/writing/evals/authoring` checks every regex grader against `examples/`, where `pass.md` is Ben's original and `fail.md` a reply that doesn't keep any of the brief's facts.
 
 Scoring a candidate against a base column:
 

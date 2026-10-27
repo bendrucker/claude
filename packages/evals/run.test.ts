@@ -3,7 +3,16 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
-import { collectTraces, keepCases, pluginErrors, prepare, splitCases, strayArgs } from "./run";
+import { z } from "zod";
+import {
+  collectTraces,
+  keepCases,
+  pluginErrors,
+  prepare,
+  sessionEnv,
+  splitCases,
+  strayArgs,
+} from "./run";
 import { casePlugins, withDependencies } from "./suite";
 import { openInvocation, siblingLinks } from "./wrap";
 
@@ -26,14 +35,16 @@ const files: Record<string, string> = {
   "user/rules/ts.md": "committed rule",
   "user/skills/other/LANGUAGE.md": "sibling vocabulary",
   "evals/user/tdd/suite.yaml":
-    "wrap:\n  skills: [user/skills/tdd]\n  context: [user/rules/ts.md]\n",
+    'wrap:\n  skills: [user/skills/tdd]\n  context: [user/rules/ts.md]\ncollect: [out.ts, "it\'s/nested", never.ts]\n',
   "evals/user/tdd/one/case.yaml": "plugins: [../..]\n",
 };
 
 beforeAll(async () => {
+  // A pre-commit hook exports GIT_DIR and GIT_INDEX_FILE, which would point the fixture repo's git at the outer one.
+  for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key];
   repo = mkdtempSync(join(tmpdir(), "run-repo-"));
   await Promise.all(Object.entries(files).map(([p, body]) => Bun.write(join(repo, p), body)));
-  await $`git init -q && git add -A && git -c user.name=t -c user.email=t@t commit -qm init`
+  await $`git init -q && git add -A && git -c commit.gpgsign=false -c user.name=t -c user.email=t@t commit -qm init`
     .cwd(repo)
     .quiet();
   await Promise.all([
@@ -90,9 +101,30 @@ describe("prepare", () => {
     expect(await read(join(target, "hooks/hooks.json"))).toContain("SessionStart");
     expect(await Bun.file(join(target, "evals/one/case.yaml")).exists()).toBe(true);
   });
+
+  test("adds a collector whose hook copies the collect paths into the config dir", async () => {
+    const { target, evalDir } = await prepare(repo, "evals/user/tdd", undefined);
+    const caseDir = join(target, evalDir, "one");
+    expect(await read(join(caseDir, "case.yaml"))).toBe("plugins: [ ../.., ./collect ]\n");
+    const Hooks = z.object({
+      hooks: z.object({
+        Stop: z.tuple([z.object({ hooks: z.tuple([z.object({ command: z.string() })]) })]),
+      }),
+    });
+    const hooks = Hooks.parse(await Bun.file(join(caseDir, "collect/hooks/hooks.json")).json());
+    const cwd = mkdtempSync(join(tmpdir(), "collect-cwd-"));
+    const config = mkdtempSync(join(tmpdir(), "collect-config-"));
+    await Bun.write(join(cwd, "out.ts"), "written");
+    await Bun.write(join(cwd, "it's/nested/deep.ts"), "nested");
+    const command = hooks.hooks.Stop[0].hooks[0].command;
+    await $`bash -c ${command}`.cwd(cwd).env({ ...process.env, CLAUDE_CONFIG_DIR: config });
+    expect(await read(join(config, "collected/out.ts"))).toBe("written");
+    expect(await read(join(config, "collected/it's/nested/deep.ts"))).toBe("nested");
+    expect(await Bun.file(join(config, "collected/never.ts")).exists()).toBe(false);
+  });
 });
 
-test("collectTraces copies kept traces beside the results and removes the runner's temp dirs", async () => {
+test("collectTraces copies kept traces and collected files beside the results and removes the runner's temp dirs", async () => {
   const output = mkdtempSync(join(tmpdir(), "run-output-"));
   const kept = mkdtempSync(join(tmpdir(), "e-"));
   const trace = join(kept, "out/trace.jsonl");
@@ -102,8 +134,13 @@ test("collectTraces copies kept traces beside the results and removes the runner
     join(output, "aggregate-result.json"),
     JSON.stringify({ cases: [{ name: "one", arms: { with: runs } }] }),
   );
-  await collectTraces(output);
+  await Bun.write(join(kept, "config/collected/adapter.ts"), "export default {}");
+  await collectTraces(output, ["adapter.ts", "never-written.ts"]);
   expect(await read(join(output, "traces/one-with-0.jsonl"))).toContain("reply");
+  expect(await read(join(output, "artifacts/one-with-0/adapter.ts"))).toBe("export default {}");
+  expect(await Bun.file(join(output, "artifacts/one-with-0/never-written.ts")).exists()).toBe(
+    false,
+  );
   expect(await Bun.file(join(output, "traces/one-with-1.jsonl")).exists()).toBe(false);
   expect(await Bun.file(trace).exists()).toBe(false);
 });
@@ -184,7 +221,7 @@ test.each<{ name: string; args: string[]; stray: string[] }>([
   { name: "runner args after --", args: ["s", "--", "--case", "a"], stray: [] },
   {
     name: "run.ts flags before --",
-    args: ["--ref", "main", "s", "--label=x", "--", "--runs", "2"],
+    args: ["--ref", "main", "s", "--label=x", "--adapter", "./a.ts", "--", "--runs", "2"],
     stray: [],
   },
   {
@@ -195,4 +232,16 @@ test.each<{ name: string; args: string[]; stray: string[] }>([
   { name: "runner args without --", args: ["s", "--runs", "2"], stray: ["--runs", "2"] },
 ])("strayArgs with $name", ({ args, stray }) => {
   expect(strayArgs(args)).toEqual(stray);
+});
+
+describe("sessionEnv", () => {
+  test("drops API credentials and the host shell prefix", () => {
+    expect(
+      sessionEnv({
+        ANTHROPIC_API_KEY: "k",
+        CLAUDE_CODE_SHELL_PREFIX: "/usr/local/bin/wrap",
+        HOME: "/h",
+      }),
+    ).toEqual({ HOME: "/h" });
+  });
 });

@@ -1,0 +1,11 @@
+{
+  "name": "evals-adapter-eval",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "score": "bun scripts/score.ts"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

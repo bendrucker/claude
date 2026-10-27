@@ -14,7 +14,7 @@ const copies: [string, string][] = [
   ["linguistics/heading.ts", "scripts/linguistics/heading.ts"],
   ["linguistics/preprocess.ts", "scripts/linguistics/preprocess.ts"],
   ["linguistics/tags.ts", "scripts/linguistics/tags.ts"],
-  ["hooks/heading-case.ts", "scripts/heading-case.ts"],
+  ["detection/heading-case.ts", "scripts/heading-case.ts"],
 ];
 
 test.each(copies)("writing/%s and pull-request/%s stay identical", async (source, destination) => {

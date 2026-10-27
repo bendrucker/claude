@@ -1,0 +1,182 @@
+{
+  "result": "results.json",
+  "labels": {
+    "with-system-prompt": "with",
+    "no-system-prompt": "without"
+  },
+  "cases": {
+    "capital-france": {
+      "tags": [
+        "dev"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "has-answer": false,
+              "terse": true
+            },
+            "reply": "I am not sure."
+          },
+          {
+            "graders": {
+              "has-answer": true,
+              "terse": true
+            },
+            "reply": "Paris."
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "has-answer": false,
+              "terse": false
+            },
+            "reply": "Great question! Let me think about the capital of France for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+          },
+          {
+            "graders": {
+              "has-answer": true,
+              "terse": false
+            },
+            "reply": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it."
+          }
+        ]
+      }
+    },
+    "largest-planet": {
+      "tags": [
+        "dev"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "has-answer": false,
+              "terse": true
+            },
+            "reply": "I am not sure."
+          },
+          {
+            "graders": {
+              "has-answer": true,
+              "terse": true
+            },
+            "reply": "Jupiter."
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "has-answer": true,
+              "terse": false
+            },
+            "reply": "Great question! Let me think about the largest planet for a moment. The answer is Jupiter, as far as I can tell, though there is more to say about it."
+          },
+          {
+            "graders": {
+              "has-answer": false,
+              "terse": false
+            },
+            "reply": "Great question! Let me think about the largest planet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+          }
+        ]
+      }
+    },
+    "gold-symbol": {
+      "tags": [
+        "holdout"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "has-answer": false,
+              "no-filler": true
+            },
+            "reply": "I am not sure."
+          },
+          {
+            "graders": {
+              "has-answer": true,
+              "no-filler": true
+            },
+            "reply": "Au."
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "has-answer": true,
+              "no-filler": false
+            },
+            "reply": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it."
+          },
+          {
+            "graders": {
+              "has-answer": true,
+              "no-filler": false
+            },
+            "reply": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it."
+          }
+        ]
+      }
+    },
+    "hamlet-author": {
+      "tags": [
+        "holdout"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "has-answer": true,
+              "no-filler": true
+            },
+            "reply": "Shakespeare."
+          },
+          {
+            "graders": {
+              "has-answer": false,
+              "no-filler": true
+            },
+            "reply": "I am not sure."
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "has-answer": false,
+              "no-filler": false
+            },
+            "reply": "Great question! Let me think about the author of Hamlet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+          },
+          {
+            "graders": {
+              "has-answer": true,
+              "no-filler": false
+            },
+            "reply": "Great question! Let me think about the author of Hamlet for a moment. The answer is Shakespeare, as far as I can tell, though there is more to say about it."
+          }
+        ]
+      }
+    }
+  },
+  "rescore": {
+    "supported": true,
+    "flips": [
+      {
+        "case": "hamlet-author",
+        "arm": "with",
+        "run": 0,
+        "grader": "has-answer"
+      },
+      {
+        "case": "hamlet-author",
+        "arm": "without",
+        "run": 1,
+        "grader": "has-answer"
+      }
+    ]
+  }
+}

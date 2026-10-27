@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 import { cli, command } from "cleye";
 import { table } from "table";
 import { isMemoryPath, isPlanPath, isProseFile } from "../../../detection/paths";
-import { type ScanResult, scanAll } from "../../../detection/scan";
+import { type Finding, findAll } from "../../../detection/findings";
 import { readInput } from "../../../scripts/io";
 import { profilePath, resolveDataDir, statisticsPath } from "../../analyze/scripts/data-dir";
 import {
@@ -58,8 +58,24 @@ export async function collectFiles(input: string): Promise<string[]> {
   return files.toSorted();
 }
 
-async function scanInput(text: string, filePath: string | undefined): Promise<number> {
-  const violations = await scanAll(text, filePath);
+interface InputOptions {
+  message: boolean;
+  json: boolean;
+}
+
+async function scanInput(
+  text: string,
+  filePath: string | undefined,
+  { message, json }: InputOptions,
+): Promise<number> {
+  const options =
+    filePath === undefined ? { message, batch: true } : { filePath, message, batch: true };
+  const violations = await findAll(text, options);
+
+  if (json) {
+    console.log(JSON.stringify(violations, null, 2));
+    return violations.length > 0 ? 1 : 0;
+  }
 
   if (violations.length === 0) {
     console.log("No violations found.");
@@ -74,14 +90,14 @@ async function scanInput(text: string, filePath: string | undefined): Promise<nu
 
 export interface FileViolations {
   path: string;
-  violations: ScanResult[];
+  violations: Finding[];
 }
 
 export async function scanFiles(files: string[]): Promise<FileViolations[]> {
   const results: FileViolations[] = [];
   for (const path of files) {
     // oxlint-disable-next-line no-await-in-loop -- audit runs over an arbitrary tree; reading every file at once would hold the whole corpus in memory.
-    const violations = await scanAll(await Bun.file(path).text(), path);
+    const violations = await findAll(await Bun.file(path).text(), { filePath: path, batch: true });
     if (violations.length > 0) results.push({ path, violations });
   }
   return results;
@@ -314,12 +330,24 @@ if (import.meta.main) {
             "Scan a single input (file path, inline text, or stdin) and report matches as line:col without a path prefix. Exits non-zero on any finding.",
           default: false,
         },
+        message: {
+          type: Boolean,
+          description:
+            "Treat the input as a message sent once (PR, issue, comment, commit, Notion page) and apply the rules for that surface.",
+          default: false,
+        },
+        json: {
+          type: Boolean,
+          description:
+            "With --input, print the findings as JSON. Still exits non-zero on any finding.",
+          default: false,
+        },
       },
     },
     async (argv) => {
       if (argv.flags.input) {
         const { text, filePath } = await readInput(argv._.path);
-        process.exit(await scanInput(text, filePath));
+        process.exit(await scanInput(text, filePath, argv.flags));
       }
       argv.showHelp();
       process.exit(1);

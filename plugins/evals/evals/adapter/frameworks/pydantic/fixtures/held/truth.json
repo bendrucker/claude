@@ -1,0 +1,188 @@
+{
+  "result": "reports",
+  "cases": {
+    "capital-france": {
+      "tags": [
+        "dev"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: Paris"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": false
+            },
+            "reply": "Answer: Paris, the capital and largest city of France, on the Seine river in the north"
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": false
+            },
+            "reply": "The capital of France is Paris, the capital and largest city of France, on the Seine river in the north"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": false
+            },
+            "reply": "It is Paris, the capital and largest city of France, on the Seine river in the north"
+          }
+        ]
+      }
+    },
+    "sum": {
+      "tags": [
+        "dev"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "Contains": false,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: 41"
+          },
+          {
+            "graders": {
+              "Contains": false,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: 41"
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "42"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "I think 42"
+          }
+        ]
+      }
+    },
+    "chemical-symbol": {
+      "tags": [
+        "holdout"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "Contains": false,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: Ag"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: Au"
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "Au"
+          },
+          {
+            "graders": {
+              "Contains": false,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "Ag"
+          }
+        ]
+      }
+    },
+    "moon-landing": {
+      "tags": [
+        "holdout"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: 1969"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: 1969"
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "Contains": false,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "1970"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": false
+            },
+            "reply": "Apollo 11 landed on the Moon in 1969 during the first crewed lunar mission, watched by millions"
+          }
+        ]
+      }
+    }
+  },
+  "rescore": {
+    "supported": true,
+    "flips": [
+      {
+        "case": "sum",
+        "arm": "without",
+        "run": 1,
+        "grader": "ShortReply"
+      }
+    ]
+  }
+}

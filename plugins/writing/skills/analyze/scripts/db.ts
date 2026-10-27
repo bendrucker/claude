@@ -17,8 +17,22 @@ export interface Database {
   close(): void;
 }
 
+// DuckDB cannot parse credentials in an `http_proxy` URL, which the Claude Code sandbox
+// proxy carries, so autoloading fts into a cold extension cache fails there. Split the
+// URL into the host and credential settings DuckDB does accept.
+export function proxyConfig(env: Record<string, string | undefined>): Record<string, string> {
+  const raw = [env.http_proxy, env.HTTP_PROXY].find((value) => value !== undefined && value !== "");
+  if (raw === undefined) return {};
+  const url = new URL(raw.includes("://") ? raw : `http://${raw}`);
+  return {
+    http_proxy: url.host,
+    http_proxy_username: decodeURIComponent(url.username),
+    http_proxy_password: decodeURIComponent(url.password),
+  };
+}
+
 export async function openSessionDb(dbPath: string): Promise<Database> {
-  const instance = await DuckDBInstance.create(dbPath);
+  const instance = await DuckDBInstance.create(dbPath, proxyConfig(process.env));
   const connection = await instance.connect();
 
   async function run(sql: string): Promise<void> {

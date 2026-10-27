@@ -210,10 +210,12 @@ export async function replaySet(db: string, top: number): Promise<Query[]> {
 }
 
 const Profile = z.looseObject({
-  latency: z.number(),
-  total_bytes_read: z.number().optional(),
-  cumulative_rows_scanned: z.number().optional(),
-  system_peak_buffer_memory: z.number().optional(),
+  query: z.looseObject({
+    total_time: z.number(),
+    total_rows_scanned: z.number().optional(),
+  }),
+  io: z.looseObject({ total_bytes_read: z.number().optional() }).optional(),
+  system: z.looseObject({ peak_buffer_memory: z.number().optional() }).optional(),
 });
 
 /**
@@ -299,10 +301,10 @@ export async function replay(
     timeout: signal.aborted,
     error,
     rss,
-    latency: p?.latency,
-    bytesRead: p?.total_bytes_read,
-    rowsScanned: p?.cumulative_rows_scanned,
-    peakBuffer: p?.system_peak_buffer_memory,
+    latency: p?.query.total_time,
+    bytesRead: p?.io?.total_bytes_read,
+    rowsScanned: p?.query.total_rows_scanned,
+    peakBuffer: p?.system?.peak_buffer_memory,
     size: a.lake === undefined ? Bun.file(a.db).size : undefined,
     gets: h.success ? h.data.gets : undefined,
     httpBytes: h.success ? h.data.bytes : undefined,

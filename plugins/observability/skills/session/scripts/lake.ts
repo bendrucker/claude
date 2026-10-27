@@ -86,7 +86,7 @@ async function runWriter(options: LakeOptions, script: string): Promise<string> 
     `.read ${join(LAKE_SQL, script)}`,
   ].join("\n");
   try {
-    const out = await $`duckdb -bail :memory: < ${Buffer.from(header)}`.cwd(work).quiet();
+    const out = await $`duckdb -no-agent -bail :memory: < ${Buffer.from(header)}`.cwd(work).quiet();
     return out.stdout.toString();
   } finally {
     await rm(work, { recursive: true, force: true });
@@ -133,6 +133,8 @@ export async function readerInit(url: string): Promise<string> {
     await read("limits.sql"),
     isRemote(url) ? await read("lake/s3.sql") : "",
     "INSTALL ducklake; LOAD ducklake;",
+    // The lake's macros carry the arrow lambdas DuckDB prints them with (writer.sql).
+    "SET lambda_syntax = 'ENABLE_SINGLE_ARROW';",
     `ATTACH ${quote(`ducklake:${catalogUrl(url)}`)} AS lake (READ_ONLY);`,
     "SET search_path = 'memory.main,lake.main';",
   ].join("\n");

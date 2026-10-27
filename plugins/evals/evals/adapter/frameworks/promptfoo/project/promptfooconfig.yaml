@@ -1,0 +1,69 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: Does prompt.txt make answers terse and correct?
+
+prompts:
+  - label: with-system-prompt
+    raw: "{{system}}\n\nQuestion: What is the {{topic}}?"
+  - label: no-system-prompt
+    raw: "Question: What is the {{topic}}?"
+
+providers:
+  - file://provider.mjs
+
+evaluateOptions:
+  repeat: 2
+  maxConcurrency: 1
+
+defaultTest:
+  vars:
+    system: file://prompt.txt
+
+tests:
+  - description: capital-france
+    vars:
+      topic: capital of France
+    metadata:
+      tags: [dev]
+    assert:
+      - type: icontains
+        value: Paris
+        metric: has-answer
+      - type: javascript
+        value: output.split(/\s+/).length <= 5
+        metric: terse
+  - description: largest-planet
+    vars:
+      topic: largest planet
+    metadata:
+      tags: [dev]
+    assert:
+      - type: icontains
+        value: Jupiter
+        metric: has-answer
+      - type: javascript
+        value: output.split(/\s+/).length <= 5
+        metric: terse
+  - description: gold-symbol
+    vars:
+      topic: chemical symbol for gold
+    metadata:
+      tags: [holdout]
+    assert:
+      - type: icontains
+        value: Au
+        metric: has-answer
+      - type: not-icontains
+        value: Great question
+        metric: no-filler
+  - description: hamlet-author
+    vars:
+      topic: author of Hamlet
+    metadata:
+      tags: [holdout]
+    assert:
+      - type: icontains
+        value: Shakespeare
+        metric: has-answer
+      - type: not-icontains
+        value: Great question
+        metric: no-filler

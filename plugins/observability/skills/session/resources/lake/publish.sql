@@ -154,20 +154,25 @@ SELECT f.* FROM idx.indexed_files f JOIN changed c ON c.host = f.host AND c.sour
 WHERE list_contains(getvariable('hosts'), f.host);
 
 -- Macros live in the lake's catalog, so a reader needs only the attach. The table macros
--- that read the refresh's scope tables stay local.
+-- that read the refresh's scope tables stay local. published_macros keeps the definition
+-- each was created from, since DuckDB does not print a macro back identically.
+CREATE TABLE IF NOT EXISTS lake.published_macros (name VARCHAR, definition VARCHAR);
 CREATE TEMP TABLE macros AS
-SELECT format('CREATE OR REPLACE MACRO lake.{}({}) AS {}{};', i.function_name,
-  array_to_string(i.parameters, ', '), CASE WHEN i.function_type = 'table_macro' THEN 'TABLE ' ELSE '' END,
-  i.macro_definition) AS sql
+SELECT i.function_name AS name, i.macro_definition AS definition,
+  format('CREATE OR REPLACE MACRO lake.{}({}) AS {}{};', i.function_name,
+    array_to_string(i.parameters, ', '), CASE WHEN i.function_type = 'table_macro' THEN 'TABLE ' ELSE '' END,
+    i.macro_definition) AS sql
 FROM duckdb_functions() i
-LEFT JOIN duckdb_functions() l ON l.database_name = 'lake' AND l.function_name = i.function_name
+LEFT JOIN lake.published_macros p ON p.name = i.function_name
 WHERE i.database_name = 'idx' AND i.function_type IN ('macro', 'table_macro') AND NOT i.internal
   AND i.function_name NOT IN ('content_item_rows', 'search_item_rows', 'field_rows')
-  AND l.macro_definition IS DISTINCT FROM i.macro_definition;
+  AND p.definition IS DISTINCT FROM i.macro_definition;
+DELETE FROM lake.published_macros WHERE name IN (SELECT name FROM macros);
+INSERT INTO lake.published_macros SELECT name, definition FROM macros;
 -- A table macro binds its tables when created, so these resolve names in the lake.
 USE lake;
 .once macros.sql
-FROM macros;
+SELECT sql FROM macros;
 .read macros.sql
 
 SET VARIABLE result = json_object(

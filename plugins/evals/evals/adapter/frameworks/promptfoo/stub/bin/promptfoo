@@ -1,0 +1,50 @@
+#!/usr/bin/env bun
+// Stand-in for `promptfoo eval`: copies the stored run to the --output path. A replay config, which
+// grades stored outputs through the echo provider without a model, goes to the real promptfoo.
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+
+const argv = process.argv.slice(2);
+
+const log = process.env.ADAPTER_STUB_LOG;
+if (log !== undefined) {
+  const file = Bun.file("prompt.txt");
+  const prompt = (await file.exists())
+    ? new Bun.CryptoHasher("sha256").update(await file.bytes()).digest("hex")
+    : null;
+  mkdirSync(dirname(log), { recursive: true });
+  appendFileSync(log, `${JSON.stringify({ argv, cwd: process.cwd(), prompt })}\n`);
+}
+
+function flag(args: string[], short: string, long: string): string | undefined {
+  for (const [i, arg] of args.entries()) {
+    if (arg === short || arg === long) return args[i + 1];
+    if (arg.startsWith(`${long}=`)) return arg.slice(long.length + 1);
+  }
+  return undefined;
+}
+
+const output = flag(argv, "-o", "--output");
+const config = flag(argv, "-c", "--config");
+if (output === undefined) {
+  // Without --output, promptfoo keeps the run in its own database and writes no file.
+  console.error("promptfoo stub: pass --output <file>");
+  process.exit(1);
+}
+
+const fixtures = resolve(import.meta.dirname, "../../fixtures", process.env.ADAPTER_FIXTURE ?? "seen");
+if (config !== undefined && !config.endsWith("promptfooconfig.yaml")) {
+  const real = ["bunx", "promptfoo@0.125.1", ...argv];
+  // Its result database goes to a scratch dir, so a replay without --no-write needs no writable home.
+  const configDir = mkdtempSync(join(tmpdir(), "promptfoo-config-"));
+  const env = { ...process.env, PROMPTFOO_DISABLE_TELEMETRY: "1", PROMPTFOO_CONFIG_DIR: configDir };
+  process.exit(Bun.spawnSync(real, { env, stdio: ["inherit", "inherit", "inherit"] }).exitCode);
+}
+const stored = join(fixtures, "results.json");
+if (!existsSync(stored)) {
+  console.error(`promptfoo stub: no stored run at ${stored}`);
+  process.exit(1);
+}
+mkdirSync(dirname(resolve(output)), { recursive: true });
+copyFileSync(stored, resolve(output));

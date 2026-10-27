@@ -1,6 +1,6 @@
 # Session Search Eval
 
-Scores `search.sql` as a ranker: each labeled query runs through an arm's `search.sql` in a fresh read-only `duckdb` process, and the sessions it returns are compared with the sessions a person would want. No agent runs, so it is cheap enough for every change to the query or its corpus. The `session/` suite's agent-level search cases reuse these labels through their query ids.
+Scores `search.sql` as a ranker: each labeled query runs through an arm's `search.sql` in a fresh read-only `duckdb` process, and the sessions it returns are compared with the sessions a person would want. No agent runs. It is cheap enough for every change to the query or its corpus. The `session/` suite's agent-level search cases reuse these labels through their query ids.
 
 ## Metrics
 
@@ -15,7 +15,7 @@ Scores `search.sql` as a ranker: each labeled query runs through an arm's `searc
 
 ## Labels
 
-`labels.jsonl` names private sessions, so it lives in the eval bucket and stays out of git. One row per query:
+`labels.jsonl` names private sessions. It lives in the eval bucket and stays out of git. One row per query:
 
 ```json
 {"id": "wedding-flight", "query": "wedding flight", "relevant": [{"host": "local", "session_id": "…"}], "tags": ["dev"]}
@@ -27,7 +27,7 @@ Seed queries with `mine.sql`, which lists the terms agents passed to `search.sql
 
 ## Runs
 
-`--index` defaults to the `session/` suite's frozen `data/session.duckdb`. Never point it at the live index. An arm is `name[=<skill dir>]`, defaulting to this checkout's skill, so a candidate worktree is scored on its own `search.sql`:
+`--index` defaults to the `session/` suite's frozen `data/session.duckdb`. Never point it at the live index. An arm is `name[=<skill dir>]`, defaulting to this checkout's skill. A candidate worktree is therefore scored on its own `search.sql`:
 
 ```bash
 bun score.ts --labels labels.jsonl --tag dev --arm main --arm bm25=../wt/plugins/observability/skills/session --out results/bm25

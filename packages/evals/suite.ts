@@ -17,6 +17,8 @@ export const SuiteFile = z.object({
   judge_model: z.string().default("claude-sonnet-5-5"),
   /** Repo-relative paths a scaffold reads, such as `packages/eval-stubs`, staged from the working tree. */
   stage: z.array(z.string()).default([]),
+  /** Paths in each run's working directory copied to `<output>/artifacts/<run>/`, for a `score` script. */
+  collect: z.array(z.string()).default([]),
   /** Artifacts that are not a plugin, wrapped into one by `wrap.ts`. */
   wrap: z
     .object({

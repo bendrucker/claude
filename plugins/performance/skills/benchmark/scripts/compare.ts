@@ -132,6 +132,9 @@ export function compare(
   const baseArm = arms.find((a) => a.name === base);
   if (baseArm === undefined)
     throw new Error(`no arm named ${base}; arms: ${arms.map((a) => a.name).join(", ")}`);
+  const missing = arms.filter((a) => a.times.length > 0 && samples(a, metric).length === 0);
+  if (missing.length > 0)
+    throw new Error(`no ${metric} samples for ${missing.map((a) => a.name).join(", ")}`);
   const baseSamples = samples(baseArm, metric);
   const baseMedian = median(baseSamples);
   return arms.map((arm) => {
@@ -150,7 +153,8 @@ export function compare(
     const change = row.median / baseMedian - 1;
     // Arms that each repeat one value differ deterministically, and the median
     // test, which counts tied relabelings as extreme, would never star them.
-    const constant = new Set(baseSamples).size === 1 && new Set(values).size === 1;
+    const constant =
+      new Set(baseSamples).size === 1 && new Set(values).size === 1 && values[0] !== baseSamples[0];
     const p = constant ? 0 : permutationP(baseSamples, values, 10_000, random);
     const significant = !row.lowN && p < alpha && Math.abs(change) >= minEffect;
     return { ...row, change, p, significant };

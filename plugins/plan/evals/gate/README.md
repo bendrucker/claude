@@ -21,7 +21,7 @@ bun test plugins/plan/hooks/replay.test.ts
 bun run --cwd plugins/plan/evals/gate sync push   # data/ -> bucket, --profile agents-admin
 ```
 
-`mine` takes `--db` for another index path and `--since` for an earlier start date. `sync` takes `--dry-run` to list changes without copying. Push after a run that writes a new `data/replay.json`, so the baseline outlives the checkout.
+`mine` takes `--db` for another index path and `--since` for an earlier start date. `sync` takes `--dry-run` to list changes without copying. Push after a run that writes a new `data/replay.json`. The baseline then outlives the checkout.
 
 ## Replay
 

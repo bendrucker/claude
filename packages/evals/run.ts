@@ -4,6 +4,7 @@ import { basename, dirname, join, relative } from "node:path";
 import { $ } from "bun";
 import { parseDocument } from "yaml";
 import { z } from "zod";
+import { subscriptionEnv } from "../eval-judge/env";
 import { shareGraders } from "./graders";
 import { readResult } from "./result";
 import { stage } from "./stage";
@@ -26,6 +27,36 @@ async function addCaseDependencies(repo: string, suite: string, root: string): P
       const path = join(root, suite, file);
       const doc = parseDocument(await Bun.file(path).text());
       for (const p of missing) doc.addIn(["plugins"], relative(join(suite, dirname(file)), p));
+      await Bun.write(path, doc.toString());
+    }),
+  );
+}
+
+const shellQuote = (s: string) => `'${s.replaceAll("'", String.raw`'\''`)}'`;
+
+/**
+ * Adds a plugin to each staged case whose hook copies the `collect` paths out of the session's
+ * working directory into `$CLAUDE_CONFIG_DIR/collected/`, which the runner keeps.
+ */
+async function addCollector(evals: string, collect: string[]): Promise<void> {
+  if (collect.length === 0) return;
+  const copies = collect
+    .map(shellQuote)
+    .map((q) => `[ ! -e ${q} ] || { mkdir -p "$d"/$(dirname ${q}) && cp -R ${q} "$d"/${q}; }`);
+  const command = [`d="$CLAUDE_CONFIG_DIR/collected"`, ...copies, "true"].join("; ");
+  const hook = [{ hooks: [{ type: "command", command }] }];
+  const files = globSync("*/case.yaml", { cwd: evals });
+  await Promise.all(
+    files.map(async (file) => {
+      const plugin = join(evals, dirname(file), "collect");
+      await Bun.write(join(plugin, ".claude-plugin/plugin.json"), '{"name":"collect"}');
+      await Bun.write(
+        join(plugin, "hooks/hooks.json"),
+        JSON.stringify({ hooks: { Stop: hook, SessionEnd: hook } }),
+      );
+      const path = join(evals, file);
+      const doc = parseDocument(await Bun.file(path).text());
+      doc.addIn(["plugins"], "./collect");
       await Bun.write(path, doc.toString());
     }),
   );
@@ -85,7 +116,21 @@ export async function prepare(
       : await stageWrapped(repo, suite, ref, root, config.wrap);
   await stage(repo, undefined, config.stage, root);
   await shareGraders(join(staged.target, staged.evalDir), config.graders);
+  await addCollector(join(staged.target, staged.evalDir), config.collect);
   return staged;
+}
+
+/**
+ * The environment an eval session runs in. An API key would bill the API instead of the
+ * subscription, and a host shell prefix sits outside the eval sandbox, so every Bash call
+ * would exit 126.
+ */
+export function sessionEnv(
+  env: Record<string, string | undefined> = process.env,
+): Record<string, string | undefined> {
+  const out = subscriptionEnv(env);
+  delete out.CLAUDE_CODE_SHELL_PREFIX;
+  return out;
 }
 
 /** Splits `--case` globs off the runner's arguments, which would keep only the last one. */
@@ -156,7 +201,8 @@ export async function pluginErrors(output: string): Promise<string[]> {
 }
 
 /**
- * Command-line arguments given before `--` other than the suite, `--ref`, `--label`, and help.
+ * Command-line arguments given before `--` other than the suite, `--ref`, `--label`, `--adapter`,
+ * and help.
  * Runner arguments such as `--case` go after `--`, and one before it would be misread as a
  * `run.ts` option or a runner argument.
  */
@@ -167,20 +213,26 @@ export function strayArgs(args: string[]): string[] {
   let suite = false;
   for (let i = 0; i < before.length; i++) {
     const arg = before[i] ?? "";
-    if (arg === "--ref" || arg === "--label") i++;
-    else if (/^--(ref|label)=/.test(arg) || arg === "-h" || arg === "--help") continue;
+    if (["--ref", "--label", "--adapter"].includes(arg)) i++;
+    else if (/^--(ref|label|adapter)=/.test(arg) || arg === "-h" || arg === "--help") continue;
     else if (!suite && !arg.startsWith("-")) suite = true;
     else stray.push(arg);
   }
   return stray;
 }
 
+/** Whether a path exists, as a file or a directory. */
+async function exists(path: string): Promise<boolean> {
+  return (await $`test -e ${path}`.nothrow().quiet()).exitCode === 0;
+}
+
 /**
- * Copies each run's trace into `<output>/traces/<case>-<arm>-<n>.jsonl`. The runner writes
- * traces inside its temp directories and deletes them unless run with `--keep-temp`, so this
- * copies them out and then removes those directories.
+ * Copies each run's trace into `<output>/traces/<case>-<arm>-<n>.jsonl`, and each `collect` path
+ * from its working directory into `<output>/artifacts/<case>-<arm>-<n>/`. The runner writes both
+ * inside its temp directories and deletes them unless run with `--keep-temp`, so this copies them
+ * out and then removes those directories.
  */
-export async function collectTraces(output: string): Promise<void> {
+export async function collectTraces(output: string, collect: string[] = []): Promise<void> {
   const path = join(output, "aggregate-result.json");
   if (!(await Bun.file(path).exists())) return;
   const { cases } = await readResult(path);
@@ -188,11 +240,21 @@ export async function collectTraces(output: string): Promise<void> {
     Object.entries(c.arms).flatMap(([arm, runs]) =>
       runs.map(async ({ tracePath }, i) => {
         if (tracePath == null || !(await Bun.file(tracePath).exists())) return;
-        await Bun.write(join(output, "traces", `${c.name}-${arm}-${i}.jsonl`), Bun.file(tracePath));
+        const run = `${c.name}-${arm}-${i}`;
+        await Bun.write(join(output, "traces", `${run}.jsonl`), Bun.file(tracePath));
         const out = dirname(tracePath);
         if (basename(out) !== "out") return;
-        // The runner leaves a write-only `sealed` directory that blocks a plain rm.
         const kept = dirname(out);
+        // The runner deletes the session's working directory, so the collector hook copied them to config.
+        await Promise.all(
+          collect.map(async (p) => {
+            const from = join(kept, "config/collected", p);
+            if (!(await exists(from))) return;
+            const to = join(output, "artifacts", run, p);
+            await $`mkdir -p ${dirname(to)} && cp -R ${from} ${to}`.quiet();
+          }),
+        );
+        // The runner leaves a write-only `sealed` directory that blocks a plain rm.
         await $`chmod -R u+rwx ${kept}/sealed ${kept}; rm -rf ${kept}`.nothrow().quiet();
       }),
     ),

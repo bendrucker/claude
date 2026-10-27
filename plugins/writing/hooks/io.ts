@@ -39,25 +39,7 @@ export function editedContent(
   return { content, filePath: toolInput.file_path };
 }
 
-// A checker's finding: the formatted hook output plus the rule category the
-// dispatcher uses for session-scoped repeat suppression and the run log.
-// suppressible: false exempts a context-shaped output from repeat suppression
-// (deny-tier findings reformatted as per-file fix-it reminders).
-export interface HookResult {
-  output: SyncHookJSONOutput;
-  category: string;
-  suppressible?: boolean;
-}
-
 export type PermissionTier = "deny" | "ask" | "context";
-
-const Tier = z.looseObject({
-  permissionDecision: z.enum(["deny", "ask"]).optional().catch(undefined),
-});
-
-export function tierOf(output: SyncHookJSONOutput): PermissionTier {
-  return Tier.safeParse(output.hookSpecificOutput).data?.permissionDecision ?? "context";
-}
 
 export function isPlanMode(input: PreToolUseHookInput): boolean {
   return input.permission_mode === "plan";

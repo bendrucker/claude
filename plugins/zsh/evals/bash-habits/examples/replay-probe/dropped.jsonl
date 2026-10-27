@@ -1,0 +1,4 @@
+{"type": "system", "subtype": "init", "cwd": "/tmp/claude-eval/home/cwd", "tools": ["Bash"]}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_1", "name": "Bash", "input": {"command": "ls -d docker-compose*.y*ml compose*.y*ml .env* 2>/dev/null; echo ---; grep -n DATABASE_URL docker-compose*.yml compose*.yml .env* 2>/dev/null"}}]}}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_1", "content": ".env.example\ndocker-compose.yml\n---\ndocker-compose.yml:5:      DATABASE_URL: postgres://app@db:5432/orders\n.env.example:1:DATABASE_URL=postgres://localhost:5432/orders_dev"}]}}
+{"type": "result", "subtype": "success", "is_error": false, "num_turns": 2, "result": "The ls listed `.env.example` and `docker-compose.yml`. The grep found `postgres://app@db:5432/orders` in the compose file and `postgres://localhost:5432/orders_dev` in `.env.example`."}

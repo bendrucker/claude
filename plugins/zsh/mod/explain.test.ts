@@ -6,6 +6,7 @@ describe("explain", () => {
     const cases: [string, string, Class][] = [
       ["glob", "zsh:1: no matches found: *.nope", "glob"],
       ["glob in eval", "(eval):3: no matches found: src/**/*.ts", "glob"],
+      ["glob under cshnullglob", "(eval):1: no match", "glob"],
       ["equals", "zsh:1: == not found", "equals"],
       ["reserved status", "zsh:1: read-only variable: status", "reserved"],
       ["reserved pipestatus", "zsh:1: read-only variable: pipestatus", "reserved"],

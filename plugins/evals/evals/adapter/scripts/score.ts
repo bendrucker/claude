@@ -1,18 +1,19 @@
 import { join } from "node:path";
 import { z } from "zod";
 import { readResult, type Run, score } from "../../../../../packages/evals/result";
+import { GRADERS } from "./check";
 
-const TIMEOUT_MS = 60_000;
-const GRADERS = ["loads"];
+const TIMEOUT_MS = 120_000;
 
 const Verdicts = z.record(z.string(), z.object({ passed: z.boolean(), explanation: z.string() }));
 
+const fail = (explanation: string) =>
+  Object.fromEntries(GRADERS.map((name) => [name, { passed: false, explanation }]));
+
 /** Runs `check.ts` on one run's artifacts in its own process, failing every grader on a crash. */
-async function grade(dir: string): Promise<z.output<typeof Verdicts>> {
-  const fail = (explanation: string) =>
-    Object.fromEntries(GRADERS.map((name) => [name, { passed: false, explanation }]));
+async function grade(dir: string, framework: string): Promise<z.output<typeof Verdicts>> {
   if (!(await Bun.file(join(dir, "adapter.ts")).exists())) return fail("no adapter.ts written");
-  const proc = Bun.spawn(["bun", join(import.meta.dirname, "check.ts"), dir], {
+  const proc = Bun.spawn(["bun", join(import.meta.dirname, "check.ts"), dir, framework], {
     stdout: "pipe",
     stderr: "pipe",
     timeout: TIMEOUT_MS,
@@ -36,8 +37,12 @@ const cases = await Promise.all(
       Object.entries(c.arms).map(async ([arm, runs]) => {
         const graded = await Promise.all(
           runs.map(async (run, i): Promise<Run> => {
-            const verdicts = await grade(join(output, "artifacts", `${c.name}-${arm}-${i}`));
-            const kept = run.graders.filter((g) => !GRADERS.includes(g.name));
+            const framework = c.name.split("-")[0] ?? c.name;
+            const verdicts = await grade(
+              join(output, "artifacts", `${c.name}-${arm}-${i}`),
+              framework,
+            );
+            const kept = run.graders.filter((g) => !GRADERS.some((name) => name === g.name));
             const added = Object.entries(verdicts).map(([name, { passed, explanation }]) => ({
               name,
               passed,

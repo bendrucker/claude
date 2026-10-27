@@ -2,7 +2,13 @@
 
 import { cli } from "cleye";
 import { table } from "table";
-import { RunLogEntry, type RunOutcome, resolveLogPath } from "../../../hooks/run-log";
+import {
+  emittedOf,
+  RunLogEntry,
+  type RunOutcome,
+  resolveLogPath,
+  suppressedOf,
+} from "../../../hooks/run-log";
 
 export interface CategoryHealth {
   category: string;
@@ -79,6 +85,21 @@ const WHOLE_FILE_TOOLS = new Set(["Write"]);
 // One bias survives: a whole-file scan also reports only newly introduced hits,
 // so a trope left at an unchanged count reads as absent. That skews the
 // surviving rate high, making it a floor on how often a rule is wrong.
+function tally(
+  counts: Map<string, Acceptance>,
+  category: string,
+  rescanned: string[] | undefined,
+): void {
+  const bucket = counts.get(category) ?? { revisited: 0, accepted: 0, unconfirmed: 0 };
+  if (rescanned == null) {
+    bucket.unconfirmed += 1;
+  } else {
+    bucket.revisited += 1;
+    if (!rescanned.includes(category)) bucket.accepted += 1;
+  }
+  counts.set(category, bucket);
+}
+
 export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
   const byTarget = new Map<string, RunLogEntry[]>();
   for (const entry of entries) {
@@ -93,20 +114,12 @@ export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
   for (const group of byTarget.values()) {
     const ordered = group.toSorted((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
     for (const [index, entry] of ordered.entries()) {
-      const { category } = entry;
-      if (category == null || category === "") continue;
-      if (entry.suppressed === true || !INJECTION_OUTCOMES.has(entry.outcome)) continue;
+      const shown = emittedOf(entry);
+      if (shown.length === 0) continue;
       const rescan = ordered
         .slice(index + 1)
         .find((next) => next.categories != null && WHOLE_FILE_TOOLS.has(next.tool));
-      const bucket = counts.get(category) ?? { revisited: 0, accepted: 0, unconfirmed: 0 };
-      if (rescan?.categories == null) {
-        bucket.unconfirmed += 1;
-      } else {
-        bucket.revisited += 1;
-        if (!rescan.categories.includes(category)) bucket.accepted += 1;
-      }
-      counts.set(category, bucket);
+      for (const category of shown) tally(counts, category, rescan?.categories);
     }
   }
   return counts;
@@ -137,14 +150,15 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
     durations.push(entry.duration_ms);
     if (entry.outcome === "silent" && !entry.suppressed) silentDurations.push(entry.duration_ms);
 
-    if (entry.category != null && entry.category !== "") {
-      const bucket = perCategory.get(entry.category) ?? { fired: 0, suppressed: 0 };
-      if (entry.suppressed) {
-        bucket.suppressed += 1;
-      } else if (INJECTION_OUTCOMES.has(entry.outcome)) {
-        bucket.fired += 1;
-      }
-      perCategory.set(entry.category, bucket);
+    for (const category of emittedOf(entry)) {
+      const bucket = perCategory.get(category) ?? { fired: 0, suppressed: 0 };
+      bucket.fired += 1;
+      perCategory.set(category, bucket);
+    }
+    for (const category of suppressedOf(entry)) {
+      const bucket = perCategory.get(category) ?? { fired: 0, suppressed: 0 };
+      bucket.suppressed += 1;
+      perCategory.set(category, bucket);
     }
 
     const ts = Date.parse(entry.ts);

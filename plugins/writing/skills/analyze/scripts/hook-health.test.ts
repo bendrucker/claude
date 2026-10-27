@@ -86,6 +86,24 @@ describe("summarize", () => {
     expect(health.latency.max).toBe(20);
     expect(health.latency.silentP95).toBe(4);
   });
+
+  it("counts each category a multi-finding run emitted or suppressed", () => {
+    const health = summarize([
+      entry({
+        outcome: "context",
+        category: "filler",
+        emitted: ["filler", "spaced em dash"],
+        suppressed_categories: ["numbering"],
+      }),
+    ]);
+    expect(
+      health.categories.map(({ category, fired, suppressed }) => ({ category, fired, suppressed })),
+    ).toEqual([
+      { category: "filler", fired: 1, suppressed: 0 },
+      { category: "spaced em dash", fired: 1, suppressed: 0 },
+      { category: "numbering", fired: 0, suppressed: 1 },
+    ]);
+  });
 });
 
 describe("acceptance", () => {
@@ -182,6 +200,14 @@ describe("acceptance", () => {
         entry({ target: "f1", categories: [] }),
       ],
       expected: {},
+    },
+    {
+      name: "every emitted category of one run pairs with the re-scan",
+      entries: [
+        shown({ emitted: ["numbering", "filler"] }),
+        entry({ target: "f1", categories: ["filler"] }),
+      ],
+      expected: { numbering: actedOn, filler: writtenPast },
     },
     {
       name: "entries logged before targets were recorded are ignored",

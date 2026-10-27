@@ -4,62 +4,27 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import type { Heading, Text } from "mdast";
 import { z } from "zod";
+import {
+  hasNumberingHint,
+  markdownNumberingFindings,
+  numberingMessage,
+} from "../detection/numbering";
 import { getExtension, isMarkdownFile } from "../detection/paths";
-import { editedContent, formatContext, formatDecision, type HookResult } from "./io";
-import { loadMarkdown } from "./mdast";
+import { editedContent } from "./io";
+import type { HookFinding } from "./report";
+
+export { hasNumberingHint } from "../detection/numbering";
 
 export type Mode = "write" | "edit";
-
-// Every shape checkMarkdown or a numbering.yml rule can flag carries a
-// step/phase/part token near a digit, so this prefilter gates the expensive
-// path (mdast parse, sg spawn) in-process.
-const NUMBER_HINT = /(step|phase|part).{0,8}[0-9]/i;
-
-export function hasNumberingHint(content: string): boolean {
-  return NUMBER_HINT.test(content);
-}
-
-interface MarkdownMatch {
-  text: string;
-  line: number;
-  column: number;
-}
 
 const AstGrepMatches = z.array(z.looseObject({ message: z.string() }));
 
 const ExecFailure = z.looseObject({ stdout: z.string().optional() });
 
-// Bare `N. ` headings are usually rankings or enumerations, not process steps,
-// so only explicit step labels count.
-const STEP_HEADING = /^(Step|Phase|Part)\s+[0-9]+/i;
-
 export async function checkMarkdown(content: string): Promise<string | null> {
-  const { fromMarkdown, visit } = await loadMarkdown();
-  const ast = fromMarkdown(content);
-  const matches: MarkdownMatch[] = [];
-
-  visit(ast, "heading", (node: Heading) => {
-    const text = node.children
-      .filter((child): child is Text => child.type === "text")
-      .map((child) => child.value)
-      .join("");
-
-    if (STEP_HEADING.test(text)) {
-      matches.push({
-        text: text.trim(),
-        line: node.position?.start.line ?? 0,
-        column: node.position?.start.column ?? 0,
-      });
-    }
-  });
-
-  if (matches.length > 0) {
-    return `Numbered step heading: ${matches[0]?.text}`;
-  }
-
-  return null;
+  const first = (await markdownNumberingFindings(content))[0];
+  return first ? numberingMessage(first.text) : null;
 }
 
 export async function checkCode(content: string, ext: string): Promise<string | null> {
@@ -120,25 +85,25 @@ async function fileAlreadyNumbered(filePath: string, ext: string): Promise<boole
   return match !== null;
 }
 
-export async function check(input: PreToolUseHookInput, mode: Mode): Promise<HookResult | null> {
+export async function check(input: PreToolUseHookInput, mode: Mode): Promise<HookFinding[]> {
   const edited = editedContent(input);
-  if (!edited) return null;
+  if (!edited) return [];
   const { content, filePath } = edited;
 
-  if (!hasNumberingHint(content)) return null;
+  if (!hasNumberingHint(content)) return [];
 
   const ext = getExtension(filePath);
   const match = isMarkdownFile(ext) ? await checkMarkdown(content) : await checkCode(content, ext);
 
   if (match == null || match === "") {
-    return null;
+    return [];
   }
 
   // Numbering already present in the target file was adjudicated when it was
   // introduced (approved by the user or pre-existing). Only first
   // introductions should prompt.
   if (await fileAlreadyNumbered(filePath, ext)) {
-    return null;
+    return [];
   }
 
   const reason = `Detected step or phase numbering that creates tight coupling.
@@ -152,8 +117,8 @@ Use descriptive names instead. See CLAUDE.md Organization guidelines.`;
   if (isMarkdownFile(ext)) {
     const message =
       mode === "edit" ? `This edit introduces step or phase numbering. ${reason}` : reason;
-    return { output: formatContext(message), category: "numbering" };
+    return [{ category: "numbering", tier: "context", message }];
   }
 
-  return { output: formatDecision("deny", reason), category: "numbering" };
+  return [{ category: "numbering", tier: "deny", message: reason }];
 }

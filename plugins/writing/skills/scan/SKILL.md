@@ -6,7 +6,7 @@ description: >-
   gate on it, reporting every match with file, line, and column. Use `score` to
   measure trope density of one input on a per-1000-word basis, compare two
   drafts, or score code comments separately. Not for rewriting a single input.
-argument-hint: audit <path...> | score <input>
+argument-hint: audit <path...> | score <input> | --input <file> [--message]
 user-invocable: true
 allowed-tools:
   - Bash
@@ -65,3 +65,8 @@ A second table follows where the artifact carries tag signatures: the share of t
 ## Single-Input Mode
 
 `writing:rewrite` and other callers invoke `scan.ts --input` to lint one input against the audit categories without walking a directory. It reads a file path, inline text, or stdin and prints matches as `line:col: category: message` with no path prefix, exiting non-zero on any finding. This is the `audit` gate over a single input.
+
+It also runs the heading and step-numbering checks on markdown input.
+
+- `--message` treats the input as a message sent once (PR, issue, comment, commit, Notion page) and applies the rules for that surface, including salutations and closers. The surface is never inferred, so pass it for a message body even when the text sits in a file.
+- `--json` prints the findings as a JSON array of `{ line, col, category, tier, structural, message }`. The exit code is unchanged.

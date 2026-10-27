@@ -1,0 +1,24 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`report caps the list and counts the rest 1`] = `
+{
+  "hookSpecificOutput": {
+    "additionalContext": 
+"Writing checks found 13 issues in this text. Fix them in one pass.
+
+- rule 0: Cut the filler.
+- rule 1: Cut the filler.
+- rule 2: Cut the filler.
+- rule 3: Cut the filler.
+- rule 4: Cut the filler.
+- rule 5: Cut the filler.
+- rule 6: Cut the filler.
+- rule 7: Cut the filler.
+- rule 8: Cut the filler.
+- rule 9: Cut the filler.
+- …and 3 more. Run writing:scan --input to see all."
+,
+    "hookEventName": "PreToolUse",
+  },
+}
+`;

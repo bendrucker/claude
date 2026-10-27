@@ -53,13 +53,26 @@ function contextOf(output: SyncHookJSONOutput | null): string | undefined {
   return specific?.hookEventName === "PreToolUse" ? specific.additionalContext : undefined;
 }
 
-describe("single output per tool call", () => {
-  it("emits exactly one injection when multiple checkers hit", async () => {
+describe("every finding in one output", () => {
+  it("lists advisory findings inside a structural deny", async () => {
+    const command = 'gh pr create --body "Hi team, this matches nothing. We must delve into it."';
+    const { output, log } = await dispatch(mockInput("Bash", { command }));
+    expect(log.outcome).toBe("deny");
+    expect(log.emitted).toContain("no-negation");
+    expect(log.emitted).toContain("salutation");
+    const specific = output?.hookSpecificOutput;
+    const reason =
+      specific?.hookEventName === "PreToolUse" ? specific.permissionDecisionReason : undefined;
+    expect(reason).toContain("delve");
+  });
+
+  it("reports each checker's findings in a single injection", async () => {
     const { output, log } = await dispatch(
       mockInput("Write", { file_path: "docs/draft.md", content: MULTI_VIOLATION }),
     );
-    expect(output).not.toBeNull();
     expect(contextOf(output)).toContain("step or phase numbering");
+    expect(contextOf(output)).toContain("title case");
+    expect(contextOf(output)).toContain("em dash");
     const { ts, session_id, duration_ms, ...stable } = log;
     expect(typeof duration_ms).toBe("number");
     expect(stable).toMatchInlineSnapshot(`
@@ -70,6 +83,11 @@ describe("single output per tool call", () => {
           "spaced em dash",
         ],
         "category": "numbering",
+        "emitted": [
+          "numbering",
+          "title case heading",
+          "spaced em dash",
+        ],
         "ext": "md",
         "outcome": "context",
         "target": "4ece0350c8d2e88b",
@@ -144,7 +162,7 @@ describe("session-scoped repeat suppression", () => {
     expect(second.log.category).toBe("numbering");
   });
 
-  it("falls through to the next finding when the winner is suppressed", async () => {
+  it("mutes only the categories that fired recently", async () => {
     const sessionId = crypto.randomUUID();
     const input = mockInput(
       "Write",
@@ -153,13 +171,11 @@ describe("session-scoped repeat suppression", () => {
     );
     const now = 1_000_000;
 
-    const first = await dispatch(input, now);
-    expect(first.log.category).toBe("numbering");
-
+    await dispatch(input, now);
     const second = await dispatch(input, now + 60_000);
-    expect(second.output).not.toBeNull();
     expect(second.log.outcome).toBe("context");
-    expect(second.log.category).toBe("title case heading");
+    expect(second.log.emitted).toEqual(["spaced em dash"]);
+    expect(second.log.suppressed_categories).toEqual(["numbering", "title case heading"]);
   });
 
   it("fires again once the window has passed", async () => {
@@ -269,7 +285,7 @@ describe("heading checker gate", () => {
       const toolInput = { file_path: `docs/note.${ext}`, content: HEADING_VIOLATION };
       const direct = headingCheck(mockInput("Write", toolInput));
       const { log } = await dispatch(mockInput("Write", toolInput));
-      expect(log.category ?? null).toBe(direct?.category ?? null);
+      expect(log.category ?? null).toBe(direct[0]?.category ?? null);
     },
   );
 });

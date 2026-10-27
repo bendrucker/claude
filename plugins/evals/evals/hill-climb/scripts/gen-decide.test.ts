@@ -10,7 +10,9 @@ import { CASES, files as bucketFiles, lastBucket } from "./gen-bucket";
 
 const suite = join(import.meta.dir, "..");
 const cases = all();
-await generate(suite);
+// A stale case and two overlapping runs, as parallel test files produce.
+await Bun.write(join(suite, "decide-stale/case.yaml"), "");
+await Promise.all([generate(suite), generate(suite)]);
 
 describe("committed cases match the generators", () => {
   test.each(CASES.map((c) => [c.name, c] as const))("%s", async (_, c) => {

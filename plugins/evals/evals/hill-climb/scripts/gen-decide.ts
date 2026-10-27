@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { globSync } from "node:fs";
-import { join } from "node:path";
+import { rm } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { all, type Decision, DECISIONS, type Evidence } from "./evidence";
@@ -118,13 +119,30 @@ export const program = new Command("gen-decide.ts")
   .description("Write the decide-* cases from truth.json")
   .action(async () => {
     const suite = join(import.meta.dir, "..");
-    const old = globSync("decide-*", { cwd: suite }).map((d) => join(suite, d));
-    if (old.length > 0) await $`rm -rf ${old}`;
     const cases = all();
+    const wanted: Record<string, string> = Object.fromEntries(
+      cases.flatMap((c) => Object.entries(files(c))),
+    );
+    // Concurrent test files each generate the suite, so a run never removes a file another
+    // run is reading: it drops only stale paths and swaps each changed file in by rename.
+    const names = new Set(cases.map((c) => c.name));
+    const stale = [
+      ...globSync("decide-*", { cwd: suite }).filter((d) => !names.has(d)),
+      ...globSync("decide-*/**/*", { cwd: suite, withFileTypes: true })
+        .filter((d) => d.isFile())
+        .map((d) => relative(suite, join(d.parentPath, d.name)))
+        .filter((f) => !(f in wanted) && !f.endsWith(".tmp")),
+    ];
+    await Promise.all(stale.map((f) => rm(join(suite, f), { recursive: true, force: true })));
     await Promise.all(
-      cases.flatMap((c) =>
-        Object.entries(files(c)).map(([f, text]) => Bun.write(join(suite, f), text)),
-      ),
+      Object.entries(wanted).map(async ([f, text]) => {
+        const path = join(suite, f);
+        const file = Bun.file(path);
+        if ((await file.exists()) && (await file.text()) === text) return;
+        const tmp = `${path}.${process.pid}.tmp`;
+        await Bun.write(tmp, text);
+        await $`mv ${tmp} ${path}`;
+      }),
     );
     console.log(`wrote ${cases.length} cases`);
   });

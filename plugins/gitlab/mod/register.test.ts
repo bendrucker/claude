@@ -106,7 +106,24 @@ function worldOf(on: On, world: World) {
   });
   on("session.start", ($, e) => ({ cwd: e.cwd }));
   on("command.register", () => ({ value: { command: "mr" } }));
-  on("ui.open", () => ({ value: { isPlaced: true } }));
+  const panes = new Set<string>();
+  on("ui.open", ($, e) => {
+    panes.add(e.id);
+    return { value: { isPlaced: true } };
+  });
+  on("ui.panes", () => ({
+    value: [...panes].map((id) => ({
+      id,
+      title: id,
+      isShown: true,
+      isFocused: false,
+      isPlaced: true,
+    })),
+  }));
+  on("ui.close", ($, e) => {
+    panes.delete(e.id);
+    return { value: undefined };
+  });
   on("session.end", ($, e) => ({ sessionId: e.sessionId }));
   on("session.cwd", () => ({ value: "/work" }));
   on("ui.render", { component: "PromptHint" }, ($, e) => {
@@ -779,6 +796,23 @@ describe("register", () => {
     world.jobs = job("success");
     await w.clock.advance(POLL_MS.settled * 2);
     expect(w.submits.length).toBe(1);
+  });
+
+  test("a second /mr closes the pane", async ($, on) => {
+    const RUN = {
+      command: "mr",
+      args: "",
+      origin: { kind: "composer" as const },
+      presentation: { isFullscreen: false, columns: 120 },
+    };
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr("success") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.command.run(RUN);
+    expect(w.named("pane.open")).toHaveLength(1);
+    await $.command.run(RUN);
+    expect(w.named("pane.close")).toHaveLength(1);
   });
 
   test("the pane lists every job and the muted notes it hides until opened", async ($, on) => {

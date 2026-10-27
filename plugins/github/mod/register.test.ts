@@ -98,7 +98,24 @@ function worldOf(on: On, world: World) {
   });
   on("session.start", ($, e) => ({ cwd: e.cwd }));
   on("command.register", () => ({ value: { command: "pr" } }));
-  on("ui.open", () => ({ value: { isPlaced: true } }));
+  const panes = new Set<string>();
+  on("ui.open", ($, e) => {
+    panes.add(e.id);
+    return { value: { isPlaced: true } };
+  });
+  on("ui.panes", () => ({
+    value: [...panes].map((id) => ({
+      id,
+      title: id,
+      isShown: true,
+      isFocused: false,
+      isPlaced: true,
+    })),
+  }));
+  on("ui.close", ($, e) => {
+    panes.delete(e.id);
+    return { value: undefined };
+  });
   on("session.end", ($, e) => ({ sessionId: e.sessionId }));
   on("session.cwd", () => ({ value: "/work" }));
   on("ui.render", { component: "PromptHint" }, ($, e) => {
@@ -968,6 +985,23 @@ describe("register", () => {
 
     await $.turn.complete(COMPLETE);
     expect(await w.shown($)).toBe("you     │ \u{f52f} 1");
+  });
+
+  test("a second /pr closes the pane", async ($, on) => {
+    const RUN = {
+      command: "pr",
+      args: "",
+      origin: { kind: "composer" as const },
+      presentation: { isFullscreen: false, columns: 120 },
+    };
+    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("SUCCESS") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.command.run(RUN);
+    expect(w.named("pane.open")).toHaveLength(1);
+    await $.command.run(RUN);
+    expect(w.named("pane.close")).toHaveLength(1);
   });
 
   test("the pane lists every check and the muted chatter it hides until opened", async ($, on) => {

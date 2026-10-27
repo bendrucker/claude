@@ -700,6 +700,12 @@ export function register(on: On, options: PluginOptions): void {
   });
 
   on("command.run", { command: "pr" }, async ($) => {
+    // A second /pr closes it: the close mark and its chord do not reach every terminal.
+    if ((await $.ui.panes()).some((pane) => pane.id === PANE)) {
+      await $.ui.close({ id: PANE });
+      emit($, "pane.close", {});
+      return {};
+    }
     const opened = await $.ui.open({ id: PANE, title: "PR", closeOnEscape: true });
     emit($, "pane.open", { placed: opened.isPlaced, pr: watch.snapshot?.pr });
     return opened.isPlaced ? {} : { text: `/pr: the pane is not drawn (${opened.reason})` };

@@ -85,6 +85,25 @@ const RESULT_SENTENCES = [
   /^(?:\w+\s+){0,3}pass(?:es|ed|ing)?(?:\s|$)/im,
 ];
 
+// A count in a list lead-in ("keeps six:", "three things:") restates what the
+// list shows and goes stale when an item changes. A label noun before the
+// number marks an ordinal heading ("Phase two:"), a comparative marks a bound
+// ("more than three titles:"), "all" with no noun refers back ("wrong for all
+// three:"), and "per" marks a rate ("five runs per arm:"). Digits count only
+// after a determiner and before a plural noun, so versions, times, and
+// measurements ("Node 20:", "at 10:30", "on 10 cores:") stay unmatched.
+const COUNT_WORD = String.raw`(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)`;
+const ORDINAL_LABEL = String.raw`(?:step|phase|part|stage|round|tier|level|option|chapter|section|day|week|version|item|case|attempt|pass|wave|batch|milestone|track|layer|gen|generation|rule|question|point|note|figure|table|appendix|season|episode|act|scene|article|plan|idea|bucket|group)`;
+const LEAD_IN_WORD = String.raw`[ \t]+(?!per\b)[\w'-]+`;
+const COUNTED_LEAD_IN = new RegExp(
+  [
+    String.raw`\bthe\s+following\s+(?:${COUNT_WORD}|\d+)\b`,
+    String.raw`(?<!\b(?:${ORDINAL_LABEL}|than|least|most)\s+)\b${COUNT_WORD}(?:${LEAD_IN_WORD}){0,3}?:(?=\s|$)(?<!\ball\s+${COUNT_WORD}:)`,
+    String.raw`\b(?:the|these|those|its|their|all|our|my)\s+(?:[2-9]|1\d)(?:${LEAD_IN_WORD}){0,2}?[ \t]+[a-z][\w'-]*s:(?=\s|$)`,
+  ].join("|"),
+  "gi",
+);
+
 // "no X needed" is a marketing brag when X is an artifact the design lacks
 // ("no config needed"), but a legitimate status report when X is an action that
 // was not required ("no change needed"). The artifact side is open-ended, so we
@@ -980,6 +999,39 @@ export const PATTERNS: PatternDef[] = [
       "Gen-5 corpus audit 2026-08: the attention-flag frame (worth noting/knowing/flagging/your attention) runs 52.6/M assistant versus 2.9/M typed user (16.6x) across 166 sessions, and a verify pass found the wrapper deletable in every sampled case. The frame regex targets the flag lead-in and leaves cost-benefit judgments (worth doing/fixing/checking/it) unmatched. Subsumes the retired 'it's worth noting that' filler alternative.",
     retire:
       "Remove when the frame rate falls to the typed-user baseline in a corpus audit window, or when a labeling pass shows the frame mostly preceding genuinely optional asides.",
+  },
+  {
+    tier: "context",
+    layer: "grammar",
+    category: "counted list lead-in",
+    test: COUNTED_LEAD_IN,
+    message: (matched) =>
+      `"${matched}" counts the list it introduces. Drop the number and let the list speak: "keeps:" rather than "keeps six:".`,
+    positives: [
+      "The global list keeps six:\n\n- a\n- b",
+      "Three things:\n\n1. the cache\n2. the queue",
+      "This PR makes four changes:\n- one",
+      "Two options: retry or fail fast.",
+      "The 3 failing tests:\n- a",
+      "It needs the following four settings.",
+      "All three PRs are merged: #1, #2, and #3.",
+    ],
+    negatives: [
+      "Phase two: migrate the readers.",
+      "Node 20: supported.",
+      "The meeting starts at 10:30 today.",
+      "Both changes ship together:\n- a\n- b",
+      "Two reviewers approved the change.",
+      "Step 3 changes: none.",
+      "Ran five runs per arm:\n\n| Case | With |",
+      "Load spikes up to 216 on 10 cores:\n- a",
+      "None lists more than three titles:\n- a",
+      "Trimming would have been wrong for all three: each reason stands alone.",
+    ],
+    evidence:
+      "User-flagged 2026-10 as slop in any register. Corpus audit 2026-10-27 over cloud-session replies and chat, PR bodies, and PR comments (847K chars): 40/M, at roughly 85% precision on a hand-labeled pass of every hit. Ben's pre-AI writing (6.0M chars across mail, PRs, issues, blog) runs 19/M and his pre-AI PRs 17/M, so the habit is about 2x the baseline rather than a distinctive tell. It ships on the user's stated preference. Typed user text in cloud threads had zero hits in 21K chars, too small to set a rate.",
+    retire:
+      "Remove when the assistant rate falls to the typed-user baseline in a corpus audit window, or when a labeling pass shows most hits are not list lead-ins.",
   },
   {
     tier: "context",

@@ -1,0 +1,5 @@
+allow_tools: [Bash]
+stage: [packages/evals, plugins/evals/skills/hill-climb/references]
+collect: [adapter.ts]
+graders:
+  wrote: "*"

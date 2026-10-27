@@ -1,6 +1,8 @@
-import { dirname, join } from "node:path";
-import { readResult, type Result, runError } from "./result";
-import { type Measure, type Measured, measures, traceMeasures } from "./trace";
+import type { z } from "zod";
+import type { Adapter } from "./adapter";
+import { native } from "./adapters/native";
+import { Result, runError } from "./result";
+import { type Measure, type Measured, measures } from "./trace";
 
 /** Every run of one case and arm, pooled across the result files of a column. */
 export interface Cell extends Record<Measure, number[]> {
@@ -12,28 +14,11 @@ export interface Cell extends Record<Measure, number[]> {
 
 export type Column = Map<string, Cell>;
 
-async function measure(path: string): Promise<Measured> {
-  const file = Bun.file(path);
-  return (await file.exists()) ? traceMeasures(await file.text()) : {};
-}
-
-interface Loaded {
-  result: Result;
+export interface Loaded {
+  /** Parsed with `Result` before pooling, so grader and run defaults may be left out. */
+  result: z.input<typeof Result>;
+  /** Trace measures per `<case>/<arm>`, one entry per run. A run without one has no measures. */
   measured: Map<string, Measured[]>;
-}
-
-async function load(path: string): Promise<Loaded> {
-  const result = await readResult(path);
-  const traces = join(dirname(path), "traces");
-  const keyed = result.cases.flatMap((c) =>
-    Object.entries(c.arms).map(async ([arm, runs]) => {
-      const measured = await Promise.all(
-        runs.map((_, i) => measure(join(traces, `${c.name}-${arm}-${i}.jsonl`))),
-      );
-      return [`${c.name}/${arm}`, measured] as const;
-    }),
-  );
-  return { result, measured: new Map(await Promise.all(keyed)) };
 }
 
 function pool(cell: Cell, values: Measured) {
@@ -43,7 +28,7 @@ function pool(cell: Cell, values: Measured) {
   }
 }
 
-function merge(column: Column, { result, measured }: Loaded) {
+function merge(column: Column, result: Result, measured: Loaded["measured"]) {
   for (const c of result.cases) {
     for (const [arm, runs] of Object.entries(c.arms)) {
       const key = `${c.name}/${arm}`;
@@ -77,9 +62,10 @@ function merge(column: Column, { result, measured }: Loaded) {
   }
 }
 
-/** Loads a column from one or more aggregate-result.json paths, pooling their runs. */
-export async function loadColumn(paths: string[]): Promise<Column> {
+/** Loads a column from one or more stored runs, pooling their runs. */
+export async function loadColumn(paths: string[], adapter: Adapter = native): Promise<Column> {
   const column: Column = new Map();
-  for (const loaded of await Promise.all(paths.map(load))) merge(column, loaded);
+  const loaded = await Promise.all(paths.map((p) => adapter.read(p)));
+  for (const { result, measured } of loaded) merge(column, Result.parse(result), measured);
   return column;
 }

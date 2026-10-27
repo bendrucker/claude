@@ -33,19 +33,23 @@ bun <skill-dir>/scripts/heap-top.ts tmp/heap/<name>.txt --json
 
 ```bash
 heaptrack -o tmp/heap/<name> <program> <args>
-heaptrack_print tmp/heap/<name>.zst --print-peaks 1 --print-allocators 0 --print-temporary 0 --print-leaks 0
+heaptrack_print <file> --print-allocators=0 --print-temporary=0 --print-leaks=0
 ```
 
-Read `PEAK MEMORY CONSUMERS`, which ranks stacks by their contribution to the heap's peak, and the summary lines `peak heap memory consumption` and `peak RSS`. Rank on the peak section, not `MOST CALLS TO ALLOCATION FUNCTIONS` or the total allocated.
+`<file>` is the path heaptrack prints at exit: `.zst` or `.gz`, depending on the build. Its boolean flags take `=0`. A bare `0` after one reads as the file argument.
+
+Read `PEAK MEMORY CONSUMERS`, which ranks stacks by their contribution to the heap's peak, and the summary line `peak heap memory consumption`. Rank on the peak section, not `MOST CALLS TO ALLOCATION FUNCTIONS` or the total allocated. Its `peak RSS` line includes heaptrack's own overhead.
+
+When the peak section shows one entry at `0x0` `in ??`, heaptrack failed to unwind, which happens with heaptrack 1.5 on arm64 even with frame pointers. Its totals still hold, so take stacks from massif.
 
 `valgrind --tool=massif` takes heap snapshots and marks the peak:
 
 ```bash
-valgrind --tool=massif --massif-out-file=tmp/heap/<name>.massif <program> <args>
-ms_print tmp/heap/<name>.massif
+valgrind --tool=massif --massif-out-file=tmp/heap/<name>.%p.massif <program> <args>
+ms_print tmp/heap/<name>.<pid>.massif
 ```
 
-The snapshot marked `(peak)` carries the allocation tree. It runs the program 20 to 100 times slower, so prefer `heaptrack` and use massif when `heaptrack` is missing. `--pages-as-heap=yes` counts `mmap` pages as well as `malloc`.
+`%p` gives each process its own file. A forked child otherwise writes to the parent's file. The header line `Detailed snapshots: [3 (peak), …]` names the peak snapshot, and that snapshot carries the allocation tree. It runs the program 20 to 100 times slower, so prefer heaptrack where it unwinds. `--pages-as-heap=yes` counts `mmap` pages as well as `malloc`.
 
 From a Mac, run either one in a Linux VM ([linux-vm.md](linux-vm.md)). Peak attribution transfers when the allocation pattern is platform-neutral. The absolute bytes do not, since the allocators differ.
 

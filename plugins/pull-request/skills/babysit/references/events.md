@@ -14,7 +14,7 @@ git merge --abort
 
 Lockfiles or generated files (`bun.lock`, etc.): regenerate per project convention (e.g. `rm bun.lock && bun install`), commit, push.
 
-Real source conflicts: rebase on `origin/<base>` and delegate to the `git:conflicts` skill. Resolve, commit, and push where mechanically clear. Where ambiguous or semantic, report the conflicting hunks and call `TaskStop` (this runs unattended, so never guess a merge).
+Real source conflicts: merge `origin/<base>` in (never rebase, which needs a force-push) and delegate to the `git:conflicts` skill. Resolve, commit, and push where mechanically clear. Where ambiguous or semantic, report the conflicting hunks and call `TaskStop` (this runs unattended, so never guess a merge).
 
 In Merge Mode, after any push here, re-arm per [Merge Mode](../SKILL.md#merge-mode) and count it as a submit attempt.
 

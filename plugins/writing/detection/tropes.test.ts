@@ -708,15 +708,16 @@ describe("scan", () => {
     it.each([
       "The global list keeps six:\n\n- a\n- b",
       "Sandboxed git failures fall into three groups:\n\n- a",
-      "Two notes:\n- a",
-      "It reads the following three files.",
+      "Five notes:\n- a",
+      "It reads the following three files:\n- a",
     ])("flags: %j", async (text) => {
       expect(await leadIn(text)).toBeDefined();
     });
 
     it.each([
       "The global list keeps:\n\n- a\n- b",
-      "Phase two: migrate the readers.",
+      "Two notes:\n- a",
+      "Phase three: migrate the readers.",
       "Four runs per arm:\n\n| Case | With |",
       "Two reviewers approved the change.",
       "The `three:` key is ignored.",

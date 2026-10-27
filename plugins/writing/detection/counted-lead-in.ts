@@ -28,7 +28,7 @@ let parsing: Promise<Parse> | undefined;
 
 function cardinalValue(nlp: Parse, token: TaggedToken): number | undefined {
   if (token.tag !== "NUM" || !token.fine.includes("Cardinal")) return undefined;
-  const value: unknown = nlp(token.text).numbers().get()[0];
+  const [value]: unknown[] = [nlp(token.text).numbers().get()].flat();
   return typeof value === "number" ? value : undefined;
 }
 

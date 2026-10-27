@@ -156,7 +156,8 @@ export async function pluginErrors(output: string): Promise<string[]> {
 }
 
 /**
- * Command-line arguments given before `--` other than the suite, `--ref`, `--label`, and help.
+ * Command-line arguments given before `--` other than the suite, `--ref`, `--label`, `--adapter`,
+ * and help.
  * Runner arguments such as `--case` go after `--`, and one before it would be misread as a
  * `run.ts` option or a runner argument.
  */
@@ -167,8 +168,8 @@ export function strayArgs(args: string[]): string[] {
   let suite = false;
   for (let i = 0; i < before.length; i++) {
     const arg = before[i] ?? "";
-    if (arg === "--ref" || arg === "--label") i++;
-    else if (/^--(ref|label)=/.test(arg) || arg === "-h" || arg === "--help") continue;
+    if (["--ref", "--label", "--adapter"].includes(arg)) i++;
+    else if (/^--(ref|label|adapter)=/.test(arg) || arg === "-h" || arg === "--help") continue;
     else if (!suite && !arg.startsWith("-")) suite = true;
     else stray.push(arg);
   }

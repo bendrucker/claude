@@ -43,7 +43,7 @@ Pin the scenario before timing it. A run that changes its own input measures a d
 
 Interleaving runs every arm in the same round, so each one exists on disk at once:
 
-- **Copies.** A `git worktree add <dir> <ref>` per version, or a separate build output per arm. Put each worktree outside the repo, where a test runner, linter, or watcher walking the tree cannot pick it up.
+- **Copies.** A `git worktree add <dir> <ref>` per version, or a separate build output per arm. Put each worktree under the repo's gitignored `tmp/arms/`, and exclude that directory from any test runner, linter, or watcher that walks the tree.
 - **State.** When the program writes outside its tree (`~/.cache`, a config directory), point each arm at its own copy. Shared state lets a candidate that changes a cache format make both arms miss on every run.
 - **Paths.** Check that each arm runs only its own copy. A test runner reads a bare path argument as a filter that can match another arm's tree, so pass paths with a leading `./`.
 - **Passing run.** Before a long comparison, run each arm once with its output visible and confirm it passes.
@@ -68,7 +68,7 @@ Before comparing versions, run the unchanged program as two arms (an A/A compari
 
 The A/A spread (`±MAD`) is the smallest change the harness can resolve.
 
-When the Mac's A/A will not tie or the fast signal needs `perf` or hardware counters, read [../profile/references/linux-vm.md](../profile/references/linux-vm.md).
+When the Mac's A/A will not tie, machine load would delay a comparison by more than about 15 minutes, or the fast signal needs `perf` or hardware counters, read [../profile/references/linux-vm.md](../profile/references/linux-vm.md).
 
 ## Reading the Report
 

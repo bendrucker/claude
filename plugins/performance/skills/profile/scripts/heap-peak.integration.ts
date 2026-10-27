@@ -7,10 +7,13 @@ const dir = mkdtempSync(join(tmpdir(), "heap-peak-"));
 const report = join(dir, "peak.txt");
 
 // `transient` allocates about 400 MB in total, six times `retained`, but the peak holds
-// only `retained` and `transient`'s first batch. The forked child must exit without stopping.
+// only `retained` and `transient`'s first batch. The forked child runs the
+// shim's destructor, and if it stops there, the parent exits before reaching its own.
 const source = `
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 __attribute__((noinline)) char *retained(size_t n) { char *p = malloc(n); memset(p, 1, n); return p; }
 __attribute__((noinline)) char *transient(size_t n) { char *p = malloc(n); memset(p, 1, n); return p; }
@@ -21,7 +24,11 @@ int main(void) {
   free(big);
   for (int i = 0; i < 100; i++) free(small[i]);
   for (int i = 0; i < 50; i++) free(transient(8 << 20));
-  if (fork() == 0) _exit(0);
+  pid_t child = fork();
+  if (child == 0) exit(0);
+  int status;
+  waitpid(child, &status, WUNTRACED);
+  if (WIFSTOPPED(status)) { kill(child, SIGKILL); _exit(1); }
   return 0;
 }
 `;

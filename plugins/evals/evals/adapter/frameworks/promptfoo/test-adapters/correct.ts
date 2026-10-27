@@ -11,17 +11,17 @@ const ARMS: Record<string, string> = {
 };
 
 const Assertion = z.looseObject({ type: z.string(), value: z.unknown(), metric: z.string() });
-const Row = z.object({
+const Row = z.looseObject({
   testIdx: z.number(),
   promptIdx: z.number(),
   testCase: z.object({ description: z.string() }),
   response: z.object({ output: z.string() }),
-  gradingResult: z.object({
-    componentResults: z.array(z.object({ pass: z.boolean(), assertion: Assertion })),
+  gradingResult: z.looseObject({
+    componentResults: z.array(z.looseObject({ pass: z.boolean(), assertion: Assertion })),
   }),
 });
-const Output = z.object({
-  results: z.object({
+const Output = z.looseObject({
+  results: z.looseObject({
     prompts: z.array(z.object({ label: z.string() })),
     results: z.array(Row),
   }),
@@ -36,9 +36,12 @@ const Config = z.object({
   ),
 });
 
-/** Runs in promptfoo's order, each with the arm its prompt label stands for. */
 async function load(path: string) {
-  const { results } = Output.parse(await Bun.file(path).json());
+  return ordered(Output.parse(await Bun.file(path).json()));
+}
+
+/** Runs in promptfoo's order, each with the arm its prompt label stands for. */
+function ordered({ results }: z.output<typeof Output>) {
   return results.results
     .toSorted((a, b) =>
       a.testIdx === b.testIdx ? a.promptIdx - b.promptIdx : a.testIdx - b.testIdx,
@@ -104,7 +107,8 @@ export const adapter: Adapter = {
 
   async rescore(suite, path) {
     const { tests } = await config(suite);
-    const stored = await load(path);
+    const output = Output.parse(await Bun.file(path).json());
+    const stored = ordered(output);
     const dir = await mkdtemp(join(tmpdir(), "promptfoo-regrade-"));
     // promptfoo's echo provider replays logged outputs, so the current assertions grade them without a model.
     const regrade = {
@@ -134,12 +138,14 @@ export const adapter: Adapter = {
         const passed = after[i]?.gradingResult.componentResults.find(
           (c) => c.assertion.metric === before.assertion.metric,
         )?.pass;
-        return passed === undefined || passed === before.pass
-          ? []
-          : [{ grader: `${name}/${before.assertion.metric}`, run: `${arm}/${run}`, passed }];
+        if (passed === undefined || passed === before.pass) return [];
+        before.pass = passed;
+        return [{ grader: `${name}/${before.assertion.metric}`, run: `${arm}/${run}`, passed }];
       });
     });
-    return { path, flips };
+    const regraded = join(dir, "results.json");
+    await Bun.write(regraded, JSON.stringify(output));
+    return { path: regraded, flips };
   },
 
   async traces(path) {

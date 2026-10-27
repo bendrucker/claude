@@ -22,10 +22,10 @@ gh workflow run eval.yml --ref evals-plugin -f suite=plugins/evals/evals/adapter
 | `read` | pass counts per case, arm, and grader equal `held/truth.json` |
 | `tags` | every case maps to tags that include its truth tags |
 | `traces` | each cell's replies equal the truth |
-| `rescore` | after `rescore.patch` edits a grader, the flips match the truth, or the adapter throws when the truth says the framework can't re-score |
+| `rescore` | after `rescore.patch` edits a grader, the flips match the truth and `read` turns the returned path into the held counts with those verdicts reversed, or the adapter throws when the truth says the framework can't re-score |
 | `run` | `run(project, { ref: "base", args: [] })` returns a path `read` turns into the held counts, and the stub log shows the `base` prompt on the with arm |
 
-`run` checks its output through `read`, so a broken `read` fails `run` too.
+`rescore` and `run` check their output through `read`, so a broken `read` fails them too.
 
 ## Frameworks
 
@@ -37,6 +37,6 @@ Each framework lives in `frameworks/<name>/`:
 - `fixtures/<run>/truth.json`: what a correct adapter reports, in the shape `Truth` in `scripts/truth.ts` defines.
 - `fixtures/held/rescore.patch`: a grader edit, applied to a `setup.sh` copy before `rescore`.
 - `stub/bin/<command>`: a stand-in for the framework's run command. It appends `{ argv, cwd, prompt }` to `$ADAPTER_STUB_LOG`, where `prompt` is the sha256 of `prompt.txt` in its working directory or `null` when absent, then copies `fixtures/${ADAPTER_FIXTURE:-seen}/` beside its `stub/` directory to where its arguments point, as the real command would write it. Its `prompt.txt` hash decides nothing: the output is the stored run either way. Every other use of the command, such as a replay that re-grades stored outputs or a script that reads the project, goes to the real tool, so an adapter isn't held to one way of calling it.
-- `test-adapters/correct.ts` passes every grader, and each `test-adapters/broken-<grader>.ts` fails exactly that grader. `adapters.test.ts` asserts both.
+- `test-adapters/correct.ts` passes every grader, and each `test-adapters/broken-<grader>.ts` wraps it with one mistake that fails that grader. `adapters.test.ts` asserts both.
 
 `gen.ts` runs the real framework in a throwaway environment under `tmp/`. Nothing it installs is declared in this repo.

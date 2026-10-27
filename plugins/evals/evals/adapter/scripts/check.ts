@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
 import { type Adapter, resolveAdapter } from "../../../../../packages/evals/adapter";
-import { countsDiffer, readTruth, resultCounts, type Truth, truthCounts } from "./truth";
+import { countsDiffer, readTruth, rescored, resultCounts, type Truth, truthCounts } from "./truth";
 
 /** One verdict per adapter operation, as the `score` script records it. */
 export type Verdicts = Record<string, { passed: boolean; explanation: string }>;
@@ -69,7 +69,7 @@ const OPERATIONS: Record<Exclude<(typeof GRADERS)[number], "loads">, Operation> 
     await $`git apply ${patch}`.cwd(dir).quiet();
     const outcome = await adapter
       .rescore(dir, join(await held(framework), truth.result))
-      .then((r) => ({ flips: r.flips }))
+      .then(async (r) => ({ flips: r.flips, result: (await adapter.read(r.path)).result }))
       .catch((error: unknown) => ({ error: String(error) }));
     if (!truth.rescore.supported)
       return "error" in outcome ? undefined : "returned flips for a framework that can't re-score";
@@ -84,9 +84,9 @@ const OPERATIONS: Record<Exclude<(typeof GRADERS)[number], "loads">, Operation> 
           (f) => f.grader.includes(w.grader) && `${f.grader} ${f.run}`.includes(w.case),
         ),
     );
-    return unmatched === undefined
-      ? undefined
-      : `no flip for ${unmatched.case}/${unmatched.grader}`;
+    if (unmatched !== undefined) return `no flip for ${unmatched.case}/${unmatched.grader}`;
+    const differ = countsDiffer(truthCounts(rescored(truth)), resultCounts(outcome.result));
+    return differ === undefined ? undefined : `read after rescore: ${differ}`;
   },
 
   async run(adapter, truth, framework) {

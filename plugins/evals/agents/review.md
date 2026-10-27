@@ -38,4 +38,4 @@ Test each check against the numbers you recomputed. Where the claim and the file
 
 ## Report
 
-One line per check: its name, `holds`, `fails`, or `can't tell`, and the evidence (the cells, files, or lines it rests on). Then the overall verdict: `holds` when no check fails, `fails` when any does. Every check gets a line, including the ones that hold.
+One line per check: its name, `holds`, `fails`, or `can't tell`, and the evidence (the cells, files, or lines it rests on). Then the overall verdict: `fails` when any check fails, `holds` when every check holds, and `can't tell` otherwise. Every check gets a line, including the ones that hold.

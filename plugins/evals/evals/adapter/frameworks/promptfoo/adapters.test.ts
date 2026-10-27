@@ -23,9 +23,9 @@ describe("promptfoo test adapters", () => {
     TIMEOUT_MS,
   );
 
-  // `run` grades the result through `read`, so a `read` mistake fails both.
+  // `rescore` and `run` grade their results through `read`, so a `read` mistake fails all three.
   const expected: Record<string, string[]> = {
-    read: ["read", "run"],
+    read: ["read", "rescore", "run"],
     tags: ["tags"],
     traces: ["traces"],
     rescore: ["rescore"],

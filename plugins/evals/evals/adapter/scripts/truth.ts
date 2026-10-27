@@ -74,3 +74,16 @@ export function countsDiffer(want: Counts, got: Counts): string | undefined {
   for (const key of got.keys()) if (!want.has(key)) return `${key}: not in the truth`;
   return undefined;
 }
+
+/** The truth after `rescore.patch`, with each listed verdict reversed. */
+export function rescored(truth: Truth): Truth {
+  const next = structuredClone(truth);
+  if (!next.rescore.supported) return next;
+  for (const f of next.rescore.flips) {
+    const graders = next.cases[f.case]?.arms[f.arm]?.[f.run]?.graders;
+    if (graders?.[f.grader] === undefined)
+      throw new Error(`truth has no ${f.case}/${f.arm}/${f.run}/${f.grader}`);
+    graders[f.grader] = !graders[f.grader];
+  }
+  return next;
+}

@@ -1,4 +1,5 @@
 import { mkdtempSync, readdirSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
@@ -20,7 +21,7 @@ const Report = z.object({
 type Report = z.output<typeof Report>;
 type Arms = Loaded["result"]["cases"][number]["arms"];
 
-/** Grades each stored output with the project's evaluators and prints the verdicts that changed. */
+/** Grades each stored output with the project's evaluators, writes the re-scored reports, and prints the verdicts that changed. */
 const RESCORE = `
 import asyncio, inspect, json, sys
 from pathlib import Path
@@ -50,10 +51,20 @@ async def main():
                 passed = await verdict(e, ctx)
                 if passed != stored["assertions"][grader]["value"]:
                     flips.append({"grader": f"{name}/{report['name']}/{grader}", "run": str(run), "passed": passed})
+                    stored["assertions"][grader]["value"] = passed
+        (Path(sys.argv[2]) / file.name).write_text(json.dumps(report))
     print(json.dumps(flips))
 
 asyncio.run(main())
 `;
+
+const TAGS = `
+import json, sys
+sys.path.insert(0, ".")
+from cases import dataset
+print(json.dumps({c.name: (c.metadata or {}).get("tags", []) for c in dataset.cases}))
+`;
+const Tags = z.record(z.string(), z.array(z.string()));
 
 const Flips = z.array(z.object({ grader: z.string(), run: z.string(), passed: z.boolean() }));
 
@@ -102,26 +113,20 @@ export const adapter: Adapter = {
   },
 
   async tags(suite) {
-    const source = await Bun.file(join(suite, "cases.py")).text();
-    const tags = new Map<string, string[]>();
-    for (const block of source.split("Case(").slice(1)) {
-      const name = /name="([^"]+)"/.exec(block)?.[1];
-      const list = /"tags":\s*\[([^\]]*)\]/.exec(block)?.[1];
-      if (name !== undefined)
-        tags.set(
-          name,
-          [...(list ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1] ?? ""),
-        );
-    }
-    return tags;
+    const out = await $`uv run --no-project --with pydantic-evals python -c ${TAGS}`
+      .cwd(suite)
+      .text();
+    return new Map(Object.entries(Tags.parse(JSON.parse(out))));
   },
 
   async rescore(suite, path) {
+    const regraded = `${path}-regraded`;
+    await mkdir(regraded, { recursive: true });
     const out =
-      await $`uv run --no-project --with pydantic-evals --with pydantic-ai python -c ${RESCORE} ${path}`
+      await $`uv run --no-project --with pydantic-evals --with pydantic-ai python -c ${RESCORE} ${path} ${regraded}`
         .cwd(suite)
         .text();
-    return { path, flips: Flips.parse(JSON.parse(out)) };
+    return { path: regraded, flips: Flips.parse(JSON.parse(out)) };
   },
 
   async traces(path) {

@@ -26,8 +26,8 @@ describe("pydantic test adapters", () => {
     180_000,
   );
 
-  // check.ts grades `run` through the adapter's own `read`, so a broken read fails both.
-  test("broken-read fails read and run", async () => {
-    expect(await failed("broken-read.ts")).toEqual(["read", "run"]);
+  // check.ts grades `rescore` and `run` through the adapter's own `read`, so a broken read fails all three.
+  test("broken-read fails read, rescore, and run", async () => {
+    expect(await failed("broken-read.ts")).toEqual(["read", "rescore", "run"]);
   }, 180_000);
 });

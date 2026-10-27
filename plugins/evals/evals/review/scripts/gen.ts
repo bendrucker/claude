@@ -90,11 +90,12 @@ bun "$here/../scripts/plant.ts" data ${c.plant} "$seed" "$PWD" "$base" "$head"
 `;
 }
 
-function verdict(c: CaseSpec): string {
+/** A regex grader on the reply's last `Verdict:` line. */
+export function verdict(c: CaseSpec): string {
   return `---
 type: regex
 target: last_message
-pattern: '^[*_ ]*Verdict[*_ ]*:[*_ ]*${c.verdict}\\b'
+pattern: '^[*_ ]*Verdict[*_ ]*:[*_ ]*${c.verdict}\\b(?![\\s\\S]*^[*_ ]*Verdict[*_ ]*:)'
 flags: mi
 match: contains
 ---
@@ -131,6 +132,8 @@ export async function files(): Promise<Record<string, string>> {
     out[`examples/${c.name}/pass.md`] = `Problem: ${problem}\n\n**Verdict:** ${c.verdict}\n`;
     out[`examples/${c.name}/fail.md`] =
       `---\nfail: [verdict]\n---\nProblem: none\n\nVerdict: ${other}\n`;
+    out[`examples/${c.name}/reversed.md`] =
+      `---\nfail: [verdict]\n---\nVerdict: ${c.verdict}\n\nOn a second look, no.\n\nVerdict: ${other}\n`;
   }
   return out;
 }

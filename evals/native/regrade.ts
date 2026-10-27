@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { Command } from "@commander-js/extra-typings";
 import { resolveAdapter } from "../../packages/evals/adapter";
+import { generate } from "../../packages/evals/generate";
 
 function verb(passed: boolean | undefined): string {
   if (passed === undefined) return "dropped";
@@ -15,6 +16,7 @@ export const program = new Command("regrade.ts")
   .argument("<results...>", "stored results")
   .option("--adapter <name|path>", "adapter that re-scores each result", "native")
   .action(async (suite, results, options) => {
+    await generate(suite);
     const adapter = await resolveAdapter(options.adapter).catch((error: unknown) =>
       program.error(error instanceof Error ? error.message : String(error)),
     );

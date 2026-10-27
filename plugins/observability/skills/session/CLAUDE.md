@@ -75,16 +75,12 @@ The writers carry the `claude:dangerouslyDisableSandbox` marker after their sheb
 
 ### Lake
 
-`lake.ts` publishes the index to a DuckLake (a DuckDB-file catalog plus Parquet) under `CLAUDE_SESSION_LAKE_URL`, an `s3://` prefix or a directory, so remote readers query it in place instead of downloading the index. The local index stays the only writer's source, and the lake is a cache of it. The SQL in `resources/lake/` does the work in the DuckDB CLI. `lake.ts` checks egress, moves the catalog to and from S3, attaches the index and lake, and runs it.
+`lake.ts` publishes the index to a DuckLake on S3 that cloud readers query in place. [`docs/session-lake.md`](../../../../docs/session-lake.md) covers the design. Invariants to keep when changing it:
 
-- **Publish** (`publish.sql`) diffs `indexed_files` against the lake's `published_files`, then in one DuckLake transaction replaces `raw` and `file_fields` per changed file, every table and view with a `session_id` per touched session, and the few without one whole. The table list comes from the index's own catalog, so the lake mirrors the plugin version that built the index. Only the hosts passed with `--host` (default `local`) are published, and a host other than `local` must have been imported with `--egress`.
-- **Rebuilds.** When the lake is missing a table the index has, a table's columns differ, or `index_meta`'s stamp moved, the publish drops and rebuilds the whole lake in the same commit. It refuses an index whose `views_hash` is NULL, the mark of a refresh that died mid-rebuild.
-- **Views become tables.** A view that parses `data` at query time costs a reader the JSON in its whole window, and the JSON columns are almost all of the lake's bytes. Materialized, a query reads only the columns it selects. `classifier_verdicts` (local `mod_events`) is not published.
-- **Layout.** Rows sort by `type`, then `timestamp`, in 8,192-row row groups, so a window filter or a rare-type filter skips most row groups. The replay dedupes partition by `uuid` and `timestamp`: a replayed line is a verbatim copy, so adding the timestamp changes no result and lets a window filter push below the window function.
-- **Catalog.** The writer downloads the remote catalog before every run, keeping its copy under `<state dir>/lake/`, and uploads it with `aws s3 cp` after a commit that changed something. Parquet files are immutable, so a reader sees the previous snapshot or the new one. One writer at a time: two concurrent publishes would each push a catalog without the other's snapshot. `checkpoint.sql` runs DuckLake's `CHECKPOINT` with a 7-day window, which must outlast the longest reader.
-- **Schedule.** `.github/workflows/session-lake.yml` publishes nightly on the Studio's actions-sandbox runner, from the index dir mounted read-only, and runs `checkpoint` on Sundays.
-- **Macros** publish into the lake's catalog, recreated when the index's definition differs, so a reader defines nothing. The table macros that read the refresh's scope tables stay local.
-- **Readers** run `duckdb -init "$(bun lake.ts init)"`. The init file carries `limits.sql`, `lake/s3.sql` and the read-only attach, with `search_path` resolving every other name to the lake. The writer's and readers' CLI must match `@duckdb/node-api`'s version, or the catalog file is unreadable.
+- `resources/lake/publish.sql` does the publish in the DuckDB CLI. `lake.ts` keeps only egress checks, the catalog transfer, the attach, and the reader init.
+- The table plan comes from the index's catalog. A new view or table publishes with no change here, and one without `session_id` is replaced whole.
+- One writer at a time, starting from the remote catalog every run.
+- The CLI's version must match `@duckdb/node-api`'s, or the catalog is unreadable.
 
 ### Callers
 

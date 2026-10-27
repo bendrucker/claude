@@ -393,6 +393,67 @@ WHERE type = 'tool_use'
   AND name = 'Skill'
   AND (data->>'$.input.skill') IS NOT NULL;
 
+-- Every time a skill body entered context, from whichever path put it there. `skill_calls`
+-- sees only the Skill tool, while a typed command, an agent's preloaded skill, and the
+-- re-injection after compaction also load a body. The body opens with the directory it was
+-- read from, and a plugin cache directory names the plugin version, so `plugin_version`
+-- says which revision of the skill a session ran.
+CREATE OR REPLACE VIEW skill_loads AS
+WITH bodies AS (
+  SELECT
+    host, session_id, timestamp, project_path, source_file, source_line, uuid,
+    CASE WHEN (data->>'$.sourceToolUseID') IS NOT NULL THEN 'tool' ELSE 'harness' END AS trigger,
+    (data->>'$.sourceToolUseID') AS tool_use_id,
+    NULL::VARCHAR AS listed_name,
+    coalesce((data->>'$.message.content[0].text'), (data->>'$.message.content')) AS body
+  FROM raw
+  WHERE type = 'user' AND is_meta
+  UNION ALL
+  SELECT
+    r.host, r.session_id, r.timestamp, r.project_path, r.source_file, r.source_line, r.uuid,
+    'compaction', NULL, (s->>'$.name'), (s->>'$.content')
+  FROM raw r, unnest(json_extract(r.data, '$.attachment.skills[*]')) AS t(s)
+  WHERE r.type = 'attachment' AND (r.data->>'$.attachment.type') = 'invoked_skills'
+), loads AS (
+  SELECT
+    *,
+    trim(regexp_extract(body, '^Base directory for this skill: ([^\n]+)', 1)) AS dir
+  FROM bodies
+  WHERE body LIKE 'Base directory for this skill: %'
+  QUALIFY uuid IS NULL
+    OR ROW_NUMBER() OVER (
+         PARTITION BY host, session_id, uuid, listed_name
+         ORDER BY source_line DESC, source_file DESC
+       ) = 1
+), parsed AS (
+  SELECT
+    *,
+    -- A cache dir is .../plugins/cache/<marketplace>/<plugin>/<version>/skills/<skill>, and
+    -- a --plugin-dir checkout is .../plugins/<plugin>/skills/<skill>.
+    coalesce(
+      NULLIF(regexp_extract(dir, '/plugins/cache/[^/]+/([^/]+)/[^/]+/skills/[^/]+/?$', 1), ''),
+      NULLIF(regexp_extract(dir, '/plugins/([^/]+)/skills/[^/]+/?$', 1), '')
+    ) AS plugin,
+    NULLIF(regexp_extract(dir, '/plugins/cache/[^/]+/[^/]+/([^/]+)/skills/[^/]+/?$', 1), '') AS plugin_version,
+    regexp_extract(dir, '([^/]+)/?$', 1) AS dir_name
+  FROM loads
+)
+SELECT
+  coalesce(listed_name, CASE WHEN plugin IS NOT NULL THEN plugin || ':' || dir_name ELSE dir_name END) AS skill,
+  plugin,
+  plugin_version,
+  trigger,
+  tool_use_id,
+  dir,
+  host,
+  session_id,
+  subagent_id(source_file) AS agent_id,
+  project_path,
+  timestamp,
+  source_file,
+  source_line
+FROM parsed;
+
 -- Every denied tool call, with the reason it was denied. `denial_kind` separates the four
 -- surfaces that used to be indistinguishable: a hand rejection (`user-rejected`), a
 -- permission rule or PreToolUse hook (`permission-rule`), and the two auto-mode refusals.

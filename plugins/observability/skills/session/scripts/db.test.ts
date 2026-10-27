@@ -965,6 +965,39 @@ describe("hook_events", () => {
   });
 });
 
+describe("skill_loads view", () => {
+  it("records each body load with its trigger and plugin version", async () => {
+    const rows = await db.query(
+      `SELECT skill, plugin, plugin_version, trigger, tool_use_id FROM skill_loads
+       WHERE session_id = 'skill-loads-session' ORDER BY timestamp`,
+      z.object({
+        skill: z.string(),
+        plugin: z.string().nullable(),
+        plugin_version: z.string().nullable(),
+        trigger: z.string(),
+        tool_use_id: z.string().nullable(),
+      }),
+    );
+    expect(rows).toEqual([
+      {
+        skill: "performance:hill-climb",
+        plugin: "performance",
+        plugin_version: "6dd71451204e",
+        trigger: "tool",
+        tool_use_id: "sl-tool-1",
+      },
+      { skill: "ship", plugin: null, plugin_version: null, trigger: "harness", tool_use_id: null },
+      {
+        skill: "performance:hill-climb",
+        plugin: "performance",
+        plugin_version: "1a2b3c4d5e6f",
+        trigger: "compaction",
+        tool_use_id: null,
+      },
+    ]);
+  });
+});
+
 describe("hook_blocks view", () => {
   it("surfaces deny, ask, and block decisions", async () => {
     const rows = await db.query(
@@ -1313,7 +1346,7 @@ describe("outcomes query", () => {
       "sessions: ongoing": 1,
       "sessions: handed-off": 2,
       "sessions: abandoned-with-edits": 4,
-      "sessions: no-artifact": 19,
+      "sessions: no-artifact": 20,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1330,7 +1363,7 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 26,
+      "sessions: ongoing": 27,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });

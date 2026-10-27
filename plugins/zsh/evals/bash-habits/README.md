@@ -11,6 +11,8 @@ A native `claude plugin eval` suite for the `zsh` plugin. Each case scaffolds a 
 | `pasted-command` | `--include=*.ts` and `echo ===` in one pasted line | no zsh error line, the grep match in the reply |
 | `gather-ticket` | the model's own one-pass gather over `.ts`, `.vue`, `.sql`, and `.sh` files | no flag-glob or `=` error line, the status grep printed |
 | `gather-brief` | the same gather in two extensions, under a subagent system prompt | no flag-glob or `=` error line, the status grep printed |
+| `replay-probe` | `ls -d` and `grep` over several candidate globs behind `2>/dev/null`, one with no match | no glob error line, the compose `DATABASE_URL` in the reply |
+| `gather-config` | the model's own one-pass search of compose, env, and settings files | no glob error line, the compose `DATABASE_URL` in the reply |
 | `missing-glob` | `ls config/*.json` with no match | reply states zero JSON and three YAML files |
 | `heredoc-untouched` | a `===` or `*.ts` line inside a heredoc | the trace shows the body intact |
 
@@ -25,6 +27,8 @@ The with arm loads the plugin. The without arm doesn't.
 `gather-ticket` and `gather-brief` leave the commands to the model. Their prompts name literal extensions (`.ts`, `.vue`) and ask for one pass with separators, which draws a chain of unquoted `--include=*.ext` flags. Naming the languages in words doesn't. `gather-brief` runs under a subagent-style system prompt, where real sessions hit the habit most.
 
 The `replay-*` cases and `pasted-command` hand the model a command shaped like real failures mined from the session index, one per rewrite rule, to run as written. The habit is present in every run, so these cases pin each rule. In `replay-find`, the model often probes with `ls *.yaml` first, which zsh rejects with the same error. The plugin notes that glob without rewriting it, so the case grades only the reply.
+
+`replay-probe` and `gather-config` pin `cshnullglob`: the probe names several candidate files at once, and zsh without it skips the whole command when any one candidate is missing.
 
 `missing-glob` and `heredoc-untouched` guard ordinary work. The plugin notes a glob that matches nothing and leaves heredoc bodies as written.
 

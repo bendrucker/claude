@@ -13,6 +13,7 @@ Quotes the bash habits that misfire under zsh before the Bash tool runs them, an
   - `flag-glob` quotes `--name=*.ts` values and `find -name` patterns.
   - `equals` quotes words starting with `=`.
   - `url` quotes URLs with `?`, `*` or `[`.
+- **`cshnullglob`**: a `SessionStart` hook writes `setopt cshnullglob` to `CLAUDE_ENV_FILE`, so a glob with no match drops out of a command when another glob in it matched, as an unmatched glob fails quietly behind `2>/dev/null` in bash. zsh still skips a command whose globs all missed, reporting `no match`.
 - **Notes**: `glob`, `equals`, `reserved`, `split`, and `bash-syntax`. A repeat within a session gets the short form.
 - **Shell detection**: the mod picks the shell from `CLAUDE_CODE_SHELL`, then `$SHELL`, then `zsh` on `PATH`, and probes `nomatch`, `nullglob`, `cshnullglob`, and `equals` with a non-interactive `zsh -c`. The glob options gate `flag-glob` and `url`, and `equals` gates the `equals` rule. Under any other shell the mod is a no-op.
 - **Events**: `session.start`, `rewrite`, `explain`, and `error` go to [`mod-events`](../mod-events/README.md).
@@ -28,4 +29,5 @@ The `mods` query in `observability:session` reads these events from `mod_events`
 
 - Retire a rewrite rule that appears in no `rewrite` event's `rules` attribute for 30 days.
 - Retire a note class with no `explain` events in 30 days.
+- Retire the `cshnullglob` hook if `explain` events of class `glob` don't fall below their pre-hook rate within 30 days.
 - Retire the plugin if the Bash tool stops running zsh or runs it under bash emulation.

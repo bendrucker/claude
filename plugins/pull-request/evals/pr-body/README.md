@@ -6,7 +6,7 @@ The loop: mine real bodies, label them, turn the labels into structure limits an
 
 ## Privacy
 
-The session index includes an imported `work` host marked block-egress, and work PR bodies live on private hosts anyway. `scripts/mine.ts` hardcodes `host = 'local'` and `repository LIKE 'bendrucker/%'` in its SQL, so only public personal PRs are ever mined. Keep those filters if you touch the query. `data/` and `feedback/` are gitignored regardless.
+The session index includes an imported `work` host marked block-egress, and work PR bodies live on private hosts anyway. `scripts/mine.ts` hardcodes `host = 'local'` and `repository LIKE 'bendrucker/%'` in its SQL, so only public personal PRs are ever mined. Keep those filters if you touch the query. `data/` and `feedback/` are gitignored.
 
 ## Fixtures
 
@@ -29,7 +29,7 @@ bun plugins/pull-request/evals/pr-body/scripts/sync.ts push   # --profile agents
 
 `scripts/limits.ts <results-dir>...` scores each run's PR body against the limits as `visible-words`, `max-block`, and `prose-code-spans` rows and writes `<results-dir>-limits/` for `compare.ts`. Run it before `compare.ts`. The `work-*` cases in `create-scenarios` come from edited work MRs, described in summary with no source. Their fixtures run `create-scenarios/stubs.sh`, which installs the [`eval-stubs`](../../../../packages/eval-stubs/) `glab` and `gh` in echo mode so the body-rules hook fires on the create call and `limits.ts` reads the body the stand-in printed.
 
-The top-level `limits.ts` prints a `PR-LIMIT <row>=pass|fail` line per limit and guard. `create-scenarios/stubs.sh` passes it to the stand-ins as their `--check`, so each counted create or edit records those lines in `.eval-verdicts`, which the `limit-*` file graders in `create` and `create-scenarios` read. The `create` fixtures install it `--offline`, so the call fails after measuring and the session replies with the draft. The `scenario-*` fixtures don't install the stand-ins, so `scripts/limits.ts` still scores them from the reply.
+The top-level `limits.ts` prints a `PR-LIMIT <row>=pass|fail` line per limit and guard. `create-scenarios/stubs.sh` passes it to the stand-ins as their `--check`, so each counted create or edit records those lines in `.eval-verdicts`, which the `limit-*` file graders in `create` and `create-scenarios` read. The `create` fixtures install it `--offline`. The call fails after measuring and the session replies with the draft. The `scenario-*` fixtures don't install the stand-ins, so `scripts/limits.ts` still scores them from the reply.
 
 `scripts/fit.ts` checks a metric against `data/revisions/`: how often a revision moves it down, and with `--human`, how well it separates plugin drafts from Ben's writing (AUC).
 
@@ -37,7 +37,7 @@ The top-level `limits.ts` prints a `PR-LIMIT <row>=pass|fail` line per limit and
 bun plugins/pull-request/evals/pr-body/scripts/fit.ts data/revisions/work.jsonl data/revisions/github.jsonl --via-skill --human data/revisions/handwritten.jsonl
 ```
 
-On the 2026-10 corpus, 2-4% of plugin drafts pass both limits, against 65% of Ben's pre-AI PRs. Diff size predicts the length of Ben's edits only weakly (Spearman 0.30), so the budget is flat.
+On the 2026-10 corpus, 2-4% of plugin drafts pass both limits, against 65% of Ben's pre-AI PRs. Diff size predicts the length of Ben's edits only weakly (Spearman 0.30). The budget is flat.
 
 ## Mining
 
@@ -69,7 +69,7 @@ Each harness carries its own copy of this UI. Extracting a shared labeler packag
 
 ## Scenario Cases
 
-The eight `fixtures/scenarios/` run as native cases in the local-only [`create-scenarios`](../create-scenarios/) suite, named `scenario-<id>` and tagged `scenario`. Each `prompt.md` carries the scenario's repository, audience tier, diff summary, and session notes, and asks for the PR through `pull-request:create`. `originalBody` never reaches a case, so the session cannot copy the shipped text. Each `fixture.sh` builds a git repo on the scenario's branch with the scenario's remote and one empty commit named for the change, so every `!` context command in the skill succeeds while the diff itself reaches the model through the summary.
+The eight `fixtures/scenarios/` run as native cases in the local-only [`create-scenarios`](../create-scenarios/) suite, named `scenario-<id>` and tagged `scenario`. Each `prompt.md` carries the scenario's repository, audience tier, diff summary, and session notes, and asks for the PR through `pull-request:create`. `originalBody` never reaches a case. The session cannot copy the shipped text. Each `fixture.sh` builds a git repo on the scenario's branch with the scenario's remote and one empty commit named for the change, so every `!` context command in the skill succeeds while the diff itself reaches the model through the summary.
 
 ```bash
 bun evals/native/run.ts plugins/pull-request/evals/create-scenarios -- --runs 2
@@ -84,11 +84,11 @@ Each scenario case grades:
 - `skill-fired`, `skill-loaded`: the plugin arm invoked `pull-request:create` and its context commands succeeded
 - `heading-sentence-case`, `heading-question`, `heading-clause`: regex approximations of `classifyPrHeading`
 - `generic-heading`: no heading that would fit any PR, such as `Summary` or `Test Plan`
-- `narration-leak`, `verbosity`, `self-contained`, `substance-retention`: `llm` graders ported from the retired promptfoo rubrics, scoped to the body after the `Title:` line. `verbosity` embeds the diff summary and `substance-retention` the session notes, so the judge grades against the scenario
+- `narration-leak`, `verbosity`, `self-contained`, `substance-retention`: `llm` graders ported from the retired promptfoo rubrics, scoped to the body after the `Title:` line. `verbosity` embeds the diff summary and `substance-retention` the session notes. The judge grades against the scenario
 
 The judge sees only the final reply, one criterion at a time, and answers with one word. `narration-leak` judges sentences only, since `generic-heading` settles the heading half of the old rubric deterministically. The rubrics this suite replaced scored an isolated slip near the middle of a scale. A native verdict is binary, so `narration-leak` and `self-contained` pass a single slip in an otherwise clean body and fail on a pattern.
 
-The three heading regexes split the classifier's signals into sentence case, question-shaped or sentence-terminated headings, and comma or parenthetical clauses. Against `fixtures/labels.json` they reach 100% precision and 76.8% recall together (sentence case alone 55.1% recall, the other two 21.7% each). The classifier itself reaches 87.0% recall, so the regexes trade recall on predicate verbs and short parentheticals for zero false positives. `bun evals/native/check.ts plugins/pull-request/evals/create-scenarios` checks each case's regex graders against `examples/scenario-<id>/`, where `shipped.md` is the PR body that actually merged.
+The three heading regexes split the classifier's signals into sentence case, question-shaped or sentence-terminated headings, and comma or parenthetical clauses. Against `fixtures/labels.json` they reach 100% precision and 76.8% recall together (sentence case alone 55.1% recall, the other two 21.7% each). The classifier itself reaches 87.0% recall. The regexes trade recall on predicate verbs and short parentheticals for zero false positives. `bun evals/native/check.ts plugins/pull-request/evals/create-scenarios` checks each case's regex graders against `examples/scenario-<id>/`, where `shipped.md` is the PR body that actually merged.
 
 ## Calibration
 

@@ -1,6 +1,6 @@
 # `performance:hill-climb` Eval
 
-A native `claude plugin eval` suite for the judgment steps of `performance:hill-climb`: the Frame, the Checkpoint's candidate ranking, the choice of profile, and the Decide step. Every case hands the session `/performance:hill-climb` with frozen inputs. Nothing builds or runs, so a case costs one read-and-write session instead of a climb. Cases are tagged by family (`frame`, `ranking`, `offcpu`, `decide`) and by split (`dev`, `holdout`). The suite is `.local-only`, since a labeled-PR run of all 42 cases would pass the monthly eval budget.
+A native `claude plugin eval` suite for the judgment steps of `performance:hill-climb`: the Frame, the Checkpoint's candidate ranking, the choice of profile, and the Decide step. Every case hands the session `/performance:hill-climb` with frozen inputs. Nothing builds or runs. A case costs one read-and-write session instead of a climb. Cases are tagged by family (`frame`, `ranking`, `offcpu`, `decide`) and by split (`dev`, `holdout`). The suite is `.local-only`, since a labeled-PR run of all 42 cases would pass the monthly eval budget.
 
 ## Frame
 
@@ -11,7 +11,7 @@ A native `claude plugin eval` suite for the judgment steps of `performance:hill-
 | `mismatch` | one line | The `bench/` fixture's lockfile matches its manifest, so every benchmark run takes the up-to-date exit and skips fetch, apply, and index. |
 | `waits` | one line | A maintainer runs the sync after each upstream release and waits for it before opening the docs PR (README usage). |
 | `time-split` | one section | The release-sync log puts 133.6s into fetch (71.82s) and apply (57.89s). |
-| `parallelism` | a list item | Fetch downloads 38 archives one at a time, so the notes say whether parallelism is in scope. |
+| `parallelism` | a list item | Fetch downloads 38 archives one at a time. The notes say whether parallelism is in scope. |
 | `assumed-*` | a Rules line | Each of the eight Frame items the brief leaves open (ceiling, fast signal, guard, side effects, scope, inputs, budget, parallelism) is marked `assumed: <value>`. Each weighs 1/8, so together they count as one check. |
 | `checkpoint` | notes | A Checkpoint section with content. |
 
@@ -70,7 +70,7 @@ The graders check the outcome and accept any wording that gets there. `gap` name
 | `near-bound` | accept or re-run | a gain 1.05 times the target's profile share, an excess inside noise |
 | `partial-load` | accept | 1 of 6 rounds loaded under a 12 to 16% gain at p = 0.001 |
 
-`failed-runs` accepts reject or re-run, since both hold the gain back until the failures are explained. Keep unconfirmed is never expected, since it needs the user's agreement and nobody answers. `decision` matches the reply's last `Decision:` line, and `reason` passes when that decision is right and the reply names the trap, so a case scores half for the right call alone. Edit the generator and rerun `bun plugins/performance/evals/hill-climb/scripts/gen-decide.ts` rather than editing a case. A test fails when the committed cases drift from it.
+`failed-runs` accepts reject or re-run, since both hold the gain back until the failures are explained. Keep unconfirmed is never expected, since it needs the user's agreement and nobody answers. `decision` matches the reply's last `Decision:` line, and `reason` passes when that decision is right and the reply names the trap. A case scores half for the right call alone. Edit the generator and rerun `bun plugins/performance/evals/hill-climb/scripts/gen-decide.ts` rather than editing a case. A test fails when the committed cases drift from it.
 
 ## Scoring
 

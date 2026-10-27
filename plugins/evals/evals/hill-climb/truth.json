@@ -1,0 +1,400 @@
+{
+  "domains": [
+    {
+      "id": "skill",
+      "artifact": "release-notes",
+      "target": "plugins/notes/skills/release-notes",
+      "suite": "plugins/notes/evals/release-notes",
+      "hypothesis": "`release-notes` never says where the version goes, so `names-version` fails when the diff is small. One rule to open the entry with the version number should lift it.",
+      "target_grader": { "case": "minor-bump", "grader": "names-version" },
+      "guards": [
+        { "case": "patch-only", "grader": "no-marketing" },
+        { "case": "breaking-change", "grader": "flags-breaking" }
+      ],
+      "other": { "case": "breaking-change", "grader": "links-migration" },
+      "cases": [
+        {
+          "id": "minor-bump",
+          "split": "dev",
+          "graders": [
+            { "name": "names-version", "base": [2, 1] },
+            { "name": "lists-changes", "base": [5, 5] }
+          ]
+        },
+        {
+          "id": "patch-only",
+          "split": "dev",
+          "graders": [{ "name": "no-marketing", "base": [6, 4] }]
+        },
+        {
+          "id": "breaking-change",
+          "split": "dev",
+          "graders": [
+            { "name": "flags-breaking", "base": [5, 5] },
+            { "name": "links-migration", "base": [2, 3] }
+          ]
+        },
+        {
+          "id": "docs-only",
+          "split": "holdout",
+          "graders": [
+            { "name": "short-entry", "base": [5, 3] },
+            { "name": "no-marketing", "base": [4, 3] }
+          ]
+        },
+        {
+          "id": "mixed-release",
+          "split": "holdout",
+          "graders": [{ "name": "names-version", "base": [4, 2] }]
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "artifact": "invoice-checker",
+      "target": "plugins/billing/agents/invoice-checker.md",
+      "suite": "plugins/billing/evals/invoice-checker",
+      "hypothesis": "`invoice-checker` reports a missing total without saying which line it checked, so `cites-line` fails. One rule to quote the line it checked should lift it.",
+      "target_grader": { "case": "missing-total", "grader": "cites-line" },
+      "guards": [
+        { "case": "clean-invoice", "grader": "no-false-alarm" },
+        { "case": "duplicate-line", "grader": "asks-before-fix" }
+      ],
+      "other": { "case": "duplicate-line", "grader": "lists-both-lines" },
+      "cases": [
+        {
+          "id": "missing-total",
+          "split": "dev",
+          "graders": [
+            { "name": "cites-line", "base": [2, 1] },
+            { "name": "names-vendor", "base": [5, 5] }
+          ]
+        },
+        {
+          "id": "clean-invoice",
+          "split": "dev",
+          "graders": [{ "name": "no-false-alarm", "base": [6, 4] }]
+        },
+        {
+          "id": "duplicate-line",
+          "split": "dev",
+          "graders": [
+            { "name": "asks-before-fix", "base": [5, 5] },
+            { "name": "lists-both-lines", "base": [2, 3] }
+          ]
+        },
+        {
+          "id": "rounded-tax",
+          "split": "holdout",
+          "graders": [
+            { "name": "cites-line", "base": [5, 3] },
+            { "name": "no-false-alarm", "base": [4, 3] }
+          ]
+        },
+        {
+          "id": "currency-mismatch",
+          "split": "holdout",
+          "graders": [{ "name": "names-currency", "base": [4, 2] }]
+        }
+      ]
+    },
+    {
+      "id": "rule",
+      "artifact": "log-fields",
+      "target": "rules/log-fields.md",
+      "suite": "evals/log-fields",
+      "hypothesis": "The rule says to log with fields but never names `request_id`, so `includes-request-id` fails on new handlers. Naming the field in the rule should lift it.",
+      "target_grader": { "case": "add-handler", "grader": "includes-request-id" },
+      "guards": [
+        { "case": "cli-script", "grader": "plain-print-ok" },
+        { "case": "error-path", "grader": "logs-once" }
+      ],
+      "other": { "case": "error-path", "grader": "redacts-token" },
+      "cases": [
+        {
+          "id": "add-handler",
+          "split": "dev",
+          "graders": [
+            { "name": "includes-request-id", "base": [2, 1] },
+            { "name": "uses-logger", "base": [5, 5] }
+          ]
+        },
+        {
+          "id": "cli-script",
+          "split": "dev",
+          "graders": [{ "name": "plain-print-ok", "base": [6, 4] }]
+        },
+        {
+          "id": "error-path",
+          "split": "dev",
+          "graders": [
+            { "name": "logs-once", "base": [5, 5] },
+            { "name": "redacts-token", "base": [2, 3] }
+          ]
+        },
+        {
+          "id": "new-worker",
+          "split": "holdout",
+          "graders": [
+            { "name": "includes-request-id", "base": [5, 3] },
+            { "name": "uses-logger", "base": [4, 3] }
+          ]
+        },
+        {
+          "id": "test-helper",
+          "split": "holdout",
+          "graders": [{ "name": "plain-print-ok", "base": [4, 2] }]
+        }
+      ]
+    },
+    {
+      "id": "prompt",
+      "artifact": "support-bot",
+      "target": "prompts/support-bot.md",
+      "suite": "evals/support-bot",
+      "hypothesis": "The prompt never tells the bot to state the return window, so `states-window` fails on refund questions. One line giving the window rule should lift it.",
+      "target_grader": { "case": "refund-ask", "grader": "states-window" },
+      "guards": [
+        { "case": "shipping-ask", "grader": "no-invented-dates" },
+        { "case": "angry-user", "grader": "stays-polite" }
+      ],
+      "other": { "case": "angry-user", "grader": "short-reply" },
+      "cases": [
+        {
+          "id": "refund-ask",
+          "split": "dev",
+          "graders": [
+            { "name": "states-window", "base": [2, 1] },
+            { "name": "offers-human", "base": [5, 5] }
+          ]
+        },
+        {
+          "id": "shipping-ask",
+          "split": "dev",
+          "graders": [{ "name": "no-invented-dates", "base": [6, 4] }]
+        },
+        {
+          "id": "angry-user",
+          "split": "dev",
+          "graders": [
+            { "name": "stays-polite", "base": [5, 5] },
+            { "name": "short-reply", "base": [2, 3] }
+          ]
+        },
+        {
+          "id": "exchange-ask",
+          "split": "holdout",
+          "graders": [
+            { "name": "states-window", "base": [5, 3] },
+            { "name": "no-invented-dates", "base": [4, 3] }
+          ]
+        },
+        {
+          "id": "out-of-scope",
+          "split": "holdout",
+          "graders": [{ "name": "declines-politely", "base": [4, 2] }]
+        }
+      ]
+    }
+  ],
+  "traps": [
+    {
+      "id": "control-star",
+      "expected": "more-runs",
+      "note": "The target star on the with arm is matched by an equal star on the without arm, which the candidate cannot touch, so the gain is drift or a lucky draw.",
+      "reason": [
+        [
+          "control",
+          "without[- ](arm|column)",
+          "the without\\b",
+          "no[- ]skill arm",
+          "both arms",
+          "drift",
+          "lucky",
+          "same (size|star|gain|jump)"
+        ]
+      ]
+    },
+    {
+      "id": "underpowered",
+      "expected": "more-runs",
+      "note": "The only gain sits on cells with fewer than 4 runs a side, which are marked † because no star is possible there.",
+      "reason": [
+        [
+          "fewer than (4|four)",
+          "less than (4|four)",
+          "under (4|four)",
+          "too few",
+          "(only|just) (3|three) runs",
+          "(3|three) runs",
+          "†",
+          "underpowered",
+          "not enough runs",
+          "(can't|cannot|can not|could not) (ever )?star",
+          "small (sample|number)",
+          "low run count"
+        ]
+      ]
+    },
+    {
+      "id": "off-target",
+      "expected": "reject",
+      "note": "The only star is on a grader outside the pre-registered targets and guards, which is a lead for error analysis and not a result. The registered target did not move.",
+      "reason": [
+        [
+          "not (a |one of the |the )?(pre-?registered )?targets?",
+          "outside (of )?(the )?(pre-?registered )?(targets|guards|target)",
+          "(un|not )registered",
+          "unregistered",
+          "not pre-?registered",
+          "off-target",
+          "non-target",
+          "not a result",
+          "a lead",
+          "wasn't (a |the )?target",
+          "isn't (a |the )?target",
+          "target[^\\n]{0,40}(flat|unchanged|did not move|didn't move|did not rise|didn't rise)"
+        ]
+      ]
+    },
+    {
+      "id": "guard-drop",
+      "expected": "reject",
+      "note": "The target starred up, but a pre-registered guard starred down, which blocks the change, and the traces tie the drop to the candidate.",
+      "reason": [
+        [
+          "guard[^\\n]{0,100}(star|regress|drop|fell|down|worse|fail|collaps|lost)",
+          "(regress|drop|fell|down|worse|collaps|lost)[^\\n]{0,100}guard",
+          "{guard}[^\\n]{0,100}(star|regress|drop|fell|down|worse|fail|collaps|lost)",
+          "{guard}[^\\n]{0,40}(1/6|1 of 6|0\\.17)"
+        ]
+      ]
+    },
+    {
+      "id": "holdout-fell",
+      "expected": "reject",
+      "note": "The dev target starred up, but the final holdout score is below the base's, so the gain overfit the dev cases.",
+      "reason": [
+        [
+          "holdout[^\\n]{0,120}(fell|fall|drop|below|lower|down|regress|worse|declin|overfit|star)",
+          "overfit",
+          "(fell|fall|drop|below|lower|down|worse|declin)[^\\n]{0,80}holdout"
+        ]
+      ]
+    },
+    {
+      "id": "quota-void",
+      "expected": "more-runs",
+      "note": "Some candidate runs errored on a session limit and left the pool, so the starred row rests on the survivors. The case has to be re-run before its row is read.",
+      "reason": [
+        [
+          "errored",
+          "errors?\\b",
+          "session[- ]limit",
+          "quota",
+          "left (out of )?the pool",
+          "dropped from the pool",
+          "excluded",
+          "lost (3|three) runs",
+          "`!`",
+          "!\\s*(mark|flag)",
+          "rate[- ]limit"
+        ]
+      ]
+    },
+    {
+      "id": "second-null",
+      "expected": "stall",
+      "note": "The previous candidate was null and this one is null too, so two nulls in a row call for the Stall review and not another edit.",
+      "reason": [
+        [
+          "two (null|consecutive|candidates|nulls)",
+          "second (null|consecutive|candidate)",
+          "(null|flat|nothing moved)[^\\n]{0,100}(again|too|also|second|two|in a row|consecutive|back[- ]to[- ]back)",
+          "in a row",
+          "back[- ]to[- ]back",
+          "previous candidate[^\\n]{0,80}(null|flat|rejected)",
+          "candidate 2[^\\n]{0,80}(null|flat|rejected)"
+        ]
+      ]
+    },
+    {
+      "id": "saturated",
+      "expected": "stop",
+      "note": "The noise runs put dev at 1.00 on both arms, so there is no room above the noise for the candidate to rise.",
+      "reason": [
+        [
+          "ceiling",
+          "saturat",
+          "1\\.00",
+          "no (more |remaining )?(room|headroom)",
+          "(can't|cannot|can not|couldn't|could not) (rise|improve|move|go up)",
+          "already (at|pass|perfect|maxed)",
+          "nothing (left )?to (gain|climb|improve)",
+          "discriminat"
+        ]
+      ]
+    },
+    {
+      "id": "efficiency-unregistered",
+      "expected": "reject",
+      "note": "Pass counts are flat and only latency and cost improved, but efficiency was not a pre-registered target, so the improvement is not a result.",
+      "reason": [
+        ["effici", "latency", "faster", "seconds", "cost", "cheaper", "duration", "speed"],
+        [
+          "not (a |the |one of the )?(pre-?registered )?targets?",
+          "(un|not )registered",
+          "unregistered",
+          "not pre-?registered",
+          "wasn't (a |the )?target",
+          "isn't (a |the )?target",
+          "didn't (pre-?)?register",
+          "target[^\\n]{0,40}(flat|unchanged|did not move|didn't move)",
+          "pass (counts|rates?)[^\\n]{0,40}(flat|unchanged|same|identical)"
+        ]
+      ]
+    },
+    {
+      "id": "version-drift",
+      "expected": "re-baseline",
+      "note": "The baseline and candidate columns ran on a different claude version or model, so the comparison measures the change in build and not the candidate.",
+      "reason": [
+        ["claude --version", "\\bversion\\b", "\\bmodel\\b"],
+        [
+          "differ",
+          "chang",
+          "drift",
+          "mismatch",
+          "not comparable",
+          "different",
+          "mixed",
+          "bumped",
+          "upgrade",
+          "updated",
+          "2\\.1\\.236",
+          "opus-5-1"
+        ]
+      ]
+    },
+    {
+      "id": "clean-accept",
+      "expected": "accept",
+      "note": "Balance case: the target starred up, the guards stayed flat, the control arm stayed flat, and the holdout holds.",
+      "reason": [
+        [
+          "star",
+          "signific",
+          "p\\s*=\\s*0?\\.0",
+          "beat (the )?noise",
+          "moved up",
+          "rose",
+          "\\bgain"
+        ],
+        [
+          "guards?[^\\n]{0,100}(flat|held|hold|fine|unchanged|no regress|stable|didn't|did not|not (down|starred)|clean)",
+          "(flat|held|hold|unchanged|no regress|stable)[^\\n]{0,100}guards?"
+        ]
+      ]
+    }
+  ]
+}

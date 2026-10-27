@@ -1,0 +1,14 @@
+{
+  "name": "evals-hill-climb-eval",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "bun scripts/gen-decide.ts"
+  },
+  "dependencies": {
+    "@commander-js/extra-typings": "~15.0.0",
+    "commander": "~15.0.0",
+    "table": "^6.9.0",
+    "zod": "^4.4.3"
+  }
+}

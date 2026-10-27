@@ -4,7 +4,7 @@ description: >-
   Use when asked to hill-climb a program, or to make software faster or
   leaner (runtime, startup, throughput, memory, bundle size) through repeated
   measured changes, including resuming a climb from its notes file. For
-  prompts or skills scored by an eval suite, use prompting:hill-climb.
+  prompts or skills scored by an eval suite, use evals:hill-climb.
 argument-hint: "<target> [<notes file>]"
 ---
 

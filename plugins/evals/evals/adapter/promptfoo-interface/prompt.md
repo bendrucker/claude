@@ -1,0 +1,1 @@
+This project's evals run on promptfoo, and `./runs/seen/` holds one stored run of them. Write `./adapter.ts`, a default export implementing `Adapter` from `./evals/adapter.ts`, so the climb tooling can run, read, tag, re-score, and trace these evals.

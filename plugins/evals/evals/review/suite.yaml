@@ -1,0 +1,5 @@
+allow_tools: [Bash]
+stage: [packages/eval-stubs]
+judge_model: claude-opus-5-5
+graders:
+  review-dispatched: "*"

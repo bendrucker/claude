@@ -233,7 +233,7 @@
     },
     {
       "name": "evals",
-      "description": "Hill-climb a skill, agent, rule, or prompt against its eval suite",
+      "description": "Hill-climb a skill, agent, rule, or prompt against its eval suite, and review a climb's claimed gain",
       "source": "./plugins/evals"
     }
   ]

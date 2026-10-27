@@ -1,0 +1,998 @@
+{
+  "schemaVersion": 1,
+  "suite": {
+    "root": "/tmp/hill-climb-Be1LGO/user",
+    "ablation": "with-without",
+    "judgeModel": "claude-sonnet-5",
+    "threshold": 0,
+    "concurrency": 4,
+    "plugins": [{ "name": "user", "path": "/tmp/hill-climb-Be1LGO/user" }]
+  },
+  "claudeVersion": "2.1.281",
+  "startedAt": "2026-09-24T03:35:45.958Z",
+  "costUsd": 4.0008508,
+  "cases": [
+    {
+      "name": "ask-seam-ratelimit",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 9,
+            "costUsd": 0.1238134,
+            "judgeCostUsd": 0.003738,
+            "durationSeconds": 27,
+            "startedAt": "2026-09-24T03:35:46.018Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "asks-seam",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-code-written",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-test-written",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 15,
+            "costUsd": 0.32002660000000005,
+            "judgeCostUsd": 0.0029040000000000003,
+            "durationSeconds": 116,
+            "startedAt": "2026-09-24T03:35:46.018Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "asks-seam",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-code-written",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-test-written",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "ask-seam-webhook",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 9,
+            "costUsd": 0.1256252,
+            "judgeCostUsd": 0.003083999999999998,
+            "durationSeconds": 33,
+            "startedAt": "2026-09-24T03:35:46.018Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "asks-seam",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-code-written",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-test-written",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0,
+            "passed": false,
+            "turns": 16,
+            "costUsd": 0.2441694,
+            "judgeCostUsd": 0.003323999999999999,
+            "durationSeconds": 80,
+            "startedAt": "2026-09-24T03:35:46.018Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "asks-seam",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-code-written",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-test-written",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "balance-pin-size",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 16,
+            "costUsd": 0.2654014,
+            "judgeCostUsd": 0,
+            "durationSeconds": 75,
+            "startedAt": "2026-09-24T03:36:13.321Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "skill-fired",
+                "passed": false,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              },
+              {
+                "name": "source-untouched",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "tests-written",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 6,
+            "costUsd": 0.1402948,
+            "judgeCostUsd": 0,
+            "durationSeconds": 36,
+            "startedAt": "2026-09-24T03:36:18.745Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "source-untouched",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "tests-written",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "balance-pin-slug",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 9,
+            "costUsd": 0.15591739999999998,
+            "judgeCostUsd": 0,
+            "durationSeconds": 35,
+            "startedAt": "2026-09-24T03:36:54.433Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              },
+              {
+                "name": "source-untouched",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "tests-written",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 13,
+            "costUsd": 0.21392180000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 56,
+            "startedAt": "2026-09-24T03:37:05.644Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "source-untouched",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "tests-written",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "bugfix-leap-year",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 10,
+            "costUsd": 0.1185234,
+            "judgeCostUsd": 0,
+            "durationSeconds": 21,
+            "startedAt": "2026-09-24T03:37:28.201Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "private-untested",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "regression-test",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 8,
+            "costUsd": 0.10781460000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 12,
+            "startedAt": "2026-09-24T03:37:29.729Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "private-untested",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "regression-test",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "bugfix-pagination-py",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 12,
+            "costUsd": 0.13882280000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 17,
+            "startedAt": "2026-09-24T03:37:41.414Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "regression-test",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 9,
+            "costUsd": 0.1189606,
+            "judgeCostUsd": 0,
+            "durationSeconds": 13,
+            "startedAt": "2026-09-24T03:37:42.224Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "regression-test",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "cart-discount",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 16,
+            "costUsd": 0.192419,
+            "judgeCostUsd": 0,
+            "durationSeconds": 33,
+            "startedAt": "2026-09-24T03:37:48.764Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              },
+              {
+                "name": "vertical-slices",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.6666666666666666,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.11811799999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 20,
+            "startedAt": "2026-09-24T03:37:55.434Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "vertical-slices",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "mock-boundary-clock",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 12,
+            "costUsd": 0.19149420000000003,
+            "judgeCostUsd": 0,
+            "durationSeconds": 47,
+            "startedAt": "2026-09-24T03:37:58.672Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "adapter-passed-in",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-global-patch",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.12897160000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 28,
+            "startedAt": "2026-09-24T03:38:01.301Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "adapter-passed-in",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-global-patch",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "mock-boundary-weather",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 14,
+            "costUsd": 0.1560842,
+            "judgeCostUsd": 0,
+            "durationSeconds": 22,
+            "startedAt": "2026-09-24T03:38:15.667Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "adapter-passed-in",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-global-patch",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.1203578,
+            "judgeCostUsd": 0,
+            "durationSeconds": 27,
+            "startedAt": "2026-09-24T03:38:21.371Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "adapter-passed-in",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-global-patch",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "parse-duration",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 0.6666666666666666,
+            "passed": false,
+            "turns": 23,
+            "costUsd": 0.24473160000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 68,
+            "startedAt": "2026-09-24T03:38:29.148Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              },
+              {
+                "name": "vertical-slices",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.6666666666666666,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.13125379999999998,
+            "judgeCostUsd": 0,
+            "durationSeconds": 23,
+            "startedAt": "2026-09-24T03:38:38.126Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "vertical-slices",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "side-channel-users",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 11,
+            "costUsd": 0.137617,
+            "judgeCostUsd": 0,
+            "durationSeconds": 34,
+            "startedAt": "2026-09-24T03:38:45.326Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-side-channel",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "read-back",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 7,
+            "costUsd": 0.10997060000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 13,
+            "startedAt": "2026-09-24T03:38:48.255Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-side-channel",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "read-back",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "tautology-invoice",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 22,
+            "costUsd": 0.25003339999999996,
+            "judgeCostUsd": 0,
+            "durationSeconds": 67,
+            "startedAt": "2026-09-24T03:39:01.107Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "literal-expectation",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-recomputed-expectation",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 7,
+            "costUsd": 0.14650820000000003,
+            "judgeCostUsd": 0,
+            "durationSeconds": 27,
+            "startedAt": "2026-09-24T03:39:01.604Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "literal-expectation",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-recomputed-expectation",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

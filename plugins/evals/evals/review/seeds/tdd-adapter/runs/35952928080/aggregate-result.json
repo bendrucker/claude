@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "suite": {
+    "root": "/tmp/hill-climb-fIZgtj/user",
+    "ablation": "with-without",
+    "judgeModel": "claude-sonnet-5",
+    "caseFilter": "mock-boundary-weather",
+    "threshold": 0,
+    "concurrency": 4,
+    "plugins": [{ "name": "user", "path": "/tmp/hill-climb-fIZgtj/user" }]
+  },
+  "claudeVersion": "2.1.281",
+  "startedAt": "2026-09-24T03:48:31.061Z",
+  "costUsd": 0.6117822,
+  "cases": [
+    {
+      "name": "mock-boundary-weather",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 13,
+            "costUsd": 0.16660879999999997,
+            "judgeCostUsd": 0,
+            "durationSeconds": 54,
+            "startedAt": "2026-09-24T03:48:31.121Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "adapter-passed-in",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-global-patch",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 13,
+            "costUsd": 0.16996780000000003,
+            "judgeCostUsd": 0,
+            "durationSeconds": 45,
+            "startedAt": "2026-09-24T03:48:31.121Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "adapter-passed-in",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-global-patch",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 11,
+            "costUsd": 0.13886720000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 30,
+            "startedAt": "2026-09-24T03:48:31.121Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "adapter-passed-in",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-global-patch",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          },
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 11,
+            "costUsd": 0.1363384,
+            "judgeCostUsd": 0,
+            "durationSeconds": 19,
+            "startedAt": "2026-09-24T03:48:31.121Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "adapter-passed-in",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-global-patch",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

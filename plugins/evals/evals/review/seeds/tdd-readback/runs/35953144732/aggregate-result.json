@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "suite": {
+    "root": "/tmp/hill-climb-7xo34i/user",
+    "ablation": "with-without",
+    "judgeModel": "claude-sonnet-5",
+    "caseFilter": "side-channel-users",
+    "threshold": 0,
+    "concurrency": 4,
+    "plugins": [{ "name": "user", "path": "/tmp/hill-climb-7xo34i/user" }]
+  },
+  "claudeVersion": "2.1.281",
+  "startedAt": "2026-09-24T03:52:02.622Z",
+  "costUsd": 0.7275248,
+  "cases": [
+    {
+      "name": "side-channel-users",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 1,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 11,
+            "costUsd": 0.1408622,
+            "judgeCostUsd": 0,
+            "durationSeconds": 23,
+            "startedAt": "2026-09-24T03:52:02.664Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-side-channel",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "read-back",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 11,
+            "costUsd": 0.1411328,
+            "judgeCostUsd": 0,
+            "durationSeconds": 37,
+            "startedAt": "2026-09-24T03:52:02.664Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-side-channel",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "read-back",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 9,
+            "costUsd": 0.1261986,
+            "judgeCostUsd": 0,
+            "durationSeconds": 17,
+            "startedAt": "2026-09-24T03:52:02.664Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-side-channel",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "read-back",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.75,
+            "passed": false,
+            "turns": 7,
+            "costUsd": 0.10711599999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 20,
+            "startedAt": "2026-09-24T03:52:02.664Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-side-channel",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "read-back",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 7,
+            "costUsd": 0.1032426,
+            "judgeCostUsd": 0,
+            "durationSeconds": 20,
+            "startedAt": "2026-09-24T03:52:19.923Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-side-channel",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "read-back",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          },
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 7,
+            "costUsd": 0.10897259999999998,
+            "judgeCostUsd": 0,
+            "durationSeconds": 15,
+            "startedAt": "2026-09-24T03:52:22.343Z",
+            "error": null,
+            "skippedPaidGraders": false,
+            "graders": [
+              { "name": "green", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "no-side-channel",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "read-back",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "red-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

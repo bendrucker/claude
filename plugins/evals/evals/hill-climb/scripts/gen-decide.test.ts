@@ -100,6 +100,11 @@ describe("the decide family", () => {
     expect(Object.keys(generated).some((f) => f.endsWith("neutral.md"))).toBe(
       c.harness !== "native",
     );
+    const accept = c.trap.expected === "accept";
+    expect(Object.keys(generated).some((f) => f.endsWith("review-dispatched.md"))).toBe(accept);
+    expect(generated[join(c.name, "case.yaml")]?.includes("allowed_tools: [Skill, Agent]")).toBe(
+      accept,
+    );
   });
 });
 

@@ -1,0 +1,753 @@
+{
+  "schemaVersion": 1,
+  "suite": {
+    "root": "/tmp/hill-climb-T7QbN4/user",
+    "ablation": "with-without",
+    "judgeModel": "claude-sonnet-5",
+    "tagFilters": ["holdout"],
+    "threshold": 0,
+    "concurrency": 4,
+    "plugins": [{ "name": "user", "path": "/tmp/hill-climb-T7QbN4/user" }]
+  },
+  "claudeVersion": "2.1.281",
+  "startedAt": "2026-09-24T03:47:34.979Z",
+  "costUsd": 1.4879747,
+  "cases": [
+    {
+      "name": "cli-dispatch",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 3,
+      "arms": {
+        "with": [
+          {
+            "score": 0.75,
+            "error": null,
+            "passed": false,
+            "turns": 11,
+            "costUsd": 0.08095100000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 15,
+            "startedAt": "2026-09-24T03:47:35.052Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "call-tree",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "failure-path",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "names-chain",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          },
+          {
+            "score": 0.75,
+            "error": null,
+            "passed": false,
+            "turns": 13,
+            "costUsd": 0.0921156,
+            "judgeCostUsd": 0,
+            "durationSeconds": 18,
+            "startedAt": "2026-09-24T03:47:35.053Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "call-tree",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "failure-path",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "names-chain",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.75,
+            "error": null,
+            "passed": false,
+            "turns": 9,
+            "costUsd": 0.0823446,
+            "judgeCostUsd": 0,
+            "durationSeconds": 17,
+            "startedAt": "2026-09-24T03:47:35.053Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "call-tree",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "failure-path",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "names-chain",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          },
+          {
+            "score": 0.75,
+            "error": null,
+            "passed": false,
+            "turns": 10,
+            "costUsd": 0.0839142,
+            "judgeCostUsd": 0,
+            "durationSeconds": 25,
+            "startedAt": "2026-09-24T03:47:35.053Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "call-tree",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "failure-path",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "names-chain",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "config-move",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 3,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "error": null,
+            "passed": true,
+            "turns": 9,
+            "costUsd": 0.07391879999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 13,
+            "startedAt": "2026-09-24T03:47:49.899Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "diff-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "diff-shows-move",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-long-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          },
+          {
+            "score": 1,
+            "error": null,
+            "passed": true,
+            "turns": 9,
+            "costUsd": 0.0777392,
+            "judgeCostUsd": 0,
+            "durationSeconds": 13,
+            "startedAt": "2026-09-24T03:47:52.510Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "diff-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "diff-shows-move",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-long-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.25,
+            "error": null,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.06913100000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 13,
+            "startedAt": "2026-09-24T03:47:53.154Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "diff-block",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "diff-shows-move",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-long-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          },
+          {
+            "score": 0.5,
+            "error": null,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.0692876,
+            "judgeCostUsd": 0,
+            "durationSeconds": 18,
+            "startedAt": "2026-09-24T03:47:59.743Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "diff-block",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "diff-shows-move",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-long-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "value-lookup",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 3,
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "error": null,
+            "passed": true,
+            "turns": 5,
+            "costUsd": 0.0628936,
+            "judgeCostUsd": 0,
+            "durationSeconds": 8,
+            "startedAt": "2026-09-24T03:48:03.204Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "no-diagram",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "one-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "short", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              },
+              { "name": "value", "passed": true, "weight": 1, "scored": true, "withOnly": false }
+            ]
+          },
+          {
+            "score": 1,
+            "error": null,
+            "passed": true,
+            "turns": 5,
+            "costUsd": 0.06292360000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 11,
+            "startedAt": "2026-09-24T03:48:05.542Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "no-diagram",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "one-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "short", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              },
+              { "name": "value", "passed": true, "weight": 1, "scored": true, "withOnly": false }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "error": null,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.05664140000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 6,
+            "startedAt": "2026-09-24T03:48:06.529Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "no-diagram",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "one-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "short", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              { "name": "value", "passed": true, "weight": 1, "scored": true, "withOnly": false }
+            ]
+          },
+          {
+            "score": 1,
+            "error": null,
+            "passed": true,
+            "turns": 4,
+            "costUsd": 0.05722020000000001,
+            "judgeCostUsd": 0,
+            "durationSeconds": 7,
+            "startedAt": "2026-09-24T03:48:10.959Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "no-diagram",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "one-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              { "name": "short", "passed": true, "weight": 1, "scored": true, "withOnly": false },
+              { "name": "value", "passed": true, "weight": 1, "scored": true, "withOnly": false }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "webhook-retry-design",
+      "model": "claude-sonnet-5",
+      "runsPerCase": 3,
+      "arms": {
+        "with": [
+          {
+            "score": 0.8,
+            "error": null,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.10103619999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 35,
+            "startedAt": "2026-09-24T03:48:12.850Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "dead-letter",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-long-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "signatures",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              },
+              {
+                "name": "types-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          },
+          {
+            "score": 0.8,
+            "error": null,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.100282,
+            "judgeCostUsd": 0,
+            "durationSeconds": 41,
+            "startedAt": "2026-09-24T03:48:16.737Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "dead-letter",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-long-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "signatures",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "skill-fired",
+                "passed": true,
+                "weight": 1,
+                "scored": false,
+                "withOnly": true
+              },
+              {
+                "name": "types-first",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 0.6,
+            "error": null,
+            "passed": false,
+            "turns": 11,
+            "costUsd": 0.24899000000000004,
+            "judgeCostUsd": 0,
+            "durationSeconds": 104,
+            "startedAt": "2026-09-24T03:48:17.679Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "dead-letter",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-long-block",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "signatures",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "types-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          },
+          {
+            "score": 0.8,
+            "error": null,
+            "passed": false,
+            "turns": 10,
+            "costUsd": 0.1685857,
+            "judgeCostUsd": 0,
+            "durationSeconds": 66,
+            "startedAt": "2026-09-24T03:48:18.268Z",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "dead-letter",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "no-long-block",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "short-close",
+                "passed": false,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "signatures",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              },
+              {
+                "name": "types-first",
+                "passed": true,
+                "weight": 1,
+                "scored": true,
+                "withOnly": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

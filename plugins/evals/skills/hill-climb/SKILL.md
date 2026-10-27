@@ -82,8 +82,8 @@ About one row in ten stars by chance at the default alpha. Treat a starred row o
 
 #### Decide
 
-- **Accept.** Open a PR whose body states the hypothesis, the target, the starred rows, and links to every run pooled into each column. When the harness reports cost, latency, or turns per run, put them beside the pass counts. An efficiency gain carries a change only when it was the pre-registered target. Merge the suite before the first candidate PR, so candidates stack on main instead of on the suite branch.
-- **Reject.** Close the PR with the same evidence, so the null result stays findable. A rejected hypothesis stays rejected until something new in the traces argues for it.
+- **Accept.** Open a PR whose body states the hypothesis, the target, the starred rows, and links to every run pooled into each column. When the harness reports cost, latency, or turns per run, put them beside the pass counts. An efficiency gain carries a change only when it was the pre-registered target. Before opening it, dispatch the review agent: an `Agent` call with `subagent_type: evals:review`, passing the climb log path and every result path pooled into each column, since the agent starts with no context. Resolve every check it marks `fails`, and put its report in the body. Merge the suite before the first candidate PR, so candidates stack on main instead of on the suite branch.
+- **Reject.** Close the PR with the same evidence, so the null result stays findable. When the evidence is borderline, such as a lone star or a guard explained from traces, dispatch `evals:review` the same way first, so a misread doesn't close the hypothesis. A rejected hypothesis stays rejected until something new in the traces argues for it.
 
 The next candidate branches off the accepted change and re-baselines on it. Candidates may run in parallel off one base. When two are accepted, the second re-runs on top of the first before it merges.
 
@@ -93,7 +93,7 @@ After two null candidates in a row, stop editing. Re-read every remaining `dev` 
 
 #### Holdout
 
-After the last accepted change, run `holdout` on the original base and on the final commit, pooled to the same run count and read against the same cases. The climb holds when the holdout score does not fall. Compare the two and report a gain only where `holdout` stars. Otherwise report the result as a `dev` gain with no demonstrated holdout gain. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it. The climb's closing PR states the holdout score before and after, and lists each accepted commit with its starred gain.
+After the last accepted change, run `holdout` on the original base and on the final commit, pooled to the same run count and read against the same cases. The climb holds when the holdout score does not fall. Compare the two and report a gain only where `holdout` stars. Otherwise report the result as a `dev` gain with no demonstrated holdout gain. A `dev` gain with a flat or falling `holdout` score overfit the `dev` cases: find the instruction that names a `dev` case's specifics and generalize or drop it. The climb's closing PR states the holdout score before and after, and lists each accepted commit with its starred gain. Before it states a holdout gain, dispatch `evals:review` with the holdout columns and resolve what it finds.
 
 ## Stopping
 

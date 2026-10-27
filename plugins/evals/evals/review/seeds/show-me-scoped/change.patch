@@ -1,0 +1,13 @@
+diff --git a/user/skills/show-me/SKILL.md b/user/skills/show-me/SKILL.md
+index 60d14c40b..145affc57 100644
+--- a/user/skills/show-me/SKILL.md
++++ b/user/skills/show-me/SKILL.md
+@@ -9,6 +9,8 @@ disable-model-invocation: true
+ 
+ Explain $ARGUMENTS visually. Pick the smallest view that makes the point, and keep the prose around it short.
+ 
++When showing how existing code works, read it first and draw its real names. Follow a flow from where it enters, such as the route or command, to where the caller sees the result.
++
+ ## Arguments
+ 
+ With no argument, show the current topic of conversation.

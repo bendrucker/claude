@@ -39,6 +39,9 @@ function fold(text: string, indent: string): string {
   return lines.map((l) => `${indent}${l}`).join("\n");
 }
 
+/** Accept is where the skill dispatches `evals:review`, so those cases can call `Agent`. */
+const reviews = (e: Evidence) => e.trap.expected === "accept";
+
 export function caseYaml(e: Evidence): string {
   return `${[
     'schema_version: "1.1"',
@@ -48,8 +51,8 @@ export function caseYaml(e: Evidence): string {
     "execution:",
     "  model: claude-sonnet-5-5",
     "  max_turns: 4",
-    "  timeout_seconds: 300",
-    "  allowed_tools: [Skill]",
+    `  timeout_seconds: ${reviews(e) ? 600 : 300}`,
+    `  allowed_tools: [${reviews(e) ? "Skill, Agent" : "Skill"}]`,
     "  append_system_prompt: >-",
     fold(SYSTEM, "    "),
   ].join("\n")}\n`;
@@ -99,6 +102,18 @@ export function graders(e: Evidence): Record<string, string> {
       "match: not_contains",
       "---",
       "The reply does not send anyone to native-only tooling. This case's columns come from another harness, which `compare.ts` reads only through `--adapter`.",
+      "",
+    ].join("\n");
+  }
+  if (reviews(e)) {
+    out["review-dispatched.md"] = [
+      "---",
+      "type: tool_used",
+      "tool: Agent",
+      "input_match: 'evals:review'",
+      "arm: with-only",
+      "---",
+      "The session dispatched the `evals:review` agent before accepting.",
       "",
     ].join("\n");
   }

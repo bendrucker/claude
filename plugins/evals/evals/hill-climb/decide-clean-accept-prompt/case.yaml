@@ -5,8 +5,8 @@ plugins: ["../../.."]
 execution:
   model: claude-sonnet-5-5
   max_turns: 4
-  timeout_seconds: 300
-  allowed_tools: [Skill]
+  timeout_seconds: 600
+  allowed_tools: [Skill, Agent]
   append_system_prompt: >-
     Nothing can be built or run in this session, and nobody answers while you
     work, so reply once. End the reply with one line naming your decision on the

@@ -36,6 +36,7 @@ The p-values in every harness come from the same permutation test, so a case rea
 - `decision` matches the reply's last `Decision:` line against the expected verdict.
 - `reason` passes when that decision is right and the reply names the trap's cause in any of several wordings, so a case scores on the call first.
 - `neutral` as above.
+- `review-dispatched`, on the `clean-accept` cases only, is an unscored with-arm indicator that the session dispatched `evals:review` before accepting. Those cases allow `Agent` and run for up to 600 seconds.
 
 Edit `truth.json` or the generator and rerun `bun plugins/evals/evals/hill-climb/scripts/gen-decide.ts` rather than editing a case. A test fails when the committed cases drift from it, and another asserts which rows of each trap star.
 

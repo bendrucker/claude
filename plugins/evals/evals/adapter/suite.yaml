@@ -1,4 +1,4 @@
-allow_tools: [Bash]
+allow_tools: [Bash, Write, Edit]
 stage: [packages/evals, plugins/evals/skills/hill-climb/references]
 collect: [adapter.ts]
 graders:

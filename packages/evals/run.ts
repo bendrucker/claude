@@ -31,6 +31,36 @@ async function addCaseDependencies(repo: string, suite: string, root: string): P
   );
 }
 
+const shellQuote = (s: string) => `'${s.replaceAll("'", String.raw`'\''`)}'`;
+
+/**
+ * Adds a plugin to each staged case whose hook copies the `collect` paths out of the session's
+ * working directory into `$CLAUDE_CONFIG_DIR/collected/`, which the runner keeps.
+ */
+async function addCollector(evals: string, collect: string[]): Promise<void> {
+  if (collect.length === 0) return;
+  const copies = collect
+    .map(shellQuote)
+    .map((q) => `[ ! -e ${q} ] || { mkdir -p "$d"/$(dirname ${q}) && cp -R ${q} "$d"/${q}; }`);
+  const command = [`d="$CLAUDE_CONFIG_DIR/collected"`, ...copies, "true"].join("; ");
+  const hook = [{ hooks: [{ type: "command", command }] }];
+  const files = globSync("*/case.yaml", { cwd: evals });
+  await Promise.all(
+    files.map(async (file) => {
+      const plugin = join(evals, dirname(file), "collect");
+      await Bun.write(join(plugin, ".claude-plugin/plugin.json"), '{"name":"collect"}');
+      await Bun.write(
+        join(plugin, "hooks/hooks.json"),
+        JSON.stringify({ hooks: { Stop: hook, SessionEnd: hook } }),
+      );
+      const path = join(evals, file);
+      const doc = parseDocument(await Bun.file(path).text());
+      doc.addIn(["plugins"], "./collect");
+      await Bun.write(path, doc.toString());
+    }),
+  );
+}
+
 async function stagePlugins(
   repo: string,
   suite: string,
@@ -85,6 +115,7 @@ export async function prepare(
       : await stageWrapped(repo, suite, ref, root, config.wrap);
   await stage(repo, undefined, config.stage, root);
   await shareGraders(join(staged.target, staged.evalDir), config.graders);
+  await addCollector(join(staged.target, staged.evalDir), config.collect);
   return staged;
 }
 
@@ -200,10 +231,10 @@ export async function collectTraces(output: string, collect: string[] = []): Pro
         const out = dirname(tracePath);
         if (basename(out) !== "out") return;
         const kept = dirname(out);
-        // The session's working directory sits at `home/cwd` beside the trace's `out/`.
+        // The runner deletes the session's working directory, so the collector hook copied them to config.
         await Promise.all(
           collect.map(async (p) => {
-            const from = join(kept, "home/cwd", p);
+            const from = join(kept, "config/collected", p);
             if (!(await exists(from))) return;
             const to = join(output, "artifacts", run, p);
             await $`mkdir -p ${dirname(to)} && cp -R ${from} ${to}`.quiet();

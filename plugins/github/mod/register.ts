@@ -700,7 +700,7 @@ export function register(on: On, options: PluginOptions): void {
   });
 
   on("command.run", { command: "pr" }, async ($) => {
-    const opened = await $.ui.open({ id: PANE, title: "PR" });
+    const opened = await $.ui.open({ id: PANE, title: "PR", closeOnEscape: true });
     emit($, "pane.open", { placed: opened.isPlaced, pr: watch.snapshot?.pr });
     return opened.isPlaced ? {} : { text: `/pr: the pane is not drawn (${opened.reason})` };
   }).catch(($, e, next) => {

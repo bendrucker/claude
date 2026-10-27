@@ -18,8 +18,8 @@ Climbed with `/performance:hill-climb`. A session resuming this climb invokes th
 - Fast signal: <the proxy used to screen candidates, and the baseline evidence that it tracks the metric>.
 - Guard: <the check that proves behavior is unchanged, and how to run it>.
 - Side effects: <each thing a run touches and whether it is stubbed, fixed, or reset>.
-- Scope: <which changes are allowed>.
-- Inputs: `dev` <scenarios>, `holdout` <scenarios>.
+- Scope: <which changes are allowed, and how much added code a gain must pay for>.
+- Inputs: `dev` <scenarios>, every one run to confirm an accept. `holdout` <scenarios>, scored once at the end.
 - Acceptance: <run count per side, interleaving, test and threshold, guard condition>.
 - Stop: <ceiling, three rejections in a row, or budget>.
 
@@ -45,7 +45,7 @@ Mark an item the user never answered as `assumed: <value>`.
 
 ## Candidates
 
-### <Accepted | Kept, unconfirmed | Rejected>: <short name> (`<commit or patch>`)
+### <Accepted | Kept, unconfirmed | Kept, trade | Rejected>: <short name> (`<commit or patch>`)
 
 Hypothesis: <which profile entry, and why this change should cut it>.
 

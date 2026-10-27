@@ -1,3 +1,4 @@
+import { COUNTED_LEAD_IN_PATTERN } from "./counted-lead-in";
 import { NO_NEGATION_PATTERN } from "./negation";
 import { isProseFile } from "./paths";
 import { splitParagraphs, splitSentences } from "./sentences";
@@ -981,6 +982,7 @@ export const PATTERNS: PatternDef[] = [
     retire:
       "Remove when the frame rate falls to the typed-user baseline in a corpus audit window, or when a labeling pass shows the frame mostly preceding genuinely optional asides.",
   },
+  COUNTED_LEAD_IN_PATTERN,
   {
     tier: "context",
     layer: "vocabulary",

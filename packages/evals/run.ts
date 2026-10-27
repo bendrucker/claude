@@ -4,6 +4,7 @@ import { basename, dirname, join, relative } from "node:path";
 import { $ } from "bun";
 import { parseDocument } from "yaml";
 import { z } from "zod";
+import { subscriptionEnv } from "../eval-judge/env";
 import { shareGraders } from "./graders";
 import { readResult } from "./result";
 import { stage } from "./stage";
@@ -117,6 +118,19 @@ export async function prepare(
   await shareGraders(join(staged.target, staged.evalDir), config.graders);
   await addCollector(join(staged.target, staged.evalDir), config.collect);
   return staged;
+}
+
+/**
+ * The environment an eval session runs in. An API key would bill the API instead of the
+ * subscription, and a host shell prefix sits outside the eval sandbox, so every Bash call
+ * would exit 126.
+ */
+export function sessionEnv(
+  env: Record<string, string | undefined> = process.env,
+): Record<string, string | undefined> {
+  const out = subscriptionEnv(env);
+  delete out.CLAUDE_CODE_SHELL_PREFIX;
+  return out;
 }
 
 /** Splits `--case` globs off the runner's arguments, which would keep only the last one. */

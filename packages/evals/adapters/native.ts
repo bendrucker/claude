@@ -1,11 +1,10 @@
 import { globSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { $ } from "bun";
-import { subscriptionEnv } from "../../eval-judge/env";
 import type { Adapter, Transcript } from "../adapter";
 import { regrade } from "../regrade";
 import { erroredRuns, readResult } from "../result";
-import { collectTraces, keepCases, pluginErrors, prepare, splitCases } from "../run";
+import { collectTraces, keepCases, pluginErrors, prepare, sessionEnv, splitCases } from "../run";
 import { scoreSuite } from "../score";
 import { loadTags, readSuite } from "../suite";
 import { calls, type Measured, traceMeasures, traceReply } from "../trace";
@@ -61,7 +60,7 @@ export const native: Adapter = {
         ...allow,
         ...args,
       ],
-      { env: subscriptionEnv(), stdio: ["inherit", "inherit", "inherit"] },
+      { env: sessionEnv(), stdio: ["inherit", "inherit", "inherit"] },
     );
     const code = await proc.exited;
     await collectTraces(output, config.collect);

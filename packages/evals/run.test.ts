@@ -4,7 +4,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
 import { z } from "zod";
-import { collectTraces, keepCases, pluginErrors, prepare, splitCases, strayArgs } from "./run";
+import {
+  collectTraces,
+  keepCases,
+  pluginErrors,
+  prepare,
+  sessionEnv,
+  splitCases,
+  strayArgs,
+} from "./run";
 import { casePlugins, withDependencies } from "./suite";
 import { openInvocation, siblingLinks } from "./wrap";
 
@@ -224,4 +232,16 @@ test.each<{ name: string; args: string[]; stray: string[] }>([
   { name: "runner args without --", args: ["s", "--runs", "2"], stray: ["--runs", "2"] },
 ])("strayArgs with $name", ({ args, stray }) => {
   expect(strayArgs(args)).toEqual(stray);
+});
+
+describe("sessionEnv", () => {
+  test("drops API credentials and the host shell prefix", () => {
+    expect(
+      sessionEnv({
+        ANTHROPIC_API_KEY: "k",
+        CLAUDE_CODE_SHELL_PREFIX: "/usr/local/bin/wrap",
+        HOME: "/h",
+      }),
+    ).toEqual({ HOME: "/h" });
+  });
 });

@@ -1,0 +1,13 @@
+diff --git a/promptfooconfig.yaml b/promptfooconfig.yaml
+index b2a451f..96e5416 100644
+--- a/promptfooconfig.yaml
++++ b/promptfooconfig.yaml
+@@ -62,7 +62,7 @@ tests:
+       tags: [holdout]
+     assert:
+       - type: icontains
+-        value: Shakespeare
++        value: William Shakespeare
+         metric: has-answer
+       - type: not-icontains
+         value: Great question

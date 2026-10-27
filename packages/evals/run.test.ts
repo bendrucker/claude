@@ -36,7 +36,7 @@ beforeAll(async () => {
   for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key];
   repo = mkdtempSync(join(tmpdir(), "run-repo-"));
   await Promise.all(Object.entries(files).map(([p, body]) => Bun.write(join(repo, p), body)));
-  await $`git init -q && git add -A && git -c user.name=t -c user.email=t@t commit -qm init`
+  await $`git init -q && git add -A && git -c commit.gpgsign=false -c user.name=t -c user.email=t@t commit -qm init`
     .cwd(repo)
     .quiet();
   await Promise.all([

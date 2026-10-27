@@ -1,0 +1,2940 @@
+{
+  "evalId": "eval-Cdl-2026-10-27T17:19:44",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-10-27T17:19:44.763Z",
+    "prompts": [
+      {
+        "id": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "raw": "{{logged_output}}",
+        "label": "{{logged_output}}",
+        "provider": "echo",
+        "metrics": {
+          "score": 9,
+          "testPassCount": 5,
+          "testFailCount": 11,
+          "testErrorCount": 0,
+          "testCacheHitCount": 0,
+          "assertPassCount": 18,
+          "assertFailCount": 14,
+          "totalLatencyMs": 9,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 16,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "namedScores": {
+            "has-answer": 10,
+            "terse": 4,
+            "no-filler": 4
+          },
+          "namedScoresCount": {
+            "has-answer": 16,
+            "terse": 8,
+            "no-filler": 8
+          },
+          "namedScoreWeights": {
+            "has-answer": 16,
+            "terse": 8,
+            "no-filler": 8
+          },
+          "cost": 0
+        }
+      }
+    ],
+    "results": [
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"Paris\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Expected output to contain \"Paris\"",
+          "namedScores": {
+            "has-answer": 0,
+            "terse": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"Paris\"",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Paris"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "terse",
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5"
+              }
+            }
+          ]
+        },
+        "id": "493a0aab-afd3-4f30-a7cf-22af7079f0bd",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 0,
+          "terse": 1
+        },
+        "prompt": {
+          "raw": "I am not sure.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "I am not sure.",
+          "raw": "I am not sure.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "capital-france",
+          "vars": {
+            "logged_output": "I am not sure."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Paris"
+            },
+            {
+              "metric": "terse",
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 0,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "I am not sure."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Paris"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+              "assertion": {
+                "metric": "terse",
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5"
+              }
+            }
+          ]
+        },
+        "id": "b8b9b241-600c-45e0-847b-704f9c082c92",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 0
+        },
+        "prompt": {
+          "raw": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it.",
+          "raw": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "capital-france",
+          "vars": {
+            "logged_output": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Paris"
+            },
+            {
+              "metric": "terse",
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 1,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Paris"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "terse",
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5"
+              }
+            }
+          ]
+        },
+        "id": "69e756be-2538-471b-a345-0b716f55a4e8",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 1
+        },
+        "prompt": {
+          "raw": "Paris.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Paris.",
+          "raw": "Paris.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "capital-france",
+          "vars": {
+            "logged_output": "Paris."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Paris"
+            },
+            {
+              "metric": "terse",
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 2,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Paris."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Paris"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+              "assertion": {
+                "metric": "terse",
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5"
+              }
+            }
+          ]
+        },
+        "id": "4fe37e99-232e-4541-9e13-989869d4d981",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 0
+        },
+        "prompt": {
+          "raw": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it.",
+          "raw": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "capital-france",
+          "vars": {
+            "logged_output": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Paris"
+            },
+            {
+              "metric": "terse",
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 3,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Jupiter"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "terse",
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5"
+              }
+            }
+          ]
+        },
+        "id": "47a6a7d3-5c77-4a67-a765-d37b9012f8bf",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 1
+        },
+        "prompt": {
+          "raw": "Jupiter.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Jupiter.",
+          "raw": "Jupiter.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "largest-planet",
+          "vars": {
+            "logged_output": "Jupiter."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Jupiter"
+            },
+            {
+              "metric": "terse",
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 4,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Jupiter."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Jupiter"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+              "assertion": {
+                "metric": "terse",
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5"
+              }
+            }
+          ]
+        },
+        "id": "fa85b2e6-c66a-4689-bf6f-426bcdb8ae32",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 0
+        },
+        "prompt": {
+          "raw": "Great question! Let me think about the largest planet for a moment. The answer is Jupiter, as far as I can tell, though there is more to say about it.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the largest planet for a moment. The answer is Jupiter, as far as I can tell, though there is more to say about it.",
+          "raw": "Great question! Let me think about the largest planet for a moment. The answer is Jupiter, as far as I can tell, though there is more to say about it.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "largest-planet",
+          "vars": {
+            "logged_output": "Great question! Let me think about the largest planet for a moment. The answer is Jupiter, as far as I can tell, though there is more to say about it."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Jupiter"
+            },
+            {
+              "metric": "terse",
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 5,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Great question! Let me think about the largest planet for a moment. The answer is Jupiter, as far as I can tell, though there is more to say about it."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Jupiter"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "terse",
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5"
+              }
+            }
+          ]
+        },
+        "id": "cc9e5610-be8f-486d-8bd0-e3a62cea25de",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 1
+        },
+        "prompt": {
+          "raw": "Jupiter.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Jupiter.",
+          "raw": "Jupiter.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "largest-planet",
+          "vars": {
+            "logged_output": "Jupiter."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Jupiter"
+            },
+            {
+              "metric": "terse",
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 6,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Jupiter."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+          "namedScores": {
+            "has-answer": 0,
+            "terse": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"Jupiter\"",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Jupiter"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+              "assertion": {
+                "metric": "terse",
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5"
+              }
+            }
+          ]
+        },
+        "id": "d257e664-4592-47c6-87a5-530e3aa4dab1",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 0,
+          "terse": 0
+        },
+        "prompt": {
+          "raw": "Great question! Let me think about the largest planet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the largest planet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it.",
+          "raw": "Great question! Let me think about the largest planet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "description": "largest-planet",
+          "vars": {
+            "logged_output": "Great question! Let me think about the largest planet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Jupiter"
+            },
+            {
+              "metric": "terse",
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 7,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Great question! Let me think about the largest planet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Au"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "no-filler",
+                "type": "not-icontains",
+                "value": "Great question"
+              }
+            }
+          ]
+        },
+        "id": "c23881dc-06be-4004-aa6f-852a9a86470b",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 1
+        },
+        "prompt": {
+          "raw": "Au.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Au.",
+          "raw": "Au.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "gold-symbol",
+          "vars": {
+            "logged_output": "Au."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Au"
+            },
+            {
+              "metric": "no-filler",
+              "type": "not-icontains",
+              "value": "Great question"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 8,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Au."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to not contain \"Great question\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Expected output to not contain \"Great question\"",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Au"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to not contain \"Great question\"",
+              "assertion": {
+                "metric": "no-filler",
+                "type": "not-icontains",
+                "value": "Great question"
+              }
+            }
+          ]
+        },
+        "id": "06a06879-ae48-44e3-a7ef-e662b1e2367e",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 0
+        },
+        "prompt": {
+          "raw": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it.",
+          "raw": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "gold-symbol",
+          "vars": {
+            "logged_output": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Au"
+            },
+            {
+              "metric": "no-filler",
+              "type": "not-icontains",
+              "value": "Great question"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 9,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Au"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "no-filler",
+                "type": "not-icontains",
+                "value": "Great question"
+              }
+            }
+          ]
+        },
+        "id": "29d1c2bd-a217-44f2-84d8-2b804c9fd44f",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 1
+        },
+        "prompt": {
+          "raw": "Au.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Au.",
+          "raw": "Au.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "gold-symbol",
+          "vars": {
+            "logged_output": "Au."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Au"
+            },
+            {
+              "metric": "no-filler",
+              "type": "not-icontains",
+              "value": "Great question"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 10,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Au."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to not contain \"Great question\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Expected output to not contain \"Great question\"",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "Au"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to not contain \"Great question\"",
+              "assertion": {
+                "metric": "no-filler",
+                "type": "not-icontains",
+                "value": "Great question"
+              }
+            }
+          ]
+        },
+        "id": "db8f66ba-7f31-4cd6-a124-b87b0ee717d9",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 0
+        },
+        "prompt": {
+          "raw": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it.",
+          "raw": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "gold-symbol",
+          "vars": {
+            "logged_output": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "Au"
+            },
+            {
+              "metric": "no-filler",
+              "type": "not-icontains",
+              "value": "Great question"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 11,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"William Shakespeare\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Expected output to contain \"William Shakespeare\"",
+          "namedScores": {
+            "has-answer": 0,
+            "no-filler": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"William Shakespeare\"",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "William Shakespeare"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "no-filler",
+                "type": "not-icontains",
+                "value": "Great question"
+              }
+            }
+          ]
+        },
+        "id": "46428a98-5df1-4114-9ce3-25d3e92a81e1",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 0,
+          "no-filler": 1
+        },
+        "prompt": {
+          "raw": "Shakespeare.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Shakespeare.",
+          "raw": "Shakespeare.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "hamlet-author",
+          "vars": {
+            "logged_output": "Shakespeare."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "William Shakespeare"
+            },
+            {
+              "metric": "no-filler",
+              "type": "not-icontains",
+              "value": "Great question"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 12,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Shakespeare."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to not contain \"Great question\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Expected output to not contain \"Great question\"",
+          "namedScores": {
+            "has-answer": 0,
+            "no-filler": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"William Shakespeare\"",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "William Shakespeare"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to not contain \"Great question\"",
+              "assertion": {
+                "metric": "no-filler",
+                "type": "not-icontains",
+                "value": "Great question"
+              }
+            }
+          ]
+        },
+        "id": "cf3bd3f5-b86e-4205-b0dc-aa2327983011",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 0,
+          "no-filler": 0
+        },
+        "prompt": {
+          "raw": "Great question! Let me think about the author of Hamlet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the author of Hamlet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it.",
+          "raw": "Great question! Let me think about the author of Hamlet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "description": "hamlet-author",
+          "vars": {
+            "logged_output": "Great question! Let me think about the author of Hamlet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "William Shakespeare"
+            },
+            {
+              "metric": "no-filler",
+              "type": "not-icontains",
+              "value": "Great question"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 13,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Great question! Let me think about the author of Hamlet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"William Shakespeare\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Expected output to contain \"William Shakespeare\"",
+          "namedScores": {
+            "has-answer": 0,
+            "no-filler": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"William Shakespeare\"",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "William Shakespeare"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "metric": "no-filler",
+                "type": "not-icontains",
+                "value": "Great question"
+              }
+            }
+          ]
+        },
+        "id": "0acd86c9-163d-4717-9694-85b4dda94ac6",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 0,
+          "no-filler": 1
+        },
+        "prompt": {
+          "raw": "Shakespeare.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Shakespeare.",
+          "raw": "Shakespeare.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "hamlet-author",
+          "vars": {
+            "logged_output": "Shakespeare."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "William Shakespeare"
+            },
+            {
+              "metric": "no-filler",
+              "type": "not-icontains",
+              "value": "Great question"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 14,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Shakespeare."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to not contain \"Great question\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Expected output to not contain \"Great question\"",
+          "namedScores": {
+            "has-answer": 0,
+            "no-filler": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"William Shakespeare\"",
+              "assertion": {
+                "metric": "has-answer",
+                "type": "icontains",
+                "value": "William Shakespeare"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to not contain \"Great question\"",
+              "assertion": {
+                "metric": "no-filler",
+                "type": "not-icontains",
+                "value": "Great question"
+              }
+            }
+          ]
+        },
+        "id": "6e7bcaf7-ad0f-4203-a936-224b6a653810",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 0,
+          "no-filler": 0
+        },
+        "prompt": {
+          "raw": "Great question! Let me think about the author of Hamlet for a moment. The answer is Shakespeare, as far as I can tell, though there is more to say about it.",
+          "label": "{{logged_output}}",
+          "config": {}
+        },
+        "promptId": "e7e70d1b780c8a049f69e81dd1cb27cef49901febb90aefbe8a06f986d3661b3",
+        "promptIdx": 0,
+        "provider": {
+          "id": "echo",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the author of Hamlet for a moment. The answer is Shakespeare, as far as I can tell, though there is more to say about it.",
+          "raw": "Great question! Let me think about the author of Hamlet for a moment. The answer is Shakespeare, as far as I can tell, though there is more to say about it.",
+          "cost": 0,
+          "cached": false,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 1,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "isRefusal": false,
+          "metadata": {}
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "description": "hamlet-author",
+          "vars": {
+            "logged_output": "Great question! Let me think about the author of Hamlet for a moment. The answer is Shakespeare, as far as I can tell, though there is more to say about it."
+          },
+          "assert": [
+            {
+              "metric": "has-answer",
+              "type": "icontains",
+              "value": "William Shakespeare"
+            },
+            {
+              "metric": "no-filler",
+              "type": "not-icontains",
+              "value": "Great question"
+            }
+          ],
+          "options": {},
+          "metadata": {}
+        },
+        "testIdx": 15,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "logged_output": "Great question! Let me think about the author of Hamlet for a moment. The answer is Shakespeare, as far as I can tell, though there is more to say about it."
+        },
+        "metadata": {
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      }
+    ],
+    "stats": {
+      "successes": 5,
+      "failures": 11,
+      "errors": 0,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 16,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "durationMs": 53,
+      "evaluationDurationMs": 53
+    }
+  },
+  "config": {
+    "tags": {},
+    "prompts": [
+      "{{logged_output}}"
+    ],
+    "providers": [
+      "echo"
+    ],
+    "tests": [
+      {
+        "description": "capital-france",
+        "vars": {
+          "logged_output": "I am not sure."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Paris"
+          },
+          {
+            "metric": "terse",
+            "type": "javascript",
+            "value": "output.split(/\\s+/).length <= 5"
+          }
+        ]
+      },
+      {
+        "description": "capital-france",
+        "vars": {
+          "logged_output": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Paris"
+          },
+          {
+            "metric": "terse",
+            "type": "javascript",
+            "value": "output.split(/\\s+/).length <= 5"
+          }
+        ]
+      },
+      {
+        "description": "capital-france",
+        "vars": {
+          "logged_output": "Paris."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Paris"
+          },
+          {
+            "metric": "terse",
+            "type": "javascript",
+            "value": "output.split(/\\s+/).length <= 5"
+          }
+        ]
+      },
+      {
+        "description": "capital-france",
+        "vars": {
+          "logged_output": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Paris"
+          },
+          {
+            "metric": "terse",
+            "type": "javascript",
+            "value": "output.split(/\\s+/).length <= 5"
+          }
+        ]
+      },
+      {
+        "description": "largest-planet",
+        "vars": {
+          "logged_output": "Jupiter."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Jupiter"
+          },
+          {
+            "metric": "terse",
+            "type": "javascript",
+            "value": "output.split(/\\s+/).length <= 5"
+          }
+        ]
+      },
+      {
+        "description": "largest-planet",
+        "vars": {
+          "logged_output": "Great question! Let me think about the largest planet for a moment. The answer is Jupiter, as far as I can tell, though there is more to say about it."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Jupiter"
+          },
+          {
+            "metric": "terse",
+            "type": "javascript",
+            "value": "output.split(/\\s+/).length <= 5"
+          }
+        ]
+      },
+      {
+        "description": "largest-planet",
+        "vars": {
+          "logged_output": "Jupiter."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Jupiter"
+          },
+          {
+            "metric": "terse",
+            "type": "javascript",
+            "value": "output.split(/\\s+/).length <= 5"
+          }
+        ]
+      },
+      {
+        "description": "largest-planet",
+        "vars": {
+          "logged_output": "Great question! Let me think about the largest planet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Jupiter"
+          },
+          {
+            "metric": "terse",
+            "type": "javascript",
+            "value": "output.split(/\\s+/).length <= 5"
+          }
+        ]
+      },
+      {
+        "description": "gold-symbol",
+        "vars": {
+          "logged_output": "Au."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Au"
+          },
+          {
+            "metric": "no-filler",
+            "type": "not-icontains",
+            "value": "Great question"
+          }
+        ]
+      },
+      {
+        "description": "gold-symbol",
+        "vars": {
+          "logged_output": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Au"
+          },
+          {
+            "metric": "no-filler",
+            "type": "not-icontains",
+            "value": "Great question"
+          }
+        ]
+      },
+      {
+        "description": "gold-symbol",
+        "vars": {
+          "logged_output": "Au."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Au"
+          },
+          {
+            "metric": "no-filler",
+            "type": "not-icontains",
+            "value": "Great question"
+          }
+        ]
+      },
+      {
+        "description": "gold-symbol",
+        "vars": {
+          "logged_output": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "Au"
+          },
+          {
+            "metric": "no-filler",
+            "type": "not-icontains",
+            "value": "Great question"
+          }
+        ]
+      },
+      {
+        "description": "hamlet-author",
+        "vars": {
+          "logged_output": "Shakespeare."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "William Shakespeare"
+          },
+          {
+            "metric": "no-filler",
+            "type": "not-icontains",
+            "value": "Great question"
+          }
+        ]
+      },
+      {
+        "description": "hamlet-author",
+        "vars": {
+          "logged_output": "Great question! Let me think about the author of Hamlet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "William Shakespeare"
+          },
+          {
+            "metric": "no-filler",
+            "type": "not-icontains",
+            "value": "Great question"
+          }
+        ]
+      },
+      {
+        "description": "hamlet-author",
+        "vars": {
+          "logged_output": "Shakespeare."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "William Shakespeare"
+          },
+          {
+            "metric": "no-filler",
+            "type": "not-icontains",
+            "value": "Great question"
+          }
+        ]
+      },
+      {
+        "description": "hamlet-author",
+        "vars": {
+          "logged_output": "Great question! Let me think about the author of Hamlet for a moment. The answer is Shakespeare, as far as I can tell, though there is more to say about it."
+        },
+        "assert": [
+          {
+            "metric": "has-answer",
+            "type": "icontains",
+            "value": "William Shakespeare"
+          },
+          {
+            "metric": "no-filler",
+            "type": "not-icontains",
+            "value": "Great question"
+          }
+        ]
+      }
+    ],
+    "env": {},
+    "sharing": false,
+    "outputPath": [
+      "regraded.json"
+    ],
+    "extensions": [],
+    "metadata": {},
+    "evaluateOptions": {},
+    "basePath": "/private/project"
+  },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.125.1",
+    "nodeVersion": "v24.21.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "exportedAt": "2026-10-27T17:19:44.848Z",
+    "evaluationCreatedAt": "2026-10-27T17:19:44.763Z"
+  },
+  "vars": [
+    "logged_output"
+  ],
+  "runtimeOptions": {
+    "maxConcurrency": 1,
+    "showProgressBar": true,
+    "eventSource": "cli",
+    "repeat": 1,
+    "cache": false
+  }
+}

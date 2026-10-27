@@ -14,7 +14,7 @@ if [ "$2" = guide ]; then
   cp "$suite/../../skills/hill-climb/references/harnesses.md" harnesses.md
 fi
 mkdir -p runs
-rsync -a --exclude truth.json --exclude rescore.patch "$src/fixtures/seen/" runs/seen/
+rsync -a --exclude truth.json --exclude rescore.patch --exclude regraded.json "$src/fixtures/seen/" runs/seen/
 stubs="$HOME/.adapter-stubs"
 mkdir -p "$stubs/fixtures"
 rsync -a "$src/stub/" "$stubs/stub/"

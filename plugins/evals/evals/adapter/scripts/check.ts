@@ -111,6 +111,8 @@ export async function check(adapterPath: string, framework: string): Promise<Ver
     fail(String(error).split("\n")[0] ?? "");
     return verdicts;
   }
+  // A pre-commit hook exports GIT_DIR and GIT_INDEX_FILE, which would point setup.sh's git at the outer repo.
+  for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key];
   const truth = await readTruth(join(suite, "frameworks", framework, "fixtures/held"));
   process.env.PATH = `${join(suite, "frameworks", framework, "stub/bin")}:${process.env.PATH ?? ""}`;
   process.env.ADAPTER_FIXTURE = "held";

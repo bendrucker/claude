@@ -1,0 +1,181 @@
+{
+  "result": "reports",
+  "cases": {
+    "capital-france": {
+      "tags": [
+        "dev"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: Paris"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: Paris"
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": false
+            },
+            "reply": "The capital of France is Paris, the capital and largest city of France, on the Seine river in the north"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "Paris."
+          }
+        ]
+      }
+    },
+    "sum": {
+      "tags": [
+        "dev"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: 42"
+          },
+          {
+            "graders": {
+              "Contains": false,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: 41"
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "17 + 25 = 42."
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "It is 42"
+          }
+        ]
+      }
+    },
+    "chemical-symbol": {
+      "tags": [
+        "holdout"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: Au"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: Au"
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "Au"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "Gold's symbol is Au."
+          }
+        ]
+      }
+    },
+    "moon-landing": {
+      "tags": [
+        "holdout"
+      ],
+      "arms": {
+        "with": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: 1969"
+          },
+          {
+            "graders": {
+              "Contains": false,
+              "StartsWithAnswer": true,
+              "ShortReply": true
+            },
+            "reply": "Answer: 1970"
+          }
+        ],
+        "without": [
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": true
+            },
+            "reply": "1969"
+          },
+          {
+            "graders": {
+              "Contains": true,
+              "StartsWithAnswer": false,
+              "ShortReply": false
+            },
+            "reply": "Apollo 11 landed on the Moon in 1969 during the first crewed lunar mission, watched by millions"
+          }
+        ]
+      }
+    }
+  },
+  "rescore": {
+    "supported": false,
+    "reason": "pydantic-evals has no API to re-run evaluators over a stored report, only Dataset.evaluate, which runs the task"
+  }
+}

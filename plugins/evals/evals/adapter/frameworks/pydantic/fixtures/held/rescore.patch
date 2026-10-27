@@ -1,0 +1,13 @@
+diff --git a/evaluators.py b/evaluators.py
+index 564bd1d..d642ff7 100644
+--- a/evaluators.py
++++ b/evaluators.py
+@@ -15,7 +15,7 @@ class StartsWithAnswer(Evaluator[str, str]):
+ class ShortReply(Evaluator[str, str]):
+     """The reply stays within a word budget."""
+ 
+-    max_words: int = 12
++    max_words: int = 4
+ 
+     def evaluate(self, ctx: EvaluatorContext[str, str]) -> bool:
+         return len(ctx.output.split()) <= self.max_words

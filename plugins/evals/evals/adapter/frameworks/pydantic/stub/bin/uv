@@ -1,0 +1,22 @@
+#!/usr/bin/env bun
+// Stand-in for `uv run ... python run_evals.py --out <dir>`: copies the stored run's reports to <dir>.
+import { appendFileSync, cpSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+
+const argv = process.argv.slice(2);
+const log = process.env.ADAPTER_STUB_LOG;
+if (log !== undefined) {
+  const file = join(process.cwd(), "prompt.txt");
+  const prompt = existsSync(file)
+    ? new Bun.CryptoHasher("sha256").update(readFileSync(file)).digest("hex")
+    : null;
+  appendFileSync(log, `${JSON.stringify({ argv, cwd: process.cwd(), prompt })}\n`);
+}
+
+const flag = argv.indexOf("--out");
+const out = resolve(flag === -1 ? "reports" : (argv[flag + 1] ?? "reports"));
+const fixture = process.env.ADAPTER_FIXTURE ?? "seen";
+mkdirSync(out, { recursive: true });
+cpSync(join(dirname(import.meta.path), "../../fixtures", fixture, "reports"), out, {
+  recursive: true,
+});

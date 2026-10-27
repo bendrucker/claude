@@ -25,6 +25,8 @@ gh workflow run eval.yml --ref evals-plugin -f suite=plugins/evals/evals/adapter
 | `rescore` | after `rescore.patch` edits a grader, the flips match the truth, or the adapter throws when the truth says the framework can't re-score |
 | `run` | `run(project, { ref: "base", args: [] })` returns a path `read` turns into the held counts, and the stub log shows the `base` prompt on the with arm |
 
+`run` checks its output through `read`, so a broken `read` fails `run` too.
+
 ## Frameworks
 
 Each framework lives in `frameworks/<name>/`:
@@ -34,6 +36,7 @@ Each framework lives in `frameworks/<name>/`:
 - `fixtures/seen/` and `fixtures/held/`: real stored runs as the framework writes them, recorded once by `gen.ts` with a deterministic stub model, so pass counts differ between the two. The session sees `seen`, and the scorer reads `held`.
 - `fixtures/<run>/truth.json`: what a correct adapter reports, in the shape `Truth` in `scripts/truth.ts` defines.
 - `fixtures/held/rescore.patch`: a grader edit, applied to a `setup.sh` copy before `rescore`.
+- `fixtures/<run>/regraded.json`: for a framework that re-grades by running its own command on a replay config, that command's output under `rescore.patch`. The stub returns it when its arguments name a config other than the project's.
 - `stub/bin/<command>`: a stand-in for the framework's run command. It appends `{ argv, cwd, prompt }` to `$ADAPTER_STUB_LOG`, where `prompt` is the sha256 of `prompt.txt` in its working directory or `null` when absent, then copies `fixtures/${ADAPTER_FIXTURE:-seen}/` beside its `stub/` directory to where its arguments point, as the real command would write it. Its `prompt.txt` hash decides nothing: the output is the stored run either way.
 - `test-adapters/correct.ts` passes every grader, and each `test-adapters/broken-<grader>.ts` fails exactly that grader. `adapters.test.ts` asserts both.
 

@@ -1,0 +1,2648 @@
+{
+  "evalId": "eval-1T4-2026-10-27T17:19:41",
+  "results": {
+    "version": 3,
+    "timestamp": "2026-10-27T17:19:41.776Z",
+    "prompts": [
+      {
+        "id": "c917d6ab55c072be9548eea0aa27238093d7ad209848db84354940186146ef11",
+        "raw": "{{system}}\n\nQuestion: What is the {{topic}}?",
+        "label": "with-system-prompt",
+        "provider": "stub-model",
+        "metrics": {
+          "score": 7.5,
+          "testPassCount": 7,
+          "testFailCount": 1,
+          "testErrorCount": 0,
+          "testCacheHitCount": 0,
+          "assertPassCount": 15,
+          "assertFailCount": 1,
+          "totalLatencyMs": 7,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 8,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "namedScores": {
+            "has-answer": 7,
+            "terse": 4,
+            "no-filler": 4
+          },
+          "namedScoresCount": {
+            "has-answer": 8,
+            "terse": 4,
+            "no-filler": 4
+          },
+          "namedScoreWeights": {
+            "has-answer": 8,
+            "terse": 4,
+            "no-filler": 4
+          },
+          "cost": 0
+        }
+      },
+      {
+        "id": "647361d9a28c20a25176f27ab017f1f2bd7b6b63ab66dab7fbf6c2714c9b9061",
+        "raw": "Question: What is the {{topic}}?",
+        "label": "no-system-prompt",
+        "provider": "stub-model",
+        "metrics": {
+          "score": 3,
+          "testPassCount": 0,
+          "testFailCount": 8,
+          "testErrorCount": 0,
+          "testCacheHitCount": 0,
+          "assertPassCount": 6,
+          "assertFailCount": 10,
+          "totalLatencyMs": 5,
+          "tokenUsage": {
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "total": 0,
+            "numRequests": 8,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            },
+            "assertions": {
+              "total": 0,
+              "prompt": 0,
+              "completion": 0,
+              "cached": 0,
+              "numRequests": 0,
+              "completionDetails": {
+                "reasoning": 0,
+                "acceptedPrediction": 0,
+                "rejectedPrediction": 0,
+                "cacheReadInputTokens": 0,
+                "cacheCreationInputTokens": 0
+              }
+            }
+          },
+          "namedScores": {
+            "has-answer": 6,
+            "terse": 0,
+            "no-filler": 0
+          },
+          "namedScoresCount": {
+            "has-answer": 8,
+            "terse": 4,
+            "no-filler": 4
+          },
+          "namedScoreWeights": {
+            "has-answer": 8,
+            "terse": 4,
+            "no-filler": 4
+          },
+          "cost": 0
+        }
+      }
+    ],
+    "results": [
+      {
+        "cost": 0,
+        "error": "Expected output to contain \"Paris\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Expected output to contain \"Paris\"",
+          "namedScores": {
+            "has-answer": 0,
+            "terse": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"Paris\"",
+              "assertion": {
+                "type": "icontains",
+                "value": "Paris",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5",
+                "metric": "terse"
+              }
+            }
+          ]
+        },
+        "id": "77c6057d-ba4a-411f-b043-71a8b0ebb14f",
+        "latencyMs": 2,
+        "namedScores": {
+          "has-answer": 0,
+          "terse": 1
+        },
+        "prompt": {
+          "raw": "You are a terse assistant. Answer in one short sentence and name the answer first.\n\nQuestion: What is the capital of France?",
+          "label": "with-system-prompt",
+          "config": {}
+        },
+        "promptId": "c917d6ab55c072be9548eea0aa27238093d7ad209848db84354940186146ef11",
+        "promptIdx": 0,
+        "repeatGroupId": "test-0-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "I am not sure."
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "capital-france",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "capital of France"
+          },
+          "metadata": {
+            "tags": [
+              "dev"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Paris",
+              "metric": "has-answer"
+            },
+            {
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5",
+              "metric": "terse"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 0,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "capital of France"
+        },
+        "metadata": {
+          "tags": [
+            "dev"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "error": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Paris",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+              "assertion": {
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5",
+                "metric": "terse"
+              }
+            }
+          ]
+        },
+        "id": "864f64b8-c579-4486-ac1e-19b0c721836f",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 0
+        },
+        "prompt": {
+          "raw": "Question: What is the capital of France?",
+          "label": "no-system-prompt",
+          "config": {}
+        },
+        "promptId": "647361d9a28c20a25176f27ab017f1f2bd7b6b63ab66dab7fbf6c2714c9b9061",
+        "promptIdx": 1,
+        "repeatGroupId": "test-0-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it."
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "capital-france",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "capital of France"
+          },
+          "metadata": {
+            "tags": [
+              "dev"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Paris",
+              "metric": "has-answer"
+            },
+            {
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5",
+              "metric": "terse"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 0,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "capital of France"
+        },
+        "metadata": {
+          "tags": [
+            "dev"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Paris",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5",
+                "metric": "terse"
+              }
+            }
+          ]
+        },
+        "id": "2297027c-c5f4-41b3-9b03-a272ad622342",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 1
+        },
+        "prompt": {
+          "raw": "You are a terse assistant. Answer in one short sentence and name the answer first.\n\nQuestion: What is the capital of France?",
+          "label": "with-system-prompt",
+          "config": {}
+        },
+        "promptId": "c917d6ab55c072be9548eea0aa27238093d7ad209848db84354940186146ef11",
+        "promptIdx": 0,
+        "repeatGroupId": "test-0-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Paris."
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "capital-france",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "capital of France"
+          },
+          "metadata": {
+            "tags": [
+              "dev"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Paris",
+              "metric": "has-answer"
+            },
+            {
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5",
+              "metric": "terse"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 1,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "capital of France"
+        },
+        "metadata": {
+          "tags": [
+            "dev"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Paris",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+              "assertion": {
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5",
+                "metric": "terse"
+              }
+            }
+          ]
+        },
+        "id": "1c1a220a-9be1-4245-b0bf-dece64a15699",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 0
+        },
+        "prompt": {
+          "raw": "Question: What is the capital of France?",
+          "label": "no-system-prompt",
+          "config": {}
+        },
+        "promptId": "647361d9a28c20a25176f27ab017f1f2bd7b6b63ab66dab7fbf6c2714c9b9061",
+        "promptIdx": 1,
+        "repeatGroupId": "test-0-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the capital of France for a moment. The answer is Paris, as far as I can tell, though there is more to say about it."
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "capital-france",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "capital of France"
+          },
+          "metadata": {
+            "tags": [
+              "dev"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Paris",
+              "metric": "has-answer"
+            },
+            {
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5",
+              "metric": "terse"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 1,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "capital of France"
+        },
+        "metadata": {
+          "tags": [
+            "dev"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Jupiter",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5",
+                "metric": "terse"
+              }
+            }
+          ]
+        },
+        "id": "26912aaf-f030-447a-a1b6-2f8d27e9d2ec",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 1
+        },
+        "prompt": {
+          "raw": "You are a terse assistant. Answer in one short sentence and name the answer first.\n\nQuestion: What is the largest planet?",
+          "label": "with-system-prompt",
+          "config": {}
+        },
+        "promptId": "c917d6ab55c072be9548eea0aa27238093d7ad209848db84354940186146ef11",
+        "promptIdx": 0,
+        "repeatGroupId": "test-1-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Jupiter."
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "largest-planet",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "largest planet"
+          },
+          "metadata": {
+            "tags": [
+              "dev"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Jupiter",
+              "metric": "has-answer"
+            },
+            {
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5",
+              "metric": "terse"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 2,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "largest planet"
+        },
+        "metadata": {
+          "tags": [
+            "dev"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Jupiter",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+              "assertion": {
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5",
+                "metric": "terse"
+              }
+            }
+          ]
+        },
+        "id": "77875518-3180-4262-bd5b-f16f72fd65d9",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 0
+        },
+        "prompt": {
+          "raw": "Question: What is the largest planet?",
+          "label": "no-system-prompt",
+          "config": {}
+        },
+        "promptId": "647361d9a28c20a25176f27ab017f1f2bd7b6b63ab66dab7fbf6c2714c9b9061",
+        "promptIdx": 1,
+        "repeatGroupId": "test-1-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the largest planet for a moment. The answer is Jupiter, as far as I can tell, though there is more to say about it."
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "largest-planet",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "largest planet"
+          },
+          "metadata": {
+            "tags": [
+              "dev"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Jupiter",
+              "metric": "has-answer"
+            },
+            {
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5",
+              "metric": "terse"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 2,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "largest planet"
+        },
+        "metadata": {
+          "tags": [
+            "dev"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Jupiter",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5",
+                "metric": "terse"
+              }
+            }
+          ]
+        },
+        "id": "06a1fbd5-f89e-4860-9d01-ec81b89331d5",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 1,
+          "terse": 1
+        },
+        "prompt": {
+          "raw": "You are a terse assistant. Answer in one short sentence and name the answer first.\n\nQuestion: What is the largest planet?",
+          "label": "with-system-prompt",
+          "config": {}
+        },
+        "promptId": "c917d6ab55c072be9548eea0aa27238093d7ad209848db84354940186146ef11",
+        "promptIdx": 0,
+        "repeatGroupId": "test-1-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Jupiter."
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "largest-planet",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "largest planet"
+          },
+          "metadata": {
+            "tags": [
+              "dev"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Jupiter",
+              "metric": "has-answer"
+            },
+            {
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5",
+              "metric": "terse"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 3,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "largest planet"
+        },
+        "metadata": {
+          "tags": [
+            "dev"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+          "namedScores": {
+            "has-answer": 0,
+            "terse": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "terse": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"Jupiter\"",
+              "assertion": {
+                "type": "icontains",
+                "value": "Jupiter",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Custom function returned false\noutput.split(/\\s+/).length <= 5",
+              "assertion": {
+                "type": "javascript",
+                "value": "output.split(/\\s+/).length <= 5",
+                "metric": "terse"
+              }
+            }
+          ]
+        },
+        "id": "2b7fa5de-e086-42b7-8efd-9e313ccfa155",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 0,
+          "terse": 0
+        },
+        "prompt": {
+          "raw": "Question: What is the largest planet?",
+          "label": "no-system-prompt",
+          "config": {}
+        },
+        "promptId": "647361d9a28c20a25176f27ab017f1f2bd7b6b63ab66dab7fbf6c2714c9b9061",
+        "promptIdx": 1,
+        "repeatGroupId": "test-1-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the largest planet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "description": "largest-planet",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "largest planet"
+          },
+          "metadata": {
+            "tags": [
+              "dev"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Jupiter",
+              "metric": "has-answer"
+            },
+            {
+              "type": "javascript",
+              "value": "output.split(/\\s+/).length <= 5",
+              "metric": "terse"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 3,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "largest planet"
+        },
+        "metadata": {
+          "tags": [
+            "dev"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Au",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-icontains",
+                "value": "Great question",
+                "metric": "no-filler"
+              }
+            }
+          ]
+        },
+        "id": "0bd7594e-b201-4496-9cda-23a7e8384b1a",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 1
+        },
+        "prompt": {
+          "raw": "You are a terse assistant. Answer in one short sentence and name the answer first.\n\nQuestion: What is the chemical symbol for gold?",
+          "label": "with-system-prompt",
+          "config": {}
+        },
+        "promptId": "c917d6ab55c072be9548eea0aa27238093d7ad209848db84354940186146ef11",
+        "promptIdx": 0,
+        "repeatGroupId": "test-2-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Au."
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "gold-symbol",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "chemical symbol for gold"
+          },
+          "metadata": {
+            "tags": [
+              "holdout"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Au",
+              "metric": "has-answer"
+            },
+            {
+              "type": "not-icontains",
+              "value": "Great question",
+              "metric": "no-filler"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 4,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "chemical symbol for gold"
+        },
+        "metadata": {
+          "tags": [
+            "holdout"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to not contain \"Great question\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Expected output to not contain \"Great question\"",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Au",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to not contain \"Great question\"",
+              "assertion": {
+                "type": "not-icontains",
+                "value": "Great question",
+                "metric": "no-filler"
+              }
+            }
+          ]
+        },
+        "id": "9b7115ee-71de-4d46-90fd-add197dcef43",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 0
+        },
+        "prompt": {
+          "raw": "Question: What is the chemical symbol for gold?",
+          "label": "no-system-prompt",
+          "config": {}
+        },
+        "promptId": "647361d9a28c20a25176f27ab017f1f2bd7b6b63ab66dab7fbf6c2714c9b9061",
+        "promptIdx": 1,
+        "repeatGroupId": "test-2-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it."
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "gold-symbol",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "chemical symbol for gold"
+          },
+          "metadata": {
+            "tags": [
+              "holdout"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Au",
+              "metric": "has-answer"
+            },
+            {
+              "type": "not-icontains",
+              "value": "Great question",
+              "metric": "no-filler"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 4,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "chemical symbol for gold"
+        },
+        "metadata": {
+          "tags": [
+            "holdout"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Au",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-icontains",
+                "value": "Great question",
+                "metric": "no-filler"
+              }
+            }
+          ]
+        },
+        "id": "7031e78d-c6e6-483b-b329-cdc9cd47ec9b",
+        "latencyMs": 2,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 1
+        },
+        "prompt": {
+          "raw": "You are a terse assistant. Answer in one short sentence and name the answer first.\n\nQuestion: What is the chemical symbol for gold?",
+          "label": "with-system-prompt",
+          "config": {}
+        },
+        "promptId": "c917d6ab55c072be9548eea0aa27238093d7ad209848db84354940186146ef11",
+        "promptIdx": 0,
+        "repeatGroupId": "test-2-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Au."
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "gold-symbol",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "chemical symbol for gold"
+          },
+          "metadata": {
+            "tags": [
+              "holdout"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Au",
+              "metric": "has-answer"
+            },
+            {
+              "type": "not-icontains",
+              "value": "Great question",
+              "metric": "no-filler"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 5,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "chemical symbol for gold"
+        },
+        "metadata": {
+          "tags": [
+            "holdout"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to not contain \"Great question\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Expected output to not contain \"Great question\"",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Au",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to not contain \"Great question\"",
+              "assertion": {
+                "type": "not-icontains",
+                "value": "Great question",
+                "metric": "no-filler"
+              }
+            }
+          ]
+        },
+        "id": "ef290df8-5378-4b23-bf10-e86d63468bdc",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 0
+        },
+        "prompt": {
+          "raw": "Question: What is the chemical symbol for gold?",
+          "label": "no-system-prompt",
+          "config": {}
+        },
+        "promptId": "647361d9a28c20a25176f27ab017f1f2bd7b6b63ab66dab7fbf6c2714c9b9061",
+        "promptIdx": 1,
+        "repeatGroupId": "test-2-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the chemical symbol for gold for a moment. The answer is Au, as far as I can tell, though there is more to say about it."
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "gold-symbol",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "chemical symbol for gold"
+          },
+          "metadata": {
+            "tags": [
+              "holdout"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Au",
+              "metric": "has-answer"
+            },
+            {
+              "type": "not-icontains",
+              "value": "Great question",
+              "metric": "no-filler"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 5,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "chemical symbol for gold"
+        },
+        "metadata": {
+          "tags": [
+            "holdout"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Shakespeare",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-icontains",
+                "value": "Great question",
+                "metric": "no-filler"
+              }
+            }
+          ]
+        },
+        "id": "cab8c58f-eebf-4fa8-a61d-43ea7c451d79",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 1
+        },
+        "prompt": {
+          "raw": "You are a terse assistant. Answer in one short sentence and name the answer first.\n\nQuestion: What is the author of Hamlet?",
+          "label": "with-system-prompt",
+          "config": {}
+        },
+        "promptId": "c917d6ab55c072be9548eea0aa27238093d7ad209848db84354940186146ef11",
+        "promptIdx": 0,
+        "repeatGroupId": "test-3-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Shakespeare."
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "hamlet-author",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "author of Hamlet"
+          },
+          "metadata": {
+            "tags": [
+              "holdout"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Shakespeare",
+              "metric": "has-answer"
+            },
+            {
+              "type": "not-icontains",
+              "value": "Great question",
+              "metric": "no-filler"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 6,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "author of Hamlet"
+        },
+        "metadata": {
+          "tags": [
+            "holdout"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to not contain \"Great question\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0,
+          "reason": "Expected output to not contain \"Great question\"",
+          "namedScores": {
+            "has-answer": 0,
+            "no-filler": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to contain \"Shakespeare\"",
+              "assertion": {
+                "type": "icontains",
+                "value": "Shakespeare",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to not contain \"Great question\"",
+              "assertion": {
+                "type": "not-icontains",
+                "value": "Great question",
+                "metric": "no-filler"
+              }
+            }
+          ]
+        },
+        "id": "20e7f69e-fe29-4ddb-b37f-839305b4418b",
+        "latencyMs": 1,
+        "namedScores": {
+          "has-answer": 0,
+          "no-filler": 0
+        },
+        "prompt": {
+          "raw": "Question: What is the author of Hamlet?",
+          "label": "no-system-prompt",
+          "config": {}
+        },
+        "promptId": "647361d9a28c20a25176f27ab017f1f2bd7b6b63ab66dab7fbf6c2714c9b9061",
+        "promptIdx": 1,
+        "repeatGroupId": "test-3-vars-0",
+        "repeatIndex": 0,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the author of Hamlet for a moment. The answer is I am not sure, as far as I can tell, though there is more to say about it."
+        },
+        "score": 0,
+        "success": false,
+        "testCase": {
+          "description": "hamlet-author",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "author of Hamlet"
+          },
+          "metadata": {
+            "tags": [
+              "holdout"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Shakespeare",
+              "metric": "has-answer"
+            },
+            {
+              "type": "not-icontains",
+              "value": "Great question",
+              "metric": "no-filler"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 6,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "author of Hamlet"
+        },
+        "metadata": {
+          "tags": [
+            "holdout"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      },
+      {
+        "cost": 0,
+        "gradingResult": {
+          "pass": true,
+          "score": 1,
+          "reason": "All assertions passed",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Shakespeare",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "not-icontains",
+                "value": "Great question",
+                "metric": "no-filler"
+              }
+            }
+          ]
+        },
+        "id": "37f5e4f0-0ce3-40e3-9285-91de44a4a8cb",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 1
+        },
+        "prompt": {
+          "raw": "You are a terse assistant. Answer in one short sentence and name the answer first.\n\nQuestion: What is the author of Hamlet?",
+          "label": "with-system-prompt",
+          "config": {}
+        },
+        "promptId": "c917d6ab55c072be9548eea0aa27238093d7ad209848db84354940186146ef11",
+        "promptIdx": 0,
+        "repeatGroupId": "test-3-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Shakespeare."
+        },
+        "score": 1,
+        "success": true,
+        "testCase": {
+          "description": "hamlet-author",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "author of Hamlet"
+          },
+          "metadata": {
+            "tags": [
+              "holdout"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Shakespeare",
+              "metric": "has-answer"
+            },
+            {
+              "type": "not-icontains",
+              "value": "Great question",
+              "metric": "no-filler"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 7,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "author of Hamlet"
+        },
+        "metadata": {
+          "tags": [
+            "holdout"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 0
+      },
+      {
+        "cost": 0,
+        "error": "Expected output to not contain \"Great question\"",
+        "gradingResult": {
+          "pass": false,
+          "score": 0.5,
+          "reason": "Expected output to not contain \"Great question\"",
+          "namedScores": {
+            "has-answer": 1,
+            "no-filler": 0
+          },
+          "namedScoreWeights": {
+            "has-answer": 1,
+            "no-filler": 1
+          },
+          "tokensUsed": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0
+          },
+          "componentResults": [
+            {
+              "pass": true,
+              "score": 1,
+              "reason": "Assertion passed",
+              "assertion": {
+                "type": "icontains",
+                "value": "Shakespeare",
+                "metric": "has-answer"
+              }
+            },
+            {
+              "pass": false,
+              "score": 0,
+              "reason": "Expected output to not contain \"Great question\"",
+              "assertion": {
+                "type": "not-icontains",
+                "value": "Great question",
+                "metric": "no-filler"
+              }
+            }
+          ]
+        },
+        "id": "54663618-834b-40d1-83cb-c1ba473ea82d",
+        "latencyMs": 0,
+        "namedScores": {
+          "has-answer": 1,
+          "no-filler": 0
+        },
+        "prompt": {
+          "raw": "Question: What is the author of Hamlet?",
+          "label": "no-system-prompt",
+          "config": {}
+        },
+        "promptId": "647361d9a28c20a25176f27ab017f1f2bd7b6b63ab66dab7fbf6c2714c9b9061",
+        "promptIdx": 1,
+        "repeatGroupId": "test-3-vars-0",
+        "repeatIndex": 1,
+        "provider": {
+          "id": "stub-model",
+          "label": ""
+        },
+        "response": {
+          "output": "Great question! Let me think about the author of Hamlet for a moment. The answer is Shakespeare, as far as I can tell, though there is more to say about it."
+        },
+        "score": 0.5,
+        "success": false,
+        "testCase": {
+          "description": "hamlet-author",
+          "vars": {
+            "system": "file:///private/project/prompt.txt",
+            "topic": "author of Hamlet"
+          },
+          "metadata": {
+            "tags": [
+              "holdout"
+            ]
+          },
+          "assert": [
+            {
+              "type": "icontains",
+              "value": "Shakespeare",
+              "metric": "has-answer"
+            },
+            {
+              "type": "not-icontains",
+              "value": "Great question",
+              "metric": "no-filler"
+            }
+          ],
+          "options": {}
+        },
+        "testIdx": 7,
+        "tokenUsage": {
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "total": 0,
+          "numRequests": 1,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          },
+          "assertions": {
+            "total": 0,
+            "prompt": 0,
+            "completion": 0,
+            "cached": 0,
+            "numRequests": 0,
+            "completionDetails": {
+              "reasoning": 0,
+              "acceptedPrediction": 0,
+              "rejectedPrediction": 0,
+              "cacheReadInputTokens": 0,
+              "cacheCreationInputTokens": 0
+            }
+          }
+        },
+        "vars": {
+          "system": "file:///private/project/prompt.txt",
+          "topic": "author of Hamlet"
+        },
+        "metadata": {
+          "tags": [
+            "holdout"
+          ],
+          "_promptfooFileMetadata": {}
+        },
+        "failureReason": 1
+      }
+    ],
+    "stats": {
+      "successes": 7,
+      "failures": 9,
+      "errors": 0,
+      "tokenUsage": {
+        "prompt": 0,
+        "completion": 0,
+        "cached": 0,
+        "total": 0,
+        "numRequests": 16,
+        "completionDetails": {
+          "reasoning": 0,
+          "acceptedPrediction": 0,
+          "rejectedPrediction": 0,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 0
+        },
+        "assertions": {
+          "total": 0,
+          "prompt": 0,
+          "completion": 0,
+          "cached": 0,
+          "numRequests": 0,
+          "completionDetails": {
+            "reasoning": 0,
+            "acceptedPrediction": 0,
+            "rejectedPrediction": 0,
+            "cacheReadInputTokens": 0,
+            "cacheCreationInputTokens": 0
+          }
+        }
+      },
+      "durationMs": 130,
+      "evaluationDurationMs": 130
+    },
+    "repeatStability": {
+      "totalGroups": 8,
+      "unstableGroups": 1,
+      "groupsWithErrors": 0,
+      "cachedResults": 0,
+      "groups": [
+        {
+          "repeatGroupId": "test-0-vars-0",
+          "promptIdx": 0,
+          "provider": {
+            "id": "stub-model",
+            "label": ""
+          },
+          "description": "capital-france",
+          "promptLabel": "with-system-prompt",
+          "repetitions": 2,
+          "passed": 1,
+          "failed": 1,
+          "errors": 0,
+          "cached": 0,
+          "unstable": true,
+          "passRate": 0.5,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.09453120573423074,
+            "upper": 0.9054687942657693
+          }
+        },
+        {
+          "repeatGroupId": "test-0-vars-0",
+          "promptIdx": 1,
+          "provider": {
+            "id": "stub-model",
+            "label": ""
+          },
+          "description": "capital-france",
+          "promptLabel": "no-system-prompt",
+          "repetitions": 2,
+          "passed": 0,
+          "failed": 2,
+          "errors": 0,
+          "cached": 0,
+          "unstable": false,
+          "passRate": 0,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0,
+            "upper": 0.6576197724933469
+          }
+        },
+        {
+          "repeatGroupId": "test-1-vars-0",
+          "promptIdx": 0,
+          "provider": {
+            "id": "stub-model",
+            "label": ""
+          },
+          "description": "largest-planet",
+          "promptLabel": "with-system-prompt",
+          "repetitions": 2,
+          "passed": 2,
+          "failed": 0,
+          "errors": 0,
+          "cached": 0,
+          "unstable": false,
+          "passRate": 1,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.34238022750665303,
+            "upper": 1
+          }
+        },
+        {
+          "repeatGroupId": "test-1-vars-0",
+          "promptIdx": 1,
+          "provider": {
+            "id": "stub-model",
+            "label": ""
+          },
+          "description": "largest-planet",
+          "promptLabel": "no-system-prompt",
+          "repetitions": 2,
+          "passed": 0,
+          "failed": 2,
+          "errors": 0,
+          "cached": 0,
+          "unstable": false,
+          "passRate": 0,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0,
+            "upper": 0.6576197724933469
+          }
+        },
+        {
+          "repeatGroupId": "test-2-vars-0",
+          "promptIdx": 0,
+          "provider": {
+            "id": "stub-model",
+            "label": ""
+          },
+          "description": "gold-symbol",
+          "promptLabel": "with-system-prompt",
+          "repetitions": 2,
+          "passed": 2,
+          "failed": 0,
+          "errors": 0,
+          "cached": 0,
+          "unstable": false,
+          "passRate": 1,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.34238022750665303,
+            "upper": 1
+          }
+        },
+        {
+          "repeatGroupId": "test-2-vars-0",
+          "promptIdx": 1,
+          "provider": {
+            "id": "stub-model",
+            "label": ""
+          },
+          "description": "gold-symbol",
+          "promptLabel": "no-system-prompt",
+          "repetitions": 2,
+          "passed": 0,
+          "failed": 2,
+          "errors": 0,
+          "cached": 0,
+          "unstable": false,
+          "passRate": 0,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0,
+            "upper": 0.6576197724933469
+          }
+        },
+        {
+          "repeatGroupId": "test-3-vars-0",
+          "promptIdx": 0,
+          "provider": {
+            "id": "stub-model",
+            "label": ""
+          },
+          "description": "hamlet-author",
+          "promptLabel": "with-system-prompt",
+          "repetitions": 2,
+          "passed": 2,
+          "failed": 0,
+          "errors": 0,
+          "cached": 0,
+          "unstable": false,
+          "passRate": 1,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0.34238022750665303,
+            "upper": 1
+          }
+        },
+        {
+          "repeatGroupId": "test-3-vars-0",
+          "promptIdx": 1,
+          "provider": {
+            "id": "stub-model",
+            "label": ""
+          },
+          "description": "hamlet-author",
+          "promptLabel": "no-system-prompt",
+          "repetitions": 2,
+          "passed": 0,
+          "failed": 2,
+          "errors": 0,
+          "cached": 0,
+          "unstable": false,
+          "passRate": 0,
+          "passRateConfidenceInterval": {
+            "confidenceLevel": 0.95,
+            "lower": 0,
+            "upper": 0.6576197724933469
+          }
+        }
+      ]
+    }
+  },
+  "config": {
+    "description": "Does prompt.txt make answers terse and correct?",
+    "prompts": [
+      {
+        "label": "with-system-prompt",
+        "raw": "{{system}}\n\nQuestion: What is the {{topic}}?"
+      },
+      {
+        "label": "no-system-prompt",
+        "raw": "Question: What is the {{topic}}?"
+      }
+    ],
+    "providers": [
+      "file://provider.mjs"
+    ],
+    "tests": [
+      {
+        "description": "capital-france",
+        "vars": {
+          "topic": "capital of France"
+        },
+        "metadata": {
+          "tags": [
+            "dev"
+          ]
+        },
+        "assert": [
+          {
+            "type": "icontains",
+            "value": "Paris",
+            "metric": "has-answer"
+          },
+          {
+            "type": "javascript",
+            "value": "output.split(/\\s+/).length <= 5",
+            "metric": "terse"
+          }
+        ]
+      },
+      {
+        "description": "largest-planet",
+        "vars": {
+          "topic": "largest planet"
+        },
+        "metadata": {
+          "tags": [
+            "dev"
+          ]
+        },
+        "assert": [
+          {
+            "type": "icontains",
+            "value": "Jupiter",
+            "metric": "has-answer"
+          },
+          {
+            "type": "javascript",
+            "value": "output.split(/\\s+/).length <= 5",
+            "metric": "terse"
+          }
+        ]
+      },
+      {
+        "description": "gold-symbol",
+        "vars": {
+          "topic": "chemical symbol for gold"
+        },
+        "metadata": {
+          "tags": [
+            "holdout"
+          ]
+        },
+        "assert": [
+          {
+            "type": "icontains",
+            "value": "Au",
+            "metric": "has-answer"
+          },
+          {
+            "type": "not-icontains",
+            "value": "Great question",
+            "metric": "no-filler"
+          }
+        ]
+      },
+      {
+        "description": "hamlet-author",
+        "vars": {
+          "topic": "author of Hamlet"
+        },
+        "metadata": {
+          "tags": [
+            "holdout"
+          ]
+        },
+        "assert": [
+          {
+            "type": "icontains",
+            "value": "Shakespeare",
+            "metric": "has-answer"
+          },
+          {
+            "type": "not-icontains",
+            "value": "Great question",
+            "metric": "no-filler"
+          }
+        ]
+      }
+    ],
+    "sharing": false,
+    "outputPath": [
+      "results.json"
+    ],
+    "extensions": [],
+    "evaluateOptions": {
+      "repeat": 2,
+      "maxConcurrency": 1
+    },
+    "defaultTest": {
+      "vars": {
+        "system": "file:///private/project/prompt.txt"
+      }
+    },
+    "basePath": "/private/project"
+  },
+  "shareableUrl": null,
+  "metadata": {
+    "promptfooVersion": "0.125.1",
+    "nodeVersion": "v24.21.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "exportedAt": "2026-10-27T17:19:41.942Z",
+    "evaluationCreatedAt": "2026-10-27T17:19:41.776Z"
+  },
+  "vars": [
+    "system",
+    "topic"
+  ],
+  "runtimeOptions": {
+    "maxConcurrency": 1,
+    "showProgressBar": true,
+    "eventSource": "cli",
+    "repeat": 2,
+    "cache": false
+  }
+}

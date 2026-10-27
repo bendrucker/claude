@@ -115,31 +115,43 @@ export interface Row {
   memory?: number;
 }
 
+export type Metric = "wall" | "memory";
+
+const defaultMetric: Metric = "wall";
+
+const samples = (arm: Arm, metric: Metric) => (metric === "memory" ? arm.memory : arm.times);
+
 export function compare(
   arms: Arm[],
   base: string,
   alpha: number,
   minEffect: number,
   random = Math.random,
+  metric: Metric = "wall",
 ): Row[] {
   const baseArm = arms.find((a) => a.name === base);
   if (baseArm === undefined)
     throw new Error(`no arm named ${base}; arms: ${arms.map((a) => a.name).join(", ")}`);
-  const baseMedian = median(baseArm.times);
+  const baseSamples = samples(baseArm, metric);
+  const baseMedian = median(baseSamples);
   return arms.map((arm) => {
+    const values = samples(arm, metric);
     const row: Row = {
       arm: arm.name,
-      n: arm.times.length,
-      median: median(arm.times),
-      spread: relativeMad(arm.times),
+      n: values.length,
+      median: median(values),
+      spread: relativeMad(values),
       significant: false,
-      lowN: arm.times.length < 4 || baseArm.times.length < 4,
+      lowN: values.length < 4 || baseSamples.length < 4,
       failures: arm.failures,
       ...(arm.memory.length > 0 && { memory: median(arm.memory) }),
     };
     if (arm === baseArm) return row;
     const change = row.median / baseMedian - 1;
-    const p = permutationP(baseArm.times, arm.times, 10_000, random);
+    // Arms that each repeat one value differ deterministically, and the median
+    // test, which counts tied relabelings as extreme, would never star them.
+    const constant = new Set(baseSamples).size === 1 && new Set(values).size === 1;
+    const p = constant ? 0 : permutationP(baseSamples, values, 10_000, random);
     const significant = !row.lowN && p < alpha && Math.abs(change) >= minEffect;
     return { ...row, change, p, significant };
   });
@@ -162,12 +174,12 @@ function markdownRow(cells: string[]): string {
   return `| ${cells.join(" | ")} |`;
 }
 
-export function render(rows: Row[], markdown: boolean): string {
+export function render(rows: Row[], markdown: boolean, metric: Metric = "wall"): string {
   const header = ["arm", "n", "median", "±MAD", "change", "p", "peak MB", "failed"];
   const body = rows.map((r) => [
     r.arm,
     `${r.n}${r.lowN ? "†" : ""}`,
-    formatSeconds(r.median),
+    metric === "memory" ? `${(r.median / 1e6).toFixed(1)}MB` : formatSeconds(r.median),
     `${(r.spread * 100).toFixed(1)}%`,
     r.change === undefined
       ? "base"
@@ -410,6 +422,14 @@ const reportCmd = command(
         description: "Smallest relative change that can be starred",
       },
       markdown: { type: Boolean, description: "Print a markdown table for the notes file" },
+      metric: {
+        type: (value: string): Metric => {
+          if (value !== "wall" && value !== "memory") throw new Error("--metric is wall or memory");
+          return value;
+        },
+        default: defaultMetric,
+        description: "Compare wall time, or each run's peak resident memory",
+      },
     },
     help: {
       description:
@@ -424,8 +444,16 @@ const reportCmd = command(
     for (const { meta } of metas) console.log(`${loadSummary(meta)}\n`);
     const report = (pooled: Arm[]) =>
       render(
-        compare(pooled, base, argv.flags.alpha, argv.flags.minEffect),
+        compare(
+          pooled,
+          base,
+          argv.flags.alpha,
+          argv.flags.minEffect,
+          Math.random,
+          argv.flags.metric,
+        ),
         argv.flags.markdown === true,
+        argv.flags.metric,
       );
     console.log(report(arms));
     const loaded = metas.flatMap(({ dir, meta }) => loadedRounds(dir, meta));

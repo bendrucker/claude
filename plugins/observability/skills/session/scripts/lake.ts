@@ -39,16 +39,9 @@ const catalogUrl = (url: string) => `${url.replace(/\/$/, "")}/catalog.ducklake`
 const quote = (s: string) => `'${s.replaceAll("'", "''")}'`;
 const read = (path: string) => Bun.file(join(RESOURCES_DIR, path)).text();
 
-// A remote catalog's local copy is keyed by its URL, so two lakes never share one.
+// pullCatalog replaces a remote catalog's copy on every run, so lakes can share the path.
 const localCatalog = (o: LakeOptions) =>
-  isRemote(o.url)
-    ? join(
-        o.stateDir,
-        "lake",
-        createHash("sha256").update(o.url).digest("hex").slice(0, 12),
-        "catalog.ducklake",
-      )
-    : catalogUrl(o.url);
+  isRemote(o.url) ? join(o.stateDir, "lake", "catalog.ducklake") : catalogUrl(o.url);
 
 /** Refuses any host but local unless its import manifest allows egress. */
 async function refuseBlockedHosts(o: LakeOptions): Promise<void> {

@@ -35,7 +35,7 @@ Only `local` sessions are published by default. Another host is published only w
 
 - refusing hosts without an egress policy
 - moving the catalog file to and from S3, since DuckDB can't write a database file there
-- attaching the index and lake, because `ATTACH` in the CLI takes no expressions
+- attaching the index and lake, because the CLI's `ATTACH` only accepts literals
 - writing the reader's init file
 
 The CLI's version must match `@duckdb/node-api`'s, which wrote the index. A newer CLI writes a catalog that older readers can't open.

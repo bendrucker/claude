@@ -2,8 +2,8 @@
 name: performance:benchmark
 description: >-
   Use when timing a program or command, asking whether a change or version
-  made it faster, or building a benchmark harness. For repeated optimization
-  toward a target, use performance:hill-climb.
+  made it faster, or building a benchmark harness. To hill-climb or
+  repeatedly optimize toward a target, use performance:hill-climb.
 argument-hint: "[<command>]"
 ---
 

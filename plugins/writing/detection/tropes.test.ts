@@ -700,6 +700,30 @@ describe("scan", () => {
     });
   });
 
+  describe("counted list lead-in", () => {
+    async function leadIn(text: string): Promise<PatternMatch | undefined> {
+      return (await scan(text)).find((m) => m.category === "counted list lead-in");
+    }
+
+    it.each([
+      "The global list keeps four:\n\n- a\n- b\n- c\n- d",
+      "Five notes:\n- a\n- b\n- c\n- d\n- e",
+      "It reads the following three files: `a.ts`, `b.ts`, and `c.ts`.",
+    ])("flags: %j", async (text) => {
+      expect(await leadIn(text)).toBeDefined();
+    });
+
+    it.each([
+      "The global list keeps:\n\n- a\n- b\n- c\n- d",
+      "Two notes:\n- a\n- b",
+      "Phase three: migrate the readers.",
+      "Four runs per arm:\n\n| Case | With |\n| --- | --- |\n| a | 1 |",
+      "The `three:` key is ignored.",
+    ])("allows: %j", async (text) => {
+      expect(await leadIn(text)).toBeUndefined();
+    });
+  });
+
   describe("I understand", () => {
     it("flags: 'I understand the issue'", async () => {
       expect(firstByTier(await scan("I understand the issue."), "context")?.category).toBe(

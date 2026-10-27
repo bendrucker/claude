@@ -10,7 +10,7 @@ import { extractHeadings, headingCaseViolations } from "./heading-case";
 test("stays identical to the pull-request plugin's copy", async () => {
   const root = join(import.meta.dirname, "..", "..", "..");
   const [writing, pullRequest] = await Promise.all([
-    Bun.file(join(root, "plugins", "writing", "hooks", "heading-case.ts")).text(),
+    Bun.file(join(root, "plugins", "writing", "detection", "heading-case.ts")).text(),
     Bun.file(join(root, "plugins", "pull-request", "scripts", "heading-case.ts")).text(),
   ]);
   expect(writing).toBe(pullRequest);

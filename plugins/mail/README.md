@@ -6,4 +6,4 @@ Apple Mail integration for reading and managing email via JXA.
 
 ### Skills
 
-- **mail** — Reading, archiving, and managing email with account-aware behavior
+- **mail**: Reading, archiving, and managing email with account-aware behavior

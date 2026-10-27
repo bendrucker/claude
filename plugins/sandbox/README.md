@@ -6,7 +6,7 @@ Teaches Claude to drop `dangerouslyDisableSandbox` when the command would escape
 
 With `git:*` and `agent-browser:*` excluded:
 
-### Scaffolding around an excluded command
+### Scaffolding Around an Excluded Command
 
 The call: `cd /repo && git push -u origin HEAD 2>&1 | tail -5`, with the flag set. What comes back with its result:
 
@@ -21,7 +21,7 @@ Next time, leave the flag off, along with the pieces that keep the chain from ma
 - `| tail -5`: the harness truncates long output itself.
 ```
 
-### An exported session variable
+### An Exported Session Variable
 
 The call: `export AGENT_BROWSER_SESSION=docs; agent-browser open https://example.com`, with the flag set. What comes back with its result:
 
@@ -34,7 +34,7 @@ Next time, leave the flag off, along with the pieces that keep the chain from ma
 - `export AGENT_BROWSER_SESSION=docs`: pass `--session docs` to `agent-browser` instead.
 ```
 
-### A bare excluded command
+### A Bare Excluded Command
 
 The call: `git status`, with the flag set. What comes back with its result:
 
@@ -43,9 +43,9 @@ That call needed no `dangerouslyDisableSandbox`: every command in it matches `sa
 It escapes as written. Next time, leave the flag off.
 ```
 
-### No reminder
+### No Reminder
 
-`git status && bun test` gets nothing back, because `bun` matches no entry. It also stays quiet for a `cd` elsewhere or in a subagent, any other variable, `$(...)`, another redirection, `||`, and `&`.
+`git status && bun test` doesn't get anything back, because `bun` doesn't match any entry. It also stays quiet for a `cd` elsewhere or in a subagent, any other variable, `$(...)`, another redirection, `||`, and `&`.
 
 ## Contents
 

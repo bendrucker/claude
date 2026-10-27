@@ -330,6 +330,7 @@
         "~/.config/.wrangler/config",
         "~/.config/.wrangler/logs",
         "~/.config/.wrangler/registry",
+        "~/.config/cloudflare",
         "~/.npm",
         "~/.local/share/uv",
         "~/.local/share/graphite",

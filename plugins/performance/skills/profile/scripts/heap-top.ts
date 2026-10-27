@@ -83,7 +83,8 @@ export function tally(report: Report, skip?: RegExp, match?: RegExp): Tally {
   const walk = (node: Node, path: Node[]) => {
     const here = [...path, node];
     const rest = node.bytes - node.children.reduce((s, c) => s + c.bytes, 0);
-    const own = node.children.length > 0 && rest <= node.precision ? 0 : Math.max(0, rest);
+    const slack = node.children.reduce((s, c) => s + c.precision, node.precision);
+    const own = node.children.length > 0 && rest <= slack ? 0 : Math.max(0, rest);
     if (own > 0) {
       result.sum += own;
       for (const f of new Set(here.filter((n) => !isAllocator(n)).map(label)))

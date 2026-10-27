@@ -39,7 +39,7 @@ the voice/rewrite cases.
   slop: the owner's gold kept-comment text. It is the minimum a reader needs,
   with its delimiters kept and no leading indentation. The report shows the
   judge's surviving length against it. The gate fails a trim that keeps more
-  than `RETENTION_CEILING` of the comment, so the gold must fit under it.
+  than `RETENTION_CEILING` of the comment. The gold must fit under it.
 - `fact`: a phrase, or a list of phrases that must all appear in the surviving
   text. Required on every `keep` and on every `trim` with `trimTo`. Each phrase
   must appear in `comment`, and in `trimTo` when one is given. Matching ignores
@@ -52,7 +52,7 @@ the voice/rewrite cases.
 - `doc`: the `DocComment` extraction attaches to a formal doc comment
   (`target`, `subject`, `exported`, `required`), or `null`. Copy it from
   `docCommentOf` over the full source file, since the judge reads it.
-- `context`: real source, line-numbered, so the judge can answer the
+- `context`: real source, line-numbered. This lets the judge answer the
   what-on-dense question.
 
 ## Curation
@@ -60,7 +60,7 @@ the voice/rewrite cases.
 `keep` fixtures are the ship gate: a judge that drops a justified comment's
 fact is wrong, and a trim that keeps the fact passes. A comment whose fact fits
 in less text belongs in `trim` with a gold `trimTo`, no matter how well
-justified, so a `keep` is already about as short as its fact allows. The keeps
+justified. A `keep` is already about as short as its fact allows. The keeps
 cover a canonical-API-name docstring, why-comments on guards and SQL, a test
 constant's rationale, and a plain factual doc that pins the over-rewrite guard.
 The `go-` fixtures pin formal doc comments: every Go doc comment keeps its

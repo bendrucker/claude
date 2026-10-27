@@ -1,6 +1,6 @@
 # `performance:profile` samply Eval
 
-A native `claude plugin eval` suite for how a session uses samply through `performance:profile`: getting a usable profile on the first attempt, attributing time to the right frame, turning a share into a bound on the gain, and not reading noise or idle threads as hotspots. Every case hands the session `/performance:profile` and a small C program its fixture builds, whose profile holds a known finding. The session records and reads real profiles, so a case costs one profiling session. Cases are tagged by kind (`attribution`, `setup`, `noise`, `batch`) and split (`dev`, `holdout`).
+A native `claude plugin eval` suite for how a session uses samply through `performance:profile`: getting a usable profile on the first attempt, attributing time to the right frame, turning a share into a bound on the gain, and not reading noise or idle threads as hotspots. Every case hands the session `/performance:profile` and a small C program its fixture builds, whose profile holds a known finding. The session records and reads real profiles. A case costs one profiling session. Cases are tagged by kind (`attribution`, `setup`, `noise`, `batch`) and split (`dev`, `holdout`).
 
 ## Cases
 
@@ -12,7 +12,7 @@ A native `claude plugin eval` suite for how a session uses samply through `perfo
 | `hardened` | dev | vendored `tilecut` | The binary carries the hardened runtime, so samply fails with "Could not obtain the root task" until a copy is re-signed ad hoc. `rle_encode` is about 75%, `crc_tile` about 25%. |
 | `short-run` | dev | `tokcount` | One run lasts about 4 ms, a handful of samples that rank at random. Pooled with `--iteration-count`, `tokenize` is about 64% of self time and `classify` about 35% inclusive. |
 | `multi-case` | dev | `csvq` | Four benchmark cases, each with its own lead: `parse_amount` (`strtod`), `group_lookup`, `compare_rows` (inclusive, its self time spread over libc), `seen_insert` (`memmove`). |
-| `copy-split` | dev | `framer` | `_platform_memmove` is the top self frame. `compact_log`'s shift reaches it for about 40 to 45% of the run, while `compact_log` is about 63% inclusive, so a fix to the shift is bounded by the smaller share. |
+| `copy-split` | dev | `framer` | `_platform_memmove` is the top self frame. `compact_log`'s shift reaches it for about 40 to 45% of the run, while `compact_log` is about 63% inclusive. A fix to the shift is bounded by the smaller share. |
 | `two-locks` | dev | `relayd` | Workers wait on two mutexes. The cache lock in `cache_get`, held for a few instructions on every event, takes about 57% of samples waiting. The journal lock, whose critical section scans the journal, takes about 10%. |
 | `quadratic` | holdout | `jobq` | `_platform_memmove` is about 77%, all under `queue_pop`'s pop-front shift, which bounds a fix at about 4.3x. |
 | `stripped` | holdout | `blend` | The release build is stripped, so frames read `fun_8d4`. At `-O2` `tone_map` is about 83%, and at `-O0` (`make debug`) `mix_rows` ranks first instead. |

@@ -12,6 +12,7 @@ allowed-tools:
   - Glob
   - Task
   - WebFetch
+  - Bash(bun:*)
 ---
 
 # Document Review
@@ -25,6 +26,16 @@ $ARGUMENTS
 The first positional is the document path. If none is provided, ask the user. Optionally accept target audience and focus areas.
 
 - `--lens content|style|artifacts`: run only the named lenses. Comma-separate to select more than one (`--lens content,style`). Default: all applicable lenses per [Dispatch Agents](#dispatch-agents).
+
+## Scan
+
+Run the pattern rules over the document before any agent starts:
+
+```bash
+bun ${CLAUDE_SKILL_DIR}/../scan/scripts/scan.ts --input <doc-path> --json
+```
+
+Add `--message` when the document is a PR, issue, or comment body. It exits 1 when it finds anything, which is expected. Pass the JSON findings to `writing:style`.
 
 ## Dispatch Agents
 

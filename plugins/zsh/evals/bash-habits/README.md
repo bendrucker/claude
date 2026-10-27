@@ -26,14 +26,14 @@ The with arm loads the plugin. The without arm doesn't.
 
 `gather-ticket` and `gather-brief` leave the commands to the model. Their prompts name literal extensions (`.ts`, `.vue`) and ask for one pass with separators, which draws a chain of unquoted `--include=*.ext` flags. Naming the languages in words doesn't. `gather-brief` runs under a subagent-style system prompt, where real sessions hit the habit most.
 
-The `replay-*` cases and `pasted-command` hand the model a command shaped like real failures mined from the session index, one per rewrite rule, to run as written. The habit is present in every run, so these cases pin each rule. In `replay-find`, the model often probes with `ls *.yaml` first, which zsh rejects with the same error. The plugin notes that glob without rewriting it, so the case grades only the reply.
+The `replay-*` cases and `pasted-command` hand the model a command shaped like real failures mined from the session index, one per rewrite rule, to run as written. The habit is present in every run. These cases therefore pin each rule. In `replay-find`, the model often probes with `ls *.yaml` first, which zsh rejects with the same error. The plugin notes that glob without rewriting it, so the case grades only the reply.
 
-`replay-probe` and `gather-config` pin `cshnullglob`: the probe names several candidate files at once, and zsh without it skips the whole command when any one candidate is missing.
+`replay-probe` and `gather-config` pin `cshnullglob`. The probe names several candidate files at once. Without the option, zsh skips the whole command when any one candidate is missing.
 
-`missing-glob` and `heredoc-untouched` guard ordinary work. The plugin notes a glob that matches nothing and leaves heredoc bodies as written.
+`missing-glob` and `heredoc-untouched` guard ordinary work. The plugin notes a glob that doesn't match any file and leaves heredoc bodies as written.
 
 The trace graders match zsh's `(eval):N:` error prefix. The bare message also appears in replies that discuss it.
 
 ## Scope
 
-The Bash tool in eval sessions runs the launcher's `$SHELL` (or `CLAUDE_CODE_SHELL`), which a case cannot set. The suite measures something only when launched from a zsh machine. CI runners run bash, where the plugin is a no-op, so the `.local-only` marker keeps the eval workflow from selecting this suite on labeled PRs.
+The Bash tool in eval sessions runs the launcher's `$SHELL` (or `CLAUDE_CODE_SHELL`), which a case cannot set. The suite measures something only when launched from a zsh machine. CI runners run bash, where the plugin is a no-op. The `.local-only` marker therefore keeps the eval workflow from selecting this suite on labeled PRs.

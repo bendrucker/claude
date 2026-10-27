@@ -11,14 +11,13 @@ import {
   isScratchPath,
 } from "../detection/paths";
 import { check as checkTropes } from "./check-tropes";
-import { type HookResult, isPlanMode, type SyncHookJSONOutput, tierOf, toolInputOf } from "./io";
+import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
 import { check as checkNumbering, type Mode } from "./numbering";
+import { type HookFinding, report } from "./report";
 import { appendRunLog, type RunLogEntry, type RunOutcome } from "./run-log";
 import { recentlyFired, recordFired } from "./session-state";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
-
-const TIER_RANK = { deny: 0, ask: 1, context: 2 } as const;
 
 export interface DispatchResult {
   output: SyncHookJSONOutput | null;
@@ -42,14 +41,14 @@ export function targetOf(filePath: string): string {
 // largest block of the ~40ms this dispatcher spent parsing modules before it
 // could read its input. Loading it from the markdown branch is the only way to
 // keep a runtime-conditional graph out of an unconditional import.
-async function headingResult(input: PreToolUseHookInput): Promise<HookResult | null> {
+async function headingFindings(input: PreToolUseHookInput): Promise<HookFinding[]> {
   const headings = await import("./headings");
   return headings.check(input);
 }
 
-// One dispatcher run sequences all checkers in-process and emits at most one
-// output. Priority is deny > ask > context, and within a tier the earliest
-// checker in numbering → headings → tropes order wins.
+// One dispatcher run sequences all checkers in-process and emits every finding
+// in one output, so the model fixes them in a single pass instead of a retry
+// per finding.
 export async function dispatch(
   input: PreToolUseHookInput,
   now: number = Date.now(),
@@ -84,17 +83,16 @@ export async function dispatch(
   const mode: Mode = input.tool_name === "Edit" ? "edit" : "write";
   const checkers = [
     () => checkNumbering(input, mode),
-    () => (isMarkdownFile(ext) ? headingResult(input) : null),
+    () => (isMarkdownFile(ext) ? headingFindings(input) : []),
     () => checkTropes(input),
   ];
 
   // One checker crashing must not take down the others or the run log.
-  const results: HookResult[] = [];
+  const findings: HookFinding[] = [];
   for (const checker of checkers) {
     try {
       // oxlint-disable-next-line no-await-in-loop -- three checkers, each reported individually when it throws; concurrency buys nothing.
-      const result = await checker();
-      if (result) results.push(result);
+      findings.push(...(await checker()));
     } catch (error) {
       console.error(
         `[writing/pretooluse] checker failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -105,35 +103,42 @@ export async function dispatch(
   // the same target is compared against. It is set only past this point: an
   // earlier return means the checkers never ran, and an absent list must not
   // read as a clean run.
-  const categories = results.map((result) => result.category);
-  if (results.length === 0) return finish(null, "silent", { categories });
+  const categories = unique(findings.map((finding) => finding.category));
+  if (findings.length === 0) return finish(null, "silent", { categories });
 
-  // Stable sort: within a tier the earliest checker keeps priority. A
-  // suppressed winner falls through to the next result rather than muting
-  // findings whose categories never fired.
-  const ordered = results.toSorted(
-    (a, b) => TIER_RANK[tierOf(a.output)] - TIER_RANK[tierOf(b.output)],
-  );
-  let suppressed: HookResult | undefined;
-  for (const result of ordered) {
-    const tier = tierOf(result.output);
-    if (tier === "context" && result.suppressible !== false) {
-      // oxlint-disable-next-line no-await-in-loop -- the loop returns at the first unsuppressed result, and recentlyFired reads state recordFired writes.
-      if (await recentlyFired(input.session_id, result.category, now)) {
-        suppressed ??= result;
+  // An introduced or blocking finding always shows. A context finding whose
+  // category fired recently in this session is muted.
+  const muted = new Set<string>();
+  const kept: HookFinding[] = [];
+  for (const finding of findings) {
+    if (finding.tier === "context" && finding.introduced !== true) {
+      if (muted.has(finding.category)) continue;
+      // oxlint-disable-next-line no-await-in-loop -- reads one small state file per category, and the loop is bounded by the categories found.
+      if (await recentlyFired(input.session_id, finding.category, now)) {
+        muted.add(finding.category);
         continue;
       }
-      // oxlint-disable-next-line no-await-in-loop -- the loop returns at the first unsuppressed result, and recentlyFired reads state recordFired writes.
-      await recordFired(input.session_id, result.category, now);
     }
-    return finish(result.output, tier, { category: result.category, categories });
+    kept.push(finding);
   }
+
   const extra: Partial<RunLogEntry> = { categories };
-  if (suppressed) {
-    extra.category = suppressed.category;
+  if (muted.size > 0) extra.suppressed_categories = [...muted];
+  const result = report(kept, { toolName: input.tool_name, filePath });
+  if (!result) {
+    extra.category = [...muted][0];
     extra.suppressed = true;
+    return finish(null, "silent", extra);
   }
-  return finish(null, "silent", extra);
+
+  const emitted = unique(result.shown.map((finding) => finding.category));
+  // oxlint-disable-next-line no-await-in-loop -- sequential writes to one state file; concurrent read-modify-write would drop categories.
+  for (const category of emitted) await recordFired(input.session_id, category, now);
+  return finish(result.output, result.tier, { ...extra, category: emitted[0], emitted });
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }
 
 const HookInput = z.looseObject({

@@ -1,3 +1,4 @@
+import { COUNTED_LEAD_IN_PATTERN } from "./counted-lead-in";
 import { NO_NEGATION_PATTERN } from "./negation";
 import { isProseFile } from "./paths";
 import { splitParagraphs, splitSentences } from "./sentences";
@@ -75,6 +76,23 @@ const FENCED_CODE_BLOCK = /```[\s\S]*?```/g;
 const INLINE_CODE = /`[^`]+`/g;
 
 const DETERMINERS = /^(?:the|a|an|it|them|this|that|its)\b/i;
+
+// "pass", "clean", and "green" also work as nouns and adjectives: after a
+// determiner or preposition ("in one pass", "a clean tree"), after a singular
+// noun that a verb "pass" would not agree with ("the uninstall pass"), or alone
+// at the start of a sentence as an imperative ("Pass the flag").
+const NOUN_AFTER_DETERMINER =
+  /\b(?:a|an|the|one|this|that|each|another|single|same|first|second|final|or|to|of|at)\s+(?:pass|clean|green)$/i;
+const NOUN_AFTER_SINGULAR =
+  /\b(?!(?:all|both|they|these|those|now|still)\b)[a-z]*[a-rt-z]\s+pass$/i;
+const BARE_LEAD = /^(?:pass|passing)$/i;
+
+function isNounUse(matched: string, rest: string): boolean {
+  const head = matched.trimEnd();
+  const bareWord = head !== matched || /^\W|^$/.test(rest);
+  if (bareWord && (NOUN_AFTER_SINGULAR.test(head) || BARE_LEAD.test(head))) return true;
+  return NOUN_AFTER_DETERMINER.test(head);
+}
 
 const RESULT_SENTENCES = [
   /\b(?:all\s+)?\d+(?:\/\d+)?\s+(?:\w+\s+)*(?:pass|fail|succeed)/i,
@@ -179,8 +197,8 @@ function testResultHits(text: string): Hits {
       pattern.lastIndex = 0;
       const match = pattern.exec(s);
       if (!match) continue;
-      const after = s.slice(match.index + match[0].length).trim();
-      if (DETERMINERS.test(after)) continue;
+      const rest = s.slice(match.index + match[0].length);
+      if (DETERMINERS.test(rest.trim()) || isNounUse(match[0], rest)) continue;
       return { count: 1, sample: match[0] };
     }
   }
@@ -670,10 +688,20 @@ export const PATTERNS: PatternDef[] = [
     test: testResultHits,
     message: (matched) =>
       `Do not report test results, counts, or CI status ("${matched}"). Describe what is covered instead.`,
-    positives: ["All 8 tests pass. Now let me check the linter.", "3/3 passing on Sonnet 4.6."],
+    positives: [
+      "All 8 tests pass. Now let me check the linter.",
+      "3/3 passing on Sonnet 4.6.",
+      "Both pass on main.",
+      "CI is green.",
+    ],
     negatives: [
       "The tests fail because processInput is now async.",
       "Write a test for this function.",
+      "Apply every fix in this one pass.",
+      "Both edits land in a single pass.",
+      "The uninstall pass removes the links.",
+      "Start from one clean checkout.",
+      "Pass the flag to skip the cache.",
     ],
     evidence:
       "Pattern emerged from corrective-feedback moments: users repeatedly asked the model to stop reporting pass/fail counts. Regex is validated against the committed shouldFlag/shouldNotFlag corpus in tropes.test.ts.",
@@ -981,6 +1009,7 @@ export const PATTERNS: PatternDef[] = [
     retire:
       "Remove when the frame rate falls to the typed-user baseline in a corpus audit window, or when a labeling pass shows the frame mostly preceding genuinely optional asides.",
   },
+  COUNTED_LEAD_IN_PATTERN,
   {
     tier: "context",
     layer: "vocabulary",

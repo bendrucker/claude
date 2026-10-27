@@ -3,6 +3,7 @@ import type {
   PreToolUseHookInput,
   PreToolUseHookSpecificOutput,
 } from "@anthropic-ai/claude-agent-sdk";
+import { report } from "./report";
 import { check, checkBoldAsHeading, checkSentenceHeading, checkTitleCase } from "./headings";
 
 function mockWriteInput(filePath: string, content: string): PreToolUseHookInput {
@@ -18,7 +19,7 @@ function mockWriteInput(filePath: string, content: string): PreToolUseHookInput 
 }
 
 function getOutput(input: PreToolUseHookInput): PreToolUseHookSpecificOutput | null {
-  const result = check(input);
+  const result = report(check(input), { toolName: input.tool_name });
   if (!result) return null;
   const output = result.output.hookSpecificOutput;
   if (output?.hookEventName !== "PreToolUse") return null;
@@ -224,6 +225,14 @@ describe("processInput", () => {
   it("returns title case guidance", () => {
     const output = getOutput(mockWriteInput("README.md", "# introduction"));
     expect(output?.additionalContext).toContain("AP-style title case");
+  });
+
+  it("lists three title-case headings and counts the rest", () => {
+    const content = Array.from({ length: 5 }, (_, i) => `## part number ${i}`).join("\n\n");
+    const findings = check(mockWriteInput("README.md", content));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.message.match(/should be title case/g)).toHaveLength(3);
+    expect(findings[0]?.message).toContain("2 more headings have the same problem");
   });
 
   it("returns bold-as-heading guidance", () => {

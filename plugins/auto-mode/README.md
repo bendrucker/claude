@@ -11,7 +11,7 @@ Records each tool call's permission verdict. It depends on the `mod-events` plug
 - `session.start`: emits a `session.start` event.
 - `turn.step`: emits a `server.tool` event for each tool the API ran inside a request.
 
-The `observability:session` index ingests the events as `mod_events` and reads them through the `classifier_verdicts` view. The engine does not expose the permission mode to `tool.check`, so a `tool.verdict` cannot tell an auto-mode classifier ask from a dialog ask. `tool_errors` carries each classifier refusal as `denial_kind = 'automode-blocked'`.
+The `observability:session` index ingests the events as `mod_events` and reads them through the `classifier_verdicts` view. The engine does not expose the permission mode to `tool.check`. A `tool.verdict` therefore cannot tell an auto-mode classifier ask from a dialog ask. `tool_errors` carries each classifier refusal as `denial_kind = 'automode-blocked'`.
 
 ## Testing
 

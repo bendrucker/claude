@@ -23,8 +23,27 @@ export const RunLogEntry = z.object({
   // Every category the checkers found this run, not only the tier winner.
   // Absent when the run returned before the checkers ran.
   categories: z.array(z.string()).optional(),
+  // Every category the run injected, and every one repeat suppression muted.
+  // Older entries carry only `category` and `suppressed`.
+  emitted: z.array(z.string()).optional(),
+  suppressed_categories: z.array(z.string()).optional(),
 });
 export type RunLogEntry = z.infer<typeof RunLogEntry>;
+
+const INJECTION_OUTCOMES = new Set<RunOutcome>(["context", "ask", "deny"]);
+
+export function emittedOf(entry: RunLogEntry): string[] {
+  if (entry.emitted) return entry.emitted;
+  if (entry.category == null || entry.category === "" || entry.suppressed === true) return [];
+  return INJECTION_OUTCOMES.has(entry.outcome) ? [entry.category] : [];
+}
+
+export function suppressedOf(entry: RunLogEntry): string[] {
+  if (entry.suppressed_categories) return entry.suppressed_categories;
+  return entry.suppressed === true && entry.category != null && entry.category !== ""
+    ? [entry.category]
+    : [];
+}
 
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
 const OFF_VALUES = new Set(["0", "false", "off"]);

@@ -5,13 +5,13 @@ Detects and eliminates type ignores across your codebase.
 ## Contents
 
 - **Skills**
-  - `fix` — Discovers and fixes type ignores across files, directories, or codebase
+  - `fix`: Discovers and fixes type ignores across files, directories, or codebase
 
 - **Hooks**
-  - `detect.ts` — PostToolUse hook that detects new type/lint ignores in edits
+  - `detect.ts`: PostToolUse hook that detects new type/lint ignores in edits
 
 - **Agents**
-  - `fixer` — Fixes type errors in a single file (spawned by hook or skill)
+  - `fixer`: Fixes type errors in a single file (spawned by hook or skill)
 
 ## Patterns Detected
 

@@ -65,6 +65,16 @@ describe("tally", () => {
     expect(t.inclusive.get("main (demo)")).toBe(t.sum);
   });
 
+  it("drops a remainder within the children's rounding", () => {
+    const rounded = parse(`
+    3 (10.0M) main  (in demo) + 40  [0x1]
+    + 1 (3.3M) a  (in demo) + 4  [0x2]
+    + 1 (3.3M) b  (in demo) + 4  [0x3]
+    + 1 (3.3M) c  (in demo) + 4  [0x4]
+`);
+    expect([...tally(rounded).sites.keys()]).toEqual(["a (demo)", "b (demo)", "c (demo)"]);
+  });
+
   it("sums the bytes under matching frames", () => {
     expect(tally(parsed, undefined, /load/).matched).toBe(24 * MB);
   });

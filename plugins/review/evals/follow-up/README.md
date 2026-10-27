@@ -11,7 +11,7 @@ A native `claude plugin eval` suite for `review:follow-up`. Each case scaffolds 
 
 ## Snapshot CLIs
 
-The cases run without network, so `gh` and `glab` answer from a snapshot through the [`eval-stubs`](../../../../packages/eval-stubs/) stand-ins, which [`suite.yaml`](suite.yaml) stages beside the suite. Each `fixture.sh` installs them, starts the repo with the shared preamble, and writes `$HOME/.eval-stubs/meta.json` with the PR or MR, its reviews and threads, and the SHAs of each version. Diffs, commits, and file contents come from the scaffolded repo. The stand-ins cover the REST and GraphQL reads the skill and its helper scripts make, and refuse every write, so a session that tries to post, approve, or resolve gets an error instead of a side effect.
+The cases run without network. `gh` and `glab` therefore answer from a snapshot through the [`eval-stubs`](../../../../packages/eval-stubs/) stand-ins, which [`suite.yaml`](suite.yaml) stages beside the suite. Each `fixture.sh` installs them, starts the repo with the shared preamble, and writes `$HOME/.eval-stubs/meta.json` with the PR or MR, its reviews and threads, and the SHAs of each version. Diffs, commits, and file contents come from the scaffolded repo. The stand-ins cover the REST and GraphQL reads the skill and its helper scripts make, and refuse every write, so a session that tries to post, approve, or resolve gets an error instead of a side effect.
 
 ## Graders
 

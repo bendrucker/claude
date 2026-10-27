@@ -151,7 +151,11 @@ async function writeReaderInit(url: string): Promise<string> {
     throw new Error(`${dir} is not private to this user; remove it and retry.`);
   const sql = await readerInit(url);
   const path = join(dir, `${createHash("sha256").update(sql).digest("hex").slice(0, 12)}.sql`);
-  if (!(await Bun.file(path).exists())) await Bun.write(path, sql);
+  if (!(await Bun.file(path).exists())) {
+    // Renamed into place, so a concurrent reader never opens a partial file.
+    await Bun.write(`${path}.${process.pid}`, sql);
+    await $`mv -f ${`${path}.${process.pid}`} ${path}`;
+  }
   return path;
 }
 

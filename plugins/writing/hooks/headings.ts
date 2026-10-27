@@ -25,10 +25,17 @@ export function checkSentenceHeading(content: string): string | null {
   return sentenceHeadingFindings(content)[0]?.message ?? null;
 }
 
+const MAX_GROUPED = 3;
+
 function grouped(category: string, findings: HeadingFinding[], advice: string): HookFinding[] {
   if (findings.length === 0) return [];
-  const listed = findings.map((finding) => finding.message).join(". ");
-  return [{ category, tier: "context", message: `${listed}. ${advice}` }];
+  const listed = findings
+    .slice(0, MAX_GROUPED)
+    .map((finding) => finding.message)
+    .join(". ");
+  const rest = findings.length - MAX_GROUPED;
+  const more = rest > 0 ? `. ${rest} more headings have the same problem` : "";
+  return [{ category, tier: "context", message: `${listed}${more}. ${advice}` }];
 }
 
 export function check(input: PreToolUseHookInput): HookFinding[] {

@@ -3,7 +3,6 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import { headingCaseViolations } from "../hooks/heading-case";
 import { classifyHeadingBaseline } from "../linguistics/heading";
-import { positionOfSample } from "./scan";
 
 export interface HeadingFinding {
   line: number;
@@ -23,16 +22,23 @@ function textOf(children: PhrasingContent[]): string {
     .join("");
 }
 
-// Title-case violations carry no source position, so each is located by its text.
+// Title-case violations carry no source position, so each heading's own source
+// is checked alone and takes its position from the parse.
 export function titleCaseFindings(content: string): HeadingFinding[] {
-  return headingCaseViolations(content).map((violation) => {
-    const { line, col } = positionOfSample(content, violation.text);
-    return {
-      line,
-      col,
-      message: `Heading "${violation.text}" should be title case: "${violation.suggested}"`,
-    };
+  const findings: HeadingFinding[] = [];
+  visit(fromMarkdown(content), "heading", (node: Heading) => {
+    const start = node.position?.start;
+    const end = node.position?.end;
+    if (start?.offset == null || end?.offset == null) return;
+    for (const violation of headingCaseViolations(content.slice(start.offset, end.offset))) {
+      findings.push({
+        line: start.line,
+        col: start.column,
+        message: `Heading "${violation.text}" should be title case: "${violation.suggested}"`,
+      });
+    }
   });
+  return findings;
 }
 
 export function boldHeadingFindings(content: string): HeadingFinding[] {

@@ -31,6 +31,14 @@ describe("findAll", () => {
     expect(found.map((f) => f.line)).toEqual([1, 5]);
   });
 
+  test("locates a repeated heading at each occurrence, past a prose mention", async () => {
+    const text = "Read the first part below.\n\n## the first part\n\ntext\n\n## the first part\n";
+    const found = (await findAll(text, { filePath: "doc.md" })).filter(
+      (f) => f.category === "title case heading",
+    );
+    expect(found.map((f) => f.line)).toEqual([3, 7]);
+  });
+
   test("reports bold-as-heading and step numbering with positions", async () => {
     const text = "Intro.\n\n**Setup:** do it.\n\n## Step 1\n";
     const found = await findAll(text, { filePath: "doc.md" });

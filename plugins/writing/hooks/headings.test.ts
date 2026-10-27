@@ -227,6 +227,14 @@ describe("processInput", () => {
     expect(output?.additionalContext).toContain("AP-style title case");
   });
 
+  it("lists three title-case headings and counts the rest", () => {
+    const content = Array.from({ length: 5 }, (_, i) => `## part number ${i}`).join("\n\n");
+    const findings = check(mockWriteInput("README.md", content));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.message.match(/should be title case/g)).toHaveLength(3);
+    expect(findings[0]?.message).toContain("2 more headings have the same problem");
+  });
+
   it("returns bold-as-heading guidance", () => {
     const output = getOutput(mockWriteInput("README.md", "**Configuration:**\nSome text"));
     expect(output?.additionalContext).toContain("markdown heading");

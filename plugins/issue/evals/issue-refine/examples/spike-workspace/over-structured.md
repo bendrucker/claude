@@ -1,5 +1,5 @@
 ---
-fail: [no-h1, heading-sentence, heading-title-case, jargon, over-structured, option-menu, summary-heading, type-spike, relations]
+fail: [headings-3, no-h1, heading-sentence, heading-title-case, jargon, over-structured, option-menu, summary-heading, type-spike, relations]
 ---
 <issue>
 ---

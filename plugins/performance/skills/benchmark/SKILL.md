@@ -2,8 +2,8 @@
 name: performance:benchmark
 description: >-
   Use when timing a program or command, asking whether a change or version
-  made it faster, or building a benchmark harness. For repeated optimization
-  toward a target, use performance:hill-climb.
+  made it faster, or building a benchmark harness. To hill-climb or
+  repeatedly optimize toward a target, use performance:hill-climb.
 argument-hint: "[<command>]"
 ---
 
@@ -43,7 +43,7 @@ Pin the scenario before timing it. A run that changes its own input measures a d
 
 Interleaving runs every arm in the same round, so each one exists on disk at once:
 
-- **Copies.** A `git worktree add <dir> <ref>` per version, or a separate build output per arm. Put each worktree outside the repo, where a test runner, linter, or watcher walking the tree cannot pick it up.
+- **Copies.** A `git worktree add <dir> <ref>` per version, or a separate build output per arm. Put each worktree under the repo's gitignored `tmp/arms/`, and exclude that directory from any test runner, linter, or watcher that walks the tree.
 - **State.** When the program writes outside its tree (`~/.cache`, a config directory), point each arm at its own copy. Shared state lets a candidate that changes a cache format make both arms miss on every run.
 - **Paths.** Check that each arm runs only its own copy. A test runner reads a bare path argument as a filter that can match another arm's tree, so pass paths with a leading `./`.
 - **Passing run.** Before a long comparison, run each arm once with its output visible and confirm it passes.
@@ -68,7 +68,7 @@ Before comparing versions, run the unchanged program as two arms (an A/A compari
 
 The A/A spread (`±MAD`) is the smallest change the harness can resolve.
 
-When the Mac's A/A will not tie or the fast signal needs `perf` or hardware counters, read [../profile/references/linux-vm.md](../profile/references/linux-vm.md).
+When the Mac's A/A will not tie, machine load would delay a comparison by more than about 15 minutes, or the fast signal needs `perf` or hardware counters, read [../profile/references/linux-vm.md](../profile/references/linux-vm.md).
 
 ## Reading the Report
 
@@ -76,6 +76,18 @@ When the Mac's A/A will not tie or the fast signal needs `perf` or hardware coun
 - `†` marks fewer than 4 runs on a side, too few to star. With 3 a side, the permutation test cannot reach p < 0.1 however far apart the arms are, so plan `--rounds` and `--runs` for at least 4 per arm, even when each run is expensive.
 - A nonzero `failed` count means some runs exited nonzero and left the pool. `compare.ts run` stops after the round where a run fails. Run that arm once with its output visible and fix the cause before starting a new comparison.
 - About one comparison in ten stars by chance at the default alpha. Re-run a star on a metric nobody predicted would move before treating it as a result.
+
+## Memory
+
+`compare.ts` records each run's peak resident set size (max RSS) from `hyperfine`, beside wall time. When the goal is memory, peak RSS is the metric: `compare.ts report <dir> --metric memory` runs the same significance test and star rule on it.
+
+- Judge a memory candidate on peak RSS with significance, never on total bytes allocated. Allocation volume tracks allocator time, and a change can cut it while the peak stays put.
+- Each run's peak RSS is that of the largest single process, read through `getrusage` of the child. Pass `-N` so it is the program's own, not a shell's. A program that spreads its peak over child processes needs each child measured.
+- Arms that each repeat one exact value differ deterministically, and the report gives that difference p = 0.
+- Outside `compare.ts`, read peak RSS with `/usr/bin/time -l` on macOS (bytes) or `/usr/bin/time -v` on Linux (KB), or from `resourceUsage().maxRSS` of a `Bun.spawn` child, which works inside the sandbox.
+- macOS reports `peak memory footprint` beside max RSS. Footprint excludes mapped binary text and shared pages, so the two differ. Name the one the climb records and compare like with like.
+
+To find what holds the peak, profile it with `performance:profile`.
 
 ## Fast Signals
 

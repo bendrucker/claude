@@ -33,6 +33,8 @@ async function backdate(target: string) {
 const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 const resourcesDir = join(import.meta.dirname, "..", "resources");
 const plansFixtureDir = join(import.meta.dirname, "..", "fixtures", "plans");
+// Outside skills/, where a plugin load would register these as the plugin's own skills.
+const skillsFixtureDir = join(import.meta.dirname, "..", "..", "..", "fixtures", "skills");
 
 async function loadExtensions(database: Database) {
   // `getenv` exists only in the duckdb CLI, so stub it for the node binding with the
@@ -232,6 +234,48 @@ describe("search", () => {
       query: '"retry budget"',
     });
     expect(rows.map((r) => r.session_id)).toEqual(["ai-titled-session"]);
+  });
+
+  const Hit = z.object({ session_id: z.string(), matched_surfaces: z.array(z.string()) });
+
+  it.each([
+    ["zebrafinch", "tool_input"],
+    ["dictation-recordings", "tool_input"],
+    ["readpathtoken", "tool_input"],
+    ["aardvarkoutput", "tool_output"],
+    ["arrayoutputtoken", "tool_output"],
+    ["quokkathink", "thinking"],
+    ["queuedprompttoken", "queued_prompt"],
+  ])("matches %s on its %s surface", async (query, surface) => {
+    const rows = await runQuery(db, "search", Hit, { ...queryParams({ limit: "10" }), query });
+    expect(rows).toEqual([{ session_id: "search-surfaces-session", matched_surfaces: [surface] }]);
+  });
+
+  it("ranks a prose match above the same match in tool output", async () => {
+    const score = async (query: string) => {
+      const rows = await runQuery(db, "search", z.object({ score: z.number() }), {
+        ...queryParams({ limit: "10" }),
+        query,
+      });
+      return rows[0]?.score ?? 0;
+    };
+    expect(await score("prosetoken")).toBeGreaterThan(await score("aardvarkoutput"));
+  });
+
+  it.each([
+    "readcontenttoken",
+    "writecontenttoken",
+    "tasknotiftoken",
+    "skillbodytoken",
+    "subagentprosetoken",
+    "subagentcmdtoken",
+    "pastcaptoken",
+  ])("leaves %s out", async (query) => {
+    const rows = await runQuery(db, "search", z.unknown(), {
+      ...queryParams({ limit: "10" }),
+      query,
+    });
+    expect(rows).toHaveLength(0);
   });
 });
 
@@ -927,6 +971,39 @@ describe("hook_events", () => {
   });
 });
 
+describe("skill_loads view", () => {
+  it("records each body load with its trigger and plugin version", async () => {
+    const rows = await db.query(
+      `SELECT skill, plugin, plugin_version, trigger, tool_use_id FROM skill_loads
+       WHERE session_id = 'skill-loads-session' ORDER BY timestamp`,
+      z.object({
+        skill: z.string(),
+        plugin: z.string().nullable(),
+        plugin_version: z.string().nullable(),
+        trigger: z.string(),
+        tool_use_id: z.string().nullable(),
+      }),
+    );
+    expect(rows).toEqual([
+      {
+        skill: "performance:hill-climb",
+        plugin: "performance",
+        plugin_version: "6dd71451204e",
+        trigger: "tool",
+        tool_use_id: "sl-tool-1",
+      },
+      { skill: "ship", plugin: null, plugin_version: null, trigger: "harness", tool_use_id: null },
+      {
+        skill: "performance:hill-climb",
+        plugin: "performance",
+        plugin_version: "1a2b3c4d5e6f",
+        trigger: "compaction",
+        tool_use_id: null,
+      },
+    ]);
+  });
+});
+
 describe("hook_blocks view", () => {
   it("surfaces deny, ask, and block decisions", async () => {
     const rows = await db.query(
@@ -1274,8 +1351,8 @@ describe("outcomes query", () => {
       "sessions: shipped": 2,
       "sessions: ongoing": 1,
       "sessions: handed-off": 2,
-      "sessions: abandoned-with-edits": 3,
-      "sessions: no-artifact": 19,
+      "sessions: abandoned-with-edits": 4,
+      "sessions: no-artifact": 20,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -1292,7 +1369,7 @@ describe("outcomes query", () => {
     // reads as ongoing; the shipped ones keep their state
     expect(metrics(rows)).toEqual({
       "sessions: shipped": 2,
-      "sessions: ongoing": 25,
+      "sessions: ongoing": 27,
       "prs opened (distinct urls)": 1,
       "prs needing multiple sessions": 0,
     });
@@ -2431,8 +2508,6 @@ describe("plan-sections query", () => {
 });
 
 describe("skill-config-vs-observed query", () => {
-  const skillsFixtureDir = join(import.meta.dirname, "..", "fixtures", "skills");
-
   const SkillRow = z.object({
     source: z.string(),
     skill_name: z.string(),
@@ -3482,9 +3557,9 @@ const fixtureGlobs: Record<string, string> = {
   frontmatter_glob: join(import.meta.dirname, "..", "SKILL.md"),
   metrics_glob: join(fixturesDir, "..", "hook-metrics", "*.jsonl"),
   plans_glob: join(plansFixtureDir, "*.md"),
-  plugin_skill_glob: join(fixturesDir, "..", "skills", "cache/*/*/*/skills/*/SKILL.md"),
-  user_skill_glob: join(fixturesDir, "..", "skills", "user/*/SKILL.md"),
-  project_skill_glob: join(fixturesDir, "..", "skills", "project/*/SKILL.md"),
+  plugin_skill_glob: join(skillsFixtureDir, "cache/*/*/*/skills/*/SKILL.md"),
+  user_skill_glob: join(skillsFixtureDir, "user/*/SKILL.md"),
+  project_skill_glob: join(skillsFixtureDir, "project/*/SKILL.md"),
 };
 
 describe.each(

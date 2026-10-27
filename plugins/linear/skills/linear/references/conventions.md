@@ -41,35 +41,7 @@ Issue refinement marks its collapsible as a `## 🤖 Agent Context` heading. Rep
 
 ## Issue Status
 
-When creating issues, set status based on assignment:
-
-- **Assigned to me** (`assignee: "me"`): Set `state: "Todo"`
-- **Unassigned**: Set `state: "Backlog"`
-
-Input for the connector `save_issue` or MCP `create_issue`:
-
-```json
-{
-  "team": "ENG",
-  "title": "Fix authentication bug",
-  "assignee": "me",
-  "state": "Todo"
-}
-```
-
-Unassigned:
-
-```json
-{
-  "team": "ENG",
-  "title": "Research API performance",
-  "state": "Backlog"
-}
-```
-
-`hooks/save-issue.ts` injects this default on the MCP tool paths (the connector `save_issue` and the local or plugin `create_issue`), and only when creating without an explicit `state`. `hooks/cli-create.ts` does the same for `linear issue create`, appending `--state` when the command is a single invocation and denying with the flag to add when it is piped or chained.
-
-Raw `linear api` mutations stay unhooked. Set `stateId` yourself there. An issue created through the API with no state lands in Triage on a triage-enabled team.
+Default a new issue's state from assignment: `Todo` when assigned to me, `Backlog` when unassigned. An explicit state from the user wins. The plugin's hooks apply this default on `save_issue`, `create_issue`, and single `linear issue create` invocations wherever its state options are set. Raw `linear api` mutations stay unhooked, so set `stateId` there, since an issue created with no state lands in Triage on a triage-enabled team.
 
 ## CLI Idioms
 
@@ -84,35 +56,8 @@ Pass body text through `--description-file <path>` so it stays out of context an
 
 ## Querying Issues
 
-Use `assignee: "me"` to filter issues assigned to the authenticated user. Input for the MCP `list_issues` tool:
-
-```json
-{ "assignee": "me" }
-```
-
-Team backlog:
-
-```json
-{ "team": "ENG", "state": "Backlog" }
-```
-
-When no MCP list tool is available, fall back to GraphQL per [GraphQL API](../SKILL.md#graphql-api).
+Filter by `assignee: "me"` for the authenticated user's issues, and include `url` when you may reference a result. Without an MCP list tool, fall back to GraphQL per [api.md](../api.md).
 
 ## Labels
 
-Use label names directly when creating or updating; no need to look up IDs:
-
-```json
-{
-  "team": "ENG",
-  "title": "Update documentation",
-  "labels": ["documentation", "high-priority"]
-}
-```
-
-Labels can exist at the workspace or team level. Check both with the MCP `list_issue_labels` tool:
-
-1. Workspace labels: no `team` filter (empty input `{}`)
-2. Team labels: `{ "team": "TEAM" }`
-
-If a label isn't found at the workspace level, check the team before concluding it doesn't exist.
+Pass label names directly, no IDs. Labels live at the workspace or team level, so when looking one up with `list_issue_labels`, check the workspace (`{}`) and then the team (`{ "team": "ENG" }`) before concluding it doesn't exist.

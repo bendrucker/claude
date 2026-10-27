@@ -32,10 +32,15 @@ let repo = "";
 let head = "";
 
 beforeAll(async () => {
+  // Under a pre-commit hook, inherited GIT_* variables point every git call in the scratch repo at the outer commit's index.
+  for (const key of Object.keys(process.env)) {
+    if (key.startsWith("GIT_")) delete process.env[key];
+  }
   repo = mkdtempSync(join(tmpdir(), "rule-precision-"));
   await $`git init -q`.cwd(repo).quiet();
   await $`git config user.email test@example.com`.cwd(repo).quiet();
   await $`git config user.name Test`.cwd(repo).quiet();
+  await $`git config core.hooksPath /dev/null`.cwd(repo).quiet();
   await Bun.write(join(repo, "doc.md"), BEFORE);
   await $`git add -A`.cwd(repo).quiet();
   await $`git commit -qm first`.cwd(repo).quiet();

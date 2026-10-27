@@ -1,3 +1,4 @@
+judge_model: claude-opus-5-5
 graders:
   skill-fired: "!neg-*"
   frontmatter: "!neg-*"
@@ -16,10 +17,32 @@ graders:
   title-length: "!neg-*"
   title-parenthetical: "!neg-*"
   title-sentence-case: "!neg-*"
+  title-no-code: "!neg-*"
+  no-leak: "!neg-*"
   type-bug: ["bug-*"]
   type-feature: ["feature-*"]
   type-refactor: ["refactor-*"]
   type-spike: ["spike-*"]
   no-headings: [bug-404-nav, refactor-double-session-read]
-  relations: [bug-partial-success, spike-workspace]
+  relations: [bug-partial-success, spike-workspace, feature-connection-check]
+  body-words-80: [bug-upstream-empty-element, bug-404-nav, bug-dialog-pointer-events, feature-dev-gateway, refactor-double-session-read, spike-ndjson-contract]
+  body-words-150: [bug-config-repro, bug-upstream-empty-element, bug-partial-success, bug-webhook-duplicates, bug-worker-memory-leak, bug-xml-type-inference, feature-aggregation-cases, feature-connection-check, feature-csv-export, feature-pin-conversations, feature-share-events, refactor-transform-cost, spike-thumbnail-offload, spike-workspace, bug-dialog-pointer-events, feature-dev-gateway, refactor-double-session-read, spike-ndjson-contract]
+  body-words-250: [bug-config-repro, bug-upstream-empty-element, bug-dialog-pointer-events, feature-dev-gateway, refactor-double-session-read, spike-ndjson-contract, bug-partial-success, bug-webhook-duplicates, bug-worker-memory-leak, bug-xml-type-inference, feature-aggregation-cases, feature-connection-check, feature-csv-export, feature-pin-conversations, feature-share-events, refactor-transform-cost, spike-thumbnail-offload, spike-workspace]
+  body-words-400: [bug-config-repro, bug-partial-success, bug-webhook-duplicates, bug-worker-memory-leak, bug-xml-type-inference, feature-aggregation-cases, feature-connection-check, feature-csv-export, feature-pin-conversations, feature-share-events, refactor-transform-cost, spike-thumbnail-offload, spike-workspace]
+  oq-justified: ["bug-*", "feature-*", "refactor-*"]
+  bullet-words-20: "!neg-*"
+  bullet-words-25: "!neg-*"
+  bullet-words-40: "!neg-*"
+  bullets-6: "!neg-*"
+  bullets-10: "!neg-*"
+  headings-3: "!neg-*"
+  para-words-60: "!neg-*"
+  identifiers-10: "!neg-*"
+  identifiers-20: "!neg-*"
+  context-words-100: "!neg-*"
+  context-words-200: "!neg-*"
+  no-provenance: "!neg-*"
+  no-tests-as-ac: "!neg-*"
+  ac-verifies: ["bug-*", "feature-*", "refactor-*"]
+  bullets-concise: "!neg-*"
   refine-not-fired: ["neg-*"]

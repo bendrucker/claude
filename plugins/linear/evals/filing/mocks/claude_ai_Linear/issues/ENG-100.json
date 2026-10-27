@@ -1,0 +1,9 @@
+{
+  "id": "uuid-eng-100",
+  "identifier": "ENG-100",
+  "title": "Rate-limit outbound webhook retries",
+  "url": "https://linear.app/acme/issue/ENG-100",
+  "state": { "name": "Todo" },
+  "team": { "key": "ENG" },
+  "relations": []
+}

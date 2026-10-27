@@ -14,7 +14,15 @@ GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
 - **Agents**:
   - `github-rulesets-manager`: Configure repository rulesets and branch protection
   - `logs`: Extracts relevant lines from failing-job logs (invoked by `actions-monitor`)
-- **Hook**: Intercepts WebFetch for efficient GitHub data access
+- **Hooks**:
+  - Intercepts WebFetch for efficient GitHub data access
+  - [`runner-queue.ts`](scripts/runner-queue.ts) follows `gh workflow run` with the new run's place in line when it waits on a self-hosted runner, so the model knows why the run has not started and how long to wait before checking. Silent when the job starts at once or runs on a GitHub-hosted runner. Self-timed to `~/.claude/hook-metrics/github-runner-queue.jsonl`
+
+    ```text
+    [github/runner-queue] Run 39817210542 is queued for a self-hosted runner labeled actions-sandbox: 0 job(s) ahead, 1 matching job(s) running.
+    Holding the runner:
+    - session-bench run 39815981118 job "bench" on main, started 8m ago (recent successful runs take ~14m)
+    ```
 - **Mod**: [`register.ts`](mod/register.ts) watches the current branch's pull request and shows its CI and review state at the end of the prompt footer. The model is told when the PR merges or closes, when it conflicts with its base or needs an update that the base requires, when its branch moves to a commit the local repository lacks, when a check newly fails, and when other people review or comment, in one line per author. A conflict alert points at the `git:conflicts` skill and fires even when the conflict is already there as the PR is first seen. Every decision and send is logged to `mod-events`. Needs a signed-in `gh`. Set the `watch` option to false to turn it off
 
 ## Testing

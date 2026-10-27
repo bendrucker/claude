@@ -34,8 +34,18 @@ export function baseRate(labels: Labels): number {
   return labels.prose === 0 ? 0 : labels.deleted / labels.prose;
 }
 
+// An inherited GIT_DIR or GIT_INDEX_FILE, as a pre-commit hook sets, would override `cwd` and read another repo.
+const repoEnv = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
+);
+
 function git(repo: string, args: string[]): string {
-  const run = Bun.spawnSync(["git", ...args], { cwd: repo, stdout: "pipe", stderr: "pipe" });
+  const run = Bun.spawnSync(["git", ...args], {
+    cwd: repo,
+    env: repoEnv,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   return run.success ? run.stdout.toString() : "";
 }
 

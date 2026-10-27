@@ -14,5 +14,5 @@ SET threads = 4;
 SET max_temp_directory_size = '16GiB';
 -- The default spill dir sits beside the database, which the sandbox denies. A
 -- per-process dir keeps concurrent readers from sharing spill files, and DuckDB
--- removes it on exit.
-SET temp_directory = rtrim(coalesce(getenv('TMPDIR'), '/tmp'), '/') || '/duckdb-' || uuid();
+-- removes it on exit. getenv returns '' for an unset variable, not NULL.
+SET temp_directory = rtrim(coalesce(nullif(getenv('TMPDIR'), ''), '/tmp'), '/') || '/duckdb-' || uuid();

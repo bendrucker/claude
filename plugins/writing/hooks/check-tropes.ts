@@ -1,14 +1,9 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { exceedsLineLimit, extractComments } from "../detection/comments";
 import { isProseFile } from "../detection/paths";
-import {
-  firstByTier,
-  type PatternMatch,
-  scan,
-  scanIntroduced,
-  semicolonSpliceHits,
-} from "../detection/tropes";
-import { formatContext, formatDecision, type HookResult, type ToolInput, toolInputOf } from "./io";
+import { scan, scanIntroduced, semicolonSpliceHits, stripCode } from "../detection/tropes";
+import { type ToolInput, toolInputOf } from "./io";
+import type { HookFinding } from "./report";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
@@ -28,6 +23,35 @@ export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 // `key=@` marker. Scoped to git so a bare `-F` in unrelated CLIs (curl) does
 // not trigger file reads. Guard fragment shipped to hooks.json like the above.
 export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
+
+// Any prose value in an MCP call puts three spaces, backticks, or JSON-escaped
+// tabs on the hook's stdin, since a stripped code span reads as spaces.
+// hooks.json ships this grep so other calls skip the bun spawn.
+export const MCP_PROSE_GUARD = "([ `]|\\\\t).*([ `]|\\\\t).*([ `]|\\\\t)";
+
+const PROSE_WORD = /^[("'*_]*(?:[A-Za-z][A-Za-z'’-]*|\d[\d,.%]*)[)"'*_.,;:!?]*$/;
+const MIN_SENTENCE_TOKENS = 4;
+const MIN_WORD_SHARE = 0.8;
+
+export function isProse(value: string): boolean {
+  // A sentence that ends on a code span keeps its terminator.
+  const text = stripCode(value).replaceAll(/[ \t]+([.!?:])/g, "$1");
+  for (const sentence of text.split(/(?<=\w[.!?])\s+|\n+/)) {
+    const trimmed = sentence.trim();
+    const tokens = trimmed.split(/[ \t]+/);
+    if (tokens.length < MIN_SENTENCE_TOKENS || !/[\w)"'’*][.!?:][)"'’*_]*$/.test(trimmed)) continue;
+    const words = tokens.filter((token) => PROSE_WORD.test(token)).length;
+    if (words / tokens.length >= MIN_WORD_SHARE) return true;
+  }
+  return false;
+}
+
+function strings(value: unknown): string[] {
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap(strings);
+  if (value !== null && typeof value === "object") return Object.values(value).flatMap(strings);
+  return [];
+}
 
 const BODY_FILE_PATTERN = new RegExp(`(?:${BODY_FILE_FLAGS.join("|")})[=\\s](\\S+)`);
 const FIELD_FILE_PATTERN = /(?:^|\s)['"]?(?:-F|--field)[= ]([^\s=]+)=@(\S+)/g;
@@ -147,6 +171,8 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
     return pair ? [pair.newText] : [];
   }
 
+  if (toolName.startsWith("mcp__")) return strings(input.tool_input).filter(isProse);
+
   if (toolName === "Bash" && toolInput.command !== undefined) {
     const command = toolInput.command;
     const texts: string[] = [];
@@ -175,18 +201,6 @@ const WORDLIST_PATH_PATTERN = /\/wordlists\/[^/]+\.txt$/;
 function isWordlistFile(input: PreToolUseHookInput): boolean {
   const filePath = toolInputOf(input).file_path;
   return filePath !== undefined && WORDLIST_PATH_PATTERN.test(filePath);
-}
-
-function buildFileOpReminder(
-  toolName: string,
-  filePath: string | undefined,
-  deny: PatternMatch,
-): string {
-  const target = filePath != null && filePath !== "" ? `\`${filePath}\`` : "the file";
-  if (toolName === "Write") {
-    return `${deny.message} You wrote ${target} introducing this. Issue a follow-up Edit that fixes only the trope you just introduced. Do not modify unrelated parts of the file.`;
-  }
-  return `${deny.message} You introduced this in your edit to ${target}. Issue a follow-up Edit that targets only the text you just changed. Do not modify unrelated parts of the file, including other pre-existing tropes.`;
 }
 
 // Comments are short, so density gates cannot work there: a single introduced
@@ -232,9 +246,9 @@ async function wholeFilePair(
   return { newText, oldText };
 }
 
-async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | null> {
+async function processFileOp(input: PreToolUseHookInput): Promise<HookFinding[]> {
   const pair = await collectFileOpPair(input);
-  if (!pair) return null;
+  if (!pair) return [];
   const filePath = toolInputOf(input).file_path;
 
   // Prose rules target prose. In a code file the model's prose surface is its
@@ -259,52 +273,38 @@ async function processFileOp(input: PreToolUseHookInput): Promise<HookResult | n
   }
   const matches = await scanIntroduced(scanPair.newText, scanPair.oldText, filePath, "file");
 
-  const deny = firstByTier(matches, "deny");
-  if (deny) {
-    // Deny-tier reminders instruct a per-file corrective edit, so repeat
-    // suppression must never mute them even though they emit as context.
-    return {
-      output: formatContext(buildFileOpReminder(input.tool_name, filePath, deny)),
-      category: deny.category,
-      suppressible: false,
-    };
-  }
-
-  const context = firstByTier(matches, "context");
-  if (context) return { output: formatContext(context.message), category: context.category };
+  const findings: HookFinding[] = matches.map((match) => ({
+    category: match.category,
+    tier: "context",
+    message: match.message,
+    introduced: match.tier === "deny",
+  }));
 
   if (!prose) {
     const splice = commentSplice(scanPair);
     if (splice != null && splice !== "")
-      return { output: formatContext(splice), category: "comment splice" };
+      findings.push({ category: "comment splice", tier: "context", message: splice });
   }
 
-  return null;
+  return findings;
 }
 
-async function processSideEffect(input: PreToolUseHookInput): Promise<HookResult | null> {
+async function processSideEffect(input: PreToolUseHookInput): Promise<HookFinding[]> {
   const texts = await collectText(input);
-  if (texts.length === 0) return null;
+  if (texts.length === 0) return [];
 
+  // Only a structural pattern blocks the call. A soft deny-tier hit is advice
+  // the model can act on while revising the rest.
   const matches = await scan(texts.join("\n"), undefined, "sideEffect");
-
-  // A structural deny blocks the call, so it outranks every other finding
-  // regardless of where its pattern sits in the catalog. Selecting the first
-  // deny of any kind would let a soft vocabulary hit that happens to be
-  // declared earlier downgrade the block to a reminder.
-  const structural = matches.find((match) => match.tier === "deny" && match.structural);
-  if (structural) {
-    return { output: formatDecision("deny", structural.message), category: structural.category };
-  }
-
-  const match = firstByTier(matches, "deny") ?? firstByTier(matches, "context");
-  if (match) return { output: formatContext(match.message), category: match.category };
-
-  return null;
+  return matches.map((match) => ({
+    category: match.category,
+    tier: match.tier === "deny" && match.structural ? "deny" : "context",
+    message: match.message,
+  }));
 }
 
-export async function check(input: PreToolUseHookInput): Promise<HookResult | null> {
-  if (isWordlistFile(input)) return null;
+export async function check(input: PreToolUseHookInput): Promise<HookFinding[]> {
+  if (isWordlistFile(input)) return [];
 
   if (FILE_OP_TOOLS.has(input.tool_name)) return processFileOp(input);
   return processSideEffect(input);

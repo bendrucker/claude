@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: feature-csv-export
-tags: [feature, full]
+tags: [feature, full, holdout]
 plugins: ["../../..", "../../../../pull-request"]
 execution:
   model: claude-sonnet-5-5

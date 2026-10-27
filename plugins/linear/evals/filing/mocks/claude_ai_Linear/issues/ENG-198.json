@@ -1,0 +1,9 @@
+{
+  "id": "uuid-eng-198",
+  "identifier": "ENG-198",
+  "title": "Migrate billing worker to the new queue",
+  "url": "https://linear.app/acme/issue/ENG-198",
+  "state": { "name": "Todo" },
+  "team": { "key": "ENG" },
+  "relations": []
+}

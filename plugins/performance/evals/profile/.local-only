@@ -1,0 +1,1 @@
+Each session profiles through relay/daemon.ts, which runs samply outside the sandbox on the operator's machine. CI runners lack that setup.

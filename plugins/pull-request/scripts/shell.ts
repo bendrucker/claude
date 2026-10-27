@@ -159,6 +159,22 @@ function substitutedFile(substitution: CmdSubst, context: Context): string | nul
   return literal(evaluateWord(operand, context));
 }
 
+// `$(cat <<'EOF' ... EOF)`, the inline body Claude Code writes by default. The
+// substitution drops the heredoc's trailing newlines, and an unquoted heredoc
+// holding an expansion stays unresolved.
+function substitutedHeredoc(substitution: CmdSubst, context: Context): string | null {
+  const statements = substitution.Stmts.filter((statement) => statement !== null);
+  const statement = statements.length === 1 ? statements[0] : undefined;
+  if (statement === undefined || !isCall(statement.Cmd)) return null;
+  const args = statement.Cmd.Args.filter((arg) => arg !== null);
+  const verb = args.length === 1 ? args[0] : undefined;
+  if (verb === undefined || literal(evaluateWord(verb, context)) !== "cat") return null;
+  const redirects = statement.Redirs.filter((redirect) => redirect !== null);
+  const heredoc = redirects.length === 1 && redirects[0] ? heredocOf(redirects[0], context) : null;
+  if (heredoc === null || heredoc.expansions.length > 0) return null;
+  return heredoc.content.replace(/\n+$/, "");
+}
+
 // An unset name stays unresolved rather than expanding to nothing, so a caller
 // reports it instead of reading the wrong path.
 function parameterSegment(expansion: ParamExp, context: Context): WordSegment {
@@ -189,6 +205,8 @@ function partSegments(part: WordPart, context: Context, quoted = false): WordSeg
   if (isSubstitution(part)) {
     const path = substitutedFile(part, context);
     if (path !== null) return [{ kind: "file", path }];
+    const text = substitutedHeredoc(part, context);
+    if (text !== null) return [{ kind: "literal", text }];
   }
   return [{ kind: "unresolved", source: sourceOf(part, context.command) }];
 }

@@ -1,0 +1,9 @@
+{
+  "id": "uuid-eng-42",
+  "identifier": "ENG-42",
+  "title": "Webhook delivery dashboard",
+  "url": "https://linear.app/acme/issue/ENG-42",
+  "state": { "name": "Todo" },
+  "team": { "key": "ENG" },
+  "relations": []
+}

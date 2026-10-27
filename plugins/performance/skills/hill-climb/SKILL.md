@@ -1,8 +1,9 @@
 ---
 name: performance:hill-climb
 description: >-
-  Use when asked to make software faster or leaner (runtime, startup,
-  throughput, memory, bundle size) through repeated measured changes. For
+  Use when asked to hill-climb a program, or to make software faster or
+  leaner (runtime, startup, throughput, memory, bundle size) through repeated
+  measured changes, including resuming a climb from its notes file. For
   prompts or skills scored by an eval suite, use prompting:hill-climb.
 argument-hint: "<target> [<notes file>]"
 ---
@@ -16,7 +17,7 @@ This skill is the workflow. Load `performance:benchmark` to build the harness an
 ## Arguments
 
 - `<target>`: the program or command to climb. Required.
-- `<notes file>`: where the climb log lives. Default: `CLIMB.md` beside the benchmark harness, or `tmp/climb.md` when the repo has no harness directory.
+- `<notes file>`: where the climb log lives. Default: `CLIMB.md` beside the benchmark harness, or `tmp/climb.md` when the repo has no harness directory. When it already exists, resume from it: skip the Frame items its Rules settle, and keep the line under its title that tells a later session to load this skill.
 
 ## Frame
 
@@ -26,26 +27,28 @@ Interview the user until each item below is settled and none rests on your assum
 - Settle every item before building anything.
 - Write the answers into the notes file's Rules section ([references/notes.md](references/notes.md) has the template), then confirm the section with the user.
 - A dispatching brief settles only the items it states. Ask the rest.
-- When the user does not answer, send a push notification and continue. Record each unanswered item in Rules as `assumed: <value>`, and name every assumed item in the first decision report.
+- When the session is unattended (a dispatched brief, or the user said they are away), settle each open item yourself. Record it in Rules as `assumed: <value>`, and name every assumed item in the first decision report.
 
 - **Metric.** The number the user cares about, on an exact scenario: the command, its input state, and the machine state. "Wall time of a sync run by hand right after one upstream commit" is a metric. "Make it faster" is not.
   - Start from who waits on the result and when: a person after a change, a CI job, a scheduled run. Measure the run the user waits through, even when the code handles another run more often.
   - A scheduled run nobody waits on can take on work that speeds the waited-on one.
   - Ask where the real workload spends its time. A benchmark input can skip the phase users wait through.
+  - A memory metric is peak RSS of the scenario, compared with `compare.ts report --metric memory`. Allocation volume can be a fast signal only after the baseline shows it tracks the peak.
 - **Ceiling.** The value past which further gains stop mattering to the user. The climb stops there.
 - **Fast signal.** A cheaper or lower-noise number that moves with the metric: CPU time, instructions retired, work per tick, bytes. Accept on it only after the baseline shows it tracks the metric.
 - **Guard.** What must stay identical: output, final state, exit code. Name the check that proves it.
   - When a candidate can change lookup order (`PATH`, module or library search paths), the guard compares what each name resolves to.
   - Only the user relaxes a guard.
 - **Side effects.** Everything a run touches outside itself: network, remote state, installed files, caches. Decide per item whether to stub it, hold it fixed, or reset it before each run.
-- **Scope.** Which changes are allowed: code, config, dependencies, external tools, public API. Ask whether parallelism is in scope. When caching is in scope, ask where a cache may live and how it invalidates.
-- **Inputs.** Which scenarios are `dev` (tuned against) and which are `holdout` (scored once at the end). Prefer real inputs over synthetic ones for `holdout`.
+- **Scope.** Which changes are allowed: code, config, dependencies, external tools, public API. Ask whether parallelism is in scope. When caching is in scope, ask where a cache may live and how it invalidates. Ask how much added code a gain must pay for.
+- **Inputs.** Which scenarios are `dev` (tuned against) and which are `holdout` (scored once at the end). Cover the workload's range of sizes and shapes. Prefer real inputs over synthetic ones for `holdout`, and look for larger real data when every `dev` input is small.
 - **Budget.** How long the climb may run and how the user wants progress between checkpoints.
 
 ## Workspace
 
 - **herdr.** Under `HERDR_ENV=1`, run the whole climb in one herdr workspace so the user can watch every run. On a cloud VM, create it on the VM's herdr machine and add `--machine <label>` to the same commands. Load `herdr:herdr` for them.
-- **Progress.** `tee` every long run into a log beside the notes file. `compare.ts run` prints each round's per-arm medians. Relay the latest round to the user at the cadence the Budget set.
+- **Runs.** Build arms per `performance:benchmark`. Launch a run longer than a few minutes detached, in the herdr pane or under `nohup`, so a session reload leaves it running. Run timed commands in the herdr pane when there is one, since the sandbox breaks ptys and skews timing.
+- **Progress.** `tee` every long run into a log beside the notes file. `compare.ts run` prints each round's per-arm medians. Report each decision with its numbers as it lands, and stay quiet between decisions unless an estimate slips.
 
 ## Harness
 
@@ -68,9 +71,7 @@ Build the benchmark per `performance:benchmark`, or adopt the project's own when
 
 #### Checkpoint
 
-Show the user the baseline table, the noise floor, the profile's top entries, a candidate list ranked by the share of the metric each one targets, and the Set Aside leads. Wait for the user's review before the first candidate.
-
-When the user does not answer, write the checkpoint into the notes file and continue.
+Show the user the baseline table, the noise floor, the profile's top entries, a candidate list ranked by the share of the metric each one targets, and the Set Aside leads. When the user is present, wait for the review before the first candidate. When the session is unattended, write the checkpoint into the notes file and continue.
 
 ## Loop
 
@@ -94,12 +95,13 @@ Record every lead you do not climb in the notes file's Set Aside table with its 
 
 Run the guard check first. A candidate that changes behavior is rejected without timing.
 
-Screen with the fast signal or a microbenchmark of the changed path. Confirm a candidate that passes the screen with the full metric, interleaved against the current accepted arm at the baseline's run count.
+Screen with the fast signal or a microbenchmark of the changed path. Confirm a candidate that passes the screen with the full metric, interleaved against the current accepted arm at the baseline's run count. Confirm on every `dev` scenario, including ones the change cannot reach on paper, since a shared lock, allocator, or cache carries a change into code it never touches.
 
 #### Decide
 
-- **Accept** when the target moves in the predicted direction past the acceptance rule in the notes file (default: permutation p < 0.1 and a median gain of at least 3%) and no guard regresses. Commit the change alone, with the evidence in the commit body.
+- **Accept** when the target moves in the predicted direction past the acceptance rule in the notes file (default: permutation p < 0.1 and a median gain of at least 3%) and no guard regresses, and the gain pays for the code the change adds at the Scope's bar. Commit the change alone, with the evidence in the commit body.
 - **Keep unconfirmed** when the target did not move but the user agrees to keep the change for a reason outside the metric. Label it "kept, unconfirmed" in the notes, commit body, and PR, and leave it out of the reported gain.
+- **Keep as a trade** when the target improves, another metric regresses, and the user approves the trade. Label it "kept, trade" and report both numbers wherever the gain appears.
 - **Reject** otherwise. Record the hypothesis, pseudocode of the change, and the numbers in the notes file, and save the diff as a patch beside it, so the null result stays findable. A rejected hypothesis stays rejected until a new profile argues for it.
 - **Re-run** an accept that rests on rounds `compare.ts report` flags for load, and decide on the re-run. An accept rests on them when the gain or its significance fails without those rounds.
 - **Bound** an accepted gain by its target's time in the profile. Re-measure a gain past that bound before committing, or report the excess as unexplained.
@@ -108,10 +110,13 @@ After each decision:
 
 - Re-profile after an accept, since the ranking shifts.
 - Report the first decision to the user in one line, and continue unless the user redirects.
-- Commit a mid-climb harness change separately, re-run the baseline, and note it in the notes file.
+- Past the Checkpoint, ask with `AskUserQuestion` only to change the Scope, a Guard, or the Ceiling. Decide anything else, record it in the notes as `assumed: <value>`, and name it in the next report.
+- Commit a mid-climb harness change separately, re-run the baseline and the A/A, and note it in the notes file. A new input family, inputs at a new scale, and a new runtime or dependency version are harness changes.
 - After two rejections in a row, re-run the A/A and re-profile before the next candidate. A stall often means the noise floor rose or the profile ranks work the scenario does not wait on.
 
 ## Stopping
+
+Before stopping on anything but the ceiling or the budget, profile every Frame metric at head on the largest inputs, and rank what that profile shows. A climb that has accepted most of its candidates still has headroom.
 
 Stop when any of these holds, and say which:
 

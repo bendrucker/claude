@@ -173,6 +173,11 @@
       "options": {
         "multiplexer": "herdr"
       }
+    },
+    "friction@bendrucker": {
+      "options": {
+        "config_repos": ["~/.dotfiles", "~/.claude-repo"]
+      }
     }
   },
   "enabledPlugins": {
@@ -205,6 +210,7 @@
     "typescript-lsp@claude-plugins-official": true,
     "gopls-lsp@claude-plugins-official": true,
     "atuin@bendrucker": true,
+    "friction@bendrucker": true,
     "comments@bendrucker": true,
     "plannotator@plannotator": true,
     "herdr@bendrucker": true,
@@ -246,7 +252,7 @@
       "source": {
         "source": "github",
         "repo": "backnotprop/plannotator",
-        "ref": "v0.28.15"
+        "ref": "v0.28.23"
       }
     }
   },
@@ -290,7 +296,8 @@
       "allowMachLookup": [
         "com.apple.trustd.agent",
         "com.apple.nehelper",
-        "com.apple.nesessionmanager"
+        "com.apple.nesessionmanager",
+        "com.apple.SecurityServer"
       ],
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
@@ -308,6 +315,7 @@
         "~/src/*/*/.worktrees/**/*",
         "~/.terraform.d/plugin-cache",
         "~/.cache",
+        "~/.local/state/friction",
         "~/Library/Caches/go-build",
         "~/Library/Caches/ms-playwright",
         "~/Library/Caches/golangci-lint",

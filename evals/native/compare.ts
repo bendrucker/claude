@@ -3,6 +3,7 @@ import { basename, dirname } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { loadColumn } from "../../packages/evals/column";
 import { render } from "../../packages/evals/compare";
+import { generate } from "../../packages/evals/generate";
 import { loadTags } from "../../packages/evals/suite";
 
 function float(value: string): number {
@@ -35,6 +36,7 @@ export const program = new Command("compare.ts")
   .option("--suite <dir>", "suite directory whose case.yaml tags roll case scores up by tag")
   .option("--markdown", "print markdown with the starred rows first and the full tables collapsed")
   .action(async (columns, options) => {
+    if (options.suite !== undefined) await generate(options.suite);
     const paths = columns.map((c) => c.split(","));
     console.log(
       render({

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { globSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { check } from "../../../../../packages/evals/check";
+import { generate } from "../../../../../packages/evals/generate";
 import { loadGraders, verdict } from "../../../../../packages/evals/graders";
 import { all, DECISIONS, type Decision, HARNESSES } from "./evidence";
 import { files, lastDecision } from "./gen-decide";
@@ -9,15 +10,9 @@ import { CASES, files as bucketFiles, lastBucket } from "./gen-bucket";
 
 const suite = join(import.meta.dir, "..");
 const cases = all();
+await generate(suite);
 
 describe("committed cases match the generators", () => {
-  test.each(cases.map((c) => [c.name, c] as const))("%s", async (_, c) => {
-    const committed = await Promise.all(
-      Object.keys(files(c)).map((file) => Bun.file(join(suite, file)).text()),
-    );
-    expect(committed).toEqual(Object.values(files(c)));
-  });
-
   test.each(CASES.map((c) => [c.name, c] as const))("%s", async (_, c) => {
     const committed = await Promise.all(
       Object.keys(bucketFiles(c)).map((file) => Bun.file(join(suite, file)).text()),
@@ -25,12 +20,13 @@ describe("committed cases match the generators", () => {
     expect(committed).toEqual(Object.values(bucketFiles(c)));
   });
 
-  test("no decide case is left over from an earlier generation", () => {
-    const committed = globSync("decide-*/case.yaml", { cwd: suite }).map(
-      (f) => f.split("/")[0] ?? "",
-    );
-    expect(committed.toSorted((a, b) => a.localeCompare(b))).toEqual(
-      cases.map((c) => c.name).toSorted((a, b) => a.localeCompare(b)),
+  test("the generate script writes every decide case and no other", async () => {
+    const written = globSync("decide-*/**/*", { cwd: suite, withFileTypes: true })
+      .filter((d) => d.isFile())
+      .map((d) => relative(suite, join(d.parentPath, d.name)));
+    const texts = await Promise.all(written.map((f) => Bun.file(join(suite, f)).text()));
+    expect(Object.fromEntries(written.map((f, i) => [f, texts[i]]))).toEqual(
+      Object.fromEntries(cases.flatMap((c) => Object.entries(files(c)))),
     );
   });
 

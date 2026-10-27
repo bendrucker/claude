@@ -37,7 +37,7 @@ The p-values in every harness come from the same permutation test, so a case rea
 - `reason` passes when that decision is right and the reply names the trap's cause in any of several wordings, so a case scores on the call first.
 - `neutral` as above.
 
-Edit `truth.json` or the generator and rerun `bun plugins/evals/evals/hill-climb/scripts/gen-decide.ts` rather than editing a case. A test fails when the committed cases drift from it, and another asserts which rows of each trap star.
+The `decide-*` cases are gitignored. The suite's `generate` package script writes them, and `run.ts`, `check.ts`, `compare.ts --suite`, and the suite's tests run it first, so edit `truth.json` or the generator rather than a case. A test asserts which rows of each trap star.
 
 ## Bucket
 

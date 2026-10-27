@@ -3,6 +3,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { subscriptionEnv } from "../../packages/eval-judge/env";
+import { generate } from "../../packages/evals/generate";
 import { erroredRuns, readResult } from "../../packages/evals/result";
 import {
   collectTraces,
@@ -25,6 +26,7 @@ export const program = new Command("run.ts")
   .action(async (suiteArg, passed, options) => {
     const repo = (await $`git rev-parse --show-toplevel`.text()).trim();
     const suite = relative(repo, resolve(suiteArg));
+    await generate(join(repo, suite));
     const config = await readSuite(join(repo, suite));
     const [globs, args] = splitCases(passed);
     const { target, evalDir } = await prepare(repo, suite, options.ref);

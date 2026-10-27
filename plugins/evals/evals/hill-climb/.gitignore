@@ -1,2 +1,4 @@
 # claude plugin eval run output.
 /results/
+# Written by scripts/gen-decide.ts before any run, check, or test reads the suite.
+/decide-*/

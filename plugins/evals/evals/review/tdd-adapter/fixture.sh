@@ -3,6 +3,7 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 stubs="$here/../../../../../packages/eval-stubs"
 seed="$here/../seeds/tdd-adapter"
+[ -d "$seed" ] || { echo "$seed is missing: run scripts/sync.ts pull" >&2; exit 1; }
 bash "$stubs/install.sh"
 source "$stubs/preamble.sh" https://github.com/bendrucker/claude.git
 tar --extract --file "$seed/tree.tar"

@@ -1,2 +1,4 @@
 # claude plugin eval run output.
 /results/
+# The frozen PRs, pulled from the eval bucket by scripts/sync.ts.
+/seeds/

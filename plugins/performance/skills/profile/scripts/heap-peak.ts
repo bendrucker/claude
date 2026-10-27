@@ -46,14 +46,19 @@ export function injectionBlocker(binary: string, codesignInfo: string): string |
 }
 
 async function compileShim(): Promise<string> {
-  const hash = new Bun.CryptoHasher("sha256").update(shimSource).digest("hex").slice(0, 12);
+  // Universal, so an x86_64 target under Rosetta loads it too.
+  const flags = ["-O1", "-dynamiclib", "-arch", "arm64", "-arch", "x86_64"];
+  const hash = new Bun.CryptoHasher("sha256")
+    .update(shimSource + flags.join(" "))
+    .digest("hex")
+    .slice(0, 12);
   const dir = join(tmpdir(), "heap-peak");
   const dylib = join(dir, `shim-${hash}.dylib`);
   if (await Bun.file(dylib).exists()) return dylib;
   await mkdir(dir, { recursive: true });
   const source = join(dir, `shim-${hash}.c`);
   await Bun.write(source, shimSource);
-  const cc = run(["cc", "-O1", "-dynamiclib", "-o", dylib, source]);
+  const cc = run(["cc", ...flags, "-o", dylib, source]);
   if (cc.exitCode !== 0) throw new Error(`cc failed to build the exit shim: ${cc.stderr}`);
   return dylib;
 }

@@ -96,3 +96,17 @@
   input: |
     We delve into the tapestry.
   absent: Writing.AiVocabulary
+
+- name: the section template on a short PR body fires
+  format: .prbody
+  input: |
+    Adds a flag.
+
+    ## Changes
+
+    - Adds `--verbose`
+
+    ## Testing
+
+    Manual.
+  contains: [Writing.TemplateOnSmallDocument]

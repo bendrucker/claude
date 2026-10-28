@@ -1,4 +1,4 @@
-# Prose held in a comment still reaches the model, which pays for every token and cannot act on a note addressed to a maintainer. A directive to a formatter or linter is not prose.
+# Prose held in a comment still reaches the model, which pays for every token and cannot act on a note addressed to a maintainer. A directive to a formatter or linter is not prose, and a comment indented into a code sample belongs to the sample.
 # evidence: a hand audit of every hit across the repo. The rule-precision labels barely exercise it.
 # retire when: a hand audit finds most hits are directives or markup rather than notes.
 extends: existence
@@ -8,7 +8,7 @@ ignorecase: true
 nonword: true
 scope: raw
 tokens:
-  - '<!--(?!\s*(?:prettier|markdownlint|eslint|oxlint|biome|shellcheck|vale|editorconfig|toc|omit|x-release)\b)\s*(?:(?:(?!-->)\S)+\s+){5}(?:(?!-->)\S)+(?=(?:\s+(?:(?!-->)\S)+){2,}\s*-->)'
+  - '(?m)(?<=^ {0,3})<!--(?!\s*(?:prettier|markdownlint|eslint|oxlint|biome|shellcheck|vale|editorconfig|toc|omit|x-release)\b)\s*(?:(?:(?!-->)\S)+\s+){5}(?:(?!-->)\S)+(?=(?:\s+(?:(?!-->)\S)+){2,}\s*-->)'
 tests:
   - name: flags a note held in a comment
     input: |
@@ -38,3 +38,17 @@ tests:
     input: |
       <!-- one two three four five six seven -->
     absent: Prompting.MaintainerAside
+  - name: allows a comment inside a code sample
+    input: |
+      ```xml
+      <dict>
+          <!-- variable reference or omit to use current input -->
+      </dict>
+      ```
+    absent: Prompting.MaintainerAside
+  - name: flags a note held in a list item
+    input: |
+      - Step one.
+
+        <!-- one two three four five six seven eight -->
+    contains: [Prompting.MaintainerAside]

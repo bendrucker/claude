@@ -1,0 +1,64 @@
+# evidence: literature heuristic, session-corpus calibration pending. Question-opener cadence is a known
+#   AI structuring pattern in explanatory prose. Threshold: 2 of 4+ paragraphs.
+# retire when: session-corpus calibration shows the pattern does not distinguish assistant from user text,
+#   or precision on a labeled sample is below the hook bar.
+extends: existence
+message: "Repeated question-opener paragraphs (e.g., '%s'). Using questions as section headers is an AI structuring pattern. State the point directly."
+level: suggestion
+scope: raw
+nonword: true
+ignorecase: true
+tokens:
+  - '(?<=(?:\A|\n[ \t]*\n)[ \t]*)(?<=\A(?=(?:[\s\S]*?(?:\A|\n[ \t]*\n)[ \t]*[^#|\s]){4})[\s\S]*)(?<!(?:\A|\n[ \t]*\n)[ \t]*(?:what|why|how|when|where|who|which|is|are|does|do|can|should|could|would|will)\b[^.!?\n]*\?[\s\S]*)(?:what|why|how|when|where|who|which|is|are|does|do|can|should|could|would|will)\b[^.!?\n]*\?(?=[\s\S]*\n[ \t]*\n[ \t]*(?:what|why|how|when|where|who|which|is|are|does|do|can|should|could|would|will)\b[^.!?\n]*\?)'
+tests:
+  - name: positives
+    about: two or more question-led paragraphs among four or more, reported once at the first
+    input: |
+      What does this do?
+      It processes jobs.
+
+      Why does it matter?
+      Performance improves.
+
+      How do you use it?
+      Call the function.
+
+      When should you avoid it?
+      On empty queues.
+    want: |
+      1:1:Writing.QuestionAnswerCadence:Repeated question-opener paragraphs (e.g., 'What does this do?'). Using questions as section headers is an AI structuring pattern. State the point directly.
+  - name: later opener
+    about: the first question-led paragraph sits after a plain one
+    input: |
+      The retry logic changed.
+
+      Why now?
+      Flakiness spiked.
+
+      How was it tested?
+      Unit tests added.
+
+      The error rate dropped.
+    want: |
+      3:1:Writing.QuestionAnswerCadence:Repeated question-opener paragraphs (e.g., 'Why now?'). Using questions as section headers is an AI structuring pattern. State the point directly.
+  - name: negatives
+    about: fewer than four paragraphs, or only one question-led paragraph
+    input: |
+      What does this do?
+      It processes jobs.
+
+      Why does it matter?
+      Performance improves.
+    want: ""
+  - name: single opener
+    about: one question-led paragraph among four, and a question mid-paragraph
+    input: |
+      What does this do?
+      It processes jobs.
+
+      The retry logic changed. Why? Flakiness spiked.
+
+      Unit tests were added.
+
+      The error rate dropped.
+    want: ""

@@ -1,0 +1,64 @@
+# evidence: pull-request:create scopes ## sections to larger changes ("Length tracks substance"). Threshold of
+#   ~150 words from corpus review of 209 hand-written PRs.
+# retire when: the corpus shows most short PRs include sections naturally, or pull-request:create updates
+#   its conditionality guidance.
+extends: existence
+message: "pull-request:create scopes ## Changes and ## Testing sections to larger changes. Length tracks substance. A short body with the full section template is over-structured. Use prose instead."
+level: warning
+scope: raw
+nonword: true
+tokens:
+  - '(?<=\A(?=\s*(?:\S+\s+){0,148}\S*\s*\z)(?=(?:[\s\S]*\n)?##[ \t]+Testing\b)(?:[\s\S]*\n)?)##[ \t]+Changes\b'
+tests:
+  - name: positives
+    about: both template headings on a body under 150 words, in either order
+    input: |
+      ## Summary
+
+      Adds a flag.
+
+      ## Changes
+
+      - Adds `--verbose`
+
+      ## Testing
+
+      Manual.
+    want: |
+      5:1:Writing.TemplateOnSmallDocument:pull-request:create scopes ## Changes and ## Testing sections to larger changes. Length tracks substance. A short body with the full section template is over-structured. Use prose instead.
+  - name: testing first
+    about: the Testing heading ahead of the Changes heading
+    input: |
+      ## Testing
+
+      Ran the suite.
+
+      ## Changes
+
+      - Adds retry logic
+
+      Fixes #1
+    want: |
+      5:1:Writing.TemplateOnSmallDocument:pull-request:create scopes ## Changes and ## Testing sections to larger changes. Length tracks substance. A short body with the full section template is over-structured. Use prose instead.
+  - name: negatives
+    about: a body over 150 words carrying both headings
+    input: |
+      Adds a cache layer. The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL. The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL. The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL. The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL. The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL. The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL. The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL. The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL. The cache reduces round-trips to the database by storing frequently accessed records in memory with a configurable TTL.
+
+      ## Changes
+
+      - Adds the LRU cache
+
+      ## Testing
+
+      Added tests for cache expiry and eviction.
+    want: ""
+  - name: one heading
+    about: a short body with only one of the two headings, and a body with none
+    input: |
+      ## Changes
+
+      Adds retry logic to the HTTP client.
+
+      Fixes the race condition in the cache layer by adding a mutex.
+    want: ""

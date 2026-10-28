@@ -1,0 +1,42 @@
+# evidence: replaces the retired CROSS_SENTENCE_NOT regex (8 hits in 2 sessions over 30 days) with a
+#   different shape: any negation cue followed by an adversative opener. Session-corpus calibration pending.
+# retire when: the pattern fires at comparable rates on user text, or session-corpus calibration shows
+#   precision below the hook bar.
+extends: existence
+message: "'%s' concedes right after a negated sentence. Negating then conceding with 'However/But/Yet' is an AI prose pattern. Merge into a single sentence or drop the negation."
+level: suggestion
+nonword: true
+ignorecase: true
+tokens:
+  - '(?<=(?:\b(?:not|never)\b|\bno\s|n[''’]t\b)(?:[^.!?]|[.!?](?!\s))*(?<!\d)[.!?]+\s+)(?:however|but|yet|nevertheless|nonetheless|still|that said)(?=,?\s)'
+tests:
+  - name: positives
+    about: a negated sentence followed by an adversative opener, with straight and curly contractions
+    input: |
+      The cache does not warm instantly. However, the first request fills it.
+
+      This isn't a regression. But it does change observed behavior.
+
+      This isn’t a regression. Still, it changes observed behavior.
+
+      The worker never retries v1.2 jobs. Yet the queue drains.
+    want: |
+      1:36:Writing.AdversativeNegationFlip:'However' concedes right after a negated sentence. Negating then conceding with 'However/But/Yet' is an AI prose pattern. Merge into a single sentence or drop the negation.
+      3:26:Writing.AdversativeNegationFlip:'But' concedes right after a negated sentence. Negating then conceding with 'However/But/Yet' is an AI prose pattern. Merge into a single sentence or drop the negation.
+      5:26:Writing.AdversativeNegationFlip:'Still' concedes right after a negated sentence. Negating then conceding with 'However/But/Yet' is an AI prose pattern. Merge into a single sentence or drop the negation.
+      7:37:Writing.AdversativeNegationFlip:'Yet' concedes right after a negated sentence. Negating then conceding with 'However/But/Yet' is an AI prose pattern. Merge into a single sentence or drop the negation.
+  - name: negatives
+    about: an affirmative lead sentence, a negation two sentences back, a word containing not, and a paragraph break
+    input: |
+      The cache fills on first request. However, it can evict under pressure.
+
+      The server starts. The queue drains.
+
+      The notable design held up under load. However, the rollout was slow.
+
+      The cache is not warm. The first request fills it. However, the second is fast.
+
+      The cache is not warm.
+
+      However, the first request fills it.
+    want: ""

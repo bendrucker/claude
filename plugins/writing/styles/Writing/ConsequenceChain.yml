@@ -1,0 +1,47 @@
+# evidence: 2026-06 corpus comparison put the consequence-chain rate at ~3/1k words in AI-era
+#   deliverables. Hook promotion requires cross-project validation.
+# retire when: the consequence-chain rate in deliverables falls below 1/1k words or matches the
+#   hand-written baseline.
+extends: existence
+message: "'%s' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately."
+level: warning
+nonword: true
+ignorecase: true
+tokens:
+  - ',\s*so\s+(?:the|an?|this|these|those|its|their|our|my|your|his|her|each|every|any|some|all|both|either|neither|no|it|they|there|that(?!\s+(?:the|an?|this|these|those|its|their|our|my|your|his|her|each|every|any|some|all|no|it|they|we|you|he|she|i|there)\b))\b'
+tests:
+  - name: positives
+    about: a comma and so ahead of a determiner or pronoun subject
+    input: |
+      The cache fills up, so the old entries get evicted.
+
+      The worker finishes, so the queue clears.
+
+      The flag is unset, so it falls back to the default.
+
+      Both writers hold the lock, so neither request proceeds.
+
+      The migration ran twice, so that table has duplicate rows.
+    want: |
+      1:19:Writing.ConsequenceChain:', so the' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately.
+      3:20:Writing.ConsequenceChain:', so the' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately.
+      5:18:Writing.ConsequenceChain:', so it' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately.
+      7:27:Writing.ConsequenceChain:', so neither' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately.
+      9:24:Writing.ConsequenceChain:', so that' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately.
+  - name: negatives
+    about: sentence-initial so, because clauses, purpose so that, so as an adverb, and personal-pronoun subjects
+    input: |
+      So the next step is to fix the test.
+
+      This happens because the cache is full.
+
+      Pin the version, so that the build stays reproducible.
+
+      The queue is long, so long that it stalls.
+
+      Retry once, or so the docs suggest.
+
+      The tests never passed in CI, so I rewrote them.
+
+      The page was blank, so you reload it.
+    want: ""

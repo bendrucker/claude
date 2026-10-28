@@ -45,3 +45,11 @@ tests:
     input: |
       Raise `--min-lift` (default 5.0) when the list is noisy.
     absent: Prompting.StaleMeasurement
+  - name: allows a count of a named set
+    input: |
+      Two of the reviewers must approve.
+    absent: Prompting.StaleMeasurement
+  - name: allows a single-digit scope
+    input: |
+      Run all 3 steps in order.
+    absent: Prompting.StaleMeasurement

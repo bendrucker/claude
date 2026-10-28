@@ -48,6 +48,16 @@
   input: |
     Run `a "b` and try to keep "this" short.
   contains: [Prompting.WeakModality]
+- name: a straight apostrophe pairs with nothing
+  format: .md
+  input: |
+    Don't try to keep it, since it's done.
+  contains: [Prompting.WeakModality]
+- name: a typeset apostrophe pairs with nothing
+  format: .md
+  input: |
+    Don’t try to keep it, since it’s done.
+  contains: [Prompting.WeakModality]
 
 - name: a blockquote is an example
   format: .md

@@ -6,7 +6,7 @@ Documents a model executes belong to the [prompting](../prompting) plugin. [`.cl
 
 ## Contents
 
-- **Hooks**: a PreToolUse dispatcher that lints introduced prose and code comments with Vale, and a background SessionStart hook that syncs the pinned Vale packages
+- **Hooks**: one dispatcher that lints message prose before a call sends it and edited files after they are saved, and a background SessionStart hook that syncs the pinned Vale packages
 - **Skills**: `writing:writing` system reminder for prose writing guidelines, `writing:analyze` hook health from the run log, `writing:rewrite` user-invoked text rewriter, `writing:scan` user-invoked trope detector (`audit` gates a directory, `score` measures one input's density), `writing:review` multi-agent document review, `writing:no-diary` cuts process narration out of a deliverable
 - **Agents**: `content`, `style`, `artifacts` (conditional review lenses)
 
@@ -16,7 +16,7 @@ Documents a model executes belong to the [prompting](../prompting) plugin. [`.cl
 
 ## Hook Dispatcher
 
-A single PreToolUse entry script, [`hooks/pretooluse.ts`](hooks/pretooluse.ts), reads stdin once and lints the text a call introduces with Vale. It emits at most one output per tool call, at the highest level any alert reached. Shared skips apply once up front: plan mode, plan and memory paths, and scratch paths (`tmp/` directories, `$TMPDIR`, background job dirs), where prose is internal handoff text that gets scanned later at the egress surface instead of at write time: Bash (`--body-file`, `--body`, `gh api -F body=@file`) and any MCP call whose input carries a prose sentence, whatever the server or field (`isProse` in [`hooks/check-tropes.ts`](hooks/check-tropes.ts)), which in a cloud session covers PR bodies and thread replies.
+One entry script, [`hooks/lint.ts`](hooks/lint.ts), handles both hook events. On PreToolUse it lints the prose a Bash or MCP call sends: Bash body flags and files (`--body`, `--body-file`, `gh api -F body=@file`, `git commit -F`) and any MCP input that carries a prose sentence (`isProse` in [`hooks/messages.ts`](hooks/messages.ts)). An `error` alert denies the call. On PostToolUse it lints a Write, Edit, or MultiEdit's saved file with Vale and reports every alert in it as context. Vale scopes code files to their comments and skips files that match no `.vale.ini` section. Both events skip plan mode, plan and memory files, and scratch paths (`tmp/` directories, `$TMPDIR`, background job dirs), whose prose gets linted at the egress surface instead. A check already reported for the same file or message in the last five minutes is muted.
 
 Context-tier findings are suppressed when the same Vale check already fired in the session within the last five minutes ([`hooks/session-state.ts`](hooks/session-state.ts)). Deny and ask tiers always fire.
 

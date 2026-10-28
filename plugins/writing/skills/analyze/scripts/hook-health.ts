@@ -62,29 +62,21 @@ export interface Acceptance {
   unconfirmed: number;
 }
 
-// Tools whose scanned text is the whole file, so the run's `checks` speak to
-// the file a finding named. An `Edit` or `MultiEdit` scans only its own hunks.
-const WHOLE_FILE_TOOLS = new Set(["Write"]);
+// A PostToolUse run lints the saved file, so its `checks` speak to the file a
+// finding named. Before that move, only a Write scanned the whole file, and an
+// `Edit` or `MultiEdit` reported the hits its own hunks introduced.
+function isWholeFile(entry: RunLogEntry): boolean {
+  return entry.event === "PostToolUse" || (entry.event === undefined && entry.tool === "Write");
+}
 
 // A fire count measures how loud a rule is. Whether it was right takes a second
-// signal. Pairing each shown finding with a whole-file re-scan of the same file
-// answers that from ordinary use: a rule missing from the re-scan's `checks`
+// signal. Pairing each shown finding with a whole-file re-lint of the same file
+// answers that from ordinary use: a rule missing from the re-lint's `checks`
 // was acted on, one still present was written past. A suppressed finding was
-// never shown, so it seeds no pair, and a run that returned before the checkers
-// ran carries no `checks`.
-//
-// Only a whole-file re-scan decides, in either direction. The checkers report
-// the hits a run newly introduced, so a hunk-scoped edit's `checks` describe
-// that hunk's own text: silence means the hunk introduced nothing, and a hit
-// means the hunk introduced one somewhere the finding never pointed. Neither
-// speaks to the prose the rule flagged. Every shown finding no whole-file
-// re-scan reached lands in `unconfirmed`, whether hunk edits followed it or
-// nothing did, so `revisited` and `unconfirmed` together account for all of
-// them and the evidence the rate leaves out stays visible.
-//
-// One bias survives: a whole-file scan also reports only newly introduced hits,
-// so a trope left at an unchanged count reads as absent. That skews the
-// surviving rate high, making it a floor on how often a rule is wrong.
+// never shown, so it seeds no pair, and a run that returned before Vale ran
+// carries no `checks`. Every shown finding no whole-file re-lint reached lands
+// in `unconfirmed`, so `revisited` and `unconfirmed` together account for all
+// of them.
 function tally(
   counts: Map<string, Acceptance>,
   check: string,
@@ -118,7 +110,7 @@ export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
       if (shown.length === 0) continue;
       const rescan = ordered
         .slice(index + 1)
-        .find((next) => next.checks != null && WHOLE_FILE_TOOLS.has(next.tool));
+        .find((next) => next.checks != null && isWholeFile(next));
       for (const check of shown) tally(counts, check, rescan?.checks);
     }
   }

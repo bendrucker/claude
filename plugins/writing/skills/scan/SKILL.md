@@ -52,5 +52,3 @@ bun ${CLAUDE_SKILL_DIR}/scripts/score.ts --json path/to/draft.md
 ```
 
 Word count is word tokens (`/[a-zA-Z]+/`) over the text with code stripped. Density is `alerts / (wordCount / 1000)`, and the table sorts by density.
-
-For non-prose source files, comments are extracted and scored as a separate `comments` group. `--comments` and `--no-comments` force that on or off.

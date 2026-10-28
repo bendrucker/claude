@@ -1,12 +1,8 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { exceedsLineLimit, extractComments } from "../detection/comments";
-import { isProseFile } from "../detection/paths";
 import { stripCode } from "../detection/code-spans";
-import { type ToolInput, toolInputOf } from "./io";
-import type { HookFinding } from "./report";
-import { valeFileFindings, valeMessageFindings } from "./vale-findings";
-
-const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
+import { valeAlerts } from "../detection/vale";
+import { toolInputOf } from "./io";
+import { findingOf, type HookFinding } from "./report";
 
 // The full set of Bash prose surfaces this hook scans. The hooks.json Bash
 // guard is derived from these. hooks.test.ts enforces the sync.
@@ -124,53 +120,9 @@ function extractInlineArg(command: string, flag: string): string | null {
   return match?.[1] ?? match?.[2] ?? null;
 }
 
-function collectMultiEditPairs(toolInput: ToolInput): { newText: string; oldText: string } {
-  const edits = toolInput.edits ?? [];
-  const newParts = edits.map((edit) => edit.new_string).filter((text) => text !== undefined);
-  const oldParts = edits.map((edit) => edit.old_string).filter((text) => text !== undefined);
-  return { newText: newParts.join("\n"), oldText: oldParts.join("\n") };
-}
-
-async function collectFileOpPair(
-  input: PreToolUseHookInput,
-): Promise<{ newText: string; oldText: string } | null> {
-  const toolInput = toolInputOf(input);
-  const toolName = input.tool_name;
-
-  if (toolName === "Write") {
-    const content = toolInput.content;
-    if (content == null || content === "") return null;
-    let oldText = "";
-    if (toolInput.file_path !== undefined) {
-      const file = Bun.file(toolInput.file_path);
-      if (await file.exists()) oldText = await file.text();
-    }
-    return { newText: content, oldText };
-  }
-
-  if (toolName === "Edit") {
-    const newString = toolInput.new_string;
-    if (newString == null || newString === "") return null;
-    return { newText: newString, oldText: toolInput.old_string ?? "" };
-  }
-
-  if (toolName === "MultiEdit") {
-    const pair = collectMultiEditPairs(toolInput);
-    if (pair.newText.length === 0) return null;
-    return pair;
-  }
-
-  return null;
-}
-
 export async function collectText(input: PreToolUseHookInput): Promise<string[]> {
   const toolInput = toolInputOf(input);
   const toolName = input.tool_name;
-
-  if (FILE_OP_TOOLS.has(toolName)) {
-    const pair = await collectFileOpPair(input);
-    return pair ? [pair.newText] : [];
-  }
 
   if (toolName.startsWith("mcp__")) return strings(input.tool_input).filter(isProse);
 
@@ -197,81 +149,12 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
   return [];
 }
 
-// Vale style rules quote the tropes they detect.
-const DETECTOR_SOURCE_PATTERN = /\/styles\/[^/]+\/[^/]+\.yml$/;
-
-function isDetectorSource(input: PreToolUseHookInput): boolean {
-  const filePath = toolInputOf(input).file_path;
-  return filePath !== undefined && DETECTOR_SOURCE_PATTERN.test(filePath);
-}
-
-// A fragment tokenizes without the grammar state around it, so a comment
-// inside `<script>` or a block comment reads as code. Apply the edits to the
-// file on disk and extract from both whole versions instead.
-async function wholeFilePair(
-  input: PreToolUseHookInput,
-  filePath: string,
-): Promise<{ newText: string; oldText: string } | null> {
-  if (input.tool_name === "Write") return null;
-  const toolInput = toolInputOf(input);
-  const edits = input.tool_name === "MultiEdit" ? (toolInput.edits ?? []) : [toolInput];
-  if (edits.length === 0) return null;
-  const file = Bun.file(filePath);
-  if (!(await file.exists())) return null;
-  const oldText = await file.text();
-  let newText = oldText;
-  for (const { old_string: from, new_string: to, replace_all: all } of edits) {
-    if (from == null || from === "" || to == null || !newText.includes(from)) return null;
-    newText = all === true ? newText.replaceAll(from, () => to) : newText.replace(from, () => to);
-  }
-  return { newText, oldText };
-}
-
-// Vale lints only the comments of these languages and reads any other code
-// file as plain text, so the rest get their comments extracted first.
-const VALE_COMMENT_SCOPED =
-  /\.(c|h|cc|cpp|hpp|cs|css|scss|go|java|kt|js|cjs|mjs|jsx|ts|cts|mts|tsx|py|rb|swift)$/i;
-
-async function processFileOp(input: PreToolUseHookInput): Promise<HookFinding[]> {
-  const pair = await collectFileOpPair(input);
-  const filePath = toolInputOf(input).file_path;
-  if (!pair || filePath == null || filePath === "") return [];
-  const whole = (await wholeFilePair(input, filePath)) ?? pair;
-  if (isProseFile(filePath) || VALE_COMMENT_SCOPED.test(filePath)) {
-    return valeFileFindings(whole.oldText, whole.newText, filePath);
-  }
-  // An unscannable version extracts as empty, which would make every
-  // comment in the other version look introduced.
-  if (exceedsLineLimit(whole.newText) || exceedsLineLimit(whole.oldText)) return [];
-  const [newText, oldText] = await Promise.all([
-    extractComments(whole.newText, filePath),
-    extractComments(whole.oldText, filePath),
-  ]);
-  return valeFileFindings(asLineComments(oldText), asLineComments(newText), `${filePath}.ts`);
-}
-
-// Vale applies its comment-scoped rules only to a language it parses, so comments from
-// one it lacks are linted as TypeScript line comments.
-function asLineComments(text: string): string {
-  return text
-    .split("\n")
-    .map((line) => (line === "" ? "" : `// ${line}`))
-    .join("\n");
-}
-
-async function processSideEffect(input: PreToolUseHookInput): Promise<HookFinding[]> {
+/** Findings for the message prose a Bash or MCP call sends. An error-level alert denies the call. */
+export async function lintMessages(input: PreToolUseHookInput): Promise<HookFinding[]> {
   const texts = await collectText(input);
   if (texts.length === 0) return [];
-
-  const text = texts.join("\n");
   const command = toolInputOf(input).command ?? "";
   const kind = /\bgit\s+(commit|tag)\b/.test(command) ? "commit" : "body";
-  return valeMessageFindings(text, kind);
-}
-
-export async function check(input: PreToolUseHookInput): Promise<HookFinding[]> {
-  if (isDetectorSource(input)) return [];
-
-  if (FILE_OP_TOOLS.has(input.tool_name)) return processFileOp(input);
-  return processSideEffect(input);
+  const alerts = await valeAlerts(texts.join("\n"), { kind });
+  return alerts.map((alert) => findingOf(alert, alert.Severity === "error" ? "deny" : "context"));
 }

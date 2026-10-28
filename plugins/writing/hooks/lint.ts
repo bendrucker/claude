@@ -1,25 +1,21 @@
 #!/usr/bin/env bun
 
-import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
+import type { PostToolUseHookInput, PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detection/paths";
-import { check as checkTropes } from "./check-tropes";
+import { lintFile } from "../detection/vale";
 import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
-import { type HookFinding, report } from "./report";
+import { lintMessages } from "./messages";
+import { findingOf, type HookFinding, report } from "./report";
 import { appendRunLog, type RunLogEntry, type RunOutcome } from "./run-log";
 import { recentlyFired, recordFired } from "./session-state";
 
-const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
+export type HookInput = PreToolUseHookInput | PostToolUseHookInput;
 
 export interface DispatchResult {
   output: SyncHookJSONOutput | null;
   log: RunLogEntry;
-}
-
-function filePathOf(input: PreToolUseHookInput): string | undefined {
-  if (!FILE_OP_TOOLS.has(input.tool_name)) return undefined;
-  return toolInputOf(input).file_path;
 }
 
 /** Correlates successive writes to one file without logging the path. */
@@ -27,24 +23,30 @@ export function targetOf(filePath: string): string {
   return createHash("sha256").update(filePath, "utf8").digest("hex").slice(0, 16);
 }
 
-// One dispatcher run sequences all checkers in-process and emits every finding
-// in one output, so the model fixes them in a single pass instead of a retry
-// per finding.
+// A file edit already happened, so every alert in the saved file is context.
+async function lintEdited(filePath: string): Promise<HookFinding[]> {
+  return (await lintFile(filePath)).map((alert) => findingOf(alert, "context"));
+}
+
+// One run emits every finding in one output, so the model fixes them in a
+// single pass instead of a retry per finding.
 export async function dispatch(
-  input: PreToolUseHookInput,
+  input: HookInput,
   now: number = Date.now(),
 ): Promise<DispatchResult> {
   const start = performance.now();
-  const filePath = filePathOf(input);
-  const ext = filePath != null && filePath !== "" ? getExtension(filePath) : "";
+  const filePath =
+    input.hook_event_name === "PostToolUse" ? toolInputOf(input).file_path : undefined;
+  const hasPath = filePath !== undefined && filePath !== "";
 
   const base: Omit<RunLogEntry, "duration_ms" | "outcome"> = {
     ts: new Date(now).toISOString(),
     session_id: input.session_id,
+    event: input.hook_event_name,
     tool: input.tool_name,
-    ext,
+    ext: hasPath ? getExtension(filePath) : "",
   };
-  if (filePath != null && filePath !== "") base.target = targetOf(filePath);
+  if (hasPath) base.target = targetOf(filePath);
 
   const finish = (
     output: SyncHookJSONOutput | null,
@@ -56,34 +58,33 @@ export async function dispatch(
   });
 
   if (isPlanMode(input)) return finish(null, "silent");
-  if (filePath != null && filePath !== "" && isScratchPath(filePath, input.cwd))
-    return finish(null, "skipped-scratch");
-  if (filePath != null && filePath !== "" && (isPlanPath(filePath) || isMemoryPath(filePath)))
-    return finish(null, "silent");
+  if (input.hook_event_name === "PostToolUse" && !hasPath) return finish(null, "silent");
+  if (hasPath && isScratchPath(filePath, input.cwd)) return finish(null, "skipped-scratch");
+  if (hasPath && (isPlanPath(filePath) || isMemoryPath(filePath))) return finish(null, "silent");
 
   // A failed lint is logged without `checks`, so it never reads as a clean run.
-  const findings: HookFinding[] = [];
+  let findings: HookFinding[] = [];
   try {
-    findings.push(...(await checkTropes(input)));
+    if (input.hook_event_name === "PreToolUse") findings = await lintMessages(input);
+    else if (hasPath) findings = await lintEdited(filePath);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[writing/pretooluse] checker failed: ${message}`);
+    console.error(`[writing/lint] Vale failed: ${message}`);
     return finish(null, "error", { vale_error: message });
   }
-  // `checks` records what the checkers found, which is what a later run on
-  // the same target is compared against. It is set only past this point: an
-  // earlier return means the checkers never ran, and an absent list must not
-  // read as a clean run.
   const checks = unique(findings.map((finding) => finding.check));
   if (findings.length === 0) return finish(null, "silent", { checks });
 
+  // Repeats are muted per file, so an alert left in one file does not hide the same check in another.
+  const key = (check: string): string =>
+    base.target === undefined ? check : `${base.target}:${check}`;
   const muted = new Set<string>();
   const kept: HookFinding[] = [];
   for (const finding of findings) {
-    if (finding.tier === "context" && finding.introduced !== true) {
+    if (finding.decision === "context") {
       if (muted.has(finding.check)) continue;
       // oxlint-disable-next-line no-await-in-loop -- reads one small state file per check, and the loop is bounded by the checks found.
-      if (await recentlyFired(input.session_id, finding.check, now)) {
+      if (await recentlyFired(input.session_id, key(finding.check), now)) {
         muted.add(finding.check);
         continue;
       }
@@ -93,7 +94,7 @@ export async function dispatch(
 
   const extra: Partial<RunLogEntry> = { checks };
   if (muted.size > 0) extra.suppressed_checks = [...muted];
-  const result = report(kept, { toolName: input.tool_name, filePath });
+  const result = report(kept, { event: input.hook_event_name, filePath });
   if (!result) {
     extra.check = [...muted][0];
     extra.suppressed = true;
@@ -102,16 +103,15 @@ export async function dispatch(
 
   const emitted = unique(result.shown.map((finding) => finding.check));
   // oxlint-disable-next-line no-await-in-loop -- sequential writes to one state file; concurrent read-modify-write would drop checks.
-  for (const check of emitted) await recordFired(input.session_id, check, now);
-  return finish(result.output, result.tier, { ...extra, check: emitted[0], emitted });
+  for (const check of emitted) await recordFired(input.session_id, key(check), now);
+  return finish(result.output, result.decision, { ...extra, check: emitted[0], emitted });
 }
 
 function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
 
-const HookInput = z.looseObject({
-  hook_event_name: z.literal("PreToolUse"),
+const Common = {
   session_id: z.string().catch(""),
   transcript_path: z.string().catch(""),
   cwd: z.string().catch(""),
@@ -119,15 +119,24 @@ const HookInput = z.looseObject({
   tool_name: z.string(),
   tool_input: z.unknown().catch(undefined),
   tool_use_id: z.string().catch(""),
-}) satisfies z.ZodType<PreToolUseHookInput>;
+};
+
+const HookInput = z.discriminatedUnion("hook_event_name", [
+  z.looseObject({ hook_event_name: z.literal("PreToolUse"), ...Common }),
+  z.looseObject({
+    hook_event_name: z.literal("PostToolUse"),
+    tool_response: z.unknown().catch(undefined),
+    ...Common,
+  }),
+]) satisfies z.ZodType<HookInput>;
 
 async function main(): Promise<void> {
-  let input: PreToolUseHookInput;
+  let input: HookInput;
   try {
     input = HookInput.parse(JSON.parse(await Bun.stdin.text()));
   } catch (error) {
     console.error(
-      `[writing/pretooluse] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
+      `[writing/lint] Failed to parse hook input: ${error instanceof Error ? error.message : String(error)}`,
     );
     return;
   }

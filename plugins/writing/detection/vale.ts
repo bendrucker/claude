@@ -1,5 +1,5 @@
 import { mkdir, rm } from "node:fs/promises";
-import { basename, dirname, extname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { z } from "zod";
 import { isProseFile } from "./paths";
 
@@ -43,7 +43,6 @@ export function valeBinary(): string | null {
 // directory-scoped section such as `[docs/*.md]` matches against.
 function sourceArg(source: ValeSource, root: string | null): string {
   if ("kind" in source) return `--ext=${source.kind === "commit" ? ".commitmsg" : ".prbody"}`;
-  if (extname(source.filePath) === "") return "--ext=.prbody";
   const path = root === null ? basename(source.filePath) : relative(root, source.filePath);
   return `--path=${path}`;
 }
@@ -173,6 +172,14 @@ export async function valeAlerts(text: string, source: ValeSource): Promise<Vale
   if (text.trim() === "") return [];
   const { args, cwd } = await configArgs(source);
   return runVale(args, { cwd, stdin: text });
+}
+
+/** Lint the file at `filePath` as saved, under the repo's Vale config if it has one and the plugin's otherwise. */
+export async function lintFile(filePath: string): Promise<ValeAlert[]> {
+  const root = await repoConfigRoot(filePath);
+  const args = root === null ? [`--config=${VALE_CONFIG}`, filePath] : [relative(root, filePath)];
+  if (process.env.NODE_ENV === "test") args.unshift("--no-global");
+  return runVale(args, { cwd: root ?? undefined });
 }
 
 /** Alerts for every file under `dir`, linted with the plugin's config alone. */

@@ -1,21 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { buildReport, renderTable, scoreComments, scoreText } from "./score";
-
-function check(report: Awaited<ReturnType<typeof buildReport>>, group: string, name: string) {
-  return report.groups.find((g) => g.group === group)?.checks.find((c) => c.check === name);
-}
+import { renderTable, scoreText } from "./score";
 
 describe("scoreText", () => {
   it("counts word tokens over stripped code", async () => {
-    const text = "The function reads input. `ignored code here`";
-    const score = await scoreText(text, undefined);
+    const score = await scoreText("The function reads input. `ignored code here`", undefined);
     expect(score.wordCount).toBe(4);
   });
 
   it("reports density as hits per 1000 words", async () => {
     // One em dash in a 1000-word body lands at density 1.0.
-    const filler = `${"word ".repeat(998)}a — b`;
-    const score = await scoreText(filler, "doc.md");
+    const score = await scoreText(`${"word ".repeat(998)}a — b`, "doc.md");
     expect(score.wordCount).toBe(1000);
     const emDash = score.checks.find((c) => c.check === "Writing.SpacedEmDash");
     expect(emDash?.hits).toBe(1);
@@ -28,39 +22,10 @@ describe("scoreText", () => {
   });
 });
 
-describe("scoreComments", () => {
-  it("scores extracted comments as a separate prose group", async () => {
-    const src = "function f() {\n  // We reach for the helper here.\n  return 1;\n}\n";
-    const group = await scoreComments(src, "src.ts");
-    expect(group?.group).toBe("comments");
-    const reaching = group?.checks.find((c) => c.check === "Writing.ReachingFor");
-    expect(reaching?.hits).toBe(1);
-  });
-
-  it("returns undefined when there are no comments", async () => {
-    expect(await scoreComments("const x = 1;\nconst y = 2;\n", "src.ts")).toBeUndefined();
-  });
-});
-
-describe("buildReport", () => {
-  it("emits only the prose group when comments are off", async () => {
-    const report = await buildReport("// leverage this", "src.ts", { comments: false });
-    expect(report.groups.map((g) => g.group)).toEqual(["prose"]);
-  });
-
-  it("adds a comments group when comments are on", async () => {
-    const src = "function f() {\n  // We reach for the helper here today.\n}\n";
-    const report = await buildReport(src, "src.ts", { comments: true });
-    expect(report.groups.map((g) => g.group)).toContain("comments");
-    expect(check(report, "comments", "Writing.ReachingFor")?.hits).toBeGreaterThan(0);
-  });
-});
-
 describe("renderTable", () => {
   it("header with word count and check rows", async () => {
-    expect(renderTable(await buildReport("a — b", "doc.md", { comments: false })))
-      .toMatchInlineSnapshot(`
-      "prose (2 words)
+    expect(renderTable(await scoreText("a — b", "doc.md"))).toMatchInlineSnapshot(`
+      "2 words
       ╔══════════════════════╤══════╤═════════════╗
       ║ Check                │ Hits │ Density /1k ║
       ╟──────────────────────┼──────┼─────────────╢
@@ -71,12 +36,11 @@ describe("renderTable", () => {
     `);
   });
 
-  it("no patterns for clean prose", async () => {
-    expect(
-      renderTable(await buildReport("The function reads input.", "doc.md", { comments: false })),
-    ).toMatchInlineSnapshot(`
-      "prose (4 words)
-      No patterns detected."
+  it("no alerts for clean prose", async () => {
+    expect(renderTable(await scoreText("The function reads input.", "doc.md")))
+      .toMatchInlineSnapshot(`
+      "4 words
+      No alerts."
     `);
   });
 });

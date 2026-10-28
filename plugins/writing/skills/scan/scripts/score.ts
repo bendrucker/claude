@@ -2,8 +2,6 @@
 import { cli } from "cleye";
 import { table } from "table";
 import { stripCode } from "../../../detection/code-spans";
-import { extractComments } from "../../../detection/comments";
-import { isProseFile } from "../../../detection/paths";
 import { lintProse } from "../../../detection/vale";
 import { readInput } from "../../../scripts/io";
 
@@ -13,19 +11,10 @@ export interface CheckScore {
   density: number;
 }
 
-export interface GroupScore {
-  group: string;
-  wordCount: number;
-  checks: CheckScore[];
-}
-
 export interface ScoreReport {
   filePath: string | undefined;
-  groups: GroupScore[];
-}
-
-export interface ReportOptions {
-  comments: boolean;
+  wordCount: number;
+  checks: CheckScore[];
 }
 
 function countWords(text: string): number {
@@ -53,48 +42,10 @@ async function checkScores(
   }));
 }
 
-export async function scoreText(text: string, filePath: string | undefined): Promise<GroupScore> {
+/** Alerts per 1000 words for each check, over the text with code stripped. */
+export async function scoreText(text: string, filePath: string | undefined): Promise<ScoreReport> {
   const wordCount = countWords(stripCode(text));
-  const checks = await checkScores(text, filePath, wordCount);
-  return { group: "prose", wordCount, checks };
-}
-
-export async function scoreComments(
-  text: string,
-  filePath: string,
-): Promise<GroupScore | undefined> {
-  const comments = await extractComments(text, filePath);
-  if (comments.trim().length === 0) return undefined;
-  // Score comments as prose so prose-only patterns apply to them.
-  return { ...(await scoreText(comments, undefined)), group: "comments" };
-}
-
-// Whether to extract and score code comments as a separate group. Prose files
-// (including `.md`, whose fenced code blocks stripCode already removes) are
-// scored whole; non-prose source files get their comments pulled out. Explicit
-// flags win: --no-comments forces off, --comments forces on.
-export function shouldScoreComments(
-  filePath: string | undefined,
-  on: boolean | undefined,
-  off: boolean,
-): boolean {
-  if (off) return false;
-  if (on) return true;
-  if (filePath === undefined) return false;
-  return !isProseFile(filePath);
-}
-
-export async function buildReport(
-  text: string,
-  filePath: string | undefined,
-  options: ReportOptions,
-): Promise<ScoreReport> {
-  const groups: GroupScore[] = [await scoreText(text, filePath)];
-  if (options.comments && filePath !== undefined) {
-    const comments = await scoreComments(text, filePath);
-    if (comments) groups.push(comments);
-  }
-  return { filePath, groups };
+  return { filePath, wordCount, checks: await checkScores(text, filePath, wordCount) };
 }
 
 function formatDensity(value: number): string {
@@ -102,22 +53,14 @@ function formatDensity(value: number): string {
 }
 
 export function renderTable(report: ScoreReport): string {
-  const sections: string[] = [];
-  for (const group of report.groups) {
-    const header = `${group.group} (${group.wordCount} words)`;
-    const rows = group.checks
-      .toSorted((a, b) => {
-        const byDensity = b.density - a.density;
-        return byDensity !== 0 ? byDensity : a.check.localeCompare(b.check);
-      })
-      .map((c) => [c.check, String(c.hits), formatDensity(c.density)]);
-    if (rows.length === 0) {
-      sections.push(`${header}\nNo patterns detected.`);
-      continue;
-    }
-    sections.push(`${header}\n${table([["Check", "Hits", "Density /1k"], ...rows])}`.trimEnd());
-  }
-  return sections.join("\n\n");
+  const header = `${report.wordCount} words`;
+  const rows = report.checks
+    .toSorted((a, b) =>
+      b.density === a.density ? a.check.localeCompare(b.check) : b.density - a.density,
+    )
+    .map((c) => [c.check, String(c.hits), formatDensity(c.density)]);
+  if (rows.length === 0) return `${header}\nNo alerts.`;
+  return `${header}\n${table([["Check", "Hits", "Density /1k"], ...rows])}`.trimEnd();
 }
 
 if (import.meta.main) {
@@ -135,27 +78,11 @@ if (import.meta.main) {
           description: "Emit the report as JSON for comparing two runs",
           default: false,
         },
-        comments: {
-          type: Boolean,
-          description:
-            "Force comment extraction on (defaults on for non-prose source files, off for prose)",
-        },
-        noComments: {
-          type: Boolean,
-          description: "Force comment extraction off",
-          default: false,
-        },
       },
     },
     async (argv) => {
       const { text, filePath } = await readInput(argv._.input);
-      if (argv.flags.comments === true && filePath === undefined) {
-        console.error("--comments needs a file path to pick the comment syntax.");
-        process.exit(1);
-      }
-      const report = await buildReport(text, filePath, {
-        comments: shouldScoreComments(filePath, argv.flags.comments, argv.flags.noComments),
-      });
+      const report = await scoreText(text, filePath);
       console.log(argv.flags.json ? JSON.stringify(report, null, 2) : renderTable(report));
     },
   );

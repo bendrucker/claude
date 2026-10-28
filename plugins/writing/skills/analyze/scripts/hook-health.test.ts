@@ -160,8 +160,7 @@ describe("acceptance", () => {
       expected: { numbering: undecided },
     },
     {
-      // The checkers report the hits a run introduced, so this edit raised the
-      // rule over its own new text, not over the prose the finding named.
+      // Before the PostToolUse move, an edit reported only the hits its own hunk introduced.
       name: "a hunk-scoped edit that raises the rule again decides nothing",
       entries: [shown(), entry({ tool: "Edit", target: "f1", checks: ["numbering"] })],
       expected: { numbering: undecided },
@@ -183,6 +182,19 @@ describe("acceptance", () => {
         entry({ tool: "Write", target: "f1", checks: [] }),
       ],
       expected: { numbering: actedOn },
+    },
+    {
+      name: "a PostToolUse edit re-lints the whole file and decides",
+      entries: [shown(), entry({ event: "PostToolUse", tool: "Edit", target: "f1", checks: [] })],
+      expected: { numbering: actedOn },
+    },
+    {
+      name: "a PostToolUse edit that still raises the rule counts as written past",
+      entries: [
+        shown(),
+        entry({ event: "PostToolUse", tool: "Edit", target: "f1", checks: ["numbering"] }),
+      ],
+      expected: { numbering: writtenPast },
     },
     {
       name: "a finding nothing followed stays counted as unconfirmed",

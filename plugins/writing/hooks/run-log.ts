@@ -17,6 +17,8 @@ const LEGACY_KEYS: Record<string, string> = {
 const RunLogFields = z.object({
   ts: z.string(),
   session_id: z.string(),
+  // Absent on entries logged before file edits moved to PostToolUse.
+  event: z.enum(["PreToolUse", "PostToolUse"]).optional(),
   tool: z.string(),
   ext: z.string(),
   duration_ms: z.number(),

@@ -6,18 +6,11 @@ import { join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
-import { check, collectText, isProse, MCP_PROSE_GUARD, pathCandidates } from "./check-tropes";
-import { toolInputOf } from "./io";
+import { collectText, isProse, lintMessages, MCP_PROSE_GUARD, pathCandidates } from "./messages";
 import { report } from "./report";
 
 async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
-  const target = { toolName: input.tool_name, filePath: toolInputOf(input).file_path };
-  return report(await check(input), target)?.output ?? null;
-}
-
-function contextOf(output: SyncHookJSONOutput | null): string | undefined {
-  const specific = output?.hookSpecificOutput;
-  return specific?.hookEventName === "PreToolUse" ? specific.additionalContext : undefined;
+  return report(await lintMessages(input), { event: "PreToolUse" })?.output ?? null;
 }
 
 function denialOf(output: SyncHookJSONOutput | null): {
@@ -27,51 +20,6 @@ function denialOf(output: SyncHookJSONOutput | null): {
   const specific = output?.hookSpecificOutput;
   if (specific?.hookEventName !== "PreToolUse") return { decision: undefined, reason: undefined };
   return { decision: specific.permissionDecision, reason: specific.permissionDecisionReason };
-}
-
-function mockWrite(content: string, filePath = "test.md"): PreToolUseHookInput {
-  return {
-    hook_event_name: "PreToolUse",
-    session_id: "test",
-    transcript_path: "/tmp/test",
-    cwd: "/tmp",
-    tool_name: "Write",
-    tool_input: { file_path: filePath, content },
-    tool_use_id: "test",
-  };
-}
-
-function mockEdit(
-  newString: string,
-  oldString?: string,
-  filePath = "test.md",
-): PreToolUseHookInput {
-  const toolInput: Record<string, unknown> = {
-    file_path: filePath,
-    new_string: newString,
-  };
-  if (oldString !== undefined) toolInput.old_string = oldString;
-  return {
-    hook_event_name: "PreToolUse",
-    session_id: "test",
-    transcript_path: "/tmp/test",
-    cwd: "/tmp",
-    tool_name: "Edit",
-    tool_input: toolInput,
-    tool_use_id: "test",
-  };
-}
-
-function mockMultiEdit(edits: { old_string?: string; new_string: string }[]): PreToolUseHookInput {
-  return {
-    hook_event_name: "PreToolUse",
-    session_id: "test",
-    transcript_path: "/tmp/test",
-    cwd: "/tmp",
-    tool_name: "MultiEdit",
-    tool_input: { file_path: "test.md", edits },
-    tool_use_id: "test",
-  };
 }
 
 function mockBash(command: string): PreToolUseHookInput {
@@ -90,211 +38,6 @@ function mockMcp(tool_name: string, tool_input: Record<string, unknown>): PreToo
   return { ...mockBash(""), tool_name, tool_input };
 }
 
-describe("Vale rule files", () => {
-  const rulePath = "/Users/test/plugins/writing/styles/Writing/ReachingFor.yml";
-
-  test.each<[string, string, string]>([
-    [
-      "skips Write to a rule file containing flagged vocabulary",
-      "Write",
-      "tokens:\n  - delve\n  - tapestry\n",
-    ],
-    ["skips Edit to a rule file", "Edit", "  - delve\n  - bolstered\n"],
-  ])("%s", async (_name, tool, content) => {
-    const input =
-      tool === "Write" ? mockWrite(content, rulePath) : mockEdit(content, undefined, rulePath);
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("does not skip other .txt files", async () => {
-    const result = await processInput(
-      mockWrite("This is a tool, not a framework.", "/tmp/notes.txt"),
-    );
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-});
-
-describe("Write/Edit", () => {
-  it("returns reminder for Write with spaced em dash", async () => {
-    const result = await processInput(mockWrite("This \u2014 is bad"));
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-    const ctx = contextOf(result);
-    expect(ctx).toContain("follow-up Edit");
-  });
-
-  it("returns reminder for Edit with spaced em dash", async () => {
-    const result = await processInput(mockEdit("This \u2014 is bad"));
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-
-  it("ignores flagged content in Edit old_string", async () => {
-    const input = mockEdit(
-      "clean replacement text here",
-      "old content with \u2014 spaced em dash inside",
-    );
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("returns reminder when old_string is clean but new_string has em dash", async () => {
-    const input = mockEdit("This \u2014 is bad", "clean original text here");
-    const result = await processInput(input);
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-
-  it("returns context for promotional language", async () => {
-    const result = await processInput(mockWrite("A groundbreaking approach"));
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-
-  it("returns null for clean text", async () => {
-    expect(await processInput(mockWrite("Clean prose here."))).toBeNull();
-  });
-
-  it("returns null for empty content", async () => {
-    expect(await processInput(mockWrite(""))).toBeNull();
-  });
-});
-
-describe("diff-aware filtering", () => {
-  it("ignores Edit that preserves a pre-existing em dash", async () => {
-    const input = mockEdit(
-      "Title \u2014 kept verbatim, with extra detail added.",
-      "Title \u2014 kept verbatim.",
-    );
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("flags Edit that adds a second em dash beyond what old_string had", async () => {
-    const input = mockEdit(
-      "Title \u2014 kept, and now another \u2014 added phrase.",
-      "Title \u2014 kept verbatim.",
-    );
-    const result = await processInput(input);
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-
-  it("ignores MultiEdit that preserves pre-existing AI vocabulary", async () => {
-    const input = mockMultiEdit([
-      {
-        old_string: "We delve into the intricacies of the system.",
-        new_string: "We delve into the intricacies of the new system, with examples.",
-      },
-    ]);
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("ignores Write that preserves an em dash already in the file", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "trope-diff-"));
-    const file = join(dir, "doc.md");
-    await Bun.write(file, "Title \u2014 already here in the existing file.\n");
-    const result = await processInput(
-      mockWrite("Title \u2014 already here in the existing file.\nAdded line.\n", file),
-    );
-    await rm(dir, { recursive: true, force: true });
-    expect(result).toBeNull();
-  });
-
-  it("flags Write that adds a new em dash beyond what file had", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "trope-diff-"));
-    const file = join(dir, "doc.md");
-    await Bun.write(file, "Title \u2014 already here.\n");
-    const result = await processInput(
-      mockWrite("Title \u2014 already here.\nNow another \u2014 line.\n", file),
-    );
-    await rm(dir, { recursive: true, force: true });
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-
-  it("skips text with no active tropes in file Edit", async () => {
-    const input = mockEdit("Excellent. Let me proceed.\nNext line.", "Next line.");
-    expect(await processInput(input)).toBeNull();
-  });
-});
-
-describe("semicolon splices", () => {
-  function codeEdit(newString: string, oldString: string): PreToolUseHookInput {
-    return mockEdit(newString, oldString, "index.ts");
-  }
-
-  it("flags a code-file edit introducing a spliced comment", async () => {
-    const result = await processInput(
-      codeEdit("// keep sorted; callers rely on order\nconst x = 1;", "const x = 1;"),
-    );
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-    const ctx = contextOf(result);
-    expect(ctx).toContain("semicolon");
-  });
-
-  it("ignores a pre-existing spliced comment untouched by the edit", async () => {
-    const result = await processInput(
-      codeEdit(
-        "// keep sorted; callers rely on order\nconst x = 2;",
-        "// keep sorted; callers rely on order\nconst x = 1;",
-      ),
-    );
-    expect(result).toBeNull();
-  });
-
-  test.each<{ name: string; edit: [string, string]; quote: string | undefined }>([
-    {
-      name: "flags and quotes a splice edited into a script block",
-      edit: ["// wait for fonts", "// keep sorted; callers rely on order"],
-      quote: "sorted; callers",
-    },
-    {
-      name: "ignores a pre-existing splice elsewhere in the file",
-      edit: ["const ready = 1;", "const ready = 2;"],
-      quote: undefined,
-    },
-  ])("$name", async ({ edit: [oldString, newString], quote }) => {
-    const file = join(mkdtempSync(join(tmpdir(), "trope-html-")), "page.html");
-    await Bun.write(
-      file,
-      [
-        "<!-- The page loads fast; the fonts arrive later. -->",
-        "<script>",
-        "// wait for fonts",
-        "const ready = 1;",
-        "</script>",
-      ].join("\n"),
-    );
-    const result = await processInput(mockEdit(newString, oldString, file));
-    expect(contextOf(result)?.match(/'([^']*)' joins two clauses/)?.[1]).toBe(quote);
-  });
-
-  it("ignores existing comments when an edit shortens an overlong line", async () => {
-    const file = join(mkdtempSync(join(tmpdir(), "trope-long-")), "app.js");
-    const long = `const blob = "${"x".repeat(3_000)}";`;
-    await Bun.write(file, `// The cache warms slowly; then it saturates.\n${long}\n`);
-    expect(await processInput(mockEdit('const blob = "";', long, file))).toBeNull();
-  });
-});
-
-describe("MultiEdit", () => {
-  it("returns null when all old_string values are flagged but new_string values are clean", async () => {
-    const input = mockMultiEdit([
-      { old_string: "text with \u2014 em dash", new_string: "clean replacement text here" },
-      { old_string: "delve into the codebase", new_string: "look at the code carefully" },
-    ]);
-    expect(await processInput(input)).toBeNull();
-  });
-
-  it("returns reminder when any new_string contains a spaced em dash", async () => {
-    const input = mockMultiEdit([
-      { old_string: "clean original text here", new_string: "clean replacement text here" },
-      { old_string: "more clean original content", new_string: "bad \u2014 replacement here" },
-    ]);
-    const result = await processInput(input);
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-
-  it("returns null for fully clean MultiEdit", async () => {
-    const input = mockMultiEdit([
-      { old_string: "original content here", new_string: "replacement content here" },
-    ]);
-    expect(await processInput(input)).toBeNull();
-  });
-});
 describe("pathCandidates", () => {
   test.each([
     ["tmp/body.md", ["tmp/body.md"]],
@@ -527,7 +270,7 @@ describe("isProse", () => {
     "negation hook latency",
     '{"type": "none", "value": "x"}',
     "/Users/ben/tmp/negation-escapes/cand.jsonl",
-    "Run `bun test plugins/writing/hooks/check-tropes.test.ts --timeout 15000`.",
+    "Run `bun test plugins/writing/hooks/messages.test.ts --timeout 15000`.",
   ])("reads %p as not prose", (text) => {
     expect(isProse(text)).toBe(false);
   });

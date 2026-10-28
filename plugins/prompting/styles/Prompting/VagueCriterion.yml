@@ -1,0 +1,28 @@
+# A bound the model cannot check leaves it to decide for itself when the work is done.
+# evidence: the rule-precision eval scores it against commits where a human cut filler from agent-facing documents.
+# retire when: the rule-precision eval reports it unproven on 10 or more hits.
+extends: existence
+message: '"%s" is a bound the model cannot check. Name the observable done-state.'
+level: error
+ignorecase: true
+nonword: true
+scope: ~text.frontmatter
+tokens:
+  - '\b(?:make sure|properly|correctly|appropriately|adequately|sufficiently|as much as (?:possible|needed)|if it makes sense|when (?:done|finished)|until satisfied)\b'
+tests:
+  - name: flags make sure
+    input: |
+      Make sure the branch is clean.
+    contains: [Prompting.VagueCriterion]
+  - name: flags appropriately
+    input: |
+      Handle the error appropriately.
+    contains: [Prompting.VagueCriterion]
+  - name: flags until satisfied
+    input: |
+      Iterate until satisfied.
+    contains: [Prompting.VagueCriterion]
+  - name: allows a checkable criterion
+    input: |
+      Stop when every modified file has a test.
+    absent: Prompting.VagueCriterion

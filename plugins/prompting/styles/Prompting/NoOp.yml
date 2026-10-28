@@ -1,0 +1,36 @@
+# An instruction that restates a default the model already follows spends context and changes nothing.
+# evidence: the rule-precision eval scores it against commits where a human cut filler from agent-facing documents.
+# retire when: the rule-precision eval reports it unproven on 10 or more hits.
+extends: existence
+message: '"%s" restates a default the model already follows. Delete the sentence.'
+level: error
+ignorecase: true
+nonword: true
+scope: ~text.frontmatter
+tokens:
+  - '\b(?:be (?:thorough|careful|concise|accurate|helpful|precise|diligent)|think (?:step by step|carefully|hard)|take your time|(?:use|using) your (?:best )?judge?ment|do your best|remember to|it(?:''s| is) important (?:to|that)|please|carefully)\b'
+tests:
+  - name: flags be thorough
+    input: |
+      Be thorough when reading the diff.
+    contains: [Prompting.NoOp]
+  - name: flags please
+    input: |
+      Please read the file first.
+    contains: [Prompting.NoOp]
+  - name: flags think step by step
+    input: |
+      Think step by step.
+    contains: [Prompting.NoOp]
+  - name: flags use your best judgment
+    input: |
+      Use your best judgment.
+    contains: [Prompting.NoOp]
+  - name: flags the British spelling of judgement
+    input: |
+      Use your best judgement.
+    contains: [Prompting.NoOp]
+  - name: allows an imperative
+    input: |
+      Write one-line comments.
+    absent: Prompting.NoOp

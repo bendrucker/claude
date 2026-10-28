@@ -1,0 +1,40 @@
+# Prose held in a comment still reaches the model, which pays for every token and cannot act on a note addressed to a maintainer. A directive to a formatter or linter is not prose.
+# evidence: a hand audit of every hit across the repo. The rule-precision labels barely exercise it.
+# retire when: a hand audit finds most hits are directives or markup rather than notes.
+extends: existence
+message: '"%s..." is a note to a maintainer that the model reads and cannot act on. Move it out of the document.'
+level: error
+ignorecase: true
+nonword: true
+scope: raw
+tokens:
+  - '<!--(?!\s*(?:prettier|markdownlint|eslint|oxlint|biome|shellcheck|vale|editorconfig|toc|omit|x-release)\b)\s*(?:(?:(?!-->)\S)+\s+){5}(?:(?!-->)\S)+(?=(?:\s+(?:(?!-->)\S)+){2,}\s*-->)'
+tests:
+  - name: flags a note held in a comment
+    input: |
+      # Doc
+
+      <!--
+      Curation note for maintainers. Skip this block when reviewing a document.
+      -->
+    contains: [Prompting.MaintainerAside]
+  - name: flags an eight-word comment on one line
+    input: |
+      <!-- one two three four five six seven eight -->
+    contains: [Prompting.MaintainerAside]
+  - name: allows a formatter directive
+    input: |
+      <!-- prettier-ignore-start -->
+    absent: Prompting.MaintainerAside
+  - name: allows a long linter directive
+    input: |
+      <!-- markdownlint-disable-next-line MD013 because the table row is long -->
+    absent: Prompting.MaintainerAside
+  - name: allows a short aside
+    input: |
+      <!-- tuned by hand -->
+    absent: Prompting.MaintainerAside
+  - name: allows a seven-word comment
+    input: |
+      <!-- one two three four five six seven -->
+    absent: Prompting.MaintainerAside

@@ -7,7 +7,13 @@ import { table } from "table";
 import { z } from "zod";
 import { legacyResults, type ScanResult } from "../../../detection/scan";
 import { PATTERNS } from "../../../detection/tropes";
-import { CATEGORY_ALIASES, type ValeAlert, valeAlerts } from "../../../detection/vale";
+import {
+  CATEGORY_ALIASES,
+  VALE_CONFIG,
+  type ValeAlert,
+  valeAlerts,
+  valeBinary,
+} from "../../../detection/vale";
 import { countWords } from "../../../detection/wordlists";
 import groups from "../vale-groups.json" with { type: "json" };
 
@@ -20,6 +26,7 @@ const VOICE_DIR = join(
   "writing-bendrucker",
   "voice-baseline",
 );
+const DRAFTS_DIR = join(import.meta.dirname, "..", "data", "drafts");
 const CHUNK_WORDS = 1500;
 const CONTEXT_CHARS = 200;
 
@@ -32,15 +39,16 @@ export interface ExampleParity {
   negatives: { flagged: number; total: number };
 }
 
-export interface VoiceRate {
-  category: string;
-  check: string | null;
-  legacy: number;
-  vale: number;
+export type Corpus = "voice" | "drafts";
+
+export interface Unit {
+  source: string;
+  text: string;
 }
 
 export interface QueueEntry {
   group: Group;
+  corpus: Corpus;
   category: string;
   check: string;
   engine: "legacy" | "vale";
@@ -49,9 +57,11 @@ export interface QueueEntry {
   context: string;
 }
 
+const Rate = z.object({ legacy: z.number(), vale: z.number() });
+
 const Report = z.object({
   group: z.string(),
-  words: z.number(),
+  words: z.object({ voice: z.number(), drafts: z.number() }),
   examples: z.array(
     z.object({
       category: z.string(),
@@ -60,12 +70,12 @@ const Report = z.object({
       negatives: z.object({ flagged: z.number(), total: z.number() }),
     }),
   ),
-  voice: z.array(
+  rates: z.array(
     z.object({
       category: z.string(),
       check: z.string().nullable(),
-      legacy: z.number(),
-      vale: z.number(),
+      voice: Rate,
+      drafts: Rate,
     }),
   ),
   queued: z.number(),
@@ -123,12 +133,9 @@ export async function mapLimit<T, R>(
 }
 
 /** Paragraph-aligned chunks of each file, up to `budget` words split evenly across files. */
-export function sampleChunks(
-  files: { name: string; text: string }[],
-  budget: number,
-): { source: string; text: string }[] {
+export function sampleChunks(files: { name: string; text: string }[], budget: number): Unit[] {
   const perFile = Math.ceil(budget / Math.max(files.length, 1));
-  const chunks: { source: string; text: string }[] = [];
+  const chunks: Unit[] = [];
   for (const { name, text } of files) {
     let taken = 0;
     let current: string[] = [];
@@ -158,7 +165,8 @@ function contextAt(text: string, line: number, matched: string): string {
 
 export function disagreements(
   group: Group,
-  chunk: { source: string; text: string },
+  corpus: Corpus,
+  chunk: Unit,
   legacy: ScanResult[],
   vale: ValeAlert[],
 ): QueueEntry[] {
@@ -169,6 +177,7 @@ export function disagreements(
       continue;
     entries.push({
       group,
+      corpus,
       category: hit.category,
       check,
       engine: "legacy",
@@ -185,6 +194,7 @@ export function disagreements(
       continue;
     entries.push({
       group,
+      corpus,
       category: categories[0] ?? "",
       check: alert.Check,
       engine: "vale",
@@ -208,31 +218,57 @@ async function readVoice(dir: string): Promise<{ name: string; text: string }[]>
   );
 }
 
-export async function runGroup(
+const DraftLine = z.object({
+  text: z.string().optional(),
+  body: z.string().optional(),
+  side: z.string().optional(),
+});
+
+/** Model-written drafts from the eval bucket, one file per harness. The rewritten side of a pair is skipped. */
+async function readDrafts(dir: string): Promise<{ name: string; text: string }[]> {
+  const names = (await readdir(dir).catch(() => []))
+    .filter((name) => name.endsWith(".jsonl"))
+    .toSorted((a, b) => a.localeCompare(b));
+  return Promise.all(
+    names.map(async (name) => {
+      const lines = (await Bun.file(join(dir, name)).text()).split("\n").filter((l) => l !== "");
+      const texts = lines
+        .map((line) => DraftLine.parse(JSON.parse(line)))
+        .filter((draft) => draft.side !== "after")
+        .map((draft) => draft.text ?? draft.body ?? "");
+      return { name: basename(name, ".jsonl"), text: texts.join("\n\n") };
+    }),
+  );
+}
+
+interface CorpusScan {
+  words: number;
+  counts: Map<string, { legacy: number; vale: number }>;
+  queue: QueueEntry[];
+}
+
+async function scanCorpus(
   group: Group,
-  budget: number,
-  voiceDir: string,
-  concurrency = 2,
-): Promise<Report> {
+  corpus: Corpus,
+  units: Unit[],
+  concurrency: number,
+): Promise<CorpusScan> {
   const categories = groups[group];
   const categorySet = new Set<string>(categories);
   const checks = new Set(categories.map(checkOf).filter((check) => check !== null));
-  const examples = await exampleParity(categories);
-
-  const chunks = sampleChunks(await readVoice(voiceDir), budget);
-  const scanned = await mapLimit(chunks, concurrency, async (chunk) => {
+  const scanned = await mapLimit(units, concurrency, async (unit) => {
     const [legacy, alerts] = await Promise.all([
-      legacyResults(chunk.text, categorySet),
-      valeAlerts(chunk.text, { kind: "body" }),
+      legacyResults(unit.text, categorySet),
+      valeAlerts(unit.text, { kind: "body" }),
     ]);
-    return { chunk, legacy, vale: alerts.filter((alert) => checks.has(alert.Check)) };
+    return { unit, legacy, vale: alerts.filter((alert) => checks.has(alert.Check)) };
   });
 
   const counts = new Map(categories.map((category) => [category, { legacy: 0, vale: 0 }]));
   const queue: QueueEntry[] = [];
   let words = 0;
-  for (const { chunk, legacy, vale } of scanned) {
-    words += countWords(chunk.text);
+  for (const { unit, legacy, vale } of scanned) {
+    words += countWords(unit.text);
     for (const hit of legacy) {
       const row = counts.get(hit.category);
       if (row) row.legacy++;
@@ -243,24 +279,52 @@ export async function runGroup(
         if (row && checkOf(category) === alert.Check) row.vale++;
       }
     }
-    queue.push(...disagreements(group, chunk, legacy, vale));
+    queue.push(...disagreements(group, corpus, unit, legacy, vale));
   }
+  return { words, counts, queue };
+}
 
-  const per1k = (n: number): number => Math.round((n / Math.max(words, 1)) * 1000 * 1000) / 1000;
+function per1k(n: number, words: number): number {
+  return Math.round((n / Math.max(words, 1)) * 1000 * 1000) / 1000;
+}
+
+export async function runGroup(
+  group: Group,
+  budget: number,
+  voiceDir: string,
+  draftsDir: string,
+  concurrency = 2,
+): Promise<Report> {
+  const categories = groups[group];
+  const examples = await exampleParity(categories);
+  const voice = await scanCorpus(
+    group,
+    "voice",
+    sampleChunks(await readVoice(voiceDir), budget),
+    concurrency,
+  );
+  const drafts = await scanCorpus(
+    group,
+    "drafts",
+    sampleChunks(await readDrafts(draftsDir), Number.POSITIVE_INFINITY),
+    concurrency,
+  );
+
+  const rate = (scan: CorpusScan, category: string): { legacy: number; vale: number } => {
+    const row = scan.counts.get(category) ?? { legacy: 0, vale: 0 };
+    return { legacy: per1k(row.legacy, scan.words), vale: per1k(row.vale, scan.words) };
+  };
   const report: Report = {
     group,
-    words,
+    words: { voice: voice.words, drafts: drafts.words },
     examples,
-    voice: categories.map((category) => {
-      const row = counts.get(category) ?? { legacy: 0, vale: 0 };
-      return {
-        category,
-        check: checkOf(category),
-        legacy: per1k(row.legacy),
-        vale: per1k(row.vale),
-      };
-    }),
-    queued: queue.length,
+    rates: categories.map((category) => ({
+      category,
+      check: checkOf(category),
+      voice: rate(voice, category),
+      drafts: rate(drafts, category),
+    })),
+    queued: voice.queue.length + drafts.queue.length,
   };
 
   const dir = join(RESULTS, group);
@@ -268,9 +332,110 @@ export async function runGroup(
   await Bun.write(join(dir, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await Bun.write(
     join(dir, "queue.jsonl"),
-    queue.map((entry) => `${JSON.stringify(entry)}\n`).join(""),
+    [...voice.queue, ...drafts.queue].map((entry) => `${JSON.stringify(entry)}\n`).join(""),
   );
   return report;
+}
+
+export type Level = "NO" | "warning" | "error";
+
+export interface SweepRow {
+  check: string;
+  voice: number;
+  drafts: number;
+  lift: number;
+  level: Level;
+}
+
+/** How much more often a check fires on drafts than on the voice baseline, with add-half smoothing. */
+export function lift(
+  draftHits: number,
+  draftWords: number,
+  voiceHits: number,
+  voiceWords: number,
+): number {
+  return (
+    (draftHits + 0.5) / Math.max(draftWords, 1) / ((voiceHits + 0.5) / Math.max(voiceWords, 1))
+  );
+}
+
+// Fewer combined hits than this is too little evidence to turn a rule off.
+const MIN_SUPPORT = 10;
+
+export function levelFor(liftValue: number, voicePer1k: number, support: number): Level {
+  if (support < MIN_SUPPORT) return "warning";
+  if (liftValue < 2) return "NO";
+  if (liftValue >= 5 && voicePer1k < 0.1) return "error";
+  return "warning";
+}
+
+async function tallyChecks(
+  units: Unit[],
+  concurrency: number,
+): Promise<{ words: number; hits: Map<string, number> }> {
+  const alerts = await mapLimit(units, concurrency, (unit) =>
+    valeAlerts(unit.text, { kind: "body" }),
+  );
+  const hits = new Map<string, number>();
+  for (const alert of alerts.flat()) hits.set(alert.Check, (hits.get(alert.Check) ?? 0) + 1);
+  return { words: units.reduce((sum, unit) => sum + countWords(unit.text), 0), hits };
+}
+
+const LsConfig = z.object({ Paths: z.array(z.string()) });
+
+/** Every ai-tells rule on Vale's style paths, so a rule silent in both corpora still gets a level. */
+async function aiTellsChecks(): Promise<string[]> {
+  const proc = Bun.spawn([valeBinary() ?? "vale", "ls-config", `--config=${VALE_CONFIG}`], {
+    stdout: "pipe",
+    stderr: "ignore",
+  });
+  const { Paths } = LsConfig.parse(JSON.parse(await new Response(proc.stdout).text()));
+  const files = await Promise.all(
+    Paths.map((path) => readdir(join(path, "ai-tells")).catch(() => [])),
+  );
+  return files
+    .flat()
+    .filter((name) => name.endsWith(".yml"))
+    .map((name) => `ai-tells.${basename(name, ".yml")}`);
+}
+
+export async function sweep(
+  budget: number,
+  voiceDir: string,
+  draftsDir: string,
+  concurrency = 2,
+): Promise<SweepRow[]> {
+  const voice = await tallyChecks(sampleChunks(await readVoice(voiceDir), budget), concurrency);
+  const drafts = await tallyChecks(
+    sampleChunks(await readDrafts(draftsDir), Number.POSITIVE_INFINITY),
+    concurrency,
+  );
+  const checks = new Set([...voice.hits.keys(), ...drafts.hits.keys(), ...(await aiTellsChecks())]);
+  return [...checks]
+    .map((check) => {
+      const voiceHits = voice.hits.get(check) ?? 0;
+      const draftHits = drafts.hits.get(check) ?? 0;
+      const liftValue = lift(draftHits, drafts.words, voiceHits, voice.words);
+      const voicePer1k = per1k(voiceHits, voice.words);
+      return {
+        check,
+        voice: voicePer1k,
+        drafts: per1k(draftHits, drafts.words),
+        lift: Math.round(liftValue * 100) / 100,
+        level: levelFor(liftValue, voicePer1k, voiceHits + draftHits),
+      };
+    })
+    .toSorted((a, b) => b.lift - a.lift);
+}
+
+/** `.vale.ini` lines for each ai-tells check whose proposed level differs from its shipped error. */
+export function levelLines(rows: SweepRow[]): string[] {
+  return rows
+    .filter((row) => row.check.startsWith("ai-tells.") && row.level !== "error")
+    .map(
+      (row) =>
+        `# lift ${row.lift}, ${row.voice}/1k in your writing, ${row.drafts}/1k in drafts\n${row.check} = ${row.level}`,
+    );
 }
 
 function ratio({ flagged, total }: { flagged: number; total: number }): string {
@@ -278,18 +443,26 @@ function ratio({ flagged, total }: { flagged: number; total: number }): string {
 }
 
 export function formatReport(report: Report): string {
-  const rows = report.voice.map((voice) => {
-    const example = report.examples.find((row) => row.category === voice.category);
+  const rows = report.rates.map((rate) => {
+    const example = report.examples.find((row) => row.category === rate.category);
     return [
-      voice.category,
-      voice.check ?? "(unported)",
+      rate.category,
+      rate.check ?? "(unported)",
       example ? ratio(example.positives) : "",
       example ? ratio(example.negatives) : "",
-      String(voice.legacy),
-      String(voice.vale),
+      `${rate.voice.legacy} / ${rate.voice.vale}`,
+      `${rate.drafts.legacy} / ${rate.drafts.vale}`,
     ];
   });
-  return `${report.group}: ${report.words} voice words, ${report.queued} queued\n${table([["category", "check", "pos hit", "neg hit", "legacy FP/1k", "vale FP/1k"], ...rows])}`;
+  const header = [
+    "category",
+    "check",
+    "pos hit",
+    "neg hit",
+    "voice/1k old/vale",
+    "drafts/1k old/vale",
+  ];
+  return `${report.group}: ${report.words.voice} voice words, ${report.words.drafts} draft words, ${report.queued} queued\n${table([header, ...rows])}`;
 }
 
 function int(value: string): number {
@@ -315,13 +488,48 @@ const run = new Command("run")
   .requiredOption("--group <group>", "port group from vale-groups.json", groupArg)
   .option("--words <n>", "voice-baseline words to sample", int, 100_000)
   .option("--voice-dir <dir>", "voice baseline directory", VOICE_DIR)
+  .option("--drafts-dir <dir>", "model drafts directory (jsonl)", DRAFTS_DIR)
   .option("--concurrency <n>", "vale processes in flight", int, 2)
   .action(async (options) => {
     console.log(
       formatReport(
-        await runGroup(options.group, options.words, options.voiceDir, options.concurrency),
+        await runGroup(
+          options.group,
+          options.words,
+          options.voiceDir,
+          options.draftsDir,
+          options.concurrency,
+        ),
       ),
     );
+  });
+
+const sweepCommand = new Command("sweep")
+  .description(
+    "Propose a level for every Vale check from its lift on model drafts over the voice baseline.",
+  )
+  .option("--words <n>", "voice-baseline words to sample", int, 100_000)
+  .option("--voice-dir <dir>", "voice baseline directory", VOICE_DIR)
+  .option("--drafts-dir <dir>", "model drafts directory (jsonl)", DRAFTS_DIR)
+  .option("--concurrency <n>", "vale processes in flight", int, 2)
+  .action(async (options) => {
+    const rows = await sweep(
+      options.words,
+      options.voiceDir,
+      options.draftsDir,
+      options.concurrency,
+    );
+    await mkdir(RESULTS, { recursive: true });
+    await Bun.write(join(RESULTS, "sweep.json"), `${JSON.stringify(rows, null, 2)}\n`);
+    await Bun.write(join(RESULTS, "levels.ini"), `${levelLines(rows).join("\n")}\n`);
+    const body = rows.map((row) => [
+      row.check,
+      String(row.voice),
+      String(row.drafts),
+      String(row.lift),
+      row.level,
+    ]);
+    console.log(table([["check", "voice/1k", "drafts/1k", "lift", "level"], ...body]));
   });
 
 const report = new Command("report")
@@ -362,6 +570,7 @@ const queue = new Command("queue")
 
 export const program = new Command("vale-gate.ts")
   .addCommand(run)
+  .addCommand(sweepCommand)
   .addCommand(report)
   .addCommand(queue);
 

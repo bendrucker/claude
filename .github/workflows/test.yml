@@ -79,6 +79,13 @@ jobs:
       # The adapter suite's tests hand rescore calls to the real uv.
       - uses: astral-sh/setup-uv@v10.3.2
 
+      # `bun test evals/` also matches plugins/writing/evals, whose tests lint through vale.
+      - name: Install writing plugin tools
+        uses: jdx/mise-action@v5
+        with:
+          working_directory: plugins/writing
+          cache: false
+
       - name: Run tests
         run: bun test evals/
 

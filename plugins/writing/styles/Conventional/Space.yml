@@ -1,0 +1,47 @@
+# The colon and the space are both required; `fix:handle` has a type and no
+# description. Reported apart from Type so the message names the one
+# character that is missing.
+extends: existence
+message: "A space follows the colon."
+link: https://www.conventionalcommits.org/en/v1.0.0/#specification
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^\w+(?:\([^()]*\))?!?:(?=\S)'
+
+tests:
+  - name: "space"
+    about: "no space after the colon"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(parser):handle empty input
+    want: |
+      1:1:Conventional.Space:A space follows the colon.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      feat(parser)!: allow config objects to extend other configs
+
+      The `extends` key is read before the rest of the file.
+
+      BREAKING CHANGE: the key was ignored before.
+      Signed-off-by: Jane Doe <jane@example.com>
+      Fixes #12
+    want: ""
+  - name: "guards"
+    about: "prose that looks like a footer is body, and real footers after a blank line pass"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      docs: correct spelling of CHANGELOG
+
+      Note: a line like this one is prose, and so is the next.
+      Reviewed by the team, not a trailer.
+
+      Reviewed-by: Z
+      Refs: #123
+    want: ""

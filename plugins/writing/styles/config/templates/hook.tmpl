@@ -1,0 +1,7 @@
+{{- /* A short report for a commit-msg hook: the rule, the line and column,
+       the message, and the link on its own line. Pick it with
+       `--output=hook.tmpl`. */ -}}
+{{- range .Files}}{{range .Alerts -}}
+{{if eq .Severity "error"}}✖{{else if eq .Severity "warning"}}⚠{{else}}ⓘ{{end}} {{.Line}}:{{index .Span 0}}  {{.Message}}
+   {{.Check}}{{if .Link}}  {{.Link}}{{end}}
+{{end}}{{end}}

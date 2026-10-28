@@ -1,0 +1,64 @@
+# "The special notation 'Fixes #12345' associates the change with issue
+# 12345 ... If the change is a partial step towards the resolution of the
+# issue, write 'Updates #12345' instead." A colon, or another verb, is not
+# the notation the tracker reads.
+extends: existence
+message: "Reference an issue as 'Fixes #12345' or 'Updates #12345', not '%s'."
+link: https://go.dev/doc/contribute#commit_messages
+level: warning
+scope:
+  - body
+  - trailer
+nonword: true
+tokens:
+  - '(?m)^(?:Fixes|Updates):\s*(?:golang/go)?#?\d+'
+  - '(?m)^(?:Fix|Fixed|Close[sd]?|Resolve[sd]?|Update|Updated) (?:golang/go)?#\d+'
+
+tests:
+  - name: "before"
+    about: "no package, a period, a long line, and Fixes with a colon"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Improve Sin, Cos and Tan precision for very large arguments.
+
+      The existing implementation has poor numerical properties for large arguments,
+      so use the McGillicutty algorithm to improve accuracy above 1e10.
+
+      Fixes: #159
+    want: |
+      6:1:Go.Issue:Reference an issue as 'Fixes #12345' or 'Updates #12345', not 'Fixes: #159'.
+  - name: "capital"
+    about: "a capitalized summary and the wrong verb"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      math: Improve Sin precision
+
+      Fix #159
+    want: |
+      3:1:Go.Issue:Reference an issue as 'Fixes #12345' or 'Updates #12345', not 'Fix #159'.
+  - name: "after"
+    about: "the guide's own example"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      math: improve Sin, Cos and Tan precision for very large arguments
+
+      The existing implementation has poor numerical properties for
+      large arguments, so use the McGillicutty algorithm to improve
+      accuracy above 1e10.
+
+      The algorithm is described at https://wikipedia.org/wiki/McGillicutty_Algorithm
+
+      Fixes #159
+    want: ""
+  - name: "guards"
+    about: "a package list, an identifier, and Updates on the x/ form"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      cmd/go, cmd/compile: Request.Body is closed on error
+
+      Updates golang/go#159
+    want: ""

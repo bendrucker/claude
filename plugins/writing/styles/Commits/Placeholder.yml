@@ -1,0 +1,63 @@
+# "fix", "wip", "update", "changes": a subject that names the act of
+# committing rather than the change. It reads fine on the day and says
+# nothing in the log. Any prefix a convention adds is skipped first, so
+# `fix: fix` is caught along with `fix`.
+extends: existence
+message: "'%s' says nothing about the change. Say what it does."
+link: https://git-scm.com/docs/SubmittingPatches#describe-changes
+level: warning
+scope: subject
+ignorecase: true
+nonword: true
+raw:
+  - '(?<=^\s*(?:[^:]*:\s+|[^\w\s]+\s+|:[\w+-]+:\s+)*)(?:wip|fix(?:es|ed)?|updates?|changes?|misc|stuff|things?|tests?|testing|cleanups?|clean ?up|refactor(?:ing)?|bump|minor(?: (?:changes?|fixes?|tweaks?))?|more (?:fixes|changes)|typos?|tweaks?|asdf|foo|temp|tmp|save|commit|\.+|-+|x+)\s*$'
+
+tests:
+  - name: "placeholder"
+    about: "a subject that names the act of committing"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: fix
+    want: |
+      1:6:Commits.Placeholder:'fix' says nothing about the change. Say what it does.
+  - name: "Commitlint-extras-short"
+    about: "a header under the minimum, no scope, no body, and the breaking footer without a '!'"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: x
+
+      BREAKING CHANGE: the flag is gone
+      Signed-off-by: J <j@example.com>
+    want: |
+      1:6:Commits.Placeholder:'x' says nothing about the change. Say what it does.
+  - name: "Gitlint-short"
+    about: "a title under five characters, and no body"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Fix
+    want: |
+      1:1:Commits.Placeholder:'Fix' says nothing about the change. Say what it does.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add fixed-point parsing to the tokenizer
+
+      Numbers with a decimal point were read as two integers.
+    want: ""
+  - name: "guards"
+    about: "a prefix is skipped, a hyphenated Fixed-point passes, and the mood rule reads the subject only"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      tests: add coverage for Fixed-point values
+
+      Increase the timeout in the fixtures that run under CI. This commit's
+      body may say "I added" freely; the mood rule reads the subject.
+
+      Fixes #12
+    want: ""

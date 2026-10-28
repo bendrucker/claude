@@ -1,0 +1,22 @@
+# `conventional.descriptionLength`, 72 by default: the description after
+# the type and scope. Off by default, as the block is optional.
+extends: Commitlint.SubjectLength
+message: "Conventional commit description is %d characters, over descriptionLength."
+link: https://github.com/siderolabs/conform#commit-policy
+level: error
+max: 72
+min: 1
+
+tests:
+  - name: "optional"
+    about: "the jira and conventional blocks, on"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      feat(api): add the parser to the API surface, in a description that runs on past seven
+
+      The parser is exposed on the API surface for other tools.
+
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: |
+      1:12:Conform.DescriptionLength:Conventional commit description is 75 characters, over descriptionLength.

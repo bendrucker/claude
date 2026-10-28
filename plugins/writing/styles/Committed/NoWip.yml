@@ -1,0 +1,31 @@
+# `no_wip = true`: "Disallow WIP commits".
+extends: existence
+message: "no_wip: '%s'."
+link: https://github.com/crate-ci/committed/blob/master/docs/reference.md
+level: error
+scope: subject
+ignorecase: true
+nonword: true
+raw:
+  - '^wip\b'
+
+tests:
+  - name: "before"
+    about: "committed's defaults, most of them at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      wip: added the parser, which took a while!
+
+      A body line that is long enough to run past the seventy-two columns allowed.
+    want: |
+      1:1:Committed.NoWip:no_wip: 'wip'.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add the parser
+
+      A body wrapped at seventy-two columns, as the default asks.
+    want: ""

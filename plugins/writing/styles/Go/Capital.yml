@@ -1,0 +1,48 @@
+# "it should be written so to complete the sentence 'This change modifies
+# Go to _____.' That means it does not start with a capital letter". An
+# identifier is a name and keeps its case: `Request.Body`, `ReadAll(`, and
+# a CamelCase word all pass.
+extends: existence
+message: "The summary completes 'This change modifies Go to ...', so it does not start with a capital: '%s'."
+link: https://go.dev/doc/contribute#commit_messages
+level: warning
+scope: subject
+nonword: true
+raw:
+  - '(?<=^[\w./, -]+: )[A-Z][a-z]+\b(?![.(])'
+
+tests:
+  - name: "capital"
+    about: "a capitalized summary and the wrong verb"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      math: Improve Sin precision
+
+      Fix #159
+    want: |
+      1:7:Go.Capital:The summary completes 'This change modifies Go to ...', so it does not start with a capital: 'Improve'.
+  - name: "after"
+    about: "the guide's own example"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      math: improve Sin, Cos and Tan precision for very large arguments
+
+      The existing implementation has poor numerical properties for
+      large arguments, so use the McGillicutty algorithm to improve
+      accuracy above 1e10.
+
+      The algorithm is described at https://wikipedia.org/wiki/McGillicutty_Algorithm
+
+      Fixes #159
+    want: ""
+  - name: "guards"
+    about: "a package list, an identifier, and Updates on the x/ form"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      cmd/go, cmd/compile: Request.Body is closed on error
+
+      Updates golang/go#159
+    want: ""

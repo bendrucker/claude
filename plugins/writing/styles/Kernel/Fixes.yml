@@ -1,0 +1,52 @@
+# "please use the 'Fixes:' tag with at least the first 12 characters of the
+# SHA-1 ID, and the one line summary." `git log -1 --pretty=fixes` prints
+# the form.
+extends: existence
+message: "A Fixes: tag carries at least 12 characters of the SHA-1 and the summary in parentheses: 'Fixes: 54a4f0239f2e (\"KVM: MMU: ...\")'."
+link: https://www.kernel.org/doc/html/latest/process/submitting-patches.html#describe-your-changes
+level: error
+scope: trailer
+nonword: true
+raw:
+  - '(?m)^Fixes:(?! [0-9a-f]{12,40} \(".+"\)$).*$'
+
+tests:
+  - name: "before"
+    about: "no subsystem, a long summary, this patch, a short SHA, a long line, a bad Fixes:, a bad Closes:, no sign-off"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Fix eflags tracking in the x86 entry code which was broken by the recent rework
+
+      This patch fixes the tracking that commit e21d217 broke. The explanation line here runs past seventy-five columns.
+
+      Fixes: e21d217 (video: remove unnecessary platform_set_drvdata())
+      Closes: BUG-1234
+    want: |
+      5:1:Kernel.Fixes:A Fixes: tag carries at least 12 characters of the SHA-1 and the summary in parentheses: 'Fixes: 54a4f0239f2e ("KVM: MMU: ...")'.
+  - name: "after"
+    about: "the document's own examples"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      x86: fix eflags tracking
+
+      Commit e21d2170f36602ae2708 ("video: remove unnecessary
+      platform_set_drvdata()") removed the unnecessary platform_set_drvdata(),
+      but left the variable "dev" unused. Delete it.
+
+      Fixes: 54a4f0239f2e ("KVM: MMU: make kvm_mmu_zap_page() return the number of pages it actually freed")
+      Closes: https://example.com/issues/1234
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: ""
+  - name: "guards"
+    about: "the one phrase the document asks for"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      net: dsa: describe the dependency on the previous patch
+
+      This patch depends on patch 2/5 in the series.
+
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: ""

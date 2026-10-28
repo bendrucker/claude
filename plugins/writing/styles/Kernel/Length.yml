@@ -1,0 +1,48 @@
+# "the summary must be no more than 70-75 characters, and it must describe
+# both what the patch changes, as well as why the patch might be necessary."
+extends: Commits._shared.SubjectLength
+message: "A summary of %d characters; the kernel asks for no more than 70-75."
+link: https://www.kernel.org/doc/html/latest/process/submitting-patches.html#the-canonical-patch-format
+level: warning
+max: 75
+
+tests:
+  - name: "before"
+    about: "no subsystem, a long summary, this patch, a short SHA, a long line, a bad Fixes:, a bad Closes:, no sign-off"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Fix eflags tracking in the x86 entry code which was broken by the recent rework
+
+      This patch fixes the tracking that commit e21d217 broke. The explanation line here runs past seventy-five columns.
+
+      Fixes: e21d217 (video: remove unnecessary platform_set_drvdata())
+      Closes: BUG-1234
+    want: |
+      1:1:Kernel.Length:A summary of 79 characters; the kernel asks for no more than 70-75.
+  - name: "after"
+    about: "the document's own examples"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      x86: fix eflags tracking
+
+      Commit e21d2170f36602ae2708 ("video: remove unnecessary
+      platform_set_drvdata()") removed the unnecessary platform_set_drvdata(),
+      but left the variable "dev" unused. Delete it.
+
+      Fixes: 54a4f0239f2e ("KVM: MMU: make kvm_mmu_zap_page() return the number of pages it actually freed")
+      Closes: https://example.com/issues/1234
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: ""
+  - name: "guards"
+    about: "the one phrase the document asks for"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      net: dsa: describe the dependency on the previous patch
+
+      This patch depends on patch 2/5 in the series.
+
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: ""

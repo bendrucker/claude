@@ -1,0 +1,77 @@
+# T4 `title-hard-tab` and B3 `body-hard-tab`: no tab anywhere in the
+# message. One rule covers both, so the message is read whole rather than
+# the subject and the body apart -- and `raw` is the one scope the View does
+# not filter. A real COMMIT_EDITMSG carries Git's own commentary, whose
+# status lines are tab-indented (`#\tmodified:   parser.go`), and under
+# `commit -v` the diff as well, which is tab-indented code. Neither is the
+# author's text and gitlint never sees either, so this walks the message the
+# way the View does, reading past Git's lines and stopping at the scissors
+# line, and reports the tabs that are left.
+extends: script
+message: "T4/B3 hard-tab: a tab character."
+link: https://jorisroovers.com/gitlint/latest/rules/builtin_rules/#t4-title-hard-tab
+level: error
+scope: raw
+script: |
+  text := import("text")
+  matches := []
+  pos := 0
+  for line in text.split(scope, "\n") {
+    next := pos + len(line) + 1
+    if text.re_match(`^#\s*-+\s*>8\s*-+\s*$`, line) {
+      break
+    }
+    if text.has_prefix(line, "#") {
+      pos = next
+      continue
+    }
+    tabs := text.re_find(`\t`, line, -1)
+    if tabs != undefined {
+      for tab in tabs {
+        matches = append(matches, {begin: pos + tab[0].begin, end: pos + tab[0].end})
+      }
+    }
+    pos = next
+  }
+
+tests:
+  - name: "before"
+    about: "gitlint's built-in rules at their defaults, most of them at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "WIP: a title that runs past seventy-two characters, with a tab\there, and a period.\nThe body starts on the second line, with trailing spaces   \nand a line that is longer than the eighty characters gitlint allows a body line to run.\n"
+    want: |
+      1:63:Gitlint.HardTab:T4/B3 hard-tab: a tab character.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add fixed-point parsing to the tokenizer
+
+      Numbers with a decimal point were read as two integers, and the
+      second one lost its sign.
+    want: ""
+  - name: "guards"
+    about: "WIPING is a word that contains WIP and passes, as in gitlint"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Stop WIPING the cache on every request
+
+      The cache was cleared by the request handler rather than by the
+      scheduler, so it never held anything for long.
+    want: ""
+  - name: "git-lines"
+    about: "Git's own commentary is tab-indented, and the diff commit -v appends is code; neither is the author's"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "Add fixed-point parsing to the tokenizer\n\nNumbers with a decimal point were read as two integers.\n\n# Please enter the commit message for your changes.\n# Changes to be committed:\n#\tmodified:   parser.go\n#\n# ------------------------ >8 ------------------------\ndiff --git a/parser.go b/parser.go\n--- a/parser.go\n+++ b/parser.go\n@@ -1,3 +1,4 @@\n func parse() {\n\tif len(src) == 0 {\n\t\treturn nil\n\t}\n"
+    want: ""
+  - name: "body-tab"
+    about: "a tab the author typed, past the subject, is still reported"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "Add fixed-point parsing to the tokenizer\n\nThe table reads\tlike a spreadsheet.\n\n# Changes to be committed:\n#\tmodified:   parser.go\n"
+    want: |
+      3:16:Gitlint.HardTab:T4/B3 hard-tab: a tab character.

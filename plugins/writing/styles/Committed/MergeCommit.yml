@@ -1,0 +1,28 @@
+# `merge_commit = true`: "Disallow merge commits". For a run over history.
+extends: existence
+message: "merge_commit: '%s'."
+link: https://github.com/crate-ci/committed/blob/master/docs/reference.md
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^Merge (?:branch|pull request|remote-tracking branch|tag)\b.*'
+
+tests:
+  - name: "merge"
+    about: "a merge commit in history"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Merge branch 'feature' into main
+    want: |
+      1:1:Committed.MergeCommit:merge_commit: 'Merge branch 'feature' into main'.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add the parser
+
+      A body wrapped at seventy-two columns, as the default asks.
+    want: ""

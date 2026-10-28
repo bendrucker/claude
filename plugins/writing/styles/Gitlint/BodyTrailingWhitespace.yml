@@ -1,0 +1,82 @@
+# B2 `body-trailing-whitespace`. The message is read raw, since Markdown
+# drops a trailing space before a rule can see it -- and `raw` is the one
+# scope the View does not filter, so the walk does the filtering instead:
+# Git's own commentary is read past and the scissors line that `commit -v`
+# puts before the diff ends the read, since trailing whitespace in either is
+# not the author's and gitlint never sees it. The subject is skipped too,
+# which T2 covers as Commits.Whitespace. A line of nothing but whitespace is
+# reported, as gitlint reports it.
+extends: script
+message: "B2 body-trailing-whitespace."
+link: https://jorisroovers.com/gitlint/latest/rules/builtin_rules/#b2-body-trailing-whitespace
+level: error
+scope: raw
+script: |
+  text := import("text")
+  matches := []
+  pos := 0
+  seen_subject := false
+  for line in text.split(scope, "\n") {
+    next := pos + len(line) + 1
+    if text.re_match(`^#\s*-+\s*>8\s*-+\s*$`, line) {
+      break
+    }
+    if text.has_prefix(line, "#") {
+      pos = next
+      continue
+    }
+    if !seen_subject {
+      if text.trim_space(line) != "" {
+        seen_subject = true
+      }
+      pos = next
+      continue
+    }
+    over := text.re_find(`[ \t]+$`, line)
+    if over != undefined {
+      matches = append(matches, {begin: pos + over[0][0].begin, end: pos + over[0][0].end})
+    }
+    pos = next
+  }
+
+tests:
+  - name: "before"
+    about: "gitlint's built-in rules at their defaults, most of them at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "WIP: a title that runs past seventy-two characters, with a tab\there, and a period.\nThe body starts on the second line, with trailing spaces   \nand a line that is longer than the eighty characters gitlint allows a body line to run.\n"
+    want: |
+      2:57:Gitlint.BodyTrailingWhitespace:B2 body-trailing-whitespace.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add fixed-point parsing to the tokenizer
+
+      Numbers with a decimal point were read as two integers, and the
+      second one lost its sign.
+    want: ""
+  - name: "guards"
+    about: "WIPING is a word that contains WIP and passes, as in gitlint"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Stop WIPING the cache on every request
+
+      The cache was cleared by the request handler rather than by the
+      scheduler, so it never held anything for long.
+    want: ""
+  - name: "git-lines"
+    about: "a trailing space in Git's commentary, and in the diff commit -v appends, is not the author's"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "Add fixed-point parsing to the tokenizer\n\nNumbers with a decimal point were read as two integers.\n\n# Please enter the commit message for your changes.   \n#\n# ------------------------ >8 ------------------------\ndiff --git a/parser.go b/parser.go\n@@ -1 +1 @@\n-\tif len(src) == 0 {   \n+\tif len(src) == 0 && src != nil {\n"
+    want: ""
+  - name: "body-space"
+    about: "a trailing space the author left, past the subject, is still reported"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "Add fixed-point parsing to the tokenizer\n\nNumbers with a decimal point.   \n\n# Please enter the commit message for your changes.   \n"
+    want: |
+      3:30:Gitlint.BodyTrailingWhitespace:B2 body-trailing-whitespace.

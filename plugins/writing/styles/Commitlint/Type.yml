@@ -1,0 +1,43 @@
+# `type-enum`: the eleven types config-conventional accepts. The spec allows
+# any type; this is the narrowing commitlint adds. The lookahead ignores
+# case so that `FIX:` is reported once, by TypeCase.
+extends: existence
+message: "'%s' is not a config-conventional type: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test."
+link: https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional#type-enum
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^(?!(?i:build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(?:[(!:]))\w+(?=(?:\([^()]*\))?!?:)'
+
+tests:
+  - name: "type"
+    about: "a type outside the eleven"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      foo: add a thing
+    want: |
+      1:1:Commitlint.Type:'foo' is not a config-conventional type: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      chore(deps): bump lodash to the latest release
+
+      The body wraps at one hundred characters, and a line that holds a URL is exempt:
+      https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional#body-max-line-length
+
+      BREAKING CHANGE: the lockfile format changed.
+    want: ""
+  - name: "guards"
+    about: "an acronym and a name are not capitalized words"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: URL parsing keeps the fragment
+
+      Two words in capitals do not make an upper-case subject, and a name
+      such as HttpClient is not a capitalized word.
+    want: ""

@@ -1,0 +1,11 @@
+# The description after a `type(scope):` prefix does not open with a
+# capitalized word. A capital followed by a lower-case letter is one; `URL`
+# and `HttpClient` are names and pass. The pattern is a token so that a
+# style can add to it with `tokens+`.
+extends: existence
+message: "The description is not capitalized: '%s'."
+level: error
+scope: subject
+nonword: true
+tokens:
+  - '(?<=^\w+(?:\([^()]*\))?!?: )[A-Z][a-z]\S*'

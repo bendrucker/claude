@@ -1,0 +1,6 @@
+{{- /* GitHub Actions annotations: each alert becomes an error or warning on
+       the job, at the line it names. Pick it with `--output=github.tmpl` in a
+       workflow step. */ -}}
+{{- range .Files}}{{$path := .Path}}{{range .Alerts -}}
+::{{if eq .Severity "error"}}error{{else if eq .Severity "warning"}}warning{{else}}notice{{end}} file={{$path}},line={{.Line}},col={{index .Span 0}},title={{.Check}}::{{.Message}}
+{{end}}{{end}}

@@ -1,0 +1,21 @@
+# `header.jira.keys`: an issue key from a list of projects. Off by default,
+# as the block is optional; extend it with your projects in the token.
+extends: Jira.Key
+message: "Commit header does not contain a Jira issue key from the configured projects."
+link: https://github.com/siderolabs/conform#commit-policy
+level: error
+token: '\b(?:PROJ|JIRA)-[1-9]\d*\b'
+
+tests:
+  - name: "optional"
+    about: "the jira and conventional blocks, on"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      feat(api): add the parser to the API surface, in a description that runs on past seven
+
+      The parser is exposed on the API surface for other tools.
+
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: |
+      1:1:Conform.Jira:Commit header does not contain a Jira issue key from the configured projects.

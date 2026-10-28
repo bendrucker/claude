@@ -1,0 +1,43 @@
+# "Only use the following Git Commit Messages": seven labels, each an emoji
+# and a word in capitals, then a colon. The README spells the fourth both
+# `DOC` and `DOCS`, so both pass. The lookahead ignores case so that a
+# label in the wrong case is reported once, by Case.
+extends: existence
+message: "Begin with one of the seven labels: 📦 NEW:, 👌 IMPROVE:, 🐛 FIX:, 📖 DOC:, 🚀 RELEASE:, 🤖 TEST:, ‼️ BREAKING:. '%s' is not one."
+link: https://github.com/ahmadawais/Emoji-Log#getting-started
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^(?!(?i:📦 NEW|👌 IMPROVE|🐛 FIX|📖 DOCS?|🚀 RELEASE|🤖 TEST|‼\x{FE0F}? BREAKING): )[^:]*:?'
+
+tests:
+  - name: "before"
+    about: "an emoji that is not one of the seven"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      ✨ NEW: Added a thing
+    want: |
+      1:1:EmojiLog.Type:Begin with one of the seven labels: 📦 NEW:, 👌 IMPROVE:, 🐛 FIX:, 📖 DOC:, 🚀 RELEASE:, 🤖 TEST:, ‼️ BREAKING:. '✨ NEW:' is not one.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      📦 NEW: Add Git ignore file
+    want: ""
+  - name: "guards"
+    about: "the breaking label, whose emoji carries a variation selector"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      ‼️ BREAKING: Change authentication protocol
+    want: ""
+  - name: "guards-docs"
+    about: "DOCS, the README's other spelling of DOC"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      📖 DOCS: Add API tutorial
+    want: ""

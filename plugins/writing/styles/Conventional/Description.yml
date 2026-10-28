@@ -1,0 +1,46 @@
+# "A description MUST immediately follow the colon and space after the
+# type/scope prefix." A subject that is only a prefix has none.
+extends: existence
+message: "A description follows the type: what the change does."
+link: https://www.conventionalcommits.org/en/v1.0.0/#specification
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^\w+(?:\([^()]*\))?!?:\s*$'
+
+tests:
+  - name: "description"
+    about: "a prefix with nothing after it"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(parser):
+    want: |
+      1:1:Conventional.Description:A description follows the type: what the change does.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      feat(parser)!: allow config objects to extend other configs
+
+      The `extends` key is read before the rest of the file.
+
+      BREAKING CHANGE: the key was ignored before.
+      Signed-off-by: Jane Doe <jane@example.com>
+      Fixes #12
+    want: ""
+  - name: "guards"
+    about: "prose that looks like a footer is body, and real footers after a blank line pass"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      docs: correct spelling of CHANGELOG
+
+      Note: a line like this one is prose, and so is the next.
+      Reviewed by the team, not a trailer.
+
+      Reviewed-by: Z
+      Refs: #123
+    want: ""

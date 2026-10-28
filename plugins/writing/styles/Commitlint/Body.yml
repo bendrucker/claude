@@ -1,0 +1,45 @@
+# `body-empty` set to `never`: a body is required. Off by default. An
+# occurrence of any non-blank character, with one required; the value the
+# View leaves empty when there is no body is where the alert lands.
+extends: occurrence
+message: "A body is required: say why."
+link: https://commitlint.js.org/reference/rules.html#body-empty
+level: error
+scope: body
+min: 1
+token: '\S'
+
+tests:
+  - name: "extras-short"
+    about: "a header under the minimum, no scope, no body, and the breaking footer without a '!'"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: x
+
+      BREAKING CHANGE: the flag is gone
+      Signed-off-by: J <j@example.com>
+    want: |
+      1:1:Commitlint.Body:A body is required: say why.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      chore(deps): bump lodash to the latest release
+
+      The body wraps at one hundred characters, and a line that holds a URL is exempt:
+      https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional#body-max-line-length
+
+      BREAKING CHANGE: the lockfile format changed.
+    want: ""
+  - name: "guards"
+    about: "an acronym and a name are not capitalized words"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: URL parsing keeps the fragment
+
+      Two words in capitals do not make an upper-case subject, and a name
+      such as HttpClient is not a capitalized word.
+    want: ""

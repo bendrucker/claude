@@ -1,0 +1,34 @@
+# `dco: true`: a `Signed-off-by: Name <email>` line anywhere in the message,
+# in the form conform's own regex accepts. conform looks at every line, not
+# only a trailer block, so the raw message is read.
+extends: occurrence
+message: "Commit does not have a valid DCO: 'Signed-off-by: Name <email>'."
+link: https://github.com/siderolabs/conform#commit-policy
+level: error
+scope: raw
+min: 1
+token: '(?m)^Signed-off-by: [^<]+ <[^<>@]+@[^<>]+>\s*$'
+
+tests:
+  - name: "before"
+    about: "the README's sample policy, most checks failing at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Added the parser, in a header that runs past the eighty-nine characters that conform allows.
+
+      Signed-off-by: J
+    want: |
+      1:1:Conform.DCO:Commit does not have a valid DCO: 'Signed-off-by: Name <email>'.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      add the parser
+
+      The parser reads the file into a tree that the rest of the tool
+      walks.
+
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: ""

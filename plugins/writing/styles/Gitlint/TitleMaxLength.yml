@@ -1,0 +1,36 @@
+# T1 `title-max-length`, `line-length=72`. `Gitlint.TitleMaxLength[max]`
+# sets it.
+extends: Commits._shared.SubjectLength
+message: "T1 title-max-length: a title of %d characters."
+link: https://jorisroovers.com/gitlint/latest/rules/builtin_rules/#t1-title-max-length
+level: error
+max: 72
+
+tests:
+  - name: "before"
+    about: "gitlint's built-in rules at their defaults, most of them at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "WIP: a title that runs past seventy-two characters, with a tab\there, and a period.\nThe body starts on the second line, with trailing spaces   \nand a line that is longer than the eighty characters gitlint allows a body line to run.\n"
+    want: |
+      1:1:Gitlint.TitleMaxLength:T1 title-max-length: a title of 82 characters.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add fixed-point parsing to the tokenizer
+
+      Numbers with a decimal point were read as two integers, and the
+      second one lost its sign.
+    want: ""
+  - name: "guards"
+    about: "WIPING is a word that contains WIP and passes, as in gitlint"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Stop WIPING the cache on every request
+
+      The cache was cleared by the request handler rather than by the
+      scheduler, so it never held anything for long.
+    want: ""

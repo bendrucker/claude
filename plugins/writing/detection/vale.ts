@@ -76,7 +76,7 @@ export async function repoConfigRoot(filePath: string): Promise<string | null> {
 }
 
 // A repo's own config replaces the plugin's, since Vale merges only the global
-// config with one other. Tests skip the global config so they see only Writing.
+// config with one other. Tests skip the global config so they see only the plugin's styles.
 async function configArgs(source: ValeSource): Promise<{ args: string[]; cwd?: string }> {
   const root = "filePath" in source ? await repoConfigRoot(source.filePath) : null;
   const args = root === null ? [`--config=${VALE_CONFIG}`] : [];

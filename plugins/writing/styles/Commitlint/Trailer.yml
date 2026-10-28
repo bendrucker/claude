@@ -1,0 +1,22 @@
+# `trailer-exists`, and the older `signed-off-by`: a trailer with the given
+# token is present. Off by default; the token is a parameter, so another
+# trailer is `Commitlint.Trailer[token] = (?m)^Reviewed-by: `.
+extends: occurrence
+message: "No trailer matched the required token, by default 'Signed-off-by: '."
+link: https://commitlint.js.org/reference/rules.html#trailer-exists
+level: error
+scope: trailer
+min: 1
+token: '(?m)^Signed-off-by: '
+
+tests:
+  - name: "extras"
+    about: "the rules config-conventional leaves off, most of them firing at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(web)!: add URL parsing
+
+      Short.
+    want: |
+      1:1:Commitlint.Trailer:No trailer matched the required token, by default 'Signed-off-by: '.

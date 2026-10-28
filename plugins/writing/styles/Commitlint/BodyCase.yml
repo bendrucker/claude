@@ -1,0 +1,30 @@
+# `body-case` set to `lower-case`: no capital anywhere in the body, as
+# commitlint compares it. Off by default, and a body is prose, so this is
+# for the project that wants it that way. Another case: extend with `raw`
+# rewritten.
+extends: existence
+message: "body-case is lower-case: '%s'."
+link: https://commitlint.js.org/reference/rules.html#body-case
+level: error
+scope: body
+nonword: true
+raw:
+  - '[A-Z]+'
+tests:
+  - name: "capital"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: add a thing
+
+      The body opens with a capital.
+    want: |
+      3:1:Commitlint.BodyCase:body-case is lower-case: 'T'.
+  - name: "clean"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: add a thing
+
+      the body stays lower-case.
+    want: ""

@@ -1,0 +1,45 @@
+# `header-min-length`: the header has at least `min` characters. Off by
+# default, since config-conventional sets none; the count is a parameter,
+# `Commitlint.HeaderMinLength[min] = 15`.
+extends: occurrence
+message: "A header of %d characters, under header-min-length."
+link: https://commitlint.js.org/reference/rules.html#header-min-length
+level: error
+scope: subject
+token: '.'
+min: 10
+
+tests:
+  - name: "extras-short"
+    about: "a header under the minimum, no scope, no body, and the breaking footer without a '!'"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: x
+
+      BREAKING CHANGE: the flag is gone
+      Signed-off-by: J <j@example.com>
+    want: |
+      1:1:Commitlint.HeaderMinLength:A header of 6 characters, under header-min-length.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      chore(deps): bump lodash to the latest release
+
+      The body wraps at one hundred characters, and a line that holds a URL is exempt:
+      https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional#body-max-line-length
+
+      BREAKING CHANGE: the lockfile format changed.
+    want: ""
+  - name: "guards"
+    about: "an acronym and a name are not capitalized words"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: URL parsing keeps the fragment
+
+      Two words in capitals do not make an upper-case subject, and a name
+      such as HttpClient is not a capitalized word.
+    want: ""

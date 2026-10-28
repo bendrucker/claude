@@ -1,0 +1,5 @@
+{{- /* gitlint's report: `line: RULE message: "text"`.
+       Pick it with `--output=gitlint.tmpl`. */ -}}
+{{- range .Files}}{{range .Alerts -}}
+{{.Line}}: {{.Check}} {{.Message}}{{if .Match}}: "{{.Match}}"{{end}}
+{{end}}{{end}}

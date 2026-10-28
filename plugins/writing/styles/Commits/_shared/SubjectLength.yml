@@ -1,0 +1,10 @@
+# The length of the subject, as a count of its characters: an `occurrence`
+# of any character, with `max` the limit. The count is a rule parameter, so
+# a project sets its own from the config without touching the rule --
+# `SevenRules.Limit[max] = 60` -- and the message reports the count it saw.
+extends: occurrence
+message: "A subject of %d characters, past the limit."
+level: error
+scope: subject
+token: '.'
+max: 72

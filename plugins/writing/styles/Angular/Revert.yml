@@ -1,0 +1,52 @@
+# "If the commit reverts a previous commit, it should begin with `revert:`
+# ... The content of the commit message body should contain information
+# about the SHA of the commit being reverted in the following format: `This
+# reverts commit <SHA>`".
+extends: conditional
+message: "A revert names what it reverts in the body: 'This reverts commit <SHA>'."
+link: https://github.com/angular/angular/blob/main/contributing-docs/commit-message-guidelines.md#revert-commits
+level: error
+scope: subject
+first: '^revert: '
+second: 'This reverts commit [0-9a-f]{7,40}'
+in: body
+
+tests:
+  - name: "revert"
+    about: "a revert whose body does not name the commit"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      revert: feat(core): add a thing
+
+      The change broke the build on Windows and needs a different approach.
+    want: |
+      1:1:Angular.Revert:A revert names what it reverts in the body: 'This reverts commit <SHA>'.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(core): handle an empty scope in the parser
+
+      An empty scope produced a header that the changelog generator rejected.
+
+      Fixes #123
+    want: ""
+  - name: "guards"
+    about: "docs needs no body"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      docs: fix typo in tutorial
+    want: ""
+  - name: "guards-revert"
+    about: "a revert that names the commit"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      revert: feat(core): add a thing
+
+      This reverts commit 42e769bdf4894310333942ffc5a15151222a87be. The change
+      broke the build on Windows and needs a different approach.
+    want: ""

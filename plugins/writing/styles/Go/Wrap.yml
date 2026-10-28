@@ -1,0 +1,45 @@
+# "The text should be wrapped at around 72 columns." The guide's own example
+# carries a URL past the margin, and a line holding one is exempt.
+extends: Commits._shared.Wrap
+message: "Wrap the description at around 72 columns; this line runs on from '%s'."
+link: https://go.dev/doc/contribute#commit_messages
+level: warning
+
+tests:
+  - name: "before"
+    about: "no package, a period, a long line, and Fixes with a colon"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Improve Sin, Cos and Tan precision for very large arguments.
+
+      The existing implementation has poor numerical properties for large arguments,
+      so use the McGillicutty algorithm to improve accuracy above 1e10.
+
+      Fixes: #159
+    want: |
+      3:73:Go.Wrap:Wrap the description at around 72 columns; this line runs on from 'ments,'.
+  - name: "after"
+    about: "the guide's own example"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      math: improve Sin, Cos and Tan precision for very large arguments
+
+      The existing implementation has poor numerical properties for
+      large arguments, so use the McGillicutty algorithm to improve
+      accuracy above 1e10.
+
+      The algorithm is described at https://wikipedia.org/wiki/McGillicutty_Algorithm
+
+      Fixes #159
+    want: ""
+  - name: "guards"
+    about: "a package list, an identifier, and Updates on the x/ form"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      cmd/go, cmd/compile: Request.Body is closed on error
+
+      Updates golang/go#159
+    want: ""

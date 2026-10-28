@@ -1,0 +1,63 @@
+# A commit message has a shape and no markup: a subject, a blank line, a body
+# in paragraphs, and trailers at the end. This template names each part so a
+# rule can reach one by scope.
+#
+# The states follow the message down. `Gap` is the line after the subject,
+# kept whatever it holds, so a rule can say whether it was blank. A paragraph
+# that opens with a `Token: value` or `Token #ref` line is a trailer block
+# to the next blank line: "a footer's value MAY contain spaces and newlines",
+# so a line without a token continues the value above it.
+# Lines Git adds as commentary are read past, and the scissors line that
+# `commit -v` puts before the diff ends the read.
+#
+# The body is typed as Markdown, so a code span or fence in it is skipped the
+# way it is in a .md file, and a spelling rule leaves an identifier alone.
+engine: textfsm
+template: |
+  Value Subject (.+)
+  Value Gap (.*)
+  Value List Body (.*)
+  Value List Trailer (.+)
+
+  Start
+    ^#\s*-+\s*>8\s*-+\s*$$ -> End
+    ^# -> Next
+    ^\s*$$ -> Next
+    ^${Subject} -> Gap
+
+  Gap
+    ^#\s*-+\s*>8\s*-+\s*$$ -> End
+    ^# -> Next
+    ^${Gap} -> Continue
+    ^\s*$$ -> Para
+    ^(?=(?:(?i:breaking[ -]change)|[\w-]+)(?:: | #))${Trailer} -> Trailers
+    ^${Body} -> Body
+
+  Body
+    ^#\s*-+\s*>8\s*-+\s*$$ -> End
+    ^# -> Next
+    ^(?=\s*$$)${Body} -> Para
+    ^${Body}
+
+  Para
+    ^#\s*-+\s*>8\s*-+\s*$$ -> End
+    ^# -> Next
+    ^(?=\s*$$)${Body} -> Para
+    ^(?=(?:(?i:breaking[ -]change)|[\w-]+)(?:: | #))${Trailer} -> Trailers
+    ^${Body} -> Body
+
+  Trailers
+    ^#\s*-+\s*>8\s*-+\s*$$ -> End
+    ^# -> Next
+    ^\s*$$ -> Para
+    ^${Trailer}
+scopes:
+  - name: subject
+    expr: Subject
+  - name: gap
+    expr: Gap
+  - name: body
+    expr: Body
+    type: md
+  - name: trailer
+    expr: Trailer

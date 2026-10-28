@@ -1,0 +1,52 @@
+# "use the 'Closes:' tag with a URL referencing the report in the mailing
+# list archives or a public bug tracker ... Private bug trackers and invalid
+# URLs are forbidden."
+extends: existence
+message: "A Closes: tag takes a URL to the public report, not '%s'."
+link: https://www.kernel.org/doc/html/latest/process/submitting-patches.html#describe-your-changes
+level: error
+scope: trailer
+nonword: true
+raw:
+  - '(?m)(?<=^Closes: )(?!https?://\S+$).*$'
+
+tests:
+  - name: "before"
+    about: "no subsystem, a long summary, this patch, a short SHA, a long line, a bad Fixes:, a bad Closes:, no sign-off"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Fix eflags tracking in the x86 entry code which was broken by the recent rework
+
+      This patch fixes the tracking that commit e21d217 broke. The explanation line here runs past seventy-five columns.
+
+      Fixes: e21d217 (video: remove unnecessary platform_set_drvdata())
+      Closes: BUG-1234
+    want: |
+      6:9:Kernel.Closes:A Closes: tag takes a URL to the public report, not 'BUG-1234'.
+  - name: "after"
+    about: "the document's own examples"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      x86: fix eflags tracking
+
+      Commit e21d2170f36602ae2708 ("video: remove unnecessary
+      platform_set_drvdata()") removed the unnecessary platform_set_drvdata(),
+      but left the variable "dev" unused. Delete it.
+
+      Fixes: 54a4f0239f2e ("KVM: MMU: make kvm_mmu_zap_page() return the number of pages it actually freed")
+      Closes: https://example.com/issues/1234
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: ""
+  - name: "guards"
+    about: "the one phrase the document asks for"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      net: dsa: describe the dependency on the previous patch
+
+      This patch depends on patch 2/5 in the series.
+
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: ""

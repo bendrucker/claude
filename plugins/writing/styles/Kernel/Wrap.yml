@@ -1,0 +1,89 @@
+# "The body of the explanation, line wrapped at 75 columns". Tags are
+# exempt, and the script skips a trailer block, so this never sees them. The
+# script is the shared one, Commits/_shared/Wrap.yml, with its margin at 75;
+# a script is one value, so a different margin means the whole of it.
+extends: Commits._shared.Wrap
+message: "Wrap the explanation at 75 columns; this line runs on from '%s'."
+link: https://www.kernel.org/doc/html/latest/process/submitting-patches.html#the-canonical-patch-format
+level: warning
+script: |
+  max := 75
+  text := import("text")
+  matches := []
+  pos := 0
+  seen_subject := false
+  para_start := true
+  in_trailers := false
+  for line in text.split(scope, "\n") {
+    next := pos + len(line) + 1
+    if text.re_match(`^#\s*-+\s*>8\s*-+\s*$`, line) {
+      break
+    }
+    if text.has_prefix(line, "#") {
+      pos = next
+      continue
+    }
+    if text.trim_space(line) == "" {
+      para_start = true
+      in_trailers = false
+      pos = next
+      continue
+    }
+    if !seen_subject {
+      seen_subject = true
+      pos = next
+      continue
+    }
+    if para_start && text.re_match(`^(?i:breaking[ -]change|[\w-]+)(?:: | #)`, line) {
+      in_trailers = true
+    }
+    para_start = false
+    if !in_trailers && !text.re_match(`https?://`, line) {
+      over := text.re_find(`^.{` + string(max) + `}`, line)
+      if over != undefined && over[0][0].end < len(line) {
+        matches = append(matches, {begin: pos + over[0][0].end, end: pos + len(line)})
+      }
+    }
+    pos = next
+  }
+
+tests:
+  - name: "before"
+    about: "no subsystem, a long summary, this patch, a short SHA, a long line, a bad Fixes:, a bad Closes:, no sign-off"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Fix eflags tracking in the x86 entry code which was broken by the recent rework
+
+      This patch fixes the tracking that commit e21d217 broke. The explanation line here runs past seventy-five columns.
+
+      Fixes: e21d217 (video: remove unnecessary platform_set_drvdata())
+      Closes: BUG-1234
+    want: |
+      3:76:Kernel.Wrap:Wrap the explanation at 75 columns; this line runs on from 'ne here runs past seventy-five columns.'.
+  - name: "after"
+    about: "the document's own examples"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      x86: fix eflags tracking
+
+      Commit e21d2170f36602ae2708 ("video: remove unnecessary
+      platform_set_drvdata()") removed the unnecessary platform_set_drvdata(),
+      but left the variable "dev" unused. Delete it.
+
+      Fixes: 54a4f0239f2e ("KVM: MMU: make kvm_mmu_zap_page() return the number of pages it actually freed")
+      Closes: https://example.com/issues/1234
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: ""
+  - name: "guards"
+    about: "the one phrase the document asks for"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      net: dsa: describe the dependency on the previous patch
+
+      This patch depends on patch 2/5 in the series.
+
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: ""

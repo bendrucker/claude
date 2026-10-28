@@ -1,0 +1,9 @@
+# A `type(scope):` prefix in lower case. The Angular guide and commitlint's
+# config both ask for it; each extends this with its own message and link.
+extends: existence
+message: "A type is lower-case: '%s'."
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^\w*[A-Z]\w*(?=(?:\([^()]*\))?!?:)'

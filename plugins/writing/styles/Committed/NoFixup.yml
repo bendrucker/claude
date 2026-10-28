@@ -1,0 +1,29 @@
+# `no_fixup = true`: "Disallow fixup commits". For a run over history; a
+# hook lets these through for autosquash.
+extends: existence
+message: "no_fixup: '%s'."
+link: https://github.com/crate-ci/committed/blob/master/docs/reference.md
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^(?:fixup|squash|amend)!'
+
+tests:
+  - name: "long"
+    about: "a subject past fifty columns, a fixup, and a merge"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fixup! Add a subject that runs well past fifty columns in all
+    want: |
+      1:1:Committed.NoFixup:no_fixup: 'fixup!'.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add the parser
+
+      A body wrapped at seventy-two columns, as the default asks.
+    want: ""

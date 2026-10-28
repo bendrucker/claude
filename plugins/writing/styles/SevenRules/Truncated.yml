@@ -1,0 +1,39 @@
+# "consider 72 the hard limit": GitHub truncates a longer subject with an
+# ellipsis.
+extends: Commits._shared.SubjectLength
+message: "A subject of %d characters; GitHub truncates it past 72."
+link: https://cbea.ms/git-commit/#limit-50
+level: error
+max: 72
+
+tests:
+  - name: "before"
+    about: "every rule but the seventh in one message"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fixed the thing in the parser so that it no longer crashes on empty input files.
+      The body follows without a blank line, and this particular line runs past seventy-two characters.
+    want: |
+      1:1:SevenRules.Truncated:A subject of 80 characters; GitHub truncates it past 72.
+  - name: "after"
+    about: "the post's own example"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Derezz the master control program
+
+      MCP turned out to be evil and had become intent on world domination.
+      This commit throws Tron's disc into MCP (causing its deresolution)
+      and turns it back into a chess game.
+    want: ""
+  - name: "guards"
+    about: "a subject of exactly 50 and a body line of exactly 72"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Summarize changes in around fifty characters or so
+
+      More detailed explanatory text, if necessary. Wrap it to about seventy-t
+      wo characters or so.
+    want: ""

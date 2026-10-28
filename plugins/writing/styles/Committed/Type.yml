@@ -1,0 +1,30 @@
+# `style = "conventional"` with `allowed_types`: fix, feat, chore, docs,
+# style, refactor, perf, test. Off by default, as `style = "none"` is the
+# default; turn it on with `Committed.Type = YES` beside `Conventional`.
+extends: Commitlint.Type
+message: "allowed_types: '%s' is not one of fix, feat, chore, docs, style, refactor, perf, test."
+link: https://github.com/crate-ci/committed/blob/master/docs/reference.md
+level: error
+raw:
+  - '^(?!(?i:fix|feat|chore|docs|style|refactor|perf|test)(?:[(!:]))\w+(?=(?:\([^()]*\))?!?:)'
+
+tests:
+  - name: "type"
+    about: "the conventional style, on, with its own type list"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      ci: add the workflow
+
+      The workflow runs the suite on every push.
+    want: |
+      1:1:Committed.Type:allowed_types: 'ci' is not one of fix, feat, chore, docs, style, refactor, perf, test.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add the parser
+
+      A body wrapped at seventy-two columns, as the default asks.
+    want: ""

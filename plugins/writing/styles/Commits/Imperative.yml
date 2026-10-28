@@ -1,0 +1,97 @@
+# A subject completes "If applied, this commit will ...". Git writes its own
+# that way -- "Merge branch", "Revert" -- and every convention here asks for
+# the same mood. The match skips any prefix a convention puts first (a type,
+# a subsystem, an emoji), then looks for the verb in the past tense, third
+# person, or gerund, or for "This commit" and "I" in the lead.
+extends: existence
+message: "Write the subject as a command: 'Add', not '%s'."
+link: https://git-scm.com/docs/SubmittingPatches#describe-changes
+level: warning
+scope: subject
+ignorecase: true
+nonword: true
+raw:
+  - '(?<=^\s*(?:[^:]*:\s+|[^\w\s]+\s+|:[\w+-]+:\s+)*)(?:this (?:commit|patch|change|pr|mr)\b|i\b(?=\s)|(?:add|fix|updat|remov|chang|implement|refactor|improv|mov|renam|delet|creat|merg|bump|upgrad|revert|clean|us|mak|allow|handl|support|replac|introduc|adjust|correct|dropp|enabl|disabl|document|test|tweak|migrat|convert|extract|simplif|optimi[sz]|prevent|ensur|avoid|resolv|check|appl|expos|extend|reduc|increas|bugfix|patch|tidi|polish|hack|switch|restor|revis|rewrit|rewrot|writ|wrot|includ|exclud|ignor)(?:ed|es|s|ing|ied|ies)\b(?![-:]))'
+
+tests:
+  - name: "before"
+    about: "whitespace at both edges, a past-tense verb, and a body on the second line"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "  Added the thing to the parser   \nThe body starts on the next line.\n"
+    want: |
+      1:3:Commits.Imperative:Write the subject as a command: 'Add', not 'Added'.
+  - name: "Committed-before"
+    about: "committed's defaults, most of them at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      wip: added the parser, which took a while!
+
+      A body line that is long enough to run past the seventy-two columns allowed.
+    want: |
+      1:6:Commits.Imperative:Write the subject as a command: 'Add', not 'added'.
+  - name: "Conventional-type"
+    about: "no type prefix at all"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Fixed the parser
+    want: |
+      1:1:Commits.Imperative:Write the subject as a command: 'Add', not 'Fixed'.
+  - name: "EmojiLog-before"
+    about: "an emoji that is not one of the seven"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      ✨ NEW: Added a thing
+    want: |
+      1:8:Commits.Imperative:Write the subject as a command: 'Add', not 'Added'.
+  - name: "Gitmoji-before"
+    about: "a shortcode that is not on the list"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      :spark: Added feature
+    want: |
+      1:9:Commits.Imperative:Write the subject as a command: 'Add', not 'Added'.
+  - name: "SevenRules-before"
+    about: "every rule but the seventh in one message"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fixed the thing in the parser so that it no longer crashes on empty input files.
+      The body follows without a blank line, and this particular line runs past seventy-two characters.
+    want: |
+      1:1:Commits.Imperative:Write the subject as a command: 'Add', not 'fixed'.
+  - name: "Conform-before"
+    about: "the README's sample policy, most checks failing at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Added the parser, in a header that runs past the eighty-nine characters that conform allows.
+
+      Signed-off-by: J
+    want: |
+      1:1:Commits.Imperative:Write the subject as a command: 'Add', not 'Added'.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add fixed-point parsing to the tokenizer
+
+      Numbers with a decimal point were read as two integers.
+    want: ""
+  - name: "guards"
+    about: "a prefix is skipped, a hyphenated Fixed-point passes, and the mood rule reads the subject only"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      tests: add coverage for Fixed-point values
+
+      Increase the timeout in the fixtures that run under CI. This commit's
+      body may say "I added" freely; the mood rule reads the subject.
+
+      Fixes #12
+    want: ""

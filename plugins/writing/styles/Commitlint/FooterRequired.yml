@@ -1,0 +1,32 @@
+# `footer-empty` set to `never`: a footer is required. Off by default.
+extends: occurrence
+message: "A footer is required."
+link: https://commitlint.js.org/reference/rules.html#footer-empty
+level: error
+scope: trailer
+min: 1
+token: '\S'
+
+tests:
+  - name: "extras"
+    about: "the rules config-conventional leaves off, most of them firing at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(web)!: add URL parsing
+
+      Short.
+    want: |
+      1:1:Commitlint.FooterRequired:A footer is required.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      chore(deps): bump lodash to the latest release
+
+      The body wraps at one hundred characters, and a line that holds a URL is exempt:
+      https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional#body-max-line-length
+
+      BREAKING CHANGE: the lockfile format changed.
+    want: ""

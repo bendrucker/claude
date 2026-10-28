@@ -1,0 +1,42 @@
+# `subject-exclamation-mark` set to `never`: no `!` before the colon; a
+# breaking change is marked in the footer instead. Off by default.
+extends: existence
+message: "No '!' before the colon; mark a breaking change with a 'BREAKING CHANGE:' footer."
+link: https://commitlint.js.org/reference/rules.html#subject-exclamation-mark
+level: error
+scope: subject
+nonword: true
+raw:
+  - '(?<=^\w+(?:\([^()]*\))?)!(?=:)'
+
+tests:
+  - name: "exclamation"
+    about: "a '!' before the colon, where the footer is wanted instead"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(web)!: add parsing
+    want: |
+      1:9:Commitlint.Exclamation:No '!' before the colon; mark a breaking change with a 'BREAKING CHANGE:' footer.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      chore(deps): bump lodash to the latest release
+
+      The body wraps at one hundred characters, and a line that holds a URL is exempt:
+      https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional#body-max-line-length
+
+      BREAKING CHANGE: the lockfile format changed.
+    want: ""
+  - name: "guards"
+    about: "an acronym and a name are not capitalized words"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: URL parsing keeps the fragment
+
+      Two words in capitals do not make an upper-case subject, and a name
+      such as HttpClient is not a capitalized word.
+    want: ""

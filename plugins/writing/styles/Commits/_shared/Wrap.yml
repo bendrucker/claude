@@ -1,0 +1,56 @@
+# A body line past the margin, read from the raw message by a script that
+# walks it the way the View does: the first line is the subject and is not
+# measured, a `#` line is Git's commentary, the scissors line ends the read,
+# and a paragraph that opens with a `Token: value` line is a trailer block
+# to the next blank line, continuation lines included. A line that holds a
+# URL is exempt, since a URL cannot be wrapped. The raw text is used so that
+# the URL is visible and every character counts, backticks included, which
+# is how commitlint and a terminal count them.
+#
+# The alert starts where the margin ends, so the text past it is what is
+# quoted back. The margin is the `max` on the script's first line; a style
+# with a different one replaces the script, since a script is one value.
+extends: script
+message: "Wrap the body at 72 characters; this line runs on from '%s'."
+level: warning
+scope: raw
+script: |
+  max := 72
+  text := import("text")
+  matches := []
+  pos := 0
+  seen_subject := false
+  para_start := true
+  in_trailers := false
+  for line in text.split(scope, "\n") {
+    next := pos + len(line) + 1
+    if text.re_match(`^#\s*-+\s*>8\s*-+\s*$`, line) {
+      break
+    }
+    if text.has_prefix(line, "#") {
+      pos = next
+      continue
+    }
+    if text.trim_space(line) == "" {
+      para_start = true
+      in_trailers = false
+      pos = next
+      continue
+    }
+    if !seen_subject {
+      seen_subject = true
+      pos = next
+      continue
+    }
+    if para_start && text.re_match(`^(?i:breaking[ -]change|[\w-]+)(?:: | #)`, line) {
+      in_trailers = true
+    }
+    para_start = false
+    if !in_trailers && !text.re_match(`https?://`, line) {
+      over := text.re_find(`^.{` + string(max) + `}`, line)
+      if over != undefined && over[0][0].end < len(line) {
+        matches = append(matches, {begin: pos + over[0][0].end, end: pos + len(line)})
+      }
+    }
+    pos = next
+  }

@@ -1,0 +1,46 @@
+# "A scope MUST consist of a noun describing a section of the codebase
+# surrounded by parenthesis." An empty pair names nothing.
+extends: existence
+message: "A scope names a section of the codebase; '()' names nothing. Drop it or fill it."
+link: https://www.conventionalcommits.org/en/v1.0.0/#specification
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^\w+\(\s*\)'
+
+tests:
+  - name: "scope"
+    about: "an empty scope"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(): handle empty input
+    want: |
+      1:1:Conventional.Scope:A scope names a section of the codebase; '()' names nothing. Drop it or fill it.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      feat(parser)!: allow config objects to extend other configs
+
+      The `extends` key is read before the rest of the file.
+
+      BREAKING CHANGE: the key was ignored before.
+      Signed-off-by: Jane Doe <jane@example.com>
+      Fixes #12
+    want: ""
+  - name: "guards"
+    about: "prose that looks like a footer is body, and real footers after a blank line pass"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      docs: correct spelling of CHANGELOG
+
+      Note: a line like this one is prose, and so is the next.
+      Reviewed by the team, not a trailer.
+
+      Reviewed-by: Z
+      Refs: #123
+    want: ""

@@ -1,0 +1,38 @@
+# Rule 6: "Wrap the body at 72 characters", so that Git can indent the
+# message and stay under 80.
+extends: Commits._shared.Wrap
+message: "Wrap the body at 72 characters; this line runs on from '%s'."
+link: https://cbea.ms/git-commit/#wrap-72
+level: warning
+
+tests:
+  - name: "before"
+    about: "every rule but the seventh in one message"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fixed the thing in the parser so that it no longer crashes on empty input files.
+      The body follows without a blank line, and this particular line runs past seventy-two characters.
+    want: |
+      2:73:SevenRules.Wrap:Wrap the body at 72 characters; this line runs on from 't seventy-two characters.'.
+  - name: "after"
+    about: "the post's own example"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Derezz the master control program
+
+      MCP turned out to be evil and had become intent on world domination.
+      This commit throws Tron's disc into MCP (causing its deresolution)
+      and turns it back into a chess game.
+    want: ""
+  - name: "guards"
+    about: "a subject of exactly 50 and a body line of exactly 72"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Summarize changes in around fifty characters or so
+
+      More detailed explanatory text, if necessary. Wrap it to about seventy-t
+      wo characters or so.
+    want: ""

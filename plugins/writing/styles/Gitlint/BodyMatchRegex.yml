@@ -1,0 +1,29 @@
+# B8 `body-match-regex`: the body matches a pattern of yours. Off by
+# default, and shipped with a placeholder that asks for an issue reference
+# somewhere in the body; extend it with your own, and turn it on. An
+# `occurrence` with `min: 1`, so a missing body is reported too.
+extends: occurrence
+message: "B8 body-match-regex: the body does not match the required pattern."
+link: https://jorisroovers.com/gitlint/latest/rules/builtin_rules/#b8-body-match-regex
+level: error
+scope: body
+min: 1
+token: '#\d+'
+tests:
+  - name: "no match"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add a thing
+
+      A body with no reference in it.
+    want: |
+      3:1:Gitlint.BodyMatchRegex:B8 body-match-regex: the body does not match the required pattern.
+  - name: "clean"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add a thing
+
+      The fix for #12 adds the thing.
+    want: ""

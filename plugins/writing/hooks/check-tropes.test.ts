@@ -322,10 +322,12 @@ describe("semicolon splices", () => {
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
-  it("stays silent on a single semicolon in prose", async () => {
-    expect(
-      await processInput(mockWrite("The cache starts cold; the first request fills it.")),
-    ).toBeNull();
+  it("leaves a single semicolon in prose to the per-semicolon rule", async () => {
+    const result = await processInput(
+      mockWrite("The cache starts cold; the first request fills it."),
+    );
+    expect(contextOf(result)).toContain("Replace the semicolon");
+    expect(contextOf(result)).not.toContain("splice");
   });
 });
 

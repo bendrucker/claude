@@ -1,0 +1,33 @@
+# An issue key in the subject is what links the commit to the issue in
+# Jira, and the key is uppercase: `PROJ-123`. `proj-123` is not read.
+extends: occurrence
+message: "Include the issue key in the subject, in capitals: 'PROJ-123'."
+link: https://support.atlassian.com/jira-software-cloud/docs/reference-issues-in-your-development-work/
+level: error
+scope: subject
+min: 1
+token: '\b[A-Z][A-Z\d]+-\d+\b'
+
+tests:
+  - name: "before"
+    about: "a key in lower case"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      add a thing for proj-123
+    want: |
+      1:1:Jira.Key:Include the issue key in the subject, in capitals: 'PROJ-123'.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      PROJ-123 add a thing
+    want: ""
+  - name: "guards"
+    about: "two keys"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Fix PROJ-1 and PROJ-22 together
+    want: ""

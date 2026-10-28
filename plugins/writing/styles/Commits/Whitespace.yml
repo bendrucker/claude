@@ -1,0 +1,44 @@
+# Git's default cleanup strips leading and trailing whitespace from a
+# message; a hook sees the message before that, and a message from another
+# tool may never be cleaned. Whitespace at either end of the subject is
+# never meant.
+extends: existence
+message: "Whitespace at the edge of the subject."
+link: https://git-scm.com/docs/git-commit#Documentation/git-commit.txt---cleanupltmodegt
+level: error
+scope: subject
+nonword: true
+tokens:
+  - '^\s+'
+  - '\s+$'
+
+tests:
+  - name: "before"
+    about: "whitespace at both edges, a past-tense verb, and a body on the second line"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "  Added the thing to the parser   \nThe body starts on the next line.\n"
+    want: |
+      1:1:Commits.Whitespace:Whitespace at the edge of the subject.
+      1:32:Commits.Whitespace:Whitespace at the edge of the subject.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add fixed-point parsing to the tokenizer
+
+      Numbers with a decimal point were read as two integers.
+    want: ""
+  - name: "guards"
+    about: "a prefix is skipped, a hyphenated Fixed-point passes, and the mood rule reads the subject only"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      tests: add coverage for Fixed-point values
+
+      Increase the timeout in the fixtures that run under CI. This commit's
+      body may say "I added" freely; the mood rule reads the subject.
+
+      Fixes #12
+    want: ""

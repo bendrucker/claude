@@ -1,0 +1,14 @@
+{{- /* commitlint's report: one line per alert, a count, and where to get help.
+       Pick it with `--output=commitlint.tmpl`. */ -}}
+{{- range .Files -}}
+⧗   input: {{.Path}}
+{{- $errors := 0}}{{- $warnings := 0}}
+{{- range .Alerts}}
+{{- if eq .Severity "error"}}{{$errors = add $errors 1}}{{else}}{{$warnings = add $warnings 1}}{{end}}
+{{if eq .Severity "error"}}✖{{else}}⚠{{end}}   {{.Message}} [{{.Check}}]
+{{- end}}
+
+{{if gt $errors 0}}✖{{else}}⚠{{end}}   found {{$errors}} problems, {{$warnings}} warnings
+{{- range $i, $a := .Alerts}}{{if and (eq $i 0) $a.Link}}
+ⓘ   Get help: {{$a.Link}}{{end}}{{end}}
+{{end}}

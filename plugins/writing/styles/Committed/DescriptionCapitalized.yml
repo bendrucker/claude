@@ -1,0 +1,27 @@
+# `subject_capitalized = true` under `style = "conventional"`: committed
+# then reads the description after the `type(scope):` prefix. Off by default,
+# as the style is; turn it on beside `Committed.Type` and turn
+# `Committed.SubjectCapitalized` off.
+extends: existence
+message: "subject_capitalized: '%s'."
+link: https://github.com/crate-ci/committed/blob/master/docs/reference.md
+level: error
+scope: subject
+nonword: true
+raw:
+  - '(?<=^\w+(?:\([^)]*\))?!?: )\p{Ll}\S*'
+
+tests:
+  - name: "lower description"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      feat(parser): add streaming reads
+    want: |
+      1:15:Committed.DescriptionCapitalized:subject_capitalized: 'add'.
+  - name: "clean"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      feat(parser): Add streaming reads
+    want: ""

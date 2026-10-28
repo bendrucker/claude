@@ -1,0 +1,52 @@
+# "The body is mandatory for all commits except for those of type 'docs'.
+# When the body is present it must be at least 20 characters long." A
+# conditional: a subject of any other type is the antecedent, and a body
+# of twenty characters is what has to follow.
+extends: conditional
+message: "A body is mandatory except for 'docs', and runs at least 20 characters: explain why."
+link: https://github.com/angular/angular/blob/main/contributing-docs/commit-message-guidelines.md#commit-message-format
+level: warning
+scope: subject
+first: '^(?!docs\b)\w+(?=(?:\([^()]*\))?!?:)'
+second: '(?s)\S.{18,}\S'
+in: body
+
+tests:
+  - name: "before"
+    about: "a type outside the list, capitalized twice, a period, and a body under 20 characters"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Chore(core): Add a thing.
+
+      Short.
+    want: |
+      1:1:Angular.Body:A body is mandatory except for 'docs', and runs at least 20 characters: explain why.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(core): handle an empty scope in the parser
+
+      An empty scope produced a header that the changelog generator rejected.
+
+      Fixes #123
+    want: ""
+  - name: "guards"
+    about: "docs needs no body"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      docs: fix typo in tutorial
+    want: ""
+  - name: "guards-revert"
+    about: "a revert that names the commit"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      revert: feat(core): add a thing
+
+      This reverts commit 42e769bdf4894310333942ffc5a15151222a87be. The change
+      broke the build on Windows and needs a different approach.
+    want: ""

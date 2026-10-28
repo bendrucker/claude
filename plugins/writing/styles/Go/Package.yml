@@ -1,0 +1,50 @@
+# "The first line of the change description is conventionally a short
+# one-line summary of the change, prefixed by the primary affected package."
+# Several packages are listed with commas: `cmd/go, cmd/compile: ...`.
+extends: existence
+message: "Prefix the first line with the affected package: 'net/http: %s ...'."
+link: https://go.dev/doc/contribute#commit_messages
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^(?![\w./-]+(?:, [\w./-]+)*: )\S+'
+
+tests:
+  - name: "before"
+    about: "no package, a period, a long line, and Fixes with a colon"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Improve Sin, Cos and Tan precision for very large arguments.
+
+      The existing implementation has poor numerical properties for large arguments,
+      so use the McGillicutty algorithm to improve accuracy above 1e10.
+
+      Fixes: #159
+    want: |
+      1:1:Go.Package:Prefix the first line with the affected package: 'net/http: Improve ...'.
+  - name: "after"
+    about: "the guide's own example"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      math: improve Sin, Cos and Tan precision for very large arguments
+
+      The existing implementation has poor numerical properties for
+      large arguments, so use the McGillicutty algorithm to improve
+      accuracy above 1e10.
+
+      The algorithm is described at https://wikipedia.org/wiki/McGillicutty_Algorithm
+
+      Fixes #159
+    want: ""
+  - name: "guards"
+    about: "a package list, an identifier, and Updates on the x/ form"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      cmd/go, cmd/compile: Request.Body is closed on error
+
+      Updates golang/go#159
+    want: ""

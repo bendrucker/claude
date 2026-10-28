@@ -1,0 +1,7 @@
+{{- /* conform's table: one row per alert, with the rule for the check.
+       Pick it with `--output=conform.tmpl`. */ -}}
+{{- range .Files -}}
+{{printf "%-8s %-32s %-8s %s" "POLICY" "CHECK" "STATUS" "MESSAGE"}}
+{{range .Alerts -}}
+{{printf "%-8s %-32s %-8s %s" "commit" .Check (ternary "FAILED" "WARN" (eq .Severity "error")) .Message}}
+{{end}}{{end}}

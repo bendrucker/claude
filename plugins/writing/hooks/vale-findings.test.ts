@@ -22,7 +22,7 @@ test.each<{ name: string; before: string; after: string; checks: string[] }>([
     name: "a second trope on the edited line",
     before: "Title — kept.\n",
     after: "Title — kept — again.\n",
-    checks: ["Writing.SpacedEmDash"],
+    checks: ["Writing.SpacedEmDash", "ai-tells.EmDashUsage"],
   },
   {
     name: "a trope on an untouched line",

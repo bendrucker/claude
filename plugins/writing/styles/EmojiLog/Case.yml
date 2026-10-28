@@ -1,0 +1,40 @@
+# The labels are in capitals; that is what makes them scan in a log.
+extends: existence
+message: "A label is in capitals: '%s'."
+link: https://github.com/ahmadawais/Emoji-Log#getting-started
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^(?!(?:📦 NEW|👌 IMPROVE|🐛 FIX|📖 DOCS?|🚀 RELEASE|🤖 TEST|‼\x{FE0F}? BREAKING):)(?i:📦 NEW|👌 IMPROVE|🐛 FIX|📖 DOCS?|🚀 RELEASE|🤖 TEST|‼\x{FE0F}? BREAKING):'
+
+tests:
+  - name: "case"
+    about: "a label in lower case"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      📦 new: add a thing
+    want: |
+      1:1:EmojiLog.Case:A label is in capitals: '📦 new:'.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      📦 NEW: Add Git ignore file
+    want: ""
+  - name: "guards"
+    about: "the breaking label, whose emoji carries a variation selector"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      ‼️ BREAKING: Change authentication protocol
+    want: ""
+  - name: "guards-docs"
+    about: "DOCS, the README's other spelling of DOC"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      📖 DOCS: Add API tutorial
+    want: ""

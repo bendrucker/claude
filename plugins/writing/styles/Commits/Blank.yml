@@ -1,0 +1,58 @@
+# Git treats the text up to the first blank line as the subject, and every
+# tool built on it -- log, shortlog, rebase, format-patch -- reads the message
+# that way. A body that starts on the second line becomes part of the title.
+# The View keeps that line as `gap`, so this rule can say what it held.
+extends: existence
+message: "Separate the subject from the body with a blank line."
+link: https://git-scm.com/docs/git-commit#_discussion
+level: error
+scope: gap
+nonword: true
+raw:
+  - '\A\S.*'
+
+tests:
+  - name: "before"
+    about: "whitespace at both edges, a past-tense verb, and a body on the second line"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "  Added the thing to the parser   \nThe body starts on the next line.\n"
+    want: |
+      2:1:Commits.Blank:Separate the subject from the body with a blank line.
+  - name: "Gitlint-before"
+    about: "gitlint's built-in rules at their defaults, most of them at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: "WIP: a title that runs past seventy-two characters, with a tab\there, and a period.\nThe body starts on the second line, with trailing spaces   \nand a line that is longer than the eighty characters gitlint allows a body line to run.\n"
+    want: |
+      2:1:Commits.Blank:Separate the subject from the body with a blank line.
+  - name: "SevenRules-before"
+    about: "every rule but the seventh in one message"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fixed the thing in the parser so that it no longer crashes on empty input files.
+      The body follows without a blank line, and this particular line runs past seventy-two characters.
+    want: |
+      2:1:Commits.Blank:Separate the subject from the body with a blank line.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add fixed-point parsing to the tokenizer
+
+      Numbers with a decimal point were read as two integers.
+    want: ""
+  - name: "guards"
+    about: "a prefix is skipped, a hyphenated Fixed-point passes, and the mood rule reads the subject only"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      tests: add coverage for Fixed-point values
+
+      Increase the timeout in the fixtures that run under CI. This commit's
+      body may say "I added" freely; the mood rule reads the subject.
+
+      Fixes #12
+    want: ""

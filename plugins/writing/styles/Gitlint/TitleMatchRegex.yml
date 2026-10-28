@@ -1,0 +1,25 @@
+# T7 `title-match-regex`: the title matches a pattern of yours. Off by
+# default, and shipped with a placeholder; extend it with your own in the
+# negative lookahead, as the placeholder shows, and turn it on.
+extends: existence
+message: "T7 title-match-regex: the title does not match the required pattern."
+link: https://jorisroovers.com/gitlint/latest/rules/builtin_rules/#t7-title-match-regex
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^(?![A-Z]+-\d+: ).*'
+tests:
+  - name: "no match"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Add a thing
+    want: |
+      1:1:Gitlint.TitleMatchRegex:T7 title-match-regex: the title does not match the required pattern.
+  - name: "clean"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      PROJ-12: Add a thing
+    want: ""

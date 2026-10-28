@@ -1,0 +1,13 @@
+# A subject is a title, not a sentence, and none of the conventions here end
+# one with a period. Each of them says so in its own words, so this holds
+# the pattern and the styles extend it: the underscore keeps the directory
+# inert, and `extends` resolves it by path.
+extends: existence
+# Never reported: the chain's root carries a message, and every rule that
+# extends this one overrides it.
+message: "A subject does not end with a period."
+level: error
+scope: subject
+nonword: true
+raw:
+  - '\.$'

@@ -1,0 +1,30 @@
+# `header.invalidLastCharacters: .` For more characters, extend this with
+# `raw` set to a class of them.
+extends: Commits._shared.Period
+message: "Commit header ends in an invalid character."
+link: https://github.com/siderolabs/conform#commit-policy
+level: error
+
+tests:
+  - name: "before"
+    about: "the README's sample policy, most checks failing at once"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Added the parser, in a header that runs past the eighty-nine characters that conform allows.
+
+      Signed-off-by: J
+    want: |
+      1:92:Conform.InvalidLastCharacter:Commit header ends in an invalid character.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      add the parser
+
+      The parser reads the file into a tree that the rest of the tool
+      walks.
+
+      Signed-off-by: Jane Doe <jane@example.com>
+    want: ""

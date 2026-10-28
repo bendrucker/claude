@@ -81,12 +81,14 @@ describe("every finding in one output", () => {
           "numbering",
           "title case heading",
           "Writing.SpacedEmDash",
+          "ai-tells.EmDashUsage",
         ],
         "category": "numbering",
         "emitted": [
           "numbering",
           "title case heading",
           "Writing.SpacedEmDash",
+          "ai-tells.EmDashUsage",
         ],
         "ext": "md",
         "outcome": "context",
@@ -194,7 +196,11 @@ describe("session-scoped repeat suppression", () => {
     const second = await dispatch(input, now + 60_000);
     expect(second.log.outcome).toBe("context");
     expect(second.log.emitted).toEqual(["Writing.SpacedEmDash"]);
-    expect(second.log.suppressed_categories).toEqual(["numbering", "title case heading"]);
+    expect(second.log.suppressed_categories).toEqual([
+      "numbering",
+      "title case heading",
+      "ai-tells.EmDashUsage",
+    ]);
   });
 
   it("fires again once the window has passed", async () => {

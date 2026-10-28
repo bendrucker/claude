@@ -1,0 +1,42 @@
+# `type-case`: the type is lower-case.
+extends: Commits._shared.TypeCase
+message: "A type is lower-case: '%s'."
+link: https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional#type-case
+level: error
+
+tests:
+  - name: "before"
+    about: "capitalized type and subject, a period, and three lines past 100; the URL line is exempt"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Chore(Deps): Bump the lodash dependency to the latest release, which closes several security advisories at once.
+
+      The body of this message has a line that is longer than one hundred characters, which commitlint reports.
+      See https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional#body-max-line-length for it.
+
+      BREAKING CHANGE: a footer line that is also longer than one hundred characters, which the footer rule reports.
+    want: |
+      1:1:Commitlint.TypeCase:A type is lower-case: 'Chore'.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      chore(deps): bump lodash to the latest release
+
+      The body wraps at one hundred characters, and a line that holds a URL is exempt:
+      https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional#body-max-line-length
+
+      BREAKING CHANGE: the lockfile format changed.
+    want: ""
+  - name: "guards"
+    about: "an acronym and a name are not capitalized words"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: URL parsing keeps the fragment
+
+      Two words in capitals do not make an upper-case subject, and a name
+      such as HttpClient is not a capitalized word.
+    want: ""

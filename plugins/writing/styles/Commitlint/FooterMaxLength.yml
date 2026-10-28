@@ -1,0 +1,80 @@
+# `footer-max-length`: the footers as a whole have at most `max` characters.
+# Off by default; `Commitlint.FooterMaxLength[max] = 300` sets the count.
+extends: occurrence
+message: "Footers of %d characters, past footer-max-length."
+link: https://commitlint.js.org/reference/rules.html#footer-max-length
+level: error
+scope: trailer
+token: '.'
+max: 1000
+
+tests:
+  - name: "extras-lengths"
+    about: "a capitalized scope, and a description, a body, and footers past the whole-part limits"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(Web)!: a description that runs on past the seventy-two characters the default allows for it
+
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand.
+      A body line of sixty characters, repeated to pass a thousand. See #1.
+
+      Reviewed-by: Reviewer Number 01 <reviewer01@example.com>
+      Reviewed-by: Reviewer Number 02 <reviewer02@example.com>
+      Reviewed-by: Reviewer Number 03 <reviewer03@example.com>
+      Reviewed-by: Reviewer Number 04 <reviewer04@example.com>
+      Reviewed-by: Reviewer Number 05 <reviewer05@example.com>
+      Reviewed-by: Reviewer Number 06 <reviewer06@example.com>
+      Reviewed-by: Reviewer Number 07 <reviewer07@example.com>
+      Reviewed-by: Reviewer Number 08 <reviewer08@example.com>
+      Reviewed-by: Reviewer Number 09 <reviewer09@example.com>
+      Reviewed-by: Reviewer Number 10 <reviewer10@example.com>
+      Reviewed-by: Reviewer Number 11 <reviewer11@example.com>
+      Reviewed-by: Reviewer Number 12 <reviewer12@example.com>
+      Reviewed-by: Reviewer Number 13 <reviewer13@example.com>
+      Reviewed-by: Reviewer Number 14 <reviewer14@example.com>
+      Reviewed-by: Reviewer Number 15 <reviewer15@example.com>
+      Reviewed-by: Reviewer Number 16 <reviewer16@example.com>
+      Reviewed-by: Reviewer Number 17 <reviewer17@example.com>
+      Reviewed-by: Reviewer Number 18 <reviewer18@example.com>
+      Reviewed-by: Reviewer Number 19 <reviewer19@example.com>
+      Signed-off-by: J <j@example.com>
+    want: |
+      21:1:Commitlint.FooterMaxLength:Footers of 1096 characters, past footer-max-length.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      chore(deps): bump lodash to the latest release
+
+      The body wraps at one hundred characters, and a line that holds a URL is exempt:
+      https://github.com/conventional-changelog/commitlint/tree/master/%40commitlint/config-conventional#body-max-line-length
+
+      BREAKING CHANGE: the lockfile format changed.
+    want: ""
+  - name: "guards"
+    about: "an acronym and a name are not capitalized words"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: URL parsing keeps the fragment
+
+      Two words in capitals do not make an upper-case subject, and a name
+      such as HttpClient is not a capitalized word.
+    want: ""

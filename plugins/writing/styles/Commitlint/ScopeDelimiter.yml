@@ -1,0 +1,25 @@
+# `scope-delimiter-style`: a scope that names several parts uses one
+# delimiter, `/` or `,`, not a mix. Off by default; commitlint's own default
+# for the delimiter is the slash, which is what a mixed scope is held to.
+extends: existence
+message: "A scope uses one delimiter: '%s' mixes them."
+link: https://commitlint.js.org/reference/rules.html#scope-delimiter-style
+level: error
+scope: subject
+nonword: true
+raw:
+  - '(?<=^\w+\()(?:[^()/,]*/[^()]*,|[^()/,]*,[^()]*/)[^()]*(?=\))'
+tests:
+  - name: "mixed"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(api/web,cli): add a thing
+    want: |
+      1:5:Commitlint.ScopeDelimiter:A scope uses one delimiter: 'api/web,cli' mixes them.
+  - name: "clean"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(api/web/cli): add a thing
+    want: ""

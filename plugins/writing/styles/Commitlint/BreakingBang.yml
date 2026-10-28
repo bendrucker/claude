@@ -1,0 +1,35 @@
+# `breaking-change-exclamation-mark` set to `always`: a `BREAKING CHANGE:`
+# footer goes with a `!` in the header. A conditional across two scopes: the
+# footer is the antecedent, and the `!` is looked for in the subject. Off by
+# default.
+extends: conditional
+message: "A 'BREAKING CHANGE:' footer goes with a '!' in the header."
+link: https://commitlint.js.org/reference/rules.html#breaking-change-exclamation-mark
+level: error
+scope: trailer
+first: '^BREAKING[ -]CHANGE: '
+second: '^\w+(?:\([^)]*\))?!:'
+in: subject
+
+tests:
+  - name: "extras-short"
+    about: "a header under the minimum, no scope, no body, and the breaking footer without a '!'"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: x
+
+      BREAKING CHANGE: the flag is gone
+      Signed-off-by: J <j@example.com>
+    want: |
+      3:1:Commitlint.BreakingBang:A 'BREAKING CHANGE:' footer goes with a '!' in the header.
+  - name: "guards"
+    about: "an acronym and a name are not capitalized words"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix: URL parsing keeps the fragment
+
+      Two words in capitals do not make an upper-case subject, and a name
+      such as HttpClient is not a capitalized word.
+    want: ""

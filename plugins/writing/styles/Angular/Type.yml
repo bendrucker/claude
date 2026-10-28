@@ -1,0 +1,51 @@
+# "Commit Type: build|ci|docs|feat|fix|perf|refactor|test", and `revert:`
+# for a commit that reverts another. The lookahead ignores case so that a
+# capitalized type is reported once, by Lowercase.
+extends: existence
+message: "'%s' is not an Angular type: build, ci, docs, feat, fix, perf, refactor, test, or revert."
+link: https://github.com/angular/angular/blob/main/contributing-docs/commit-message-guidelines.md#type
+level: error
+scope: subject
+nonword: true
+raw:
+  - '^(?!(?i:build|ci|docs|feat|fix|perf|refactor|test|revert)(?:[(!:]))\w+(?=(?:\([^()]*\))?!?:)'
+
+tests:
+  - name: "before"
+    about: "a type outside the list, capitalized twice, a period, and a body under 20 characters"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      Chore(core): Add a thing.
+
+      Short.
+    want: |
+      1:1:Angular.Type:'Chore' is not an Angular type: build, ci, docs, feat, fix, perf, refactor, test, or revert.
+  - name: "after"
+    about: "the rewrite"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      fix(core): handle an empty scope in the parser
+
+      An empty scope produced a header that the changelog generator rejected.
+
+      Fixes #123
+    want: ""
+  - name: "guards"
+    about: "docs needs no body"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      docs: fix typo in tutorial
+    want: ""
+  - name: "guards-revert"
+    about: "a revert that names the commit"
+    format: COMMIT_EDITMSG
+    view: Commit
+    input: |
+      revert: feat(core): add a thing
+
+      This reverts commit 42e769bdf4894310333942ffc5a15151222a87be. The change
+      broke the build on Windows and needs a different approach.
+    want: ""

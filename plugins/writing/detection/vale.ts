@@ -1,5 +1,5 @@
 import { mkdir, rm } from "node:fs/promises";
-import { dirname, extname, join } from "node:path";
+import { basename, dirname, extname, join, relative } from "node:path";
 import { z } from "zod";
 import { isProseFile } from "./paths";
 
@@ -20,6 +20,16 @@ const Output = z.record(z.string(), z.array(Alert));
 
 export type ValeAlert = z.infer<typeof Alert>;
 
+/** A Vale runtime failure, carrying the E1xx/E2xx code Vale printed when it printed one. */
+export class ValeError extends Error {
+  readonly code: string | undefined;
+  constructor(exitCode: number, output: string) {
+    super(`vale exited ${exitCode}: ${output}`);
+    this.name = "ValeError";
+    this.code = /"Code":\s*"(E\d+)"/.exec(output)?.[1];
+  }
+}
+
 export function valeBinary(): string | null {
   const onPath = Bun.which("vale");
   if (onPath !== null) return onPath;
@@ -29,10 +39,13 @@ export function valeBinary(): string | null {
   return Bun.which(bundled) ?? null;
 }
 
-function extensionOf(source: ValeSource): string {
-  if ("kind" in source) return source.kind === "commit" ? ".commitmsg" : ".prbody";
-  const ext = extname(source.filePath);
-  return ext === "" ? ".prbody" : ext;
+// A file goes by its path relative to the config root, which is what a
+// directory-scoped section such as `[docs/*.md]` matches against.
+function sourceArg(source: ValeSource, root: string | null): string {
+  if ("kind" in source) return `--ext=${source.kind === "commit" ? ".commitmsg" : ".prbody"}`;
+  if (extname(source.filePath) === "") return "--ext=.prbody";
+  const path = root === null ? basename(source.filePath) : relative(root, source.filePath);
+  return `--path=${path}`;
 }
 
 /** The directory of the nearest `.vale.ini` or `_vale.ini` above `filePath`, if a repo adopted Vale. */
@@ -124,15 +137,12 @@ async function configArgs(source: ValeSource): Promise<{ args: string[]; cwd?: s
   const root = "filePath" in source ? await repoConfigRoot(source.filePath) : null;
   const args = root === null ? [`--config=${VALE_CONFIG}`] : [];
   if (process.env.NODE_ENV === "test") args.push("--no-global");
+  args.push(sourceArg(source, root));
   return root === null ? { args } : { args, cwd: root };
 }
 
-/** Lint `text` with the plugin's Vale config. Returns [] when vale is unavailable, or on a runtime failure unless `strict`. */
-export async function valeAlerts(
-  text: string,
-  source: ValeSource,
-  { strict = false }: { strict?: boolean } = {},
-): Promise<ValeAlert[]> {
+/** Lint `text` with the plugin's Vale config. Returns [] when vale is unavailable, and throws on a runtime failure. */
+export async function valeAlerts(text: string, source: ValeSource): Promise<ValeAlert[]> {
   if (text.trim() === "") return [];
   const binary = valeBinary();
   if (binary === null) return [];
@@ -141,7 +151,7 @@ export async function valeAlerts(
   if (cwd.cwd === undefined && !(await isSynced(await pinnedPackages()))) {
     throw new Error(`Vale packages are not installed. Run ${INSTALL_HINT}`);
   }
-  const proc = Bun.spawn([binary, ...args, "--output=JSON", `--ext=${extensionOf(source)}`], {
+  const proc = Bun.spawn([binary, ...args, "--output=JSON"], {
     ...cwd,
     stdin: new Blob([text]),
     stdout: "pipe",
@@ -153,12 +163,12 @@ export async function valeAlerts(
     proc.exited,
   ]);
   // vale exits 1 when it reports an error-level alert, 2 on a runtime failure.
-  if (exitCode > 1 && strict) throw new Error(`vale exited ${exitCode}: ${stderr.trim()}`);
-  if (exitCode > 1 || stdout.trim() === "") return [];
+  if (exitCode > 1) throw new ValeError(exitCode, `${stdout.trim()}${stderr.trim()}`);
+  if (stdout.trim() === "") return [];
   return Object.values(Output.parse(JSON.parse(stdout))).flat();
 }
 
-/** Alerts in prose at warning or above, sorted by position. A code file yields none, and no path lints as a message. */
+/** Alerts in prose, sorted by position. A code file yields none, and no path lints as a message. */
 export async function lintProse(
   text: string,
   filePath?: string,
@@ -166,7 +176,7 @@ export async function lintProse(
 ): Promise<ValeAlert[]> {
   if (filePath !== undefined && !isProseFile(filePath)) return [];
   const source = message || filePath === undefined ? { kind: "body" as const } : { filePath };
-  return (await valeAlerts(text, source))
-    .filter((alert) => alert.Severity !== "suggestion")
-    .toSorted((a, b) => (a.Line === b.Line ? a.Span[0] - b.Span[0] : a.Line - b.Line));
+  return (await valeAlerts(text, source)).toSorted((a, b) =>
+    a.Line === b.Line ? a.Span[0] - b.Span[0] : a.Line - b.Line,
+  );
 }

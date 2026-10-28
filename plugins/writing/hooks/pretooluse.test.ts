@@ -287,6 +287,22 @@ describe("accept-and-flag logging", () => {
     expect(log.checks).toEqual([]);
   });
 
+  it("logs a failed lint as an error without a check list", async () => {
+    const repo = mkdtempSync(join(import.meta.dirname, ".broken-repo-"));
+    try {
+      await Bun.write(join(repo, ".vale.ini"), "StylesPath = missing\n");
+      const { output, log } = await dispatch(
+        mockInput("Write", { file_path: join(repo, "notes.md"), content: "Plain prose here.\n" }),
+      );
+      expect(output).toBeNull();
+      expect(log.outcome).toBe("error");
+      expect(log.vale_error).toContain("E201");
+      expect(log.checks).toBeUndefined();
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
   it("omits the check list on a run that returned before the checkers", async () => {
     const { log } = await dispatch(mockInput("Write", clean, { permission_mode: "plan" }));
     expect(log.checks).toBeUndefined();

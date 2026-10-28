@@ -25,6 +25,17 @@ test.each<{ name: string; before: string; after: string; checks: string[] }>([
     checks: ["Writing.SpacedEmDash", "ai-tells.EmDashUsage"],
   },
   {
+    name: "each occurrence of a trope",
+    before: "",
+    after: "One — two — three.\n",
+    checks: [
+      "Writing.SpacedEmDash",
+      "ai-tells.EmDashUsage",
+      "Writing.SpacedEmDash",
+      "ai-tells.EmDashUsage",
+    ],
+  },
+  {
     name: "a trope on an untouched line",
     before: "Title — kept.\nPlain.\n",
     after: "Title — kept.\nPlain, longer.\n",

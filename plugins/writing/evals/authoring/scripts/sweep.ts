@@ -5,7 +5,13 @@ import { basename, join } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
-import { VALE_CONFIG, type ValeAlert, valeAlerts, valeBinary } from "../../../detection/vale";
+import {
+  VALE_CONFIG,
+  type ValeAlert,
+  ValeError,
+  valeAlerts,
+  valeBinary,
+} from "../../../detection/vale";
 
 const RESULTS = join(import.meta.dirname, "..", "results", "sweep");
 const VOICE_DIR = join(
@@ -34,9 +40,9 @@ export let skippedUnits = 0;
 // naming a rule file. A broken rule names its file and still throws.
 async function lint(text: string): Promise<ValeAlert[]> {
   try {
-    return await valeAlerts(text, { kind: "body" }, { strict: true });
+    return await valeAlerts(text, { kind: "body" });
   } catch (error) {
-    if (error instanceof Error && error.message.includes('"Path": ""')) {
+    if (error instanceof ValeError && error.code === "E100") {
       skippedUnits++;
       return [];
     }

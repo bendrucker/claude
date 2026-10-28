@@ -61,14 +61,14 @@ export async function dispatch(
   if (filePath != null && filePath !== "" && (isPlanPath(filePath) || isMemoryPath(filePath)))
     return finish(null, "silent");
 
-  // A crashing checker must not take down the run log.
+  // A failed lint is logged without `checks`, so it never reads as a clean run.
   const findings: HookFinding[] = [];
   try {
     findings.push(...(await checkTropes(input)));
   } catch (error) {
-    console.error(
-      `[writing/pretooluse] checker failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[writing/pretooluse] checker failed: ${message}`);
+    return finish(null, "error", { vale_error: message });
   }
   // `checks` records what the checkers found, which is what a later run on
   // the same target is compared against. It is set only past this point: an

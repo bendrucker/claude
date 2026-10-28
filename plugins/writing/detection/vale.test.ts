@@ -1,6 +1,9 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { lintProse, valeBinary } from "./vale";
+import { lintProse, ValeError, valeAlerts, valeBinary } from "./vale";
 
 const root = join(import.meta.dirname, "..");
 
@@ -50,8 +53,45 @@ describe("lintProse", () => {
     );
     expect(positions.length).toBeGreaterThan(1);
   });
+});
 
-  test("drops suggestion-level alerts", async () => {
-    expect(await lintProse("We delve into the tapestry.", "doc.md")).toEqual([]);
+describe("a repo's own config", () => {
+  let repo: string;
+
+  beforeAll(async () => {
+    repo = mkdtempSync(join(tmpdir(), "vale-repo-"));
+    await mkdir(join(repo, "styles"));
+    await Bun.write(
+      join(repo, ".vale.ini"),
+      "StylesPath = styles\n[docs/*.md]\nBasedOnStyles = Vale\n",
+    );
+  });
+
+  afterAll(async () => {
+    await rm(repo, { recursive: true, force: true });
+  });
+
+  test.each<{ name: string; path: string; fires: boolean }>([
+    { name: "a file its directory section matches", path: "docs/guide.md", fires: true },
+    { name: "a file outside that directory", path: "notes/guide.md", fires: false },
+  ])("lints $name", async ({ path, fires }) => {
+    const checks = (await valeAlerts("The the cache.", { filePath: join(repo, path) })).map(
+      (alert) => alert.Check,
+    );
+    expect(checks.includes("Vale.Repetition")).toBe(fires);
+  });
+
+  test("throws a runtime failure with Vale's error code", async () => {
+    const broken = mkdtempSync(join(tmpdir(), "vale-broken-"));
+    await Bun.write(
+      join(broken, ".vale.ini"),
+      "StylesPath = missing\n[*.md]\nBasedOnStyles = Vale\n",
+    );
+    const failure = await valeAlerts("Plain.", { filePath: join(broken, "a.md") }).catch(
+      (error: unknown) => error,
+    );
+    await rm(broken, { recursive: true, force: true });
+    expect(failure).toBeInstanceOf(ValeError);
+    expect(failure).toMatchObject({ code: "E201" });
   });
 });

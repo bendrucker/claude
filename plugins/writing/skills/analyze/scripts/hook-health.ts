@@ -136,6 +136,7 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
     ask: 0,
     deny: 0,
     "skipped-scratch": 0,
+    error: 0,
   };
   const byTool: Record<string, number> = {};
   const perCheck = new Map<string, { fired: number; suppressed: number }>();
@@ -249,6 +250,12 @@ export function opportunities(health: HookHealth): string[] {
   if (health.byOutcome.ask > 0) {
     found.push(
       `${health.byOutcome.ask} ask outcomes recorded. Asks block background jobs. Find the emitting rule and demote it.`,
+    );
+  }
+
+  if (health.byOutcome.error > 0) {
+    found.push(
+      `${health.byOutcome.error} runs failed to lint, so their text went unchecked. Read \`vale_error\` on those log lines for the Vale error code.`,
     );
   }
 

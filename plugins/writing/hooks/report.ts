@@ -8,6 +8,8 @@ export interface HookFinding {
   check: string;
   tier: PermissionTier;
   message: string;
+  /** Where Vale reported it, as `line:column`. */
+  at?: string;
   // A deny-tier trope in a Write or Edit already happened, so it is reported as
   // context with an instruction to fix only the introduced text.
   introduced?: boolean;
@@ -44,7 +46,8 @@ function renderMany(findings: HookFinding[], omitted: number, target: ReportTarg
   lines.push("");
   for (const finding of findings) {
     const mark = finding.introduced === true ? " (introduced)" : "";
-    lines.push(`- ${finding.check}${mark}: ${finding.message}`);
+    const at = finding.at === undefined ? "" : `${finding.at} `;
+    lines.push(`- ${at}${finding.check}${mark}: ${finding.message}`);
   }
   if (omitted > 0) {
     lines.push(`- …and ${omitted} more. Run writing:scan --input to see all.`);

@@ -14,12 +14,6 @@ export function changedLines(before: string, after: string): Set<number> {
   return changed;
 }
 
-function firstPerCheck(alerts: ValeAlert[]): ValeAlert[] {
-  const seen = new Map<string, ValeAlert>();
-  for (const alert of alerts) if (!seen.has(alert.Check)) seen.set(alert.Check, alert);
-  return [...seen.values()];
-}
-
 function alertKey(alert: ValeAlert): string {
   return `${alert.Check}\0${alert.Match.toLowerCase()}`;
 }
@@ -42,14 +36,15 @@ export async function valeFileFindings(
       carried.set(alertKey(alert), (carried.get(alertKey(alert)) ?? 0) + 1);
   }
   const alerts = afterAlerts.filter((alert) => {
-    if (alert.Severity === "suggestion" || !added.has(alert.Line)) return false;
+    if (!added.has(alert.Line)) return false;
     const left = carried.get(alertKey(alert)) ?? 0;
     if (left === 0) return true;
     carried.set(alertKey(alert), left - 1);
     return false;
   });
-  return firstPerCheck(alerts).map((alert) => ({
+  return alerts.map((alert) => ({
     check: alert.Check,
+    at: `${alert.Line}:${alert.Span[0]}`,
     tier: "context",
     message: alert.Message,
     introduced: alert.Severity === "error",
@@ -61,11 +56,9 @@ export async function valeMessageFindings(
   text: string,
   kind: Extract<ValeSource, { kind: string }>["kind"],
 ): Promise<HookFinding[]> {
-  const alerts = (await valeAlerts(text, { kind })).filter(
-    (alert) => alert.Severity !== "suggestion",
-  );
-  return firstPerCheck(alerts).map((alert) => ({
+  return (await valeAlerts(text, { kind })).map((alert) => ({
     check: alert.Check,
+    at: `${alert.Line}:${alert.Span[0]}`,
     tier: alert.Severity === "error" ? "deny" : "context",
     message: alert.Message,
   }));

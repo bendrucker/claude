@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 
-export const RunOutcome = z.enum(["silent", "context", "ask", "deny", "skipped-scratch"]);
+export const RunOutcome = z.enum(["silent", "context", "ask", "deny", "skipped-scratch", "error"]);
 export type RunOutcome = z.infer<typeof RunOutcome>;
 
 const LEGACY_KEYS: Record<string, string> = {
@@ -32,6 +32,7 @@ const RunLogFields = z.object({
   // Every check the run injected, and every one repeat suppression muted.
   // Older entries carry only `check` and `suppressed`.
   emitted: z.array(z.string()).optional(),
+  vale_error: z.string().optional(),
   suppressed_checks: z.array(z.string()).optional(),
 });
 // Entries written before the Vale port name checks under the `category` keys.

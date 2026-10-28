@@ -1,0 +1,119 @@
+# evidence: assistant-written comments open by addressing the reader with a greeting or a name before the substance, which no published comment in the hand-written baseline does.
+# retire when: openings that address a person stop appearing in assistant output, or the name branch fires on ordinary sentence openers in corpus spot-checks.
+extends: existence
+message: "'%s' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance."
+level: warning
+scope: raw
+nonword: true
+tokens:
+  - '\A(?:#[^\n]*\n\s*)*(?:(?i:hi|hey|hello|dear|greetings|good\s+(?:morning|afternoon|evening))(?:[\s,!.:]|$)[^\n]{0,30}|(?![A-Za-z]*(?:ly|ing),)(?!(?:Nit|Agreed|Today|Tests|First|Question|Upstream|Given|Overall|Otherwise|Instead|However|Also|Still|Note|Currently|Here|Now|So|But|Yes|No|Sure|Thanks|Next|Then|Finally|Second|Third|Both|Either|Neither|Fine|Good|Great|Done)\b)[A-Z][a-z]+(?:\s[A-Z][a-z]+)?,)(?=\s|$)'
+tests:
+  - name: positive name before a comma
+    about: name before a comma
+    input: |
+      Dana, this fires for the entire run rather than the changed files.
+    want: |
+      1:1:Writing.Salutation:'Dana,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
+  - name: positive full name before a comma
+    about: full name before a comma
+    input: |
+      Dana Reyes, the retry loop swallows the error.
+    want: |
+      1:1:Writing.Salutation:'Dana Reyes,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
+  - name: positive greeting word and name
+    about: greeting word and name
+    input: |
+      Hi Dana,
+
+      The retry loop swallows the error.
+    want: |
+      1:1:Writing.Salutation:'Hi Dana,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
+  - name: positive greeting without a name
+    about: greeting without a name
+    input: |
+      Hey there,
+
+      A few notes below.
+    want: |
+      1:1:Writing.Salutation:'Hey there,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
+  - name: positive greeting to a group
+    about: greeting to a group
+    input: |
+      Hello team, a few notes below.
+    want: |
+      1:1:Writing.Salutation:'Hello team, a few notes below.' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
+  - name: positive formal greeting
+    about: formal greeting
+    input: |
+      Dear reviewer,
+
+      A few notes below.
+    want: |
+      1:1:Writing.Salutation:'Dear reviewer,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
+  - name: positive name after a heading
+    about: name after a heading
+    input: |
+      ## Review
+
+      Dana, the retry loop swallows the error.
+    want: |
+      1:1:Writing.Salutation:'## Review Dana,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
+  - name: positive name alone on the opening line
+    about: name alone on the opening line
+    input: |
+      Dana,
+      The retry loop swallows the error.
+    want: |
+      1:1:Writing.Salutation:'Dana,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
+  - name: negative connective opener
+    about: connective opener
+    input: |
+      Otherwise, this looks right.
+    want: ""
+  - name: negative prepositional opener
+    about: prepositional opener
+    input: |
+      Given the constraint, the second pass is redundant.
+    want: ""
+  - name: negative review idiom
+    about: review idiom
+    input: |
+      Nit, but the constant belongs next to its only caller.
+    want: ""
+  - name: negative adverb opener
+    about: adverb opener
+    input: |
+      Ideally, the retry budget comes from config.
+    want: ""
+  - name: negative gerund opener
+    about: gerund opener
+    input: |
+      Naming, formatting, and tests all read fine.
+    want: ""
+  - name: negative agreement opener
+    about: agreement opener
+    input: |
+      Agreed, the second pass is redundant.
+    want: ""
+  - name: negative time opener
+    about: time opener
+    input: |
+      Today, the sweep still walks every file.
+    want: ""
+  - name: negative address after the opening line
+    about: address after the opening line
+    input: |
+      The sweep is too broad.
+
+      Dana, it fires on every run.
+    want: ""
+  - name: negative name inside a sentence
+    about: name inside a sentence
+    input: |
+      The retry loop swallows the error Dana, who wrote it, described.
+    want: ""
+  - name: negative plain statement
+    about: plain statement
+    input: |
+      The retry loop swallows the error.
+    want: ""

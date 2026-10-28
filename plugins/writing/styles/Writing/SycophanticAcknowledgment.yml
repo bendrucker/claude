@@ -1,0 +1,37 @@
+# evidence: assistant replies open a correction by agreeing with the user, which reads as sycophancy and delays the fix.
+# retire when: corrective-feedback moments stop citing acknowledgment phrases, or the pattern fires on non-sycophantic usage in corpus spot-checks.
+extends: existence
+message: "'%s' is a sycophantic acknowledgment. Move directly to the correction."
+level: warning
+ignorecase: true
+tokens:
+  - 'you(?:[''’]re|\s+are)\s+(?:absolutely\s+|completely\s+)?right'
+tests:
+  - name: positive straight apostrophe
+    about: straight apostrophe
+    input: |
+      You're right about the bug.
+    want: |
+      1:1:Writing.SycophanticAcknowledgment:'You're right' is a sycophantic acknowledgment. Move directly to the correction.
+  - name: positive curly apostrophe
+    about: curly apostrophe
+    input: |
+      You’re right, that was wrong.
+    want: |
+      1:1:Writing.SycophanticAcknowledgment:'You’re right' is a sycophantic acknowledgment. Move directly to the correction.
+  - name: positive spelled out with intensifier
+    about: spelled out with intensifier
+    input: |
+      You are absolutely right, I missed that.
+    want: |
+      1:1:Writing.SycophanticAcknowledgment:'You are absolutely right' is a sycophantic acknowledgment. Move directly to the correction.
+  - name: negative direction
+    about: direction
+    input: |
+      Turn right at the corner.
+    want: ""
+  - name: negative adjective
+    about: adjective
+    input: |
+      The right answer is to simplify.
+    want: ""

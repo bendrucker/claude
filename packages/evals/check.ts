@@ -10,6 +10,7 @@ import {
   sharedFor,
   verdict,
 } from "./graders";
+import { listCases } from "./layout";
 import { readSuite } from "./suite";
 import { traceReply } from "./trace";
 
@@ -66,7 +67,7 @@ export interface Checked {
  * body as the prompt, so the session would answer that text instead of the case.
  */
 export async function emptyPrompts(suite: string): Promise<string[]> {
-  const cases = globSync("*/case.yaml", { cwd: suite }).map((f) => dirname(f));
+  const cases = await listCases(suite);
   const bad = await Promise.all(
     cases.map(async (c) => {
       const file = Bun.file(join(suite, c, "prompt.md"));
@@ -99,8 +100,7 @@ export async function earlyClose(suite: string): Promise<string[]> {
 /** Case graders, as `<case>/<grader>`, that hide a grader `suite.yaml` shares into the case. */
 export async function shadowed(suite: string): Promise<string[]> {
   const shared = (await readSuite(suite)).graders;
-  return globSync("*/case.yaml", { cwd: suite })
-    .map(dirname)
+  return (await listCases(suite))
     .flatMap((name) => {
       const own = new Set(
         globSync("graders/*.md", { cwd: join(suite, name) }).map((f) => basename(f, ".md")),

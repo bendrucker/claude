@@ -1,7 +1,7 @@
-import { globSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { $ } from "bun";
 import type { Adapter, Transcript } from "../adapter";
+import { listTraces, resultPath, scoredDir, tracePath } from "../layout";
 import { regrade } from "../regrade";
 import { erroredRuns, readResult } from "../result";
 import { collectTraces, keepCases, pluginErrors, prepare, sessionEnv, splitCases } from "../run";
@@ -16,6 +16,10 @@ async function measure(path: string): Promise<Measured> {
 
 /** A results directory, from itself or the `aggregate-result.json` inside it. */
 const resultsDir = (path: string) => (path.endsWith(".json") ? dirname(path) : path);
+
+/** The directory holding a result's traces. A post-scorer's `scored/` result reads its parent's. */
+const tracesOwner = (dir: string) =>
+  dirname(dir) !== dir && scoredDir(dirname(dir)) === dir ? dirname(dir) : dir;
 
 /** `claude plugin eval`: `aggregate-result.json` plus a `traces/` transcript per run. */
 export const native: Adapter = {
@@ -65,8 +69,7 @@ export const native: Adapter = {
     const code = await proc.exited;
     await collectTraces(output, config.collect);
     await $`rm -rf ${dirname(target)}`.quiet();
-    if (await Bun.file(join(output, "aggregate-result.json")).exists())
-      await scoreSuite(join(repo, suite), output);
+    if (await Bun.file(resultPath(output)).exists()) await scoreSuite(join(repo, suite), output);
     const loadErrors = await pluginErrors(output);
     if (loadErrors.length > 0)
       throw new Error(
@@ -77,7 +80,7 @@ export const native: Adapter = {
       );
     // The runner fails on a run that ended on an API error, which it leaves ungraded. A run it
     // graded despite an error, such as a timeout or a judge call that threw, exits clean.
-    const result = join(output, "aggregate-result.json");
+    const result = resultPath(output);
     const errors = (await Bun.file(result).exists())
       ? erroredRuns(await readResult(result)).filter((e) => e.graded)
       : [];
@@ -94,11 +97,10 @@ export const native: Adapter = {
 
   async read(path) {
     const result = await readResult(path);
-    const traces = join(dirname(path), "traces");
     const keyed = result.cases.flatMap((c) =>
       Object.entries(c.arms).map(async ([arm, runs]) => {
         const measured = await Promise.all(
-          runs.map((_, i) => measure(join(traces, `${c.name}-${arm}-${i}.jsonl`))),
+          runs.map((_, i) => measure(tracePath(tracesOwner(dirname(path)), c.name, arm, i))),
         );
         return [`${c.name}/${arm}`, measured] as const;
       }),
@@ -117,18 +119,17 @@ export const native: Adapter = {
   // Throws on a result with no traces, which would otherwise read as no session making a call.
   async traces(path) {
     const dir = resultsDir(path);
-    const found = globSync("traces/*.jsonl", { cwd: dir });
+    const found = listTraces(dir);
     if (found.length === 0) throw new Error(`No traces/*.jsonl in ${dir}`);
     const read = await Promise.all(
-      found.map(async (file) => [file, await Bun.file(join(dir, file)).text()] as const),
+      found.map(async (ref) => [ref, await Bun.file(ref.path).text()] as const),
     );
     const cells = new Map<string, Transcript[]>();
-    for (const [file, text] of read) {
-      const match = /^(.+)-(with|without)-(\d+)\.jsonl$/.exec(basename(file));
-      if (match === null) continue;
-      const key = `${match[1]}/${match[2]}`;
+    for (const [ref, text] of read) {
+      if (ref.arm !== "with" && ref.arm !== "without") continue;
+      const key = `${ref.case}/${ref.arm}`;
       const runs = cells.get(key) ?? [];
-      runs[Number(match[3])] = { reply: traceReply(text), calls: calls(text) };
+      runs[ref.n] = { reply: traceReply(text), calls: calls(text) };
       cells.set(key, runs);
     }
     return cells;

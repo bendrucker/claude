@@ -79,18 +79,8 @@ jobs:
       # The adapter suite's tests hand rescore calls to the real uv.
       - uses: astral-sh/setup-uv@v10.3.2
 
-      # `bun test evals/` also matches plugins/writing/evals, whose tests lint through vale.
-      - name: Install writing plugin tools
-        uses: jdx/mise-action@v5
-        with:
-          working_directory: plugins/writing
-          cache: false
-
-      - name: Install writing plugin Vale packages
-        run: bun plugins/writing/hooks/sessionstart.ts
-
       - name: Run tests
-        run: bun test evals/
+        run: bun test ./evals/
 
       - name: Check regex graders against examples
         run: |
@@ -305,10 +295,11 @@ jobs:
           # The cache key globs every file in the workspace (~24s), while a cold install takes ~3s.
           cache: false
 
-      # No SessionStart hook runs in CI, so the job installs what it would.
-      - name: Install writing plugin Vale packages
-        if: matrix.plugin.name == 'writing'
-        run: bun plugins/writing/hooks/sessionstart.ts
+      - name: Run plugin setup
+        working-directory: plugins/${{ matrix.plugin.name }}
+        run: |
+          [[ -f .ci.json ]] || exit 0
+          jq -r '.setup // [] | .[]' .ci.json | while IFS= read -r cmd; do bash -c "$cmd"; done
 
       # Profilers record through perf events, which the runner's default paranoia level blocks.
       - name: Allow perf events

@@ -58,14 +58,13 @@ export { parseRunId };
 
 export const RESULT_FILE = "aggregate-result.json";
 
-/** Matches a suite's results, relative to the suite: `results/<run>/aggregate-result.json`. */
 export const RESULT_GLOB = `results/*/${RESULT_FILE}`;
 
 export function resultPath(dir: string): string {
   return join(dir, RESULT_FILE);
 }
 
-/** Where a post-scorer writes the result `compare.ts` reads as a column beside the native one. */
+/** Where a post-scorer writes its result. */
 export function scoredDir(results: string): string {
   return join(results, "scored");
 }

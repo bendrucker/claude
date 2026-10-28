@@ -186,7 +186,7 @@ export async function scoreResults(results: string, index: string): Promise<Scor
   return (await Promise.all(runs)).flat();
 }
 
-/** Writes the scored runs to `<results>/scored/aggregate-result.json`, keeping the numbers as metrics. */
+/** Writes the scored runs to `<results>/scored/aggregate-result.json`. */
 export async function writeScored(results: string, scored: Scored[]): Promise<void> {
   const cases: Record<string, Record<string, ScoredRun[]>> = {};
   for (const s of scored.toSorted((a, b) => a.n - b.n)) {

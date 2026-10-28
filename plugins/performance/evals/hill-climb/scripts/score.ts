@@ -27,7 +27,7 @@ export function scoreReply(reply: string, truth: CaseTruth, profile: string): Sc
 
 /**
  * Scores every ranking and off-CPU trace under `<results>/traces/` and writes the runs to
- * `<results>/scored/aggregate-result.json`, where `compare.ts` reads them as a column.
+ * `<results>/scored/aggregate-result.json`.
  */
 export async function scoreResults(suite: string, results: string): Promise<Result> {
   const scored = listTraces(results).map(async (ref) => {

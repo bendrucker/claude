@@ -83,9 +83,8 @@ export function erroredRuns(result: Result): Errored[] {
 export interface ScoredRun {
   /** Verdicts, with the runner's defaults for an omitted weight, `scored`, or `withOnly`. */
   graders: z.input<typeof Grader>[];
-  /** Overrides the score the graders give, for a scorer that ranks rather than passes. */
+  /** Overrides the score derived from the graders, for a scorer that ranks. */
   score?: number | undefined;
-  /** Kept on the run as `metrics`. */
   metrics?: Record<string, number> | undefined;
   /** The run's final reply, written as its trace so `compare.ts` counts its words. */
   reply?: string | undefined;

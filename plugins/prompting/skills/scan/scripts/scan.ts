@@ -3,7 +3,7 @@ import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
-import { type Finding, scanPrompt } from "./rules";
+import { type Alert, lint } from "./vale";
 
 const SKIP_SEGMENTS = ["node_modules", ".git", "fixtures", "__snapshots__"];
 
@@ -56,19 +56,17 @@ export async function collectFiles(input: string, all: boolean): Promise<string[
   return files.toSorted();
 }
 
-export interface FileFindings {
+export interface FileAlerts {
   path: string;
-  findings: Finding[];
+  alerts: Alert[];
 }
 
-export async function scanFiles(files: string[]): Promise<FileFindings[]> {
-  const results: FileFindings[] = [];
-  for (const path of files) {
-    // oxlint-disable-next-line no-await-in-loop -- an audit walks an arbitrary tree. Reading every file at once would hold the whole corpus in memory.
-    const findings = scanPrompt(await Bun.file(path).text());
-    if (findings.length > 0) results.push({ path, findings });
-  }
-  return results;
+export async function scanFiles(files: string[]): Promise<FileAlerts[]> {
+  const alerts = await lint(files);
+  return files.flatMap((path) => {
+    const found = alerts.get(path);
+    return found ? [{ path, alerts: found }] : [];
+  });
 }
 
 function label(path: string): string {
@@ -76,20 +74,20 @@ function label(path: string): string {
   return rel.startsWith("..") ? path : rel;
 }
 
-function printSummary(results: FileFindings[]): void {
-  const byRule = new Map<string, number>();
+function printSummary(results: FileAlerts[]): void {
+  const byCheck = new Map<string, number>();
   let total = 0;
-  for (const { findings } of results) {
-    total += findings.length;
-    for (const finding of findings) {
-      byRule.set(finding.rule, (byRule.get(finding.rule) ?? 0) + 1);
+  for (const { alerts } of results) {
+    total += alerts.length;
+    for (const alert of alerts) {
+      byCheck.set(alert.Check, (byCheck.get(alert.Check) ?? 0) + 1);
     }
   }
-  const rows = [...byRule.entries()]
+  const rows = [...byCheck.entries()]
     .toSorted((a, b) => b[1] - a[1])
-    .map(([rule, count]) => [rule, String(count)]);
-  console.error(table([["Rule", "Count"], ...rows]));
-  console.error(`${total} findings across ${results.length} files.`);
+    .map(([check, count]) => [check, String(count)]);
+  console.error(table([["Check", "Count"], ...rows]));
+  console.error(`${total} alerts across ${results.length} files.`);
 }
 
 if (import.meta.main) {
@@ -98,7 +96,7 @@ if (import.meta.main) {
     parameters: ["[path]"],
     help: {
       description:
-        "Report prompt defects in documents a model executes. Exits non-zero on any finding.",
+        "Report prompt defects in documents a model executes. Exits non-zero on any alert.",
     },
     flags: {
       all: {
@@ -109,16 +107,16 @@ if (import.meta.main) {
       quiet: {
         type: Boolean,
         default: false,
-        description: "Print findings without the summary table",
+        description: "Print alerts without the summary table",
       },
     },
   });
 
   const results = await scanFiles(await collectFiles(argv._.path ?? ".", argv.flags.all));
-  for (const { path, findings } of results) {
+  for (const { path, alerts } of results) {
     const name = label(path);
-    for (const finding of findings) {
-      console.log(`${name}:${finding.line}:${finding.col}: ${finding.rule}: ${finding.message}`);
+    for (const alert of alerts) {
+      console.log(`${name}:${alert.Line}:${alert.Span[0]}: ${alert.Check}: ${alert.Message}`);
     }
   }
   if (!argv.flags.quiet && results.length > 0) printSummary(results);

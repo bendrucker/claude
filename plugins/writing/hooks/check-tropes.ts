@@ -248,6 +248,11 @@ async function wholeFilePair(
   return { newText, oldText };
 }
 
+// Vale lints only the comments of these languages and reads any other code
+// file as plain text, so the rest get their comments extracted first.
+const VALE_COMMENT_SCOPED =
+  /\.(c|h|cc|cpp|hpp|cs|css|scss|go|java|kt|js|cjs|mjs|jsx|ts|cts|mts|tsx|py|rb|swift)$/i;
+
 async function processFileOp(input: PreToolUseHookInput): Promise<HookFinding[]> {
   const pair = await collectFileOpPair(input);
   if (!pair) return [];
@@ -283,8 +288,14 @@ async function processFileOp(input: PreToolUseHookInput): Promise<HookFinding[]>
   }));
 
   if (filePath != null && filePath !== "") {
-    const whole = (await wholeFilePair(input, filePath)) ?? pair;
-    findings.push(...(await valeFileFindings(whole.oldText, whole.newText, filePath)));
+    if (prose || VALE_COMMENT_SCOPED.test(filePath)) {
+      const whole = (await wholeFilePair(input, filePath)) ?? pair;
+      findings.push(...(await valeFileFindings(whole.oldText, whole.newText, filePath)));
+    } else {
+      findings.push(
+        ...(await valeFileFindings(scanPair.oldText, scanPair.newText, `${filePath}.md`)),
+      );
+    }
   }
 
   if (!prose) {

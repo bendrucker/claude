@@ -91,12 +91,6 @@
     The handler reads the cache, so the event costs no extra query.
   contains: [Writing.NoNegation]
 
-- name: suggestion-level rules stay below the severity floor
-  format: .md
-  input: |
-    We delve into the tapestry.
-  absent: Writing.AiVocabulary
-
 - name: the section template on a short PR body fires
   format: .prbody
   input: |

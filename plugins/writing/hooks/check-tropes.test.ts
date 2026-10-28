@@ -91,7 +91,7 @@ function mockMcp(tool_name: string, tool_input: Record<string, unknown>): PreToo
 }
 
 describe("Vale rule files", () => {
-  const rulePath = "/Users/test/plugins/writing/styles/Writing/AiVocabulary.yml";
+  const rulePath = "/Users/test/plugins/writing/styles/Writing/ReachingFor.yml";
 
   test.each<[string, string, string]>([
     [

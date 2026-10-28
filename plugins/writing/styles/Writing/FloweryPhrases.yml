@@ -1,0 +1,34 @@
+# evidence: flowery-phrases.txt entries were audited on the deliverable surface against the model corpus and the voice baseline.
+# retire when: an entry is dead on the deliverable surface or not distinctive versus the voice baseline. Remove that entry.
+extends: existence
+message: "'%s' is stock phrasing the model reaches for. State the mechanism plainly."
+level: error
+ignorecase: true
+tokens:
+  - '\bsources?[\s-]+of[\s-]+truths?\b'
+  - '\bescape[\s-]+hatch(?:es)?\b'
+  - '\bself[\s-]+(?:sufficient|sufficiency)\b'
+  - '\b(?:fail|fails|failed|failing)[\s-]+loud(?:ly)?\b'
+tests:
+  - name: positives
+    about: each phrase and common inflections
+    input: |
+      This keeps a single source of truth.
+
+      Added an escape hatch for power users.
+
+      The tool is self-sufficient.
+
+      It should fail loudly on bad input.
+    want: |
+      1:21:Writing.FloweryPhrases:'source of truth' is stock phrasing the model reaches for. State the mechanism plainly.
+      3:10:Writing.FloweryPhrases:'escape hatch' is stock phrasing the model reaches for. State the mechanism plainly.
+      5:13:Writing.FloweryPhrases:'self-sufficient' is stock phrasing the model reaches for. State the mechanism plainly.
+      7:11:Writing.FloweryPhrases:'fail loudly' is stock phrasing the model reaches for. State the mechanism plainly.
+  - name: negatives
+    about: the words apart or in other senses
+    input: |
+      The truth about the data source is unclear.
+
+      A hatch you can escape through.
+    want: ""

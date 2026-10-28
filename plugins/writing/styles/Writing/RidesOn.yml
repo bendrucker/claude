@@ -1,0 +1,28 @@
+# evidence: user-flagged 2026-06 as a recurring figurative construction for dependency or coupling. It appears mostly in conversational reasoning.
+# retire when: a chat-voice corpus pass shows the construction is not distinctive versus the user baseline.
+extends: existence
+message: "'%s' is figurative dependency language. State the relationship plainly: 'X depends on Y', 'X reuses Y', or 'X piggybacks on Y'."
+level: error
+ignorecase: true
+tokens:
+  - '\brid(?:e|es|ing)\s+(?:on|atop|alongside)\b'
+tests:
+  - name: positives
+    about: each preposition
+    input: |
+      The teardown rides on the normal end of a team.
+
+      The new reader rides atop the existing layer.
+
+      The sync loop rides alongside the poll cycle.
+    want: |
+      1:14:Writing.RidesOn:'rides on' is figurative dependency language. State the relationship plainly: 'X depends on Y', 'X reuses Y', or 'X piggybacks on Y'.
+      3:16:Writing.RidesOn:'rides atop' is figurative dependency language. State the relationship plainly: 'X depends on Y', 'X reuses Y', or 'X piggybacks on Y'.
+      5:15:Writing.RidesOn:'rides alongside' is figurative dependency language. State the relationship plainly: 'X depends on Y', 'X reuses Y', or 'X piggybacks on Y'.
+  - name: negatives
+    about: literal riding
+    input: |
+      The cyclists ride for charity.
+
+      She takes the early train to work.
+    want: ""

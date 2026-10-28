@@ -1,0 +1,25 @@
+# evidence: user-flagged as the flagship gen-5 tell. The gen-5 corpus audit found 27.8 per million assistant characters versus 3.4 in typed user text, and a verify pass judged 43% of uses bare gravity markers.
+# retire when: the gen-5+ assistant rate falls under 5/M in a corpus audit window, or a labeling pass shows most surviving uses name the dependency in-sentence.
+extends: existence
+message: "'%s' asserts importance by metaphor. Name the dependency instead: say what breaks or changes without it."
+level: error
+ignorecase: true
+tokens:
+  - '\bload[\s-]bearing\b'
+tests:
+  - name: positives
+    about: hyphenated and spaced forms
+    input: |
+      That comment is load-bearing for the retry logic.
+
+      The ordering here is load bearing.
+    want: |
+      1:17:Writing.LoadBearing:'load-bearing' asserts importance by metaphor. Name the dependency instead: say what breaks or changes without it.
+      3:22:Writing.LoadBearing:'load bearing' asserts importance by metaphor. Name the dependency instead: say what breaks or changes without it.
+  - name: negatives
+    about: stated dependency
+    input: |
+      Removing the check breaks the parser.
+
+      The retry logic depends on this ordering.
+    want: ""

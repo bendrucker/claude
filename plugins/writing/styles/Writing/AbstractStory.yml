@@ -1,0 +1,25 @@
+# evidence: gen-5 corpus audit, raw "story" hits are dominated by Storybook and user-story senses, so the noun list enumerates the abstraction frame's observed heads (about 30 hits, chat-dominant).
+# retire when: head nouns stop appearing in corpus audits, the frame stops recurring in chat output, or the list needs constant extension.
+extends: existence
+message: "'%s' dresses up a plain referent. Name the thing: the rollback plan, the cleanup path, the error handling."
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:rollback|cleanup|migration|error|consumer|state|budget|ingest|deletion|upgrade|onboarding|testing|deploy(?:ment)?|win)\s+stor(?:y|ies)\b'
+tests:
+  - name: positives
+    about: abstraction frame heads
+    input: |
+      The migration story gets messy across major versions.
+
+      This improves the rollback story.
+    want: |
+      1:5:Writing.AbstractStory:'migration story' dresses up a plain referent. Name the thing: the rollback plan, the cleanup path, the error handling.
+      3:19:Writing.AbstractStory:'rollback story' dresses up a plain referent. Name the thing: the rollback plan, the cleanup path, the error handling.
+  - name: negatives
+    about: Storybook and agile senses
+    input: |
+      The Storybook story renders the grid.
+
+      The user story covers the checkout flow.
+    want: ""

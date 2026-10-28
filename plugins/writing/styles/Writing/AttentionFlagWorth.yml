@@ -1,0 +1,30 @@
+# evidence: gen-5 corpus audit, the attention-flag frame runs 52.6/M assistant versus 2.9/M typed user (16.6x), and a verify pass found the wrapper deletable in every sampled case.
+# retire when: the frame rate falls to the typed-user baseline in a corpus audit window, or a labeling pass shows the frame mostly precedes genuinely optional asides.
+extends: existence
+message: "'%s' announces that a point matters instead of making it. Cut the wrapper and state the point."
+level: error
+ignorecase: true
+tokens:
+  - '\bworth\s+(?:noting|knowing|flagging|mentioning|saying|stating|naming|recording|remembering|a\s+look|your\s+(?:attention|awareness|time|call))\b'
+tests:
+  - name: positives
+    about: flag lead-ins
+    input: |
+      Two things worth flagging before this merges.
+
+      Also worth noting for the rollout: the flag defaults off.
+
+      One caveat worth your attention.
+    want: |
+      1:12:Writing.AttentionFlagWorth:'worth flagging' announces that a point matters instead of making it. Cut the wrapper and state the point.
+      3:6:Writing.AttentionFlagWorth:'worth noting' announces that a point matters instead of making it. Cut the wrapper and state the point.
+      5:12:Writing.AttentionFlagWorth:'worth your attention' announces that a point matters instead of making it. Cut the wrapper and state the point.
+  - name: negatives
+    about: cost-benefit judgments
+    input: |
+      The refactor is worth doing before the freeze.
+
+      That tradeoff is not worth it.
+
+      The fix is worth confirming against staging.
+    want: ""

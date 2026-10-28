@@ -1,0 +1,28 @@
+# evidence: pre-dates the curation principle with no corpus evidence recorded. Kept because the figurative construction is distinctive to AI output.
+# retire when: corpus analysis shows the phrase at low lift, or corrective-feedback moments stop citing it.
+extends: existence
+message: "'%s' is an AI-flavored figurative construction. Prefer 'use' or 'prefer X over Y'."
+level: error
+ignorecase: true
+tokens:
+  - '\breach(?:ing|es|ed)?\s+for\b'
+tests:
+  - name: positives
+    about: base and inflected forms
+    input: |
+      Open a sibling pane rather than reaching for Bash.
+
+      Reach for the linter before the formatter.
+
+      She reaches for the shell first.
+    want: |
+      1:33:Writing.ReachingFor:'reaching for' is an AI-flavored figurative construction. Prefer 'use' or 'prefer X over Y'.
+      3:1:Writing.ReachingFor:'Reach for' is an AI-flavored figurative construction. Prefer 'use' or 'prefer X over Y'.
+      5:5:Writing.ReachingFor:'reaches for' is an AI-flavored figurative construction. Prefer 'use' or 'prefer X over Y'.
+  - name: negatives
+    about: literal reach and the noun
+    input: |
+      She reached the summit by noon.
+
+      The fix is within reach.
+    want: ""

@@ -1,0 +1,41 @@
+# evidence: each vocabulary entry was corpus-audited for lift and distinctiveness (model rate above the voice baseline, count >= 5 in the audit window).
+# retire when: an entry falls below the minimum count or stops being distinctive versus the voice baseline. Drop that entry.
+extends: existence
+message: "'%s' is flagged as AI-typical vocabulary. Use a more natural word."
+level: suggestion
+ignorecase: true
+tokens:
+  - '\bdelv(?:e|es|ed|ing)\b'
+  - '\btapestr(?:y|ies)\b'
+  - '\bmeticulous(?:ly|ness)?\b'
+  - '\bleverag(?:e|es|ed|ing)\b'
+  - '\brobust(?:ly|ness)?\b'
+  - '\bnuanc(?:e|es|ed)\b'
+tests:
+  - name: positives
+    about: base forms and inflections of each listed word
+    input: |
+      Let's delve into the codebase.
+
+      A meticulous review process.
+
+      This is a robust solution.
+
+      We leveraged the cache and it's a rich tapestry.
+
+      Mind the nuance, and the nuances.
+    want: |
+      1:7:Writing.AiVocabulary:'delve' is flagged as AI-typical vocabulary. Use a more natural word.
+      3:3:Writing.AiVocabulary:'meticulous' is flagged as AI-typical vocabulary. Use a more natural word.
+      5:11:Writing.AiVocabulary:'robust' is flagged as AI-typical vocabulary. Use a more natural word.
+      7:4:Writing.AiVocabulary:'leveraged' is flagged as AI-typical vocabulary. Use a more natural word.
+      7:40:Writing.AiVocabulary:'tapestry' is flagged as AI-typical vocabulary. Use a more natural word.
+      9:10:Writing.AiVocabulary:'nuance' is flagged as AI-typical vocabulary. Use a more natural word.
+      9:26:Writing.AiVocabulary:'nuances' is flagged as AI-typical vocabulary. Use a more natural word.
+  - name: negatives
+    about: plain technical prose
+    input: |
+      The function processes input.
+
+      The server returns a result.
+    want: ""

@@ -1,0 +1,28 @@
+# evidence: pre-dates the curation principle with no corpus evidence recorded. Kept as a filler gate for common AI preamble phrases.
+# retire when: a per-entry corpus audit shows an entry lacks distinctiveness. Remove or migrate that entry.
+extends: existence
+message: "'%s' is filler. Cut it."
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:importantly|interestingly|it should be noted|as mentioned|in terms of)\b'
+tests:
+  - name: positives
+    about: each filler phrase
+    input: |
+      Interestingly, the cache is cold.
+
+      Importantly, the test was skipped.
+
+      It should be noted that the flag is off.
+    want: |
+      1:1:Writing.FillerWords:'Interestingly' is filler. Cut it.
+      3:1:Writing.FillerWords:'Importantly' is filler. Cut it.
+      5:1:Writing.FillerWords:'It should be noted' is filler. Cut it.
+  - name: negatives
+    about: plain statements
+    input: |
+      The cache is cold.
+
+      Note that the test was skipped.
+    want: ""

@@ -1,0 +1,29 @@
+# evidence: each word was identified as promotional AI vocabulary, though none has a per-entry corpus audit.
+# retire when: a corpus audit shows an entry lacks lift or is dead. Remove that entry.
+extends: existence
+message: "'%s' reads as promotional AI language. Consider a more neutral word."
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:boasts|vibrant|showcasing|nestled|groundbreaking|renowned|diverse array)\b'
+tests:
+  - name: positives
+    about: each promotional word
+    input: |
+      The library boasts excellent performance.
+
+      A groundbreaking approach to caching.
+
+      A vibrant community, nestled in the docs.
+    want: |
+      1:13:Writing.PromotionalLanguage:'boasts' reads as promotional AI language. Consider a more neutral word.
+      3:3:Writing.PromotionalLanguage:'groundbreaking' reads as promotional AI language. Consider a more neutral word.
+      5:3:Writing.PromotionalLanguage:'vibrant' reads as promotional AI language. Consider a more neutral word.
+      5:22:Writing.PromotionalLanguage:'nestled' reads as promotional AI language. Consider a more neutral word.
+  - name: negatives
+    about: plain technical prose
+    input: |
+      The server handles concurrent requests.
+
+      A well-tested approach to retries.
+    want: ""

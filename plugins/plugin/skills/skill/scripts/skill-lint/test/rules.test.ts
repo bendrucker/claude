@@ -422,7 +422,6 @@ describe("substitutionResults", () => {
 
   test.each([
     "plugins/plugin/skills/skill/references/patterns.md",
-    "plugins/writing/skills/analyze/references/methodology.md",
     "plugins/plugin/skills/hook/references/debugging.md",
   ])("passes prose in %s", async (relative) => {
     const content = await Bun.file(join(repoRoot, relative)).text();

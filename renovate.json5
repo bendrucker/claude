@@ -38,7 +38,9 @@
       customType: "regex",
       description: "Vale packages pinned by release URL",
       managerFilePatterns: ["**/.vale.ini"],
-      matchStrings: ["https://github\\.com/(?<depName>[^/\\s]+/[^/\\s]+)/releases/download/(?<currentValue>[^/\\s]+)/"],
+      matchStrings: [
+        "https://github\\.com/(?<depName>[^/\\s]+/[^/\\s]+)/releases/download/(?<currentValue>[^/\\s]+)/",
+      ],
       datasourceTemplate: "github-releases",
     },
   ],

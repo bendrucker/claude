@@ -108,9 +108,7 @@ function wrapReason(wrapped: WrappedParagraph[]): string {
   return `Prose in the body is hard-wrapped at a fixed column. A PR body renders in a web UI that soft-wraps, so a hard wrap gains nothing and displays as a narrow column. Write one line per paragraph and one line per list item. This applies to the body only. A markdown file in the repo keeps its own wrapping convention, so a body sourced from one gets copied to a scratch file and unwrapped there.\n\n${examples}${more}`;
 }
 
-// Mirrors the writing plugin's "template on small document" detector: a full
-// `## Changes` + `## Testing` scaffold on a body under this many words is
-// over-structured. Reimplemented locally to avoid a cross-plugin import.
+// A full `## Changes` + `## Testing` scaffold on a body under this many words is over-structured.
 const SMALL_BODY_WORD_LIMIT = 150;
 const CHANGES_HEADING_PATTERN = /^##\s+Changes\b/m;
 const TESTING_HEADING_PATTERN = /^##\s+Testing\b/m;

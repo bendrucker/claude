@@ -310,6 +310,7 @@ export async function runGroup(
   voiceDir: string,
   draftsDir: string,
   concurrency = 2,
+  draftBudget = Number.POSITIVE_INFINITY,
 ): Promise<Report> {
   const categories = groups[group];
   const examples = await exampleParity(categories);
@@ -322,7 +323,7 @@ export async function runGroup(
   const drafts = await scanCorpus(
     group,
     "drafts",
-    sampleChunks(await readDrafts(draftsDir), Number.POSITIVE_INFINITY),
+    sampleChunks(await readDrafts(draftsDir), draftBudget),
     concurrency,
   );
 
@@ -513,6 +514,7 @@ const run = new Command("run")
   .option("--voice-dir <dir>", "voice baseline directory", VOICE_DIR)
   .option("--drafts-dir <dir>", "model drafts directory (jsonl)", DRAFTS_DIR)
   .option("--concurrency <n>", "vale processes in flight", int, 2)
+  .option("--draft-words <n>", "model-draft words to sample (default: all)", int)
   .option(
     "--aliases <json>",
     "category-to-check entries to apply over category-aliases.json",
@@ -528,6 +530,7 @@ const run = new Command("run")
           options.voiceDir,
           options.draftsDir,
           options.concurrency,
+          options.draftWords,
         ),
       ),
     );

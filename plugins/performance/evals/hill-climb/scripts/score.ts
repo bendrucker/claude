@@ -38,24 +38,11 @@ export async function scoreResults(suite: string, results: string): Promise<Resu
     const reply = traceReply(await Bun.file(ref.path).text()) ?? "";
     return [{ ...ref, run: { ...scoreReply(reply, truth, profile), trace: ref.path } }];
   });
-  const cases: Record<string, Record<string, { n: number; run: ScoredRun }[]>> = {};
-  for (const { case: name, arm, n, run } of (await Promise.all(scored)).flat()) {
-    ((cases[name] ??= {})[arm] ??= []).push({ n, run });
+  const cases: Record<string, Record<string, ScoredRun[]>> = {};
+  for (const { case: name, arm, run } of (await Promise.all(scored)).flat()) {
+    ((cases[name] ??= {})[arm] ??= []).push(run);
   }
-  const sorted = Object.fromEntries(
-    Object.entries(cases)
-      .toSorted(([x], [y]) => x.localeCompare(y))
-      .map(([name, arms]) => [
-        name,
-        Object.fromEntries(
-          Object.entries(arms).map(([arm, list]) => [
-            arm,
-            list.toSorted((x, y) => x.n - y.n).map((r) => r.run),
-          ]),
-        ),
-      ]),
-  );
-  return writeResult(scoredDir(results), sorted);
+  return writeResult(scoredDir(results), cases);
 }
 
 export const program = new Command("score.ts")

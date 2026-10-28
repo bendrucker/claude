@@ -6,7 +6,7 @@ import { parseDocument } from "yaml";
 import { z } from "zod";
 import { subscriptionEnv } from "../eval-judge/env";
 import { shareGraders } from "./graders";
-import { artifactsPath, casePath, listCases, tracePath } from "./layout";
+import { artifactsPath, casePath, listCases, resultPath, tracePath } from "./layout";
 import { eachRun, readResult } from "./result";
 import { stage } from "./stage";
 import { casePlugins, listedPlugins, readSuite, type SuiteFile, withDependencies } from "./suite";
@@ -173,7 +173,7 @@ const InitEvent = z.object({
  * the runner otherwise scores without complaint.
  */
 export async function pluginErrors(output: string): Promise<string[]> {
-  const path = join(output, "aggregate-result.json");
+  const path = resultPath(output);
   if (!(await Bun.file(path).exists())) return [];
   const found = await Promise.all(
     [...eachRun(await readResult(path))].map(async ({ case: name, arm, n }) => {
@@ -226,7 +226,7 @@ async function exists(path: string): Promise<boolean> {
  * out and then removes those directories.
  */
 export async function collectTraces(output: string, collect: string[] = []): Promise<void> {
-  const path = join(output, "aggregate-result.json");
+  const path = resultPath(output);
   if (!(await Bun.file(path).exists())) return;
   const copies = [...eachRun(await readResult(path))].map(
     async ({ case: name, arm, n, run: { tracePath: source } }) => {

@@ -60,19 +60,19 @@ function lastWrittenBody(trace: string): string | undefined {
 
 async function bodies(dirs: string): Promise<Map<string, string[]>> {
   const casePattern = new RegExp(opts.cases);
-  const paths = dirs
-    .split(",")
-    .flatMap((dir) => listTraces(dir).filter((ref) => ref.arm === "with"))
-    .map((ref) => ({ ref, path: ref.path }));
+  const refs = dirs.split(",").flatMap((dir) => {
+    const found = listTraces(dir);
+    if (found.length === 0) throw new Error(`No traces/*.jsonl in ${dir}`);
+    return found.filter((ref) => ref.arm === "with");
+  });
   const read = await Promise.all(
-    paths.flatMap(({ ref, path }) => {
-      const caseName = ref.case;
-      if (!casePattern.test(caseName)) return [];
+    refs.flatMap((ref) => {
+      if (!casePattern.test(ref.case)) return [];
       return [
-        Bun.file(path)
+        Bun.file(ref.path)
           .text()
           .then((trace) => ({
-            name: caseName,
+            name: ref.case,
             body: lastWrittenBody(trace) ?? bodyOf(trace)?.text,
           })),
       ];

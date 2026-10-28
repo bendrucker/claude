@@ -157,7 +157,6 @@ export function processOf(trace: string, reference?: RegExp): Process {
 export interface Scored extends Process {
   case: string;
   arm: string;
-  n: number;
   trace: string;
   recall: number;
   precision: number;
@@ -167,7 +166,7 @@ export interface Scored extends Process {
 export async function scoreResults(results: string, index: string): Promise<Scored[]> {
   const truths = new Map<string, Promise<Truth>>();
   const runs = listTraces(results).map(async (ref) => {
-    const { case: name, arm, n } = ref;
+    const { case: name, arm } = ref;
     const dir = join(SUITE, name);
     if (!(await Bun.file(join(dir, "truth.sql")).exists())) return [];
     const pending = truths.get(name) ?? loadTruth(dir, index);
@@ -178,7 +177,6 @@ export async function scoreResults(results: string, index: string): Promise<Scor
       {
         case: name,
         arm,
-        n,
         trace: ref.path,
         ...overlap(traceReply(trace) ?? "", truth),
         ...processOf(trace, truth.reference),
@@ -191,7 +189,7 @@ export async function scoreResults(results: string, index: string): Promise<Scor
 /** Writes the scored runs to `<results>/scored/aggregate-result.json`. */
 export async function writeScored(results: string, scored: Scored[]): Promise<void> {
   const cases: Record<string, Record<string, ScoredRun[]>> = {};
-  for (const s of scored.toSorted((a, b) => a.n - b.n)) {
+  for (const s of scored) {
     ((cases[s.case] ??= {})[s.arm] ??= []).push({
       score: (s.recall + s.precision) / 2,
       trace: s.trace,

@@ -1,6 +1,7 @@
+import { rm } from "node:fs/promises";
 import { mean } from "simple-statistics";
 import { z } from "zod";
-import { type RunRef, resultPath, tracePath } from "./layout";
+import { type RunRef, resultPath, tracePath, tracesDir } from "./layout";
 
 /**
  * The runner's `aggregate-result.json`, parsed loosely: the runner adds fields without renaming
@@ -104,6 +105,8 @@ export async function writeResult(
   dir: string,
   cases: Record<string, Record<string, ScoredRun[]>>,
 ): Promise<Result> {
+  // A rewrite drops the previous write's traces, which listTraces would still read.
+  await rm(tracesDir(dir), { recursive: true, force: true });
   const traces: Promise<number>[] = [];
   const written = Object.entries(cases).map(([name, arms]) => {
     const scored = Object.fromEntries(

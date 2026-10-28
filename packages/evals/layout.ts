@@ -47,14 +47,12 @@ export interface RunRef {
 }
 
 /** Splits a run id, or a trace filename, into its parts. An arm never contains `-`. */
-function parseRunId(stem: string): RunRef | undefined {
+export function parseRunId(stem: string): RunRef | undefined {
   const match = /^(.+)-([^-]+)-(\d+)(?:\.jsonl)?$/.exec(stem);
   if (match === null) return undefined;
   const [, name = "", arm = "", n = ""] = match;
   return { case: name, arm, n: Number(n) };
 }
-
-export { parseRunId };
 
 export const RESULT_FILE = "aggregate-result.json";
 

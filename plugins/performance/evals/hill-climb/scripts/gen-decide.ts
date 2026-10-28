@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
-import { globSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
-import { $ } from "bun";
+import { serializeCase, writeCases } from "../../../../../packages/evals/cases";
 
 export const DECISIONS = ["accept", "reject", "keep-unconfirmed", "re-run"] as const;
 export type Decision = (typeof DECISIONS)[number];
@@ -654,21 +653,24 @@ export function all(): Generated[] {
   );
 }
 
-const CASE = `schema_version: "1.1"
-name: {name}
-tags: [decide, {split}]
-plugins: ["../../.."]
-execution:
-  model: claude-sonnet-5-5
-  max_turns: 4
-  timeout_seconds: 300
-  allowed_tools: [Skill]
-  append_system_prompt: >-
-    Nothing can be built or run in this session, and nobody answers while you
-    work, so reply once. End the reply with one line naming your decision on
-    the candidate: \`Decision: accept\`, \`Decision: reject\`, \`Decision: keep
-    unconfirmed\`, or \`Decision: re-run\`.
-`;
+const SYSTEM =
+  "Nothing can be built or run in this session, and nobody answers while you work, so reply once. End the reply with one line naming your decision on the candidate: `Decision: accept`, `Decision: reject`, `Decision: keep unconfirmed`, or `Decision: re-run`.";
+
+export function caseYaml(c: Pick<Generated, "name" | "split">): string {
+  return serializeCase({
+    schema_version: "1.1",
+    name: c.name,
+    tags: ["decide", c.split],
+    plugins: ["../../.."],
+    execution: {
+      model: "claude-sonnet-5-5",
+      max_turns: 4,
+      timeout_seconds: 300,
+      allowed_tools: ["Skill"],
+      append_system_prompt: SYSTEM,
+    },
+  });
+}
 
 const DECISION_PATTERN = {
   accept: "accept",
@@ -718,19 +720,15 @@ export const program = new Command("gen-decide.ts")
   .description("Write the decide-* cases from the trap and domain tables")
   .action(async () => {
     const suite = join(import.meta.dir, "..");
-    const old = globSync("decide-*", { cwd: suite }).map((d) => join(suite, d));
-    if (old.length > 0) await $`rm -rf ${old}`;
     const cases = all();
-    const writes = cases.flatMap((c) => {
-      const files: Record<string, string> = {
-        "case.yaml": CASE.replace("{name}", c.name).replace("{split}", c.split),
-        "prompt.md": c.prompt,
-      };
+    const files: Record<string, string> = {};
+    for (const c of cases) {
+      files[join(c.name, "case.yaml")] = caseYaml(c);
+      files[join(c.name, "prompt.md")] = c.prompt;
       for (const [file, text] of Object.entries(graders(c.truth)))
-        files[join("graders", file)] = text;
-      return Object.entries(files).map(([f, text]) => Bun.write(join(suite, c.name, f), text));
-    });
-    await Promise.all(writes);
+        files[join(c.name, "graders", file)] = text;
+    }
+    await writeCases(suite, files, { prefix: "decide-" });
     console.log(`wrote ${cases.length} cases`);
   });
 

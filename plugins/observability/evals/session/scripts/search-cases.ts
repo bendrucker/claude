@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
-import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { z } from "zod";
+import { serializeCase, writeCases } from "../../../../../packages/evals/cases";
 
 const SUITE = join(import.meta.dirname, "..");
 
@@ -28,19 +28,19 @@ export function truth(sessions: string[]): string {
 }
 
 export function caseYaml(label: Label): string {
-  const tags = ["search", ...label.tags].join(", ");
-  return `schema_version: "1.1"
-name: search-${label.id}
-tags: [${tags}]
-plugins: ["../../.."]
-execution:
-  model: claude-sonnet-5-5
-  max_turns: 30
-  timeout_seconds: 600
-  allowed_tools: [Read, Glob, Grep, Skill, Bash]
-context:
-  scaffold_script: fixture.sh
-`;
+  return serializeCase({
+    schema_version: "1.1",
+    name: `search-${label.id}`,
+    tags: ["search", ...label.tags],
+    plugins: ["../../.."],
+    execution: {
+      model: "claude-sonnet-5-5",
+      max_turns: 30,
+      timeout_seconds: 600,
+      allowed_tools: ["Read", "Glob", "Grep", "Skill", "Bash"],
+    },
+    context: { scaffold_script: "fixture.sh" },
+  });
 }
 
 /** Sessions the frozen index holds, so a case never asks about one outside the snapshot. */
@@ -54,16 +54,19 @@ async function indexed(index: string, ids: string[]): Promise<Set<string>> {
   return new Set(rows.map((r) => r.session_id));
 }
 
-async function writeCase(label: Label, sessions: string[]): Promise<void> {
-  const dir = join(SUITE, `search-${label.id}`);
-  mkdirSync(dir, { recursive: true });
-  await Promise.all([
-    Bun.write(join(dir, "case.yaml"), caseYaml(label)),
-    Bun.write(join(dir, "prompt.md"), `${prompt(label)}\n`),
-    Bun.write(join(dir, "truth.sql"), truth(sessions)),
-    Bun.write(join(dir, "fixture.sh"), '#!/usr/bin/env bash\nexec "$(dirname "$0")/../index.sh"\n'),
-  ]);
-  await $`chmod +x ${join(dir, "fixture.sh")}`;
+async function writeSearchCases(cases: { label: Label; sessions: string[] }[]): Promise<void> {
+  const files: Record<string, string> = {};
+  for (const { label, sessions } of cases) {
+    const dir = `search-${label.id}`;
+    files[join(dir, "case.yaml")] = caseYaml(label);
+    files[join(dir, "prompt.md")] = `${prompt(label)}\n`;
+    files[join(dir, "truth.sql")] = truth(sessions);
+    files[join(dir, "fixture.sh")] = '#!/usr/bin/env bash\nexec "$(dirname "$0")/../index.sh"\n';
+  }
+  await writeCases(SUITE, files, { prefix: "search-" });
+  await Promise.all(
+    cases.map((c) => $`chmod +x ${join(SUITE, `search-${c.label.id}`, "fixture.sh")}`),
+  );
 }
 
 export const program = new Command("search-cases")
@@ -87,7 +90,7 @@ export const program = new Command("search-cases")
         sessions: label.relevant.map((r) => r.session_id).filter((s) => held.has(s)),
       }))
       .filter((c) => c.sessions.length > 0);
-    await Promise.all(cases.map((c) => writeCase(c.label, c.sessions)));
+    await writeSearchCases(cases);
     console.log(`${cases.length} of ${labels.length} labels have a session in the index`);
   });
 

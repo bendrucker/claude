@@ -74,7 +74,7 @@ The graders check the outcome and accept any wording that gets there. `gap` name
 
 ## Scoring
 
-The native graders' weighted pass rate is the headline score. [`scripts/score.ts`](scripts/score.ts) scores what a regex can't and writes it as `<results>/scored.json`, in `aggregate-result.json` shape:
+The native graders' weighted pass rate is the headline score. [`scripts/score.ts`](scripts/score.ts) scores what a regex can't and writes it through `writeResult` as `<results>/scored/aggregate-result.json`, which `compare.ts` reads as a column:
 
 - **ranking** ([`ranking.ts`](scripts/ranking.ts)): finds the reply's candidate list and scores the share of its entries that cite a profile entry by name, percentage, or seconds. `cited-all` passes when every entry does.
 - **offcpu** ([`offcpu.ts`](scripts/offcpu.ts)): scores the reciprocal rank of the first candidate in the last ranked list whose headline targets the true lead. `lead@1` passes when it ranks first.
@@ -83,6 +83,6 @@ The native graders' weighted pass rate is the headline score. [`scripts/score.ts
 
 `bun evals/native/run.ts plugins/performance/evals/hill-climb --ref <ref> -- --runs 4 --tag dev` runs the plugin at `<ref>` against a no-plugin baseline on the dev split, with the Bash sandbox disabled. Add `--ablation none` after `--` to skip the baseline when comparing a second ref, `--tag holdout` to confirm a win, and `--model <id>` to override the model. Results land in the gitignored `results/<timestamp>-<label>/`.
 
-- `bun plugins/performance/evals/hill-climb/scripts/score.ts <results>...` writes `scored.json` into each results directory.
-- `bun evals/native/compare.ts <base>/aggregate-result.json <candidate>/aggregate-result.json --suite plugins/performance/evals/hill-climb` compares the native scores by case and tag. Pass each `scored.json` instead for the lead and citation scores.
+- `bun plugins/performance/evals/hill-climb/scripts/score.ts <results>...` writes `scored/aggregate-result.json` into each results directory.
+- `bun evals/native/compare.ts <base>/aggregate-result.json <candidate>/aggregate-result.json --suite plugins/performance/evals/hill-climb` compares the native scores by case and tag. Pass each `scored/aggregate-result.json` instead for the lead and citation scores.
 - `bun evals/native/check.ts plugins/performance/evals/hill-climb` tests the regex graders against [`examples/`](examples/).

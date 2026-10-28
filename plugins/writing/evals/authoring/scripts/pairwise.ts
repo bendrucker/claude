@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { globSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import seedrandom from "seedrandom";
 import { mean } from "simple-statistics";
@@ -16,6 +16,7 @@ import {
   promptHash as hashPrompt,
   structured,
 } from "../../../../../packages/eval-judge/index";
+import { listTraces } from "../../../../../packages/evals/layout";
 import { mapPool } from "../../../../../packages/evals/pool";
 import { signFlipPValue, wilson } from "../../../../../packages/evals/stats";
 import { loadTags } from "../../../../../packages/evals/suite";
@@ -106,15 +107,9 @@ interface TraceFile {
 }
 
 function traceFiles(dir: string, arm: string): TraceFile[] {
-  const pattern = new RegExp(`^(.+)-${arm}-(\\d+)\\.jsonl$`);
-  return globSync(`traces/*-${arm}-*.jsonl`, { cwd: dir })
-    .flatMap((file) => {
-      const match = pattern.exec(basename(file));
-      return match?.[1] === undefined || match[2] === undefined
-        ? []
-        : [{ case: match[1], run: Number(match[2]), path: join(dir, file) }];
-    })
-    .toSorted((a, b) => a.run - b.run);
+  return listTraces(dir)
+    .filter((ref) => ref.arm === arm)
+    .map((ref) => ({ case: ref.case, run: ref.n, path: ref.path }));
 }
 
 /** A case's deliverable file as the fixture leaves it, from `<beforeDir>/<case>.md`. */

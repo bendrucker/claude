@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { parse } from "yaml";
+import { CaseFile } from "../../../../../packages/evals/layout";
 import { caseYaml, prompt, truth } from "./search-cases";
 
 const label = (tags: string[]) => ({
@@ -20,5 +22,9 @@ test("truth lists the sessions as keys and checks the search query was used", ()
 });
 
 test("case tags carry the label's split", () => {
-  expect(caseYaml(label(["holdout", "topical"]))).toContain("tags: [search, holdout, topical]");
+  expect(CaseFile.parse(parse(caseYaml(label(["holdout", "topical"])))).tags).toEqual([
+    "search",
+    "holdout",
+    "topical",
+  ]);
 });

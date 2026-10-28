@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
+import { serializeCase, writeCases } from "../../../../../packages/evals/cases";
 
 export const BUCKETS = ["skill", "grader", "reach", "floor"] as const;
 export type Bucket = (typeof BUCKETS)[number];
@@ -102,22 +103,23 @@ export function lastBucket(bucket: Bucket): string {
   return String.raw`${LINE}(?:${bucket})\b(?![\s\S]*${LINE}(?:${ANY})\b)`;
 }
 
+const SYSTEM =
+  "Nothing can be built or run in this session, and nobody answers while you work, so reply once. End the reply with one line naming the bucket: `Bucket: skill`, `Bucket: grader`, `Bucket: reach`, or `Bucket: floor`.";
+
 export function caseYaml(c: BucketCase): string {
-  return `${[
-    'schema_version: "1.1"',
-    `name: ${c.name}`,
-    `tags: [bucket, ${c.split}]`,
-    'plugins: ["../../.."]',
-    "execution:",
-    "  model: claude-sonnet-5-5",
-    "  max_turns: 4",
-    "  timeout_seconds: 300",
-    "  allowed_tools: [Skill]",
-    "  append_system_prompt: >-",
-    "    Nothing can be built or run in this session, and nobody answers while you",
-    "    work, so reply once. End the reply with one line naming the bucket:",
-    "    `Bucket: skill`, `Bucket: grader`, `Bucket: reach`, or `Bucket: floor`.",
-  ].join("\n")}\n`;
+  return serializeCase({
+    schema_version: "1.1",
+    name: c.name,
+    tags: ["bucket", c.split],
+    plugins: ["../../.."],
+    execution: {
+      model: "claude-sonnet-5-5",
+      max_turns: 4,
+      timeout_seconds: 300,
+      allowed_tools: ["Skill"],
+      append_system_prompt: SYSTEM,
+    },
+  });
 }
 
 export function graders(c: BucketCase): Record<string, string> {
@@ -158,11 +160,9 @@ export const program = new Command("gen-bucket.ts")
   .description("Write the case.yaml and graders of the hand-written bucket-* cases")
   .action(async () => {
     const suite = join(import.meta.dir, "..");
-    await Promise.all(
-      CASES.flatMap((c) =>
-        Object.entries(files(c)).map(([f, text]) => Bun.write(join(suite, f), text)),
-      ),
-    );
+    await writeCases(suite, Object.fromEntries(CASES.flatMap((c) => Object.entries(files(c)))), {
+      prefix: "bucket-",
+    });
     console.log(`wrote ${CASES.length} cases`);
   });
 

@@ -4,7 +4,8 @@ import { findAll } from "./findings";
 const categories = (findings: { category: string }[]) => findings.map((f) => f.category);
 
 describe("findAll", () => {
-  const body = "Hi team,\n\nThe parser now streams input.\n\nLet me know if you have questions.\n";
+  const body =
+    "The parser now streams input.\n\nWant me to add tests? Let me know if you'd like changes.\n";
 
   test("message rules appear only with message: true", async () => {
     const file = categories(await findAll(body, { filePath: "notes.md" }));

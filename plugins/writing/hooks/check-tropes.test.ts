@@ -110,7 +110,7 @@ describe("wordlist files", () => {
 
   it("does not skip non-wordlist .txt files", async () => {
     const result = await processInput(
-      mockWrite("delve into the data is the way forward.", "/tmp/notes.txt"),
+      mockWrite("This is a tool, not a framework.", "/tmp/notes.txt"),
     );
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
@@ -483,7 +483,7 @@ describe("Bash processInput", () => {
   it("flags Bash body-file with AI vocabulary as context", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trope-test-"));
     const file = join(dir, "body.md");
-    await Bun.write(file, "We must delve into the issue");
+    await Bun.write(file, "This is a tool, not a framework.");
     const result = await processInput(mockBash(`gh pr create --body-file ${file}`));
     await rm(dir, { recursive: true, force: true });
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
@@ -497,22 +497,22 @@ describe("Bash processInput", () => {
     }
   });
 
-  it("denies a review comment that opens with a vocative", async () => {
+  it("flags a review comment that opens with a vocative", async () => {
     const result = await processInput(
       mockBash(
         `glab mr note 871 --message "Dana, this fires for the entire run rather than the changed files."`,
       ),
     );
-    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
-  it("denies a body-file comment that opens with a greeting", async () => {
+  it("flags a body-file comment that opens with a greeting", async () => {
     const dir = mkdtempSync(join(tmpdir(), "trope-test-"));
     const file = join(dir, "body.md");
     await Bun.write(file, "Hi Dana,\n\nThe retry loop swallows the error.\n");
     const result = await processInput(mockBash(`gh pr review --body-file ${file}`));
     await rm(dir, { recursive: true, force: true });
-    expect(result?.hookSpecificOutput).toHaveProperty("permissionDecision", "deny");
+    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
   it("denies an MR body that negates the noun", async () => {
@@ -531,18 +531,6 @@ describe("Bash processInput", () => {
       mockBash(`glab mr note 871 --message "Otherwise, this looks right."`),
     );
     expect(result).toBeNull();
-  });
-
-  // A soft vocabulary deny is declared earlier in the catalog than the
-  // salutation. Selection by catalog order would report it and let the comment
-  // through with a reminder.
-  it("blocks on the salutation when a softer deny also matches", async () => {
-    const result = await processInput(
-      mockBash(`glab mr note 871 --message "Dana, we should delve into the retry budget."`),
-    );
-    const denial = denialOf(result);
-    expect(denial.decision).toBe("deny");
-    expect(denial.reason).toContain("salutation");
   });
 
   it("returns null for non-text Bash commands", async () => {

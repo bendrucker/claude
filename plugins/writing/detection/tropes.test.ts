@@ -72,162 +72,6 @@ describe("stripCode", () => {
 });
 
 describe("scan", () => {
-  describe("AI vocabulary", () => {
-    const words = [
-      "delve",
-      "tapestry",
-      "meticulous",
-      "meticulously",
-      "leverage",
-      "leveraged",
-      "robust",
-      "nuance",
-      "nuanced",
-    ];
-
-    it.each(words)('detects "%s"', async (word) => {
-      const deny = firstByTier(await scan(`The ${word} of the project`), "deny");
-      expect(deny?.category).toBe("AI vocabulary");
-    });
-
-    it.each(["```\ndelve into code\n```", "The `delve` function"])(
-      'ignores in code: "%s..."',
-      async (safe) => {
-        expect(firstByTier(await scan(safe), "deny")).toBeUndefined();
-      },
-    );
-  });
-
-  describe("copula avoidance", () => {
-    const deny = ["The module serves as the entry point", "This stands as a reminder"];
-    const allow = ["The restaurant serves food"];
-
-    it.each(deny)('flags: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "deny")?.category).toBe("copula avoidance");
-    });
-
-    it.each(allow)('allows: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "deny")).toBeUndefined();
-    });
-  });
-
-  describe("test result reporting", () => {
-    const shouldFlag = [
-      "All 8 tests pass. Now let me run the full test suite for this file:",
-      "All tests pass. Now create the skill and update the README.",
-      "All 35 tests pass. Let me also lint:",
-      "All 20 pass. Now verify against real data:",
-      "All 91 tests pass. Let me check if the code reviewer has finished.",
-      "Tests pass (46/46). The tsc errors are pre-existing.",
-      "All 45 tests pass. Let me also verify biome is clean.",
-      "All linting passes, marketplace check passes. Let me commit.",
-      "All hooks passed. Now push and create the draft PR.",
-      "Build passes. The fix is good.",
-      "Build passes too. Ready to commit.",
-      "Test passes, line 252 is covered, lint and format are clean.",
-      "All CI checks pass. Now let me update the Things todo.",
-      "PR #509 CI is now green.",
-      "Both PRs are green and ready for review.",
-      "CI passed. Now I'll update the Things todos.",
-      "Done. 54/57 succeeded, 3 failed. Let me check the failures.",
-      "All 12 tests pass (including the 2 new tool approval tests).",
-      "All 555 unit tests pass.",
-      "Typecheck passes. Server looks good.",
-      "Lint passed now. Let me get the test failure details.",
-      "Skill lint passes. The marketplace check failure is pre-existing.",
-      "All 25 pass. Let me also verify end-to-end:",
-      "All passing. Let me also run the full E2E suite:",
-      "3/3 passing on Sonnet 4.6.",
-      "0 errors from dispatch or launch.",
-      "Type checking passes (0 errors).",
-      "#202 rebased and pushed. Auto-merge is still enabled so it'll merge once CI passes.",
-      "Pushed and auto-merge enabled. It'll squash-merge once checks pass.",
-    ];
-
-    const shouldNotFlag = [
-      "Good, no conflicts. Now let me write the CI check script.",
-      "Now simplify all generators.",
-      "Let me find the actual test file and failing test names.",
-      "Let me check the CI workflow to see where to add the DuckDB CLI install.",
-      "The tests fail because processInput is now async.",
-      "Reproduced. Let me read the failing lines.",
-      "Let me check what test is failing at line 226:",
-      "Also need to add workflow_dispatch to the CI trigger.",
-      "Pushed. Now let me monitor CI.",
-      "Let me wait for CI and check the runs.",
-      "The push went through but CI hasn't triggered yet.",
-      "Now pass the icon from Part.tsx:",
-      "Let me look at the existing test pattern for dispatch_request mocking.",
-      "No changes. Now commit and push the fail-fast branch.",
-      "The template substitution works. Let me pass it via 1Password.",
-      "3 skipped locally, will run in CI. Ready to commit.",
-      "Tests cover the new validation logic.",
-      "Write a test for this function.",
-    ];
-
-    it.each(shouldFlag)('flags: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "context")?.category).toBe("test result reporting");
-    });
-
-    it.each(shouldNotFlag)('allows: "%s"', async (text) => {
-      expect(
-        (await scan(text)).find((m) => m.category === "test result reporting"),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("promotional language", () => {
-    const flag = ["The library boasts excellent performance", "A groundbreaking approach"];
-
-    it.each(flag)('flags: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "context")?.category).toBe("promotional language");
-    });
-  });
-
-  describe("no X needed brag", () => {
-    // The flag side is open-ended: these artifact nouns are not enumerated
-    // anywhere in the detector, proving it generalizes past a fixed list.
-    const flag = [
-      "Handlers are auto-discovered, no config needed.",
-      "It runs inline (no wrapper needed).",
-      "Spin it up with no docker needed.",
-      "Drop the file in place, no namespace required.",
-      "It reads the token directly, no auth needed.",
-    ];
-    const allow = [
-      "Reviewed the helper, no change needed.",
-      "No further action needed here.",
-      "Patch-ids matched, no rebase needed.",
-      "No adjustment needed, it scales on its own.",
-      "It is no longer needed.",
-      "There is no way the runtime needed that much memory.",
-    ];
-
-    it.each(flag)('flags: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "context")?.category).toBe("no X needed brag");
-    });
-
-    it.each(allow)("allows: %j", async (text) => {
-      expect((await scan(text)).find((m) => m.category === "no X needed brag")).toBeUndefined();
-    });
-  });
-
-  describe("parallelism", () => {
-    const flag = [
-      "It is not just fast, but also reliable",
-      "This not only improves speed, but reduces memory",
-    ];
-    const allow = ["Not just yet"];
-
-    it.each(flag)('flags: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "context")?.category).toBe("parallelism");
-    });
-
-    it.each(allow)('allows: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "context")).toBeUndefined();
-    });
-  });
-
   describe("connector density", () => {
     const semicolons =
       "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
@@ -375,6 +219,64 @@ describe("scan", () => {
     });
   });
 
+  it("returns empty for empty string", async () => {
+    expect(await scan("")).toHaveLength(0);
+  });
+
+  it("returns empty for clean prose", async () => {
+    expect(await scan("The function processes input and returns a result.")).toHaveLength(0);
+  });
+
+  describe("sycophantic opener", () => {
+    it("does not fire when openers.txt is empty", async () => {
+      expect(
+        (await scan("Excellent. That works.")).find((m) => m.category === "sycophantic opener"),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("skillOnly patterns stay out of the hook", () => {
+    it.each([
+      ["rides on", "The teardown rides on the normal end of a team."],
+      ["can bite", "A stale cache entry can bite at runtime."],
+      ["surface as verb", "The hook should surface the conflict to the user."],
+    ])("scan() does not report %s", async (category, text) => {
+      expect(
+        (await scan(text, "doc.md", "file")).find((m) => m.category === category),
+      ).toBeUndefined();
+    });
+  });
+});
+
+describe("firstByTier", () => {
+  it("finds first deny match", () => {
+    const matches: PatternMatch[] = [
+      { tier: "context", category: "test", matched: "x", message: "x", structural: false },
+      { tier: "deny", category: "test", matched: "y", message: "y", structural: false },
+    ];
+    expect(firstByTier(matches, "deny")?.matched).toBe("y");
+  });
+
+  it("returns undefined when tier not found", () => {
+    const matches: PatternMatch[] = [
+      { tier: "context", category: "test", matched: "x", message: "x", structural: false },
+    ];
+    expect(firstByTier(matches, "deny")).toBeUndefined();
+  });
+
+  describe("copula avoidance", () => {
+    const deny = ["The module serves as the entry point", "This stands as a reminder"];
+    const allow = ["The restaurant serves food"];
+
+    it.each(deny)('flags: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "deny")?.category).toBe("copula avoidance");
+    });
+
+    it.each(allow)('allows: "%s"', async (text) => {
+      expect(firstByTier(await scan(text), "deny")).toBeUndefined();
+    });
+  });
+
   describe("semicolon splice", () => {
     const twoSplices =
       "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.";
@@ -434,441 +336,5 @@ describe("scan", () => {
         (await scan(twoSplices, path)).find((m) => m.category === "semicolon splice"),
       ).toBeUndefined();
     });
-  });
-
-  it("returns all matches per tier", async () => {
-    const denyMatches = (await scan("This delve serves as a testament")).filter(
-      (m) => m.tier === "deny",
-    );
-    const categories = denyMatches.map((m) => m.category);
-    expect(categories).toContain("AI vocabulary");
-    expect(categories).toContain("copula avoidance");
-  });
-
-  it("returns empty for empty string", async () => {
-    expect(await scan("")).toHaveLength(0);
-  });
-
-  it("returns empty for clean prose", async () => {
-    expect(await scan("The function processes input and returns a result.")).toHaveLength(0);
-  });
-
-  describe("sycophantic opener", () => {
-    it("does not fire when openers.txt is empty", async () => {
-      expect(
-        (await scan("Excellent. That works.")).find((m) => m.category === "sycophantic opener"),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("sycophantic acknowledgment", () => {
-    it.each(["You're right, that was wrong.", "You're absolutely right about that."])(
-      "flags: %j",
-      async (text) => {
-        expect(firstByTier(await scan(text), "deny")?.category).toBe("sycophantic acknowledgment");
-      },
-    );
-
-    it("allows: turn right", async () => {
-      expect(
-        (await scan("Turn right at the corner.")).find(
-          (m) => m.category === "sycophantic acknowledgment",
-        ),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("reaching for", () => {
-    const flag = [
-      "Open a sibling pane rather than reaching for Bash.",
-      "Reach for the linter before the formatter.",
-    ];
-    it.each(flag)('flags: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "deny")?.category).toBe("reaching for");
-    });
-  });
-
-  describe("contrast not", () => {
-    const flag = [
-      "This is a tool, not a framework.",
-      "The goal is clarity, not perfection.",
-      "We want specificity, not abstraction.",
-      "It's a refactor, not a rewrite.",
-      "Focus on outcomes, not process.",
-      "Return an error, not an exception.",
-      "a command-line tool, not a library",
-    ];
-    const allow = [
-      "It is not the case that X.",
-      "not only X, but Y",
-      "a, not b",
-      "Not a framework, but a tool",
-      "Inline code: `foo, not bar`",
-      "```\nif err != nil, not ok\n```",
-    ];
-
-    it.each(flag)('flags: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "context")?.category).toBe("contrast not");
-    });
-
-    it.each(allow)("allows: %j", async (text) => {
-      expect((await scan(text)).find((m) => m.category === "contrast not")).toBeUndefined();
-    });
-  });
-
-  describe("passive PR summary", () => {
-    it("flags in markdown: 'is added'", async () => {
-      expect(
-        firstByTier(await scan("Retry logic is added to the HTTP client.", "pr.md"), "context")
-          ?.category,
-      ).toBe("passive PR summary");
-    });
-
-    it("flags in markdown: 'was refactored'", async () => {
-      expect(
-        firstByTier(await scan("The cache layer was refactored last week.", "pr.md"), "context")
-          ?.category,
-      ).toBe("passive PR summary");
-    });
-
-    it("skips in code files", async () => {
-      expect(
-        (await scan("retry logic is added to the http client", "index.ts")).find(
-          (m) => m.category === "passive PR summary",
-        ),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("tests cover preamble", () => {
-    it("flags: 'Tests cover ...'", async () => {
-      expect(
-        firstByTier(await scan("Tests cover error handling for malformed JSON."), "context")
-          ?.category,
-      ).toBe("tests cover preamble");
-    });
-
-    it("allows: 'Added tests covering ...'", async () => {
-      expect(
-        (await scan("Added tests covering the error handling for malformed JSON.")).find(
-          (m) => m.category === "tests cover preamble",
-        ),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("path bullet", () => {
-    it("flags in markdown", async () => {
-      expect(
-        firstByTier(await scan("- **src/foo.ts**: refactors the helper", "doc.md"), "context")
-          ?.category,
-      ).toBe("path bullet");
-    });
-
-    it("skips in code files", async () => {
-      expect(
-        (await scan("- **src/foo.ts**: refactors the helper", "index.ts")).find(
-          (m) => m.category === "path bullet",
-        ),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("trailing hedge", () => {
-    it("flags in markdown: 'regardless.' at line end", async () => {
-      expect(
-        firstByTier(
-          await scan("It keeps the running shells stale regardless.\nNext sentence.", "doc.md"),
-          "context",
-        )?.category,
-      ).toBe("trailing hedge");
-    });
-  });
-
-  describe("label bold", () => {
-    it("flags in markdown: '**Why:**' label", async () => {
-      expect(
-        firstByTier(await scan("**Why:** the diff is small", "doc.md"), "context")?.category,
-      ).toBe("label bold");
-    });
-
-    it("skips in code files", async () => {
-      expect(
-        (await scan("**Why:** the diff is small", "index.ts")).find(
-          (m) => m.category === "label bold",
-        ),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("hedging observation", () => {
-    it.each(["This looks like a regression.", "The fix appears to hold."])(
-      "flags: %j",
-      async (text) => {
-        expect(firstByTier(await scan(text), "context")?.category).toBe("hedging observation");
-      },
-    );
-  });
-
-  describe("filler", () => {
-    it.each(["Importantly, the test was skipped.", "In terms of latency, it improved."])(
-      "flags: %j",
-      async (text) => {
-        expect(firstByTier(await scan(text), "context")?.category).toBe("filler");
-      },
-    );
-
-    it("allows prose without filler markers", async () => {
-      expect(
-        (await scan("The cache starts cold.")).find((m) => m.category === "filler"),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("gravity markers", () => {
-    it.each<{ text: string; category: string | undefined }>([
-      { text: "The ordering here is load-bearing.", category: "load-bearing" },
-      { text: "Removing the check breaks the parser.", category: undefined },
-      { text: "The honest answer is the cache never worked.", category: "honest qualifier" },
-      { text: "The prefix keeps the test honest.", category: undefined },
-      { text: "Be honest about the coverage limits.", category: undefined },
-      { text: "Two things worth flagging before this merges.", category: "attention-flag worth" },
-      { text: "It's worth noting that the cache is cold.", category: "attention-flag worth" },
-      { text: "One caveat worth your attention.", category: "attention-flag worth" },
-      { text: "The refactor is worth doing before the freeze.", category: undefined },
-      { text: "The fix is worth confirming against staging.", category: undefined },
-    ])("$text -> $category", async ({ text, category }) => {
-      expect(firstByTier(await scan(text), "context")?.category).toBe(category);
-    });
-  });
-
-  describe("counted list lead-in", () => {
-    async function leadIn(text: string): Promise<PatternMatch | undefined> {
-      return (await scan(text)).find((m) => m.category === "counted list lead-in");
-    }
-
-    it.each([
-      "The global list keeps four:\n\n- a\n- b\n- c\n- d",
-      "Five notes:\n- a\n- b\n- c\n- d\n- e",
-      "It reads the following three files: `a.ts`, `b.ts`, and `c.ts`.",
-    ])("flags: %j", async (text) => {
-      expect(await leadIn(text)).toBeDefined();
-    });
-
-    it.each([
-      "The global list keeps:\n\n- a\n- b\n- c\n- d",
-      "Two notes:\n- a\n- b",
-      "Phase three: migrate the readers.",
-      "Four runs per arm:\n\n| Case | With |\n| --- | --- |\n| a | 1 |",
-      "The `three:` key is ignored.",
-    ])("allows: %j", async (text) => {
-      expect(await leadIn(text)).toBeUndefined();
-    });
-  });
-
-  describe("I understand", () => {
-    it("flags: 'I understand the issue'", async () => {
-      expect(firstByTier(await scan("I understand the issue."), "context")?.category).toBe(
-        "I understand",
-      );
-    });
-
-    it("allows: 'do you understand'", async () => {
-      expect(
-        (await scan("Do you understand the issue?")).find((m) => m.category === "I understand"),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("salutation", () => {
-    async function salutation(text: string): Promise<PatternMatch | undefined> {
-      return (await scan(text, undefined, "sideEffect")).find((m) => m.category === "salutation");
-    }
-
-    const addressed = [
-      "Dana, this fires for the entire run rather than the changed files.",
-      "Dana Reyes, the retry loop swallows the error.",
-      "Hi Dana,\n\nThe retry loop swallows the error.",
-      "Hey there,\n\nA few notes below.",
-      "Hello team, a few notes below.",
-      "Dear reviewer,\n\nA few notes below.",
-      "## Review\n\nDana, the retry loop swallows the error.",
-      "Dana,\nThe retry loop swallows the error.",
-    ];
-
-    it.each(addressed)("denies: %j", async (text) => {
-      const match = await salutation(text);
-      expect(match?.tier).toBe("deny");
-      expect(match?.structural).toBe(true);
-    });
-
-    const substantive = [
-      "Otherwise, this looks right.",
-      "Given the constraint, the second pass is redundant.",
-      "Nit, but the constant belongs next to its only caller.",
-      "Overall, the shape is right.",
-      "First, the constant is unused.",
-      "Ideally, the retry budget comes from config.",
-      "Naming, formatting, and tests all read fine.",
-      "Agreed, the second pass is redundant.",
-      "The retry loop swallows the error.",
-      "Question, does the sweep cover deleted files?",
-      "`Dana`, the identifier, is a fixture name.",
-      "Today, the sweep still walks every file.",
-      "Upstream, the API dropped the field.",
-      "Tests, then the docs.",
-    ];
-
-    it.each(substantive)("allows: %j", async (text) => {
-      expect(await salutation(text)).toBeUndefined();
-    });
-
-    it("ignores an address that is not on the opening line", async () => {
-      expect(
-        await salutation("The sweep is too broad.\n\nDana, it fires on every run."),
-      ).toBeUndefined();
-    });
-
-    it("skips file context", async () => {
-      expect(
-        (await scan("Dana, this fires for the entire run.", undefined, "file")).find(
-          (m) => m.category === "salutation",
-        ),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("sideEffectOnly scoping", () => {
-    const conversational = [
-      { text: "You're right about that.", category: "sycophantic acknowledgment" },
-      { text: "I understand the issue.", category: "I understand" },
-    ];
-
-    it.each(conversational)('fires without context: "$text"', async ({ text, category }) => {
-      expect((await scan(text)).find((m) => m.category === category)).toBeDefined();
-    });
-
-    it.each(conversational)('fires in sideEffect context: "$text"', async ({ text, category }) => {
-      expect(
-        (await scan(text, undefined, "sideEffect")).find((m) => m.category === category),
-      ).toBeDefined();
-    });
-
-    it.each(conversational)('skips in file context: "$text"', async ({ text, category }) => {
-      expect(
-        (await scan(text, undefined, "file")).find((m) => m.category === category),
-      ).toBeUndefined();
-    });
-
-    it("non-conversational patterns still fire in file context", async () => {
-      expect(
-        firstByTier(await scan("The tapestry of the project", undefined, "file"), "deny")?.category,
-      ).toBe("AI vocabulary");
-    });
-  });
-
-  describe("marketing verbs (weighted)", () => {
-    it("does not flag a single hit below threshold", async () => {
-      // empower is 2.5, below the 3.0 threshold on its own.
-      expect(
-        (await scan("This release empowers users.")).find((m) => m.category === "marketing verbs"),
-      ).toBeUndefined();
-    });
-
-    it("flags repeated high-weight hits", async () => {
-      // Two occurrences of empower (2.5 each) = 5.0, well above 3.0.
-      const text = "This empowers teams. That empowers customers.";
-      expect(firstByTier(await scan(text), "context")?.category).toBe("marketing verbs");
-    });
-  });
-
-  describe("flowery phrasing", () => {
-    const flag = [
-      "this keeps a single source of truth",
-      "the canonical sources of truth live here",
-      "stored as source-of-truth metadata",
-      "treat it as the Source Of Truth",
-      "added an escape hatch for power users",
-      "two escape hatches remain",
-      "the module is fully self-sufficient",
-      "the fixture is self sufficient",
-      "the assertion fails loudly on drift",
-      "it failed loudly during CI",
-    ];
-    const allow = [
-      "the truth about the data source is unclear",
-      "a hatch you can escape through",
-      "loudly proclaimed the failure",
-    ];
-    it.each(flag)("flags %j", async (text) => {
-      expect(firstByTier(await scan(text), "context")?.category).toBe("flowery phrasing");
-    });
-    it.each(allow)("allows %j", async (text) => {
-      expect((await scan(text)).find((m) => m.category === "flowery phrasing")).toBeUndefined();
-    });
-    it("does not fire in non-prose file context", async () => {
-      expect(
-        (await scan("a single source of truth", "module.ts", "file")).find(
-          (m) => m.category === "flowery phrasing",
-        ),
-      ).toBeUndefined();
-    });
-    it("fires in prose file context", async () => {
-      expect(
-        firstByTier(await scan("a single source of truth", "README.md", "file"), "context")
-          ?.category,
-      ).toBe("flowery phrasing");
-    });
-  });
-
-  describe("soft phrasing (weighted)", () => {
-    it("does not flag a lone soft word", async () => {
-      // cleanly is 1.5, below the 3.0 threshold on its own.
-      expect(
-        (await scan("the fixtures strip cleanly")).find((m) => m.category === "soft phrasing"),
-      ).toBeUndefined();
-    });
-
-    it("flags when soft words stack", async () => {
-      // Two occurrences of cleanly (1.5 each) = 3.0, at the threshold.
-      const text = "the migration runs cleanly and the tests strip cleanly";
-      expect(firstByTier(await scan(text), "context")?.category).toBe("soft phrasing");
-    });
-
-    it("does not fire in non-prose file context", async () => {
-      const text = "the migration runs cleanly and the tests strip cleanly";
-      expect(
-        (await scan(text, "module.ts", "file")).find((m) => m.category === "soft phrasing"),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("skillOnly patterns stay out of the hook", () => {
-    it.each([
-      ["rides on", "The teardown rides on the normal end of a team."],
-      ["can bite", "A stale cache entry can bite at runtime."],
-      ["surface as verb", "The hook should surface the conflict to the user."],
-    ])("scan() does not report %s", async (category, text) => {
-      expect(
-        (await scan(text, "doc.md", "file")).find((m) => m.category === category),
-      ).toBeUndefined();
-    });
-  });
-});
-
-describe("firstByTier", () => {
-  it("finds first deny match", () => {
-    const matches: PatternMatch[] = [
-      { tier: "context", category: "test", matched: "x", message: "x", structural: false },
-      { tier: "deny", category: "test", matched: "y", message: "y", structural: false },
-    ];
-    expect(firstByTier(matches, "deny")?.matched).toBe("y");
-  });
-
-  it("returns undefined when tier not found", () => {
-    const matches: PatternMatch[] = [
-      { tier: "context", category: "test", matched: "x", message: "x", structural: false },
-    ];
-    expect(firstByTier(matches, "deny")).toBeUndefined();
   });
 });

@@ -50,7 +50,7 @@ describe("scoreComments", () => {
     const src = "function f() {\n  // We reach for the helper here.\n  return 1;\n}\n";
     const group = await scoreComments(src, "src.ts");
     expect(group?.group).toBe("comments");
-    const reaching = group?.categories.find((c) => c.category === "reaching for");
+    const reaching = group?.categories.find((c) => c.category === "Writing.ReachingFor");
     expect(reaching?.hits).toBe(1);
   });
 
@@ -66,10 +66,10 @@ describe("buildReport", () => {
   });
 
   it("adds a comments group when comments are on", async () => {
-    const src = "function f() {\n  // We delve into the leverage here today.\n}\n";
+    const src = "function f() {\n  // We reach for the helper here today.\n}\n";
     const report = await buildReport(src, "src.ts", { comments: true });
     expect(report.groups.map((g) => g.group)).toContain("comments");
-    expect(category(report, "comments", "AI vocabulary")?.hits).toBeGreaterThan(0);
+    expect(category(report, "comments", "Writing.ReachingFor")?.hits).toBeGreaterThan(0);
   });
 
   it("applies the custom matcher to every group", async () => {

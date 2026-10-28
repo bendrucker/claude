@@ -43,7 +43,7 @@ describe("rewriteDraft", () => {
       makeDraft({ message: true, text: "Hi team,\n\nThe parser now streams input.\n" }),
       { model: "m", judgeModel: "j", query: fakeQuery("The parser now streams input.\n", prompts) },
     );
-    expect(result.before.map((f) => f.category)).toContain("salutation");
+    expect(result.before.map((f) => f.category)).toContain("Writing.Salutation");
   });
 });
 

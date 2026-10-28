@@ -53,7 +53,7 @@ describe("collectFiles and scanFiles", () => {
 
   beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), "writing-scan-"));
-    await Bun.write(join(dir, "dirty.md"), "We delve into a robust tapestry of ideas.\n");
+    await Bun.write(join(dir, "dirty.md"), "We reach for a tapestry of ideas.\n");
     await Bun.write(join(dir, "clean.md"), "The function reads input and writes output.\n");
     await Bun.write(join(dir, "code.ts"), "const serves = 1; // serves as nothing\n");
     mkdirSync(join(dir, "node_modules", "pkg"), { recursive: true });
@@ -85,7 +85,7 @@ describe("collectFiles and scanFiles", () => {
     const dirty = results.find((r) => r.path.endsWith("dirty.md"));
     expect(dirty).toBeDefined();
     const categories = dirty?.violations.map((v) => v.category) ?? [];
-    expect(categories).toContain("AI vocabulary");
+    expect(categories).toContain("Writing.ReachingFor");
     for (const v of dirty?.violations ?? []) {
       expect(v.line).toBeGreaterThanOrEqual(1);
       expect(v.col).toBeGreaterThanOrEqual(1);

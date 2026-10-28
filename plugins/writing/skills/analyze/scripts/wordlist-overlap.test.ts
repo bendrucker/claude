@@ -98,7 +98,7 @@ describe("coverageOf", () => {
   test("a skill-only detector still counts as coverage", async () => {
     expect(
       (await coverageOf("rides", "The retry path rides on the same socket.")).categories,
-    ).toContain("rides on");
+    ).toContain("Writing.RidesOn");
   });
 
   test("an empty example cannot trip a sentence-level detector", async () => {

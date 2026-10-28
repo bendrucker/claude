@@ -25,8 +25,14 @@ export type ValeAlert = z.infer<typeof Alert>;
 /** Old TS categories whose Vale replacement has landed, keyed old name to Vale check. */
 export const CATEGORY_ALIASES: Readonly<Record<string, string>> = aliases;
 
+const RETIRED_CATEGORIES: ReadonlySet<string> = new Set([
+  "honest qualifier",
+  "backtick path bullet",
+  "tricolon",
+]);
+
 export function isPorted(category: string): boolean {
-  return Object.hasOwn(CATEGORY_ALIASES, category);
+  return Object.hasOwn(CATEGORY_ALIASES, category) || RETIRED_CATEGORIES.has(category);
 }
 
 export function tierOfSeverity(severity: ValeSeverity): PatternTier | undefined {

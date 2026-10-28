@@ -55,15 +55,15 @@ function contextOf(output: SyncHookJSONOutput | null): string | undefined {
 
 describe("every finding in one output", () => {
   it("lists advisory findings inside a structural deny", async () => {
-    const command = 'gh pr create --body "Hi team, this matches nothing. We must delve into it."';
+    const command = 'gh pr create --body "Hi team, this matches nothing. We must reach for it."';
     const { output, log } = await dispatch(mockInput("Bash", { command }));
     expect(log.outcome).toBe("deny");
     expect(log.emitted).toContain("no-negation");
-    expect(log.emitted).toContain("salutation");
+    expect(log.emitted).toContain("Writing.Salutation");
     const specific = output?.hookSpecificOutput;
     const reason =
       specific?.hookEventName === "PreToolUse" ? specific.permissionDecisionReason : undefined;
-    expect(reason).toContain("delve");
+    expect(reason).toContain("reach");
   });
 
   it("reports each checker's findings in a single injection", async () => {
@@ -96,6 +96,25 @@ describe("every finding in one output", () => {
     `);
   });
 
+  it.each<{ name: string; file_path: string; content: string; flagged: boolean }>([
+    {
+      name: "a shell string",
+      file_path: "scripts/run.sh",
+      content: 'echo "a — b"\n',
+      flagged: false,
+    },
+    {
+      name: "a shell comment",
+      file_path: "scripts/run.sh",
+      content: "# a — b\necho ok\n",
+      flagged: true,
+    },
+    { name: "a YAML value", file_path: "conf/app.yaml", content: "title: a — b\n", flagged: false },
+  ])("lints only the comments of $name", async ({ file_path, content, flagged }) => {
+    const { log } = await dispatch(mockInput("Write", { file_path, content }));
+    expect((log.categories ?? []).includes("Writing.SpacedEmDash")).toBe(flagged);
+  });
+
   it("falls through to later checkers when earlier ones are silent", async () => {
     const { output, log } = await dispatch(
       mockInput("Write", { file_path: "docs/draft.md", content: "This — is bad\n" }),
@@ -124,7 +143,7 @@ describe("code files", () => {
         content: "// All 8 tests pass\nconst x = 1;\n",
       }),
     );
-    expect(contextOf(output)).toContain('"All 8 tests pass"');
+    expect(contextOf(output)).toContain("'All 8 tests pass'");
   });
 
   it("scans block comments, not just single-line ones", async () => {
@@ -248,24 +267,24 @@ describe("scratch paths", () => {
   it("still scans scratch content at the Bash egress surface", async () => {
     const dir = mkdtempSync(join(tmpdir(), "dispatch-egress-"));
     const bodyFile = join(dir, "pr-body.md");
-    await Bun.write(bodyFile, "We must delve into the issue");
+    await Bun.write(bodyFile, "This is a tool, not a framework.");
     const { output, log } = await dispatch(
       mockInput("Bash", { command: `gh pr create --body-file ${bodyFile}` }),
     );
     await rm(dir, { recursive: true, force: true });
-    expect(contextOf(output)).toContain("delve");
+    expect(contextOf(output)).toContain("not a framework");
     expect(log.outcome).toBe("context");
   });
 
   it("scans gh api field-file egress", async () => {
     const dir = mkdtempSync(join(tmpdir(), "dispatch-egress-"));
     const replyFile = join(dir, "reply.md");
-    await Bun.write(replyFile, "We must delve into the issue");
+    await Bun.write(replyFile, "This is a tool, not a framework.");
     const { output } = await dispatch(
       mockInput("Bash", { command: `gh api repos/x/issues/1/comments -F body=@${replyFile}` }),
     );
     await rm(dir, { recursive: true, force: true });
-    expect(contextOf(output)).toContain("delve");
+    expect(contextOf(output)).toContain("not a framework");
   });
 });
 

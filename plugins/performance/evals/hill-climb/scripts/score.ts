@@ -36,7 +36,7 @@ export async function scoreResults(suite: string, results: string): Promise<Resu
     const truth = CaseTruth.parse(await truthFile.json());
     const profile = await Bun.file(join(suite, ref.case, truth.profile)).text();
     const reply = traceReply(await Bun.file(ref.path).text()) ?? "";
-    return [{ ...ref, run: scoreReply(reply, truth, profile) }];
+    return [{ ...ref, run: { ...scoreReply(reply, truth, profile), trace: ref.path } }];
   });
   const cases: Record<string, Record<string, { n: number; run: ScoredRun }[]>> = {};
   for (const { case: name, arm, n, run } of (await Promise.all(scored)).flat()) {

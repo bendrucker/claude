@@ -1,7 +1,7 @@
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { $ } from "bun";
 import type { Adapter, Transcript } from "../adapter";
-import { listTraces, resultPath, scoredDir, tracePath } from "../layout";
+import { listTraces, resultPath, tracePath } from "../layout";
 import { regrade } from "../regrade";
 import { erroredRuns, readResult } from "../result";
 import { collectTraces, keepCases, pluginErrors, prepare, sessionEnv, splitCases } from "../run";
@@ -16,10 +16,6 @@ async function measure(path: string): Promise<Measured> {
 
 /** A results directory, from itself or the `aggregate-result.json` inside it. */
 const resultsDir = (path: string) => (path.endsWith(".json") ? dirname(path) : path);
-
-/** The directory holding a result's traces. A post-scorer's `scored/` result reads its parent's. */
-const tracesOwner = (dir: string) =>
-  dirname(dir) !== dir && scoredDir(dirname(dir)) === dir ? dirname(dir) : dir;
 
 /** `claude plugin eval`: `aggregate-result.json` plus a `traces/` transcript per run. */
 export const native: Adapter = {
@@ -100,7 +96,7 @@ export const native: Adapter = {
     const keyed = result.cases.flatMap((c) =>
       Object.entries(c.arms).map(async ([arm, runs]) => {
         const measured = await Promise.all(
-          runs.map((_, i) => measure(tracePath(tracesOwner(dirname(path)), c.name, arm, i))),
+          runs.map((_, i) => measure(tracePath(dirname(path), c.name, arm, i))),
         );
         return [`${c.name}/${arm}`, measured] as const;
       }),

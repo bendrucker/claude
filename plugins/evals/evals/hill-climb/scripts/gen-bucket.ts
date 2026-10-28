@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
-import { serializeCase, writeCases } from "../../../../../packages/evals/cases";
+import { serializeCase } from "../../../../../packages/evals/cases";
 
 export const BUCKETS = ["skill", "grader", "reach", "floor"] as const;
 export type Bucket = (typeof BUCKETS)[number];
@@ -160,9 +160,11 @@ export const program = new Command("gen-bucket.ts")
   .description("Write the case.yaml and graders of the hand-written bucket-* cases")
   .action(async () => {
     const suite = join(import.meta.dir, "..");
-    await writeCases(suite, Object.fromEntries(CASES.flatMap((c) => Object.entries(files(c)))), {
-      prefix: "bucket-",
-    });
+    await Promise.all(
+      CASES.flatMap((c) =>
+        Object.entries(files(c)).map(([f, text]) => Bun.write(join(suite, f), text)),
+      ),
+    );
     console.log(`wrote ${CASES.length} cases`);
   });
 

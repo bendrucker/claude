@@ -88,6 +88,8 @@ export interface ScoredRun {
   metrics?: Record<string, number> | undefined;
   /** The run's final reply, written as its trace so `compare.ts` counts its words. */
   reply?: string | undefined;
+  /** A source trace to copy as the run's trace, in place of `reply`. */
+  trace?: string | undefined;
   error?: string | undefined;
 }
 
@@ -108,7 +110,9 @@ export async function writeResult(
       Object.entries(arms).map(([arm, runs]) => [
         arm,
         runs.map((r, i): Run => {
-          if (r.reply !== undefined) {
+          if (r.trace !== undefined) {
+            traces.push(Bun.write(tracePath(dir, name, arm, i), Bun.file(r.trace)));
+          } else if (r.reply !== undefined) {
             const line = JSON.stringify({ type: "result", result: r.reply });
             traces.push(Bun.write(tracePath(dir, name, arm, i), line));
           }

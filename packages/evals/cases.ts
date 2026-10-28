@@ -33,7 +33,7 @@ export async function writeCases(
       const path = join(suite, f);
       const file = Bun.file(path);
       if ((await file.exists()) && (await file.text()) === text) return undefined;
-      const tmp = `${path}.${process.pid}.tmp`;
+      const tmp = `${path}.${crypto.randomUUID()}.tmp`;
       await Bun.write(tmp, text);
       await $`mv ${tmp} ${path}`;
       return f;

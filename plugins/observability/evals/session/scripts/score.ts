@@ -158,6 +158,7 @@ export interface Scored extends Process {
   case: string;
   arm: string;
   n: number;
+  trace: string;
   recall: number;
   precision: number;
 }
@@ -178,6 +179,7 @@ export async function scoreResults(results: string, index: string): Promise<Scor
         case: name,
         arm,
         n,
+        trace: ref.path,
         ...overlap(traceReply(trace) ?? "", truth),
         ...processOf(trace, truth.reference),
       },
@@ -192,6 +194,7 @@ export async function writeScored(results: string, scored: Scored[]): Promise<vo
   for (const s of scored.toSorted((a, b) => a.n - b.n)) {
     ((cases[s.case] ??= {})[s.arm] ??= []).push({
       score: (s.recall + s.precision) / 2,
+      trace: s.trace,
       graders: [
         { name: "recall", passed: s.recall === 1 },
         { name: "precision", passed: s.precision === 1 },

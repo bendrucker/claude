@@ -33,7 +33,7 @@ const WorktreeState = z.looseObject({
 function gitCommonDir(dir: string): string | null {
   const result = Bun.spawnSync(
     ["git", "-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir"],
-    { stdout: "pipe", stderr: "ignore" },
+    { env: process.env, stdout: "pipe", stderr: "ignore" },
   );
   if (result.exitCode !== 0) return null;
   return realpath(result.stdout.toString().trim());

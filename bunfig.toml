@@ -1,4 +1,5 @@
 [test]
+preload = ["./scripts/test-preload.ts"]
 # Eval examples hold snippets a grader reads, not tests to run.
 # Mod tests import claude-code/testing and run under `claude plugin test`.
 pathIgnorePatterns = ["**/evals/**/examples/**", "plugins/*/mod/**"]

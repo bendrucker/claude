@@ -447,10 +447,7 @@ export async function sweep(
 export function levelLines(rows: SweepRow[]): string[] {
   return rows
     .filter((row) => row.check.startsWith("ai-tells.") && row.level !== "error")
-    .map(
-      (row) =>
-        `# lift ${row.lift}, ${row.voice}/1k on the baseline, ${row.drafts}/1k in drafts\n${row.check} = ${row.level}`,
-    );
+    .map((row) => `${row.check} = ${row.level}`);
 }
 
 function ratio({ flagged, total }: { flagged: number; total: number }): string {

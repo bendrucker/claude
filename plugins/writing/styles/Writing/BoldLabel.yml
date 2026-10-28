@@ -2,6 +2,7 @@
 # retire when: the model reliably uses headings instead, or the pattern fires on user-authored markdown at a high rate.
 extends: existence
 message: "'**%s**' is a bold label. Use a heading, or fold the label into the sentence."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/BoldLabel.yml
 level: error
 scope: strong
 nonword: true

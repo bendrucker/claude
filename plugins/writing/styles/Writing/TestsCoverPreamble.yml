@@ -2,6 +2,7 @@
 # retire when: the opener stops appearing in deliverable prose, or corrective-feedback moments stop citing it.
 extends: existence
 message: "'%s' elides the subject. Use 'Added tests covering ...' or describe the change."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/TestsCoverPreamble.yml
 level: warning
 nonword: true
 tokens:

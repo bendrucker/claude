@@ -2,6 +2,7 @@
 # retire when: a later corpus pass shows the frame rate collapsed, or a chat-voice rewrite pass absorbs it.
 extends: existence
 message: "'%s' is a transition marker that defers the substance. Say what you learned or what changed."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/FullPicture.yml
 level: warning
 ignorecase: true
 tokens:

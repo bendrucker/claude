@@ -2,6 +2,7 @@
 # retire when: model headings stop carrying predicates.
 extends: existence
 message: "This heading reads like a sentence. Cut it to the noun phrase that names the topic, and move the explanation into the section's first sentence."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/SentenceHeading.yml
 level: warning
 scope: heading
 ignorecase: true

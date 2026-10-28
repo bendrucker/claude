@@ -4,6 +4,7 @@
 #   analysis shows the pattern no longer appears in assistant output.
 extends: existence
 message: "'%s' is a hedging close. State the next step directly."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/HedgingClose.yml
 level: warning
 ignorecase: true
 tokens:

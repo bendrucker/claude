@@ -2,6 +2,7 @@
 # retire when: model output stops numbering sections.
 extends: existence
 message: "'%s' numbers a step. Name the section for what it covers."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/StepHeading.yml
 level: warning
 scope: heading
 ignorecase: true

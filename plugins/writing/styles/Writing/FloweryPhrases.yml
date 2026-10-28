@@ -2,6 +2,7 @@
 # retire when: an entry is dead on the deliverable surface or not distinctive versus the voice baseline. Remove that entry.
 extends: existence
 message: "'%s' is stock phrasing the model reaches for. State the mechanism plainly."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/FloweryPhrases.yml
 level: error
 ignorecase: true
 tokens:

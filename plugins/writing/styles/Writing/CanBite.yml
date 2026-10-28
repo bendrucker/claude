@@ -2,6 +2,7 @@
 # retire when: a chat-voice corpus pass shows the construction is not distinctive versus the user baseline.
 extends: existence
 message: "'%s' is figurative risk language for a latent bug. Name the failure: what breaks, and under what condition."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/CanBite.yml
 level: warning
 ignorecase: true
 tokens:

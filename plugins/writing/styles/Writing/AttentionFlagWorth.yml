@@ -2,6 +2,7 @@
 # retire when: the frame rate falls to the typed-user baseline in a corpus audit window, or a labeling pass shows the frame mostly precedes genuinely optional asides.
 extends: existence
 message: "'%s' announces that a point matters instead of making it. Cut the wrapper and state the point."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/AttentionFlagWorth.yml
 level: error
 ignorecase: true
 tokens:

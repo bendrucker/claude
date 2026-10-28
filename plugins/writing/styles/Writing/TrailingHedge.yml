@@ -2,6 +2,7 @@
 # retire when: corpus analysis shows the pattern fires on user text at comparable rates.
 extends: existence
 message: "'%s' dangles at sentence end as AI hedging. Drop it or rewrite the clause."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/TrailingHedge.yml
 level: warning
 ignorecase: true
 nonword: true

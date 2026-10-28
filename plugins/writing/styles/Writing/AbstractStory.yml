@@ -2,6 +2,7 @@
 # retire when: head nouns stop appearing in corpus audits, the frame stops recurring in chat output, or the list needs constant extension.
 extends: existence
 message: "'%s' dresses up a plain referent. Name the thing: the rollback plan, the cleanup path, the error handling."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/AbstractStory.yml
 level: warning
 ignorecase: true
 tokens:

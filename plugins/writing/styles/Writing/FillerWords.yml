@@ -2,6 +2,7 @@
 # retire when: a per-entry corpus audit shows an entry lacks distinctiveness. Remove or migrate that entry.
 extends: existence
 message: "'%s' is filler. Cut it."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/FillerWords.yml
 level: warning
 ignorecase: true
 tokens:

@@ -2,6 +2,7 @@
 # retire when: a chat-voice corpus pass shows the construction is not distinctive versus the user baseline.
 extends: existence
 message: "'%s' is figurative dependency language. State the relationship plainly: 'X depends on Y', 'X reuses Y', or 'X piggybacks on Y'."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/RidesOn.yml
 level: error
 ignorecase: true
 tokens:

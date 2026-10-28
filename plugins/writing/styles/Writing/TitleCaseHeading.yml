@@ -2,6 +2,7 @@
 # retire when: the user's style moves to sentence-case headings.
 extends: capitalization
 message: "'%s' should be in AP title case."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/TitleCaseHeading.yml
 level: warning
 scope: heading
 match: $title

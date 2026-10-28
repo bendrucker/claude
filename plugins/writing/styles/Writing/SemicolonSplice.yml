@@ -2,6 +2,7 @@
 # retire when: the deliverable splice rate sits at or below the hand-written baseline for 30 days, or a labeling pass shows precision below the hook bar.
 extends: occurrence
 message: "A semicolon joins independent clauses here, the em-dash run-on respelled. Split it into two sentences rather than swapping connectors."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/SemicolonSplice.yml
 level: warning
 scope: paragraph
 max: 1

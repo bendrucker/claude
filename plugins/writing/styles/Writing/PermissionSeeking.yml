@@ -4,6 +4,7 @@
 #   permission-seeking phrases shift to a different form.
 extends: existence
 message: "'%s' reads as permission-seeking. Just do it, or describe options."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/PermissionSeeking.yml
 level: warning
 ignorecase: true
 tokens:

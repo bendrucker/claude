@@ -2,6 +2,7 @@
 # retire when: precision is low on a labeled corpus sample, or the pattern fires heavily on user text.
 extends: existence
 message: "'%s' is a rhetorical 'X, not Y' contrast. State the positive directly."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/ContrastNot.yml
 level: warning
 ignorecase: true
 nonword: true

@@ -2,6 +2,7 @@
 # retire when: the no-form share sits at the human voice baseline for 30 days, or the run log shows blocked side effects that are false positives.
 extends: sequence
 message: "This puts the negation on the noun. Negate the verb with a contraction ('doesn't cost an extra query', 'doesn't add anything'), or use a positive term that names the state exactly ('a no-op', 'unchanged')."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/NoNegation.yml
 level: error
 scope: ~table
 # The indefinite is case-sensitive: capitalized, it opens the sentence as a subject.

@@ -2,6 +2,7 @@
 # retire when: the deliverable-surface rule-health check shows the entry dead or not distinctive versus the voice baseline.
 extends: occurrence
 message: "Soft phrasing piles up. These read as filler. Describe what the code does plainly."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/SoftPhrasing.yml
 level: warning
 scope: paragraph
 ignorecase: true

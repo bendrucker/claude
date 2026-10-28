@@ -2,6 +2,7 @@
 # retire when: a word that is a status report starts producing false nudges (add it to the exceptions), or the construction stops appearing in assistant deliverables and corrective feedback.
 extends: existence
 message: "'%s' advertises what the design avoids. Describe what it does instead."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/NoXNeededBrag.yml
 level: warning
 ignorecase: true
 exceptions:

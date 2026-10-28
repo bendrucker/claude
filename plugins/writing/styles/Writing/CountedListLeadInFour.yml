@@ -2,6 +2,7 @@
 # retire when: the assistant rate for counts of three and up falls to the voice baseline, or a labeling pass shows most hits are not list lead-ins.
 extends: existence
 message: "A count in the lead-in repeats what the list shows. Drop the number: 'keeps:' rather than 'keeps four:'."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/CountedListLeadInFour.yml
 level: warning
 # A paragraph followed by a list of exactly 4 items.
 scope: 'doc(p:has(+ ul:has(> li:nth-child(4):last-child)), p:has(+ ol:has(> li:nth-child(4):last-child)))'

@@ -2,6 +2,7 @@
 # retire when: the draft rate falls to the voice baseline, or a labeling pass shows most hits are plain facts about a state that changes.
 extends: existence
 message: "'%s' asserts a state. For a requirement, say so with 'should': 'should be synchronous' rather than 'stays synchronous'. Otherwise say what happens."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/StateAssertion.yml
 level: warning
 ignorecase: true
 nonword: true

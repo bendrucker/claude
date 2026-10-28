@@ -4,6 +4,7 @@
 #   individual inflections that stop appearing in assistant output.
 extends: existence
 message: "'%s' is exploration filler. Describe what you're actually looking at."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/DigInto.yml
 level: warning
 ignorecase: true
 tokens:

@@ -4,6 +4,7 @@
 #   its conditionality guidance.
 extends: metric
 message: "pull-request:create scopes ## Changes and ## Testing sections to larger changes. Length tracks substance. A short body with the full section template is over-structured. Use prose instead."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/TemplateOnSmallDocument.yml
 level: warning
 formula: words
 condition: "< 150"

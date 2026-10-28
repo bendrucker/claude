@@ -4,6 +4,7 @@
 #   hand-written baseline.
 extends: existence
 message: "'%s' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/ConsequenceChain.yml
 level: warning
 nonword: true
 ignorecase: true

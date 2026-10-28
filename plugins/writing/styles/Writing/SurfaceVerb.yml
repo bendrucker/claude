@@ -2,6 +2,7 @@
 # retire when: a sense-aware corpus pass shows the verb usage isn't distinctive against the user baseline.
 extends: existence
 message: "'%s' uses 'surface' as a verb meaning reveal or report. Say 'show', 'report', or 'expose'."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/SurfaceVerb.yml
 level: warning
 ignorecase: true
 tokens:

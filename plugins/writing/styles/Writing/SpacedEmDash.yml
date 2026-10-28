@@ -4,6 +4,7 @@
 #   or the pattern stops appearing in corrective-feedback moments.
 extends: existence
 message: "Spaced em dashes ( — ) are an AI writing tell. Split the clauses into two sentences. Do not substitute a semicolon or unspaced em dash: the run-on structure is the problem, not the mark."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/SpacedEmDash.yml
 level: error
 nonword: true
 tokens:

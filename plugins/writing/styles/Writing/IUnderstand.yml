@@ -2,6 +2,7 @@
 # retire when: corrective-feedback moments stop citing sycophantic preambles, or the phrase stops appearing in assistant output.
 extends: existence
 message: "'%s' is a sycophantic preamble. Move to the substance."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/IUnderstand.yml
 level: warning
 ignorecase: true
 tokens:

@@ -2,6 +2,7 @@
 # retire when: corrective-feedback moments stop citing result-reporting language, or the model stops producing it in deliverables.
 extends: existence
 message: "'%s' reports a test result, count, or CI status. Describe what is covered instead."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/TestResultReporting.yml
 level: error
 ignorecase: true
 exceptions:

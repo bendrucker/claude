@@ -2,6 +2,7 @@
 # retire when: corpus analysis shows the phrase at low lift, or corrective-feedback moments stop citing it.
 extends: existence
 message: "'%s' is an AI-flavored figurative construction. Prefer 'use' or 'prefer X over Y'."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/ReachingFor.yml
 level: error
 ignorecase: true
 tokens:

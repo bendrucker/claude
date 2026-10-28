@@ -2,6 +2,7 @@
 # retire when: the rule-health table shows the verb dead or not distinctive versus the voice baseline. Lower the limit if the pattern stops firing.
 extends: occurrence
 message: "Marketing verbs stack up. Describe concretely what changed instead of promotional framing."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/MarketingVerbs.yml
 level: warning
 scope: paragraph
 ignorecase: true

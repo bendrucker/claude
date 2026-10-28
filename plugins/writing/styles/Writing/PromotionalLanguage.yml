@@ -2,6 +2,7 @@
 # retire when: a corpus audit shows an entry lacks lift or is dead. Remove that entry.
 extends: existence
 message: "'%s' reads as promotional AI language. Consider a more neutral word."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/PromotionalLanguage.yml
 level: warning
 ignorecase: true
 tokens:

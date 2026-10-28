@@ -2,6 +2,7 @@
 # retire when: ai-tells.SemicolonUsage matches a clause-final splice with no terminal punctuation.
 extends: existence
 message: "'%s' joins two clauses with a semicolon. Split the comment into two sentences."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/CommentSplice.yml
 level: warning
 scope: comment
 nonword: true

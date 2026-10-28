@@ -1,0 +1,68 @@
+# evidence: 2026-09 session-corpus measurement. On shared verbs assistant chat picks the no-form 4.4:1 against the human's 2.7:1, and PR bodies reach 10:1. The governing verbs are an open set and the tagger often reads them as nouns, so the rule excludes closed classes and have/be predication (Tottie 1991) rather than requiring a verb tag. A tagger that reads the next verb as a noun lets an indefinite subject through ("work nobody performs").
+# retire when: the no-form share sits at the human voice baseline for 30 days, or the run log shows blocked side effects that are false positives.
+extends: sequence
+message: "This puts the negation on the noun. Negate the verb with a contraction ('doesn't cost an extra query', 'doesn't add anything'), or use a positive term that names the state exactly ('a no-op', 'unchanged')."
+level: error
+scope: ~table
+# The indefinite is case-sensitive: capitalized, it opens the sentence as a subject.
+tokens:
+  - pattern: '(?i)has|have|had|having|there|is|are|was|were|be|been|being|am|\||—|–|-|’s|''s'
+    tag: 'DT|PDT|PRP|PRP\$|IN|CC|MD|RB|RBR|RBS|RP|CD|TO|WDT|WP|WP\$|WRB|EX|POS|UH|SYM|LS|,|\.|:|\(|\)'
+    negate: true
+  - pattern: no|nothing|nobody|nowhere|none|neither
+  - pattern: '(?i)longer|more|further|less|fewer|later|sooner|doubt|matter|way|wonder|different|better|worse|greater|bigger|smaller|larger|shorter|faster|slower|higher|lower|closer|earlier|wider|narrower|easier|harder|cheaper|safer|stronger|weaker|small'
+    tag: 'VB|VBD|VBP|VBZ|MD'
+    negate: true
+tests:
+  - name: positives
+    about: open-class governors, including ones the tagger reads as nouns
+    input: |
+      The wrapper adds nothing to the default path.
+
+      The tooltip surface holds no controls.
+
+      The audit found no defects in the queue.
+
+      Report no findings when the queue drains clean.
+
+      The retry path returns none.
+
+      That leaves no one to answer the page.
+    want: |
+      1:13:Writing.NoNegation:This puts the negation on the noun. Negate the verb with a contraction ('doesn't cost an extra query', 'doesn't add anything'), or use a positive term that names the state exactly ('a no-op', 'unchanged').
+      3:21:Writing.NoNegation:This puts the negation on the noun. Negate the verb with a contraction ('doesn't cost an extra query', 'doesn't add anything'), or use a positive term that names the state exactly ('a no-op', 'unchanged').
+      5:11:Writing.NoNegation:This puts the negation on the noun. Negate the verb with a contraction ('doesn't cost an extra query', 'doesn't add anything'), or use a positive term that names the state exactly ('a no-op', 'unchanged').
+      7:1:Writing.NoNegation:This puts the negation on the noun. Negate the verb with a contraction ('doesn't cost an extra query', 'doesn't add anything'), or use a positive term that names the state exactly ('a no-op', 'unchanged').
+      9:16:Writing.NoNegation:This puts the negation on the noun. Negate the verb with a contraction ('doesn't cost an extra query', 'doesn't add anything'), or use a positive term that names the state exactly ('a no-op', 'unchanged').
+      11:6:Writing.NoNegation:This puts the negation on the noun. Negate the verb with a contraction ('doesn't cost an extra query', 'doesn't add anything'), or use a positive term that names the state exactly ('a no-op', 'unchanged').
+  - name: negatives
+    about: have/be predication, sentence-initial subjects, idioms, clause breaks, and the not-form
+    input: |
+      The build has no tests.
+
+      There is no lock on the guard.
+
+      Nothing changes when the flag is off.
+
+      The list no longer needs an entry.
+
+      It doesn't add anything the default lacks.
+
+      The queue drains, and nothing else moves.
+
+      Draining the queue is no small thing.
+
+      A null here means nothing is archived under the window.
+
+      The VM has 3.9 GB of RAM, no swap.
+
+      The cap stays at its default (no cap).
+
+      When the Mac hangs, nothing records the processes.
+
+      | repo | cd |
+      | --- | --- |
+      | `app` | none (no cd) |
+
+      The run had one stage — no services.
+    want: ""

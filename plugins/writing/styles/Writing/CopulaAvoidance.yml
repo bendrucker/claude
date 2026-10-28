@@ -1,0 +1,25 @@
+# evidence: pre-dates the curation principle, with no corpus evidence recorded. Kept because the construction is consistently wrong in practice.
+# retire when: corrective feedback stops citing it, or corpus spot-checks show it flagging legitimate usage.
+extends: existence
+message: "'%s' avoids a simple copula. Use 'is' or 'are' instead."
+level: error
+ignorecase: true
+tokens:
+  - '(?:serves|stands) as'
+tests:
+  - name: positives
+    about: both verbs
+    input: |
+      The module serves as the entry point.
+
+      This stands as a reminder.
+    want: |
+      1:12:Writing.CopulaAvoidance:'serves as' avoids a simple copula. Use 'is' or 'are' instead.
+      3:6:Writing.CopulaAvoidance:'stands as' avoids a simple copula. Use 'is' or 'are' instead.
+  - name: negatives
+    about: the verbs with an object or a place
+    input: |
+      The restaurant serves food.
+
+      She stands at the podium.
+    want: ""

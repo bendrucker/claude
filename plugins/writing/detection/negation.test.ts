@@ -116,7 +116,7 @@ describe("noNegationHits", () => {
   it("reports one scan result per construction", async () => {
     const text = "The wrapper adds nothing, holds no controls, and leaves no one to page.";
     const categories = (await scanAll(text, "notes.md")).map((result) => result.category);
-    expect(categories.filter((category) => category === "no-negation")).toHaveLength(3);
+    expect(categories.filter((category) => category === "Writing.NoNegation")).toHaveLength(3);
   });
 
   it("never flags an excluded governing word", async () => {

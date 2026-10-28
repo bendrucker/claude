@@ -525,7 +525,7 @@ describe("Bash processInput", () => {
     );
     const denial = denialOf(result);
     expect(denial.decision).toBe("deny");
-    expect(denial.reason).toContain("costs no extra");
+    expect(denial.reason).toContain("Writing.NoNegation");
   });
 
   it("allows a comment that opens with a connective", async () => {
@@ -552,7 +552,7 @@ describe("MCP calls", () => {
     );
     const denial = denialOf(result);
     expect(denial.decision).toBe("deny");
-    expect(denial.reason).toContain("costs no extra");
+    expect(denial.reason).toContain("Writing.NoNegation");
   });
 
   it("denies a thread reply that negates the noun", async () => {

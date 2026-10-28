@@ -33,5 +33,10 @@
   "template on small document": "Writing.TemplateOnSmallDocument",
   "test result reporting": "Writing.TestResultReporting",
   "tests cover preamble": "Writing.TestsCoverPreamble",
-  "trailing hedge": "Writing.TrailingHedge"
+  "trailing hedge": "Writing.TrailingHedge",
+  "semicolon splice": "Writing.SemicolonSplice",
+  "surface as verb": "Writing.SurfaceVerb",
+  "copula avoidance": "Writing.CopulaAvoidance",
+  "no-negation": "Writing.NoNegation",
+  "connector density": "Writing.ConnectorDensity"
 }

@@ -41,21 +41,21 @@ describe("scanAll", () => {
   test.each<[string, string | undefined, boolean]>([
     ["applies fileOnly patterns for prose files", "notes.md", true],
     ["skips fileOnly patterns for non-prose files", "script.ts", false],
-    ["applies fileOnly patterns when no path is given", undefined, true],
+    ["skips file-only rules when no path reads the text as a message", undefined, false],
   ])("%s", async (_name, path, contains) => {
     const categories = (await scanAll(dense, path)).map((r) => r.category);
     contains
-      ? expect(categories).toContain("connector density")
-      : expect(categories).not.toContain("connector density");
+      ? expect(categories).toContain("Writing.ConnectorDensity")
+      : expect(categories).not.toContain("Writing.ConnectorDensity");
   });
 
   it("reports the position of the connector density sample", async () => {
     const match = (await scanAll(dense, "notes.md")).find(
-      (r) => r.category === "connector density",
+      (r) => r.category === "Writing.ConnectorDensity",
     );
     expect(match).toBeDefined();
     expect(match?.line).toBe(1);
-    expect(match?.col).toBe(2);
+    expect(match?.col).toBe(22);
   });
 
   it("does not report sideEffectOnly patterns", async () => {
@@ -97,7 +97,7 @@ describe("scanAll", () => {
   it.each([
     ["Writing.RidesOn", "The teardown rides on the normal end of a team."],
     ["Writing.CanBite", "A stale cache entry can bite at runtime."],
-    ["surface as verb", "The hook should surface the conflict to the user."],
+    ["Writing.SurfaceVerb", "The hook should surface the conflict to the user."],
   ])("reports the skillOnly %s pattern", async (category, text) => {
     expect((await scanAll(text, "doc.md")).map((r) => r.category)).toContain(category);
   });

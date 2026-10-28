@@ -58,7 +58,7 @@ describe("every finding in one output", () => {
     const command = 'gh pr create --body "Hi team, this matches nothing. We must reach for it."';
     const { output, log } = await dispatch(mockInput("Bash", { command }));
     expect(log.outcome).toBe("deny");
-    expect(log.emitted).toContain("no-negation");
+    expect(log.emitted).toContain("Writing.NoNegation");
     expect(log.emitted).toContain("Writing.Salutation");
     const specific = output?.hookSpecificOutput;
     const reason =
@@ -413,7 +413,7 @@ describe("deferred dependencies", () => {
       "prose with an indefinite",
       "Write",
       { file_path: "docs/a.md", content: "It adds nothing.\n" },
-      ["compromise"],
+      [],
     ],
     ["a code edit", "Edit", { file_path: "src/a.ts", old_string: "1", new_string: "2" }, ["shiki"]],
   ])("%s", (_name, tool, toolInput, expected) => {

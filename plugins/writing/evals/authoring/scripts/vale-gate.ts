@@ -11,6 +11,7 @@ import {
   CATEGORY_ALIASES,
   VALE_CONFIG,
   type ValeAlert,
+  type ValeSource,
   valeAlerts,
   valeBinary,
 } from "../../../detection/vale";
@@ -92,9 +93,9 @@ export let skippedUnits = 0;
 
 // A unit opening with a `---` line parses as front matter and fails without
 // naming a rule file. A broken rule names its file and still throws.
-async function lint(text: string): Promise<ValeAlert[]> {
+async function lintAs(text: string, source: ValeSource): Promise<ValeAlert[]> {
   try {
-    return await valeAlerts(text, { kind: "body" }, { strict: true });
+    return await valeAlerts(text, source, { strict: true });
   } catch (error) {
     if (error instanceof Error && error.message.includes('"Path": ""')) {
       skippedUnits++;
@@ -102,6 +103,24 @@ async function lint(text: string): Promise<ValeAlert[]> {
     }
     throw error;
   }
+}
+
+// Each check is read under the config section the hook would apply: a
+// message-only category's check from a message body, every other from a file.
+async function lint(text: string): Promise<ValeAlert[]> {
+  const messageChecks = new Set(
+    PATTERNS.filter((pattern) => pattern.sideEffectOnly).map((pattern) =>
+      checkOf(pattern.category),
+    ),
+  );
+  const [file, body] = await Promise.all([
+    lintAs(text, { filePath: "/nonexistent/unit.md" }),
+    lintAs(text, { kind: "body" }),
+  ]);
+  return [
+    ...file.filter((alert) => !messageChecks.has(alert.Check)),
+    ...body.filter((alert) => messageChecks.has(alert.Check)),
+  ];
 }
 
 async function flags(text: string, check: string): Promise<boolean> {

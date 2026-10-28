@@ -1,0 +1,71 @@
+# evidence: 2026-07 session-history analysis found semicolon clause-joins at a high rate in assistant deliverables after the em dash ban, the run-on habit relocated rather than fixed. Two splices in a document fire, so short texts below the connector-density gate are covered, and a lone semicolon never fires.
+# retire when: the deliverable splice rate sits at or below the hand-written baseline for 30 days, or a labeling pass shows precision below the hook bar.
+extends: script
+message: "A semicolon joins independent clauses here, the em-dash run-on respelled. Split it into two sentences rather than swapping connectors."
+level: warning
+scope: raw
+script: |
+  text := import("text")
+  matches := []
+
+  // Sentences split as the TS engine does: at [.!?] before whitespace unless a digit
+  // precedes, and at every newline. Code and HTML entities are masked to keep offsets.
+  sentences := []
+  pos := 0
+  fenced := false
+  for _, line in text.split(scope, "\n") {
+    start := pos
+    pos += len(line) + 1
+    if text.re_match(`^\s*(\x60{3}|~{3})`, line) {
+      fenced = !fenced
+      continue
+    }
+    trimmed := text.trim_space(line)
+    if fenced || trimmed == "" || text.has_prefix(trimmed, "|") || text.re_match(`^#{1,6}\s`, trimmed) { continue }
+    masked := line
+    for _, span in text.re_find(`\x60[^\x60]*\x60`, line, -1) {
+      masked = text.replace(masked, span[0].text, text.repeat("_", len(span[0].text)), 1)
+    }
+    for _, span in text.re_find(`&#?\w+;`, masked, -1) {
+      masked = text.replace(masked, span[0].text, text.repeat("_", len(span[0].text)), 1)
+    }
+    last := 0
+    cuts := text.re_find(`[.!?]+(\s|$)`, masked, -1)
+    if cuts == undefined { cuts = [] }
+    for _, cut in cuts {
+      at := cut[0].begin
+      if at > 0 && text.re_match(`\d`, masked[at - 1:at]) { continue }
+      sentences = append(sentences, {begin: start + last, body: masked[last:at], item: last == 0 && text.re_match(`^\s*([-*+]|\d+[.)])\s`, masked)})
+      last = cut[0].end
+    }
+    sentences = append(sentences, {begin: start + last, body: masked[last:], item: last == 0 && text.re_match(`^\s*([-*+]|\d+[.)])\s`, masked)})
+  }
+
+  spliced := []
+  for _, sentence in sentences {
+    if sentence.item { continue }
+    found := text.re_find(`[a-zA-Z]; [a-zA-Z]`, sentence.body)
+    if found != undefined { spliced = append(spliced, sentence.begin + found[0][0].begin + 1) }
+  }
+  if len(spliced) >= 2 { matches = append(matches, {begin: spliced[0], end: spliced[0] + 1}) }
+tests:
+  - name: positives
+    about: two splices in short prose
+    input: |
+      The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.
+    want: |
+      1:22:Writing.SemicolonSplice:A semicolon joins independent clauses here, the em-dash run-on respelled. Split it into two sentences rather than swapping connectors.
+  - name: negatives
+    about: one splice, list items, digit-led references, and code
+    input: |
+      The cache starts cold; the first request fills it. The retry logic backs off.
+
+      - compile the sources; link the objects
+      - package the build; ship the artifact
+
+      The count was 2; see below. Run `a; b` first.
+
+      ```sh
+      cd src; make
+      ```
+    want: ""

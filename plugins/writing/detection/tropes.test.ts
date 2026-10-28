@@ -72,153 +72,6 @@ describe("stripCode", () => {
 });
 
 describe("scan", () => {
-  describe("connector density", () => {
-    const semicolons =
-      "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
-    const emDashes =
-      "The cache starts cold—the first request fills it. The retry logic backs off—later attempts succeed. The parser rejects malformed input—it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
-    const mixed =
-      "The cache starts cold; the first request fills it. The retry logic backs off—later attempts succeed. The parser rejects malformed input - it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
-    const hyphen =
-      "The cache starts cold - the first request fills it. The retry logic backs off - later attempts succeed. The parser rejects malformed input - it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
-
-    it.each([
-      ["semicolons", semicolons],
-      ["unspaced em dashes", emDashes],
-      ["mixed connectors", mixed],
-      ["letter-flanked hyphens", hyphen],
-    ] as const)("flags %s", async (_name, text) => {
-      expect(firstByTier(await scan(text), "context")?.category).toBe("connector density");
-    });
-
-    it("fires at exactly 30% density (3 of 10)", async () => {
-      const text =
-        "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input; it errors. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely.";
-      expect(firstByTier(await scan(text), "context")?.category).toBe("connector density");
-    });
-
-    it("does not fire below MIN_CONNECTOR_SENTENCES (2 of 10)", async () => {
-      const text =
-        "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input and errors. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely.";
-      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
-    });
-
-    it("does not fire below MIN_SENTENCES (4 all connectored)", async () => {
-      const text =
-        "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input; it errors. The server validates; it stops.";
-      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
-    });
-
-    it("does not fire below density threshold (3 of 11, 27%)", async () => {
-      const text =
-        "The cache starts cold; it fills later. The retry logic backs off; it succeeds. The parser rejects input; it errors. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely. The cron schedules the task.";
-      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
-    });
-
-    it("does not fire on one semicolon list among clean sentences", async () => {
-      const text =
-        "The build depends on three steps; compile; link; package. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day. The metric updates often. The alert fires rarely. The cron schedules the task. The cache warms slowly.";
-      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
-    });
-
-    it("does not fire on a numeric range", async () => {
-      const text =
-        "The project ran from 2024 - 2025 without issues. The server validates each field. The client sends a token. The job runs nightly. The worker drains the queue. The log rotates each day.";
-      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
-    });
-
-    it("does not fire on markdown table rows alone", async () => {
-      const text = [
-        "| col a | col b | col c |",
-        "| --- | --- | --- |",
-        "| x; y | a; b | p; q |",
-        "| m; n | c; d | r; s |",
-        "| e; f | g; h | i; j |",
-        "| k; l | u; v | w; z |",
-      ].join("\n");
-      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
-    });
-
-    it("does not fire on a two-sentence text", async () => {
-      const text = "The cache starts cold; it fills later. The retry logic backs off; it succeeds.";
-      expect((await scan(text)).find((m) => m.category === "connector density")).toBeUndefined();
-    });
-
-    it("does not fire on a definition bullet list", async () => {
-      const text = [
-        "- **jxa** — JXA language guide for automation",
-        "- **jxa-run** — App-scoped JXA runner with validation",
-        "- **sandbox** — Detects Go binaries and disables the sandbox",
-        "- **shortcut** — Author shortcuts as plain text",
-        "- **xcall** — Send x-callback-url requests",
-        "- **tmux** — Layout awareness and pane management",
-      ].join("\n");
-      expect(
-        (await scan(text, "README.md")).find((m) => m.category === "connector density"),
-      ).toBeUndefined();
-    });
-
-    it("does not fire on a numbered definition list", async () => {
-      const text = [
-        "1. Flowchart — nodes and edges here",
-        "2. Sequence — participants and messages",
-        "3. State — states and transitions here",
-        "4. ER — entities and relationships here",
-        "5. Class — members and methods here",
-        "6. Gantt — tasks and milestones here",
-      ].join("\n");
-      expect(
-        (await scan(text, "doc.md")).find((m) => m.category === "connector density"),
-      ).toBeUndefined();
-    });
-
-    it("does not fire on reference-link bullets with periods in the path", async () => {
-      const text = [
-        "- [Flowchart](./references/flowchart.md) — Nodes, edges, subgraphs, direction",
-        "- [Sequence](./references/sequence.md) — Participants, messages, activations",
-        "- [State](./references/state.md) — States, transitions, composite states",
-        "- [ER](./references/er.md) — Entities, relationships, cardinality",
-        "- [Class](./references/class.md) — Classes, members, relationships",
-        "- [Gantt](./references/gantt.md) — Tasks, sections, milestones",
-      ].join("\n");
-      expect(
-        (await scan(text, "SKILL.md")).find((m) => m.category === "connector density"),
-      ).toBeUndefined();
-    });
-
-    it("does not fire on headings with hyphen subtitles", async () => {
-      const text = [
-        "## Flowchart - Basic",
-        "## Flowchart - Unclosed Bracket",
-        "## Sequence - Simple",
-        "## State - Composite",
-        "## ER - Cardinality",
-        "## Class - Inheritance",
-      ].join("\n");
-      expect(
-        (await scan(text, "doc.md")).find((m) => m.category === "connector density"),
-      ).toBeUndefined();
-    });
-
-    it("detects in prose files", async () => {
-      expect(firstByTier(await scan(semicolons, "doc.md"), "context")?.category).toBe(
-        "connector density",
-      );
-    });
-
-    it("applies when no path is given", async () => {
-      expect(firstByTier(await scan(semicolons, undefined), "context")?.category).toBe(
-        "connector density",
-      );
-    });
-
-    it.each(["script.sh", "index.ts", "style.css"])("skips in %s", async (path) => {
-      expect(
-        (await scan(semicolons, path)).find((m) => m.category === "connector density"),
-      ).toBeUndefined();
-    });
-  });
-
   it("returns empty for empty string", async () => {
     expect(await scan("")).toHaveLength(0);
   });
@@ -264,19 +117,6 @@ describe("firstByTier", () => {
     expect(firstByTier(matches, "deny")).toBeUndefined();
   });
 
-  describe("copula avoidance", () => {
-    const deny = ["The module serves as the entry point", "This stands as a reminder"];
-    const allow = ["The restaurant serves food"];
-
-    it.each(deny)('flags: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "deny")?.category).toBe("copula avoidance");
-    });
-
-    it.each(allow)('allows: "%s"', async (text) => {
-      expect(firstByTier(await scan(text), "deny")).toBeUndefined();
-    });
-  });
-
   describe("semicolon splice", () => {
     const twoSplices =
       "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.";
@@ -315,20 +155,10 @@ describe("firstByTier", () => {
       expect(semicolonSpliceHits(text, min).count).toBe(count);
     });
 
-    it("flags two splices in short prose below the density gate", async () => {
-      expect((await scan(twoSplices)).find((m) => m.category === "semicolon splice")).toBeDefined();
-    });
-
     it("stays silent on a single splice in prose", async () => {
       expect(
         (await scan(oneSplice)).find((m) => m.category === "semicolon splice"),
       ).toBeUndefined();
-    });
-
-    it("detects in prose files", async () => {
-      expect(
-        (await scan(twoSplices, "doc.md")).find((m) => m.category === "semicolon splice"),
-      ).toBeDefined();
     });
 
     it.each(["script.sh", "index.ts"])("skips in %s", async (path) => {

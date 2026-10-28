@@ -1,0 +1,78 @@
+# evidence: pre-dates the curation principle, with no corpus evidence recorded. The 30% density threshold was set by hand to spare definition-list bullets.
+# retire when: corpus analysis shows it fires heavily on the user's own text, or a labeling pass shows precision below the hook bar.
+extends: script
+message: "Many sentences here fuse independent clauses with semicolons or dashes. Split each into two sentences. Swapping one connector for another is not a fix."
+level: warning
+scope: raw
+script: |
+  text := import("text")
+  matches := []
+
+  // Sentences split as the TS engine does: at [.!?] before whitespace unless a digit
+  // precedes, and at every newline. Code and HTML entities are masked to keep offsets.
+  sentences := []
+  pos := 0
+  fenced := false
+  for _, line in text.split(scope, "\n") {
+    start := pos
+    pos += len(line) + 1
+    if text.re_match(`^\s*(\x60{3}|~{3})`, line) {
+      fenced = !fenced
+      continue
+    }
+    trimmed := text.trim_space(line)
+    if fenced || trimmed == "" || text.has_prefix(trimmed, "|") || text.re_match(`^#{1,6}\s`, trimmed) { continue }
+    masked := line
+    for _, span in text.re_find(`\x60[^\x60]*\x60`, line, -1) {
+      masked = text.replace(masked, span[0].text, text.repeat("_", len(span[0].text)), 1)
+    }
+    for _, span in text.re_find(`&#?\w+;`, masked, -1) {
+      masked = text.replace(masked, span[0].text, text.repeat("_", len(span[0].text)), 1)
+    }
+    last := 0
+    cuts := text.re_find(`[.!?]+(\s|$)`, masked, -1)
+    if cuts == undefined { cuts = [] }
+    for _, cut in cuts {
+      at := cut[0].begin
+      if at > 0 && text.re_match(`\d`, masked[at - 1:at]) { continue }
+      sentences = append(sentences, {begin: start + last, body: masked[last:at], item: last == 0 && text.re_match(`^\s*([-*+]|\d+[.)])\s`, masked)})
+      last = cut[0].end
+    }
+    sentences = append(sentences, {begin: start + last, body: masked[last:], item: last == 0 && text.re_match(`^\s*([-*+]|\d+[.)])\s`, masked)})
+  }
+
+  // A dash in a list item usually glosses a label, so only a semicolon counts there.
+  long := 0
+  connected := []
+  for _, sentence in sentences {
+    if len(text.fields(sentence.body)) < 4 { continue }
+    long++
+    pattern := `;|—|[A-Za-z] [-–] [A-Za-z]`
+    if sentence.item { pattern = `;` }
+    found := text.re_find(pattern, sentence.body)
+    if found == undefined { continue }
+    at := found[0][0].begin
+    if len(found[0][0].text) > 3 { at += 2 }
+    connected = append(connected, sentence.begin + at)
+  }
+  if long >= 5 && len(connected) >= 3 && len(connected) * 10 >= long * 3 {
+    matches = append(matches, {begin: connected[0], end: connected[0] + 1})
+  }
+tests:
+  - name: positives
+    about: three semicolon joins among six sentences
+    input: |
+      The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.
+    want: |
+      1:22:Writing.ConnectorDensity:Many sentences here fuse independent clauses with semicolons or dashes. Split each into two sentences. Swapping one connector for another is not a fix.
+  - name: negatives
+    about: too few sentences, no connectors, and dashes that gloss list labels
+    input: |
+      The cache starts cold. The first request fills it. The retry logic backs off.
+
+      - **cache** — holds the warm entries for reuse
+      - **queue** — orders the pending jobs by age
+      - **lock** — guards the shared index from writers
+      - **log** — records each request as it lands
+      - **pool** — keeps idle connections open for later
+    want: ""

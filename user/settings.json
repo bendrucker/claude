@@ -104,6 +104,15 @@
             "type": "command"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/bin/sh -c 'rex __internal session-start --agent claude 2>/dev/null || true'",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [
@@ -303,6 +312,7 @@
       "allowUnixSockets": [
         "~/Library/Containers/com.maxgoedjen.Secretive.SecretAgent/Data/socket.ssh",
         "~/.config/herdr/herdr.sock",
+        "~/Library/Application Support/rex/server.sock",
         "~/.local/state/vm",
         "~/.docker/run/docker.sock",
         "/tmp/claude"

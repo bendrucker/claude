@@ -4,6 +4,9 @@
 # contents. claude-upgrade reinstalls it after every sync, so the deployed clone
 # always carries the installed herdr's version without git tracking a vendor file.
 user/hooks/herdr-agent-state.sh
+# `rex skill setup` writes this through the ~/.claude/skills symlink and owns it.
+# claude-sync reruns setup after every sync.
+user/skills/rex/
 .prek/
 node_modules/
 .DS_Store

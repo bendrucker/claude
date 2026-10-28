@@ -11,7 +11,7 @@ Why each sandbox grant and hook exists, and what would retire it, is in [`docs/s
 
 ## Layers
 
-`managed/settings.json` loads on every platform as managed settings. Put an entry there only when it is right in a remote session too, because a lower scope cannot remove a list entry or hook it adds, and its scalars outrank project settings and `/config`. Everything else stays in `user/settings.json`, the local machines' user file, where `/plugin`, moshi, and herdr write and `claude-sync` reads plugin declarations. Remote-only entries go in `platforms/remote/settings.json`.
+`managed/settings.json` loads on every platform as managed settings. Put an entry there only when it is right in a remote session too, because a lower scope cannot remove a list entry or hook it adds, and its scalars outrank project settings and `/config`. Everything else stays in `user/settings.json`, the local machines' user file, where `/plugin`, moshi, herdr, and Rex write and `claude-sync` reads plugin declarations. Remote-only entries go in `platforms/remote/settings.json`.
 
 ## Permission Paths
 

@@ -19,4 +19,8 @@ The [claude topic](https://github.com/bendrucker/dotfiles/tree/main/claude) in d
 
 The `SessionStart` entry that runs it is committed in `settings.json` in `$HOME` form. herdr's installer matches its own entry by exact command string, so it cannot recognize that form and appends a duplicate absolute-path entry on every install. `claude-upgrade` discards that edit. herdr's status check reads only the script's version marker, so the discarded edit costs nothing.
 
+## Rex
+
+`rex skill setup` owns `skills/rex/` and the `rex __internal session-start` entry in `settings.json`. `claude-sync` in dotfiles reruns it after every sync. The skill path is gitignored, so setup's write leaves the deployed clone clean, and a fresh clone has no Rex skill until that runs. The hook entry is committed, because `settings.json` is tracked and a sync would drop an entry that lived only in the deployed copy. Setup finds the committed entry current and leaves the file alone. A Rex release that changes the entry dirties the deployed clone, which stops the next `claude-sync` at its gate. Commit setup's new entry then.
+
 `bun scripts/check-hook-paths.ts` fails if a hook command in either settings file points at a `~/.claude/` or `$CLAUDE_PROJECT_DIR/` path this repo does not ship. That catches a hook path outliving the script it named. The herdr script is exempt because its installer ships it.

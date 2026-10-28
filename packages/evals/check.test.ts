@@ -149,7 +149,7 @@ test.each<{ body: string; expected: string[] }>([
 
 /** Every tracked suite directory, as the parent of a directory holding a `case.yaml`. */
 function trackedSuites(root: string): Set<string> {
-  const listed = Bun.spawnSync(["git", "ls-files", "*/case.yaml"], { cwd: root });
+  const listed = Bun.spawnSync(["git", "ls-files", "*/case.yaml"], { cwd: root, env: process.env });
   return new Set(
     listed.stdout
       .toString()

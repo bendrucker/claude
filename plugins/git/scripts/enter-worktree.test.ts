@@ -12,7 +12,11 @@ import {
 } from "./enter-worktree";
 
 function git(cwd: string, ...args: string[]): void {
-  const result = Bun.spawnSync(["git", "-C", cwd, ...args], { stdout: "ignore", stderr: "pipe" });
+  const result = Bun.spawnSync(["git", "-C", cwd, ...args], {
+    env: process.env,
+    stdout: "ignore",
+    stderr: "pipe",
+  });
   if (result.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${result.stderr.toString()}`);
 }
 

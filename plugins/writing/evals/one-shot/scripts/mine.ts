@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { z } from "zod";
-import { type ScanResult, scanAll } from "../../../detection/scan";
+import { lintProse, type ValeAlert } from "../../../detection/vale";
 import { getExtension, isMarkdownFile } from "../../../detection/paths";
 import {
   getDataDir,
@@ -55,7 +55,7 @@ export interface Payload {
 export interface Draft extends Omit<Payload, "session" | "target"> {
   id: string;
   split: "dev" | "holdout";
-  findings: ScanResult[];
+  findings: ValeAlert[];
 }
 
 const words = (text: string) => text.split(/\s+/).filter(Boolean).length;
@@ -113,17 +113,17 @@ export function firstDrafts(payloads: Payload[]): Payload[] {
 }
 
 /**
- * Up to `perCategory` drafts for each category, in id order, so a rare rule
+ * Up to `perCheck` drafts for each check, in id order, so a rare rule
  * gets drafts beside the common ones.
  */
-export function sample(drafts: Draft[], perCategory: number): Draft[] {
+export function sample(drafts: Draft[], perCheck: number): Draft[] {
   const counts = new Map<string, number>();
   const chosen: Draft[] = [];
   for (const draft of drafts.toSorted((a, b) => a.id.localeCompare(b.id))) {
-    const categories = new Set(draft.findings.map((finding) => finding.category));
-    if (![...categories].some((category) => (counts.get(category) ?? 0) < perCategory)) continue;
+    const checks = new Set(draft.findings.map((finding) => finding.Check));
+    if (![...checks].some((check) => (counts.get(check) ?? 0) < perCheck)) continue;
     chosen.push(draft);
-    for (const category of categories) counts.set(category, (counts.get(category) ?? 0) + 1);
+    for (const check of checks) counts.set(check, (counts.get(check) ?? 0) + 1);
   }
   return chosen;
 }
@@ -155,7 +155,7 @@ async function egressHosts(): Promise<string[]> {
 
 async function toDraft(payload: Payload): Promise<Draft> {
   const id = idOf(payload.text);
-  const findings = await scanAll(payload.text, payload.message ? undefined : payload.target, {
+  const findings = await lintProse(payload.text, payload.message ? undefined : payload.target, {
     message: payload.message,
   });
   const { session: _session, target: _target, ...rest } = payload;
@@ -172,7 +172,7 @@ const program = new Command()
   .name("mine")
   .description("Collect hook-visible drafts that trip at least one writing rule.")
   .option("--since <date>", "earliest tool call to read", "2026-01-01")
-  .option("--per-category <n>", "drafts kept per finding category", positive, 15)
+  .option("--per-check <n>", "drafts kept per Vale check", positive, 15)
   .option("--out <file>", "output JSONL", join(import.meta.dirname, "..", "data", "drafts.jsonl"))
   .action(async (options) => {
     const hosts = await egressHosts();
@@ -185,7 +185,7 @@ const program = new Command()
     const drafts = (await Promise.all(payloads.map(toDraft))).filter(
       (draft) => draft.findings.length > 0,
     );
-    const chosen = sample(drafts, options.perCategory);
+    const chosen = sample(drafts, options.perCheck);
     await mkdir(join(options.out, ".."), { recursive: true });
     await Bun.write(options.out, `${chosen.map((draft) => JSON.stringify(draft)).join("\n")}\n`);
     console.error(

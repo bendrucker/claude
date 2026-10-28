@@ -3,7 +3,7 @@ import type { RunLogEntry } from "../../../hooks/run-log";
 import {
   type Acceptance,
   acceptance,
-  type CategoryHealth,
+  type CheckHealth,
   type HookHealth,
   opportunities,
   parseLog,
@@ -39,22 +39,37 @@ describe("parseLog", () => {
       JSON.stringify(entry()),
       '{"ts":"2026-07-01T00:00:00.000Z","session_id":"s1","tool":"Wr',
       "",
-      JSON.stringify(entry({ outcome: "context", category: "numbering" })),
+      JSON.stringify(entry({ outcome: "context", check: "numbering" })),
     ].join("\n");
     const entries = parseLog(text);
     expect(entries).toHaveLength(2);
-    expect(entries[1]?.category).toBe("numbering");
+    expect(entries[1]?.check).toBe("numbering");
+  });
+
+  it("reads the category keys entries carried before the Vale port", () => {
+    const { check: _, ...base } = entry();
+    const legacy = {
+      ...base,
+      category: "numbering",
+      categories: ["numbering"],
+      suppressed_categories: [],
+    };
+    expect(parseLog(JSON.stringify(legacy))[0]).toMatchObject({
+      check: "numbering",
+      checks: ["numbering"],
+      suppressed_checks: [],
+    });
   });
 });
 
 describe("summarize", () => {
-  it("aggregates outcomes, tools, categories, and latency", () => {
+  it("aggregates outcomes, tools, checks, and latency", () => {
     const health = summarize([
       entry({ duration_ms: 2 }),
       entry({ duration_ms: 4, tool: "Bash", ext: "" }),
-      entry({ outcome: "context", category: "numbering", duration_ms: 10 }),
-      entry({ outcome: "silent", category: "numbering", suppressed: true, duration_ms: 1 }),
-      entry({ outcome: "deny", category: "spaced em dash", duration_ms: 20 }),
+      entry({ outcome: "context", check: "numbering", duration_ms: 10 }),
+      entry({ outcome: "silent", check: "numbering", suppressed: true, duration_ms: 1 }),
+      entry({ outcome: "deny", check: "spaced em dash", duration_ms: 20 }),
       entry({ outcome: "skipped-scratch", duration_ms: 0 }),
     ]);
 
@@ -63,9 +78,9 @@ describe("summarize", () => {
     expect(health.byOutcome.context).toBe(1);
     expect(health.byOutcome["skipped-scratch"]).toBe(1);
     expect(health.byTool.Bash).toBe(1);
-    expect(health.categories).toEqual([
+    expect(health.checks).toEqual([
       {
-        category: "numbering",
+        check: "numbering",
         fired: 1,
         suppressed: 1,
         share: 0.5,
@@ -74,7 +89,7 @@ describe("summarize", () => {
         unconfirmed: 0,
       },
       {
-        category: "spaced em dash",
+        check: "spaced em dash",
         fired: 1,
         suppressed: 0,
         share: 0.5,
@@ -87,28 +102,28 @@ describe("summarize", () => {
     expect(health.latency.silentP95).toBe(4);
   });
 
-  it("counts each category a multi-finding run emitted or suppressed", () => {
+  it("counts each check a multi-finding run emitted or suppressed", () => {
     const health = summarize([
       entry({
         outcome: "context",
-        category: "filler",
+        check: "filler",
         emitted: ["filler", "spaced em dash"],
-        suppressed_categories: ["numbering"],
+        suppressed_checks: ["numbering"],
       }),
     ]);
     expect(
-      health.categories.map(({ category, fired, suppressed }) => ({ category, fired, suppressed })),
+      health.checks.map(({ check, fired, suppressed }) => ({ check, fired, suppressed })),
     ).toEqual([
-      { category: "filler", fired: 1, suppressed: 0 },
-      { category: "spaced em dash", fired: 1, suppressed: 0 },
-      { category: "numbering", fired: 0, suppressed: 1 },
+      { check: "filler", fired: 1, suppressed: 0 },
+      { check: "spaced em dash", fired: 1, suppressed: 0 },
+      { check: "numbering", fired: 0, suppressed: 1 },
     ]);
   });
 });
 
 describe("acceptance", () => {
   function shown(overrides: Partial<RunLogEntry> = {}): RunLogEntry {
-    return entry({ outcome: "context", category: "numbering", target: "f1", ...overrides });
+    return entry({ outcome: "context", check: "numbering", target: "f1", ...overrides });
   }
 
   const actedOn: Acceptance = { revisited: 1, accepted: 1, unconfirmed: 0 };
@@ -118,45 +133,45 @@ describe("acceptance", () => {
   test.each<{ name: string; entries: RunLogEntry[]; expected: Record<string, Acceptance> }>([
     {
       name: "a whole-file re-scan that no longer raises the rule counts as acted on",
-      entries: [shown(), entry({ target: "f1", categories: [] })],
+      entries: [shown(), entry({ target: "f1", checks: [] })],
       expected: { numbering: actedOn },
     },
     {
       name: "a whole-file re-scan that still raises the rule counts as written past",
-      entries: [shown(), entry({ target: "f1", categories: ["numbering"] })],
+      entries: [shown(), entry({ target: "f1", checks: ["numbering"] })],
       expected: { numbering: writtenPast },
     },
     {
-      name: "a re-scan pairs even when it ranked a different category first",
+      name: "a re-scan pairs even when it ranked a different check first",
       entries: [
         shown(),
         entry({
           outcome: "deny",
-          category: "spaced em dash",
+          check: "spaced em dash",
           target: "f1",
-          categories: ["numbering"],
+          checks: ["numbering"],
         }),
       ],
       expected: { numbering: writtenPast, "spaced em dash": undecided },
     },
     {
       name: "a hunk-scoped edit's silence decides nothing",
-      entries: [shown(), entry({ tool: "Edit", target: "f1", categories: [] })],
+      entries: [shown(), entry({ tool: "Edit", target: "f1", checks: [] })],
       expected: { numbering: undecided },
     },
     {
       // The checkers report the hits a run introduced, so this edit raised the
       // rule over its own new text, not over the prose the finding named.
       name: "a hunk-scoped edit that raises the rule again decides nothing",
-      entries: [shown(), entry({ tool: "Edit", target: "f1", categories: ["numbering"] })],
+      entries: [shown(), entry({ tool: "Edit", target: "f1", checks: ["numbering"] })],
       expected: { numbering: undecided },
     },
     {
       name: "a whole-file re-scan decides past a silent hunk edit",
       entries: [
         shown(),
-        entry({ tool: "Edit", target: "f1", categories: [] }),
-        entry({ tool: "Write", target: "f1", categories: [] }),
+        entry({ tool: "Edit", target: "f1", checks: [] }),
+        entry({ tool: "Write", target: "f1", checks: [] }),
       ],
       expected: { numbering: actedOn },
     },
@@ -164,8 +179,8 @@ describe("acceptance", () => {
       name: "a whole-file re-scan decides past a hunk edit that raised the rule",
       entries: [
         shown(),
-        entry({ tool: "Edit", target: "f1", categories: ["numbering"] }),
-        entry({ tool: "Write", target: "f1", categories: [] }),
+        entry({ tool: "Edit", target: "f1", checks: ["numbering"] }),
+        entry({ tool: "Write", target: "f1", checks: [] }),
       ],
       expected: { numbering: actedOn },
     },
@@ -188,8 +203,8 @@ describe("acceptance", () => {
       name: "pairing stays within one session and one file",
       entries: [
         shown(),
-        entry({ target: "f2", categories: [] }),
-        entry({ session_id: "s2", target: "f1", categories: [] }),
+        entry({ target: "f2", checks: [] }),
+        entry({ session_id: "s2", target: "f1", checks: [] }),
       ],
       expected: { numbering: undecided },
     },
@@ -197,21 +212,21 @@ describe("acceptance", () => {
       name: "a suppressed finding seeds no pair",
       entries: [
         shown({ outcome: "silent", suppressed: true }),
-        entry({ target: "f1", categories: [] }),
+        entry({ target: "f1", checks: [] }),
       ],
       expected: {},
     },
     {
-      name: "every emitted category of one run pairs with the re-scan",
+      name: "every emitted check of one run pairs with the re-scan",
       entries: [
         shown({ emitted: ["numbering", "filler"] }),
-        entry({ target: "f1", categories: ["filler"] }),
+        entry({ target: "f1", checks: ["filler"] }),
       ],
       expected: { numbering: actedOn, filler: writtenPast },
     },
     {
       name: "entries logged before targets were recorded are ignored",
-      entries: [entry({ outcome: "context", category: "numbering" }), entry({ categories: [] })],
+      entries: [entry({ outcome: "context", check: "numbering" }), entry({ checks: [] })],
       expected: {},
     },
   ])("$name", ({ entries, expected }) => {
@@ -222,8 +237,8 @@ describe("acceptance", () => {
 describe("opportunities", () => {
   // Acceptance gates the retirement message, so a baseline that raises nothing
   // still needs pairs closed.
-  const measured: CategoryHealth = {
-    category: "numbering",
+  const measured: CheckHealth = {
+    check: "numbering",
     fired: 10,
     suppressed: 0,
     share: 0.1,
@@ -239,7 +254,7 @@ describe("opportunities", () => {
         7,
       ),
     );
-    return { ...quiet, injections: 100, categories: [measured], ...overrides };
+    return { ...quiet, injections: 100, checks: [measured], ...overrides };
   }
 
   it("asks for more evidence on a thin log", () => {
@@ -248,18 +263,18 @@ describe("opportunities", () => {
     expect(found[0]).toContain("Evidence still accumulating");
   });
 
-  it("flags a category dominating injections", () => {
+  it("flags a check dominating injections", () => {
     const health = baseline({
       injections: 100,
-      categories: [{ ...measured, category: "test result reporting", fired: 40, share: 0.4 }],
+      checks: [{ ...measured, check: "test result reporting", fired: 40, share: 0.4 }],
     });
     expect(opportunities(health).join("\n")).toContain("test result reporting");
   });
 
-  it("flags a category suppressed as often as it fires", () => {
+  it("flags a check suppressed as often as it fires", () => {
     const health = baseline({
       injections: 100,
-      categories: [{ ...measured, suppressed: 15 }],
+      checks: [{ ...measured, suppressed: 15 }],
     });
     expect(opportunities(health).join("\n")).toContain("suppressed as often as it fires");
   });
@@ -283,16 +298,14 @@ describe("opportunities", () => {
   });
 
   it("reports acceptance as unmeasurable rather than printing a rate", () => {
-    const found = opportunities(
-      baseline({ categories: [{ ...measured, revisited: 0, accepted: 0 }] }),
-    );
+    const found = opportunities(baseline({ checks: [{ ...measured, revisited: 0, accepted: 0 }] }));
     expect(found).toHaveLength(1);
     expect(found[0]).toContain("not measurable yet");
     expect(found[0]).toContain("Keep the log on");
   });
 
   it("flags a rule acted on less than half the time", () => {
-    const health = baseline({ categories: [{ ...measured, revisited: 30, accepted: 9 }] });
+    const health = baseline({ checks: [{ ...measured, revisited: 30, accepted: 9 }] });
     expect(opportunities(health).join("\n")).toContain("acted on after 9 of 30");
   });
 
@@ -309,7 +322,7 @@ describe("renderReport", () => {
       daysApart(
         [
           ...Array.from({ length: 60 }, () => entry()),
-          entry({ outcome: "context", category: "numbering", duration_ms: 12 }),
+          entry({ outcome: "context", check: "numbering", duration_ms: 12 }),
         ],
         7,
       ),
@@ -321,12 +334,12 @@ describe("renderReport", () => {
   });
 
   test("marks a rule with no closed pair n/a and prints the ratio once one closes", () => {
-    const unmeasured = summarize([entry({ outcome: "context", category: "numbering" })]);
+    const unmeasured = summarize([entry({ outcome: "context", check: "numbering" })]);
     expect(renderReport(unmeasured)).toContain("n/a");
 
     const measured = summarize([
-      entry({ outcome: "context", category: "numbering", target: "f1" }),
-      entry({ ts: "2026-07-01T00:01:00.000Z", target: "f1", categories: [] }),
+      entry({ outcome: "context", check: "numbering", target: "f1" }),
+      entry({ ts: "2026-07-01T00:01:00.000Z", target: "f1", checks: [] }),
     ]);
     expect(renderReport(measured)).toContain("1/1 100%");
   });

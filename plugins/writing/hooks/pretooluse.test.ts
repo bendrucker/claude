@@ -75,13 +75,13 @@ describe("every finding in one output", () => {
     expect(typeof duration_ms).toBe("number");
     expect(stable).toMatchInlineSnapshot(`
       {
-        "categories": [
+        "check": "Writing.StepHeading",
+        "checks": [
           "Writing.StepHeading",
           "Writing.TitleCaseHeading",
           "Writing.SpacedEmDash",
           "ai-tells.EmDashUsage",
         ],
-        "category": "Writing.StepHeading",
         "emitted": [
           "Writing.StepHeading",
           "Writing.TitleCaseHeading",
@@ -112,15 +112,15 @@ describe("every finding in one output", () => {
     { name: "a YAML value", file_path: "conf/app.yaml", content: "title: a — b\n", flagged: false },
   ])("lints only the comments of $name", async ({ file_path, content, flagged }) => {
     const { log } = await dispatch(mockInput("Write", { file_path, content }));
-    expect((log.categories ?? []).includes("Writing.SpacedEmDash")).toBe(flagged);
+    expect((log.checks ?? []).includes("Writing.SpacedEmDash")).toBe(flagged);
   });
 
-  it("reports a lone finding as its category", async () => {
+  it("reports a lone finding as its check", async () => {
     const { output, log } = await dispatch(
       mockInput("Write", { file_path: "docs/draft.md", content: "This — is bad\n" }),
     );
     expect(contextOf(output)).toContain("em dash");
-    expect(log.category).toBe("Writing.SpacedEmDash");
+    expect(log.check).toBe("Writing.SpacedEmDash");
   });
 });
 
@@ -161,7 +161,7 @@ describe("session-scoped repeat suppression", () => {
   // Step heading only: title-cased, no other findings.
   const NUMBERED_ONLY = "# Step 1: Introduction\n\nPlain prose here.\n";
 
-  it("suppresses a repeat of the same category within the window", async () => {
+  it("suppresses a repeat of the same check within the window", async () => {
     const sessionId = crypto.randomUUID();
     const input = mockInput(
       "Write",
@@ -178,10 +178,10 @@ describe("session-scoped repeat suppression", () => {
     expect(second.output).toBeNull();
     expect(second.log.outcome).toBe("silent");
     expect(second.log.suppressed).toBe(true);
-    expect(second.log.category).toBe("Writing.StepHeading");
+    expect(second.log.check).toBe("Writing.StepHeading");
   });
 
-  it("mutes only the categories that fired recently", async () => {
+  it("mutes only the checks that fired recently", async () => {
     const sessionId = crypto.randomUUID();
     const input = mockInput(
       "Write",
@@ -194,7 +194,7 @@ describe("session-scoped repeat suppression", () => {
     const second = await dispatch(input, now + 60_000);
     expect(second.log.outcome).toBe("context");
     expect(second.log.emitted).toEqual(["Writing.SpacedEmDash"]);
-    expect(second.log.suppressed_categories).toEqual([
+    expect(second.log.suppressed_checks).toEqual([
       "Writing.StepHeading",
       "Writing.TitleCaseHeading",
       "ai-tells.EmDashUsage",
@@ -213,7 +213,7 @@ describe("session-scoped repeat suppression", () => {
     await dispatch(input, now);
     const later = await dispatch(input, now + 6 * 60_000);
     expect(later.output).not.toBeNull();
-    expect(later.log.category).toBe("Writing.StepHeading");
+    expect(later.log.check).toBe("Writing.StepHeading");
   });
 
   it("does not suppress across sessions", async () => {
@@ -295,22 +295,22 @@ describe("scratch paths", () => {
 describe("accept-and-flag logging", () => {
   const clean = { file_path: "docs/draft.md", content: "# Cache Layer\n\nPlain.\n" };
 
-  it("records every category the checkers found, not only the tier winner", async () => {
+  it("records every check the checkers found, not only the tier winner", async () => {
     const { log } = await dispatch(
       mockInput("Write", { file_path: "docs/draft.md", content: MULTI_VIOLATION }),
     );
-    expect(log.categories?.length).toBeGreaterThan(1);
-    expect(log.categories).toContain(log.category);
+    expect(log.checks?.length).toBeGreaterThan(1);
+    expect(log.checks).toContain(log.check);
   });
 
-  it("records an empty category list when the checkers found nothing", async () => {
+  it("records an empty check list when the checkers found nothing", async () => {
     const { log } = await dispatch(mockInput("Write", clean));
-    expect(log.categories).toEqual([]);
+    expect(log.checks).toEqual([]);
   });
 
-  it("omits the category list on a run that returned before the checkers", async () => {
+  it("omits the check list on a run that returned before the checkers", async () => {
     const { log } = await dispatch(mockInput("Write", clean, { permission_mode: "plan" }));
-    expect(log.categories).toBeUndefined();
+    expect(log.checks).toBeUndefined();
   });
 
   it("hashes the file path so repeat writes correlate without the path", async () => {

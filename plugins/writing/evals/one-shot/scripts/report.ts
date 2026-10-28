@@ -5,7 +5,7 @@ import { Command } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
 
-const Counted = z.object({ category: z.string() });
+const Counted = z.object({ Check: z.string() });
 
 const Result = z.object({
   id: z.string(),
@@ -16,16 +16,16 @@ const Result = z.object({
 });
 export type Result = z.infer<typeof Result>;
 
-export interface CategoryRow {
-  category: string;
-  /** Drafts the category fired on before the rewrite. */
+export interface CheckRow {
+  check: string;
+  /** Drafts the check fired on before the rewrite. */
   drafts: number;
   before: number;
   /** Instances left in those drafts after the rewrite. */
   residual: number;
-  /** Instances in rewrites of drafts where the category did not fire before. */
+  /** Instances in rewrites of drafts where the check did not fire before. */
   introduced: number;
-  /** Drafts the category fired on whose rewrite lost meaning. */
+  /** Drafts the check fired on whose rewrite lost meaning. */
   lossy: number;
 }
 
@@ -34,38 +34,38 @@ export interface Summary {
   clean: number;
   preserved: number;
   wordRatio: number;
-  rows: CategoryRow[];
+  rows: CheckRow[];
 }
 
-function tally(findings: { category: string }[]): Map<string, number> {
+function tally(findings: { Check: string }[]): Map<string, number> {
   const counts = new Map<string, number>();
-  for (const { category } of findings) counts.set(category, (counts.get(category) ?? 0) + 1);
+  for (const { Check: check } of findings) counts.set(check, (counts.get(check) ?? 0) + 1);
   return counts;
 }
 
-function emptyRow(category: string): CategoryRow {
-  return { category, drafts: 0, before: 0, residual: 0, introduced: 0, lossy: 0 };
+function emptyRow(check: string): CheckRow {
+  return { check, drafts: 0, before: 0, residual: 0, introduced: 0, lossy: 0 };
 }
 
 export function summarize(results: Result[]): Summary {
-  const rows = new Map<string, CategoryRow>();
-  const row = (category: string) => {
-    const existing = rows.get(category) ?? emptyRow(category);
-    rows.set(category, existing);
+  const rows = new Map<string, CheckRow>();
+  const row = (check: string) => {
+    const existing = rows.get(check) ?? emptyRow(check);
+    rows.set(check, existing);
     return existing;
   };
   for (const result of results) {
     const before = tally(result.before);
     const after = tally(result.after);
-    for (const [category, count] of before) {
-      const entry = row(category);
+    for (const [check, count] of before) {
+      const entry = row(check);
       entry.drafts += 1;
       entry.before += count;
-      entry.residual += after.get(category) ?? 0;
+      entry.residual += after.get(check) ?? 0;
       if (!result.meaning.preserved) entry.lossy += 1;
     }
-    for (const [category, count] of after) {
-      if (!before.has(category)) row(category).introduced += count;
+    for (const [check, count] of after) {
+      if (!before.has(check)) row(check).introduced += count;
     }
   }
   const ratios = results.map((result) => result.words.after / Math.max(1, result.words.before));
@@ -75,7 +75,7 @@ export function summarize(results: Result[]): Summary {
     preserved: results.filter((result) => result.meaning.preserved).length,
     wordRatio: ratios.reduce((sum, ratio) => sum + ratio, 0) / Math.max(1, ratios.length),
     rows: [...rows.values()].toSorted((a, b) =>
-      b.drafts === a.drafts ? a.category.localeCompare(b.category) : b.drafts - a.drafts,
+      b.drafts === a.drafts ? a.check.localeCompare(b.check) : b.drafts - a.drafts,
     ),
   };
 }
@@ -83,20 +83,20 @@ export function summarize(results: Result[]): Summary {
 const percent = (part: number, whole: number) =>
   whole === 0 ? "-" : `${Math.round((100 * part) / whole)}%`;
 
-const fixRate = (row: CategoryRow) => percent(row.before - row.residual, row.before);
+const fixRate = (row: CheckRow) => percent(row.before - row.residual, row.before);
 
 function delta(current: string, base: string | undefined): string {
   return base === undefined || base === current ? current : `${current} (was ${base})`;
 }
 
-/** Per-category fix, survival, introduction, and meaning-loss figures, with a base run's beside them. */
+/** Per-check fix, survival, introduction, and meaning-loss figures, with a base run's beside them. */
 export function render(summary: Summary, base?: Summary): string {
-  const baseRows = new Map(base?.rows.map((row) => [row.category, row]));
-  const header = ["category", "drafts", "fixed", "residual", "introduced", "lossy"];
+  const baseRows = new Map(base?.rows.map((row) => [row.check, row]));
+  const header = ["check", "drafts", "fixed", "residual", "introduced", "lossy"];
   const body = summary.rows.map((row) => {
-    const was = baseRows.get(row.category);
+    const was = baseRows.get(row.check);
     return [
-      row.category,
+      row.check,
       String(row.drafts),
       delta(fixRate(row), was && fixRate(was)),
       delta(String(row.residual), was && String(was.residual)),

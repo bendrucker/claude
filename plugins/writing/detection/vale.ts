@@ -1,10 +1,9 @@
 import { mkdir, rm } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { z } from "zod";
+import { isProseFile } from "./paths";
 
 export const VALE_CONFIG = join(import.meta.dirname, "..", ".vale.ini");
-
-export type ValeSeverity = "error" | "warning" | "suggestion";
 
 /** Where text came from, which picks the `.vale.ini` section that lints it. */
 export type ValeSource = { filePath: string } | { kind: "body" | "commit" };
@@ -20,15 +19,6 @@ const Alert = z.object({
 const Output = z.record(z.string(), z.array(Alert));
 
 export type ValeAlert = z.infer<typeof Alert>;
-
-/** How a finding reaches the model: `deny` blocks a message, `context` advises. */
-export type Tier = "deny" | "context";
-
-export function tierOfSeverity(severity: ValeSeverity): Tier | undefined {
-  if (severity === "error") return "deny";
-  if (severity === "warning") return "context";
-  return undefined;
-}
 
 export function valeBinary(): string | null {
   const onPath = Bun.which("vale");
@@ -166,4 +156,17 @@ export async function valeAlerts(
   if (exitCode > 1 && strict) throw new Error(`vale exited ${exitCode}: ${stderr.trim()}`);
   if (exitCode > 1 || stdout.trim() === "") return [];
   return Object.values(Output.parse(JSON.parse(stdout))).flat();
+}
+
+/** Alerts in prose at warning or above, sorted by position. A code file yields none, and no path lints as a message. */
+export async function lintProse(
+  text: string,
+  filePath?: string,
+  { message = false }: { message?: boolean } = {},
+): Promise<ValeAlert[]> {
+  if (filePath !== undefined && !isProseFile(filePath)) return [];
+  const source = message || filePath === undefined ? { kind: "body" as const } : { filePath };
+  return (await valeAlerts(text, source))
+    .filter((alert) => alert.Severity !== "suggestion")
+    .toSorted((a, b) => (a.Line === b.Line ? a.Span[0] - b.Span[0] : a.Line - b.Line));
 }

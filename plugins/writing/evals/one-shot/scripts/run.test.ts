@@ -31,7 +31,7 @@ describe("rewriteDraft", () => {
       query: fakeQuery("The cache starts cold and warms up after the first request.\n", prompts),
     });
     expect(prompts[0]).toContain("line 1, Writing.SpacedEmDash:");
-    expect(result.before.map((f) => f.category)).toContain("Writing.SpacedEmDash");
+    expect(result.before.map((f) => f.Check)).toContain("Writing.SpacedEmDash");
     expect(result.after).toEqual([]);
     expect(result.meaning).toEqual({ preserved: true, lost: [] });
     expect(result.words.after).toBe(11);
@@ -43,7 +43,7 @@ describe("rewriteDraft", () => {
       makeDraft({ message: true, text: "Hi team,\n\nThe parser now streams input.\n" }),
       { model: "m", judgeModel: "j", query: fakeQuery("The parser now streams input.\n", prompts) },
     );
-    expect(result.before.map((f) => f.category)).toContain("Writing.Salutation");
+    expect(result.before.map((f) => f.Check)).toContain("Writing.Salutation");
   });
 });
 

@@ -32,5 +32,5 @@ test.each<{ name: string; before: string; after: string; checks: string[] }>([
   },
 ])("valeFileFindings reports $name", async ({ before, after, checks }) => {
   const findings = await valeFileFindings(before, after, "/nonexistent/doc.md");
-  expect(findings.map((finding) => finding.category)).toEqual(checks);
+  expect(findings.map((finding) => finding.check)).toEqual(checks);
 });

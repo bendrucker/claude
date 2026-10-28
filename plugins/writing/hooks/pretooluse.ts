@@ -70,40 +70,40 @@ export async function dispatch(
       `[writing/pretooluse] checker failed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  // `categories` records what the checkers found, which is what a later run on
+  // `checks` records what the checkers found, which is what a later run on
   // the same target is compared against. It is set only past this point: an
   // earlier return means the checkers never ran, and an absent list must not
   // read as a clean run.
-  const categories = unique(findings.map((finding) => finding.category));
-  if (findings.length === 0) return finish(null, "silent", { categories });
+  const checks = unique(findings.map((finding) => finding.check));
+  if (findings.length === 0) return finish(null, "silent", { checks });
 
   const muted = new Set<string>();
   const kept: HookFinding[] = [];
   for (const finding of findings) {
     if (finding.tier === "context" && finding.introduced !== true) {
-      if (muted.has(finding.category)) continue;
-      // oxlint-disable-next-line no-await-in-loop -- reads one small state file per category, and the loop is bounded by the categories found.
-      if (await recentlyFired(input.session_id, finding.category, now)) {
-        muted.add(finding.category);
+      if (muted.has(finding.check)) continue;
+      // oxlint-disable-next-line no-await-in-loop -- reads one small state file per check, and the loop is bounded by the checks found.
+      if (await recentlyFired(input.session_id, finding.check, now)) {
+        muted.add(finding.check);
         continue;
       }
     }
     kept.push(finding);
   }
 
-  const extra: Partial<RunLogEntry> = { categories };
-  if (muted.size > 0) extra.suppressed_categories = [...muted];
+  const extra: Partial<RunLogEntry> = { checks };
+  if (muted.size > 0) extra.suppressed_checks = [...muted];
   const result = report(kept, { toolName: input.tool_name, filePath });
   if (!result) {
-    extra.category = [...muted][0];
+    extra.check = [...muted][0];
     extra.suppressed = true;
     return finish(null, "silent", extra);
   }
 
-  const emitted = unique(result.shown.map((finding) => finding.category));
-  // oxlint-disable-next-line no-await-in-loop -- sequential writes to one state file; concurrent read-modify-write would drop categories.
-  for (const category of emitted) await recordFired(input.session_id, category, now);
-  return finish(result.output, result.tier, { ...extra, category: emitted[0], emitted });
+  const emitted = unique(result.shown.map((finding) => finding.check));
+  // oxlint-disable-next-line no-await-in-loop -- sequential writes to one state file; concurrent read-modify-write would drop checks.
+  for (const check of emitted) await recordFired(input.session_id, check, now);
+  return finish(result.output, result.tier, { ...extra, check: emitted[0], emitted });
 }
 
 function unique(values: string[]): string[] {

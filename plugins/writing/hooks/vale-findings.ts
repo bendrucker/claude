@@ -49,7 +49,7 @@ export async function valeFileFindings(
     return false;
   });
   return firstPerCheck(alerts).map((alert) => ({
-    category: alert.Check,
+    check: alert.Check,
     tier: "context",
     message: alert.Message,
     introduced: alert.Severity === "error",
@@ -65,7 +65,7 @@ export async function valeMessageFindings(
     (alert) => alert.Severity !== "suggestion",
   );
   return firstPerCheck(alerts).map((alert) => ({
-    category: alert.Check,
+    check: alert.Check,
     tier: alert.Severity === "error" ? "deny" : "context",
     message: alert.Message,
   }));

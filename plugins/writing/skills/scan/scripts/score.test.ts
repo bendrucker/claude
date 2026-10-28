@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { buildReport, renderTable, scoreComments, scoreText } from "./score";
 
-function category(report: Awaited<ReturnType<typeof buildReport>>, group: string, name: string) {
-  return report.groups.find((g) => g.group === group)?.categories.find((c) => c.category === name);
+function check(report: Awaited<ReturnType<typeof buildReport>>, group: string, name: string) {
+  return report.groups.find((g) => g.group === group)?.checks.find((c) => c.check === name);
 }
 
 describe("scoreText", () => {
@@ -17,14 +17,14 @@ describe("scoreText", () => {
     const filler = `${"word ".repeat(998)}a — b`;
     const score = await scoreText(filler, "doc.md");
     expect(score.wordCount).toBe(1000);
-    const emDash = score.categories.find((c) => c.category === "Writing.SpacedEmDash");
+    const emDash = score.checks.find((c) => c.check === "Writing.SpacedEmDash");
     expect(emDash?.hits).toBe(1);
     expect(emDash?.density).toBeCloseTo(1.0, 5);
   });
 
-  it("returns no categories for clean prose", async () => {
+  it("returns no checks for clean prose", async () => {
     const score = await scoreText("The function reads input and writes output.", undefined);
-    expect(score.categories).toHaveLength(0);
+    expect(score.checks).toHaveLength(0);
   });
 });
 
@@ -33,7 +33,7 @@ describe("scoreComments", () => {
     const src = "function f() {\n  // We reach for the helper here.\n  return 1;\n}\n";
     const group = await scoreComments(src, "src.ts");
     expect(group?.group).toBe("comments");
-    const reaching = group?.categories.find((c) => c.category === "Writing.ReachingFor");
+    const reaching = group?.checks.find((c) => c.check === "Writing.ReachingFor");
     expect(reaching?.hits).toBe(1);
   });
 
@@ -52,17 +52,17 @@ describe("buildReport", () => {
     const src = "function f() {\n  // We reach for the helper here today.\n}\n";
     const report = await buildReport(src, "src.ts", { comments: true });
     expect(report.groups.map((g) => g.group)).toContain("comments");
-    expect(category(report, "comments", "Writing.ReachingFor")?.hits).toBeGreaterThan(0);
+    expect(check(report, "comments", "Writing.ReachingFor")?.hits).toBeGreaterThan(0);
   });
 });
 
 describe("renderTable", () => {
-  it("header with word count and category rows", async () => {
+  it("header with word count and check rows", async () => {
     expect(renderTable(await buildReport("a — b", "doc.md", { comments: false })))
       .toMatchInlineSnapshot(`
       "prose (2 words)
       ╔══════════════════════╤══════╤═════════════╗
-      ║ Category             │ Hits │ Density /1k ║
+      ║ Check                │ Hits │ Density /1k ║
       ╟──────────────────────┼──────┼─────────────╢
       ║ ai-tells.EmDashUsage │ 1    │ 500.0       ║
       ╟──────────────────────┼──────┼─────────────╢

@@ -2,10 +2,10 @@ import { table } from "table";
 import { stripCode } from "../../../detection/code-spans";
 import { extractComments } from "../../../detection/comments";
 import { isProseFile } from "../../../detection/paths";
-import { scanAll } from "../../../detection/scan";
+import { lintProse } from "../../../detection/vale";
 
-export interface CategoryScore {
-  category: string;
+export interface CheckScore {
+  check: string;
   hits: number;
   density: number;
 }
@@ -13,7 +13,7 @@ export interface CategoryScore {
 export interface GroupScore {
   group: string;
   wordCount: number;
-  categories: CategoryScore[];
+  checks: CheckScore[];
 }
 
 export interface ScoreReport {
@@ -34,17 +34,17 @@ function density(hits: number, wordCount: number): number {
   return hits / (wordCount / 1000);
 }
 
-async function categoryScores(
+async function checkScores(
   text: string,
   filePath: string | undefined,
   wordCount: number,
-): Promise<CategoryScore[]> {
+): Promise<CheckScore[]> {
   const counts = new Map<string, number>();
-  for (const result of await scanAll(text, filePath)) {
-    counts.set(result.category, (counts.get(result.category) ?? 0) + 1);
+  for (const alert of await lintProse(text, filePath)) {
+    counts.set(alert.Check, (counts.get(alert.Check) ?? 0) + 1);
   }
-  return [...counts.entries()].map(([category, hits]) => ({
-    category,
+  return [...counts.entries()].map(([check, hits]) => ({
+    check,
     hits,
     density: density(hits, wordCount),
   }));
@@ -52,8 +52,8 @@ async function categoryScores(
 
 export async function scoreText(text: string, filePath: string | undefined): Promise<GroupScore> {
   const wordCount = countWords(stripCode(text));
-  const categories = await categoryScores(text, filePath, wordCount);
-  return { group: "prose", wordCount, categories };
+  const checks = await checkScores(text, filePath, wordCount);
+  return { group: "prose", wordCount, checks };
 }
 
 export async function scoreComments(
@@ -102,17 +102,17 @@ export function renderTable(report: ScoreReport): string {
   const sections: string[] = [];
   for (const group of report.groups) {
     const header = `${group.group} (${group.wordCount} words)`;
-    const rows = group.categories
+    const rows = group.checks
       .toSorted((a, b) => {
         const byDensity = b.density - a.density;
-        return byDensity !== 0 ? byDensity : a.category.localeCompare(b.category);
+        return byDensity !== 0 ? byDensity : a.check.localeCompare(b.check);
       })
-      .map((c) => [c.category, String(c.hits), formatDensity(c.density)]);
+      .map((c) => [c.check, String(c.hits), formatDensity(c.density)]);
     if (rows.length === 0) {
       sections.push(`${header}\nNo patterns detected.`);
       continue;
     }
-    sections.push(`${header}\n${table([["Category", "Hits", "Density /1k"], ...rows])}`.trimEnd());
+    sections.push(`${header}\n${table([["Check", "Hits", "Density /1k"], ...rows])}`.trimEnd());
   }
   return sections.join("\n\n");
 }

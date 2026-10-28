@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { type HookFinding, MAX_REPORTED, report } from "./report";
 
 function makeFinding(overrides: Partial<HookFinding> = {}): HookFinding {
-  return { category: "filler", tier: "context", message: "Cut the filler.", ...overrides };
+  return { check: "filler", tier: "context", message: "Cut the filler.", ...overrides };
 }
 
 describe("report", () => {
@@ -40,8 +40,8 @@ describe("report", () => {
     const result = report(
       [
         makeFinding(),
-        makeFinding({ category: "no-negation", tier: "deny", message: "Negate the verb." }),
-        makeFinding({ category: "sentence heading", message: "Cut the heading." }),
+        makeFinding({ check: "no-negation", tier: "deny", message: "Negate the verb." }),
+        makeFinding({ check: "sentence heading", message: "Cut the heading." }),
       ],
       { toolName: "Bash" },
     );
@@ -66,7 +66,7 @@ describe("report", () => {
   test("states the introduced-fix instruction once for several findings", () => {
     const result = report(
       [
-        makeFinding({ category: "spaced em dash", message: "Split it.", introduced: true }),
+        makeFinding({ check: "spaced em dash", message: "Split it.", introduced: true }),
         makeFinding(),
       ],
       { toolName: "Write", filePath: "docs/a.md" },
@@ -89,7 +89,7 @@ describe("report", () => {
 
   test("caps the list and counts the rest", () => {
     const findings = Array.from({ length: MAX_REPORTED + 3 }, (_, i) =>
-      makeFinding({ category: `rule ${i}` }),
+      makeFinding({ check: `rule ${i}` }),
     );
     const result = report(findings, { toolName: "Bash" });
     expect(result?.shown).toHaveLength(MAX_REPORTED);

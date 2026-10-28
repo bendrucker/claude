@@ -50,7 +50,7 @@ For non-prose source files, comments are extracted and scored as a separate `com
 
 ## Single-Input Mode
 
-`writing:rewrite` and other callers invoke `scan.ts --input` to lint one input against the audit checks without walking a directory. It reads a file path, inline text, or stdin and prints matches as `line:col: category: message` with no path prefix, exiting non-zero on any finding. This is the `audit` gate over a single input.
+`writing:rewrite` and other callers invoke `scan.ts --input` to lint one input against the audit checks without walking a directory. It reads a file path, inline text, or stdin and prints alerts as `line:col: check: message` with no path prefix, exiting non-zero on any finding. This is the `audit` gate over a single input.
 
 - `--message` treats the input as a message sent once (PR, issue, comment, commit, Notion page) and applies the rules for that surface, including salutations and closers. The surface is never inferred, so pass it for a message body even when the text sits in a file.
-- `--json` prints the findings as a JSON array of `{ line, col, category, tier, matched, message }`, where `category` is the Vale check. The exit code is unchanged.
+- `--json` prints the alerts as Vale emits them, a JSON array of `{ Check, Message, Severity, Line, Span, Match }`. The exit code is unchanged.

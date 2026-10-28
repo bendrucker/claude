@@ -10,8 +10,8 @@ import {
   suppressedOf,
 } from "../../../hooks/run-log";
 
-export interface CategoryHealth {
-  category: string;
+export interface CheckHealth {
+  check: string;
   fired: number;
   suppressed: number;
   share: number;
@@ -30,7 +30,7 @@ export interface HookHealth {
   byOutcome: Record<RunOutcome, number>;
   byTool: Record<string, number>;
   injections: number;
-  categories: CategoryHealth[];
+  checks: CheckHealth[];
   latency: { p50: number; p95: number; max: number; silentP95: number };
 }
 
@@ -62,19 +62,19 @@ export interface Acceptance {
   unconfirmed: number;
 }
 
-// Tools whose scanned text is the whole file, so the run's `categories` speak to
+// Tools whose scanned text is the whole file, so the run's `checks` speak to
 // the file a finding named. An `Edit` or `MultiEdit` scans only its own hunks.
 const WHOLE_FILE_TOOLS = new Set(["Write"]);
 
 // A fire count measures how loud a rule is. Whether it was right takes a second
 // signal. Pairing each shown finding with a whole-file re-scan of the same file
-// answers that from ordinary use: a rule missing from the re-scan's `categories`
+// answers that from ordinary use: a rule missing from the re-scan's `checks`
 // was acted on, one still present was written past. A suppressed finding was
 // never shown, so it seeds no pair, and a run that returned before the checkers
-// ran carries no `categories`.
+// ran carries no `checks`.
 //
 // Only a whole-file re-scan decides, in either direction. The checkers report
-// the hits a run newly introduced, so a hunk-scoped edit's `categories` describe
+// the hits a run newly introduced, so a hunk-scoped edit's `checks` describe
 // that hunk's own text: silence means the hunk introduced nothing, and a hit
 // means the hunk introduced one somewhere the finding never pointed. Neither
 // speaks to the prose the rule flagged. Every shown finding no whole-file
@@ -87,17 +87,17 @@ const WHOLE_FILE_TOOLS = new Set(["Write"]);
 // surviving rate high, making it a floor on how often a rule is wrong.
 function tally(
   counts: Map<string, Acceptance>,
-  category: string,
+  check: string,
   rescanned: string[] | undefined,
 ): void {
-  const bucket = counts.get(category) ?? { revisited: 0, accepted: 0, unconfirmed: 0 };
+  const bucket = counts.get(check) ?? { revisited: 0, accepted: 0, unconfirmed: 0 };
   if (rescanned == null) {
     bucket.unconfirmed += 1;
   } else {
     bucket.revisited += 1;
-    if (!rescanned.includes(category)) bucket.accepted += 1;
+    if (!rescanned.includes(check)) bucket.accepted += 1;
   }
-  counts.set(category, bucket);
+  counts.set(check, bucket);
 }
 
 export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
@@ -118,14 +118,14 @@ export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
       if (shown.length === 0) continue;
       const rescan = ordered
         .slice(index + 1)
-        .find((next) => next.categories != null && WHOLE_FILE_TOOLS.has(next.tool));
-      for (const category of shown) tally(counts, category, rescan?.categories);
+        .find((next) => next.checks != null && WHOLE_FILE_TOOLS.has(next.tool));
+      for (const check of shown) tally(counts, check, rescan?.checks);
     }
   }
   return counts;
 }
 
-export function acceptRate(cat: CategoryHealth): number | null {
+export function acceptRate(cat: CheckHealth): number | null {
   return cat.revisited > 0 ? cat.accepted / cat.revisited : null;
 }
 
@@ -138,7 +138,7 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
     "skipped-scratch": 0,
   };
   const byTool: Record<string, number> = {};
-  const perCategory = new Map<string, { fired: number; suppressed: number }>();
+  const perCheck = new Map<string, { fired: number; suppressed: number }>();
   const durations: number[] = [];
   const silentDurations: number[] = [];
   let firstTs = Number.POSITIVE_INFINITY;
@@ -150,15 +150,15 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
     durations.push(entry.duration_ms);
     if (entry.outcome === "silent" && !entry.suppressed) silentDurations.push(entry.duration_ms);
 
-    for (const category of emittedOf(entry)) {
-      const bucket = perCategory.get(category) ?? { fired: 0, suppressed: 0 };
+    for (const check of emittedOf(entry)) {
+      const bucket = perCheck.get(check) ?? { fired: 0, suppressed: 0 };
       bucket.fired += 1;
-      perCategory.set(category, bucket);
+      perCheck.set(check, bucket);
     }
-    for (const category of suppressedOf(entry)) {
-      const bucket = perCategory.get(category) ?? { fired: 0, suppressed: 0 };
+    for (const check of suppressedOf(entry)) {
+      const bucket = perCheck.get(check) ?? { fired: 0, suppressed: 0 };
       bucket.suppressed += 1;
-      perCategory.set(category, bucket);
+      perCheck.set(check, bucket);
     }
 
     const ts = Date.parse(entry.ts);
@@ -176,15 +176,15 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
   silentDurations.sort((a, b) => a - b);
 
   const accepts = acceptance(entries);
-  const categories = [...perCategory.entries()]
-    .map(([category, counts]) => ({
-      category,
+  const checks = [...perCheck.entries()]
+    .map(([check, counts]) => ({
+      check,
       fired: counts.fired,
       suppressed: counts.suppressed,
       share: injections > 0 ? counts.fired / injections : 0,
-      revisited: accepts.get(category)?.revisited ?? 0,
-      accepted: accepts.get(category)?.accepted ?? 0,
-      unconfirmed: accepts.get(category)?.unconfirmed ?? 0,
+      revisited: accepts.get(check)?.revisited ?? 0,
+      accepted: accepts.get(check)?.accepted ?? 0,
+      unconfirmed: accepts.get(check)?.unconfirmed ?? 0,
     }))
     .toSorted((a, b) => (b.fired === a.fired ? b.suppressed - a.suppressed : b.fired - a.fired));
 
@@ -195,7 +195,7 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
     byOutcome,
     byTool,
     injections,
-    categories,
+    checks,
     latency: {
       p50: percentile(durations, 50),
       p95: percentile(durations, 95),
@@ -227,21 +227,21 @@ export function opportunities(health: HookHealth): string[] {
     return found;
   }
 
-  for (const cat of health.categories) {
+  for (const cat of health.checks) {
     if (cat.share >= DOMINANT_SHARE) {
       found.push(
-        `"${cat.category}" is ${Math.round(cat.share * 100)}% of injections. Audit its precision: sample recent firings from session history and demote, narrow, or retire the rule if hits are unactionable.`,
+        `"${cat.check}" is ${Math.round(cat.share * 100)}% of injections. Audit its precision: sample recent firings from session history and demote, narrow, or retire the rule if hits are unactionable.`,
       );
     }
     const rate = acceptRate(cat);
     if (cat.revisited >= MIN_REVISITS && rate !== null && rate < LOW_ACCEPT_RATE) {
       found.push(
-        `"${cat.category}" was acted on after ${cat.accepted} of ${cat.revisited} shown findings. Sample those runs: prose the author rewrote past is prose the rule read wrong.`,
+        `"${cat.check}" was acted on after ${cat.accepted} of ${cat.revisited} shown findings. Sample those runs: prose the author rewrote past is prose the rule read wrong.`,
       );
     }
     if (cat.fired >= MIN_FIRES_FOR_SUPPRESSION_SIGNAL && cat.suppressed >= cat.fired) {
       found.push(
-        `"${cat.category}" is suppressed as often as it fires (${cat.fired} fired, ${cat.suppressed} suppressed). The reminder is not changing behavior within sessions. Consider a stronger message or retiring the rule.`,
+        `"${cat.check}" is suppressed as often as it fires (${cat.fired} fired, ${cat.suppressed} suppressed). The reminder is not changing behavior within sessions. Consider a stronger message or retiring the rule.`,
       );
     }
   }
@@ -265,8 +265,8 @@ export function opportunities(health: HookHealth): string[] {
     );
   }
 
-  const revisited = health.categories.reduce((sum, cat) => sum + cat.revisited, 0);
-  const unconfirmed = health.categories.reduce((sum, cat) => sum + cat.unconfirmed, 0);
+  const revisited = health.checks.reduce((sum, cat) => sum + cat.revisited, 0);
+  const unconfirmed = health.checks.reduce((sum, cat) => sum + cat.unconfirmed, 0);
   if (revisited < MIN_REVISITS) {
     found.push(
       `Acceptance is not measurable yet (${revisited} shown findings re-scanned, ${MIN_REVISITS} needed; ${unconfirmed} more never got a whole-file re-scan). Until it is, the fired column is a flag count and says nothing about whether a rule is right. Keep the log on.`,
@@ -316,14 +316,14 @@ export function renderReport(health: HookHealth): string {
     ]),
   );
 
-  if (health.categories.length > 0) {
+  if (health.checks.length > 0) {
     lines.push(
       table([
-        ["category", "fired", "suppressed", "share of injections", "acted on", "unconfirmed"],
-        ...health.categories.map((cat) => {
+        ["check", "fired", "suppressed", "share of injections", "acted on", "unconfirmed"],
+        ...health.checks.map((cat) => {
           const rate = acceptRate(cat);
           return [
-            cat.category,
+            cat.check,
             String(cat.fired),
             String(cat.suppressed),
             formatShare(cat.share),

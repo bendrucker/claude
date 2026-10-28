@@ -134,7 +134,7 @@ export function hookDenies(trace: string): number {
 export async function tropeDensity(text: string): Promise<number> {
   const report = await scoreText(text, undefined);
   if (report.wordCount === 0) return 0;
-  const hits = report.categories.reduce((sum, c) => sum + c.hits, 0);
+  const hits = report.checks.reduce((sum, c) => sum + c.hits, 0);
   return hits / (report.wordCount / 1000);
 }
 

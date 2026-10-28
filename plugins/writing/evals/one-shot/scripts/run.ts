@@ -10,7 +10,7 @@ import {
   structured,
 } from "../../../../../packages/eval-judge/index";
 import { mapPool } from "../../../../../packages/evals/pool";
-import { type ScanResult, scanAll } from "../../../detection/scan";
+import { lintProse, type ValeAlert } from "../../../detection/vale";
 
 const REWRITE_TEMPLATE = await Bun.file(join(import.meta.dirname, "rewrite-prompt.md")).text();
 const MEANING_TEMPLATE = await Bun.file(join(import.meta.dirname, "meaning-prompt.md")).text();
@@ -31,8 +31,8 @@ export interface Result {
   key: string;
   model: string;
   split: Draft["split"];
-  before: ScanResult[];
-  after: ScanResult[];
+  before: ValeAlert[];
+  after: ValeAlert[];
   words: { before: number; after: number };
   rewrite: string;
   meaning: z.infer<typeof Meaning>;
@@ -46,13 +46,13 @@ export interface RunOptions {
 
 // Every file draft the miner keeps is markdown, so one stand-in path selects
 // the same rules the hook applied to it.
-export function scanDraft(draft: Pick<Draft, "message">, text: string): Promise<ScanResult[]> {
-  return scanAll(text, draft.message ? undefined : "draft.md", { message: draft.message });
+export function scanDraft(draft: Pick<Draft, "message">, text: string): Promise<ValeAlert[]> {
+  return lintProse(text, draft.message ? undefined : "draft.md", { message: draft.message });
 }
 
-export function renderFindings(findings: ScanResult[]): string {
+export function renderFindings(findings: ValeAlert[]): string {
   return findings
-    .map((finding) => `- line ${finding.line}, ${finding.category}: ${finding.message}`)
+    .map((finding) => `- line ${finding.Line}, ${finding.Check}: ${finding.Message}`)
     .join("\n");
 }
 
@@ -63,7 +63,7 @@ export function fill(template: string, values: Record<string, string>): string {
 const words = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
 /** The cache key for one draft under the current rules, prompts, and models. */
-export function keyOf(draft: Draft, findings: ScanResult[], options: RunOptions): string {
+export function keyOf(draft: Draft, findings: ValeAlert[], options: RunOptions): string {
   return cacheKey(
     promptHash(REWRITE_TEMPLATE),
     promptHash(MEANING_TEMPLATE),

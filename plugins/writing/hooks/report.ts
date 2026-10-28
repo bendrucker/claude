@@ -5,7 +5,7 @@ export const MAX_REPORTED = 10;
 const TIER_RANK: Record<PermissionTier, number> = { deny: 0, ask: 1, context: 2 };
 
 export interface HookFinding {
-  category: string;
+  check: string;
   tier: PermissionTier;
   message: string;
   // A deny-tier trope in a Write or Edit already happened, so it is reported as
@@ -44,7 +44,7 @@ function renderMany(findings: HookFinding[], omitted: number, target: ReportTarg
   lines.push("");
   for (const finding of findings) {
     const mark = finding.introduced === true ? " (introduced)" : "";
-    lines.push(`- ${finding.category}${mark}: ${finding.message}`);
+    lines.push(`- ${finding.check}${mark}: ${finding.message}`);
   }
   if (omitted > 0) {
     lines.push(`- …and ${omitted} more. Run writing:scan --input to see all.`);

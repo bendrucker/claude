@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 import { cli, command } from "cleye";
 import { table } from "table";
 import { isMemoryPath, isPlanPath, isProseFile } from "../../../detection/paths";
-import { type ScanResult, scanAll } from "../../../detection/scan";
+import { lintProse, type ValeAlert } from "../../../detection/vale";
 import { readInput } from "../../../scripts/io";
 import { buildReport, renderTable, shouldScoreComments } from "./score";
 
@@ -50,35 +50,35 @@ async function scanInput(
   filePath: string | undefined,
   { message, json }: InputOptions,
 ): Promise<number> {
-  const violations = await scanAll(text, filePath, { message });
+  const alerts = await lintProse(text, filePath, { message });
 
   if (json) {
-    console.log(JSON.stringify(violations, null, 2));
-    return violations.length > 0 ? 1 : 0;
+    console.log(JSON.stringify(alerts, null, 2));
+    return alerts.length > 0 ? 1 : 0;
   }
 
-  if (violations.length === 0) {
-    console.log("No violations found.");
+  if (alerts.length === 0) {
+    console.log("No alerts found.");
     return 0;
   }
 
-  for (const v of violations) {
-    console.log(`${v.line}:${v.col}: ${v.category}: ${v.message}`);
+  for (const v of alerts) {
+    console.log(`${v.Line}:${v.Span[0]}: ${v.Check}: ${v.Message}`);
   }
   return 1;
 }
 
-export interface FileViolations {
+export interface FileAlerts {
   path: string;
-  violations: ScanResult[];
+  alerts: ValeAlert[];
 }
 
-export async function scanFiles(files: string[]): Promise<FileViolations[]> {
-  const results: FileViolations[] = [];
+export async function scanFiles(files: string[]): Promise<FileAlerts[]> {
+  const results: FileAlerts[] = [];
   for (const path of files) {
     // oxlint-disable-next-line no-await-in-loop -- audit runs over an arbitrary tree; reading every file at once would hold the whole corpus in memory.
-    const violations = await scanAll(await Bun.file(path).text(), path);
-    if (violations.length > 0) results.push({ path, violations });
+    const alerts = await lintProse(await Bun.file(path).text(), path);
+    if (alerts.length > 0) results.push({ path, alerts });
   }
   return results;
 }
@@ -88,42 +88,42 @@ function relativeLabel(path: string): string {
   return rel.startsWith("..") ? path : rel;
 }
 
-function printViolations(results: FileViolations[]): void {
-  for (const { path, violations } of results) {
-    for (const v of violations) {
-      console.log(`${relativeLabel(path)}:${v.line}:${v.col}: ${v.category}: ${v.message}`);
+function printAlerts(results: FileAlerts[]): void {
+  for (const { path, alerts } of results) {
+    for (const v of alerts) {
+      console.log(`${relativeLabel(path)}:${v.Line}:${v.Span[0]}: ${v.Check}: ${v.Message}`);
     }
   }
 }
 
-export function renderCategories(counts: ReadonlyMap<string, number>): string {
+export function renderChecks(counts: ReadonlyMap<string, number>): string {
   const rows = [...counts.entries()]
     .toSorted((a, b) => b[1] - a[1])
-    .map(([category, count]) => [category, String(count)]);
-  return table([["Category", "Count"], ...rows]).trimEnd();
+    .map(([check, count]) => [check, String(count)]);
+  return table([["Check", "Count"], ...rows]).trimEnd();
 }
 
-function printSummary(results: FileViolations[]): void {
-  const byCategory = new Map<string, number>();
+function printSummary(results: FileAlerts[]): void {
+  const byCheck = new Map<string, number>();
   const byFile = new Map<string, number>();
   let total = 0;
-  for (const { path, violations } of results) {
-    byFile.set(path, violations.length);
-    total += violations.length;
-    for (const v of violations) {
-      byCategory.set(v.category, (byCategory.get(v.category) ?? 0) + 1);
+  for (const { path, alerts } of results) {
+    byFile.set(path, alerts.length);
+    total += alerts.length;
+    for (const v of alerts) {
+      byCheck.set(v.Check, (byCheck.get(v.Check) ?? 0) + 1);
     }
   }
 
-  console.error(`${renderCategories(byCategory)}\n`);
+  console.error(`${renderChecks(byCheck)}\n`);
 
   const noisiest = [...byFile.entries()]
     .toSorted((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([path, count]) => [relativeLabel(path), String(count)]);
-  console.error(table([["File", "Violations"], ...noisiest]));
+  console.error(table([["File", "Alerts"], ...noisiest]));
 
-  console.error(`${total} violations across ${results.length} files.`);
+  console.error(`${total} alerts across ${results.length} files.`);
 }
 
 async function collectAcross(paths: string[]): Promise<string[]> {
@@ -158,7 +158,7 @@ const auditCmd = command(
     }
 
     const results = await scanFiles(await collectAcross(paths));
-    printViolations(results);
+    printAlerts(results);
 
     if (results.length > 0 && !argv.flags.noSummary) printSummary(results);
 

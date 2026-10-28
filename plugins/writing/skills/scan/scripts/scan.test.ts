@@ -4,7 +4,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readInput } from "../../../scripts/io";
-import { collectFiles, renderCategories, scanFiles, shouldSkip, toGlob } from "./scan";
+import { collectFiles, renderChecks, scanFiles, shouldSkip, toGlob } from "./scan";
 
 describe("shouldSkip", () => {
   it("skips node_modules", () => {
@@ -55,7 +55,7 @@ describe("collectFiles and scanFiles", () => {
     expect(files.some((f) => f.includes("node_modules"))).toBe(false);
   });
 
-  it("reports violations only for files that have them", async () => {
+  it("reports alerts only for files that have them", async () => {
     const files = await collectFiles(dir);
     const results = await scanFiles(files);
     const paths = results.map((r) => r.path);
@@ -63,15 +63,15 @@ describe("collectFiles and scanFiles", () => {
     expect(paths.some((p) => p.endsWith("clean.md"))).toBe(false);
   });
 
-  it("attaches positioned violations to each file", async () => {
+  it("attaches positioned alerts to each file", async () => {
     const results = await scanFiles(await collectFiles(dir));
     const dirty = results.find((r) => r.path.endsWith("dirty.md"));
     expect(dirty).toBeDefined();
-    const categories = dirty?.violations.map((v) => v.category) ?? [];
-    expect(categories).toContain("Writing.ReachingFor");
-    for (const v of dirty?.violations ?? []) {
-      expect(v.line).toBeGreaterThanOrEqual(1);
-      expect(v.col).toBeGreaterThanOrEqual(1);
+    const checks = dirty?.alerts.map((v) => v.Check) ?? [];
+    expect(checks).toContain("Writing.ReachingFor");
+    for (const v of dirty?.alerts ?? []) {
+      expect(v.Line).toBeGreaterThanOrEqual(1);
+      expect(v.Span[0]).toBeGreaterThanOrEqual(1);
     }
   });
 });
@@ -100,20 +100,20 @@ describe("readInput", () => {
   });
 });
 
-describe("renderCategories", () => {
-  it("sorts categories by count", () => {
+describe("renderChecks", () => {
+  it("sorts checks by count", () => {
     const counts = new Map([
       ["hedge", 2],
       ["trope", 5],
     ]);
-    expect(renderCategories(counts)).toMatchInlineSnapshot(`
-      "╔══════════╤═══════╗
-      ║ Category │ Count ║
-      ╟──────────┼───────╢
-      ║ trope    │ 5     ║
-      ╟──────────┼───────╢
-      ║ hedge    │ 2     ║
-      ╚══════════╧═══════╝"
+    expect(renderChecks(counts)).toMatchInlineSnapshot(`
+      "╔═══════╤═══════╗
+      ║ Check │ Count ║
+      ╟───────┼───────╢
+      ║ trope │ 5     ║
+      ╟───────┼───────╢
+      ║ hedge │ 2     ║
+      ╚═══════╧═══════╝"
     `);
   });
 });

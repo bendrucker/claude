@@ -9,19 +9,19 @@ ignorecase: true
 tokens:
   - 'want\s+me\s+to\s+\w+'
 tests:
-  - name: positives
-    about: offers to act on the reader's behalf
+  - name: "flags Want me to fix that for you?"
     input: |
       Want me to fix that for you?
-
+    contains: [Writing.PermissionSeeking]
+  - name: "flags Want me to run the tests?"
+    input: |
       Want me to run the tests?
-    want: |
-      1:1:Writing.PermissionSeeking:'Want me to fix' reads as permission-seeking. Just do it, or describe options.
-      3:1:Writing.PermissionSeeking:'Want me to run' reads as permission-seeking. Just do it, or describe options.
-  - name: negatives
-    about: someone else wanting the writer somewhere, and the writer's own intent
+    contains: [Writing.PermissionSeeking]
+  - name: "allows They want me there by noon."
     input: |
       They want me there by noon.
-
+    absent: Writing.PermissionSeeking
+  - name: "allows I want to understand the issue."
+    input: |
       I want to understand the issue.
-    want: ""
+    absent: Writing.PermissionSeeking

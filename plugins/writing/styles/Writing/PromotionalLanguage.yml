@@ -7,23 +7,23 @@ ignorecase: true
 tokens:
   - '\b(?:boasts|vibrant|showcasing|nestled|groundbreaking|renowned|diverse array)\b'
 tests:
-  - name: positives
-    about: each promotional word
+  - name: "flags The library boasts excellent performance."
     input: |
       The library boasts excellent performance.
-
+    contains: [Writing.PromotionalLanguage]
+  - name: "flags A groundbreaking approach to caching."
+    input: |
       A groundbreaking approach to caching.
-
+    contains: [Writing.PromotionalLanguage]
+  - name: "flags A vibrant community, nestled in the docs."
+    input: |
       A vibrant community, nestled in the docs.
-    want: |
-      1:13:Writing.PromotionalLanguage:'boasts' reads as promotional AI language. Consider a more neutral word.
-      3:3:Writing.PromotionalLanguage:'groundbreaking' reads as promotional AI language. Consider a more neutral word.
-      5:3:Writing.PromotionalLanguage:'vibrant' reads as promotional AI language. Consider a more neutral word.
-      5:22:Writing.PromotionalLanguage:'nestled' reads as promotional AI language. Consider a more neutral word.
-  - name: negatives
-    about: plain technical prose
+    contains: [Writing.PromotionalLanguage]
+  - name: "allows The server handles concurrent requests."
     input: |
       The server handles concurrent requests.
-
+    absent: Writing.PromotionalLanguage
+  - name: "allows A well-tested approach to retries."
+    input: |
       A well-tested approach to retries.
-    want: ""
+    absent: Writing.PromotionalLanguage

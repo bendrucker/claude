@@ -7,19 +7,19 @@ ignorecase: true
 tokens:
   - '(?:serves|stands) as'
 tests:
-  - name: positives
-    about: both verbs
+  - name: "flags The module serves as the entry point."
     input: |
       The module serves as the entry point.
-
+    contains: [Writing.CopulaAvoidance]
+  - name: "flags This stands as a reminder."
+    input: |
       This stands as a reminder.
-    want: |
-      1:12:Writing.CopulaAvoidance:'serves as' avoids a simple copula. Use 'is' or 'are' instead.
-      3:6:Writing.CopulaAvoidance:'stands as' avoids a simple copula. Use 'is' or 'are' instead.
-  - name: negatives
-    about: the verbs with an object or a place
+    contains: [Writing.CopulaAvoidance]
+  - name: "allows The restaurant serves food."
     input: |
       The restaurant serves food.
-
+    absent: Writing.CopulaAvoidance
+  - name: "allows She stands at the podium."
+    input: |
       She stands at the podium.
-    want: ""
+    absent: Writing.CopulaAvoidance

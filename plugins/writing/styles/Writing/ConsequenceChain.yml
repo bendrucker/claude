@@ -10,38 +10,51 @@ ignorecase: true
 tokens:
   - ',\s*so\s+(?:the|an?|this|these|those|its|their|our|my|your|his|her|each|every|any|some|all|both|either|neither|no|it|they|there|that(?!\s+(?:the|an?|this|these|those|its|their|our|my|your|his|her|each|every|any|some|all|no|it|they|we|you|he|she|i|there)\b))\b'
 tests:
-  - name: positives
-    about: a comma and so ahead of a determiner or pronoun subject
+  - name: "flags The cache fills up, so the old entries get evicted."
     input: |
       The cache fills up, so the old entries get evicted.
-
+    contains: [Writing.ConsequenceChain]
+  - name: "flags The worker finishes, so the queue clears."
+    input: |
       The worker finishes, so the queue clears.
-
+    contains: [Writing.ConsequenceChain]
+  - name: "flags The flag is unset, so it falls back to the default."
+    input: |
       The flag is unset, so it falls back to the default.
-
+    contains: [Writing.ConsequenceChain]
+  - name: "flags Both writers hold the lock, so neither request proceeds."
+    input: |
       Both writers hold the lock, so neither request proceeds.
-
+    contains: [Writing.ConsequenceChain]
+  - name: "flags The migration ran twice, so that table has duplicate rows."
+    input: |
       The migration ran twice, so that table has duplicate rows.
-    want: |
-      1:19:Writing.ConsequenceChain:', so the' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately.
-      3:20:Writing.ConsequenceChain:', so the' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately.
-      5:18:Writing.ConsequenceChain:', so it' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately.
-      7:27:Writing.ConsequenceChain:', so neither' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately.
-      9:24:Writing.ConsequenceChain:', so that' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately.
-  - name: negatives
-    about: sentence-initial so, because clauses, purpose so that, so as an adverb, and personal-pronoun subjects
+    contains: [Writing.ConsequenceChain]
+  - name: "allows So the next step is to fix the test."
     input: |
       So the next step is to fix the test.
-
+    absent: Writing.ConsequenceChain
+  - name: "allows This happens because the cache is full."
+    input: |
       This happens because the cache is full.
-
+    absent: Writing.ConsequenceChain
+  - name: "allows Pin the version, so that the build stays reproducible."
+    input: |
       Pin the version, so that the build stays reproducible.
-
+    absent: Writing.ConsequenceChain
+  - name: "allows The queue is long, so long that it stalls."
+    input: |
       The queue is long, so long that it stalls.
-
+    absent: Writing.ConsequenceChain
+  - name: "allows Retry once, or so the docs suggest."
+    input: |
       Retry once, or so the docs suggest.
-
+    absent: Writing.ConsequenceChain
+  - name: "allows The tests never passed in CI, so I rewrote them."
+    input: |
       The tests never passed in CI, so I rewrote them.
-
+    absent: Writing.ConsequenceChain
+  - name: "allows The page was blank, so you reload it."
+    input: |
       The page was blank, so you reload it.
-    want: ""
+    absent: Writing.ConsequenceChain

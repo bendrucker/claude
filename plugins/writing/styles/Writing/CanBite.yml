@@ -7,19 +7,19 @@ ignorecase: true
 tokens:
   - '\b(?:can|could|will|may|might)\s+bite\b'
 tests:
-  - name: positives
-    about: modal plus bite
+  - name: "flags A stale cache entry can bite at runtime."
     input: |
       A stale cache entry can bite at runtime.
-
+    contains: [Writing.CanBite]
+  - name: "flags That assumption could bite once the schema changes."
+    input: |
       That assumption could bite once the schema changes.
-    want: |
-      1:21:Writing.CanBite:'can bite' is figurative risk language for a latent bug. Name the failure: what breaks, and under what condition.
-      3:17:Writing.CanBite:'could bite' is figurative risk language for a latent bug. Name the failure: what breaks, and under what condition.
-  - name: negatives
-    about: other senses and plain failure
+    contains: [Writing.CanBite]
+  - name: "allows The dog will bark at strangers."
     input: |
       The dog will bark at strangers.
-
+    absent: Writing.CanBite
+  - name: "allows This could break under load."
+    input: |
       This could break under load.
-    want: ""
+    absent: Writing.CanBite

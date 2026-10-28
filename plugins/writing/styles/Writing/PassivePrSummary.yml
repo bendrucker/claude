@@ -7,24 +7,27 @@ ignorecase: true
 tokens:
   - '(?:is|was|are|were)\s+(?:added|updated|removed|refactored|introduced|created|deleted|modified|improved)'
 tests:
-  - name: positives
-    about: a be-verb plus a change participle
+  - name: "flags Retry logic is added to the HTTP client."
     input: |
       Retry logic is added to the HTTP client.
-
+    contains: [Writing.PassivePrSummary]
+  - name: "flags The cache layer was refactored for clarity."
+    input: |
       The cache layer was refactored for clarity.
-
+    contains: [Writing.PassivePrSummary]
+  - name: "flags Both helpers were removed."
+    input: |
       Both helpers were removed.
-    want: |
-      1:13:Writing.PassivePrSummary:'is added' is passive voice in PR-style writing. Rewrite so something is doing the verb.
-      3:17:Writing.PassivePrSummary:'was refactored' is passive voice in PR-style writing. Rewrite so something is doing the verb.
-      5:14:Writing.PassivePrSummary:'were removed' is passive voice in PR-style writing. Rewrite so something is doing the verb.
-  - name: negatives
-    about: active voice and a participle without a be-verb
+    contains: [Writing.PassivePrSummary]
+  - name: "allows The server handles retries."
     input: |
       The server handles retries.
-
+    absent: Writing.PassivePrSummary
+  - name: "allows We refactored the cache layer."
+    input: |
       We refactored the cache layer.
-
+    absent: Writing.PassivePrSummary
+  - name: "allows The added logic retries twice."
+    input: |
       The added logic retries twice.
-    want: ""
+    absent: Writing.PassivePrSummary

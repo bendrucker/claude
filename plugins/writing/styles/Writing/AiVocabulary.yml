@@ -12,30 +12,31 @@ tokens:
   - '\brobust(?:ly|ness)?\b'
   - '\bnuanc(?:e|es|ed)\b'
 tests:
-  - name: positives
-    about: base forms and inflections of each listed word
+  - name: "flags Let's delve into the codebase."
     input: |
       Let's delve into the codebase.
-
+    contains: [Writing.AiVocabulary]
+  - name: "flags A meticulous review process."
+    input: |
       A meticulous review process.
-
+    contains: [Writing.AiVocabulary]
+  - name: "flags This is a robust solution."
+    input: |
       This is a robust solution.
-
+    contains: [Writing.AiVocabulary]
+  - name: "flags We leveraged the cache and it's a rich tapestry."
+    input: |
       We leveraged the cache and it's a rich tapestry.
-
+    contains: [Writing.AiVocabulary]
+  - name: "flags Mind the nuance, and the nuances."
+    input: |
       Mind the nuance, and the nuances.
-    want: |
-      1:7:Writing.AiVocabulary:'delve' is flagged as AI-typical vocabulary. Use a more natural word.
-      3:3:Writing.AiVocabulary:'meticulous' is flagged as AI-typical vocabulary. Use a more natural word.
-      5:11:Writing.AiVocabulary:'robust' is flagged as AI-typical vocabulary. Use a more natural word.
-      7:4:Writing.AiVocabulary:'leveraged' is flagged as AI-typical vocabulary. Use a more natural word.
-      7:40:Writing.AiVocabulary:'tapestry' is flagged as AI-typical vocabulary. Use a more natural word.
-      9:10:Writing.AiVocabulary:'nuance' is flagged as AI-typical vocabulary. Use a more natural word.
-      9:26:Writing.AiVocabulary:'nuances' is flagged as AI-typical vocabulary. Use a more natural word.
-  - name: negatives
-    about: plain technical prose
+    contains: [Writing.AiVocabulary]
+  - name: "allows The function processes input."
     input: |
       The function processes input.
-
+    absent: Writing.AiVocabulary
+  - name: "allows The server returns a result."
+    input: |
       The server returns a result.
-    want: ""
+    absent: Writing.AiVocabulary

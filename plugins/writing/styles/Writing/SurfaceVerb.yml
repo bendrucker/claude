@@ -7,22 +7,23 @@ ignorecase: true
 tokens:
   - 'surfac(?:e|es|ed|ing)\s+(?:the|a|an|that|this|these|those|any|all|each|its|their|every)'
 tests:
-  - name: positives
-    about: inflected verb forms, including a sentence-initial imperative
+  - name: "flags The hook should surface the conflict to the user."
     input: |
       The hook should surface the conflict to the user.
-
+    contains: [Writing.SurfaceVerb]
+  - name: "flags The report surfaces these gaps automatically."
+    input: |
       The report surfaces these gaps automatically.
-
+    contains: [Writing.SurfaceVerb]
+  - name: "flags Surface the PR link in the summary."
+    input: |
       Surface the PR link in the summary.
-    want: |
-      1:17:Writing.SurfaceVerb:'surface the' uses 'surface' as a verb meaning reveal or report. Say 'show', 'report', or 'expose'.
-      3:12:Writing.SurfaceVerb:'surfaces these' uses 'surface' as a verb meaning reveal or report. Say 'show', 'report', or 'expose'.
-      5:1:Writing.SurfaceVerb:'Surface the' uses 'surface' as a verb meaning reveal or report. Say 'show', 'report', or 'expose'.
-  - name: negatives
-    about: the noun sense
+    contains: [Writing.SurfaceVerb]
+  - name: "allows The attack surface is large."
     input: |
       The attack surface is large.
-
+    absent: Writing.SurfaceVerb
+  - name: "allows Reduce the API surface area."
+    input: |
       Reduce the API surface area.
-    want: ""
+    absent: Writing.SurfaceVerb

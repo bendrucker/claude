@@ -13,43 +13,59 @@ tokens:
   - '\b(?:0|zero)\s+(?:errors?|failures?|warnings?)\b'
   - '\b(?:ci|tests?|checks?|build|lint|typecheck|suite|pipeline)\s+(?:(?:is|are)\s+)?(?:now\s+)?(?:green|clean)\b'
 tests:
-  - name: positives
-    about: counts, all-pass claims, zero-error claims, and CI status
+  - name: "flags All 8 tests pass. Now let me check the linter."
     input: |
       All 8 tests pass. Now let me check the linter.
-
+    contains: [Writing.TestResultReporting]
+  - name: "flags 3/3 passing on Sonnet 4.6."
+    input: |
       3/3 passing on Sonnet 4.6.
-
+    contains: [Writing.TestResultReporting]
+  - name: "flags Both pass on main."
+    input: |
       Both pass on main.
-
+    contains: [Writing.TestResultReporting]
+  - name: "flags CI is green."
+    input: |
       CI is green.
-
+    contains: [Writing.TestResultReporting]
+  - name: "flags Zero failures on the last run."
+    input: |
       Zero failures on the last run.
-
+    contains: [Writing.TestResultReporting]
+  - name: "flags The tests passed locally."
+    input: |
       The tests passed locally.
-    want: |
-      1:1:Writing.TestResultReporting:'All 8 tests pass' reports a test result, count, or CI status. Describe what is covered instead.
-      3:1:Writing.TestResultReporting:'3/3 passing' reports a test result, count, or CI status. Describe what is covered instead.
-      5:1:Writing.TestResultReporting:'Both pass' reports a test result, count, or CI status. Describe what is covered instead.
-      7:1:Writing.TestResultReporting:'CI is green' reports a test result, count, or CI status. Describe what is covered instead.
-      9:1:Writing.TestResultReporting:'Zero failures' reports a test result, count, or CI status. Describe what is covered instead.
-      11:5:Writing.TestResultReporting:'tests passed' reports a test result, count, or CI status. Describe what is covered instead.
-  - name: negatives
-    about: failures with a cause, imperatives, and pass used as a noun
+    contains: [Writing.TestResultReporting]
+  - name: "allows The tests fail because processInput is now async."
     input: |
       The tests fail because processInput is now async.
-
+    absent: Writing.TestResultReporting
+  - name: "allows Write a test for this function."
+    input: |
       Write a test for this function.
-
+    absent: Writing.TestResultReporting
+  - name: "allows Apply every fix in this one pass."
+    input: |
       Apply every fix in this one pass.
-
+    absent: Writing.TestResultReporting
+  - name: "allows Both edits land in a single pass."
+    input: |
       Both edits land in a single pass.
-
+    absent: Writing.TestResultReporting
+  - name: "allows The uninstall pass removes the links."
+    input: |
       The uninstall pass removes the links.
-
+    absent: Writing.TestResultReporting
+  - name: "allows Start from one clean checkout."
+    input: |
       Start from one clean checkout.
-
+    absent: Writing.TestResultReporting
+  - name: "allows Pass the flag to skip the cache."
+    input: |
       Pass the flag to skip the cache.
-
+    absent: Writing.TestResultReporting
+  - name: "allows Retry if the checks pass."
+    input: |
       Retry if the checks pass.
-    want: ""
+    absent: Writing.TestResultReporting

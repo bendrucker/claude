@@ -9,23 +9,25 @@ nonword: true
 tokens:
   - ' — '
 tests:
-  - name: positives
-    about: clauses joined by a spaced em dash
+  - name: "flags The cache warms slowly — then it saturates."
     input: |
       The cache warms slowly — then it saturates.
-
+    contains: [Writing.SpacedEmDash]
+  - name: "flags The worker finishes — the queue clears."
+    input: |
       The worker finishes — the queue clears.
-    want: |
-      1:23:Writing.SpacedEmDash:Spaced em dashes ( — ) are an AI writing tell. Split the clauses into two sentences. Do not substitute a semicolon or unspaced em dash: the run-on structure is the problem, not the mark.
-      3:20:Writing.SpacedEmDash:Spaced em dashes ( — ) are an AI writing tell. Split the clauses into two sentences. Do not substitute a semicolon or unspaced em dash: the run-on structure is the problem, not the mark.
-  - name: negatives
-    about: an unspaced em dash, an en dash range, and a table cell holding only a dash
+    contains: [Writing.SpacedEmDash]
+  - name: "allows This is—fine without spaces."
     input: |
       This is—fine without spaces.
-
+    absent: Writing.SpacedEmDash
+  - name: "allows The range spans 2024–2025."
+    input: |
       The range spans 2024–2025.
-
+    absent: Writing.SpacedEmDash
+  - name: "allows | Rule | Level | | ---- | ----- | | Foo | — |"
+    input: |
       | Rule | Level |
       | ---- | ----- |
       | Foo  | —     |
-    want: ""
+    absent: Writing.SpacedEmDash

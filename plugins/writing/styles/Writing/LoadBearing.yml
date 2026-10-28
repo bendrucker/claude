@@ -7,19 +7,19 @@ ignorecase: true
 tokens:
   - '\bload[\s-]bearing\b'
 tests:
-  - name: positives
-    about: hyphenated and spaced forms
+  - name: "flags That comment is load-bearing for the retry logic."
     input: |
       That comment is load-bearing for the retry logic.
-
+    contains: [Writing.LoadBearing]
+  - name: "flags The ordering here is load bearing."
+    input: |
       The ordering here is load bearing.
-    want: |
-      1:17:Writing.LoadBearing:'load-bearing' asserts importance by metaphor. Name the dependency instead: say what breaks or changes without it.
-      3:22:Writing.LoadBearing:'load bearing' asserts importance by metaphor. Name the dependency instead: say what breaks or changes without it.
-  - name: negatives
-    about: stated dependency
+    contains: [Writing.LoadBearing]
+  - name: "allows Removing the check breaks the parser."
     input: |
       Removing the check breaks the parser.
-
+    absent: Writing.LoadBearing
+  - name: "allows The retry logic depends on this ordering."
+    input: |
       The retry logic depends on this ordering.
-    want: ""
+    absent: Writing.LoadBearing

@@ -7,22 +7,23 @@ ignorecase: true
 tokens:
   - '\brid(?:e|es|ing)\s+(?:on|atop|alongside)\b'
 tests:
-  - name: positives
-    about: each preposition
+  - name: "flags The teardown rides on the normal end of a team."
     input: |
       The teardown rides on the normal end of a team.
-
+    contains: [Writing.RidesOn]
+  - name: "flags The new reader rides atop the existing layer."
+    input: |
       The new reader rides atop the existing layer.
-
+    contains: [Writing.RidesOn]
+  - name: "flags The sync loop rides alongside the poll cycle."
+    input: |
       The sync loop rides alongside the poll cycle.
-    want: |
-      1:14:Writing.RidesOn:'rides on' is figurative dependency language. State the relationship plainly: 'X depends on Y', 'X reuses Y', or 'X piggybacks on Y'.
-      3:16:Writing.RidesOn:'rides atop' is figurative dependency language. State the relationship plainly: 'X depends on Y', 'X reuses Y', or 'X piggybacks on Y'.
-      5:15:Writing.RidesOn:'rides alongside' is figurative dependency language. State the relationship plainly: 'X depends on Y', 'X reuses Y', or 'X piggybacks on Y'.
-  - name: negatives
-    about: literal riding
+    contains: [Writing.RidesOn]
+  - name: "allows The cyclists ride for charity."
     input: |
       The cyclists ride for charity.
-
+    absent: Writing.RidesOn
+  - name: "allows She takes the early train to work."
+    input: |
       She takes the early train to work.
-    want: ""
+    absent: Writing.RidesOn

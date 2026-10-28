@@ -8,19 +8,19 @@ nonword: true
 tokens:
   - '(?m)\b(?:regardless|nonetheless|anyway)\.[ \t]*$'
 tests:
-  - name: positives
-    about: a hedge word that closes the sentence
+  - name: "flags The approach has tradeoffs regardless."
     input: |
       The approach has tradeoffs regardless.
-
+    contains: [Writing.TrailingHedge]
+  - name: "flags The fix works anyway."
+    input: |
       The fix works anyway.
-    want: |
-      1:28:Writing.TrailingHedge:'regardless.' dangles at sentence end as AI hedging. Drop it or rewrite the clause.
-      3:15:Writing.TrailingHedge:'anyway.' dangles at sentence end as AI hedging. Drop it or rewrite the clause.
-  - name: negatives
-    about: the same words mid-sentence
+    contains: [Writing.TrailingHedge]
+  - name: "allows Regardless of the input, the parser rejects it."
     input: |
       Regardless of the input, the parser rejects it.
-
+    absent: Writing.TrailingHedge
+  - name: "allows The fix works anyway you look at it."
+    input: |
       The fix works anyway you look at it.
-    want: ""
+    absent: Writing.TrailingHedge

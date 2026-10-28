@@ -10,34 +10,43 @@ exceptions:
 tokens:
   - '\bno\s+(?:[a-z-]+\s+){0,3}?[a-z-]+\s+(?:(?:is|are|was|were|will|would|should|could|can|be|being|been|ever|really|actually|strictly|even|typically|usually|generally|always|also|then|now|yet|just)\s+){0,3}(?:needed|required|necessary)\b'
 tests:
-  - name: positives
-    about: an advertised absent artifact, with and without an auxiliary or adverb
+  - name: "flags Handlers are auto-discovered, no config needed."
     input: |
       Handlers are auto-discovered, no config needed.
-
+    contains: [Writing.NoXNeededBrag]
+  - name: "flags It runs inline (no wrapper needed)."
+    input: |
       It runs inline (no wrapper needed).
-
+    contains: [Writing.NoXNeededBrag]
+  - name: "flags Spin it up with no docker needed."
+    input: |
       Spin it up with no docker needed.
-
+    contains: [Writing.NoXNeededBrag]
+  - name: "flags It’s wired up, no config is required."
+    input: |
       It’s wired up, no config is required.
-
+    contains: [Writing.NoXNeededBrag]
+  - name: "flags Setup is trivial, no extra tooling will be strictly neces..."
+    input: |
       Setup is trivial, no extra tooling will be strictly necessary.
-    want: |
-      1:31:Writing.NoXNeededBrag:'no config needed' advertises what the design avoids. Describe what it does instead.
-      3:17:Writing.NoXNeededBrag:'no wrapper needed' advertises what the design avoids. Describe what it does instead.
-      5:17:Writing.NoXNeededBrag:'no docker needed' advertises what the design avoids. Describe what it does instead.
-      7:16:Writing.NoXNeededBrag:'no config is required' advertises what the design avoids. Describe what it does instead.
-      9:19:Writing.NoXNeededBrag:'no extra tooling will be strictly necessary' advertises what the design avoids. Describe what it does instead.
-  - name: negatives
-    about: status reports, extra nouns, and a clause boundary inside the gap
+    contains: [Writing.NoXNeededBrag]
+  - name: "allows Reviewed the helper, no change needed."
     input: |
       Reviewed the helper, no change needed.
-
+    absent: Writing.NoXNeededBrag
+  - name: "allows No further action needed here."
+    input: |
       No further action needed here.
-
+    absent: Writing.NoXNeededBrag
+  - name: "allows There is no way the runtime needed that much memory."
+    input: |
       There is no way the runtime needed that much memory.
-
+    absent: Writing.NoXNeededBrag
+  - name: "allows No migration is required."
+    input: |
       No migration is required.
-
+    absent: Writing.NoXNeededBrag
+  - name: "allows No changes will be needed."
+    input: |
       No changes will be needed.
-    want: ""
+    absent: Writing.NoXNeededBrag

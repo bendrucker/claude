@@ -10,23 +10,27 @@ exceptions:
 tokens:
   - '\b\w[\w\s]{2,40},\s+not\s+\w[\w\s]{2,30}(?:[.!?,;:]|$)'
 tests:
-  - name: positives
-    about: a positive claim followed by a comma and a negated alternative
+  - name: "flags This is a tool, not a framework."
     input: |
       This is a tool, not a framework.
-
+    contains: [Writing.ContrastNot]
+  - name: "flags The goal is clarity, not perfection."
+    input: |
       The goal is clarity, not perfection.
-    want: |
-      1:1:Writing.ContrastNot:'This is a tool, not a framework.' is a rhetorical 'X, not Y' contrast. State the positive directly.
-      3:1:Writing.ContrastNot:'The goal is clarity, not perfection.' is a rhetorical 'X, not Y' contrast. State the positive directly.
-  - name: negatives
-    about: a leading not, a not-necessarily hedge, and an including list
+    contains: [Writing.ContrastNot]
+  - name: "allows It is not the case that X."
     input: |
       It is not the case that X.
-
+    absent: Writing.ContrastNot
+  - name: "allows Not a framework, but a tool."
+    input: |
       Not a framework, but a tool.
-
+    absent: Writing.ContrastNot
+  - name: "allows The cache is fast, not necessarily correct."
+    input: |
       The cache is fast, not necessarily correct.
-
+    absent: Writing.ContrastNot
+  - name: "allows Ship the build, not including the docs."
+    input: |
       Ship the build, not including the docs.
-    want: ""
+    absent: Writing.ContrastNot

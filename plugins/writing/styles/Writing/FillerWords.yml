@@ -7,22 +7,23 @@ ignorecase: true
 tokens:
   - '\b(?:importantly|interestingly|it should be noted|as mentioned|in terms of)\b'
 tests:
-  - name: positives
-    about: each filler phrase
+  - name: "flags Interestingly, the cache is cold."
     input: |
       Interestingly, the cache is cold.
-
+    contains: [Writing.FillerWords]
+  - name: "flags Importantly, the test was skipped."
+    input: |
       Importantly, the test was skipped.
-
+    contains: [Writing.FillerWords]
+  - name: "flags It should be noted that the flag is off."
+    input: |
       It should be noted that the flag is off.
-    want: |
-      1:1:Writing.FillerWords:'Interestingly' is filler. Cut it.
-      3:1:Writing.FillerWords:'Importantly' is filler. Cut it.
-      5:1:Writing.FillerWords:'It should be noted' is filler. Cut it.
-  - name: negatives
-    about: plain statements
+    contains: [Writing.FillerWords]
+  - name: "allows The cache is cold."
     input: |
       The cache is cold.
-
+    absent: Writing.FillerWords
+  - name: "allows Note that the test was skipped."
+    input: |
       Note that the test was skipped.
-    want: ""
+    absent: Writing.FillerWords

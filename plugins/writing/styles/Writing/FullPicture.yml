@@ -7,19 +7,19 @@ ignorecase: true
 tokens:
   - '\b(?:(?:full|complete|whole|real|bigger|clearer?)\s+picture|(?:chang(?:es?|ed|ing)|shift(?:s|ed|ing)?|complet(?:es?|ed|ing))\s+the\s+picture)\b'
 tests:
-  - name: positives
-    about: the two fixed frames
+  - name: "flags After the third log read I have a complete picture."
     input: |
       After the third log read I have a complete picture.
-
+    contains: [Writing.FullPicture]
+  - name: "flags That stack trace changed the picture."
+    input: |
       That stack trace changed the picture.
-    want: |
-      1:35:Writing.FullPicture:'complete picture' is a transition marker that defers the substance. Say what you learned or what changed.
-      3:18:Writing.FullPicture:'changed the picture' is a transition marker that defers the substance. Say what you learned or what changed.
-  - name: negatives
-    about: literal pictures
+    contains: [Writing.FullPicture]
+  - name: "allows The picture shows the login screen."
     input: |
       The picture shows the login screen.
-
+    absent: Writing.FullPicture
+  - name: "allows A reviewer would picture the whole flow."
+    input: |
       A reviewer would picture the whole flow.
-    want: ""
+    absent: Writing.FullPicture

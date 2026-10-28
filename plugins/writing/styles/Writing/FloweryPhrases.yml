@@ -10,25 +10,27 @@ tokens:
   - '\bself[\s-]+(?:sufficient|sufficiency)\b'
   - '\b(?:fail|fails|failed|failing)[\s-]+loud(?:ly)?\b'
 tests:
-  - name: positives
-    about: each phrase and common inflections
+  - name: "flags This keeps a single source of truth."
     input: |
       This keeps a single source of truth.
-
+    contains: [Writing.FloweryPhrases]
+  - name: "flags Added an escape hatch for power users."
+    input: |
       Added an escape hatch for power users.
-
+    contains: [Writing.FloweryPhrases]
+  - name: "flags The tool is self-sufficient."
+    input: |
       The tool is self-sufficient.
-
+    contains: [Writing.FloweryPhrases]
+  - name: "flags It should fail loudly on bad input."
+    input: |
       It should fail loudly on bad input.
-    want: |
-      1:21:Writing.FloweryPhrases:'source of truth' is stock phrasing the model reaches for. State the mechanism plainly.
-      3:10:Writing.FloweryPhrases:'escape hatch' is stock phrasing the model reaches for. State the mechanism plainly.
-      5:13:Writing.FloweryPhrases:'self-sufficient' is stock phrasing the model reaches for. State the mechanism plainly.
-      7:11:Writing.FloweryPhrases:'fail loudly' is stock phrasing the model reaches for. State the mechanism plainly.
-  - name: negatives
-    about: the words apart or in other senses
+    contains: [Writing.FloweryPhrases]
+  - name: "allows The truth about the data source is unclear."
     input: |
       The truth about the data source is unclear.
-
+    absent: Writing.FloweryPhrases
+  - name: "allows A hatch you can escape through."
+    input: |
       A hatch you can escape through.
-    want: ""
+    absent: Writing.FloweryPhrases

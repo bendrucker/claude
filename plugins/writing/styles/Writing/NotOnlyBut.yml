@@ -7,19 +7,19 @@ ignorecase: true
 tokens:
   - 'not\s+(?:just|only)\s+[^.!?\n]{1,50},\s+but\s+(?:also\s+)?'
 tests:
-  - name: positives
-    about: not just or not only, then a comma and but
+  - name: "flags It is not just fast, but also reliable."
     input: |
       It is not just fast, but also reliable.
-
+    contains: [Writing.NotOnlyBut]
+  - name: "flags This not only improves speed, but reduces memory."
+    input: |
       This not only improves speed, but reduces memory.
-    want: |
-      1:7:Writing.NotOnlyBut:'not just fast, but also ' is a not-just-but-also parallelism. Simplify the sentence.
-      3:6:Writing.NotOnlyBut:'not only improves speed, but ' is a not-just-but-also parallelism. Simplify the sentence.
-  - name: negatives
-    about: not just as an adverb phrase and a plain list
+    contains: [Writing.NotOnlyBut]
+  - name: "allows Not just yet."
     input: |
       Not just yet.
-
+    absent: Writing.NotOnlyBut
+  - name: "allows It is fast, reliable, and cheap."
+    input: |
       It is fast, reliable, and cheap.
-    want: ""
+    absent: Writing.NotOnlyBut

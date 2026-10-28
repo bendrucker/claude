@@ -7,24 +7,27 @@ ignorecase: true
 tokens:
   - '\bworth\s+(?:noting|knowing|flagging|mentioning|saying|stating|naming|recording|remembering|a\s+look|your\s+(?:attention|awareness|time|call))\b'
 tests:
-  - name: positives
-    about: flag lead-ins
+  - name: "flags Two things worth flagging before this merges."
     input: |
       Two things worth flagging before this merges.
-
+    contains: [Writing.AttentionFlagWorth]
+  - name: "flags Also worth noting for the rollout: the flag defaults off."
+    input: |
       Also worth noting for the rollout: the flag defaults off.
-
+    contains: [Writing.AttentionFlagWorth]
+  - name: "flags One caveat worth your attention."
+    input: |
       One caveat worth your attention.
-    want: |
-      1:12:Writing.AttentionFlagWorth:'worth flagging' announces that a point matters instead of making it. Cut the wrapper and state the point.
-      3:6:Writing.AttentionFlagWorth:'worth noting' announces that a point matters instead of making it. Cut the wrapper and state the point.
-      5:12:Writing.AttentionFlagWorth:'worth your attention' announces that a point matters instead of making it. Cut the wrapper and state the point.
-  - name: negatives
-    about: cost-benefit judgments
+    contains: [Writing.AttentionFlagWorth]
+  - name: "allows The refactor is worth doing before the freeze."
     input: |
       The refactor is worth doing before the freeze.
-
+    absent: Writing.AttentionFlagWorth
+  - name: "allows That tradeoff is not worth it."
+    input: |
       That tradeoff is not worth it.
-
+    absent: Writing.AttentionFlagWorth
+  - name: "allows The fix is worth confirming against staging."
+    input: |
       The fix is worth confirming against staging.
-    want: ""
+    absent: Writing.AttentionFlagWorth

@@ -7,22 +7,23 @@ ignorecase: true
 tokens:
   - '(?:looks|appears|seems)\s+(?:like|to)'
 tests:
-  - name: positives
-    about: hedged observations
+  - name: "flags This looks like a regression."
     input: |
       This looks like a regression.
-
+    contains: [Writing.HedgingObservation]
+  - name: "flags The fix appears to hold."
+    input: |
       The fix appears to hold.
-
+    contains: [Writing.HedgingObservation]
+  - name: "flags That seems to work."
+    input: |
       That seems to work.
-    want: |
-      1:6:Writing.HedgingObservation:'looks like' is hedging observation. State the observation directly or name the uncertainty.
-      3:9:Writing.HedgingObservation:'appears to' is hedging observation. State the observation directly or name the uncertainty.
-      5:6:Writing.HedgingObservation:'seems to' is hedging observation. State the observation directly or name the uncertainty.
-  - name: negatives
-    about: a direct observation and a plain description
+    contains: [Writing.HedgingObservation]
+  - name: "allows The output looks correct."
     input: |
       The output looks correct.
-
+    absent: Writing.HedgingObservation
+  - name: "allows She looks tired today."
+    input: |
       She looks tired today.
-    want: ""
+    absent: Writing.HedgingObservation

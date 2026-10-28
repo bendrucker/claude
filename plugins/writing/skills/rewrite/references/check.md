@@ -1,6 +1,6 @@
 # Output Check
 
-Questions to answer about the rewritten draft before returning it. `scan.ts` already covers the fixed-phrase checks, so these cover only what a regex cannot see. Read the rewrite beside the original, answer each, fix what fails, then check again.
+Questions to answer about the rewritten draft before returning it. Vale already covers the fixed-phrase checks, so these cover only what a regex cannot see. Read the rewrite beside the original, answer each, fix what fails, then check again.
 
 - Does every claim in the rewrite appear in the original? A rewrite that introduces a fact, a number, a cause, or a hedge has invented it.
 - Does every claim in the original survive? Compression that quietly drops a condition or a caveat changed the meaning, however much better it reads.

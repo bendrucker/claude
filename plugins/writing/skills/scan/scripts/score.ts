@@ -1,8 +1,11 @@
+#!/usr/bin/env bun
+import { cli } from "cleye";
 import { table } from "table";
 import { stripCode } from "../../../detection/code-spans";
 import { extractComments } from "../../../detection/comments";
 import { isProseFile } from "../../../detection/paths";
 import { lintProse } from "../../../detection/vale";
+import { readInput } from "../../../scripts/io";
 
 export interface CheckScore {
   check: string;
@@ -115,4 +118,45 @@ export function renderTable(report: ScoreReport): string {
     sections.push(`${header}\n${table([["Check", "Hits", "Density /1k"], ...rows])}`.trimEnd());
   }
   return sections.join("\n\n");
+}
+
+if (import.meta.main) {
+  await cli(
+    {
+      name: "score",
+      parameters: ["[input]"],
+      help: {
+        description:
+          "Score one input (file path, inline text, or stdin) for trope density per 1000 words. Informational: always exits 0.",
+      },
+      flags: {
+        json: {
+          type: Boolean,
+          description: "Emit the report as JSON for comparing two runs",
+          default: false,
+        },
+        comments: {
+          type: Boolean,
+          description:
+            "Force comment extraction on (defaults on for non-prose source files, off for prose)",
+        },
+        noComments: {
+          type: Boolean,
+          description: "Force comment extraction off",
+          default: false,
+        },
+      },
+    },
+    async (argv) => {
+      const { text, filePath } = await readInput(argv._.input);
+      if (argv.flags.comments === true && filePath === undefined) {
+        console.error("--comments needs a file path to pick the comment syntax.");
+        process.exit(1);
+      }
+      const report = await buildReport(text, filePath, {
+        comments: shouldScoreComments(filePath, argv.flags.comments, argv.flags.noComments),
+      });
+      console.log(argv.flags.json ? JSON.stringify(report, null, 2) : renderTable(report));
+    },
+  );
 }

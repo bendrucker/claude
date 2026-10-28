@@ -50,7 +50,7 @@ function renderMany(findings: HookFinding[], omitted: number, target: ReportTarg
     lines.push(`- ${at}${finding.check}${mark}: ${finding.message}`);
   }
   if (omitted > 0) {
-    lines.push(`- …and ${omitted} more. Run writing:scan --input to see all.`);
+    lines.push(`- …and ${omitted} more. Lint the text with Vale to see all.`);
   }
   return lines.join("\n");
 }

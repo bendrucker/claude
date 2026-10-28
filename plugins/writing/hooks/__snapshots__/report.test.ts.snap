@@ -16,7 +16,7 @@ exports[`report caps the list and counts the rest 1`] = `
 - rule 7: Cut the filler.
 - rule 8: Cut the filler.
 - rule 9: Cut the filler.
-- …and 3 more. Run writing:scan --input to see all."
+- …and 3 more. Lint the text with Vale to see all."
 ,
     "hookEventName": "PreToolUse",
   },

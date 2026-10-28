@@ -34,13 +34,13 @@ If `$ARGUMENTS` is a path to an existing file, read the file. Otherwise treat it
 
 ## Lint
 
-Before and after rewriting, run the scan script in single-input mode to find Vale alerts. It accepts a file path, inline text, or stdin and outputs one finding per line (`line:col: check: message`):
+Before and after rewriting, lint the draft with Vale to find its alerts. It prints one per line (`path:line:col:check:message`):
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/../scan/scripts/scan.ts --input path/to/file.md
+vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line path/to/file.md
 ```
 
-Pass `--message` when the rewrite target is a message body (PR, issue, comment, commit).
+When the rewrite target is a message body (PR, issue, comment), pipe it on stdin with `--ext=.prbody`, or `--ext=.commitmsg` for a commit message.
 
 Fix every hard tell (em dash, copula avoidance, hedging, filler, vocabulary, and the other fixed-phrase checks), then re-run until those are clean.
 

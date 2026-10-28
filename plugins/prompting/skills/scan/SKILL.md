@@ -1,7 +1,7 @@
 ---
 name: prompting:scan
 description: "Report prompt defects a lexical scan finds in documents a model executes. Use to audit a repository's skills, CLAUDE.md, agent definitions, or a product's prompt files, or to gate them in CI or a pre-commit hook."
-argument-hint: "[<path>] [--all] [--quiet]"
+argument-hint: "[<path>...] [--all] [--quiet]"
 effort: low
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts:*)
@@ -11,15 +11,15 @@ allowed-tools:
 
 # Scan
 
-Run the scanner over the path in `$ARGUMENTS`, defaulting to the current directory:
+Run the scanner over the paths in `$ARGUMENTS`, defaulting to the current directory:
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts [<path>] [--all] [--quiet]
+bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts [<path>...] [--all] [--quiet]
 ```
 
 It reports each alert as `file:line:col: check: message` on stdout and a per-check count table on stderr, and exits non-zero on any alert. `--quiet` drops the table.
 
-Without `--all` it reads the paths that hold documents a model executes: `SKILL.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/agents`, `.claude/commands`, `.claude/rules`, a skill's `references/`, and a `prompt/` or `prompts/` directory holding `.md` or `.txt` files. Use `--all` for a prompt that lives somewhere else, such as one extracted from a string in a product repo. A directory walk reads `.md` and `.txt` under either setting, so `--all` widens which documents count without pulling in source files.
+Without `--all` it reads the paths that hold documents a model executes: `SKILL.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/agents`, `.claude/commands`, `.claude/rules`, a skill's `references/`, and a `prompt/` or `prompts/` directory holding `.md` or `.txt` files. Use `--all` for a prompt that lives somewhere else, such as one extracted from a string in a product repo. It reads `.md` and `.txt` under either setting, so `--all` widens which documents count without pulling in source files. It skips `node_modules`, `.git`, `fixtures`, and `__snapshots__`.
 
 ## Checks
 

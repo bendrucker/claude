@@ -95,13 +95,13 @@ export async function candidateConfig(rules: readonly string[], base: string): P
   return config;
 }
 
-interface Document {
+interface PreImage {
   before: string;
   removed: Set<number>;
 }
 
-function documents(repo: string, commits: string[], labels: Labels): Document[] {
-  const docs: Document[] = [];
+function documents(repo: string, commits: string[], labels: Labels): PreImage[] {
+  const docs: PreImage[] = [];
   for (const commit of commits) {
     const parent = git(repo, ["rev-parse", `${commit}^`]).trim();
     if (parent.length === 0) continue;
@@ -141,7 +141,7 @@ export async function measure(
   try {
     const paths = docs.map((_, index) => join(dir, `${index}.md`));
     await Promise.all(docs.map((doc, index) => Bun.write(paths[index] ?? "", doc.before)));
-    const alerts = await lint(paths, config);
+    const alerts = await lint(paths, { config });
     for (const [index, doc] of docs.entries()) {
       for (const alert of alerts.get(paths[index] ?? "") ?? []) {
         flagged.set(alert.Check, (flagged.get(alert.Check) ?? 0) + 1);

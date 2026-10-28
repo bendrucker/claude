@@ -66,15 +66,18 @@ describe("lint", () => {
     ]);
   });
 
-  test("keys alerts by the path as given, ordered by position", async () => {
+  test("keys alerts by cleaned path, ordered by position", async () => {
     const clean = await write("clean.md", "Write it.\n");
-    await write("both.md", "Please read it.\n\nMake sure it works.\n");
-    const given = `${dir}/./both.md`;
-    const alerts = await lint([clean, given]);
-    expect([...alerts.keys()]).toEqual([given]);
-    expect(alerts.get(given)?.map((alert) => alert.Check)).toEqual([
-      "Prompting.NoOp",
-      "Prompting.VagueCriterion",
+    const both = await write(
+      "both.md",
+      "Make sure to read it. Please try.\n\nMake sure it works.\n",
+    );
+    const alerts = await lint([clean, `${dir}/./both.md`]);
+    expect([...alerts.keys()]).toEqual([both]);
+    expect(alerts.get(both)?.map((alert) => [alert.Line, alert.Span[0]])).toEqual([
+      [1, 1],
+      [1, 23],
+      [3, 1],
     ]);
   });
 });

@@ -1,6 +1,6 @@
-import { join } from "node:path";
 import { mean } from "simple-statistics";
 import { z } from "zod";
+import { type RunRef, resultPath, tracePath } from "./layout";
 
 /**
  * The runner's `aggregate-result.json`, parsed loosely: the runner adds fields without renaming
@@ -83,6 +83,10 @@ export function erroredRuns(result: Result): Errored[] {
 export interface ScoredRun {
   /** Verdicts, with the runner's defaults for an omitted weight, `scored`, or `withOnly`. */
   graders: z.input<typeof Grader>[];
+  /** Overrides the score the graders give, for a scorer that ranks rather than passes. */
+  score?: number | undefined;
+  /** Kept on the run as `metrics`. */
+  metrics?: Record<string, number> | undefined;
   /** The run's final reply, written as its trace so `compare.ts` counts its words. */
   reply?: string | undefined;
   error?: string | undefined;
@@ -107,10 +111,11 @@ export async function writeResult(
         runs.map((r, i): Run => {
           if (r.reply !== undefined) {
             const line = JSON.stringify({ type: "result", result: r.reply });
-            traces.push(Bun.write(join(dir, "traces", `${name}-${arm}-${i}.jsonl`), line));
+            traces.push(Bun.write(tracePath(dir, name, arm, i), line));
           }
           const run = Run.parse({ score: 0, graders: r.graders, error: r.error ?? null });
-          return { ...run, score: score(run, arm) };
+          const metrics = r.metrics === undefined ? {} : { metrics: r.metrics };
+          return { ...run, ...metrics, score: r.score ?? score(run, arm) };
         }),
       ]),
     );
@@ -128,9 +133,13 @@ export async function writeResult(
     },
     cases: written,
   };
-  await Promise.all([
-    ...traces,
-    Bun.write(join(dir, "aggregate-result.json"), JSON.stringify(result, null, 2)),
-  ]);
+  await Promise.all([...traces, Bun.write(resultPath(dir), JSON.stringify(result, null, 2))]);
   return Result.parse(result);
+}
+
+/** Every run in a result, in case, arm, and run order. */
+export function* eachRun(result: Result): Iterable<RunRef & { run: Run }> {
+  for (const c of result.cases)
+    for (const [arm, list] of Object.entries(c.arms))
+      for (const [n, run] of list.entries()) yield { case: c.name, arm, n, run };
 }

@@ -102,3 +102,18 @@ test("writeResult scores runs as the runner does and writes a trace per reply", 
   const cell = (await loadColumn([join(dir, "aggregate-result.json")])).get("c/with");
   expect([cell?.scores, cell?.words]).toEqual([[0.5, 1], [2]]);
 });
+
+test("writeResult takes a scorer's own score and keeps its metrics on the run", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "write-"));
+  await writeResult(dir, {
+    c: {
+      with: [
+        { score: 0.5, graders: [grader("lead@1", false)], metrics: { tokens: 10, seconds: 2 } },
+        { graders: [grader("lead@1", true)] },
+      ],
+    },
+  });
+  const runs = (await readResult(join(dir, "aggregate-result.json"))).cases[0]?.arms.with;
+  expect(runs?.map((r) => r.score)).toEqual([0.5, 1]);
+  expect(runs?.map((r) => r.metrics)).toEqual([{ tokens: 10, seconds: 2 }, undefined]);
+});

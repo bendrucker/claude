@@ -148,6 +148,22 @@ const line = (cells: string[]) => `| ${cells.join(" | ")} |`;
 const markdown = (head: string[], rows: string[][]) =>
   [line(head), line(head.map(() => "---")), ...rows.map(line)].join("\n");
 
+/** Each starred row as its measure, its row label, then one cell per column. */
+function flaggedRows(all: Section[]): string[][] {
+  return all.flatMap(([title, head, rows]) =>
+    rows.filter(starred).map((r) => {
+      const cells = [title, r.slice(0, head.length).join(" · ")];
+      cells.push(...r.slice(head.length));
+      return cells;
+    }),
+  );
+}
+
+/** The rows the markdown report flags as moved against the first column. */
+export function flagged(options: RenderOptions): string[][] {
+  return options.columns.length === 1 ? [] : flaggedRows(sections(options));
+}
+
 /** Sections a single-column markdown report shows open rather than collapsed. */
 const headline = new Set(["Tag score", "Case score"]);
 
@@ -181,16 +197,10 @@ export function render(options: RenderOptions): string {
     return out.join("\n");
   }
 
-  const flagged = all.flatMap(([title, head, rows]) =>
-    rows.filter(starred).map((r) => {
-      const cells = [title, r.slice(0, head.length).join(" · ")];
-      cells.push(...r.slice(head.length));
-      return cells;
-    }),
-  );
+  const moved = flaggedRows(all);
   out.push(
-    flagged.length > 0
-      ? markdown(["measure", "row", ...labels], flagged)
+    moved.length > 0
+      ? markdown(["measure", "row", ...labels], moved)
       : "No row moved past the noise rule.",
   );
   for (const [title, head, rows] of all) {

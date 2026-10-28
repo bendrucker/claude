@@ -21,6 +21,6 @@ The `SessionStart` entry that runs it is committed in `settings.json` in `$HOME`
 
 ## Rex
 
-`rex skill setup` owns `skills/rex/` and the `rex __internal session-start` entry in `settings.json`. `claude-sync` in dotfiles reruns it after every sync. The skill path is gitignored, so setup's write leaves the deployed clone clean, and a fresh clone has no Rex skill until that runs. The hook entry is committed, because `settings.json` is tracked and a sync would drop an entry that lived only in the deployed copy. Setup finds the committed entry current and leaves the file alone. A Rex release that changes the entry dirties the deployed clone, which stops the next `claude-sync` at its gate. Commit setup's new entry then.
+`rex skill setup` owns `skills/rex/` and its `SessionStart` entry in the deployed `settings.json`. Neither is committed. `claude-sync` in dotfiles strips Rex's entry before its dirty-tree gate, pulls, then reruns setup, so the deployed copy carries whatever the installed Rex writes. The skill path is gitignored.
 
 `bun scripts/check-hook-paths.ts` fails if a hook command in either settings file points at a `~/.claude/` or `$CLAUDE_PROJECT_DIR/` path this repo does not ship. That catches a hook path outliving the script it named. The herdr script is exempt because its installer ships it.

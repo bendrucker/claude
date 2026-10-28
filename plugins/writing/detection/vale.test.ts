@@ -37,7 +37,7 @@ describe("lintProse", () => {
 
   test.each<{ name: string; path: string | undefined; message: boolean; fires: boolean }>([
     { name: "a prose file gets the file rules", path: "notes.md", message: false, fires: true },
-    { name: "a code file is skipped", path: "script.ts", message: false, fires: false },
+    { name: "a code file gets the code rules", path: "script.ts", message: false, fires: false },
     { name: "no path lints as a message", path: undefined, message: false, fires: false },
     { name: "a message flag overrides the path", path: "notes.md", message: true, fires: false },
   ])("$name", async ({ path, message, fires }) => {

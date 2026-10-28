@@ -51,4 +51,4 @@ bun ${CLAUDE_SKILL_DIR}/scripts/score.ts path/to/draft.md
 bun ${CLAUDE_SKILL_DIR}/scripts/score.ts --json path/to/draft.md
 ```
 
-Word count is word tokens (`/[a-zA-Z]+/`) over the text with code stripped. Density is `alerts / (wordCount / 1000)`, and the table sorts by density.
+Word count is Vale's own (`vale ls-metrics`), which leaves out code. Inline text and stdin score as a markdown file. Density is `alerts / (wordCount / 1000)`, and the table sorts by density.

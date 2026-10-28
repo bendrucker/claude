@@ -1,7 +1,6 @@
 import { mkdir, rm } from "node:fs/promises";
 import { basename, dirname, join, relative } from "node:path";
 import { z } from "zod";
-import { isProseFile } from "./paths";
 
 export const VALE_CONFIG = join(import.meta.dirname, "..", ".vale.ini");
 
@@ -143,14 +142,14 @@ async function configArgs(source: ValeSource): Promise<{ args: string[]; cwd?: s
 async function runVale(
   args: string[],
   { cwd, stdin }: { cwd?: string | undefined; stdin?: string } = {},
-): Promise<ValeAlert[]> {
+): Promise<string | null> {
   const binary = valeBinary();
-  if (binary === null) return [];
+  if (binary === null) return null;
   // The SessionStart hook installs the packages, so a lint only checks for them.
   if (cwd === undefined && !(await isSynced(await pinnedPackages()))) {
     throw new Error(`Vale packages are not installed. Run ${INSTALL_HINT}`);
   }
-  const proc = Bun.spawn([binary, ...args, "--output=JSON"], {
+  const proc = Bun.spawn([binary, "--output=JSON", ...args], {
     cwd: cwd ?? process.cwd(),
     stdin: stdin === undefined ? "ignore" : new Blob([stdin]),
     stdout: "pipe",
@@ -163,37 +162,56 @@ async function runVale(
   ]);
   // vale exits 1 when it reports an error-level alert, 2 on a runtime failure.
   if (exitCode > 1) throw new ValeError(exitCode, `${stdout.trim()}${stderr.trim()}`);
-  if (stdout.trim() === "") return [];
+  return stdout;
+}
+
+function alertsOf(stdout: string | null): ValeAlert[] {
+  if (stdout === null || stdout.trim() === "") return [];
   return Object.values(Output.parse(JSON.parse(stdout))).flat();
 }
+
+function fileArgs(filePath: string, root: string | null): string[] {
+  const args = root === null ? [`--config=${VALE_CONFIG}`, filePath] : [relative(root, filePath)];
+  if (process.env.NODE_ENV === "test") args.unshift("--no-global");
+  return args;
+}
+
+// An empty file reports no metrics at all.
+const Metrics = z.object({ words: z.number().default(0) });
 
 /** Lint `text` with the plugin's Vale config. Returns [] when vale is unavailable, and throws on a runtime failure. */
 export async function valeAlerts(text: string, source: ValeSource): Promise<ValeAlert[]> {
   if (text.trim() === "") return [];
   const { args, cwd } = await configArgs(source);
-  return runVale(args, { cwd, stdin: text });
+  return alertsOf(await runVale(args, { cwd, stdin: text }));
 }
 
 /** Lint the file at `filePath` as saved, under the repo's Vale config if it has one and the plugin's otherwise. */
 export async function lintFile(filePath: string): Promise<ValeAlert[]> {
   const root = await repoConfigRoot(filePath);
-  const args = root === null ? [`--config=${VALE_CONFIG}`, filePath] : [relative(root, filePath)];
-  if (process.env.NODE_ENV === "test") args.unshift("--no-global");
-  return runVale(args, { cwd: root ?? undefined });
+  return alertsOf(await runVale(fileArgs(filePath, root), { cwd: root ?? undefined }));
+}
+
+/** Vale's word count for the file at `filePath`, which leaves out code. Null when vale is unavailable. */
+export async function valeWords(filePath: string): Promise<number | null> {
+  const root = await repoConfigRoot(filePath);
+  const args = fileArgs(filePath, root);
+  args.splice(-1, 0, "ls-metrics");
+  const stdout = await runVale(args, { cwd: root ?? undefined });
+  return stdout === null ? null : Metrics.parse(JSON.parse(stdout)).words;
 }
 
 /** Alerts for every file under `dir`, linted with the plugin's config alone. */
 export async function lintDirectory(dir: string): Promise<ValeAlert[]> {
-  return runVale(["--no-global", `--config=${VALE_CONFIG}`, dir]);
+  return alertsOf(await runVale(["--no-global", `--config=${VALE_CONFIG}`, dir]));
 }
 
-/** Alerts in prose, sorted by position. A code file yields none, and no path lints as a message. */
+/** Alerts in `text`, sorted by position. No path lints it as a message. */
 export async function lintProse(
   text: string,
   filePath?: string,
   { message = false }: { message?: boolean } = {},
 ): Promise<ValeAlert[]> {
-  if (filePath !== undefined && !isProseFile(filePath)) return [];
   const source = message || filePath === undefined ? { kind: "body" as const } : { filePath };
   return (await valeAlerts(text, source)).toSorted((a, b) =>
     a.Line === b.Line ? a.Span[0] - b.Span[0] : a.Line - b.Line,

@@ -1,8 +1,10 @@
 #!/usr/bin/env bun
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
-import { stripCode } from "../../../detection/code-spans";
-import { lintProse } from "../../../detection/vale";
+import { lintFile, valeWords } from "../../../detection/vale";
 import { readInput } from "../../../scripts/io";
 
 export interface CheckScore {
@@ -17,35 +19,35 @@ export interface ScoreReport {
   checks: CheckScore[];
 }
 
-function countWords(text: string): number {
-  return text.match(/[a-zA-Z]+/g)?.length ?? 0;
-}
-
 function density(hits: number, wordCount: number): number {
   if (wordCount === 0) return 0;
   return hits / (wordCount / 1000);
 }
 
-async function checkScores(
-  text: string,
-  filePath: string | undefined,
-  wordCount: number,
-): Promise<CheckScore[]> {
+/** Alerts per 1000 words for each check in the file at `filePath`, counting words as Vale does. */
+export async function scoreFile(filePath: string): Promise<ScoreReport> {
+  const [alerts, words] = await Promise.all([lintFile(filePath), valeWords(filePath)]);
+  const wordCount = words ?? 0;
   const counts = new Map<string, number>();
-  for (const alert of await lintProse(text, filePath)) {
-    counts.set(alert.Check, (counts.get(alert.Check) ?? 0) + 1);
-  }
-  return [...counts.entries()].map(([check, hits]) => ({
+  for (const alert of alerts) counts.set(alert.Check, (counts.get(alert.Check) ?? 0) + 1);
+  const checks = [...counts].map(([check, hits]) => ({
     check,
     hits,
     density: density(hits, wordCount),
   }));
+  return { filePath, wordCount, checks };
 }
 
-/** Alerts per 1000 words for each check, over the text with code stripped. */
-export async function scoreText(text: string, filePath: string | undefined): Promise<ScoreReport> {
-  const wordCount = countWords(stripCode(text));
-  return { filePath, wordCount, checks: await checkScores(text, filePath, wordCount) };
+/** Score `text` as a markdown file. */
+export async function scoreText(text: string): Promise<ScoreReport> {
+  const dir = await mkdtemp(join(tmpdir(), "score-"));
+  try {
+    const filePath = join(dir, "input.md");
+    await Bun.write(filePath, text);
+    return { ...(await scoreFile(filePath)), filePath: undefined };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 function formatDensity(value: number): string {
@@ -82,7 +84,7 @@ if (import.meta.main) {
     },
     async (argv) => {
       const { text, filePath } = await readInput(argv._.input);
-      const report = await scoreText(text, filePath);
+      const report = filePath === undefined ? await scoreText(text) : await scoreFile(filePath);
       console.log(argv.flags.json ? JSON.stringify(report, null, 2) : renderTable(report));
     },
   );

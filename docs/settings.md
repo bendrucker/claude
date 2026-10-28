@@ -174,9 +174,9 @@ diff "$TMPDIR/before.json" "$TMPDIR/after.json"
 
 **Drop it** by 2027-01-15 if no `unless-desktop` rows appear, or sooner if the app misses a prompt Moshi would have delivered.
 
-`rex __internal session-start --agent claude` on `SessionStart` tells a session hosted in a Rex terminal its `REX_SESSION` and `REX_BLOCK` and asks it to name the Rex session. Outside Rex it's a silent no-op, and the `|| true` covers a `PATH` without `rex`. It stays synchronous because its output is the context. `rex skill setup` writes it and the [`rex` skill](../user/skills/rex/SKILL.md) stub, and finds both current when they match its output byte for byte, so keep the command string and the stub verbatim. Rex is on trial as a second multiplexer beside herdr, which keeps sibling-agent dispatch, pane metadata, and review attention.
+`rex __internal session-start --agent claude` on `SessionStart` tells a session hosted in a Rex terminal its `REX_SESSION` and `REX_BLOCK` and asks it to name the Rex session. Outside Rex it's a silent no-op, and the `|| true` covers a `PATH` without `rex`. It stays synchronous because its output is the context. `rex skill setup` writes it and the gitignored `rex` skill, and `claude-sync` reruns setup after every sync. Take setup's output for this entry rather than editing it, as [`user/README.md`](../user/README.md#rex) describes. Rex is on trial as a second multiplexer beside herdr, which keeps sibling-agent dispatch, pane metadata, and review attention.
 
-**End the trial** around 2026-12-15 by removing this hook, the skill, and the Rex socket grant if the session index shows Rex hosting no sessions in the two weeks before. Bash calls starting `rex ` mark one. **Keep it** past that date only by moving a herdr-only integration over, since two multiplexers both used for layout but only one of them used for dispatch is not a steady state.
+**End the trial** around 2026-12-15 by removing this hook, the skill's ignore entry, the Rex socket grant, and the `claude-sync` setup step in dotfiles if the session index shows Rex hosting no sessions in the two weeks before. Bash calls starting `rex ` mark one. **Keep it** past that date only by moving a herdr-only integration over, since two multiplexers both used for layout but only one of them used for dispatch is not a steady state.
 
 ## Plugins
 

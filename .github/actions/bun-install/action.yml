@@ -14,6 +14,24 @@ runs:
 
     # No dependency cache: restoring the ~900 MB store takes longer than
     # installing from the registry.
+    # A healthy install takes seconds, but bun sometimes stalls silently on
+    # the network for minutes. Cap the first attempt and keep its verbose log
+    # so a stall shows what bun was waiting on, then retry once.
     - name: Install dependencies
       shell: bash
-      run: bun install --frozen-lockfile
+      run: |
+        log="$RUNNER_TEMP/bun-install.log"
+        # perl's alarm stands in for timeout(1), which macOS runners lack.
+        st=0
+        perl -e 'alarm shift; exec @ARGV' 90 bun install --frozen-lockfile --verbose > "$log" 2>&1 || st=$?
+        if [[ $st -eq 0 ]]; then
+          tail -n 1 "$log"
+          exit 0
+        fi
+        tail -n 40 "$log"
+        if [[ $st -eq 142 ]]; then
+          echo "::warning::bun install stalled past 90s, retrying"
+        else
+          echo "::warning::bun install exited $st, retrying"
+        fi
+        bun install --frozen-lockfile

@@ -201,9 +201,9 @@ export async function valeWords(filePath: string): Promise<number | null> {
   return stdout === null ? null : Metrics.parse(JSON.parse(stdout)).words;
 }
 
-/** Alerts for every file under `dir`, linted with the plugin's config alone. */
-export async function lintDirectory(dir: string): Promise<ValeAlert[]> {
-  return alertsOf(await runVale(["--no-global", `--config=${VALE_CONFIG}`, dir]));
+/** Alerts for every file under `dir`, linted with `config` alone. */
+export async function lintDirectory(dir: string, config: string): Promise<ValeAlert[]> {
+  return alertsOf(await runVale(["--no-global", `--config=${config}`, dir]));
 }
 
 /** Alerts in `text`, sorted by position. No path lints it as a message. */

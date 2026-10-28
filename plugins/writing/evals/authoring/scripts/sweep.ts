@@ -5,7 +5,7 @@ import { basename, join } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
-import { lintDirectory, VALE_CONFIG, valeBinary } from "../../../detection/vale";
+import { lintDirectory, valeBinary } from "../../../detection/vale";
 
 const RESULTS = join(import.meta.dirname, "..", "results", "sweep");
 const VOICE_DIR = join(
@@ -18,6 +18,7 @@ const VOICE_DIR = join(
 );
 const DRAFTS_DIR = join(import.meta.dirname, "..", "data", "drafts");
 const CHUNK_WORDS = 1500;
+const SWEEP_CONFIG = join(import.meta.dirname, "..", "sweep.vale.ini");
 
 interface Unit {
   source: string;
@@ -135,7 +136,7 @@ async function tallyChecks(units: Unit[]): Promise<{ words: number; hits: Map<st
       ),
     );
     const hits = new Map<string, number>();
-    for (const alert of await lintDirectory(dir)) {
+    for (const alert of await lintDirectory(dir, SWEEP_CONFIG)) {
       hits.set(alert.Check, (hits.get(alert.Check) ?? 0) + 1);
     }
     return { words: units.reduce((sum, unit) => sum + countWords(unit.text), 0), hits };
@@ -148,10 +149,13 @@ const LsConfig = z.object({ Paths: z.array(z.string()) });
 
 /** Every ai-tells rule on Vale's style paths, so a rule silent in both corpora still gets a level. */
 async function aiTellsChecks(): Promise<string[]> {
-  const proc = Bun.spawn([valeBinary() ?? "vale", "ls-config", `--config=${VALE_CONFIG}`], {
-    stdout: "pipe",
-    stderr: "ignore",
-  });
+  const proc = Bun.spawn(
+    [valeBinary() ?? "vale", "ls-config", "--no-global", `--config=${SWEEP_CONFIG}`],
+    {
+      stdout: "pipe",
+      stderr: "ignore",
+    },
+  );
   const { Paths } = LsConfig.parse(JSON.parse(await new Response(proc.stdout).text()));
   const files = await Promise.all(
     Paths.map((path) => readdir(join(path, "ai-tells")).catch(() => [])),

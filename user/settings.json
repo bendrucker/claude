@@ -222,7 +222,6 @@
     "atuin@bendrucker": true,
     "friction@bendrucker": true,
     "comments@bendrucker": true,
-    "plannotator@plannotator": true,
     "herdr@bendrucker": true,
     "run-command@bendrucker": true,
     "session-limit@bendrucker": true,
@@ -256,13 +255,6 @@
         "source": "github",
         "repo": "schpet/linear-cli",
         "ref": "v3.0.0"
-      }
-    },
-    "plannotator": {
-      "source": {
-        "source": "github",
-        "repo": "backnotprop/plannotator",
-        "ref": "v0.28.23"
       }
     }
   },

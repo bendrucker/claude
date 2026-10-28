@@ -163,6 +163,8 @@ describe("echo mode", () => {
   test.each([
     ["glab", ["mr", "update", "1", "--description", "Edited"], gitlab],
     ["gh", ["pr", "edit", "1", "--body", "Edited"], "https://github.com/team/service/pull/1"],
+    ["glab", ["mr", "note", "1", "-m", "Edited"], gitlab],
+    ["glab", ["issue", "note", "1", "--message=Edited"], gitlab],
   ])("%s %j prints the edited body", (tool, args, url) => {
     expect(stub(run, tool, args).out).toBe(block("", "Edited", url));
   });

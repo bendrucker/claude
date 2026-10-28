@@ -18,7 +18,7 @@ GitLab workflow best practices and glab CLI usage for Claude Code.
 
 - Transforms GitLab URLs into API requests for better content fetching
 - Detects glab OAuth token expiration and provides recovery guidance
-- Denies gh-isms that always fail against GitLab (`glab api --jq`, `gh pr` on a GitLab remote, escaped-`$` inline GraphQL, hallucinated mutations) with the corrected form, and nudges loading `gitlab:merge-request` before hand-rolled MR transactions
+- Denies gh-isms that always fail against GitLab (`glab api --jq`, `gh pr` on a GitLab remote, escaped-`$` inline GraphQL, hallucinated mutations, an `@<file>` body glab would post as the bare path) with the corrected form, and nudges loading `gitlab:merge-request` before hand-rolled MR transactions
 
 ### Mod
 

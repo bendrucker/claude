@@ -109,6 +109,35 @@ export function lintGlab(command: string): string | null {
   return null;
 }
 
+// gh api, curl, and Claude Code's own @-mentions read `@<path>` as a file. glab
+// sends it literally, so a note posts as the bare path. Only `glab api -F`
+// reads the file.
+const FILE_PATH = String.raw`@((?:[~/.]|\$)[^\s"']*|[^\s"']+\.(?:md|markdown|txt))`;
+const FLAG_FILE = new RegExp(
+  String.raw`(?:^|\s)(?:-\w|--[a-z][\w-]*)(?:=|\s+)(["']?)${FILE_PATH}\1(?=\s|$)`,
+);
+const RAW_FIELD_FILE = new RegExp(
+  String.raw`(?:^|\s)(?:-f|--raw-field)(?:=|\s+)(["']?)([\w.[\]]+)=${FILE_PATH}\1(?=\s|$)`,
+);
+
+export function lintFileReference(command: string): string | null {
+  for (const segment of segments(command)) {
+    if (!/\bglab\s/.test(segment)) continue;
+    if (/\bglab\s+api\b/.test(segment)) {
+      const raw = segment.match(RAW_FIELD_FILE);
+      if (raw) {
+        return `glab api -f sends "@${raw[3]}" as the literal value of ${raw[2]}. Use -F ${raw[2]}=@${raw[3]}, which reads the file.`;
+      }
+      continue;
+    }
+    const path = segment.match(FLAG_FILE)?.at(2);
+    if (path != null) {
+      return `glab does not read @<file> arguments: this would post the literal text "@${path}". Pass the contents instead, e.g. -m "$(cat ${path})".`;
+    }
+  }
+  return null;
+}
+
 function remoteHost(url: string): string | null {
   const scheme = url.match(/^[a-z+]+:\/\/(?:[^@/]+@)?([^/:]+)/i);
   if (scheme) return scheme[1] ?? null;
@@ -213,7 +242,7 @@ export async function processInput(
   if (command == null || command === "") return null;
 
   if (command.includes("glab")) {
-    const violation = lintGlab(command);
+    const violation = lintGlab(command) ?? lintFileReference(command);
     if (violation != null && violation !== "") return deny(violation);
   }
 

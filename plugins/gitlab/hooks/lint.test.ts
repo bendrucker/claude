@@ -127,6 +127,64 @@ describe("glab gh-ism denials", () => {
   });
 });
 
+describe("@file references", () => {
+  test.each<{ name: string; command: string; reason: string }>([
+    {
+      name: "quoted absolute path to mr note",
+      command: `glab mr note 42 -m "@/tmp/claude/comment.md"`,
+      reason: `-m "$(cat /tmp/claude/comment.md)"`,
+    },
+    {
+      name: "unquoted $TMPDIR path to issue note",
+      command: "glab issue note 7 --message @$TMPDIR/reply.md",
+      reason: "$TMPDIR/reply.md",
+    },
+    {
+      name: "relative markdown file to mr create",
+      command: "git push && glab mr create --title 'Fix' --description @body.md",
+      reason: "body.md",
+    },
+    {
+      name: "= form on mr update",
+      command: "glab mr update 42 --description='@./desc.md'",
+      reason: "./desc.md",
+    },
+    {
+      name: "-f raw field on glab api",
+      command: "glab api projects/:id/merge_requests/42/notes -X POST -f body=@/tmp/note.md",
+      reason: "Use -F body=@/tmp/note.md",
+    },
+  ])("denies $name", async ({ command, reason }) => {
+    const output = decision(await processInput(mockInput(command), fakeEnv()));
+    expect(output?.permissionDecision).toBe("deny");
+    expect(output?.permissionDecisionReason).toContain(reason);
+  });
+
+  test.each<{ name: string; command: string }>([
+    {
+      name: "-F field on glab api, which reads the file",
+      command: "glab api projects/:id/merge_requests/42/notes -X POST -F body=@/tmp/note.md",
+    },
+    { name: "body read with cat", command: `glab mr note 42 -m "$(cat /tmp/note.md)"` },
+    {
+      name: "body opening with a mention",
+      command: `glab mr note 42 -m "@alice can you take a look?"`,
+    },
+    { name: "reviewer username", command: "glab mr update 42 --reviewer @alice" },
+    {
+      name: "body that is only a mention",
+      command: "glab mr note 42 -m '@alice'",
+    },
+    {
+      name: "gh with an @file body",
+      command: "gh api repos/o/r/issues/1/comments -F body=@/tmp/x.md",
+    },
+  ])("allows $name", async ({ command }) => {
+    const output = decision(await processInput(mockInput(command), fakeEnv(GITHUB_REPO)));
+    expect(output?.permissionDecision).toBeUndefined();
+  });
+});
+
 describe("gh on a GitLab remote", () => {
   test.each<{ name: string; command: string }>([
     { name: "gh pr view", command: "gh pr view --json url,state" },

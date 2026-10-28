@@ -4,12 +4,15 @@ import { dirname, join } from "node:path";
 import { dir } from "./snapshot";
 
 /** The create and edit commands echo mode answers, per tool. */
-const WRITES = { gh: ["pr create", "pr edit"], glab: ["mr create", "mr update"] } as const;
+const WRITES = {
+  gh: ["pr create", "pr edit"],
+  glab: ["mr create", "mr update", "mr note", "issue note"],
+} as const;
 
 export type Tool = keyof typeof WRITES;
 
 const TITLE = new Set(["-t", "--title"]);
-const BODY = new Set(["-d", "--description", "-b", "--body"]);
+const BODY = new Set(["-d", "--description", "-b", "--body", "-m", "--message"]);
 const BODY_FILE = new Set(["-F", "--body-file", "--description-file"]);
 
 function stdin(): string {

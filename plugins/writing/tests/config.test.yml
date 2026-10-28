@@ -108,3 +108,11 @@
   input: |
     const help = "**Note:** run the installer first.";
   absent: Writing.BoldLabel
+
+- name: a tool name in a heading is accepted by the vocabulary
+  format: .md
+  input: |
+    ## Profiling With py-spy on macOS
+
+    Text.
+  absent: Writing.TitleCaseHeading

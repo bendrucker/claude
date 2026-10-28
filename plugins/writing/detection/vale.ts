@@ -78,8 +78,12 @@ async function configArgs(source: ValeSource): Promise<{ args: string[]; cwd?: s
   return root === null ? { args } : { args, cwd: root };
 }
 
-/** Lint `text` with the plugin's Vale config. Returns [] when vale is unavailable. */
-export async function valeAlerts(text: string, source: ValeSource): Promise<ValeAlert[]> {
+/** Lint `text` with the plugin's Vale config. Returns [] when vale is unavailable, or on a runtime failure unless `strict`. */
+export async function valeAlerts(
+  text: string,
+  source: ValeSource,
+  { strict = false }: { strict?: boolean } = {},
+): Promise<ValeAlert[]> {
   if (text.trim() === "") return [];
   const binary = valeBinary();
   if (binary === null) return [];
@@ -90,8 +94,13 @@ export async function valeAlerts(text: string, source: ValeSource): Promise<Vale
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
   // vale exits 1 when it reports an error-level alert, 2 on a runtime failure.
+  if (exitCode > 1 && strict) throw new Error(`vale exited ${exitCode}: ${stderr.trim()}`);
   if (exitCode > 1 || stdout.trim() === "") return [];
   return Object.values(Output.parse(JSON.parse(stdout))).flat();
 }

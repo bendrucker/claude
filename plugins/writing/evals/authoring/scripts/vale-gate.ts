@@ -82,12 +82,30 @@ const Report = z.object({
 });
 type Report = z.infer<typeof Report>;
 
+let aliases: Readonly<Record<string, string>> = CATEGORY_ALIASES;
+
 function checkOf(category: string): string | null {
-  return CATEGORY_ALIASES[category] ?? null;
+  return aliases[category] ?? null;
+}
+
+export let skippedUnits = 0;
+
+// A unit opening with a `---` line parses as front matter and fails without
+// naming a rule file. A broken rule names its file and still throws.
+async function lint(text: string): Promise<ValeAlert[]> {
+  try {
+    return await valeAlerts(text, { kind: "body" }, { strict: true });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('"Path": ""')) {
+      skippedUnits++;
+      return [];
+    }
+    throw error;
+  }
 }
 
 async function flags(text: string, check: string): Promise<boolean> {
-  return (await valeAlerts(text, { kind: "body" })).some((alert) => alert.Check === check);
+  return (await lint(text)).some((alert) => alert.Check === check);
 }
 
 export function exampleParity(categories: readonly string[]): Promise<ExampleParity[]> {
@@ -187,9 +205,7 @@ export function disagreements(
     });
   }
   for (const alert of vale) {
-    const categories = Object.keys(CATEGORY_ALIASES).filter(
-      (category) => CATEGORY_ALIASES[category] === alert.Check,
-    );
+    const categories = Object.keys(aliases).filter((category) => aliases[category] === alert.Check);
     if (legacy.some((hit) => categories.includes(hit.category) && hit.line === alert.Line))
       continue;
     entries.push({
@@ -259,7 +275,7 @@ async function scanCorpus(
   const scanned = await mapLimit(units, concurrency, async (unit) => {
     const [legacy, alerts] = await Promise.all([
       legacyResults(unit.text, categorySet),
-      valeAlerts(unit.text, { kind: "body" }),
+      lint(unit.text),
     ]);
     return { unit, legacy, vale: alerts.filter((alert) => checks.has(alert.Check)) };
   });
@@ -373,9 +389,7 @@ async function tallyChecks(
   units: Unit[],
   concurrency: number,
 ): Promise<{ words: number; hits: Map<string, number> }> {
-  const alerts = await mapLimit(units, concurrency, (unit) =>
-    valeAlerts(unit.text, { kind: "body" }),
-  );
+  const alerts = await mapLimit(units, concurrency, (unit) => lint(unit.text));
   const hits = new Map<string, number>();
   for (const alert of alerts.flat()) hits.set(alert.Check, (hits.get(alert.Check) ?? 0) + 1);
   return { words: units.reduce((sum, unit) => sum + countWords(unit.text), 0), hits };
@@ -434,7 +448,7 @@ export function levelLines(rows: SweepRow[]): string[] {
     .filter((row) => row.check.startsWith("ai-tells.") && row.level !== "error")
     .map(
       (row) =>
-        `# lift ${row.lift}, ${row.voice}/1k in your writing, ${row.drafts}/1k in drafts\n${row.check} = ${row.level}`,
+        `# lift ${row.lift}, ${row.voice}/1k on the baseline, ${row.drafts}/1k in drafts\n${row.check} = ${row.level}`,
     );
 }
 
@@ -481,6 +495,15 @@ function groupArg(value: string): Group {
   return value;
 }
 
+const AliasOverlay = z.record(z.string(), z.string());
+
+function aliasArg(value: string): Record<string, string> {
+  const parsed = AliasOverlay.safeParse(JSON.parse(value));
+  if (!parsed.success)
+    throw new InvalidArgumentError("Expected a JSON object of category to check.");
+  return parsed.data;
+}
+
 const run = new Command("run")
   .description(
     "Compare a group's TS detectors with their Vale rules on examples and the voice baseline.",
@@ -490,7 +513,13 @@ const run = new Command("run")
   .option("--voice-dir <dir>", "voice baseline directory", VOICE_DIR)
   .option("--drafts-dir <dir>", "model drafts directory (jsonl)", DRAFTS_DIR)
   .option("--concurrency <n>", "vale processes in flight", int, 2)
+  .option(
+    "--aliases <json>",
+    "category-to-check entries to apply over category-aliases.json",
+    aliasArg,
+  )
   .action(async (options) => {
+    aliases = { ...CATEGORY_ALIASES, ...options.aliases };
     console.log(
       formatReport(
         await runGroup(
@@ -502,6 +531,8 @@ const run = new Command("run")
         ),
       ),
     );
+    if (skippedUnits > 0)
+      console.log(`${skippedUnits} units skipped: vale read them as front matter`);
   });
 
 const sweepCommand = new Command("sweep")

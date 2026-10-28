@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { scan } from "./scan";
+import { fails, scan } from "./scan";
 
 describe("scan", () => {
   let root = "";
@@ -50,5 +50,28 @@ describe("scan", () => {
     const readme = join(root, "README.md");
     expect((await scan([readme], false)).size).toBe(0);
     expect([...(await scan([readme], true)).keys()]).toEqual([readme]);
+  });
+});
+
+describe("fails", () => {
+  let dir = "";
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "prompting-fails-"));
+    await Promise.all([
+      Bun.write(join(dir, "warn/CLAUDE.md"), "Wait for #123.\n"),
+      Bun.write(join(dir, "error/CLAUDE.md"), "Wait for #123. Try to wait.\n"),
+    ]);
+  });
+
+  afterAll(async () => {
+    await Bun.$`rm -rf ${dir}`.quiet();
+  });
+
+  test.each([
+    ["passes on warnings alone", "warn", false],
+    ["fails on an error", "error", true],
+  ])("%s", async (_label, name, expected) => {
+    expect(fails(await scan([join(dir, name)], false))).toBe(expected);
   });
 });

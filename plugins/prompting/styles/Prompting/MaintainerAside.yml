@@ -3,7 +3,7 @@
 # retire when: a hand audit finds most hits are directives or markup rather than notes.
 extends: existence
 message: '"%s..." is a note to a maintainer that the model reads and cannot act on. Move it out of the document.'
-level: error
+level: warning
 ignorecase: true
 nonword: true
 scope: raw

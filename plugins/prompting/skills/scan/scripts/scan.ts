@@ -17,6 +17,10 @@ export function scan(paths: readonly string[], all: boolean): Promise<Map<string
   return lint(paths, { glob: all ? DOCUMENTS : AGENT_FACING });
 }
 
+export function fails(alerts: Map<string, Alert[]>): boolean {
+  return [...alerts.values()].flat().some((alert) => alert.Severity === "error");
+}
+
 function label(path: string): string {
   const rel = relative(".", path);
   return rel.startsWith("..") ? path : rel;
@@ -44,7 +48,7 @@ if (import.meta.main) {
     parameters: ["[paths...]"],
     help: {
       description:
-        "Report prompt defects in documents a model executes. Exits non-zero on any alert.",
+        "Report prompt defects in documents a model executes. Exits non-zero on an error-level alert.",
     },
     flags: {
       all: {
@@ -65,9 +69,11 @@ if (import.meta.main) {
   for (const [path, found] of alerts) {
     const name = label(path);
     for (const alert of found) {
-      console.log(`${name}:${alert.Line}:${alert.Span[0]}: ${alert.Check}: ${alert.Message}`);
+      console.log(
+        `${name}:${alert.Line}:${alert.Span[0]}: ${alert.Severity}: ${alert.Check}: ${alert.Message}`,
+      );
     }
   }
   if (!argv.flags.quiet && alerts.size > 0) printSummary(alerts);
-  process.exit(alerts.size > 0 ? 1 : 0);
+  process.exit(fails(alerts) ? 1 : 0);
 }

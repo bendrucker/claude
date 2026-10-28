@@ -6,7 +6,7 @@ Writing documents a model executes: product and system prompts, skills, tool and
 
 - **Skills**:
   - `prompting`: doctrine for any document a model executes, with `references/conversion.md` for rewriting an existing one
-  - `prompting:scan`: lints with the `Prompting` Vale style for weak modality, vague completion criteria, and no-op instructions, and exits non-zero on any alert
+  - `prompting:scan`: lints with the `Prompting` Vale style for weak modality, vague completion criteria, and no-op instructions, and exits non-zero on an error-level alert
 
 Climbing a prompt against its eval suite belongs to the [evals](../evals) plugin's `evals:hill-climb`.
 

@@ -3,7 +3,7 @@
 # retire when: a hand audit finds most hits are not issue references.
 extends: existence
 message: '"%s" points at a tracker the model cannot read. State the rule instead.'
-level: error
+level: warning
 nonword: true
 scope: ~link
 tokens:

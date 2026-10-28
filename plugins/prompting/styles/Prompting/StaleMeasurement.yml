@@ -4,7 +4,7 @@
 # retire when: a hand audit finds most hits are budgets, thresholds, or other numbers a run does not report.
 extends: existence
 message: '"%s" reports what a past run measured. The run prints it. Delete the sentence.'
-level: error
+level: warning
 ignorecase: true
 nonword: true
 scope: ~text.frontmatter

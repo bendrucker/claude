@@ -3,7 +3,7 @@
 # retire when: a hand audit finds most hits describe behavior rather than project status.
 extends: existence
 message: '"%s" records project status the model cannot act on. Delete the sentence.'
-level: error
+level: warning
 ignorecase: true
 nonword: true
 scope: ~text.frontmatter

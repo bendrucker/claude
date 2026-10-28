@@ -1,0 +1,27 @@
+# evidence: none recorded; pre-dates the curation principle. Kept because the construction
+#   reliably signals permission-seeking in a message.
+# retire when: the pattern no longer appears in corrective-feedback moments, or real
+#   permission-seeking phrases shift to a different form.
+extends: existence
+message: "'%s' reads as permission-seeking. Just do it, or describe options."
+level: warning
+ignorecase: true
+tokens:
+  - 'want\s+me\s+to\s+\w+'
+tests:
+  - name: positives
+    about: offers to act on the reader's behalf
+    input: |
+      Want me to fix that for you?
+
+      Want me to run the tests?
+    want: |
+      1:1:Writing.PermissionSeeking:'Want me to fix' reads as permission-seeking. Just do it, or describe options.
+      3:1:Writing.PermissionSeeking:'Want me to run' reads as permission-seeking. Just do it, or describe options.
+  - name: negatives
+    about: someone else wanting the writer somewhere, and the writer's own intent
+    input: |
+      They want me there by noon.
+
+      I want to understand the issue.
+    want: ""

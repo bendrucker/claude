@@ -80,13 +80,13 @@ describe("every finding in one output", () => {
         "categories": [
           "numbering",
           "title case heading",
-          "spaced em dash",
+          "Writing.SpacedEmDash",
         ],
         "category": "numbering",
         "emitted": [
           "numbering",
           "title case heading",
-          "spaced em dash",
+          "Writing.SpacedEmDash",
         ],
         "ext": "md",
         "outcome": "context",
@@ -101,7 +101,7 @@ describe("every finding in one output", () => {
       mockInput("Write", { file_path: "docs/draft.md", content: "This — is bad\n" }),
     );
     expect(contextOf(output)).toContain("em dash");
-    expect(log.category).toBe("spaced em dash");
+    expect(log.category).toBe("Writing.SpacedEmDash");
   });
 });
 
@@ -174,7 +174,7 @@ describe("session-scoped repeat suppression", () => {
     await dispatch(input, now);
     const second = await dispatch(input, now + 60_000);
     expect(second.log.outcome).toBe("context");
-    expect(second.log.emitted).toEqual(["spaced em dash"]);
+    expect(second.log.emitted).toEqual(["Writing.SpacedEmDash"]);
     expect(second.log.suppressed_categories).toEqual(["numbering", "title case heading"]);
   });
 

@@ -8,6 +8,7 @@ import {
   WEIGHTED_PATTERNS,
   type WeightedPatternGroup,
 } from "./tropes";
+import { isPorted, tierOfSeverity, valeAlerts } from "./vale";
 import { weightedStemHits } from "./wordlists";
 
 // Patterns that run only on the batch surfaces (scan, score) because their
@@ -126,6 +127,20 @@ function weightedResults(stripped: string, group: WeightedPatternGroup): ScanRes
   ];
 }
 
+/** Matches from the TS detectors named in `categories`, ported or not, for comparison against Vale. */
+export async function legacyResults(
+  text: string,
+  categories: ReadonlySet<string>,
+): Promise<ScanResult[]> {
+  const stripped = stripCode(text);
+  const defs = [...PATTERNS, ...BATCH_PATTERNS].filter((def) => categories.has(def.category));
+  const results = (await Promise.all(defs.map((def) => regexResults(stripped, def)))).flat();
+  for (const group of WEIGHTED_PATTERNS) {
+    if (categories.has(group.category)) results.push(...weightedResults(stripped, group));
+  }
+  return results;
+}
+
 export interface ScanOptions {
   /** Include `sideEffectOnly` patterns: the rules for a message sent once. */
   message?: boolean;
@@ -145,13 +160,31 @@ export async function scanAll(
   const stripped = stripCode(text);
   const prose = filePath === undefined || isProseFile(filePath);
   const defs = [...PATTERNS, ...(batch ? BATCH_PATTERNS : [])].filter(
-    (def) => (message || !def.sideEffectOnly) && (prose || !def.fileOnly),
+    (def) =>
+      !isPorted(def.category) && (message || !def.sideEffectOnly) && (prose || !def.fileOnly),
   );
   const results = (await Promise.all(defs.map((def) => regexResults(stripped, def)))).flat();
 
   for (const group of WEIGHTED_PATTERNS) {
-    if (group.fileOnly && !prose) continue;
+    if (isPorted(group.category) || (group.fileOnly && !prose)) continue;
     results.push(...weightedResults(stripped, group));
+  }
+
+  if (prose) {
+    const source = message || filePath === undefined ? { kind: "body" as const } : { filePath };
+    for (const alert of await valeAlerts(text, source)) {
+      const tier = tierOfSeverity(alert.Severity);
+      if (tier === undefined) continue;
+      results.push({
+        line: alert.Line,
+        col: alert.Span[0],
+        category: alert.Check,
+        tier,
+        structural: false,
+        matched: alert.Match,
+        message: alert.Message,
+      });
+    }
   }
 
   results.sort((a, b) => {

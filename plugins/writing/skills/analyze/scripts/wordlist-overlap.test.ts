@@ -90,7 +90,7 @@ describe("coverageOf", () => {
 
   test("a sentence tripping a detector reports its category", async () => {
     expect((await coverageOf("dig", "Let me dig into the failing test.")).categories).toContain(
-      "dig into",
+      "Writing.DigInto",
     );
   });
 

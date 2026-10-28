@@ -2,6 +2,7 @@ import { COUNTED_LEAD_IN_PATTERN } from "./counted-lead-in";
 import { NO_NEGATION_PATTERN } from "./negation";
 import { isProseFile } from "./paths";
 import { splitParagraphs, splitSentences } from "./sentences";
+import { isPorted, tierOfSeverity, valeAlerts } from "./vale";
 import {
   type Hits,
   type StemmedWeight,
@@ -1322,8 +1323,23 @@ export function scan(
 
 // The batch analyze surface audits every pattern, skillOnly included. The hook
 // path through scan() skips them.
-export function scanAudit(text: string): Promise<PatternMatch[]> {
-  return collectMatches(text, "", undefined, undefined, true);
+export async function scanAudit(text: string): Promise<PatternMatch[]> {
+  const [matches, alerts] = await Promise.all([
+    collectMatches(text, "", undefined, undefined, true),
+    valeAlerts(text, { kind: "body" }),
+  ]);
+  for (const alert of alerts) {
+    const tier = tierOfSeverity(alert.Severity);
+    if (tier === undefined) continue;
+    matches.push({
+      tier,
+      category: alert.Check,
+      matched: alert.Match,
+      message: alert.Message,
+      structural: false,
+    });
+  }
+  return matches;
 }
 
 export function scanIntroduced(
@@ -1348,6 +1364,7 @@ async function collectMatches(
   const defs = PATTERNS.filter(
     (def) =>
       (includeSkillOnly || !def.skillOnly) &&
+      !isPorted(def.category) &&
       !(def.fileOnly && proseOnly) &&
       !(def.sideEffectOnly && context === "file"),
   );
@@ -1369,6 +1386,7 @@ async function collectMatches(
   const matches = introduced.filter((match) => match !== undefined);
 
   for (const group of WEIGHTED_PATTERNS) {
+    if (isPorted(group.category)) continue;
     if (group.fileOnly && filePath != null && filePath !== "" && !isProseFile(filePath)) continue;
 
     const newWeighted = weightedStemHits(newStripped, group.entries);

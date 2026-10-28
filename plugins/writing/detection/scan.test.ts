@@ -4,7 +4,7 @@ import { scanAll } from "./scan";
 describe("scanAll", () => {
   it("reports line and column for an em dash", async () => {
     const text = "First line.\nA spaced — dash here.";
-    const match = (await scanAll(text)).find((r) => r.category === "spaced em dash");
+    const match = (await scanAll(text)).find((r) => r.category === "Writing.SpacedEmDash");
     expect(match).toBeDefined();
     expect(match?.line).toBe(2);
     expect(match?.col).toBe(9);
@@ -32,7 +32,7 @@ describe("scanAll", () => {
     const categories = new Set((await scanAll(text, "doc.md")).map((r) => r.category));
     expect(categories.has("flowery phrasing")).toBe(true);
     expect(categories.has("soft phrasing")).toBe(true);
-    expect(categories.has("spaced em dash")).toBe(true);
+    expect(categories.has("Writing.SpacedEmDash")).toBe(true);
   });
 
   const dense =

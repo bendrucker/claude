@@ -72,23 +72,6 @@ describe("stripCode", () => {
 });
 
 describe("scan", () => {
-  describe("spaced em dashes", () => {
-    it("detects spaced em dash", async () => {
-      const match = await scan("This is \u2014 a problem");
-      expect(match[0]?.tier).toBe("deny");
-      expect(match[0]?.category).toBe("spaced em dash");
-    });
-
-    it("steers toward splitting into two sentences", async () => {
-      const match = await scan("This is \u2014 a problem");
-      expect(match[0]?.message).toContain("two sentences");
-    });
-
-    it.each(["This is\u2014fine", "2024 \u2013 2025"])('allows: "%s"', async (allowed) => {
-      expect(firstByTier(await scan(allowed), "deny")).toBeUndefined();
-    });
-  });
-
   describe("AI vocabulary", () => {
     const words = [
       "delve",
@@ -495,30 +478,6 @@ describe("scan", () => {
     });
   });
 
-  describe("permission-seeking", () => {
-    it("flags: want me to fix", async () => {
-      expect(firstByTier(await scan("Want me to fix the bug?"), "deny")?.category).toBe(
-        "permission-seeking",
-      );
-    });
-
-    it("allows: they want me there", async () => {
-      expect(
-        (await scan("They want me there by noon.")).find(
-          (m) => m.category === "permission-seeking",
-        ),
-      ).toBeUndefined();
-    });
-  });
-
-  describe("hedging close", () => {
-    it("flags: would you like", async () => {
-      expect(firstByTier(await scan("Would you like me to retry?"), "deny")?.category).toBe(
-        "hedging close",
-      );
-    });
-  });
-
   describe("reaching for", () => {
     const flag = [
       "Open a sibling pane rather than reaching for Bash.",
@@ -639,23 +598,6 @@ describe("scan", () => {
           (m) => m.category === "label bold",
         ),
       ).toBeUndefined();
-    });
-  });
-
-  describe("dig into", () => {
-    it.each([
-      "Let's dig into the codebase.",
-      "We'll dive into the data later.",
-      "I dug into the parser internals.",
-      "She dove into the schema migration.",
-      "We're digging into the root cause.",
-      "The audit dives into each subsystem.",
-    ])("flags: %j", async (text) => {
-      expect(firstByTier(await scan(text), "context")?.category).toBe("dig into");
-    });
-
-    it.each(["She dug a trench.", "Water drains into the basin."])("allows: %j", async (text) => {
-      expect((await scan(text)).find((m) => m.category === "dig into")).toBeUndefined();
     });
   });
 
@@ -799,8 +741,6 @@ describe("scan", () => {
   describe("sideEffectOnly scoping", () => {
     const conversational = [
       { text: "You're right about that.", category: "sycophantic acknowledgment" },
-      { text: "Want me to fix the bug?", category: "permission-seeking" },
-      { text: "Would you like me to retry?", category: "hedging close" },
       { text: "I understand the issue.", category: "I understand" },
     ];
 

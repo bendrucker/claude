@@ -4,6 +4,7 @@ import { isProseFile } from "../detection/paths";
 import { scan, scanIntroduced, semicolonSpliceHits, stripCode } from "../detection/tropes";
 import { type ToolInput, toolInputOf } from "./io";
 import type { HookFinding } from "./report";
+import { valeFileFindings, valeMessageFindings } from "./vale-findings";
 
 const FILE_OP_TOOLS = new Set(["Write", "Edit", "MultiEdit"]);
 
@@ -196,11 +197,12 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
   return [];
 }
 
-const WORDLIST_PATH_PATTERN = /\/wordlists\/[^/]+\.txt$/;
+// Wordlists and Vale style rules quote the tropes they detect.
+const DETECTOR_SOURCE_PATTERN = /\/wordlists\/[^/]+\.txt$|\/styles\/[^/]+\/[^/]+\.yml$/;
 
-function isWordlistFile(input: PreToolUseHookInput): boolean {
+function isDetectorSource(input: PreToolUseHookInput): boolean {
   const filePath = toolInputOf(input).file_path;
-  return filePath !== undefined && WORDLIST_PATH_PATTERN.test(filePath);
+  return filePath !== undefined && DETECTOR_SOURCE_PATTERN.test(filePath);
 }
 
 // Comments are short, so density gates cannot work there: a single introduced
@@ -280,6 +282,11 @@ async function processFileOp(input: PreToolUseHookInput): Promise<HookFinding[]>
     introduced: match.tier === "deny",
   }));
 
+  if (filePath != null && filePath !== "") {
+    const whole = (await wholeFilePair(input, filePath)) ?? pair;
+    findings.push(...(await valeFileFindings(whole.oldText, whole.newText, filePath)));
+  }
+
   if (!prose) {
     const splice = commentSplice(scanPair);
     if (splice != null && splice !== "")
@@ -295,16 +302,21 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<HookFindin
 
   // Only a structural pattern blocks the call. A soft deny-tier hit is advice
   // the model can act on while revising the rest.
-  const matches = await scan(texts.join("\n"), undefined, "sideEffect");
-  return matches.map((match) => ({
+  const text = texts.join("\n");
+  const matches = await scan(text, undefined, "sideEffect");
+  const findings: HookFinding[] = matches.map((match) => ({
     category: match.category,
     tier: match.tier === "deny" && match.structural ? "deny" : "context",
     message: match.message,
   }));
+  const command = toolInputOf(input).command ?? "";
+  const kind = /\bgit\s+(commit|tag)\b/.test(command) ? "commit" : "body";
+  findings.push(...(await valeMessageFindings(text, kind)));
+  return findings;
 }
 
 export async function check(input: PreToolUseHookInput): Promise<HookFinding[]> {
-  if (isWordlistFile(input)) return [];
+  if (isDetectorSource(input)) return [];
 
   if (FILE_OP_TOOLS.has(input.tool_name)) return processFileOp(input);
   return processSideEffect(input);

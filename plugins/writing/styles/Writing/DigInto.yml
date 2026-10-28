@@ -1,0 +1,39 @@
+# evidence: assistant output uses exploration-filler "into" constructions in inflected
+#   forms, including the irregular pasts "dug into" and "dove into", so each is listed.
+# retire when: corpus analysis shows the construction is no longer distinctive. Drop
+#   individual inflections that stop appearing in assistant output.
+extends: existence
+message: "'%s' is exploration filler. Describe what you're actually looking at."
+level: warning
+ignorecase: true
+tokens:
+  - '(?:dig|digs|digging|dug|dive|dives|diving|dove|dived|wade|wades|wading|waded)\s+into'
+tests:
+  - name: positives
+    about: base, past, irregular past, and progressive forms
+    input: |
+      Let's dig into the codebase.
+
+      I dug into the parser internals.
+
+      She dove into the schema migration.
+
+      We're digging into the root cause.
+
+      We'll dive into the data later.
+
+      The audit dives into each subsystem.
+    want: |
+      1:7:Writing.DigInto:'dig into' is exploration filler. Describe what you're actually looking at.
+      3:3:Writing.DigInto:'dug into' is exploration filler. Describe what you're actually looking at.
+      5:5:Writing.DigInto:'dove into' is exploration filler. Describe what you're actually looking at.
+      7:7:Writing.DigInto:'digging into' is exploration filler. Describe what you're actually looking at.
+      9:7:Writing.DigInto:'dive into' is exploration filler. Describe what you're actually looking at.
+      11:11:Writing.DigInto:'dives into' is exploration filler. Describe what you're actually looking at.
+  - name: negatives
+    about: literal digging and motion into a place
+    input: |
+      She dug a trench.
+
+      Water drains into the basin.
+    want: ""

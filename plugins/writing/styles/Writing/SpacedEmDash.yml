@@ -1,0 +1,31 @@
+# evidence: spaced em dashes appear at high lift in assistant deliverables and are absent
+#   from the 209-PR hand-written baseline.
+# retire when: fewer than 5 hits appear in the deliverable corpus across a 30-day window,
+#   or the pattern stops appearing in corrective-feedback moments.
+extends: existence
+message: "Spaced em dashes ( — ) are an AI writing tell. Split the clauses into two sentences. Do not substitute a semicolon or unspaced em dash: the run-on structure is the problem, not the mark."
+level: error
+nonword: true
+tokens:
+  - ' — '
+tests:
+  - name: positives
+    about: clauses joined by a spaced em dash
+    input: |
+      The cache warms slowly — then it saturates.
+
+      The worker finishes — the queue clears.
+    want: |
+      1:23:Writing.SpacedEmDash:Spaced em dashes ( — ) are an AI writing tell. Split the clauses into two sentences. Do not substitute a semicolon or unspaced em dash: the run-on structure is the problem, not the mark.
+      3:20:Writing.SpacedEmDash:Spaced em dashes ( — ) are an AI writing tell. Split the clauses into two sentences. Do not substitute a semicolon or unspaced em dash: the run-on structure is the problem, not the mark.
+  - name: negatives
+    about: an unspaced em dash, an en dash range, and a table cell holding only a dash
+    input: |
+      This is—fine without spaces.
+
+      The range spans 2024–2025.
+
+      | Rule | Level |
+      | ---- | ----- |
+      | Foo  | —     |
+    want: ""

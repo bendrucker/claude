@@ -27,7 +27,7 @@ describe("scoreText", () => {
     const filler = `${"word ".repeat(998)}a — b`;
     const score = await scoreText(filler, "doc.md");
     expect(score.wordCount).toBe(1000);
-    const emDash = score.categories.find((c) => c.category === "spaced em dash");
+    const emDash = score.categories.find((c) => c.category === "Writing.SpacedEmDash");
     expect(emDash?.hits).toBe(1);
     expect(emDash?.density).toBeCloseTo(1.0, 5);
   });
@@ -86,11 +86,11 @@ describe("renderTable", () => {
     expect(renderTable(await buildReport("a — b", "doc.md", { comments: false })))
       .toMatchInlineSnapshot(`
       "prose (2 words)
-      ╔════════════════╤══════╤═════════════╗
-      ║ Category       │ Hits │ Density /1k ║
-      ╟────────────────┼──────┼─────────────╢
-      ║ spaced em dash │ 1    │ 500.0       ║
-      ╚════════════════╧══════╧═════════════╝"
+      ╔══════════════════════╤══════╤═════════════╗
+      ║ Category             │ Hits │ Density /1k ║
+      ╟──────────────────────┼──────┼─────────────╢
+      ║ Writing.SpacedEmDash │ 1    │ 500.0       ║
+      ╚══════════════════════╧══════╧═════════════╝"
     `);
   });
 

@@ -1,0 +1,27 @@
+# evidence: none recorded; pre-dates the curation principle. Kept as a reliable
+#   hedging-close signal in conversational output.
+# retire when: corrective-feedback moments no longer cite hedging-close language, or usage
+#   analysis shows the pattern no longer appears in assistant output.
+extends: existence
+message: "'%s' is a hedging close. State the next step directly."
+level: warning
+ignorecase: true
+tokens:
+  - 'would\s+you\s+like'
+tests:
+  - name: positives
+    about: offers phrased as a question
+    input: |
+      Would you like me to retry?
+
+      Would you like a summary?
+    want: |
+      1:1:Writing.HedgingClose:'Would you like' is a hedging close. State the next step directly.
+      3:1:Writing.HedgingClose:'Would you like' is a hedging close. State the next step directly.
+  - name: negatives
+    about: 'would like as a plain statement of preference'
+    input: |
+      I would like to understand your goal.
+
+      They would like a design review.
+    want: ""

@@ -10,7 +10,7 @@ import { findResults, latestResult, summarize } from "./summary";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "summary-"));
 
-/** The title expression `.github/workflows/eval.yml` ran before `summary.ts`. */
+/** The jq title expression from `eval.yml` that `summary.ts` reproduces. */
 const JQ_TITLE = `
   def pct: (. * 100 | round | tostring) + "%";
   "score \\(.aggregates.overallScore | pct)"

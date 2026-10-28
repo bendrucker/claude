@@ -4,7 +4,7 @@ import { join, relative, sep } from "node:path";
 import { $ } from "bun";
 import { stringify } from "yaml";
 
-/** Serializes a generated `case.yaml`. */
+/** Serializes a `case.yaml` without line wrapping. */
 export function serializeCase(file: Record<string, unknown>): string {
   return stringify(file, { lineWidth: 0 });
 }

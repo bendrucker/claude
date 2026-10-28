@@ -18,7 +18,7 @@ export function scan(paths: readonly string[], all: boolean): Promise<Map<string
 }
 
 export function fails(alerts: Map<string, Alert[]>): boolean {
-  return [...alerts.values()].flat().some((alert) => alert.Severity === "error");
+  return [...alerts.values()].some((found) => found.length > 0);
 }
 
 function label(path: string): string {

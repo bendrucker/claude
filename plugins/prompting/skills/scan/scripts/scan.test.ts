@@ -59,7 +59,9 @@ describe("fails", () => {
   beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), "prompting-fails-"));
     await Promise.all([
+      Bun.write(join(dir, "clean/CLAUDE.md"), "Wait for the release.\n"),
       Bun.write(join(dir, "warn/CLAUDE.md"), "Wait for #123.\n"),
+      Bun.write(join(dir, "draft/evals/CLAUDE.md"), "Wait for #123.\n"),
       Bun.write(join(dir, "error/CLAUDE.md"), "Wait for #123. Try to wait.\n"),
     ]);
   });
@@ -69,7 +71,9 @@ describe("fails", () => {
   });
 
   test.each([
-    ["passes on warnings alone", "warn", false],
+    ["passes with no alerts", "clean", false],
+    ["fails on a warning", "warn", true],
+    ["skips an eval draft", "draft", false],
     ["fails on an error", "error", true],
   ])("%s", async (_label, name, expected) => {
     expect(fails(await scan([join(dir, name)], false))).toBe(expected);

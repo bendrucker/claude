@@ -247,13 +247,6 @@
         "repo": "schpet/linear-cli",
         "ref": "v3.0.0"
       }
-    },
-    "plannotator": {
-      "source": {
-        "source": "github",
-        "repo": "backnotprop/plannotator",
-        "ref": "v0.28.23"
-      }
     }
   },
   "sandbox": {

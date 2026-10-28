@@ -1,5 +1,5 @@
-# evidence: replaces the retired CROSS_SENTENCE_NOT regex (8 hits in 2 sessions over 30 days) with a
-#   different shape: any negation cue followed by an adversative opener. Session-corpus calibration pending.
+# evidence: the retired CROSS_SENTENCE_NOT regex had 8 hits in 2 sessions over 30 days.
+#   Session-corpus calibration pending.
 # retire when: the pattern fires at comparable rates on user text, or session-corpus calibration shows
 #   precision below the hook bar.
 extends: existence

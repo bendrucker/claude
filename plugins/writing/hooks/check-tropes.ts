@@ -312,7 +312,7 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<HookFindin
   if (texts.length === 0) return [];
 
   // A non-structural deny-tier hit is advice the model can act on while
-    // revising the rest, so it is reported as context.
+  // revising the rest, so it is reported as context.
   const text = texts.join("\n");
   const matches = await scan(text, undefined, "sideEffect");
   const findings: HookFinding[] = matches.map((match) => ({

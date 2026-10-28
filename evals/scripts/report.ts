@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
 
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { getBorderCharacters, table } from "table";
 import { z } from "zod";
 import type { RunCommand } from "./command";
 import { literal, query, timestampLiteral } from "./duckdb";
+import { parseResultPath } from "../../packages/evals/layout";
 import { resultFiles } from "../../packages/evals/suite";
 
 export const BUDGET_USD = 20;
@@ -62,6 +63,13 @@ export interface Summary {
 export function views(root: string, files: readonly string[]): string {
   const list = `[${files.map(literal).join(", ")}]`;
   const prefix = literal(`${resolve(root)}/`);
+  const names = files
+    .map((file) => {
+      const path = relative(resolve(root), file);
+      const { suite, run } = parseResultPath(path);
+      return `(${literal(path)}, ${literal(suite)}, ${literal(run)})`;
+    })
+    .join(", ");
   return `
 CREATE OR REPLACE VIEW raw AS
 SELECT replace(filename, ${prefix}, '') AS path, json
@@ -69,8 +77,8 @@ FROM read_json_objects(${list}, filename=true);
 CREATE OR REPLACE VIEW runs AS
 SELECT
   path,
-  regexp_replace(path, '^(?:plugins/([^/]+)/evals|evals/(user))/([^/]+)/results/.*$', '\\1\\2/\\3') AS suite,
-  regexp_extract(path, '/results/([^/]+)/aggregate-result\\.json$', 1) AS run,
+  names.suite AS suite,
+  names.run AS run,
   TRY_CAST(json->>'$.startedAt' AS TIMESTAMP) AS started_at,
   COALESCE(TRY_CAST(json->>'$.costUsd' AS DOUBLE), 0)::DOUBLE AS cost_usd,
   COALESCE(TRY_CAST(json->>'$.durationSeconds' AS DOUBLE), 0)::DOUBLE AS duration_seconds,
@@ -79,7 +87,8 @@ SELECT
   TRY_CAST(json->>'$.aggregates.casesPassed' AS INTEGER) AS cases_passed,
   TRY_CAST(json->>'$.aggregates.overallScore' AS DOUBLE) AS overall_score,
   TRY_CAST(json->>'$.aggregates.meanDelta' AS DOUBLE) AS mean_delta
-FROM raw;
+FROM raw
+JOIN (VALUES ${names}) AS names(path, suite, run) USING (path);
 CREATE OR REPLACE VIEW cases AS
 SELECT
   runs.suite,

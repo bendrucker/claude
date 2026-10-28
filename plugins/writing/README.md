@@ -22,7 +22,7 @@ Context-tier findings are suppressed when the same Vale check already fired in t
 
 #### Run Log
 
-Every dispatcher run appends one JSONL line to `~/.claude/writing-hooks/log.jsonl` (rotated past 5 MB): timestamp, session, tool, extension, duration, outcome (`silent | context | ask | deny | skipped-scratch`), the reported check and whether it was suppressed, a hash of the file path, and every check that alerted. This is the evidence surface for auditing the hooks' cost and precision. `WRITING_HOOKS_LOG=0` disables it, and a path value redirects it. The `writing:analyze` skill reads it through [`skills/analyze/scripts/hook-health.ts`](skills/analyze/scripts/hook-health.ts), which summarizes volume, latency, per-check fire/suppress counts, and how often each rule was acted on, then raises fix opportunities. Once two consecutive health checks come back stable, flip the default off.
+Every dispatcher run appends one JSONL line to `~/.claude/writing-hooks/log.jsonl` (rotated past 5 MB): timestamp, session, tool, extension, duration, outcome (`silent | context | ask | deny | skipped-scratch`), the reported check and whether it was suppressed, a hash of the file path, and every check that alerted. This is the evidence surface for auditing the hooks' cost and precision. `WRITING_HOOKS_LOG=0` disables it, and a path value redirects it. The `writing:analyze` skill reads it through [`skills/analyze/scripts/hook-health.ts`](skills/analyze/scripts/hook-health.ts), which summarizes outcomes, latency, and per check its fire count and how often its alerts were acted on.
 
 ## Testing
 

@@ -2,36 +2,27 @@
 
 import { cli } from "cleye";
 import { table } from "table";
-import {
-  emittedOf,
-  RunLogEntry,
-  type RunOutcome,
-  resolveLogPath,
-  suppressedOf,
-} from "../../../hooks/run-log";
+import { emittedOf, RunLogEntry, type RunOutcome, resolveLogPath } from "../../../hooks/run-log";
 
-export interface CheckHealth {
+export interface Acceptance {
+  /** Shown alerts followed by a whole-file re-lint of the same file. */
+  revisited: number;
+  /** Revisited alerts the re-lint no longer raised. */
+  accepted: number;
+  /** Shown alerts no whole-file re-lint reached, leaving nothing that decides them. */
+  unconfirmed: number;
+}
+
+export interface CheckHealth extends Acceptance {
   check: string;
   fired: number;
-  suppressed: number;
-  share: number;
-  /** Shown findings followed by a whole-file re-scan of the same file. */
-  revisited: number;
-  /** Revisited findings the re-scan no longer raised. */
-  accepted: number;
-  /** Shown findings no whole-file re-scan reached, leaving nothing that decides them. */
-  unconfirmed: number;
 }
 
 export interface HookHealth {
   total: number;
-  spanDays: number;
-  runsPerDay: number;
   byOutcome: Record<RunOutcome, number>;
-  byTool: Record<string, number>;
-  injections: number;
   checks: CheckHealth[];
-  latency: { p50: number; p95: number; max: number; silentP95: number };
+  latency: { p50: number; p95: number; silentP95: number };
 }
 
 export function parseLog(text: string): RunLogEntry[] {
@@ -54,29 +45,15 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, index)] ?? 0;
 }
 
-const INJECTION_OUTCOMES = new Set<RunOutcome>(["context", "ask", "deny"]);
-
-export interface Acceptance {
-  revisited: number;
-  accepted: number;
-  unconfirmed: number;
-}
-
-// A PostToolUse run lints the saved file, so its `checks` speak to the file a
-// finding named. Before that move, only a Write scanned the whole file, and an
-// `Edit` or `MultiEdit` reported the hits its own hunks introduced.
+// A PostToolUse run lints the saved file, so its `checks` speak to the file an
+// alert named. Before that move, only a Write linted the whole file.
 function isWholeFile(entry: RunLogEntry): boolean {
   return entry.event === "PostToolUse" || (entry.event === undefined && entry.tool === "Write");
 }
 
-// A fire count measures how loud a rule is. Whether it was right takes a second
-// signal. Pairing each shown finding with a whole-file re-lint of the same file
-// answers that from ordinary use: a rule missing from the re-lint's `checks`
-// was acted on, one still present was written past. A suppressed finding was
-// never shown, so it seeds no pair, and a run that returned before Vale ran
-// carries no `checks`. Every shown finding no whole-file re-lint reached lands
-// in `unconfirmed`, so `revisited` and `unconfirmed` together account for all
-// of them.
+// Pairing each shown alert with the next whole-file re-lint of the same file
+// tells whether it was acted on: a check missing from the re-lint's `checks`
+// was fixed, one still present was written past.
 function tally(
   counts: Map<string, Acceptance>,
   check: string,
@@ -117,10 +94,6 @@ export function acceptance(entries: RunLogEntry[]): Map<string, Acceptance> {
   return counts;
 }
 
-export function acceptRate(cat: CheckHealth): number | null {
-  return cat.revisited > 0 ? cat.accepted / cat.revisited : null;
-}
-
 export function summarize(entries: RunLogEntry[]): HookHealth {
   const byOutcome: Record<RunOutcome, number> = {
     silent: 0,
@@ -130,233 +103,83 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
     "skipped-scratch": 0,
     error: 0,
   };
-  const byTool: Record<string, number> = {};
-  const perCheck = new Map<string, { fired: number; suppressed: number }>();
+  const fired = new Map<string, number>();
   const durations: number[] = [];
   const silentDurations: number[] = [];
-  let firstTs = Number.POSITIVE_INFINITY;
-  let lastTs = Number.NEGATIVE_INFINITY;
 
   for (const entry of entries) {
     byOutcome[entry.outcome] += 1;
-    byTool[entry.tool] = (byTool[entry.tool] ?? 0) + 1;
     durations.push(entry.duration_ms);
     if (entry.outcome === "silent" && !entry.suppressed) silentDurations.push(entry.duration_ms);
-
-    for (const check of emittedOf(entry)) {
-      const bucket = perCheck.get(check) ?? { fired: 0, suppressed: 0 };
-      bucket.fired += 1;
-      perCheck.set(check, bucket);
-    }
-    for (const check of suppressedOf(entry)) {
-      const bucket = perCheck.get(check) ?? { fired: 0, suppressed: 0 };
-      bucket.suppressed += 1;
-      perCheck.set(check, bucket);
-    }
-
-    const ts = Date.parse(entry.ts);
-    if (!Number.isNaN(ts)) {
-      firstTs = Math.min(firstTs, ts);
-      lastTs = Math.max(lastTs, ts);
-    }
+    for (const check of emittedOf(entry)) fired.set(check, (fired.get(check) ?? 0) + 1);
   }
-
-  const injections = entries.filter((entry) => INJECTION_OUTCOMES.has(entry.outcome)).length;
-  const spanDays =
-    entries.length > 0 && lastTs > firstTs ? (lastTs - firstTs) / (24 * 60 * 60 * 1000) : 0;
 
   durations.sort((a, b) => a - b);
   silentDurations.sort((a, b) => a - b);
 
   const accepts = acceptance(entries);
-  const checks = [...perCheck.entries()]
-    .map(([check, counts]) => ({
+  const checks = [...fired.entries()]
+    .map(([check, count]) => ({
       check,
-      fired: counts.fired,
-      suppressed: counts.suppressed,
-      share: injections > 0 ? counts.fired / injections : 0,
+      fired: count,
       revisited: accepts.get(check)?.revisited ?? 0,
       accepted: accepts.get(check)?.accepted ?? 0,
       unconfirmed: accepts.get(check)?.unconfirmed ?? 0,
     }))
-    .toSorted((a, b) => (b.fired === a.fired ? b.suppressed - a.suppressed : b.fired - a.fired));
+    .toSorted((a, b) => b.fired - a.fired);
 
   return {
     total: entries.length,
-    spanDays,
-    runsPerDay: spanDays > 0 ? entries.length / spanDays : entries.length,
     byOutcome,
-    byTool,
-    injections,
     checks,
     latency: {
       p50: percentile(durations, 50),
       p95: percentile(durations, 95),
-      max: durations.at(-1) ?? 0,
       silentP95: percentile(silentDurations, 95),
     },
   };
 }
 
-const MIN_RUNS = 50;
-const MIN_SPAN_DAYS = 3;
-const DOMINANT_SHARE = 0.25;
-const MIN_FIRES_FOR_SUPPRESSION_SIGNAL = 5;
-const SILENT_P95_BUDGET_MS = 100;
-const SCRATCH_SHARE_CEILING = 0.6;
-const MIN_REVISITS = 20;
-const LOW_ACCEPT_RATE = 0.5;
-
-// Each opportunity names a concrete fix, mirroring the curation principle:
-// the log exists so audits read over/under-firing directly instead of
-// inferring it from transcripts.
-export function opportunities(health: HookHealth): string[] {
-  const found: string[] = [];
-
-  if (health.total < MIN_RUNS || health.spanDays < MIN_SPAN_DAYS) {
-    found.push(
-      `Evidence still accumulating (${health.total} runs over ${health.spanDays.toFixed(1)} days). Re-run once the log spans at least ${MIN_SPAN_DAYS} days and ${MIN_RUNS} runs.`,
-    );
-    return found;
-  }
-
-  for (const cat of health.checks) {
-    if (cat.share >= DOMINANT_SHARE) {
-      found.push(
-        `"${cat.check}" is ${Math.round(cat.share * 100)}% of injections. Audit its precision: sample recent firings from session history and demote, narrow, or retire the rule if hits are unactionable.`,
-      );
-    }
-    const rate = acceptRate(cat);
-    if (cat.revisited >= MIN_REVISITS && rate !== null && rate < LOW_ACCEPT_RATE) {
-      found.push(
-        `"${cat.check}" was acted on after ${cat.accepted} of ${cat.revisited} shown findings. Sample those runs: prose the author rewrote past is prose the rule read wrong.`,
-      );
-    }
-    if (cat.fired >= MIN_FIRES_FOR_SUPPRESSION_SIGNAL && cat.suppressed >= cat.fired) {
-      found.push(
-        `"${cat.check}" is suppressed as often as it fires (${cat.fired} fired, ${cat.suppressed} suppressed). The reminder is not changing behavior within sessions. Consider a stronger message or retiring the rule.`,
-      );
-    }
-  }
-
-  if (health.byOutcome.ask > 0) {
-    found.push(
-      `${health.byOutcome.ask} ask outcomes recorded. Asks block background jobs. Find the emitting rule and demote it.`,
-    );
-  }
-
-  if (health.byOutcome.error > 0) {
-    found.push(
-      `${health.byOutcome.error} runs failed to lint, so their text went unchecked. Read \`vale_error\` on those log lines for the Vale error code.`,
-    );
-  }
-
-  if (health.latency.silentP95 > SILENT_P95_BUDGET_MS) {
-    found.push(
-      `Silent-run p95 latency is ${health.latency.silentP95}ms (budget ${SILENT_P95_BUDGET_MS}ms). The no-finding path runs on every file op. Profile the dispatcher's checker order and prefilters.`,
-    );
-  }
-
-  const scratchShare = health.total > 0 ? health.byOutcome["skipped-scratch"] / health.total : 0;
-  if (scratchShare > SCRATCH_SHARE_CEILING) {
-    found.push(
-      `${Math.round(scratchShare * 100)}% of runs are skipped-scratch. Verify the scratch heuristic is not swallowing durable prose (check recent Write paths in session history against isScratchPath).`,
-    );
-  }
-
-  const revisited = health.checks.reduce((sum, cat) => sum + cat.revisited, 0);
-  const unconfirmed = health.checks.reduce((sum, cat) => sum + cat.unconfirmed, 0);
-  if (revisited < MIN_REVISITS) {
-    found.push(
-      `Acceptance is not measurable yet (${revisited} shown findings re-scanned, ${MIN_REVISITS} needed; ${unconfirmed} more never got a whole-file re-scan). Until it is, the fired column is a flag count and says nothing about whether a rule is right. Keep the log on.`,
-    );
-    return found;
-  }
-
-  if (found.length === 0) {
-    found.push(
-      "No issues raised. After two consecutive stable audits, flip the WRITING_HOOKS_LOG default to off (see README Run Log).",
-    );
-  }
-
-  return found;
-}
-
-function formatShare(share: number): string {
-  return `${Math.round(share * 100)}%`;
+function actedOn(cat: CheckHealth): string {
+  if (cat.revisited === 0) return "n/a";
+  return `${cat.accepted}/${cat.revisited} ${Math.round((cat.accepted / cat.revisited) * 100)}%`;
 }
 
 export function renderReport(health: HookHealth): string {
-  const lines: string[] = [];
-
-  lines.push(
-    table([
-      ["runs", String(health.total)],
-      ["span (days)", health.spanDays.toFixed(1)],
-      ["runs/day", health.runsPerDay.toFixed(1)],
-      ["injections", String(health.injections)],
-      [
-        "outcomes",
-        Object.entries(health.byOutcome)
-          .filter(([, count]) => count > 0)
-          .map(([outcome, count]) => `${outcome}=${count}`)
-          .join(" "),
-      ],
-      [
-        "tools",
-        Object.entries(health.byTool)
-          .map(([tool, count]) => `${tool}=${count}`)
-          .join(" "),
-      ],
-      [
-        "latency (ms)",
-        `p50=${health.latency.p50} p95=${health.latency.p95} max=${health.latency.max} silent-p95=${health.latency.silentP95}`,
-      ],
+  const outcomes = Object.entries(health.byOutcome)
+    .filter(([, count]) => count > 0)
+    .map(([outcome, count]) => `${outcome}=${count}`)
+    .join(" ");
+  const { p50, p95, silentP95 } = health.latency;
+  const summary = table([
+    ["runs", String(health.total)],
+    ["outcomes", outcomes],
+    ["latency (ms)", `p50=${p50} p95=${p95} silent-p95=${silentP95}`],
+  ]);
+  if (health.checks.length === 0) return summary;
+  const checks = table([
+    ["check", "fired", "acted on", "unconfirmed"],
+    ...health.checks.map((cat) => [
+      cat.check,
+      String(cat.fired),
+      actedOn(cat),
+      String(cat.unconfirmed),
     ]),
-  );
-
-  if (health.checks.length > 0) {
-    lines.push(
-      table([
-        ["check", "fired", "suppressed", "share of injections", "acted on", "unconfirmed"],
-        ...health.checks.map((cat) => {
-          const rate = acceptRate(cat);
-          return [
-            cat.check,
-            String(cat.fired),
-            String(cat.suppressed),
-            formatShare(cat.share),
-            rate === null ? "n/a" : `${cat.accepted}/${cat.revisited} ${formatShare(rate)}`,
-            String(cat.unconfirmed),
-          ];
-        }),
-      ]),
-    );
-  }
-
-  lines.push("Opportunities:");
-  for (const opportunity of opportunities(health)) {
-    lines.push(`- ${opportunity}`);
-  }
-
-  return lines.join("\n");
+  ]);
+  return `${summary}\n${checks}`;
 }
 
 export async function readLog(path: string, since?: string): Promise<RunLogEntry[]> {
-  const texts: string[] = [];
-  for (const candidate of [`${path}.1`, path]) {
-    const file = Bun.file(candidate);
-    // oxlint-disable-next-line no-await-in-loop -- the rotated log and the live log concatenate in that order.
-    if (await file.exists()) texts.push(await file.text());
-  }
-  let entries = parseLog(texts.join("\n"));
-  if (since != null && since !== "") {
-    const cutoff = Date.parse(since);
-    if (!Number.isNaN(cutoff)) {
-      entries = entries.filter((entry) => Date.parse(entry.ts) >= cutoff);
-    }
-  }
-  return entries;
+  // The rotated log precedes the live one.
+  const texts = await Promise.all(
+    [`${path}.1`, path].map(async (candidate) => {
+      const file = Bun.file(candidate);
+      return (await file.exists()) ? file.text() : "";
+    }),
+  );
+  const entries = parseLog(texts.join("\n"));
+  const cutoff = since == null ? Number.NaN : Date.parse(since);
+  return Number.isNaN(cutoff) ? entries : entries.filter((entry) => Date.parse(entry.ts) >= cutoff);
 }
 
 if (import.meta.main) {
@@ -364,7 +187,7 @@ if (import.meta.main) {
     name: "hook-health",
     help: {
       description:
-        "Read the writing-hooks run log and report volume, latency, per-rule fire/suppress counts, and fix opportunities.",
+        "Read the writing-hooks run log and report outcomes, latency, and how often each check's alerts were acted on.",
     },
     flags: {
       log: {
@@ -390,14 +213,10 @@ if (import.meta.main) {
 
   const entries = await readLog(path, argv.flags.since);
   if (entries.length === 0) {
-    console.error(`No log entries at ${path}. The dispatcher writes one line per hook run.`);
+    console.error(`No log entries at ${path}. The hook writes one line per run.`);
     process.exit(1);
   }
 
   const health = summarize(entries);
-  if (argv.flags.json) {
-    console.log(JSON.stringify({ ...health, opportunities: opportunities(health) }, null, 2));
-  } else {
-    console.log(renderReport(health));
-  }
+  console.log(argv.flags.json ? JSON.stringify(health, null, 2) : renderReport(health));
 }

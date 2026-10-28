@@ -106,8 +106,6 @@ export async function dispatch(
   const categories = unique(findings.map((finding) => finding.category));
   if (findings.length === 0) return finish(null, "silent", { categories });
 
-  // An introduced or blocking finding always shows. A context finding whose
-  // category fired recently in this session is muted.
   const muted = new Set<string>();
   const kept: HookFinding[] = [];
   for (const finding of findings) {

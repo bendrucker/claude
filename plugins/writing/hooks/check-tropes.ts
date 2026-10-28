@@ -311,8 +311,8 @@ async function processSideEffect(input: PreToolUseHookInput): Promise<HookFindin
   const texts = await collectText(input);
   if (texts.length === 0) return [];
 
-  // Only a structural pattern blocks the call. A soft deny-tier hit is advice
-  // the model can act on while revising the rest.
+  // A non-structural deny-tier hit is advice the model can act on while
+    // revising the rest, so it is reported as context.
   const text = texts.join("\n");
   const matches = await scan(text, undefined, "sideEffect");
   const findings: HookFinding[] = matches.map((match) => ({

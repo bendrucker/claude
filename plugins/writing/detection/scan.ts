@@ -144,7 +144,7 @@ export async function legacyResults(
 export interface ScanOptions {
   /** Include `sideEffectOnly` patterns: the rules for a message sent once. */
   message?: boolean;
-  /** Include `BATCH_PATTERNS`. Defaults to true, the scan and score surfaces. */
+  /** Include `BATCH_PATTERNS`. Defaults to true. */
   batch?: boolean;
 }
 

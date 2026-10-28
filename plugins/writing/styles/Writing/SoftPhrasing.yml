@@ -1,0 +1,21 @@
+# evidence: soft-phrasing.txt entries are weighted against the deliverable corpus and the 209-PR hand-written baseline, and a lone hit stays quiet.
+# retire when: the deliverable-surface rule-health check shows the entry dead or not distinctive versus the voice baseline.
+extends: occurrence
+message: "Soft phrasing piles up. These read as filler. Describe what the code does plainly."
+level: warning
+scope: paragraph
+ignorecase: true
+max: 1
+token: '\bcleanly\b'
+tests:
+  - name: positives
+    about: two hits in one paragraph
+    input: |
+      The migration runs cleanly and the tests strip cleanly.
+    want: |
+      1:20:Writing.SoftPhrasing:Soft phrasing piles up. These read as filler. Describe what the code does plainly.
+  - name: negatives
+    about: a single hit stays quiet
+    input: |
+      The fixtures strip cleanly.
+    want: ""

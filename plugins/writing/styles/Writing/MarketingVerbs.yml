@@ -1,0 +1,24 @@
+# evidence: marketing-verbs.txt weights each promotional verb, and the threshold requires two co-occurring hits so a single use stays quiet.
+# retire when: the rule-health table shows the verb dead or not distinctive versus the voice baseline. Lower the limit if the pattern stops firing.
+extends: occurrence
+message: "Marketing verbs stack up. Describe concretely what changed instead of promotional framing."
+level: warning
+scope: paragraph
+ignorecase: true
+max: 1
+token: '\bempower(?:s|ed|ing|ment)?\b'
+tests:
+  - name: positives
+    about: two hits in one paragraph
+    input: |
+      This empowers teams. That empowers customers.
+
+      The release empowered users and is empowering admins.
+    want: |
+      1:6:Writing.MarketingVerbs:Marketing verbs stack up. Describe concretely what changed instead of promotional framing.
+      3:13:Writing.MarketingVerbs:Marketing verbs stack up. Describe concretely what changed instead of promotional framing.
+  - name: negatives
+    about: a single hit stays quiet
+    input: |
+      This release empowers users.
+    want: ""

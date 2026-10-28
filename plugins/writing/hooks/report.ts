@@ -9,7 +9,7 @@ import {
 
 export const MAX_REPORTED = 10;
 
-export interface HookFinding {
+export interface HookAlert {
   check: string;
   decision: Decision;
   message: string;
@@ -17,7 +17,7 @@ export interface HookFinding {
   at: string;
 }
 
-export function findingOf(alert: ValeAlert, decision: Decision): HookFinding {
+export function hookAlertOf(alert: ValeAlert, decision: Decision): HookAlert {
   return {
     check: alert.Check,
     decision,
@@ -26,25 +26,24 @@ export function findingOf(alert: ValeAlert, decision: Decision): HookFinding {
   };
 }
 
-function render(findings: HookFinding[], omitted: number, filePath: string | undefined): string {
-  const total = findings.length + omitted;
+function render(alerts: HookAlert[], omitted: number, filePath: string | undefined): string {
+  const total = alerts.length + omitted;
   const where = filePath === undefined ? "this text" : `\`${filePath}\``;
   const count = total === 1 ? "1 alert" : `${total} alerts`;
   const fix = total === 1 ? "Fix it." : "Fix them in one pass.";
   const lines = [`Vale found ${count} in ${where}. ${fix}`, ""];
-  for (const finding of findings)
-    lines.push(`- ${finding.at} ${finding.check}: ${finding.message}`);
+  for (const alert of alerts) lines.push(`- ${alert.at} ${alert.check}: ${alert.message}`);
   if (omitted > 0) lines.push(`- …and ${omitted} more. Lint the text with Vale to see all.`);
   return lines.join("\n");
 }
 
-/** Every finding in one hook output, denying when any finding denies. */
+/** Every alert in one hook output, denying when any alert denies. */
 export function report(
-  findings: HookFinding[],
+  alerts: HookAlert[],
   { event, filePath }: { event: HookEvent; filePath?: string | undefined },
-): { output: SyncHookJSONOutput; decision: Decision; shown: HookFinding[] } | null {
-  if (findings.length === 0) return null;
-  const ordered = findings.toSorted(
+): { output: SyncHookJSONOutput; decision: Decision; shown: HookAlert[] } | null {
+  if (alerts.length === 0) return null;
+  const ordered = alerts.toSorted(
     (a, b) => Number(b.decision === "deny") - Number(a.decision === "deny"),
   );
   const shown = ordered.slice(0, MAX_REPORTED);

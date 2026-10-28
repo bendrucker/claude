@@ -2,7 +2,7 @@ import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { stripCode } from "../detection/code-spans";
 import { valeAlerts } from "../detection/vale";
 import { toolInputOf } from "./io";
-import { findingOf, type HookFinding } from "./report";
+import { hookAlertOf, type HookAlert } from "./report";
 
 // The full set of Bash prose surfaces this hook scans. The hooks.json Bash
 // guard is derived from these. hooks.test.ts enforces the sync.
@@ -149,12 +149,12 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
   return [];
 }
 
-/** Findings for the message prose a Bash or MCP call sends. An error-level alert denies the call. */
-export async function lintMessages(input: PreToolUseHookInput): Promise<HookFinding[]> {
+/** Alerts for the message prose a Bash or MCP call sends. An error-level alert denies the call. */
+export async function lintMessages(input: PreToolUseHookInput): Promise<HookAlert[]> {
   const texts = await collectText(input);
   if (texts.length === 0) return [];
   const command = toolInputOf(input).command ?? "";
   const kind = /\bgit\s+(commit|tag)\b/.test(command) ? "commit" : "body";
   const alerts = await valeAlerts(texts.join("\n"), { kind });
-  return alerts.map((alert) => findingOf(alert, alert.Severity === "error" ? "deny" : "context"));
+  return alerts.map((alert) => hookAlertOf(alert, alert.Severity === "error" ? "deny" : "context"));
 }

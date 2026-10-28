@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { type HookFinding, MAX_REPORTED, report } from "./report";
+import { type HookAlert, MAX_REPORTED, report } from "./report";
 
-function makeFinding(overrides: Partial<HookFinding> = {}): HookFinding {
+function makeAlert(overrides: Partial<HookAlert> = {}): HookAlert {
   return {
     check: "Writing.FillerWords",
     decision: "context",
@@ -12,12 +12,12 @@ function makeFinding(overrides: Partial<HookFinding> = {}): HookFinding {
 }
 
 describe("report", () => {
-  test("is null without findings", () => {
+  test("is null without alerts", () => {
     expect(report([], { event: "PreToolUse" })).toBeNull();
   });
 
   test("lists a file's alerts as PostToolUse context", () => {
-    const result = report([makeFinding()], { event: "PostToolUse", filePath: "docs/a.md" });
+    const result = report([makeAlert()], { event: "PostToolUse", filePath: "docs/a.md" });
     expect(result?.output).toMatchInlineSnapshot(`
       {
         "hookSpecificOutput": {
@@ -32,11 +32,11 @@ describe("report", () => {
     `);
   });
 
-  test("denies a message when any finding denies, listing the deny first", () => {
+  test("denies a message when any alert denies, listing the deny first", () => {
     const result = report(
       [
-        makeFinding(),
-        makeFinding({
+        makeAlert(),
+        makeAlert({
           check: "Writing.NoNegation",
           decision: "deny",
           message: "Negate the verb.",
@@ -63,10 +63,10 @@ describe("report", () => {
   });
 
   test("caps the list and counts the rest", () => {
-    const findings = Array.from({ length: MAX_REPORTED + 3 }, (_, i) =>
-      makeFinding({ check: `Writing.Rule${i}` }),
+    const alerts = Array.from({ length: MAX_REPORTED + 3 }, (_, i) =>
+      makeAlert({ check: `Writing.Rule${i}` }),
     );
-    const result = report(findings, { event: "PreToolUse" });
+    const result = report(alerts, { event: "PreToolUse" });
     expect(result?.shown).toHaveLength(MAX_REPORTED);
     expect(result?.output).toMatchSnapshot();
   });

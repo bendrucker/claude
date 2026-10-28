@@ -206,14 +206,11 @@ export async function lintDirectory(dir: string, config: string): Promise<ValeAl
   return alertsOf(await runVale(["--no-global", `--config=${config}`, dir]));
 }
 
-/** Alerts in `text`, sorted by position. No path lints it as a message. */
+/** Alerts in `text`, in position order. No path lints it as a message. */
 export async function lintProse(
   text: string,
   filePath?: string,
   { message = false }: { message?: boolean } = {},
 ): Promise<ValeAlert[]> {
-  const source = message || filePath === undefined ? { kind: "body" as const } : { filePath };
-  return (await valeAlerts(text, source)).toSorted((a, b) =>
-    a.Line === b.Line ? a.Span[0] - b.Span[0] : a.Line - b.Line,
-  );
+  return valeAlerts(text, message || filePath === undefined ? { kind: "body" } : { filePath });
 }

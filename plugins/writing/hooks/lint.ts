@@ -7,7 +7,7 @@ import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detect
 import { lintFile } from "../detection/vale";
 import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
 import { lintMessages } from "./messages";
-import { findingOf, type HookFinding, report } from "./report";
+import { hookAlertOf, type HookAlert, report } from "./report";
 import { appendRunLog, type RunLogEntry, type RunOutcome } from "./run-log";
 import { recentlyFired, recordFired } from "./session-state";
 
@@ -24,12 +24,12 @@ export function targetOf(filePath: string): string {
 }
 
 // A file edit already happened, so every alert in the saved file is context.
-async function lintEdited(filePath: string): Promise<HookFinding[]> {
-  return (await lintFile(filePath)).map((alert) => findingOf(alert, "context"));
+async function lintEdited(filePath: string): Promise<HookAlert[]> {
+  return (await lintFile(filePath)).map((alert) => hookAlertOf(alert, "context"));
 }
 
-// One run emits every finding in one output, so the model fixes them in a
-// single pass instead of a retry per finding.
+// One run emits every alert in one output, so the model fixes them in a
+// single pass instead of a retry per alert.
 export async function dispatch(
   input: HookInput,
   now: number = Date.now(),
@@ -63,33 +63,33 @@ export async function dispatch(
   if (hasPath && (isPlanPath(filePath) || isMemoryPath(filePath))) return finish(null, "silent");
 
   // A failed lint is logged without `checks`, so it never reads as a clean run.
-  let findings: HookFinding[] = [];
+  let alerts: HookAlert[] = [];
   try {
-    if (input.hook_event_name === "PreToolUse") findings = await lintMessages(input);
-    else if (hasPath) findings = await lintEdited(filePath);
+    if (input.hook_event_name === "PreToolUse") alerts = await lintMessages(input);
+    else if (hasPath) alerts = await lintEdited(filePath);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[writing/lint] Vale failed: ${message}`);
     return finish(null, "error", { vale_error: message });
   }
-  const checks = unique(findings.map((finding) => finding.check));
-  if (findings.length === 0) return finish(null, "silent", { checks });
+  const checks = unique(alerts.map((alert) => alert.check));
+  if (alerts.length === 0) return finish(null, "silent", { checks });
 
   // Repeats are muted per file, so an alert left in one file does not hide the same check in another.
   const key = (check: string): string =>
     base.target === undefined ? check : `${base.target}:${check}`;
   const muted = new Set<string>();
-  const kept: HookFinding[] = [];
-  for (const finding of findings) {
-    if (finding.decision === "context") {
-      if (muted.has(finding.check)) continue;
+  const kept: HookAlert[] = [];
+  for (const alert of alerts) {
+    if (alert.decision === "context") {
+      if (muted.has(alert.check)) continue;
       // oxlint-disable-next-line no-await-in-loop -- reads one small state file per check, and the loop is bounded by the checks found.
-      if (await recentlyFired(input.session_id, key(finding.check), now)) {
-        muted.add(finding.check);
+      if (await recentlyFired(input.session_id, key(alert.check), now)) {
+        muted.add(alert.check);
         continue;
       }
     }
-    kept.push(finding);
+    kept.push(alert);
   }
 
   const extra: Partial<RunLogEntry> = { checks };
@@ -101,7 +101,7 @@ export async function dispatch(
     return finish(null, "silent", extra);
   }
 
-  const emitted = unique(result.shown.map((finding) => finding.check));
+  const emitted = unique(result.shown.map((alert) => alert.check));
   // oxlint-disable-next-line no-await-in-loop -- sequential writes to one state file; concurrent read-modify-write would drop checks.
   for (const check of emitted) await recordFired(input.session_id, key(check), now);
   return finish(result.output, result.decision, { ...extra, check: emitted[0], emitted });

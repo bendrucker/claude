@@ -169,6 +169,17 @@ describe("echo mode", () => {
     expect(stub(run, tool, args).out).toBe(block("", "Edited", url));
   });
 
+  test("glab api note posts read -F body=@<path> and send -f body=@<path> literally", async () => {
+    const file = join(run.cwd, "note.md");
+    await Bun.write(file, "From file\n");
+    const post = (...flags: string[]) =>
+      stub(run, "glab", ["api", "projects/:id/merge_requests/1/notes", "-X", "POST", ...flags]).out;
+    expect(post("-F", `body=@${file}`)).toBe(block("", "From file", gitlab));
+    expect(post(`--field=body=@${file}`)).toBe(block("", "From file", gitlab));
+    expect(post("-f", `body=@${file}`)).toBe(block("", `@${file}`, gitlab));
+    expect(post("--raw-field", "body=Inline")).toBe(block("", "Inline", gitlab));
+  });
+
   test("gh derives the URL from an ssh origin", async () => {
     const cwd = mkdtempSync(join(tmpdir(), "eval-stubs-repo-"));
     await $`git init -q && git remote add origin git@github.com:bendrucker/claude.git`.cwd(cwd);
@@ -178,6 +189,7 @@ describe("echo mode", () => {
 
   test.each([
     ["glab", ["mr", "list"]],
+    ["glab", ["api", "projects/:id/merge_requests/1"]],
     ["gh", ["pr", "view", "1"]],
     ["gh", ["api", "repos/x/y"]],
     ["gh", ["mr", "create"]],

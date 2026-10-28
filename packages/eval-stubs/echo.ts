@@ -3,7 +3,7 @@ import { readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { dir } from "./snapshot";
 
-/** The create and edit commands echo mode answers, per tool. */
+/** The create and edit commands echo mode answers, per tool, beside `glab api` note posts. */
 const WRITES = {
   gh: ["pr create", "pr edit"],
   glab: ["mr create", "mr update", "mr note", "issue note"],
@@ -62,6 +62,30 @@ export function parseWrite(argv: string[]): { title: string; body: string } {
   return { title, body };
 }
 
+const FIELD = new Set(["-F", "--field"]);
+const RAW_FIELD = new Set(["-f", "--raw-field"]);
+
+/** Whether a `glab api` call posts a note, to an MR or issue's notes or discussions. */
+export function postsNote(argv: string[]): boolean {
+  return /\/(notes|discussions)(\/|\?|$)/.test(argv[1] ?? "");
+}
+
+/** The `body` field a note API call carries: `-F body=@<path>` reads the file, as glab does. */
+export function parseNoteField(argv: string[]): string {
+  let body = "";
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i] ?? "";
+    const eq = arg.startsWith("--") ? arg.indexOf("=") : -1;
+    const name = eq > 0 ? arg.slice(0, eq) : arg;
+    if (!FIELD.has(name) && !RAW_FIELD.has(name)) continue;
+    const field = eq > 0 ? arg.slice(eq + 1) : (argv[++i] ?? "");
+    if (!field.startsWith("body=")) continue;
+    const value = field.slice("body=".length);
+    body = FIELD.has(name) && value.startsWith("@") ? slurp(value.slice(1)) : value;
+  }
+  return body;
+}
+
 /** The URL the created request would get, from the origin remote's path. */
 export function requestUrl(tool: Tool, remote: string): string {
   const path = remote
@@ -82,11 +106,12 @@ export function requestUrl(tool: Tool, remote: string): string {
  */
 export async function echo(tool: Tool, argv: string[]): Promise<never> {
   const [cmd = "", sub = "", ...rest] = argv;
-  if (!(WRITES[tool] as readonly string[]).includes(`${cmd} ${sub}`)) {
+  const note = tool === "glab" && cmd === "api" && postsNote(argv);
+  if (!note && !(WRITES[tool] as readonly string[]).includes(`${cmd} ${sub}`)) {
     process.stderr.write(`${tool} stand-in: ${argv.join(" ")} is unavailable offline\n`);
     process.exit(1);
   }
-  const { title, body } = parseWrite(rest);
+  const { title, body } = note ? { title: "", body: parseNoteField(rest) } : parseWrite(rest);
   const installed = readdirSync(dir());
   const verdicts = installed.includes("check.js") && counts(rest, body) ? checkLines(body) : "";
   if (verdicts !== "") await record(verdicts);

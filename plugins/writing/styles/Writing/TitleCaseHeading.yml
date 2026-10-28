@@ -1,0 +1,25 @@
+# evidence: the user's headings use AP title case.
+# retire when: the user's style moves to sentence-case headings.
+extends: capitalization
+message: "'%s' should be in AP title case."
+level: warning
+scope: heading
+match: $title
+style: AP
+tests:
+  - name: positives
+    about: lowercase major words
+    input: |
+      # introduction
+
+      ## setup and Configuration
+    want: |
+      1:3:Writing.TitleCaseHeading:'introduction' should be in AP title case.
+      3:4:Writing.TitleCaseHeading:'setup and Configuration' should be in AP title case.
+  - name: negatives
+    about: title-cased headings, minor words lowercase
+    input: |
+      # The Guide to Everything
+
+      ## Blast Radius of a Leaked Key
+    want: ""

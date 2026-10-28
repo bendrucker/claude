@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { z } from "zod";
-import { type Finding, findAll } from "../../../detection/findings";
+import { type ScanResult, scanAll } from "../../../detection/scan";
 import { getExtension, isMarkdownFile } from "../../../detection/paths";
 import {
   getDataDir,
@@ -55,7 +55,7 @@ export interface Payload {
 export interface Draft extends Omit<Payload, "session" | "target"> {
   id: string;
   split: "dev" | "holdout";
-  findings: Finding[];
+  findings: ScanResult[];
 }
 
 const words = (text: string) => text.split(/\s+/).filter(Boolean).length;
@@ -155,10 +155,9 @@ async function egressHosts(): Promise<string[]> {
 
 async function toDraft(payload: Payload): Promise<Draft> {
   const id = idOf(payload.text);
-  const findings = await findAll(
-    payload.text,
-    payload.message ? { message: true, batch: true } : { filePath: payload.target, batch: true },
-  );
+  const findings = await scanAll(payload.text, payload.message ? undefined : payload.target, {
+    message: payload.message,
+  });
   const { session: _session, target: _target, ...rest } = payload;
   return { ...rest, id, split: splitOf(id), findings };
 }

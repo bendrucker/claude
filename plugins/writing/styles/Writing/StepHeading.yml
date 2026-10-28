@@ -1,0 +1,26 @@
+# evidence: the user's rule against numbered steps or phases; descriptive names replace the sequence numbers.
+# retire when: model output stops numbering sections.
+extends: existence
+message: "'%s' numbers a step. Name the section for what it covers."
+level: warning
+scope: heading
+ignorecase: true
+tokens:
+  - '(?:step|phase|part|stage)\s+\d+'
+tests:
+  - name: positives
+    about: numbered step headings
+    input: |
+      ## Step 1: Read the Transcript
+
+      ## Stage 1: Context Gathering
+    want: |
+      1:4:Writing.StepHeading:'Step 1' numbers a step. Name the section for what it covers.
+      3:4:Writing.StepHeading:'Stage 1' numbers a step. Name the section for what it covers.
+  - name: negatives
+    about: unnumbered and ranked headings
+    input: |
+      ## Phase: Calendar
+
+      ## Pattern Catalog
+    want: ""

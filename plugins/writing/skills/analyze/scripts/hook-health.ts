@@ -248,7 +248,7 @@ export function opportunities(health: HookHealth): string[] {
 
   if (health.byOutcome.ask > 0) {
     found.push(
-      `${health.byOutcome.ask} ask outcomes recorded. Asks block background jobs and the numbering demotion expected zero. Find the emitting rule and demote it.`,
+      `${health.byOutcome.ask} ask outcomes recorded. Asks block background jobs. Find the emitting rule and demote it.`,
     );
   }
 

@@ -1,8 +1,6 @@
 import { mkdir, rm } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { z } from "zod";
-import aliases from "./category-aliases.json" with { type: "json" };
-import type { PatternTier } from "./tropes";
 
 export const VALE_CONFIG = join(import.meta.dirname, "..", ".vale.ini");
 
@@ -23,20 +21,10 @@ const Output = z.record(z.string(), z.array(Alert));
 
 export type ValeAlert = z.infer<typeof Alert>;
 
-/** Old TS categories whose Vale replacement has landed, keyed old name to Vale check. */
-export const CATEGORY_ALIASES: Readonly<Record<string, string>> = aliases;
+/** How a finding reaches the model: `deny` blocks a message, `context` advises. */
+export type Tier = "deny" | "context";
 
-const RETIRED_CATEGORIES: ReadonlySet<string> = new Set([
-  "honest qualifier",
-  "backtick path bullet",
-  "tricolon",
-]);
-
-export function isPorted(category: string): boolean {
-  return Object.hasOwn(CATEGORY_ALIASES, category) || RETIRED_CATEGORIES.has(category);
-}
-
-export function tierOfSeverity(severity: ValeSeverity): PatternTier | undefined {
+export function tierOfSeverity(severity: ValeSeverity): Tier | undefined {
   if (severity === "error") return "deny";
   if (severity === "warning") return "context";
   return undefined;

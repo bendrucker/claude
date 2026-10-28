@@ -1,137 +1,20 @@
 ---
 name: writing:analyze
 description: >-
-  Curate the writing plugin's trope ruleset by auditing wordlist entries against
-  session history and surfacing candidate phrases. Use when refreshing trope
-  detection, reviewing wordlist health, or mining sessions for new AI-writing
-  patterns to add or stale rules to remove.
-argument-hint: "[--since date] [--model glob]"
+  Audit the writing hook from its run log: volume, latency, per-check fire and
+  suppress counts, and whether each finding was acted on. Use when reviewing
+  hook health, judging a Vale check's precision in practice, or deciding which
+  checks to demote or retire.
+argument-hint: "[--since date] [--json]"
 disable-model-invocation: true
 allowed-tools:
   - Bash
   - Read
-  - Skill(observability:session)
 ---
 
 # Writing Analyze
 
-Mine the session DuckDB index for assistant writing patterns, compare against the user's voice, and propose a diff to `plugins/writing/wordlists/*.txt`.
-
-## Arguments
-
-Forward these from `$ARGUMENTS` to `analyze.ts` (see [Run](#run)):
-
-- `--since <date>`: restrict the corpus to sessions on or after the date. Default: the full index.
-- `--model <glob>`: restrict to matching model IDs (e.g. `*opus*`). Default: all models.
-
-## Prerequisites
-
-Activate the `observability:session` skill first. Run its refresh script to update the index and capture the DB path:
-
-```bash
-DB_PATH=$(<session-skill-dir>/scripts/refresh.ts --refresh)
-```
-
-The refresh script prints the resolved DB path to stdout.
-
-Build the local voice baseline once, and refresh it as new writing accumulates. It is the comparison surface for deliverable-aware rule health, local-only and never committed, stored in the plugin data directory (`CLAUDE_PLUGIN_DATA`, else `~/.claude/plugins/data/writing-bendrucker`).
-
-```bash
-# Seed from the already-present delimited corpus (no re-fetch needed)
-bun ${CLAUDE_SKILL_DIR}/scripts/ingest-voice.ts --source file --file <data-dir>/voice-baseline/github-prs.txt
-# Or fetch fresh merged PRs (designed to add more sources later)
-bun ${CLAUDE_SKILL_DIR}/scripts/ingest-voice.ts --source github --author <user> --created 2019-01-01..2025-01-01
-# Build the profile the audit reads
-bun ${CLAUDE_SKILL_DIR}/scripts/voice-profile.ts
-```
-
-Both scripts write to the plugin data directory, outside the default sandbox allowlist, so run them with `dangerouslyDisableSandbox: true` (or via a terminal outside Claude Code).
-
-If no profile exists, analyze still runs: deliverable-surface rules fall back to the chat audit and the report flags the baseline as not loaded.
-
-## Run
-
-Pass the DB path via `--session-db`:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/analyze.ts --session-db "$DB_PATH"
-```
-
-Run with `--help` for the remaining flags. Writes a markdown report to `tmp/trope-analysis-<date>.md`. The report may quote any host in the combined index, so keep it under `tmp/` and never paste host-specific content into committed work.
-
-## Detector Coverage
-
-`wordlist-overlap.ts` ranks agent-authored prose (corpus A) against the pre-agent voice baseline (corpus B) by log-odds with an informative Dirichlet prior, then measures how much of that ranking the shipped detectors already cover. It reports both directions: discovered terms a detector matches, and curated entries the ranking independently places.
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts
-bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts --baseline github-issues.txt --sizes 1 --sizes 2
-bun ${CLAUDE_SKILL_DIR}/scripts/wordlist-overlap.ts --kind message
-```
-
-Corpora A and B must match register. Contrasting mismatched genres raises the split-half null floor far above any real term and makes the ranking uninterpretable. Every run prints that floor, which is the z a finding has to clear.
-
-Corpus A holds several genres, sorted by source pointer into the kinds `--kind` selects: `message`, `plan`, `memory`, `scratch`, `docs`, and `other`. `message` is prose the miner found on a command line rather than in a file (`gh pr create --body`, `git commit -m`), which makes it the same register as a baseline of PR and issue text. `docs` is the prose committed to a repository for another reader. The rest have no counterpart to pair against. `--study-filter` narrows the selected kinds further by a regex over the source.
-
-Every run also splits each kind against itself, so the per-kind floors price the pairing. Unrestricted, the floor sits at 10.4 against a top score of 16.4; `--kind message` drops it to 3.9 against 17.0. Over a single kind the aggregate control would repeat that kind's floor, so it is omitted.
-
-`--json` omits the example sentences the human-readable report already withholds, so no corpus prose reaches a file.
-
-## Authorship Distance
-
-`burrows-delta.ts` scores agent-authored prose against the voice baseline by Burrows's Delta, the mean absolute difference of standardized frequencies over the most frequent words of the reference corpus. Burrows, ["'Delta': a Measure of Stylistic Difference and a Guide to Likely Authorship"](https://doi.org/10.1093/llc/17.3.267), Literary and Linguistic Computing 17(3), 267-287 (2002).
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/burrows-delta.ts --kind message
-bun ${CLAUDE_SKILL_DIR}/scripts/burrows-delta.ts --kind message --bin-words 2000 --words 300
-```
-
-Baseline documents run 40 to 200 words, where a single word's rate is mostly sampling noise, so whole documents pool in corpus order into bins of `--bin-words` and the bin is the unit scored. Below 1,000 words the reference spread swamps the signal: separation falls from every bin clearing the floor to 18% at 500. Half the reference fits the word set and the standardizer, and the other half is scored to give the floor. That floor is the held-out 95th percentile by nearest rank, so at 20 or fewer held-out bins it is the held-out maximum. The PR and issue baseline yields 17, which makes "above floor" today mean "past anything the reference itself reached".
-
-The drift table carries the finding. Every register under the voice baseline is the same author, so the ones not spent on the reference are scored as controls, and they land where agent prose lands: agent commit messages sit 1.08 from the PR centroid against a 0.84 floor, while the author's own high-school essays sit at 1.16. Magnitude alone therefore cannot separate a different author from a different register. The signed per-word drift can: `to`, `be`, and `this` fall and `its`, `the`, and `and` rise across all four agent kinds, while the author's own registers move on `you`, `i`, `should`, and `would`.
-
-## Structural Signatures
-
-`tag-signatures.ts` gives part-of-speech tag sequences the treatment `wordlist-overlap.ts` gives words: log-odds with an informative Dirichlet prior against the pre-agent voice baseline, gated on a split-half null floor. Vocabulary tells drift with model releases while the shape of a habit persists, so a sequence that clears its floor is a candidate for a rule no wordlist change invalidates.
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/tag-signatures.ts --kind message
-bun ${CLAUDE_SKILL_DIR}/scripts/tag-signatures.ts --sizes 3 --sizes 4 --show 60
-```
-
-The ranking pools the selected kinds, so the null splits that pooled corpus against itself and takes the largest z it reaches with no difference to find. Sequences of different lengths draw on different amounts of corpus mass, so the floor is computed per n-gram size, and shapes at or below their size's floor are dropped. Over `--kind message` the floors sit at 2.9, 2.5 and 3.7 for 3-, 4- and 5-grams and 253 of 901 shapes clear them. Unrestricted they are 4.2, 4.0 and 3.4 and 114 of 15,740 clear. Those shares are not comparable across configurations, because `--min-count` admits a different slice of the tail at each corpus size.
-
-A size the split produced no shapes of leaves its shapes ungated rather than dropped, printed as `n/a`, so an unmeasured size is visible instead of silently permissive.
-
-The `compromise` tagger runs over every sentence and dominates the runtime, so sentences are tagged once and reused for both the ranking and the null. Restricted to `--kind message` a run costs seconds; the unrestricted corpus costs about two minutes.
-
-Read the surviving head against several examples before promoting a shape to a rule. `compromise` tags unknown identifiers `NOUN`, and the example picker takes the shortest matching sentence, so the top nominal shapes surface fragments and code residue alongside prose.
-
-Examples are verbatim corpus prose, so `--json` omits them the way the word layer does.
-
-## Rate Feature Floors
-
-`rate-nulls.ts` puts the `voice-delta.ts` rate features through the same question the word and tag layers answer: is this gap larger than one the baseline reaches against itself?
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/rate-nulls.ts
-bun ${CLAUDE_SKILL_DIR}/scripts/rate-nulls.ts --kind message --splits 2000 --seed 7
-bun ${CLAUDE_SKILL_DIR}/scripts/rate-nulls.ts --splits 2000 --min-words 100 --max-words 400
-```
-
-The baseline is shuffled and split in half `--splits` times and each feature's between-half gap recorded. The floor is the `--percentile` value of that distribution, so it is an estimate of the null maximum rather than the single draw the word and tag layers take. Feature rates are computed once per document and the splits average over indices, which is why thousands of splits cost no more than a few.
-
-Every feature is printed with its gap, its floor, and the ratio between them. All sixteen features in `voice-delta.ts` clear their floor on the full corpus. Retire a feature whose gap fails to clear its floor across several seeds at a high split count (2,000 splits). A single seed's floor is one draw and is not conclusive on its own.
-
-Corpus A documents run about three times longer than corpus B's. `--min-words` and `--max-words` hold both corpora to one length band, which separates voice from document length. Run the band before promoting any new feature. `--candidates` also scores the retired candidates in `RETIRED_FEATURES`, which is what makes a retirement reproducible from the flags. `references/methodology.md` carries the measurements.
-
-A baseline too small to split leaves a feature unfloored, printed as `n/a`, and it stays. An empty corpus is refused, since every gap would then equal the other corpus's mean and read as signal. A `--kind` selection and a length band can each empty either side, and the refusal names the cause.
-
-## Hook Health
-
-The PreToolUse dispatcher (`hooks/pretooluse.ts`) appends one JSONL line per run to `~/.claude/writing-hooks/log.jsonl` (controlled by `WRITING_HOOKS_LOG`, see the plugin README). That log is the runtime half of this skill's audit: the wordlist analysis judges rule precision from session history, and the health check judges hook behavior from what the dispatcher actually did.
-
-Run it before or alongside the wordlist audit:
+The PreToolUse dispatcher (`hooks/pretooluse.ts`) appends one JSONL line per run to `~/.claude/writing-hooks/log.jsonl` (controlled by `WRITING_HOOKS_LOG`, see the plugin README). `hook-health.ts` reads it:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts
@@ -139,40 +22,8 @@ bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --since 2026-07-01 --json
 bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts --log /path/to/log.jsonl
 ```
 
-It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, per-category fire/suppress counts, an acted-on column, and the unconfirmed pairs no whole-file re-scan closed.
+It reads the default log (plus its `.1` rotation) and reports run volume, outcome and tool breakdowns, latency percentiles for the silent hot path, per-check fire/suppress counts, an acted-on column, and the unconfirmed pairs no whole-file re-scan closed.
 
-The acted-on column pairs each shown finding with the next whole-file re-scan of the same file: a rule that re-scan no longer raises was acted on, one it still raises was written past. Only a whole-file run decides. The checkers report the hits a run introduced, so a hunk-scoped `Edit` speaks only to its own new text, silent or not. Every shown finding no whole-file re-scan reached counts as `unconfirmed`, whether hunk edits followed it or nothing did, so the two columns account for all of them. The acted-on column reads `n/a` until pairs close, and the opportunities list reports acceptance as unmeasurable rather than printing a rate over no data. Recall is not measurable from this log, since a rule that never fires leaves no line.
+The acted-on column pairs each shown finding with the next whole-file re-scan of the same file: a check that re-scan no longer raises was acted on, one it still raises was written past. Only a whole-file run decides. The hook reports the alerts a run introduced, so a hunk-scoped `Edit` speaks only to its own new text, silent or not. Every shown finding no whole-file re-scan reached counts as `unconfirmed`, so the two columns account for all of them. The acted-on column reads `n/a` until pairs close. Recall is not measurable from this log, since a check that never fires leaves no line.
 
-The report ends with an opportunities list, each naming a concrete fix. Flipping the `WRITING_HOOKS_LOG` default to off is offered only once acceptance is measurable, since turning the log off before then forecloses the measurement. Fixes land in the plugin (wordlists, `detection/`, `hooks/`), then the next audit's log confirms or refutes them.
-
-## Statistics Artifact
-
-Structural Signatures, Rate Feature Floors, and Hook Health each measure against data that never leaves this machine, and the two corpus passes cost minutes. `build-statistics.ts` runs them once and persists the verdicts to `statistics.json` in the plugin data dir. `writing:scan` reads that file.
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts
-bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts --section rate-nulls --splits 2000 --min-words 100 --max-words 400
-bun ${CLAUDE_SKILL_DIR}/scripts/build-statistics.ts --section hook-health --since 2026-07-01
-```
-
-`--section` takes `rate-nulls`, `tag-signatures`, or `hook-health`, is repeatable, and defaults to all three. Sections merge into whatever is on disk, so refreshing the run-log numbers keeps the tag signatures that cost minutes of tagging.
-
-Run rate nulls over both the full corpus and the 100-400 word band. `scan score --voice-delta` reads a feature as signal only where it cleared every band measured. Tag signatures hold one band at a time, so narrow `--min-words`/`--max-words` to `--section rate-nulls` unless the signatures should be re-mined inside that band. [`references/methodology.md`](references/methodology.md) covers how the sections merge.
-
-A `statistics.json` that fails to parse reads the same as an absent one. A scan then leaves its annotations off instead of failing over an artifact it only decorates with. A rebuild names the file it ignored, because it drops every section it is not recomputing.
-
-The corpora and the run log stay on this machine. Only `statistics.json` moves, into the plugin data dir.
-
-## Corpora and Verdicts
-
-Each rule is judged on the surface where the hook fires it: chat-surface rules against the user's chat, deliverable-surface rules (`flowery-phrases.txt`, `soft-phrasing.txt`) against the voice baseline. Lift gates new candidate phrases only (`--min-lift`, default 5.0, plus session count >= 3), never removals: the smoothed user baseline compresses lift for any word the user never types, which would flag the model's strongest tells for removal. Voice-delta features carry provenance labels (**skill-prescribed**, **skill-encouraged**, **ungoverned**) so drift points at the right fix, and they are aggregate trends only, never per-document flags.
-
-[references/methodology.md](references/methodology.md) is the single home for the corpora, metrics, queries, per-surface reasoning, and tuning behind each report section and verdict.
-
-## Workflow
-
-Review the report. Edit `plugins/writing/wordlists/*.txt` by hand, then re-run to confirm. The skill never edits wordlists.
-
-## Linguistics
-
-See [references/linguistics.md](references/linguistics.md) for the part-of-speech tagger evaluation behind `scripts/headings-eval.ts`: classifier comparison, synthetic corpus generation, promotion criteria, and dependency earn/retire rules.
+The report ends with an opportunities list, each naming a concrete fix. Flipping the `WRITING_HOOKS_LOG` default to off is offered only once acceptance is measurable. Fixes land as level overrides in `.vale.ini` or edits to `styles/Writing/`, and the next audit's log confirms or refutes them.

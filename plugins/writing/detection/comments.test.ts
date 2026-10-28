@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import { extractComments } from "./comments";
-import { semicolonSpliceHits } from "./tropes";
 
 describe("extractComments", () => {
   test.each<{ name: string; path: string; src: string; expected: string }>([
@@ -77,7 +76,7 @@ describe("extractComments", () => {
   });
 });
 
-describe("comment splices", () => {
+describe("semicolons reaching the comment linter", () => {
   test.each<{ name: string; path: string; src: string; count: number }>([
     {
       name: "splice in a // comment",
@@ -110,6 +109,6 @@ describe("comment splices", () => {
       count: 0,
     },
   ])("$name", async ({ path, src, count }) => {
-    expect(semicolonSpliceHits(await extractComments(src, path), 1).count).toBe(count);
+    expect((await extractComments(src, path)).match(/[a-z]; [a-z]/gi)?.length ?? 0).toBe(count);
   });
 });

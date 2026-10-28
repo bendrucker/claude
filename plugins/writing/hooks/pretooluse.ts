@@ -3,16 +3,9 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import {
-  getExtension,
-  isMarkdownFile,
-  isMemoryPath,
-  isPlanPath,
-  isScratchPath,
-} from "../detection/paths";
+import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detection/paths";
 import { check as checkTropes } from "./check-tropes";
 import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
-import { check as checkNumbering, type Mode } from "./numbering";
 import { type HookFinding, report } from "./report";
 import { appendRunLog, type RunLogEntry, type RunOutcome } from "./run-log";
 import { recentlyFired, recordFired } from "./session-state";
@@ -32,18 +25,6 @@ function filePathOf(input: PreToolUseHookInput): string | undefined {
 /** Correlates successive writes to one file without logging the path. */
 export function targetOf(filePath: string): string {
   return createHash("sha256").update(filePath, "utf8").digest("hex").slice(0, 16);
-}
-
-// Every heading check is markdown-only: `headings.check` returns null for any
-// other extension and for the Bash surface, which is most of what this hook
-// sees. Its module graph is not free, though. It reaches an AP title-case
-// library, the heading classifier, and the markdown parser, together the
-// largest block of the ~40ms this dispatcher spent parsing modules before it
-// could read its input. Loading it from the markdown branch is the only way to
-// keep a runtime-conditional graph out of an unconditional import.
-async function headingFindings(input: PreToolUseHookInput): Promise<HookFinding[]> {
-  const headings = await import("./headings");
-  return headings.check(input);
 }
 
 // One dispatcher run sequences all checkers in-process and emits every finding
@@ -80,24 +61,14 @@ export async function dispatch(
   if (filePath != null && filePath !== "" && (isPlanPath(filePath) || isMemoryPath(filePath)))
     return finish(null, "silent");
 
-  const mode: Mode = input.tool_name === "Edit" ? "edit" : "write";
-  const checkers = [
-    () => checkNumbering(input, mode),
-    () => (isMarkdownFile(ext) ? headingFindings(input) : []),
-    () => checkTropes(input),
-  ];
-
-  // One checker crashing must not take down the others or the run log.
+  // A crashing checker must not take down the run log.
   const findings: HookFinding[] = [];
-  for (const checker of checkers) {
-    try {
-      // oxlint-disable-next-line no-await-in-loop -- three checkers, each reported individually when it throws; concurrency buys nothing.
-      findings.push(...(await checker()));
-    } catch (error) {
-      console.error(
-        `[writing/pretooluse] checker failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
+  try {
+    findings.push(...(await checkTropes(input)));
+  } catch (error) {
+    console.error(
+      `[writing/pretooluse] checker failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
   // `categories` records what the checkers found, which is what a later run on
   // the same target is compared against. It is set only past this point: an

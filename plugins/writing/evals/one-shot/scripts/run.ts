@@ -10,7 +10,7 @@ import {
   structured,
 } from "../../../../../packages/eval-judge/index";
 import { mapPool } from "../../../../../packages/evals/pool";
-import { type Finding, type FindOptions, findAll } from "../../../detection/findings";
+import { type ScanResult, scanAll } from "../../../detection/scan";
 
 const REWRITE_TEMPLATE = await Bun.file(join(import.meta.dirname, "rewrite-prompt.md")).text();
 const MEANING_TEMPLATE = await Bun.file(join(import.meta.dirname, "meaning-prompt.md")).text();
@@ -31,8 +31,8 @@ export interface Result {
   key: string;
   model: string;
   split: Draft["split"];
-  before: Finding[];
-  after: Finding[];
+  before: ScanResult[];
+  after: ScanResult[];
   words: { before: number; after: number };
   rewrite: string;
   meaning: z.infer<typeof Meaning>;
@@ -46,11 +46,11 @@ export interface RunOptions {
 
 // Every file draft the miner keeps is markdown, so one stand-in path selects
 // the same rules the hook applied to it.
-export function scanOptions(draft: Pick<Draft, "message">): FindOptions {
-  return draft.message ? { message: true, batch: true } : { filePath: "draft.md", batch: true };
+export function scanDraft(draft: Pick<Draft, "message">, text: string): Promise<ScanResult[]> {
+  return scanAll(text, draft.message ? undefined : "draft.md", { message: draft.message });
 }
 
-export function renderFindings(findings: Finding[]): string {
+export function renderFindings(findings: ScanResult[]): string {
   return findings
     .map((finding) => `- line ${finding.line}, ${finding.category}: ${finding.message}`)
     .join("\n");
@@ -63,7 +63,7 @@ export function fill(template: string, values: Record<string, string>): string {
 const words = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
 /** The cache key for one draft under the current rules, prompts, and models. */
-export function keyOf(draft: Draft, findings: Finding[], options: RunOptions): string {
+export function keyOf(draft: Draft, findings: ScanResult[], options: RunOptions): string {
   return cacheKey(
     promptHash(REWRITE_TEMPLATE),
     promptHash(MEANING_TEMPLATE),
@@ -75,7 +75,7 @@ export function keyOf(draft: Draft, findings: Finding[], options: RunOptions): s
 }
 
 export async function rewriteDraft(draft: Draft, options: RunOptions): Promise<Result> {
-  const before = await findAll(draft.text, scanOptions(draft));
+  const before = await scanDraft(draft, draft.text);
   const call = (model: string, label: string) => ({
     model,
     label,
@@ -87,7 +87,7 @@ export async function rewriteDraft(draft: Draft, options: RunOptions): Promise<R
     call(options.model, `rewrite of ${draft.id}`),
   );
   const [after, meaning] = await Promise.all([
-    findAll(rewrite, scanOptions(draft)),
+    scanDraft(draft, rewrite),
     structured(
       Meaning,
       fill(MEANING_TEMPLATE, { original: draft.text, rewrite }),
@@ -145,7 +145,7 @@ const program = new Command()
     let written = 0;
     await mapPool(drafts, options.concurrency, async (draft) => {
       const path = join(out, `${draft.id}.json`);
-      const key = keyOf(draft, await findAll(draft.text, scanOptions(draft)), run);
+      const key = keyOf(draft, await scanDraft(draft, draft.text), run);
       if ((await cachedKey(path)) === key) return;
       await Bun.write(path, `${JSON.stringify(await rewriteDraft(draft, run), null, 2)}\n`);
       written += 1;

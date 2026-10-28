@@ -90,25 +90,23 @@ function mockMcp(tool_name: string, tool_input: Record<string, unknown>): PreToo
   return { ...mockBash(""), tool_name, tool_input };
 }
 
-describe("wordlist files", () => {
-  const wordlistPath = "/Users/test/plugins/writing/wordlists/vocabulary.txt";
+describe("Vale rule files", () => {
+  const rulePath = "/Users/test/plugins/writing/styles/Writing/AiVocabulary.yml";
 
   test.each<[string, string, string]>([
     [
-      "skips Write to wordlist file containing flagged vocabulary",
+      "skips Write to a rule file containing flagged vocabulary",
       "Write",
-      "delve\ntapestry\nbolstered\n",
+      "tokens:\n  - delve\n  - tapestry\n",
     ],
-    ["skips Edit to wordlist file", "Edit", "delve\nadded entry\n"],
+    ["skips Edit to a rule file", "Edit", "  - delve\n  - bolstered\n"],
   ])("%s", async (_name, tool, content) => {
     const input =
-      tool === "Write"
-        ? mockWrite(content, wordlistPath)
-        : mockEdit(content, undefined, wordlistPath);
+      tool === "Write" ? mockWrite(content, rulePath) : mockEdit(content, undefined, rulePath);
     expect(await processInput(input)).toBeNull();
   });
 
-  it("does not skip non-wordlist .txt files", async () => {
+  it("does not skip other .txt files", async () => {
     const result = await processInput(
       mockWrite("This is a tool, not a framework.", "/tmp/notes.txt"),
     );
@@ -283,7 +281,7 @@ describe("semicolon splices", () => {
     {
       name: "flags and quotes a splice edited into a script block",
       edit: ["// wait for fonts", "// keep sorted; callers rely on order"],
-      quote: "keep sorted; callers rely on order",
+      quote: "sorted; callers",
     },
     {
       name: "ignores a pre-existing splice elsewhere in the file",
@@ -303,7 +301,7 @@ describe("semicolon splices", () => {
       ].join("\n"),
     );
     const result = await processInput(mockEdit(newString, oldString, file));
-    expect(contextOf(result)?.match(/\("(.*)"\)/)?.[1]).toBe(quote);
+    expect(contextOf(result)?.match(/'([^']*)' joins two clauses/)?.[1]).toBe(quote);
   });
 
   it("ignores existing comments when an edit shortens an overlong line", async () => {

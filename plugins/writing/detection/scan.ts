@@ -1,195 +1,40 @@
-import { TRICOLON_PATTERN } from "../linguistics/tricolon";
 import { isProseFile } from "./paths";
-import {
-  PATTERNS,
-  type PatternDef,
-  type PatternTier,
-  stripCode,
-  WEIGHTED_PATTERNS,
-  type WeightedPatternGroup,
-} from "./tropes";
-import { isPorted, tierOfSeverity, valeAlerts } from "./vale";
-import { weightedStemHits } from "./wordlists";
-
-// Patterns that run only on the batch surfaces (scan, score) because their
-// calibration has not cleared the hook bar in linguistics.md. Hooks import
-// detection/tropes directly and never this module. A tagger import is not what
-// keeps a pattern here: compromise is a runtime dependency and no-negation
-// runs it in the hook. natural stays a devDependency and out of hooks.
-export const BATCH_PATTERNS: PatternDef[] = [TRICOLON_PATTERN];
+import { type Tier, tierOfSeverity, valeAlerts } from "./vale";
 
 export interface ScanResult {
   line: number;
   col: number;
   category: string;
-  tier: PatternTier;
-  structural: boolean;
+  tier: Tier;
   matched: string;
   message: string;
 }
 
-interface Position {
-  line: number;
-  col: number;
-}
-
-function positionAt(text: string, index: number): Position {
-  let line = 1;
-  let lastNewline = -1;
-  for (let i = 0; i < index && i < text.length; i++) {
-    if (text[i] === "\n") {
-      line++;
-      lastNewline = i;
-    }
-  }
-  return { line, col: index - lastNewline };
-}
-
-// Best-effort position for a sample string the matcher reported without an
-// index. Cross-sentence detectors join sentence excerpts with " / ", so when
-// the joined sample is absent from the text, fall back to its first segment.
-export function positionOfSample(text: string, sample: string): Position {
-  const lower = text.toLowerCase();
-  for (const candidate of [sample, sample.split(" / ")[0] ?? ""]) {
-    if (candidate.length === 0) continue;
-    const index = lower.indexOf(candidate.toLowerCase());
-    if (index !== -1) return positionAt(text, index);
-  }
-  return { line: 1, col: 1 };
-}
-
-async function regexResults(stripped: string, def: PatternDef): Promise<ScanResult[]> {
-  if (typeof def.test === "function") {
-    if (def.spans) {
-      return (await def.spans(stripped)).map(({ index, matched }) => {
-        const { line, col } = positionAt(stripped, index);
-        return {
-          line,
-          col,
-          category: def.category,
-          tier: def.tier,
-          structural: def.structural ?? false,
-          matched,
-          message: def.message(matched),
-        };
-      });
-    }
-    const hits = await def.test(stripped);
-    if (hits.count === 0) return [];
-    const { line, col } = positionOfSample(stripped, hits.sample);
-    return [
-      {
-        line,
-        col,
-        category: def.category,
-        tier: def.tier,
-        structural: def.structural ?? false,
-        matched: hits.sample,
-        message: def.message(hits.sample),
-      },
-    ];
-  }
-
-  const results: ScanResult[] = [];
-  const pattern = def.test;
-  const global = pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`);
-  global.lastIndex = 0;
-  for (let match = global.exec(stripped); match !== null; match = global.exec(stripped)) {
-    const { line, col } = positionAt(stripped, match.index);
-    results.push({
-      line,
-      col,
-      category: def.category,
-      tier: def.tier,
-      structural: def.structural ?? false,
-      matched: match[0],
-      message: def.message(match[0]),
-    });
-    if (match[0].length === 0) global.lastIndex++;
-  }
-  return results;
-}
-
-function weightedResults(stripped: string, group: WeightedPatternGroup): ScanResult[] {
-  const hits = weightedStemHits(stripped, group.entries);
-  if (hits.totalWeight < group.threshold) return [];
-  const { line, col } = positionOfSample(stripped, hits.samples[0] ?? "");
-  return [
-    {
-      line,
-      col,
-      category: group.category,
-      tier: group.tier,
-      structural: false,
-      matched: hits.samples[0] ?? "",
-      message: group.message(hits.samples, hits.totalWeight),
-    },
-  ];
-}
-
-/** Matches from the TS detectors named in `categories`, ported or not, for comparison against Vale. */
-export async function legacyResults(
-  text: string,
-  categories: ReadonlySet<string>,
-): Promise<ScanResult[]> {
-  const stripped = stripCode(text);
-  const defs = [...PATTERNS, ...BATCH_PATTERNS].filter((def) => categories.has(def.category));
-  const results = (await Promise.all(defs.map((def) => regexResults(stripped, def)))).flat();
-  for (const group of WEIGHTED_PATTERNS) {
-    if (categories.has(group.category)) results.push(...weightedResults(stripped, group));
-  }
-  return results;
-}
-
 export interface ScanOptions {
-  /** Include `sideEffectOnly` patterns: the rules for a message sent once. */
+  /** Lint as a message sent once (PR, issue, comment, commit) rather than a file. */
   message?: boolean;
-  /** Include `BATCH_PATTERNS`. Defaults to true. */
-  batch?: boolean;
 }
 
-// Report every trope match in `text`, without per-tier dedup or diff-awareness.
-// Patterns run in file context unless `message` is set: `fileOnly` patterns
-// apply to prose files, `sideEffectOnly` patterns only to messages.
+/** Every Vale alert in `text` at a hook-visible level, sorted by position. A code file yields an empty list. */
 export async function scanAll(
   text: string,
   filePath?: string,
-  options: ScanOptions = {},
+  { message = false }: ScanOptions = {},
 ): Promise<ScanResult[]> {
-  const { message = false, batch = true } = options;
-  const stripped = stripCode(text);
-  const prose = filePath === undefined || isProseFile(filePath);
-  const defs = [...PATTERNS, ...(batch ? BATCH_PATTERNS : [])].filter(
-    (def) =>
-      !isPorted(def.category) && (message || !def.sideEffectOnly) && (prose || !def.fileOnly),
-  );
-  const results = (await Promise.all(defs.map((def) => regexResults(stripped, def)))).flat();
-
-  for (const group of WEIGHTED_PATTERNS) {
-    if (isPorted(group.category) || (group.fileOnly && !prose)) continue;
-    results.push(...weightedResults(stripped, group));
+  if (filePath !== undefined && !isProseFile(filePath)) return [];
+  const source = message || filePath === undefined ? { kind: "body" as const } : { filePath };
+  const results: ScanResult[] = [];
+  for (const alert of await valeAlerts(text, source)) {
+    const tier = tierOfSeverity(alert.Severity);
+    if (tier === undefined) continue;
+    results.push({
+      line: alert.Line,
+      col: alert.Span[0],
+      category: alert.Check,
+      tier,
+      matched: alert.Match,
+      message: alert.Message,
+    });
   }
-
-  if (prose) {
-    const source = message || filePath === undefined ? { kind: "body" as const } : { filePath };
-    for (const alert of await valeAlerts(text, source)) {
-      const tier = tierOfSeverity(alert.Severity);
-      if (tier === undefined) continue;
-      results.push({
-        line: alert.Line,
-        col: alert.Span[0],
-        category: alert.Check,
-        tier,
-        structural: false,
-        matched: alert.Match,
-        message: alert.Message,
-      });
-    }
-  }
-
-  results.sort((a, b) => {
-    const byLine = a.line - b.line;
-    return byLine !== 0 ? byLine : a.col - b.col;
-  });
-  return results;
+  return results.toSorted((a, b) => (a.line === b.line ? a.col - b.col : a.line - b.line));
 }

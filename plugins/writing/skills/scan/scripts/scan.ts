@@ -4,33 +4,15 @@ import { join, relative } from "node:path";
 import { cli, command } from "cleye";
 import { table } from "table";
 import { isMemoryPath, isPlanPath, isProseFile } from "../../../detection/paths";
-import { type Finding, findAll } from "../../../detection/findings";
+import { type ScanResult, scanAll } from "../../../detection/scan";
 import { readInput } from "../../../scripts/io";
-import { profilePath, resolveDataDir, statisticsPath } from "../../analyze/scripts/data-dir";
-import {
-  acceptanceByCategory,
-  acceptedShare,
-  loadStatistics,
-  type WritingStatistics,
-} from "../../analyze/scripts/statistics";
-import { loadProfile } from "../../analyze/scripts/voice-profile";
-import {
-  buildReport,
-  loadCustomMatch,
-  type ReportOptions,
-  renderSignatureTable,
-  renderTable,
-  renderVoiceDeltaTable,
-  shouldScoreComments,
-} from "./score";
+import { buildReport, renderTable, shouldScoreComments } from "./score";
 
 const SKIP_SEGMENTS = ["node_modules", ".git"];
-const WORDLIST_PATH = /(?:^|\/)wordlists\/[^/]+\.txt$/;
 
 export function shouldSkip(path: string): boolean {
   if (SKIP_SEGMENTS.some((seg) => path.split("/").includes(seg))) return true;
   if (isMemoryPath(path) || isPlanPath(path)) return true;
-  if (WORDLIST_PATH.test(path)) return true;
   return false;
 }
 
@@ -68,9 +50,7 @@ async function scanInput(
   filePath: string | undefined,
   { message, json }: InputOptions,
 ): Promise<number> {
-  const options =
-    filePath === undefined ? { message, batch: true } : { filePath, message, batch: true };
-  const violations = await findAll(text, options);
+  const violations = await scanAll(text, filePath, { message });
 
   if (json) {
     console.log(JSON.stringify(violations, null, 2));
@@ -90,14 +70,14 @@ async function scanInput(
 
 export interface FileViolations {
   path: string;
-  violations: Finding[];
+  violations: ScanResult[];
 }
 
 export async function scanFiles(files: string[]): Promise<FileViolations[]> {
   const results: FileViolations[] = [];
   for (const path of files) {
     // oxlint-disable-next-line no-await-in-loop -- audit runs over an arbitrary tree; reading every file at once would hold the whole corpus in memory.
-    const violations = await findAll(await Bun.file(path).text(), { filePath: path, batch: true });
+    const violations = await scanAll(await Bun.file(path).text(), path);
     if (violations.length > 0) results.push({ path, violations });
   }
   return results;
@@ -116,58 +96,14 @@ function printViolations(results: FileViolations[]): void {
   }
 }
 
-// A rule the author wrote past more often than it changed the prose is firing on
-// text the author meant, so its findings here deserve less weight than its count.
-const LOW_ACCEPT_SHARE = 0.5;
-
-/**
- * Per-category counts, from the run log's record of whether a later whole-file
- * re-scan still raised each rule after it last fired. The column appears only
- * for categories where acceptance was measured.
- */
-export function renderCategories(
-  counts: ReadonlyMap<string, number>,
-  statistics: WritingStatistics | null,
-): string {
-  const acceptance = acceptanceByCategory(statistics);
-  // A category the log only ever fired is still unmeasured, so the column
-  // appears once one of the rules firing here has a pair behind it.
-  const measured = [...counts.keys()].some(
-    (category) => (acceptance.get(category)?.revisited ?? 0) > 0,
-  );
-
-  const headers = measured ? ["Category", "Count", "Acted on"] : ["Category", "Count"];
+export function renderCategories(counts: ReadonlyMap<string, number>): string {
   const rows = [...counts.entries()]
     .toSorted((a, b) => b[1] - a[1])
-    .map(([category, count]) => {
-      const row = [category, String(count)];
-      if (!measured) return row;
-      const health = acceptance.get(category);
-      row.push(
-        health === undefined || health.revisited === 0
-          ? "-"
-          : `${health.accepted}/${health.revisited}`,
-      );
-      return row;
-    });
-  const lines = [table([headers, ...rows]).trimEnd()];
-
-  if (measured) {
-    const written = [...counts.keys()]
-      .map((category) => acceptance.get(category))
-      .filter((health) => health !== undefined)
-      .filter((health) => (acceptedShare(health) ?? 1) < LOW_ACCEPT_SHARE)
-      .map((health) => health.category);
-    if (written.length > 0) {
-      lines.push(
-        `Written past more often than acted on: ${written.join(", ")}. Weigh their findings below accordingly.`,
-      );
-    }
-  }
-  return lines.join("\n");
+    .map(([category, count]) => [category, String(count)]);
+  return table([["Category", "Count"], ...rows]).trimEnd();
 }
 
-function printSummary(results: FileViolations[], statistics: WritingStatistics | null): void {
+function printSummary(results: FileViolations[]): void {
   const byCategory = new Map<string, number>();
   const byFile = new Map<string, number>();
   let total = 0;
@@ -179,7 +115,7 @@ function printSummary(results: FileViolations[], statistics: WritingStatistics |
     }
   }
 
-  console.error(`${renderCategories(byCategory, statistics)}\n`);
+  console.error(`${renderCategories(byCategory)}\n`);
 
   const noisiest = [...byFile.entries()]
     .toSorted((a, b) => b[1] - a[1])
@@ -212,11 +148,6 @@ const auditCmd = command(
         description: "Suppress the trailing summary table",
         default: false,
       },
-      dataDir: {
-        type: String,
-        description:
-          "Local data dir holding statistics.json, whose measured per-rule acceptance annotates the summary (default: CLAUDE_PLUGIN_DATA or ~/.claude/plugins/data/writing-bendrucker)",
-      },
     },
   },
   async (argv) => {
@@ -229,10 +160,7 @@ const auditCmd = command(
     const results = await scanFiles(await collectAcross(paths));
     printViolations(results);
 
-    if (results.length > 0 && !argv.flags.noSummary) {
-      const statistics = await loadStatistics(statisticsPath(resolveDataDir(argv.flags.dataDir)));
-      printSummary(results, statistics);
-    }
+    if (results.length > 0 && !argv.flags.noSummary) printSummary(results);
 
     process.exit(results.length > 0 ? 1 : 0);
   },
@@ -262,21 +190,6 @@ const scoreCmd = command(
         description: "Force comment extraction off",
         default: false,
       },
-      wordlist: {
-        type: String,
-        description: "Score an extra stemmed vocabulary file as a 'custom vocabulary' category",
-      },
-      voiceDelta: {
-        type: Boolean,
-        description:
-          "Report voice-delta rate features alongside the baseline from the local voice profile. Skips baseline comparison when the input is out-of-register.",
-        default: false,
-      },
-      dataDir: {
-        type: String,
-        description:
-          "Local data dir for the voice baseline (default: CLAUDE_PLUGIN_DATA or ~/.claude/plugins/data/writing-bendrucker). Only used with --voice-delta.",
-      },
     },
   },
   async (argv) => {
@@ -285,28 +198,14 @@ const scoreCmd = command(
       console.error("--comments needs a file path to pick the comment syntax.");
       process.exit(1);
     }
-    const customMatch = await loadCustomMatch(argv.flags.wordlist);
-    const options: ReportOptions = {
+    const report = await buildReport(text, filePath, {
       comments: shouldScoreComments(filePath, argv.flags.comments, argv.flags.noComments),
-    };
-    if (customMatch) options.customMatch = customMatch;
-    const report = await buildReport(text, filePath, options);
+    });
 
     if (argv.flags.json) {
       console.log(JSON.stringify(report, null, 2));
     } else {
       console.log(renderTable(report));
-    }
-
-    if (argv.flags.voiceDelta) {
-      const dataDir = resolveDataDir(argv.flags.dataDir);
-      const [profileData, statistics] = await Promise.all([
-        loadProfile(profilePath(dataDir)),
-        loadStatistics(statisticsPath(dataDir)),
-      ]);
-      console.log(`\n${await renderVoiceDeltaTable(text, profileData, statistics)}`);
-      const signatures = await renderSignatureTable(text, statistics);
-      if (signatures !== null) console.log(`\n${signatures}`);
     }
 
     process.exit(0);

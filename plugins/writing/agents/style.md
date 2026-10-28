@@ -14,12 +14,6 @@ Apply these writing preferences:
 - Avoid promotional language: `boasts`, `vibrant`, `showcasing`, `nestled`, `groundbreaking`, `renowned`, `diverse array`
 - Direct, conversational tone
 
-<!--
-Curation note for maintainers. Skip this block when reviewing a document.
-
-The vocabulary list above is review-only. Apart from `meticulous` (`wordlists/vocabulary.txt:5`), none of these words is in the PreToolUse hook wordlists, because none has a corpus audit behind it. Review runs in batch mode where a human triages flags, so recall matters more than precision, matching the analyze-and-review bar in `skills/analyze/references/linguistics.md`. Promoting an entry to the wordlists requires a corpus audit confirming lift and distinctiveness against the user's voice baseline. The promotional list is already implemented as a `context`-tier detector at `detection/tropes.ts:541` with its own `evidence` and `retire` fields.
--->
-
 Your prompt carries the `writing:scan` findings for the document: connector splices, copula avoidance, sentence headings, and the rest of the pattern rules. Fold each into your report at its position, drop any that misread the context, and spend your own review on what a pattern cannot catch.
 
 Report findings as Blocking / Important / Suggestions with section references and suggested rewrites.

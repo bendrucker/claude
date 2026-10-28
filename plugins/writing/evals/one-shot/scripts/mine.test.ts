@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Finding } from "../../../detection/findings";
+import type { ScanResult } from "../../../detection/scan";
 import { type Draft, firstDrafts, MIN_WORDS, type Payload, payloadsOf, sample } from "./mine";
 
 const prose = (word: string) => Array.from({ length: MIN_WORDS }, () => word).join(" ");
@@ -72,12 +72,12 @@ describe("firstDrafts", () => {
 });
 
 describe("sample", () => {
-  const finding = (category: string): Finding => ({
+  const finding = (category: string): ScanResult => ({
     line: 1,
     col: 1,
     category,
     tier: "context",
-    structural: false,
+    matched: "",
     message: "",
   });
   const draft = (id: string, ...categories: string[]): Draft => ({

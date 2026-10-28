@@ -4,7 +4,6 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
-import { check as headingCheck } from "./headings";
 import type { SyncHookJSONOutput } from "./io";
 import { dispatch, targetOf } from "./pretooluse";
 
@@ -44,8 +43,7 @@ function mockInput(
   };
 }
 
-// Trips all three checkers at context tier: a lowercase step heading
-// (numbering + headings) and a spaced em dash (tropes).
+// Trips several checks at context tier: a lowercase step heading and a spaced em dash.
 const MULTI_VIOLATION = "# step 1: introduction\n\nThis — is bad\n";
 
 function contextOf(output: SyncHookJSONOutput | null): string | undefined {
@@ -66,27 +64,27 @@ describe("every finding in one output", () => {
     expect(reason).toContain("reach");
   });
 
-  it("reports each checker's findings in a single injection", async () => {
+  it("reports every check's findings in a single injection", async () => {
     const { output, log } = await dispatch(
       mockInput("Write", { file_path: "docs/draft.md", content: MULTI_VIOLATION }),
     );
-    expect(contextOf(output)).toContain("step or phase numbering");
-    expect(contextOf(output)).toContain("title case");
+    expect(contextOf(output)).toContain("numbers a step");
+    expect(contextOf(output)).toContain("AP title case");
     expect(contextOf(output)).toContain("em dash");
     const { ts, session_id, duration_ms, ...stable } = log;
     expect(typeof duration_ms).toBe("number");
     expect(stable).toMatchInlineSnapshot(`
       {
         "categories": [
-          "numbering",
-          "title case heading",
+          "Writing.StepHeading",
+          "Writing.TitleCaseHeading",
           "Writing.SpacedEmDash",
           "ai-tells.EmDashUsage",
         ],
-        "category": "numbering",
+        "category": "Writing.StepHeading",
         "emitted": [
-          "numbering",
-          "title case heading",
+          "Writing.StepHeading",
+          "Writing.TitleCaseHeading",
           "Writing.SpacedEmDash",
           "ai-tells.EmDashUsage",
         ],
@@ -117,7 +115,7 @@ describe("every finding in one output", () => {
     expect((log.categories ?? []).includes("Writing.SpacedEmDash")).toBe(flagged);
   });
 
-  it("falls through to later checkers when earlier ones are silent", async () => {
+  it("reports a lone finding as its category", async () => {
     const { output, log } = await dispatch(
       mockInput("Write", { file_path: "docs/draft.md", content: "This — is bad\n" }),
     );
@@ -160,7 +158,7 @@ describe("code files", () => {
 });
 
 describe("session-scoped repeat suppression", () => {
-  // Step heading only: title-cased so headings stays silent, no tropes.
+  // Step heading only: title-cased, no other findings.
   const NUMBERED_ONLY = "# Step 1: Introduction\n\nPlain prose here.\n";
 
   it("suppresses a repeat of the same category within the window", async () => {
@@ -180,7 +178,7 @@ describe("session-scoped repeat suppression", () => {
     expect(second.output).toBeNull();
     expect(second.log.outcome).toBe("silent");
     expect(second.log.suppressed).toBe(true);
-    expect(second.log.category).toBe("numbering");
+    expect(second.log.category).toBe("Writing.StepHeading");
   });
 
   it("mutes only the categories that fired recently", async () => {
@@ -197,8 +195,8 @@ describe("session-scoped repeat suppression", () => {
     expect(second.log.outcome).toBe("context");
     expect(second.log.emitted).toEqual(["Writing.SpacedEmDash"]);
     expect(second.log.suppressed_categories).toEqual([
-      "numbering",
-      "title case heading",
+      "Writing.StepHeading",
+      "Writing.TitleCaseHeading",
       "ai-tells.EmDashUsage",
     ]);
   });
@@ -215,7 +213,7 @@ describe("session-scoped repeat suppression", () => {
     await dispatch(input, now);
     const later = await dispatch(input, now + 6 * 60_000);
     expect(later.output).not.toBeNull();
-    expect(later.log.category).toBe("numbering");
+    expect(later.log.category).toBe("Writing.StepHeading");
   });
 
   it("does not suppress across sessions", async () => {
@@ -294,27 +292,6 @@ describe("scratch paths", () => {
   });
 });
 
-// The dispatcher loads the heading checker only for markdown, so its own
-// extension test has to agree with the checker's for every extension the hook
-// sees. Where they disagree the hook quietly stops reporting findings it used
-// to report, and nothing else fails.
-describe("heading checker gate", () => {
-  // A lowercase heading over clean prose. Only the heading checker has a rule
-  // for it, so the dispatcher's winning category names that checker exactly
-  // when it ran.
-  const HEADING_VIOLATION = "# the cache layer\n\nStores records in memory.\n";
-
-  test.each(["md", "markdown", "mdx", "txt", "rst", "adoc", "ts", "go", "yml", "json", "vue"])(
-    "agrees with headings.check on .%s",
-    async (ext) => {
-      const toolInput = { file_path: `docs/note.${ext}`, content: HEADING_VIOLATION };
-      const direct = headingCheck(mockInput("Write", toolInput));
-      const { log } = await dispatch(mockInput("Write", toolInput));
-      expect(log.category ?? null).toBe(direct[0]?.category ?? null);
-    },
-  );
-});
-
 describe("accept-and-flag logging", () => {
   const clean = { file_path: "docs/draft.md", content: "# Cache Layer\n\nPlain.\n" };
 
@@ -386,7 +363,7 @@ describe("shared skips", () => {
 });
 
 describe("deferred dependencies", () => {
-  // A fresh process, since this file's other imports already hold both packages.
+  // A fresh process, since this file's other imports already hold Shiki.
   function loadedAfter(input: PreToolUseHookInput): string[] {
     const script = `
       const { dispatch } = await import(${JSON.stringify(join(import.meta.dir, "pretooluse.ts"))});
@@ -400,9 +377,7 @@ describe("deferred dependencies", () => {
     const keys: unknown = JSON.parse(run.stdout.toString());
     if (!Array.isArray(keys)) throw new Error(run.stdout.toString());
     const loaded = keys.flatMap((key) =>
-      typeof key === "string" && /node_modules\/(compromise\/|shiki\/dist\/index)/.test(key)
-        ? [key.includes("compromise") ? "compromise" : "shiki"]
-        : [],
+      typeof key === "string" && key.includes("node_modules/shiki/dist/index") ? ["shiki"] : [],
     );
     return [...new Set(loaded)];
   }
@@ -415,7 +390,18 @@ describe("deferred dependencies", () => {
       { file_path: "docs/a.md", content: "It adds nothing.\n" },
       [],
     ],
-    ["a code edit", "Edit", { file_path: "src/a.ts", old_string: "1", new_string: "2" }, ["shiki"]],
+    [
+      "a Vale-native code edit",
+      "Edit",
+      { file_path: "src/a.ts", old_string: "1", new_string: "2" },
+      [],
+    ],
+    [
+      "a code edit Vale cannot read",
+      "Edit",
+      { file_path: "src/a.rs", old_string: "1", new_string: "2" },
+      ["shiki"],
+    ],
   ])("%s", (_name, tool, toolInput, expected) => {
     expect(loadedAfter(mockInput(tool, toolInput))).toEqual(expected);
   });

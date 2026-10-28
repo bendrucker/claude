@@ -91,11 +91,7 @@ describe("tokenUsage", () => {
 describe("hookDenies", () => {
   test.each([
     ["spaced em dash", "Spaced em dashes ( — ) are an AI writing tell. Split the clauses."],
-    ["salutation", '"Dana," opens the comment with a salutation. Delete the address.'],
-    [
-      "numbering",
-      "Detected step or phase numbering that creates tight coupling.\nUse descriptive names.",
-    ],
+    ["multi-finding", "Writing checks found 2 issues in this text. Fix them in one pass."],
   ])("counts a %s deny", (_name, text) => {
     expect(hookDenies(trace(toolUseResult("t1", text)))).toBe(1);
   });
@@ -143,7 +139,7 @@ describe("hookDenies", () => {
         trace(
           toolUseResult("t1", "Spaced em dashes ( — ) are an AI writing tell."),
           toolUseResult("t2", "unrelated failure"),
-          toolUseResult("t3", "Detected step or phase numbering that creates tight coupling."),
+          toolUseResult("t3", "Writing checks found 3 issues in this text."),
         ),
       ),
     ).toBe(2);

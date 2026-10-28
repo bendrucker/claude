@@ -1,7 +1,7 @@
 import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { exceedsLineLimit, extractComments } from "../detection/comments";
 import { isProseFile } from "../detection/paths";
-import { scan, scanIntroduced, semicolonSpliceHits, stripCode } from "../detection/tropes";
+import { stripCode } from "../detection/code-spans";
 import { type ToolInput, toolInputOf } from "./io";
 import type { HookFinding } from "./report";
 import { valeFileFindings, valeMessageFindings } from "./vale-findings";
@@ -197,33 +197,12 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
   return [];
 }
 
-// Wordlists and Vale style rules quote the tropes they detect.
-const DETECTOR_SOURCE_PATTERN = /\/wordlists\/[^/]+\.txt$|\/styles\/[^/]+\/[^/]+\.yml$/;
+// Vale style rules quote the tropes they detect.
+const DETECTOR_SOURCE_PATTERN = /\/styles\/[^/]+\/[^/]+\.yml$/;
 
 function isDetectorSource(input: PreToolUseHookInput): boolean {
   const filePath = toolInputOf(input).file_path;
   return filePath !== undefined && DETECTOR_SOURCE_PATTERN.test(filePath);
-}
-
-// Comments are short, so density gates cannot work there: a single introduced
-// splice fires. Diff-aware like scanIntroduced, comparing splice counts across
-// the old and new comment text.
-const COMMENT_SPLICE_MIN = 1;
-
-function commentSplice(comments: { newText: string; oldText: string }): string | null {
-  const newHits = semicolonSpliceHits(comments.newText, COMMENT_SPLICE_MIN);
-  if (newHits.count === 0) return null;
-  const oldHits = semicolonSpliceHits(comments.oldText, COMMENT_SPLICE_MIN);
-  if (newHits.count <= oldHits.count) return null;
-  // Quote a splice from a line the edit introduced over one already in the file.
-  const oldLines = new Set(comments.oldText.split("\n"));
-  const introduced = comments.newText
-    .split("\n")
-    .filter((line) => !oldLines.has(line))
-    .join("\n");
-  const introducedHits = semicolonSpliceHits(introduced, COMMENT_SPLICE_MIN);
-  const sample = introducedHits.count > 0 ? introducedHits.sample : newHits.sample;
-  return `A code comment splices clauses with a semicolon ("${sample}"). Comments can be fragments. Use a period or drop a word.`;
 }
 
 // A fragment tokenizes without the grammar state around it, so a comment
@@ -255,75 +234,39 @@ const VALE_COMMENT_SCOPED =
 
 async function processFileOp(input: PreToolUseHookInput): Promise<HookFinding[]> {
   const pair = await collectFileOpPair(input);
-  if (!pair) return [];
   const filePath = toolInputOf(input).file_path;
-
-  // Prose rules target prose. In a code file the model's prose surface is its
-  // comments, so scan those; strings and identifiers are program text the
-  // model did not write as prose.
-  const codePath = filePath == null || filePath === "" || isProseFile(filePath) ? null : filePath;
-  const prose = codePath == null;
-  let scanPair = pair;
-  if (codePath != null) {
-    const source = (await wholeFilePair(input, codePath)) ?? pair;
-    // An unscannable version extracts as empty, which would make every
-    // comment in the other version look introduced.
-    if (exceedsLineLimit(source.newText) || exceedsLineLimit(source.oldText)) {
-      scanPair = { newText: "", oldText: "" };
-    } else {
-      const [newText, oldText] = await Promise.all([
-        extractComments(source.newText, codePath),
-        extractComments(source.oldText, codePath),
-      ]);
-      scanPair = { newText, oldText };
-    }
+  if (!pair || filePath == null || filePath === "") return [];
+  const whole = (await wholeFilePair(input, filePath)) ?? pair;
+  if (isProseFile(filePath) || VALE_COMMENT_SCOPED.test(filePath)) {
+    return valeFileFindings(whole.oldText, whole.newText, filePath);
   }
-  const matches = await scanIntroduced(scanPair.newText, scanPair.oldText, filePath, "file");
+  // An unscannable version extracts as empty, which would make every
+  // comment in the other version look introduced.
+  if (exceedsLineLimit(whole.newText) || exceedsLineLimit(whole.oldText)) return [];
+  const [newText, oldText] = await Promise.all([
+    extractComments(whole.newText, filePath),
+    extractComments(whole.oldText, filePath),
+  ]);
+  return valeFileFindings(asLineComments(oldText), asLineComments(newText), `${filePath}.ts`);
+}
 
-  const findings: HookFinding[] = matches.map((match) => ({
-    category: match.category,
-    tier: "context",
-    message: match.message,
-    introduced: match.tier === "deny",
-  }));
-
-  if (filePath != null && filePath !== "") {
-    if (prose || VALE_COMMENT_SCOPED.test(filePath)) {
-      const whole = (await wholeFilePair(input, filePath)) ?? pair;
-      findings.push(...(await valeFileFindings(whole.oldText, whole.newText, filePath)));
-    } else {
-      findings.push(
-        ...(await valeFileFindings(scanPair.oldText, scanPair.newText, `${filePath}.md`)),
-      );
-    }
-  }
-
-  if (!prose) {
-    const splice = commentSplice(scanPair);
-    if (splice != null && splice !== "")
-      findings.push({ category: "comment splice", tier: "context", message: splice });
-  }
-
-  return findings;
+// Vale applies its comment-scoped rules only to a language it parses, so comments from
+// one it lacks are linted as TypeScript line comments.
+function asLineComments(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => (line === "" ? "" : `// ${line}`))
+    .join("\n");
 }
 
 async function processSideEffect(input: PreToolUseHookInput): Promise<HookFinding[]> {
   const texts = await collectText(input);
   if (texts.length === 0) return [];
 
-  // A non-structural deny-tier hit is advice the model can act on while
-  // revising the rest, so it is reported as context.
   const text = texts.join("\n");
-  const matches = await scan(text, undefined, "sideEffect");
-  const findings: HookFinding[] = matches.map((match) => ({
-    category: match.category,
-    tier: match.tier === "deny" && match.structural ? "deny" : "context",
-    message: match.message,
-  }));
   const command = toolInputOf(input).command ?? "";
   const kind = /\bgit\s+(commit|tag)\b/.test(command) ? "commit" : "body";
-  findings.push(...(await valeMessageFindings(text, kind)));
-  return findings;
+  return valeMessageFindings(text, kind);
 }
 
 export async function check(input: PreToolUseHookInput): Promise<HookFinding[]> {

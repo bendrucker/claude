@@ -1,22 +1,20 @@
-- name: connector density fires in markdown
+- name: the splice rule fires in markdown
   format: .md
-  input: &dense |
-    The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.
-  contains: [Writing.ConnectorDensity]
-- name: connector density is off in TypeScript
-  format: .ts
-  input: *dense
-  absent: Writing.ConnectorDensity
-- name: connector density is off in a message
-  format: .prbody
-  input: *dense
-  absent: Writing.ConnectorDensity
-
-- name: two splices in a short prose file fire the splice rule
-  format: .md
-  input: |
+  input: &spliced |
     The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.
   contains: [Writing.SemicolonSplice]
+- name: the splice rule is off in code comments
+  format: .ts
+  input: |
+    // The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.
+    const x = 1;
+  contains: [Writing.CommentSplice]
+  absent: Writing.SemicolonSplice
+- name: the splice rule is off in a message
+  format: .prbody
+  input: *spliced
+  absent: Writing.SemicolonSplice
+
 - name: a single semicolon in prose is left to the per-semicolon rule
   format: .md
   input: |
@@ -104,3 +102,9 @@
 
     Manual.
   contains: [Writing.TemplateOnSmallDocument]
+
+- name: a bold label in a string literal is skipped
+  format: .ts
+  input: |
+    const help = "**Note:** run the installer first.";
+  absent: Writing.BoldLabel

@@ -42,7 +42,7 @@ describe("lintProse", () => {
     { name: "a message flag overrides the path", path: "notes.md", message: true, fires: false },
   ])("$name", async ({ path, message, fires }) => {
     const checks = (await lintProse(dense, path, { message })).map((alert) => alert.Check);
-    expect(checks.includes("Writing.ConnectorDensity")).toBe(fires);
+    expect(checks.includes("Writing.SemicolonSplice")).toBe(fires);
   });
 
   test("sorts by line, then column", async () => {

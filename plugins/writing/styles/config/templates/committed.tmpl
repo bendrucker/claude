@@ -1,5 +1,0 @@
-{{- /* committed's report: `path: severity message`.
-       Pick it with `--output=committed.tmpl`. */ -}}
-{{- range .Files}}{{$path := .Path}}{{range .Alerts -}}
-{{$path}}: {{.Severity}} {{.Message}}
-{{end}}{{end}}

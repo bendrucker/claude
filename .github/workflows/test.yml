@@ -86,6 +86,9 @@ jobs:
           working_directory: plugins/writing
           cache: false
 
+      - name: Install writing plugin Vale packages
+        run: bun plugins/writing/hooks/sessionstart.ts
+
       - name: Run tests
         run: bun test evals/
 
@@ -301,6 +304,11 @@ jobs:
           working_directory: plugins/${{ matrix.plugin.name }}
           # The cache key globs every file in the workspace (~24s), while a cold install takes ~3s.
           cache: false
+
+      # No SessionStart hook runs in CI, so the job installs what it would.
+      - name: Install writing plugin Vale packages
+        if: matrix.plugin.name == 'writing'
+        run: bun plugins/writing/hooks/sessionstart.ts
 
       # Profilers record through perf events, which the runner's default paranoia level blocks.
       - name: Allow perf events

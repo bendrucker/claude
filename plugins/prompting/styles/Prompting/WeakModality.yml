@@ -5,10 +5,17 @@ extends: existence
 message: '"%s" softens an instruction into a suggestion. State the instruction.'
 level: error
 ignorecase: true
-nonword: true
 scope: ~text.frontmatter
 tokens:
-  - '\b(?:try to|feel free to|if possible|if necessary|as needed|(?:where|when|as) appropriate|you (?:may|might|could) want to|it(?:''s| is) (?:a good idea|often best|usually best|generally best) to|consider \w+ing)\b'
+  - 'try to'
+  - 'feel free to'
+  - 'if possible'
+  - 'if necessary'
+  - 'as needed'
+  - '(?:where|when|as) appropriate'
+  - 'you (?:may|might|could) want to'
+  - 'it(?:''s| is) (?:a good idea|often best|usually best|generally best) to'
+  - 'consider \w+ing'
 tests:
   - name: flags a try-to instruction
     input: |

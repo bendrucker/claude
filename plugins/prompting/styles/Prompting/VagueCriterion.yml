@@ -5,10 +5,18 @@ extends: existence
 message: '"%s" is a bound the model cannot check. Name the observable done-state.'
 level: error
 ignorecase: true
-nonword: true
 scope: ~text.frontmatter
 tokens:
-  - '\b(?:make sure|properly|correctly|appropriately|adequately|sufficiently|as much as (?:possible|needed)|if it makes sense|when (?:done|finished)|until satisfied)\b'
+  - 'make sure'
+  - 'properly'
+  - 'correctly'
+  - 'appropriately'
+  - 'adequately'
+  - 'sufficiently'
+  - 'as much as (?:possible|needed)'
+  - 'if it makes sense'
+  - 'when (?:done|finished)'
+  - 'until satisfied'
 tests:
   - name: flags make sure
     input: |

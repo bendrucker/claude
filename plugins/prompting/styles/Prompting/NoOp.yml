@@ -5,10 +5,17 @@ extends: existence
 message: '"%s" restates a default the model already follows. Delete the sentence.'
 level: error
 ignorecase: true
-nonword: true
 scope: ~text.frontmatter
 tokens:
-  - '\b(?:be (?:thorough|careful|concise|accurate|helpful|precise|diligent)|think (?:step by step|carefully|hard)|take your time|(?:use|using) your (?:best )?judge?ment|do your best|remember to|it(?:''s| is) important (?:to|that)|please|carefully)\b'
+  - 'be (?:thorough|careful|concise|accurate|helpful|precise|diligent)'
+  - 'think (?:step by step|carefully|hard)'
+  - 'take your time'
+  - '(?:use|using) your (?:best )?judge?ment'
+  - 'do your best'
+  - 'remember to'
+  - 'it(?:''s| is) important (?:to|that)'
+  - 'please'
+  - 'carefully'
 tests:
   - name: flags be thorough
     input: |

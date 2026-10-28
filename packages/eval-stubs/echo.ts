@@ -70,18 +70,26 @@ export function postsNote(argv: string[]): boolean {
   return /\/(notes|discussions)(\/|\?|$)/.test(argv[1] ?? "");
 }
 
-/** The `body` field a note API call carries: `-F body=@<path>` reads the file, as glab does. */
-export function parseNoteField(argv: string[]): string {
-  let body = "";
+/**
+ * The `body` a note API call carries, from a field or a JSON `--input` file, or undefined for a
+ * read. `-F body=@<path>` reads the file, as glab does, and `-f` sends it literally.
+ */
+export function parseNoteField(argv: string[]): string | undefined {
+  let body: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] ?? "";
     const eq = arg.startsWith("--") ? arg.indexOf("=") : -1;
     const name = eq > 0 ? arg.slice(0, eq) : arg;
-    if (!FIELD.has(name) && !RAW_FIELD.has(name)) continue;
-    const field = eq > 0 ? arg.slice(eq + 1) : (argv[++i] ?? "");
-    if (!field.startsWith("body=")) continue;
-    const value = field.slice("body=".length);
-    body = FIELD.has(name) && value.startsWith("@") ? slurp(value.slice(1)) : value;
+    const value = () => (eq > 0 ? arg.slice(eq + 1) : (argv[++i] ?? ""));
+    if (name === "--input") {
+      const input: unknown = JSON.parse(slurp(value()));
+      if (typeof input === "object" && input !== null && "body" in input) body = String(input.body);
+    } else if (FIELD.has(name) || RAW_FIELD.has(name)) {
+      const field = value();
+      if (!field.startsWith("body=")) continue;
+      const raw = field.slice("body=".length);
+      body = FIELD.has(name) && raw.startsWith("@") ? slurp(raw.slice(1)) : raw;
+    }
   }
   return body;
 }
@@ -106,12 +114,13 @@ export function requestUrl(tool: Tool, remote: string): string {
  */
 export async function echo(tool: Tool, argv: string[]): Promise<never> {
   const [cmd = "", sub = "", ...rest] = argv;
-  const note = tool === "glab" && cmd === "api" && postsNote(argv);
-  if (!note && !(WRITES[tool] as readonly string[]).includes(`${cmd} ${sub}`)) {
+  const note =
+    tool === "glab" && cmd === "api" && postsNote(argv) ? parseNoteField(rest) : undefined;
+  if (note === undefined && !(WRITES[tool] as readonly string[]).includes(`${cmd} ${sub}`)) {
     process.stderr.write(`${tool} stand-in: ${argv.join(" ")} is unavailable offline\n`);
     process.exit(1);
   }
-  const { title, body } = note ? { title: "", body: parseNoteField(rest) } : parseWrite(rest);
+  const { title, body } = note === undefined ? parseWrite(rest) : { title: "", body: note };
   const installed = readdirSync(dir());
   const verdicts = installed.includes("check.js") && counts(rest, body) ? checkLines(body) : "";
   if (verdicts !== "") await record(verdicts);

@@ -178,6 +178,9 @@ describe("echo mode", () => {
     expect(post(`--field=body=@${file}`)).toBe(block("", "From file", gitlab));
     expect(post("-f", `body=@${file}`)).toBe(block("", `@${file}`, gitlab));
     expect(post("--raw-field", "body=Inline")).toBe(block("", "Inline", gitlab));
+    const json = join(run.cwd, "payload.json");
+    await Bun.write(json, JSON.stringify({ body: "From JSON" }));
+    expect(post("--input", json)).toBe(block("", "From JSON", gitlab));
   });
 
   test("gh derives the URL from an ssh origin", async () => {
@@ -190,6 +193,7 @@ describe("echo mode", () => {
   test.each([
     ["glab", ["mr", "list"]],
     ["glab", ["api", "projects/:id/merge_requests/1"]],
+    ["glab", ["api", "projects/:id/merge_requests/1/discussions", "--paginate"]],
     ["gh", ["pr", "view", "1"]],
     ["gh", ["api", "repos/x/y"]],
     ["gh", ["mr", "create"]],

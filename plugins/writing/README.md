@@ -12,7 +12,7 @@ Documents a model executes belong to the [prompting](../prompting) plugin. [`.cl
 
 ## Vale
 
-[`.vale.ini`](.vale.ini) enables the [`ai-tells`](https://github.com/tbhb/vale-ai-tells) package and this plugin's own [`styles/Writing/`](styles/Writing/) rules, and sets each check's level: `error` denies a message, `warning` adds context, `suggestion` stays out of the hook. Each rule carries its `evidence:` and `retire when:` criteria in a header comment and its cases in a `tests` block, run with `vale test styles/Writing`.
+[`.vale.ini`](.vale.ini) enables the [`ai-tells`](https://github.com/tbhb/vale-ai-tells) package and this plugin's own [`styles/Writing/`](styles/Writing/) rules, and sets each check's level: `error` denies a message, `warning` adds context, `suggestion` stays out of the hook. Each rule carries its `evidence:` and `retire when:` criteria in a header comment and its cases in a `tests` block, run with `vale test styles/Writing`. Project cases in [`tests/`](tests/) check what the config decides per file type and message, run with `vale --no-global --config=.vale.ini test tests/`.
 
 ## Hook Dispatcher
 

@@ -2,16 +2,21 @@ import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { lintProse, valeBinary } from "./vale";
 
-test("every Writing rule passes its own cases and matches at least one", async () => {
+const root = join(import.meta.dirname, "..");
+
+test.each<{ name: string; args: string[] }>([
+  {
+    name: "every Writing rule passes its own cases and matches at least one",
+    args: ["test", "--coverage", join(root, "styles", "Writing")],
+  },
+  {
+    name: "the plugin config passes its project cases",
+    args: ["--no-global", `--config=${join(root, ".vale.ini")}`, "test", join(root, "tests")],
+  },
+])("$name", async ({ args }) => {
   const binary = valeBinary();
   expect(binary).not.toBeNull();
-  const proc = Bun.spawn(
-    [binary ?? "vale", "test", "--coverage", join(import.meta.dirname, "..", "styles", "Writing")],
-    {
-      stdout: "pipe",
-      stderr: "pipe",
-    },
-  );
+  const proc = Bun.spawn([binary ?? "vale", ...args], { stdout: "pipe", stderr: "pipe" });
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),

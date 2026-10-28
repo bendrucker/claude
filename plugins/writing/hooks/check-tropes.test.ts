@@ -114,25 +114,6 @@ describe("Vale rule files", () => {
   });
 });
 
-describe("connector density file scoping", () => {
-  const denseText =
-    "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
-
-  it("flags connector density in markdown files", async () => {
-    const input = mockWrite(denseText);
-    const result = await processInput(input);
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-
-  it("skips connector density in shell scripts", async () => {
-    expect(await processInput(mockWrite(denseText, "deploy.sh"))).toBeNull();
-  });
-
-  it("skips connector density in TypeScript files", async () => {
-    expect(await processInput(mockWrite(denseText, "index.ts"))).toBeNull();
-  });
-});
-
 describe("Write/Edit", () => {
   it("returns reminder for Write with spaced em dash", async () => {
     const result = await processInput(mockWrite("This \u2014 is bad"));
@@ -254,29 +235,6 @@ describe("semicolon splices", () => {
     expect(result).toBeNull();
   });
 
-  it("ignores commented-out code in a code file", async () => {
-    expect(
-      await processInput(codeEdit("// foo(); bar()\nconst x = 1;", "const x = 1;")),
-    ).toBeNull();
-  });
-
-  it("ignores splices in code outside comments", async () => {
-    expect(
-      await processInput(codeEdit('const label = "cold start; warm later";', "const label = 1;")),
-    ).toBeNull();
-  });
-
-  it("ignores hex colors in an HTML style block", async () => {
-    const html = [
-      "<style>",
-      "/* Dark palette. */",
-      ":root { --bg: #12151b; --surface: #1a1e26; --fg: #e4e8ef; --muted: #98a1b0; --line: #2c323d;",
-      "  --accent: #6c9cf0; --accent-fg: #0d1117; --chip: #232934; --good: #4cc27f; color-scheme: dark; }",
-      "</style>",
-    ].join("\n");
-    expect(await processInput(mockWrite(html, "page.html"))).toBeNull();
-  });
-
   test.each<{ name: string; edit: [string, string]; quote: string | undefined }>([
     {
       name: "flags and quotes a splice edited into a script block",
@@ -309,23 +267,6 @@ describe("semicolon splices", () => {
     const long = `const blob = "${"x".repeat(3_000)}";`;
     await Bun.write(file, `// The cache warms slowly; then it saturates.\n${long}\n`);
     expect(await processInput(mockEdit('const blob = "";', long, file))).toBeNull();
-  });
-
-  it("flags two splices in a short prose file", async () => {
-    const result = await processInput(
-      mockWrite(
-        "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.",
-      ),
-    );
-    expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
-  });
-
-  it("leaves a single semicolon in prose to the per-semicolon rule", async () => {
-    const result = await processInput(
-      mockWrite("The cache starts cold; the first request fills it."),
-    );
-    expect(contextOf(result)).toContain("Replace the semicolon");
-    expect(contextOf(result)).not.toContain("splice");
   });
 });
 
@@ -524,13 +465,6 @@ describe("Bash processInput", () => {
     const denial = denialOf(result);
     expect(denial.decision).toBe("deny");
     expect(denial.reason).toContain("Writing.NoNegation");
-  });
-
-  it("allows a comment that opens with a connective", async () => {
-    const result = await processInput(
-      mockBash(`glab mr note 871 --message "Otherwise, this looks right."`),
-    );
-    expect(result).toBeNull();
   });
 
   it("returns null for non-text Bash commands", async () => {

@@ -125,17 +125,6 @@ describe("every finding in one output", () => {
 });
 
 describe("code files", () => {
-  it("stays silent on a trope inside a string literal", async () => {
-    const { output, log } = await dispatch(
-      mockInput("Write", {
-        file_path: "src/args.ts",
-        content: 'const msg = "All 8 tests pass";\n',
-      }),
-    );
-    expect(output).toBeNull();
-    expect(log.outcome).toBe("silent");
-  });
-
   it("flags the same trope in a comment, quoting the match", async () => {
     const { output } = await dispatch(
       mockInput("Write", {
@@ -144,16 +133,6 @@ describe("code files", () => {
       }),
     );
     expect(contextOf(output)).toContain("'All 8 tests pass'");
-  });
-
-  it("scans block comments, not just single-line ones", async () => {
-    const { output } = await dispatch(
-      mockInput("Write", {
-        file_path: "src/cache.ts",
-        content: "/**\n * The cache — cold at first — warms up.\n */\nconst x = 1;\n",
-      }),
-    );
-    expect(contextOf(output)).toContain("em dash");
   });
 });
 

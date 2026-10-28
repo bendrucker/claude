@@ -141,19 +141,19 @@ async function configArgs(source: ValeSource): Promise<{ args: string[]; cwd?: s
   return root === null ? { args } : { args, cwd: root };
 }
 
-/** Lint `text` with the plugin's Vale config. Returns [] when vale is unavailable, and throws on a runtime failure. */
-export async function valeAlerts(text: string, source: ValeSource): Promise<ValeAlert[]> {
-  if (text.trim() === "") return [];
+async function runVale(
+  args: string[],
+  { cwd, stdin }: { cwd?: string | undefined; stdin?: string } = {},
+): Promise<ValeAlert[]> {
   const binary = valeBinary();
   if (binary === null) return [];
-  const { args, ...cwd } = await configArgs(source);
   // The SessionStart hook installs the packages, so a lint only checks for them.
-  if (cwd.cwd === undefined && !(await isSynced(await pinnedPackages()))) {
+  if (cwd === undefined && !(await isSynced(await pinnedPackages()))) {
     throw new Error(`Vale packages are not installed. Run ${INSTALL_HINT}`);
   }
   const proc = Bun.spawn([binary, ...args, "--output=JSON"], {
-    ...cwd,
-    stdin: new Blob([text]),
+    cwd: cwd ?? process.cwd(),
+    stdin: stdin === undefined ? "ignore" : new Blob([stdin]),
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -166,6 +166,18 @@ export async function valeAlerts(text: string, source: ValeSource): Promise<Vale
   if (exitCode > 1) throw new ValeError(exitCode, `${stdout.trim()}${stderr.trim()}`);
   if (stdout.trim() === "") return [];
   return Object.values(Output.parse(JSON.parse(stdout))).flat();
+}
+
+/** Lint `text` with the plugin's Vale config. Returns [] when vale is unavailable, and throws on a runtime failure. */
+export async function valeAlerts(text: string, source: ValeSource): Promise<ValeAlert[]> {
+  if (text.trim() === "") return [];
+  const { args, cwd } = await configArgs(source);
+  return runVale(args, { cwd, stdin: text });
+}
+
+/** Alerts for every file under `dir`, linted with the plugin's config alone. */
+export async function lintDirectory(dir: string): Promise<ValeAlert[]> {
+  return runVale(["--no-global", `--config=${VALE_CONFIG}`, dir]);
 }
 
 /** Alerts in prose, sorted by position. A code file yields none, and no path lints as a message. */

@@ -1,17 +1,11 @@
 #!/usr/bin/env bun
-import { mkdir, readdir } from "node:fs/promises";
-import { homedir } from "node:os";
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
-import {
-  VALE_CONFIG,
-  type ValeAlert,
-  ValeError,
-  valeAlerts,
-  valeBinary,
-} from "../../../detection/vale";
+import { lintDirectory, VALE_CONFIG, valeBinary } from "../../../detection/vale";
 
 const RESULTS = join(import.meta.dirname, "..", "results", "sweep");
 const VOICE_DIR = join(
@@ -32,41 +26,6 @@ interface Unit {
 
 function countWords(text: string): number {
   return text.match(/[a-zA-Z]+/g)?.length ?? 0;
-}
-
-export let skippedUnits = 0;
-
-// A unit opening with a `---` line parses as front matter and fails without
-// naming a rule file. A broken rule names its file and still throws.
-async function lint(text: string): Promise<ValeAlert[]> {
-  try {
-    return await valeAlerts(text, { kind: "body" });
-  } catch (error) {
-    if (error instanceof ValeError && error.code === "E100") {
-      skippedUnits++;
-      return [];
-    }
-    throw error;
-  }
-}
-
-/** `fn` over `items` with at most `limit` in flight, results in input order. */
-export async function mapLimit<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = [];
-  let next = 0;
-  const worker = async (): Promise<void> => {
-    const index = next++;
-    const item = items[index];
-    if (item === undefined) return;
-    results[index] = await fn(item);
-    return worker();
-  };
-  await Promise.all(Array.from({ length: limit }, worker));
-  return results;
 }
 
 /** Paragraph-aligned chunks of each file, up to `budget` words split evenly across files. */
@@ -165,14 +124,24 @@ export function levelFor(liftValue: number, voicePer1k: number, support: number)
   return "warning";
 }
 
-async function tallyChecks(
-  units: Unit[],
-  concurrency: number,
-): Promise<{ words: number; hits: Map<string, number> }> {
-  const alerts = await mapLimit(units, concurrency, (unit) => lint(unit.text));
-  const hits = new Map<string, number>();
-  for (const alert of alerts.flat()) hits.set(alert.Check, (hits.get(alert.Check) ?? 0) + 1);
-  return { words: units.reduce((sum, unit) => sum + countWords(unit.text), 0), hits };
+// Each chunk lints as a message body in one Vale run. A leading `---` would
+// parse as front matter and abort the run, so it becomes the equivalent `***` break.
+async function tallyChecks(units: Unit[]): Promise<{ words: number; hits: Map<string, number> }> {
+  const dir = await mkdtemp(join(tmpdir(), "writing-sweep-"));
+  try {
+    await Promise.all(
+      units.map((unit, index) =>
+        Bun.write(join(dir, `${index}.prbody`), unit.text.replace(/^---/, "***")),
+      ),
+    );
+    const hits = new Map<string, number>();
+    for (const alert of await lintDirectory(dir)) {
+      hits.set(alert.Check, (hits.get(alert.Check) ?? 0) + 1);
+    }
+    return { words: units.reduce((sum, unit) => sum + countWords(unit.text), 0), hits };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 const LsConfig = z.object({ Paths: z.array(z.string()) });
@@ -197,12 +166,10 @@ export async function sweep(
   budget: number,
   voiceDir: string,
   draftsDir: string,
-  concurrency = 2,
 ): Promise<SweepRow[]> {
-  const voice = await tallyChecks(sampleChunks(await readVoice(voiceDir), budget), concurrency);
+  const voice = await tallyChecks(sampleChunks(await readVoice(voiceDir), budget));
   const drafts = await tallyChecks(
     sampleChunks(await readDrafts(draftsDir), Number.POSITIVE_INFINITY),
-    concurrency,
   );
   const checks = new Set([...voice.hits.keys(), ...drafts.hits.keys(), ...(await aiTellsChecks())]);
   return [...checks]
@@ -242,14 +209,8 @@ export const program = new Command("sweep.ts")
   .option("--words <n>", "voice-baseline words to sample", int, 100_000)
   .option("--voice-dir <dir>", "voice baseline directory", VOICE_DIR)
   .option("--drafts-dir <dir>", "model drafts directory (jsonl)", DRAFTS_DIR)
-  .option("--concurrency <n>", "vale processes in flight", int, 2)
   .action(async (options) => {
-    const rows = await sweep(
-      options.words,
-      options.voiceDir,
-      options.draftsDir,
-      options.concurrency,
-    );
+    const rows = await sweep(options.words, options.voiceDir, options.draftsDir);
     await mkdir(RESULTS, { recursive: true });
     await Bun.write(join(RESULTS, "sweep.json"), `${JSON.stringify(rows, null, 2)}\n`);
     await Bun.write(join(RESULTS, "levels.ini"), `${levelLines(rows).join("\n")}\n`);

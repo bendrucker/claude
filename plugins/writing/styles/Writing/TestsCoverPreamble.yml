@@ -1,0 +1,27 @@
+# evidence: none recorded; pre-dates the curation principle. Kept as a low-false-positive opener pattern.
+# retire when: the opener stops appearing in deliverable prose, or corrective-feedback moments stop citing it.
+extends: existence
+message: "'%s' elides the subject. Use 'Added tests covering ...' or describe the change."
+level: warning
+nonword: true
+tokens:
+  - '(?m)^Tests\s+(?:cover|verify|ensure|validate)\b'
+tests:
+  - name: positives
+    about: a paragraph opening with Tests plus a coverage verb
+    input: |
+      Tests cover error handling for malformed JSON.
+
+      Tests verify the retry logic.
+    want: |
+      1:1:Writing.TestsCoverPreamble:'Tests cover' elides the subject. Use 'Added tests covering ...' or describe the change.
+      3:1:Writing.TestsCoverPreamble:'Tests verify' elides the subject. Use 'Added tests covering ...' or describe the change.
+  - name: negatives
+    about: an explicit subject and a mid-sentence use
+    input: |
+      Added tests covering error handling.
+
+      The suite validates the retry logic.
+
+      The new tests cover the parser.
+    want: ""

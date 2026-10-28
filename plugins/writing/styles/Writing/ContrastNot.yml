@@ -1,0 +1,32 @@
+# evidence: none recorded; pre-dates the curation principle. Kept because the rhetorical "X, not Y" contrast is a consistent AI-prose tell.
+# retire when: precision is low on a labeled corpus sample, or the pattern fires heavily on user text.
+extends: existence
+message: "'%s' is a rhetorical 'X, not Y' contrast. State the positive directly."
+level: warning
+ignorecase: true
+nonword: true
+exceptions:
+  - ',\s+not\s+(?:necessarily|including|to\s+mention)\b'
+tokens:
+  - '\b\w[\w\s]{2,40},\s+not\s+\w[\w\s]{2,30}(?:[.!?,;:]|$)'
+tests:
+  - name: positives
+    about: a positive claim followed by a comma and a negated alternative
+    input: |
+      This is a tool, not a framework.
+
+      The goal is clarity, not perfection.
+    want: |
+      1:1:Writing.ContrastNot:'This is a tool, not a framework.' is a rhetorical 'X, not Y' contrast. State the positive directly.
+      3:1:Writing.ContrastNot:'The goal is clarity, not perfection.' is a rhetorical 'X, not Y' contrast. State the positive directly.
+  - name: negatives
+    about: a leading not, a not-necessarily hedge, and an including list
+    input: |
+      It is not the case that X.
+
+      Not a framework, but a tool.
+
+      The cache is fast, not necessarily correct.
+
+      Ship the build, not including the docs.
+    want: ""

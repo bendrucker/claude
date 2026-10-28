@@ -1,0 +1,30 @@
+# evidence: none recorded; pre-dates the curation principle. Kept as a passive-voice rule for PR-style prose.
+# retire when: a tagger-based passive-voice rule replaces it, or it fires on user-authored prose at a high rate.
+extends: existence
+message: "'%s' is passive voice in PR-style writing. Rewrite so something is doing the verb."
+level: suggestion
+ignorecase: true
+tokens:
+  - '(?:is|was|are|were)\s+(?:added|updated|removed|refactored|introduced|created|deleted|modified|improved)'
+tests:
+  - name: positives
+    about: a be-verb plus a change participle
+    input: |
+      Retry logic is added to the HTTP client.
+
+      The cache layer was refactored for clarity.
+
+      Both helpers were removed.
+    want: |
+      1:13:Writing.PassivePrSummary:'is added' is passive voice in PR-style writing. Rewrite so something is doing the verb.
+      3:17:Writing.PassivePrSummary:'was refactored' is passive voice in PR-style writing. Rewrite so something is doing the verb.
+      5:14:Writing.PassivePrSummary:'were removed' is passive voice in PR-style writing. Rewrite so something is doing the verb.
+  - name: negatives
+    about: active voice and a participle without a be-verb
+    input: |
+      The server handles retries.
+
+      We refactored the cache layer.
+
+      The added logic retries twice.
+    want: ""

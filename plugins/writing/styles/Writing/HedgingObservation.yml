@@ -1,0 +1,28 @@
+# evidence: none recorded; pre-dates the curation principle. Kept because hedged observations are a recurring tell in assistant reasoning output.
+# retire when: corpus analysis shows low lift, or the pattern fires frequently on user text.
+extends: existence
+message: "'%s' is hedging observation. State the observation directly or name the uncertainty."
+level: suggestion
+ignorecase: true
+tokens:
+  - '(?:looks|appears|seems)\s+(?:like|to)'
+tests:
+  - name: positives
+    about: hedged observations
+    input: |
+      This looks like a regression.
+
+      The fix appears to hold.
+
+      That seems to work.
+    want: |
+      1:6:Writing.HedgingObservation:'looks like' is hedging observation. State the observation directly or name the uncertainty.
+      3:9:Writing.HedgingObservation:'appears to' is hedging observation. State the observation directly or name the uncertainty.
+      5:6:Writing.HedgingObservation:'seems to' is hedging observation. State the observation directly or name the uncertainty.
+  - name: negatives
+    about: a direct observation and a plain description
+    input: |
+      The output looks correct.
+
+      She looks tired today.
+    want: ""

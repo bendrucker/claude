@@ -1,0 +1,43 @@
+# evidence: the user flagged this trope directly. "No config needed" advertises an absent artifact, and the artifact noun is open-ended, so the rule flags the construction and carves out status reports (no change needed, no action required).
+# retire when: a word that is a status report starts producing false nudges (add it to the exceptions), or the construction stops appearing in assistant deliverables and corrective feedback.
+extends: existence
+message: "'%s' advertises what the design avoids. Describe what it does instead."
+level: warning
+ignorecase: true
+exceptions:
+  - '\b(?:the|a|an|it|them|this|that|its)\b'
+  - '\b(?:longer|more|further|additional|extra|fewer|less|other|change|changes|fix|fixes|edit|edits|action|actions|work|move|moves|update|updates|override|overrides|touch|tweak|tweaks|patch|patches|bump|bumps|swap|swaps|merge|merges|sync|run|runs|check|checks|review|reviews|test|tests|cleanup|dedup|retry|retries|rebuild|rebase|restack|restart|reload|resize|reorder|recompile|redeploy|reinstall|rerun|refactor|modification|modifications|adjustment|adjustments|intervention|correction|revision|migration|migrations|rework)\s+(?:(?:is|are|was|were|will|would|should|could|can|be|being|been|ever|really|actually|strictly|even|typically|usually|generally|always|also|then|now|yet|just)\s+){0,3}(?:needed|required|necessary)'
+tokens:
+  - '\bno\s+(?:[a-z-]+\s+){0,3}?[a-z-]+\s+(?:(?:is|are|was|were|will|would|should|could|can|be|being|been|ever|really|actually|strictly|even|typically|usually|generally|always|also|then|now|yet|just)\s+){0,3}(?:needed|required|necessary)\b'
+tests:
+  - name: positives
+    about: an advertised absent artifact, with and without an auxiliary or adverb
+    input: |
+      Handlers are auto-discovered, no config needed.
+
+      It runs inline (no wrapper needed).
+
+      Spin it up with no docker needed.
+
+      It’s wired up, no config is required.
+
+      Setup is trivial, no extra tooling will be strictly necessary.
+    want: |
+      1:31:Writing.NoXNeededBrag:'no config needed' advertises what the design avoids. Describe what it does instead.
+      3:17:Writing.NoXNeededBrag:'no wrapper needed' advertises what the design avoids. Describe what it does instead.
+      5:17:Writing.NoXNeededBrag:'no docker needed' advertises what the design avoids. Describe what it does instead.
+      7:16:Writing.NoXNeededBrag:'no config is required' advertises what the design avoids. Describe what it does instead.
+      9:19:Writing.NoXNeededBrag:'no extra tooling will be strictly necessary' advertises what the design avoids. Describe what it does instead.
+  - name: negatives
+    about: status reports, extra nouns, and a clause boundary inside the gap
+    input: |
+      Reviewed the helper, no change needed.
+
+      No further action needed here.
+
+      There is no way the runtime needed that much memory.
+
+      No migration is required.
+
+      No changes will be needed.
+    want: ""

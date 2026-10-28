@@ -1,0 +1,55 @@
+# evidence: users repeatedly asked the model to stop reporting pass and fail counts or CI status in corrective-feedback moments.
+# retire when: corrective-feedback moments stop citing result-reporting language, or the model stops producing it in deliverables.
+extends: existence
+message: "'%s' reports a test result, count, or CI status. Describe what is covered instead."
+level: error
+ignorecase: true
+exceptions:
+  - '\b(?:when|if|unless)\b'
+tokens:
+  - '\b(?:(?:when|if|unless)\s+(?:[a-z-]+\s+){0,3})?(?:tests?|checks?|specs?|suites?|builds?|linters?|lint|typecheck|assertions?|jobs?|pipelines?|workflows?|ci)\s+(?:(?:are|is|was|were|now|all|both|still|also|already|locally|again|then|finally|currently)\s+)*(?:pass(?:es|ed|ing)?|succeed(?:s|ed|ing)?)\b'
+  - '\b\d+(?:/\d+)?\s+(?:[a-z-]+\s+){0,2}(?:pass(?:es|ed|ing)?|fail(?:s|ed|ing)?|succeed(?:s|ed|ing)?)\b'
+  - '\b(?:all|both|every)\s+(?:[a-z0-9-]+\s+){0,2}(?:pass(?:es|ed|ing)?|green)\b'
+  - '\b(?:0|zero)\s+(?:errors?|failures?|warnings?)\b'
+  - '\b(?:ci|tests?|checks?|build|lint|typecheck|suite|pipeline)\s+(?:(?:is|are)\s+)?(?:now\s+)?(?:green|clean)\b'
+tests:
+  - name: positives
+    about: counts, all-pass claims, zero-error claims, and CI status
+    input: |
+      All 8 tests pass. Now let me check the linter.
+
+      3/3 passing on Sonnet 4.6.
+
+      Both pass on main.
+
+      CI is green.
+
+      Zero failures on the last run.
+
+      The tests passed locally.
+    want: |
+      1:1:Writing.TestResultReporting:'All 8 tests pass' reports a test result, count, or CI status. Describe what is covered instead.
+      3:1:Writing.TestResultReporting:'3/3 passing' reports a test result, count, or CI status. Describe what is covered instead.
+      5:1:Writing.TestResultReporting:'Both pass' reports a test result, count, or CI status. Describe what is covered instead.
+      7:1:Writing.TestResultReporting:'CI is green' reports a test result, count, or CI status. Describe what is covered instead.
+      9:1:Writing.TestResultReporting:'Zero failures' reports a test result, count, or CI status. Describe what is covered instead.
+      11:5:Writing.TestResultReporting:'tests passed' reports a test result, count, or CI status. Describe what is covered instead.
+  - name: negatives
+    about: failures with a cause, imperatives, and pass used as a noun
+    input: |
+      The tests fail because processInput is now async.
+
+      Write a test for this function.
+
+      Apply every fix in this one pass.
+
+      Both edits land in a single pass.
+
+      The uninstall pass removes the links.
+
+      Start from one clean checkout.
+
+      Pass the flag to skip the cache.
+
+      Retry if the checks pass.
+    want: ""

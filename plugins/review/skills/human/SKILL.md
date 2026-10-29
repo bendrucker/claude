@@ -5,6 +5,8 @@ description: >-
 argument-hint: "[--doc <file>] [--kind <kind>] [--browser] [--summary <text>]"
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts:*)"
+  - Bash(rex run:*)
+  - Bash(tuicr review:*)
   - Bash(plannotator review:*)
   - Bash(plannotator annotate:*)
 ---
@@ -16,6 +18,7 @@ Put the change in front of Ben and act on what comes back. `attention.ts` labels
 ## Context
 
 - herdr pane: !`[ "$HERDR_ENV" = 1 ] && printf %s "${HERDR_PANE_ID:-none}" || printf none`
+- Rex block: !`printf %s "${REX_BLOCK:-none}"`
 
 ## Modes
 
@@ -26,7 +29,7 @@ Put the change in front of Ben and act on what comes back. `attention.ts` labels
 | `--browser`, diff | `plannotator review --git --json [--base <ref>]` | Blocks. The decision is the tool result |
 | `--browser`, `--doc <file>` | `plannotator annotate <file> --gate --json --require-approval` | Blocks. The decision is the tool result |
 
-Terminal surfaces open as a split beside this pane, named explicitly and without taking focus, and deliver into it once it is idle. So the turn has to end before Send can land. They need the herdr pane above. When it reads `none`, run the gate as if `--browser` were passed. In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
+Terminal surfaces open as a split beside this pane, named explicitly and without taking focus, and deliver into it once it is idle. So the turn has to end before Send can land. They need the herdr pane above. When it reads `none` and the Rex block is set, a diff review runs the Rex gate below, and a document review takes `--browser`. With neither, run the gate as if `--browser` were passed. In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
 
 ## Precondition
 
@@ -52,3 +55,9 @@ With `--browser`:
 2. `plannotator review --git --json`, adding `--base <ref>` when the caller resolved one, or `plannotator annotate <file> --gate --json --require-approval`
 3. `attention.ts clear`
 4. Act on the decision. `approved` ends the review. `annotated` means act on the annotations and run the gate again. `dismissed`, or exit 1 from the annotate gate, means not approved: fold the feedback in and run the gate again. Exit 2 is a startup error: report it and stop.
+
+## Rex Gate
+
+1. Note the comment IDs from `tuicr review comments --session <path>` for each session `tuicr review list --repo "$PWD"` prints.
+2. With `run_in_background: true`, run `rex run --block "$REX_BLOCK" --split=right --focus=false --cwd "$PWD" --wait -- tuicr -w`, adding `-r <base>..HEAD` when the caller resolved a base. End the turn with one line saying quitting tuicr resumes the work.
+3. When it completes, read the comments again. Those with IDs absent from step 1 are the feedback: act on them and run the gate again. No new comments means approved.

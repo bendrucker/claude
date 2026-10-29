@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { describe, expect, mock, test, type Engine } from "claude-code/testing";
-import { MAX_ATTEMPTS, POLL_MS } from "./register.ts";
+import { IDLE_CAP_MS, MAX_ATTEMPTS, POLL_MS, QUIET_MS, TICK_MS } from "./register.ts";
 
 interface Recorded {
   event: string;
@@ -9,6 +9,14 @@ interface Recorded {
 }
 
 const START = { surface: "terminal", isInteractive: true, cwd: "/work" } as const;
+
+const COMPLETE = {
+  answer: "",
+  durationMs: 1,
+  isAborted: false,
+  turnId: "t1",
+  reason: "answer",
+} as const;
 
 const mr = (pipeline: string | null = "running", state = "opened") => ({
   iid: 7,
@@ -28,9 +36,10 @@ const approvals = (...names: string[]) => ({
   approved_by: names.map((username) => ({ user: { username } })),
 });
 
-const note = (id: number, username: string, system = false) => ({
+const note = (id: number, username: string, system = false, body = "") => ({
   id,
   system,
+  body,
   author: { username },
 });
 
@@ -44,6 +53,11 @@ interface World {
   jobs?: unknown[];
   approvals?: unknown;
   notes?: unknown;
+  /** GraphQL reviewer nodes, or a string for a failed read. */
+  reviewers?: unknown;
+  /** The merge request fields the merge query reads. */
+  merge?: Record<string, unknown>;
+  discussions?: unknown[];
   // Runs after each read of the MR by branch, to move the MR mid-poll.
   afterView?: () => void;
   slowMs?: number;
@@ -52,6 +66,10 @@ interface World {
   /** Heads this checkout lacks, as a push from elsewhere leaves them. */
   foreign?: string[];
   drop?: string;
+  /** A sleep of the host that the ticker's next period waits out first. */
+  sleptMs?: number;
+  /** Refuses the ticker's periods, which ends it. */
+  isTickRefused?: boolean;
 }
 
 const result = (stdout: string, stderr = "", exitCode = stderr === "" ? 0 : 1) => ({
@@ -66,7 +84,18 @@ function worldOf(on: On, world: World) {
   const tails: (string | undefined)[] = [];
   const submits: string[] = [];
   const views: string[] = [];
+  on("clock.every", { ms: TICK_MS }, async ($, e, next) => {
+    if (world.isTickRefused === true) throw new Error("refused");
+    const slept = world.sleptMs ?? 0;
+    delete world.sleptMs;
+    // Timers stand still while the host sleeps, so the period ends late by the clock.
+    if (slept > 0) await clock.sleep(slept);
+    return next(e);
+  });
+  const apis: string[] = [];
+  const graphql: string[] = [];
   const clock = mock.clock(on);
+  on("turn.complete", () => ({ text: "" }));
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
@@ -76,6 +105,25 @@ function worldOf(on: On, world: World) {
     return { value: undefined };
   });
   on("session.start", ($, e) => ({ cwd: e.cwd }));
+  on("command.register", () => ({ value: { command: "mr" } }));
+  const panes = new Set<string>();
+  on("ui.open", ($, e) => {
+    panes.add(e.id);
+    return { value: { isPlaced: true } };
+  });
+  on("ui.panes", () => ({
+    value: [...panes].map((id) => ({
+      id,
+      title: id,
+      isShown: true,
+      isFocused: false,
+      isPlaced: true,
+    })),
+  }));
+  on("ui.close", ($, e) => {
+    panes.delete(e.id);
+    return { value: undefined };
+  });
   on("session.end", ($, e) => ({ sessionId: e.sessionId }));
   on("session.cwd", () => ({ value: "/work" }));
   on("ui.render", { component: "PromptHint" }, ($, e) => {
@@ -119,8 +167,23 @@ function worldOf(on: On, world: World) {
       return view;
     }
     if (argv === "glab api user") return reply({ username: "ben" });
+    if (argv.startsWith("glab api graphql") && argv.includes("mergeTrainIndex")) {
+      const mergeRequest = { autoMergeEnabled: false, mergeTrainIndex: null, ...world.merge };
+      const ciCdSettings = { mergeTrainsEnabled: false };
+      return reply({ data: { project: { ciCdSettings, mergeRequest } } });
+    }
+    if (argv.startsWith("glab api graphql")) {
+      graphql.push(argv);
+      const nodes = world.reviewers ?? [];
+      if (typeof nodes === "string") return reply(nodes);
+      return reply({ data: { project: { mergeRequest: { reviewers: { nodes } } } } });
+    }
+    apis.push(argv);
     if (argv.endsWith("/approvals")) return reply(world.approvals ?? approvals());
     if (argv.includes("/notes?")) return reply(world.notes ?? []);
+    if (argv.includes("/discussions?")) {
+      return result((world.discussions ?? []).map((row) => JSON.stringify(row)).join("\n"));
+    }
     if (argv.startsWith("glab api --paginate --output ndjson projects/1/pipelines/50/jobs?")) {
       return result((world.jobs ?? job("running")).map((row) => JSON.stringify(row)).join("\n"));
     }
@@ -137,7 +200,7 @@ function worldOf(on: On, world: World) {
     });
     return tails.at(-1);
   };
-  return { events, named, shown, submits, views, clock };
+  return { events, named, shown, submits, views, apis, graphql, clock };
 }
 
 const HINT = { isDraft: false, isWorking: false, hint: "? for shortcuts" };
@@ -160,7 +223,7 @@ describe("register", () => {
       phase: "pending",
       state: "opened",
     });
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1 · \u{f441} 1 approval needed");
+    expect(await w.shown($)).toBe("author  │ \u{f444} 0/1  \u{f441} 1");
 
     world.view = mr("failed");
     world.jobs = job("failed");
@@ -175,7 +238,7 @@ describe("register", () => {
         detail: expect.objectContaining({ kinds: ["ci.failed"] }),
       }),
     );
-    expect(await w.shown($)).toBe("\u{f52f} test · \u{f441} 1 approval needed");
+    expect(await w.shown($)).toBe("author  │ \u{f52f} 1  \u{f441} 1");
 
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
@@ -185,7 +248,7 @@ describe("register", () => {
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
     expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f441} 1 approval needed");
+    expect(await w.shown($)).toBe("author  │ \u{f49e}  \u{f441} 1");
   });
 
   test("an MR already conflicting when first seen is announced once, through a recheck", async ($, on) => {
@@ -264,15 +327,15 @@ describe("register", () => {
 
     await $.session.start(START);
     await w.clock.settle();
-    world.notes = [note(4, "ben"), note(3, "alice", true), note(2, "greptile"), note(1, "alice")];
+    world.notes = [note(4, "ben"), note(3, "alice", true), note(2, "carol"), note(1, "alice")];
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits.length).toBe(1);
-    expect(w.submits[0]).toContain("@greptile commented on MR !7 (1 new comment)");
+    expect(w.submits[0]).toContain("@carol commented on MR !7 (1 new comment)");
 
     world.approvals = approvals("alice");
     await w.clock.advance(POLL_MS.settled);
     expect(w.submits[1]).toContain("@alice approved MR !7");
-    expect(await w.shown($)).toBe("\u{f49e} CI · \u{f42e} approved");
+    expect(await w.shown($)).toBe("author  │ \u{f49e}  \u{f42e}");
 
     world.approvals = approvals();
     await w.clock.advance(POLL_MS.settled);
@@ -283,6 +346,84 @@ describe("register", () => {
       "unapproved",
     ]);
   });
+
+  test(
+    "bot chatter stays quiet and is logged once",
+    { options: { ignore: "deploy-bot" } },
+    async ($, on) => {
+      const world: World = {
+        branch: "topic",
+        glab: GLAB_OK,
+        view: mr("success"),
+        jobs: job("success"),
+      };
+      const w = worldOf(on, world);
+      const ack = "<!-- reply marker -->\n✅ Actions performed";
+
+      await $.session.start(START);
+      await w.clock.settle();
+      world.notes = [note(3, "deploy-bot"), note(2, "review-bot", false, ack)];
+      await w.clock.advance(POLL_MS.settled);
+      await w.clock.advance(POLL_MS.settled);
+
+      expect(w.submits).toEqual([]);
+      expect(w.named("muted").map((e) => e.detail)).toEqual([
+        { mr: 7, head: "aaaaaaa1111", id: "3", author: "deploy-bot", reason: "author" },
+        { mr: 7, head: "aaaaaaa1111", id: "2", author: "review-bot", reason: "marked" },
+      ]);
+      expect(await w.shown($)).toBe("author  │ \u{f49e}  \u{f441} 1");
+    },
+  );
+
+  test("whose turn the review is is read when a note lands, and a failed read keeps it", async ($, on) => {
+    const state = (reviewState: string) => [
+      { username: "alice", mergeRequestInteraction: { reviewState } },
+    ];
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+      approvals: approvals(),
+      notes: [note(4, "alice", true)],
+      reviewers: state("REQUESTED_CHANGES"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(await w.shown($)).toBe("author  │ \u{f49e}  \u{f4a8}");
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.graphql.length).toBe(1);
+
+    world.notes = [note(5, "ben", true), note(4, "alice", true)];
+    world.reviewers = state("UNREVIEWED");
+    await w.clock.advance(POLL_MS.settled);
+    expect(await w.shown($)).toBe("review  │ \u{f49e}  \u{f4e3} 1");
+
+    world.notes = [note(6, "ben", true), note(5, "ben", true), note(4, "alice", true)];
+    world.reviewers = "HTTP 500";
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.graphql.length).toBe(3);
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("review.read").map((e) => e.ok)).toEqual([true, true, false]);
+    expect(await w.shown($)).toBe("review  │ \u{f49e}  \u{f4e3} 1");
+    expect(w.named("review.turn").map((e) => e.detail)).toEqual([
+      { mr: 7, head: "aaaaaaa1111", turn: "author", waiting: ["alice"] },
+      { mr: 7, head: "aaaaaaa1111", turn: "reviewer", waiting: ["alice"] },
+    ]);
+  });
+
+  test(
+    "an invalid body pattern is reported at start",
+    { options: { ignoreBody: "(" } },
+    async ($, on) => {
+      const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr("success") });
+      await $.session.start(START);
+      await w.clock.settle();
+      expect(w.named("ignoreBody.invalid")[0]).toMatchObject({ ok: false });
+    },
+  );
 
   test("a note back in the window after deletions stays quiet", async ($, on) => {
     const world: World = {
@@ -330,6 +471,35 @@ describe("register", () => {
       "ci.passing",
       "approvals.reset",
     ]);
+  });
+
+  test("an unchanged updated_at and pipeline reuse the last approvals, notes, and jobs", async ($, on) => {
+    const at = (updated_at: string, pipeline = "success") => ({ ...mr(pipeline), updated_at });
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: at("2026-10-23T10:00:00Z"),
+      jobs: job("success"),
+    };
+    const w = worldOf(on, world);
+    const reads = () => w.named("poll").map((e) => e.detail?.read);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.apis.length).toBe(4);
+
+    world.view = at("2026-10-23T10:05:00Z");
+    world.notes = [note(11, "alice")];
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits[0]).toContain("@alice commented on MR !7");
+
+    world.view = at("2026-10-23T10:05:00Z", "running");
+    world.jobs = job("running");
+    await w.clock.advance(POLL_MS.settled);
+    await w.clock.advance(POLL_MS.pending);
+    expect(reads()).toEqual(["full", "hit", "miss", "miss", "full"]);
+    expect(w.apis.length).toBe(16);
   });
 
   test("a merged MR is read back by IID, sent to the model, shown as merged, and read no further", async ($, on) => {
@@ -413,6 +583,22 @@ describe("register", () => {
     expect(w.views.length).toBe(1);
     expect(await w.shown($)).toBe(undefined);
     expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("mr.none").map((e) => [e.detail?.reason, e.detail?.branch])).toEqual([
+      ["default branch", "main"],
+      ["no mr", "topic"],
+    ]);
+  });
+
+  test("a checkout on another forge reads as no MR, not an error", async ($, on) => {
+    const view =
+      "None of the git remotes configured for this repository point to a known GitLab host.";
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view });
+
+    await $.session.start(START);
+    await w.clock.settle();
+
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("mr.none").map((e) => e.detail?.reason)).toEqual(["not gitlab"]);
   });
 
   test("origin/HEAD names the default branch, so an MR from master is still watched", async ($, on) => {
@@ -445,7 +631,7 @@ describe("register", () => {
     expect(w.named("poll.error")).toEqual([
       expect.objectContaining({ ok: false, detail: { error: KEYRING } }),
     ]);
-    expect(await w.shown($)).toBe("\u{f444} CI 0/1 · \u{f441} 1 approval needed · \u{f421} stale");
+    expect(await w.shown($)).toBe("author  │ \u{f444} 0/1  \u{f441} 1  \u{f421}");
   });
 
   test("an unexpected payload is a poll error", async ($, on) => {
@@ -545,6 +731,25 @@ describe("register", () => {
     expect(w.views.length).toBe(3);
   });
 
+  test("a poll from before a restart that fails leaves the new chain alone", async ($, on) => {
+    const world: World = { branch: "topic", glab: GLAB_OK, view: mr(), slowMs: 20_000 };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.slowMs = 1_000;
+    await $.session.end({ reason: "other", sessionId: "s1", resume: { id: "s1" } });
+    await $.session.start(START);
+    await w.clock.advance(1_000);
+    world.view = "HTTP 502: Bad Gateway";
+    await w.clock.advance(19_000);
+    world.view = mr();
+    await w.clock.advance(POLL_MS.pending);
+
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.views.length).toBe(3);
+  });
+
   test("a dropped injection is retried until the engine takes it", async ($, on) => {
     const world: World = { branch: "topic", glab: GLAB_OK, view: mr(), drop: "busy" };
     const w = worldOf(on, world);
@@ -593,7 +798,89 @@ describe("register", () => {
     expect(w.submits.length).toBe(1);
   });
 
-  test("an MR with no pipeline and no approval rule leaves the footer as it was", async ($, on) => {
+  test("a second /mr closes the pane", async ($, on) => {
+    const RUN = {
+      command: "mr",
+      args: "",
+      origin: { kind: "composer" as const },
+      presentation: { isFullscreen: false, columns: 120 },
+    };
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr("success") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.command.run(RUN);
+    expect(w.named("pane.open")).toHaveLength(1);
+    await $.command.run(RUN);
+    expect(w.named("pane.close")).toHaveLength(1);
+  });
+
+  test("refresh reads the MR in full at once", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr("success") });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const pane = await $.ui.mount({
+      plugin: "gitlab",
+      surface: "terminal",
+      component: "Pane",
+      requestId: "mr",
+      props: {
+        title: "MR",
+        isFocused: true,
+        bodyColumns: 60,
+        placement: "dock",
+        scroll: { offset: 0, bodyRows: 30 },
+        view: {},
+      },
+    });
+    await pane.press({ key: "refresh" });
+    await w.clock.settle();
+    expect(w.named("pane.refresh")).toHaveLength(1);
+    expect(w.named("poll").at(-1)?.detail?.read).toBe("full");
+    await pane.unmount();
+  });
+
+  test("the pane lists failing jobs, counts the passing, and hides muted notes until opened", async ($, on) => {
+    const ack = "<!-- reply marker -->\n✅ Actions performed";
+    const w = worldOf(on, {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("failed"),
+      jobs: [...job("failed"), { id: 901, name: "lint", status: "success", allow_failure: false }],
+      notes: [note(2, "review-bot", false, ack)],
+    });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    const pane = await $.ui.mount({
+      plugin: "gitlab",
+      surface: "terminal",
+      component: "Pane",
+      requestId: "mr",
+      props: {
+        title: "MR",
+        isFocused: false,
+        bodyColumns: 60,
+        placement: "dock",
+        scroll: { offset: 0, bodyRows: 30 },
+        view: {},
+      },
+    });
+
+    expect(await pane.find({ type: "Text", text: /\u{f52f} test/u })).toBeDefined();
+    expect(await pane.find({ type: "Text", text: /lint/ })).toBeUndefined();
+    expect(await pane.find({ type: "Text", text: /1 passed/ })).toBeDefined();
+    expect(await pane.find({ type: "Text", text: /review-bot · marked/ })).toBeUndefined();
+
+    await pane.press({ key: "muted" });
+    expect((await pane.find({ type: "Text", text: /review-bot/ }))?.text).toContain(
+      "review-bot · marked",
+    );
+    await pane.unmount();
+  });
+
+  test("an MR with no pipeline and no approval rule waits on its author", async ($, on) => {
     const w = worldOf(on, {
       branch: "topic",
       glab: GLAB_OK,
@@ -604,6 +891,100 @@ describe("register", () => {
     await $.session.start(START);
     await w.clock.settle();
 
-    expect(await w.shown($)).toBe(undefined);
+    expect(await w.shown($)).toBe("author");
+  });
+
+  test("an unchanged MR backs off until a turn or a change resets it", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled + QUIET_MS.reduce((sum, ms) => sum + ms));
+    expect(w.views.length).toBe(8);
+    expect(w.named("poll.backoff").map((e) => e.detail?.delayMs)).toEqual(QUIET_MS.slice(1));
+
+    await w.clock.advance(30 * 60_000);
+    await $.turn.complete(COMPLETE);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(9);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn"]);
+
+    await w.clock.advance(POLL_MS.settled * 2);
+    world.view = mr("failed");
+    world.jobs = job("failed");
+    await w.clock.advance(QUIET_MS[1] ?? 0);
+    expect(w.submits.length).toBe(1);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn", "change"]);
+  });
+
+  test("a turn soon after a poll brings the next one in to the unbacked wait", async ($, on) => {
+    const w = worldOf(on, {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+    });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(POLL_MS.settled + (QUIET_MS[0] ?? 0));
+    await $.turn.complete(COMPLETE);
+    await w.clock.advance(TICK_MS);
+    expect(w.views.length).toBe(3);
+    expect(w.named("poll.reset").map((e) => e.detail?.cause)).toEqual(["turn"]);
+    await w.clock.advance(POLL_MS.settled - TICK_MS);
+    expect(w.views.length).toBe(4);
+  });
+
+  test("with no MR the backoff stops at the idle cap", async ($, on) => {
+    const w = worldOf(on, {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: 'no open merge request available for "topic"',
+    });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(3 * 3_600_000);
+    const delays = w.named("poll.backoff").map((e) => e.detail?.delayMs);
+    expect(delays).toEqual([QUIET_MS[0], QUIET_MS[1], IDLE_CAP_MS]);
+  });
+
+  test("a poll due during a sleep runs on the first tick after the wake", async ($, on) => {
+    const w = worldOf(on, { branch: "topic", glab: GLAB_OK, view: mr(), sleptMs: 30 * 60_000 });
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(30 * 60_000 + TICK_MS);
+
+    expect(w.views.length).toBe(2);
+    expect(w.named("poll.late")[0]?.detail).toEqual({
+      gapMs: TICK_MS + 30 * 60_000,
+      delayMs: POLL_MS.pending,
+      lateMs: 30 * 60_000,
+    });
+  });
+
+  test("a turn revives a ticker the engine stopped", async ($, on) => {
+    const world: World = { branch: "topic", glab: GLAB_OK, view: mr(), isTickRefused: true };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await w.clock.advance(TICK_MS * 10);
+    expect(w.views.length).toBe(1);
+
+    world.isTickRefused = false;
+    await $.turn.complete(COMPLETE);
+    await w.clock.settle();
+    expect(w.views.length).toBe(2);
+    expect(w.named("watch.revived")[0]?.detail).toEqual({ silentMs: TICK_MS * 10, mr: 7 });
+    expect(w.named("poll.late")).toEqual([]);
   });
 });

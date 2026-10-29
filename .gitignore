@@ -63,3 +63,6 @@ similarity.json
 # tsconfig.json extending its generated .claude-plugin/types, which ignores
 # itself. Mods keep their tsconfig in mod/ instead.
 /plugins/*/tsconfig.json
+
+# The prose lab's labels quote documents it may later read outside this repo, so the eval bucket holds them.
+/packages/prose-lab/data/

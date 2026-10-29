@@ -95,6 +95,16 @@
         "zod": "^4.4.3",
       },
     },
+    "packages/prose-lab": {
+      "name": "prose-lab",
+      "version": "1.0.0",
+      "dependencies": {
+        "@commander-js/extra-typings": "~15.0.0",
+        "commander": "~15.0.0",
+        "table": "^6.9.0",
+        "zod": "^4.4.3",
+      },
+    },
     "packages/skill-lint": {
       "name": "skill-lint",
       "version": "0.0.1",
@@ -1660,6 +1670,8 @@
     "prettier": ["prettier@1.19.1", "", { "bin": { "prettier": "./bin-prettier.js" } }, "sha512-s7PoyDv/II1ObgQunCbB9PdLmUcBZcnWOcxDh7O0N/UwDEsHyqkW+Qh28jW+mVuCdx7gLB0BotYI1Y6uI9iyew=="],
 
     "property-information": ["property-information@7.2.0", "", {}, "sha512-IAtzIB6sUiWaJYrX9smp3V46pBGbBeLFRGdh25kg1334VcBlD8HzhPeNIWQH9zhGmo2itIe25EHt9dQP7G5hmg=="],
+
+    "prose-lab": ["prose-lab@workspace:packages/prose-lab"],
 
     "proxy-addr": ["proxy-addr@2.0.7", "", { "dependencies": { "forwarded": "0.2.0", "ipaddr.js": "1.9.1" } }, "sha512-llQsMLSUDUPT44jdrU/O37qlnifitDP+ZwrmmZcoSKyLKvtZxpyV0n2/bD/N4tBAAZ/gJEdZU7KMraoK1+XYAg=="],
 

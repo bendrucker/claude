@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prose lab</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 56rem; margin: 1.5rem auto; padding: 0 1rem; }
+  nav button { padding: .3rem .9rem; margin-right: .3rem; }
+  nav button.on { font-weight: 700; }
+  .item { border: 1px solid #8884; border-radius: 6px; padding: .75rem 1rem; margin: 1rem 0; }
+  .item.done { opacity: .45; }
+  .meta, .keys { font-size: 13px; color: #777; }
+  .check { font-weight: 600; }
+  .ctx, .doc { font-family: ui-monospace, monospace; font-size: 13px; white-space: pre-wrap; }
+  .ctx { margin: .5rem 0; }
+  .dim { color: #999; }
+  mark { background: #fd4a; padding: 0 1px; }
+  mark.flag { background: #6c64; }
+  .doc div { padding: 1px 0 1px 3.5rem; text-indent: -3.5rem; }
+  .doc .no { color: #aaa; display: inline-block; width: 3rem; text-indent: 0; user-select: none; }
+  button { margin-right: .4rem; padding: .3rem .8rem; }
+  input { padding: .3rem; }
+  .note { width: 45%; }
+  .pattern { width: 14rem; }
+  #flagbar { position: sticky; top: 0; background: Canvas; padding: .5rem 0; border-bottom: 1px solid #8884; }
+</style>
+</head>
+<body>
+<h1>Prose lab</h1>
+<nav><button id="tab-sample" class="on" onclick="show('sample')">Sample</button><button id="tab-doc" onclick="show('doc')">Document</button></nav>
+<datalist id="patterns"></datalist>
+
+<section id="sample">
+  <p class="keys">Right: the skill should cut or rewrite this prose. Wrong: it is fine as written. Unsure: you'd need more context. Name the pattern when you know it, and use the note for anything else. Keys: j/k move, r/w/u label the focused item.</p>
+  <p id="progress"></p>
+  <div id="items"></div>
+</section>
+
+<section id="doc" hidden>
+  <div id="flagbar">
+    <select id="file" onchange="openDoc(this.value)"></select>
+    <p class="keys">Select prose on one line that no rule marked, then name its pattern and flag it.</p>
+    <input id="flag-pattern" class="pattern" list="patterns" placeholder="pattern slug">
+    <input id="flag-note" class="note" placeholder="note">
+    <button onclick="flag()">flag selection</button>
+    <span id="selection" class="meta"></span>
+  </div>
+  <div id="lines" class="doc"></div>
+</section>
+
+<script>
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let items = [], labels = new Map(), focus = 0, picked = null;
+
+function show(view) {
+  for (const name of ["sample", "doc"]) {
+    document.getElementById(name).hidden = name !== view;
+    document.getElementById(`tab-${name}`).classList.toggle("on", name === view);
+  }
+}
+
+async function loadPatterns() {
+  const patterns = await (await fetch("/api/patterns")).json();
+  document.getElementById("patterns").innerHTML = patterns.map((p) => `<option value="${esc(p.slug)}">${esc(p.description)}</option>`).join("");
+}
+
+async function loadSample() {
+  const body = await (await fetch("/api/items")).json();
+  items = body.items;
+  labels = new Map(body.labels.map((label) => [label.id, label]));
+  render();
+}
+
+function render() {
+  const done = items.filter((item) => labels.has(item.id)).length;
+  document.getElementById("progress").textContent = `${done} of ${items.length} labeled`;
+  document.getElementById("items").innerHTML = items.map((item, i) => {
+    const label = labels.get(item.id);
+    const origin = item.candidate ? ` · candidate ${esc(item.candidate)} for ${esc(item.pattern)}` : "";
+    return `<div class="item ${label ? "done" : ""}" id="i${i}" style="${i === focus ? "outline:2px solid #48f" : ""}">
+      <div class="meta"><span class="check">${esc(item.check)}</span> · ${esc(item.severity)} · <a href="#" onclick="show('doc');openDoc('${esc(item.file)}');return false">${esc(item.file)}:${item.line}</a>${origin}</div>
+      <div class="meta">${esc(item.message)}</div>
+      <div class="ctx"><span class="dim">${esc(item.before)}</span>
+${esc(item.pre)}<mark>${esc(item.marked)}</mark>${esc(item.post)}
+<span class="dim">${esc(item.after)}</span></div>
+      <button onclick="save(${i},'right')">right</button><button onclick="save(${i},'wrong')">wrong</button><button onclick="save(${i},'unsure')">unsure</button>
+      <input id="p${i}" class="pattern" list="patterns" placeholder="pattern slug" value="${esc(label?.pattern ?? item.pattern ?? "")}">
+      <input id="n${i}" class="note" placeholder="note" value="${esc(label?.note ?? "")}">
+      ${label ? `<b>${label.verdict}</b>` : ""}
+    </div>`;
+  }).join("");
+}
+
+async function save(i, verdict) {
+  const item = items[i];
+  const pattern = document.getElementById(`p${i}`).value.trim() || undefined;
+  const note = document.getElementById(`n${i}`).value;
+  const response = await fetch("/api/labels", { method: "POST", body: JSON.stringify({ id: item.id, verdict, note, pattern }) });
+  if (!response.ok) return console.error(await response.text());
+  labels.set(item.id, { id: item.id, verdict, note, pattern });
+  focus = Math.min(items.length - 1, i + 1);
+  render();
+  document.getElementById(`i${focus}`).scrollIntoView({ block: "center" });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (document.getElementById("sample").hidden || event.target.tagName === "INPUT") return;
+  if (event.key === "j") focus = Math.min(items.length - 1, focus + 1);
+  else if (event.key === "k") focus = Math.max(0, focus - 1);
+  else if (event.key === "r") return save(focus, "right");
+  else if (event.key === "w") return save(focus, "wrong");
+  else if (event.key === "u") return save(focus, "unsure");
+  else return;
+  render();
+  document.getElementById(`i${focus}`).scrollIntoView({ block: "center" });
+});
+
+async function loadFiles() {
+  const files = (await (await fetch("/api/files")).json()).toSorted((a, b) => b.hits - a.hits);
+  document.getElementById("file").innerHTML = `<option value="">choose a document</option>` +
+    files.map((f) => `<option value="${esc(f.file)}">${esc(f.file)} (${f.hits})</option>`).join("");
+}
+
+function marked(text, spans) {
+  let out = "", at = 0;
+  for (const span of spans.toSorted((a, b) => a.start - b.start)) {
+    if (span.start < at) continue;
+    out += esc(text.slice(at, span.start)) + `<mark class="${span.kind}" title="${esc(span.title)}">${esc(text.slice(span.start, span.end))}</mark>`;
+    at = span.end;
+  }
+  return out + esc(text.slice(at));
+}
+
+async function openDoc(file) {
+  if (!file) return;
+  document.getElementById("file").value = file;
+  const doc = await (await fetch(`/api/doc?file=${encodeURIComponent(file)}`)).json();
+  document.getElementById("lines").innerHTML = doc.lines.map((text, index) => {
+    const line = index + 1;
+    const spans = [
+      ...doc.hits.filter((h) => h.line === line).map((h) => ({ start: h.span[0] - 1, end: h.span[1], kind: "", title: h.check })),
+      ...doc.flags.filter((f) => f.line === line).map((f) => ({ start: f.span[0] - 1, end: f.span[1], kind: "flag", title: f.pattern })),
+    ];
+    return `<div data-line="${line}" data-file="${esc(file)}"><span class="no">${line}</span><span class="text">${marked(text, spans)}</span></div>`;
+  }).join("");
+}
+
+document.addEventListener("selectionchange", () => {
+  const selection = document.getSelection();
+  const label = document.getElementById("selection");
+  picked = null;
+  if (!selection || selection.isCollapsed) return (label.textContent = "");
+  const range = selection.getRangeAt(0);
+  const start = range.startContainer.parentElement?.closest(".text");
+  const end = range.endContainer.parentElement?.closest(".text");
+  if (!start || start !== end) return (label.textContent = "select within one line");
+  const before = document.createRange();
+  before.setStart(start, 0);
+  before.setEnd(range.startContainer, range.startOffset);
+  const offset = before.toString().length;
+  const text = range.toString();
+  const row = start.parentElement;
+  picked = { file: row.dataset.file, line: Number(row.dataset.line), span: [offset + 1, offset + text.length] };
+  label.textContent = `line ${picked.line}: "${text}"`;
+});
+
+async function flag() {
+  const pattern = document.getElementById("flag-pattern").value.trim();
+  if (!picked || !pattern) return (document.getElementById("selection").textContent = "select text and name a pattern first");
+  const note = document.getElementById("flag-note").value;
+  const response = await fetch("/api/flags", { method: "POST", body: JSON.stringify({ ...picked, pattern, note }) });
+  if (!response.ok) return (document.getElementById("selection").textContent = await response.text());
+  document.getElementById("flag-note").value = "";
+  await openDoc(picked.file);
+}
+
+loadPatterns();
+loadSample();
+loadFiles();
+</script>
+</body>
+</html>

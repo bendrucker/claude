@@ -101,6 +101,17 @@ jobs:
 
       - uses: ./.github/actions/bun-install
 
+      # prose-lab lints against the writing plugin's Vale config and its synced packages.
+      - name: Install Vale
+        uses: jdx/mise-action@v5
+        with:
+          working_directory: plugins/writing
+          cache: false
+
+      - name: Sync writing's Vale packages
+        working-directory: plugins/writing
+        run: bun hooks/sessionstart.ts
+
       - name: Test packages
         run: bun test packages/
 

@@ -22,8 +22,13 @@ function hit(file: string, line: number, span: [number, number], check = "Writin
   };
 }
 
-function label(at: Hit, verdict: Label["verdict"], pattern?: string): Label {
-  return { ...at, id: hitId(at), verdict, note: "", pattern, ts: "t" };
+function label(
+  at: Hit,
+  verdict: Label["verdict"],
+  pattern?: string,
+  by: Label["by"] = "user",
+): Label {
+  return { ...at, id: hitId(at), verdict, note: "", pattern, by, ts: "t" };
 }
 
 function flag(file: string, line: number, span: [number, number], pattern: string): Flag {
@@ -76,6 +81,17 @@ describe("judge", () => {
       unlabeled: judged.unlabeled.map((h) => h.line),
     }).toEqual({ right: 2, wrong: 1, unlabeled: [4] });
   });
+
+  test("the user's label overrides a model's, and a model-only verdict counts as byModel", () => {
+    const at = hit("a", 1, [1, 5]);
+    const other = hit("a", 2, [1, 5]);
+    const labels = [
+      label(at, "right", undefined, "model"),
+      label(at, "wrong"),
+      label(other, "right", undefined, "model"),
+    ];
+    expect(judge([at, other], labels, [])).toMatchObject({ right: 1, wrong: 1, byModel: 1 });
+  });
 });
 
 describe("stage", () => {
@@ -89,6 +105,7 @@ describe("stage", () => {
     hits: right + wrong,
     right,
     wrong,
+    byModel: 0,
     low,
     high: 1,
     recall: 1,
@@ -235,7 +252,7 @@ describe("labConfig", () => {
     root = await mkdtemp(join(tmpdir(), "prose-lab-corpus-"));
     await Bun.write(
       join(root, "doc.md"),
-      "# Doc\n\nThe rule carries the weight.\n\nThe box carries books.\n",
+      "# Doc\n\nThe rule carries the weight.\n\nThe box carries books; the shelf holds them.\n",
     );
     await Bun.write(
       join(root, "Carries.yml"),
@@ -244,11 +261,14 @@ describe("labConfig", () => {
   });
   afterAll(() => rm(root, { recursive: true }));
 
-  test("lints with the candidate alone under the plugin's config", async () => {
-    const config = await labConfig([join(root, "Carries.yml")], PLUGINS.prompting);
-    const hits = await lintFiles("prompting", config, ["doc.md"], root);
-    expect(hits.map((h) => `${h.check}@${h.line}:${h.match}`)).toEqual([
-      "Lab.Carries@3:carries the weight",
-    ]);
-  });
+  test.each(["prompting", "writing"] as const)(
+    "lints with the candidate alone under %s's config",
+    async (plugin) => {
+      const config = await labConfig([join(root, "Carries.yml")], PLUGINS[plugin]);
+      const hits = await lintFiles(plugin, config, ["doc.md"], root);
+      expect(hits.map((h) => `${h.check}@${h.line}:${h.match}`)).toEqual([
+        "Lab.Carries@3:carries the weight",
+      ]);
+    },
+  );
 });

@@ -1,7 +1,7 @@
 ---
 name: review:meat-proxy
 description: Draft a reply that hands AI-relayed work back to its author.
-argument-hint: "<target> [reaction]"
+argument-hint: "<target> [instructions]"
 disable-model-invocation: true
 allowed-tools:
   - Bash(gh:*)
@@ -12,17 +12,20 @@ allowed-tools:
 
 # Meat Proxy
 
-Target and reaction: $ARGUMENTS
+Target and instructions: $ARGUMENTS
 
-The author of this artifact relayed model output without reading or checking it, and can't explain or defend it. Each round of review feedback goes back into the model, so the reviewer ends up doing the authoring. Your job is to hand the work back: draft a short reply in my voice that makes the author engage with their own change, and keep everything else private to me. A good reply asks things the author must think about to answer, and leaves the finding to them.
+I suspect the author of this artifact relayed model output without reading or checking it, and can't explain or defend it. When that holds, each round of review feedback goes back into the model, so the reviewer ends up doing the authoring. Your job is to hand the work back: draft a short reply in my voice that makes the author engage with their own change, and keep everything else private to me. A good reply asks things the author must think about to answer, and leaves the finding to them.
 
-You draft only. Never post, comment, approve, or react on any platform or chat. I copy the draft myself.
+You draft. Don't post until I tell you to. When I do, stage the draft unpublished where the platform supports it (a GitLab draft note, a pending GitHub review), and record `outcome` in the state file then.
 
 ## Inputs
 
 - **Target**: the first argument. A PR or MR URL, a doc link, or pasted text. Fetch PRs through `gh`, MRs through `glab` (load `gitlab:merge-request` for GitLab), and docs through whatever reads them.
-- **Reaction**: everything after the target, optional. My one-line gut call about what's wrong. Test it against the artifact before using it. When it holds, frame the questions around it. When it doesn't, frame them around what does hold and say why in the private notes.
-- **Author answers**: text pasted after a previous round's draft went out. Treat it as this round's input alongside the fetched thread.
+- **Instructions**: everything after the target, optional. They can carry any of:
+  - A reaction: my gut call about what's wrong. Test it against the artifact before using it. When it holds, frame the questions around it. When it doesn't, frame them around what does hold and say why in the private notes.
+  - Questions for you. Answer them in the private notes.
+  - Sources to consult: a ticket, a chat thread, my earlier review. Read them alongside the artifact.
+- **Prior direction**: what I've already told the author about this change, in the thread or in those sources. Anchor the draft's questions in it, and treat what it settles as settled.
 
 ## State
 
@@ -37,13 +40,13 @@ The file records, per round:
 - the draft as written
 - the held findings
 - `engaged`: whether the author's answers engaged with the questions, filled in on the next round
-- `outcome`: whether I kept, edited, or dropped the draft, filled in on the next round
+- `outcome`: whether I kept, edited, or dropped the draft, filled in when I have you post it or on the next round
 
 ## Reading
 
-Read every part of the artifact: the description, the diff or document, and every comment thread. Small artifacts you read inline.
+Read every part of the artifact: the description, the diff or document, and every comment thread. Read it inline when the diff touches at most 10 files and 500 changed lines.
 
-For a large PR or MR, dispatch one `analyst` subagent with `model: sonnet`. Brief it that the work is probably model-generated and may be narrow, naive, or incomplete. Ask it for:
+Past that, dispatch one `analyst` subagent with `model: sonnet`. Brief it that the work is probably model-generated and may be narrow, naive, or incomplete, and give it my prior direction so it leaves settled decisions alone. Ask it for:
 
 - what problem the change claims to solve, and whether the change shows that problem exists
 - where the change draws its scope, and the adjacent code or cases it leaves out
@@ -52,18 +55,25 @@ For a large PR or MR, dispatch one `analyst` subagent with `model: sonnet`. Brie
 
 It returns findings only, no diff text.
 
-Judge engagement from the artifact itself. Signs of engagement are answers that reference specifics of the codebase, a description that explains a trade-off, or a reply that pushes back with reasons. When the artifact shows engagement, flag it in the private notes with the evidence and still write the draft.
+## Engagement
+
+Engagement means the author thought about their own change. It shows as answers that reference specifics of the codebase, a description that explains a trade-off, or a reply that pushes back with reasons. Its absence shows as answers that restate the diff, paraphrase the question back, or answer a different question.
+
+Judge it from the artifact every round. When the artifact shows engagement, report it in the private notes with the evidence, and still write the draft.
 
 ## Draft
 
 The draft is 2 to 5 sentences in my voice. Follow [tone.md](../peer/tone.md) for address and register: no greeting, no thanks, open with substance.
 
+- Write every sentence as a question the author answers, including the one that carries the pointer.
 - Lead with a motivation question (what need prompted this change) or a scope question (what made the author draw the line where they did). Ask one or both.
 - Ask questions that depend on context only the author has: the incident, the user, the deadline, the reason this file and not its neighbor. A model given the question and the diff should be unable to answer it.
-- Add exactly one pointer to where they should look: a file, an existing pattern, a doc. Name the place. Leave what they'll find there for them to discover.
+- Point to exactly one place to look: a file, an existing pattern, a doc. Name the place. Leave what they'll find there for them to discover.
 - Pick one to three points from everything you read. Hold back the rest.
 
-The draft is neutral and assumes good faith. It never names the pattern, mentions AI, models, or proxying, or judges the author. It asks questions, and leaves out demands for proof, test output, screenshots, and checklists.
+When I ask for several comments, write up to three, each anchored to a line or section and each under these rules.
+
+The draft is neutral and assumes good faith. It never names the pattern or mentions AI, models, or proxying.
 
 ## Private Notes
 
@@ -71,15 +81,17 @@ After the draft, give me notes in chat that never go to the author:
 
 - **Held findings**: the line-level findings you left out of the draft, each with `file:symbol` and one line.
 - **Reaction**: whether my reaction held, with the evidence. Omit when I gave none.
+- **Answers**: answers to the questions in my instructions. Omit when I asked none.
+- **Prior direction**: each point I raised before, and whether the artifact now addresses it. Omit when I raised none.
 - **Engagement**: present only when the artifact shows engagement, with the evidence.
 
 ## Follow-Up Rounds
 
 When the state file exists:
 
-1. Ask me whether I kept, edited, or dropped the last draft, and record it as `outcome`.
-2. Read the author's new answers and commits against the previous draft's questions and the held findings.
-3. Record `engaged` for the previous round: yes when the answers carry author-only context or a change reflects the pointer, no when they restate the diff, paraphrase the question back, or answer a different question.
+1. Ask me whether I kept, edited, or dropped the last draft, and record it as `outcome`. Skip this when `outcome` is already recorded.
+2. Read the author's new answers and commits, including any answers I paste, against the previous draft's questions and the held findings.
+3. Record `engaged` for the previous round: yes when the answers carry author-only context or a change reflects the pointer, no otherwise. [Engagement](#engagement) defines the signs.
 4. Write a narrower draft on the question they dodged, under the same draft rules. When they answered everything, ask about the most important held finding instead.
 5. In the private notes, add a recommendation: one more round, take it over myself, or close it. Give the reason in one line.
 

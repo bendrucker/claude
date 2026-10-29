@@ -6,7 +6,16 @@ import { $ } from "bun";
 import { table } from "table";
 import { z } from "zod";
 import { corpusFiles, lintFiles, PLUGINS, type Plugin, sweep } from "./corpus";
-import { Corpus, hitId, type Label, type Pattern, type Queued, readJsonl, store } from "./data";
+import {
+  Corpus,
+  hitId,
+  type Label,
+  type Pattern,
+  type Queued,
+  readJsonl,
+  store,
+  Verdict,
+} from "./data";
 import { sample } from "./sample";
 import { labConfig, score } from "./score";
 import { serve } from "./server";
@@ -106,6 +115,33 @@ const assignCommand = new Command("assign")
     );
   });
 
+const labelCommand = new Command("label")
+  .description("Record a model's verdict on a swept or queued hit, kept apart from the user's.")
+  .argument("<id>", "hit id")
+  .addOption(
+    new Option("--verdict <verdict>", "verdict").choices(Verdict.options).makeOptionMandatory(),
+  )
+  .option("--note <text>", "why", "")
+  .option("--pattern <slug>", "pattern the hit belongs to")
+  .action(async (id, options) => {
+    const swept = await data.sweep();
+    const hit = [...(swept?.hits ?? []), ...(await data.queue())].find(
+      (entry) => hitId(entry) === id,
+    );
+    if (hit === undefined) throw new Error(`Unknown hit ${id}.`);
+    await data.addLabels([
+      {
+        ...hit,
+        id,
+        verdict: options.verdict,
+        note: options.note,
+        pattern: options.pattern,
+        by: "model",
+        ts: new Date().toISOString(),
+      },
+    ]);
+  });
+
 const PrototypeLabel = z.object({
   id: z.string(),
   verdict: z.enum(["right", "wrong", "unsure"]),
@@ -123,7 +159,7 @@ const importCommand = new Command("import")
     const records = await readJsonl(PrototypeLabel, resolve(file));
     const labels: Label[] = records.flatMap((record) => {
       const hit = hits.get(record.id);
-      return hit === undefined ? [] : [{ ...hit, ...record }];
+      return hit === undefined ? [] : [{ ...hit, ...record, by: "user" as const }];
     });
     await data.addLabels(labels);
     console.log(
@@ -172,13 +208,24 @@ const scoreCommand = new Command("score")
     await data.enqueue(fresh);
     console.log(
       table([
-        ["candidate", "hits", "per 1k", "right", "wrong", "interval", "recall", "unlabeled"],
+        [
+          "candidate",
+          "hits",
+          "per 1k",
+          "right",
+          "wrong",
+          "by model",
+          "interval",
+          "recall",
+          "unlabeled",
+        ],
         ...results.map(({ candidate, score: s, unlabeled }) => [
           candidate,
           s.hits,
           s.perThousand.toFixed(2),
           s.right,
           s.wrong,
+          s.byModel,
           `${Math.round(s.low * 100)}%-${Math.round(s.high * 100)}%`,
           `${Math.round(s.recall * s.positives)}/${s.positives}`,
           unlabeled.length,
@@ -230,6 +277,7 @@ export const program = new Command("lab")
   .addCommand(patternCommand)
   .addCommand(assignCommand)
   .addCommand(importCommand)
+  .addCommand(labelCommand)
   .addCommand(scoreCommand)
   .addCommand(statusCommand)
   .addCommand(

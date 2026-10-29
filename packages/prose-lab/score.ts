@@ -34,7 +34,9 @@ export async function labConfig(rules: readonly string[], base: string): Promise
   const ini = (await Bun.file(base).text())
     .replace(/^StylesPath\s*=.*$/m, `StylesPath = ${styles}`)
     .replace(/^MinAlertLevel\s*=.*$/m, "MinAlertLevel = suggestion")
-    .replaceAll(/^BasedOnStyles\s*=\s*\S.*$/gm, "BasedOnStyles = Lab");
+    .replaceAll(/^BasedOnStyles\s*=\s*\S.*$/gm, "BasedOnStyles = Lab")
+    // A per-check level such as `ai-tells.Foo = warning` enables that check outside BasedOnStyles.
+    .replaceAll(/^[A-Za-z][\w-]*\.\w+\s*=.*\n?/gm, "");
   const config = join(dir, ".vale.ini");
   await Bun.write(config, ini);
   return config;
@@ -61,10 +63,15 @@ export function evidence(slug: string, labels: readonly Label[], flags: readonly
 export interface Judged {
   right: number;
   wrong: number;
+  /** Judged hits that only a model's label decided. */
+  byModel: number;
   unlabeled: Hit[];
 }
 
-/** A hit on a span the user called bad prose is right, and one on a span they called fine is wrong, whatever check made it. */
+/**
+ * A hit on a span labeled bad prose is right, and one on a span labeled fine is
+ * wrong, whatever check made it. The user's labels on a span override a model's.
+ */
 export function judge(
   hits: readonly Hit[],
   labels: readonly Label[],
@@ -72,14 +79,21 @@ export function judge(
 ): Judged {
   let right = 0;
   let wrong = 0;
+  let byModel = 0;
   const unlabeled: Hit[] = [];
   for (const hit of hits) {
-    const verdicts = labels.filter((label) => overlaps(label, hit)).map((label) => label.verdict);
-    if (verdicts.includes("right") || flags.some((flag) => overlaps(flag, hit))) right++;
+    const touching = labels.filter((label) => overlaps(label, hit));
+    const user = touching.filter((label) => label.by === "user");
+    const deciding = user.length > 0 ? user : touching;
+    const verdicts = deciding.map((label) => label.verdict);
+    const flagged = flags.some((flag) => overlaps(flag, hit));
+    const decided = flagged || verdicts.includes("right") || verdicts.includes("wrong");
+    if (flagged || verdicts.includes("right")) right++;
     else if (verdicts.includes("wrong")) wrong++;
     else if (verdicts.length === 0) unlabeled.push(hit);
+    if (decided && !flagged && user.length === 0) byModel++;
   }
-  return { right, wrong, unlabeled };
+  return { right, wrong, byModel, unlabeled };
 }
 
 export function score(
@@ -91,7 +105,7 @@ export function score(
   words: number,
   ts: string,
 ): { score: Score; unlabeled: Hit[] } {
-  const { right, wrong, unlabeled } = judge(hits, labels, flags);
+  const { right, wrong, byModel, unlabeled } = judge(hits, labels, flags);
   const { positives } = evidence(pattern, labels, flags);
   const covered = positives.filter((positive) => hits.some((hit) => overlaps(hit, positive)));
   const [low, high] = right + wrong === 0 ? [0, 1] : wilson(right, right + wrong);
@@ -102,6 +116,7 @@ export function score(
       hits: hits.length,
       right,
       wrong,
+      byModel,
       low,
       high,
       recall: positives.length === 0 ? 0 : covered.length / positives.length,

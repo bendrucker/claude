@@ -33,6 +33,8 @@ export const Label = Hit.extend({
   verdict: Verdict,
   note: z.string(),
   pattern: z.string().optional(),
+  /** Scores count a model's labels apart from the user's. */
+  by: z.enum(["user", "model"]).default("user"),
   ts: z.string(),
 });
 export type Label = z.infer<typeof Label>;
@@ -65,6 +67,7 @@ export const Score = z.object({
   hits: z.number(),
   right: z.number(),
   wrong: z.number(),
+  byModel: z.number().default(0),
   low: z.number(),
   high: z.number(),
   recall: z.number(),

@@ -102,7 +102,7 @@ export async function serve(
           const input = LabelInput.parse(await request.json());
           const hit = byId.get(input.id);
           if (hit === undefined) return new Response("unknown hit", { status: 404 });
-          await data.addLabels([{ ...hit, ...input, ts }]);
+          await data.addLabels([{ ...hit, ...input, by: "user", ts }]);
           return new Response("ok");
         }
         case "/api/flags": {

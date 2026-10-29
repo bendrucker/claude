@@ -1,0 +1,6 @@
+allow_tools: [Bash, Write, Edit]
+stage:
+  - packages/eval-stubs
+  - plugins/gitlab/evals/note-body/check.ts
+graders:
+  note-sent: "*"

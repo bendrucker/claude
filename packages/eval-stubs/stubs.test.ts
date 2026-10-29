@@ -163,8 +163,24 @@ describe("echo mode", () => {
   test.each([
     ["glab", ["mr", "update", "1", "--description", "Edited"], gitlab],
     ["gh", ["pr", "edit", "1", "--body", "Edited"], "https://github.com/team/service/pull/1"],
+    ["glab", ["mr", "note", "1", "-m", "Edited"], gitlab],
+    ["glab", ["issue", "note", "1", "--message=Edited"], gitlab],
   ])("%s %j prints the edited body", (tool, args, url) => {
     expect(stub(run, tool, args).out).toBe(block("", "Edited", url));
+  });
+
+  test("glab api note posts read -F body=@<path> and send -f body=@<path> literally", async () => {
+    const file = join(run.cwd, "note.md");
+    await Bun.write(file, "From file\n");
+    const post = (...flags: string[]) =>
+      stub(run, "glab", ["api", "projects/:id/merge_requests/1/notes", "-X", "POST", ...flags]).out;
+    expect(post("-F", `body=@${file}`)).toBe(block("", "From file", gitlab));
+    expect(post(`--field=body=@${file}`)).toBe(block("", "From file", gitlab));
+    expect(post("-f", `body=@${file}`)).toBe(block("", `@${file}`, gitlab));
+    expect(post("--raw-field", "body=Inline")).toBe(block("", "Inline", gitlab));
+    const json = join(run.cwd, "payload.json");
+    await Bun.write(json, JSON.stringify({ body: "From JSON" }));
+    expect(post("--input", json)).toBe(block("", "From JSON", gitlab));
   });
 
   test("gh derives the URL from an ssh origin", async () => {
@@ -176,6 +192,8 @@ describe("echo mode", () => {
 
   test.each([
     ["glab", ["mr", "list"]],
+    ["glab", ["api", "projects/:id/merge_requests/1"]],
+    ["glab", ["api", "projects/:id/merge_requests/1/discussions", "--paginate"]],
     ["gh", ["pr", "view", "1"]],
     ["gh", ["api", "repos/x/y"]],
     ["gh", ["mr", "create"]],

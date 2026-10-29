@@ -44,6 +44,8 @@ SELECT
   END AS kind,
   list_contains(cols, 'session_id') AS has_session,
   list_contains(cols, 'host') AS has_host,
+  list_contains(cols, 'source_file') AS has_file,
+  list_contains(cols, 'timestamp') AS has_ts,
   -- Clustering by record type first lets a filter on a rare type skip the row groups
   -- of every other type, and a window still prunes within each type's run.
   CASE
@@ -89,7 +91,13 @@ WHERE database_name = 'lake' AND getvariable('rebuild');
 CREATE TABLE IF NOT EXISTS lake.published_files AS FROM idx.indexed_files WITH NO DATA;
 .once ddl.sql
 SELECT format('CREATE TABLE IF NOT EXISTS lake.{0} AS FROM idx.{0} WITH NO DATA;', name) FROM plan;
+-- Monthly partitions let a republish skip the files of months its sessions never reach,
+-- and leave older months' files unchanged once their sessions end. Repeating it is a no-op.
+SELECT format('ALTER TABLE lake.{} SET PARTITIONED BY (year(timestamp), month(timestamp));', name)
+FROM plan WHERE has_ts;
 .read ddl.sql
+-- The earliest timestamp each published session holds, which bounds its rows' months.
+CREATE TABLE IF NOT EXISTS lake.published_sessions (host VARCHAR, session_id VARCHAR, since TIMESTAMP);
 
 CREATE TEMP TABLE changed AS
 WITH now AS (FROM idx.indexed_files WHERE list_contains(getvariable('hosts'), host))
@@ -97,10 +105,26 @@ SELECT host, path AS source_file FROM (FROM now EXCEPT FROM lake.published_files
 UNION
 SELECT host, path FROM (FROM lake.published_files EXCEPT FROM now);
 
+-- Every filter on a set of keys is a plain IN on one column, which DuckDB pushes into the
+-- scan, plus the exact tuple. A tuple or coalesce alone filters only after the view has
+-- computed every row. Rows without a session are replaced by file.
 CREATE TEMP TABLE touched AS
-SELECT DISTINCT host, session_id FROM idx.raw JOIN changed USING (host, source_file)
-UNION
-SELECT DISTINCT host, session_id FROM lake.raw JOIN changed USING (host, source_file);
+WITH r AS (
+  FROM idx.raw SELECT host, session_id, source_file
+  UNION ALL
+  FROM lake.raw SELECT host, session_id, source_file
+)
+SELECT DISTINCT host, session_id FROM r
+WHERE session_id IS NOT NULL
+  AND source_file IN (SELECT source_file FROM changed)
+  AND (host, source_file) IN (SELECT (host, source_file) FROM changed);
+
+-- A session's rows in the lake all fall at or after its earliest published timestamp, or
+-- have none. A session the lake has never seen has no rows to delete.
+SET VARIABLE since = coalesce((
+  SELECT min(since) FROM lake.published_sessions
+  WHERE (host, session_id) IN (SELECT (host, session_id) FROM touched)
+), 'infinity'::TIMESTAMP);
 
 -- Each insert evaluates its view and sorts its rows in memory, so a first publish goes in
 -- batches of about 512 MB of raw text, ordered by session start.
@@ -111,42 +135,60 @@ FROM (
   SELECT host, session_id, min(timestamp) AS first_ts, sum(strlen(data::VARCHAR)) AS bytes
   FROM idx.raw
   WHERE list_contains(getvariable('hosts'), host)
-    AND (host, coalesce(session_id, '')) IN (SELECT (host, coalesce(session_id, '')) FROM touched)
+    AND session_id IN (SELECT session_id FROM touched)
+    AND (host, session_id) IN (SELECT (host, session_id) FROM touched)
   GROUP BY ALL
 );
 
 -- A correlated EXISTS plans as a delim join that buffers every row of the outer table,
--- payload included, so the filters are uncorrelated IN lists. coalesce keeps records
--- without a session in their own group.
+-- payload included, so the filters are uncorrelated IN lists. Nothing is written when
+-- nothing changed.
+CREATE TEMP MACRO in_sessions(src) AS format(
+  'session_id IN (SELECT session_id FROM {0}) AND (host, session_id) IN (SELECT (host, session_id) FROM {0})', src);
 .once dml.sql
 WITH
-  f AS (SELECT '(host, source_file) IN (SELECT (host, source_file) FROM changed)' AS in_files),
+  f AS (SELECT 'source_file IN (SELECT source_file FROM changed) AND (host, source_file) IN (SELECT (host, source_file) FROM changed)' AS in_files),
   h AS (SELECT 'list_contains(getvariable(''hosts''), host)' AS allowed),
-  s AS (SELECT '(host, coalesce(session_id, '''')) IN (SELECT (host, coalesce(session_id, '''')) FROM ' AS in_sessions),
   b AS (SELECT DISTINCT batch FROM batches),
   steps AS (
     SELECT 1 AS step, 0 AS batch, name, format('DELETE FROM lake.{} WHERE {};', name, in_files) AS sql
     FROM plan, f WHERE kind = 'file'
     UNION ALL
-    SELECT 2, 0, name, format('DELETE FROM lake.{} WHERE {}touched);', name, in_sessions)
-    FROM plan, s WHERE kind = 'session'
+    SELECT 2, 0, name, format('DELETE FROM lake.{} WHERE {}{};', name, in_sessions('touched'),
+      CASE WHEN has_ts THEN ' AND (timestamp >= getvariable(''since'') OR timestamp IS NULL)' ELSE '' END)
+    FROM plan WHERE kind = 'session'
+    UNION ALL
+    SELECT 2, 0, name, format('DELETE FROM lake.{} WHERE session_id IS NULL AND {};', name, in_files)
+    FROM plan, f WHERE kind = 'session' AND has_file
     UNION ALL
     SELECT 3, 0, name, format('INSERT INTO lake.{0} FROM idx.{0} WHERE {1} AND {2} ORDER BY {3};', name, in_files, allowed, sort)
     FROM plan, f, h WHERE kind = 'file' AND NOT has_session
     UNION ALL
-    SELECT 4, b.batch, name, format(
-      'INSERT INTO lake.{0} FROM idx.{0} WHERE {1} AND {2}batches WHERE batch = {3}) ORDER BY {4};',
-      name, CASE WHEN kind = 'file' THEN in_files ELSE allowed END, in_sessions, b.batch, sort)
-    FROM plan, f, h, s, b WHERE kind = 'session' OR (kind = 'file' AND has_session)
+    SELECT 3, 0, name, format('INSERT INTO lake.{0} FROM idx.{0} WHERE session_id IS NULL AND {1} AND {2} ORDER BY {3};',
+      name, in_files, allowed, sort)
+    FROM plan, f, h WHERE has_session AND has_file
+    UNION ALL
+    SELECT 4, b.batch, name, format('INSERT INTO lake.{0} FROM idx.{0} WHERE {1} AND {2} ORDER BY {3};',
+      name, CASE WHEN kind = 'file' THEN in_files ELSE allowed END,
+      in_sessions(format('(FROM batches WHERE batch = {})', b.batch)), sort)
+    FROM plan, f, h, b WHERE kind = 'session' OR (kind = 'file' AND has_session)
     UNION ALL
     SELECT 5, 0, name, format('DELETE FROM lake.{0}; INSERT INTO lake.{0} FROM idx.{0}{1};',
       name, CASE WHEN has_host THEN ' WHERE ' || allowed ELSE '' END)
-    FROM plan, h
-    WHERE kind = 'whole'
-      AND ((SELECT count(*) > 0 FROM changed) OR getvariable('rebuild') OR NOT getvariable('existed'))
+    FROM plan, h WHERE kind = 'whole'
   )
-SELECT sql FROM steps ORDER BY step, batch, name;
+SELECT sql FROM steps
+WHERE (SELECT count(*) > 0 FROM changed) OR getvariable('rebuild') OR NOT getvariable('existed')
+ORDER BY step, batch, name;
 .read dml.sql
+
+DELETE FROM lake.published_sessions WHERE (host, session_id) IN (SELECT (host, session_id) FROM touched);
+INSERT INTO lake.published_sessions
+SELECT host, session_id, min(timestamp) FROM idx.raw
+WHERE list_contains(getvariable('hosts'), host)
+  AND session_id IN (SELECT session_id FROM touched)
+  AND (host, session_id) IN (SELECT (host, session_id) FROM touched)
+GROUP BY ALL;
 
 DELETE FROM lake.published_files WHERE (host, path) IN (SELECT (host, source_file) FROM changed);
 INSERT INTO lake.published_files

@@ -79,6 +79,7 @@ The writers carry the `claude:dangerouslyDisableSandbox` marker after their sheb
 
 - `resources/lake/publish.sql` does the publish in the DuckDB CLI. `lake.ts` keeps only egress checks, the catalog transfer, the attach, and the reader init.
 - The table plan comes from the index's catalog. A new view or table publishes with no change here, and one without `session_id` is replaced whole.
+- A view's `timestamp` must come from a `raw` row of the same session. A republish deletes a session's rows only from its earliest raw timestamp on, so an earlier row would stay in the lake.
 - One writer at a time, starting from the remote catalog every run.
 - The CLI's version must match `@duckdb/node-api`'s, or the catalog is unreadable.
 

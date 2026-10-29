@@ -70,7 +70,13 @@ The table list comes from the index's own catalog, so the lake mirrors whatever 
 | Session | Every table and view with a `session_id` | Per touched session |
 | Whole | The rest: `meta`, `index_meta`, `fields`, `field_triage`, `view_paths` | Whole, on any change, first publish or rebuild |
 
-A changed file is one whose `(mtime, size)` in `indexed_files` differs from the lake's `published_files`, including files added or removed. A touched session is any session with rows in a changed file, before or after the change.
+A changed file is one whose `(mtime, size)` in `indexed_files` differs from the lake's `published_files`, including files added or removed. A touched session is any session with rows in a changed file, before or after the change. Rows without a session, such as file history snapshots, are replaced with their file.
+
+A republish costs what it touches, not what the lake holds:
+
+- Session deletes add a bound of `timestamp >= since`, where `since` is the earliest timestamp of any touched session, kept in `published_sessions`. With monthly partitions, DuckLake skips every file of an earlier month from the catalog's stats alone.
+- Every key filter is a plain `IN` on one column next to the exact tuple. DuckDB pushes a one-column `IN` into the scan, but filters a tuple or a `coalesce` only after the view computed every row.
+- A publish with no changed file writes no statements.
 
 Views are published as tables. A view that parses `data` at query time would cost a reader the JSON across its whole window, and the JSON columns are almost all of the lake's bytes. Materialized, a query reads only the columns it selects. `classifier_verdicts` reads local telemetry and is not published.
 
@@ -97,9 +103,16 @@ DuckDB 2.0 prints a stored macro's lambdas in the deprecated arrow form. The wri
 
 ### Layout
 
+- Every table with a `timestamp` is partitioned by year and month, so its files live under `year=…/month=…/` and never span months. Rows without a timestamp share a partition, which every session delete scans.
 - Rows sort by `type`, then `timestamp`, in 8,192-row row groups. A filter on a rare record type skips the row groups of every other type, and a window filter still prunes within each type's run.
 - A first publish inserts sessions in batches of about 512 MB of raw text, ordered by session start, so each insert's sort fits in memory.
 - Session filters are uncorrelated `IN` lists. A correlated `EXISTS` plans as a delim join that buffers every row of the outer table, JSON included.
+
+### Growth
+
+Without partitions, a session delete reads its key column from every row group in its table, so each republish grew with the whole history. With them it grows with the months the touched sessions span, and an ended month's files change only when one of its sessions resumes, or when `CHECKPOINT` merges or rewrites them.
+
+That also suits S3 Intelligent-Tiering on `data/`. Readers fetch only the files their window reaches, so older months go unread and age into the Infrequent Access and Archive Instant Access tiers, which keep millisecond range reads. The Archive and Deep Archive tiers would break queries in place, so they stay off. Objects under 128 KB stay in the frequent tier, and `CHECKPOINT` merges small files. Bucket versioning keeps each replaced object until the noncurrent-version expiry removes it.
 
 ## Readers
 

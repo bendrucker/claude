@@ -50,7 +50,7 @@ const tables = () =>
         (
           await c.runAndReadAll(
             `SELECT DISTINCT table_name AS t FROM duckdb_columns()
-              WHERE database_name = 'lake' AND column_name = 'host' AND table_name <> 'published_files'
+              WHERE database_name = 'lake' AND column_name = 'host' AND table_name NOT IN ('published_files', 'published_sessions')
               ORDER BY 1`,
           )
         ).getRowObjectsJS(),
@@ -121,6 +121,28 @@ describe("publish", () => {
     expect(ts).toContain("messages");
     expect(await drift(ts)).toEqual(clean(ts));
   }, 120_000);
+
+  // A republish deletes a session's rows only from its earliest raw timestamp on.
+  test("no published row precedes its session's earliest raw timestamp", async () => {
+    const early = await withLake(async (c) => {
+      const keyed = z.array(z.object({ t: z.string() })).parse(
+        (
+          await c.runAndReadAll(
+            `SELECT table_name AS t FROM duckdb_columns() WHERE database_name = 'lake'
+              GROUP BY 1 HAVING bool_or(column_name = 'timestamp') AND bool_or(column_name = 'session_id')`,
+          )
+        ).getRowObjectsJS(),
+      );
+      const sql = keyed
+        .map(
+          ({ t }) => `SELECT '${t}' AS t, count(*) AS n FROM lake.${t} x
+            JOIN lake.published_sessions p USING (host, session_id) WHERE x.timestamp < p.since`,
+        )
+        .join(" UNION ALL ");
+      return (await c.runAndReadAll(sql)).getRowObjectsJS().filter((r) => Number(r.n) > 0);
+    });
+    expect(early).toEqual([]);
+  }, 60_000);
 
   test("a reader's init resolves the index's tables and macros in the lake", async () => {
     const init = join(dir, "reader.sql");

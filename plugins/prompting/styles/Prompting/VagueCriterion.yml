@@ -9,12 +9,7 @@ scope: ~text.frontmatter
 tokens:
   - 'make sure'
   - 'properly'
-  - 'correctly'
   - 'appropriately'
-  - 'adequately'
-  - 'sufficiently'
-  - 'as much as (?:possible|needed)'
-  - 'if it makes sense'
   - 'when (?:done|finished)'
   - 'until satisfied'
 tests:

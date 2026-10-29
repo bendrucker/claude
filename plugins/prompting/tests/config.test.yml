@@ -64,7 +64,7 @@
   input: |
     Flagged example:
 
-    > All 47 tests pass, ensuring correctness.
+    > 253 of 901 shapes clear the floor.
   absent: Prompting.StaleMeasurement
 - name: a fenced block is an example
   format: .md

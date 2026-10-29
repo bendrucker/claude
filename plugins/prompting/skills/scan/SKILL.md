@@ -35,10 +35,8 @@ Sharpen the sentence the alert names.
 Delete the span the alert names.
 
 - `Prompting.NoOp`: the instruction restates a default the model already follows, spending context and changing nothing.
-- `Prompting.StaleMeasurement`: the document reports what a past run measured. The run prints the number again, so the document caches its own output and drifts as the work behind it moves.
+- `Prompting.StaleMeasurement`: the document reports a tally a past run counted. The run prints the number again, so the document caches its own output and drifts as the work behind it moves.
 - `Prompting.TicketRef`: a bare issue number points at a tracker the model cannot read, and the prose around it goes stale when the issue closes.
-- `Prompting.StatusProse`: the document reports its own progress. A model executing it cannot act on unfinished work, and the note outlives the state it describes.
-- `Prompting.MaintainerAside`: prose held in a comment reaches the model, which pays for the tokens and cannot act on a note addressed to a person.
 
 ## Acting on an Alert
 

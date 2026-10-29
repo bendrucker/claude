@@ -12,8 +12,6 @@ tokens:
   - 'take your time'
   - '(?:use|using) your (?:best )?judge?ment'
   - 'do your best'
-  - 'remember to'
-  - 'it(?:''s| is) important (?:to|that)'
   - 'please'
   - 'carefully'
 tests:

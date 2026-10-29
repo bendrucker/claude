@@ -13,7 +13,7 @@ bun plugins/prompting/evals/rule-precision/precision.ts --commit 1ec44ee80 --com
 
 ## Reading the Numbers
 
-The labels are scoped to what each commit's author was looking for. Both labeling commits were after filler, so they label filler deletions and nothing else. A check aimed at a different defect class draws almost no hits from them, which is an absence of evidence rather than evidence against the check. `Prompting.StatusProse`, `Prompting.TicketRef`, and `Prompting.StaleMeasurement` sit there now. Their evidence is a hand audit of every hit they produce across the repo, not this table.
+The labels are scoped to what each commit's author was looking for. Both labeling commits were after filler, so they label filler deletions and nothing else. A check aimed at a different defect class draws almost no hits from them, which is an absence of evidence rather than evidence against the check. `Prompting.TicketRef` and `Prompting.StaleMeasurement` sit there now. Their evidence is a hand audit of every hit each produces across the repo, not this table.
 
 Precision here is a floor rather than an estimate. The human deleted what they were after in one pass, so a check can flag a real defect on a line that survived. A check reading well below its true precision is expected. A check reading well is hard to fake.
 

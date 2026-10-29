@@ -1,55 +1,31 @@
-# A number a past run produced goes stale as the work behind it moves, and the run prints it again anyway.
-# A modal makes the number a budget rather than a result. Prose scopes a list with a small spelled count, so only digits and larger counts read as a tally.
+# A tally a past run produced goes stale as the work behind it moves, and the run prints it again anyway. Prose scopes a set with a spelled count, so only digits read as a tally.
 # evidence: a hand audit of every hit across the repo. The rule-precision labels barely exercise it.
-# retire when: a hand audit finds most hits are budgets, thresholds, or other numbers a run does not report.
+# retire when: a hand audit finds most hits are thresholds or fixed facts rather than numbers a run reports.
 extends: existence
-message: '"%s" reports what a past run measured. The run prints it. Delete the sentence.'
+message: '"%s" reports what a past run counted. The run prints it. Delete the sentence.'
 level: warning
-ignorecase: true
 nonword: true
 scope: ~text.frontmatter
 tokens:
-  - '(?<!\b(?:can|may|might|should|would|could|will|must|cannot)\s)\b(?:sits?|sat|lands?|landed|clears?|cleared|yields?|yielded|falls?|fell|drops?|dropped|rises?|rose|reaches|reached|scores?|scored|hovers?|averages?|stands? at|tops? out)\s+(?:(?:at|to|from|around|about|near|below|above|by)\s+)?\d(?:[\d.,]*\d)?'
-  - '\b(?:\d[\d,]*|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen)\s+of\s+(?:\d[\d,]*|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen)\b'
-  - '\ball\s+(?:\d[\d,]+|six|seven|eight|nine|ten|eleven|twelve|thirteen)\s+\w+'
+  - '\b\d[\d,]* of \d[\d,]*\b'
 tests:
-  - name: flags a value a run measured
-    input: |
-      The floor sits at 10.4 on the full corpus.
-    contains: [Prompting.StaleMeasurement]
-  - name: flags a change a run measured
-    input: |
-      Separation dropped to 18 on the shorter bins.
-    contains: [Prompting.StaleMeasurement]
   - name: flags a survival count
     input: |
       253 of 901 shapes clear the floor.
     contains: [Prompting.StaleMeasurement]
-  - name: flags a tally
+  - name: flags a ratio inside a sentence
     input: |
-      All thirteen features clear their floor.
+      The record appears in only 66 of 1,645 recent files.
     contains: [Prompting.StaleMeasurement]
-  - name: allows a scoping count
+  - name: allows a spelled count of a set
     input: |
-      Record a decision when all three hold.
-    absent: Prompting.StaleMeasurement
-  - name: allows a budget rather than a result
-    input: |
-      A long-form essay can yield 2-3 cards.
-    absent: Prompting.StaleMeasurement
-  - name: allows a verb that ends the sentence
-    input: |
-      Pick the path the agent reached from.
-    absent: Prompting.StaleMeasurement
-  - name: allows a flag default
-    input: |
-      Raise `--min-lift` (default 5.0) when the list is noisy.
+      Record a decision when two of three reviewers agree.
     absent: Prompting.StaleMeasurement
   - name: allows a count of a named set
     input: |
       Two of the reviewers must approve.
     absent: Prompting.StaleMeasurement
-  - name: allows a single-digit scope
+  - name: allows a hyphenated quorum
     input: |
-      Run all 3 steps in order.
+      Merge on a 3-of-5 vote.
     absent: Prompting.StaleMeasurement

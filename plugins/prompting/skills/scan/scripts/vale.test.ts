@@ -56,16 +56,6 @@ describe("lint", () => {
     expect((await lint([path])).get(path)).toMatchObject([{ Line: 2, Span: [6, 11] }]);
   });
 
-  test("reports a comment at the line it opens", async () => {
-    const path = await write(
-      "aside.md",
-      "# Doc\n\n<!--\nCuration note for maintainers. Skip this block when reviewing a document.\n-->\n",
-    );
-    expect((await lint([path])).get(path)).toMatchObject([
-      { Line: 3, Check: "Prompting.MaintainerAside" },
-    ]);
-  });
-
   test("keys alerts by cleaned path, ordered by position", async () => {
     const clean = await write("clean.md", "Write it.\n");
     const both = await write(

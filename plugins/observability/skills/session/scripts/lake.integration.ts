@@ -120,6 +120,15 @@ describe("publish", () => {
     const ts = await tables();
     expect(ts).toContain("messages");
     expect(await drift(ts)).toEqual(clean(ts));
+    const partitioned = await withLake(async (c) =>
+      (
+        await c.runAndReadAll(
+          `SELECT DISTINCT t.table_name FROM __ducklake_metadata_lake.ducklake_partition_info p
+            JOIN __ducklake_metadata_lake.ducklake_table t USING (table_id) ORDER BY 1`,
+        )
+      ).getRowsJS(),
+    );
+    expect(partitioned.flat()).toContain("messages");
   }, 120_000);
 
   // A republish deletes a session's rows only from its earliest raw timestamp on.
@@ -174,6 +183,7 @@ describe("publish", () => {
   test.each([
     ["a table's columns drift", "ALTER TABLE lake.messages ADD COLUMN stale INTEGER"],
     ["a table goes missing", "DROP TABLE lake.messages"],
+    ["it predates published_sessions", "DROP TABLE lake.published_sessions"],
     ["the index's views fingerprint moves", "UPDATE lake.index_meta SET views_hash = 'stale'"],
   ])(
     "rebuilds the lake when %s",

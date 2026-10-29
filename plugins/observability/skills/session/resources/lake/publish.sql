@@ -57,9 +57,9 @@ SELECT
   END AS sort
 FROM objects JOIN cols USING (name);
 
--- The lake rebuilds from scratch when it is missing a table the index has, when a
--- table's columns differ, or when the index's own stamp moved: a views.sql or
--- projection change rewrites rows of files whose stats never changed.
+-- The lake rebuilds from scratch when it is missing a table the index has or its own
+-- published_sessions, when a table's columns differ, or when the index's own stamp
+-- moved: a views.sql or projection change rewrites rows of files whose stats never changed.
 SET VARIABLE existed = (
   SELECT count(*) > 0 FROM duckdb_tables() WHERE database_name = 'lake' AND table_name = 'published_files'
 );
@@ -77,6 +77,7 @@ SET VARIABLE rebuild = getvariable('existed') AND (
     LEFT JOIN shapes l ON l.db = 'lake' AND l.name = p.name
     WHERE l.shape IS DISTINCT FROM i.shape
   )
+  OR NOT EXISTS (SELECT 1 FROM shapes WHERE db = 'lake' AND name = 'published_sessions')
   OR (SELECT list(row(version, views_hash, import_hash)) FROM lake.index_meta)
     IS DISTINCT FROM (SELECT list(row(version, views_hash, import_hash)) FROM idx.index_meta)
 );
@@ -91,8 +92,10 @@ WHERE database_name = 'lake' AND getvariable('rebuild');
 CREATE TABLE IF NOT EXISTS lake.published_files AS FROM idx.indexed_files WITH NO DATA;
 .once ddl.sql
 SELECT format('CREATE TABLE IF NOT EXISTS lake.{0} AS FROM idx.{0} WITH NO DATA;', name) FROM plan;
+.read ddl.sql
 -- Monthly partitions let a republish skip the files of months its sessions never reach,
 -- and leave older months' files unchanged once their sessions end. Repeating it is a no-op.
+.once ddl.sql
 SELECT format('ALTER TABLE lake.{} SET PARTITIONED BY (year(timestamp), month(timestamp));', name)
 FROM plan WHERE has_ts;
 .read ddl.sql

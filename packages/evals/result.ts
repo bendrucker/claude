@@ -1,6 +1,7 @@
-import { join } from "node:path";
+import { rm } from "node:fs/promises";
 import { mean } from "simple-statistics";
 import { z } from "zod";
+import { type RunRef, resultPath, tracePath, tracesDir } from "./layout";
 
 /**
  * The runner's `aggregate-result.json`, parsed loosely: the runner adds fields without renaming
@@ -83,8 +84,13 @@ export function erroredRuns(result: Result): Errored[] {
 export interface ScoredRun {
   /** Verdicts, with the runner's defaults for an omitted weight, `scored`, or `withOnly`. */
   graders: z.input<typeof Grader>[];
+  /** Overrides the score derived from the graders, for a scorer that ranks. */
+  score?: number | undefined;
+  metrics?: Record<string, number> | undefined;
   /** The run's final reply, written as its trace so `compare.ts` counts its words. */
   reply?: string | undefined;
+  /** A source trace to copy as the run's trace, in place of `reply`. */
+  trace?: string | undefined;
   error?: string | undefined;
 }
 
@@ -99,18 +105,23 @@ export async function writeResult(
   dir: string,
   cases: Record<string, Record<string, ScoredRun[]>>,
 ): Promise<Result> {
+  // A rewrite drops the previous write's traces, which listTraces would still read.
+  await rm(tracesDir(dir), { recursive: true, force: true });
   const traces: Promise<number>[] = [];
   const written = Object.entries(cases).map(([name, arms]) => {
     const scored = Object.fromEntries(
       Object.entries(arms).map(([arm, runs]) => [
         arm,
         runs.map((r, i): Run => {
-          if (r.reply !== undefined) {
+          if (r.trace !== undefined) {
+            traces.push(Bun.write(tracePath(dir, name, arm, i), Bun.file(r.trace)));
+          } else if (r.reply !== undefined) {
             const line = JSON.stringify({ type: "result", result: r.reply });
-            traces.push(Bun.write(join(dir, "traces", `${name}-${arm}-${i}.jsonl`), line));
+            traces.push(Bun.write(tracePath(dir, name, arm, i), line));
           }
           const run = Run.parse({ score: 0, graders: r.graders, error: r.error ?? null });
-          return { ...run, score: score(run, arm) };
+          const metrics = r.metrics === undefined ? {} : { metrics: r.metrics };
+          return { ...run, ...metrics, score: r.score ?? score(run, arm) };
         }),
       ]),
     );
@@ -128,9 +139,13 @@ export async function writeResult(
     },
     cases: written,
   };
-  await Promise.all([
-    ...traces,
-    Bun.write(join(dir, "aggregate-result.json"), JSON.stringify(result, null, 2)),
-  ]);
+  await Promise.all([...traces, Bun.write(resultPath(dir), JSON.stringify(result, null, 2))]);
   return Result.parse(result);
+}
+
+/** Every run in a result, in case, arm, and run order. */
+export function* eachRun(result: Result): Iterable<RunRef & { run: Run }> {
+  for (const c of result.cases)
+    for (const [arm, list] of Object.entries(c.arms))
+      for (const [n, run] of list.entries()) yield { case: c.name, arm, n, run };
 }

@@ -206,6 +206,17 @@ describe("loadRuns and render", () => {
     expect(cell?.[0]).toEqual({ tokens: { total: 100, output: 0 }, denies: 1, density: 0 });
   });
 
+  test("orders a case's runs numerically, run 2 before run 10", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "metrics-"));
+    await Promise.all(
+      [10, 2].map((n) =>
+        Bun.write(join(dir, "traces", `brief-with-${n}.jsonl`), traceWith(n, undefined, "x")),
+      ),
+    );
+    const cell = (await loadRuns([dir])).get("brief/with");
+    expect(cell?.map((m) => m.tokens?.total)).toEqual([2, 10]);
+  });
+
   test("renders a table with a starred cost guard and a JSON report", async () => {
     const base = await writeColumn({
       brief: {

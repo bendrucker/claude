@@ -1,4 +1,4 @@
-import { globSync, mkdtempSync, readdirSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
 import { $ } from "bun";
@@ -6,7 +6,8 @@ import { parseDocument } from "yaml";
 import { z } from "zod";
 import { subscriptionEnv } from "../eval-judge/env";
 import { shareGraders } from "./graders";
-import { readResult } from "./result";
+import { artifactsPath, casePath, listCases, resultPath, tracePath } from "./layout";
+import { eachRun, readResult } from "./result";
 import { stage } from "./stage";
 import { casePlugins, listedPlugins, readSuite, type SuiteFile, withDependencies } from "./suite";
 import { wrap } from "./wrap";
@@ -18,15 +19,15 @@ export interface Staged {
 
 /** Appends each staged case's missing plugin dependencies to its `plugins:` list. */
 async function addCaseDependencies(repo: string, suite: string, root: string): Promise<void> {
-  const files = globSync("*/case.yaml", { cwd: join(root, suite) });
+  const names = await listCases(join(root, suite));
   await Promise.all(
-    files.map(async (file) => {
-      const listed = await listedPlugins(root, suite, file);
+    names.map(async (name) => {
+      const listed = await listedPlugins(root, suite, name);
       const missing = (await withDependencies(repo, listed)).filter((p) => !listed.includes(p));
       if (missing.length === 0) return;
-      const path = join(root, suite, file);
+      const path = casePath(join(root, suite), name);
       const doc = parseDocument(await Bun.file(path).text());
-      for (const p of missing) doc.addIn(["plugins"], relative(join(suite, dirname(file)), p));
+      for (const p of missing) doc.addIn(["plugins"], relative(join(suite, name), p));
       await Bun.write(path, doc.toString());
     }),
   );
@@ -45,16 +46,16 @@ async function addCollector(evals: string, collect: string[]): Promise<void> {
     .map((q) => `[ ! -e ${q} ] || { mkdir -p "$d"/$(dirname ${q}) && cp -R ${q} "$d"/${q}; }`);
   const command = [`d="$CLAUDE_CONFIG_DIR/collected"`, ...copies, "true"].join("; ");
   const hook = [{ hooks: [{ type: "command", command }] }];
-  const files = globSync("*/case.yaml", { cwd: evals });
+  const names = await listCases(evals);
   await Promise.all(
-    files.map(async (file) => {
-      const plugin = join(evals, dirname(file), "collect");
+    names.map(async (name) => {
+      const plugin = join(evals, name, "collect");
       await Bun.write(join(plugin, ".claude-plugin/plugin.json"), '{"name":"collect"}');
       await Bun.write(
         join(plugin, "hooks/hooks.json"),
         JSON.stringify({ hooks: { Stop: hook, SessionEnd: hook } }),
       );
-      const path = join(evals, file);
+      const path = casePath(evals, name);
       const doc = parseDocument(await Bun.file(path).text());
       doc.addIn(["plugins"], "./collect");
       await Bun.write(path, doc.toString());
@@ -149,16 +150,13 @@ export function splitCases(args: string[]): [cases: string[], rest: string[]] {
 /** Deletes the staged case directories that don't match any glob, and returns the rest. */
 export async function keepCases(dir: string, globs: string[]): Promise<string[]> {
   const patterns = globs.map((g) => new Bun.Glob(g));
-  const withCase = new Set(globSync("*/case.yaml", { cwd: dir }).map(dirname));
-  const cases = readdirSync(dir, { withFileTypes: true }).filter(
-    (e) => withCase.has(e.name) && e.name !== "examples" && e.name !== "results",
-  );
-  const kept = cases.filter((e) => patterns.some((p) => p.match(e.name))).map((e) => e.name);
+  const cases = await listCases(dir);
+  const kept = cases.filter((name) => patterns.some((p) => p.match(name)));
   if (kept.length === 0) throw new Error(`No case matches --case ${globs.join(", ")}`);
   await Promise.all(
-    cases.filter((e) => !kept.includes(e.name)).map(async (e) => $`rm -rf ${join(dir, e.name)}`),
+    cases.filter((name) => !kept.includes(name)).map(async (name) => $`rm -rf ${join(dir, name)}`),
   );
-  return kept.toSorted();
+  return kept;
 }
 
 const InitEvent = z.object({
@@ -175,27 +173,22 @@ const InitEvent = z.object({
  * the runner otherwise scores without complaint.
  */
 export async function pluginErrors(output: string): Promise<string[]> {
-  const path = join(output, "aggregate-result.json");
+  const path = resultPath(output);
   if (!(await Bun.file(path).exists())) return [];
-  const { cases } = await readResult(path);
   const found = await Promise.all(
-    cases.flatMap((c) =>
-      Object.entries(c.arms).flatMap(([arm, runs]) =>
-        runs.map(async (_, i) => {
-          const trace = Bun.file(join(output, "traces", `${c.name}-${arm}-${i}.jsonl`));
-          if (!(await trace.exists())) return [];
-          for (const line of (await trace.text()).split("\n")) {
-            if (line.trim() === "") continue;
-            const init = InitEvent.safeParse(JSON.parse(line));
-            if (!init.success) continue;
-            return (init.data.plugin_errors ?? []).map(
-              (e) => `${c.name}/${arm}/${i}: ${e.plugin} ${e.type}: ${e.message}`,
-            );
-          }
-          return [];
-        }),
-      ),
-    ),
+    [...eachRun(await readResult(path))].map(async ({ case: name, arm, n }) => {
+      const trace = Bun.file(tracePath(output, name, arm, n));
+      if (!(await trace.exists())) return [];
+      for (const line of (await trace.text()).split("\n")) {
+        if (line.trim() === "") continue;
+        const init = InitEvent.safeParse(JSON.parse(line));
+        if (!init.success) continue;
+        return (init.data.plugin_errors ?? []).map(
+          (e) => `${name}/${arm}/${n}: ${e.plugin} ${e.type}: ${e.message}`,
+        );
+      }
+      return [];
+    }),
   );
   return found.flat();
 }
@@ -233,31 +226,27 @@ async function exists(path: string): Promise<boolean> {
  * out and then removes those directories.
  */
 export async function collectTraces(output: string, collect: string[] = []): Promise<void> {
-  const path = join(output, "aggregate-result.json");
+  const path = resultPath(output);
   if (!(await Bun.file(path).exists())) return;
-  const { cases } = await readResult(path);
-  const copies = cases.flatMap((c) =>
-    Object.entries(c.arms).flatMap(([arm, runs]) =>
-      runs.map(async ({ tracePath }, i) => {
-        if (tracePath == null || !(await Bun.file(tracePath).exists())) return;
-        const run = `${c.name}-${arm}-${i}`;
-        await Bun.write(join(output, "traces", `${run}.jsonl`), Bun.file(tracePath));
-        const out = dirname(tracePath);
-        if (basename(out) !== "out") return;
-        const kept = dirname(out);
-        // The runner deletes the session's working directory, so the collector hook copied them to config.
-        await Promise.all(
-          collect.map(async (p) => {
-            const from = join(kept, "config/collected", p);
-            if (!(await exists(from))) return;
-            const to = join(output, "artifacts", run, p);
-            await $`mkdir -p ${dirname(to)} && cp -R ${from} ${to}`.quiet();
-          }),
-        );
-        // The runner leaves a write-only `sealed` directory that blocks a plain rm.
-        await $`chmod -R u+rwx ${kept}/sealed ${kept}; rm -rf ${kept}`.nothrow().quiet();
-      }),
-    ),
+  const copies = [...eachRun(await readResult(path))].map(
+    async ({ case: name, arm, n, run: { tracePath: source } }) => {
+      if (source == null || !(await Bun.file(source).exists())) return;
+      await Bun.write(tracePath(output, name, arm, n), Bun.file(source));
+      const out = dirname(source);
+      if (basename(out) !== "out") return;
+      const kept = dirname(out);
+      // The runner deletes the session's working directory, so the collector hook copied them to config.
+      await Promise.all(
+        collect.map(async (p) => {
+          const from = join(kept, "config/collected", p);
+          if (!(await exists(from))) return;
+          const to = join(artifactsPath(output, name, arm, n), p);
+          await $`mkdir -p ${dirname(to)} && cp -R ${from} ${to}`.quiet();
+        }),
+      );
+      // The runner leaves a write-only `sealed` directory that blocks a plain rm.
+      await $`chmod -R u+rwx ${kept}/sealed ${kept}; rm -rf ${kept}`.nothrow().quiet();
+    },
   );
   await Promise.all(copies);
 }

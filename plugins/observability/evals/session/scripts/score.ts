@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
-import { globSync } from "node:fs";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { table } from "table";
 import { z } from "zod";
 import { mean } from "simple-statistics";
+import { listTraces, scoredDir } from "../../../../../packages/evals/layout";
+import { type ScoredRun, writeResult } from "../../../../../packages/evals/result";
 import { traceReply } from "../../../../../packages/evals/trace";
 import { statements } from "../../bench/sql";
 
@@ -156,33 +157,58 @@ export function processOf(trace: string, reference?: RegExp): Process {
 export interface Scored extends Process {
   case: string;
   arm: string;
+  trace: string;
   recall: number;
   precision: number;
 }
 
-const TRACE = /^(.+)-([^-]+)-(\d+)\.jsonl$/;
-
 /** Scores every trace under `<results>/traces/` whose case carries a `truth.sql`. */
 export async function scoreResults(results: string, index: string): Promise<Scored[]> {
   const truths = new Map<string, Promise<Truth>>();
-  const runs = globSync("traces/*.jsonl", { cwd: results }).map(async (file) => {
-    const [, name = "", arm = ""] = TRACE.exec(basename(file)) ?? [];
+  const runs = listTraces(results).map(async (ref) => {
+    const { case: name, arm } = ref;
     const dir = join(SUITE, name);
     if (!(await Bun.file(join(dir, "truth.sql")).exists())) return [];
     const pending = truths.get(name) ?? loadTruth(dir, index);
     truths.set(name, pending);
     const truth = await pending;
-    const trace = await Bun.file(join(results, file)).text();
+    const trace = await Bun.file(ref.path).text();
     return [
       {
         case: name,
         arm,
+        trace: ref.path,
         ...overlap(traceReply(trace) ?? "", truth),
         ...processOf(trace, truth.reference),
       },
     ];
   });
   return (await Promise.all(runs)).flat();
+}
+
+/** Writes the scored runs to `<results>/scored/aggregate-result.json`. */
+export async function writeScored(results: string, scored: Scored[]): Promise<void> {
+  const cases: Record<string, Record<string, ScoredRun[]>> = {};
+  for (const s of scored) {
+    ((cases[s.case] ??= {})[s.arm] ??= []).push({
+      score: (s.recall + s.precision) / 2,
+      trace: s.trace,
+      graders: [
+        { name: "recall", passed: s.recall === 1 },
+        { name: "precision", passed: s.precision === 1 },
+        { name: "reference", passed: s.reference },
+      ],
+      metrics: {
+        recall: s.recall,
+        precision: s.precision,
+        tokens: s.tokens,
+        seconds: s.seconds,
+        queries: s.queries,
+        errors: s.errors,
+      },
+    });
+  }
+  await writeResult(scoredDir(results), cases);
 }
 
 const COLUMNS = [
@@ -197,7 +223,7 @@ const COLUMNS = [
 
 export const program = new Command("score.ts")
   .description(
-    "Score session eval runs against each case's truth.sql on the frozen index: precision and recall of the reply, plus tokens, seconds, queries, SQL errors, and whether the session opened the case's reference. Writes <results>/scored.json.",
+    "Score session eval runs against each case's truth.sql on the frozen index: precision and recall of the reply, plus tokens, seconds, queries, SQL errors, and whether the session opened the case's reference. Writes <results>/scored/aggregate-result.json.",
   )
   .argument("<results...>", "results directories holding traces/")
   .option("--index <path>", "the frozen index the runs read", join(SUITE, "data", "session.duckdb"))
@@ -205,7 +231,7 @@ export const program = new Command("score.ts")
     const all = await Promise.all(
       results.map(async (dir) => {
         const scored = await scoreResults(dir, options.index);
-        await Bun.write(join(dir, "scored.json"), `${JSON.stringify(scored, null, 2)}\n`);
+        await writeScored(dir, scored);
         return scored;
       }),
     );

@@ -97,13 +97,16 @@ jobs:
             echo "::error::CLAUDE_CODE_OAUTH_TOKEN is not set. Add the secret (from 'claude setup-token') to run native evals."
             exit 1
           fi
-          name=${SUITE_DIR#plugins/}
-          name=${name#evals/}
-          echo "SUITE=${name//\//-}" >> "$GITHUB_ENV"
 
       # Skill context injection runs scripts with bun, and the runner and
       # compare.ts need the workspace dependencies.
       - uses: ./.github/actions/bun-install
+
+      - name: Name suite
+        run: |
+          name=${SUITE_DIR#plugins/}
+          name=${name#evals/}
+          echo "SUITE=${name//\//-}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/claude-code
         with:
@@ -156,34 +159,28 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          results=("$SUITE_DIR"/results/*/aggregate-result.json)
-          result=${results[-1]}
           report="$RUNNER_TEMP/report.md"
-          title=$(jq -r '
-            # A suite whose cases all lack a without arm has no delta.
-            def pct: (. * 100 | round | tostring) + "%";
-            "score \(.aggregates.overallScore | pct)"
-              + if .aggregates.meanDelta == null then "" else ", \(.aggregates.meanDelta | pct) over no plugin" end
-          ' "$result")
-          jq -r --arg run "$RUN_URL" \
-            '"\(.aggregates.casesTotal) cases · cost $\(.costUsd * 100 | round / 100) · [run](\($run))\n"' \
-            "$result" > "$report"
-          columns=("$result")
-          labels=(--label "this run")
+          baseline=()
           if [ -n "$BASELINE" ]; then
             IFS=, read -ra ids <<< "$BASELINE"
             for id in "${ids[@]}"; do
               gh run download "$id" --dir "$RUNNER_TEMP/baseline/$id"
             done
-            pooled=$(printf '%s,' "$RUNNER_TEMP"/baseline/*/*/*/aggregate-result.json)
-            columns=("${pooled%,}" "$result")
+            baseline=(--baseline "$RUNNER_TEMP/baseline" --label "run $BASELINE")
+          fi
+          summary=$(bun evals/native/summary.ts "$SUITE_DIR" "${baseline[@]}")
+          result=$(jq -r .result <<< "$summary")
+          title=$(jq -r .title <<< "$summary")
+          jq -r --arg run "$RUN_URL" \
+            '"\(.cases) cases · cost $\(.costUsd * 100 | round / 100) · [run](\($run))\n"' \
+            <<< "$summary" > "$report"
+          columns=("$result")
+          labels=(--label "this run")
+          if [ -n "$BASELINE" ]; then
+            columns=("$(jq -r '.baseline | join(",")' <<< "$summary")" "$result")
             labels=(--label "run $BASELINE" --label "this run")
           fi
           compared=$(bun evals/native/compare.ts --markdown --suite "$SUITE_DIR" "${labels[@]}" "${columns[@]}")
-          if [ -n "$BASELINE" ]; then
-            flagged=$(sed '/<details>/q' <<< "$compared" | grep -c '^|.*\* |' || true)
-            title="$title, $flagged flagged against run $BASELINE"
-          fi
           printf '%s\n' "$compared" >> "$report"
           {
             echo "## $SUITE: $title"

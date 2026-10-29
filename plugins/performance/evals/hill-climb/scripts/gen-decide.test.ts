@@ -1,7 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { loadGraders, verdict } from "../../../../../packages/evals/graders";
-import { all, type Decision, graders, lastDecision, loadLine, report, rounds } from "./gen-decide";
+import { parse } from "yaml";
+import { CaseFile } from "../../../../../packages/evals/layout";
+import {
+  all,
+  caseYaml,
+  type Decision,
+  graders,
+  lastDecision,
+  loadLine,
+  report,
+  rounds,
+} from "./gen-decide";
 
 const suite = join(import.meta.dir, "..");
 const cases = all();
@@ -11,7 +22,8 @@ test.each(cases.map((c) => [c.name, c] as const))(
   async (name, c) => {
     const read = (file: string) => Bun.file(join(suite, name, file)).text();
     expect(await read("prompt.md")).toBe(c.prompt);
-    expect(await read("case.yaml")).toContain(`tags: [decide, ${c.split}]`);
+    expect(await read("case.yaml")).toBe(caseYaml(c));
+    expect(CaseFile.parse(parse(await read("case.yaml"))).tags).toEqual(["decide", c.split]);
     const expected = graders(c.truth);
     const written = await Promise.all(
       Object.keys(expected).map(async (file) => [file, await read(join("graders", file))]),

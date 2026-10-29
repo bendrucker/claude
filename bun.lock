@@ -77,6 +77,7 @@
         "zod": "^4.4.3",
       },
       "devDependencies": {
+        "@hegeldev/hegel": "^0.4.7",
         "@types/mdast": "^4.0.4",
         "@types/seedrandom": "^3.0.8",
       },
@@ -144,6 +145,9 @@
         "commander": "~15.0.0",
         "table": "^6.9.0",
         "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "yaml": "^2.7.1",
       },
     },
     "plugins/friction": {
@@ -297,6 +301,9 @@
         "table": "^6.9.0",
         "zod": "^4.4.3",
       },
+      "devDependencies": {
+        "yaml": "^2.7.1",
+      },
     },
     "plugins/performance": {
       "name": "performance",
@@ -314,6 +321,9 @@
         "@commander-js/extra-typings": "~15.0.0",
         "commander": "~15.0.0",
         "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "yaml": "^2.7.1",
       },
     },
     "plugins/plan": {

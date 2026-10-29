@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { globSync } from "node:fs";
 import { join, relative } from "node:path";
+import { parse } from "yaml";
+import { z } from "zod";
 import { check } from "../../../../../packages/evals/check";
 import { generate } from "../../../../../packages/evals/generate";
 import { loadGraders, verdict } from "../../../../../packages/evals/graders";
@@ -100,9 +102,10 @@ describe("the decide family", () => {
     );
     const accept = c.trap.expected === "accept";
     expect(Object.keys(generated).some((f) => f.endsWith("review-dispatched.md"))).toBe(accept);
-    expect(generated[join(c.name, "case.yaml")]?.includes("allowed_tools: [Skill, Agent]")).toBe(
-      accept,
-    );
+    const { execution } = z
+      .object({ execution: z.object({ allowed_tools: z.array(z.string()) }) })
+      .parse(parse(generated[join(c.name, "case.yaml")] ?? ""));
+    expect(execution.allowed_tools.includes("Agent")).toBe(accept);
   });
 });
 

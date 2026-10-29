@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { join } from "node:path";
+import { serializeCase } from "../../../../../packages/evals/cases";
 import { CASES, type CaseSpec, SEEDS } from "./spec";
 
 const suite = join(import.meta.dir, "..");
@@ -45,21 +46,21 @@ The session dispatched the \`evals:review\` agent.
 `;
 
 function caseYaml(c: CaseSpec): string {
-  return `schema_version: "1.1"
-name: ${c.name}
-tags: [review, ${c.split}, ${c.seed}]
-plugins: ["../../.."]
-context:
-  scaffold_script: fixture.sh
-execution:
-  model: claude-sonnet-5-5
-  max_turns: 60
-  timeout_seconds: 1200
-  allowed_tools: [Read, Glob, Grep, Bash, Agent]
-  append_system_prompt: >-
-    Nobody answers while you work, so decide without asking.
-    Leave the PR as it is: no comments, edits, or merges.
-`;
+  return serializeCase({
+    schema_version: "1.1",
+    name: c.name,
+    tags: ["review", c.split, c.seed],
+    plugins: ["../../.."],
+    context: { scaffold_script: "fixture.sh" },
+    execution: {
+      model: "claude-sonnet-5-5",
+      max_turns: 60,
+      timeout_seconds: 1200,
+      allowed_tools: ["Read", "Glob", "Grep", "Bash", "Agent"],
+      append_system_prompt:
+        "Nobody answers while you work, so decide without asking. Leave the PR as it is: no comments, edits, or merges.",
+    },
+  });
 }
 
 function prompt(c: CaseSpec): string {

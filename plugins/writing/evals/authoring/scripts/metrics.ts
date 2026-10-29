@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
-import { basename, dirname, join } from "node:path";
-import { globSync } from "node:fs";
+import { basename, dirname } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { mean } from "simple-statistics";
 import { table } from "table";
 import { z } from "zod";
+import { listTraces } from "../../../../../packages/evals/layout";
 import { pFloor, pValue } from "../../../../../packages/evals/stats";
 import { scoreText } from "../../../skills/scan/scripts/score";
 import { extractDeliverable, parseMap } from "./pairwise";
@@ -162,23 +162,24 @@ export async function loadRuns(
 ): Promise<Runs> {
   const traces = results.flatMap((result) => {
     const dir = result.endsWith(".json") ? dirname(result) : result;
-    const found = globSync("traces/*.jsonl", { cwd: dir }).map((t) => join(dir, t));
+    const found = listTraces(dir);
     if (found.length === 0) throw new Error(`No traces/*.jsonl in ${dir}`);
     return found;
   });
-  const read = await Promise.all(traces.map(async (t) => [t, await Bun.file(t).text()] as const));
+  const read = await Promise.all(
+    traces.map(async (t) => [t, await Bun.file(t.path).text()] as const),
+  );
 
   const measured = await Promise.all(
-    read.map(async ([path, text]) => {
-      const match = /^(.+)-(with|without)-\d+\.jsonl$/.exec(basename(path));
-      if (match === null) return undefined;
-      const draft = extractDeliverable(text, files.get(match[1] ?? ""));
+    read.map(async ([ref, text]) => {
+      if (ref.arm !== "with" && ref.arm !== "without") return undefined;
+      const draft = extractDeliverable(text, files.get(ref.case));
       const metrics: RunMetrics = {
         tokens: tokenUsage(text),
         denies: hookDenies(text),
         density: draft === undefined ? undefined : await tropeDensity(draft),
       };
-      return { key: `${match[1]}/${match[2]}`, metrics };
+      return { key: `${ref.case}/${ref.arm}`, metrics };
     }),
   );
 

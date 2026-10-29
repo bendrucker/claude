@@ -235,6 +235,11 @@
       "name": "evals",
       "description": "Hill-climb a skill, agent, rule, or prompt against its eval suite, and review a climb's claimed gain",
       "source": "./plugins/evals"
+    },
+    {
+      "name": "vale",
+      "description": "Fix Vale alerts in bulk, one rewrite agent per file",
+      "source": "./plugins/vale"
     }
   ]
 }

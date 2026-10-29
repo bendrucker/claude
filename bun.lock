@@ -470,6 +470,15 @@
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
       },
     },
+    "plugins/vale": {
+      "name": "@bendrucker/claude-vale",
+      "dependencies": {
+        "@commander-js/extra-typings": "~15.0.0",
+        "commander": "~15.0.0",
+        "table": "^6.9.0",
+        "zod": "^4.4.3",
+      },
+    },
     "plugins/writing": {
       "name": "@bendrucker/claude-writing",
       "dependencies": {
@@ -588,6 +597,8 @@
     "@bendrucker/claude-prompting": ["@bendrucker/claude-prompting@workspace:plugins/prompting"],
 
     "@bendrucker/claude-review": ["@bendrucker/claude-review@workspace:plugins/review"],
+
+    "@bendrucker/claude-vale": ["@bendrucker/claude-vale@workspace:plugins/vale"],
 
     "@bendrucker/claude-validate": ["@bendrucker/claude-validate@workspace:packages/validate"],
 

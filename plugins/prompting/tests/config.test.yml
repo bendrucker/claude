@@ -1,0 +1,122 @@
+- name: a straight-quoted phrase is named
+  format: .md
+  input: |
+    Replace a weak word ("be thorough") with a stronger one.
+  absent: Prompting.NoOp
+- name: a curly-quoted phrase is named
+  format: .md
+  input: |
+    Replace a weak word (“be thorough”) with a stronger one.
+  absent: Prompting.NoOp
+- name: an emphasized quoted phrase is named
+  format: .md
+  input: |
+    Replace a weak word ("*be thorough*") with a stronger one.
+  absent: Prompting.NoOp
+- name: a linked quoted phrase is named
+  format: .md
+  input: |
+    Replace a weak word ("[be thorough](x)") with a stronger one.
+  absent: Prompting.NoOp
+- name: a quote around a code span is named
+  format: .md
+  input: |
+    Replace a weak word ("be `very` thorough") with a stronger one.
+  absent: Prompting.NoOp
+- name: a quote wrapped across lines is named
+  format: .md
+  input: |
+    Replace a weak word ("be
+    thorough") with a stronger one.
+  absent: Prompting.NoOp
+- name: a stray curly opener exempts nothing past itself
+  format: .md
+  input: |
+    A “stray opener. Try to keep going, then "quoted" text.
+  contains: [Prompting.WeakModality]
+- name: a stray opener stops at the end of its block
+  format: .md
+  input: |
+    A "stray opener.
+
+    Try to keep going.
+
+    Then "quoted" text.
+  contains: [Prompting.WeakModality]
+- name: a quote inside a code span pairs with nothing
+  format: .md
+  input: |
+    Run `a "b` and try to keep "this" short.
+  contains: [Prompting.WeakModality]
+- name: a straight apostrophe pairs with nothing
+  format: .md
+  input: |
+    Don't try to keep it, since it's done.
+  contains: [Prompting.WeakModality]
+- name: a typeset apostrophe pairs with nothing
+  format: .md
+  input: |
+    Don’t try to keep it, since it’s done.
+  contains: [Prompting.WeakModality]
+
+- name: a blockquote is an example
+  format: .md
+  input: |
+    Flagged example:
+
+    > 253 of 901 shapes clear the floor.
+  absent: Prompting.StaleMeasurement
+- name: a fenced block is an example
+  format: .md
+  input: |
+    ```
+    Try to keep it short.
+    ```
+  absent: Prompting.WeakModality
+- name: inline code is an example
+  format: .md
+  input: |
+    Run `make sure-clean` first.
+  absent: Prompting.VagueCriterion
+
+- name: frontmatter is data
+  format: .md
+  input: |
+    ---
+    name: never-used
+    description: Please pick a name before #123 lands.
+    ---
+
+    Write it.
+  absent: [Prompting.NoOp, Prompting.TicketRef]
+- name: prose past frontmatter is linted
+  format: .md
+  input: |
+    ---
+    name: demo
+    ---
+
+    Try to run it.
+  contains: [Prompting.WeakModality]
+
+- name: a linked issue keeps its context
+  format: .md
+  input: |
+    Teammates may idle ([#23415](https://example.com/23415)).
+  absent: Prompting.TicketRef
+- name: a bare issue beside a linked one fires
+  format: .md
+  input: |
+    See [#44](https://example.com/44) and #55 too.
+  contains: [Prompting.TicketRef]
+
+- name: a text file is read as markdown
+  format: .txt
+  input: |
+    Please read `be thorough` first.
+  contains: [Prompting.NoOp]
+- name: a text file keeps the code exemption
+  format: .txt
+  input: |
+    Run `make sure-clean` first.
+  absent: Prompting.VagueCriterion

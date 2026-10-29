@@ -6,7 +6,7 @@ Writing documents a model executes: product and system prompts, skills, tool and
 
 - **Skills**:
   - `prompting`: doctrine for any document a model executes, with `references/conversion.md` for rewriting an existing one
-  - `prompting:scan`: reports weak modality, vague completion criteria, and no-op instructions, and exits non-zero on any finding
+  - `prompting:scan`: lints with the `Prompting` Vale style for weak modality, vague completion criteria, and no-op instructions, and exits non-zero on an error-level alert
 
 Climbing a prompt against its eval suite belongs to the [evals](../evals) plugin's `evals:hill-climb`.
 
@@ -14,7 +14,7 @@ Claude API application prompts belong to the bundled `claude-api` skill: `build-
 
 ## Evals
 
-`evals/rule-precision` scores the scan rules against commits where a human deleted prose, and scores a candidate pattern before it ships.
+`evals/rule-precision` scores the scan's Vale checks against commits where a human deleted prose, and scores a candidate rule before it ships.
 
 ## Testing
 

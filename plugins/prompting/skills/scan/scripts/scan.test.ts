@@ -1,61 +1,32 @@
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { collectFiles, isAgentFacing, shouldSkip, toGlob } from "./scan";
+import { fails, scan } from "./scan";
 
-describe("isAgentFacing", () => {
-  test.each([
-    ["a plugin skill", "plugins/prompting/skills/scan/SKILL.md", true],
-    ["a repo instruction file", "CLAUDE.md", true],
-    ["an agents file", "nested/AGENTS.md", true],
-    ["a project rule", ".claude/rules/plugins.md", true],
-    ["a project agent", ".claude/agents/reviewer.md", true],
-    ["a skill reference", "plugins/writing/skills/scan/references/tropes.md", true],
-    ["a prompt directory", "src/prompts/system.txt", true],
-    ["a readme", "plugins/prompting/README.md", false],
-    ["source", "plugins/prompting/skills/scan/scripts/scan.ts", false],
-  ])("%s", (_label, path, expected) => {
-    expect(isAgentFacing(path)).toBe(expected);
-  });
-});
-
-describe("shouldSkip", () => {
-  test.each([
-    ["vendored code", "node_modules/pkg/SKILL.md", true],
-    ["test fixtures", "plugins/x/fixtures/CLAUDE.md", true],
-    ["a real skill", "plugins/x/skills/y/SKILL.md", false],
-  ])("%s", (_label, path, expected) => {
-    expect(shouldSkip(path)).toBe(expected);
-  });
-});
-
-describe("toGlob", () => {
-  test("walks a directory", () => {
-    expect(toGlob(import.meta.dirname)).toEqual({
-      cwd: import.meta.dirname,
-      pattern: "**/*.{md,txt}",
-    });
-  });
-
-  test("passes a non-directory through as a pattern", () => {
-    expect(toGlob("plugins/**/SKILL.md")).toEqual({ cwd: ".", pattern: "plugins/**/SKILL.md" });
-  });
-});
-
-describe("collectFiles", () => {
+describe("scan", () => {
   let root = "";
+  const agentFacing = [
+    ".claude/rules/style.md",
+    "CLAUDE.md",
+    "nested/AGENTS.md",
+    "plugins/x/skills/y/SKILL.md",
+    "plugins/x/skills/y/references/guide.md",
+    "src/prompts/system.txt",
+  ];
+  const skipped = [
+    "node_modules/pkg/CLAUDE.md",
+    "plugins/x/fixtures/CLAUDE.md",
+    "plugins/x/__snapshots__/SKILL.md",
+  ];
 
   beforeAll(async () => {
     root = mkdtempSync(join(tmpdir(), "prompting-scan-"));
-    mkdirSync(join(root, ".claude", "rules"), { recursive: true });
-    mkdirSync(join(root, "node_modules"), { recursive: true });
     await Promise.all([
-      Bun.write(join(root, ".claude/rules/style.md"), "Try to keep it short.\n"),
-      Bun.write(join(root, "CLAUDE.md"), "Write it.\n"),
-      Bun.write(join(root, "notes.md"), "Write it.\n"),
-      Bun.write(join(root, "node_modules/CLAUDE.md"), "Write it.\n"),
-      Bun.write(join(root, "build.ts"), 'const note = "try to be thorough";\n'),
+      ...[...agentFacing, "README.md", ...skipped].map((path) =>
+        Bun.write(join(root, path), "Try to keep it short.\n"),
+      ),
+      Bun.write(join(root, "build.ts"), "// Try to keep it short.\n"),
     ]);
   });
 
@@ -63,18 +34,48 @@ describe("collectFiles", () => {
     await Bun.$`rm -rf ${root}`.quiet();
   });
 
-  test("reaches agent-facing files under a dot directory", async () => {
-    expect(await collectFiles(root, false)).toEqual([
-      join(root, ".claude/rules/style.md"),
-      join(root, "CLAUDE.md"),
+  test("reads agent-facing documents, including under a dot directory", async () => {
+    expect([...(await scan([root], false)).keys()].toSorted()).toEqual(
+      agentFacing.map((path) => join(root, path)).toSorted(),
+    );
+  });
+
+  test("reads every document under --all", async () => {
+    expect([...(await scan([root], true)).keys()].toSorted()).toEqual(
+      [...agentFacing, "README.md"].map((path) => join(root, path)).toSorted(),
+    );
+  });
+
+  test("filters an explicit path the same way", async () => {
+    const readme = join(root, "README.md");
+    expect((await scan([readme], false)).size).toBe(0);
+    expect([...(await scan([readme], true)).keys()]).toEqual([readme]);
+  });
+});
+
+describe("fails", () => {
+  let dir = "";
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "prompting-fails-"));
+    await Promise.all([
+      Bun.write(join(dir, "clean/CLAUDE.md"), "Wait for the release.\n"),
+      Bun.write(join(dir, "warn/CLAUDE.md"), "Wait for #123.\n"),
+      Bun.write(join(dir, "draft/evals/CLAUDE.md"), "Wait for #123.\n"),
+      Bun.write(join(dir, "error/CLAUDE.md"), "Wait for #123. Try to wait.\n"),
     ]);
   });
 
-  test("drops the path filter under --all", async () => {
-    expect(await collectFiles(root, true)).toEqual([
-      join(root, ".claude/rules/style.md"),
-      join(root, "CLAUDE.md"),
-      join(root, "notes.md"),
-    ]);
+  afterAll(async () => {
+    await Bun.$`rm -rf ${dir}`.quiet();
+  });
+
+  test.each([
+    ["passes with no alerts", "clean", false],
+    ["fails on a warning", "warn", true],
+    ["skips an eval draft", "draft", false],
+    ["fails on an error", "error", true],
+  ])("%s", async (_label, name, expected) => {
+    expect(fails(await scan([join(dir, name)], false))).toBe(expected);
   });
 });

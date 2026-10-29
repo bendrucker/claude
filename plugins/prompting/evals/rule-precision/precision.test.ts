@@ -5,14 +5,15 @@ import { $ } from "bun";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import {
   baseRate,
+  candidateConfig,
+  type CheckScore,
   deletedLines,
   type Labels,
   measure,
-  parseRule,
   render,
-  type RuleScore,
   verdict,
 } from "./precision";
+import { VALE_CONFIG } from "../../skills/scan/scripts/vale";
 
 const BEFORE = `# Doc
 
@@ -30,6 +31,14 @@ Alpha keepword stays put.
 
 let repo = "";
 let head = "";
+let rules = "";
+
+const candidate = (word: string): string => `extends: existence
+message: "'%s' matched."
+level: error
+tokens:
+  - ${word}
+`;
 
 beforeAll(async () => {
   // Under a pre-commit hook, inherited GIT_* variables point every git call in the scratch repo at the outer commit's index.
@@ -47,10 +56,13 @@ beforeAll(async () => {
   await Bun.write(join(repo, "doc.md"), AFTER);
   await $`git commit -qam prune`.cwd(repo).quiet();
   head = (await $`git rev-parse HEAD`.cwd(repo).quiet().text()).trim();
+  rules = mkdtempSync(join(tmpdir(), "rule-precision-rules-"));
+  await Bun.write(join(rules, "Cut.yml"), candidate("cutword"));
+  await Bun.write(join(rules, "Keep.yml"), candidate("keepword"));
 });
 
 afterAll(async () => {
-  await $`rm -rf ${repo}`.quiet();
+  await $`rm -rf ${repo} ${rules}`.quiet();
 });
 
 describe("deletedLines", () => {
@@ -65,21 +77,21 @@ describe("deletedLines", () => {
 });
 
 describe("measure", () => {
-  test("scores a candidate against what the commit deleted", () => {
-    const { scores, labels } = measure(
-      repo,
-      [head],
-      [parseRule("cut=/cutword/"), parseRule("keep=/keepword/")],
+  test("scores candidate rules against what the commit deleted", async () => {
+    const config = await candidateConfig(
+      [join(rules, "Cut.yml"), join(rules, "Keep.yml")],
+      VALE_CONFIG,
     );
+    const { scores, labels } = await measure(repo, [head], config);
     expect(labels).toEqual({ deleted: 2, prose: 4, docs: 1 } satisfies Labels);
-    expect(scores.map(({ rule, flagged, confirmed }) => ({ rule, flagged, confirmed }))).toEqual([
-      { rule: "cut", flagged: 2, confirmed: 2 },
-      { rule: "keep", flagged: 1, confirmed: 0 },
+    expect(scores.map(({ check, flagged, confirmed }) => ({ check, flagged, confirmed }))).toEqual([
+      { check: "Prompting.Cut", flagged: 2, confirmed: 2 },
+      { check: "Prompting.Keep", flagged: 1, confirmed: 0 },
     ]);
   });
 
-  test("measures nothing when the commit is unknown", () => {
-    expect(measure(repo, ["nosuchcommit"]).scores).toEqual([]);
+  test("measures nothing when the commit is unknown", async () => {
+    expect((await measure(repo, ["nosuchcommit"])).scores).toEqual([]);
   });
 });
 
@@ -92,24 +104,9 @@ describe("baseRate", () => {
   });
 });
 
-describe("parseRule", () => {
-  test("adds the global flag a match-all scan needs", () => {
-    expect(parseRule("cut=/x/i").pattern.flags).toBe("gi");
-    expect(parseRule("cut=/x/g").pattern.flags).toBe("g");
-  });
-
-  test("keeps a pattern containing its own separator", () => {
-    expect(parseRule(String.raw`path=/a\/b/`).pattern.source).toBe(String.raw`a\/b`);
-  });
-
-  test.each(["cut", "=/x/", "cut=x"])("rejects %j", (spec) => {
-    expect(() => parseRule(spec)).toThrow();
-  });
-});
-
 describe("verdict", () => {
-  const score = (flagged: number, low: number): RuleScore => ({
-    rule: "r",
+  const score = (flagged: number, low: number): CheckScore => ({
+    check: "r",
     flagged,
     confirmed: 0,
     precision: 0,
@@ -127,9 +124,23 @@ describe("verdict", () => {
 });
 
 test("render states the floor it applied", () => {
-  const scores: RuleScore[] = [
-    { rule: "no-op", flagged: 17, confirmed: 12, precision: 12 / 17, low: 0.47, high: 0.87 },
-    { rule: "ticket-ref", flagged: 7, confirmed: 1, precision: 1 / 7, low: 0.03, high: 0.51 },
+  const scores: CheckScore[] = [
+    {
+      check: "Prompting.NoOp",
+      flagged: 17,
+      confirmed: 12,
+      precision: 12 / 17,
+      low: 0.47,
+      high: 0.87,
+    },
+    {
+      check: "Prompting.TicketRef",
+      flagged: 7,
+      confirmed: 1,
+      precision: 1 / 7,
+      low: 0.03,
+      high: 0.51,
+    },
   ];
   expect(render(scores, { deleted: 953, prose: 8840, docs: 135 }, 0.11, 10)).toMatchSnapshot();
 });

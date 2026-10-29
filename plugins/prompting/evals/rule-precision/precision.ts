@@ -1,16 +1,14 @@
 #!/usr/bin/env bun
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
-import {
-  type Finding,
-  type PatternRule,
-  scanPrompt,
-  scanWith,
-} from "../../skills/scan/scripts/rules";
+import { lint, VALE_CONFIG } from "../../skills/scan/scripts/vale";
 import { wilson } from "../../../../packages/evals/stats";
 
-export interface RuleScore {
-  rule: string;
+export interface CheckScore {
+  check: string;
   flagged: number;
   confirmed: number;
   precision: number;
@@ -78,37 +76,32 @@ export function deletedLines(
   return removed;
 }
 
-/** A candidate rule given on the command line as `name=/pattern/flags`. */
-export function parseRule(spec: string): PatternRule {
-  const split = spec.indexOf("=");
-  if (split < 1) throw new Error(`rule must be name=/pattern/flags, got: ${spec}`);
-  const name = spec.slice(0, split);
-  const body = spec.slice(split + 1);
-  const parsed = /^\/(.*)\/([gimsuy]*)$/s.exec(body);
-  const source = parsed?.[1] ?? "";
-  if (source.length === 0) throw new Error(`rule pattern must be /pattern/flags, got: ${body}`);
-  const given = parsed?.[2] ?? "";
-  const flags = given.includes("g") ? given : `${given}g`;
-  return {
-    name,
-    message: "matched a candidate pattern.",
-    pattern: new RegExp(source, flags),
-  };
+/**
+ * A config that lints with `rules` alone, under the scopes and ignores of
+ * `base`. Each rule keeps its file name as its check name in the `Prompting`
+ * style, so a candidate sharing a shipped name stands in for it.
+ */
+export async function candidateConfig(rules: readonly string[], base: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "rule-precision-config-"));
+  const style = join(dir, "styles", "Prompting");
+  await mkdir(style, { recursive: true });
+  await Promise.all(rules.map((rule) => Bun.write(join(style, basename(rule)), Bun.file(rule))));
+  const ini = (await Bun.file(base).text()).replace(
+    /^StylesPath\s*=.*$/m,
+    `StylesPath = ${join(dir, "styles")}`,
+  );
+  const config = join(dir, ".vale.ini");
+  await Bun.write(config, ini);
+  return config;
 }
 
-function score(source: string, rules?: readonly PatternRule[]): Finding[] {
-  return rules ? scanWith(source, rules) : scanPrompt(source);
+interface PreImage {
+  before: string;
+  removed: Set<number>;
 }
 
-export function measure(
-  repo: string,
-  commits: string[],
-  rules?: readonly PatternRule[],
-): { scores: RuleScore[]; labels: Labels } {
-  const flagged = new Map<string, number>();
-  const confirmed = new Map<string, number>();
-  const labels: Labels = { deleted: 0, prose: 0, docs: 0 };
-
+function documents(repo: string, commits: string[], labels: Labels): PreImage[] {
+  const docs: PreImage[] = [];
   for (const commit of commits) {
     const parent = git(repo, ["rev-parse", `${commit}^`]).trim();
     if (parent.length === 0) continue;
@@ -122,26 +115,50 @@ export function measure(
       if (before.length === 0) continue;
       labels.docs++;
       const removed = deletedLines(repo, parent, commit, file);
-      const lines = before.split("\n");
-      for (const [index, text] of lines.entries()) {
+      for (const [index, text] of before.split("\n").entries()) {
         if (!/\w/.test(text)) continue;
         labels.prose++;
         if (removed.has(index + 1)) labels.deleted++;
       }
-      for (const finding of score(before, rules)) {
-        flagged.set(finding.rule, (flagged.get(finding.rule) ?? 0) + 1);
-        if (removed.has(finding.line)) {
-          confirmed.set(finding.rule, (confirmed.get(finding.rule) ?? 0) + 1);
+      docs.push({ before, removed });
+    }
+  }
+  return docs;
+}
+
+export async function measure(
+  repo: string,
+  commits: string[],
+  config: string = VALE_CONFIG,
+): Promise<{ scores: CheckScore[]; labels: Labels }> {
+  const flagged = new Map<string, number>();
+  const confirmed = new Map<string, number>();
+  const labels: Labels = { deleted: 0, prose: 0, docs: 0 };
+  const docs = documents(repo, commits, labels);
+
+  // Vale lints files, so each pre-image is written out and the set linted in one run.
+  const dir = await mkdtemp(join(tmpdir(), "rule-precision-docs-"));
+  try {
+    const paths = docs.map((_, index) => join(dir, `${index}.md`));
+    await Promise.all(docs.map((doc, index) => Bun.write(paths[index] ?? "", doc.before)));
+    const alerts = await lint(paths, { config });
+    for (const [index, doc] of docs.entries()) {
+      for (const alert of alerts.get(paths[index] ?? "") ?? []) {
+        flagged.set(alert.Check, (flagged.get(alert.Check) ?? 0) + 1);
+        if (doc.removed.has(alert.Line)) {
+          confirmed.set(alert.Check, (confirmed.get(alert.Check) ?? 0) + 1);
         }
       }
     }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 
   const scores = [...flagged.entries()]
-    .map(([rule, total]) => {
-      const hits = confirmed.get(rule) ?? 0;
+    .map(([check, total]) => {
+      const hits = confirmed.get(check) ?? 0;
       const [low, high] = wilson(hits, total);
-      return { rule, flagged: total, confirmed: hits, precision: hits / total, low, high };
+      return { check, flagged: total, confirmed: hits, precision: hits / total, low, high };
     })
     .toSorted((a, b) => b.precision - a.precision);
   return { scores, labels };
@@ -156,29 +173,29 @@ function percent(value: number): string {
  * keeps a commit that was not looking for this defect class from reading as
  * evidence against the rule.
  */
-export function verdict(entry: RuleScore, floor: number, minFlagged: number): string {
+export function verdict(entry: CheckScore, floor: number, minFlagged: number): string {
   if (entry.flagged < minFlagged) return "too few to judge";
   return entry.low >= floor ? "clears" : "unproven";
 }
 
 export function render(
-  scores: RuleScore[],
+  scores: CheckScore[],
   labels: Labels,
   floor: number,
   minFlagged: number,
 ): string {
   const rows = scores.map((entry) => [
-    entry.rule,
+    entry.check,
     String(entry.flagged),
     String(entry.confirmed),
     percent(entry.precision),
     `${percent(entry.low)} - ${percent(entry.high)}`,
     verdict(entry, floor, minFlagged),
   ]);
-  const header = ["Rule", "Flagged", "Cut by hand", "Precision", "95% interval", "Verdict"];
+  const header = ["Check", "Flagged", "Cut by hand", "Precision", "95% interval", "Verdict"];
   const preamble = [
     `ground truth: ${labels.deleted} of ${labels.prose} prose lines removed across ${labels.docs} documents`,
-    `a rule clears when its interval's lower bound reaches ${percent(floor)} on ${minFlagged}+ hits`,
+    `a check clears when its interval's lower bound reaches ${percent(floor)} on ${minFlagged}+ hits`,
     "precision here is a lower bound: the human cut what they were looking for, not every defect",
   ].join("\n");
   return `${preamble}\n${table([header, ...rows])}`;
@@ -189,7 +206,7 @@ if (import.meta.main) {
     name: "rule-precision",
     help: {
       description:
-        "Score scan rules by per-line precision against commits where a human deleted prose. A rule clears when its interval beats the rate at which those commits deleted prose at all. Exits non-zero when a rule with enough hits fails to clear.",
+        "Score Vale checks by per-line precision against commits where a human deleted prose. A check clears when its interval beats the rate at which those commits deleted prose at all. Exits non-zero when a check with enough hits fails to clear.",
     },
     flags: {
       commit: {
@@ -198,7 +215,12 @@ if (import.meta.main) {
       },
       rule: {
         type: [String],
-        description: "Candidate to score instead of the shipped set, as name=/pattern/flags",
+        description: "Vale rule file to score instead of the shipped style (repeatable)",
+      },
+      config: {
+        type: String,
+        default: VALE_CONFIG,
+        description: "Vale config to lint with, such as an overlay of the shipped one",
       },
       repo: { type: String, default: ".", description: "Repository to read history from" },
       minPrecision: {
@@ -208,7 +230,7 @@ if (import.meta.main) {
       minFlagged: {
         type: Number,
         default: 10,
-        description: "Hits a rule needs before the labeled history can judge it",
+        description: "Hits a check needs before the labeled history can judge it",
       },
     },
   });
@@ -218,15 +240,15 @@ if (import.meta.main) {
     process.exit(2);
   }
 
-  const candidates = argv.flags.rule.map(parseRule);
-  const { scores, labels } = measure(
-    argv.flags.repo,
-    argv.flags.commit,
-    candidates.length > 0 ? candidates : undefined,
-  );
+  const config =
+    argv.flags.rule.length > 0
+      ? await candidateConfig(argv.flags.rule, argv.flags.config)
+      : argv.flags.config;
+  const { scores, labels } = await measure(argv.flags.repo, argv.flags.commit, config);
+  if (config !== argv.flags.config) await rm(dirname(config), { recursive: true, force: true });
 
   if (scores.length === 0) {
-    console.error("No rule matched anything in the labeled history. Nothing was measured.");
+    console.error("No check matched anything in the labeled history. Nothing was measured.");
     process.exit(1);
   }
 

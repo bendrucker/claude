@@ -1,0 +1,31 @@
+# A tally a past run produced goes stale as the work behind it moves, and the run prints it again anyway. Prose scopes a set with a spelled count, so only digits read as a tally.
+# evidence: a hand audit of every hit across the repo. The rule-precision labels barely exercise it.
+# retire when: a hand audit finds most hits are thresholds or fixed facts rather than numbers a run reports.
+extends: existence
+message: '"%s" reports what a past run counted. The run prints it. Delete the sentence.'
+level: warning
+nonword: true
+scope: ~text.frontmatter
+tokens:
+  - '\b\d[\d,]* of \d[\d,]*\b'
+tests:
+  - name: flags a survival count
+    input: |
+      253 of 901 shapes clear the floor.
+    contains: [Prompting.StaleMeasurement]
+  - name: flags a ratio inside a sentence
+    input: |
+      The record appears in only 66 of 1,645 recent files.
+    contains: [Prompting.StaleMeasurement]
+  - name: allows a spelled count of a set
+    input: |
+      Record a decision when two of three reviewers agree.
+    absent: Prompting.StaleMeasurement
+  - name: allows a count of a named set
+    input: |
+      Two of the reviewers must approve.
+    absent: Prompting.StaleMeasurement
+  - name: allows a hyphenated quorum
+    input: |
+      Merge on a 3-of-5 vote.
+    absent: Prompting.StaleMeasurement

@@ -1,0 +1,12 @@
+{
+  "name": "prose-lab",
+  "version": "1.0.0",
+  "description": "Flag prose anti-patterns, generalize them into Vale rules, and score the rules against labels",
+  "type": "module",
+  "dependencies": {
+    "@commander-js/extra-typings": "~15.0.0",
+    "commander": "~15.0.0",
+    "table": "^6.9.0",
+    "zod": "^4.4.3"
+  }
+}

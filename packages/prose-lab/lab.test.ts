@@ -1,0 +1,274 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { countWords, lintFiles, PLUGINS } from "./corpus";
+import { type Flag, type Hit, hitId, type Label, type Pattern, type Score, store } from "./data";
+import { sample } from "./sample";
+import { clears, evidence, judge, labConfig, overlaps, type Stage, score, stage } from "./score";
+import { context } from "./server";
+import { checkRows } from "./status";
+
+function hit(file: string, line: number, span: [number, number], check = "Writing.X"): Hit {
+  return {
+    plugin: "writing",
+    check,
+    severity: "warning",
+    message: "",
+    file,
+    line,
+    span,
+    match: "",
+  };
+}
+
+function label(
+  at: Hit,
+  verdict: Label["verdict"],
+  pattern?: string,
+  by: Label["by"] = "user",
+): Label {
+  return { ...at, id: hitId(at), verdict, note: "", pattern, by, ts: "t" };
+}
+
+function flag(file: string, line: number, span: [number, number], pattern: string): Flag {
+  return {
+    id: `${file}|${line}|${span[0]}`,
+    pattern,
+    file,
+    line,
+    span,
+    match: "",
+    note: "",
+    ts: "t",
+  };
+}
+
+const pattern: Pattern = { slug: "p", description: "", style: "Writing" };
+
+test.each<{
+  name: string;
+  a: [string, number, number, number];
+  b: [string, number, number, number];
+  want: boolean;
+}>([
+  { name: "shared columns", a: ["f", 1, 5, 9], b: ["f", 1, 9, 12], want: true },
+  { name: "adjacent columns", a: ["f", 1, 5, 9], b: ["f", 1, 10, 12], want: false },
+  { name: "another line", a: ["f", 1, 5, 9], b: ["f", 2, 5, 9], want: false },
+  { name: "another file", a: ["f", 1, 5, 9], b: ["g", 1, 5, 9], want: false },
+])("overlaps: $name", ({ a, b, want }) => {
+  expect(overlaps(hit(a[0], a[1], [a[2], a[3]]), hit(b[0], b[1], [b[2], b[3]]))).toBe(want);
+});
+
+describe("judge", () => {
+  test("counts a hit on bad prose as right whatever check labeled it, and skips unsure spans", () => {
+    const labels = [
+      label(hit("a", 1, [1, 5], "ai-tells.Y"), "right"),
+      label(hit("a", 2, [1, 5]), "wrong"),
+      label(hit("a", 3, [1, 5]), "unsure"),
+    ];
+    const hits = [
+      hit("a", 1, [3, 4], "Lab.C"),
+      hit("a", 2, [1, 2], "Lab.C"),
+      hit("a", 3, [1, 2], "Lab.C"),
+      hit("a", 4, [1, 2], "Lab.C"),
+      hit("b", 1, [1, 2], "Lab.C"),
+    ];
+    const judged = judge(hits, labels, [flag("b", 1, [1, 9], "q")]);
+    expect({
+      right: judged.right,
+      wrong: judged.wrong,
+      unlabeled: judged.unlabeled.map((h) => h.line),
+    }).toEqual({ right: 2, wrong: 1, unlabeled: [4] });
+  });
+
+  test("the user's label overrides a model's, and a model-only verdict counts as byModel", () => {
+    const at = hit("a", 1, [1, 5]);
+    const other = hit("a", 2, [1, 5]);
+    const labels = [
+      label(at, "right", undefined, "model"),
+      label(at, "wrong"),
+      label(other, "right", undefined, "model"),
+    ];
+    expect(judge([at, other], labels, [])).toMatchObject({ right: 1, wrong: 1, byModel: 1 });
+  });
+});
+
+describe("stage", () => {
+  const positives = (count: number, files: number): Label[] =>
+    Array.from({ length: count }, (_, i) =>
+      label(hit(`f${i % files}`, i + 1, [1, 2]), "right", "p"),
+    );
+  const top = (right: number, wrong: number, low: number): Score => ({
+    pattern: "p",
+    candidate: "c",
+    hits: right + wrong,
+    right,
+    wrong,
+    byModel: 0,
+    low,
+    high: 1,
+    recall: 1,
+    positives: 8,
+    perThousand: 0,
+    ts: "t",
+  });
+
+  test.each<{ name: string; labels: Label[]; best?: Score; want: Stage }>([
+    {
+      name: "seven positives keep collecting",
+      labels: positives(7, 7),
+      best: top(20, 0, 0.9),
+      want: "collecting",
+    },
+    {
+      name: "eight positives in three files keep collecting",
+      labels: positives(8, 3),
+      best: top(20, 0, 0.9),
+      want: "collecting",
+    },
+    {
+      name: "enough positives with no candidate generalize",
+      labels: positives(8, 4),
+      want: "generalizing",
+    },
+    {
+      name: "a candidate under ten labeled hits is not ready",
+      labels: positives(8, 4),
+      best: top(9, 0, 0.7),
+      want: "generalizing",
+    },
+    {
+      name: "a candidate under the floor is not ready",
+      labels: positives(8, 4),
+      best: top(10, 4, 0.45),
+      want: "generalizing",
+    },
+    {
+      name: "a candidate over the floor is ready",
+      labels: positives(8, 4),
+      best: top(12, 0, 0.75),
+      want: "ready",
+    },
+  ])("$name", ({ labels, best, want }) => {
+    expect(stage(pattern, evidence("p", labels, []), best)).toBe(want);
+  });
+
+  test("a pattern with a check is shipped", () => {
+    expect(stage({ ...pattern, check: "Writing.P" }, evidence("p", [], []), undefined)).toBe(
+      "shipped",
+    );
+  });
+
+  test("clears needs both the count and the floor", () => {
+    expect([
+      clears({ right: 10, wrong: 0, low: 0.72 }),
+      clears({ right: 9, wrong: 0, low: 0.7 }),
+    ]).toEqual([true, false]);
+  });
+});
+
+test("score reports recall over the pattern's labels and flags", () => {
+  const labels = [
+    label(hit("a", 1, [1, 5]), "right", "p"),
+    label(hit("a", 2, [1, 5]), "right", "other"),
+  ];
+  const flags = [flag("b", 1, [1, 5], "p"), flag("b", 2, [1, 5], "p")];
+  const { score: s } = score(
+    "p",
+    "c",
+    [hit("a", 1, [2, 3], "Lab.c"), hit("b", 1, [1, 1], "Lab.c")],
+    labels,
+    flags,
+    2000,
+    "t",
+  );
+  expect({
+    recall: s.recall,
+    positives: s.positives,
+    right: s.right,
+    perThousand: s.perThousand,
+  }).toEqual({ recall: 2 / 3, positives: 3, right: 2, perThousand: 1 });
+});
+
+describe("sample", () => {
+  const hits = ["a", "b", "c", "d"].flatMap((file) => [
+    hit(file, 1, [1, 2], "X"),
+    hit(file, 2, [1, 2], "X"),
+  ]);
+
+  test("spreads a check across files and skips labeled hits", () => {
+    const picked = sample(hits, [label(hits[0]!, "right")], [], 2);
+    expect(picked.map((item) => `${item.file}:${item.line}`)).toEqual(["a:2", "c:1"]);
+  });
+
+  test("puts queued candidate hits first", () => {
+    const queued = { ...hit("z", 9, [1, 2], "Lab.c"), pattern: "p", candidate: "c" };
+    expect(sample(hits, [], [queued], 1)[0]).toMatchObject({ file: "z", candidate: "c" });
+  });
+});
+
+test("countWords leaves fenced code out", () => {
+  expect(countWords("One two.\n\n```ts\nconst three = 3;\n```\n\nFour.\n")).toBe(3);
+});
+
+test("context splits the line around Vale's one-based inclusive span", () => {
+  expect(context({ line: 2, span: [5, 7] }, ["above", "The fox ran.", "below"])).toEqual({
+    before: "above",
+    pre: "The ",
+    marked: "fox",
+    post: " ran.",
+    after: "below",
+  });
+});
+
+test("checkRows marks a check labeled past ten with a floor under the bar", () => {
+  const hits = Array.from({ length: 12 }, (_, i) => hit("a", i + 1, [1, 2], "ai-tells.Loud"));
+  const labels = hits.map((h, i) => label(h, i < 4 ? "right" : "wrong"));
+  expect(checkRows(hits, labels, [])).toMatchObject([
+    { check: "ai-tells.Loud", right: 4, wrong: 8, below: true },
+  ]);
+});
+
+describe("store", () => {
+  let dir: string;
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), "prose-lab-store-"));
+  });
+  afterAll(() => rm(dir, { recursive: true }));
+
+  test("a relabel supersedes the earlier label", async () => {
+    const data = store(dir);
+    const at = hit("a", 1, [1, 2]);
+    await data.addLabels([label(at, "right")]);
+    await data.addLabels([label(at, "wrong", "p")]);
+    expect(await data.labels()).toMatchObject([{ verdict: "wrong", pattern: "p" }]);
+  });
+});
+
+describe("labConfig", () => {
+  let root: string;
+  beforeAll(async () => {
+    root = await mkdtemp(join(tmpdir(), "prose-lab-corpus-"));
+    await Bun.write(
+      join(root, "doc.md"),
+      "# Doc\n\nThe rule carries the weight.\n\nThe box carries books; the shelf holds them.\n",
+    );
+    await Bun.write(
+      join(root, "Carries.yml"),
+      "extends: existence\nmessage: \"'%s'\"\nlevel: suggestion\ntokens:\n  - carries the weight\n",
+    );
+  });
+  afterAll(() => rm(root, { recursive: true }));
+
+  test.each(["prompting", "writing"] as const)(
+    "lints with the candidate alone under %s's config",
+    async (plugin) => {
+      const config = await labConfig([join(root, "Carries.yml")], PLUGINS[plugin]);
+      const hits = await lintFiles(plugin, config, ["doc.md"], root);
+      expect(hits.map((h) => `${h.check}@${h.line}:${h.match}`)).toEqual([
+        "Lab.Carries@3:carries the weight",
+      ]);
+    },
+  );
+});

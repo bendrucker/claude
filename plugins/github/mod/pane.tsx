@@ -1,5 +1,5 @@
 import type { EngineInterface, RenderElement, RenderInput } from "claude-code";
-import { OCT, type Part, type Snapshot, statusPartsOf, turnOf } from "./pr.ts";
+import { OCT, type Part, SEP, type Snapshot, statusPartsOf, turnOf } from "./pr.ts";
 
 export const PANE = "pr";
 export const MUTED = "muted";
@@ -109,24 +109,21 @@ export function drawPane(
   // JSX names the surface's Text resolved above, which the rule misses.
   // oxlint-disable-next-line unicorn/consistent-function-scoping
   const tinted = (part: Part) => <Text color={part.tone}>{part.text}</Text>;
+  // oxlint-disable-next-line unicorn/consistent-function-scoping
+  const inline = (parts: Part[]) =>
+    parts.map((part, index) => (
+      <Text color={part.tone}>
+        {index === 0 ? "" : SEP}
+        {part.text}
+      </Text>
+    ));
   const section = (label: string, parts: Part[], extra: RenderElement[] = [], isInline = false) => (
     <Box flexDirection="row">
       <Box width={LABEL} flexShrink={0}>
         <Text dimColor>{label}</Text>
       </Box>
       <Box flexDirection="column" flexGrow={1}>
-        {isInline ? (
-          <Text>
-            {parts.map((part, index) => (
-              <Text color={part.tone}>
-                {index === 0 ? "" : "  "}
-                {part.text}
-              </Text>
-            ))}
-          </Text>
-        ) : (
-          parts.map(tinted)
-        )}
+        {isInline ? <Text>{inline(parts)}</Text> : parts.map(tinted)}
         {extra}
       </Box>
     </Box>
@@ -169,12 +166,7 @@ export function drawPane(
             {"  "}
           </Text>
         )}
-        {status.parts.map((part, index) => (
-          <Text color={part.tone}>
-            {index === 0 ? "" : "  "}
-            {part.text}
-          </Text>
-        ))}
+        {inline(status.parts)}
       </Text>
       {isOpen && (
         <Box flexDirection="column" marginTop={1}>

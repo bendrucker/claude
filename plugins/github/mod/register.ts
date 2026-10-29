@@ -35,7 +35,7 @@ export const POLL_MS = {
 export const TICK_MS = 60_000;
 // The wait after each further unchanged poll, until a change or a turn.
 export const QUIET_MS = [3, 6, 12, 30, 60, 120].map((minutes) => minutes * 60_000);
-export const BACKOFF_CAP_MS = QUIET_MS.at(-1) ?? 0;
+const BACKOFF_CAP_MS = QUIET_MS.at(-1) ?? 0;
 // A PR opened elsewhere shows up within this long, even on an idle session.
 export const IDLE_CAP_MS = 10 * 60_000;
 // A gap this long between ticks means the host slept or the ticker died.
@@ -68,6 +68,8 @@ interface Watch {
   etags: Map<string, string>;
   /** When the last full read ran, which the gate forces again after a while. */
   fullAt: number;
+  /** A refresh or a turn wants the next poll to skip every cache. */
+  isFullDue: boolean;
   extras: { url: string; extras: Extras } | undefined;
   me: string | undefined;
   noise: Noise;
@@ -92,7 +94,6 @@ interface Watch {
   turns: Map<string, Span>;
   line: string | undefined;
   /** How the last successful poll read the PR. */
-  via: Via | undefined;
   isMutedOpen: boolean;
   generation: number;
   isStopped: boolean;
@@ -284,6 +285,7 @@ async function readPr($: EngineInterface, watch: Watch, now: number): Promise<Re
   const last = watch.last;
   const isProbed =
     watch.snapshot !== undefined &&
+    !watch.isFullDue &&
     now - watch.fullAt < FULL_EVERY_MS &&
     last?.cwd === cwd &&
     last.branch === branch &&
@@ -291,7 +293,7 @@ async function readPr($: EngineInterface, watch: Watch, now: number): Promise<Re
     last.snapshot.block !== undefined;
   const probed = isProbed ? await changedOf($, watch, cwd, last.snapshot) : undefined;
   const changed = probed?.changed;
-  if (isProbed && probed?.changed.length === 0) {
+  if (probed?.changed.length === 0 && last !== undefined) {
     const cache = { last, etags: probed.etags };
     return { kind: "pr", snapshot: last.snapshot, read: "hit", changed, cache };
   }
@@ -317,8 +319,7 @@ async function readPr($: EngineInterface, watch: Watch, now: number): Promise<Re
   const turns = [...watch.turns.values()];
   const snapshot = snapshotOf(parsed, { me, isHeadKnown, noise: watch.noise, turns, extras });
   const cache = { last: { cwd, branch, snapshot }, etags: probed?.etags ?? watch.etags };
-  const read = changed === undefined ? "full" : "miss";
-  return { kind: "pr", snapshot, read, changed, cache };
+  return { kind: "pr", snapshot, read: changed === undefined ? "full" : "miss", changed, cache };
 }
 
 async function inject(
@@ -525,10 +526,9 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     if (!isCurrent() || seq !== watch.polls) return;
     watch.error = undefined;
     watch.errors = 0;
-    watch.via = read.kind === "pr" ? read.read : undefined;
     if (read.kind === "pr") {
       Object.assign(watch, read.cache);
-      if (read.read !== "hit") watch.fullAt = now;
+      if (read.read !== "hit") Object.assign(watch, { fullAt: now, isFullDue: false });
     }
     const { isTracked, isChanged } = apply($, watch, read, isCurrent);
     let streak = isChanged ? 0 : watch.streak + 1;
@@ -552,6 +552,14 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
   }
 }
 
+// pollingSince marks the poll in flight, for the stuck check and the pane.
+async function pollNow($: EngineInterface, watch: Watch, generation: number, now: number) {
+  watch.pollingSince = now;
+  $.ui.invalidate("ui.render");
+  await poll($, watch, generation, now);
+  if (watch.pollingSince === now) watch.pollingSince = undefined;
+}
+
 async function tick($: EngineInterface, watch: Watch, generation: number): Promise<void> {
   const now = await $.clock.now();
   if (watch.isStopped || watch.generation !== generation) return;
@@ -566,9 +574,7 @@ async function tick($: EngineInterface, watch: Watch, generation: number): Promi
     emit($, "poll.stuck", { ms: now - watch.pollingSince }, false);
   }
   if (now < watch.due - TICK_MS / 2) return;
-  watch.pollingSince = now;
-  await poll($, watch, generation, now);
-  if (watch.pollingSince === now) watch.pollingSince = undefined;
+  await pollNow($, watch, generation, now);
 }
 
 // A refresh skips the probe, so it reads everything GitHub has now.
@@ -576,11 +582,8 @@ async function refresh($: EngineInterface, watch: Watch): Promise<void> {
   if (watch.isStopped || watch.pollingSince !== undefined) return;
   const now = await $.clock.now();
   emit($, "pane.refresh", { pr: watch.snapshot?.pr });
-  watch.fullAt = Number.NEGATIVE_INFINITY;
-  watch.pollingSince = now;
-  $.ui.invalidate("ui.render");
-  await poll($, watch, watch.generation, now);
-  if (watch.pollingSince === now) watch.pollingSince = undefined;
+  watch.isFullDue = true;
+  await pollNow($, watch, watch.generation, now);
   $.ui.invalidate("ui.render");
 }
 
@@ -636,6 +639,7 @@ export function register(on: On, options: PluginOptions): void {
     last: undefined,
     etags: new Map(),
     fullAt: 0,
+    isFullDue: false,
     extras: undefined,
     me: undefined,
     noise,
@@ -652,7 +656,6 @@ export function register(on: On, options: PluginOptions): void {
     streak: 0,
     none: undefined,
     turns: new Map(),
-    via: undefined,
     isMutedOpen: false,
     line: undefined,
     generation: 0,
@@ -761,7 +764,7 @@ export function register(on: On, options: PluginOptions): void {
     render($, watch);
     if (e.agentId === undefined) {
       // No probed resource moves when a thread is resolved, which a turn often does.
-      watch.etags.clear();
+      watch.isFullDue = true;
       void wake($, watch);
     }
     return next(e);

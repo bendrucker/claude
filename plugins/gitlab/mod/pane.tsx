@@ -1,5 +1,5 @@
 import type { EngineInterface, RenderElement, RenderInput } from "claude-code";
-import { OCT, type Part, type Snapshot, statusPartsOf, turnOf } from "./mr.ts";
+import { OCT, type Part, SEP, type Snapshot, isOpen, statusPartsOf, turnOf } from "./mr.ts";
 
 export const PANE = "mr";
 export const MUTED = "muted";
@@ -120,24 +120,21 @@ export function drawPane(
   // JSX names the surface's Text resolved above, which the rule misses.
   // oxlint-disable-next-line unicorn/consistent-function-scoping
   const tinted = (part: Part) => <Text color={part.tone}>{part.text}</Text>;
+  // oxlint-disable-next-line unicorn/consistent-function-scoping
+  const inline = (parts: Part[]) =>
+    parts.map((part, index) => (
+      <Text color={part.tone}>
+        {index === 0 ? "" : SEP}
+        {part.text}
+      </Text>
+    ));
   const section = (label: string, parts: Part[], extra: RenderElement[] = [], isInline = false) => (
     <Box flexDirection="row">
       <Box width={LABEL} flexShrink={0}>
         <Text dimColor>{label}</Text>
       </Box>
       <Box flexDirection="column" flexGrow={1}>
-        {isInline ? (
-          <Text>
-            {parts.map((part, index) => (
-              <Text color={part.tone}>
-                {index === 0 ? "" : "  "}
-                {part.text}
-              </Text>
-            ))}
-          </Text>
-        ) : (
-          parts.map(tinted)
-        )}
+        {isInline ? <Text>{inline(parts)}</Text> : parts.map(tinted)}
         {extra}
       </Box>
     </Box>
@@ -163,7 +160,6 @@ export function drawPane(
     );
   }
   const status = statusPartsOf(s, seen.isBusy, seen.error !== undefined);
-  const isOpen = s.state === "opened" || s.state === "locked";
   const failing = s.checks.filter((check) => check.outcome !== "passed");
   return (
     <Box flexDirection="column">
@@ -180,14 +176,9 @@ export function drawPane(
             {"  "}
           </Text>
         )}
-        {status.parts.map((part, index) => (
-          <Text color={part.tone}>
-            {index === 0 ? "" : "  "}
-            {part.text}
-          </Text>
-        ))}
+        {inline(status.parts)}
       </Text>
-      {isOpen && (
+      {isOpen(s) && (
         <Box flexDirection="column" marginTop={1}>
           {section(
             "Jobs",

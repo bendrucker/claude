@@ -282,7 +282,7 @@ export function noiseOf(
   }
 }
 
-export const NO_NOISE = noiseOf("", "", "").noise;
+const NO_NOISE = noiseOf("", "", "").noise;
 
 // `gh pr view` names an author by login alone, which drops an app's `[bot]` suffix,
 // so the extras query's author types name the rest.
@@ -742,12 +742,12 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
 }
 
 /** Whom the PR waits on, which leads the footer. */
-export type Ball = "author" | "reviewer" | "merging" | "ci" | "none";
+type Ball = "author" | "reviewer" | "merging" | "ci" | "none";
 
 // Anything the author can fix outranks a reviewer, who outranks a merge that
 // would wait on them anyway. A required review nobody was asked for, or a green
 // PR nothing will merge, is the author's.
-export function ballOf(snapshot: Snapshot): Ball {
+function ballOf(snapshot: Snapshot): Ball {
   if (snapshot.state !== "OPEN") return "none";
   const { turn } = turnOf(snapshot);
   const isFixable = isBlocked(snapshot.block) || snapshot.phase === "failing";
@@ -778,7 +778,7 @@ export const OCT = {
 };
 
 /** Between footer segments: a glyph and its count sit one space apart, segments two. */
-const SEP = "  ";
+export const SEP = "  ";
 
 // The lead is padded to its longest word, so the glyphs after it hold still as it changes.
 const LEAD_WIDTH = "merging".length;

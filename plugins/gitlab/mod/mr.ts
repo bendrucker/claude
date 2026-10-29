@@ -289,7 +289,7 @@ export function noiseOf(
   }
 }
 
-export const NO_NOISE = noiseOf("", "", "").noise;
+const NO_NOISE = noiseOf("", "", "").noise;
 
 // Service accounts end in `-bot` or `_bot`, and token accounts are `group_<id>_bot_<hash>`.
 const SERVICE_ACCOUNT = /[_-]bot$|^(?:group|project)_\d+_bot_[0-9a-f]+$/;
@@ -739,12 +739,12 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
 }
 
 /** Whom the MR waits on, which leads the footer. */
-export type Ball = "author" | "reviewer" | "merging" | "ci" | "none";
+type Ball = "author" | "reviewer" | "merging" | "ci" | "none";
 
 // Anything the author can fix outranks a reviewer, who outranks a merge that
 // would wait on them anyway. An approval nobody was asked for, or a green MR
 // nothing will merge, is the author's.
-export function ballOf(snapshot: Snapshot): Ball {
+function ballOf(snapshot: Snapshot): Ball {
   if (!isOpen(snapshot)) return "none";
   if (snapshot.state === "locked") return "merging";
   const { turn } = turnOf(snapshot);
@@ -775,7 +775,7 @@ export const OCT = {
 };
 
 /** Between footer segments: a glyph and its count sit one space apart, segments two. */
-const SEP = "  ";
+export const SEP = "  ";
 
 // The lead is padded to its longest word, so the glyphs after it hold still as it changes.
 const LEAD_WIDTH = "merging".length;

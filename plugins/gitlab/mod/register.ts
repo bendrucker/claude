@@ -46,7 +46,7 @@ export const POLL_MS = {
 export const TICK_MS = 60_000;
 // The wait after each further unchanged poll, until a change or a turn.
 export const QUIET_MS = [3, 6, 12, 30, 60, 120].map((minutes) => minutes * 60_000);
-export const BACKOFF_CAP_MS = QUIET_MS.at(-1) ?? 0;
+const BACKOFF_CAP_MS = QUIET_MS.at(-1) ?? 0;
 // An MR opened elsewhere shows up within this long, even on an idle session.
 export const IDLE_CAP_MS = 10 * 60_000;
 // A gap this long between ticks means the host slept or the ticker died.
@@ -90,6 +90,8 @@ interface Watch {
   feedback: Feedback | undefined;
   /** When approvals, notes, and jobs were last read in full. */
   fullAt: number;
+  /** A refresh or a turn wants the next poll to skip every cache. */
+  isFullDue: boolean;
   /** The last review state read, refetched only when `key` changes. */
   graphs: { reviewers: Held<Reviewer[]>; merging: Held<Merging> };
   me: string | undefined;
@@ -115,7 +117,6 @@ interface Watch {
   turns: Map<string, Span>;
   line: string | undefined;
   /** How the last successful poll read the MR. */
-  via: Via | undefined;
   isMutedOpen: boolean;
   generation: number;
   isStopped: boolean;
@@ -367,6 +368,7 @@ async function readMr(
     view.updatedAt !== "" &&
     prev?.phase !== "pending" &&
     prev?.pending === 0 &&
+    !watch.isFullDue &&
     now - watch.fullAt < FULL_EVERY_MS;
   const isCheap = isGated && held.gate === gate;
   const [feedback, me, isHeadKnown] = await Promise.all([
@@ -621,9 +623,8 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
     if (!isCurrent() || seq !== watch.polls) return;
     watch.error = undefined;
     watch.errors = 0;
-    watch.via = read.kind === "mr" ? read.read : undefined;
     if (read.kind === "mr" && read.feedback !== undefined) {
-      if (read.feedback !== watch.feedback) watch.fullAt = now;
+      if (read.read !== "hit") Object.assign(watch, { fullAt: now, isFullDue: false });
       watch.feedback = read.feedback;
     }
     const { isTracked, isChanged } = apply($, watch, read, isCurrent);
@@ -648,6 +649,14 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
   }
 }
 
+// pollingSince marks the poll in flight, for the stuck check and the pane.
+async function pollNow($: EngineInterface, watch: Watch, generation: number, now: number) {
+  watch.pollingSince = now;
+  $.ui.invalidate("ui.render");
+  await poll($, watch, generation, now);
+  if (watch.pollingSince === now) watch.pollingSince = undefined;
+}
+
 async function tick($: EngineInterface, watch: Watch, generation: number): Promise<void> {
   const now = await $.clock.now();
   if (watch.isStopped || watch.generation !== generation) return;
@@ -662,9 +671,7 @@ async function tick($: EngineInterface, watch: Watch, generation: number): Promi
     emit($, "poll.stuck", { ms: now - watch.pollingSince }, false);
   }
   if (now < watch.due - TICK_MS / 2) return;
-  watch.pollingSince = now;
-  await poll($, watch, generation, now);
-  if (watch.pollingSince === now) watch.pollingSince = undefined;
+  await pollNow($, watch, generation, now);
 }
 
 // A refresh skips the cached reads, so it reads everything GitLab has now.
@@ -672,11 +679,8 @@ async function refresh($: EngineInterface, watch: Watch): Promise<void> {
   if (watch.isStopped || watch.pollingSince !== undefined) return;
   const now = await $.clock.now();
   emit($, "pane.refresh", { mr: watch.snapshot?.mr });
-  watch.fullAt = Number.NEGATIVE_INFINITY;
-  watch.pollingSince = now;
-  $.ui.invalidate("ui.render");
-  await poll($, watch, watch.generation, now);
-  if (watch.pollingSince === now) watch.pollingSince = undefined;
+  watch.isFullDue = true;
+  await pollNow($, watch, watch.generation, now);
   $.ui.invalidate("ui.render");
 }
 
@@ -732,6 +736,7 @@ export function register(on: On, options: PluginOptions): void {
     branch: undefined,
     feedback: undefined,
     fullAt: 0,
+    isFullDue: false,
     graphs: { reviewers: {}, merging: {} },
     me: undefined,
     noise,
@@ -748,7 +753,6 @@ export function register(on: On, options: PluginOptions): void {
     streak: 0,
     none: undefined,
     turns: new Map(),
-    via: undefined,
     isMutedOpen: false,
     line: undefined,
     generation: 0,
@@ -857,7 +861,7 @@ export function register(on: On, options: PluginOptions): void {
     render($, watch);
     if (e.agentId === undefined) {
       // Resolving a thread leaves updated_at alone, and a turn often resolves one.
-      watch.feedback = undefined;
+      watch.isFullDue = true;
       void wake($, watch);
     }
     return next(e);

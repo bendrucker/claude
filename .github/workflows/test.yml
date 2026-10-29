@@ -80,7 +80,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
 
       - name: Run tests
-        run: bun test evals/
+        run: bun test ./evals/
 
       - name: Check regex graders against examples
         run: |
@@ -294,6 +294,12 @@ jobs:
           working_directory: plugins/${{ matrix.plugin.name }}
           # The cache key globs every file in the workspace (~24s), while a cold install takes ~3s.
           cache: false
+
+      - name: Run plugin setup
+        working-directory: plugins/${{ matrix.plugin.name }}
+        run: |
+          [[ -f .ci.json ]] || exit 0
+          jq -r '.setup // [] | .[]' .ci.json | while IFS= read -r cmd; do bash -c "$cmd"; done
 
       # Profilers record through perf events, which the runner's default paranoia level blocks.
       - name: Allow perf events

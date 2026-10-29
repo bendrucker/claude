@@ -1,0 +1,37 @@
+# evidence: the user's headings name a topic in a couple of words; a linking verb or modal makes the heading a clause. Title case defeats the tagger, so this lists the verbs.
+# retire when: model headings stop carrying predicates.
+extends: existence
+message: "This heading reads like a sentence. Cut it to the noun phrase that names the topic, and move the explanation into the section's first sentence."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/SentenceHeading.yml
+level: warning
+scope: heading
+ignorecase: true
+tokens:
+  - is
+  - are
+  - was
+  - were
+  - should
+  - must
+  - will
+  - can
+  - cannot
+tests:
+  - name: positives
+    about: headings with a finite verb
+    input: |
+      ## Latency Is the Main Bottleneck
+
+      ## Retries Should Back Off
+    want: |
+      1:12:Writing.SentenceHeading:This heading reads like a sentence. Cut it to the noun phrase that names the topic, and move the explanation into the section's first sentence.
+      3:12:Writing.SentenceHeading:This heading reads like a sentence. Cut it to the noun phrase that names the topic, and move the explanation into the section's first sentence.
+  - name: negatives
+    about: noun-phrase headings
+    input: |
+      ## Blast Radius of a Leaked Key
+
+      ## Error Taxonomy
+
+      ## Token Exchange (RFC 8693)
+    want: ""

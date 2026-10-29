@@ -1,0 +1,34 @@
+# evidence: gen-5 corpus audit, the attention-flag frame runs 52.6/M assistant versus 2.9/M typed user (16.6x), and a verify pass found the wrapper deletable in every sampled case.
+# retire when: the frame rate falls to the typed-user baseline in a corpus audit window, or a labeling pass shows the frame mostly precedes genuinely optional asides.
+extends: existence
+message: "'%s' announces that a point matters instead of making it. Cut the wrapper and state the point."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/AttentionFlagWorth.yml
+level: error
+ignorecase: true
+tokens:
+  - '\bworth\s+(?:noting|knowing|flagging|mentioning|saying|stating|naming|recording|remembering|a\s+look|your\s+(?:attention|awareness|time|call))\b'
+tests:
+  - name: "flags Two things worth flagging before this merges."
+    input: |
+      Two things worth flagging before this merges.
+    contains: [Writing.AttentionFlagWorth]
+  - name: "flags Also worth noting for the rollout: the flag defaults off."
+    input: |
+      Also worth noting for the rollout: the flag defaults off.
+    contains: [Writing.AttentionFlagWorth]
+  - name: "flags One caveat worth your attention."
+    input: |
+      One caveat worth your attention.
+    contains: [Writing.AttentionFlagWorth]
+  - name: "allows The refactor is worth doing before the freeze."
+    input: |
+      The refactor is worth doing before the freeze.
+    absent: Writing.AttentionFlagWorth
+  - name: "allows That tradeoff is not worth it."
+    input: |
+      That tradeoff is not worth it.
+    absent: Writing.AttentionFlagWorth
+  - name: "allows The fix is worth confirming against staging."
+    input: |
+      The fix is worth confirming against staging.
+    absent: Writing.AttentionFlagWorth

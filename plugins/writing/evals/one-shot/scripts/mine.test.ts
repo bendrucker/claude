@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Finding } from "../../../detection/findings";
+import type { ValeAlert } from "../../../detection/vale";
 import { type Draft, firstDrafts, MIN_WORDS, type Payload, payloadsOf, sample } from "./mine";
 
 const prose = (word: string) => Array.from({ length: MIN_WORDS }, () => word).join(" ");
@@ -72,15 +72,15 @@ describe("firstDrafts", () => {
 });
 
 describe("sample", () => {
-  const finding = (category: string): Finding => ({
-    line: 1,
-    col: 1,
-    category,
-    tier: "context",
-    structural: false,
-    message: "",
+  const finding = (check: string): ValeAlert => ({
+    Line: 1,
+    Span: [1, 1],
+    Check: check,
+    Severity: "warning",
+    Match: "",
+    Message: "",
   });
-  const draft = (id: string, ...categories: string[]): Draft => ({
+  const draft = (id: string, ...checks: string[]): Draft => ({
     id,
     split: "dev",
     host: "local",
@@ -88,10 +88,10 @@ describe("sample", () => {
     tool: "Write",
     message: false,
     text: "",
-    findings: categories.map(finding),
+    findings: checks.map(finding),
   });
 
-  test("caps each category and still takes a draft carrying a rare one", () => {
+  test("caps each check and still takes a draft carrying a rare one", () => {
     const chosen = sample(
       [draft("a", "common"), draft("b", "common"), draft("c", "common", "rare")],
       1,

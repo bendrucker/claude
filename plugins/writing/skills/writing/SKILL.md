@@ -10,7 +10,7 @@ description: >-
 
 ## Patterns to Avoid
 
-The hook enforces most of these automatically; the rest ship in the scan and review skills. Specific vocabulary and marketing-verb lists live in [`wordlists/`](../../wordlists/).
+The hook enforces most of these automatically; the rest ship in the scan and review skills. The rules live as Vale styles in [`styles/Writing/`](../../styles/Writing/).
 
 #### Structure
 

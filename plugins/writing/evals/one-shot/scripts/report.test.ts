@@ -10,7 +10,7 @@ const makeResult = (overrides: Partial<Result> = {}): Result => ({
   ...overrides,
 });
 
-const found = (...categories: string[]) => categories.map((category) => ({ category }));
+const found = (...checks: string[]) => checks.map((check) => ({ Check: check }));
 
 const results = [
   makeResult({
@@ -22,11 +22,11 @@ const results = [
   makeResult({ id: "b", before: found("em dash"), after: found("tricolon") }),
 ];
 
-test("summarize counts fixes, survivors, introductions, and lossy drafts per category", () => {
+test("summarize counts fixes, survivors, introductions, and lossy drafts per check", () => {
   expect(summarize(results).rows).toEqual([
-    { category: "em dash", drafts: 2, before: 3, residual: 1, introduced: 0, lossy: 1 },
-    { category: "contrast", drafts: 1, before: 1, residual: 0, introduced: 0, lossy: 1 },
-    { category: "tricolon", drafts: 0, before: 0, residual: 0, introduced: 1, lossy: 0 },
+    { check: "em dash", drafts: 2, before: 3, residual: 1, introduced: 0, lossy: 1 },
+    { check: "contrast", drafts: 1, before: 1, residual: 0, introduced: 0, lossy: 1 },
+    { check: "tricolon", drafts: 0, before: 0, residual: 0, introduced: 1, lossy: 0 },
   ]);
 });
 

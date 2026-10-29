@@ -1,0 +1,118 @@
+- name: the splice rule fires in markdown
+  format: .md
+  input: &spliced |
+    The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.
+  contains: [Writing.SemicolonSplice]
+- name: the splice rule is off in code comments
+  format: .ts
+  input: |
+    // The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.
+    const x = 1;
+  contains: [Writing.CommentSplice]
+  absent: Writing.SemicolonSplice
+- name: the splice rule is off in a message
+  format: .prbody
+  input: *spliced
+  absent: Writing.SemicolonSplice
+
+- name: a single semicolon in prose is left to the per-semicolon rule
+  format: .md
+  input: |
+    The cache starts cold; the first request fills it.
+  contains: [ai-tells.SemicolonUsage]
+  absent: Writing.SemicolonSplice
+
+- name: a spliced code comment fires
+  format: .ts
+  input: |
+    // keep sorted; callers rely on order
+    const x = 1;
+  contains: [Writing.CommentSplice]
+- name: commented-out code is not a splice
+  format: .ts
+  input: |
+    // foo(); bar()
+    const x = 1;
+  absent: Writing.CommentSplice
+- name: a semicolon in a string literal is not a splice
+  format: .ts
+  input: |
+    const label = "cold start; warm later";
+  absent: Writing.CommentSplice
+- name: hex colors in an HTML style block are not splices
+  format: .html
+  input: |
+    <style>
+    /* Dark palette. */
+    :root { --bg: #12151b; --surface: #1a1e26; --fg: #e4e8ef; --muted: #98a1b0; --line: #2c323d;
+      --accent: #6c9cf0; --accent-fg: #0d1117; --chip: #232934; --good: #4cc27f; color-scheme: dark; }
+    </style>
+  absent: [Writing.CommentSplice, Writing.SemicolonSplice, ai-tells.SemicolonUsage]
+
+- name: a trope in a code comment fires
+  format: .ts
+  input: |
+    // All 8 tests pass
+    const x = 1;
+  contains: [Writing.TestResultReporting]
+- name: a trope in a string literal is skipped
+  format: .ts
+  input: |
+    const msg = "All 8 tests pass";
+  absent: Writing.TestResultReporting
+- name: block comments are linted
+  format: .ts
+  input: |
+    /**
+     * The cache — cold at first — warms up.
+     */
+    const x = 1;
+  contains: [Writing.SpacedEmDash]
+
+- name: a salutation fires in a PR body
+  format: .prbody
+  input: &salutation |
+    Dana, this fires for the entire run rather than the changed files.
+  contains: [Writing.Salutation]
+- name: a salutation is off in a markdown file
+  format: .md
+  input: *salutation
+  absent: Writing.Salutation
+- name: a connective opener is not a salutation
+  format: .prbody
+  input: |
+    Otherwise, this looks right.
+  absent: Writing.Salutation
+- name: a negated noun fires in a commit message
+  format: .commitmsg
+  input: |
+    The handler reads the cache, so the event costs no extra query.
+  contains: [Writing.NoNegation]
+
+- name: the section template on a short PR body fires
+  format: .prbody
+  input: |
+    Adds a flag.
+
+    ## Changes
+
+    - Adds `--verbose`
+
+    ## Testing
+
+    Manual.
+  contains: [Writing.TemplateOnSmallDocument]
+
+- name: a bold label in a string literal is skipped
+  format: .ts
+  input: |
+    const help = "**Note:** run the installer first.";
+  absent: Writing.BoldLabel
+
+- name: a tool name in a heading is accepted by the vocabulary
+  format: .md
+  input: |
+    ## Profiling With py-spy on macOS
+
+    Text.
+  absent: Writing.TitleCaseHeading

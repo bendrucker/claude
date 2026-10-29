@@ -1,0 +1,30 @@
+# evidence: each word was identified as promotional AI vocabulary, though none has a per-entry corpus audit.
+# retire when: a corpus audit shows an entry lacks lift or is dead. Remove that entry.
+extends: existence
+message: "'%s' reads as promotional AI language. Consider a more neutral word."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/PromotionalLanguage.yml
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:boasts|vibrant|showcasing|nestled|groundbreaking|renowned|diverse array)\b'
+tests:
+  - name: "flags The library boasts excellent performance."
+    input: |
+      The library boasts excellent performance.
+    contains: [Writing.PromotionalLanguage]
+  - name: "flags A groundbreaking approach to caching."
+    input: |
+      A groundbreaking approach to caching.
+    contains: [Writing.PromotionalLanguage]
+  - name: "flags A vibrant community, nestled in the docs."
+    input: |
+      A vibrant community, nestled in the docs.
+    contains: [Writing.PromotionalLanguage]
+  - name: "allows The server handles concurrent requests."
+    input: |
+      The server handles concurrent requests.
+    absent: Writing.PromotionalLanguage
+  - name: "allows A well-tested approach to retries."
+    input: |
+      A well-tested approach to retries.
+    absent: Writing.PromotionalLanguage

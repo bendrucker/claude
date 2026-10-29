@@ -4,19 +4,19 @@ exports[`report caps the list and counts the rest 1`] = `
 {
   "hookSpecificOutput": {
     "additionalContext": 
-"Writing checks found 13 issues in this text. Fix them in one pass.
+"Vale found 13 alerts in this text. Fix them in one pass.
 
-- rule 0: Cut the filler.
-- rule 1: Cut the filler.
-- rule 2: Cut the filler.
-- rule 3: Cut the filler.
-- rule 4: Cut the filler.
-- rule 5: Cut the filler.
-- rule 6: Cut the filler.
-- rule 7: Cut the filler.
-- rule 8: Cut the filler.
-- rule 9: Cut the filler.
-- …and 3 more. Run writing:scan --input to see all."
+- 1:1 Writing.Rule0: Cut the filler.
+- 1:1 Writing.Rule1: Cut the filler.
+- 1:1 Writing.Rule2: Cut the filler.
+- 1:1 Writing.Rule3: Cut the filler.
+- 1:1 Writing.Rule4: Cut the filler.
+- 1:1 Writing.Rule5: Cut the filler.
+- 1:1 Writing.Rule6: Cut the filler.
+- 1:1 Writing.Rule7: Cut the filler.
+- 1:1 Writing.Rule8: Cut the filler.
+- 1:1 Writing.Rule9: Cut the filler.
+- …and 3 more. Lint the text with Vale to see all."
 ,
     "hookEventName": "PreToolUse",
   },

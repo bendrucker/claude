@@ -8,7 +8,7 @@ import {
   GIT_MESSAGE_FILE_GUARD,
   MCP_PROSE_GUARD,
   PROSE_FLAGS,
-} from "./check-tropes";
+} from "./messages";
 import config from "./hooks.json";
 
 interface HookCommand {
@@ -34,6 +34,17 @@ function findCommand(matcher: string, script: string): string {
   return hook.command;
 }
 
+describe("PostToolUse", () => {
+  test("file edits route to the dispatcher unguarded", () => {
+    expect(config.hooks.PostToolUse).toEqual([
+      {
+        matcher: "Write|Edit|MultiEdit",
+        hooks: [{ type: "command", command: 'bun "${CLAUDE_PLUGIN_ROOT}/hooks/lint.ts"' }],
+      },
+    ]);
+  });
+});
+
 describe("PreToolUse gating", () => {
   test("every matcher routes to the single dispatcher", () => {
     const view = Object.fromEntries(
@@ -46,21 +57,18 @@ describe("PreToolUse gating", () => {
       ]),
     );
     expect(view).toEqual({
-      Write: [{ script: "pretooluse", guarded: false }],
-      Edit: [{ script: "pretooluse", guarded: false }],
-      MultiEdit: [{ script: "pretooluse", guarded: false }],
-      Bash: [{ script: "pretooluse", guarded: true }],
-      "mcp__.*": [{ script: "pretooluse", guarded: true }],
+      Bash: [{ script: "lint", guarded: true }],
+      "mcp__.*": [{ script: "lint", guarded: true }],
     });
   });
 
-  test("MCP guard grep is the one check-tropes exports", () => {
-    const command = findCommand("mcp__.*", "pretooluse");
+  test("MCP guard grep is the one messages.ts exports", () => {
+    const command = findCommand("mcp__.*", "lint");
     expect(command).toContain(`grep -qE '${MCP_PROSE_GUARD}'`);
   });
 
-  test("Bash guard alternation is derived from the flags check-tropes extracts", () => {
-    const command = findCommand("Bash", "pretooluse");
+  test("Bash guard alternation is derived from the flags messages.ts extracts", () => {
+    const command = findCommand("Bash", "lint");
     const alternation = `--(${PROSE_FLAGS.map((flag) => flag.slice(2)).join("|")})[-= ]`;
     expect(command).toContain(alternation);
     expect(command).toContain(FIELD_FILE_GUARD);
@@ -135,13 +143,13 @@ describe("inline guard behavior", () => {
     { name: "git commit inline message", command: "git commit -m 'fix: parser'", runs: false },
     { name: "flag-free long command", command: "ls -la && bun test plugins/writing", runs: false },
   ])("dispatcher bash: $name", async ({ command, runs }) => {
-    const hookCommand = findCommand("Bash", "pretooluse");
+    const hookCommand = findCommand("Bash", "lint");
     const result = await runGuard(hookCommand, {
       tool_name: "Bash",
       tool_input: { command },
     });
     expect(result.exitCode).toBe(0);
-    expect(result.calls).toEqual(runs ? ["bun /plugin/hooks/pretooluse.ts"] : []);
+    expect(result.calls).toEqual(runs ? ["bun /plugin/hooks/lint.ts"] : []);
   });
 
   test.each<{ name: string; input: Record<string, unknown>; runs: boolean }>([
@@ -159,9 +167,9 @@ describe("inline guard behavior", () => {
     },
     { name: "short search", input: { query: "negation hook" }, runs: false },
   ])("dispatcher mcp: $name", async ({ input, runs }) => {
-    const hookCommand = findCommand("mcp__.*", "pretooluse");
+    const hookCommand = findCommand("mcp__.*", "lint");
     const result = await runGuard(hookCommand, { tool_name: "mcp__x__y", tool_input: input });
     expect(result.exitCode).toBe(0);
-    expect(result.calls).toEqual(runs ? ["bun /plugin/hooks/pretooluse.ts"] : []);
+    expect(result.calls).toEqual(runs ? ["bun /plugin/hooks/lint.ts"] : []);
   });
 });

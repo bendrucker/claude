@@ -24,7 +24,7 @@ So every Bash-matched hook script must re-read `input.tool_input.command` and co
 
 The `plugin:hook` skill covers `async` and `asyncRewake`. Read it before marking a hook async here.
 
-Only the herdr state export in `user/settings.json` qualifies, alongside the generated `moshi-hook` entries. Everything else gates a call or emits `hookSpecificOutput`, including every hook in `plugins/*/hooks/hooks.json`. Keep `Stop` and `StopFailure` synchronous, since Claude Code kills their backgrounded processes before they finish, and `PermissionRequest`, which blocks to return a decision.
+Background a hook only when nothing in the session waits on its result: a notifier, a state export, a cache warm-up whose consumers check for it themselves. A hook that gates a call or emits `hookSpecificOutput` stays synchronous. Keep `Stop` and `StopFailure` synchronous, since Claude Code kills their backgrounded processes before they finish, and `PermissionRequest`, which blocks to return a decision.
 
 
 ## MCP Matchers

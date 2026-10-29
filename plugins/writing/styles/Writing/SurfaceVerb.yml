@@ -1,0 +1,30 @@
+# evidence: user-flagged 2026-06 as the highest-frequency tell. "Surface" is also a domain noun here ("chat surface", "surface area"), so the determiner after the verb picks out the verb-with-object sense.
+# retire when: a sense-aware corpus pass shows the verb usage isn't distinctive against the user baseline.
+extends: existence
+message: "'%s' uses 'surface' as a verb meaning reveal or report. Say 'show', 'report', or 'expose'."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/SurfaceVerb.yml
+level: warning
+ignorecase: true
+tokens:
+  - 'surfac(?:e|es|ed|ing)\s+(?:the|a|an|that|this|these|those|any|all|each|its|their|every)'
+tests:
+  - name: "flags The hook should surface the conflict to the user."
+    input: |
+      The hook should surface the conflict to the user.
+    contains: [Writing.SurfaceVerb]
+  - name: "flags The report surfaces these gaps automatically."
+    input: |
+      The report surfaces these gaps automatically.
+    contains: [Writing.SurfaceVerb]
+  - name: "flags Surface the PR link in the summary."
+    input: |
+      Surface the PR link in the summary.
+    contains: [Writing.SurfaceVerb]
+  - name: "allows The attack surface is large."
+    input: |
+      The attack surface is large.
+    absent: Writing.SurfaceVerb
+  - name: "allows Reduce the API surface area."
+    input: |
+      Reduce the API surface area.
+    absent: Writing.SurfaceVerb

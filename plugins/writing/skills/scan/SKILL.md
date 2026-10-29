@@ -6,7 +6,7 @@ description: >-
   gate on it, reporting every match with file, line, and column. Use `score` to
   measure trope density of one input on a per-1000-word basis, compare two
   drafts, or score code comments separately. Not for rewriting a single input.
-argument-hint: audit <path...> | score <input> | --input <file> [--message]
+argument-hint: "audit <path...> | score <input>"
 user-invocable: true
 allowed-tools:
   - Bash
@@ -15,58 +15,40 @@ allowed-tools:
 
 # Scan
 
-Detect AI writing tropes already present in prose. Two modes share the detection engine (`detection/scan.ts`), the same categories the `tropes` hook enforces on new edits. To transform a single input instead, use `writing:rewrite`.
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts audit "docs/**/*.md"
-bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts score path/to/draft.md
-```
-
-Run either subcommand with `--help` for its flags.
-
-## Exit Codes
-
-`audit` exits non-zero when it finds any trope, so it gates in CI or a pre-commit check. `score` is informational and always exits 0.
+Detect AI writing tropes already present in prose. Every mode lints through Vale with the plugin's `.vale.ini`, the same checks the hook enforces on new edits. To transform a single input instead, use `writing:rewrite`.
 
 ## Audit
 
-`audit <path...>` walks each directory or glob, keeps prose files (`.md`, `.markdown`, `.txt`, `.mdx`, `.rst`, `.adoc`), and skips `node_modules`, `.git`, wordlists, and memory/plan paths. There is no implicit whole-repo scan. Pass an explicit path.
+List the files or directories for Vale to lint. It walks directories itself and skips `node_modules` and `.git`:
 
-Each violation prints as `path:line:col: category: message`. A summary table follows on stderr with per-category counts and the noisiest files.
+```bash
+vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line docs README.md
+vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line --glob='*.md' .
+```
 
-Once the statistics artifact carries a measured re-scan for one of the rules firing here, the category table gains an `Acted on` column reading `accepted/revisited`, with `-` for an unmeasured category: how often a later whole-file re-scan stopped raising that rule after it fired in a real session. A rule the author wrote past more often than acted on is named below the table. Read its count as volume. `--data-dir` points at a different artifact.
+Each alert prints as `path:line:col:check:message`, where `check` is the Vale rule name (`Writing.SpacedEmDash`, `ai-tells.EmDashUsage`). Vale exits 1 when any alert is at `error` level, so the command gates in CI or a pre-commit check.
 
 Audit is report-only. Fix flagged files with `writing:rewrite` or direct edits at the reported positions.
 
+## Single Input
+
+`writing:rewrite` and other callers lint one input the same way:
+
+```bash
+vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line path/to/draft.md
+vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line --ext=.prbody < body.md
+```
+
+- `--ext=.prbody` with the text on stdin applies the rules for a message sent once (PR, issue, comment, Notion page), including salutations and closers. Use `--ext=.commitmsg` for a commit message. The surface is never inferred, so pass it for a message body even when the text sits in a file.
+- `--output=JSON` prints Vale's alerts keyed by path, each with `Check`, `Message`, `Severity`, `Line`, `Span`, and `Match`.
+
 ## Score
 
-`score <input>` takes one file path, inline text, or stdin and reports trope density per category.
+`score.ts` takes one file path, inline text, or stdin and reports Vale alerts per 1000 words for each check. It always exits 0.
 
-Word count is word tokens (`/[a-zA-Z]+/`) over the text with code stripped, matching how the wordlists tokenize. Density is `hits / (wordCount / 1000)`, so it reads as hits per 1000 words. A weighted group (marketing verbs, soft phrasing) counts as one hit when it crosses its threshold.
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/score.ts path/to/draft.md
+bun ${CLAUDE_SKILL_DIR}/scripts/score.ts --json path/to/draft.md
+```
 
-The table sorts by density.
-
-#### Comments
-
-For non-prose source files, single-line comments (`//`, `#`) are extracted and scored as a separate `comments` group, so prose-only patterns apply to them without an AST. Prose files skip this because their fenced code blocks are already stripped.
-
-#### Voice Delta
-
-`--voice-delta` appends a table of voice rate features (first-person rate, sentence length, backtick density, and friends) beside the rates from the local voice baseline. Each feature carries a provenance label: **skill-prescribed** drift means tune the skill, **skill-encouraged** deficits mean the skill is under-applied, and **ungoverned** features are genuine voice signal. The register check skips inputs too short or too markdown-heavy to compare against the PR-body baseline.
-
-A `Null` column appears where `writing:analyze` measured the permutation floors. `clears` means the corpus gap beat the floor in every length band measured (a band is a document-word-count range, which holds both corpora to comparable lengths), `noise` names a delta to read as sampling spread, `partial` means some stored band carries no floor for that feature, so the bands left untested could still be where the delta comes from, and `unmeasured` means no run covered it at all. The bands behind a `noise` or `partial` verdict are listed under the table.
-
-A second table follows where the artifact carries tag signatures: the share of this document's part-of-speech n-grams landing on a shape over-represented in the agent corpus, read against the agent and baseline shares, both measured over the length band the table names. Corpora separate on how often a shape recurs, which makes the share the number to read. Treat a single hit as noise.
-
-#### Custom Vocabulary
-
-`--wordlist <path>` compiles an extra stemmed vocabulary file (one term per line, `#` comments allowed) and scores it as a `custom vocabulary` category in every group, for context-specific terms a general wordlist would not flag.
-
-## Single-Input Mode
-
-`writing:rewrite` and other callers invoke `scan.ts --input` to lint one input against the audit categories without walking a directory. It reads a file path, inline text, or stdin and prints matches as `line:col: category: message` with no path prefix, exiting non-zero on any finding. This is the `audit` gate over a single input.
-
-It also runs the heading and step-numbering checks on markdown input.
-
-- `--message` treats the input as a message sent once (PR, issue, comment, commit, Notion page) and applies the rules for that surface, including salutations and closers. The surface is never inferred, so pass it for a message body even when the text sits in a file.
-- `--json` prints the findings as a JSON array of `{ line, col, category, tier, structural, message }`. The exit code is unchanged.
+Word count is Vale's own (`vale ls-metrics`), which leaves out code. Inline text and stdin score as a markdown file. Density is `alerts / (wordCount / 1000)`, and the table sorts by density.

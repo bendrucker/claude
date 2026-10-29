@@ -1,0 +1,6 @@
+/*
+!/.gitignore
+!/Writing/
+!/config/
+/config/*
+!/config/vocabularies/

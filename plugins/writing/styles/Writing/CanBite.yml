@@ -1,0 +1,26 @@
+# evidence: user-flagged 2026-06 as a recurring figurative construction for latent-bug risk. It lives almost entirely in conversational reasoning.
+# retire when: a chat-voice corpus pass shows the construction is not distinctive versus the user baseline.
+extends: existence
+message: "'%s' is figurative risk language for a latent bug. Name the failure: what breaks, and under what condition."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/CanBite.yml
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:can|could|will|may|might)\s+bite\b'
+tests:
+  - name: "flags A stale cache entry can bite at runtime."
+    input: |
+      A stale cache entry can bite at runtime.
+    contains: [Writing.CanBite]
+  - name: "flags That assumption could bite once the schema changes."
+    input: |
+      That assumption could bite once the schema changes.
+    contains: [Writing.CanBite]
+  - name: "allows The dog will bark at strangers."
+    input: |
+      The dog will bark at strangers.
+    absent: Writing.CanBite
+  - name: "allows This could break under load."
+    input: |
+      This could break under load.
+    absent: Writing.CanBite

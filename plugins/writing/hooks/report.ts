@@ -1,70 +1,54 @@
-import { formatContext, formatDecision, type PermissionTier, type SyncHookJSONOutput } from "./io";
+import type { ValeAlert } from "../detection/vale";
+import {
+  type Decision,
+  formatContext,
+  formatDecision,
+  type HookEvent,
+  type SyncHookJSONOutput,
+} from "./io";
 
 export const MAX_REPORTED = 10;
 
-const TIER_RANK: Record<PermissionTier, number> = { deny: 0, ask: 1, context: 2 };
-
-export interface HookFinding {
-  category: string;
-  tier: PermissionTier;
+export interface HookAlert {
+  check: string;
+  decision: Decision;
   message: string;
-  // A deny-tier trope in a Write or Edit already happened, so it is reported as
-  // context with an instruction to fix only the introduced text.
-  introduced?: boolean;
+  /** Where Vale reported it, as `line:column`. */
+  at: string;
 }
 
-export interface ReportTarget {
-  toolName: string;
-  filePath?: string | undefined;
+export function hookAlertOf(alert: ValeAlert, decision: Decision): HookAlert {
+  return {
+    check: alert.Check,
+    decision,
+    message: alert.Message,
+    at: `${alert.Line}:${alert.Span[0]}`,
+  };
 }
 
-function introducedInstruction({ toolName, filePath }: ReportTarget, listed: boolean): string {
-  const target = filePath != null && filePath !== "" ? `\`${filePath}\`` : "the file";
-  const subject = listed ? "the findings marked (introduced)" : "this";
-  if (toolName === "Write") {
-    const what = listed ? "those tropes" : "the trope you just introduced";
-    return `You wrote ${target} introducing ${subject}. Issue a follow-up Edit that fixes only ${what}. Do not modify unrelated parts of the file.`;
-  }
-  return `You introduced ${subject} in your edit to ${target}. Issue a follow-up Edit that targets only the text you just changed. Do not modify unrelated parts of the file, including other pre-existing tropes.`;
-}
-
-function renderOne(finding: HookFinding, target: ReportTarget): string {
-  return finding.introduced === true
-    ? `${finding.message} ${introducedInstruction(target, false)}`
-    : finding.message;
-}
-
-function renderMany(findings: HookFinding[], omitted: number, target: ReportTarget): string {
-  const lines = [
-    `Writing checks found ${findings.length + omitted} issues in this text. Fix them in one pass.`,
-  ];
-  if (findings.some((finding) => finding.introduced === true)) {
-    lines.push(introducedInstruction(target, true));
-  }
-  lines.push("");
-  for (const finding of findings) {
-    const mark = finding.introduced === true ? " (introduced)" : "";
-    lines.push(`- ${finding.category}${mark}: ${finding.message}`);
-  }
-  if (omitted > 0) {
-    lines.push(`- …and ${omitted} more. Run writing:scan --input to see all.`);
-  }
+function render(alerts: HookAlert[], omitted: number, filePath: string | undefined): string {
+  const total = alerts.length + omitted;
+  const where = filePath === undefined ? "this text" : `\`${filePath}\``;
+  const count = total === 1 ? "1 alert" : `${total} alerts`;
+  const fix = total === 1 ? "Fix it." : "Fix them in one pass.";
+  const lines = [`Vale found ${count} in ${where}. ${fix}`, ""];
+  for (const alert of alerts) lines.push(`- ${alert.at} ${alert.check}: ${alert.message}`);
+  if (omitted > 0) lines.push(`- …and ${omitted} more. Lint the text with Vale to see all.`);
   return lines.join("\n");
 }
 
-/** Every finding in one hook output, at the strictest tier any of them carries. */
+/** Every alert in one hook output, denying when any alert denies. */
 export function report(
-  findings: HookFinding[],
-  target: ReportTarget,
-): { output: SyncHookJSONOutput; tier: PermissionTier; shown: HookFinding[] } | null {
-  if (findings.length === 0) return null;
-  const ordered = findings.toSorted((a, b) => TIER_RANK[a.tier] - TIER_RANK[b.tier]);
+  alerts: HookAlert[],
+  { event, filePath }: { event: HookEvent; filePath?: string | undefined },
+): { output: SyncHookJSONOutput; decision: Decision; shown: HookAlert[] } | null {
+  if (alerts.length === 0) return null;
+  const ordered = alerts.toSorted(
+    (a, b) => Number(b.decision === "deny") - Number(a.decision === "deny"),
+  );
   const shown = ordered.slice(0, MAX_REPORTED);
-  const omitted = ordered.length - shown.length;
-  const [first] = shown;
-  const text =
-    shown.length === 1 && first ? renderOne(first, target) : renderMany(shown, omitted, target);
-  const tier = ordered[0]?.tier ?? "context";
-  const output = tier === "context" ? formatContext(text) : formatDecision(tier, text);
-  return { output, tier, shown };
+  const text = render(shown, ordered.length - shown.length, filePath);
+  const decision = ordered[0]?.decision ?? "context";
+  const output = decision === "deny" ? formatDecision(text) : formatContext(event, text);
+  return { output, decision, shown };
 }

@@ -1,0 +1,41 @@
+# evidence: the `**Label:**` form is a reliable AI-template signal in file writes, and a bold-colon label opening a list item reads as a file manifest or a templated field.
+# retire when: the model reliably uses headings instead, or the pattern fires on user-authored markdown at a high rate.
+extends: existence
+message: "'**%s**' is a bold label. Use a heading, or fold the label into the sentence."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/BoldLabel.yml
+level: error
+scope: strong
+nonword: true
+tokens:
+  - '^.+:\s*$'
+tests:
+  - name: "flags a bold label opening a paragraph"
+    input: |
+      **Why:** the diff is small.
+    contains: [Writing.BoldLabel]
+  - name: "flags a bold label opening a list item"
+    input: |
+      - **Setup:** run the installer.
+    contains: [Writing.BoldLabel]
+  - name: "flags a bold label opening a numbered item"
+    input: |
+      1. **Result:** it passes.
+    contains: [Writing.BoldLabel]
+  - name: "allows a heading"
+    input: |
+      #### Why
+
+      The diff is small.
+    absent: Writing.BoldLabel
+  - name: "allows mid-sentence bold"
+    input: |
+      The diff is **small** and clear.
+    absent: Writing.BoldLabel
+  - name: "allows bold without a colon"
+    input: |
+      **Important** note about things.
+    absent: Writing.BoldLabel
+  - name: "allows bold markers in a code span"
+    input: |
+      Use `**Note:**` for bold in this guide.
+    absent: Writing.BoldLabel

@@ -1,0 +1,26 @@
+# evidence: pre-dates the curation principle, with no corpus evidence recorded. Kept because the construction is consistently wrong in practice.
+# retire when: corrective feedback stops citing it, or corpus spot-checks show it flagging legitimate usage.
+extends: existence
+message: "'%s' avoids a simple copula. Use 'is' or 'are' instead."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/CopulaAvoidance.yml
+level: error
+ignorecase: true
+tokens:
+  - '(?:serves|stands) as'
+tests:
+  - name: "flags The module serves as the entry point."
+    input: |
+      The module serves as the entry point.
+    contains: [Writing.CopulaAvoidance]
+  - name: "flags This stands as a reminder."
+    input: |
+      This stands as a reminder.
+    contains: [Writing.CopulaAvoidance]
+  - name: "allows The restaurant serves food."
+    input: |
+      The restaurant serves food.
+    absent: Writing.CopulaAvoidance
+  - name: "allows She stands at the podium."
+    input: |
+      She stands at the podium.
+    absent: Writing.CopulaAvoidance

@@ -1,0 +1,30 @@
+# evidence: none recorded; pre-dates the curation principle. Kept as a low-false-positive opener pattern.
+# retire when: the opener stops appearing in deliverable prose, or corrective-feedback moments stop citing it.
+extends: existence
+message: "'%s' elides the subject. Use 'Added tests covering ...' or describe the change."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/TestsCoverPreamble.yml
+level: warning
+nonword: true
+tokens:
+  - '(?m)^Tests\s+(?:cover|verify|ensure|validate)\b'
+tests:
+  - name: "flags Tests cover error handling for malformed JSON."
+    input: |
+      Tests cover error handling for malformed JSON.
+    contains: [Writing.TestsCoverPreamble]
+  - name: "flags Tests verify the retry logic."
+    input: |
+      Tests verify the retry logic.
+    contains: [Writing.TestsCoverPreamble]
+  - name: "allows Added tests covering error handling."
+    input: |
+      Added tests covering error handling.
+    absent: Writing.TestsCoverPreamble
+  - name: "allows The suite validates the retry logic."
+    input: |
+      The suite validates the retry logic.
+    absent: Writing.TestsCoverPreamble
+  - name: "allows The new tests cover the parser."
+    input: |
+      The new tests cover the parser.
+    absent: Writing.TestsCoverPreamble

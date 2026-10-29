@@ -1,3 +1,4 @@
 {
-  "paths": ["packages/evals/"]
+  "paths": ["packages/evals/"],
+  "setup": ["bun hooks/sessionstart.ts"]
 }

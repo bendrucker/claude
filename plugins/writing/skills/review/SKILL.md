@@ -32,10 +32,10 @@ The first positional is the document path. If none is provided, ask the user. Op
 Run the pattern rules over the document before any agent starts:
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/../scan/scripts/scan.ts --input <doc-path> --json
+vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=JSON <doc-path>
 ```
 
-Add `--message` when the document is a PR, issue, or comment body. It exits 1 when it finds anything, which is expected. Pass the JSON findings to `writing:style`.
+When the document is a PR, issue, or comment body, pipe it on stdin with `--ext=.prbody`. Vale exits 1 on an error-level alert, which is expected. Pass the JSON findings to `writing:style`.
 
 ## Dispatch Agents
 

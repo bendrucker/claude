@@ -1,0 +1,28 @@
+# evidence: none recorded; pre-dates the curation principle. Kept because the construction
+#   reliably signals permission-seeking in a message.
+# retire when: the pattern no longer appears in corrective-feedback moments, or real
+#   permission-seeking phrases shift to a different form.
+extends: existence
+message: "'%s' reads as permission-seeking. Just do it, or describe options."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/PermissionSeeking.yml
+level: warning
+ignorecase: true
+tokens:
+  - 'want\s+me\s+to\s+\w+'
+tests:
+  - name: "flags Want me to fix that for you?"
+    input: |
+      Want me to fix that for you?
+    contains: [Writing.PermissionSeeking]
+  - name: "flags Want me to run the tests?"
+    input: |
+      Want me to run the tests?
+    contains: [Writing.PermissionSeeking]
+  - name: "allows They want me there by noon."
+    input: |
+      They want me there by noon.
+    absent: Writing.PermissionSeeking
+  - name: "allows I want to understand the issue."
+    input: |
+      I want to understand the issue.
+    absent: Writing.PermissionSeeking

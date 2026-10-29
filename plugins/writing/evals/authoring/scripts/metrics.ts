@@ -96,19 +96,10 @@ function blockText(content: unknown): string {
   return "";
 }
 
-// The only `permissionDecision: "deny"` outputs the writing plugin's hooks can produce, so the
-// substrings below are exhaustive rather than a sample. In `plugins/writing/detection/tropes.ts`
-// only the "salutation" and "spaced em dash" categories carry `structural: true`, the flag
-// `check-tropes.ts`'s `processSideEffect` requires to block a Bash call (PR/issue body prose);
-// every other deny-tier category there only ever reaches `formatContext`, a reminder that lets
-// the call through. `plugins/writing/hooks/numbering.ts` denies only a Write/Edit to a
-// non-markdown file. The list is hand-maintained because a hook builds its reason at runtime, so
-// the string cannot be read off source, and it drifts as hooks are reworded.
-export const WRITING_DENY_MARKERS = [
-  "are an AI writing tell",
-  "opens the comment with a salutation",
-  "Detected step or phase numbering that creates tight coupling",
-];
+// Text a writing-hook deny reason carries. A deny lists several findings under `report.ts`'s
+// header, or carries one Vale error-level message alone. Hand-maintained, since the hook builds
+// its reason at runtime.
+export const WRITING_DENY_MARKERS = ["Writing checks found", "are an AI writing tell"];
 
 // Since 2026-09-19 the harness prepends this before a PreToolUse deny's reason reaches the
 // denied call's tool_result. Stripping it is not required for the substring match above, but
@@ -141,9 +132,9 @@ export function hookDenies(trace: string): number {
 
 /** Trope density per 1000 words. */
 export async function tropeDensity(text: string): Promise<number> {
-  const report = await scoreText(text, undefined);
+  const report = await scoreText(text);
   if (report.wordCount === 0) return 0;
-  const hits = report.categories.reduce((sum, c) => sum + c.hits, 0);
+  const hits = report.checks.reduce((sum, c) => sum + c.hits, 0);
   return hits / (report.wordCount / 1000);
 }
 

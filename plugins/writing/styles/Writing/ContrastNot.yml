@@ -1,0 +1,37 @@
+# evidence: none recorded; pre-dates the curation principle. Kept because the rhetorical "X, not Y" contrast is a consistent AI-prose tell.
+# retire when: precision is low on a labeled corpus sample, or the pattern fires heavily on user text.
+extends: existence
+message: "'%s' is a rhetorical 'X, not Y' contrast. State the positive directly."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/ContrastNot.yml
+level: warning
+ignorecase: true
+nonword: true
+exceptions:
+  - ',\s+not\s+(?:necessarily|including|to\s+mention)\b'
+tokens:
+  - '\b\w[\w\s]{2,40},\s+not\s+\w[\w\s]{2,30}(?:[.!?,;:]|$)'
+tests:
+  - name: "flags This is a tool, not a framework."
+    input: |
+      This is a tool, not a framework.
+    contains: [Writing.ContrastNot]
+  - name: "flags The goal is clarity, not perfection."
+    input: |
+      The goal is clarity, not perfection.
+    contains: [Writing.ContrastNot]
+  - name: "allows It is not the case that X."
+    input: |
+      It is not the case that X.
+    absent: Writing.ContrastNot
+  - name: "allows Not a framework, but a tool."
+    input: |
+      Not a framework, but a tool.
+    absent: Writing.ContrastNot
+  - name: "allows The cache is fast, not necessarily correct."
+    input: |
+      The cache is fast, not necessarily correct.
+    absent: Writing.ContrastNot
+  - name: "allows Ship the build, not including the docs."
+    input: |
+      Ship the build, not including the docs.
+    absent: Writing.ContrastNot

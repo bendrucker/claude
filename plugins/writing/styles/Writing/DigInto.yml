@@ -1,0 +1,44 @@
+# evidence: assistant output uses exploration-filler "into" constructions in inflected
+#   forms, including the irregular pasts "dug into" and "dove into", so each is listed.
+# retire when: corpus analysis shows the construction is no longer distinctive. Drop
+#   individual inflections that stop appearing in assistant output.
+extends: existence
+message: "'%s' is exploration filler. Describe what you're actually looking at."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/DigInto.yml
+level: warning
+ignorecase: true
+tokens:
+  - '(?:dig|digs|digging|dug|dive|dives|diving|dove|dived|wade|wades|wading|waded)\s+into'
+tests:
+  - name: "flags Let's dig into the codebase."
+    input: |
+      Let's dig into the codebase.
+    contains: [Writing.DigInto]
+  - name: "flags I dug into the parser internals."
+    input: |
+      I dug into the parser internals.
+    contains: [Writing.DigInto]
+  - name: "flags She dove into the schema migration."
+    input: |
+      She dove into the schema migration.
+    contains: [Writing.DigInto]
+  - name: "flags We're digging into the root cause."
+    input: |
+      We're digging into the root cause.
+    contains: [Writing.DigInto]
+  - name: "flags We'll dive into the data later."
+    input: |
+      We'll dive into the data later.
+    contains: [Writing.DigInto]
+  - name: "flags The audit dives into each subsystem."
+    input: |
+      The audit dives into each subsystem.
+    contains: [Writing.DigInto]
+  - name: "allows She dug a trench."
+    input: |
+      She dug a trench.
+    absent: Writing.DigInto
+  - name: "allows Water drains into the basin."
+    input: |
+      Water drains into the basin.
+    absent: Writing.DigInto

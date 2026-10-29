@@ -11,6 +11,8 @@ const CiConfig = z.looseObject({
    * of a file the plugin keeps a checked copy of.
    */
   paths: z.array(z.string()).optional(),
+  /** Shell commands the job runs in the plugin directory before its tests. */
+  setup: z.array(z.string()).optional(),
 });
 type CiConfig = z.infer<typeof CiConfig>;
 

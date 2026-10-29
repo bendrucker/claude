@@ -1,0 +1,26 @@
+# evidence: gen-5 corpus audit, 96 of 159 "picture" hits sit in two fixed frames at 15.4/M assistant versus 3.7/M user, almost always as preamble before the finding.
+# retire when: a later corpus pass shows the frame rate collapsed, or a chat-voice rewrite pass absorbs it.
+extends: existence
+message: "'%s' is a transition marker that defers the substance. Say what you learned or what changed."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/FullPicture.yml
+level: warning
+ignorecase: true
+tokens:
+  - '\b(?:(?:full|complete|whole|real|bigger|clearer?)\s+picture|(?:chang(?:es?|ed|ing)|shift(?:s|ed|ing)?|complet(?:es?|ed|ing))\s+the\s+picture)\b'
+tests:
+  - name: "flags After the third log read I have a complete picture."
+    input: |
+      After the third log read I have a complete picture.
+    contains: [Writing.FullPicture]
+  - name: "flags That stack trace changed the picture."
+    input: |
+      That stack trace changed the picture.
+    contains: [Writing.FullPicture]
+  - name: "allows The picture shows the login screen."
+    input: |
+      The picture shows the login screen.
+    absent: Writing.FullPicture
+  - name: "allows A reviewer would picture the whole flow."
+    input: |
+      A reviewer would picture the whole flow.
+    absent: Writing.FullPicture

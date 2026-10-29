@@ -1,0 +1,27 @@
+# evidence: none recorded; pre-dates the curation principle. Kept because a hedge word dangling at the end of a sentence is a consistent AI-prose tell.
+# retire when: corpus analysis shows the pattern fires on user text at comparable rates.
+extends: existence
+message: "'%s' dangles at sentence end as AI hedging. Drop it or rewrite the clause."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/TrailingHedge.yml
+level: warning
+ignorecase: true
+nonword: true
+tokens:
+  - '(?m)\b(?:regardless|nonetheless|anyway)\.[ \t]*$'
+tests:
+  - name: "flags The approach has tradeoffs regardless."
+    input: |
+      The approach has tradeoffs regardless.
+    contains: [Writing.TrailingHedge]
+  - name: "flags The fix works anyway."
+    input: |
+      The fix works anyway.
+    contains: [Writing.TrailingHedge]
+  - name: "allows Regardless of the input, the parser rejects it."
+    input: |
+      Regardless of the input, the parser rejects it.
+    absent: Writing.TrailingHedge
+  - name: "allows The fix works anyway you look at it."
+    input: |
+      The fix works anyway you look at it.
+    absent: Writing.TrailingHedge

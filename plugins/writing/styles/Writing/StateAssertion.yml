@@ -1,0 +1,32 @@
+# evidence: "stays" or "remains" before a state runs 0.524/1k in model drafts against 0.105/1k in the user's pre-AI writing, a lift of 5.0. It states a requirement as though it were a description, so the reader cannot tell a rule from an observation.
+# retire when: the draft rate falls to the voice baseline, or a labeling pass shows most hits are plain facts about a state that changes.
+extends: existence
+message: "'%s' asserts a state. For a requirement, say so with 'should': 'should be synchronous' rather than 'stays synchronous'. Otherwise say what happens."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/StateAssertion.yml
+level: warning
+ignorecase: true
+nonword: true
+tokens:
+  # The verb, then a word that names a state rather than a place, a preposition, or a clause.
+  - '\b(?:stays?|stayed|remains?|remained)\s+(?!(?:as|is|of|and|or|but|so|yet|just|well|because|that|which|where|when|while|in|at|on|with|until|the|a|an|to|for|by|from|within|inside|outside|under|behind|there|here|up|out|off|around|away|back|home|one|part|today|our|ours|its|their)\b)[a-z][\w-]*'
+tests:
+  - name: "flags a requirement written as a state"
+    input: |
+      A hook that gates a call stays synchronous.
+    contains: [Writing.StateAssertion]
+  - name: "flags remains before a state"
+    input: |
+      The flag remains user-invoked.
+    contains: [Writing.StateAssertion]
+  - name: "allows the requirement stated with a modal"
+    input: |
+      A hook that gates a call should be synchronous.
+    absent: Writing.StateAssertion
+  - name: "allows a place or a preposition"
+    input: |
+      The file stays in the repo. The value remains at its default. It stays with the caller.
+    absent: Writing.StateAssertion
+  - name: "allows remains as a noun and remaining"
+    input: |
+      The remains of the build were removed. The remaining work is small.
+    absent: Writing.StateAssertion

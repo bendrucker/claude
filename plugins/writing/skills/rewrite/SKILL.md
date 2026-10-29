@@ -34,15 +34,15 @@ If `$ARGUMENTS` is a path to an existing file, read the file. Otherwise treat it
 
 ## Lint
 
-Before and after rewriting, run the scan script in single-input mode to find violations. It accepts a file path, inline text, or stdin and outputs one finding per line (`line:col: category: message`):
+Before and after rewriting, lint the draft with Vale to find its alerts. It prints one per line (`path:line:col:check:message`):
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/../scan/scripts/scan.ts --input path/to/file.md
+vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line path/to/file.md
 ```
 
-Pass `--message` when the rewrite target is a message body (PR, issue, comment, commit).
+When the rewrite target is a message body (PR, issue, comment), pipe it on stdin with `--ext=.prbody`, or `--ext=.commitmsg` for a commit message.
 
-Fix every hard tell (em dash, copula avoidance, hedging, filler, vocabulary, and the other fixed-phrase categories), then re-run until those are clean.
+Fix every hard tell (em dash, copula avoidance, hedging, filler, vocabulary, and the other fixed-phrase checks), then re-run until those are clean.
 
 Treat `marketing verb` findings as advisory. The script flags each one, but the live hook only objects when their weighted sum is high enough, so a lone marketing verb may be fine. Consider each in context and replace the ones that read as promotional rather than driving the count to zero.
 

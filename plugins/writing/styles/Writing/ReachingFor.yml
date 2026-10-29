@@ -1,0 +1,30 @@
+# evidence: pre-dates the curation principle with no corpus evidence recorded. Kept because the figurative construction is distinctive to AI output.
+# retire when: corpus analysis shows the phrase at low lift, or corrective-feedback moments stop citing it.
+extends: existence
+message: "'%s' is an AI-flavored figurative construction. Prefer 'use' or 'prefer X over Y'."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/ReachingFor.yml
+level: error
+ignorecase: true
+tokens:
+  - '\breach(?:ing|es|ed)?\s+for\b'
+tests:
+  - name: "flags Open a sibling pane rather than reaching for Bash."
+    input: |
+      Open a sibling pane rather than reaching for Bash.
+    contains: [Writing.ReachingFor]
+  - name: "flags Reach for the linter before the formatter."
+    input: |
+      Reach for the linter before the formatter.
+    contains: [Writing.ReachingFor]
+  - name: "flags She reaches for the shell first."
+    input: |
+      She reaches for the shell first.
+    contains: [Writing.ReachingFor]
+  - name: "allows She reached the summit by noon."
+    input: |
+      She reached the summit by noon.
+    absent: Writing.ReachingFor
+  - name: "allows The fix is within reach."
+    input: |
+      The fix is within reach.
+    absent: Writing.ReachingFor

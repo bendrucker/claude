@@ -1,0 +1,26 @@
+# evidence: none recorded; pre-dates the curation principle. Kept because the "not just X, but Y" structure is a consistent AI tell.
+# retire when: corpus analysis shows the pattern fires at low lift, or a tagger-based replacement matches its precision.
+extends: existence
+message: "'%s' is a not-just-but-also parallelism. Simplify the sentence."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/NotOnlyBut.yml
+level: warning
+ignorecase: true
+tokens:
+  - 'not\s+(?:just|only)\s+[^.!?\n]{1,50},\s+but\s+(?:also\s+)?'
+tests:
+  - name: "flags It is not just fast, but also reliable."
+    input: |
+      It is not just fast, but also reliable.
+    contains: [Writing.NotOnlyBut]
+  - name: "flags This not only improves speed, but reduces memory."
+    input: |
+      This not only improves speed, but reduces memory.
+    contains: [Writing.NotOnlyBut]
+  - name: "allows Not just yet."
+    input: |
+      Not just yet.
+    absent: Writing.NotOnlyBut
+  - name: "allows It is fast, reliable, and cheap."
+    input: |
+      It is fast, reliable, and cheap.
+    absent: Writing.NotOnlyBut

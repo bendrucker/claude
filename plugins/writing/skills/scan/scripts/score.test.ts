@@ -1,282 +1,45 @@
 import { describe, expect, it } from "bun:test";
-import { compileStemmedWordlist } from "../../../detection/wordlists";
-import type { WritingStatistics } from "../../analyze/scripts/statistics";
-import type { VoiceProfile } from "../../analyze/scripts/voice-profile";
-import {
-  buildReport,
-  renderSignatureTable,
-  renderTable,
-  renderVoiceDeltaTable,
-  scoreComments,
-  scoreText,
-} from "./score";
-
-function category(report: Awaited<ReturnType<typeof buildReport>>, group: string, name: string) {
-  return report.groups.find((g) => g.group === group)?.categories.find((c) => c.category === name);
-}
+import { renderTable, scoreText } from "./score";
 
 describe("scoreText", () => {
-  it("counts word tokens over stripped code", async () => {
-    const text = "The function reads input. `ignored code here`";
-    const score = await scoreText(text, undefined);
+  it("counts words as Vale does, leaving out code", async () => {
+    const score = await scoreText("The function reads input. `ignored code here`");
     expect(score.wordCount).toBe(4);
   });
 
   it("reports density as hits per 1000 words", async () => {
     // One em dash in a 1000-word body lands at density 1.0.
-    const filler = `${"word ".repeat(998)}a — b`;
-    const score = await scoreText(filler, "doc.md");
+    const score = await scoreText(`${"word ".repeat(998)}a — b`);
     expect(score.wordCount).toBe(1000);
-    const emDash = score.categories.find((c) => c.category === "spaced em dash");
+    const emDash = score.checks.find((c) => c.check === "Writing.SpacedEmDash");
     expect(emDash?.hits).toBe(1);
     expect(emDash?.density).toBeCloseTo(1.0, 5);
   });
 
-  it("returns no categories for clean prose", async () => {
-    const score = await scoreText("The function reads input and writes output.", undefined);
-    expect(score.categories).toHaveLength(0);
-  });
-
-  it("scores a custom vocabulary pass when given a matcher", async () => {
-    const match = compileStemmedWordlist("widget\n");
-    const score = await scoreText("The widget powers the widgets.", undefined, match);
-    const custom = score.categories.find((c) => c.category === "custom vocabulary");
-    expect(custom?.hits).toBe(2);
-  });
-});
-
-describe("scoreComments", () => {
-  it("scores extracted comments as a separate prose group", async () => {
-    const src = "function f() {\n  // We reach for the helper here.\n  return 1;\n}\n";
-    const group = await scoreComments(src, "src.ts");
-    expect(group?.group).toBe("comments");
-    const reaching = group?.categories.find((c) => c.category === "reaching for");
-    expect(reaching?.hits).toBe(1);
-  });
-
-  it("returns undefined when there are no comments", async () => {
-    expect(await scoreComments("const x = 1;\nconst y = 2;\n", "src.ts")).toBeUndefined();
-  });
-});
-
-describe("buildReport", () => {
-  it("emits only the prose group when comments are off", async () => {
-    const report = await buildReport("// leverage this", "src.ts", { comments: false });
-    expect(report.groups.map((g) => g.group)).toEqual(["prose"]);
-  });
-
-  it("adds a comments group when comments are on", async () => {
-    const src = "function f() {\n  // We delve into the leverage here today.\n}\n";
-    const report = await buildReport(src, "src.ts", { comments: true });
-    expect(report.groups.map((g) => g.group)).toContain("comments");
-    expect(category(report, "comments", "AI vocabulary")?.hits).toBeGreaterThan(0);
-  });
-
-  it("applies the custom matcher to every group", async () => {
-    const match = compileStemmedWordlist("widget\n");
-    const src = "const w = 1; // a widget comment\nwidget();\n";
-    const report = await buildReport(src, "src.ts", { comments: true, customMatch: match });
-    expect(category(report, "prose", "custom vocabulary")?.hits).toBe(2);
-    expect(category(report, "comments", "custom vocabulary")?.hits).toBe(1);
+  it("returns no checks for clean prose", async () => {
+    const score = await scoreText("The function reads input and writes output.");
+    expect(score.checks).toHaveLength(0);
   });
 });
 
 describe("renderTable", () => {
-  it("header with word count and category rows", async () => {
-    expect(renderTable(await buildReport("a — b", "doc.md", { comments: false })))
-      .toMatchInlineSnapshot(`
-      "prose (2 words)
-      ╔════════════════╤══════╤═════════════╗
-      ║ Category       │ Hits │ Density /1k ║
-      ╟────────────────┼──────┼─────────────╢
-      ║ spaced em dash │ 1    │ 500.0       ║
-      ╚════════════════╧══════╧═════════════╝"
+  it("header with word count and check rows", async () => {
+    expect(renderTable(await scoreText("a — b"))).toMatchInlineSnapshot(`
+      "2 words
+      ╔══════════════════════╤══════╤═════════════╗
+      ║ Check                │ Hits │ Density /1k ║
+      ╟──────────────────────┼──────┼─────────────╢
+      ║ ai-tells.EmDashUsage │ 1    │ 500.0       ║
+      ╟──────────────────────┼──────┼─────────────╢
+      ║ Writing.SpacedEmDash │ 1    │ 500.0       ║
+      ╚══════════════════════╧══════╧═════════════╝"
     `);
   });
 
-  it("no patterns for clean prose", async () => {
-    expect(
-      renderTable(await buildReport("The function reads input.", "doc.md", { comments: false })),
-    ).toMatchInlineSnapshot(`
-      "prose (4 words)
-      No patterns detected."
+  it("no alerts for clean prose", async () => {
+    expect(renderTable(await scoreText("The function reads input."))).toMatchInlineSnapshot(`
+      "4 words
+      No alerts."
     `);
-  });
-});
-
-// Invented fixture profile for voice-delta rendering. Rates are made-up
-// numbers; real baseline stats stay in the local data dir.
-const fixtureProfile: VoiceProfile = {
-  documentCount: 5,
-  totalTokens: 1200,
-  ngrams: {},
-  stemmedNgrams: {},
-  totalStemmedTokens: 1100,
-  generatedAt: "2026-01-01",
-  sources: ["github"],
-  voiceDelta: {
-    rates: { first_person_rate: 9.5 },
-    documentCount: 5,
-    computedAt: "2026-01-01",
-  },
-};
-
-const inRegisterText =
-  "This fixes the loader race. I noticed it while testing retries. The fix holds the lock across the read.";
-
-describe("renderVoiceDeltaTable", () => {
-  const cases: { name: string; text: string; profile: VoiceProfile | null }[] = [
-    {
-      name: "rate, baseline, and delta columns for in-register text",
-      text: inRegisterText,
-      profile: fixtureProfile,
-    },
-    {
-      name: "skips the baseline comparison for out-of-register input",
-      text: "Too short.",
-      profile: fixtureProfile,
-    },
-    { name: "missing baseline still renders rates", text: inRegisterText, profile: null },
-  ];
-
-  it.each(cases)("$name", async ({ text, profile }) => {
-    expect(await renderVoiceDeltaTable(text, profile)).toMatchSnapshot();
-  });
-
-  it("omits the baseline column when the comparison is skipped or unavailable", async () => {
-    expect(await renderVoiceDeltaTable("Too short.", fixtureProfile)).not.toContain("Baseline");
-    expect(await renderVoiceDeltaTable(inRegisterText, null)).not.toContain("Baseline");
-  });
-});
-
-// Invented floors over the live feature ids. The real artifact is built from
-// corpora that stay on the machine that measured them.
-const gatedStatistics: WritingStatistics = {
-  generatedAt: "2026-01-01T00:00:00.000Z",
-  rateNulls: {
-    runs: [
-      {
-        splits: 500,
-        percentile: 95,
-        seed: 1,
-        minWords: null,
-        maxWords: null,
-        floors: [
-          { featureId: "first_person_rate", gap: 4, floor: 1 },
-          { featureId: "backtick_density", gap: 2, floor: 1 },
-        ],
-      },
-      {
-        splits: 500,
-        percentile: 95,
-        seed: 1,
-        minWords: 100,
-        maxWords: 400,
-        floors: [
-          { featureId: "first_person_rate", gap: 4, floor: 1 },
-          { featureId: "backtick_density", gap: 0.5, floor: 1 },
-        ],
-      },
-    ],
-  },
-};
-
-describe("renderVoiceDeltaTable with null floors", () => {
-  it("adds a verdict per feature and names the bands a delta failed", async () => {
-    expect(
-      await renderVoiceDeltaTable(inRegisterText, fixtureProfile, gatedStatistics),
-    ).toMatchSnapshot();
-  });
-
-  it("holds the verdict column back without a baseline to gate", async () => {
-    expect(await renderVoiceDeltaTable(inRegisterText, null, gatedStatistics)).not.toContain(
-      "Null",
-    );
-    expect(
-      await renderVoiceDeltaTable("Too short.", fixtureProfile, gatedStatistics),
-    ).not.toContain("Null floor:");
-  });
-
-  it("holds it back when no null has been measured", async () => {
-    const empty = { generatedAt: "2026-01-01T00:00:00.000Z", rateNulls: { runs: [] } };
-    expect(await renderVoiceDeltaTable(inRegisterText, fixtureProfile, empty)).toBe(
-      await renderVoiceDeltaTable(inRegisterText, fixtureProfile),
-    );
-  });
-
-  // A band rebuilt before a feature existed carries no floor for it. Reading
-  // the one run that does cover it as `clears` would certify a gap against the
-  // length confound the banding exists to rule out.
-  it("withholds clears from a feature a stored band never measured", async () => {
-    const partial: WritingStatistics = {
-      generatedAt: "2026-01-01T00:00:00.000Z",
-      rateNulls: {
-        runs: [
-          {
-            splits: 500,
-            percentile: 95,
-            seed: 1,
-            minWords: null,
-            maxWords: null,
-            floors: [
-              { featureId: "first_person_rate", gap: 4, floor: 1 },
-              { featureId: "backtick_density", gap: 2, floor: 1 },
-            ],
-          },
-          {
-            splits: 500,
-            percentile: 95,
-            seed: 1,
-            minWords: 100,
-            maxWords: 400,
-            floors: [{ featureId: "first_person_rate", gap: 4, floor: 1 }],
-          },
-        ],
-      },
-    };
-    const rendered = await renderVoiceDeltaTable(inRegisterText, fixtureProfile, partial);
-    expect(rendered).toContain("partial");
-    expect(rendered).toContain("No floor covers these features in every band");
-    expect(rendered).toContain("100-400 word band");
-  });
-});
-
-describe("renderSignatureTable", () => {
-  const signed: WritingStatistics = {
-    generatedAt: "2026-01-01T00:00:00.000Z",
-    tagSignatures: {
-      sizes: [3],
-      minWords: 100,
-      maxWords: 400,
-      studyShare: 0.158,
-      baselineShare: 0.065,
-      shapes: [{ shape: "DET NOUN COPULA", n: 40, z: 6.2 }],
-    },
-  };
-
-  it("reads the document's hit share against the two corpus shares", async () => {
-    expect(
-      await renderSignatureTable("The flag is removed after the rollout.", signed),
-    ).toMatchSnapshot();
-  });
-
-  it("says so when the document offers no n-grams to match", async () => {
-    expect(await renderSignatureTable("Yes.", signed)).toContain("no tag 3-grams");
-  });
-
-  it("renders nothing until the signatures have been mined", async () => {
-    expect(await renderSignatureTable(inRegisterText, null)).toBeNull();
-    const none = {
-      generatedAt: "2026-01-01T00:00:00.000Z",
-      tagSignatures: {
-        sizes: [3],
-        minWords: null,
-        maxWords: null,
-        studyShare: 0,
-        baselineShare: 0,
-        shapes: [],
-      },
-    };
-    expect(await renderSignatureTable(inRegisterText, none)).toBeNull();
   });
 });

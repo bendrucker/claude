@@ -18,6 +18,6 @@ Scoring a candidate against a base column:
 
 - `bun plugins/writing/evals/authoring/scripts/metrics.ts <results>...`: tokens per deliverable, hook denies, and trope density.
 - `bun plugins/writing/evals/authoring/scripts/pairwise.ts pairs|judge|score`: blind pairs, judge picks, and the win rate with per-case permutation p-values. Pass `--before data/before` so doc and skill drafts are judged on their changed region. Each file there is the case's deliverable as its fixture leaves it. The judge call, blinding, swap, and cache keys come from [`packages/eval-judge`](../../../../packages/eval-judge/index.ts), on subscription auth.
-- `bun plugins/writing/evals/authoring/scripts/span-gate.ts`: an offline gate for trope rule and wordlist changes against Ben's span labels.
+- `bun plugins/writing/evals/authoring/scripts/sweep.ts`: proposes a level for each Vale check from its lift on model drafts over the voice baseline.
 
-Ben labels pairs and spans in [`label/server.ts`](label/server.ts). Labels and judgments land in the gitignored `feedback/`, and originals in `data/`.
+Ben labels pairs in [`label/server.ts`](label/server.ts). Labels and judgments land in the gitignored `feedback/`, and originals in `data/`.

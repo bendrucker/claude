@@ -1,0 +1,33 @@
+# evidence: 2026-07 session-history analysis found semicolon clause-joins at a high rate in assistant deliverables after the em dash ban, the run-on habit relocated rather than fixed. Two splices in a paragraph fire, so short texts below the connector-density gate are covered, and a lone semicolon never fires.
+# retire when: the deliverable splice rate sits at or below the hand-written baseline for 30 days, or a labeling pass shows precision below the hook bar.
+extends: occurrence
+message: "A semicolon joins independent clauses here, the em-dash run-on respelled. Split it into two sentences rather than swapping connectors."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/SemicolonSplice.yml
+level: warning
+scope: paragraph
+max: 1
+token: '[a-zA-Z]; [a-zA-Z]'
+tests:
+  - name: "flags two splices in one paragraph"
+    input: |
+      The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.
+    contains: [Writing.SemicolonSplice]
+  - name: "allows a single splice"
+    input: |
+      The cache starts cold; the first request fills it. The retry logic backs off.
+    absent: Writing.SemicolonSplice
+  - name: "allows splices in list items"
+    input: |
+      - compile the sources; link the objects
+      - package the build; ship the artifact
+    absent: Writing.SemicolonSplice
+  - name: "allows a digit before the semicolon and code spans"
+    input: |
+      The count was 2; see below. Run `a; b` first, then `c; d`.
+    absent: Writing.SemicolonSplice
+  - name: "allows splices in a fenced block"
+    input: |
+      ```sh
+      cd src; make; make install
+      ```
+    absent: Writing.SemicolonSplice

@@ -6,6 +6,7 @@ import {
   BODY_FILE_FLAGS,
   FIELD_FILE_GUARD,
   GIT_MESSAGE_FILE_GUARD,
+  INPUT_FILE_GUARD,
   MCP_PROSE_GUARD,
   PROSE_FLAGS,
 } from "./messages";
@@ -73,6 +74,7 @@ describe("PreToolUse gating", () => {
     expect(command).toContain(alternation);
     expect(command).toContain(FIELD_FILE_GUARD);
     expect(command).toContain(GIT_MESSAGE_FILE_GUARD);
+    expect(command).toContain(INPUT_FILE_GUARD);
     for (const flag of BODY_FILE_FLAGS) expect(`${flag} `).toMatch(new RegExp(alternation));
   });
 });
@@ -139,6 +141,11 @@ describe("inline guard behavior", () => {
     },
     { name: "git commit message file", command: "git commit -F tmp/msg.txt", runs: true },
     { name: "git tag long file flag", command: "git tag -a v1 --file tmp/tag.txt", runs: true },
+    {
+      name: "review payload file",
+      command: "bun draft-note.ts review 1 --input tmp/review.json",
+      runs: true,
+    },
     { name: "field with inline value", command: "gh api repos/x -F state=closed", runs: false },
     { name: "git commit inline message", command: "git commit -m 'fix: parser'", runs: false },
     { name: "flag-free long command", command: "ls -la && bun test plugins/writing", runs: false },

@@ -18,7 +18,7 @@ Commands for a suite run by `claude plugin eval` through this repo's `evals/nati
 
 On CI, `gh workflow run eval.yml --ref <branch> -f suite=<suite> -f args='--tag dev'` runs one replicate. `-f ref=<sha>` tests another commit against the branch's cases, and `-f baseline=<run id>,<run id>` adds the pooled comparison to the job summary. `gh run download <id>` fetches a run's results for pooling locally. For a `holdout` pair, dispatch the final branch for both sides, adding `-f ref=<base sha>` for the base, so both read the same cases.
 
-`run.ts` takes `--case` repeatedly and ORs the globs, with braces and character classes, so scope replicates to exactly the cases in doubt. A run costs roughly cases × runs × 2 arms agent sessions, about $0.05–0.10 each for Sonnet on a small fixture, plus three judge calls per `llm` grader per run. `--ablation none` drops the without arm and halves the cost. A screen is one such run per side, launched together: `--case` for each target and guard, `--runs 16 --concurrency 8 --ablation none`, and a distinct `--label` for each side.
+`run.ts` takes `--case` repeatedly and ORs the globs, with braces and character classes, so scope replicates to exactly the cases in doubt. A run costs roughly cases × runs × 2 arms agent sessions plus three judge calls per `llm` grader per run. Price each session from the `cost` the last stored result measured for the same cases and model. `--ablation none` drops the without arm and halves the cost. A screen is one such run per side, launched together: `--case` for each target and guard, `--runs` sized per [screen.md](screen.md), `--concurrency` at the most workers the rate limit sustains without errored runs, and `--ablation none`, and a distinct `--label` for each side.
 
 ## Comparing
 

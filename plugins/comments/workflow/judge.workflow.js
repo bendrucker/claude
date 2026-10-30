@@ -4,21 +4,9 @@ export const meta = {
   phases: [{ title: "Judge", model: "sonnet" }],
 };
 
-// job = { shards: [{ id, path }], promptPath, promptSha, verdictsDir }
-// The Workflow tool delivers args as a JSON string, so parse it before use.
-// The Bun side already sharded in ranked order, so each shard maps 1:1 to one
-// agent. The rubric is a file the agent reads (job.promptPath), keeping the
-// large rubric text out of the tool-call args and the sandboxed script free of
-// imports. Verdicts land on disk for the apply step, off the orchestrator
-// context; `apply/join.ts` validates them there, so the agent's structured
-// output is only the small summary the log needs.
-
 const job = typeof args === "string" ? JSON.parse(args) : args;
 
-// The eval gate judges the labeled fixture corpus through this workflow
-// (evals/eval.ts build, then score --gate), so the rubric is cleared on the
-// model and effort pinned here. Re-clear the gate before changing either.
-// Unpinned, effort follows the caller's session.
+// The eval gate cleared the rubric on this model and effort. Re-clear it before changing either.
 const JUDGE_MODEL = "sonnet";
 const JUDGE_EFFORT = "high";
 

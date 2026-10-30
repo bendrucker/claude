@@ -45,7 +45,7 @@ The ship gate scores the fixture corpus through the judge that ships. `build` sh
 
 ```bash
 bun run plugins/comments/evals/eval.ts build
-# Workflow({ scriptPath: <scriptPath>, args: <the parsed contents of argsPath> })
+# Workflow({ script: <the contents of scriptPath>, args: <the parsed contents of argsPath> })
 bun run plugins/comments/evals/eval.ts score --job <jobDir> --gate
 ```
 

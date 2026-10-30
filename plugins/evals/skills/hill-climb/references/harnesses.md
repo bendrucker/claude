@@ -15,6 +15,8 @@ The loop drives every harness through one adapter: a TypeScript module implement
 
 An operation the harness can't perform throws with the reason, and the climb log records the gap.
 
+When the harness needs secrets behind an approval prompt, resolve them once per batch: wrap the driver that launches every invocation in the secret tool rather than each invocation. A per-invocation prompt stalls a queued run until a person answers it.
+
 ## Example
 
 A harness whose `my-evals run --out <dir>` writes `runs.json`, one `{ case, arm, run, grader, passed, reply }` row per grader per run, with tags in `cases.json`:

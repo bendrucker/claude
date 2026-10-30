@@ -206,6 +206,32 @@ describe("render", () => {
   });
 });
 
+test("leads the markdown with named rows whether or not they starred", async () => {
+  const base = await result({
+    c: { with: Array.from({ length: 6 }, () => pass()) },
+    d: { with: Array.from({ length: 6 }, () => pass()) },
+  });
+  const next = await result({
+    c: { with: Array.from({ length: 6 }, fail) },
+    d: { with: Array.from({ length: 6 }, () => pass()) },
+  });
+  const columns = await Promise.all([loadColumn([base]), loadColumn([next])]);
+  const options = { columns, labels: ["base", "next"], alpha: 0.1, markdown: true };
+  const out = render({ ...options, rows: ["c/with/fact", "d/with"] });
+  const lead = out.slice(out.indexOf("#### Targets"), out.indexOf("#### Starred"));
+  expect(lead).toMatchInlineSnapshot(`
+    "#### Targets and Guards
+
+    | measure | row | base | next |
+    | --- | --- | --- | --- |
+    | Grader pass rate | c/with · fact | 1.00 | 0.00 (p=0.001)\\* |
+    | Case score | d/with | 1.00 | 1.00 (p=1.000) |
+
+    "
+  `);
+  expect(() => render({ ...options, rows: ["e/with"] })).toThrow("No score row named e/with");
+});
+
 test("marks cells too small to star", async () => {
   const base = await result({ c: { with: [fail(), fail()] } });
   const next = await result({ c: { with: [pass(), pass()] } });

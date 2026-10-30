@@ -102,7 +102,7 @@ describe("every harness presents the same evidence", () => {
     for (const r of compared(e.dev)) {
       const [caseId, arm, name] = r.key.split("/");
       expect(csv).toContain(`${caseId},${arm},${name},${r.p.toFixed(3)}\n`);
-      if (r.mark === "*") expect(native).toContain(`(p=${r.p.toFixed(3)})*`);
+      if (r.mark === "*") expect(native).toContain(String.raw`(p=${r.p.toFixed(3)})\*`);
     }
     expect(pydantic).toContain("Evaluation Diff: base → candidate");
     for (const r of compared(e.dev).filter(

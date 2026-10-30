@@ -3,23 +3,19 @@ export const LIMIT = 9;
 
 // A line that is only `! <command>`, optionally bulleted or in backticks.
 const COMMAND = /^\s*(?:[-*]\s+)?`?!\s+([^`\s][^`]*?)\s*`?\s*$/;
-// A `! <command>` code span inside a sentence.
-const INLINE = /`!\s+([^`\s][^`]*?)\s*`/g;
-// A capitalized word opens prose, such as a linter's `! This variable is unused.`,
-// and an option is a negated test, such as `find`'s `! -path`.
-const NOT_COMMAND = /^(?:[A-Z][a-z]|-)/;
-// A bare placeholder such as `<command>` names a command rather than giving one.
+// A code span, paired left to right so a closing backtick never opens one.
+const SPAN = /`([^`]*)`/g;
+// A code span's text that is `! <command>`.
+const INLINE = /^!\s+(\S.*?)\s*$/;
+// A capitalized sentence ending in a period is prose, such as a linter's
+// `! This variable is unused.`, and an option is a negated test, such as `find`'s `! -path`.
+const NOT_COMMAND = /^(?:[A-Z][a-z]\S*\s.*\.$|-)/;
+// A bare placeholder such as `<command>` is not a runnable command.
 const PLACEHOLDER = /^<[^<>]*>$/;
 // Operators holding an `&` that still chain: `&&` and fd redirects.
 const CHAINING_AMPERSANDS = /&&|[<>]&|&>/g;
 // Code sourced or eval'd runs in this shell, where a chain switches off its `set -e`.
 const IN_SHELL = /(?:^|&&|\|)\s*(?:source|\.|eval)(?:\s|$)/;
-
-/** Blank lines and code fences sit between commands without ending their block. */
-function keepsBlock(line: string): boolean {
-  const trimmed = line.trim();
-  return trimmed === "" || trimmed.startsWith("```");
-}
 
 /**
  * `;` would mask an earlier failure, `||` would run after one, `#` comments
@@ -92,11 +88,16 @@ export function blocks(text: string): string[][] {
       open = true;
       continue;
     }
-    if (line.trim().startsWith("```")) fenced = !fenced;
-    if (keepsBlock(line)) continue;
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      fenced = !fenced;
+      continue;
+    }
+    if (trimmed === "") continue;
     open = false;
     if (fenced) continue;
-    for (const [, inline] of line.matchAll(INLINE)) {
+    for (const [, span = ""] of line.matchAll(SPAN)) {
+      const inline = INLINE.exec(span)?.[1];
       if (runnable(inline)) found.push([inline]);
     }
   }

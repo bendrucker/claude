@@ -86,9 +86,19 @@ describe("blocks", () => {
       expected: [["wt list"]],
     },
     {
+      name: "a bang after a closing backtick opens no span",
+      text: "It works with `npm`! no flags needed with `bun`.",
+      expected: [],
+    },
+    {
       name: "negation and placeholders are not commands",
       text: "Unreachable behind `[[ ! -t 0 ]]` and `find . ! -path x`.\nEach `! <command>` line.",
       expected: [],
+    },
+    {
+      name: "a capitalized command without a closing period is a command",
+      text: "! Rscript build.R\n! VBoxManage list vms",
+      expected: [["Rscript build.R", "VBoxManage list vms"]],
     },
     {
       name: "prose and options after a bang are not commands",

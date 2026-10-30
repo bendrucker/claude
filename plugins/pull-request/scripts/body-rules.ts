@@ -305,7 +305,7 @@ const RULES = [
       const detail = exceeded
         .map(({ label, measured, limit }) => `${label} ${measured} > ${limit}`)
         .join(", ");
-      return `The body is over its structure limits (${detail}). Tables, fenced output, and \`<details>\` don't count. Rewrite it under them, then retry the create. This check doesn't run again, so make the cut in one rewrite.`;
+      return `The body is over its structure limits (${detail}). List words count apart from prose words. Tables, fenced output, and \`<details>\` don't count. Rewrite it under them, then retry the create. This check doesn't run again, so make the cut in one rewrite.`;
     },
   }),
   rule({

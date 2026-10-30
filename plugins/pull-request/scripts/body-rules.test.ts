@@ -331,7 +331,7 @@ describe("warn rules", () => {
       fires: [],
     },
     {
-      name: "visible words past the limit",
+      name: "prose words past the limit",
       body: VISIBLE_PROSE,
       fires: ["structure-limits"],
     },
@@ -486,7 +486,7 @@ describe("rule messages", () => {
       body: `${VISIBLE_PROSE}\n\n${BLOCK_PARAGRAPH}\n\nRenames \`a\`, \`b\`, \`c\`, \`d\`, \`e\`, \`f\`, and \`g\`.`,
       id: "structure-limits",
       fragments: [
-        "visible words 235 > 120",
+        "prose words 235 > 120",
         "longest paragraph or bullet words 52 > 40",
         "inline code spans 7 > 6",
         "`<details>` don't count",

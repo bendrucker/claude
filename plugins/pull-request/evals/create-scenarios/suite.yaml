@@ -4,7 +4,7 @@ stage:
   - plugins/pull-request/evals/pr-body/limits.ts
   - plugins/pull-request/evals/pr-body/structure.ts
 graders:
-  limit-visible-words: "work-*"
+  limit-prose-words: "work-*"
   limit-max-block: "work-*"
   limit-prose-code-spans: "work-*"
   limit-path-spans: "work-*"

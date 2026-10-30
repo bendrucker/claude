@@ -506,8 +506,8 @@ describe("audit.ts", () => {
   }
 
   const Preflight = z.object({
-    scriptPath: z.string(),
-    argsPath: z.string(),
+    agent: z.string(),
+    prompts: z.array(z.string()),
     jobDir: z.string(),
     count: z.number(),
     shardCount: z.number(),
@@ -515,21 +515,31 @@ describe("audit.ts", () => {
 
   const JobArgs = z.object({
     shards: z.array(z.object({ id: z.number(), path: z.string() })),
+    promptPath: z.string(),
     verdictsDir: z.string(),
   });
 
-  test("preflight hands the job to the workflow and apply reads the verdicts back", async () => {
+  test("preflight hands each shard to a judge agent and apply reads the verdicts back", async () => {
     const pre = await run("preflight", "--all", "--shard-size", "2");
     expect(pre.code).toBe(0);
     const block = /<preflight>\n(.*)\n<\/preflight>/.exec(pre.stdout);
     const handoff = Preflight.parse(JSON.parse(block?.[1] ?? ""));
-    expect(handoff.scriptPath).toEndWith("workflow/judge.workflow.js");
-    expect(await Bun.file(handoff.scriptPath).exists()).toBe(true);
+    expect(handoff.agent).toBe("comments:judge");
+    const paths = handoff.prompts.flatMap((prompt) =>
+      [...prompt.matchAll(/^(?:Rubric|Shard): (.+)$/gm)].map((m) => m[1] ?? ""),
+    );
+    expect(await Promise.all(paths.map((path) => Bun.file(path).exists()))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
     expect(handoff.jobDir.startsWith(jobs)).toBe(true);
     expect(handoff).toMatchObject({ count: 4, shardCount: 2 });
 
-    const args = await readJson(handoff.argsPath, JobArgs);
-    await shardJudge(scripted)({ ...handoff, ...args });
+    const argsPath = join(handoff.jobDir, "job-args.json");
+    const args = await readJson(argsPath, JobArgs);
+    await shardJudge(scripted)({ ...handoff, ...args, argsPath });
 
     const applied = await run("apply", "--job", handoff.jobDir, "--report");
     expect(applied.code).toBe(0);

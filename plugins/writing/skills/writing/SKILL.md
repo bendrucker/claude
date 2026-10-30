@@ -8,43 +8,41 @@ description: >-
 
 # Writing
 
-## Patterns to Avoid
-
-The hook enforces most of these automatically; the rest ship in the scan and review skills. The rules live as Vale styles in [`styles/Writing/`](../../styles/Writing/).
-
-#### Structure
-
-- Never use spaced em dashes (` — `).
-- Avoid "not just X, but also Y" parallelism. Simplify.
-- Don't join independent clauses with em dashes, semicolons, or hyphens. Write two sentences. Swapping one connector for another is not a fix. A rare semicolon is fine only when the clauses genuinely can't stand alone.
-- Headings name the topic in a couple of words. No verbs, no `Topic: clause`, no sentence-shaped headings. Move the explanation into the body.
-
-#### Word Choice
-
-- Don't replace "is"/"are" with "serves as" or "stands as".
-- Don't write "reaching for X." Use "use X" or "prefer X over Y."
-- Don't write "dig into" / "dive into." Name what you're looking at.
-- Hedging verbs ("looks like", "appears to", "seems to") are vague. State directly or name the uncertainty.
-- Negate the verb with a contraction: "doesn't cost an extra query", "doesn't add anything", "doesn't need a change". A positive term works when it names the state exactly ("a no-op", "unchanged"). "Has no tests" and "there is no lock" are plain statements and stay.
-- No gravity markers. "Load-bearing", "the honest answer", "worth noting/flagging", "the full picture", and "the cleanup story" all assert that something matters instead of saying why. Replace each with its substance: name what breaks without the dependency, state the fact plainly, make the point without announcing it.
-
-#### PR and Review Prose
-
-- No salutations. A published comment opens on the substance, never on a name or a greeting. Referring to someone in third person is fine, and never invent a name for a username.
-- Active voice in PR and review prose. Not "X is added" but "Adds X." Commit subjects take the imperative: "Add X".
-- Not "Tests cover X" but "Added tests covering X."
-- No trailing hedge adverbs ("regardless.", "nonetheless.").
-- No cross-sentence negation ("It isn't X. It is Y."). Combine or drop the negation.
-- No test counts, pass/fail tallies, or CI status. Describe what the tests cover.
-- No `X, not Y` contrast. State the positive directly.
-
-#### Outbound Email and Messages
-
-- Don't write human-facing email in a punchy journalistic cadence: dramatic one-sentence paragraphs, rhetorical question then answer ("The result? X."), or escalating triads. Match the sender's plain voice.
+Write prose a person reads in a direct, conversational voice. The writing hooks lint saved files and outgoing messages against the Vale styles in [`styles/Writing/`](../../styles/Writing/). The text is done when every alert the hook reports on it is fixed.
 
 ## Voice
 
-Direct, conversational. Every sentence should teach something new. Cut words that restate the obvious. A sentence that could move unchanged to another person, company, or product is filler: cut it, or replace it with something true only of this subject.
+Every sentence teaches something new and holds only for this subject. Cut a sentence that restates the obvious or could move unchanged to another person, company, or product, or replace it with something true only of this subject.
 
-- Substance over filenames or implementation details
-- Shorter sentences over compound constructions
+- Prefer substance to filenames or implementation details.
+- Prefer short sentences to compound constructions.
+
+## Rules
+
+#### Structure
+
+- Use no spaced em dash (` — `).
+- Write each independent clause as its own sentence. A clause joined by an em dash, semicolon, hyphen, or any connector swapped in for one becomes a sentence break. Keep a semicolon only when the clauses can't stand alone.
+- State the point directly in place of "not just X, but also Y" parallelism.
+- Name a heading's topic in a couple of words: a noun phrase, without verbs or a `Topic: clause` form. Put the explanation in the body.
+
+#### Word Choice
+
+- Use "is" or "are" where "serves as" or "stands as" would go.
+- Write "use X" or "prefer X over Y" in place of "reaching for X".
+- Name what you're examining in place of "dig into" or "dive into".
+- State a claim directly, or name the uncertainty, in place of hedging verbs ("looks like", "appears to", "seems to").
+- Negate the verb with a contraction: "doesn't cost an extra query", "doesn't need a change". A positive term works when it names the state exactly ("a no-op", "unchanged"). Plain statements like "has no tests" and "there is no lock" stay.
+- Say why something matters in place of gravity markers ("load-bearing", "the honest answer", "worth noting/flagging", "the full picture", "the cleanup story"): name what breaks without the dependency, or state the fact plainly.
+
+#### PR and Review Prose
+
+- Open a published comment on the substance, without a greeting or a name. Refer to people in third person by their username as written.
+- Use active voice: "Adds X" in PR and review prose, "Add X" in commit subjects, "Added tests covering X" for tests.
+- Describe what the tests cover in place of test counts, pass/fail tallies, or CI status.
+- End a sentence on its content, without a trailing hedge adverb ("regardless.", "nonetheless.").
+- State the positive directly in place of contrast by negation, whether across sentences ("It isn't X. It is Y.") or inline (`X, not Y`).
+
+#### Email and Messages
+
+- Match the sender's plain voice in human-facing email: ordinary paragraphs in place of dramatic one-sentence paragraphs, rhetorical question then answer ("The result? X."), or escalating triads.

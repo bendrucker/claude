@@ -1,4 +1,5 @@
 import { table } from "table";
+import { CEILING, type RuleComplexity } from "./complexity";
 import type { Flag, Hit, Label, Pattern, Score } from "./data";
 import { best, clears, evidence, FLOOR, judge, MIN_LABELED, type Stage, stage } from "./score";
 import { wilson } from "../evals/stats";
@@ -114,4 +115,19 @@ export function render(
     ]),
   ]);
   return `${patterns.length === 0 ? "No patterns yet.\n" : patternTable}\n${checks.length === 0 ? "No labeled checks yet.\n" : checkTable}\n${unassigned} flags without a pattern.\n`;
+}
+
+/** Rules by complexity, marking those over the ceiling. */
+export function renderRules(rules: readonly RuleComplexity[]): string {
+  return table([
+    ["rule", "complexity", "lookarounds", "gaps", "exception words", "branches"],
+    ...rules.map((rule) => [
+      rule.rule,
+      rule.score > CEILING ? `${rule.score} (over ${CEILING})` : rule.score,
+      rule.features.lookarounds,
+      rule.features.gaps,
+      rule.features.exceptionWords,
+      rule.features.branches,
+    ]),
+  ]);
 }

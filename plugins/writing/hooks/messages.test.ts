@@ -181,10 +181,10 @@ describe("Bash processInput", () => {
     }
   });
 
-  it("flags a review comment that opens with a vocative", async () => {
+  it("flags a review comment that opens with a greeting", async () => {
     const result = await processInput(
       mockBash(
-        `glab mr note 871 --message "Dana, this fires for the entire run rather than the changed files."`,
+        `glab mr note 871 --message "Hey Dana, this fires for the entire run rather than the changed files."`,
       ),
     );
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");

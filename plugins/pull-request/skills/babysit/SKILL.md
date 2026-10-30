@@ -22,7 +22,7 @@ allowed-tools:
 
 # Babysit PR
 
-Delegate CI monitoring to a provider-specific watcher and react to its events with fix-and-push behavior, stopping when CI turns green.
+Drive a PR to green CI, or to merged with `--merge`, by reacting to a provider watcher's events with fix-and-push. Babysit is done when it calls `TaskStop` after reporting one terminal: green (no flags), merged (`--merge`), or a block it cannot fix unattended.
 
 ## Context
 
@@ -33,70 +33,45 @@ Delegate CI monitoring to a provider-specific watcher and react to its events wi
 
 ## Workflow
 
-Inspect the remote URL. For a `github.com` remote, invoke the `github:actions-monitor` skill. For a `gitlab.com` remote, invoke the `gitlab:ci-monitor` skill. Each provider skill owns the watcher process (via the `Monitor` tool) and emits a structured JSON event stream describing CI state changes.
+Start the watcher with `github:actions-monitor` for a `github.com` remote, or `gitlab:ci-monitor` for a `gitlab.com` remote. It runs under `Monitor` and emits JSON events, already deduped by `(sha, state)`. Read event fields from that JSON directly, without piping CLI output to an inline interpreter.
 
-Babysit consumes that event stream and reacts with the handlers below. The watcher handles polling, deduping by `(sha, state)`, rate limits, timeouts, and session-scoped lifecycle. Babysit handles fixes, pushes, and reporting. Remember the start SHA above so the success handler can summarize work done in the session.
+Arguments (`$ARGUMENTS`), both flags off by default:
 
-Parse `$ARGUMENTS` for an optional PR positional and two optional flags, both flags off by default so plain babysit stays CI-only:
+- `$0` (pr-url): the PR as a URL or number. Pass it through to `follow-up` and the merge commands. Default: the PR for the current branch.
+- `--reviews`: after the first green, hand off per [`reviews.md`](reviews.md).
+- `--merge`: after green, drive to merged per [`merge-mode.md`](merge-mode.md).
 
-- `$0` (pr-url): the PR to babysit, given as a URL or number. Pass it through to `follow-up` and the merge commands below. Default: resolve the PR from the branch in Context.
-- `--reviews`: after the first green, triage AI-reviewer threads. See [Reviews Hand-off](#reviews-hand-off).
-- `--merge`: don't stop at green; drive the PR to merged. See [Merge Mode](#merge-mode).
-
-On GitHub, a PR whose auto-merge is already enabled (`gh pr view <pr> --json autoMergeRequest` is non-null) runs as if `--merge` were passed: whoever enabled it approved the merge.
+On GitHub, a PR with auto-merge already enabled (`gh pr view <pr> --json autoMergeRequest` is non-null) runs as `--merge`, since whoever enabled it approved the merge.
 
 ## Bounds
 
-Every wait babysit performs runs through a watcher, including the post-submit merge wait ([Merge Mode](#merge-mode)); babysit has no poll loop of its own. The watcher enforces the wall clock (`--max-minutes`, default 60), poll interval, and dedup, so pass `--max-minutes` through when the user supplies one. After a watcher emits `max-time-reached` it has exited: report and stop, never re-arm a fresh watcher. If babysit runs under `/loop`, the loop owns repetition, not babysit.
+Every wait runs through a watcher, including the post-submit merge wait. The watcher enforces the poll interval and wall clock (`--max-minutes`, default 60). Pass through a user-supplied `--max-minutes`. After `max-time-reached`, report and stop without starting a new watcher. When babysit runs in `/loop`, the loop handles repetition.
+
+The watcher ends with the session. Resume by invoking babysit from a new session.
 
 ## Event Handlers
 
 #### status: running
 
-Do nothing. The watcher emits a new status event when the situation changes.
+Wait for the next event.
 
 #### status: failing
 
-Compare `git rev-parse HEAD` against the event's `sha`. If HEAD is newer, a fix was already pushed; ignore this event and wait for the new run.
+CI may run on a synthetic merge commit, so each event reports the source branch SHA. When `git rev-parse HEAD` is newer than the event's `sha`, a fix is already pushed: wait for the new run.
 
-The monitor skill's flow has already invoked the provider's logs agent (`github:logs` or `gitlab:logs`) and produced a summary plus a log-file path. Read the summary to decide triviality.
+The monitor skill has already run the provider's logs agent (`github:logs` or `gitlab:logs`), which gives a summary and a log-file path. Use the summary to judge triviality.
 
-A failing event carrying no run id has no logs agent behind it: the red check is an external status rather than a CI run. Read the failing check names from the provider's CLI (`gh pr checks`, `glab ci status`), report them, and call `TaskStop`.
-
-Check whether the start SHA's CI run had the same failure. If so, it's pre-existing, not a regression from this branch. Report it and call `TaskStop`.
-
-For trivial failures (lint, type, format, lockfile), attempt a fix. Reproduce the CI step locally to verify (skip reproduction for lockfile-only changes). Commit, push. The watcher picks up the new SHA on its next poll.
-
-For non-trivial failures (logic bugs, design issues, flaky tests, environment-dependent behavior), report the logs agent's summary and log-file path, then call `TaskStop`.
+- No run id on the event: the red check is an external status. Report the failing check names from `gh pr checks` or `glab ci status`, then `TaskStop`.
+- Same failure on the start SHA's run: pre-existing. Report it, then `TaskStop`.
+- Trivial (lint, type, format, lockfile): fix it, reproduce the CI step locally to verify (skip reproducing lockfile-only changes), commit, and push. The watcher picks up the new SHA.
+- Non-trivial (logic bugs, design issues, flaky tests, environment-dependent behavior): report the summary and log-file path, then `TaskStop`.
 
 #### status: success
 
-Green on a conflicting PR is stale: if a `conflicts` or unresolved `mergeable-unknown` event arrived for the current SHA, address it per [`references/events.md`](references/events.md) before treating green as done.
+When a `conflicts` or unresolved `mergeable-unknown` event arrived for the current SHA, handle it per [`references/events.md`](references/events.md) first, since green on a conflicting PR is stale.
 
-Summarize the session: run `git log ${start-sha}..HEAD --oneline` for the commits pushed while babysitting.
-
-Then branch on the `$ARGUMENTS` flags:
-
-- `--reviews`: hand off to AI-review triage before finishing. See [Reviews Hand-off](#reviews-hand-off).
-- `--merge`: don't stop here. Drive the PR to merged. See [Merge Mode](#merge-mode).
-- neither: report the summary and call `TaskStop`.
+Summarize the commits pushed this session with `git log <start-sha>..HEAD --oneline`. Then continue to `--reviews` or `--merge` when set. With neither, report the summary and `TaskStop`.
 
 #### other events
 
-The watcher also emits `conflicts`, `mergeable-unknown`, `queued-timeout`, `api-error`, `rate-limited`, `pr-closed`, `merged`, and `max-time-reached`. Load [`references/events.md`](references/events.md) for those handlers when one of these arrives.
-
-## Reviews Hand-off
-
-With `--reviews`, after the first green, hand off to `pull-request:follow-up --auto` for AI-reviewer triage, then re-request the human reviewers a push invalidated. Load [`reviews.md`](reviews.md) for the hand-off contract and the re-request commands.
-
-## Merge Mode
-
-With `--merge`, or on a GitHub PR with auto-merge already enabled, don't stop at green; drive the PR to **merged**. Load [`merge-mode.md`](merge-mode.md) for the merge-submission paths, conflict resolution, the re-arm-after-every-push rule, and the oscillation guard.
-
-## Gotchas
-
-The monitor script delivers structured JSON events. Do not pipe CLI output to `python3 -c`, `bun -e`, `node -e`, or any inline interpreter for parsing.
-
-CI may run on synthetic merge commits whose SHA never matches the branch tip. The watcher reports the source branch SHA in each event. Compare against `git rev-parse HEAD`: a failing event for an older SHA is stale (a fix was already pushed) and should be ignored.
-
-Babysit is session-scoped. If the session ends, the watcher process ends with it. Re-invoke this skill from a new session to resume.
+For `conflicts`, `mergeable-unknown`, `queued-timeout`, `api-error`, `rate-limited`, `pr-closed`, `merged`, and `max-time-reached`, load [`references/events.md`](references/events.md).

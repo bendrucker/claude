@@ -17,24 +17,22 @@ allowed-tools:
 
 # Actions Monitor
 
-Watch a PR, branch, or specific run's GitHub Actions progress and react to failures by pulling logs through the `github:logs` agent. The watch script handles state tracking and deduplication. This skill starts it, reacts to events, and stops it.
+Watch a PR, branch, or workflow run until it reaches a terminal event, and diagnose each failure. The watch script tracks state and deduplicates events. The monitor is done when the script exits or you stop it with `TaskStop`, with every `failing` event diagnosed along the way.
 
 ## Target
 
-`$ARGUMENTS`
+`$ARGUMENTS` selects the mode:
 
-- A GitHub PR URL runs in **PR mode**. Owner and repo come from the URL, so PR mode works from any working directory.
-- A branch name runs in **branch mode**.
-- A run ID runs in **run-id mode**, watching a specific workflow run directly (covers `workflow_dispatch`, manual triggers, and re-runs).
-- No argument: derive the current PR with `gh pr view --json url --jq '.url'`. If the branch has no PR, fall back to branch mode with the current branch name.
+- A PR URL selects PR mode. It reads owner and repo from the URL and works from any directory.
+- A branch name selects branch mode.
+- A run ID selects run-id mode, which covers `workflow_dispatch`, manual triggers, and re-runs.
+- With no argument, use the current PR from `gh pr view --json url --jq '.url'`. When the branch has no PR, use branch mode on the current branch.
 
-Branch and run-id mode infer the repo from `git remote get-url origin`; pass `--repo <owner/repo>` to override.
+Branch and run-id mode read the repo from `git remote get-url origin`. Pass `--repo <owner/repo>` to override it.
 
-## Workflow
+## Start
 
-#### Start the monitor
-
-Invoke `Monitor` with `persistent: true` on the watch script, with exactly one mode flag:
+Run the script under `Monitor` with `persistent: true` and one mode flag:
 
 ```
 bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --pr <pr-url>
@@ -42,36 +40,30 @@ bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --branch <name> [--repo <owner/repo>]
 bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --run-id <id> [--repo <owner/repo>]
 ```
 
-Optional flags: `--interval <seconds>`, `--max-minutes <N>`, `--queued-timeout <minutes>`, `--api-error-threshold <N>`. Omit `--interval` to let the script derive one from recent run durations in PR/branch mode; run-id mode uses a 180s default.
+Optional flags are `--interval <seconds>`, `--max-minutes <N>`, `--queued-timeout <minutes>`, and `--api-error-threshold <N>`. Without `--interval`, PR and branch mode derive the interval from recent run durations, and run-id mode polls every 180s.
 
-#### Event schema
+## Events
 
-The script emits one JSON object per line on stdout:
+The script prints one JSON object per line:
 
 - `{"type":"status","state":"running|failing|success","sha":"...","run_id":"..."}`
-- `{"type":"conflicts","sha":"..."}` (PR mode only)
-- `{"type":"mergeable-unknown","sha":"..."}` (PR mode only)
+- `{"type":"conflicts","sha":"..."}` (PR mode)
+- `{"type":"mergeable-unknown","sha":"..."}` (PR mode)
 - `{"type":"queued-timeout","minutes":N}`
 - `{"type":"api-error","consecutive":N}`
 - `{"type":"rate-limited","retry_after":"..."}`
-- `{"type":"pr-closed"}` (PR mode only; also fires if the branch is deleted)
-- `{"type":"merged"}` (PR mode only)
+- `{"type":"pr-closed"}` (PR mode, also when the branch is deleted)
+- `{"type":"merged"}` (PR mode)
 - `{"type":"max-time-reached","minutes":60}`
 
-If the target is already green at startup, the script emits a single `status:success` and exits.
+The script exits on `status:success`, `pr-closed`, `merged`, and `max-time-reached`. Run-id mode also exits on `status:failing`. PR and branch mode keep watching after `failing`, because a new push or run can follow. A target already green at startup emits one `status:success` and exits.
 
-The script exits on `status:success`, `pr-closed`, `merged`, and `max-time-reached`. In run-id mode it also exits on `status:failing`, since a specific run reaches a terminal conclusion with no "next run" to wait for. In PR and branch mode, `failing` is not terminal (the user may push a fix or start another run). To stop early, call `TaskStop` on the monitor task.
+## Reactions
 
-#### React to events
+- `failing` with a `run_id`: dispatch the `github:logs` agent with the `run_id` and the PR URL or branch. It returns a JSON summary of the failing jobs and saves the raw logs to a temp path you can read for more detail.
+- `failing` with `"run_id": null`: the red check is an external status such as a hosted reviewer or deployment. Name the failing checks from `gh pr checks`.
+- `conflicts` and `mergeable-unknown`: report the SHA and leave the response to the caller, such as `pull-request:babysit`. `mergeable-unknown` means GitHub had not settled mergeability after bounded re-polling.
+- `queued-timeout` and `api-error`: report them to the user.
+- `rate-limited`: wait until `retry_after`, then retry.
 
-On a `status` event with `state == "failing"`, invoke the `github:logs` agent via the `Agent` tool, passing the `run_id` and the PR URL (or branch name) from the event. It returns a structured JSON summary of the failing jobs and persists the raw logs to a known temp path; read that file for more context.
-
-A failing event with `"run_id": null` means no Actions run failed: the red check is an external status (a hosted reviewer, a deployment) with no job logs to fetch. Skip the `github:logs` dispatch and name the failing checks from `gh pr checks` instead.
-
-- `conflicts` / `mergeable-unknown` (PR mode): note the SHA; the caller (e.g. `pull-request:babysit`) decides whether to resolve or run an authoritative local check. `mergeable-unknown` means GitHub could not settle mergeability after bounded re-polling.
-- `queued-timeout` / `api-error`: surface to the user.
-- `rate-limited`: back off and retry once the window passes.
-
-## References
-
-Log parsing strategy (shared with `github:logs`): [references/log-parsing.md](references/log-parsing.md).
+For log parsing, see [references/log-parsing.md](references/log-parsing.md).

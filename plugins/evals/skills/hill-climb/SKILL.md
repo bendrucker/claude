@@ -63,9 +63,15 @@ Write the instruction as the failing behavior in general terms, never with a `de
 
 Count the tokens the change adds to the body. A skill body re-injects at every compaction, so an added sentence needs a starred target to stay.
 
-A removal is a candidate too: delete an instruction, target the graders it was written for, and accept when no guard stars down. `/claude-api prompt-audit` proposes removals of text written for an older model's failures.
+A removal is a candidate too, judged by whether the score holds rather than rises: follow [references/prune.md](references/prune.md). `/claude-api prompt-audit` proposes removals of text written for an older model's failures.
 
-Run the candidate on the `dev` tag as many times as the baseline. When the budget is tight, run one full `dev` replicate for the guards and top up the target cases with scoped replicates to 4 runs a side. Guards at that count cannot star, so read their case minimums and open the trace behind any drop.
+#### Screen
+
+Screen each candidate before its full run. Run the base and the candidate concurrently on the target and guard cases only, with enough repeats in one invocation to star the smallest drop that would reject it, about 5 ÷ the drop rate a side at a ceiling base. Compare the two sides as in `Compare`. Drop or revise a candidate whose targets do not move in the predicted direction or whose guards fall, and re-screen the revision. Send the rest to verify. A screen never accepts a change. Size, invocations, and parallelism are in [references/screen.md](references/screen.md).
+
+#### Verify
+
+Run the candidate on the `dev` tag as many times as the baseline, each replicate its own invocation. Pool the screen's repeats into neither column.
 
 #### Compare
 
@@ -99,7 +105,7 @@ After the last accepted change, run `holdout` on the original base and on the fi
 
 Stop when any of these holds, and say which:
 
-- The `dev` score has no room left above the noise from `Ready the Suite`. Climb tokens at parity with removal candidates instead, or stop.
+- The `dev` score has no room left above the noise from `Ready the Suite`. Prune instead, per [references/prune.md](references/prune.md), or stop.
 - A third null candidate followed a `Stall` review. Add harder cases, then resume.
 - The budget cannot cover another candidate at the baseline's replicate count. Skip `holdout` when nothing was accepted, since the final commit is the base.
 - A `Stall` review buckets every remaining failure as reach or floor.
@@ -108,8 +114,8 @@ After a model upgrade, re-run the baseline before climbing. When the with arm no
 
 ## Budget
 
-Price a candidate before launching it: cases × runs × 2 arms sessions, plus judge calls. CI and local runs draw on the same subscription quota. When the quota is tight, run one invocation at a time and cap the session's spend before the first run.
+Price a candidate before launching it: cases × runs × 2 arms sessions, plus judge calls, each at the per-run cost the latest stored result measured. Re-price after a model or fixture change. CI and local runs draw on the same subscription quota. When the quota is tight, run one invocation at a time and cap the session's spend before the first run.
 
-Under a cap, divide it by the cost of one `dev` replicate before the first run. The loop needs two baseline replicates, a matching count per candidate, and a `holdout` pair at the end. When the cap cannot cover that, save in this order: scope candidate top-ups to the target and guard cases, then drop the without arm on those top-ups once the baseline shows it flat. Keep both arms on the baseline and the first candidate replicate, since the without arm is the drift check.
+Under a cap, divide it by the cost of one `dev` replicate before the first run. The loop needs two baseline replicates, a matching count per candidate, and a `holdout` pair at the end. When the cap cannot cover that, save in this order: verify only candidates that pass their screen, then drop the without arm on screens and scoped top-ups once the baseline shows it flat. Keep both arms on the baseline and the first candidate replicate, since the without arm is the drift check.
 
 A run that hit a session or quota limit is void. Drop it from its column and re-run it. A column with a void run is not comparable until it is refilled.

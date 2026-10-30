@@ -4,13 +4,13 @@ What goes in a PR body. Used by the create and update skills.
 
 The body covers what the diff can't: why the change exists, the decisions behind it, and how you know it works. The reviewer reads the code for what changed.
 
-Write the body to stand alone. The reviewer sees only the diff and links that open for them: issues, PRs, permalinks. Don't reference your plan, your instructions, or the session ("as planned", "the issue specified", a `## Deviations From the Plan` heading). State each decision itself, not its difference from an instruction the reviewer never saw.
+Write the body to stand alone. The reviewer sees only the diff and links that open for them: issues, PRs, permalinks. State each decision itself, rather than as its difference from a plan, an instruction, or a session the reviewer never saw.
 
-Use active voice, first person for your own decisions ("I chose X over Y because…"). Keep the prose plain. Technical terms are fine. Marketing flourishes (`source of truth`, `fail loudly`, `cleanly`) are not. Load the `writing` skill for the full trope list. Don't reuse this document's vocabulary in the body. A body that calls a detail subtle or notes what it left out is narrating its instructions.
+Use active voice, first person for your own decisions ("I chose X over Y because…"). Keep the prose plain and technical, per the `writing` skill. Describe the change in the repo's own terms rather than this document's vocabulary.
 
 ## Audience
 
-Set depth from the repo's owner and visibility, the same probe the create skill runs for reviewers. The rules below apply at every tier.
+Set depth from the repo's owner and visibility. The rules below apply at every tier.
 
 - **Personal** (a repo you own, public or private): no one else reads the body. One to three paragraphs: intent and the decisions worth re-examining. Skip background you already have.
 - **Corporate** (a private or org-owned repo): coworkers skim it. Put the intent in the first sentence and keep supporting detail moderate.
@@ -18,7 +18,7 @@ Set depth from the repo's owner and visibility, the same probe the create skill 
 
 ## Intent
 
-Intent is what the code can't say: why the change exists, the requirement it satisfies, the constraint that forced the design, the alternative you rejected. Narrating the code at a higher level (walking the new control flow, naming what each function now does) is still restating the diff. Cut any sentence the reviewer could reconstruct from the changed code. Quote or link the issue requirement instead of paraphrasing the code.
+Intent is what the code can't say: why the change exists, the requirement it satisfies, the constraint that forced the design, the alternative you rejected. Cut any sentence the reviewer could reconstruct from the changed code, including a higher-level walk through its control flow. Quote or link the issue requirement instead of paraphrasing the code.
 
 ## Density
 
@@ -41,7 +41,7 @@ A heading carrying a comma, a colon, trailing punctuation, a linking verb, a rel
 
 ### AP Title Case
 
-The PR-body hook re-cases every heading through `heading-case.ts`. When the body reaches the command as a file already on disk, the hook rewrites the heading lines in that file and reports what it changed, so the command runs. Carry those headings into any later edit of the body. A body the hook cannot rewrite (written by a heredoc in the same command, or passed inline) is denied instead, as is a file whose heading the hook cannot map word for word back to its source: one carrying a backslash escape or an HTML entity, or one where a word straddles markup (`fol**low**up`). Capitalize each word, except these when they fall between the first and last word: `a`, `an`, `and`, `as`, `at`, `but`, `by`, `for`, `in`, `nor`, `of`, `on`, `or`, `per`, `so`, `the`, `to`, `via`, `vs`, `vs.`, `yet`. Every other word stays capitalized, `up` included, since the checker leaves it off the list (`Speed Up the Commit Hook`).
+The PR-body hook re-cases every heading through `heading-case.ts`. For a body file already on disk, it rewrites the heading lines in place and reports the change. Carry those headings into any later edit. A body it cannot rewrite (a heredoc in the same command, or passed inline) is denied instead, as is a heading it cannot map word for word back to its source: one with a backslash escape, an HTML entity, or a word straddling markup (`fol**low**up`). Capitalize each word, except these when they fall between the first and last word: `a`, `an`, `and`, `as`, `at`, `but`, `by`, `for`, `in`, `nor`, `of`, `on`, `or`, `per`, `so`, `the`, `to`, `via`, `vs`, `vs.`, `yet`. Every other word stays capitalized, `up` included, since the checker leaves it off the list (`Speed Up the Commit Hook`).
 
 - Lowercase a listed word in the middle: `Heading Case Via the Hook` → `Heading Case via the Hook`; `Reasons To Defer` → `Reasons to Defer`.
 - A hyphenated compound capitalizes each element and applies the same list past the first: `Follow-up Tasks` → `Follow-Up Tasks`, while `Ready-to-Ship Checklist` keeps its lowercase `to`.
@@ -56,7 +56,7 @@ The best material happened in the session but never reached the code. Review the
 - Test observations: the actual result or failure, with real output. Name what you couldn't test and the concrete blocker ("brew install failed locally", not "needs a real machine").
 - A follow-up, named concretely ("follow-up in #N to…").
 
-A disproved theory, a rejected workaround, or a name the user settled by hand gets one sentence, and only when it changes the review. Don't mention what you left out. When sub-agents did the work, pull the material from their returned summaries before it's lost.
+A disproved theory, a rejected workaround, or a name the user settled by hand gets one sentence, and only when it changes the review. When sub-agents did the work, pull the material from their returned summaries.
 
 ### By Change Type
 
@@ -70,30 +70,20 @@ Show instead of asserting: permalink the exact lines instead of paraphrasing cod
 
 ## Optional Sections
 
-Only when the body is long enough to need them. A small PR stays one paragraph.
-
 ### Changes
 
-Organize by concept, not by file. One bullet per conceptual change, even when it spans files. Never `**path**: description`. Name an identifier only when it adds what the diff doesn't. Don't pair a count with an enumeration (`all three X (a, b, c)`): enumerate or summarize. Skip cleanup that follows from the main change.
+Organize by concept: one bullet per conceptual change, even when it spans files, rather than one per path. Name an identifier only when it adds what the diff doesn't. Enumerate or summarize, without a count on top. Skip cleanup that follows from the main change.
 
 For a schema change, name the tables and columns touched, since file names rarely show them. Past roughly ten columns, summarize and name only the columns that involved a decision. When the schema is generated from a model that names the table, add only what that mapping doesn't show. Describe a hand-written, date-prefixed migration. Skip a regenerated schema file.
 
 ### Testing
 
-Include only when a test or hand check tells the reviewer something the status checks won't. State what the test proves: the falsification ("reverting the fix makes `TestX` fail with `exit 2`"), the edge cases covered, what you verified by hand and what you couldn't.
-
-- Nothing CI already posts: no green-check lists (`lint passes`, `193 pass, 0 fail`). Name a check only when CI doesn't show its result: an intentional exclusion (`ruff over the repo, generated tree excluded`), a pre-existing warning left in place.
-- No test counts.
-- Paste real output instead of claiming success.
+Include only when a test or hand check tells the reviewer something the status checks won't. State what the test proves: the falsification ("reverting the fix makes `TestX` fail with `exit 2`"), the edge cases covered, what you verified by hand and what you couldn't. Leave pass results and test counts to CI. Name a check only when CI doesn't show its result: an intentional exclusion (`ruff over the repo, generated tree excluded`), a pre-existing warning left in place.
 
 ### References
 
 Links that aren't the motivating issue: `Closes #N` for what this resolves, `Relates to #N` for context. Every link must open for the reviewer. On a corporate or open-source repo, drop a private task-tracker URL or replace it with the artifact it points to. On a personal repo the owner is the reviewer, so an `Original Task:` Things link stays.
 
-## Slop to Cut
+## Connectives
 
-Beyond what the sections above ban:
-
-- The "This PR introduces" opening. Lead with the change or the problem.
-- Count-padding ("six detectors, three and three").
-- The consequence chain (`, so the…`) as a filler connective and the antithesis (`not just X but Y`, `X instead of Y`) as framing.
+Join sentences with plain connectives. State a contrast only when the reviewer would otherwise consider the rejected option.

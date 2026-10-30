@@ -4,22 +4,20 @@ House rules for writing to and querying Linear. Tool inputs below are JSON argum
 
 ## Issue References
 
-An issue reference renders as an inline chip only when Linear resolves it to a real entity. The two write paths recognize opposite inputs for the same issue. The correct form depends on which path you write through.
+An issue reference renders as an inline chip only when Linear resolves it. The two write paths recognize opposite inputs:
 
 - **Connector `save_issue`**: reference an issue by its bare identifier, `ENG-123`. The connector resolves it to a clean `[ENG-123](url)` chip. A URL renders as a plain link, since the connector wraps it in `<>` and Linear stops recognizing it.
 - **CLI / GraphQL API**: reference an issue by its URL, either bare (`https://linear.app/workspace/issue/ENG-123`) or hyperlinked (`[the auth bug](https://linear.app/workspace/issue/ENG-123)`). A bare identifier stays literal text.
 - **Users, either path**: `@displayname` (for example `@bvdrucker`) chips a user mention on both paths, and is the most portable reference.
 
-Both connector tools and GraphQL queries return a `url` field on issues. Include `url` when querying issues you may reference in writing. The CLI/API path needs it.
+Include the `url` field when querying issues you may reference in a CLI/API write.
 
 ### Serialization and Round-Trip
 
-Storage is GFM markdown. Raw GraphQL `description` and `linear issue view --json` return byte-identical markdown. The CLI is a pass-through of stored content. The connector is a transformer. On read it projects storage into node markup (`<issue>`, `<user>`, `<linear-embed>`), `>>>` collapsibles, and signed image URLs. On write it parses that markup back to GFM. GFM is the canonical interchange form.
+Storage is GFM markdown, the canonical interchange form. Raw GraphQL `description` and `linear issue view --json` return it byte-identical. The connector transforms it. On read it projects storage into node markup (`<issue>`, `<user>`, `<linear-embed>`), `>>>` collapsibles, and signed image URLs. On write it parses that markup back to GFM. When content moves between paths:
 
-This matters when content moves between the two paths:
-
-- Signed image URLs (`?signature=…`) from a connector read expire within minutes and return 401 afterward. Never copy one into stored content. The durable form is the unsigned `uploads.linear.app` URL that the CLI/API return.
-- Moving connector output to the CLI requires converting node markup to GFM first. Raw node markup written through the CLI is stored literally and corrupted. Reading the same issue via CLI/API returns GFM directly.
+- Store images by the unsigned `uploads.linear.app` URL the CLI/API return. Signed URLs (`?signature=…`) from a connector read expire within minutes.
+- Convert connector node markup to GFM before writing it through the CLI, or read the issue through the CLI/API to get GFM directly. The CLI stores node markup literally.
 - A `[ENG-123](url)` link read through the CLI loses its chip when written back through the connector, which `<>`-wraps it. To edit through the connector and keep chips, reference issues by bare identifier, or write through the CLI/API.
 
 ## Collapsible Sections
@@ -56,7 +54,7 @@ Pass body text through `--description-file <path>` so it stays out of context an
 
 ## Querying Issues
 
-Filter by `assignee: "me"` for the authenticated user's issues, and include `url` when you may reference a result. Without an MCP list tool, fall back to GraphQL per [api.md](../api.md).
+Filter by `assignee: "me"` for the authenticated user's issues. Without an MCP list tool, fall back to GraphQL per [api.md](../api.md).
 
 ## Labels
 

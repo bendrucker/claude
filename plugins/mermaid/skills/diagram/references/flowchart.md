@@ -19,7 +19,7 @@ flowchart TB
 | `LR` | Left to right |
 | `RL` | Right to left |
 
-Use `LR` for timelines and processes. Use `TB` for hierarchies and org charts.
+Use `LR` for timelines and processes. Use `TB` for hierarchies and for diagrams too wide for `LR`.
 
 ## Node Shapes
 
@@ -43,11 +43,11 @@ Use `LR` for timelines and processes. Use `TB` for hierarchies and org charts.
 | `-.->`| Dotted arrow |
 | `==>` | Thick arrow |
 | `--text-->` | Arrow with label |
-| `-->|text|` | Arrow with label (alt) |
+| `-->\|text\|` | Arrow with label (alt) |
 
 ## Subgraphs
 
-Group related nodes:
+Subgraphs inherit the parent direction. Use them to group by component, team, or phase.
 
 ```mermaid
 flowchart TB
@@ -63,44 +63,7 @@ flowchart TB
     C --> D
 ```
 
-Subgraphs inherit parent direction. Use them for:
-- Logical grouping (auth, database, external services)
-- Swimlanes (by team or system)
-- Phases (input, processing, output)
-
-## Parallel Paths
-
-Show concurrent operations:
-
-```mermaid
-flowchart TB
-    A[Start] --> B[Fork]
-    B --> C[Task 1]
-    B --> D[Task 2]
-    B --> E[Task 3]
-    C --> F[Join]
-    D --> F
-    E --> F
-    F --> G[End]
-```
-
-## Decision Trees
-
-```mermaid
-flowchart TB
-    A[Request] --> B{Authenticated?}
-    B -->|Yes| C{Authorized?}
-    B -->|No| D[401 Unauthorized]
-    C -->|Yes| E[Process]
-    C -->|No| F[403 Forbidden]
-    E --> G{Success?}
-    G -->|Yes| H[200 OK]
-    G -->|No| I[500 Error]
-```
-
 ## Styling
-
-Define classes and apply them:
 
 ```mermaid
 flowchart LR
@@ -109,10 +72,3 @@ flowchart LR
 
     A[Normal] --> B[Highlighted]:::highlight
 ```
-
-## Layout Tips
-
-- Minimize edge crossings by ordering nodes logically
-- Use subgraphs to reduce visual complexity
-- Keep labels short—expand in surrounding text
-- For wide diagrams, prefer `TB` over `LR`

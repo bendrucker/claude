@@ -16,11 +16,9 @@ What this does not include. Skip unless there's an adjacent thing a reasonable r
 
 ### Design
 
-Include subsections selectively.
-
 #### Approach
 
-High-level implementation. Reference existing patterns. Skip for trivially-designed features. Don't enumerate thin, unevaluated options. State the chosen approach, or the goal plus acceptance criteria, and leave option-weighing to a real decision.
+High-level implementation. Reference existing patterns. Skip for trivially-designed features. State the one chosen approach, or the goal plus acceptance criteria, and leave option-weighing to a real decision.
 
 #### Changes
 

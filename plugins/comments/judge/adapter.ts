@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { readShard, type ShardComment, type WrittenJob } from "./job";
+import { readShard, type ShardComment, type ShardRef, type WrittenJob } from "./job";
 import type { Verdict } from "./schema";
 
 /**
@@ -10,21 +10,26 @@ import type { Verdict } from "./schema";
  */
 export type JudgeAdapter = (job: WrittenJob) => Promise<void>;
 
-export const WORKFLOW_PATH = join(import.meta.dirname, "..", "workflow", "judge.workflow.js");
+/** The plugin agent that judges one shard. Its frontmatter pins the model and effort the eval gate cleared. */
+export const JUDGE_AGENT = "comments:judge";
+
+/** The prompt one judge agent gets, naming every path it reads or writes. */
+export function judgePrompt(job: WrittenJob, ref: ShardRef): string {
+  return `Rubric: ${job.promptPath}\nShard: ${ref.path}\nVerdicts: ${verdictPath(job.verdictsDir, ref.id)}`;
+}
 
 /**
- * The production judge: hand the job to the Workflow tool. The skill reads the
- * `<preflight>` block, asks the user to confirm, and fans out one agent per
- * shard. Those agents write the verdict files, so in-process there is nothing
- * more to do.
+ * Print the `<preflight>` block the session turns into one
+ * `Agent` call per shard. Those agents write the verdict files, so in-process
+ * there is nothing more to do.
  */
-export function workflowJudge(log: (line: string) => void): JudgeAdapter {
+export function agentJudge(log: (line: string) => void): JudgeAdapter {
   return (job) => {
     log("<preflight>");
     log(
       JSON.stringify({
-        scriptPath: WORKFLOW_PATH,
-        argsPath: job.argsPath,
+        agent: JUDGE_AGENT,
+        prompts: job.shards.map((ref) => judgePrompt(job, ref)),
         jobDir: job.jobDir,
         count: job.count,
         shardCount: job.shardCount,
@@ -35,7 +40,7 @@ export function workflowJudge(log: (line: string) => void): JudgeAdapter {
   };
 }
 
-/** Where a shard's verdict file lands, the name the workflow prompt spells out to each agent. */
+/** Where a shard's verdict file lands, the path each judge prompt names. */
 export function verdictPath(verdictsDir: string, shardId: number): string {
   return join(verdictsDir, `verdict-${shardId}.json`);
 }

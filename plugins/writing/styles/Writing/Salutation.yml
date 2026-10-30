@@ -1,5 +1,6 @@
 # evidence: assistant-written comments open by addressing the reader with a greeting or a name before the substance, which no published comment in the hand-written baseline does.
-# retire when: openings that address a person stop appearing in assistant output, or the name branch fires on ordinary sentence openers in corpus spot-checks.
+# A bare "Name," opener is not matched. Most of its corpus hits were openers like "Implemented,".
+# retire when: openings that address a person stop appearing in assistant output.
 extends: existence
 message: "'%s' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/Salutation.yml
@@ -7,20 +8,14 @@ level: warning
 scope: raw
 nonword: true
 tokens:
-  - '\A(?:#[^\n]*\n\s*)*(?:(?i:hi|hey|hello|dear|greetings|good\s+(?:morning|afternoon|evening))(?:[\s,!.:]|$)[^\n]{0,30}|(?![A-Za-z]*(?:ly|ing),)(?!(?:Nit|Agreed|Today|Tests|First|Question|Upstream|Given|Overall|Otherwise|Instead|However|Also|Still|Note|Currently|Here|Now|So|But|Yes|No|Sure|Thanks|Next|Then|Finally|Second|Third|Both|Either|Neither|Fine|Good|Great|Done)\b)[A-Z][a-z]+(?:\s[A-Z][a-z]+)?,)(?=\s|$)'
+  # A greeting at the start of the document, past any headings, with the rest of its line.
+  - '\A(?:#[^\n]*\n\s*)*(?i:hi|hey|hello|dear|greetings|good\s+(?:morning|afternoon|evening))(?:[\s,!.:]|$)[^\n]{0,30}(?=\s|$)'
 tests:
-  - name: positive name before a comma
-    about: name before a comma
+  - name: negative bare name before a comma
+    about: bare name before a comma, given up with the name branch
     input: |
       Dana, this fires for the entire run rather than the changed files.
-    want: |
-      1:1:Writing.Salutation:'Dana,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
-  - name: positive full name before a comma
-    about: full name before a comma
-    input: |
-      Dana Reyes, the retry loop swallows the error.
-    want: |
-      1:1:Writing.Salutation:'Dana Reyes,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
+    want: ""
   - name: positive greeting word and name
     about: greeting word and name
     input: |
@@ -51,21 +46,14 @@ tests:
       A few notes below.
     want: |
       1:1:Writing.Salutation:'Dear reviewer,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
-  - name: positive name after a heading
-    about: name after a heading
+  - name: positive greeting after a heading
+    about: greeting after a heading
     input: |
       ## Review
 
-      Dana, the retry loop swallows the error.
+      Hi Dana, the retry loop swallows the error.
     want: |
-      1:1:Writing.Salutation:'## Review Dana,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
-  - name: positive name alone on the opening line
-    about: name alone on the opening line
-    input: |
-      Dana,
-      The retry loop swallows the error.
-    want: |
-      1:1:Writing.Salutation:'Dana,' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
+      1:1:Writing.Salutation:'## Review Hi Dana, the retry loop swallows' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance.
   - name: negative connective opener
     about: connective opener
     input: |

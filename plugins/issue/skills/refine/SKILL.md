@@ -10,8 +10,8 @@ argument-hint: "[--type bug|feature|refactor|spike] [--compact]"
 
 Parse `$ARGUMENTS`:
 
-- `--type bug|feature|refactor|spike`: skip type identification and read that guide directly. Default: infer the type from the description per [Issue Types](#issue-types).
-- `--compact`: force the trivial body per [Section Selection](#section-selection). Frontmatter is always emitted. Default: size the body to the issue.
+- `--type bug|feature|refactor|spike`: use that type's guide. Default: infer the type per [Issue Types](#issue-types).
+- `--compact`: write the trivial body per [Section Selection](#section-selection), still with frontmatter. Default: size the body to the issue.
 
 ## Issue Types
 
@@ -24,7 +24,7 @@ Parse `$ARGUMENTS`:
 
 ## Workflow
 
-Read the type guide, gather context from code and related issues, and draft the refinement following the type's structure. Write it to `tmp/issue-<slug>.md` and output it for approval. After approval, hand the file to the platform skill (for Linear, `linear:linear`), which maps the frontmatter to tracker fields and saves the body. Defer all save mechanics to that skill. On GitHub, a screenshot the body references by local path goes on `gh issue create --attach`, per `github:attach`.
+Read the type guide, gather context from code and related issues, and draft the refinement. Write it to `tmp/issue-<slug>.md` and output it for approval. After approval, hand the file to the platform skill (for Linear, `linear:linear`), which owns all save mechanics, including mapping frontmatter to tracker fields. On GitHub, a screenshot the body references by local path goes on `gh issue create --attach`, per `github:attach`.
 
 ## Output Structure
 
@@ -52,21 +52,21 @@ time out, so downstream jobs read a partial snapshot as if it were complete.
 ## 🤖 Agent Context
 ```
 
-Populate only the keys you can infer: `title`, `type`, `labels`, `priority`, `relations`. Omit any optional key you can't fill, and drop empty relation lists. The platform skill fills routing and workspace fields (team, assignee, state, estimate) at save time.
+Populate only the keys you can infer, and drop empty relation lists. The platform skill fills routing and workspace fields (team, assignee, state, estimate) at save time.
 
-A related issue you found belongs under `relations` as a tracker link, kept out of the body. Mention another issue in the body only when it tells the reader something the relation can't: what a prior attempt tried, why upstream work matters. Never append a standalone Related Issues section. It just restates links the relation already expresses. Put links the tracker has no field for (cross-tracker issues, upstream bug reports) under [Agent Context](#agent-context).
+A related issue you found belongs under `relations` as a tracker link, kept out of the body. Mention another issue in the body only when it tells the reader something the relation can't: what a prior attempt tried, why upstream work matters. The body has no Related Issues section. Put links the tracker has no field for (cross-tracker issues, upstream bug reports) under [Agent Context](#agent-context).
 
 ## Section Selection
 
-Every section must tell the reader something they couldn't have guessed. Cut sections whose content is tautological ("tests must pass"), template residue ("no behavior change"), or obvious given the issue's size.
+Keep a section only when it tells the reader something they couldn't have guessed. Cut sections whose content is tautological ("tests must pass"), template residue ("no behavior change"), or obvious given the issue's size.
 
 For a substantial issue, the opening summary plus one type section is the floor. Grow only when content demands. A trivial issue needs none of that frame: a sentence or two that names the problem and points at the code is enough.
 
 ## Agent Context
 
-What you learned exploring the codebase, so the implementing agent doesn't explore it again. Last in the body, under a `## 🤖 Agent Context` heading. The platform skill turns that heading into a collapsible. Where no platform skill covers the tracker, wrap it in GFM `<details>` at save time.
+What you learned exploring the codebase, so the implementing agent doesn't explore it again. Last in the body, under a `## 🤖 Agent Context` heading, which the platform skill turns into a collapsible. Where no platform skill covers the tracker, wrap it in GFM `<details>` at save time.
 
-Write for an agent. Use lists of paths, symbols, and commands. [Style](#style) does not apply. Line numbers, ranges, and bare enumeration are fine when they save a search.
+Write lists of paths, symbols, and commands for an agent. [Style](#style) does not apply: line numbers, ranges, and bare enumeration are fine when they save a search.
 
 Emit only what exploration produced. Drop subsections you can't fill, and the whole section when you explored nothing.
 
@@ -100,12 +100,12 @@ Subsections, in order:
 
 Human-facing body only. [Agent Context](#agent-context) has its own rules.
 
-State facts and drop the hedging. Name the function, file, or behavior rather than describing it vaguely. Every sentence should add information.
+State facts without hedging.
 
 Section headings are title-case noun phrases. Keep them free of sentences, slogans, and "X, not Y" antithesis. Write "Connection Lifecycle" rather than "Pin, don't invalidate".
 
-Plain words over jargon and marketing. Drop terms like "spike" (as a verb), "seam", "disposition", "reality". Say what the thing does.
+Use plain words over jargon and marketing. Drop terms like "spike" (as a verb), "seam", "disposition", "reality". Say what the thing does.
 
-Reference code by symbol. Name the function or type and quote the few relevant lines inline. Skip bare line ranges (`file.py:26-56`, `#L26-L56`): they go stale as the file changes. Use a SHA-pinned permalink only when a stable anchor is genuinely needed.
+Reference code by symbol. Name the function or type and quote the few relevant lines inline. Skip bare line ranges (`file.py:26-56`, `#L26-L56`): they go stale as the file changes. Use a SHA-pinned permalink only when a stable anchor is needed.
 
-Reference issues and PRs as tracker links that expand inline, never as bare numbers (`ENG-1970`, `!578`, `#123`) a reader can't resolve. The platform skill owns the link syntax.
+Reference issues and PRs as tracker links that expand inline, rather than bare numbers (`ENG-1970`, `!578`, `#123`) a reader can't resolve. The platform skill owns the link syntax.

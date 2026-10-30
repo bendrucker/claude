@@ -2,8 +2,6 @@
 
 ## Basic Syntax
 
-Use `stateDiagram-v2` for the latest features:
-
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
@@ -13,8 +11,6 @@ stateDiagram-v2
     Complete --> [*]
     Failed --> Idle: retry
 ```
-
-## States
 
 | Syntax | Meaning |
 |--------|---------|
@@ -31,13 +27,7 @@ stateDiagram-v2
     C --> D: event / action
 ```
 
-- **event**: What triggers the transition
-- **[guard]**: Condition that must be true
-- **/ action**: Side effect of the transition
-
 ## Composite States
-
-Nest states for complex workflows:
 
 ```mermaid
 stateDiagram-v2
@@ -56,8 +46,6 @@ stateDiagram-v2
 
 ## Forks and Joins
 
-Parallel state regions:
-
 ```mermaid
 stateDiagram-v2
     [*] --> Fork
@@ -72,7 +60,7 @@ stateDiagram-v2
     Complete --> [*]
 ```
 
-## Choice (Decision)
+## Choice
 
 ```mermaid
 stateDiagram-v2
@@ -94,33 +82,3 @@ stateDiagram-v2
         incoming requests
     end note
 ```
-
-## Example: Order Lifecycle
-
-```mermaid
-stateDiagram-v2
-    [*] --> Pending
-
-    Pending --> Confirmed: payment_received
-    Pending --> Cancelled: timeout
-
-    state Confirmed {
-        [*] --> Preparing
-        Preparing --> Ready: packed
-        Ready --> [*]
-    }
-
-    Confirmed --> Shipped: dispatch
-    Shipped --> Delivered: arrive
-    Delivered --> [*]
-
-    Cancelled --> [*]
-```
-
-## Best Practices
-
-- Always use `[*]` for clear entry and exit points
-- Group related states with composite states
-- Use guards `[condition]` for conditional transitions
-- Keep state names short, use descriptions for detail
-- Order states to minimize arrow crossings

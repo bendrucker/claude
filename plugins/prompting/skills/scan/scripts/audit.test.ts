@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { z } from "zod";
@@ -15,7 +16,7 @@ import {
   type Proposal,
 } from "./audit";
 
-const SCRATCH_PARENT = join(import.meta.dirname, "..", "..", "..", "..", "..", "tmp");
+const SCRATCH_PARENT = tmpdir();
 
 function proposal(id: string, quote: string, replacement = "", file = "doc.md"): Proposal {
   return { id, file, quote, replacement, class: "no-op", reason: "test" };
@@ -137,7 +138,6 @@ describe("round", () => {
   let base = "";
 
   beforeAll(() => {
-    mkdirSync(SCRATCH_PARENT, { recursive: true });
     base = mkdtempSync(join(SCRATCH_PARENT, "audit-round-"));
   });
 
@@ -291,7 +291,6 @@ describe("audit commands", () => {
   const savedSession = process.env.CLAUDE_CODE_SESSION_ID;
 
   beforeAll(() => {
-    mkdirSync(SCRATCH_PARENT, { recursive: true });
     base = mkdtempSync(join(SCRATCH_PARENT, "audit-cli-"));
     events = join(base, "events");
     process.env[EVENTS_DIR_VAR] = events;

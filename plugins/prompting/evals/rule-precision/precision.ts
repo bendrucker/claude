@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
+import { z } from "zod";
 import { lint, VALE_CONFIG } from "../../skills/scan/scripts/vale";
 import { wilson } from "../../../../packages/evals/stats";
 
@@ -201,6 +202,53 @@ export function render(
   return `${preamble}\n${table([header, ...rows])}`;
 }
 
+const LABELS_FILE = join(import.meta.dir, "labels.json");
+
+const labelSources = z.object({ human: z.array(z.string()), agent: z.array(z.string()) });
+
+export type LabelSources = z.infer<typeof labelSources>;
+
+export async function loadLabelSources(path: string = LABELS_FILE): Promise<LabelSources> {
+  return labelSources.parse(await Bun.file(path).json());
+}
+
+/**
+ * Scores each non-empty source on its own labels and floor. Only the human
+ * source sets `failed`: the judge behind the agent labels shares doctrine
+ * vocabulary with the rules, so its table informs and never gates.
+ */
+export async function scoreSources(
+  repo: string,
+  sources: LabelSources,
+  config: string,
+  options: { minFlagged: number; minPrecision?: number | undefined },
+): Promise<{ output: string; failed: boolean; empty: boolean }> {
+  const named = (["human", "agent"] as const).filter((name) => sources[name].length > 0);
+  const sections: string[] = [];
+  let failed = false;
+  let empty = false;
+  const measured = await Promise.all(named.map((name) => measure(repo, sources[name], config)));
+  for (const [index, name] of named.entries()) {
+    const { scores, labels } = measured[index] ?? {
+      scores: [],
+      labels: { deleted: 0, prose: 0, docs: 0 },
+    };
+    if (scores.length === 0) {
+      if (name === "human") empty = true;
+      sections.push(`${name} labels: no check matched anything in the labeled history.`);
+      continue;
+    }
+    const floor = options.minPrecision ?? baseRate(labels);
+    const body = render(scores, labels, floor, options.minFlagged);
+    const heading = `${name} labels${name === "agent" ? " (report only)" : ""}`;
+    sections.push(named.length > 1 ? `${heading}\n${body}` : body);
+    if (name === "human") {
+      failed = scores.some((entry) => entry.flagged >= options.minFlagged && entry.low < floor);
+    }
+  }
+  return { output: sections.join("\n\n"), failed, empty };
+}
+
 if (import.meta.main) {
   const argv = cli({
     name: "rule-precision",
@@ -211,7 +259,12 @@ if (import.meta.main) {
     flags: {
       commit: {
         type: [String],
-        description: "Commit whose deletions label the ground truth (repeatable, required)",
+        description: "Commit where a human deleted prose, gating the exit code (repeatable)",
+      },
+      agentCommit: {
+        type: [String],
+        description:
+          "Commit whose cuts an LLM judge proposed and a human accepted, reported without gating (repeatable)",
       },
       rule: {
         type: [String],
@@ -235,25 +288,26 @@ if (import.meta.main) {
     },
   });
 
-  if (argv.flags.commit.length === 0) {
-    console.error("--commit is required. Name a commit where a human deleted prose.");
-    process.exit(2);
-  }
+  const tracked = await loadLabelSources();
+  const sources: LabelSources = {
+    human: argv.flags.commit.length > 0 ? argv.flags.commit : tracked.human,
+    agent: [...tracked.agent, ...argv.flags.agentCommit],
+  };
 
   const config =
     argv.flags.rule.length > 0
       ? await candidateConfig(argv.flags.rule, argv.flags.config)
       : argv.flags.config;
-  const { scores, labels } = await measure(argv.flags.repo, argv.flags.commit, config);
+  const result = await scoreSources(argv.flags.repo, sources, config, {
+    minFlagged: argv.flags.minFlagged,
+    minPrecision: argv.flags.minPrecision,
+  });
   if (config !== argv.flags.config) await rm(dirname(config), { recursive: true, force: true });
 
-  if (scores.length === 0) {
+  if (result.empty) {
     console.error("No check matched anything in the labeled history. Nothing was measured.");
     process.exit(1);
   }
-
-  const floor = argv.flags.minPrecision ?? baseRate(labels);
-  console.log(render(scores, labels, floor, argv.flags.minFlagged));
-  const judged = scores.filter((entry) => entry.flagged >= argv.flags.minFlagged);
-  process.exit(judged.some((entry) => entry.low < floor) ? 1 : 0);
+  console.log(result.output);
+  process.exit(result.failed ? 1 : 0);
 }

@@ -13,3 +13,31 @@ precision here is a lower bound: the human cut what they were looking for, not e
 ╚═════════════════════╧═════════╧═════════════╧═══════════╧══════════════╧══════════════════╝
 "
 `;
+
+exports[`scoreSources reports each source under its own heading 1`] = `
+"human labels
+ground truth: 2 of 4 prose lines removed across 1 documents
+a check clears when its interval's lower bound reaches 50% on 1+ hits
+precision here is a lower bound: the human cut what they were looking for, not every defect
+╔════════════════╤═════════╤═════════════╤═══════════╤══════════════╤══════════╗
+║ Check          │ Flagged │ Cut by hand │ Precision │ 95% interval │ Verdict  ║
+╟────────────────┼─────────┼─────────────┼───────────┼──────────────┼──────────╢
+║ Prompting.Cut  │ 2       │ 2           │ 100%      │ 34% - 100%   │ unproven ║
+╟────────────────┼─────────┼─────────────┼───────────┼──────────────┼──────────╢
+║ Prompting.Keep │ 1       │ 0           │ 0%        │ 0% - 79%     │ unproven ║
+╚════════════════╧═════════╧═════════════╧═══════════╧══════════════╧══════════╝
+
+
+agent labels (report only)
+ground truth: 2 of 4 prose lines removed across 1 documents
+a check clears when its interval's lower bound reaches 50% on 1+ hits
+precision here is a lower bound: the human cut what they were looking for, not every defect
+╔════════════════╤═════════╤═════════════╤═══════════╤══════════════╤══════════╗
+║ Check          │ Flagged │ Cut by hand │ Precision │ 95% interval │ Verdict  ║
+╟────────────────┼─────────┼─────────────┼───────────┼──────────────┼──────────╢
+║ Prompting.Cut  │ 2       │ 2           │ 100%      │ 34% - 100%   │ unproven ║
+╟────────────────┼─────────┼─────────────┼───────────┼──────────────┼──────────╢
+║ Prompting.Keep │ 1       │ 0           │ 0%        │ 0% - 79%     │ unproven ║
+╚════════════════╧═════════╧═════════════╧═══════════╧══════════════╧══════════╝
+"
+`;

@@ -15,12 +15,12 @@ Both run extraction, intrinsic-complexity ranking, an agent fan-out for judging,
 
 ## Contents
 
-- **`comments:audit`** skill: the three-step pipeline. `preflight` extracts, ranks, and builds the judging job. The committed Workflow fans out one agent per shard to judge. `apply` lands the trims and rewrites on a `comments/audit-*` branch or reports the findings. `--report`, `--fix`, `--path`, `--sort`, and `--limit` tune scope and output.
+- **`comments:audit`** skill: the three-step pipeline. `preflight` extracts, ranks, and builds the judging job. The `comments:judge` agent judges each shard. `apply` lands the trims and rewrites on a `comments/audit-*` branch or reports the findings. `--report`, `--fix`, `--path`, `--sort`, and `--limit` tune scope and output.
 - Detection, in `detection/`, covers comment extraction over Shiki's TextMate grammars, the diff and repo collectors, intrinsic-complexity ranking, stable comment ids, and the exemption gate that keeps tool directives, shebangs, and license headers away from the judge. `doc.ts` marks comments in the language's formal doc-comment position (godoc, JSDoc/TSDoc, Javadoc/KDoc and the other C-family `/** */` and `///` forms, Rust `///` and `//!`, Python docstrings) with the name they document and whether it is exported. It flags godoc on exported Go identifiers and packages as required. `density.ts` measures comment share against calibrated per-language baselines, weighting the ranking. `provenance.ts` blames each comment's lines and quotes the agent evidence off their commits (uncommitted lines, trailers such as `Co-Authored-By` and `Claude-Session`, the Claude Code footer, bot authors), which rides along to the judge as authorship evidence. Git names the committer. A human name with no signal is weak evidence, and the judge reads the voice as well. `tree.ts` reads the working tree against the branch's merge base for the Stop hook, and `transcript.ts` names the files a session edited. Per-comment deterministic features land in the job dir beside the verdicts, accumulating labeled pairs for a future routing layer.
-- Judging, in `judge/`, combines the versioned `prompt.md`, the verdict schema, per-verdict validation, and the job builder that shards comments for the Workflow.
-- The committed Workflow script the skill hands the job to lives in `workflow/`.
+- Judging, in `judge/`, combines the versioned `prompt.md`, the verdict schema, per-verdict validation, and the job builder that shards comments for the judge agents.
+- The `comments:judge` agent in `agents/` judges one shard and pins the gate's model and effort.
 - Applying, in `apply/`, is handled by the deterministic edit engine, the verdict id-match against re-extracted comments, the branch writer, and the report renderer. The edit engine refuses to delete a required doc comment, drop a Go doc comment's `Name` lead, or splice a line wider than the comment it replaces.
-- Evaluation, in `evals/`, uses the labeled fixture corpus and the action-accuracy eval, which scores it through the production Workflow judge (the ship gate).
+- Evaluation, in `evals/`, uses the labeled fixture corpus and the action-accuracy eval, which scores it through the production judge agent (the ship gate).
 - A preventive steering rule lives at `user/rules/code-comments.md`, scoped by path to code files.
 
 ## Density Hook
@@ -41,11 +41,11 @@ Deterministic extraction, ranking, the job builder, the edit engine, the verdict
 bun test plugins/comments
 ```
 
-The ship gate scores the fixture corpus through the judge that ships. `build` shards the fixtures with the same writer `preflight` uses and prints a `<preflight>` block. Hand that to the Workflow tool as `preflight` does, then score the verdicts it wrote:
+The ship gate scores the fixture corpus through the judge that ships. `build` shards the fixtures with the same writer `preflight` uses and prints a `<preflight>` block. Dispatch one `comments:judge` agent per prompt in it, as the skill does, then score the verdicts it wrote:
 
 ```bash
 bun run plugins/comments/evals/eval.ts build
-# Workflow({ script: <the contents of scriptPath>, args: <the parsed contents of argsPath> })
+# Agent({ subagent_type: "comments:judge", prompt: <each entry in prompts> })
 bun run plugins/comments/evals/eval.ts score --job <jobDir> --gate
 ```
 

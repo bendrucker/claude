@@ -12,14 +12,14 @@ argument-hint: "[--all] [--base <ref>] [--mr <iid>] [--path <glob>] [--sort <key
 allowed-tools:
   - Bash
   - Read
-  - Workflow
+  - Agent
 ---
 
 # Comments Audit
 
 Find low-value comments and act on them. A comment earns its place when it adds information not readily available in the adjacent code. The judge returns one action per comment: `keep`, `trim` (delete or shorten), or `rewrite` (keep the fact, strip the AI voice). [`judge/prompt.md`](../../judge/prompt.md) holds the comment model and its carve-outs.
 
-The pipeline is three steps, run in order: `preflight` (extract, rank, build the job), the Workflow tool (judge), and `apply` (write the trims or report them).
+The pipeline is three steps, run in order: `preflight` (extract, rank, build the job), one judge agent per shard, and `apply` (write the trims or report them).
 
 ## Scope and Flags
 
@@ -45,7 +45,7 @@ The script prints a human summary followed by a machine block:
 
 ```
 <preflight>
-{"scriptPath": "...", "argsPath": "...", "jobDir": "...", "count": N, "shardCount": K}
+{"agent": "comments:judge", "prompts": ["..."], "jobDir": "...", "count": N, "shardCount": K}
 </preflight>
 ```
 
@@ -66,13 +66,13 @@ every shape under it, which keeps a shape's evidence visible while it builds.
 
 ## Judge
 
-Read `scriptPath` and `argsPath` from the preflight block. The Workflow tool loads a `scriptPath` only from the session's working directories, so pass the script's full text inline, verbatim, with `args` set to the parsed contents of `argsPath`:
+Make one `Agent` call per entry in `prompts`, all in a single message so they run concurrently. Set `subagent_type` to the block's `agent` and `prompt` to the entry, verbatim. Leave `model` and `effort` unset, because the agent definition pins the ones the eval gate cleared.
 
 ```
-Workflow({ script: <contents of scriptPath>, args: <parsed job-args.json> })
+Agent({ subagent_type: "comments:judge", description: "Judge comment shard <n>", prompt: <prompts[n]> })
 ```
 
-Each agent judges one shard and writes its verdicts to disk for `apply` to read. The workflow log carries only a shard count and how many were flagged.
+Each agent judges one shard, writes its verdicts to disk for `apply` to read, and replies with one line of counts.
 
 ## Apply
 

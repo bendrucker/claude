@@ -1,3 +1,4 @@
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 
@@ -93,6 +94,16 @@ export type Queued = z.infer<typeof Queued>;
 
 export function hitId(hit: Pick<Hit, "check" | "file" | "line" | "span">): string {
   return `${hit.check}|${hit.file}|${hit.line}|${hit.span[0]}`;
+}
+
+/** A directory's entries, or none when it does not exist yet. */
+export async function entries(dir: string): Promise<string[]> {
+  try {
+    return await readdir(dir);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+    throw error;
+  }
 }
 
 export async function readJsonl<T>(schema: z.ZodType<T>, path: string): Promise<T[]> {

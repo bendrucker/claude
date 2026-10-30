@@ -1,11 +1,10 @@
-import { readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { InlineCode, Text } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { visit } from "unist-util-visit";
 import { z } from "zod";
-import { type Flag, readJsonl } from "./data";
+import { entries, type Flag, readJsonl } from "./data";
 
 const FEEDBACK = join(homedir(), ".plannotator", "feedback");
 
@@ -51,7 +50,9 @@ function rendered(raw: string): Rendered[] {
     // Escapes, indentation, and code-span backticks sit in the raw text but not the value, so walk past them.
     let at = start;
     const first = out.length;
-    for (const char of value) {
+    // Walk UTF-16 code units, the unit the quote's length counts in.
+    for (let i = 0; i < value.length; i++) {
+      const char = value.charAt(i);
       while (at < end && raw[at] !== char) at++;
       out.push({ char, offset: at < end ? at : -1 });
       at++;
@@ -100,7 +101,7 @@ export async function annotations(
   feedback = FEEDBACK,
 ): Promise<Annotation[]> {
   // Plannotator's JSON output omits the annotations. Only its feedback index records them.
-  const indexes = (await readdir(feedback).catch(() => []))
+  const indexes = (await entries(feedback))
     .map((dir) => join(feedback, dir, "index.jsonl"))
     .filter((index) => Bun.file(index).lastModified >= since.getTime());
   const sessions = (await Promise.all(indexes.map((index) => readJsonl(z.unknown(), index))))

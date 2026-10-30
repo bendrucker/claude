@@ -1,8 +1,7 @@
-import { readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { $ } from "bun";
 import { lint } from "../../plugins/prompting/skills/scan/scripts/vale";
-import { type Corpus, DOCS, type Hit, type Sweep } from "./data";
+import { type Corpus, DOCS, entries, type Hit, type Sweep } from "./data";
 
 export const ROOT = join(import.meta.dirname, "..", "..");
 
@@ -38,7 +37,7 @@ const SAMPLES = [
 export async function corpusFiles(corpus: Corpus, root = ROOT, docs = DOCS): Promise<string[]> {
   const out = await $`git -C ${root} ls-files -- ${[...CORPORA[corpus], ...SAMPLES]}`.text();
   // Snapshots are gitignored, so ls-files never lists them.
-  const reviewed = (await readdir(docs).catch(() => []))
+  const reviewed = (await entries(docs))
     .filter((name) => name.endsWith(".md"))
     .map((name) => relative(root, join(docs, name)));
   return [...out.split("\n").filter(Boolean), ...reviewed];

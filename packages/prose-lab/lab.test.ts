@@ -294,6 +294,7 @@ describe("locate", () => {
     "See [the guide](https://example.com) for more.",
     "",
     "A second paragraph.",
+    "Emoji 😀x y.",
   ];
   const slices = (quote: string): string[] =>
     locate(lines, quote).map(
@@ -315,6 +316,7 @@ describe("locate", () => {
       want: ["starts.", "See [the"],
     },
     { name: "missing", quote: "not in the doc", want: [] },
+    { name: "an astral character", quote: "😀x", want: ["😀x"] },
   ])("$name", ({ quote, want }) => {
     expect(slices(quote)).toEqual(want);
   });

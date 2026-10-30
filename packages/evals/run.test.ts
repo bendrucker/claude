@@ -21,7 +21,10 @@ let repo: string;
 const files: Record<string, string> = {
   "plugins/p/.claude-plugin/plugin.json": '{"name":"p"}',
   "plugins/p/skills/s/SKILL.md": "committed skill",
-  "plugins/q/.claude-plugin/plugin.json": '{"name":"q","dependencies":["r"]}',
+  "plugins/q/.claude-plugin/plugin.json":
+    '{"name":"q","dependencies":["r"],"userConfig":{"stack":{"default":""},"auto":{"default":true},"token":{}}}',
+  "plugins/q/skills/t/SKILL.md":
+    '!`ctx --stack "${user_config.stack}"`\nauto: ${user_config.auto}, token: ${user_config.token}',
   "plugins/r/.claude-plugin/plugin.json": '{"name":"r","dependencies":["s","q"]}',
   "plugins/s/.claude-plugin/plugin.json": '{"name":"s"}',
   "plugins/bad/.claude-plugin/plugin.json": '{"name":"bad","dependencies":["missing"]}',
@@ -87,6 +90,13 @@ describe("prepare", () => {
     expect(await read(join(target, evalDir, "one/graders/fired.md"))).toBe("shared grader");
     expect(await Bun.file(join(target, evalDir, "graders/fired.md")).exists()).toBe(false);
     expect(await read(join(target, "../packages/stubs/install.sh"))).toBe("working stub");
+  });
+
+  test("fills userConfig placeholders that have a default", async () => {
+    const { target } = await prepare(repo, "plugins/p/evals/suite", undefined);
+    expect(await read(join(target, "q/skills/t/SKILL.md"))).toBe(
+      '!`ctx --stack ""`\nauto: true, token: ${user_config.token}',
+    );
   });
 
   test("wraps skills and context that are not a plugin", async () => {

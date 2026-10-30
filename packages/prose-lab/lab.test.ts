@@ -255,6 +255,14 @@ test.each<{ name: string; scores: Score[]; want: string }>([
     ],
     want: "precise",
   },
+  {
+    name: "a precise candidate over the ceiling yields to a promotable one",
+    scores: [
+      makeScore({ candidate: "precise", low: 0.96, high: 1, complexity: CEILING + 1 }),
+      makeScore({ candidate: "simple", low: 0.83, high: 0.94, complexity: 1 }),
+    ],
+    want: "simple",
+  },
 ])("best: $name", ({ scores, want }) => {
   expect(best(scores, "p")?.candidate).toBe(want);
 });
@@ -385,6 +393,21 @@ describe("labConfig", () => {
       ]);
     },
   );
+
+  test("skips a file vale can't read and keeps the other files' hits", async () => {
+    await Bun.write(
+      join(root, "bad.md"),
+      "---\n: [unclosed\n---\n\nThe rule carries the weight.\n",
+    );
+    const config = await labConfig([join(root, "Carries.yml")], PLUGINS.writing);
+    const hits = await lintFiles("writing", config, ["bad.md", "doc.md"], root);
+    expect(hits.map((h) => h.file)).toEqual(["doc.md"]);
+  });
+
+  test("throws when the config is broken", async () => {
+    const config = join(root, "missing.ini");
+    expect(await lintFiles("writing", config, ["doc.md"], root).catch(() => "threw")).toBe("threw");
+  });
 });
 
 describe("locate", () => {

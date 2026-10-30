@@ -157,12 +157,12 @@ export function best(scores: readonly Score[], pattern: string): Score | undefin
   const ranked = scores
     .filter((entry) => entry.pattern === pattern)
     .toSorted((a, b) => (b.low === a.low ? b.recall - a.recall : b.low - a.low));
-  const top = ranked[0];
-  if (top === undefined) return undefined;
-  const simplest = ranked
-    .filter((entry) => entry.high >= top.low && promotable(entry))
+  const eligible = ranked.filter(promotable);
+  const top = eligible[0];
+  if (top === undefined) return ranked[0];
+  return eligible
+    .filter((entry) => entry.high >= top.low)
     .toSorted((a, b) => a.complexity - b.complexity)[0];
-  return simplest ?? top;
 }
 
 export interface HitDiff {

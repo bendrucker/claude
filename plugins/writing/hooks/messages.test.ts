@@ -215,6 +215,69 @@ describe("Bash processInput", () => {
   });
 });
 
+describe("review payloads", () => {
+  const dense = {
+    comments: [
+      {
+        body: "Dropping `parse_error` deletes `GRAMMAR_LINE`, `extractLine`, and the `patch` fallback. The event reads only structured fields.",
+      },
+    ],
+  };
+  const light = {
+    comments: [
+      {
+        body: "Dropping the error message deletes the regexes too. The event reads only structured fields.",
+      },
+    ],
+  };
+  let dir: string;
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "review-payload-test-"));
+    await Bun.write(join(dir, "dense.json"), JSON.stringify(dense));
+    await Bun.write(join(dir, "light.json"), JSON.stringify(light));
+    await Bun.write(join(dir, "dense.md"), dense.comments[0]?.body ?? "");
+  });
+
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test.each<{ name: string; command: (dir: string) => string; denied: boolean }>([
+    {
+      name: "a dense draft-note batch is denied",
+      command: (d) => `bun draft-note.ts review 1 --input ${d}/dense.json`,
+      denied: true,
+    },
+    {
+      name: "a dense gh api review is denied",
+      command: (d) => `gh api repos/o/r/pulls/1/reviews --input ${d}/dense.json`,
+      denied: true,
+    },
+    {
+      name: "a light draft-note batch passes",
+      command: (d) => `bun draft-note.ts review 1 --input ${d}/light.json`,
+      denied: false,
+    },
+    {
+      name: "a dense PR body is out of scope",
+      command: (d) => `gh pr create --body-file ${d}/dense.md`,
+      denied: false,
+    },
+  ])("$name", async ({ command, denied }) => {
+    const alerts = await lintMessages(mockBash(command(dir)));
+    const density = alerts.filter((alert) => alert.check === "Writing.CodeDensity");
+    expect(density.map((alert) => alert.decision)).toEqual(denied ? ["deny"] : []);
+  });
+
+  it("skips a payload that is not JSON", async () => {
+    const file = join(dir, "dense.md");
+    expect(await collectText(mockBash(`gh api repos/o/r/pulls/1/reviews --input ${file}`))).toEqual(
+      [],
+    );
+  });
+});
+
 describe("MCP calls", () => {
   it("denies a GitHub PR body that negates the noun", async () => {
     const result = await processInput(

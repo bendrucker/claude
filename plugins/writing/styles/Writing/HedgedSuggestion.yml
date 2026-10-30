@@ -1,0 +1,29 @@
+# evidence: these tokens hit 6 of 8 Claude-rewritten review comments the user then edited into instructions, and 1 of 194 pre-LLM human review bodies. "consider" and "might want to" never fired on a draft, and the one human "consider" hit read fine.
+# retire when: judged precision on a fresh sample of review-comment hits falls under 0.7.
+extends: existence
+message: "'%s' hedges a suggestion. State the change as an instruction (Use zod here) or a pointed question (Shouldn't we...?)."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/HedgedSuggestion.yml
+level: warning
+ignorecase: true
+tokens:
+  - we could
+  - could we
+  - what if we
+  - would be nice
+tests:
+  - name: "flags We could declare the shape once"
+    input: |
+      We could declare the shape once.
+    contains: [Writing.HedgedSuggestion]
+  - name: "flags Could we open a PR there?"
+    input: |
+      Could we open a PR there?
+    contains: [Writing.HedgedSuggestion]
+  - name: "allows You could probably access this via the status checks API"
+    input: |
+      You could probably access this via the status checks API.
+    absent: Writing.HedgedSuggestion
+  - name: "allows Shouldn't we open a PR there?"
+    input: |
+      Shouldn't we open a PR there?
+    absent: Writing.HedgedSuggestion

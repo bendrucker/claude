@@ -1,0 +1,54 @@
+# evidence: a paragraph with 3+ code spans at 8+ per 100 words flags 5 of 7 drafted review comments and 4 of 194 pre-LLM human review bodies, all dense Terraform reviews.
+# retire when: judged precision on a fresh sample of review-comment hits falls under 0.7, or drafts stop clustering identifiers.
+extends: script
+message: "%s"
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/CodeDensity.yml
+level: error
+scope: raw
+script: |
+  text := import("text")
+  fmt := import("fmt")
+  guidance := "%d code spans in one paragraph read as written for a machine. Name things the way a reviewer would say them aloud (the token field, this regex), and keep a code span only for the one identifier the author has to find. Never list identifiers. A fenced suggestion block is fine."
+  matches := []
+  masked := scope
+  fences := text.re_find("(?ms)^[ \t]*```.*?^[ \t]*```[^\n]*", scope, -1)
+  if fences != undefined {
+    for f in fences {
+      m := f[0]
+      masked = masked[:m.begin] + text.repeat("\n", m.end - m.begin) + masked[m.end:]
+    }
+  }
+  paras := text.re_find("(?m)^.*\\S.*(?:\n.*\\S.*)*", masked, -1)
+  if paras != undefined {
+    for p in paras {
+      para := p[0]
+      spans := text.re_find("`[^`\n]+`", para.text, -1)
+      n := spans == undefined ? 0 : len(spans)
+      words := len(text.fields(text.re_replace("`[^`\n]+`", para.text, "X")))
+      if n >= 3 && n * 100 / words >= 8 {
+        matches = append(matches, {begin: para.begin, end: para.end, message: fmt.sprintf(guidance, n)})
+      }
+    }
+  }
+tests:
+  - name: "flags four spans in a short paragraph"
+    input: |
+      Dropping `parse_error` deletes `GRAMMAR_LINE`, `extractLine`, and the `patch` fallback, so the event reads only structured fields.
+    contains: [Writing.CodeDensity]
+  - name: "allows two spans in a paragraph"
+    input: |
+      The `token` field and the `expected` field already carry this, so the message adds nothing.
+    absent: Writing.CodeDensity
+  - name: "allows three spans in a long paragraph"
+    input: |
+      The `token` field already carries what the parser saw, and `expected` carries what it wanted instead. Together they rebuild the whole line that the old message text scraped together, which means the event can stop matching against free text entirely. Once that happens the `fallback` branch has nothing left to do, and the dashboard reads the same values it always did.
+    absent: Writing.CodeDensity
+  - name: "allows identifiers inside a fenced block"
+    input: |
+      Declaring the shape once would cover every caller, as in `Event`:
+
+      ```ts
+      const Event = z.object({ parse_token: z.string(), parse_expected: z.string(), parse_line: z.number() });
+      type Event = z.infer<typeof Event>;
+      ```
+    absent: Writing.CodeDensity

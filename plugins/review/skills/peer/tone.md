@@ -2,7 +2,16 @@
 
 Comments should be concise and instructive. Help the author understand why a suggestion was made, with inline links to relevant sources. Write in a natural, conversational tone, and read the reviewer's comment history to match their voice.
 
-Refer to code by symbol name. Line numbers drift as the change evolves and make the reader hunt for what you mean.
+Refer to code by symbol name. Line numbers drift as the change evolves and make the reader hunt for what you mean. Name at most one or two identifiers in a paragraph, and describe the rest by what they do ("the token field", "this regex").
+
+## Voice
+
+- Instruct ("Use zod here") or ask a pointed question ("Shouldn't we open a PR there?").
+- Understate a risk dryly instead of speculating about it. State a concern plainly, without saying how it makes you feel.
+- End on the last substantive point. Leave out scope and cost caveats and closing payoff lines.
+- Lay out a proposal with several steps as a list that opens with the principle and ends with the payoff.
+- When you want an action, end with the concrete ask in its exact wording.
+- Casual openers are fine ("Not from this MR, but since you're in here").
 
 ## Who You're Addressing
 
@@ -16,7 +25,7 @@ The Context block at the top of the skill records the reviewing user. The author
 
 Use RFC keywords (must, should, may) naturally within sentences to convey importance ("this must validate the input before writing"), never as labels or prefixes ("**Must**: Add input validation"). The keyword conveys severity without drawing attention to itself.
 
-Blocking comments state the problem and its impact directly, without hedging. Non-blocking suggestions invite discussion ("what about...", "have you considered...", "worth adding").
+Blocking comments state the problem and its impact directly, without hedging. Mark a non-blocking suggestion with `Nit:` or by asking it as a question.
 
 ## Nitpicks
 

@@ -21,6 +21,10 @@ export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 // not trigger file reads. Guard fragment shipped to hooks.json like the above.
 export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 
+// `draft-note.ts review` and `gh api ... --input` read a JSON payload from a
+// file. Guard fragment shipped to hooks.json like the above.
+export const INPUT_FILE_GUARD = "--input[= ]";
+
 // Any prose value in an MCP call puts three spaces, backticks, or JSON-escaped
 // tabs on the hook's stdin, since a stripped code span reads as spaces.
 // hooks.json ships this grep so other calls skip the bun spawn.
@@ -53,6 +57,12 @@ function strings(value: unknown): string[] {
 const BODY_FILE_PATTERN = new RegExp(`(?:${BODY_FILE_FLAGS.join("|")})[=\\s](\\S+)`);
 const FIELD_FILE_PATTERN = /(?:^|\s)['"]?(?:-F|--field)[= ]([^\s=]+)=@(\S+)/g;
 const GIT_MESSAGE_FILE_PATTERN = /\bgit\s+(?:commit|tag)\b[^|;&]*?\s(?:-F|--file)[= ](\S+)/g;
+const INPUT_FILE_PATTERN = /(?:^|\s)--input[= ](\S+)/g;
+
+// Commands that post a peer-review comment: a GitLab draft note, discussion, or
+// note, or a GitHub pull request review or comment.
+const REVIEW_COMMAND =
+  /draft-note\.ts|\bglab\s+api\b[^|;&]*\/(?:draft_notes|discussions|notes)\b|\bglab\s+mr\s+note\b|\bgh\s+api\b[^|;&]*\/pulls\/\d+\/(?:reviews|comments)\b|\bgh\s+pr\s+(?:review|comment)\b/;
 
 // Shell quoting survives into the raw command string, so a path captured from
 // `-F 'body=@tmp/x.md'` carries the closing quote.
@@ -109,6 +119,25 @@ function extractFieldFilePaths(command: string): string[] {
   return paths;
 }
 
+function extractInputFilePaths(command: string): string[] {
+  return [...command.matchAll(INPUT_FILE_PATTERN)]
+    .map((match) => stripQuotes(match[1] ?? ""))
+    .filter((path) => path !== "" && path !== "-");
+}
+
+// Each prose string becomes its own paragraph, so two comments never read as one.
+function payloadProse(body: string): string | null {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    return null;
+  }
+  const prose = strings(payload).filter(isProse);
+  return prose.length === 0 ? null : prose.join("\n\n");
+}
+
 const INLINE_ARG_PATTERNS = new Map<string, RegExp>(
   PROSE_FLAGS.map((flag) => [flag, new RegExp(`${flag}[= ](?:"([^"]+)"|'([^']+)')`)]),
 );
@@ -139,6 +168,15 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
       files.map((path) => readNewest(pathCandidates(path, process.env, uid))),
     );
     texts.push(...bodies.filter((body) => body !== null));
+    const payloads = await Promise.all(
+      extractInputFilePaths(command).map((path) =>
+        readNewest(pathCandidates(path, process.env, uid)),
+      ),
+    );
+    for (const payload of payloads) {
+      const prose = payload === null ? null : payloadProse(payload);
+      if (prose !== null) texts.push(prose);
+    }
     for (const flag of PROSE_FLAGS) {
       const value = extractInlineArg(command, flag);
       if (value != null && value !== "") texts.push(value);
@@ -149,12 +187,17 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
   return [];
 }
 
+function messageKind(input: PreToolUseHookInput): "body" | "commit" | "review" {
+  const command = toolInputOf(input).command ?? "";
+  if (/\bgit\s+(commit|tag)\b/.test(command)) return "commit";
+  if (REVIEW_COMMAND.test(command) || /review|comment/i.test(input.tool_name)) return "review";
+  return "body";
+}
+
 /** Alerts for the message prose a Bash or MCP call sends. An error-level alert denies the call. */
 export async function lintMessages(input: PreToolUseHookInput): Promise<HookAlert[]> {
   const texts = await collectText(input);
   if (texts.length === 0) return [];
-  const command = toolInputOf(input).command ?? "";
-  const kind = /\bgit\s+(commit|tag)\b/.test(command) ? "commit" : "body";
-  const alerts = await valeAlerts(texts.join("\n"), { kind });
+  const alerts = await valeAlerts(texts.join("\n"), { kind: messageKind(input) });
   return alerts.map((alert) => hookAlertOf(alert, alert.Severity === "error" ? "deny" : "context"));
 }

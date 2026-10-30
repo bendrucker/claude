@@ -5,7 +5,7 @@ import { z } from "zod";
 export const VALE_CONFIG = join(import.meta.dirname, "..", ".vale.ini");
 
 /** Where text came from, which picks the `.vale.ini` section that lints it. */
-export type ValeSource = { filePath: string } | { kind: "body" | "commit" };
+export type ValeSource = { filePath: string } | { kind: "body" | "commit" | "review" };
 
 const Alert = z.object({
   Check: z.string(),
@@ -38,10 +38,12 @@ export function valeBinary(): string | null {
   return Bun.which(bundled) ?? null;
 }
 
+const KIND_EXTENSIONS = { body: ".prbody", commit: ".commitmsg", review: ".reviewbody" } as const;
+
 // A file goes by its path relative to the config root, which is what a
 // directory-scoped section such as `[docs/*.md]` matches against.
 function sourceArg(source: ValeSource, root: string | null): string {
-  if ("kind" in source) return `--ext=${source.kind === "commit" ? ".commitmsg" : ".prbody"}`;
+  if ("kind" in source) return `--ext=${KIND_EXTENSIONS[source.kind]}`;
   const path = root === null ? basename(source.filePath) : relative(root, source.filePath);
   return `--path=${path}`;
 }

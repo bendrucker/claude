@@ -4,7 +4,7 @@ Fill a reply's `! <command>` suggestions into the shell prompt instead of copyin
 
 ## Contents
 
-- **Mod**: Once you type `!`, [`register.tsx`](mod/register.tsx) offers a reply's `! <command>` lines, and the `` `! <command>` `` code spans in its sentences, as a button under the reply and a numbered list above the prompt. A digit or a click fills the command. Whole-line commands separated only by blank lines or code fences form a block, and each inline span is a block of its own. Each block of two or more gets a "run all" entry that fills them joined with `&&`. The run stops at the first failure. `0` fills the first run-all entry. A block whose commands would misbehave when chained doesn't get an entry, and [`commands.ts`](mod/commands.ts) lists the cases. Picks are recorded through [`mod-events`](../mod-events).
+- **Mod**: Once you type `!`, [`register.tsx`](mod/register.tsx) offers a reply's `! <command>` suggestions as buttons and a numbered list, plus a "run all" entry that chains a block of them with `&&`. [`commands.ts`](mod/commands.ts) finds and groups them. Picks are recorded through [`mod-events`](../mod-events).
 
 ## Tests
 

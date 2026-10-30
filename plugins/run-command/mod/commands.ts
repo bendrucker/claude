@@ -3,16 +3,19 @@ export const LIMIT = 9;
 
 // A line that is only `! <command>`, optionally bulleted or in backticks.
 const COMMAND = /^\s*(?:[-*]\s+)?`?!\s+([^`\s][^`]*?)\s*`?\s*$/;
+// A code span, paired left to right so a closing backtick never opens one.
+const SPAN = /`([^`]*)`/g;
+// A code span's text that is `! <command>`.
+const INLINE = /^!\s+(\S.*?)\s*$/;
+// A capitalized sentence ending in a period is prose, such as a linter's
+// `! This variable is unused.`, and an option is a negated test, such as `find`'s `! -path`.
+const NOT_COMMAND = /^(?:[A-Z][a-z]\S*\s.*\.$|-)/;
+// A bare placeholder such as `<command>` is not a runnable command.
+const PLACEHOLDER = /^<[^<>]*>$/;
 // Operators holding an `&` that still chain: `&&` and fd redirects.
 const CHAINING_AMPERSANDS = /&&|[<>]&|&>/g;
 // Code sourced or eval'd runs in this shell, where a chain switches off its `set -e`.
 const IN_SHELL = /(?:^|&&|\|)\s*(?:source|\.|eval)(?:\s|$)/;
-
-/** Blank lines and code fences sit between commands without ending their block. */
-function keepsBlock(line: string): boolean {
-  const trimmed = line.trim();
-  return trimmed === "" || trimmed.startsWith("```");
-}
 
 /**
  * `;` would mask an earlier failure, `||` would run after one, `#` comments
@@ -64,18 +67,38 @@ function unquoted(command: string): string | undefined {
   return quote === undefined && depth === 0 ? bare : undefined;
 }
 
-/** A reply's commands, grouped into runs that only blank lines and fences separate. */
+function runnable(command: string | undefined): command is string {
+  return command !== undefined && !NOT_COMMAND.test(command) && !PLACEHOLDER.test(command);
+}
+
+/**
+ * A reply's commands, grouped into runs that only blank lines and fences
+ * separate. A command inside a sentence gets a block of its own, since its
+ * prose may set it apart from its neighbors, as with a preview before a delete.
+ */
 export function blocks(text: string): string[][] {
   const found: string[][] = [];
   let open = false;
+  let fenced = false;
   for (const line of text.split("\n")) {
     const command = COMMAND.exec(line)?.[1];
-    if (command !== undefined) {
+    if (runnable(command)) {
       if (open) found.at(-1)?.push(command);
       else found.push([command]);
       open = true;
-    } else if (!keepsBlock(line)) {
-      open = false;
+      continue;
+    }
+    const trimmed = line.trim();
+    if (trimmed.startsWith("```")) {
+      fenced = !fenced;
+      continue;
+    }
+    if (trimmed === "") continue;
+    open = false;
+    if (fenced) continue;
+    for (const [, span = ""] of line.matchAll(SPAN)) {
+      const inline = INLINE.exec(span)?.[1];
+      if (runnable(inline)) found.push([inline]);
     }
   }
   return found;

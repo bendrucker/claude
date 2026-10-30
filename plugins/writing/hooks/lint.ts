@@ -24,8 +24,8 @@ export function targetOf(filePath: string): string {
   return createHash("sha256").update(filePath, "utf8").digest("hex").slice(0, 16);
 }
 
-// A file edit already happened, so every alert it wrote is context. Alerts on
-// lines it left alone are counted but not reported, since the model did not write them.
+// Alerts on lines the edit left alone are counted but not reported, since the
+// model did not write them.
 async function lintEdited(
   filePath: string,
   toolResponse: unknown,

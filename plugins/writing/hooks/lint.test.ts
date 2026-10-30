@@ -166,7 +166,6 @@ describe("edited files", () => {
   describe("scoped to the edit", () => {
     const BEFORE = ["# Notes", "", "We should dig into the cache.", "", "The config is fine."];
 
-    // An Edit replacing line 5 of BEFORE with `replacement`, as Claude Code reports it.
     async function edit(name: string, replacement: string): Promise<PostToolUseHookInput> {
       const after = [...BEFORE.slice(0, 4), replacement];
       return edited(name, `${after.join("\n")}\n`, {

@@ -197,6 +197,16 @@
       "source": "./plugins/herdr"
     },
     {
+      "name": "dispatch",
+      "description": "Hand new work to a fresh Claude session in its own worktree, in a Rex tab or a herdr workspace",
+      "source": "./plugins/dispatch"
+    },
+    {
+      "name": "rex",
+      "description": "Conventions for driving the Rex terminal multiplexer: tabs, panes, splits, hosts, and reading other terminals",
+      "source": "./plugins/rex"
+    },
+    {
       "name": "comments",
       "description": "Detect AI slop code comments in a diff and steer clean comment generation",
       "source": "./plugins/comments"

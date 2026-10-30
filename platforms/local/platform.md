@@ -22,17 +22,17 @@ Point `cwd` at the main repo, never a worktree.
 
 ## Worktrees
 
-Start any change meant to become its own PR in a worktree created with `worktrunk:wt-switch-create`, even where the harness suggests `EnterWorktree`. When already on a topic branch in a worktree, stay there. Work handed to a sibling agent gets its worktree through `herdr:herdr`.
+Start any change meant to become its own PR in a worktree created with `worktrunk:wt-switch-create`, even where the harness suggests `EnterWorktree`. When already on a topic branch in a worktree, stay there. Work handed to a sibling agent gets its worktree through `dispatch:dispatch`.
 
 ## Multiplexers
 
-herdr, the Herdr app, and Rex host sessions here. Open panes, tabs, and splits with the multiplexer hosting this session: `rex` when the session-start context names a Rex terminal, `herdr:herdr` otherwise. `herdr:herdr` covers both herdr TUI and the Herdr app. Sibling-agent dispatch goes through `herdr:herdr` from any of them.
+herdr, the Herdr app, and Rex host sessions here. Open panes, tabs, and splits with the multiplexer hosting this session: `rex:rex` when the session-start context names a Rex terminal, `herdr:herdr` otherwise. `herdr:herdr` covers both herdr TUI and the Herdr app. Sibling-agent dispatch goes through `dispatch:dispatch` from Rex or herdr TUI, and through the herdr skill's Herdr App steps from the app. Claude sessions talk to each other over `SendMessage`.
 
 ## Configuration Repos
 
 Edit `bendrucker/claude` at `~/src/bendrucker/claude`. `claude-sync` updates `~/.claude-repo` from `main`, so a merged change goes live only after that sync runs. Dotfiles are deployed at `~/.dotfiles`.
 
-When work in another repo needs a change in either repo, hand it to a sibling agent through `herdr:herdr` and report the PR back to me. Where herdr is unavailable, queue it with `spawn_task`, or tell me the change.
+When work in another repo needs a change in either repo, hand it to a sibling agent through `dispatch:dispatch` and report the PR back to me. Where dispatch can't run, queue it with `spawn_task`, or tell me the change.
 
 When an `aws --profile` call fails on an expired SSO session, run `aws sso login --profile <name> --use-device-code` in the background and send me the URL and code it prints. I approve it on my phone and the command exits. The default flow redirects to localhost, which a phone never reaches.
 

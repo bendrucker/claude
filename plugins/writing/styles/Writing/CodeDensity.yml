@@ -11,7 +11,7 @@ script: |
   guidance := "%d code spans in one paragraph read as written for a machine. Name things the way a reviewer would say them aloud (the token field, this regex), and keep a code span only for the one identifier the author has to find. Never list identifiers. A fenced suggestion block is fine."
   matches := []
   masked := scope
-  fences := text.re_find("(?ms)^[ \t]*```.*?^[ \t]*```[^\n]*", scope, -1)
+  fences := text.re_find("(?ms)^[ \t]*```.*?^[ \t]*```[^\n]*|^[ \t]*~~~.*?^[ \t]*~~~[^\n]*", scope, -1)
   if fences != undefined {
     for f in fences {
       m := f[0]
@@ -51,4 +51,12 @@ tests:
       const Event = z.object({ parse_token: z.string(), parse_expected: z.string(), parse_line: z.number() });
       type Event = z.infer<typeof Event>;
       ```
+    absent: Writing.CodeDensity
+  - name: "allows backticked identifiers inside a tilde fence"
+    input: |
+      The parser already carries these:
+
+      ~~~md
+      Use `parse_token`, `parse_expected`, and `parse_line` directly.
+      ~~~
     absent: Writing.CodeDensity

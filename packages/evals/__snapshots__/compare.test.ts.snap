@@ -3,22 +3,24 @@
 exports[`render stars rows that moved and leads the markdown with them 1`] = `
 "Each cell shows its two-sided permutation p-value against base, and * marks p < 0.1. all/<arm> pools every case's runs. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.
 
+#### Starred
+
 | measure | row | base | next |
 | --- | --- | --- | --- |
-| Case score | c/with | 1.00 | 0.00 (p=0.001)* |
-| Reply words | c/with | 3 | 6 (p=0.001)* |
-| Turns per run | c/with | 2.0 | 5.0 (p=0.001)* |
-| Seconds per run | c/with | 10.0 | 30.0 (p=0.001)* |
-| Output tokens per run | c/with | 500 | 900 (p=0.001)* |
-| Cost per run (USD) | c/with | 0.100 | 0.300 (p=0.001)* |
-| Grader pass rate | c/with · fact | 1.00 | 0.00 (p=0.001)* |
-| Grader pass rate | c/with · fired (indicator) | 1.00 | 0.00 (p=0.001)* |
+| Case score | c/with | 1.00 | 0.00 (p=0.001)\\* |
+| Reply words | c/with | 3 | 6 (p=0.001)\\* |
+| Turns per run | c/with | 2.0 | 5.0 (p=0.001)\\* |
+| Seconds per run | c/with | 10.0 | 30.0 (p=0.001)\\* |
+| Output tokens per run | c/with | 500 | 900 (p=0.001)\\* |
+| Cost per run (USD) | c/with | 0.100 | 0.300 (p=0.001)\\* |
+| Grader pass rate | c/with · fact | 1.00 | 0.00 (p=0.001)\\* |
+| Grader pass rate | c/with · fired (indicator) | 1.00 | 0.00 (p=0.001)\\* |
 
 <details><summary>Case score</summary>
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 1.00 | 0.00 (p=0.001)* |
+| c/with | 1.00 | 0.00 (p=0.001)\\* |
 
 </details>
 
@@ -34,7 +36,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 3 | 6 (p=0.001)* |
+| c/with | 3 | 6 (p=0.001)\\* |
 
 </details>
 
@@ -42,7 +44,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 2.0 | 5.0 (p=0.001)* |
+| c/with | 2.0 | 5.0 (p=0.001)\\* |
 
 </details>
 
@@ -50,7 +52,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 10.0 | 30.0 (p=0.001)* |
+| c/with | 10.0 | 30.0 (p=0.001)\\* |
 
 </details>
 
@@ -58,7 +60,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 500 | 900 (p=0.001)* |
+| c/with | 500 | 900 (p=0.001)\\* |
 
 </details>
 
@@ -66,7 +68,7 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | base | next |
 | --- | --- | --- |
-| c/with | 0.100 | 0.300 (p=0.001)* |
+| c/with | 0.100 | 0.300 (p=0.001)\\* |
 
 </details>
 
@@ -74,8 +76,8 @@ exports[`render stars rows that moved and leads the markdown with them 1`] = `
 
 | case/arm | grader | base | next |
 | --- | --- | --- | --- |
-| c/with | fact | 1.00 | 0.00 (p=0.001)* |
-| c/with | fired (indicator) | 1.00 | 0.00 (p=0.001)* |
+| c/with | fact | 1.00 | 0.00 (p=0.001)\\* |
+| c/with | fired (indicator) | 1.00 | 0.00 (p=0.001)\\* |
 
 </details>"
 `;

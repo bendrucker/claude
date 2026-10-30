@@ -26,7 +26,7 @@ On CI, `gh workflow run eval.yml --ref <branch> -f suite=<suite> -f args='--tag 
 bun evals/native/compare.ts --suite <suite> --markdown <base1>,<base2> <cand1>,<cand2>
 ```
 
-Each positional column is one or more `aggregate-result.json` paths joined by commas, pooled into one column. `--alpha` sets the star threshold (0.1). `--markdown` prints the starred rows first.
+Each positional column is one or more `aggregate-result.json` paths joined by commas, pooled into one column. `--alpha` sets the star threshold (0.1). `--markdown` prints the starred rows first. `--row <case>/<arm>[/<grader>]`, repeated, prints those rows ahead of the starred ones whether or not they starred, for a PR's targets and guards.
 
 ## Other Operations
 

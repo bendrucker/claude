@@ -40,6 +40,12 @@ export const program = new Command("compare.ts")
     "native",
   )
   .option("--markdown", "print markdown with the starred rows first and the full tables collapsed")
+  .option(
+    "--row <label>",
+    "score row the markdown leads with, starred or not: <case>/<arm>, <tag>/<arm>, or <case>/<arm>/<grader>; repeatable",
+    collect,
+    [],
+  )
   .action(async (columns, options) => {
     if (options.suite !== undefined) await generate(options.suite);
     const paths = columns.map((c) => c.split(","));
@@ -47,15 +53,19 @@ export const program = new Command("compare.ts")
       program.error(error instanceof Error ? error.message : String(error)),
     );
     const label = adapter.label ?? basename;
-    console.log(
-      render({
-        columns: await Promise.all(paths.map((p) => loadColumn(p, adapter))),
-        labels: paths.map((p, i) => options.label[i] ?? label(p[0] ?? "")),
-        alpha: options.alpha,
-        tags: options.suite === undefined ? undefined : await adapter.tags(options.suite),
-        markdown: options.markdown,
-      }),
-    );
+    const report = {
+      columns: await Promise.all(paths.map((p) => loadColumn(p, adapter))),
+      labels: paths.map((p, i) => options.label[i] ?? label(p[0] ?? "")),
+      alpha: options.alpha,
+      tags: options.suite === undefined ? undefined : await adapter.tags(options.suite),
+      markdown: options.markdown,
+      rows: options.row,
+    };
+    try {
+      console.log(render(report));
+    } catch (error) {
+      program.error(error instanceof Error ? error.message : String(error));
+    }
   });
 
 if (import.meta.main) {

@@ -11,6 +11,8 @@ export interface RenderOptions {
   /** Case name to tags, which adds a per-tag score section. */
   tags?: Map<string, string[]> | undefined;
   markdown?: boolean | undefined;
+  /** Score rows (`<case>/<arm>`, `<tag>/<arm>`, or `<case>/<arm>/<grader>`) the markdown leads with. */
+  rows?: string[] | undefined;
 }
 
 type Section = [title: string, head: string[], rows: string[][]];
@@ -144,7 +146,9 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
 }
 
 const starred = (r: string[]) => r.some((cell) => cell.endsWith("*"));
-const line = (cells: string[]) => `| ${cells.join(" | ")} |`;
+// Escaped so a reader who bolds a starred cell doesn't merge the star into the emphasis.
+const line = (cells: string[]) =>
+  `| ${cells.map((c) => c.replace(/\*$/, String.raw`\*`)).join(" | ")} |`;
 const markdown = (head: string[], rows: string[][]) =>
   [line(head), line(head.map(() => "---")), ...rows.map(line)].join("\n");
 
@@ -157,6 +161,26 @@ function flaggedRows(all: Section[]): string[][] {
       return cells;
     }),
   );
+}
+
+const scoreSections = new Set(["Tag score", "Case score", "Grader pass rate"]);
+
+/** The score row each label names, in label order, failing on a label that names none. */
+function namedRows(all: Section[], patterns: string[]): string[][] {
+  const byLabel = new Map<string, string[]>();
+  for (const [title, head, rows] of all) {
+    if (!scoreSections.has(title)) continue;
+    for (const r of rows) {
+      const label = r
+        .slice(0, head.length)
+        .join("/")
+        .replace(/!(?=\/|$)/, "");
+      byLabel.set(label, [title, r.slice(0, head.length).join(" · "), ...r.slice(head.length)]);
+    }
+  }
+  const missing = patterns.filter((p) => !byLabel.has(p));
+  if (missing.length > 0) throw new Error(`No score row named ${missing.join(", ")}`);
+  return patterns.map((p) => byLabel.get(p) ?? []);
 }
 
 /** The rows the markdown report flags as moved against the first column. */
@@ -197,11 +221,13 @@ export function render(options: RenderOptions): string {
     return out.join("\n");
   }
 
+  const lead = ["measure", "row", ...labels];
+  if (options.rows !== undefined && options.rows.length > 0) {
+    out.push(`#### Targets and Guards\n\n${markdown(lead, namedRows(all, options.rows))}\n`);
+  }
   const moved = flaggedRows(all);
   out.push(
-    moved.length > 0
-      ? markdown(["measure", "row", ...labels], moved)
-      : "No row moved past the noise rule.",
+    `#### Starred\n\n${moved.length > 0 ? markdown(lead, moved) : "No row moved past the noise rule."}`,
   );
   for (const [title, head, rows] of all) {
     out.push(

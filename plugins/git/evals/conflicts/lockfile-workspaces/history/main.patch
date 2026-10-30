@@ -1,0 +1,45 @@
+diff --git a/bun.lock b/bun.lock
+index 5f24a54..d82fb21 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -11,10 +11,21 @@
+         "zod": "^4.4.3",
+       },
+     },
++    "packages/lint": {
++      "name": "@agents/lint",
++      "dependencies": {
++        "commander": "~15.0.0",
++        "zod": "^4.4.3",
++      },
++    },
+   },
+   "packages": {
+     "@agents/judge": ["@agents/judge@workspace:packages/judge"],
+ 
++    "@agents/lint": ["@agents/lint@workspace:packages/lint"],
++
++    "commander": ["commander@15.0.0", "", {}, "sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg=="],
++
+     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
+   }
+ }
+diff --git a/packages/lint/index.ts b/packages/lint/index.ts
+new file mode 100644
+index 0000000..cb0ff5c
+--- /dev/null
++++ b/packages/lint/index.ts
+@@ -0,0 +1 @@
++export {};
+diff --git a/packages/lint/package.json b/packages/lint/package.json
+new file mode 100644
+index 0000000..3bd99f0
+--- /dev/null
++++ b/packages/lint/package.json
+@@ -0,0 +1,6 @@
++{
++  "name": "@agents/lint",
++  "private": true,
++  "type": "module",
++  "dependencies": { "commander": "~15.0.0", "zod": "^4.4.3" }
++}

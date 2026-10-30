@@ -1,0 +1,35 @@
+diff --git a/plugins/performance/skills/hill-climb/SKILL.md b/plugins/performance/skills/hill-climb/SKILL.md
+index 470d7b97..66af0e50 100644
+--- a/plugins/performance/skills/hill-climb/SKILL.md
++++ b/plugins/performance/skills/hill-climb/SKILL.md
+@@ -40,8 +40,8 @@ Interview the user until each item below is settled and none rests on your assum
+   - When a candidate can change lookup order (`PATH`, module or library search paths), the guard compares what each name resolves to.
+   - Only the user relaxes a guard.
+ - **Side effects.** Everything a run touches outside itself: network, remote state, installed files, caches. Decide per item whether to stub it, hold it fixed, or reset it before each run.
+-- **Scope.** Which changes are allowed: code, config, dependencies, external tools, public API. Ask whether parallelism is in scope. When caching is in scope, ask where a cache may live and how it invalidates.
+-- **Inputs.** Which scenarios are `dev` (tuned against) and which are `holdout` (scored once at the end). Prefer real inputs over synthetic ones for `holdout`.
++- **Scope.** Which changes are allowed: code, config, dependencies, external tools, public API. Ask whether parallelism is in scope. When caching is in scope, ask where a cache may live and how it invalidates. Ask how much added code a gain must pay for.
++- **Inputs.** Which scenarios are `dev` (tuned against) and which are `holdout` (scored once at the end). Cover the workload's range of sizes and shapes. Prefer real inputs over synthetic ones for `holdout`, and look for larger real data when every `dev` input is small.
+ - **Budget.** How long the climb may run and how the user wants progress between checkpoints.
+ 
+ ## Workspace
+@@ -100,8 +100,9 @@ Screen with the fast signal or a microbenchmark of the changed path. Confirm a c
+ 
+ #### Decide
+ 
+-- **Accept** when the target moves in the predicted direction past the acceptance rule in the notes file (default: permutation p < 0.1 and a median gain of at least 3%) and no guard regresses. Commit the change alone, with the evidence in the commit body.
++- **Accept** when the target moves in the predicted direction past the acceptance rule in the notes file (default: permutation p < 0.1 and a median gain of at least 3%) and no guard regresses, and the gain pays for the code the change adds at the Scope's bar. Commit the change alone, with the evidence in the commit body.
+ - **Keep unconfirmed** when the target did not move but the user agrees to keep the change for a reason outside the metric. Label it "kept, unconfirmed" in the notes, commit body, and PR, and leave it out of the reported gain.
++- **Keep as a trade** when the target improves, another metric regresses, and the user approves the trade. Label it "kept, trade" and report both numbers wherever the gain appears.
+ - **Reject** otherwise. Record the hypothesis, pseudocode of the change, and the numbers in the notes file, and save the diff as a patch beside it, so the null result stays findable. A rejected hypothesis stays rejected until a new profile argues for it.
+ - **Re-run** an accept that rests on rounds `compare.ts report` flags for load, and decide on the re-run. An accept rests on them when the gain or its significance fails without those rounds.
+ - **Bound** an accepted gain by its target's time in the profile. Re-measure a gain past that bound before committing, or report the excess as unexplained.
+@@ -115,6 +116,8 @@ After each decision:
+ 
+ ## Stopping
+ 
++Before stopping on anything but the ceiling or the budget, profile every Frame metric at head on the largest inputs, and rank what that profile shows. A climb that has accepted most of its candidates still has headroom.
++
+ Stop when any of these holds, and say which:
+ 
+ - The metric reached the ceiling.

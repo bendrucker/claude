@@ -1,0 +1,45 @@
+diff --git a/bun.lock b/bun.lock
+index 5f24a54..5e49af1 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -11,10 +11,21 @@
+         "zod": "^4.4.3",
+       },
+     },
++    "packages/stubs": {
++      "name": "@agents/stubs",
++      "dependencies": {
++        "picocolors": "^1.1.0",
++        "zod": "^4.4.3",
++      },
++    },
+   },
+   "packages": {
+     "@agents/judge": ["@agents/judge@workspace:packages/judge"],
+ 
++    "@agents/stubs": ["@agents/stubs@workspace:packages/stubs"],
++
++    "picocolors": ["picocolors@1.1.0", "", {}, "sha512-TQ92mBOW0l3LeMeyLV6mzy/kWr8lkd/hp3mTg7wYK7zJhuBStmGMBG0BdeDZS/dZx1IukaX6Bk11zcln25o1Aw=="],
++
+     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
+   }
+ }
+diff --git a/packages/stubs/index.ts b/packages/stubs/index.ts
+new file mode 100644
+index 0000000..cb0ff5c
+--- /dev/null
++++ b/packages/stubs/index.ts
+@@ -0,0 +1 @@
++export {};
+diff --git a/packages/stubs/package.json b/packages/stubs/package.json
+new file mode 100644
+index 0000000..74948de
+--- /dev/null
++++ b/packages/stubs/package.json
+@@ -0,0 +1,6 @@
++{
++  "name": "@agents/stubs",
++  "private": true,
++  "type": "module",
++  "dependencies": { "picocolors": "^1.1.0", "zod": "^4.4.3" }
++}

@@ -1,0 +1,394 @@
+diff --git a/plugins/pull-request/evals/pr-body/README.md b/plugins/pull-request/evals/pr-body/README.md
+index 8e5afe96..819a89b3 100644
+--- a/plugins/pull-request/evals/pr-body/README.md
++++ b/plugins/pull-request/evals/pr-body/README.md
+@@ -25,7 +25,9 @@ bun plugins/pull-request/evals/pr-body/scripts/sync.ts push   # --profile agents
+ 
+ ## Structure Limits
+ 
+-`structure.ts` parses a body to mdast and measures what a reader sees without expanding anything: prose outside fenced code and `<details>`. `LIMITS` holds two one-sided limits, 120 visible words and 40 words in the longest paragraph or bullet. A body fails only by exceeding one, so collapsing data or writing less never costs anything. The output should be a baseline Ben adds to, shorter than what he writes himself.
++`structure.ts` parses a body to mdast and measures what a reader sees without expanding anything: prose outside fenced code and `<details>`. `LIMITS` holds three one-sided limits: 120 visible words, 40 words in the longest paragraph or bullet, and 6 inline code spans in paragraphs and list items (`proseCodeSpans`, excluding tables, fenced code, and `<details>`). A body fails only by exceeding one, so collapsing data or writing less never costs anything. The output should be a baseline Ben adds to, shorter than what he writes himself.
++
++`scripts/limits.ts <results-dir>...` scores each run's PR body against the limits as `visible-words`, `max-block`, and `prose-code-spans` rows and writes `<results-dir>-limits/` for `compare.ts`. Run it before `compare.ts`. The `work-*` cases in `create-scenarios` come from edited work MRs, described in summary with no source. Their fixtures run `create-scenarios/stubs.sh`, which puts stand-in `glab` and `gh` on `PATH` so the body-rules hook fires on the create call and `limits.ts` reads the body the stand-in printed.
+ 
+ `scripts/fit.ts` checks a metric against `data/revisions/`: how often a revision moves it down, and with `--human`, how well it separates plugin drafts from Ben's writing (AUC).
+ 
+diff --git a/plugins/pull-request/evals/pr-body/scripts/limits.test.ts b/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
+new file mode 100644
+index 00000000..ac5042b7
+--- /dev/null
++++ b/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
+@@ -0,0 +1,116 @@
++import { expect, test } from "bun:test";
++import { mkdtempSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { Result } from "../../../../../evals/native/regrade";
++import { applyLimits, bodyOf, render } from "./limits";
++
++const long = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
++const spans = (n: number) => Array.from({ length: n }, (_, i) => `\`c${i}\``).join(" ");
++
++const grader = (name: string, passed: boolean) => ({
++  name,
++  passed,
++  weight: 1,
++  scored: true,
++  withOnly: false,
++});
++
++const jsonl = (lines: object[]) => lines.map((l) => JSON.stringify(l)).join("\n");
++
++const toolResult = (content: unknown) => ({
++  type: "user",
++  message: { content: [{ type: "tool_result", tool_use_id: "t", content }] },
++});
++
++const stubTrace = (body: string) =>
++  jsonl([
++    toolResult([{ type: "text", text: `PR-BODY-BEGIN\n${body}\nPR-BODY-END\n` }]),
++    { type: "result", result: "Opened it." },
++  ]);
++
++const replyTrace = (reply: string) => jsonl([{ type: "result", result: reply }]);
++
++test("scores the stub body when a tool result carries one and the reply otherwise", async () => {
++  const dir = mkdtempSync(join(tmpdir(), "limits-"));
++  const results = join(dir, "run");
++  const out = join(dir, "run-limits");
++  const run = (score: number) => ({ score, graders: [grader("fact", true)] });
++  await Promise.all([
++    Bun.write(
++      join(results, "aggregate-result.json"),
++      JSON.stringify({
++        aggregates: { overallScore: 1 },
++        cases: [{ name: "one", arms: { with: [run(1), run(1), run(1)], without: [run(1)] } }],
++      }),
++    ),
++    Bun.write(join(results, "traces/one-with-0.jsonl"), stubTrace(`${long(10)} ${spans(7)}`)),
++    Bun.write(
++      join(results, "traces/one-with-1.jsonl"),
++      replyTrace(`Title: Fix it\n\n${long(130)}`),
++    ),
++    Bun.write(join(results, "traces/one-without-0.jsonl"), stubTrace(long(10))),
++  ]);
++
++  const counts = await applyLimits(results, out);
++  const written = Result.parse(await Bun.file(join(out, "aggregate-result.json")).json());
++  expect(written.aggregates).toBeUndefined();
++  const rows = (arm: string, i: number) =>
++    written.cases[0]?.arms[arm]?.[i]?.graders.map((g) => [g.name, g.passed]);
++  expect(rows("with", 0)).toEqual([
++    ["fact", true],
++    ["visible-words", true],
++    ["max-block", true],
++    ["prose-code-spans", false],
++  ]);
++  expect(rows("with", 1)).toEqual([
++    ["fact", true],
++    ["visible-words", false],
++    ["max-block", false],
++    ["prose-code-spans", true],
++  ]);
++  expect(written.cases[0]?.arms.with?.[0]?.graders.at(-1)?.explanation).toContain("from stub");
++  expect(written.cases[0]?.arms.with?.[1]?.graders.at(-1)?.explanation).toContain("from reply");
++  expect(written.cases[0]?.arms.with?.map((r) => r.score)).toEqual([3 / 4, 2 / 4, 1]);
++  expect(written.cases[0]?.arms.without?.[0]?.score).toBe(1);
++  expect(await Bun.file(join(out, "traces/one-with-1.jsonl")).exists()).toBe(true);
++  expect(render(counts)).toMatchInlineSnapshot(`
++    "╔══════╤════════════════════╤════════════════╤═══════════════════════╤═══════════════════════╤═══════════════════╤══════════════════════════╗
++    ║ case │ with visible-words │ with max-block │ with prose-code-spans │ without visible-words │ without max-block │ without prose-code-spans ║
++    ╟──────┼────────────────────┼────────────────┼───────────────────────┼───────────────────────┼───────────────────┼──────────────────────────╢
++    ║ one  │ 1/2                │ 1/2            │ 1/2                   │ 1/1                   │ 1/1               │ 1/1                      ║
++    ╚══════╧════════════════════╧════════════════╧═══════════════════════╧═══════════════════════╧═══════════════════╧══════════════════════════╝
++    "
++  `);
++});
++
++test.each<{ name: string; trace: string; body: string | undefined; source?: string }>([
++  {
++    name: "string tool_result content",
++    trace: jsonl([toolResult("noise\nPR-BODY-BEGIN\nHello\nPR-BODY-END")]),
++    body: "Hello",
++    source: "stub",
++  },
++  {
++    name: "last stub block wins",
++    trace: jsonl([
++      toolResult("PR-BODY-BEGIN\nfirst\nPR-BODY-END"),
++      toolResult("PR-BODY-BEGIN\nsecond\nPR-BODY-END"),
++    ]),
++    body: "second",
++    source: "stub",
++  },
++  {
++    name: "stub beats the reply",
++    trace: jsonl([
++      toolResult("PR-BODY-BEGIN\nstub\nPR-BODY-END"),
++      { type: "result", result: "Title: T\n\nreply" },
++    ]),
++    body: "stub",
++    source: "stub",
++  },
++  { name: "reply without a Title line", trace: replyTrace("Just prose."), body: undefined },
++])("bodyOf: $name", ({ trace, body, source }) => {
++  expect(bodyOf(trace)?.text).toBe(body);
++  expect(bodyOf(trace)?.source).toBe(source);
++});
+diff --git a/plugins/pull-request/evals/pr-body/scripts/limits.ts b/plugins/pull-request/evals/pr-body/scripts/limits.ts
+new file mode 100644
+index 00000000..f6ee2211
+--- /dev/null
++++ b/plugins/pull-request/evals/pr-body/scripts/limits.ts
+@@ -0,0 +1,161 @@
++#!/usr/bin/env bun
++import { basename, join } from "node:path";
++import { Command } from "@commander-js/extra-typings";
++import { $ } from "bun";
++import { table } from "table";
++import { z } from "zod";
++import { traceReply } from "../../../../../evals/native/load";
++import { type Run, Result, score } from "../../../../../evals/native/regrade";
++import { LIMITS, type LimitKey, limitKeys, measureStructure } from "../structure";
++
++// Scores a results directory against the PR-body structure limits, so changing
++// a limit doesn't require new sessions.
++
++const ToolResult = z.object({
++  type: z.literal("tool_result"),
++  content: z.union([
++    z.string(),
++    z.array(z.looseObject({ type: z.string(), text: z.string().optional() })),
++  ]),
++});
++const TraceLine = z.looseObject({
++  message: z.looseObject({ content: z.unknown() }).optional(),
++});
++
++const ROWS = {
++  visibleWords: "visible-words",
++  maxBlockWords: "max-block",
++  proseCodeSpans: "prose-code-spans",
++} as const satisfies Record<LimitKey, string>;
++
++const STUB_BLOCK = /^PR-BODY-BEGIN[^\S\n]*\n([\s\S]*?)\n?^PR-BODY-END[^\S\n]*$/gm;
++
++export interface Body {
++  text: string;
++  source: "stub" | "reply";
++}
++
++function toolResultTexts(trace: string): string[] {
++  return trace
++    .split("\n")
++    .filter((l) => l.trim() !== "")
++    .flatMap((l) => {
++      const line = TraceLine.safeParse(JSON.parse(l));
++      const content = line.success ? line.data.message?.content : undefined;
++      if (!Array.isArray(content)) return [];
++      return content.flatMap((block: unknown) => {
++        const result = ToolResult.safeParse(block);
++        if (!result.success) return [];
++        const { content: c } = result.data;
++        return typeof c === "string" ? [c] : [c.map((p) => p.text ?? "").join("")];
++      });
++    });
++}
++
++/** The PR body a run produced: the last stub block in a tool result, else the reply after its `Title:` line. */
++export function bodyOf(trace: string): Body | undefined {
++  const blocks = toolResultTexts(trace).flatMap((t) => t.matchAll(STUB_BLOCK).toArray());
++  const stub = blocks.at(-1)?.[1];
++  if (stub !== undefined) return { text: stub, source: "stub" };
++  const reply = traceReply(trace);
++  const title = reply === undefined ? null : /^Title:.*$/m.exec(reply);
++  if (reply === undefined || title === null) return undefined;
++  return { text: reply.slice(title.index + title[0].length).trim(), source: "reply" };
++}
++
++export function limitRows(body: Body): Run["graders"] {
++  const s = measureStructure(body.text);
++  return limitKeys.map((key) => ({
++    name: ROWS[key],
++    passed: s[key] <= LIMITS[key],
++    weight: 1,
++    scored: true,
++    withOnly: false,
++    explanation: `${key} ${s[key]} against limit ${LIMITS[key]} (body from ${body.source})`,
++  }));
++}
++
++export function limitRun(run: Run, arm: string, trace: string): Run {
++  const body = bodyOf(trace);
++  if (body === undefined) return run;
++  const names = new Set<string>(Object.values(ROWS));
++  const next = {
++    ...run,
++    graders: [...run.graders.filter((g) => !names.has(g.name)), ...limitRows(body)],
++  };
++  return run.score === null ? next : { ...next, score: score(next, arm) };
++}
++
++export type Counts = Map<string, Map<string, [passed: number, total: number]>>;
++
++/** Writes `<out>` with the limit rows added to every run that has a body, and returns per-case pass counts. */
++export async function applyLimits(results: string, out: string): Promise<Counts> {
++  const result = Result.parse(await Bun.file(join(results, "aggregate-result.json")).json());
++  const counts: Counts = new Map();
++  const names = new Set<string>(Object.values(ROWS));
++  const cases = await Promise.all(
++    result.cases.map(async (c) => {
++      const perCase = new Map<string, [number, number]>();
++      counts.set(c.name, perCase);
++      const arms = await Promise.all(
++        Object.entries(c.arms).map(async ([arm, runs]) => {
++          const next = await Promise.all(
++            runs.map(async (run, i) => {
++              const file = Bun.file(join(results, "traces", `${c.name}-${arm}-${i}.jsonl`));
++              if (!(await file.exists())) return run;
++              const limited = limitRun(run, arm, await file.text());
++              for (const g of limited.graders.filter((x) => names.has(x.name))) {
++                const key = `${arm}/${g.name}`;
++                const [passed, total] = perCase.get(key) ?? [0, 0];
++                perCase.set(key, [passed + (g.passed ? 1 : 0), total + 1]);
++              }
++              return limited;
++            }),
++          );
++          return [arm, next] as const;
++        }),
++      );
++      return { ...c, arms: Object.fromEntries(arms) };
++    }),
++  );
++  // The aggregates summarize the recorded scores, so a rescored result drops them.
++  const { aggregates: _, ...rest } = result;
++  await Bun.write(join(out, "aggregate-result.json"), JSON.stringify({ ...rest, cases }, null, 2));
++  await $`cp -R ${join(results, "traces")} ${out}/`.quiet().nothrow();
++  return counts;
++}
++
++const armOf = (key: string) => key.split("/")[0] ?? "";
++
++function cell(m: Map<string, [number, number]>, arm: string, row: string): string {
++  const c = m.get(`${arm}/${row}`);
++  return c === undefined ? "-" : `${c[0]}/${c[1]}`;
++}
++
++export function render(counts: Counts): string {
++  const arms = new Set<string>();
++  for (const m of counts.values()) for (const key of m.keys()) arms.add(armOf(key));
++  const names = Object.values(ROWS);
++  const header = ["case"];
++  for (const a of arms) for (const r of names) header.push(`${a} ${r}`);
++  const rows: string[][] = [];
++  for (const [name, m] of counts) {
++    const row = [name];
++    for (const a of arms) for (const r of names) row.push(cell(m, a, r));
++    rows.push(row);
++  }
++  return table([header, ...rows]);
++}
++
++const program = new Command()
++  .description(
++    "Add visible-words, max-block, and prose-code-spans rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
++  )
++  .argument("<results-dir...>", "results directories holding aggregate-result.json and traces/")
++  .action(async (dirs) => {
++    const outs = dirs.map((dir) => join(dir, "..", `${basename(dir)}-limits`));
++    const all = await Promise.all(dirs.map((dir, i) => applyLimits(dir, outs[i] ?? "")));
++    for (const [i, counts] of all.entries()) console.log(`${outs[i]}\n${render(counts)}`);
++  });
++
++if (import.meta.main) await program.parseAsync();
+diff --git a/plugins/pull-request/evals/pr-body/structure.test.ts b/plugins/pull-request/evals/pr-body/structure.test.ts
+index 0445dafb..7e12658d 100644
+--- a/plugins/pull-request/evals/pr-body/structure.test.ts
++++ b/plugins/pull-request/evals/pr-body/structure.test.ts
+@@ -3,6 +3,8 @@ import { measureStructure, overLimits } from "./structure";
+ 
+ const long = (n: number) => Array.from({ length: n }, (_, i) => `w${i}`).join(" ");
+ 
++const codeSpans = (n: number) => Array.from({ length: n }, (_, i) => `\`c${i}\``).join(" ");
++
+ describe("measureStructure", () => {
+   test.each([
+     [
+@@ -37,11 +39,27 @@ describe("measureStructure", () => {
+   });
+ });
+ 
++describe("proseCodeSpans", () => {
++  test("counts spans in paragraphs and list items only", () => {
++    const body = [
++      "Use `a` and `b`.",
++      "- item `c`\n  - nested `d`",
++      "| h |\n|---|\n| `t` |",
++      "```\n`fenced`\n```",
++      "<details>\n\nhidden `e`\n\n</details>",
++    ].join("\n\n");
++    expect(measureStructure(body).proseCodeSpans).toBe(4);
++  });
++});
++
+ describe("overLimits", () => {
+   const cases: [string, ReturnType<typeof overLimits>][] = [
+     [long(20), []],
+     [long(41), ["maxBlockWords"]],
+     [Array.from({ length: 5 }, () => long(30)).join("\n\n"), ["visibleWords"]],
++    [codeSpans(7), ["proseCodeSpans"]],
++    [codeSpans(6), []],
++    [`${long(41)} ${codeSpans(7)}`, ["maxBlockWords", "proseCodeSpans"]],
+   ];
+   test.each(cases)("%#", (body, expected) => {
+     expect(overLimits(measureStructure(body))).toEqual(expected);
+diff --git a/plugins/pull-request/evals/pr-body/structure.ts b/plugins/pull-request/evals/pr-body/structure.ts
+index 512eded7..77bd8c0a 100644
+--- a/plugins/pull-request/evals/pr-body/structure.ts
++++ b/plugins/pull-request/evals/pr-body/structure.ts
+@@ -37,6 +37,7 @@ export interface Structure {
+   semicolons: number;
+   dashes: number;
+   inlineCodePer100: number;
++  proseCodeSpans: number;
+ }
+ 
+ const wordSeg = new Intl.Segmenter("en", { granularity: "word" });
+@@ -108,7 +109,9 @@ function visitList(list: List, acc: Acc): void {
+     acc.bulletSentences.push(sentences(text).length);
+     acc.listWords += words;
+     acc.visibleWords += words;
+-    acc.inlineCode += countInlineCode(item);
++    acc.inlineCode += item.children
++      .filter((c) => c.type !== "list")
++      .reduce((n, c) => n + countInlineCode(c), 0);
+     acc.visibleImages += countImages(item);
+     acc.proseText.push(text);
+     for (const child of item.children) if (child.type === "list") visitList(child, acc);
+@@ -236,6 +239,7 @@ export function measureStructure(body: string): Structure {
+     semicolons: per100((prose.match(/;/g) ?? []).length, v),
+     dashes: per100((prose.match(/\s[—–]\s|—/g) ?? []).length, v),
+     inlineCodePer100: per100(acc.inlineCode, v),
++    proseCodeSpans: acc.inlineCode,
+   };
+ }
+ 
+@@ -244,8 +248,15 @@ export function measureStructure(body: string): Structure {
+ export const LIMITS = {
+   visibleWords: 120,
+   maxBlockWords: 40,
++  proseCodeSpans: 6,
+ } as const satisfies Partial<Structure>;
+ 
+-export function overLimits(s: Structure): (keyof typeof LIMITS)[] {
+-  return (["visibleWords", "maxBlockWords"] as const).filter((k) => s[k] > LIMITS[k]);
++export type LimitKey = keyof typeof LIMITS;
++
++const isLimitKey = (k: string): k is LimitKey => k in LIMITS;
++
++export const limitKeys: LimitKey[] = Object.keys(LIMITS).filter(isLimitKey);
++
++export function overLimits(s: Structure): LimitKey[] {
++  return limitKeys.filter((k) => s[k] > LIMITS[k]);
+ }

@@ -61,7 +61,7 @@ describe("processInput", () => {
     const main = join(root, "main");
     worktree = join(root, "wt");
     await $`git init -q -b main ${main}`.quiet();
-    await $`git -C ${main} -c user.name=test -c user.email=test@example.com commit -q --allow-empty -m init`.quiet();
+    await $`git -C ${main} -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false commit -q --allow-empty -m init`.quiet();
     await $`git -C ${main} remote add origin ${join(root, "remote.git")}`.quiet();
     await $`git -C ${main} branch base`.quiet();
     await $`git -C ${main} worktree add -q -b feat ${worktree}`.quiet();

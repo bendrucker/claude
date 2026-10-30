@@ -1,0 +1,131 @@
+diff --git a/plugins/claude-code/skills/session/scripts/catalog.test.ts b/plugins/observability/skills/session/scripts/catalog.test.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/catalog.test.ts
+rename to plugins/observability/skills/session/scripts/catalog.test.ts
+diff --git a/plugins/claude-code/skills/session/scripts/catalog.ts b/plugins/observability/skills/session/scripts/catalog.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/catalog.ts
+rename to plugins/observability/skills/session/scripts/catalog.ts
+diff --git a/plugins/claude-code/skills/session/scripts/db.test.ts b/plugins/observability/skills/session/scripts/db.test.ts
+similarity index 99%
+rename from plugins/claude-code/skills/session/scripts/db.test.ts
+rename to plugins/observability/skills/session/scripts/db.test.ts
+index 5a4dd840..5aef140d 100644
+--- a/plugins/claude-code/skills/session/scripts/db.test.ts
++++ b/plugins/observability/skills/session/scripts/db.test.ts
+@@ -717,6 +717,28 @@ describe("model-summary query", () => {
+   });
+ });
+ 
++describe("bare-refs query", () => {
++  const Row = z.object({
++    bucket: z.string(),
++    ref_messages: z.bigint(),
++    bare_messages: z.bigint(),
++    linked_messages: z.bigint(),
++    bare_pct: z.number(),
++  });
++
++  it.each([
++    ["week", "2024-01-15"],
++    ["model", "claude-opus-4-7-20260101"],
++  ])("splits bare from linked refs per %s", async (per, bucket) => {
++    const rows = await runQuery(db, "bare-refs", Row, filterParams({ per, project: "refs" }));
++    // the fixture's fourth message (a list number, a standards ID, inline code, a plan
++    // label) and the user's own #77 both fall outside the count
++    expect(rows).toEqual([
++      { bucket, ref_messages: 6n, bare_messages: 4n, linked_messages: 3n, bare_pct: 66.7 },
++    ]);
++  });
++});
++
+ describe("cross-machine history", () => {
+   it("tags imported rows with the host across sessions, messages, and content_items", async () => {
+     await importFixtureHost("work");
+@@ -1298,7 +1320,7 @@ describe("outcomes query", () => {
+       "sessions: ongoing": 1,
+       "sessions: handed-off": 2,
+       "sessions: abandoned-with-edits": 3,
+-      "sessions: no-artifact": 18,
++      "sessions: no-artifact": 19,
+       "prs opened (distinct urls)": 1,
+       "prs needing multiple sessions": 0,
+     });
+@@ -1315,7 +1337,7 @@ describe("outcomes query", () => {
+     // reads as ongoing; the shipped ones keep their state
+     expect(metrics(rows)).toEqual({
+       "sessions: shipped": 2,
+-      "sessions: ongoing": 24,
++      "sessions: ongoing": 25,
+       "prs opened (distinct urls)": 1,
+       "prs needing multiple sessions": 0,
+     });
+@@ -2649,7 +2671,7 @@ describe("frontmatter query", () => {
+       { frontmatter_glob: skill },
+     );
+     expect(rows).toHaveLength(1);
+-    expect(rows[0]?.name).toBe("claude-code:session");
++    expect(rows[0]?.name).toBe("observability:session");
+     expect(rows[0]?.description).toContain("DuckDB index");
+   });
+ });
+diff --git a/plugins/claude-code/skills/session/scripts/db.ts b/plugins/observability/skills/session/scripts/db.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/db.ts
+rename to plugins/observability/skills/session/scripts/db.ts
+diff --git a/plugins/claude-code/skills/session/scripts/file-catalog.ts b/plugins/observability/skills/session/scripts/file-catalog.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/file-catalog.ts
+rename to plugins/observability/skills/session/scripts/file-catalog.ts
+diff --git a/plugins/claude-code/skills/session/scripts/forget.ts b/plugins/observability/skills/session/scripts/forget.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/forget.ts
+rename to plugins/observability/skills/session/scripts/forget.ts
+diff --git a/plugins/claude-code/skills/session/scripts/hosts.ts b/plugins/observability/skills/session/scripts/hosts.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/hosts.ts
+rename to plugins/observability/skills/session/scripts/hosts.ts
+diff --git a/plugins/claude-code/skills/session/scripts/import.ts b/plugins/observability/skills/session/scripts/import.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/import.ts
+rename to plugins/observability/skills/session/scripts/import.ts
+diff --git a/plugins/claude-code/skills/session/scripts/query-header.ts b/plugins/observability/skills/session/scripts/query-header.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/query-header.ts
+rename to plugins/observability/skills/session/scripts/query-header.ts
+diff --git a/plugins/claude-code/skills/session/scripts/query.test.ts b/plugins/observability/skills/session/scripts/query.test.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/query.test.ts
+rename to plugins/observability/skills/session/scripts/query.test.ts
+diff --git a/plugins/claude-code/skills/session/scripts/query.ts b/plugins/observability/skills/session/scripts/query.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/query.ts
+rename to plugins/observability/skills/session/scripts/query.ts
+diff --git a/plugins/claude-code/skills/session/scripts/refresh.integration.ts b/plugins/observability/skills/session/scripts/refresh.integration.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/refresh.integration.ts
+rename to plugins/observability/skills/session/scripts/refresh.integration.ts
+diff --git a/plugins/claude-code/skills/session/scripts/refresh.ts b/plugins/observability/skills/session/scripts/refresh.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/refresh.ts
+rename to plugins/observability/skills/session/scripts/refresh.ts
+diff --git a/plugins/claude-code/skills/session/scripts/schema.ts b/plugins/observability/skills/session/scripts/schema.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/schema.ts
+rename to plugins/observability/skills/session/scripts/schema.ts
+diff --git a/plugins/claude-code/skills/session/scripts/telemetry.test.ts b/plugins/observability/skills/session/scripts/telemetry.test.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/telemetry.test.ts
+rename to plugins/observability/skills/session/scripts/telemetry.test.ts
+diff --git a/plugins/claude-code/skills/session/scripts/telemetry.ts b/plugins/observability/skills/session/scripts/telemetry.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/telemetry.ts
+rename to plugins/observability/skills/session/scripts/telemetry.ts
+diff --git a/plugins/claude-code/skills/session/scripts/usage.test.ts b/plugins/observability/skills/session/scripts/usage.test.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/usage.test.ts
+rename to plugins/observability/skills/session/scripts/usage.test.ts
+diff --git a/plugins/claude-code/skills/session/scripts/usage.ts b/plugins/observability/skills/session/scripts/usage.ts
+similarity index 100%
+rename from plugins/claude-code/skills/session/scripts/usage.ts
+rename to plugins/observability/skills/session/scripts/usage.ts

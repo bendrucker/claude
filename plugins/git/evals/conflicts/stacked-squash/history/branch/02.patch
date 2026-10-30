@@ -1,0 +1,838 @@
+diff --git a/plugins/github/README.md b/plugins/github/README.md
+index 4a919fd0..92c68080 100644
+--- a/plugins/github/README.md
++++ b/plugins/github/README.md
+@@ -15,9 +15,17 @@ GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
+   - `github-rulesets-manager`: Configure repository rulesets and branch protection
+   - `logs`: Extracts relevant lines from failing-job logs (invoked by `actions-monitor`)
+ - **Hook**: Intercepts WebFetch for efficient GitHub data access
++- **Mod**: [`register.ts`](mod/register.ts) watches the current branch's pull request and shows its CI and review state as a status line
++
++## PR Watch Mod
++
++The mod runs only under `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, in interactive sessions, with `gh` on `PATH` and signed in. It depends on the `mod-events` plugin for its event log. Without `gh` it records `session.start` with `active: false` and stays idle.
++
++It polls `gh pr view` for the branch in the session's working directory: every minute while checks run, every three minutes once they settle, and never on `main`, `master`, or a detached `HEAD`. A newly failed check, or a review requesting changes, reaches the model as a message from the plugin. Every other change only updates the status line. Each promotion, drop, and injection is logged to `mod-events` under `github`.
+ 
+ ## Testing
+ 
+ ```bash
+ bun test plugins/github
++bun scripts/mod-test.ts github
+ ```
+diff --git a/plugins/github/mod/pr.test.ts b/plugins/github/mod/pr.test.ts
+new file mode 100644
+index 00000000..fe9ceaa5
+--- /dev/null
++++ b/plugins/github/mod/pr.test.ts
+@@ -0,0 +1,130 @@
++import { describe, expect, test } from "claude-code/testing";
++import { type CheckNode, type PrView, decide, parseView, snapshotOf, statusOf } from "./pr.ts";
++
++const run = (name: string, status: string, conclusion = "", startedAt = "2026-10-06T10:00:00Z") =>
++  ({
++    __typename: "CheckRun",
++    workflowName: "ci",
++    name,
++    status,
++    conclusion,
++    startedAt,
++  }) satisfies CheckNode;
++
++const view = (over: Partial<PrView> = {}): PrView => ({
++  number: 7,
++  url: "https://github.com/o/r/pull/7",
++  state: "OPEN",
++  headRefOid: "aaaaaaa1111",
++  reviewDecision: "",
++  statusCheckRollup: [],
++  reviews: [],
++  ...over,
++});
++
++describe("parseView", () => {
++  test("narrows gh output and rejects anything else", () => {
++    const parsed = parseView(
++      JSON.stringify({
++        ...view(),
++        statusCheckRollup: [run("lint", "COMPLETED", "SUCCESS"), "junk"],
++        reviews: [{ id: "r1", state: "COMMENTED", author: { login: "bot" } }, { id: 3 }],
++      }),
++    );
++    expect(parsed?.statusCheckRollup?.length).toBe(1);
++    expect(parsed?.reviews).toEqual([{ id: "r1", state: "COMMENTED", author: { login: "bot" } }]);
++    expect(parseView("not json")).toBe(undefined);
++    expect(parseView(JSON.stringify({ number: "7" }))).toBe(undefined);
++  });
++});
++
++describe("snapshotOf", () => {
++  test("a rerun replaces the run it reran, and a status context counts", () => {
++    const snapshot = snapshotOf(
++      view({
++        statusCheckRollup: [
++          run("test", "COMPLETED", "FAILURE", "2026-10-06T10:00:00Z"),
++          run("test", "COMPLETED", "SUCCESS", "2026-10-06T10:05:00Z"),
++          run("lint", "COMPLETED", "CANCELLED"),
++          { __typename: "StatusContext", context: "deploy", state: "ERROR" },
++        ],
++      }),
++    );
++    expect(snapshot.phase).toBe("failing");
++    expect(snapshot.failed).toEqual(["deploy"]);
++    expect(snapshot.total).toBe(3);
++  });
++
++  test("a queued rerun outranks the failure it replaces", () => {
++    const snapshot = snapshotOf(
++      view({
++        statusCheckRollup: [
++          run("test", "COMPLETED", "FAILURE"),
++          { ...run("test", "QUEUED"), startedAt: null },
++        ],
++      }),
++    );
++    expect(snapshot.phase).toBe("pending");
++  });
++});
++
++describe("decide", () => {
++  const pending = snapshotOf(view({ statusCheckRollup: [run("test", "IN_PROGRESS")] }));
++  const failing = snapshotOf(view({ statusCheckRollup: [run("test", "COMPLETED", "FAILURE")] }));
++  const passing = snapshotOf(view({ statusCheckRollup: [run("test", "COMPLETED", "SUCCESS")] }));
++
++  test("promotes a new failure once per head", () => {
++    expect(decide(pending, failing)).toEqual([
++      { action: "promote", kind: "ci.failed", failed: ["ci / test"] },
++    ]);
++    expect(decide(failing, failing)).toEqual([]);
++  });
++
++  test("the same failure after a push promotes again", () => {
++    const pushed = { ...failing, head: "bbbbbbb2222" };
++    expect(decide(failing, pushed)).toEqual([
++      { action: "drop", kind: "push", from: "aaaaaaa1111" },
++      { action: "promote", kind: "ci.failed", failed: ["ci / test"] },
++    ]);
++  });
++
++  test("drops green, pending, and closing", () => {
++    expect(decide(pending, passing)).toEqual([{ action: "drop", kind: "ci.passing" }]);
++    expect(decide(passing, pending)).toEqual([{ action: "drop", kind: "ci.pending" }]);
++    expect(decide(passing, { ...passing, state: "MERGED" })).toEqual([
++      { action: "drop", kind: "pr.merged" },
++    ]);
++  });
++
++  test("promotes requested changes and drops other reviews", () => {
++    const reviewed = {
++      ...passing,
++      reviews: [
++        { id: "r1", author: "alice", state: "CHANGES_REQUESTED" },
++        { id: "r2", author: "greptile", state: "COMMENTED" },
++      ],
++    };
++    expect(decide(passing, reviewed)).toEqual([
++      { action: "promote", kind: "review.changes_requested", author: "alice" },
++      { action: "drop", kind: "review", author: "greptile", state: "COMMENTED" },
++    ]);
++    expect(decide(reviewed, reviewed)).toEqual([]);
++  });
++});
++
++describe("statusOf", () => {
++  test("formats each phase", () => {
++    const of = (over: Partial<PrView>, flagged = false) =>
++      statusOf(snapshotOf(view(over)), flagged);
++    expect(
++      of({ statusCheckRollup: [run("a", "IN_PROGRESS"), run("b", "COMPLETED", "SUCCESS")] }),
++    ).toBe("PR #7 · CI 1/2");
++    expect(of({ statusCheckRollup: [run("a", "COMPLETED", "FAILURE")] }, true)).toBe(
++      "PR #7 · CI ✗ ci / a → Claude",
++    );
++    expect(
++      of({ statusCheckRollup: [run("a", "COMPLETED", "SUCCESS")], reviewDecision: "APPROVED" }),
++    ).toBe("PR #7 · CI ✓ · approved");
++    expect(of({ state: "MERGED" })).toBe("PR #7 merged");
++  });
++});
+diff --git a/plugins/github/mod/pr.ts b/plugins/github/mod/pr.ts
+new file mode 100644
+index 00000000..94119c33
+--- /dev/null
++++ b/plugins/github/mod/pr.ts
+@@ -0,0 +1,262 @@
++export const VIEW_FIELDS = "number,url,state,headRefOid,reviewDecision,statusCheckRollup,reviews";
++
++export interface CheckNode {
++  __typename?: string;
++  name?: string | null;
++  workflowName?: string | null;
++  context?: string | null;
++  status?: string | null;
++  conclusion?: string | null;
++  state?: string | null;
++  startedAt?: string | null;
++}
++
++export interface ReviewNode {
++  id: string;
++  author?: { login?: string } | null;
++  state: string;
++}
++
++export interface PrView {
++  number: number;
++  url: string;
++  state: string;
++  headRefOid: string;
++  reviewDecision?: string | null;
++  statusCheckRollup?: CheckNode[] | null;
++  reviews?: ReviewNode[] | null;
++}
++
++const isRecord = (value: unknown): value is Record<string, unknown> =>
++  typeof value === "object" && value !== null && !Array.isArray(value);
++
++const textOf = (value: unknown): string | null => (typeof value === "string" ? value : null);
++
++function checkOf(value: unknown): CheckNode | undefined {
++  if (!isRecord(value)) return undefined;
++  return {
++    __typename: textOf(value.__typename) ?? "CheckRun",
++    name: textOf(value.name),
++    workflowName: textOf(value.workflowName),
++    context: textOf(value.context),
++    status: textOf(value.status),
++    conclusion: textOf(value.conclusion),
++    state: textOf(value.state),
++    startedAt: textOf(value.startedAt),
++  };
++}
++
++function reviewOf(value: unknown): ReviewNode | undefined {
++  if (!isRecord(value) || typeof value.id !== "string" || typeof value.state !== "string") {
++    return undefined;
++  }
++  const login = isRecord(value.author) ? textOf(value.author.login) : null;
++  return { id: value.id, state: value.state, author: login === null ? null : { login } };
++}
++
++function listOf<T>(value: unknown, item: (v: unknown) => T | undefined): T[] {
++  if (!Array.isArray(value)) return [];
++  return value.map(item).filter((v): v is T => v !== undefined);
++}
++
++/** Narrows `gh pr view --json` output to a PrView, or undefined when it is not one. */
++export function parseView(stdout: string): PrView | undefined {
++  let value: unknown;
++  try {
++    value = JSON.parse(stdout);
++  } catch {
++    // The caller reports malformed output as an unexpected shape.
++    return undefined;
++  }
++  if (
++    !isRecord(value) ||
++    typeof value.number !== "number" ||
++    typeof value.url !== "string" ||
++    typeof value.state !== "string" ||
++    typeof value.headRefOid !== "string"
++  ) {
++    return undefined;
++  }
++  return {
++    number: value.number,
++    url: value.url,
++    state: value.state,
++    headRefOid: value.headRefOid,
++    reviewDecision: textOf(value.reviewDecision),
++    statusCheckRollup: listOf(value.statusCheckRollup, checkOf),
++    reviews: listOf(value.reviews, reviewOf),
++  };
++}
++
++export type Phase = "none" | "pending" | "passing" | "failing";
++
++export interface Snapshot {
++  pr: number;
++  url: string;
++  state: string;
++  head: string;
++  phase: Phase;
++  total: number;
++  pending: number;
++  failed: string[];
++  reviewDecision: string;
++  reviews: { id: string; author: string; state: string }[];
++}
++
++export type Decision =
++  | { action: "promote"; kind: "ci.failed"; failed: string[] }
++  | { action: "promote"; kind: "review.changes_requested"; author: string }
++  | { action: "drop"; kind: "ci.passing" | "ci.pending" | "ci.none" }
++  | { action: "drop"; kind: "push"; from: string }
++  | { action: "drop"; kind: "pr.closed" | "pr.merged" }
++  | { action: "drop"; kind: "review"; author: string; state: string };
++
++const FAILED = new Set(["FAILURE", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "ERROR"]);
++const PENDING_STATES = new Set(["PENDING", "EXPECTED"]);
++
++type Outcome = "pending" | "passed" | "failed";
++
++function outcomeOf(node: CheckNode): Outcome {
++  if (node.__typename === "StatusContext") {
++    if (PENDING_STATES.has(node.state ?? "")) return "pending";
++    return FAILED.has(node.state ?? "") ? "failed" : "passed";
++  }
++  if (node.status !== "COMPLETED") return "pending";
++  return FAILED.has(node.conclusion ?? "") ? "failed" : "passed";
++}
++
++function labelOf(node: CheckNode): string {
++  if (node.__typename === "StatusContext") return node.context ?? "status";
++  const name = node.name ?? "check";
++  return node.workflowName ? `${node.workflowName} / ${name}` : name;
++}
++
++// A rerun lists beside the run it replaces, so keep the latest start per label.
++// One not started yet is queued, hence newest.
++function latest(nodes: CheckNode[]): CheckNode[] {
++  const byLabel = new Map<string, CheckNode>();
++  for (const node of nodes) {
++    const label = labelOf(node);
++    const held = byLabel.get(label);
++    if (held === undefined || (held.startedAt ?? "￿") <= (node.startedAt ?? "￿")) {
++      byLabel.set(label, node);
++    }
++  }
++  return [...byLabel.values()];
++}
++
++export function snapshotOf(view: PrView): Snapshot {
++  const checks = latest(view.statusCheckRollup ?? []);
++  const failed: string[] = [];
++  let pending = 0;
++  for (const node of checks) {
++    const outcome = outcomeOf(node);
++    if (outcome === "failed") failed.push(labelOf(node));
++    else if (outcome === "pending") pending += 1;
++  }
++  failed.sort();
++  let phase: Phase = "passing";
++  if (checks.length === 0) phase = "none";
++  else if (failed.length > 0) phase = "failing";
++  else if (pending > 0) phase = "pending";
++  return {
++    pr: view.number,
++    url: view.url,
++    state: view.state,
++    head: view.headRefOid,
++    phase,
++    total: checks.length,
++    pending,
++    failed,
++    reviewDecision: view.reviewDecision ?? "",
++    reviews: (view.reviews ?? []).map((r) => ({
++      id: r.id,
++      author: r.author?.login ?? "someone",
++      state: r.state,
++    })),
++  };
++}
++
++/**
++ * What changed between two polls of the same PR. A check that newly fails, or
++ * a review requesting changes, is promoted. Every other change is dropped.
++ */
++export function decide(prev: Snapshot, next: Snapshot): Decision[] {
++  const decisions: Decision[] = [];
++  if (prev.state === "OPEN" && next.state !== "OPEN") {
++    decisions.push({ action: "drop", kind: next.state === "MERGED" ? "pr.merged" : "pr.closed" });
++  }
++  const isSameHead = prev.head === next.head;
++  if (!isSameHead) decisions.push({ action: "drop", kind: "push", from: prev.head });
++
++  const known = new Set(isSameHead ? prev.failed : []);
++  const failed = next.failed.filter((label) => !known.has(label));
++  if (failed.length > 0) decisions.push({ action: "promote", kind: "ci.failed", failed });
++  else if (next.phase !== prev.phase || !isSameHead) {
++    if (next.phase === "passing") decisions.push({ action: "drop", kind: "ci.passing" });
++    else if (next.phase === "pending") decisions.push({ action: "drop", kind: "ci.pending" });
++    else if (next.phase === "none") decisions.push({ action: "drop", kind: "ci.none" });
++  }
++
++  const seen = new Set(prev.reviews.map((r) => r.id));
++  for (const review of next.reviews) {
++    if (seen.has(review.id)) continue;
++    decisions.push(
++      review.state === "CHANGES_REQUESTED"
++        ? { action: "promote", kind: "review.changes_requested", author: review.author }
++        : { action: "drop", kind: "review", author: review.author, state: review.state },
++    );
++  }
++  return decisions;
++}
++
++const short = (sha: string) => sha.slice(0, 7);
++
++function listed(labels: string[], max = 3): string {
++  const shown = labels.slice(0, max).join(", ");
++  return labels.length > max ? `${shown} (+${labels.length - max})` : shown;
++}
++
++function paragraphOf(snapshot: Snapshot, decision: Decision): string | undefined {
++  const pr = `PR #${snapshot.pr}`;
++  if (decision.kind === "ci.failed") {
++    return [
++      `CI failed on ${pr} at ${short(snapshot.head)}: ${decision.failed.join(", ")}.`,
++      `Read the failure with \`gh pr checks ${snapshot.pr}\` and \`gh run view <run> --log-failed\`.`,
++    ].join("\n");
++  }
++  if (decision.kind === "review.changes_requested") {
++    return [
++      `@${decision.author} requested changes on ${pr}: ${snapshot.url}`,
++      `Read the review with \`gh pr view ${snapshot.pr} --comments\`.`,
++    ].join("\n");
++  }
++  return undefined;
++}
++
++export function messageOf(snapshot: Snapshot, promoted: Decision[]): string {
++  const paragraphs = promoted
++    .map((decision) => paragraphOf(snapshot, decision))
++    .filter((p): p is string => p !== undefined);
++  paragraphs.push(
++    "The github plugin watches this PR's checks and reviews, so polling them is unnecessary.",
++  );
++  return paragraphs.join("\n\n");
++}
++
++export function statusOf(snapshot: Snapshot, isFlagged: boolean): string {
++  const pr = `PR #${snapshot.pr}`;
++  if (snapshot.state === "MERGED") return `${pr} merged`;
++  if (snapshot.state === "CLOSED") return `${pr} closed`;
++  let ci: string;
++  if (snapshot.phase === "failing") ci = `CI ✗ ${listed(snapshot.failed)}`;
++  else if (snapshot.phase === "pending") {
++    ci = `CI ${snapshot.total - snapshot.pending}/${snapshot.total}`;
++  } else if (snapshot.phase === "passing") ci = "CI ✓";
++  else ci = "no checks";
++  const parts = [pr, ci];
++  if (snapshot.reviewDecision === "CHANGES_REQUESTED") parts.push("changes requested");
++  else if (snapshot.reviewDecision === "APPROVED") parts.push("approved");
++  const line = parts.join(" · ");
++  return isFlagged ? `${line} → Claude` : line;
++}
+diff --git a/plugins/github/mod/register.test.ts b/plugins/github/mod/register.test.ts
+new file mode 100644
+index 00000000..401ff317
+--- /dev/null
++++ b/plugins/github/mod/register.test.ts
+@@ -0,0 +1,219 @@
++import type { On } from "claude-code";
++import { describe, expect, mock, test } from "claude-code/testing";
++import type { ModEventsInput } from "../../mod-events/types";
++import { POLL_MS } from "./register.ts";
++
++const START = { surface: "terminal", isInteractive: true, cwd: "/work" } as const;
++
++const check = (conclusion: string) => ({
++  __typename: "CheckRun",
++  workflowName: "ci",
++  name: "test",
++  status: conclusion === "" ? "IN_PROGRESS" : "COMPLETED",
++  conclusion,
++  startedAt: "2026-10-06T10:00:00Z",
++});
++
++const pr = (conclusion: string, reviews: unknown[] = []) => ({
++  number: 7,
++  url: "https://github.com/o/r/pull/7",
++  state: "OPEN",
++  headRefOid: "aaaaaaa1111",
++  reviewDecision: "",
++  statusCheckRollup: [check(conclusion)],
++  reviews,
++});
++
++interface World {
++  branch: string;
++  gh: { exitCode: number; stdout: string; stderr: string } | Error;
++  view: unknown;
++}
++
++function worldOf(on: On, world: World) {
++  const events: ModEventsInput[] = [];
++  const statuses: (string | undefined)[] = [];
++  const submits: string[] = [];
++  const views: string[] = [];
++  const clock = mock.clock(on);
++  on("engine.create", async ($, e, next) => ({
++    ...(await next(e)),
++    modEvents: { emit: () => Promise.resolve() },
++  }));
++  on("modEvents.emit", ($, e) => {
++    events.push(e);
++    return { value: undefined };
++  });
++  on("session.start", ($, e) => ({ cwd: e.cwd }));
++  on("session.end", ($, e) => ({ sessionId: e.sessionId }));
++  on("session.cwd", () => ({ value: "/work" }));
++  on("ui.status", ($, e) => {
++    statuses.push(e.text);
++    return { value: undefined };
++  });
++  on("prompt.submit", ($, e) => {
++    submits.push(e.text);
++    return { text: e.text };
++  });
++  on("process.run", ($, e) => {
++    const argv = e.argv.join(" ");
++    if (argv.startsWith("git ")) {
++      return {
++        value: {
++          exitCode: 0,
++          stdout: `${world.branch}\n`,
++          stderr: "",
++          isStdoutTruncated: false,
++          isStderrTruncated: false,
++        },
++      };
++    }
++    if (argv === "gh --version") {
++      if (world.gh instanceof Error) throw world.gh;
++      return { value: { ...world.gh, isStdoutTruncated: false, isStderrTruncated: false } };
++    }
++    views.push(argv);
++    const stdout = typeof world.view === "string" ? "" : JSON.stringify(world.view);
++    const stderr = typeof world.view === "string" ? world.view : "";
++    return {
++      value: {
++        exitCode: stderr === "" ? 0 : 1,
++        stdout,
++        stderr,
++        isStdoutTruncated: false,
++        isStderrTruncated: false,
++      },
++    };
++  });
++  const named = (event: string) => events.filter((e) => e.event === event);
++  return { events, named, statuses, submits, views, clock };
++}
++
++const GH_OK = { exitCode: 0, stdout: "gh version 2.80.0\n", stderr: "" };
++
++describe("register", () => {
++  test("a new failure wakes the model once; the baseline and green stay quiet", async ($, on) => {
++    const world: World = { branch: "topic", gh: GH_OK, view: pr("") };
++    const w = worldOf(on, world);
++
++    await $.session.start(START);
++    await w.clock.settle();
++    expect(w.named("pr.tracked")[0]?.detail).toEqual({
++      pr: 7,
++      head: "aaaaaaa1111",
++      phase: "pending",
++      state: "OPEN",
++    });
++    expect(w.statuses.at(-1)).toBe("PR #7 · CI 0/1");
++
++    world.view = pr("FAILURE");
++    await w.clock.advance(POLL_MS.pending);
++    expect(w.submits.length).toBe(1);
++    expect(w.submits[0]).toContain("CI failed on PR #7 at aaaaaaa: ci / test.");
++    expect(w.named("promote").map((e) => e.detail?.kind)).toEqual(["ci.failed"]);
++    expect(w.named("inject")[0]).toEqual(
++      expect.objectContaining({
++        ok: true,
++        detail: expect.objectContaining({ kinds: ["ci.failed"] }),
++      }),
++    );
++    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✗ ci / test → Claude");
++
++    await w.clock.advance(POLL_MS.settled);
++    expect(w.submits.length).toBe(1);
++
++    world.view = pr("SUCCESS");
++    await w.clock.advance(POLL_MS.settled);
++    expect(w.submits.length).toBe(1);
++    expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["ci.passing"]);
++    expect(w.statuses.at(-1)).toBe("PR #7 · CI ✓");
++  });
++
++  test("requested changes wake the model and a comment review does not", async ($, on) => {
++    const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
++    const w = worldOf(on, world);
++
++    await $.session.start(START);
++    await w.clock.settle();
++    world.view = pr("SUCCESS", [
++      { id: "r1", state: "COMMENTED", author: { login: "greptile" } },
++      { id: "r2", state: "CHANGES_REQUESTED", author: { login: "alice" } },
++    ]);
++    await w.clock.advance(POLL_MS.settled);
++
++    expect(w.submits.length).toBe(1);
++    expect(w.submits[0]).toContain("@alice requested changes on PR #7");
++    expect(w.named("drop").map((e) => e.detail?.kind)).toEqual(["review"]);
++  });
++
++  test("stays idle without gh", async ($, on) => {
++    const w = worldOf(on, { branch: "topic", gh: new Error("ENOENT"), view: pr("") });
++
++    await $.session.start(START);
++    await w.clock.advance(POLL_MS.idle * 3);
++
++    expect(w.named("session.start")[0]?.detail).toEqual({
++      active: false,
++      reason: "gh unavailable",
++    });
++    expect(w.views).toEqual([]);
++  });
++
++  test("a non-interactive session never polls", async ($, on) => {
++    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("") });
++
++    await $.session.start({ ...START, isInteractive: false });
++    await w.clock.advance(POLL_MS.idle * 3);
++
++    expect(w.named("session.start")[0]?.detail).toEqual({
++      active: false,
++      reason: "non-interactive",
++    });
++    expect(w.views).toEqual([]);
++  });
++
++  test("the default branch skips gh, and a branch with no PR shows nothing", async ($, on) => {
++    const world: World = {
++      branch: "main",
++      gh: GH_OK,
++      view: 'no pull requests found for branch "topic"',
++    };
++    const w = worldOf(on, world);
++
++    await $.session.start(START);
++    await w.clock.settle();
++    expect(w.views).toEqual([]);
++
++    world.branch = "topic";
++    await w.clock.advance(POLL_MS.idle);
++    expect(w.views.length).toBe(1);
++    expect(w.statuses).toEqual([]);
++    expect(w.named("poll.error")).toEqual([]);
++  });
++
++  test("a repeated gh failure is logged once and backs off", async ($, on) => {
++    const world: World = { branch: "topic", gh: GH_OK, view: "HTTP 502: Bad Gateway" };
++    const w = worldOf(on, world);
++
++    await $.session.start(START);
++    await w.clock.settle();
++    await w.clock.advance(POLL_MS.error);
++
++    expect(w.views.length).toBe(2);
++    expect(w.named("poll.error")).toEqual([
++      expect.objectContaining({ ok: false, detail: { error: "HTTP 502: Bad Gateway" } }),
++    ]);
++  });
++
++  test("session end stops the watch and clears the status", async ($, on) => {
++    const w = worldOf(on, { branch: "topic", gh: GH_OK, view: pr("") });
++
++    await $.session.start(START);
++    await w.clock.settle();
++    await $.session.end({ reason: "prompt_input_exit", sessionId: "s1", resume: { id: "s1" } });
++    await w.clock.advance(POLL_MS.pending * 3);
++
++    expect(w.views.length).toBe(1);
++    expect(w.statuses.at(-1)).toBe(undefined);
++  });
++});
+diff --git a/plugins/github/mod/register.ts b/plugins/github/mod/register.ts
+new file mode 100644
+index 00000000..1ee687fc
+--- /dev/null
++++ b/plugins/github/mod/register.ts
+@@ -0,0 +1,170 @@
++import type { EngineInterface, On, Timer } from "claude-code";
++import {
++  type Decision,
++  type Snapshot,
++  VIEW_FIELDS,
++  decide,
++  messageOf,
++  parseView,
++  snapshotOf,
++  statusOf,
++} from "./pr.ts";
++
++const MOD = "github";
++
++export const POLL_MS = {
++  pending: 60_000,
++  settled: 180_000,
++  idle: 120_000,
++  closed: 600_000,
++  error: 300_000,
++} as const;
++
++const UNTRACKED_BRANCHES = new Set(["HEAD", "main", "master"]);
++// /clear and /resume keep the process running, so the watch continues.
++const CONTINUING = new Set(["clear", "resume"]);
++
++interface Watch {
++  snapshot: Snapshot | undefined;
++  flagged: boolean;
++  error: string | undefined;
++  timer: Timer | undefined;
++  isStopped: boolean;
++}
++
++type Read = { kind: "none" } | { kind: "pr"; snapshot: Snapshot };
++
++function emit($: EngineInterface, event: string, detail: Record<string, unknown>, ok = true) {
++  void $.modEvents.emit({ mod: MOD, event, ok, detail });
++}
++
++async function readPr($: EngineInterface): Promise<Read> {
++  const cwd = await $.session.cwd();
++  const branch = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
++  if (branch.exitCode !== 0 || UNTRACKED_BRANCHES.has(branch.stdout.trim())) {
++    return { kind: "none" };
++  }
++  const view = await $.process.run(["gh", "pr", "view", "--json", VIEW_FIELDS], {
++    cwd,
++    timeoutMs: 20_000,
++  });
++  if (view.exitCode !== 0) {
++    if (/no pull requests found/i.test(view.stderr)) return { kind: "none" };
++    const line = view.stderr.trim().split("\n")[0] ?? "";
++    throw new Error(line === "" ? `gh exited ${view.exitCode}` : line);
++  }
++  const parsed = parseView(view.stdout);
++  if (parsed === undefined) throw new Error("gh pr view returned an unexpected shape");
++  return { kind: "pr", snapshot: snapshotOf(parsed) };
++}
++
++async function inject($: EngineInterface, snapshot: Snapshot, promoted: Decision[]): Promise<void> {
++  const text = messageOf(snapshot, promoted);
++  const kinds = promoted.map((d) => d.kind);
++  const detail = { pr: snapshot.pr, head: snapshot.head, kinds, chars: text.length };
++  try {
++    const result = await $.prompt.submit({ text });
++    if ("drop" in result && result.drop !== undefined) {
++      emit($, "inject", { ...detail, dropped: result.drop }, false);
++    } else emit($, "inject", detail);
++  } catch (error) {
++    emit($, "inject", { ...detail, error: String(error) }, false);
++  }
++}
++
++function delayOf(snapshot: Snapshot): number {
++  if (snapshot.state !== "OPEN") return POLL_MS.closed;
++  return snapshot.phase === "pending" ? POLL_MS.pending : POLL_MS.settled;
++}
++
++async function apply($: EngineInterface, watch: Watch, read: Read): Promise<number> {
++  if (read.kind === "none") {
++    if (watch.snapshot !== undefined) $.ui.status(undefined);
++    watch.snapshot = undefined;
++    watch.flagged = false;
++    return POLL_MS.idle;
++  }
++  const next = read.snapshot;
++  const prev = watch.snapshot;
++  if (prev === undefined || prev.pr !== next.pr) {
++    emit($, "pr.tracked", { pr: next.pr, head: next.head, phase: next.phase, state: next.state });
++    watch.flagged = false;
++  } else {
++    const decisions = decide(prev, next);
++    for (const { action, ...detail } of decisions) {
++      emit($, action, { pr: next.pr, head: next.head, ...detail });
++    }
++    const promoted = decisions.filter((d) => d.action === "promote");
++    if (decisions.length > 0) watch.flagged = promoted.length > 0;
++    if (promoted.length > 0) await inject($, next, promoted);
++  }
++  watch.snapshot = next;
++  $.ui.status(statusOf(next, watch.flagged));
++  return delayOf(next);
++}
++
++async function poll($: EngineInterface, watch: Watch): Promise<void> {
++  if (watch.isStopped) return;
++  let delay: number;
++  try {
++    delay = await apply($, watch, await readPr($));
++    watch.error = undefined;
++  } catch (error) {
++    const message = error instanceof Error ? error.message : String(error);
++    if (message !== watch.error) emit($, "poll.error", { error: message }, false);
++    watch.error = message;
++    delay = POLL_MS.error;
++  }
++  watch.timer = $.clock.after(delay, () => void poll($, watch));
++}
++
++async function hasGh($: EngineInterface): Promise<boolean> {
++  try {
++    return (await $.process.run(["gh", "--version"], { timeoutMs: 5000 })).exitCode === 0;
++  } catch {
++    // The run rejects when gh is not on PATH, which is the absence this probe tests for.
++    return false;
++  }
++}
++
++/**
++ * Watches the current branch's pull request with `gh` and shows its CI and
++ * review state as a status line. A newly failed check or a review requesting
++ * changes is sent to the model; every other change is only shown and logged.
++ */
++export function register(on: On): void {
++  const watch: Watch = {
++    snapshot: undefined,
++    flagged: false,
++    error: undefined,
++    timer: undefined,
++    isStopped: true,
++  };
++
++  on("session.start", async ($, e, next) => {
++    const started = await next(e);
++    if (!e.isInteractive) {
++      emit($, "session.start", { active: false, reason: "non-interactive" });
++      return started;
++    }
++    if (!(await hasGh($))) {
++      emit($, "session.start", { active: false, reason: "gh unavailable" });
++      return started;
++    }
++    emit($, "session.start", { active: true });
++    if (watch.isStopped) {
++      watch.isStopped = false;
++      void poll($, watch);
++    }
++    return started;
++  });
++
++  on("session.end", ($, e, next) => {
++    if (!CONTINUING.has(e.reason)) {
++      watch.isStopped = true;
++      watch.timer?.cancel();
++      $.ui.status(undefined);
++    }
++    return next(e);
++  });
++}
+diff --git a/plugins/github/mod/tsconfig.json b/plugins/github/mod/tsconfig.json
+new file mode 100644
+index 00000000..8f04ea2b
+--- /dev/null
++++ b/plugins/github/mod/tsconfig.json
+@@ -0,0 +1,5 @@
++{
++  "extends": "../../../tsconfig.mod.json",
++  "compilerOptions": { "allowImportingTsExtensions": true },
++  "include": ["../../../.claude/types", "../../mod-events/types", "."]
++}

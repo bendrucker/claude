@@ -1,0 +1,19 @@
+diff --git a/plugins/github/mod/register.ts b/plugins/github/mod/register.ts
+index d0304d33..172212fd 100644
+--- a/plugins/github/mod/register.ts
++++ b/plugins/github/mod/register.ts
+@@ -1,4 +1,4 @@
+-import type { EngineInterface, On, Timer } from "claude-code";
++import type { EngineInterface, On } from "claude-code";
+ import {
+   type Promoted,
+   type Snapshot,
+@@ -28,7 +28,7 @@ interface Watch {
+   snapshot: Snapshot | undefined;
+   flagged: boolean;
+   error: string | undefined;
+-  timer: Timer | undefined;
++  timer: { cancel(): void } | undefined;
+   generation: number;
+   isStopped: boolean;
+ }

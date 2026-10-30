@@ -77,9 +77,9 @@ Summarize the session: run `git log ${start-sha}..HEAD --oneline` for the commit
 
 Then branch on the `$ARGUMENTS` flags:
 
-- **`--reviews`**: hand off to AI-review triage before finishing. See [Reviews Hand-off](#reviews-hand-off).
-- **`--merge`**: don't stop here. Drive the PR to merged. See [Merge Mode](#merge-mode).
-- **neither**: report the summary and call `TaskStop`.
+- `--reviews`: hand off to AI-review triage before finishing. See [Reviews Hand-off](#reviews-hand-off).
+- `--merge`: don't stop here. Drive the PR to merged. See [Merge Mode](#merge-mode).
+- neither: report the summary and call `TaskStop`.
 
 #### other events
 

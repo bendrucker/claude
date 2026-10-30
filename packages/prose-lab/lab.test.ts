@@ -247,6 +247,14 @@ test.each<{ name: string; scores: Score[]; want: string }>([
     ],
     want: "precise",
   },
+  {
+    name: "a simpler candidate with too few labels for its wide interval loses",
+    scores: [
+      makeScore({ candidate: "precise", low: 0.7, high: 0.95, complexity: 9 }),
+      makeScore({ candidate: "unlabeled", hits: 0, right: 0, low: 0, high: 1, complexity: 1 }),
+    ],
+    want: "precise",
+  },
 ])("best: $name", ({ scores, want }) => {
   expect(best(scores, "p")?.candidate).toBe(want);
 });
@@ -271,6 +279,11 @@ test.each<{ name: string; yaml: string; want: Partial<Features> }>([
     name: "a separator class is not a gap",
     yaml: "tokens:\n  - 'source[\\s-]+of[\\s-]+truth'\n",
     want: { gaps: 0 },
+  },
+  {
+    name: "a quantified group of open words is a gap, and one of listed words is not",
+    yaml: "tokens:\n  - 'no\\s+(?:[a-z-]+\\s+){0,3}(?:(?:is|are)\\s+){0,3}needed'\n",
+    want: { gaps: 1 },
   },
   {
     name: "swap keys and the exceptions list",

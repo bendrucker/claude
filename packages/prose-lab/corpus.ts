@@ -1,4 +1,5 @@
-import { readdir } from "node:fs/promises";
+import { mkdtemp, readdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { $ } from "bun";
 import { lint } from "../../plugins/prompting/skills/scan/scripts/vale";
@@ -63,6 +64,24 @@ export async function markdownUnder(dir: string, root = ROOT): Promise<string[]>
 /** Files per Vale run, since one run over thousands of files fails. */
 const LINT_BATCH = 400;
 
+const probes = new Map<string, Promise<void>>();
+
+async function lintProbe(config: string): Promise<void> {
+  const file = join(await mkdtemp(join(tmpdir(), "prose-lab-probe-")), "probe.md");
+  await Bun.write(file, "Probe.\n");
+  await lint([file], { config });
+}
+
+/** Rejects when Vale fails on a trivial file, which puts the fault in the config or binary. */
+function probe(config: string): Promise<void> {
+  let probed = probes.get(config);
+  if (probed === undefined) {
+    probed = lintProbe(config);
+    probes.set(config, probed);
+  }
+  return probed;
+}
+
 /** Lints in batches, halving a failed batch until the file Vale can't read is skipped. */
 export async function lintFiles(
   plugin: string,
@@ -83,6 +102,7 @@ export async function lintFiles(
       { config },
     );
   } catch {
+    await probe(config);
     if (files.length > 1) return split(Math.ceil(files.length / 2));
     console.error(`Skipped ${files[0]}: vale could not lint it.`);
     return [];

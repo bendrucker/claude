@@ -149,9 +149,9 @@ export function stage(pattern: Pattern, found: Evidence, top: Score | undefined)
 }
 
 /**
- * The candidate a promotion would pick: the simplest of those whose
+ * The candidate a promotion would pick: the simplest promotable one whose
  * interval overlaps the most precise one's, a precision difference the labels
- * don't resolve.
+ * don't resolve, or else the most precise.
  */
 export function best(scores: readonly Score[], pattern: string): Score | undefined {
   const ranked = scores
@@ -159,9 +159,10 @@ export function best(scores: readonly Score[], pattern: string): Score | undefin
     .toSorted((a, b) => (b.low === a.low ? b.recall - a.recall : b.low - a.low));
   const top = ranked[0];
   if (top === undefined) return undefined;
-  return ranked
-    .filter((entry) => entry.high >= top.low)
+  const simplest = ranked
+    .filter((entry) => entry.high >= top.low && promotable(entry))
     .toSorted((a, b) => a.complexity - b.complexity)[0];
+  return simplest ?? top;
 }
 
 export interface HitDiff {

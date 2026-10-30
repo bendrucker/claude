@@ -255,9 +255,9 @@ const scoreCommand = new Command("score")
     const ts = new Date().toISOString();
     const results = await Promise.all(
       candidates.map(async (candidate) => {
+        const complexity = measure(await Bun.file(candidate).text()).score;
         const config = await labConfig([resolve(candidate)], PLUGINS[plugin]);
         const hits = await lintFiles(plugin, config, files);
-        const complexity = measure(await Bun.file(candidate).text()).score;
         return {
           candidate: basename(candidate, ".yml"),
           ...score(
@@ -342,16 +342,18 @@ const compareCommand = new Command("compare")
   .option("--examples <n>", "dropped and added hits to print per candidate", int, 10)
   .action(async (baseline, candidates, options) => {
     const files = [
-      ...(await corpusFiles(options.corpus)),
-      ...(await Promise.all(options.dir.map((dir) => markdownUnder(resolve(dir))))).flat(),
+      ...new Set([
+        ...(await corpusFiles(options.corpus)),
+        ...(await Promise.all(options.dir.map((dir) => markdownUnder(resolve(dir))))).flat(),
+      ]),
     ];
     const base = await lintRule(options.plugin, baseline, files);
     const results = await Promise.all(
-      candidates.map(async (candidate) => ({
-        candidate,
-        diff: diffHits(base, await lintRule(options.plugin, candidate, files)),
-        complexity: measure(await Bun.file(candidate).text()).score,
-      })),
+      candidates.map(async (candidate) => {
+        const complexity = measure(await Bun.file(candidate).text()).score;
+        const diff = diffHits(base, await lintRule(options.plugin, candidate, files));
+        return { candidate, diff, complexity };
+      }),
     );
     for (const { candidate, diff, complexity } of results) {
       const { kept, dropped, added } = diff;

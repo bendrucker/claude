@@ -1,14 +1,18 @@
-# evidence: split from ConsequenceChain, whose corpus hits are about a tenth ", so it" and ", so they". Which pronoun opens the clause is a word choice no tag carries, so it stays a two-word list.
+# evidence: split from ConsequenceChain, whose corpus hits are about a tenth ", so it" and ", so they". Which pronoun opens the clause is a word choice no tag carries. It stays a short list, with "neither" and "either", which the tagger reads as conjunctions.
 # retire when: ConsequenceChain retires, or a labeling pass shows most hits read fine.
 extends: existence
-message: "', so %s' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately."
+message: "'%s' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/ConsequenceChainPronoun.yml
 level: warning
 ignorecase: true
 nonword: true
 tokens:
-  - ',\s*so\s+(it|they)\b'
+  - ',\s*so\s+(it|they|neither|either)\b'
 tests:
+  - name: "flags Both writers hold the lock, so neither request proceeds."
+    input: |
+      Both writers hold the lock, so neither request proceeds.
+    contains: [Writing.ConsequenceChainPronoun]
   - name: "flags The flag is unset, so it falls back to the default."
     input: |
       The flag is unset, so it falls back to the default.

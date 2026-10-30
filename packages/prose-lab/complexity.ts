@@ -1,7 +1,12 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { RegExpParser, visitRegExpAST } from "@eslint-community/regexpp";
-import type { Alternative, CharacterClass, Element } from "@eslint-community/regexpp/ast";
+import type {
+  Alternative,
+  CharacterClassElement,
+  Element,
+  Quantifier,
+} from "@eslint-community/regexpp/ast";
 import { parse } from "yaml";
 import { z } from "zod";
 
@@ -63,22 +68,28 @@ function toJavaScript(source: string): string {
     .replaceAll(/\\[zZ]/g, "$");
 }
 
-function spansWords(element: Element): boolean {
-  if (element.type === "CharacterSet") return element.kind === "any";
-  if (element.type !== "CharacterClass") return false;
-  const cls: CharacterClass = element;
-  if (cls.negate) return true;
-  // A gap must match both letters and spaces, or it only consumes separators like `[\s-]+`.
-  const space = cls.elements.some(
-    (member) => member.type === "CharacterSet" && member.kind === "space" && !member.negate,
-  );
-  const letters = cls.elements.some(
-    (member) =>
-      member.type === "CharacterClassRange" ||
-      (member.type === "CharacterSet" && member.kind === "word" && !member.negate),
-  );
-  return space && letters;
+type Atom = Element | CharacterClassElement;
+
+const space = (atom: Atom) =>
+  (atom.type === "CharacterSet" &&
+    (atom.kind === "any" || (atom.kind === "space" && !atom.negate))) ||
+  (atom.type === "Character" && atom.value === 0x20);
+
+const letters = (atom: Atom) =>
+  atom.type === "CharacterClassRange" ||
+  (atom.type === "CharacterSet" && (atom.kind === "any" || (atom.kind === "word" && !atom.negate)));
+
+function consumes(atom: Atom, test: (atom: Atom) => boolean): boolean {
+  if (atom.type === "CharacterClass")
+    return atom.negate || atom.elements.some((member) => consumes(member, test));
+  if (atom.type === "Quantifier") return consumes(atom.element, test);
+  if (atom.type === "Group" || atom.type === "CapturingGroup")
+    return atom.alternatives.some((alt) => alt.elements.some((member) => consumes(member, test)));
+  return test(atom);
 }
+
+// A gap must match both letters and spaces, or it only consumes separators like `[\s-]+`.
+const spansWords = (element: Element) => consumes(element, space) && consumes(element, letters);
 
 const lookaround = (kind: string) => kind === "lookahead" || kind === "lookbehind";
 
@@ -87,6 +98,7 @@ const parser = new RegExpParser({ ecmaVersion: 2025 });
 function measurePattern(source: string, features: Features): void {
   const ast = parser.parsePattern(toJavaScript(source), undefined, undefined, { unicode: false });
   let negated = 0;
+  let gap: Quantifier | undefined;
   const alternatives = (node: { alternatives: readonly Alternative[] }) => {
     const count = node.alternatives.length;
     if (count < 2) return;
@@ -106,8 +118,15 @@ function measurePattern(source: string, features: Features): void {
     onAssertionLeave: (node) => {
       if (lookaround(node.kind) && "negate" in node && node.negate) negated--;
     },
+    // A gap nested inside a counted gap widens the same span and counts once.
     onQuantifierEnter: (node) => {
-      if (node.max > 1 && spansWords(node.element)) features.gaps++;
+      if (gap === undefined && node.max > 1 && spansWords(node.element)) {
+        gap = node;
+        features.gaps++;
+      }
+    },
+    onQuantifierLeave: (node) => {
+      if (node === gap) gap = undefined;
     },
   });
 }

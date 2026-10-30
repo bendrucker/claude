@@ -52,7 +52,7 @@ When no candidate clears the floor, ship nothing. Record the trial (each candida
 
 After each `sweep`, the check table in `status` marks shipped checks whose labeled floor fell under the bar. Propose retiring each one to the user with its counts.
 
-`rules` ranks the plugins' rules by complexity and marks those over the ceiling. Rewrite one with candidates checked by `compare <rule> <candidates...> --dir <corpus>`, which lists the hits each keeps, drops, and adds. Accept a drop when the dropped hits are rare or marginal. When the user disagrees with a score, adjust `WEIGHTS` in `complexity.ts`.
+`rules` ranks the plugins' rules by complexity and marks those over the ceiling. Rewrite one with candidates checked by `compare <rule.yml> <candidates...> --dir <corpus>`, passing the rule's file path, which lists the hits each keeps, drops, and adds. Accept a drop when the dropped hits are rare or marginal. When the user disagrees with a score, adjust `WEIGHTS` in `complexity.ts`.
 
 ## Completion
 

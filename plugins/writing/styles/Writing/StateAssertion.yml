@@ -1,4 +1,5 @@
 # evidence: "stays" or "remains" before a state runs 0.524/1k in model drafts against 0.105/1k in the user's pre-AI writing, a lift of 5.0. It states a requirement as though it were a description, so the reader cannot tell a rule from an observation.
+# The tag check replaced a 49-word exception list. Adverbs and nouns of place ("stays home", "remains part of") now fire, a rarer miss than the list cost to keep.
 # retire when: the draft rate falls to the voice baseline, or a labeling pass shows most hits are plain facts about a state that changes.
 extends: sequence
 message: "'%s' asserts a state. For a requirement, say so with 'should': 'should be synchronous' rather than 'stays synchronous'. Otherwise say what happens."

@@ -140,7 +140,7 @@ async function openDoc(file) {
     const line = index + 1;
     const spans = [
       ...doc.hits.filter((h) => h.line === line).map((h) => ({ start: h.span[0] - 1, end: h.span[1], kind: "", title: h.check })),
-      ...doc.flags.filter((f) => f.line === line).map((f) => ({ start: f.span[0] - 1, end: f.span[1], kind: "flag", title: f.pattern })),
+      ...doc.flags.filter((f) => f.line === line).map((f) => ({ start: f.span[0] - 1, end: f.span[1], kind: "flag", title: f.pattern ?? f.note })),
     ];
     return `<div data-line="${line}" data-file="${esc(file)}"><span class="no">${line}</span><span class="text">${marked(text, spans)}</span></div>`;
   }).join("");

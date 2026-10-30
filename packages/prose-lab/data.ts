@@ -26,6 +26,7 @@ export const Sweep = z.object({
   rev: z.string(),
   words: z.number(),
   hits: z.array(Hit),
+  plugins: z.array(z.string()).optional(),
 });
 export type Sweep = z.infer<typeof Sweep>;
 
@@ -141,10 +142,9 @@ export function assign(
   ]);
   const missing = ids.filter((id) => !byId.has(id));
   if (missing.length > 0) throw new Error(`Unknown ids: ${missing.join(", ")}`);
+  const wanted = new Set(ids);
   const pick = <T extends { id: string }>(records: readonly T[]): T[] =>
-    records.flatMap((record) =>
-      ids.includes(record.id) ? [{ ...record, pattern: slug, ts }] : [],
-    );
+    records.flatMap((record) => (wanted.has(record.id) ? [{ ...record, pattern: slug, ts }] : []));
   return { labels: pick(labels), flags: pick(flags) };
 }
 

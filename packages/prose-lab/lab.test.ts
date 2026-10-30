@@ -295,6 +295,7 @@ describe("locate", () => {
     "",
     "A second paragraph.",
     "Emoji 😀x y.",
+    "Made &copy; here today.",
   ];
   const slices = (quote: string): string[] =>
     locate(lines, quote).map(
@@ -316,7 +317,9 @@ describe("locate", () => {
       want: ["starts.", "See [the"],
     },
     { name: "missing", quote: "not in the doc", want: [] },
+    { name: "a quote that appears twice", quote: "for", want: [] },
     { name: "an astral character", quote: "😀x", want: ["😀x"] },
+    { name: "text after a decoded entity", quote: "here today", want: ["here today"] },
   ])("$name", ({ quote, want }) => {
     expect(slices(quote)).toEqual(want);
   });
@@ -339,7 +342,9 @@ describe("locate", () => {
       const found = locate(raw, quote).map(({ line, span }) =>
         raw[line - 1]?.slice(span[0] - 1, span[1]),
       );
-      expect(found.join(" ")).toBe(quote);
+      const text = all.join(" ");
+      const unique = text.indexOf(quote) === text.lastIndexOf(quote);
+      expect(found.join(" ")).toBe(unique ? quote : "");
     });
   });
 });

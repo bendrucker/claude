@@ -53,9 +53,14 @@ function rendered(raw: string): Rendered[] {
     // Walk UTF-16 code units, the unit the quote's length counts in.
     for (let i = 0; i < value.length; i++) {
       const char = value.charAt(i);
-      while (at < end && raw[at] !== char) at++;
-      out.push({ char, offset: at < end ? at : -1 });
-      at++;
+      const match = raw.indexOf(char, at);
+      // A character with no raw counterpart, such as a decoded entity, must not strand the rest of the node.
+      if (match === -1 || match >= end) {
+        out.push({ char, offset: -1 });
+        continue;
+      }
+      out.push({ char, offset: match });
+      at = match + 1;
     }
     const last = out.at(-1);
     if (node.type === "inlineCode" && out[first] !== undefined && last !== undefined) {
@@ -76,7 +81,8 @@ export function locate(lines: readonly string[], quote: string): Located[] {
   const needle = quote.trim().replaceAll(/\s+/g, " ");
   const text = collapsed.map((entry) => (/\s/.test(entry.char) ? " " : entry.char)).join("");
   const found = needle === "" ? -1 : text.indexOf(needle);
-  if (found === -1) return [];
+  // A quote that appears twice could mark either copy. Leave it unlocated instead of guessing.
+  if (found === -1 || text.includes(needle, found + 1)) return [];
 
   const starts = [0];
   for (const line of lines) starts.push((starts.at(-1) ?? 0) + line.length + 1);

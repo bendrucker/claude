@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { mkdir, readdir } from "node:fs/promises";
+import { mkdir, readdir, rm } from "node:fs/promises";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typings";
 import { $ } from "bun";
@@ -144,14 +144,18 @@ const reviewCommand = new Command("review")
     const snapshot = await snapshotPath(source, date);
     const doc = relative(ROOT, snapshot);
     await Bun.write(snapshot, original);
-    await data.addDocs([{ doc, source, ts }]);
 
     const since = new Date();
     const session = Bun.spawn(["plannotator", "annotate", snapshot, "--json"], {
       stdout: "ignore",
       stderr: "inherit",
     });
-    if ((await session.exited) !== 0) throw new Error("plannotator exited with an error.");
+    if ((await session.exited) !== 0) {
+      // Every corpus lists the snapshots. A failed session's copy would sweep with no flags.
+      await rm(snapshot);
+      throw new Error("plannotator exited with an error.");
+    }
+    await data.addDocs([{ doc, source, ts }]);
 
     if ((await Bun.file(snapshot).text()) !== original) {
       console.log("The session edited the snapshot. Restoring it, since flags index the original:");
@@ -166,8 +170,7 @@ const reviewCommand = new Command("review")
       console.log(`Unlocated ${type}: ${JSON.stringify(originalText ?? "")} ${text}`);
 
     const last = await data.sweep();
-    const swept = new Set(last?.hits.map((hit) => hit.plugin));
-    const plugins = PLUGIN_NAMES.filter((name) => swept.size === 0 || swept.has(name));
+    const plugins = PLUGIN_NAMES.filter((name) => last?.plugins?.includes(name) ?? true);
     await data.writeSweep(await sweep(last?.corpus ?? "skills", plugins));
     console.log(
       `${reviewed.flags.length} flags recorded on ${doc}, ${reviewed.unlocated.length} unlocated, ${reviewed.globals.length} global notes.`,

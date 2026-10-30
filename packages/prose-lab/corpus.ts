@@ -91,5 +91,6 @@ export async function sweep(
     rev: rev.trim(),
     words: words.reduce((a, b) => a + b, 0),
     hits: hits.flat(),
+    plugins: [...plugins],
   };
 }

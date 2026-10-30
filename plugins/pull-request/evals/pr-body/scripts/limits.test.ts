@@ -68,7 +68,6 @@ test("scores the stub body when a tool result carries one and the reply otherwis
     ["path-spans", true],
     ["contrast-phrases", true],
     ["hidden-words", false],
-    ["list-words", true],
     ["list-items", true],
   ]);
   expect(rows("with", 1)).toEqual([
@@ -79,20 +78,19 @@ test("scores the stub body when a tool result carries one and the reply otherwis
     ["path-spans", true],
     ["contrast-phrases", true],
     ["hidden-words", true],
-    ["list-words", true],
     ["list-items", true],
   ]);
   expect(written.cases[0]?.arms.with?.[0]?.graders.at(-1)?.explanation).toContain("from stub");
   expect(written.cases[0]?.arms.with?.[1]?.graders.at(-1)?.explanation).toContain("from reply");
-  expect(written.cases[0]?.arms.with?.map((r) => r.score)).toEqual([7 / 9, 7 / 9, 1]);
+  expect(written.cases[0]?.arms.with?.map((r) => r.score)).toEqual([6 / 8, 6 / 8, 1]);
   expect(written.cases[0]?.arms.without?.[0]?.score).toBe(1);
   expect(await Bun.file(join(out, "traces/one-with-1.jsonl")).exists()).toBe(true);
   expect(render(counts)).toMatchInlineSnapshot(`
-    "╔══════╤══════════════════╤════════════════╤═══════════════════════╤═════════════════╤═══════════════════════╤═══════════════════╤═════════════════╤═════════════════╤═════════════════════╤═══════════════════╤══════════════════════════╤════════════════════╤══════════════════════════╤══════════════════════╤════════════════════╤════════════════════╗
-    ║ case │ with prose-words │ with max-block │ with prose-code-spans │ with path-spans │ with contrast-phrases │ with hidden-words │ with list-words │ with list-items │ without prose-words │ without max-block │ without prose-code-spans │ without path-spans │ without contrast-phrases │ without hidden-words │ without list-words │ without list-items ║
-    ╟──────┼──────────────────┼────────────────┼───────────────────────┼─────────────────┼───────────────────────┼───────────────────┼─────────────────┼─────────────────┼─────────────────────┼───────────────────┼──────────────────────────┼────────────────────┼──────────────────────────┼──────────────────────┼────────────────────┼────────────────────╢
-    ║ one  │ 1/2              │ 1/2            │ 1/2                   │ 2/2             │ 2/2                   │ 1/2               │ 2/2             │ 2/2             │ 1/1                 │ 1/1               │ 1/1                      │ 1/1                │ 1/1                      │ 1/1                  │ 1/1                │ 1/1                ║
-    ╚══════╧══════════════════╧════════════════╧═══════════════════════╧═════════════════╧═══════════════════════╧═══════════════════╧═════════════════╧═════════════════╧═════════════════════╧═══════════════════╧══════════════════════════╧════════════════════╧══════════════════════════╧══════════════════════╧════════════════════╧════════════════════╝
+    "╔══════╤══════════════════╤════════════════╤═══════════════════════╤═════════════════╤═══════════════════════╤═══════════════════╤═════════════════╤═════════════════════╤═══════════════════╤══════════════════════════╤════════════════════╤══════════════════════════╤══════════════════════╤════════════════════╗
+    ║ case │ with prose-words │ with max-block │ with prose-code-spans │ with path-spans │ with contrast-phrases │ with hidden-words │ with list-items │ without prose-words │ without max-block │ without prose-code-spans │ without path-spans │ without contrast-phrases │ without hidden-words │ without list-items ║
+    ╟──────┼──────────────────┼────────────────┼───────────────────────┼─────────────────┼───────────────────────┼───────────────────┼─────────────────┼─────────────────────┼───────────────────┼──────────────────────────┼────────────────────┼──────────────────────────┼──────────────────────┼────────────────────╢
+    ║ one  │ 1/2              │ 1/2            │ 1/2                   │ 2/2             │ 2/2                   │ 1/2               │ 2/2             │ 1/1                 │ 1/1               │ 1/1                      │ 1/1                │ 1/1                      │ 1/1                  │ 1/1                ║
+    ╚══════╧══════════════════╧════════════════╧═══════════════════════╧═════════════════╧═══════════════════════╧═══════════════════╧═════════════════╧═════════════════════╧═══════════════════╧══════════════════════════╧════════════════════╧══════════════════════════╧══════════════════════╧════════════════════╝
     "
   `);
 });

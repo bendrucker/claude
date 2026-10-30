@@ -116,7 +116,6 @@ describe("exceededLimits", () => {
       "at every limit",
       {
         proseWords: 120,
-        listWords: 150,
         maxBlockWords: 40,
         proseCodeSpans: 6,
         pathSpans: 1,
@@ -128,7 +127,6 @@ describe("exceededLimits", () => {
       "prose words only",
       {
         proseWords: 121,
-        listWords: 150,
         maxBlockWords: 40,
         proseCodeSpans: 6,
         pathSpans: 1,
@@ -137,22 +135,9 @@ describe("exceededLimits", () => {
       ["prose words"],
     ],
     [
-      "list words only",
-      {
-        proseWords: 120,
-        listWords: 151,
-        maxBlockWords: 40,
-        proseCodeSpans: 6,
-        pathSpans: 1,
-        contrastPhrases: 1,
-      },
-      ["list words"],
-    ],
-    [
       "every limit",
       {
         proseWords: 240,
-        listWords: 151,
         maxBlockWords: 52,
         proseCodeSpans: 9,
         pathSpans: 2,
@@ -160,7 +145,6 @@ describe("exceededLimits", () => {
       },
       [
         "prose words",
-        "list words",
         "longest paragraph or bullet words",
         "inline code spans",
         "file paths in inline code",
@@ -171,9 +155,9 @@ describe("exceededLimits", () => {
     expect(exceededLimits(structure).map((limit) => limit.label)).toEqual(labels);
   });
 
-  test("a list past the old 120 visible words passes when its prose fits", () => {
+  test("a long list passes when its prose fits", () => {
     const prose = Array.from({ length: 3 }, () => "word ".repeat(30).trim()).join("\n\n");
-    const list = Array.from({ length: 5 }, () => `- ${"item ".repeat(20).trim()}`).join("\n");
+    const list = Array.from({ length: 12 }, () => `- ${"item ".repeat(30).trim()}`).join("\n");
     expect(exceededLimits(measureStructure(`${prose}\n\n${list}`))).toEqual([]);
   });
 });

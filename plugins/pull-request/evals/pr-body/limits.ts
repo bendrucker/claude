@@ -12,7 +12,6 @@ export const ROWS = {
   pathSpans: "path-spans",
   contrastPhrases: "contrast-phrases",
   hiddenWords: "hidden-words",
-  listWords: "list-words",
   maxItemsPerList: "list-items",
 } as const satisfies Record<CheckKey, string>;
 

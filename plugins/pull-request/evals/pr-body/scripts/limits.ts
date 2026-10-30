@@ -146,7 +146,7 @@ export function render(counts: Counts): string {
 
 const program = new Command()
   .description(
-    "Add prose-words, max-block, prose-code-spans, path-spans, contrast-phrases, hidden-words, list-words, and list-items rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
+    "Add prose-words, max-block, prose-code-spans, path-spans, contrast-phrases, hidden-words, and list-items rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
   )
   .argument("<results-dir...>", "results directories holding aggregate-result.json and traces/")
   .action(async (dirs) => {

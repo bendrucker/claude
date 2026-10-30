@@ -1,6 +1,6 @@
 // How much a PR body asks of its reader. Only what a reader sees without
 // expanding anything counts: not fenced code, not tables, not <details>.
-// Prose and list words count apart, since lists carry parallel items cheaply.
+// Only prose words are capped, since lists carry parallel items cheaply.
 
 import type { List, ListItem, Nodes, RootContent } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
@@ -25,19 +25,12 @@ export interface Structure {
   contrastPhrases: number;
 }
 
-type LimitKey =
-  | "proseWords"
-  | "listWords"
-  | "maxBlockWords"
-  | "proseCodeSpans"
-  | "pathSpans"
-  | "contrastPhrases";
+type LimitKey = "proseWords" | "maxBlockWords" | "proseCodeSpans" | "pathSpans" | "contrastPhrases";
 
 // One-sided limits fitted against hand-written PRs: a body fails only by
 // exceeding them, so terseness is never penalized.
 export const LIMITS = {
   proseWords: 120,
-  listWords: 150,
   maxBlockWords: 40,
   proseCodeSpans: 6,
   pathSpans: 1,
@@ -46,7 +39,6 @@ export const LIMITS = {
 
 const LIMIT_LABELS = {
   proseWords: "prose words",
-  listWords: "list words",
   maxBlockWords: "longest paragraph or bullet words",
   proseCodeSpans: "inline code spans",
   pathSpans: "file paths in inline code",
@@ -55,7 +47,6 @@ const LIMIT_LABELS = {
 
 const LIMIT_KEYS = [
   "proseWords",
-  "listWords",
   "maxBlockWords",
   "proseCodeSpans",
   "pathSpans",

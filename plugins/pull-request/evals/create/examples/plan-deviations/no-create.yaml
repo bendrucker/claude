@@ -1,6 +1,5 @@
 fail:
   - limit-prose-words
-  - limit-list-words
   - limit-max-block
   - limit-prose-code-spans
   - limit-path-spans

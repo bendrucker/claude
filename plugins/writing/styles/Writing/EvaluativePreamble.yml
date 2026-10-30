@@ -1,0 +1,121 @@
+# evidence: five chat corrections (2026-05 to 2026-10) objected to a lead-in that grades a source or acknowledges the reviewer before the content, and no shipped rule fired on any. Calibrated 2026-10-29 on a 1.01M-word random sample of assistant chat: 0.063/1k against 0.015/1k in the voice baseline (lift 4.3x), with 27 of 32 sampled hits judged real.
+# retire when: the session rate falls to within 2x of the voice baseline for 30 days, or spot-checks show the second-person token firing mostly on status reminders.
+extends: existence
+message: "'%s' grades the source or acknowledges the reviewer before the content. Lead with the content, and quote the source if it matters."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/EvaluativePreamble.yml
+level: warning
+scope: sentence
+nonword: true
+tokens:
+  # An assent opener: the reply agrees or praises before it says anything.
+  - '^(?:Agreed|Fair point|Good (?:catch|call|point|question))\b'
+  # A short subject graded as right or explicit, then a colon that hands off to the content.
+  - '^(?:\S+\s+){0,4}?(?:is|are|was|were)\s+(?:\w+\s+)?(?:explicit|right|correct|unambiguous|accurate|spot[- ]on)\s*:'
+  - '^(?:\S+\s+){0,4}?(?:has|have|had|got|gets)\s+(?:this|it|that)\s+right\s*[:,]'
+  # Telling the reviewer what they already did: a sentence-initial "You" plus a past participle and "already".
+  - '^You(?:[''’]ve|\s+have)?\s+(?:already\s+(?!need\b)\w+ed\b|(?!need\b)\w+ed\b[^.;:!?]{0,100}?\balready\b)'
+tests:
+  - name: "flags a recap of what the reviewer raised"
+    input: |
+      You raised the threshold question on the ticket already. The threshold is a calibration.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags a source graded as explicit"
+    input: |
+      Aembit's docs are explicit: the agent stores the access token.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags a reply graded as right"
+    input: |
+      Your reply has this right: we are still handling a secret.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags an agreed opener"
+    input: |
+      Agreed that no case measured this, and the gate couldn't have caught it.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags a reviewer graded as right"
+    input: |
+      Greptile was right: the migration removed the old nightly job.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags a source graded as unambiguous"
+    input: |
+      The RFC is unambiguous: a refresh token must be bound to the client.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags a person graded as right"
+    input: |
+      Kurt is right: the helper isn't exported from the public API.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags a good-catch opener"
+    input: |
+      Good catch, the retry loop never resets its counter.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags an instinct graded as correct"
+    input: |
+      Your instinct is correct: a force push resets approvals.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags a recap of what the reviewer flagged"
+    input: |
+      You flagged the empty-set case already, and the new assertion closes it.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags a source that had it right"
+    input: |
+      The upstream README had it right: the flag only applies to fork PRs.
+    contains: [Writing.EvaluativePreamble]
+  - name: "flags a fair-point opener"
+    input: |
+      Fair point, the split only changes the wording.
+    contains: [Writing.EvaluativePreamble]
+  - name: "allows plain attribution"
+    input: |
+      The README says the flag applies only to fork PRs.
+    absent: Writing.EvaluativePreamble
+  - name: "allows docs that say"
+    input: |
+      Aembit's docs say the agent stores the token.
+    absent: Writing.EvaluativePreamble
+  - name: "allows a list lead-in colon"
+    input: |
+      The config has two flags: `strict` and `cache`.
+    absent: Writing.EvaluativePreamble
+  - name: "allows a past action without already"
+    input: |
+      You merged #1453, so I closed out behind it.
+    absent: Writing.EvaluativePreamble
+  - name: "allows you need"
+    input: |
+      You need to run the apply before the tag exists.
+    absent: Writing.EvaluativePreamble
+  - name: "allows agreement as a noun"
+    input: |
+      Agreement on the schema came from the March review.
+    absent: Writing.EvaluativePreamble
+  - name: "allows right as an adjective"
+    input: |
+      The right fix is to move the guard into the loader.
+    absent: Writing.EvaluativePreamble
+  - name: "allows it is clear that"
+    input: |
+      It is clear that the cache misses on cold start.
+    absent: Writing.EvaluativePreamble
+  - name: "allows a clear colon in self-narration"
+    input: |
+      The root cause is clear: the cache misses on cold start.
+    absent: Writing.EvaluativePreamble
+  - name: "allows per your question"
+    input: |
+      Per your question in Linear, the threshold is a calibration.
+    absent: Writing.EvaluativePreamble
+  - name: "allows right as an adverb"
+    input: |
+      This is right after the migration step.
+    absent: Writing.EvaluativePreamble
+  - name: "allows we agreed"
+    input: |
+      We agreed to keep the materialized view.
+    absent: Writing.EvaluativePreamble
+  - name: "allows a direction"
+    input: |
+      Turn right at the second hook, then read the log.
+    absent: Writing.EvaluativePreamble
+  - name: "allows good news"
+    input: |
+      The good news is the fix is two lines.
+    absent: Writing.EvaluativePreamble

@@ -32,6 +32,18 @@ const BUSY_SPINNER = /esc to interrupt/i;
 const TURN_DONE = /^\s*✻ .*\bdone\b/m;
 // An echoed prompt followed by a reply. The empty input box shows a bare `❯`.
 const ANSWERED = /^❯ \S.*\n(?:.*\n)*?⏺ /m;
+// `--exec` and its shell launcher print these, and `--keep-open` leaves them on screen.
+const EXEC_FAILED = /^dispatch failed: /m;
+const WORKTREE_LINE = /^dispatch worktree: (\S+)$/m;
+// Linux caps one argv element at 128KB including its terminator.
+const MAX_ARG_BYTES = 128 * 1024 - 1;
+// rex passes words without a shell. This launcher's own shell expands $HOME.
+const REMOTE_LAUNCHER = [
+  'script="$HOME/.claude-repo/plugins/dispatch/skills/dispatch/scripts/dispatch.ts"',
+  'command -v bun >/dev/null 2>&1 || { echo "dispatch failed: bun is not on PATH"; exit 1; }',
+  '[ -f "$script" ] || { echo "dispatch failed: $script is not deployed"; exit 1; }',
+  'exec bun "$script" "$@"',
+].join("; ");
 
 export interface CommandResult {
   code: number;
@@ -98,7 +110,7 @@ export const spawnRunner: Runner = async (argv, options) => {
 
 export const MUXES = ["rex", "herdr", "bg"] as const;
 export type Mux = (typeof MUXES)[number];
-export type Status = "working" | "blocked" | "unknown";
+export type Status = "working" | "blocked" | "failed" | "unknown";
 
 export interface DispatchRecord {
   mux: Mux;
@@ -106,7 +118,8 @@ export interface DispatchRecord {
   target: string | null;
   host: string | null;
   name: string;
-  path: string;
+  // A remote worktree's path is known only once its screen shows it.
+  path: string | null;
   branch: string;
   session: string | null;
   status: Status;
@@ -256,9 +269,21 @@ export function backgroundId(stdout: string): string | null {
 
 export function classifyScreen(screen: string): Status {
   const tail = screen.split("\n").slice(-SCREEN_TAIL_LINES).join("\n");
+  if (EXEC_FAILED.test(tail)) return "failed";
   if (DIALOG.test(tail)) return "blocked";
   if (BUSY_SPINNER.test(tail) || TURN_DONE.test(tail) || ANSWERED.test(screen)) return "working";
   return "unknown";
+}
+
+// Base64 keeps a prompt or settings file one opaque word on its way through rex.
+export function encodeArg(text: string): string {
+  return Buffer.from(text, "utf8").toString("base64");
+}
+
+export function decodeArg(value: string, label: string): string {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0)
+    throw new Error(`${label} is not base64`);
+  return Buffer.from(value, "base64").toString("utf8");
 }
 
 function isObject(value: unknown): value is Settings {
@@ -462,8 +487,8 @@ function agentNames(listed: z.infer<typeof AgentList>): ReadonlySet<string> {
 
 // The `--` keeps a prompt that opens with a dash or a frontmatter rule from
 // parsing as a flag.
-function claudeArgs(name: string, prompt: string): string[] {
-  return ["--name", name, "--", prompt];
+function claudeArgs(name: string, prompt: string, extra: readonly string[] = []): string[] {
+  return ["--name", name, ...extra, "--", prompt];
 }
 
 interface Context {
@@ -471,6 +496,7 @@ interface Context {
   pause: Pause;
   options: DispatchOptions;
   partial: DispatchRecord;
+  path: string;
 }
 
 async function launchRex(ctx: Context): Promise<void> {
@@ -485,7 +511,7 @@ async function launchRex(ctx: Context): Promise<void> {
           options.rexBlock,
           "--split=right",
           "-c",
-          partial.path,
+          ctx.path,
           "--label",
           options.branch,
           "--focus=false",
@@ -499,7 +525,7 @@ async function launchRex(ctx: Context): Promise<void> {
           options.rexSession ?? "",
           options.branch,
           "-c",
-          partial.path,
+          ctx.path,
           "--focus=false",
           ...command,
         ];
@@ -548,16 +574,7 @@ async function launchHerdr(ctx: Context): Promise<void> {
   const { run, options, partial } = ctx;
   const workspace = await requiredJson(
     run,
-    [
-      "herdr",
-      "workspace",
-      "create",
-      "--cwd",
-      partial.path,
-      "--label",
-      options.branch,
-      "--no-focus",
-    ],
+    ["herdr", "workspace", "create", "--cwd", ctx.path, "--label", options.branch, "--no-focus"],
     WorkspaceCreated,
     partial,
   );
@@ -576,14 +593,20 @@ async function launchBackground(ctx: Context): Promise<void> {
     ctx.run,
     ["claude", "--bg", ...claudeArgs(partial.name, ctx.options.prompt)],
     partial,
-    { cwd: partial.path, env: detachedEnv(process.env) },
+    { cwd: ctx.path, env: detachedEnv(process.env) },
   );
   partial.target = backgroundId(started.stdout);
 }
 
-async function pollScreen(ctx: Context, argv: readonly string[]): Promise<Status> {
-  const captured = await ctx.run(argv);
-  return captured.code === 0 ? classifyScreen(captured.stdout) : "unknown";
+async function pollScreen(
+  run: Runner,
+  partial: DispatchRecord,
+  argv: readonly string[],
+): Promise<Status> {
+  const captured = await run(argv);
+  if (captured.code !== 0) return "unknown";
+  partial.path ??= WORKTREE_LINE.exec(captured.stdout)?.[1] ?? null;
+  return classifyScreen(captured.stdout);
 }
 
 async function pollHerdr(ctx: Context, name: string): Promise<Status> {
@@ -595,21 +618,26 @@ async function pollHerdr(ctx: Context, name: string): Promise<Status> {
   return agent.agent_status === "blocked" ? "blocked" : "unknown";
 }
 
-async function awaitStatus(ctx: Context): Promise<Status> {
-  const { partial } = ctx;
-  const poll = (): Promise<Status> => {
-    if (partial.mux === "herdr") return pollHerdr(ctx, partial.name);
-    if (partial.mux === "bg")
-      return pollScreen(ctx, ["claude", "logs", partial.target ?? partial.name]);
-    return pollScreen(ctx, ["rex", "capture", "-b", partial.target ?? "", "--trim"]);
-  };
+async function awaitStatus(
+  poll: () => Promise<Status>,
+  pause: Pause,
+  timeout: number,
+): Promise<Status> {
   const attempt = async (left: number): Promise<Status> => {
     const status = await poll();
     if (status !== "unknown" || left <= 1) return status;
-    await ctx.pause(POLL_MS);
+    await pause(POLL_MS);
     return attempt(left - 1);
   };
-  return attempt(Math.ceil(ctx.options.timeout / POLL_MS));
+  return attempt(Math.ceil(timeout / POLL_MS));
+}
+
+function localPoll(ctx: Context): () => Promise<Status> {
+  const { run, partial } = ctx;
+  if (partial.mux === "herdr") return () => pollHerdr(ctx, partial.name);
+  if (partial.mux === "bg")
+    return () => pollScreen(run, partial, ["claude", "logs", partial.target ?? partial.name]);
+  return () => pollScreen(run, partial, ["rex", "capture", "-b", partial.target ?? "", "--trim"]);
 }
 
 export interface DispatchOptions {
@@ -623,10 +651,14 @@ export interface DispatchOptions {
   split?: boolean;
   rexSession?: string | undefined;
   rexBlock?: string | undefined;
+  // A saved Rex host label. The launcher runs there with --exec.
+  host?: string | undefined;
   settings?: Settings;
 }
 
-function validate(options: DispatchOptions): void {
+function validateCommon(
+  options: WorktreeOptions & { prompt: string; name?: string | undefined },
+): void {
   if (!BRANCH_PATTERN.test(options.branch))
     throw new DispatchError(
       `branch ${JSON.stringify(options.branch)} must match ${BRANCH_PATTERN.source}`,
@@ -647,6 +679,14 @@ function validate(options: DispatchOptions): void {
       `the prompt is ${promptBytes} bytes, over the ${MAX_PROMPT_BYTES} an argument carries. Point the session at a file instead of pasting its contents.`,
       null,
     );
+}
+
+function validate(options: DispatchOptions): void {
+  validateCommon(options);
+  if (options.host != null) {
+    validateRemote(options, options.host);
+    return;
+  }
   if (options.split === true && options.mux !== "rex")
     throw new DispatchError("--split needs --mux rex", null);
   if (options.mux === "rex" && options.split === true && (options.rexBlock ?? "") === "")
@@ -658,12 +698,117 @@ function validate(options: DispatchOptions): void {
     );
 }
 
+function validateRemote(options: DispatchOptions, host: string): void {
+  if (options.mux !== "rex") throw new DispatchError("--host needs --mux rex", null);
+  if (options.split === true)
+    throw new DispatchError("--split opens beside this block, so it cannot take --host", null);
+  if ((options.rexSession ?? "") === "")
+    throw new DispatchError(
+      `--host needs --session naming a session on ${host} (\`rex -S ${host} ls\` lists them)`,
+      null,
+    );
+  const encoded = [
+    ["the prompt", encodeArg(options.prompt)],
+    ["the settings", encodeArg(JSON.stringify(options.settings ?? {}))],
+  ] as const;
+  for (const [label, value] of encoded)
+    if (value.length > MAX_ARG_BYTES)
+      throw new DispatchError(
+        `${label} encodes to ${value.length} bytes, over the ${MAX_ARG_BYTES} one argument carries to another machine`,
+        null,
+      );
+}
+
+// The words after `rex window new --`, which run the launcher on the host.
+export function remoteCommand(options: DispatchOptions, name: string): string[] {
+  const settings = options.settings ?? {};
+  return [
+    "sh",
+    "-c",
+    REMOTE_LAUNCHER,
+    "dispatch",
+    "--exec",
+    "--repo",
+    options.repo,
+    "--branch",
+    options.branch,
+    "--base",
+    options.base,
+    "--name",
+    name,
+    "--timeout",
+    String(options.timeout),
+    "--prompt-base64",
+    encodeArg(options.prompt),
+    ...(Object.keys(settings).length > 0
+      ? ["--settings-base64", encodeArg(JSON.stringify(settings))]
+      : []),
+  ];
+}
+
+async function dispatchRemote(
+  options: DispatchOptions,
+  host: string,
+  run: Runner,
+  pause: Pause,
+): Promise<DispatchResult> {
+  const name = options.name ?? deriveName(options.branch, new Set());
+  const created = await requiredJson(
+    run,
+    [
+      "rex",
+      "-S",
+      host,
+      "window",
+      "new",
+      "-s",
+      options.rexSession ?? "",
+      options.branch,
+      "-c",
+      options.repo,
+      "--keep-open",
+      "--focus=false",
+      "--json",
+      "--",
+      ...remoteCommand(options, name),
+    ],
+    RexCreated,
+    null,
+  );
+  const record: DispatchRecord = {
+    mux: "rex",
+    target: created.block_ids[0] ?? null,
+    host,
+    name,
+    path: null,
+    branch: options.branch,
+    session: null,
+    status: "unknown",
+    settings: settingsKeys(options.settings ?? {}),
+  };
+  const capture = ["rex", "-S", host, "capture", "-b", record.target ?? "", "--trim"];
+  record.status = await awaitStatus(() => pollScreen(run, record, capture), pause, options.timeout);
+  return { root: options.repo, record };
+}
+
+export type WorktreeOptions = Pick<
+  DispatchOptions,
+  "repo" | "branch" | "base" | "timeout" | "settings"
+>;
+
+interface Prepared {
+  root: string;
+  path: string;
+  partial: DispatchRecord;
+}
+
 export async function dispatch(
   options: DispatchOptions,
   run: Runner = spawnRunner,
   pause: Pause = Bun.sleep,
 ): Promise<DispatchResult> {
   validate(options);
+  if (options.host != null) return dispatchRemote(options, options.host, run, pause);
 
   // A herdr name already bound would fail agent start after the worktree
   // exists, so the live names are read before anything is created.
@@ -678,6 +823,26 @@ export async function dispatch(
       null,
     );
 
+  const { root, path, partial } = await prepareWorktree(options, wanted, options.mux, run, pause);
+  try {
+    const ctx: Context = { run, pause, options, partial, path };
+    const launch = { rex: launchRex, herdr: launchHerdr, bg: launchBackground }[options.mux];
+    await launch(ctx);
+    partial.status = await awaitStatus(localPoll(ctx), pause, options.timeout);
+    return { root, record: partial };
+  } catch (error) {
+    if (error instanceof DispatchError) error.root ??= root;
+    throw error;
+  }
+}
+
+async function prepareWorktree(
+  options: WorktreeOptions,
+  name: string,
+  mux: Mux,
+  run: Runner,
+  pause: Pause,
+): Promise<Prepared> {
   // The porcelain listing puts the main worktree first whatever the
   // repository's git layout, and wt runs from there.
   const listing = await required(
@@ -757,31 +922,54 @@ export async function dispatch(
     // Everything past here has a worktree behind it, so a failure carries the
     // record forward rather than leaving the checkout orphaned without a trace.
     const partial: DispatchRecord = {
-      mux: options.mux,
+      mux,
       target: null,
       host: null,
-      name: wanted,
+      name,
       path,
       branch: options.branch,
       session: null,
       status: "unknown",
       settings: [],
     };
-    const ctx: Context = { run, pause, options, partial };
 
     const submoduleError = await initSubmodules(run, path);
     if (submoduleError != null) partial.submoduleError = submoduleError;
     partial.settings = await writeSettings(run, path, options.settings ?? {}, partial);
-
-    const launch = { rex: launchRex, herdr: launchHerdr, bg: launchBackground }[options.mux];
-    await launch(ctx);
-
-    partial.status = await awaitStatus(ctx);
-    return { root, record: partial };
+    return { root, path, partial };
   } catch (error) {
     if (error instanceof DispatchError) error.root ??= root;
     throw error;
   }
+}
+
+export type Start = (argv: readonly string[], cwd: string) => Promise<number>;
+
+const inheritStart: Start = async (argv, cwd) =>
+  Bun.spawn([...argv], { cwd, stdin: "inherit", stdout: "inherit", stderr: "inherit" }).exited;
+
+export interface ExecOptions extends WorktreeOptions {
+  prompt: string;
+  name: string;
+}
+
+// The far side of --host. It owns the terminal rex opened, and Remote Control
+// puts the session in the caller's ListAgents.
+export async function execSession(
+  options: ExecOptions,
+  run: Runner = spawnRunner,
+  pause: Pause = Bun.sleep,
+  start: Start = inheritStart,
+): Promise<number> {
+  validateCommon(options);
+  const { path, partial } = await prepareWorktree(options, options.name, "rex", run, pause);
+  process.stdout.write(`dispatch worktree: ${path}\n`);
+  if (partial.submoduleError != null)
+    process.stderr.write(`warning: submodules were not initialized: ${partial.submoduleError}\n`);
+  return start(
+    ["claude", ...claudeArgs(options.name, options.prompt, ["--remote-control", options.name])],
+    path,
+  );
 }
 
 async function readPrompt(path: string | undefined): Promise<string> {
@@ -796,6 +984,8 @@ async function readPrompt(path: string | undefined): Promise<string> {
 }
 
 function inspectHint(record: DispatchRecord): string {
+  if (record.mux === "rex" && record.host != null)
+    return `rex -S ${record.host} capture -b ${record.target ?? "<block>"} --trim`;
   if (record.mux === "rex") return `rex capture -b ${record.target ?? "<block>"} --trim`;
   if (record.mux === "bg") return `claude logs ${record.target ?? record.name}`;
   return `herdr agent read ${record.name}`;
@@ -840,6 +1030,19 @@ if (import.meta.main) {
         type: String,
         description: "JSON file deep-merged into the worktree's .claude/settings.local.json",
       },
+      host: {
+        type: String,
+        description:
+          "Rex only: saved host label (`rex hosts list`) to run the session on; --repo is a path there",
+      },
+      exec: {
+        type: Boolean,
+        default: false,
+        description:
+          "Internal: the --host side. Prepare the worktree here and run claude in the foreground",
+      },
+      promptBase64: { type: String, description: "Internal: --exec prompt, base64" },
+      settingsBase64: { type: String, description: "Internal: --exec settings JSON, base64" },
       dataDir: {
         type: String,
         description: "Dispatch ledger directory; defaults to the plugin data dir",
@@ -851,6 +1054,38 @@ if (import.meta.main) {
       },
     },
   });
+
+  // The caller's poll reads this screen, so every failure prints its marker.
+  if (argv.flags.exec) {
+    try {
+      const { branch, name, promptBase64, settingsBase64 } = argv.flags;
+      if (branch == null || branch === "") throw new Error("--branch is required");
+      if (name == null || name === "") throw new Error("--name is required");
+      if (promptBase64 == null) throw new Error("--prompt-base64 is required");
+      const settings =
+        settingsBase64 == null
+          ? {}
+          : parseSettings(decodeArg(settingsBase64, "--settings-base64"), "--settings-base64");
+      process.exit(
+        await execSession({
+          repo: argv.flags.repo,
+          branch,
+          base: argv.flags.base,
+          timeout: argv.flags.timeout,
+          name,
+          prompt: decodeArg(promptBase64, "--prompt-base64"),
+          settings,
+        }),
+      );
+    } catch (error) {
+      process.stdout.write(
+        `dispatch failed: ${error instanceof Error ? error.message.trim() : String(error)}\n`,
+      );
+      if (error instanceof DispatchError && error.partial != null)
+        process.stdout.write(`${formatRecord(error.partial)}\n`);
+      process.exit(1);
+    }
+  }
 
   if (argv.flags.branch == null || argv.flags.branch === "") {
     process.stderr.write("--branch is required\n");
@@ -937,7 +1172,10 @@ if (import.meta.main) {
       timeout: argv.flags.timeout,
       mux,
       split: argv.flags.split,
-      rexSession: argv.flags.session ?? process.env.REX_SESSION,
+      // REX_SESSION names a session on this machine, never the host's.
+      rexSession:
+        argv.flags.session ?? (argv.flags.host == null ? process.env.REX_SESSION : undefined),
+      host: argv.flags.host,
       rexBlock: process.env.REX_BLOCK,
       settings,
     });

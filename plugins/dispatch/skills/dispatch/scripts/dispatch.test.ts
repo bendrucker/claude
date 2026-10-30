@@ -2,30 +2,37 @@ import { mkdtempSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { beforeAll, describe, expect, test } from "bun:test";
 import { z } from "zod";
 import {
   backgroundId,
   classifyScreen,
   type CommandResult,
+  decodeArg,
   deriveName,
   detachedEnv,
   detectMux,
   dispatch,
   DispatchError,
   type DispatchOptions,
+  encodeArg,
   envelopeCode,
+  execSession,
   fetchArgs,
   formatRecord,
   mergeSettings,
   type Mux,
   type Pause,
+  remoteCommand,
   type RunOptions,
   type Runner,
   type Settings,
   settingsKeys,
   settingsPatch,
   spawnRunner,
+  type Start,
   type Status,
   taskSummary,
 } from "./dispatch";
@@ -328,6 +335,11 @@ describe("classifyScreen", () => {
       expected: "blocked",
     },
     { name: "an idle prompt", screen: IDLE_SCREEN.stdout, expected: "unknown" },
+    {
+      name: "a failed --exec held open",
+      screen: "dispatch failed: base names no commit\n",
+      expected: "failed",
+    },
     { name: "a finished first turn", screen: FINISHED_SCREEN.stdout, expected: "working" },
     {
       name: "a reply with no timing line",
@@ -417,6 +429,17 @@ describe("validation", () => {
     { name: "a split without REX_BLOCK", bad: makeOptions({ split: true, rexBlock: "" }) },
     { name: "a Rex tab without a session", bad: makeOptions({ rexSession: undefined }) },
     { name: "a split under bg", bad: makeOptions({ mux: "bg", split: true }) },
+    { name: "a host under herdr", bad: herdrOptions({ host: "studio", rexSession: "work" }) },
+    { name: "a host with a split", bad: makeOptions({ host: "studio", split: true }) },
+    { name: "a host without a session", bad: makeOptions({ host: "studio", rexSession: "" }) },
+    {
+      name: "a prompt that fits locally but not encoded for a host",
+      bad: makeOptions({ host: "studio", prompt: "x".repeat(100_000) }),
+    },
+    {
+      name: "settings too large to send to a host",
+      bad: makeOptions({ host: "studio", settings: { env: { BIG: "x".repeat(100_000) } } }),
+    },
   ])("rejects $name before spawning", async ({ bad }) => {
     const { run, calls } = fakeRunner([]);
     await failureOf(dispatch(bad, run, instant));
@@ -939,6 +962,246 @@ describe("dispatch settings", () => {
   });
 });
 
+describe("argument encoding", () => {
+  test("round-trips any text", () => {
+    hegel.test((tc) => {
+      const text = tc.draw(gs.text());
+      expect(decodeArg(encodeArg(text), "arg")).toBe(text);
+    });
+  });
+
+  test.each<{ name: string; text: string }>([
+    { name: "a frontmatter prompt", text: "---\ntitle: x\n---\n-leading dash" },
+    { name: "shell syntax", text: "'q' \"dq\" $HOME `tick` $(whoami); rm -rf /" },
+    { name: "settings JSON", text: JSON.stringify({ permissions: { allow: ["Bash(bun:*)"] } }) },
+  ])("encodes $name as one word of base64", ({ text }) => {
+    const encoded = encodeArg(text);
+    expect(encoded).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    expect(decodeArg(encoded, "arg")).toBe(text);
+  });
+
+  test("rejects text that is not base64", () => {
+    expect(() => decodeArg("not base64!", "--prompt-base64")).toThrow(
+      "--prompt-base64 is not base64",
+    );
+  });
+});
+
+describe("dispatch to another host", () => {
+  const SETTINGS: Settings = { permissions: { allow: ["Bash(bun test:*)"] } };
+  const REMOTE_PATH = "/home/ben/src/demo/.worktrees/fix-thing";
+  const remoteOptions = (overrides: Partial<DispatchOptions> = {}) =>
+    makeOptions({
+      host: "studio",
+      rexSession: "work",
+      rexBlock: undefined,
+      repo: "/home/ben/src/demo",
+      settings: SETTINGS,
+      ...overrides,
+    });
+  const capture = ["rex", "-S", "studio", "capture", "-b", "block:new", "--trim"];
+
+  test("opens a kept-open tab on the host running the launcher with --exec", async () => {
+    const shown = ok(`dispatch worktree: ${REMOTE_PATH}\n${WORKING_SCREEN.stdout}`);
+    const { run, calls } = fakeRunner([REX_CREATED, shown]);
+    const { record, root } = await dispatch(remoteOptions(), run, instant);
+
+    const [launch] = calls;
+    expect(launch?.slice(0, 16)).toEqual([
+      "rex",
+      "-S",
+      "studio",
+      "window",
+      "new",
+      "-s",
+      "work",
+      "fix-thing",
+      "-c",
+      "/home/ben/src/demo",
+      "--keep-open",
+      "--focus=false",
+      "--json",
+      "--",
+      "sh",
+      "-c",
+    ]);
+    expect(launch?.[16]).toContain(
+      '"$HOME/.claude-repo/plugins/dispatch/skills/dispatch/scripts/dispatch.ts"',
+    );
+    expect(launch?.slice(17)).toEqual([
+      "dispatch",
+      "--exec",
+      "--repo",
+      "/home/ben/src/demo",
+      "--branch",
+      "fix-thing",
+      "--base",
+      "origin/main",
+      "--name",
+      "fix-thing",
+      "--timeout",
+      "3000",
+      "--prompt-base64",
+      encodeArg("do the thing"),
+      "--settings-base64",
+      encodeArg(JSON.stringify(SETTINGS)),
+    ]);
+    expect(calls.slice(1)).toEqual([capture]);
+    expect(root).toBe("/home/ben/src/demo");
+    expect(formatRecord(record)).toMatchInlineSnapshot(
+      `"{"mux":"rex","target":"block:new","host":"studio","name":"fix-thing","path":"/home/ben/src/demo/.worktrees/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":["permissions.allow"]}"`,
+    );
+  });
+
+  test.each<{ name: string; screens: CommandResult[]; status: Status; polls: number }>([
+    {
+      name: "failed once the launcher prints its marker",
+      screens: [ok("dispatch failed: base names no commit\n")],
+      status: "failed",
+      polls: 1,
+    },
+    {
+      name: "working after a screen that shows nothing yet",
+      screens: [ok("Cloning…\n"), WORKING_SCREEN],
+      status: "working",
+      polls: 2,
+    },
+    {
+      name: "unknown when capture fails",
+      screens: [fail("no route")],
+      status: "unknown",
+      polls: 3,
+    },
+  ])("reports $name", async ({ screens, status, polls }) => {
+    const { run, calls } = fakeRunner([
+      REX_CREATED,
+      ...screens,
+      fail("no route"),
+      fail("no route"),
+    ]);
+    const { record } = await dispatch(remoteOptions(), run, instant);
+    expect(record.status).toBe(status);
+    expect(record.path).toBeNull();
+    expect(calls.slice(1)).toEqual(Array.from({ length: polls }, () => capture));
+  });
+
+  test("omits the settings word when there are none", async () => {
+    const { run, calls } = fakeRunner([REX_CREATED, WORKING_SCREEN]);
+    await dispatch(remoteOptions({ settings: {} }), run, instant);
+    expect(calls[0]).not.toContain("--settings-base64");
+  });
+
+  test("leaves no record when the host refuses the tab", async () => {
+    const { run } = fakeRunner([fail("connect: host studio is unreachable")]);
+    const failure = await failureOf(dispatch(remoteOptions(), run, instant));
+    expect(failure.message).toMatch(/unreachable/);
+    expect(failure.partial).toBeNull();
+  });
+});
+
+describe("remote launcher", () => {
+  const launch = async (env: Record<string, string>) => {
+    const argv = remoteCommand(makeOptions({ prompt: "it's $HOME" }), "fix-thing");
+    const proc = Bun.spawn(argv, { stdin: "ignore", stdout: "pipe", stderr: "pipe", env });
+    const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+    return { stdout, code };
+  };
+  const bunDir = join(process.execPath, "..");
+
+  test("expands $HOME on the host and hands every word to the script", async () => {
+    const home = mkdtempSync(join(tmpdir(), "dispatch-home-"));
+    await Bun.write(
+      join(home, ".claude-repo/plugins/dispatch/skills/dispatch/scripts/dispatch.ts"),
+      "console.log(JSON.stringify(process.argv.slice(2)));\n",
+    );
+    const { stdout, code } = await launch({ HOME: home, PATH: `${bunDir}:/usr/bin:/bin` });
+    expect(code).toBe(0);
+    const words = z.array(z.string()).parse(JSON.parse(stdout));
+    expect(words.slice(0, 2)).toEqual(["--exec", "--repo"]);
+    expect(decodeArg(words[words.indexOf("--prompt-base64") + 1] ?? "", "prompt")).toBe(
+      "it's $HOME",
+    );
+  });
+
+  test.each<{ name: string; path: string; expected: RegExp }>([
+    {
+      name: "the script is not deployed",
+      path: "",
+      expected: /dispatch failed: .* is not deployed/,
+    },
+    {
+      name: "bun is not on PATH",
+      path: "/usr/bin:/bin",
+      expected: /dispatch failed: bun is not on PATH/,
+    },
+  ])("prints the failure marker when $name", async ({ path, expected }) => {
+    const home = mkdtempSync(join(tmpdir(), "dispatch-home-"));
+    const { stdout, code } = await launch({
+      HOME: home,
+      PATH: path === "" ? `${bunDir}:/usr/bin:/bin` : path,
+    });
+    expect(code).toBe(1);
+    expect(stdout).toMatch(expected);
+    expect(classifyScreen(stdout)).toBe("failed");
+  });
+});
+
+describe("exec on the host", () => {
+  const recordedStart = (): { start: Start; starts: { argv: string[]; cwd: string }[] } => {
+    const starts: { argv: string[]; cwd: string }[] = [];
+    const start: Start = (argv, cwd) => {
+      starts.push({ argv: [...argv], cwd });
+      return Promise.resolve(0);
+    };
+    return { start, starts };
+  };
+  const execOptions = {
+    repo: "/repo",
+    branch: "fix-thing",
+    base: "origin/main",
+    timeout: 3_000,
+    name: "fix-thing",
+    prompt: "-do the thing",
+  };
+
+  test("prepares the worktree and settings, then runs claude under Remote Control", async () => {
+    const path = mkdtempSync(join(tmpdir(), "dispatch-exec-"));
+    const settings = { permissions: { allow: ["Read"] } };
+    const { run, calls } = fakeRunner([...rexPath(path), ok("")]);
+    const { start, starts } = recordedStart();
+    const code = await execSession({ ...execOptions, settings }, run, instant, start);
+
+    expect(code).toBe(0);
+    expect(calls).toContainEqual(WT_SWITCH);
+    expect(calls.filter((argv) => argv[0] === "rex" || argv[0] === "herdr")).toEqual([]);
+    expect(JSON.parse(await Bun.file(join(path, ".claude", "settings.local.json")).text())).toEqual(
+      settings,
+    );
+    expect(starts).toEqual([
+      {
+        argv: [
+          "claude",
+          "--name",
+          "fix-thing",
+          "--remote-control",
+          "fix-thing",
+          "--",
+          "-do the thing",
+        ],
+        cwd: path,
+      },
+    ]);
+  });
+
+  test("starts nothing when the worktree cannot be made", async () => {
+    const { run } = fakeRunner([...PREPARE.slice(0, -1), fail("", 1)]);
+    const { start, starts } = recordedStart();
+    const failure = await failureOf(execSession(execOptions, run, instant, start));
+    expect(failure.message).toMatch(/names no commit/);
+    expect(starts).toEqual([]);
+  });
+});
+
 const LedgerRow = z.object({
   ts: z.string(),
   task: z.string(),
@@ -1042,6 +1305,20 @@ describe("cli", () => {
       status: 2,
       expected: /must hold a JSON object/,
     },
+    {
+      name: "a host with only this machine's REX_SESSION",
+      args: ["--branch", "ok", "--prompt", filled, "--host", "studio"],
+      env: rex,
+      status: 1,
+      expected: /--host needs --session naming a session on studio/,
+    },
+    {
+      name: "a host under herdr",
+      args: ["--branch", "ok", "--prompt", filled, "--host", "studio", "--session", "work"],
+      env: { HERDR_ENV: "1" },
+      status: 1,
+      expected: /--host needs --mux rex/,
+    },
   ])("rejects $name", async ({ args, env, status, expected }) => {
     const {
       REX_BLOCK: _block,
@@ -1058,6 +1335,31 @@ describe("cli", () => {
     const [stderr, code] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
     expect(code).toBe(status);
     expect(stderr).toMatch(expected);
+  });
+
+  test.each<{ name: string; args: string[]; expected: RegExp }>([
+    { name: "no branch", args: ["--name", "n"], expected: /--branch is required/ },
+    { name: "no name", args: ["--branch", "ok"], expected: /--name is required/ },
+    {
+      name: "a prompt that is not base64",
+      args: ["--branch", "ok", "--name", "n", "--prompt-base64", "!!"],
+      expected: /--prompt-base64 is not base64/,
+    },
+    {
+      name: "a bad branch",
+      args: ["--branch", "bad branch", "--name", "n", "--prompt-base64", encodeArg("x")],
+      expected: /must match/,
+    },
+  ])("marks an --exec failure on screen for $name", async ({ args, expected }) => {
+    const proc = Bun.spawn(["bun", script, "--exec", ...args], {
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+    expect(code).toBe(1);
+    expect(stdout).toMatch(expected);
+    expect(classifyScreen(stdout)).toBe("failed");
   });
 });
 

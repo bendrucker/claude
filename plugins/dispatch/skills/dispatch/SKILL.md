@@ -46,6 +46,10 @@ bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --
 
 Run `--help` for the rest.
 
+## Other Machines
+
+To run the session on another machine, pass `--host <label> --session <remote session> --repo <remote path>`. The label must appear in `rex hosts list`, and that machine must have the dispatch plugin deployed at `~/.claude-repo`. The worktree, settings, and fetch happen there. The session starts with `--remote-control`, which puts it in `ListAgents` here. `path` stays `null` until the remote screen shows it.
+
 ## Read the Result
 
 On success the script prints one JSON line:
@@ -57,6 +61,7 @@ On success the script prints one JSON line:
 - `status`:
   - `working`: the session took the prompt.
   - `blocked`: a dialog is showing, such as folder trust or a permission prompt. Read the screen (`rex capture -b <target> --trim`, `herdr agent read <name>`, or `claude logs <target>`) and tell the user what it asks. The user answers it.
+  - `failed`: the remote launcher printed `dispatch failed:` and stopped. Read the screen with `rex -S <host> capture -b <target> --trim` and report the error.
   - `unknown`: the session showed neither before the timeout. Read the screen before reporting the hand-off.
 - `submoduleError`, when present: submodules failed to initialize. The session can repair them.
 

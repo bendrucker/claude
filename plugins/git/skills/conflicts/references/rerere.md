@@ -1,30 +1,9 @@
 # Rerere
 
-Git's "reuse recorded resolution" remembers conflict resolutions and auto-applies them.
-
-## Enable
-
-```bash
-git config --global rerere.enabled true
-```
-
-## How It Works
-
-1. Resolve a conflict manually
-2. Git records the resolution
-3. Same conflict later: git auto-applies it
-4. Verify with `git diff` before committing
-
-## Commands
+With `rerere.enabled` set (`git config --global rerere.enabled true`), git records each manual resolution and reapplies it when the same conflict recurs. Check a reapplied resolution with `git diff` before staging it.
 
 | Command | Purpose |
 |---------|---------|
 | `git rerere status` | Files with recorded resolutions |
 | `git rerere diff` | What rerere would apply |
-| `git rerere forget <file>` | Delete recorded resolution |
-
-## Use Cases
-
-- Repeated rebases onto updated main
-- Long-running feature branches
-- Backporting fixes across branches
+| `git rerere forget <file>` | Delete a recorded resolution |

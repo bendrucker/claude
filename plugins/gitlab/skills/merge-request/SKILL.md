@@ -10,103 +10,69 @@ allowed-tools:
 ---
 # Merge Requests
 
-Working with GitLab merge requests via `glab mr`.
-
 Scripts directory (absolute, for invocations from other skills where `${CLAUDE_SKILL_DIR}` points elsewhere): !`mkdir -p /tmp/claude/gitlab-skill 2>/dev/null; touch "/tmp/claude/gitlab-skill/${CLAUDE_SESSION_ID}" 2>/dev/null; echo "${CLAUDE_SKILL_DIR}/scripts"`
 
 ## Arguments
 
 `$0` (optional verb) routes to a section below. With no verb, infer the operation from the request.
 
-- `create`: open an MR. See [Patterns](#patterns). `--draft` opens it as a draft (`glab mr create --draft`).
-- `merge`: merge the MR. See [Merging](#merging). `--auto` enables auto-merge (`merge.ts --auto-merge`).
-- `review`: review MRs. See [Reviews](#reviews). `--role reviewer` (default) fetches MRs awaiting your review; `--role author` triages threads on MRs you authored.
-- `discussions`: work MR discussion threads. See [Discussions](#discussions).
-- `block`: block an MR until another merges. See [Blocking](#blocking).
-
-Flag defaults: `--draft` off, `--auto` off, `--role reviewer`.
+- `create`: open an MR, see [Creating](#creating). `--draft` opens it as a draft.
+- `merge`: see [Merging](#merging). `--auto` enables auto-merge (`merge.ts --auto-merge`).
+- `review`: see [Reviews](#reviews). `--role reviewer` (default) fetches MRs awaiting your review. `--role author` triages threads on MRs you authored.
+- `discussions`: see [Discussions](#discussions).
+- `block`: block an MR until another merges, see [blocking.md](blocking.md).
 
 ## Merging
 
-Always use `merge.ts` to merge. It handles merge trains, auto-merge, and squash, falling back to `glab mr merge` internally when appropriate.
+Merge only through `merge.ts`. It handles merge trains, auto-merge, and squash. A bare `glab mr merge` turns on auto-merge whenever a pipeline is running. The MR then merges later instead of now. `merge.ts` always sends `--auto-merge=<choice>`.
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --auto-merge
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --auto-merge --squash
-```
-
-Never call `glab mr merge` directly. It turns auto-merge on by default whenever a pipeline is running. A bare invocation then queues the MR to merge itself later instead of merging it now, silently breaking a deliberate merge order. `merge.ts` always sends `--auto-merge=<choice>` so the default cannot apply.
-
-### Inspect Before Merging
-
-`--status` prints the MR's merge readiness as JSON and exits without touching it: target branch, draft state, `detailed_merge_status`, head pipeline, and a `rebased_on_target` ancestry check computed from git rather than the API's stale conflict fields.
-
-```bash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --status
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --status
 ```
 
-### Re-Arm Auto-Merge After a Push
+`--status` prints merge readiness as JSON without mutating the MR: target branch, draft state, `detailed_merge_status`, head pipeline, and `rebased_on_target`, an ancestry check computed from git. Trust `rebased_on_target` over the API's conflict fields, which lag.
 
-Pushing new commits cancels queued auto-merge and drops the MR from the merge train. GitLab does this deliberately so the new commits get a fresh pipeline and review. To keep auto-merge, re-run `merge.ts --auto-merge` after every push that intends to stay armed. The script is idempotent: it treats an already-armed MR as success and retries through the brief `approvals_syncing` window that follows a push, so re-running it is always safe.
+#### Re-Arm After a Push
 
-A push also resets approvals when `reset_approvals_on_push` is on. Re-trigger review in the same pass, see [Re-request reviewers](#re-request-reviewers).
+A push cancels queued auto-merge and drops the MR from the merge train. Re-run `merge.ts --auto-merge` after every push to an MR meant to auto-merge. It is idempotent and retries through the `approvals_syncing` window after a push. When `reset_approvals_on_push` is on, also [re-request reviewers](#re-request-reviewers) in the same pass.
 
-### Inspect or Recover a Train
-
-To inspect the active train or clear a stuck entry via the API (`glab` has no merge-train command), see [merge-trains.md](merge-trains.md).
+To inspect the active train or clear a stuck entry, see [merge-trains.md](merge-trains.md).
 
 ## Stacked MRs
 
-Merging one layer of a stack leaves the layer above it targeting a branch that already merged. GitLab does not retarget it. Retarget, rebase, and verify after every layer, see [stacked-mrs.md](stacked-mrs.md).
+Merging one layer of a stack leaves the layer above it targeting the merged branch, and GitLab does not retarget it. After every layer merges, retarget, rebase, and verify the next one per [stacked-mrs.md](stacked-mrs.md).
 
-## Patterns
+## Creating
 
-**Always push before creating:**
-```bash
-git push -u origin feature-branch && glab mr create --fill
-```
-
-**Draft MRs:** Use `--draft` to prevent accidental merges.
-
-**Auto-fill vs custom:** `--fill` auto-populates from commits but cannot combine with `--title`/`--description`. Choose one approach.
-
-**Body from file:** The flag is `--description-file file.md`, not gh's `--body-file`. Prefer it over `--description "$(cat file.md)"`, which passes the body through the shell and keeps it out of some hooks.
-
-**Screenshots:** `glab mr` has no attach flag. Upload each file through project uploads per `gitlab:api` and paste the returned markdown into the description before creating.
-
-**Username resolution:** Flags like `--reviewer` and `--assignee` require exact usernames; invalid names are silently ignored. Look up users first:
+- Push the branch first: `git push -u origin feature-branch && glab mr create --fill`.
+- `--fill` populates title and description from commits and cannot combine with `--title`/`--description`.
+- Pass a body with `--description-file file.md` (gh's `--body-file` does not exist here) in place of `--description "$(cat file.md)"`, which passes the body through the shell and keeps it out of some hooks.
+- `glab mr` has no attach flag. Upload screenshots through project uploads per `gitlab:api` and paste the returned markdown into the description.
+- `--reviewer` and `--assignee` silently drop unknown usernames. Resolve exact usernames first, then confirm they appear in `glab mr view`:
 
 ```bash
 glab api projects/:id/members/all --paginate | jq '.[] | select(.name | test("<name>"; "i")) | {name, username}'
 ```
 
-## Blocking
-
-Block an MR from merging until another MR merges first (`block` verb). See [blocking.md](blocking.md) for the REST API commands.
-
 ## Reviews
 
-Submit review feedback as draft notes that accumulate before publishing. See [review.md](review.md) for the draft notes workflow, code suggestions, and approvals.
+Review feedback goes out as draft notes published together, per [review.md](review.md), which also covers the review base, code suggestions, and approvals.
 
-Fetch MRs awaiting your first review across all projects (the `UNREVIEWED` bucket; REST's `scope=reviews_for_me` cannot filter by review state). Emits `[{ url, reference, title }]` as JSON:
+`review-queue.ts` lists MRs awaiting your first review across all projects as `[{ url, reference, title }]`:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/review-queue.ts
 ```
 
-See [review-state.md](review-state.md) for the underlying GraphQL query and filter.
+For the underlying GraphQL, reading review state, and grouping every review-requested MR by next actor, see [review-state.md](review-state.md).
 
-To group all your review-requested MRs by next actor (not just the `UNREVIEWED` slice), see [Review Inbox (Next-Actor Triage)](review-state.md#review-inbox-next-actor-triage) in review-state.md.
+## Re-Request Reviewers
 
-## Re-request reviewers
-
-Re-trigger a review after a push reset approvals. The `mergeRequestReviewerRereview` mutation flips the target's `reviewState` back to `UNREVIEWED` and re-surfaces the MR. The reviewer must already be assigned. See [Re-Request Review](review-state.md#re-request-review) for the user-ID lookup and exact mutation.
+After a push resets approvals, the `mergeRequestReviewerRereview` mutation sets an assigned reviewer's `reviewState` back to `UNREVIEWED`. See [Re-Request Review](review-state.md#re-request-review) for the user-ID lookup and exact mutation.
 
 ## Discussions
-
-Fetch, filter, resolve, and summarize MR discussion threads.
 
 ```bash
 # Open threads, one line each
@@ -118,4 +84,4 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --bots --reviewers=${u
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id>...
 ```
 
-See [discussions.md](discussions.md) for the other commands, output formats, and pagination pitfalls.
+See [discussions.md](discussions.md) for the other commands, the JSON schema, and API pitfalls.

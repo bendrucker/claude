@@ -16,15 +16,9 @@ allowed-tools:
 
 # Rewrite
 
-Load the `writing:writing` skill for the style rules, then rewrite the input to match them. Preserve all functional information. Change only voice, word choice, and sentence structure, conveying the same information in fewer, clearer words.
+Load the `writing:writing` skill for the style rules, then rewrite the input to match them. Keep every piece of functional information and change only voice, word choice, and sentence structure. On top of that skill, prefer specific verbs ("generates a report" over "handles report generation") and keep the tone plain and even.
 
-When the input is the user's own writing rather than model output, name its core point and a few voice signals before editing: vocabulary, cadence, bluntness, humor, admitted uncertainty, digressions. Keep that note to yourself and make the smallest edit that clears the tells. Stripping the voice is the goal only when the voice is a model's.
-
-These rules apply on top of that skill:
-
-- Specific verbs over vague ones. "Generates a report" not "handles report generation."
-- No marketing language.
-- No excessive enthusiasm.
+When the input is the user's own writing rather than model output, first note to yourself its core point and its voice: vocabulary, cadence, bluntness, humor, admitted uncertainty, digressions. Then make the smallest edit that clears the tells. Strip the voice entirely only when it is a model's.
 
 ## Input
 
@@ -34,22 +28,20 @@ If `$ARGUMENTS` is a path to an existing file, read the file. Otherwise treat it
 
 ## Lint
 
-Before and after rewriting, lint the draft with Vale to find its alerts. It prints one per line (`path:line:col:check:message`):
+Lint the draft with Vale before and after rewriting. It prints one alert per line (`path:line:col:check:message`):
 
 ```bash
 vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line path/to/file.md
 ```
 
-When the rewrite target is a message body (PR, issue, comment), pipe it on stdin with `--ext=.prbody`, or `--ext=.commitmsg` for a commit message.
+For a message body (PR, issue, comment), pipe it on stdin with `--ext=.prbody`, or `--ext=.commitmsg` for a commit message.
 
-Fix every hard tell (em dash, copula avoidance, hedging, filler, vocabulary, and the other fixed-phrase checks), then re-run until those are clean.
-
-Treat `marketing verb` findings as advisory. The script flags each one, but the live hook only objects when their weighted sum is high enough, so a lone marketing verb may be fine. Consider each in context and replace the ones that read as promotional rather than driving the count to zero.
+Re-run until every alert is clean except `marketing verb`. Treat those as advisory: replace the ones that read as promotional in context, since the live hook objects only to a high weighted sum.
 
 ## Check
 
-Once the tells are clean, answer the questions in [`references/check.md`](references/check.md) against the rewrite beside the original. They cover the failures a detector cannot see: invented or dropped claims, cutting out of proportion to the slop, and a distinctive sentence flattened for consistency. Fix what fails and re-check.
+Once Vale is clean, answer the questions in [`references/check.md`](references/check.md) with the rewrite beside the original. Fix what fails and re-check until every answer passes.
 
 ## Output
 
-Display the rewritten text directly. Do not wrap it in a code block unless the input was code.
+Display the rewritten text as plain prose, in a code block only when the input was code.

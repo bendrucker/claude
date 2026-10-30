@@ -1,64 +1,66 @@
 # Local Review CLI
 
-Mechanics for running a hosted reviewer's CLI locally in [Local Mode](SKILL.md#local-mode-pre-push). Triage criteria and the [acceptance bar](SKILL.md#acceptance-bar) live in SKILL.md; per-reviewer scores live in [reviewers.md](reviewers.md). This file is the channel: when a local review is worth its credit, how to detect the provider, and how to drive its CLI.
+Mechanics for running a hosted reviewer's CLI in [Local Mode](SKILL.md#local-mode-pre-push): when a local review justifies its metered credit, how to detect the provider, and how to drive its CLI.
 
 ## When the Diff Warrants a Review
 
-Reviews are metered, and a local pass plus a hosted one costs two credits for one change. A diff earns one review through one channel. Spend it when the diff carries risk (auth, permissions, sandbox config, secret handling, network egress), adds a runtime surface, or runs past roughly 100 changed lines or 4 files excluding tests, docs, and lockfiles. Prose, dependency bumps, and reverts never qualify, and a config diff qualifies only through the risk surfaces just named.
+Reviews are metered, and a diff earns one review through one channel, local or hosted. Spend it when the diff touches risk areas (auth, permissions, sandbox config, secret handling, network egress), adds a new runtime entry point (a hook, script, server, or CLI command), or runs past roughly 100 changed lines or 4 files excluding tests, docs, and lockfiles. Prose, dependency bumps, and reverts never qualify. A config diff qualifies only through the risk areas above.
 
-A `ship` skill with its own Bot Review Gate overrides these defaults, and tuning belongs there first. An explicit `--local` request overrides everything.
+A `ship` skill with its own Bot Review Gate overrides these defaults. An explicit `--local` request overrides everything.
 
-**Recalibration trigger.** The 100 and 4 above halve an earlier 200 and 8, cut on 2026-08-14 because the allotment was going unspent. The 2026-09-06 recheck held them: over those 24 days 154 PRs opened and 54 drew a hosted review, no local CLI run targeted this repo, and `free_reviews_limit_reached` stayed absent. It also settled the label question: `pull-request:create` now applies the gating label by default on a diff that clears this gate ([Review Label](../create/references/labels.md#review-label)). Recheck the same three counts at the next review of this file, against a rate of roughly 68 reviews a month and a free tier that emptied once at 128 in a month. PRs and labels come from `gh pr list --state all --json number,labels,createdAt`, hosted reviews from the bot's comments on those PRs, local runs from `~/.greptile/reviews.json`, and the limit signal from a session-index search for `free_reviews_limit_reached`. A hit in the window restores 200 and 8 and returns the label to explicit `--label`. Usage still far under the cap argues for widening this gate, the only adjustment left. Usage near the cap leaves the thresholds and the default as they stand.
+#### Recalibration
+
+The 100 and 4 thresholds are on trial. When editing this file, recheck three counts since the last recheck (2026-09-06): PRs opened and those that drew a hosted review (`gh pr list --state all --json number,labels,createdAt` plus the bot's comments), local runs (`~/.greptile/reviews.json`), and hits on `free_reviews_limit_reached` in the session index. A limit hit restores 200 and 8 and returns the review label to explicit `--label`. Usage far under the roughly 68-a-month rate and the 128-a-month free tier argues for widening the gate.
 
 ## Provider Detection
 
-SKILL.md injects the fast path at load: `scripts/detect-bot.ts` reports each provider's repo config, CLI presence, and any live cooldown without spending a turn. Resolve its verdict:
+SKILL.md injects `scripts/detect-bot.ts` output at load: each provider's repo config, CLI presence, and any live cooldown. Resolve it:
 
-- `paused until <date> (<reason>)` on a provider line means it is out of reviews until that date. Treat it as unavailable, in the CLI and in the hosted waiting loop ([reviewers.md](reviewers.md)). If it is the only provider, report the pause and stop.
-- A repo config hit is definitive: that provider reviews this repo.
-- No config does not mean no bot. Repos often run a hosted reviewer with nothing committed, so check the hosted signals (the same ones behind "When a Review Is Expected" in [reviewers.md](reviewers.md)). One call usually settles it, recent commenters first:
+- `paused until <date> (<reason>)`: the provider is out of reviews until that date, in the CLI and the hosted loop. If it is the only provider, report the pause and stop.
+- A repo config hit: that provider reviews this repo.
+- No config: check the hosted signals ([When a Review Is Expected](reviewers.md#when-a-review-is-expected)), since repos often run a hosted reviewer with nothing committed. Recent commenters usually settle it, then required checks:
   - `gh api 'repos/{owner}/{repo}/issues/comments?sort=updated&direction=desc&per_page=100' --jq '[.[].user.login] | unique | map(select(test("greptile|coderabbit")))'`
-  - Falling back to required checks: `gh api 'repos/{owner}/{repo}/rules/branches/{default-branch}' --jq '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]'`
-- A CLI on PATH with no config and no hosted signals is just a global install. Don't run a bot against a repo it doesn't review.
-- Provider identified but CLI missing → offer to install it (per the provider section below).
-- No signals anywhere → no bot reviews this repo. In the proactive paths (ship's pass, create's pre-push step) skip silently. On an explicit `--local` request, ask which bot reviews this repo's PRs.
+  - `gh api 'repos/{owner}/{repo}/rules/branches/{default-branch}' --jq '[.[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context]'`
+- A CLI on PATH with no config and no hosted signals is a global install. Run a bot only against a repo it reviews.
+- Provider identified but CLI missing: offer to install it (per the provider section below).
+- No signals anywhere: in the proactive paths (ship's pass, create's pre-push step) skip silently. On an explicit `--local` request, ask which bot reviews this repo's PRs.
 
 ## Running a Review
 
-Both CLIs take minutes, and CodeRabbit's own docs say 7-30+. Launch the review with `run_in_background`, redirecting both streams to a file. The harness re-invokes you when the run exits.
+Both CLIs take minutes (CodeRabbit's docs say 7-30+). Launch with `run_in_background`, redirecting both streams to a file. The harness re-invokes you when the run exits.
 
-Both print within a second or two of starting: Greptile prints `▸ Dispatching review…`, CodeRabbit `--agent` starts streaming NDJSON events. Silence past 30 seconds means the CLI is broken rather than slow, and a broken run would otherwise sit backgrounded until the harness wakes you at exit that never comes. So follow the launch with a bounded liveness probe, which returns the moment output appears:
+Both print within a second or two: Greptile prints `▸ Dispatching review…`, CodeRabbit `--agent` starts streaming NDJSON. A run silent past 30 seconds is broken and would sit backgrounded with no exit to wake you, so follow the launch with this probe:
 
 ```
 for i in $(seq 30); do [ -s <outfile> ] && break; sleep 1; done; head -5 <outfile>
 ```
 
-An empty file at the end means dead. Kill the run, report what the file holds (usually an auth or network error), and stop. A retry costs another metered review.
+An empty file at the end means dead. Kill the run, report what the file contains (usually an auth or network error), and stop, since a retry costs another metered review.
 
-Record a pause to the availability cache and stop when a run reports one:
+When a run reports a pause, record it and stop:
 
 - Greptile `free_reviews_limit_reached`
 - a CodeRabbit fair-usage or rate-limit message
 - a hosted summary comment saying reviews are paused
 
-Merge it into `~/.cache/claude/bot-review.json`, a JSON array of `{provider, remote, pausedUntil, reason}`. `pausedUntil` is the resume date the message gives as `YYYY-MM-DD` (fall back to the first of next month), and `reason` is a short phrase like `free credits exhausted`. `detect-bot.ts` reads the file. The next session's fast path then reports the pause instead of re-probing.
+Merge it into `~/.cache/claude/bot-review.json`, a JSON array of `{provider, remote, pausedUntil, reason}`, which `detect-bot.ts` reads. `pausedUntil` is the resume date from the message as `YYYY-MM-DD` (default: the first of next month), and `reason` is a short phrase like `free credits exhausted`. Omit `remote` for a quota or plan limit, which is charged to the account and stops reviews everywhere. Set `remote` to `git remote get-url origin` only for a pause specific to this repo, like a per-repo rate limit.
 
-`remote` scopes the record, and the message says which scope fits. A quota or plan limit is charged to the account and stops reviews everywhere. Omit `remote` and one record covers every repo. Reserve `git remote get-url origin` for a pause that names this repo, like a per-repo rate limit. Scope an account-wide pause to one repo and the next session in a sibling repo rediscovers it the expensive way.
+#### Removal Criterion
 
-**Removal criterion.** This step is model-instructed. The cache earns its parsing code and its load-time read only if the record actually gets written. The check: when the session index next shows a `free_reviews_limit_reached`, `~/.cache/claude/bot-review.json` should carry a matching record. A limit hit with no record means the instruction is inert. Replace the cache with a script the skill calls, or drop it.
+When the session index next shows a `free_reviews_limit_reached`, `~/.cache/claude/bot-review.json` should contain a matching record. If it doesn't, replace the cache with a script the skill calls, or drop it.
 
 ## Greptile
 
-Preflight: confirm you are in a git repo. If the CLI is missing, offer to install it (`npm i -g greptile` or `brew install greptileai/tap/greptile`). Check auth with `greptile whoami`. On failure, offer `greptile login` (interactive, so suggest I run it myself). Greptile reviews committed work only: if the tree is dirty, offer to commit first.
+Preflight: confirm you are in a git repo. If the CLI is missing, offer to install it (`npm i -g greptile` or `brew install greptileai/tap/greptile`). Check auth with `greptile whoami`, and on failure suggest I run `greptile login` myself (it is interactive). Greptile reviews committed work only, so offer to commit a dirty tree first.
 
-Run `greptile review --json` backgrounded, adding `-b <base>` only when a base was given. The base flag is `-b`/`--branch`. Absent a base, the CLI reviews against the repository's default branch. Fall back to `--agent` (plain-text output for agents) if `--json` fails. For an interrupted run, `greptile review --resume` continues it and `greptile review status` reports the most recent review. For other flags, check `greptile review --help`.
+Run `greptile review --json` backgrounded, adding `-b <base>` only when a base was given. Without a base it reviews against the default branch. Fall back to `--agent` (plain text) if `--json` fails. `greptile review --resume` continues an interrupted run and `greptile review status` reports the latest. See `greptile review --help` for other flags.
 
-The `--json` output carries `comments` (each with file, line, severity) plus `confidence` and `summary`. The acceptance bar is the local form of the hosted one in [reviewers.md](reviewers.md): `confidence` at its maximum with no comments left, or a written reason in the report for each comment you declined.
+The `--json` output carries `comments` (each with file, line, severity) plus `confidence` and `summary`. The bar is `confidence` at its maximum with no comments left, or a written reason in the report for each declined comment.
 
 ## CodeRabbit
 
-Preflight: confirm you are in a git repo. If the CLI is missing, offer to install it from the [official CLI docs](https://docs.coderabbit.ai/cli) (the `coderabbitai/skills` plugin is the work-machine integration); don't hardcode a `curl | sh` installer. Check auth with `coderabbit auth status`. On failure, offer `coderabbit auth login` (interactive, so suggest I run it myself). `coderabbit doctor` verifies review readiness.
+Preflight: confirm you are in a git repo. If the CLI is missing, offer to install it from the [official CLI docs](https://docs.coderabbit.ai/cli) (the `coderabbitai/skills` plugin is the work-machine integration) rather than a hardcoded `curl | sh`. Check auth with `coderabbit auth status`, and on failure suggest I run `coderabbit auth login` myself (it is interactive). `coderabbit doctor` verifies review readiness.
 
-Run `coderabbit review --agent --light` backgrounded, adding `--base <base>` only when a base was given. `--light` trades depth for turnaround, which is the point of the local pass. Absent a base, the CLI reviews against a resolved default base and errors asking for `--base` when it can't find one. Fall back to `--plain` (human-readable output) if the `--agent` output can't be parsed; `coderabbit review findings` re-prints the last local review without re-running. For other flags, check `coderabbit review --help`.
+Run `coderabbit review --agent --light` backgrounded, adding `--base <base>` only when a base was given. `--light` trades depth for turnaround. Without a base it resolves a default and errors asking for `--base` when it can't. Fall back to `--plain` if the `--agent` output can't be parsed. `coderabbit review findings` re-prints the last local review without re-running. See `coderabbit review --help` for other flags.
 
-`--agent` emits newline-delimited JSON events. Parse the `finding` events (`severity` = `critical`|`warning`|`info`, `fileName`, `codegenInstructions`) and the terminal `complete` event (`findings` count, `reviewedFiles`). The acceptance bar is the local form of the hosted one in [reviewers.md](reviewers.md): a terminal `complete` event with no critical or warning `finding` events, or a written reason in the report for each one you declined. Info-level findings are noise, the local form of the hosted nitpick/LGTM notes, so they don't hold the bar (a `complete` with `findings: 0` is the clean case, and info-only findings clear it too).
+`--agent` emits NDJSON events. Parse the `finding` events (`severity` = `critical`|`warning`|`info`, `fileName`, `codegenInstructions`) and the terminal `complete` event (`findings` count, `reviewedFiles`). The bar is a `complete` event with no critical or warning findings, or a written reason in the report for each declined one. Info-level findings don't hold the bar.

@@ -1,21 +1,19 @@
 # History-Discovery Recipe
 
-Fan out read-only analysts over the session index to mine config-change candidates, ground every candidate against the live config, then emit a ranked digest. This is the engine `improve-claude-code`'s Discover mode drives. The recipe lives here so the per-run prompt stays small.
+Fan out read-only analysts over the session index to mine config-change candidates, ground every candidate against the live config, then emit a ranked digest. `improve-claude-code`'s Discover mode drives this recipe. The digest is done when every candidate carries its SQL, `grounded`, and `confidence`.
 
 ## Fan-Out
 
-Mirror the "Parallel Queries (Workflows)" pattern in [`SKILL.md`](../SKILL.md): refresh once, then every agent opens the index read-only.
-
-1. Refresh once, alone. `scripts/refresh.ts --refresh` opens the database read-write, which needs exclusive access, so it must finish before any agent starts. Never let a fanned-out agent call `refresh.ts`. The DB path is stable (stated in `SKILL.md`), so agent prompts reference it directly.
+1. Run `scripts/refresh.ts --refresh` once and let it finish before any agent starts. Agents only read, and their prompts name the DB path from `SKILL.md`.
 2. Audit the instrument before trusting it: `duckdb -readonly -json -init resources/limits.sql <db-path> < resources/queries/index-health.sql`. Every alert constrains the run: a `stream-silent` kind means the dimensions reading it (e.g. diagnostics) return stale or empty results with no error; a `stream-migrated` kind is still live under the successor field its detail names, so read that field instead of treating the kind's zero as an absence; a stale host means cross-host numbers read that machine as idle; `null-timestamp-kinds` lists rows every date-scoped query excludes. Pass the alerts to the agents, and cite them in the digest wherever they cap a finding's confidence.
 3. `index-health`'s `field-new` and `field-dead` count the fields the harness started or stopped writing on record kinds the index already carried, and `field-drift` lists them. A hit means a query somewhere is inferring what the harness now states, so read it as a backlog item rather than as a constraint on the current run.
-4. Fan out one agent per dimension below, each with `subagent_type: analyst`. Every dimension reads the index and reports, which is what that agent is for, and it carries its own Sonnet default so the fan-out does not bill at an Opus orchestrator's rate. Each runs its named queries (`duckdb -readonly -json -init resources/limits.sql <db-path> < resources/queries/<name>.sql`, scoped with `SET VARIABLE`) plus any inline rollups, all read-only, all against the one shared file. Read-only opens share the lock, so the agents never contend with each other.
-5. Each agent returns at most six candidate findings in about 2,500 characters total, each with the SQL that produced it: a named query plus its `SET VARIABLE` params, or a short inline statement. The SQL travels with the finding so the grounding pass and the digest can both cite it. The bound matters because results that finish together share one capped delivery, and an oversized return arrives truncated. Recover a truncated return from the agent's transcript, `~/.claude/projects/<project>/<session-id>/subagents/agent-<id>.jsonl`, whose longest assistant text block is the full report. An `analyst` is read-only and cannot write its report to a file.
-6. One or more grounding agents re-check every candidate against the live config (see [Grounding](#grounding)). Drop or downgrade anything that does not hold. Grounding needs `WebFetch` to check harness claims against the primary docs, which `analyst` has no access to, so leave these agents generic and pass them a cheap `model`.
+4. Fan out one `analyst` agent per dimension below, which reads at its own cheaper model default. Each runs its named queries (`duckdb -readonly -json -init resources/limits.sql <db-path> < resources/queries/<name>.sql`, scoped with `SET VARIABLE`) plus any inline rollups against the one shared file.
+5. Each agent returns at most six candidate findings in about 2,500 characters total, each with the SQL that produced it: a named query plus its `SET VARIABLE` params, or a short inline statement. Results that finish together share one capped delivery, so an oversized return arrives truncated. Recover one from the agent's transcript, `~/.claude/projects/<project>/<session-id>/subagents/agent-<id>.jsonl`, whose longest assistant text block is the full report.
+6. One or more grounding agents re-check every candidate (see [Grounding](#grounding)). They need `WebFetch`, which `analyst` lacks, so spawn them generic with a cheap `model`.
 
 ## Dimension Cheat Sheet
 
-Each dimension maps to the named queries that answer it, each indexed in [`catalog.md`](catalog.md), plus the survey surfaces to start from. Simple `GROUP BY ... COUNT/SUM` rollups (tokens by host, turns by project, hook time by event) stay inline. An agent writes them in seconds.
+Each dimension maps to the named queries that answer it ([`catalog.md`](catalog.md)) and the survey surfaces to start from. Write simple `GROUP BY ... COUNT/SUM` rollups inline.
 
 This table and the Tier-2 list below are generated from the `-- ---` headers on `resources/queries/*.sql`. Edit the header, then regenerate with `UPDATE_QUERY_CATALOG=1 bun test plugins/observability/skills/session`.
 
@@ -39,14 +37,12 @@ Use `records` and `fields` whenever a dimension needs a path that isn't pinned: 
 
 ## Grounding
 
-Grounding is required. Raw query findings can go stale if config changes.
-
 Re-check every candidate against the live config repo, the git toplevel of `dirname "$(readlink ~/.claude/settings.json)"`. Drop the candidate if the config already addresses it; downgrade it if the evidence is thin or host-skewed. Carry two fields per candidate:
 
 - `grounded` (boolean): the finding survived the re-check against live config.
 - `confidence` (high/medium/low): how strong the grounded evidence is.
 
-- Hooks run in parallel. Never sum hook durations as wall-clock; the cost the user waits on is the single slowest hook plus a fixed per-process overhead, not the sum across matching hooks. A sum over `hook_events.duration_ms`, split by `origin` or otherwise, is aggregate process work, not latency.
+- Hooks run in parallel. Report wait time as the slowest matching hook plus a fixed per-process overhead. A sum over `hook_events.duration_ms` is aggregate process work.
 - `hook_events` never records a PreToolUse deny, so the `blocks` and `friction_pct` columns in `hooks` understate a denying hook, often to zero. Read `hook-blocks` (which unions the recovered `hook_denies` rows) before calling a hook low-friction, and check `index-health`'s `hook-deny-invisible` for how much of the deny channel is dark in the window you are mining.
 - A subagent's transcript lines carry the PARENT session's id, so `session_id` alone cannot separate a parent's own tool calls from its fan-out's. `hook_denies` is where this bites hardest, because a recovered deny comes from a tool_result and subagents produce those in volume: a discovery run's own mining subagents each hitting a hook once reads as one enormous burst by the orchestrator. Key any per-session claim over `tool_calls`, `tool_errors`, or `hook_denies` on `agent_id` as well (`hook-blocks` does), and read `subagent_blocks` before calling a hook a storm.
 - An aggregate spanning a fix reports a closed bug as current. Before citing a block or deny count, compare the signature's `first_seen`/`last_seen` against the git history of the hook that produced it: a count that stops at the commit that fixed the hook is evidence the fix worked, not evidence of friction. Split the window at that commit and re-run rather than reporting the total.

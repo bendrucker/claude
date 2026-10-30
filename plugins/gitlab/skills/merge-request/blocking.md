@@ -1,6 +1,6 @@
 # Blocking an MR
 
-Prevent an MR from merging until another MR merges first. Uses the REST API since `glab mr` has no blocking subcommand.
+`glab mr` has no blocking subcommand, so use the REST API:
 
 ```bash
 # Block MR !10 until MR !5 merges

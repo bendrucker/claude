@@ -13,7 +13,7 @@ allowed-tools:
 
 # Human Review
 
-Put the change in front of Ben and act on what comes back. `attention.ts` labels the herdr pane `review`, sets its `$review`, `$review_kind`, and `$review_summary` tokens, and raises a toast. Outside herdr, `raise` and `clear` are no-ops and `open` exits 1.
+Put the change in front of Ben and act on what comes back until he approves. `attention.ts` flags the herdr pane for review. Outside herdr, `raise` and `clear` are no-ops and `open` exits 1.
 
 ## Context
 
@@ -29,7 +29,7 @@ Put the change in front of Ben and act on what comes back. `attention.ts` labels
 | `--browser`, diff | `plannotator review --git --json [--base <ref>]` | Blocks. The decision is the tool result |
 | `--browser`, `--doc <file>` | `plannotator annotate <file> --gate --json --require-approval` | Blocks. The decision is the tool result |
 
-Terminal surfaces open as a split beside this pane, named explicitly and without taking focus, and deliver into it once it is idle. So the turn has to end before Send can land. They need the herdr pane above. When it reads `none` and the Rex block is set, a diff review runs the Rex gate below, and a document review takes `--browser`. With neither, run the gate as if `--browser` were passed. In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
+Terminal surfaces open as a split beside this pane and deliver into it once it is idle, so the turn has to end before Send can land. They need the herdr pane above. When it reads `none` and the Rex block is set, a diff review runs the Rex gate below, and a document review takes `--browser`. With neither, run the gate as if `--browser` were passed. In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
 
 ## Precondition
 
@@ -39,13 +39,13 @@ Request after the mechanical passes have run. `/ship` orders them. Standalone on
 
 1. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts raise --kind <kind> --summary "<repo> <branch>: <what to review>"`. The kind is `code` for the diff and `doc` for a document, unless the caller passes a more specific `--kind` (`plan`, `pr-body`). A caller's `--kind` and `--summary` pass through verbatim.
 2. `bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts open --diff`, or `open --doc <file>` for a document. `open --diff` re-uses a reviewr sidebar already up over this working tree. `open --doc` reloads the plannotator-tui pane it opened earlier for the same file, keeping Ben's annotations.
-3. End the turn with exactly one line naming the surface and that Send resumes the work. The surface shows the change. The line carries no recap.
+3. End the turn with one line naming the surface and saying Send resumes the work, with no recap of the change.
 
 ## Resume
 
-The next user turn carries the comment batch plus Ben's own remarks. Each block is a `path:lines` header, the verbatim snippet, and his text. The herdr plugin's `skills/herdr/references/reviewr.md` covers the shape in full. Act on all of it. Sending cleared reviewr's store. The batch in the turn is the only copy. This plugin's `UserPromptSubmit` hook has already cleared the pane label.
+The next user turn carries the comment batch plus Ben's own remarks. Each block is a `path:lines` header, the verbatim snippet, and his text, as the herdr plugin's `skills/herdr/references/reviewr.md` details. Act on all of it. Sending cleared reviewr's store, so the batch in the turn is the only copy. This plugin's `UserPromptSubmit` hook has already cleared the pane label.
 
-Until Ben says approve, ship, or no further comments, act on the batch and request again. Once he does, run `attention.ts close --diff`, or `close --doc <file>` for a document, which quits the surface. Exit 2 means the surface stayed open holding unsent comments or a draft: tell Ben and leave it. Any other failure: relay its stderr to Ben.
+Until Ben says approve, ship, or no further comments, act on the batch and request again. The review is done when he does: then run `attention.ts close --diff`, or `close --doc <file>` for a document, which quits the surface. Exit 2 means the surface stayed open holding unsent comments or a draft: tell Ben and leave it. Any other failure: relay its stderr to Ben.
 
 ## Gate
 

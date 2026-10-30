@@ -1,135 +1,67 @@
 # Discussions
 
-MR discussions (threaded comments) via `glab api` and the discussions script.
+`${CLAUDE_SKILL_DIR}/scripts/discussions.ts` creates, lists, filters, resolves, and summarizes MR discussion threads. It resolves the project from the current directory's git remote, so run it from a checkout of the MR's repo. Elsewhere it returns `[]`.
 
-## Discussions Script
-
-`${CLAUDE_SKILL_DIR}/scripts/discussions.ts` handles creating, fetching, filtering, resolving, and summarizing discussions. It fetches diff refs automatically for positioned comments.
-
-### List
+## List
 
 ```bash
-# All discussions as JSON
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid>
-
-# Filter by author
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid>                          # JSON
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --author username
-
-# Only review bots
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --bots
-
-# Only unresolved resolvable discussions
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --resolvable --unresolved
-
-# Deduplicate threads across diff versions
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --dedupe
-
-# Compact triage views
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest --truncate 120
 ```
 
-Four output formats: `json` (default), `digest`, `table`, and `raw`.
+Formats are `json` (default), `digest`, `table`, and `raw`. Use `digest` or `table` for triage. `digest` prints one line per thread: id, location (`file:line`, `file:start-end`, or `-`), resolution state, and the body truncated to `--truncate` characters (default 80). `table` adds the author.
 
-To filter `--author` to yourself, resolve your username with `glab api user 2>/dev/null | jq -r .username`. The `glab api user --jq .username` form returns empty on glab 1.102.0.
+Resolve your own username for `--author` with `glab api user 2>/dev/null | jq -r .username`. The `--jq .username` form returns empty on glab 1.102.0.
 
-`--bots` matches by username shape, since GitLab exposes nothing that marks an account as a bot: a `-bot`/`_bot` suffix, or a `group_<id>_bot_<hash>`/`project_<id>_bot_<hash>` token service account. Bots that break those conventions, and humans whose threads should be treated the same way, go in the plugin's comma-separated `reviewers` option, which SKILL.md passes as `--reviewers`.
+`--bots` matches usernames with a `-bot`/`_bot` suffix, or a `group_<id>_bot_<hash>`/`project_<id>_bot_<hash>` service account. Other accounts to treat as bots go in the plugin's comma-separated `reviewers` option, passed as `--reviewers`.
 
-The script resolves the project from the current directory's git remote. Run it from a checkout of the MR's repo; from an unrelated directory it returns `[]`.
+`--dedupe` collapses the duplicate threads GitLab creates for one comment across diff versions, grouping by file path and body prefix.
 
-#### JSON output schema
+#### JSON Output
 
-The default (`--format json`) is a flat array of summary objects, one per discussion (the first note of each thread). Not the raw GitLab `{ notes: [...] }` shape, so query the top-level fields directly.
+A flat array with one summary object per thread, built from the thread's first note:
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | string | Discussion id, pass to `resolve` |
-| `author` | string | Username of the first note's author |
-| `body` | string | Full body of the first note |
-| `resolved` | boolean | Flattened from `notes[0].resolved` (see Resolution status location) |
-| `resolvable` | boolean | Whether the thread can be resolved |
-| `file` | string (optional) | Present only for positioned (inline) comments |
-| `line` | number (optional) | Present only for positioned (inline) comments |
-| `lineRange` | `{ start, end }` or `null` | `null` for single-line and non-positioned comments |
+| `author` | string | First note's author |
+| `body` | string | First note's full body |
+| `resolved` | boolean | From `notes[0].resolved` |
+| `resolvable` | boolean | |
+| `file` | string, optional | Inline comments only |
+| `line` | number, optional | Inline comments only |
+| `lineRange` | `{ start, end }` or `null` | Non-null only for multi-line comments |
 
-`file` and `line` are omitted entirely for general (non-inline) discussions, so handle them as optional. `lineRange` is always present but `null` unless the comment spans multiple lines.
+To read replies, pass `--format raw`, which prints GitLab's `{ id, notes: [...] }` shape with every note. A note with `system == true` (such as `changed line in version N`) is not a reply. Treat a thread as answered only on a non-system note.
 
-The summary flattens each thread to its **first note only**. To see the author's replies or the full thread, pass `--format raw`, which prints the filtered discussions in GitLab's `{ id, notes: [...] }` shape with every note:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --resolvable --author username --format raw
-```
-
-A GitLab "reply" that is a `changed line in version N` system note (`notes[].system == true`) is not a substantive response. Filter those out before treating a thread as answered.
-
-#### Compact triage
-
-For triage, prefer a compact format over the full JSON. Both truncate each body to `--truncate` characters (default 80); raise it when bodies are clipped too much.
-
-`--format digest` prints one line per discussion: id, location (`file:line`, `file:start-end` for ranges, or `-` when not positioned), resolution state, and a truncated body.
+## Resolve and Summarize
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format digest --truncate 120
-```
-
-`--format table` shows the same fields as bordered columns, plus the author.
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --format table
-```
-
-### Resolve
-
-```bash
-# Resolve specific discussions
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id> [<discussion-id>...]
+bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts summary <iid>   # resolution counts by author
 ```
 
-Or directly via the API:
+## Create
+
+Pass bodies with `--body-file`, which keeps backtick-heavy markdown away from shell expansion. Positioned comments are validated against diff hunks, and a line outside them exits with the valid ranges.
 
 ```bash
-glab api projects/:id/merge_requests/<iid>/discussions/<id> -X PUT -f resolved=true
-glab api projects/:id/merge_requests/<iid>/discussions/<id> -X PUT -f resolved=false
-```
-
-### Summary
-
-Shows resolution counts grouped by author:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts summary <iid>
-```
-
-### Create
-
-Always use `--body-file` for comment bodies. Piping through echo breaks backtick-heavy markdown due to shell expansion.
-
-```bash
-# General discussion (no position)
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --body-file tmp/note.md
-
-# Inline comment on a new line (validated against diff hunks)
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/note.md
-
-# Comment on a deleted line
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --old-line 10 --body-file tmp/note.md
 ```
 
-Diff refs are fetched automatically. Positioned comments are validated against diff hunks before posting. If a line is not in the diff, the command exits with the valid line ranges.
+For suggestion syntax, see [Code Suggestions](review.md#code-suggestions).
 
-### Suggestions
-
-For GitLab's suggestion syntax and its `-N+M` offsets, see [Code Suggestions](review.md#code-suggestions) in review.md. Write the suggestion to a file, then pass it to `create`:
+## Raw API
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts create <iid> --file src/app.ts --line 42 --body-file tmp/suggestion.md
+glab api projects/:id/merge_requests/<iid>/discussions/<id> -X PUT -f resolved=true
 ```
 
-## Pitfalls
-
-**Pagination concatenation**: `glab api --paginate` concatenates JSON arrays as `][` across pages, producing invalid JSON. The script handles this with `parseGlabPaginated`, which replaces `][` with `,`.
-
-**Resolution status location**: Check `notes[0].resolved`, not the top-level discussion `resolved` field. The top-level field may not reflect the current state accurately.
-
-**Duplicate threads across diff versions**: When an MR is updated with new commits, GitLab may create new discussion threads for the same file/comment pair across diff versions. Use `--dedupe` to group by file path + body prefix and show only the first occurrence.
+- `glab api --paginate` joins pages as `][`, which is invalid JSON. Replace `][` with `,` before parsing.
+- Read resolution from `notes[0].resolved`. The top-level `resolved` field can be stale.

@@ -17,78 +17,58 @@ allowed-tools:
 
 # CI Monitor
 
-Watch a GitLab pipeline (for an MR, a branch, or a specific pipeline ID), reacting to failures by dispatching the `gitlab:logs` agent for diagnostics. Exits cleanly when the pipeline is green, the MR is closed, a pipeline-id target reaches a terminal status, or the wall-clock cap is hit.
+Watch a GitLab pipeline and report its outcome to the caller: green, a failure diagnosis, or the event that ended the watch. Done when the watcher has exited or been stopped and the outcome is reported.
 
 ## Target
 
 $ARGUMENTS
 
-Accepts an MR URL, a branch name, a pipeline ID, or derives one from the current branch:
+- MR URL (`https://gitlab.com/group/project/-/merge_requests/123`): `--mr <url>`
+- Branch name: `--branch <name>`
+- Pipeline ID: `--pipeline-id <id>`
+- No argument: use the current branch's MR from `glab mr view --output json | jq -r '.web_url'`.
 
-- MR mode: pass a URL like `https://gitlab.com/group/project/-/merge_requests/123`.
-- Branch mode: pass a branch name (e.g. `main`, a release branch). Project path `group/project` is inferred from `git remote get-url origin` in the current directory; pass `--project <group/project>` to override.
-- Pipeline-id mode: pass a pipeline ID (e.g. from a manually-triggered pipeline or a re-run). Project is inferred from the git remote; override with `--project <group/project>`.
-- No argument: derive an MR URL from the current branch: `glab mr view --output json | jq -r '.web_url'`.
+Branch and pipeline-id modes infer the project from the git remote. Pass `--project <group/project>` to override.
 
-## Workflow
+## Watch
 
-#### Start the monitor
+Run the watcher with the `Monitor` tool and `persistent: true`:
 
-Launch the watch script via the `Monitor` tool with `persistent: true`:
-
-- MR mode: `bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --mr <mr-url>`
-- Branch mode: `bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --branch <name> [--project <group/project>]`
-- Pipeline-id mode: `bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --pipeline-id <id> [--project <group/project>]`
-- Optional flags: `--interval <seconds>`, `--max-minutes <N>`, `--queued-timeout <minutes>`, `--api-error-threshold <N>`.
-
-Exactly one of `--mr`, `--branch`, or `--pipeline-id` is required. In branch and pipeline-id modes, `--project` is inferred from the current git remote when omitted. Pipeline-id mode queries `glab api projects/:id/pipelines/:pid` directly; if the pipeline does not exist the watcher exits non-zero on the first call.
-
-MR mode resolves the pipeline from `projects/:id/merge_requests/:iid/pipelines` and branch mode from `projects/:id/pipelines?ref=<branch>`. Both ignore `external` pipelines (commit statuses posted by other tools, which carry no CI jobs) and `parent_pipeline` pipelines (children the parent already aggregates), and each prefers its own kind: `merge_request_event` in MR mode, branch pipelines in branch mode.
-
-The script emits one JSON object per line on stdout. When the first probe is already green, it emits a single `status: success` event and exits, so there is no separate initial-green path. In pipeline-id mode it also exits after emitting `status: failing`, because a specific pipeline has a finite lifetime and will not restart on its own.
-
-#### Event schema
-
-Each line is one of:
-
-- `{"type":"status","state":"running|failing|success","sha":"...","run_id":"..."}`: `run_id` is the GitLab pipeline ID. A `success` is confirmed against the pipeline's jobs before it is emitted, so a pipeline reporting `success` while a required job failed is reported as `failing`.
-- `{"type":"conflicts","sha":"..."}`: MR reports merge conflicts against the target branch. MR mode only.
-- `{"type":"mergeable-unknown","sha":"..."}`: GitLab could not settle merge status after bounded re-polling. MR mode only.
-- `{"type":"queued-timeout","minutes":N}`: pipeline has been queued longer than the threshold.
-- `{"type":"api-error","consecutive":N}`: consecutive `glab` failures crossed the threshold.
-- `{"type":"rate-limited","retry_after":"..."}`: emitted only when `glab` surfaces structured rate-limit data.
-- `{"type":"pr-closed"}`: MR closed without merging, or the source branch was deleted. MR mode only. The script exits after emitting.
-- `{"type":"merged"}`: MR merged. MR mode only. The script exits after emitting.
-- `{"type":"max-time-reached","minutes":60}`: wall-clock cap hit. The script exits after emitting.
-
-In branch and pipeline-id modes, `conflicts`, `mergeable-unknown`, `pr-closed`, and `merged` are never emitted (there is no MR metadata to derive them from). `merged` and `pr-closed` are distinct terminal events: `merged` means the MR landed, `pr-closed` means it closed without merging.
-
-The script exits on `status: success` in every mode, but only once that success survives the job-level confirmation above. A pipeline whose jobs cannot be read keeps the watcher polling rather than exiting green, surfacing as `api-error` if it persists. In pipeline-id mode it also exits on `status: failing` (the pipeline is terminal).
-
-#### React to events
-
-On `status: failing`, invoke the `gitlab:logs` agent via the `Agent` tool with the pipeline ID from `run_id`. This applies to all three modes; the logs agent accepts a pipeline ID, so pipeline-id mode fits:
-
-```
-Agent(
-  subagent_type="gitlab:logs",
-  prompt="Fetch failing-job logs for pipeline <run_id>. Return the JSON summary described in the logs agent definition."
-)
+```bash
+bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --mr <url> | --branch <name> | --pipeline-id <id> [--project <group/project>]
 ```
 
-Surface the summary to the parent conversation. Do not attempt fixes; `pull-request:babysit` owns that decision.
+Optional flags: `--interval <seconds>`, `--max-minutes <N>`, `--queued-timeout <minutes>`, `--api-error-threshold <N>`.
 
-On `conflicts`, report the SHA with conflicts and stop watching; conflict resolution belongs to the caller.
+The watcher ignores `external` and `parent_pipeline` pipelines. A `success` is confirmed against the pipeline's jobs, so a pipeline reporting success with a failed required job reports `failing`. A pipeline whose jobs cannot be read keeps polling and surfaces as `api-error` if it persists.
 
-On `mergeable-unknown`, report the SHA; the caller decides whether to run an authoritative local check.
+## Events
 
-On `queued-timeout`, `api-error`, or `rate-limited`, surface the event once and keep the monitor running. Consecutive rate-limit or api-error events mean the monitor should be stopped manually.
+The script prints one JSON object per line. `run_id` is the GitLab pipeline ID.
 
-On `merged`, `pr-closed`, or `max-time-reached`, the monitor has already exited. Report and finish.
+| Event | Meaning | Watcher exits | Action |
+| --- | --- | --- | --- |
+| `{"type":"status","state":"running"}` | Pipeline in progress | no | Keep watching |
+| `{"type":"status","state":"failing"}` | A job failed | pipeline-id mode only | Dispatch `gitlab:logs` (below) and report its summary |
+| `{"type":"status","state":"success"}` | Green, job-confirmed | yes | Report green |
+| `{"type":"conflicts","sha":"..."}` | MR conflicts with target | no | Report the SHA and stop the monitor |
+| `{"type":"mergeable-unknown","sha":"..."}` | Merge status unsettled | no | Report the SHA |
+| `{"type":"queued-timeout","minutes":N}` | Queued past threshold | no | Report once |
+| `{"type":"api-error","consecutive":N}` | `glab` failures crossed threshold | no | Report once; stop the monitor if it repeats |
+| `{"type":"rate-limited","retry_after":"..."}` | `glab` rate limit | no | Report once; stop the monitor if it repeats |
+| `{"type":"merged"}` | MR merged | yes | Report |
+| `{"type":"pr-closed"}` | MR closed unmerged or source branch deleted | yes | Report |
+| `{"type":"max-time-reached","minutes":N}` | Wall-clock cap | yes | Report |
 
-#### Stopping
+`conflicts`, `mergeable-unknown`, `merged`, and `pr-closed` occur in MR mode only.
 
-The monitor exits on its own for `status: success`, `merged`, `pr-closed`, and `max-time-reached`. In pipeline-id mode it also exits on `status: failing`. To stop earlier (e.g. after surfacing a failure summary to the user), call `TaskStop` on the monitor task.
+On `failing`, pass `run_id` to the logs agent:
+
+```
+Agent(subagent_type="gitlab:logs", prompt="Fetch failing-job logs for pipeline <run_id>. Return the JSON summary described in the logs agent definition.")
+```
+
+Report the diagnosis and leave fixes, conflict resolution, and merge checks to the caller (`pull-request:babysit` owns fixes). Stop a running watcher with `TaskStop`.
 
 ## Config Authoring
 
@@ -104,8 +84,4 @@ glab ci trace <job-id>     # Stream job logs
 glab ci retry <job-id>     # Retry a failed job
 ```
 
-Keyword syntax lives at `/ci/yaml/` in [GitLab docs](https://docs.gitlab.com/ci/yaml/). Predefined variables are at `/ci/variables/`.
-
-## Reference
-
-See [references/log-parsing.md](references/log-parsing.md) for how the `gitlab:logs` agent narrows long job traces via ANSI `section_start`/`section_end` markers.
+Keyword syntax is at <https://docs.gitlab.com/ci/yaml/> and predefined variables at <https://docs.gitlab.com/ci/variables/>.

@@ -25,59 +25,60 @@ allowed-tools:
 
 # Peer Review
 
-Assist me in reviewing this PR: $ARGUMENTS
+Help me review this PR: $ARGUMENTS
+
+The review is done when I have approved a mapped set of comments (or an approval with none) and it is posted as one batch.
 
 ## Context
 
-Your own login as the reviewer (see [tone.md](tone.md) for how to address each party). Whichever platform applies resolves. The other reads `unavailable`.
+Your own login as the reviewer (see [tone.md](tone.md) for how to address each party). The platform that doesn't apply reads `unavailable`.
 
 - GitHub user: !`gh api graphql -f query='{viewer{login}}' --jq .data.viewer.login 2>/dev/null | grep . || echo "unavailable"`
 - GitLab user: !`glab api user 2>/dev/null | jq -r .username 2>/dev/null | grep . || echo "unavailable"`
 
-## Arguments
-
-- `--triage`: assess the PR for sequencing instead of reviewing it (see [Triage Mode](#triage-mode)). Default: off, which runs the full review workflow below.
-
 ## Triage Mode
 
-When `--triage` is set, stay read-only and assess the PR for sequencing. Gather just enough to judge scope: the PR body, the diff stat, and the files touched. Then report two things and stop.
+With `--triage`, stay read-only and judge scope from the PR body, diff stat, and files touched. Report two things and stop:
 
 - What the PR changes, in one line.
-- The estimated review effort on the same scale step 4 uses for `code-review` (low, medium, high, xhigh), with one-line reasoning.
+- The review effort on the [effort scale](#effort-scale), with one-line reasoning.
 
 ## Guardrails
 
-- **Must** check with me before submitting. Show file comments and review comment.
-- **Don't** insist on commenting on every PR. Propose approving with no comment if everything looks good.
-- **Do** match my writing style. You're commenting as me, not a generic AI assistant.
-- **Do** ask me about ambiguous code rather than guessing.
-- **Don't** run interpreter one-liners for library introspection. Read the source or fetch the docs.
+- Show me the file comments and review comment, and post only on my go.
+- When everything looks good, propose approving with no comment.
+- Write in my voice. You're commenting as me.
+- Ask me about ambiguous code.
+- For library introspection, read the source or fetch the docs.
 
 ## Workflow
 
-1. **Research** - Gather context and identify participants (see [research.md](research.md))
-2. **Context** - Determine review context using repository visibility. Private repositories use [corporate](references/corporate.md) defaults. Public repositories use [open-source](references/open-source.md) defaults. Check visibility via the platform API (`gh api repos/OWNER/REPO --jq .visibility` or `glab api projects/ENCODED_PATH | jq .visibility`). If ambiguous, ask me.
-3. **Review** - Examine changed files and existing comments
-4. **Delegate** - Run `code-review` for code-quality analysis. `code-review` reads the local diff, so run `gh pr checkout` first if not already on the PR branch. Summarize the diff (rough line count, files touched, sensitive areas) and signals from the PR body, propose an effort level with one-line reasoning, and confirm via `AskUserQuestion` before invoking. Skip the call for trivial PRs (docs-only, dep bumps). Effort heuristics:
-   - **low**: docs-only, dep bumps, config tweaks, trivial fixes (<50 lines)
-   - **medium**: typical features or fixes, single module, ~50–500 lines
-   - **high**: large refactors, multi-module, public API or schema changes, ~500–2000 lines
-   - **xhigh**: security-sensitive (auth, payments, data access), breaking changes, migrations, or a change with extreme blast radius
-5. **Think** - Evaluate along two axes. Requirement fulfillment: does the change deliver what was asked (see [requirements.md](requirements.md))? Code quality: evaluate against priorities (see [priorities.md](priorities.md)) and smells (see [smells.md](smells.md)), incorporating `code-review` findings. Keep the axes separate so a clean diff does not mask a missed requirement.
-6. **Map** - Write the proposed comments to a JSON file (`id`, `path`, `start_line`, `end_line`, `side`, `comment_type`, `content` per comment), then map each to a platform position:
+1. Research: gather context and identify participants (see [research.md](research.md)).
+2. Context: private repos use [corporate](references/corporate.md) defaults, public repos use [open-source](references/open-source.md). Check with `gh api repos/OWNER/REPO --jq .visibility` or `glab api projects/ENCODED_PATH | jq .visibility`. Ask me if ambiguous.
+3. Review the changed files and existing comments.
+4. Delegate: run `code-review`, except on trivial PRs (docs-only, dep bumps). It reads the local diff, so `gh pr checkout` first. Before invoking, summarize the diff (rough line count, files, sensitive areas) and PR-body signals, propose an effort level, and confirm it via `AskUserQuestion`.
+5. Think on two separate axes, so a clean diff does not mask a missed requirement: requirement fulfillment ([requirements.md](requirements.md)) and code quality ([priorities.md](priorities.md), [smells.md](smells.md)), folding in `code-review` findings.
+6. Map: write proposed comments to a JSON file (`id`, `path`, `start_line`, `end_line`, `side`, `comment_type`, `content`), then map them to platform positions. Skip when approving with no comments.
 
    ```bash
    bun ${CLAUDE_SKILL_DIR}/scripts/mapping.ts map --platform <github|gitlab> \
      --comments <path> --diff <path> --commit <head-sha>
    ```
 
-   GitLab also needs `--base` and `--start` from the MR `diff_refs`. The CLI runs the in-diff pre-check and returns `{ payloads, dropped }`. An anchor outside a diff hunk lands in `dropped` (GitHub rejects it with `422 "Line could not be resolved"`), so surface those to me and re-anchor rather than losing them. Skip this step when approving with no comments.
-7. **Post** - Show me the mapped set, then on my go post as one batch and choose Approve / Comment / Request Changes based on severity. GitHub: a pending review submitted as a batch. GitLab: draft notes published together.
+   GitLab also needs `--base` and `--start` from the MR `diff_refs`. The output is `{ payloads, dropped }`. A `dropped` comment anchors outside a diff hunk (GitHub rejects it with `422 "Line could not be resolved"`), so show it to me and re-anchor it.
+7. Post: show me the mapped set, then on my go post one batch with Approve, Comment, or Request Changes by severity. GitHub uses a pending review, GitLab draft notes published together.
 
-See [tone.md](tone.md) for comment style guidelines.
+See [tone.md](tone.md) for comment style.
+
+### Effort Scale
+
+- low: docs-only, dep bumps, config tweaks, trivial fixes (<50 lines)
+- medium: typical features or fixes, single module, ~50–500 lines
+- high: large refactors, multi-module, public API or schema changes, ~500–2000 lines
+- xhigh: security-sensitive (auth, payments, data access), breaking changes, migrations, or extreme blast radius
 
 ## Service Support
 
-This skill assumes GitHub. For GitLab merge requests, load `gitlab:merge-request` for the submission workflow; use `draft-note.ts submit` to publish draft notes with an optional summary and review decision.
+For GitLab, load `gitlab:merge-request` for submission and publish draft notes with `draft-note.ts submit`, which takes an optional summary and review decision.
 
-Comments post through the programmatic path (`mcp__github` / `gh` / `glab`). On follow-up, resolve addressed threads natively on the platform: `review-threads.ts` for GitHub, the resolve flow in `gitlab:merge-request` for GitLab.
+Post comments through `mcp__github`, `gh`, or `glab`. On follow-up, resolve addressed threads natively: `review-threads.ts` on GitHub, the resolve flow in `gitlab:merge-request` on GitLab.

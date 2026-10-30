@@ -1,5 +1,5 @@
 # evidence: assistant-written comments open by addressing the reader with a greeting or a name before the substance, which no published comment in the hand-written baseline does.
-# A bare "Name," opener is not matched. Across the session corpus 19 of its 23 hits were openers like "Implemented," that an exception list never converged on, and a part-of-speech sequence cannot anchor to the start of the document.
+# A bare "Name," opener is not matched. Most of its corpus hits were openers like "Implemented,".
 # retire when: openings that address a person stop appearing in assistant output.
 extends: existence
 message: "'%s' opens with a salutation. Nothing published addresses a person, by name or greeting. Delete the address and open on the substance."

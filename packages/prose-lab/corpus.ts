@@ -53,7 +53,6 @@ export function countWords(text: string): number {
     .filter(Boolean).length;
 }
 
-/** Every markdown file under a directory, relative to the repo root. */
 export async function markdownUnder(dir: string, root = ROOT): Promise<string[]> {
   const names = await readdir(dir, { recursive: true });
   return names
@@ -72,7 +71,7 @@ async function lintProbe(config: string): Promise<void> {
   await lint([file], { config });
 }
 
-/** Rejects when Vale fails on a trivial file, which puts the fault in the config or binary. */
+/** Rejects when the config or binary is broken. */
 function probe(config: string): Promise<void> {
   let probed = probes.get(config);
   if (probed === undefined) {
@@ -82,7 +81,6 @@ function probe(config: string): Promise<void> {
   return probed;
 }
 
-/** Lints in batches, halving a failed batch until the file Vale can't read is skipped. */
 export async function lintFiles(
   plugin: string,
   config: string,

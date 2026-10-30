@@ -10,7 +10,7 @@ import type {
 import { parse } from "yaml";
 import { z } from "zod";
 
-/** A rule scoring past this is rewritten as an abstraction or left to a model judge. */
+/** Past this, rewrite the rule as an abstraction. */
 export const CEILING = 10;
 
 export const WEIGHTS = {
@@ -29,7 +29,6 @@ export interface Features {
   /** Alternatives inside a negative lookaround: exceptions hand-listed into the pattern. */
   exceptionWords: number;
   branches: number;
-  /** Entries in the rule's `exceptions:` list. */
   exceptions: number;
   tokens: number;
 }
@@ -131,7 +130,7 @@ function measurePattern(source: string, features: Features): void {
   });
 }
 
-/** Scores a Vale rule's YAML by the pattern features that make it hard to maintain. */
+/** Scores how hard a Vale rule is to maintain. */
 export function measure(yaml: string): Complexity {
   const rule = Rule.parse(parse(yaml));
   const sources = patterns(rule);
@@ -155,11 +154,9 @@ export function measure(yaml: string): Complexity {
 }
 
 export interface RuleComplexity extends Complexity {
-  /** The check name, `Style.Rule`. */
   rule: string;
 }
 
-/** Each rule in a style directory with its complexity. */
 export async function styleRules(styleDir: string, style: string): Promise<RuleComplexity[]> {
   const names = (await readdir(styleDir)).filter((name) => name.endsWith(".yml")).toSorted();
   return Promise.all(

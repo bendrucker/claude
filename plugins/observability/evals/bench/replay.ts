@@ -49,6 +49,8 @@ export interface Arm {
   name: string;
   db: string;
   skill: string;
+  /** A published lake's url, read in place through the skill's reader init instead of `db`. */
+  lake?: string | undefined;
 }
 
 /** Rotating arm order spreads drift within a round across every arm. */
@@ -57,7 +59,16 @@ export function rotate<T>(arms: T[], n: number): T[] {
   return [...arms.slice(k), ...arms.slice(0, k)];
 }
 
-const METRICS = ["latency", "bytesRead", "rowsScanned", "peakBuffer", "rss", "size"] as const;
+const METRICS = [
+  "latency",
+  "bytesRead",
+  "rowsScanned",
+  "peakBuffer",
+  "rss",
+  "size",
+  "gets",
+  "httpBytes",
+] as const;
 type Metrics = Partial<Record<(typeof METRICS)[number], number | undefined>>;
 
 interface Measured extends Metrics {
@@ -134,6 +145,8 @@ const CWD_RELATIVE = /\bread_\w+\(\s*'[^~/']/;
  * the views it expects add.
  */
 export async function checkViews(a: Arm): Promise<void> {
+  // A lake holds tables only. Its views come from the arm's own reader init.
+  if (a.lake !== undefined) return;
   const views = await Bun.file(join(a.skill, "resources", "views.sql")).text();
   const want = new Bun.CryptoHasher("sha256").update(views).digest("hex");
   const [row] = await duckdbJson(
@@ -205,6 +218,23 @@ const Profile = z.looseObject({
   system: z.looseObject({ peak_buffer_memory: z.number().optional() }).optional(),
 });
 
+/**
+ * A lake arm's init is the skill's reader init, which carries limits.sql, with HTTP logging
+ * switched on before its attach so the catalog fetch counts toward each query's bytes as it
+ * does for a real reader.
+ */
+async function lakeInit(a: Arm & { lake: string }): Promise<string> {
+  const path = (
+    await $`bun ${join(a.skill, "scripts", "lake.ts")} init --url ${a.lake}`.text()
+  ).trim();
+  const init = await Bun.file(path).text();
+  return `CALL enable_logging('HTTP', storage = 'memory');\n${init}\n`;
+}
+
+const Http = z.object({ gets: z.number(), bytes: z.number() });
+const HTTP_STATS = `SELECT count(*) AS gets, coalesce(sum(TRY_CAST(response.headers['Content-Length'] AS BIGINT)), 0) AS bytes
+  FROM duckdb_logs_parsed('HTTP') WHERE request.type = 'GET'`;
+
 // Built once per arm, query and limit: the schedule replays each thousands of times.
 const prepared = new Map<string, Promise<{ sql: string; init: string; disk: boolean }>>();
 
@@ -217,7 +247,11 @@ async function prepare(q: Query, a: Arm, limits: Limits, dir: string) {
   const disk = named !== undefined && parseQueryHeader(named).extensions.length > 0;
   const limitsFile = join(a.skill, "resources", disk ? "extensions.sql" : "limits.sql");
   const init = join(dir, `init-${a.name}-${limits}-${disk ? "ext" : "idx"}.sql`);
-  await Bun.write(init, (await Bun.file(limitsFile).text()) + LIMITS[limits]);
+  const base =
+    a.lake === undefined
+      ? await Bun.file(limitsFile).text()
+      : (await lakeInit({ ...a, lake: a.lake })) + (disk ? await Bun.file(limitsFile).text() : "");
+  await Bun.write(init, base + LIMITS[limits]);
   return { sql: named === undefined ? q.sql : `${q.sql}\n${named}`, init, disk };
 }
 
@@ -238,22 +272,28 @@ export async function replay(
   const { sql, init, disk } = await ready;
   const profile = Bun.file(join(dir, "profile.json"));
   await profile.delete().catch(() => undefined);
-  const stdin = `PRAGMA enable_profiling = 'json';\nPRAGMA profiling_output = '${profile.name}';\n${sql}\n`;
+  const http = Bun.file(join(dir, "http.json"));
+  await http.delete().catch(() => undefined);
+  const stats =
+    a.lake === undefined
+      ? ""
+      : `PRAGMA disable_profiling;\nCOPY (${HTTP_STATS}) TO '${http.name}' (FORMAT json);\n`;
+  const stdin = `PRAGMA enable_profiling = 'json';\nPRAGMA profiling_output = '${profile.name}';\n${sql}\n${stats}`;
   const signal = AbortSignal.timeout(timeoutMs);
-  const { wall, exit, rss, stderr } = await timed(
-    ["duckdb", "-readonly", "-json", "-init", init, a.db],
-    {
-      stdin: Buffer.from(stdin),
-      stderr: "pipe",
-      // Disk queries read globs such as .claude/skills relative to where agents ran them.
-      cwd: disk ? homedir() : dir,
-      signal,
-    },
-  );
+  const target =
+    a.lake === undefined ? ["-readonly", "-json", "-init", init, a.db] : ["-json", "-init", init];
+  const { wall, exit, rss, stderr } = await timed(["duckdb", ...target], {
+    stdin: Buffer.from(stdin),
+    stderr: "pipe",
+    // Disk queries read globs such as .claude/skills relative to where agents ran them.
+    cwd: disk ? homedir() : dir,
+    signal,
+  });
   // The CLI can print an error and still exit 0.
   const error = /\b\w+ Error:.*/.exec(stderr)?.[0];
   const parsed = Profile.safeParse(await profile.json().catch(() => null));
   const p = parsed.success ? parsed.data : undefined;
+  const h = Http.safeParse(await http.json().catch(() => null));
   return {
     wall,
     exit: error !== undefined && exit === 0 ? 1 : exit,
@@ -265,7 +305,9 @@ export async function replay(
     bytesRead: p?.io?.total_bytes_read,
     rowsScanned: p?.query.total_rows_scanned,
     peakBuffer: p?.system?.peak_buffer_memory,
-    size: Bun.file(a.db).size,
+    size: a.lake === undefined ? Bun.file(a.db).size : undefined,
+    gets: h.success ? h.data.gets : undefined,
+    httpBytes: h.success ? h.data.bytes : undefined,
   };
 }
 
@@ -356,6 +398,8 @@ const HEADER = [
   "buffer MB",
   "RSS MB",
   "index MB",
+  "GETs",
+  "GET MB",
   "OOM",
   "failed",
 ];
@@ -378,6 +422,8 @@ export function render(rows: Row[]): string {
       mb(r.peakBuffer),
       mb(r.rss),
       mb(r.size),
+      r.gets ?? "-",
+      mb(r.httpBytes),
       r.ooms,
       r.failures,
     ]),

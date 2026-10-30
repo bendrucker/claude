@@ -54,6 +54,10 @@ For a fan-out of agents investigating the corpus, the orchestrator runs `refresh
 
 For self-improvement discovery (fanning out over the whole corpus to mine config-change candidates, then grounding them against the live config), [`references/discovery.md`](references/discovery.md) carries the full recipe.
 
+### Remote Index
+
+Where `CLAUDE_SESSION_LAKE_URL` is set and no local index exists, query the published lake in place: `duckdb -init "$(bun "${CLAUDE_SKILL_DIR}/scripts/lake.ts" init)" -c "<sql>"`. Table and view names match the local index. Every byte read is S3 egress, so bound each query by a date window and select only the columns it needs. A query that reads `data` or `attachment` across a wide window can pull hundreds of MB. The lake holds no local telemetry (`mod_events`, `debug_events`), so `index-health`, `classifier`, `sandbox-bypass-scaffold` and `mods` run only against a local index.
+
 ## Named Queries
 
 Built-in queries in `resources/queries/` run by name with `SET VARIABLE` params. Prefer these over writing SQL from scratch.

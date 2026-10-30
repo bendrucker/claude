@@ -63,7 +63,7 @@ Write the instruction as the failing behavior in general terms, never with a `de
 
 Count the tokens the change adds to the body. A skill body re-injects at every compaction, so an added sentence needs a starred target to stay.
 
-A removal is a candidate too: delete an instruction, target the graders it was written for, and accept when no guard stars down. `/claude-api prompt-audit` proposes removals of text written for an older model's failures.
+A removal is a candidate too, judged by whether the score holds rather than rises: follow [references/prune.md](references/prune.md). `/claude-api prompt-audit` proposes removals of text written for an older model's failures.
 
 Run the candidate on the `dev` tag as many times as the baseline. When the budget is tight, run one full `dev` replicate for the guards and top up the target cases with scoped replicates to 4 runs a side. Guards at that count cannot star, so read their case minimums and open the trace behind any drop.
 
@@ -99,7 +99,7 @@ After the last accepted change, run `holdout` on the original base and on the fi
 
 Stop when any of these holds, and say which:
 
-- The `dev` score has no room left above the noise from `Ready the Suite`. Climb tokens at parity with removal candidates instead, or stop.
+- The `dev` score has no room left above the noise from `Ready the Suite`. Prune instead, per [references/prune.md](references/prune.md), or stop.
 - A third null candidate followed a `Stall` review. Add harder cases, then resume.
 - The budget cannot cover another candidate at the baseline's replicate count. Skip `holdout` when nothing was accepted, since the final commit is the base.
 - A `Stall` review buckets every remaining failure as reach or floor.

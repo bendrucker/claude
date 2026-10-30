@@ -198,6 +198,17 @@ export interface LakeQueryResult {
 
 const MB = 1024 * 1024;
 
+// The variables limits.sql and lake/s3.sql read with getenv. Only these reach the macro, so a
+// query that prints macro definitions exposes no other part of the environment.
+const READER_ENV = [
+  "TMPDIR",
+  "http_proxy",
+  "HTTP_PROXY",
+  "AWS_CA_BUNDLE",
+  "SSL_CERT_FILE",
+  "AWS_REGION",
+];
+
 /**
  * Runs `sql` against the lake in-process, refusing it when the catalog's stats put its
  * data reads above `maxBytes`. The node client has no getenv, so a macro over the
@@ -215,9 +226,11 @@ export async function queryLake(
   const c = await instance.connect();
   try {
     const init = await readerInit(url);
-    const names = [...new Set([...init.matchAll(/getenv\('(\w+)'\)/g)].map((m) => m[1] ?? ""))];
-    const env = names.map((n) => `${quote(n)}: ${quote(process.env[n] ?? "")}`).join(", ");
-    await c.run(`CREATE TEMP MACRO getenv(name) AS coalesce(MAP {${env}}[name], '')`);
+    const env = READER_ENV.map((n) => `${quote(n)}: ${quote(process.env[n] ?? "")}`).join(", ");
+    // A name missing from READER_ENV fails the init instead of reading as unset.
+    await c.run(
+      `CREATE TEMP MACRO getenv(name) AS CASE WHEN map_contains(MAP {${env}}, name) THEN MAP {${env}}[name] ELSE error('getenv: add ' || name || ' to READER_ENV') END`,
+    );
     await c.run("CALL enable_logging('HTTP', storage = 'memory')");
     await c.run(init);
 

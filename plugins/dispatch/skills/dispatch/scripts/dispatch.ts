@@ -28,6 +28,8 @@ const SCREEN_TAIL_LINES = 20;
 const DIALOG =
   /Do you trust the files in this folder\?|trust this folder|Do you want to proceed\?|Esc to cancel/i;
 const BUSY_SPINNER = /esc to interrupt/i;
+// A spinner glyph, a gerund ending in an ellipsis, then the elapsed timer.
+const SPINNER_LINE = /^\s*[^\s\w❯⏺│─]\s\S+…\s\(\d+[hms]\b/m;
 // A first turn can finish inside one poll interval, leaving its timing line.
 const TURN_DONE = /^\s*✻ .*\bdone\b/m;
 // An echoed prompt followed by a reply. The empty input box shows a bare `❯`.
@@ -125,6 +127,9 @@ export interface DispatchRecord {
   status: Status;
   settings: string[];
   submoduleError?: string;
+  // What a blocked Claude Code reported through Rex's program status.
+  blockedKind?: string;
+  blockedMessage?: string;
 }
 
 export interface DispatchResult {
@@ -154,6 +159,47 @@ const WorktreeList = z.object({
 });
 
 const RexCreated = z.object({ block_ids: z.array(z.string()).min(1) });
+
+const ProgramStatus = z.object({
+  records: z.array(
+    z.object({
+      id: z.string().nullish(),
+      state: z.string(),
+      effective_app: z.string().nullish(),
+      kind: z.string().nullish(),
+      msg: z.string().nullish(),
+    }),
+  ),
+});
+
+export interface ReportedStatus {
+  status: Status;
+  kind?: string;
+  message?: string;
+}
+
+// The session's own record carries no id. Records with one track its tasks.
+export function readProgramStatus(stdout: string): ReportedStatus | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(stdout);
+  } catch {
+    // An older Rex, or a block that is not a terminal, returns something else.
+    return null;
+  }
+  const parsed = ProgramStatus.safeParse(json);
+  if (!parsed.success) return null;
+  const claude = parsed.data.records.filter((record) => record.effective_app === "claude-code");
+  const record = claude.find((entry) => entry.id == null) ?? claude[0];
+  if (record == null) return null;
+  if (record.state === "working" || record.state === "done") return { status: "working" };
+  if (record.state === "error") return { status: "failed" };
+  if (record.state !== "blocked") return { status: "unknown" };
+  const blocked: ReportedStatus = { status: "blocked" };
+  if (record.kind != null) blocked.kind = record.kind;
+  if (record.msg != null) blocked.message = record.msg;
+  return blocked;
+}
 
 const WorkspaceCreated = z.object({
   result: z.object({ root_pane: z.object({ pane_id: z.string() }) }),
@@ -271,7 +317,9 @@ export function classifyScreen(screen: string): Status {
   const tail = screen.split("\n").slice(-SCREEN_TAIL_LINES).join("\n");
   if (EXEC_FAILED.test(tail)) return "failed";
   if (DIALOG.test(tail)) return "blocked";
-  if (BUSY_SPINNER.test(tail) || TURN_DONE.test(tail) || ANSWERED.test(screen)) return "working";
+  if ([BUSY_SPINNER, SPINNER_LINE, TURN_DONE].some((pattern) => pattern.test(tail)))
+    return "working";
+  if (ANSWERED.test(screen)) return "working";
   return "unknown";
 }
 
@@ -618,13 +666,50 @@ async function pollHerdr(ctx: Context, name: string): Promise<Status> {
   return agent.agent_status === "blocked" ? "blocked" : "unknown";
 }
 
+// Claude Code reports its state to Rex, which outlasts any screen pattern. The
+// screen still shows what comes before the first report: the trust dialog, or
+// the remote launcher's failure.
+async function pollRex(
+  run: Runner,
+  partial: DispatchRecord,
+  server: readonly string[],
+  last: boolean,
+): Promise<Status> {
+  const block = partial.target ?? "";
+  const called = await run([
+    "rex",
+    ...server,
+    "block",
+    "call",
+    "-b",
+    block,
+    "program_status",
+    "{}",
+  ]);
+  const reported = called.code === 0 ? readProgramStatus(called.stdout) : null;
+  if (reported != null) {
+    if (reported.kind != null) partial.blockedKind = reported.kind;
+    if (reported.message != null) partial.blockedMessage = reported.message;
+    return reported.status;
+  }
+  const screen = await pollScreen(run, partial, [
+    "rex",
+    ...server,
+    "capture",
+    "-b",
+    block,
+    "--trim",
+  ]);
+  return last || screen === "blocked" || screen === "failed" ? screen : "unknown";
+}
+
 async function awaitStatus(
-  poll: () => Promise<Status>,
+  poll: (last: boolean) => Promise<Status>,
   pause: Pause,
   timeout: number,
 ): Promise<Status> {
   const attempt = async (left: number): Promise<Status> => {
-    const status = await poll();
+    const status = await poll(left <= 1);
     if (status !== "unknown" || left <= 1) return status;
     await pause(POLL_MS);
     return attempt(left - 1);
@@ -632,12 +717,12 @@ async function awaitStatus(
   return attempt(Math.ceil(timeout / POLL_MS));
 }
 
-function localPoll(ctx: Context): () => Promise<Status> {
+function localPoll(ctx: Context): (last: boolean) => Promise<Status> {
   const { run, partial } = ctx;
   if (partial.mux === "herdr") return () => pollHerdr(ctx, partial.name);
   if (partial.mux === "bg")
     return () => pollScreen(run, partial, ["claude", "logs", partial.target ?? partial.name]);
-  return () => pollScreen(run, partial, ["rex", "capture", "-b", partial.target ?? "", "--trim"]);
+  return (last) => pollRex(run, partial, [], last);
 }
 
 export interface DispatchOptions {
@@ -786,8 +871,22 @@ async function dispatchRemote(
     status: "unknown",
     settings: settingsKeys(options.settings ?? {}),
   };
-  const capture = ["rex", "-S", host, "capture", "-b", record.target ?? "", "--trim"];
-  record.status = await awaitStatus(() => pollScreen(run, record, capture), pause, options.timeout);
+  const server = ["-S", host];
+  record.status = await awaitStatus(
+    (last) => pollRex(run, record, server, last),
+    pause,
+    options.timeout,
+  );
+  // A program status report skips the screen, which is where the path shows.
+  if (record.path == null)
+    await pollScreen(run, record, [
+      "rex",
+      ...server,
+      "capture",
+      "-b",
+      record.target ?? "",
+      "--trim",
+    ]);
   return { root: options.repo, record };
 }
 

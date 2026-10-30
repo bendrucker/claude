@@ -60,8 +60,8 @@ On success the script prints one JSON line:
 - `settings`: the settings keys written.
 - `status`:
   - `working`: the session took the prompt.
-  - `blocked`: a dialog is showing, such as folder trust or a permission prompt. Read the screen (`rex capture -b <target> --trim`, `herdr agent read <name>`, or `claude logs <target>`) and tell the user what it asks. The user answers it.
-  - `failed`: the remote launcher printed `dispatch failed:` and stopped. Read the screen with `rex -S <host> capture -b <target> --trim` and report the error.
+  - `blocked`: a dialog is showing, such as folder trust or a permission prompt. Under Rex, `blockedKind` (`permission`, `question`, or `auth`) and `blockedMessage` say what it asks when the session reported them. Otherwise read the screen (`rex capture -b <target> --trim`, `herdr agent read <name>`, or `claude logs <target>`). Tell the user what it asks. The user answers it.
+  - `failed`: under Rex, the session reported an error, or the remote launcher printed `dispatch failed:` and stopped. Read the screen (add `-S <host>` for a remote one) and report the error.
   - `unknown`: the session showed neither before the timeout. Read the screen before reporting the hand-off.
 - `submoduleError`, when present: submodules failed to initialize. The session can repair them.
 

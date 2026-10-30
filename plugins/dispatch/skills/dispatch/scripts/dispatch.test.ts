@@ -25,7 +25,9 @@ import {
   mergeSettings,
   type Mux,
   type Pause,
+  readProgramStatus,
   remoteCommand,
+  type ReportedStatus,
   type RunOptions,
   type Runner,
   type Settings,
@@ -70,6 +72,16 @@ const SWITCHED = ok("");
 const PREPARE = [GIT_COMMON, ...REMOTES, ok(""), BASE_OK];
 
 const REX_CREATED = ok(JSON.stringify({ block_ids: ["block:new"], window_id: "window:new" }));
+const reported = (state: string, extra: Record<string, string> = {}) =>
+  ok(
+    JSON.stringify({
+      records: [
+        { state, app: "claude-code", effective_app: "claude-code", ...extra, owner: { pid: 1 } },
+      ],
+    }),
+  );
+const REPORTED_WORKING = reported("working");
+const NO_REPORT = ok(JSON.stringify({ records: [] }));
 const screen = (...lines: string[]) => ok(`${["╭─ Claude Code", ...lines].join("\n")}\n`);
 const WORKING_SCREEN = screen("✻ Thinking… (3s · esc to interrupt)", "❯ ");
 const IDLE_SCREEN = screen("❯ ", "  ⏵⏵ auto mode on");
@@ -336,6 +348,21 @@ describe("classifyScreen", () => {
     },
     { name: "an idle prompt", screen: IDLE_SCREEN.stdout, expected: "unknown" },
     {
+      name: "a spinner without the interrupt hint",
+      screen: screen("✽ Newspapering… (32s · ↓ 1.2k tokens · still thinking)", "❯ ").stdout,
+      expected: "working",
+    },
+    {
+      name: "a minute-long spinner",
+      screen: screen("✶ Pondering… (1m 4s · ↑ 300 tokens)", "❯ ").stdout,
+      expected: "working",
+    },
+    {
+      name: "a tool line that only ends in an ellipsis",
+      screen: screen("⏺ Reading… (src/main.ts)", "❯ ").stdout,
+      expected: "unknown",
+    },
+    {
       name: "a failed --exec held open",
       screen: "dispatch failed: base names no commit\n",
       expected: "failed",
@@ -369,6 +396,53 @@ describe("classifyScreen", () => {
     { name: "an empty screen", screen: "", expected: "unknown" },
   ])("$name -> $expected", ({ screen: text, expected }) => {
     expect(classifyScreen(text)).toBe(expected);
+  });
+});
+
+describe("readProgramStatus", () => {
+  const claudeRecord = (entry: Record<string, string>) => ({
+    app: "claude-code",
+    effective_app: "claude-code",
+    ...entry,
+  });
+  const records = (...entries: Record<string, string>[]) =>
+    JSON.stringify({ records: entries.map(claudeRecord) });
+
+  test.each<{ name: string; stdout: string; expected: ReportedStatus | null }>([
+    { name: "working", stdout: records({ state: "working" }), expected: { status: "working" } },
+    { name: "done", stdout: records({ state: "done" }), expected: { status: "working" } },
+    { name: "error", stdout: records({ state: "error" }), expected: { status: "failed" } },
+    { name: "idle", stdout: records({ state: "idle" }), expected: { status: "unknown" } },
+    { name: "clear", stdout: records({ state: "clear" }), expected: { status: "unknown" } },
+    {
+      name: "blocked with its kind and message",
+      stdout: records({ state: "blocked", kind: "question", msg: "Which branch?" }),
+      expected: { status: "blocked", kind: "question", message: "Which branch?" },
+    },
+    {
+      name: "blocked alone",
+      stdout: records({ state: "blocked" }),
+      expected: { status: "blocked" },
+    },
+    {
+      name: "the session's record over a task's",
+      stdout: records({ id: "t1", state: "blocked" }, { state: "working" }),
+      expected: { status: "working" },
+    },
+    {
+      name: "a task's record when the session has none",
+      stdout: records({ id: "t1", state: "working" }),
+      expected: { status: "working" },
+    },
+    {
+      name: "only another program's record",
+      stdout: JSON.stringify({ records: [{ state: "working", effective_app: "vim" }] }),
+      expected: null,
+    },
+    { name: "no records", stdout: JSON.stringify({ records: [] }), expected: null },
+    { name: "something that is not JSON", stdout: "unknown method", expected: null },
+  ])("reads $name", ({ stdout, expected }) => {
+    expect(readProgramStatus(stdout)).toEqual(expected);
   });
 });
 
@@ -449,7 +523,7 @@ describe("validation", () => {
 
 describe("dispatch under rex", () => {
   test("creates the worktree with wt and opens a tab running claude", async () => {
-    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, WORKING_SCREEN]);
+    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, REPORTED_WORKING]);
     const { record, root } = await dispatch(makeOptions(), run, instant);
 
     expect(calls).toEqual([
@@ -485,7 +559,7 @@ describe("dispatch under rex", () => {
         "--",
         "do the thing",
       ],
-      ["rex", "capture", "-b", "block:new", "--trim"],
+      ["rex", "block", "call", "-b", "block:new", "program_status", "{}"],
     ]);
 
     const mutating = new Set(["pull", "merge", "checkout", "reset", "rebase"]);
@@ -499,7 +573,7 @@ describe("dispatch under rex", () => {
   });
 
   test("splits the current block when asked", async () => {
-    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, WORKING_SCREEN]);
+    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, REPORTED_WORKING]);
     await dispatch(makeOptions({ split: true, name: "custom" }), run, instant);
     expect(calls.find((argv) => argv[0] === "rex")).toEqual([
       "rex",
@@ -522,32 +596,61 @@ describe("dispatch under rex", () => {
     ]);
   });
 
-  test.each<{ name: string; screens: CommandResult[]; status: Status }>([
+  const unreported = (shown: CommandResult) => [NO_REPORT, shown];
+  test.each<{ name: string; polls: CommandResult[][]; status: Status }>([
     {
-      name: "starts working",
-      screens: [IDLE_SCREEN, IDLE_SCREEN, WORKING_SCREEN],
+      name: "reports working after idle",
+      polls: [[reported("idle")], [REPORTED_WORKING]],
       status: "working",
     },
+    { name: "reports its first turn done", polls: [[reported("done")]], status: "working" },
+    { name: "reports an error", polls: [[reported("error")]], status: "failed" },
     {
-      name: "finishes its first turn",
-      screens: [FRESH_SCREEN, FINISHED_SCREEN],
-      status: "working",
-    },
-    { name: "shows the trust dialog", screens: [IDLE_SCREEN, TRUST_SCREEN], status: "blocked" },
-    { name: "stays fresh", screens: [FRESH_SCREEN, FRESH_SCREEN, FRESH_SCREEN], status: "unknown" },
-    { name: "never settles", screens: [IDLE_SCREEN, IDLE_SCREEN, IDLE_SCREEN], status: "unknown" },
-    {
-      name: "cannot be captured",
-      screens: [fail("no such block"), fail("no such block"), fail("no such block")],
+      name: "reports idle until the timeout",
+      polls: [[reported("idle")], [reported("clear")], [reported("idle")]],
       status: "unknown",
     },
-  ])("polls until the session $name", async ({ screens, status }) => {
+    {
+      name: "shows the trust dialog before reporting",
+      polls: [unreported(IDLE_SCREEN), unreported(TRUST_SCREEN)],
+      status: "blocked",
+    },
+    {
+      name: "shows a spinner but reports nothing until the timeout",
+      polls: [unreported(WORKING_SCREEN), unreported(WORKING_SCREEN), unreported(WORKING_SCREEN)],
+      status: "working",
+    },
+    {
+      name: "reports nothing and stays fresh",
+      polls: [unreported(FRESH_SCREEN), unreported(FRESH_SCREEN), unreported(FRESH_SCREEN)],
+      status: "unknown",
+    },
+    {
+      name: "runs under a Rex without program status",
+      polls: [
+        [fail("unknown method"), FINISHED_SCREEN],
+        [fail("unknown method"), FINISHED_SCREEN],
+        [fail("unknown method"), FINISHED_SCREEN],
+      ],
+      status: "working",
+    },
+  ])("polls until the session $name", async ({ polls, status }) => {
     const { pause, pauses } = recordedPause();
-    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, ...screens]);
+    const { run } = fakeRunner([...rexPath(), REX_CREATED, ...polls.flat()]);
     const { record } = await dispatch(makeOptions(), run, pause);
     expect(record.status).toBe(status);
-    expect(calls.filter((argv) => argv[1] === "capture")).toHaveLength(screens.length);
-    expect(pauses).toEqual(Array.from({ length: screens.length - 1 }, () => 1_000));
+    expect(pauses).toEqual(Array.from({ length: polls.length - 1 }, () => 1_000));
+  });
+
+  test("records what a blocked session reports", async () => {
+    const blocked = reported("blocked", { kind: "permission", msg: "Allow Bash(rm -rf tmp)?" });
+    const { run } = fakeRunner([...rexPath(), REX_CREATED, blocked]);
+    const { record } = await dispatch(makeOptions(), run, instant);
+    expect(record).toMatchObject({
+      status: "blocked",
+      blockedKind: "permission",
+      blockedMessage: "Allow Bash(rm -rf tmp)?",
+    });
   });
 
   test("fails with the worktree recorded when rex refuses the tab", async () => {
@@ -619,7 +722,7 @@ describe("dispatch under bg", () => {
 
 describe("dispatch under rex from outside", () => {
   test("opens the tab in the session passed in", async () => {
-    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, WORKING_SCREEN]);
+    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, REPORTED_WORKING]);
     await dispatch(makeOptions({ rexSession: "Claude", rexBlock: undefined }), run, instant);
     expect(calls.find((argv) => argv[0] === "rex")?.slice(0, 6)).toEqual([
       "rex",
@@ -767,7 +870,7 @@ describe("dispatch worktree", () => {
       SWITCHED,
       worktreeList(PATH),
       REX_CREATED,
-      WORKING_SCREEN,
+      REPORTED_WORKING,
     ]);
     await dispatch(makeOptions({ base: "release-2026" }), run, instant);
     expect(calls.filter((argv) => argv[3] === "fetch")).toEqual([]);
@@ -783,7 +886,7 @@ describe("dispatch worktree", () => {
       SWITCHED,
       worktreeList(PATH),
       REX_CREATED,
-      WORKING_SCREEN,
+      REPORTED_WORKING,
     ]);
     await dispatch(makeOptions(), run, instant);
     expect(calls.filter((argv) => argv[3] === "fetch").map((argv) => argv[4])).toEqual([
@@ -793,7 +896,7 @@ describe("dispatch worktree", () => {
   });
 
   test("fetches the remote the base names", async () => {
-    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, WORKING_SCREEN]);
+    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, REPORTED_WORKING]);
     await dispatch(makeOptions({ base: "upstream/main" }), run, instant);
     expect(calls).toContainEqual([
       "git",
@@ -821,7 +924,7 @@ describe("dispatch worktree", () => {
       SWITCHED,
       worktreeList(PATH),
       REX_CREATED,
-      WORKING_SCREEN,
+      REPORTED_WORKING,
     ]);
     const { record } = await dispatch(makeOptions(), run, pause);
     expect(calls.filter((argv) => argv[3] === "switch")).toHaveLength(3);
@@ -854,7 +957,7 @@ describe("dispatch worktree", () => {
   ])("submodules: $name", async ({ result, expected }) => {
     const path = mkdtempSync(join(tmpdir(), "dispatch-submodules-"));
     await Bun.write(join(path, ".gitmodules"), "");
-    const { run, calls } = fakeRunner([...rexPath(path), result, REX_CREATED, WORKING_SCREEN]);
+    const { run, calls } = fakeRunner([...rexPath(path), result, REX_CREATED, REPORTED_WORKING]);
     const { record } = await dispatch(makeOptions(), run, instant);
     expect(calls).toContainEqual([
       "git",
@@ -900,7 +1003,7 @@ describe("dispatch settings", () => {
 
   test("writes a new file and reports the keys", async () => {
     const path = mkdtempSync(join(tmpdir(), "dispatch-settings-"));
-    const { run, calls } = fakeRunner([...rexPath(path), ok(""), REX_CREATED, WORKING_SCREEN]);
+    const { run, calls } = fakeRunner([...rexPath(path), ok(""), REX_CREATED, REPORTED_WORKING]);
     const { record } = await dispatch(makeOptions({ settings: patch }), run, instant);
 
     expect(calls).toContainEqual(CHECK_IGNORE(path));
@@ -921,7 +1024,7 @@ describe("dispatch settings", () => {
         permissions: { allow: ["Bash(bun test:*)", "Read"] },
       }),
     );
-    const { run } = fakeRunner([...rexPath(path), ok(""), REX_CREATED, WORKING_SCREEN]);
+    const { run } = fakeRunner([...rexPath(path), ok(""), REX_CREATED, REPORTED_WORKING]);
     await dispatch(makeOptions({ settings: patch }), run, instant);
 
     expect(JSON.parse(await Bun.file(settingsFile(path)).text())).toEqual({
@@ -956,7 +1059,7 @@ describe("dispatch settings", () => {
   });
 
   test("skips the check when there is nothing to write", async () => {
-    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, WORKING_SCREEN]);
+    const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, REPORTED_WORKING]);
     await dispatch(makeOptions({ settings: settingsPatch([], []) }), run, instant);
     expect(calls.filter((argv) => argv[3] === "check-ignore")).toEqual([]);
   });
@@ -1000,10 +1103,21 @@ describe("dispatch to another host", () => {
       ...overrides,
     });
   const capture = ["rex", "-S", "studio", "capture", "-b", "block:new", "--trim"];
+  const status = [
+    "rex",
+    "-S",
+    "studio",
+    "block",
+    "call",
+    "-b",
+    "block:new",
+    "program_status",
+    "{}",
+  ];
 
   test("opens a kept-open tab on the host running the launcher with --exec", async () => {
     const shown = ok(`dispatch worktree: ${REMOTE_PATH}\n${WORKING_SCREEN.stdout}`);
-    const { run, calls } = fakeRunner([REX_CREATED, shown]);
+    const { run, calls } = fakeRunner([REX_CREATED, REPORTED_WORKING, shown]);
     const { record, root } = await dispatch(remoteOptions(), run, instant);
 
     const [launch] = calls;
@@ -1046,47 +1160,43 @@ describe("dispatch to another host", () => {
       "--settings-base64",
       encodeArg(JSON.stringify(SETTINGS)),
     ]);
-    expect(calls.slice(1)).toEqual([capture]);
+    expect(calls.slice(1)).toEqual([status, capture]);
     expect(root).toBe("/home/ben/src/demo");
     expect(formatRecord(record)).toMatchInlineSnapshot(
       `"{"mux":"rex","target":"block:new","host":"studio","name":"fix-thing","path":"/home/ben/src/demo/.worktrees/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":["permissions.allow"]}"`,
     );
   });
 
-  test.each<{ name: string; screens: CommandResult[]; status: Status; polls: number }>([
+  const NO_ROUTE = fail("no route");
+  test.each<{ name: string; responses: CommandResult[]; expected: Status; calls: string[][] }>([
     {
       name: "failed once the launcher prints its marker",
-      screens: [ok("dispatch failed: base names no commit\n")],
-      status: "failed",
-      polls: 1,
+      responses: [NO_REPORT, ok("dispatch failed: base names no commit\n"), NO_ROUTE],
+      expected: "failed",
+      calls: [status, capture, capture],
     },
     {
-      name: "working after a screen that shows nothing yet",
-      screens: [ok("Cloning…\n"), WORKING_SCREEN],
-      status: "working",
-      polls: 2,
+      name: "working once claude reports after the worktree is made",
+      responses: [NO_REPORT, ok("Cloning…\n"), REPORTED_WORKING, NO_ROUTE],
+      expected: "working",
+      calls: [status, capture, status, capture],
     },
     {
-      name: "unknown when capture fails",
-      screens: [fail("no route")],
-      status: "unknown",
-      polls: 3,
+      name: "unknown when the host stops answering",
+      responses: Array.from({ length: 7 }, () => NO_ROUTE),
+      expected: "unknown",
+      calls: [status, capture, status, capture, status, capture, capture],
     },
-  ])("reports $name", async ({ screens, status, polls }) => {
-    const { run, calls } = fakeRunner([
-      REX_CREATED,
-      ...screens,
-      fail("no route"),
-      fail("no route"),
-    ]);
+  ])("reports $name", async ({ responses, expected, calls: wanted }) => {
+    const { run, calls } = fakeRunner([REX_CREATED, ...responses]);
     const { record } = await dispatch(remoteOptions(), run, instant);
-    expect(record.status).toBe(status);
+    expect(record.status).toBe(expected);
     expect(record.path).toBeNull();
-    expect(calls.slice(1)).toEqual(Array.from({ length: polls }, () => capture));
+    expect(calls.slice(1)).toEqual(wanted);
   });
 
   test("omits the settings word when there are none", async () => {
-    const { run, calls } = fakeRunner([REX_CREATED, WORKING_SCREEN]);
+    const { run, calls } = fakeRunner([REX_CREATED, REPORTED_WORKING, NO_ROUTE]);
     await dispatch(remoteOptions({ settings: {} }), run, instant);
     expect(calls[0]).not.toContain("--settings-base64");
   });

@@ -1,0 +1,8 @@
+{
+  "name": "dispatch",
+  "description": "Hand new work to a fresh Claude session in its own worktree, in a Rex tab or a herdr workspace",
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

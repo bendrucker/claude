@@ -214,6 +214,8 @@
     "friction@bendrucker": true,
     "comments@bendrucker": true,
     "herdr@bendrucker": true,
+    "dispatch@bendrucker": true,
+    "rex@bendrucker": true,
     "run-command@bendrucker": true,
     "session-limit@bendrucker": true,
     "load@bendrucker": true,

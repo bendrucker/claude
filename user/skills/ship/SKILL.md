@@ -41,15 +41,15 @@ Diff against the remote base, which is what the PR merges against. Take the base
 
 Gate each pass on the file set, its size, and the content behind any judgment call. Gates, effort inference, and the `code-review` versus `simplify` choice: [`references/passes.md`](references/passes.md).
 
-- **`plan:review`**: a substantial approved plan is in context (`~/.claude/plans/` file) and the session ran long or redirected enough for the diff to drift from it.
-- **Correctness and quality**: code changed. Exactly one of `code-review <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs- or config-only diffs.
-- **`comments:audit`**: the diff adds code comments.
-- **`pull-request:follow-up --local`**: a supported review bot is available for the repo and the diff clears the [Bot Review Gate](references/passes.md#bot-review-gate).
-- **`github:copilot`**: code changed on a repo I own and the diff clears the [Cross-Model Gate](references/passes.md#cross-model-gate).
-- **`prompting:scan`**: the diff touches a document a model executes: `CLAUDE.md`, `AGENTS.md`, `SKILL.md`, a skill's `references/`, `.claude/agents`, `.claude/commands`, `.claude/rules`, or a `prompt/` or `prompts/` dir.
-- **`writing:review`**: the diff touches prose people read (READMEs, docs, `.mdx`, `.rst`) outside those prompt files. A diff with both kinds runs both passes, each over its own files.
-- **`run`**: the diff has a runtime surface. Skip on docs-only and tests-only diffs.
-- **`review:human`**: the diff clears the [Human Review Gate](references/passes.md#human-review-gate), which skips trivial diffs.
+- `plan:review`: a substantial approved plan is in context (`~/.claude/plans/` file) and the session ran long or redirected enough for the diff to drift from it.
+- Correctness and quality: code changed. Exactly one of `code-review <effort> --fix` (default) or `simplify` (pure refactor, no new behavior). Skip on docs- or config-only diffs.
+- `comments:audit`: the diff adds code comments.
+- `pull-request:follow-up --local`: a supported review bot is available for the repo and the diff clears the [Bot Review Gate](references/passes.md#bot-review-gate).
+- `github:copilot`: code changed on a repo I own and the diff clears the [Cross-Model Gate](references/passes.md#cross-model-gate).
+- `prompting:scan`: the diff touches a document a model executes: `CLAUDE.md`, `AGENTS.md`, `SKILL.md`, a skill's `references/`, `.claude/agents`, `.claude/commands`, `.claude/rules`, or a `prompt/` or `prompts/` dir.
+- `writing:review`: the diff touches prose people read (READMEs, docs, `.mdx`, `.rst`) outside those prompt files. A diff with both kinds runs both passes, each over its own files.
+- `run`: the diff has a runtime surface. Skip on docs-only and tests-only diffs.
+- `review:human`: the diff clears the [Human Review Gate](references/passes.md#human-review-gate), which skips trivial diffs.
 
 State the plan in one line and proceed. Use `AskUserQuestion` only for a real toss-up: refactor versus behavior change, or `medium` versus `high` effort.
 

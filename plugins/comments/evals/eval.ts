@@ -12,7 +12,7 @@ import { collectVerdicts } from "../apply/join";
 import { type DocComment, DocCommentSchema } from "../detection/doc";
 import { type Provenance, ProvenanceSchema } from "../detection/provenance";
 import type { CommentKind, Language } from "../detection/types";
-import { workflowJudge } from "../judge/adapter";
+import { agentJudge } from "../judge/adapter";
 import { buildJob, type ShardComment, writeJob } from "../judge/job";
 import {
   SLOP_CATEGORIES,
@@ -450,8 +450,7 @@ export async function clearVerdicts(verdictsDir: string): Promise<void> {
 
 /**
  * Shard the corpus through the production job writer and emit the `<preflight>`
- * block for the Workflow tool, so the gate judges fixtures on the path that
- * ships.
+ * block, so the gate judges fixtures through the agent the skill dispatches.
  */
 async function build(jobBase: string): Promise<number> {
   const fixtures = await loadFixtures();
@@ -465,7 +464,7 @@ async function build(jobBase: string): Promise<number> {
   console.error(
     `${written.count} fixtures / ${written.shardCount} shards (prompt ${descriptor.promptSha.slice(0, 12)})`,
   );
-  await workflowJudge((line) => {
+  await agentJudge((line) => {
     console.log(line);
   })(written);
   console.error(`\nScore with: bun ${import.meta.path} score --job ${written.jobDir}`);
@@ -480,7 +479,7 @@ async function readJobVerdicts(jobDir: string): Promise<Map<string, Verdict>> {
   const verdictsDir = join(jobDir, "verdicts");
   const files = await verdictFiles(verdictsDir);
   if (files.length === 0) {
-    throw new Error(`No verdict files in ${verdictsDir}. Run the judge workflow first.`);
+    throw new Error(`No verdict files in ${verdictsDir}. Run the judge agents first.`);
   }
   const texts = await Promise.all(files.map((path) => Bun.file(path).text()));
   const contents: unknown[] = [];
@@ -492,7 +491,7 @@ async function readJobVerdicts(jobDir: string): Promise<Map<string, Verdict>> {
 
 /**
  * The least headline slop recall `--gate` accepts. Set at what the production
- * workflow measures on the current rubric, so it catches a judge that keeps
+ * judge measures on the current rubric, so it catches a judge that keeps
  * everything without failing today's.
  */
 export const RECALL_FLOOR = 1;

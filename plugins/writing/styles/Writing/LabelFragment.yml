@@ -1,0 +1,86 @@
+# evidence: a bare gerund that announces a disposition ("Dismissing.", "Keeping as-is.", "Declining this one.") runs 0.0075/1k in Claude's posted prose (PR and MR bodies, review replies, issue comments: 30 hits in 4.0M words, 28 of 30 judged real) against 0.001/1k in the user's pre-AI writing (1 hit in 1.03M words), a lift of 5.2. The user objected that the label adds nothing once the reason is stated.
+# retire when: judged precision on a fresh sample falls under 0.7, or most hits are statuses the reader needed.
+extends: existence
+message: "'%s' labels a disposition. State the outcome as a fact, such as 'The annotation stays because the literal fixes the type', or drop the label after the reason."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/LabelFragment.yml
+level: warning
+scope: [paragraph, list, blockquote]
+nonword: true
+tokens:
+  # A sentence of one -ing verb whose object is a pronoun or "as-is", anywhere in a paragraph.
+  - '(?:^|(?<=[.!?:]\s))[A-Z][a-z]+ing(?<!thing)(?:\s+(?:it|this|that|them|these|those|this one|that one)(?:\s+(?:as-is|as is|unchanged))?|\s+(?:as-is|as is|unchanged))\.(?=\s|$)'
+  # A bare -ing verb closing a paragraph after the reason. A standalone one is a label or a table value.
+  - '(?<=[.!?:]\s)[A-Z][a-z]+ing(?<!thing)\.$'
+tests:
+  - name: "flags a bare disposition after the reason"
+    input: |
+      `ty` infers `Path` from the right-hand side, and we don't annotate module constants whose type the literal fixes. Dismissing.
+    contains: [Writing.LabelFragment]
+  - name: "flags keeping as-is"
+    input: |
+      Routing through `logger.info` with the booleans as fields drops the report. Keeping as-is.
+    contains: [Writing.LabelFragment]
+  - name: "flags leaving as-is after a preference"
+    input: |
+      An injected factory owns its own credentials policy, so threading a constant through the contract would duplicate it. Leaving as-is.
+    contains: [Writing.LabelFragment]
+  - name: "flags a leading disposition with a pronoun object"
+    input: |
+      Declining this one. The crash only happens partway through a sweep, so failing loudly is right.
+    contains: [Writing.LabelFragment]
+  - name: "flags a disposition in a list item"
+    input: |
+      - The new flag is opt-in, so existing callers see no change. Leaving it unchanged.
+    contains: [Writing.LabelFragment]
+  - name: "flags a disposition in a quoted reply draft"
+    input: |
+      > Both blockers described here are fixed and the deploy is green. Closing.
+    contains: [Writing.LabelFragment]
+  - name: "flags a pronoun disposition"
+    input: |
+      The guard covers every path under the well-known prefix, so the finding holds. Taking this one.
+    contains: [Writing.LabelFragment]
+  - name: "flags resolving after the explanation"
+    input: |
+      The test asserts the peak equals the cap, and dropping the semaphore fails it. Resolving.
+    contains: [Writing.LabelFragment]
+  - name: "flags keeping these as is"
+    input: |
+      Keeping these as is. They're internal async methods, not part of the public surface.
+    contains: [Writing.LabelFragment]
+  - name: "allows a gerund that opens a full sentence"
+    input: |
+      Keeping the annotation would duplicate what the literal already says, so this removes it.
+    absent: Writing.LabelFragment
+  - name: "allows a gerund with a concrete object"
+    input: |
+      The pipeline is still running on the new SHA. Watching CI.
+    absent: Writing.LabelFragment
+  - name: "allows a standalone label or table value"
+    input: |
+      Pending.
+
+      **Scoring.** Each draft gets a rate per 1,000 words.
+    absent: Writing.LabelFragment
+  - name: "allows nothing and everything as subjects"
+    input: |
+      All three commits are on the remote. Nothing further. Everything checks out.
+    absent: Writing.LabelFragment
+  - name: "allows a gerund noun in a heading"
+    input: |
+      ## Testing
+
+      Run `bun test` from the plugin root.
+    absent: Writing.LabelFragment
+  - name: "allows a gerund mid-sentence"
+    input: |
+      The fix keeps the default as-is and documents the override.
+    absent: Writing.LabelFragment
+  - name: "allows a plain statement of the outcome"
+    input: |
+      The annotation stays, since `ty` infers `Path` from the literal.
+    absent: Writing.LabelFragment
+  - name: "allows a gerund closing a sentence with a longer object"
+    input: |
+      The cache misses on every cold start. Keeping the warm pool is cheaper than fixing the key.
+    absent: Writing.LabelFragment

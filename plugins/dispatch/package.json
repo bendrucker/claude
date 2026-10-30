@@ -1,0 +1,12 @@
+{
+  "name": "dispatch",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "cleye": "^2.2.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@hegeldev/hegel": "^0.4.7"
+  }
+}

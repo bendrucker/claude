@@ -1,6 +1,6 @@
 # Other Harnesses
 
-For a Claude API application with no suite yet, `/claude-api build-eval` builds one and `/claude-api hillclimb` climbs it. This file connects a suite that already exists to the loop.
+This file connects a suite that already exists to the loop.
 
 The loop drives every harness through one adapter: a TypeScript module implementing `Adapter` from `packages/evals/adapter.ts`. `native` is built in. For any other harness, read its docs and one stored run, then write the adapter beside the climb log before the first run, so every column runs and reads through the same file. A suite that already ships an adapter names it in its `README.md`. Use that one.
 

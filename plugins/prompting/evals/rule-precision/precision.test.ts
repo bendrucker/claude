@@ -9,8 +9,10 @@ import {
   type CheckScore,
   deletedLines,
   type Labels,
+  loadLabelSources,
   measure,
   render,
+  scoreSources,
   verdict,
 } from "./precision";
 import { VALE_CONFIG } from "../../skills/scan/scripts/vale";
@@ -143,4 +145,62 @@ test("render states the floor it applied", () => {
     },
   ];
   expect(render(scores, { deleted: 953, prose: 8840, docs: 135 }, 0.11, 10)).toMatchSnapshot();
+});
+
+describe("scoreSources", () => {
+  const options = { minFlagged: 1, minPrecision: 0.5 };
+  let config = "";
+
+  beforeAll(async () => {
+    config = await candidateConfig([join(rules, "Cut.yml"), join(rules, "Keep.yml")], VALE_CONFIG);
+  });
+
+  test("a failing human table fails the run", async () => {
+    const result = await scoreSources(repo, { human: [head], agent: [] }, config, options);
+    expect(result.failed).toBe(true);
+  });
+
+  test("the same failing table from agent labels does not", async () => {
+    const result = await scoreSources(repo, { human: [], agent: [head] }, config, options);
+    expect(result.output).toContain("Prompting.Keep");
+    expect(result.failed).toBe(false);
+  });
+
+  test("an agent source that matches nothing neither empties nor fails the run", async () => {
+    const lenient = { minFlagged: 1, minPrecision: 0.3 };
+    const cutOnly = await candidateConfig([join(rules, "Cut.yml")], VALE_CONFIG);
+    const result = await scoreSources(
+      repo,
+      { human: [head], agent: ["nosuchcommit"] },
+      cutOnly,
+      lenient,
+    );
+    expect(result).toMatchObject({ failed: false, empty: false });
+    expect(result.output).toContain("agent labels: no check matched");
+  });
+
+  test("human-only output has no source heading", async () => {
+    const result = await scoreSources(repo, { human: [head], agent: [] }, config, options);
+    expect(result.output).not.toContain("labels\n");
+  });
+
+  test("reports each source under its own heading", async () => {
+    const result = await scoreSources(repo, { human: [head], agent: [head] }, config, options);
+    expect(result.output).toMatchSnapshot();
+  });
+});
+
+describe("loadLabelSources", () => {
+  test("reads the tracked labels", async () => {
+    const sources = await loadLabelSources();
+    expect(sources.human.length).toBeGreaterThan(0);
+    expect(Array.isArray(sources.agent)).toBe(true);
+  });
+
+  test("rejects a malformed file", async () => {
+    const path = join(rules, "bad.json");
+    await Bun.write(path, JSON.stringify({ human: "1ec44ee80" }));
+    const failure = await loadLabelSources(path).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+  });
 });

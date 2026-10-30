@@ -85,6 +85,8 @@ export const Score = z.object({
   recall: z.number(),
   positives: z.number(),
   perThousand: z.number(),
+  // A score recorded before complexity was measured can't be promoted until it is rescored.
+  complexity: z.number().default(Number.POSITIVE_INFINITY),
   ts: z.string(),
 });
 export type Score = z.infer<typeof Score>;

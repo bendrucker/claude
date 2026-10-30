@@ -88,7 +88,7 @@ duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql -cmd "SET 
 The rest:
 
 <!-- generated:queries -->
-`already-allowed-still-prompting`, `bare-refs`, `catalog-reinjection-thrash-sessions`, `classifier`, `cli-health`, `field-drift`, `hook-block-then-retry-success`, `hook-config-vs-observed`, `hook-self-timing`, `model-summary`, `mods`, `permissions`, `plan-iterations`, `plan-sections`, `plan-sizes`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence`, `search`, `skill-activity`, `stats`, `stop-hook-noop-detector`, `text-export`, `tool-failure-rates`, `top-sessions`, `usage-spikes`
+`already-allowed-still-prompting`, `bare-refs`, `catalog-reinjection-thrash-sessions`, `classifier`, `cli-health`, `field-drift`, `hook-block-then-retry-success`, `hook-config-vs-observed`, `hook-self-timing`, `model-summary`, `mods`, `permissions`, `plan-iterations`, `plan-sections`, `plan-sizes`, `prune-acceptance`, `sandbox-bypass-scaffold`, `sandbox-path-deny-recurrence`, `search`, `skill-activity`, `stats`, `stop-hook-noop-detector`, `text-export`, `tool-failure-rates`, `top-sessions`, `usage-spikes`
 <!-- /generated:queries -->
 
 [`references/catalog.md`](references/catalog.md) gives each query's purpose and params. Before running a query you have not used, read the YAML header of its `resources/queries/<name>.sql` for its output, caveats, and param defaults.

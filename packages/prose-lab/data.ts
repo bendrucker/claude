@@ -2,6 +2,8 @@ import { join } from "node:path";
 import { z } from "zod";
 
 export const DATA = join(import.meta.dirname, "data");
+/** Snapshots of documents reviewed in Plannotator, which every corpus includes. */
+export const DOCS = join(DATA, "docs");
 
 export const Hit = z.object({
   plugin: z.string(),
@@ -42,7 +44,7 @@ export type Label = z.infer<typeof Label>;
 /** A span the user marked that no shipped rule caught. */
 export const Flag = z.object({
   id: z.string(),
-  pattern: z.string(),
+  pattern: z.string().optional(),
   file: z.string(),
   line: z.number(),
   span: z.tuple([z.number(), z.number()]),
@@ -51,6 +53,14 @@ export const Flag = z.object({
   ts: z.string(),
 });
 export type Flag = z.infer<typeof Flag>;
+
+/** A reviewed document's snapshot under `DOCS`, and the file it was copied from. */
+export const Doc = z.object({
+  doc: z.string(),
+  source: z.string(),
+  ts: z.string(),
+});
+export type Doc = z.infer<typeof Doc>;
 
 export const Pattern = z.object({
   slug: z.string().regex(/^[a-z0-9-]+$/),
@@ -112,11 +122,13 @@ export interface Store {
   writeSweep(sweep: Sweep): Promise<void>;
   labels(): Promise<Label[]>;
   flags(): Promise<Flag[]>;
+  docs(): Promise<Doc[]>;
   patterns(): Promise<Pattern[]>;
   scores(): Promise<Score[]>;
   queue(): Promise<Queued[]>;
   addLabels(records: readonly Label[]): Promise<void>;
   addFlags(records: readonly Flag[]): Promise<void>;
+  addDocs(records: readonly Doc[]): Promise<void>;
   addPatterns(records: readonly Pattern[]): Promise<void>;
   addScores(records: readonly Score[]): Promise<void>;
   enqueue(records: readonly Queued[]): Promise<void>;
@@ -135,12 +147,14 @@ export function store(dir = DATA): Store {
     },
     labels: async () => latest(await readJsonl(Label, path("labels.jsonl")), (l) => l.id),
     flags: async () => latest(await readJsonl(Flag, path("flags.jsonl")), (f) => f.id),
+    docs: () => readJsonl(Doc, path("docs.jsonl")),
     patterns: async () => latest(await readJsonl(Pattern, path("patterns.jsonl")), (p) => p.slug),
     scores: async () =>
       latest(await readJsonl(Score, path("scores.jsonl")), (s) => `${s.pattern}|${s.candidate}`),
     queue: async () => latest(await readJsonl(Queued, path("queue.jsonl")), hitId),
     addLabels: (records) => appendJsonl(path("labels.jsonl"), records),
     addFlags: (records) => appendJsonl(path("flags.jsonl"), records),
+    addDocs: (records) => appendJsonl(path("docs.jsonl"), records),
     addPatterns: (records) => appendJsonl(path("patterns.jsonl"), records),
     addScores: (records) => appendJsonl(path("scores.jsonl"), records),
     enqueue: (records) => appendJsonl(path("queue.jsonl"), records),

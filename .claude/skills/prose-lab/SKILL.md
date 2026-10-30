@@ -1,8 +1,8 @@
 ---
 name: prose-lab
-description: Turn the user's labels on repo prose into calibrated Vale rules.
+description: Turn the user's labels on repo prose, or their notes from reviewing a document in Plannotator, into calibrated Vale rules.
 disable-model-invocation: true
-argument-hint: "[--corpus skills|agent-facing|all]"
+argument-hint: "[review <file>] [--corpus skills|agent-facing|all]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/../../../packages/prose-lab/lab.ts:*)
   - Read
@@ -26,9 +26,13 @@ Run every command as `bun ${CLAUDE_SKILL_DIR}/../../../packages/prose-lab/lab.ts
 
 Run `sweep`, then `serve` in the background, and hand the user the URL. The sample tab takes right, wrong, or unsure per hit with an optional pattern slug. The document tab flags spans that the rules missed. Stop until the user says the sitting is done.
 
+## Review
+
+For `review <file>`, run `review <file>` in the background with `timeout: 7200000` and `dangerouslyDisableSandbox: true`, since the sandbox refuses the browser's connection to Plannotator. Hand the user the URL it prints. It snapshots the file into the lab data, records each inline comment as a flag without a pattern, prints global and unlocated notes, and re-sweeps. When it exits, go straight to Group.
+
 ## Group
 
-Read the new labels and flags. Cluster their notes and matches into patterns, and confirm each new slug with the user through `AskUserQuestion`. Register each with `pattern`, then `assign` its labels.
+Read the new labels and flags, including flags without a pattern and the notes `review` printed. Cluster their notes and matches into patterns, and confirm each new slug with the user through `AskUserQuestion`. Register each with `pattern`, then `assign` its labels and flags.
 
 ## Generalize
 

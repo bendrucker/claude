@@ -1,13 +1,15 @@
 #!/usr/bin/env bun
 
-import { basename, resolve } from "node:path";
+import { mkdir, readdir } from "node:fs/promises";
+import { basename, extname, join, relative, resolve } from "node:path";
 import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typings";
 import { $ } from "bun";
 import { table } from "table";
 import { z } from "zod";
-import { corpusFiles, lintFiles, PLUGINS, type Plugin, sweep } from "./corpus";
+import { corpusFiles, lintFiles, PLUGINS, type Plugin, ROOT, sweep } from "./corpus";
 import {
   Corpus,
+  DOCS,
   hitId,
   type Label,
   type Pattern,
@@ -16,6 +18,7 @@ import {
   store,
   Verdict,
 } from "./data";
+import { annotations, toFlags } from "./review";
 import { sample } from "./sample";
 import { labConfig, score } from "./score";
 import { serve } from "./server";
@@ -99,19 +102,82 @@ const patternCommand = new Command("pattern")
   });
 
 const assignCommand = new Command("assign")
-  .description("Assign labels to a pattern.")
+  .description("Assign labels and flags to a pattern.")
   .argument("<slug>", "pattern")
-  .argument("<ids...>", "label ids")
+  .argument("<ids...>", "label or flag ids")
   .action(async (slug, ids) => {
     const labels = new Map((await data.labels()).map((label) => [label.id, label]));
-    const missing = ids.filter((id) => !labels.has(id));
-    if (missing.length > 0) throw new Error(`Unknown label ids: ${missing.join(", ")}`);
+    const flags = new Map((await data.flags()).map((flag) => [flag.id, flag]));
+    const missing = ids.filter((id) => !labels.has(id) && !flags.has(id));
+    if (missing.length > 0) throw new Error(`Unknown ids: ${missing.join(", ")}`);
     const ts = new Date().toISOString();
     await data.addLabels(
       ids.flatMap((id) => {
         const label = labels.get(id);
         return label === undefined ? [] : [{ ...label, pattern: slug, ts }];
       }),
+    );
+    await data.addFlags(
+      ids.flatMap((id) => {
+        const flag = flags.get(id);
+        return flag === undefined ? [] : [{ ...flag, pattern: slug, ts }];
+      }),
+    );
+  });
+
+/** A path under `DOCS` for `source` that no earlier snapshot took. */
+async function snapshotPath(source: string, date: string): Promise<string> {
+  const stem = `${date}-${basename(source, extname(source))}`;
+  const taken = new Set(await readdir(DOCS));
+  let name = `${stem}.md`;
+  for (let n = 2; taken.has(name); n++) name = `${stem}-${n}.md`;
+  return join(DOCS, name);
+}
+
+const reviewCommand = new Command("review")
+  .description(
+    "Review a document in Plannotator, record its inline comments as flags, and re-sweep.",
+  )
+  .argument("<file>", "document to review")
+  .action(async (file) => {
+    const source = resolve(file);
+    const original = await Bun.file(source).text();
+    const ts = new Date().toISOString();
+    await mkdir(DOCS, { recursive: true });
+    const now = new Date();
+    const date = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+      .map((part) => String(part).padStart(2, "0"))
+      .join("-");
+    const snapshot = await snapshotPath(source, date);
+    const doc = relative(ROOT, snapshot);
+    await Bun.write(snapshot, original);
+    await data.addDocs([{ doc, source, ts }]);
+
+    const since = new Date();
+    const session = Bun.spawn(["plannotator", "annotate", snapshot, "--json"], {
+      stdout: "ignore",
+      stderr: "inherit",
+    });
+    if ((await session.exited) !== 0) throw new Error("plannotator exited with an error.");
+
+    if ((await Bun.file(snapshot).text()) !== original) {
+      console.log("The session edited the snapshot. Restoring it, since flags index the original:");
+      console.log(await $`diff -u - ${snapshot} < ${new Response(original)}`.nothrow().text());
+      await Bun.write(snapshot, original);
+    }
+
+    const reviewed = toFlags(await annotations(snapshot, since), doc, original.split("\n"), ts);
+    await data.addFlags(reviewed.flags);
+    for (const note of reviewed.globals) console.log(`Global: ${note}`);
+    for (const { type, originalText, text } of reviewed.unlocated)
+      console.log(`Unlocated ${type}: ${JSON.stringify(originalText ?? "")} ${text}`);
+
+    const last = await data.sweep();
+    const swept = new Set(last?.hits.map((hit) => hit.plugin));
+    const plugins = PLUGIN_NAMES.filter((name) => swept.size === 0 || swept.has(name));
+    await data.writeSweep(await sweep(last?.corpus ?? "skills", plugins));
+    console.log(
+      `${reviewed.flags.length} flags recorded on ${doc}, ${reviewed.unlocated.length} unlocated, ${reviewed.globals.length} global notes.`,
     );
   });
 
@@ -249,6 +315,7 @@ const statusCommand = new Command("status")
       render(
         patternRows(patterns, labels, flags, scores),
         checkRows(swept?.hits ?? [], labels, flags),
+        flags.filter((flag) => flag.pattern === undefined).length,
       ),
     );
   });
@@ -276,6 +343,7 @@ export const program = new Command("lab")
   .addCommand(serveCommand)
   .addCommand(patternCommand)
   .addCommand(assignCommand)
+  .addCommand(reviewCommand)
   .addCommand(importCommand)
   .addCommand(labelCommand)
   .addCommand(scoreCommand)

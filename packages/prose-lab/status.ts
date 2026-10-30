@@ -73,7 +73,11 @@ export function checkRows(
 const percent = (value: number | undefined): string =>
   value === undefined ? "-" : `${Math.round(value * 100)}%`;
 
-export function render(patterns: readonly PatternRow[], checks: readonly CheckRow[]): string {
+export function render(
+  patterns: readonly PatternRow[],
+  checks: readonly CheckRow[],
+  unassigned = 0,
+): string {
   const patternTable = table([
     [
       "pattern",
@@ -109,5 +113,5 @@ export function render(patterns: readonly PatternRow[], checks: readonly CheckRo
       row.below ? "yes" : "",
     ]),
   ]);
-  return `${patterns.length === 0 ? "No patterns yet.\n" : patternTable}\n${checks.length === 0 ? "No labeled checks yet.\n" : checkTable}`;
+  return `${patterns.length === 0 ? "No patterns yet.\n" : patternTable}\n${checks.length === 0 ? "No labeled checks yet.\n" : checkTable}\n${unassigned} flags without a pattern.\n`;
 }

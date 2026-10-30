@@ -292,9 +292,8 @@ const isLimitKey = (k: string): k is LimitKey => k in LIMITS;
 export const limitKeys: LimitKey[] = Object.keys(LIMITS).filter(isLimitKey);
 
 // Trimming a body to fit the limits must not move its prose into <details>,
-// tables, fences, or lists. No baseline body comes near the first, and lists
-// past five items are rare in Ben's own PRs. List words go uncapped: a large
-// change needs long lists, and maxBlockWords keeps prose out of bullets.
+// tables, or fences, or pile it into one long list. No baseline body comes near
+// the first, and lists past five items are rare in Ben's own PRs.
 export const GUARDS = {
   hiddenWords: 60,
   maxItemsPerList: 5,

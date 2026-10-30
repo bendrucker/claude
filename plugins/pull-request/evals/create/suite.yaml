@@ -19,3 +19,5 @@ graders:
   limit-list-items: "!quiet-*"
   create-quiet: "quiet-*"
   no-test-tally: [manual-verification, overturned-theory]
+  structured: "large-*"
+  no-placeholder: "template-*"

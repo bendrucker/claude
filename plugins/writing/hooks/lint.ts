@@ -29,12 +29,13 @@ export function targetOf(filePath: string): string {
 async function lintEdited(
   filePath: string,
   toolResponse: unknown,
-): Promise<{ alerts: HookAlert[]; unedited: number }> {
+): Promise<{ alerts: HookAlert[]; checks: string[]; unedited: number }> {
   const all = await lintFile(filePath);
   const scope = editScopeOf(toolResponse);
   const edited = scope === null ? all : editedAlerts(all, scope);
   return {
     alerts: edited.map((alert) => hookAlertOf(alert, "context")),
+    checks: unique(all.map((alert) => alert.Check)),
     unedited: all.length - edited.length,
   };
 }
@@ -75,16 +76,22 @@ export async function dispatch(
 
   // A failed lint is logged without `checks`, so it never reads as a clean run.
   let alerts: HookAlert[] = [];
+  // Every check in the saved file, including those an edit left alone, so a
+  // re-lint tells the health report whether an earlier alert was fixed.
+  let checks: string[] = [];
   let unedited = 0;
   try {
-    if (input.hook_event_name === "PreToolUse") alerts = await lintMessages(input);
-    else if (hasPath) ({ alerts, unedited } = await lintEdited(filePath, input.tool_response));
+    if (input.hook_event_name === "PreToolUse") {
+      alerts = await lintMessages(input);
+      checks = unique(alerts.map((alert) => alert.check));
+    } else if (hasPath) {
+      ({ alerts, checks, unedited } = await lintEdited(filePath, input.tool_response));
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[writing/lint] Vale failed: ${message}`);
     return finish(null, "error", { vale_error: message });
   }
-  const checks = unique(alerts.map((alert) => alert.check));
   const scoped: Partial<RunLogEntry> =
     unedited > 0 ? { checks, unedited_alerts: unedited } : { checks };
   if (alerts.length === 0) return finish(null, "silent", scoped);

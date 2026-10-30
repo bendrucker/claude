@@ -81,19 +81,20 @@ async function isSynced(packages: string): Promise<boolean> {
   return (await stamp.exists()) && (await stamp.text()) === packages;
 }
 
+// A missing lock reads as infinitely old, which every caller treats as stale.
+async function lockAge(): Promise<number> {
+  const stat = await Bun.file(SYNC_LOCK)
+    .stat()
+    .catch(() => null);
+  return stat === null ? Infinity : Date.now() - stat.mtimeMs;
+}
+
 async function holdLock(): Promise<boolean> {
   try {
     await mkdir(SYNC_LOCK);
     return true;
   } catch {
-    const age =
-      Date.now() -
-      (
-        await Bun.file(SYNC_LOCK)
-          .stat()
-          .catch(() => ({ mtimeMs: 0 }))
-      ).mtimeMs;
-    if (age < LOCK_STALE_MS) return false;
+    if ((await lockAge()) < LOCK_STALE_MS) return false;
     await rm(SYNC_LOCK, { recursive: true, force: true });
     return holdLock();
   }
@@ -132,13 +133,8 @@ const SYNC_WAIT_MS = 30_000;
 async function packagesReady(): Promise<boolean> {
   const packages = await pinnedPackages();
   if (await isSynced(packages)) return true;
-  const syncing = await Bun.file(SYNC_LOCK)
-    .stat()
-    .then(
-      () => true,
-      () => false,
-    );
-  return syncing && awaitSync(packages, Date.now() + SYNC_WAIT_MS);
+  if ((await lockAge()) >= LOCK_STALE_MS) return false;
+  return awaitSync(packages, Date.now() + SYNC_WAIT_MS);
 }
 
 const INSTALL_HINT = `bun "${join(import.meta.dirname, "..", "hooks", "sessionstart.ts")}"`;

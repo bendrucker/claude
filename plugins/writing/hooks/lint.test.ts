@@ -187,7 +187,8 @@ describe("edited files", () => {
       { name: "an alert the edit wrote", replacement: "Let's dig into it.", reported: true },
     ])("handles $name", async ({ name, replacement, reported }) => {
       const { output, log } = await dispatch(await edit(`${name}.md`, replacement));
-      expect(log.checks?.includes("Writing.DigInto")).toBe(reported);
+      expect(log.checks).toContain("Writing.DigInto");
+      expect(log.emitted?.includes("Writing.DigInto") ?? false).toBe(reported);
       expect(log.unedited_alerts).toBe(1);
       expect(output !== null).toBe(reported);
     });

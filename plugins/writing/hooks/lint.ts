@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detection/paths";
 import { lintFile } from "../detection/vale";
-import { editScopeOf, inScope } from "./edit-scope";
+import { editedAlerts, editScopeOf } from "./edit-scope";
 import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
 import { lintMessages } from "./messages";
 import { hookAlertOf, type HookAlert, report } from "./report";
@@ -32,7 +32,7 @@ async function lintEdited(
 ): Promise<{ alerts: HookAlert[]; unedited: number }> {
   const all = await lintFile(filePath);
   const scope = editScopeOf(toolResponse);
-  const edited = scope === null ? all : all.filter((alert) => inScope(alert, scope));
+  const edited = scope === null ? all : editedAlerts(all, scope);
   return {
     alerts: edited.map((alert) => hookAlertOf(alert, "context")),
     unedited: all.length - edited.length,

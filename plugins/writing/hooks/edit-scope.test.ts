@@ -1,9 +1,17 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import type { ValeAlert } from "../detection/vale";
-import { editScopeOf, inScope } from "./edit-scope";
+import { type EditScope, editedAlerts, editScopeOf } from "./edit-scope";
 
-function alert(Line: number, Match: string): ValeAlert {
-  return { Check: "Writing.DigInto", Message: "", Severity: "warning", Line, Span: [1, 1], Match };
+function makeAlert(overrides: Partial<ValeAlert> = {}): ValeAlert {
+  return {
+    Check: "Writing.DigInto",
+    Message: "",
+    Severity: "warning",
+    Line: 1,
+    Span: [1, 1],
+    Match: "dig into",
+    ...overrides,
+  };
 }
 
 describe("editScopeOf", () => {
@@ -14,16 +22,17 @@ describe("editScopeOf", () => {
         { newStart: 10, lines: ["+first", " keep", "+second"] },
       ],
     });
-    expect(scope).toEqual(
-      new Map([
-        [4, "old one\nold two"],
-        [10, ""],
-        [12, ""],
+    expect(scope).toEqual({
+      added: new Map([
+        [4, 0],
+        [10, 1],
+        [12, 1],
       ]),
-    );
+      removed: ["old one\nold two", ""],
+    });
   });
 
-  it.each([
+  test.each([
     { name: "a created file", response: { type: "create", structuredPatch: [] } },
     { name: "a response without a patch", response: {} },
     { name: "a malformed response", response: "edited" },
@@ -32,22 +41,36 @@ describe("editScopeOf", () => {
   });
 
   it("scopes an overwrite that changed nothing to no lines", () => {
-    expect(editScopeOf({ type: "update", structuredPatch: [] })).toEqual(new Map());
+    expect(editScopeOf({ type: "update", structuredPatch: [] })).toEqual({
+      added: new Map(),
+      removed: [],
+    });
   });
 });
 
-describe("inScope", () => {
-  const scope = new Map([[4, "we should dig into it"]]);
+describe("editedAlerts", () => {
+  const scope: EditScope = {
+    added: new Map([
+      [4, 0],
+      [5, 0],
+    ]),
+    removed: ["we should dig into it"],
+  };
 
-  it("keeps an alert the edit introduced", () => {
-    expect(inScope(alert(4, "deep dive"), scope)).toBe(true);
-  });
-
-  it("drops an alert on a line the edit left alone", () => {
-    expect(inScope(alert(2, "dig into"), scope)).toBe(false);
-  });
-
-  it("drops an alert the replaced text already carried", () => {
-    expect(inScope(alert(4, "dig into"), scope)).toBe(false);
+  test.each<{ name: string; alerts: ValeAlert[]; kept: number[] }>([
+    {
+      name: "an alert the edit introduced",
+      alerts: [makeAlert({ Line: 4, Match: "deep dive" })],
+      kept: [4],
+    },
+    { name: "an alert on a line the edit left alone", alerts: [makeAlert({ Line: 2 })], kept: [] },
+    { name: "a match the hunk already removed", alerts: [makeAlert({ Line: 4 })], kept: [] },
+    {
+      name: "a match added beyond the ones removed",
+      alerts: [makeAlert({ Line: 4 }), makeAlert({ Line: 5 })],
+      kept: [5],
+    },
+  ])("handles $name", ({ alerts, kept }) => {
+    expect(editedAlerts(alerts, scope).map((alert) => alert.Line)).toEqual(kept);
   });
 });

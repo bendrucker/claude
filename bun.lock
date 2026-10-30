@@ -154,6 +154,9 @@
         "cleye": "^2.2.1",
         "zod": "^4.4.3",
       },
+      "devDependencies": {
+        "@hegeldev/hegel": "^0.4.7",
+      },
     },
     "plugins/evals/evals/adapter": {
       "name": "evals-adapter-eval",

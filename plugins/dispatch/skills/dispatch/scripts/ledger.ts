@@ -13,7 +13,7 @@ export interface DispatchLedgerRow {
   task: string;
   repo: string;
   branch: string;
-  path: string;
+  path: string | null;
   mux: "rex" | "herdr" | "bg";
   target: string | null;
   host: string | null;

@@ -54,7 +54,7 @@ time out, so downstream jobs read a partial snapshot as if it were complete.
 
 Populate only the keys you can infer, and drop empty relation lists. The platform skill fills routing and workspace fields (team, assignee, state, estimate) at save time.
 
-A related issue you found belongs under `relations` as a tracker link, kept out of the body. Mention another issue in the body only when it tells the reader something the relation can't: what a prior attempt tried, why upstream work matters. The body has no Related Issues section. Link a source the body relies on (a spec, a dashboard, a status page) inline in the sentence that relies on it.
+A related issue you found belongs under `relations` as a tracker link, kept out of the body. Mention another issue in the body only when it tells the reader something the relation can't: what a prior attempt tried, why upstream work matters. The body has no Related Issues section. Link a source the body relies on (an RFC, a status page, an API reference) inline in the sentence that relies on it.
 
 ## Section Selection
 

@@ -6,7 +6,6 @@ argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/orient.ts)
   - Bash(bash ${CLAUDE_SKILL_DIR}/scripts/commands.sh)
-  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
   - Bash(herdr api snapshot:*)
   - Bash(herdr --help:*)
   - Bash(herdr agent --help:*)
@@ -129,7 +128,7 @@ Each agent pane carries `agent_session.value`, its Claude session UUID.
 
 Work bound for its own pull request always goes through [Dispatch](#dispatch), whatever an existing pane shows. Otherwise hand off only to a pane whose `title` or `cwd` names work in flight there. A `primary` workspace is the repo's main checkout, so no pane under one is a hand-off target whatever `cwd` it prints.
 
-Hand off with `agent prompt --wait`, which blocks until the agent settles at `idle`, `done`, or `blocked`, then collect with `agent read`:
+For a Claude peer, confirm its name in `ListAgents`, then talk to it with `SendMessage`. For other agents, hand off with `agent prompt --wait`, which blocks until the agent settles at `idle`, `done`, or `blocked`, then collect with `agent read`:
 
 ```bash
 herdr agent prompt <target> "the request" --wait --timeout 900000
@@ -150,13 +149,7 @@ An agent sitting in its own interactive UI takes logical key names: `herdr agent
 
 ### Dispatch
 
-New work needing its own worktree and agent gets both in one call:
-
-```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE"
-```
-
-It creates the worktree off `origin/main`, starts a Claude agent in it, and prompts it. Before reporting the hand-off, read the result fields in [`references/agents.md`](references/agents.md#dispatch-result).
+Hand new work bound for its own pull request to `dispatch:dispatch`, which opens it in a herdr workspace when run under herdr.
 
 `worktrunk:wt-switch-create` re-roots this session instead.
 

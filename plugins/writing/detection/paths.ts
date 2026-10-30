@@ -1,8 +1,7 @@
-import { resolve } from "node:path";
+import { extname, resolve } from "node:path";
 
 export function getExtension(filePath: string): string {
-  const parts = filePath.split(".");
-  return parts.length > 1 ? (parts.at(-1) ?? "") : "";
+  return extname(filePath).slice(1);
 }
 
 const MEMORY_PATH_PATTERN = /\/\.claude\/projects\/[^/]+\/memory\//;

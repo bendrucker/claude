@@ -1,6 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
-import { isScratchPath } from "./paths";
+import { getExtension, isScratchPath } from "./paths";
+
+describe("getExtension", () => {
+  test.each<{ path: string; ext: string }>([
+    { path: "/repo/README.md", ext: "md" },
+    { path: "/repo/.worktrees/io-seam/bin/clone-repo", ext: "" },
+    { path: "/repo/.vale.ini", ext: "ini" },
+    { path: "/repo/archive.tar.gz", ext: "gz" },
+  ])("$path has extension '$ext'", ({ path, ext }) => {
+    expect(getExtension(path)).toBe(ext);
+  });
+});
 
 describe("isScratchPath", () => {
   test.each<{ name: string; filePath: string; scratch: boolean }>([

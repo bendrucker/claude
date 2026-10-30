@@ -163,6 +163,63 @@ describe("edited files", () => {
     expect(log.target).toBe(targetOf(join(docs, "hashed.md")));
   });
 
+  describe("scoped to the edit", () => {
+    const BEFORE = ["# Notes", "", "We should dig into the cache.", "", "The config is fine."];
+
+    // An Edit replacing line 5 of BEFORE with `replacement`, as Claude Code reports it.
+    async function edit(name: string, replacement: string): Promise<PostToolUseHookInput> {
+      const after = [...BEFORE.slice(0, 4), replacement];
+      return edited(name, `${after.join("\n")}\n`, {
+        tool_name: "Edit",
+        tool_response: {
+          structuredPatch: [
+            { newStart: 3, lines: [` ${BEFORE[2]}`, " ", `-${BEFORE[4]}`, `+${replacement}`] },
+          ],
+        },
+      });
+    }
+
+    test.each<{ name: string; replacement: string; reported: boolean }>([
+      {
+        name: "an alert on a line the edit left alone",
+        replacement: "The config reads one file.",
+        reported: false,
+      },
+      { name: "an alert the edit wrote", replacement: "Let's dig into it.", reported: true },
+    ])("handles $name", async ({ name, replacement, reported }) => {
+      const { output, log } = await dispatch(await edit(`${name}.md`, replacement));
+      expect(log.checks?.includes("Writing.DigInto")).toBe(reported);
+      expect(log.unedited_alerts).toBe(1);
+      expect(output !== null).toBe(reported);
+    });
+
+    it("drops an alert the replaced line already carried", async () => {
+      const input = await edited("kept.md", "We should dig into the cache now.\n", {
+        tool_name: "Edit",
+        tool_response: {
+          structuredPatch: [
+            {
+              newStart: 1,
+              lines: ["-We should dig into the cache.", "+We should dig into the cache now."],
+            },
+          ],
+        },
+      });
+      const { output, log } = await dispatch(input);
+      expect(output).toBeNull();
+      expect(log.unedited_alerts).toBe(1);
+    });
+
+    it("reports every alert in a file a Write created", async () => {
+      const input = await edited("created.md", `${BEFORE.join("\n")}\n`, {
+        tool_response: { type: "create", structuredPatch: [] },
+      });
+      const { log } = await dispatch(input);
+      expect(log.checks).toContain("Writing.DigInto");
+      expect(log.unedited_alerts).toBeUndefined();
+    });
+  });
+
   it("logs a failed lint as an error without a check list", async () => {
     const repo = mkdtempSync(join(import.meta.dirname, ".broken-repo-"));
     try {

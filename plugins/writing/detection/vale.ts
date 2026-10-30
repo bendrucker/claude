@@ -127,6 +127,20 @@ export async function ensurePackages(binary: string): Promise<void> {
   }
 }
 
+const SYNC_WAIT_MS = 30_000;
+
+async function packagesReady(): Promise<boolean> {
+  const packages = await pinnedPackages();
+  if (await isSynced(packages)) return true;
+  const syncing = await Bun.file(SYNC_LOCK)
+    .stat()
+    .then(
+      () => true,
+      () => false,
+    );
+  return syncing && awaitSync(packages, Date.now() + SYNC_WAIT_MS);
+}
+
 const INSTALL_HINT = `bun "${join(import.meta.dirname, "..", "hooks", "sessionstart.ts")}"`;
 
 // A repo's own config replaces the plugin's, since Vale merges only the global
@@ -145,8 +159,8 @@ async function runVale(
 ): Promise<string | null> {
   const binary = valeBinary();
   if (binary === null) return null;
-  // The SessionStart hook installs the packages, so a lint only checks for them.
-  if (cwd === undefined && !(await isSynced(await pinnedPackages()))) {
+  // The SessionStart hook installs the packages, so a lint only waits out a sync already running.
+  if (cwd === undefined && !(await packagesReady())) {
     throw new Error(`Vale packages are not installed. Run ${INSTALL_HINT}`);
   }
   const proc = Bun.spawn([binary, "--output=JSON", ...args], {

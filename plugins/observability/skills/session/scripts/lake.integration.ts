@@ -178,6 +178,17 @@ describe("publish", () => {
     expect(String(await failure(queryLake(options.url, "SELECT 1; SELECT 2", 1e9)))).toContain(
       "one statement",
     );
+    const refused = await failure(queryLake(options.url, sql, 1, { after: "2000-01-01" }));
+    // A local lake makes no HTTP requests, so this checks only that a refusal reports them.
+    expect(refused instanceof LakeBudgetError ? typeof refused.fetched.gets : refused).toBe(
+      "number",
+    );
+    expect(String(await failure(queryLake(options.url, sql, Number.NaN)))).toContain("budget");
+    // The estimator's own variables leave the caller's intact.
+    const kept = await queryLake(options.url, "SELECT getvariable('scans') AS s", 1e9, {
+      scans: "mine",
+    });
+    expect(kept.rows).toEqual([{ s: "mine" }]);
   }, 60_000);
 
   test("an unchanged index publishes nothing", async () => {

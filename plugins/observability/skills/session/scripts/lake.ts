@@ -11,7 +11,7 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { Command } from "@commander-js/extra-typings";
-import { DuckDBInstance } from "@duckdb/node-api";
+import { type DuckDBConnection, DuckDBInstance } from "@duckdb/node-api";
 import { $ } from "bun";
 import { z } from "zod";
 import { enumerateHosts, getDataDir, LOCAL_HOST, sessionDbPath } from "./db";
@@ -209,6 +209,8 @@ export async function queryLake(
   maxBytes: number,
   params: QueryParams = {},
 ): Promise<LakeQueryResult> {
+  if (!Number.isFinite(maxBytes) || maxBytes < 0)
+    throw new Error(`The budget must be a nonnegative number of bytes, got ${maxBytes}.`);
   const instance = await DuckDBInstance.create(":memory:");
   const c = await instance.connect();
   try {
@@ -232,6 +234,9 @@ export async function queryLake(
     const scans = Estimate.parse(
       (await c.runAndReadAll(await read("lake/estimate.sql"))).getRowObjectsJS(),
     );
+    // The estimator's variables share the caller's namespace, so the caller's are restored.
+    await c.run("RESET VARIABLE scans; RESET VARIABLE comparison;");
+    if (vars !== "") await c.run(vars);
     const estimate = scans.reduce((n, s) => n + s.bytes, 0);
     if (estimate > maxBytes) {
       const top = scans
@@ -241,37 +246,44 @@ export async function queryLake(
       throw new LakeBudgetError(
         `Estimated ${(estimate / MB).toFixed(1)} MB of lake reads, above the ${(maxBytes / MB).toFixed(0)} MB budget (${top}). Narrow the date window or the columns, or pass a larger --max-mb.`,
         estimate,
+        await fetchedBytes(c),
       );
     }
 
     const rows = (await c.runAndReadAll(sql)).getRowObjectsJS();
-    const fetched = z
-      .object({
-        gets: z.coerce.number(),
-        bytes: z.coerce.number(),
-        catalogBytes: z.coerce.number(),
-      })
-      .parse(
-        (
-          await c.runAndReadAll(
-            `SELECT count(*) AS gets, coalesce(sum(n), 0) AS bytes,
-                coalesce(sum(n) FILTER (WHERE request.url LIKE '%/catalog.ducklake'), 0) AS "catalogBytes"
-              FROM (SELECT *, TRY_CAST(response.headers['Content-Length'] AS BIGINT) AS n
-                FROM duckdb_logs_parsed('HTTP') WHERE request.type = 'GET')`,
-          )
-        ).getRowObjectsJS()[0],
-      );
-    return { rows, estimate, ...fetched };
+    return { rows, estimate, ...(await fetchedBytes(c)) };
   } finally {
     c.closeSync();
     instance.closeSync();
   }
 }
 
+type Fetched = Pick<LakeQueryResult, "gets" | "bytes" | "catalogBytes">;
+
+async function fetchedBytes(c: DuckDBConnection): Promise<Fetched> {
+  return z
+    .object({
+      gets: z.coerce.number(),
+      bytes: z.coerce.number(),
+      catalogBytes: z.coerce.number(),
+    })
+    .parse(
+      (
+        await c.runAndReadAll(
+          `SELECT count(*) AS gets, coalesce(sum(n), 0) AS bytes,
+                coalesce(sum(n) FILTER (WHERE request.url LIKE '%/catalog.ducklake'), 0) AS "catalogBytes"
+              FROM (SELECT *, TRY_CAST(response.headers['Content-Length'] AS BIGINT) AS n
+                FROM duckdb_logs_parsed('HTTP') WHERE request.type = 'GET')`,
+        )
+      ).getRowObjectsJS()[0],
+    );
+}
+
 export class LakeBudgetError extends Error {
   constructor(
     message: string,
     readonly estimate: number,
+    readonly fetched: Fetched,
   ) {
     super(message);
     this.name = "LakeBudgetError";
@@ -338,7 +350,15 @@ if (import.meta.main) {
     .description("Run SQL against the lake, refusing it when its estimated reads exceed a budget")
     .argument("[sql]", "One SQL statement")
     .option("--name <query>", "A named query from resources/queries, in place of SQL")
-    .option("--param <name=value...>", "Variables to set first, read with getvariable()", [])
+    .option(
+      "--param <name=value>",
+      "A variable to set first, read with getvariable(). Repeatable",
+      (kv: string, all: string[]) => {
+        if (!/^\w+=/.test(kv)) throw new Error(`--param takes name=value, got ${kv}`);
+        return [...all, kv];
+      },
+      [],
+    )
     .option("--max-mb <mb>", "Budget for the estimated data reads, in MiB", "256")
     .action(async (text, o) => {
       if ((text === undefined) === (o.name === undefined))
@@ -347,18 +367,24 @@ if (import.meta.main) {
       const params = Object.fromEntries(
         o.param.map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)]),
       );
+      const maxMb = Number(o.maxMb);
+      if (!Number.isFinite(maxMb) || maxMb < 0)
+        throw new Error(`--max-mb takes a number of MiB, got ${o.maxMb}`);
       const started = performance.now();
       const url = options().url;
+      // The summary also lands in the transcript, which is how a cloud session's spend
+      // reaches the index.
+      const report = (f: Fetched, estimate: number) => {
+        console.error(
+          `lake: read ${(f.bytes / MB).toFixed(1)} MB in ${f.gets} GETs, ${(f.catalogBytes / MB).toFixed(1)} MB of it the catalog (data estimate ${(estimate / MB).toFixed(1)} MB)`,
+        );
+      };
       try {
-        const r = await queryLake(url, sql, Number(o.maxMb) * MB, params);
+        const r = await queryLake(url, sql, maxMb * MB, params);
         console.log(
           JSON.stringify(r.rows, (_, v: unknown) => (typeof v === "bigint" ? Number(v) : v)),
         );
-        // The summary also lands in the transcript, which is how a cloud session's spend
-        // reaches the index.
-        console.error(
-          `lake: read ${(r.bytes / MB).toFixed(1)} MB in ${r.gets} GETs, ${(r.catalogBytes / MB).toFixed(1)} MB of it the catalog (data estimate ${(r.estimate / MB).toFixed(1)} MB)`,
-        );
+        report(r, r.estimate);
         await emit({
           event: "query",
           ok: true,
@@ -384,6 +410,10 @@ if (import.meta.main) {
         if (error instanceof LakeBudgetError) {
           detail.error = "over budget";
           detail.estimate_bytes = error.estimate;
+          detail.gets = error.fetched.gets;
+          detail.http_bytes = error.fetched.bytes;
+          detail.catalog_bytes = error.fetched.catalogBytes;
+          report(error.fetched, error.estimate);
         }
         await emit({ event: "query", ok: false, ms: performance.now() - started, detail });
         throw error;

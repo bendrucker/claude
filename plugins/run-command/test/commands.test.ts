@@ -10,11 +10,13 @@ type Segment =
 const word = gs.text({ alphabet: "abcxyz019-_./=", minSize: 1, maxSize: 6 });
 
 const commandText = gs
-  .arrays(gs.oneOf(word, gs.sampledFrom(["!", "|", "&&", "2>&1", "'a b'", "$X", "\\"])), {
-    minSize: 1,
-    maxSize: 5,
+  .record({
+    head: gs.text({ alphabet: "abcxyz019_./=", minSize: 1, maxSize: 6 }),
+    rest: gs.arrays(gs.oneOf(word, gs.sampledFrom(["!", "|", "&&", "2>&1", "'a b'", "$X", "\\"])), {
+      maxSize: 4,
+    }),
   })
-  .map((parts) => parts.join(" "));
+  .map(({ head, rest }) => [head, ...rest].join(" "));
 
 const commandSegment: gs.Generator<Segment> = gs
   .record({
@@ -71,8 +73,28 @@ describe("blocks", () => {
       text: "!echo nospace\n* ! ls -la  \n`! wt list `",
       expected: [["ls -la", "wt list"]],
     },
-    { name: "an inline command is prose", text: "or run ! pwd inline", expected: [] },
+    { name: "a bare inline bang is prose", text: "or run ! pwd inline", expected: [] },
     { name: "a bang with only whitespace is no command", text: "!  \n` !  `", expected: [] },
+    {
+      name: "each inline code span is a block of its own",
+      text: "! ls\nRun `! git clean -n` to list them, then `! git clean -f`.\n! pwd",
+      expected: [["ls"], ["git clean -n"], ["git clean -f"], ["pwd"]],
+    },
+    {
+      name: "an inline span inside a fence is literal",
+      text: "```\nif `! true` fails\n```\nRun `! wt list`.",
+      expected: [["wt list"]],
+    },
+    {
+      name: "negation and placeholders are not commands",
+      text: "Unreachable behind `[[ ! -t 0 ]]` and `find . ! -path x`.\nEach `! <command>` line.",
+      expected: [],
+    },
+    {
+      name: "prose and options after a bang are not commands",
+      text: "```\n  ! This variable is unused.\n```\nUse `! -path ./mise/*`.",
+      expected: [],
+    },
   ])("$name", ({ text, expected }) => {
     expect(blocks(text)).toEqual(expected);
   });

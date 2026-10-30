@@ -66,10 +66,10 @@ every shape under it, which keeps a shape's evidence visible while it builds.
 
 ## Judge
 
-Read `argsPath` (JSON) and call the Workflow tool with the `scriptPath` from the preflight block and `args` set to the parsed contents:
+Read `scriptPath` and `argsPath` from the preflight block. The Workflow tool loads a `scriptPath` only from the session's working directories, so pass the script's full text inline, verbatim, with `args` set to the parsed contents of `argsPath`:
 
 ```
-Workflow({ scriptPath: <scriptPath>, args: <parsed job-args.json> })
+Workflow({ script: <contents of scriptPath>, args: <parsed job-args.json> })
 ```
 
 Each agent judges one shard and writes its verdicts to disk for `apply` to read. The workflow log carries only a shard count and how many were flagged.

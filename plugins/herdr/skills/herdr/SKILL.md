@@ -1,7 +1,7 @@
 ---
 name: herdr
 description: >-
-  Drive the herdr terminal workspace manager: inspect workspaces, tabs, and panes, hand work to sibling coding agents in other panes (distinct from in-session `Agent` subagents), split panes for collaborative file viewing or long-running processes, and correlate panes to Claude sessions. Load this when the decision to hand a task to another pane's agent arrives mid-task, and when opening a file alongside the user, starting a dev server or log tail the user should watch, capturing another pane's output, or asking what else is running. Pane, tab, workspace, and split are herdr's terms. In a session herdr hosts, a request naming one is a herdr request even when it never says herdr.
+  Drive the herdr terminal workspace manager, as the herdr TUI or the Herdr app and its herdr-core (`hc`) server: inspect workspaces, tabs, and panes, hand work to sibling coding agents in other panes (distinct from in-session `Agent` subagents), split panes for collaborative file viewing or long-running processes, and correlate panes to Claude sessions. Load this when the decision to hand a task to another pane's agent arrives mid-task, and when opening a file alongside the user, starting a dev server or log tail the user should watch, capturing another pane's output, or asking what else is running. Pane, tab, workspace, and split are herdr's terms. In a session herdr hosts, a request naming one is a herdr request even when it never says herdr.
 argument-hint: "[orient | agents | view <file> | read <pane>]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/orient.ts)
@@ -36,6 +36,14 @@ allowed-tools:
   - Bash(herdr plugin log list:*)
   - Bash(herdr plugin config-dir:*)
   - Bash(herdr machine list:*)
+  - Bash(hc --skill)
+  - Bash(hc --help:*)
+  - Bash(hc ls:*)
+  - Bash(hc get:*)
+  - Bash(hc read:*)
+  - Bash(hc wait:*)
+  - Bash(herdr-app --skill)
+  - Bash(herdr-app commands:*)
 ---
 
 # Herdr
@@ -43,6 +51,15 @@ allowed-tools:
 herdr manages the terminal workspace this session runs in, including every pane, tab, and sibling coding agent.
 
 Under `HERDR_ENV=1`, a request naming a pane, tab, workspace, or split is about this session's herdr layout.
+
+## Herdr App
+
+`HC_TERMINAL_ID` set means this session runs in a herdr-core terminal, usually under the Herdr app. The `herdr` CLI and everything below drive the TUI's server, a separate process that can't see the app's terminals. Take commands from the manuals the installed binaries print:
+
+- `hc --skill`: terminals and agents, including starting, reading, sending to, and waiting on them. `$HC_TERMINAL_ID` is this session's address.
+- `herdr-app --skill`: the window, including spaces, tabs, layouts, and splits. `herdr-app commands` lists every command.
+
+Dispatch a sibling agent by creating its worktree with `wt switch --create <branch> --no-cd`, then `hc run --bg --name <branch> --cwd <worktree> claude "<prompt>"`. Claude Code reports its own status to herdr-core. Never run `hc server stop`, which ends every terminal.
 
 ## Command Surface
 

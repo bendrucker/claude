@@ -26,7 +26,7 @@ Start any change meant to become its own PR in a worktree created with `worktrun
 
 ## Multiplexers
 
-herdr and Rex both host sessions here. Open panes, tabs, and splits with the multiplexer hosting this session: `rex` when the session-start context names a Rex terminal, `herdr:herdr` otherwise. Sibling-agent dispatch goes through `herdr:herdr` from either.
+herdr, the Herdr app, and Rex host sessions here. Open panes, tabs, and splits with the multiplexer hosting this session: `rex` when the session-start context names a Rex terminal, `herdr:herdr` otherwise. `herdr:herdr` covers both herdr TUI and the Herdr app. Sibling-agent dispatch goes through `herdr:herdr` from any of them.
 
 ## Configuration Repos
 

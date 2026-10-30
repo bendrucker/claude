@@ -5,6 +5,7 @@ argument-hint: "[audit] [<path>...] [--all] [--quiet]"
 effort: low
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts:*)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/audit.ts:*)
   - Read
   - Edit
 ---

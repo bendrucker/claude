@@ -17,7 +17,19 @@ import {
   store,
 } from "./data";
 import { sample } from "./sample";
-import { clears, evidence, judge, labConfig, overlaps, type Stage, score, stage } from "./score";
+import { CEILING, type Features, measure } from "./complexity";
+import {
+  best,
+  clears,
+  diffHits,
+  evidence,
+  judge,
+  labConfig,
+  overlaps,
+  type Stage,
+  score,
+  stage,
+} from "./score";
 import { locate, toFlags } from "./review";
 import { context } from "./server";
 import { checkRows } from "./status";
@@ -58,6 +70,25 @@ function flag(file: string, line: number, span: [number, number], pattern?: stri
 }
 
 const pattern: Pattern = { slug: "p", description: "", style: "Writing" };
+
+function makeScore(overrides: Partial<Score> = {}): Score {
+  return {
+    pattern: "p",
+    candidate: "c",
+    hits: 10,
+    right: 10,
+    wrong: 0,
+    byModel: 0,
+    low: 0.7,
+    high: 1,
+    recall: 1,
+    positives: 8,
+    perThousand: 0,
+    complexity: 0,
+    ts: "t",
+    ...overrides,
+  };
+}
 
 test.each<{
   name: string;
@@ -112,20 +143,8 @@ describe("stage", () => {
     Array.from({ length: count }, (_, i) =>
       label(hit(`f${i % files}`, i + 1, [1, 2]), "right", "p"),
     );
-  const top = (right: number, wrong: number, low: number): Score => ({
-    pattern: "p",
-    candidate: "c",
-    hits: right + wrong,
-    right,
-    wrong,
-    byModel: 0,
-    low,
-    high: 1,
-    recall: 1,
-    positives: 8,
-    perThousand: 0,
-    ts: "t",
-  });
+  const top = (right: number, wrong: number, low: number, complexity = 0): Score =>
+    makeScore({ hits: right + wrong, right, wrong, low, complexity });
 
   test.each<{ name: string; labels: Label[]; best?: Score; want: Stage }>([
     {
@@ -163,8 +182,14 @@ describe("stage", () => {
       best: top(12, 0, 0.75),
       want: "ready",
     },
-  ])("$name", ({ labels, best, want }) => {
-    expect(stage(pattern, evidence("p", labels, []), best)).toBe(want);
+    {
+      name: "a candidate over the complexity ceiling is not ready",
+      labels: positives(8, 4),
+      best: top(12, 0, 0.75, CEILING + 1),
+      want: "generalizing",
+    },
+  ])("$name", ({ labels, best: candidate, want }) => {
+    expect(stage(pattern, evidence("p", labels, []), candidate)).toBe(want);
   });
 
   test("a pattern with a check is shipped", () => {
@@ -194,6 +219,7 @@ test("score reports recall over the pattern's labels and flags", () => {
     labels,
     flags,
     2000,
+    0,
     "t",
   );
   expect({
@@ -202,6 +228,68 @@ test("score reports recall over the pattern's labels and flags", () => {
     right: s.right,
     perThousand: s.perThousand,
   }).toEqual({ recall: 2 / 3, positives: 3, right: 2, perThousand: 1 });
+});
+
+test.each<{ name: string; scores: Score[]; want: string }>([
+  {
+    name: "a simpler candidate within the top interval wins",
+    scores: [
+      makeScore({ candidate: "precise", low: 0.7, high: 0.95, complexity: 9 }),
+      makeScore({ candidate: "simple", low: 0.65, high: 0.9, complexity: 1 }),
+    ],
+    want: "simple",
+  },
+  {
+    name: "a simpler candidate whose interval misses the top floor loses",
+    scores: [
+      makeScore({ candidate: "precise", low: 0.7, high: 0.95, complexity: 9 }),
+      makeScore({ candidate: "simple", low: 0.3, high: 0.6, complexity: 1 }),
+    ],
+    want: "precise",
+  },
+])("best: $name", ({ scores, want }) => {
+  expect(best(scores, "p")?.candidate).toBe(want);
+});
+
+test.each<{ name: string; yaml: string; want: Partial<Features> }>([
+  {
+    name: "a plain word list",
+    yaml: "tokens:\n  - foo\n  - bar|baz\n",
+    want: { lookarounds: 0, gaps: 0, exceptionWords: 0, branches: 1, tokens: 2 },
+  },
+  {
+    name: "a negative lookahead counts its alternatives as exception words",
+    yaml: "tokens:\n  - '(?i)hi (?!there|team|all)\\w+'\n",
+    want: { lookarounds: 1, exceptionWords: 3, branches: 0 },
+  },
+  {
+    name: "a wildcard gap across words",
+    yaml: "raw:\n  - 'the reason .{0,40} is because'\n  - 'not [\\w\\s]+ but'\n",
+    want: { gaps: 2 },
+  },
+  {
+    name: "a separator class is not a gap",
+    yaml: "tokens:\n  - 'source[\\s-]+of[\\s-]+truth'\n",
+    want: { gaps: 0 },
+  },
+  {
+    name: "swap keys and the exceptions list",
+    yaml: "swap:\n  'a|b': c\nexceptions:\n  - x\n  - y\n",
+    want: { branches: 1, exceptions: 2, tokens: 1 },
+  },
+])("measure: $name", ({ yaml, want }) => {
+  expect(measure(yaml).features).toMatchObject({ unparsed: 0, ...want });
+});
+
+test("diffHits matches overlapping hits and reports the rest each way", () => {
+  const baseline = [hit("a", 1, [1, 5]), hit("a", 2, [1, 5])];
+  const candidate = [hit("a", 1, [3, 8], "Lab.c"), hit("b", 1, [1, 2], "Lab.c")];
+  const { kept, dropped, added } = diffHits(baseline, candidate);
+  expect([kept, dropped, added].map((list) => list.map((h) => `${h.file}:${h.line}`))).toEqual([
+    ["a:1"],
+    ["a:2"],
+    ["b:1"],
+  ]);
 });
 
 describe("sample", () => {

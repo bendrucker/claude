@@ -38,6 +38,8 @@ Read the new labels and flags, including flags without a pattern and the notes `
 
 Take a pattern whose `status` stage is `generalizing`. Write three or more candidate rules into `tmp/candidates/`, ranging from the most abstract form to the narrowest. Score them together with `score <pattern> <files...>`.
 
+`score` also reports each candidate's complexity, and `status` picks the simplest candidate whose precision interval overlaps the most precise one's. A candidate over the ceiling never reaches `ready`. Rewrite it with a part-of-speech `sequence` or a scope instead of a hand-listed exception.
+
 Pre-judge the hits `score` queues with `label <id> --verdict ... --pattern <slug>`, which records them as the model's. Rescore. Collect the hits you judged `unsure` into one list for the user. The user's label on a span overrides yours.
 
 ## Promote
@@ -49,6 +51,8 @@ When no candidate clears the floor, ship nothing. Record the trial (each candida
 ## Retire
 
 After each `sweep`, the check table in `status` marks shipped checks whose labeled floor fell under the bar. Propose retiring each one to the user with its counts.
+
+`status` also names the plugins' rules over the complexity ceiling, and `rules` ranks them all. Rewrite one with candidates checked by `compare <rule> <candidates...> --dir <corpus>`, which lists the hits each keeps, drops, and adds. Accept a drop when the dropped hits are rare or marginal. Pass `--rate <Style.Rule> --verdict complex|fine` to `rules` when the user disagrees with a score, and refit `WEIGHTS` in `complexity.ts` when the ceiling's agreement falls.
 
 ## Completion
 

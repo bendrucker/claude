@@ -85,9 +85,18 @@ export const Score = z.object({
   recall: z.number(),
   positives: z.number(),
   perThousand: z.number(),
+  complexity: z.number().default(0),
   ts: z.string(),
 });
 export type Score = z.infer<typeof Score>;
+
+/** The user's judgment of whether a rule is too complex to maintain, which the complexity weights are fit against. */
+export const Rating = z.object({
+  rule: z.string(),
+  verdict: z.enum(["complex", "fine"]),
+  ts: z.string(),
+});
+export type Rating = z.infer<typeof Rating>;
 
 /** A candidate's unlabeled hit, queued so the next sitting judges text the candidate was not written from. */
 export const Queued = Hit.extend({ pattern: z.string(), candidate: z.string() });
@@ -158,6 +167,8 @@ export interface Store {
   patterns(): Promise<Pattern[]>;
   scores(): Promise<Score[]>;
   queue(): Promise<Queued[]>;
+  ratings(): Promise<Rating[]>;
+  addRatings(records: readonly Rating[]): Promise<void>;
   addLabels(records: readonly Label[]): Promise<void>;
   addFlags(records: readonly Flag[]): Promise<void>;
   addDocs(records: readonly Doc[]): Promise<void>;
@@ -184,6 +195,8 @@ export function store(dir = DATA): Store {
     scores: async () =>
       latest(await readJsonl(Score, path("scores.jsonl")), (s) => `${s.pattern}|${s.candidate}`),
     queue: async () => latest(await readJsonl(Queued, path("queue.jsonl")), hitId),
+    ratings: async () => latest(await readJsonl(Rating, path("ratings.jsonl")), (r) => r.rule),
+    addRatings: (records) => appendJsonl(path("ratings.jsonl"), records),
     addLabels: (records) => appendJsonl(path("labels.jsonl"), records),
     addFlags: (records) => appendJsonl(path("flags.jsonl"), records),
     addDocs: (records) => appendJsonl(path("docs.jsonl"), records),

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { $ } from "bun";
 import { wilson } from "../evals/stats";
+import { CEILING } from "./complexity";
 import type { Flag, Hit, Label, Pattern, Score } from "./data";
 
 export const MIN_POSITIVES = 8;
@@ -103,6 +104,7 @@ export function score(
   labels: readonly Label[],
   flags: readonly Flag[],
   words: number,
+  complexity: number,
   ts: string,
 ): { score: Score; unlabeled: Hit[] } {
   const { right, wrong, byModel, unlabeled } = judge(hits, labels, flags);
@@ -122,6 +124,7 @@ export function score(
       recall: positives.length === 0 ? 0 : covered.length / positives.length,
       positives: positives.length,
       perThousand: words === 0 ? 0 : (hits.length / words) * 1000,
+      complexity,
       ts,
     },
     unlabeled,
@@ -132,17 +135,47 @@ export function clears(entry: Pick<Score, "right" | "wrong" | "low">): boolean {
   return entry.right + entry.wrong >= MIN_LABELED && entry.low >= FLOOR;
 }
 
+/** Meets the precision floor at a complexity under the ceiling. */
+export function promotable(entry: Pick<Score, "right" | "wrong" | "low" | "complexity">): boolean {
+  return clears(entry) && entry.complexity <= CEILING;
+}
+
 export type Stage = "collecting" | "generalizing" | "ready" | "shipped";
 
 export function stage(pattern: Pattern, found: Evidence, top: Score | undefined): Stage {
   if (pattern.check !== undefined) return "shipped";
   if (found.positives.length < MIN_POSITIVES || found.files < MIN_FILES) return "collecting";
-  return top !== undefined && clears(top) ? "ready" : "generalizing";
+  return top !== undefined && promotable(top) ? "ready" : "generalizing";
 }
 
-/** The candidate with the highest interval floor, the one a promotion would pick. */
+/**
+ * The candidate a promotion would pick: the simplest of those whose
+ * interval overlaps the most precise one's, a precision difference the labels
+ * don't resolve.
+ */
 export function best(scores: readonly Score[], pattern: string): Score | undefined {
-  return scores
+  const ranked = scores
     .filter((entry) => entry.pattern === pattern)
-    .toSorted((a, b) => (b.low === a.low ? b.recall - a.recall : b.low - a.low))[0];
+    .toSorted((a, b) => (b.low === a.low ? b.recall - a.recall : b.low - a.low));
+  const top = ranked[0];
+  if (top === undefined) return undefined;
+  return ranked
+    .filter((entry) => entry.high >= top.low)
+    .toSorted((a, b) => a.complexity - b.complexity)[0];
+}
+
+export interface HitDiff {
+  kept: Hit[];
+  dropped: Hit[];
+  added: Hit[];
+}
+
+/** How a candidate's hits differ from a baseline rule's, matching hits that overlap. */
+export function diffHits(baseline: readonly Hit[], candidate: readonly Hit[]): HitDiff {
+  const covers = (hits: readonly Hit[], hit: Hit) => hits.some((other) => overlaps(other, hit));
+  return {
+    kept: baseline.filter((hit) => covers(candidate, hit)),
+    dropped: baseline.filter((hit) => !covers(candidate, hit)),
+    added: candidate.filter((hit) => !covers(baseline, hit)),
+  };
 }

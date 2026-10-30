@@ -19,11 +19,12 @@ import {
   store,
   Verdict,
 } from "./data";
+import { CEILING, measure, type RuleComplexity, styleRules } from "./complexity";
 import { annotations, toFlags } from "./review";
 import { sample } from "./sample";
-import { labConfig, score } from "./score";
+import { diffHits, labConfig, score } from "./score";
 import { serve } from "./server";
-import { checkRows, patternRows, render } from "./status";
+import { checkRows, patternRows, render, renderRules } from "./status";
 
 const BUCKET = "s3://ben-drucker-agents-eval-corpus/prose-lab/data";
 const STYLE_PLUGIN = { Prompting: "prompting", Writing: "writing" } as const satisfies Record<
@@ -45,6 +46,13 @@ function collect(value: string, previous: string[] = []): string[] {
 }
 
 const data = store();
+
+async function ownRules(): Promise<RuleComplexity[]> {
+  const styles = Object.entries(STYLE_PLUGIN).map(([style, plugin]) =>
+    styleRules(join(ROOT, "plugins", plugin, "styles", style), style),
+  );
+  return (await Promise.all(styles)).flat();
+}
 
 const sweepCommand = new Command("sweep")
   .description("Lint the corpus with each plugin's Vale config and save the hits.")
@@ -249,9 +257,19 @@ const scoreCommand = new Command("score")
       candidates.map(async (candidate) => {
         const config = await labConfig([resolve(candidate)], PLUGINS[plugin]);
         const hits = await lintFiles(plugin, config, files);
+        const complexity = measure(await Bun.file(candidate).text()).score;
         return {
           candidate: basename(candidate, ".yml"),
-          ...score(slug, basename(candidate, ".yml"), hits, labels, flags, swept.words, ts),
+          ...score(
+            slug,
+            basename(candidate, ".yml"),
+            hits,
+            labels,
+            flags,
+            swept.words,
+            complexity,
+            ts,
+          ),
         };
       }),
     );
@@ -279,6 +297,7 @@ const scoreCommand = new Command("score")
           "by model",
           "interval",
           "recall",
+          "complexity",
           "unlabeled",
         ],
         ...results.map(({ candidate, score: s, unlabeled }) => [
@@ -290,6 +309,7 @@ const scoreCommand = new Command("score")
           s.byModel,
           `${Math.round(s.low * 100)}%-${Math.round(s.high * 100)}%`,
           `${Math.round(s.recall * s.positives)}/${s.positives}`,
+          s.complexity > CEILING ? `${s.complexity} (over ${CEILING})` : s.complexity,
           unlabeled.length,
         ]),
       ]),
@@ -297,21 +317,117 @@ const scoreCommand = new Command("score")
     console.log(`Queued ${fresh.length} unlabeled hits for the next sitting.`);
   });
 
+const rulesCommand = new Command("rules")
+  .description(
+    "Rank each plugin's own rules by complexity, and record whether a rule is too complex to maintain.",
+  )
+  .option("--rate <rule>", "rule to rate, as Style.Rule")
+  .addOption(
+    new Option("--verdict <verdict>", "rating for --rate").choices(["complex", "fine"] as const),
+  )
+  .action(async (options) => {
+    if (options.rate !== undefined) {
+      if (options.verdict === undefined) throw new InvalidArgumentError("--rate needs --verdict.");
+      await data.addRatings([
+        { rule: options.rate, verdict: options.verdict, ts: new Date().toISOString() },
+      ]);
+    }
+    const ratings = new Map((await data.ratings()).map((rating) => [rating.rule, rating.verdict]));
+    const rules = (await ownRules()).toSorted((a, b) => b.score - a.score);
+    process.stdout.write(renderRules(rules, ratings));
+  });
+
+/** Files per Vale run, since one run over thousands of files fails. */
+const LINT_BATCH = 400;
+
+async function lintRule(plugin: Plugin, rule: string, files: readonly string[]) {
+  const config = await labConfig([resolve(rule)], PLUGINS[plugin]);
+  const batches = Array.from({ length: Math.ceil(files.length / LINT_BATCH) }, (_, i) =>
+    files.slice(i * LINT_BATCH, (i + 1) * LINT_BATCH),
+  );
+  const lintBatch = async (batch: readonly string[]) => {
+    try {
+      return await lintFiles(plugin, config, batch);
+    } catch {
+      // One unparseable file fails its whole batch, so isolate it.
+      const each = await Promise.all(
+        batch.map((file) =>
+          lintFiles(plugin, config, [file]).catch(() => {
+            console.error(`Skipped ${file}: vale could not lint it.`);
+            return [];
+          }),
+        ),
+      );
+      return each.flat();
+    }
+  };
+  return (await Promise.all(batches.map(lintBatch))).flat();
+}
+
+async function markdownUnder(dir: string): Promise<string[]> {
+  const names = await readdir(resolve(dir), { recursive: true });
+  return names
+    .filter((name) => name.endsWith(".md"))
+    .map((name) => relative(ROOT, join(resolve(dir), name)));
+}
+
+const compareCommand = new Command("compare")
+  .description(
+    "Diff each candidate's hits against a baseline rule's, to check that a simpler rewrite keeps its recall.",
+  )
+  .argument("<baseline>", "the rule a candidate would replace")
+  .argument("<candidates...>", "Vale rule files")
+  .addOption(
+    new Option("--plugin <name>", "plugin config").choices(PLUGIN_NAMES).default("writing"),
+  )
+  .addOption(new Option("--corpus <name>", "lab corpus").choices(Corpus.options).default("skills"))
+  .option("--dir <path>", "also lint every .md under a directory, repeatable", collect, [])
+  .option("--examples <n>", "dropped and added hits to print per candidate", int, 10)
+  .action(async (baseline, candidates, options) => {
+    const files = [
+      ...(await corpusFiles(options.corpus)),
+      ...(await Promise.all(options.dir.map(markdownUnder))).flat(),
+    ];
+    const base = await lintRule(options.plugin, baseline, files);
+    const results = await Promise.all(
+      candidates.map(async (candidate) => ({
+        candidate,
+        diff: diffHits(base, await lintRule(options.plugin, candidate, files)),
+        complexity: measure(await Bun.file(candidate).text()).score,
+      })),
+    );
+    for (const { candidate, diff, complexity } of results) {
+      const { kept, dropped, added } = diff;
+      console.log(
+        `${basename(candidate, ".yml")}: kept ${kept.length}/${base.length}, dropped ${dropped.length}, added ${added.length}, complexity ${complexity}`,
+      );
+      for (const [kind, list] of [
+        ["dropped", dropped],
+        ["added", added],
+      ] as const) {
+        for (const hit of list.slice(0, options.examples))
+          console.log(`  ${kind} ${hit.file}:${hit.line} ${JSON.stringify(hit.match)}`);
+      }
+    }
+  });
+
 const statusCommand = new Command("status")
   .description("Report each pattern's stage and each labeled check's precision.")
   .action(async () => {
-    const [swept, labels, flags, patterns, scores] = await Promise.all([
+    const [swept, labels, flags, patterns, scores, rules] = await Promise.all([
       data.sweep(),
       data.labels(),
       data.flags(),
       data.patterns(),
       data.scores(),
+      ownRules(),
     ]);
     process.stdout.write(
       render(
         patternRows(patterns, labels, flags, scores),
         checkRows(swept?.hits ?? [], labels, flags),
         flags.filter((flag) => flag.pattern === undefined).length,
+        rules.filter((rule) => rule.score > CEILING).map((rule) => rule.rule),
       ),
     );
   });
@@ -344,6 +460,8 @@ export const program = new Command("lab")
   .addCommand(labelCommand)
   .addCommand(scoreCommand)
   .addCommand(statusCommand)
+  .addCommand(rulesCommand)
+  .addCommand(compareCommand)
   .addCommand(
     new Command("sync")
       .description("Mirror the lab data with the eval bucket.")

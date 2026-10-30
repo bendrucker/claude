@@ -72,7 +72,7 @@
 - name: a salutation fires in a PR body
   format: .prbody
   input: &salutation |
-    Dana, this fires for the entire run rather than the changed files.
+    Hi Dana, this fires for the entire run rather than the changed files.
   contains: [Writing.Salutation]
 - name: a salutation is off in a markdown file
   format: .md

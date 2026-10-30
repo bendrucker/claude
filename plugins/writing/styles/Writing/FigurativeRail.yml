@@ -1,0 +1,40 @@
+# evidence: mined 2026-10 from session corrections, where a rail stood for a constraint the reader had to decode ("a deliberate rail against fan-out"). The coined-jargon draft these tokens came from sampled at 0.9 precision with no voice baseline hits. It extends ai-tells.FigurativeNouns, which this repo syncs rather than edits.
+# retire when: a session sample shows precision under 0.7, or ai-tells.FigurativeNouns covers the figurative rail.
+extends: existence
+message: "'%s' is a figure for a constraint. Name the mechanism in plain technical terms."
+link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/FigurativeRail.yml
+level: warning
+nonword: true
+tokens:
+  # Only the guarding frame matches. A bare "rail" is a UI component, and "Rails" is the framework.
+  - '\brails? against\b'
+  - '\b(?i:safety|billing|monitoring|deliberate|hard|soft) rails?\b'
+tests:
+  - name: "flags a rail against fan-out"
+    input: |
+      The allowlist is a deliberate rail against ILIKE fan-out.
+    contains: [Writing.FigurativeRail]
+  - name: "flags billing rails"
+    input: |
+      The tension here is billing rails, and it is worth separating from the front-end choice.
+    contains: [Writing.FigurativeRail]
+  - name: "flags a safety rail"
+    input: |
+      The hook adds a safety rail for pushes to the default branch.
+    contains: [Writing.FigurativeRail]
+  - name: "allows the rail as a navigation component"
+    input: |
+      The rail collapses to years and expands only the active one.
+    absent: Writing.FigurativeRail
+  - name: "allows the Rails framework"
+    input: |
+      The Rails app reads the session from Redis.
+    absent: Writing.FigurativeRail
+  - name: "allows Ruby on Rails"
+    input: |
+      Upgrade Ruby on Rails to 7.2 before the deploy.
+    absent: Writing.FigurativeRail
+  - name: "allows a literal rail line"
+    input: |
+      The new rail line opens next spring.
+    absent: Writing.FigurativeRail

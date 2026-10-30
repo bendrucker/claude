@@ -128,6 +128,6 @@ A bot review often lands after the green push with no CI event to key off. `--re
 
 Rejected:
 
-- **`--report` plus inline apply**: pulls the full findings into ship's context, defeating the point of keeping bulk verdicts off the conversation.
+- **Report with inline apply** (`--report`): pulls the full findings into ship's context, defeating the point of keeping bulk verdicts off the conversation.
 - **Running it after `code-review --fix`**: the fix pass dirties the tree, failing `comments:audit`'s clean-tree check.
 - **Invoking the audit's scripts directly from ship**: ship cannot resolve the comments plugin's install path, it would duplicate the three-step runbook, and it would widen ship's tool grant past `git diff` and `git status`. `comments:audit` was made model-invocable instead.

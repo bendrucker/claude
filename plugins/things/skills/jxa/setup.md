@@ -26,7 +26,7 @@ Collections returned by JXA calls like `list.toDos()` are not JavaScript arrays.
 
 The `src/` directory contains TypeScript type definitions for reference:
 
-- **`Things3.d.ts`**: Generated from Things.app AppleScript dictionary. Covers Application, List, ToDo, Project, Area, Tag, Contact.
-- **`jxa-globals.d.ts`**: Global JXA functions like `Application()`.
+- `Things3.d.ts`: Generated from Things.app AppleScript dictionary. Covers Application, List, ToDo, Project, Area, Tag, Contact.
+- `jxa-globals.d.ts`: Global JXA functions like `Application()`.
 
 These document the API even when writing plain JXA.

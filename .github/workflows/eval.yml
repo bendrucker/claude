@@ -140,6 +140,7 @@ jobs:
           bun evals/native/run.ts "$SUITE_DIR" "${ref[@]}" -- --no-publish --threshold 0 --concurrency 4 "${args[@]}"
 
       - name: Upload results
+        id: upload
         if: steps.eval.outcome != 'skipped' && hashFiles(format('{0}/results/*/aggregate-result.json', env.SUITE_DIR)) != ''
         uses: actions/upload-artifact@v7
         with:
@@ -196,11 +197,14 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           TITLE: ${{ steps.report.outputs.title }}
+          LINK: ${{ steps.upload.outputs.artifact-url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}
         run: |
+          set -euo pipefail
+          bun evals/native/fit.ts "$RUNNER_TEMP/report.md" --link "$LINK" > "$RUNNER_TEMP/check.md"
           gh api "repos/$REPO/check-runs" --silent \
             -f name="eval / $SUITE" -f head_sha="$SHA" \
             -f status=completed -f conclusion=neutral \
-            -f "output[title]=$TITLE" -F "output[summary]=@$RUNNER_TEMP/report.md"
+            -f "output[title]=$TITLE" -F "output[summary]=@$RUNNER_TEMP/check.md"
 
       - name: Surface eval failure
         if: steps.eval.outcome == 'failure'

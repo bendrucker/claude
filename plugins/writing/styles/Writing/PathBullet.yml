@@ -1,5 +1,5 @@
 # evidence: a list item keyed by a bolded path or identifier (`- **`src/foo.ts`**: ...`) reads as a file manifest. Calibrated 2026-10-29: 0.026/1k across 1.1M session words, 0/1k in 1.1M words of the voice baseline, and every sampled hit keyed on a code span or path. Writing.BoldLabel reads only a colon inside the bold. Capitalized labels, enum values, and data rows are left out because most of their hits were legitimate definition lists.
-# retire when: the model stops writing identifier manifests, or the rule fires on user-authored markdown.
+# retire when: the model stops writing identifier manifests, or judged precision on a fresh sample falls under 0.7.
 extends: existence
 message: "'%s' bolds a path or identifier as a list label. Describe the change in prose, or drop the bold."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/PathBullet.yml

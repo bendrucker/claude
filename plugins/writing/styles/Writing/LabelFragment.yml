@@ -1,5 +1,5 @@
 # evidence: a bare gerund that announces a disposition ("Dismissing.", "Keeping as-is.", "Declining this one.") runs 0.0075/1k in Claude's posted prose (PR and MR bodies, review replies, issue comments: 30 hits in 4.0M words, 28 of 30 judged real) against 0.001/1k in the user's pre-AI writing (1 hit in 1.03M words), a lift of 5.2. The user objected that the label adds nothing once the reason is stated.
-# retire when: the posted-prose rate falls to the voice baseline, or a labeling pass shows most hits are statuses the reader needed.
+# retire when: judged precision on a fresh sample falls under 0.7, or most hits are statuses the reader needed.
 extends: existence
 message: "'%s' labels a disposition. State the outcome as a fact, such as 'The annotation stays because the literal fixes the type', or drop the label after the reason."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/LabelFragment.yml

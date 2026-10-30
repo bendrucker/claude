@@ -1,5 +1,5 @@
 # evidence: five chat corrections (2026-05 to 2026-10) objected to a lead-in that grades a source or acknowledges the reviewer before the content, and no shipped rule fired on any. Calibrated 2026-10-29 on a 1.01M-word random sample of assistant chat: 0.063/1k against 0.015/1k in the voice baseline (lift 4.3x), with 27 of 32 sampled hits judged real.
-# retire when: the session rate falls to within 2x of the voice baseline for 30 days, or spot-checks show the second-person token firing mostly on status reminders.
+# retire when: judged precision on a fresh sample falls under 0.7, or the second-person token fires mostly on status reminders.
 extends: existence
 message: "'%s' grades the source or acknowledges the reviewer before the content. Lead with the content, and quote the source if it matters."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/EvaluativePreamble.yml

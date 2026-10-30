@@ -116,6 +116,27 @@ export function latest<T>(records: readonly T[], key: (record: T) => string): T[
   return [...new Map(records.map((record) => [key(record), record])).values()];
 }
 
+/** The records that move the labels and flags named by `ids` to pattern `slug`. */
+export function assign(
+  slug: string,
+  ids: readonly string[],
+  labels: readonly Label[],
+  flags: readonly Flag[],
+  ts: string,
+): { labels: Label[]; flags: Flag[] } {
+  const byId = new Map<string, Label | Flag>([
+    ...labels.map((label) => [label.id, label] as const),
+    ...flags.map((flag) => [flag.id, flag] as const),
+  ]);
+  const missing = ids.filter((id) => !byId.has(id));
+  if (missing.length > 0) throw new Error(`Unknown ids: ${missing.join(", ")}`);
+  const pick = <T extends { id: string }>(records: readonly T[]): T[] =>
+    records.flatMap((record) =>
+      ids.includes(record.id) ? [{ ...record, pattern: slug, ts }] : [],
+    );
+  return { labels: pick(labels), flags: pick(flags) };
+}
+
 export interface Store {
   dir: string;
   sweep(): Promise<Sweep | undefined>;

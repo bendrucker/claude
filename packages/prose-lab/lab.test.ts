@@ -5,7 +5,17 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { countWords, lintFiles, PLUGINS } from "./corpus";
-import { type Flag, type Hit, hitId, type Label, type Pattern, type Score, store } from "./data";
+import {
+  assign,
+  type Flag,
+  type Hit,
+  hitId,
+  type Label,
+  latest,
+  type Pattern,
+  type Score,
+  store,
+} from "./data";
 import { sample } from "./sample";
 import { clears, evidence, judge, labConfig, overlaps, type Stage, score, stage } from "./score";
 import { locate, toFlags } from "./review";
@@ -364,8 +374,17 @@ describe("toFlags", () => {
   });
 });
 
-test("evidence counts a flag only once it has a pattern", () => {
-  const unassigned = flag("a", 1, [1, 5]);
-  expect(evidence("p", [], [unassigned]).positives).toEqual([]);
-  expect(evidence("p", [], [{ ...unassigned, pattern: "p" }]).positives).toHaveLength(1);
+describe("assign", () => {
+  test("evidence counts a flag only once assign gives it a pattern", () => {
+    const unassigned = flag("a", 1, [1, 5]);
+    expect(evidence("p", [], [unassigned]).positives).toEqual([]);
+    const assigned = assign("p", [unassigned.id], [], [unassigned], "t2");
+    expect(assigned).toEqual({ labels: [], flags: [{ ...unassigned, pattern: "p", ts: "t2" }] });
+    const current = latest([unassigned, ...assigned.flags], (f) => f.id);
+    expect(evidence("p", [], current).positives).toHaveLength(1);
+  });
+
+  test("rejects an id that is neither a label nor a flag", () => {
+    expect(() => assign("p", ["nope"], [], [], "t")).toThrow("Unknown ids: nope");
+  });
 });

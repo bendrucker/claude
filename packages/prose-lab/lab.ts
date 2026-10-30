@@ -8,6 +8,7 @@ import { table } from "table";
 import { z } from "zod";
 import { corpusFiles, lintFiles, PLUGINS, type Plugin, ROOT, sweep } from "./corpus";
 import {
+  assign,
   Corpus,
   DOCS,
   hitId,
@@ -106,23 +107,15 @@ const assignCommand = new Command("assign")
   .argument("<slug>", "pattern")
   .argument("<ids...>", "label or flag ids")
   .action(async (slug, ids) => {
-    const labels = new Map((await data.labels()).map((label) => [label.id, label]));
-    const flags = new Map((await data.flags()).map((flag) => [flag.id, flag]));
-    const missing = ids.filter((id) => !labels.has(id) && !flags.has(id));
-    if (missing.length > 0) throw new Error(`Unknown ids: ${missing.join(", ")}`);
-    const ts = new Date().toISOString();
-    await data.addLabels(
-      ids.flatMap((id) => {
-        const label = labels.get(id);
-        return label === undefined ? [] : [{ ...label, pattern: slug, ts }];
-      }),
+    const assigned = assign(
+      slug,
+      ids,
+      await data.labels(),
+      await data.flags(),
+      new Date().toISOString(),
     );
-    await data.addFlags(
-      ids.flatMap((id) => {
-        const flag = flags.get(id);
-        return flag === undefined ? [] : [{ ...flag, pattern: slug, ts }];
-      }),
-    );
+    await data.addLabels(assigned.labels);
+    await data.addFlags(assigned.flags);
   });
 
 /** A path under `DOCS` for `source` that no earlier snapshot took. */

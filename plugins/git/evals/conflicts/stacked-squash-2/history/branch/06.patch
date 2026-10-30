@@ -1,0 +1,182 @@
+diff --git a/plugins/pull-request/evals/pr-body/scripts/limits.test.ts b/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
+index 747c6ca0..758bd0f9 100644
+--- a/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
++++ b/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
+@@ -44,7 +44,10 @@ test("scores the stub body when a tool result carries one and the reply otherwis
+         cases: [{ name: "one", arms: { with: [run(1), run(1), run(1)], without: [run(1)] } }],
+       }),
+     ),
+-    Bun.write(join(results, "traces/one-with-0.jsonl"), stubTrace(`${long(10)} ${spans(7)}`)),
++    Bun.write(
++      join(results, "traces/one-with-0.jsonl"),
++      stubTrace(`${long(10)} ${spans(7)}\n\n<details>\n\n${long(70)}\n\n</details>`),
++    ),
+     Bun.write(
+       join(results, "traces/one-with-1.jsonl"),
+       replyTrace(`Title: Fix it\n\n${long(130)}`),
+@@ -62,24 +65,26 @@ test("scores the stub body when a tool result carries one and the reply otherwis
+     ["visible-words", true],
+     ["max-block", true],
+     ["prose-code-spans", false],
++    ["hidden-words", false],
+   ]);
+   expect(rows("with", 1)).toEqual([
+     ["fact", true],
+     ["visible-words", false],
+     ["max-block", false],
+     ["prose-code-spans", true],
++    ["hidden-words", true],
+   ]);
+   expect(written.cases[0]?.arms.with?.[0]?.graders.at(-1)?.explanation).toContain("from stub");
+   expect(written.cases[0]?.arms.with?.[1]?.graders.at(-1)?.explanation).toContain("from reply");
+-  expect(written.cases[0]?.arms.with?.map((r) => r.score)).toEqual([3 / 4, 2 / 4, 1]);
++  expect(written.cases[0]?.arms.with?.map((r) => r.score)).toEqual([3 / 5, 3 / 5, 1]);
+   expect(written.cases[0]?.arms.without?.[0]?.score).toBe(1);
+   expect(await Bun.file(join(out, "traces/one-with-1.jsonl")).exists()).toBe(true);
+   expect(render(counts)).toMatchInlineSnapshot(`
+-    "╔══════╤════════════════════╤════════════════╤═══════════════════════╤═══════════════════════╤═══════════════════╤══════════════════════════╗
+-    ║ case │ with visible-words │ with max-block │ with prose-code-spans │ without visible-words │ without max-block │ without prose-code-spans ║
+-    ╟──────┼────────────────────┼────────────────┼───────────────────────┼───────────────────────┼───────────────────┼──────────────────────────╢
+-    ║ one  │ 1/2                │ 1/2            │ 1/2                   │ 1/1                   │ 1/1               │ 1/1                      ║
+-    ╚══════╧════════════════════╧════════════════╧═══════════════════════╧═══════════════════════╧═══════════════════╧══════════════════════════╝
++    "╔══════╤════════════════════╤════════════════╤═══════════════════════╤═══════════════════╤═══════════════════════╤═══════════════════╤══════════════════════════╤══════════════════════╗
++    ║ case │ with visible-words │ with max-block │ with prose-code-spans │ with hidden-words │ without visible-words │ without max-block │ without prose-code-spans │ without hidden-words ║
++    ╟──────┼────────────────────┼────────────────┼───────────────────────┼───────────────────┼───────────────────────┼───────────────────┼──────────────────────────┼──────────────────────╢
++    ║ one  │ 1/2                │ 1/2            │ 1/2                   │ 1/2               │ 1/1                   │ 1/1               │ 1/1                      │ 1/1                  ║
++    ╚══════╧════════════════════╧════════════════╧═══════════════════════╧═══════════════════╧═══════════════════════╧═══════════════════╧══════════════════════════╧══════════════════════╝
+     "
+   `);
+ });
+diff --git a/plugins/pull-request/evals/pr-body/scripts/limits.ts b/plugins/pull-request/evals/pr-body/scripts/limits.ts
+index d0902295..01c1ca1a 100644
+--- a/plugins/pull-request/evals/pr-body/scripts/limits.ts
++++ b/plugins/pull-request/evals/pr-body/scripts/limits.ts
+@@ -6,7 +6,7 @@ import { table } from "table";
+ import { z } from "zod";
+ import { traceReply } from "../../../../../evals/native/load";
+ import { type Run, Result, score } from "../../../../../evals/native/regrade";
+-import { LIMITS, type LimitKey, limitKeys, measureStructure } from "../structure";
++import { GUARDS, LIMITS, limitKeys, measureStructure } from "../structure";
+ 
+ // Scores a results directory against the PR-body structure limits, so changing
+ // a limit doesn't require new sessions.
+@@ -22,11 +22,16 @@ const TraceLine = z.looseObject({
+   message: z.looseObject({ content: z.unknown() }).optional(),
+ });
+ 
++const CHECKS = { ...LIMITS, ...GUARDS };
++type CheckKey = keyof typeof CHECKS;
++const checkKeys: CheckKey[] = [...limitKeys, "hiddenWords"];
++
+ const ROWS = {
+   visibleWords: "visible-words",
+   maxBlockWords: "max-block",
+   proseCodeSpans: "prose-code-spans",
+-} as const satisfies Record<LimitKey, string>;
++  hiddenWords: "hidden-words",
++} as const satisfies Record<CheckKey, string>;
+ 
+ const STUB_BLOCK = /^PR-BODY-BEGIN[^\S\n]*\n([\s\S]*?)\n?^PR-BODY-END[^\S\n]*$/gm;
+ 
+@@ -65,13 +70,13 @@ export function bodyOf(trace: string): Body | undefined {
+ 
+ export function limitRows(body: Body): Run["graders"] {
+   const s = measureStructure(body.text);
+-  return limitKeys.map((key) => ({
++  return checkKeys.map((key) => ({
+     name: ROWS[key],
+-    passed: s[key] <= LIMITS[key],
++    passed: s[key] <= CHECKS[key],
+     weight: 1,
+     scored: true,
+     withOnly: false,
+-    explanation: `${key} ${s[key]} against limit ${LIMITS[key]} (body from ${body.source})`,
++    explanation: `${key} ${s[key]} against limit ${CHECKS[key]} (body from ${body.source})`,
+   }));
+ }
+ 
+@@ -150,7 +155,7 @@ export function render(counts: Counts): string {
+ 
+ const program = new Command()
+   .description(
+-    "Add visible-words, max-block, and prose-code-spans rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
++    "Add visible-words, max-block, prose-code-spans, and hidden-words rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
+   )
+   .argument("<results-dir...>", "results directories holding aggregate-result.json and traces/")
+   .action(async (dirs) => {
+diff --git a/plugins/pull-request/evals/pr-body/structure.ts b/plugins/pull-request/evals/pr-body/structure.ts
+index 77bd8c0a..1b9e83dc 100644
+--- a/plugins/pull-request/evals/pr-body/structure.ts
++++ b/plugins/pull-request/evals/pr-body/structure.ts
+@@ -10,6 +10,7 @@ import { gfm } from "micromark-extension-gfm";
+ export interface Structure {
+   visibleWords: number;
+   collapsedWords: number;
++  hiddenWords: number;
+   leadWords: number;
+   paragraphs: number;
+   maxParagraphWords: number;
+@@ -77,6 +78,8 @@ interface Acc {
+   listSizes: number[];
+   visibleWords: number;
+   collapsedWords: number;
++  tableWords: number;
++  fenceWords: number;
+   listWords: number;
+   headings: number;
+   visibleTables: number;
+@@ -135,7 +138,8 @@ function visitChildren(children: RootContent[], acc: Acc, collapsed: boolean): v
+     }
+     const hidden = collapsed || depth > 0;
+     if (hidden) {
+-      acc.collapsedWords += node.type === "code" ? 0 : countWords(toString(node));
++      if (node.type === "code") acc.fenceWords += countWords(node.value);
++      else acc.collapsedWords += countWords(toString(node));
+       continue;
+     }
+     // oxlint-disable-next-line typescript/switch-exhaustiveness-check -- other block types carry no prose
+@@ -166,10 +170,14 @@ function visitChildren(children: RootContent[], acc: Acc, collapsed: boolean): v
+         break;
+       case "table":
+         acc.visibleTables++;
++        acc.tableWords += countWords(
++          node.children.flatMap((row) => row.children.map((c) => toString(c))).join(" "),
++        );
+         acc.visibleImages += countImages(node);
+         break;
+       case "code":
+         acc.visibleCodeLines += node.value.split("\n").length;
++        acc.fenceWords += countWords(node.value);
+         break;
+       case "blockquote":
+         visitChildren(node.children, acc, false);
+@@ -195,6 +203,8 @@ export function measureStructure(body: string): Structure {
+     listSizes: [],
+     visibleWords: 0,
+     collapsedWords: 0,
++    tableWords: 0,
++    fenceWords: 0,
+     listWords: 0,
+     headings: 0,
+     visibleTables: 0,
+@@ -212,6 +222,7 @@ export function measureStructure(body: string): Structure {
+   return {
+     visibleWords: v,
+     collapsedWords: acc.collapsedWords,
++    hiddenWords: acc.collapsedWords + acc.tableWords + acc.fenceWords,
+     leadWords: firstParagraph ? countWords(toString(firstParagraph)) : 0,
+     paragraphs: acc.paragraphWords.length,
+     maxParagraphWords: max(acc.paragraphWords),
+@@ -257,6 +268,12 @@ const isLimitKey = (k: string): k is LimitKey => k in LIMITS;
+ 
+ export const limitKeys: LimitKey[] = Object.keys(LIMITS).filter(isLimitKey);
+ 
++// Trimming a body to fit the limits must not move its prose into <details>,
++// tables, or fences. No baseline body comes near this.
++export const GUARDS = {
++  hiddenWords: 60,
++} as const satisfies Partial<Structure>;
++
+ export function overLimits(s: Structure): LimitKey[] {
+   return limitKeys.filter((k) => s[k] > LIMITS[k]);
+ }

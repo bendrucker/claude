@@ -1,0 +1,22 @@
+diff --git a/plugins/performance/skills/hill-climb/SKILL.md b/plugins/performance/skills/hill-climb/SKILL.md
+index bd3236c2..470d7b97 100644
+--- a/plugins/performance/skills/hill-climb/SKILL.md
++++ b/plugins/performance/skills/hill-climb/SKILL.md
+@@ -96,7 +96,7 @@ Record every lead you do not climb in the notes file's Set Aside table with its
+ 
+ Run the guard check first. A candidate that changes behavior is rejected without timing.
+ 
+-Screen with the fast signal or a microbenchmark of the changed path. Confirm a candidate that passes the screen with the full metric, interleaved against the current accepted arm at the baseline's run count.
++Screen with the fast signal or a microbenchmark of the changed path. Confirm a candidate that passes the screen with the full metric, interleaved against the current accepted arm at the baseline's run count. Confirm on every `dev` scenario, including ones the change cannot reach on paper, since a shared lock, allocator, or cache carries a change into code it never touches.
+ 
+ #### Decide
+ 
+@@ -110,7 +110,7 @@ After each decision:
+ 
+ - Re-profile after an accept, since the ranking shifts.
+ - Report the first decision to the user in one line, and continue unless the user redirects.
+-- Commit a mid-climb harness change separately, re-run the baseline, and note it in the notes file.
++- Commit a mid-climb harness change separately, re-run the baseline and the A/A, and note it in the notes file. A new input family, inputs at a new scale, and a new runtime or dependency version are harness changes.
+ - After two rejections in a row, re-run the A/A and re-profile before the next candidate. A stall often means the noise floor rose or the profile ranks work the scenario does not wait on.
+ 
+ ## Stopping

@@ -1,0 +1,13 @@
+diff --git a/plugins/performance/skills/hill-climb/SKILL.md b/plugins/performance/skills/hill-climb/SKILL.md
+index 02bbd96a..00b66472 100644
+--- a/plugins/performance/skills/hill-climb/SKILL.md
++++ b/plugins/performance/skills/hill-climb/SKILL.md
+@@ -99,7 +99,7 @@ Screen with the fast signal or a microbenchmark of the changed path. Confirm a c
+ - **Accept** when the target moves in the predicted direction past the acceptance rule in the notes file (default: permutation p < 0.1 and a median gain of at least 3%) and no guard regresses. Commit the change alone, with the evidence in the commit body.
+ - **Keep unconfirmed** when the target did not move but the user agrees to keep the change for a reason outside the metric. Label it "kept, unconfirmed" in the notes, commit body, and PR, and leave it out of the reported gain.
+ - **Reject** otherwise. Record the hypothesis, pseudocode of the change, and the numbers in the notes file, and save the diff as a patch beside it, so the null result stays findable. A rejected hypothesis stays rejected until a new profile argues for it.
+-- **Re-run** an accept whose rounds `compare.ts report` flags for load, and decide on the re-run.
++- **Re-run** an accept that rests on rounds `compare.ts report` flags for load, and decide on the re-run. An accept rests on them when the gain or its significance fails without those rounds.
+ - **Bound** an accepted gain by its target's time in the profile. Re-measure a gain past that bound before committing, or report the excess as unexplained.
+ 
+ After each decision:

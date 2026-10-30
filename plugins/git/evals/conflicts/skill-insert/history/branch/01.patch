@@ -1,0 +1,25 @@
+diff --git a/plugins/performance/skills/hill-climb/SKILL.md b/plugins/performance/skills/hill-climb/SKILL.md
+index 9022e9bb..bd3236c2 100644
+--- a/plugins/performance/skills/hill-climb/SKILL.md
++++ b/plugins/performance/skills/hill-climb/SKILL.md
+@@ -1,8 +1,9 @@
+ ---
+ name: performance:hill-climb
+ description: >-
+-  Use when asked to make software faster or leaner (runtime, startup,
+-  throughput, memory, bundle size) through repeated measured changes. For
++  Use when asked to hill-climb a program, or to make software faster or
++  leaner (runtime, startup, throughput, memory, bundle size) through repeated
++  measured changes, including resuming a climb from its notes file. For
+   prompts or skills scored by an eval suite, use prompting:hill-climb.
+ argument-hint: "<target> [<notes file>]"
+ ---
+@@ -16,7 +17,7 @@ This skill is the workflow. Load `performance:benchmark` to build the harness an
+ ## Arguments
+ 
+ - `<target>`: the program or command to climb. Required.
+-- `<notes file>`: where the climb log lives. Default: `CLIMB.md` beside the benchmark harness, or `tmp/climb.md` when the repo has no harness directory.
++- `<notes file>`: where the climb log lives. Default: `CLIMB.md` beside the benchmark harness, or `tmp/climb.md` when the repo has no harness directory. When it already exists, resume from it: skip the Frame items its Rules settle, and keep the line under its title that tells a later session to load this skill.
+ 
+ ## Frame
+ 

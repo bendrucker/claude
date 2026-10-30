@@ -1,11 +1,24 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { countWords, lintFiles, PLUGINS } from "./corpus";
-import { type Flag, type Hit, hitId, type Label, type Pattern, type Score, store } from "./data";
+import {
+  assign,
+  type Flag,
+  type Hit,
+  hitId,
+  type Label,
+  latest,
+  type Pattern,
+  type Score,
+  store,
+} from "./data";
 import { sample } from "./sample";
 import { clears, evidence, judge, labConfig, overlaps, type Stage, score, stage } from "./score";
+import { locate, toFlags } from "./review";
 import { context } from "./server";
 import { checkRows } from "./status";
 
@@ -31,7 +44,7 @@ function label(
   return { ...at, id: hitId(at), verdict, note: "", pattern, by, ts: "t" };
 }
 
-function flag(file: string, line: number, span: [number, number], pattern: string): Flag {
+function flag(file: string, line: number, span: [number, number], pattern?: string): Flag {
   return {
     id: `${file}|${line}|${span[0]}`,
     pattern,
@@ -271,4 +284,126 @@ describe("labConfig", () => {
       ]);
     },
   );
+});
+
+describe("locate", () => {
+  const lines = [
+    "# Doc",
+    "",
+    "Run `lab.ts sweep` before a **sitting** starts.",
+    "See [the guide](https://example.com) for more.",
+    "",
+    "A second paragraph.",
+    "Emoji 😀x y.",
+    "Made &copy; here today.",
+    "It can't be read.",
+  ];
+  const slices = (quote: string): string[] =>
+    locate(lines, quote).map(
+      ({ line, span }) => lines[line - 1]?.slice(span[0] - 1, span[1]) ?? "",
+    );
+
+  test.each<{ name: string; quote: string; want: string[] }>([
+    { name: "plain text", quote: "A second", want: ["A second"] },
+    {
+      name: "across backticked code",
+      quote: "Run lab.ts sweep before",
+      want: ["Run `lab.ts sweep` before"],
+    },
+    { name: "the whole code span", quote: "lab.ts sweep", want: ["`lab.ts sweep`"] },
+    { name: "link text", quote: "the guide", want: ["the guide"] },
+    {
+      name: "across two lines",
+      quote: "starts. See the",
+      want: ["starts.", "See [the"],
+    },
+    { name: "missing", quote: "not in the doc", want: [] },
+    { name: "a quote that appears twice", quote: "for", want: [] },
+    { name: "an astral character", quote: "😀x", want: ["😀x"] },
+    { name: "text after a decoded entity", quote: "here today", want: ["here today"] },
+    { name: "a curled apostrophe", quote: "can’t be", want: ["can't be"] },
+  ])("$name", ({ quote, want }) => {
+    expect(slices(quote)).toEqual(want);
+  });
+
+  test("finds any run of words from plain paragraphs", () => {
+    const words = ["alpha", "beta", "gamma", "delta"];
+    const wordsGen = gs.arrays(gs.integers({ minValue: 0, maxValue: words.length - 1 }), {
+      minSize: 1,
+      maxSize: 6,
+    });
+    hegel.test((tc) => {
+      const paragraphs = tc
+        .draw(gs.arrays(wordsGen, { minSize: 1, maxSize: 4 }))
+        .map((picks) => picks.map((i) => words[i]).join(" "));
+      const raw = paragraphs.join("\n\n").split("\n");
+      const all = paragraphs.join(" ").split(" ");
+      const start = tc.draw(gs.integers({ minValue: 0, maxValue: all.length - 1 }));
+      const end = tc.draw(gs.integers({ minValue: start + 1, maxValue: all.length }));
+      const quote = all.slice(start, end).join(" ");
+      const found = locate(raw, quote).map(({ line, span }) =>
+        raw[line - 1]?.slice(span[0] - 1, span[1]),
+      );
+      const text = all.join(" ");
+      const unique = text.indexOf(quote) === text.lastIndexOf(quote);
+      expect(found.join(" ")).toBe(unique ? quote : "");
+    });
+  });
+});
+
+describe("toFlags", () => {
+  const lines = ["Run `lab.ts sweep` first."];
+
+  test("turns a comment into an unassigned flag on the raw slice and keeps global notes apart", () => {
+    const reviewed = toFlags(
+      [
+        { type: "COMMENT", text: "jargon", originalText: "lab.ts sweep" },
+        { type: "GLOBAL_COMMENT", text: "too terse" },
+        { type: "COMMENT", text: "gone", originalText: "edited away" },
+        { type: "DELETION", text: "", originalText: "first" },
+      ],
+      "d.md",
+      lines,
+      "t",
+    );
+    expect(reviewed).toEqual({
+      flags: [
+        {
+          id: "d.md|1|5",
+          file: "d.md",
+          line: 1,
+          span: [5, 18],
+          match: "`lab.ts sweep`",
+          note: "jargon",
+          ts: "t",
+        },
+        {
+          id: "d.md|1|20",
+          file: "d.md",
+          line: 1,
+          span: [20, 24],
+          match: "first",
+          note: "deletion",
+          ts: "t",
+        },
+      ],
+      unlocated: [{ type: "COMMENT", text: "gone", originalText: "edited away" }],
+      globals: ["too terse"],
+    });
+  });
+});
+
+describe("assign", () => {
+  test("evidence counts a flag only once assign gives it a pattern", () => {
+    const unassigned = flag("a", 1, [1, 5]);
+    expect(evidence("p", [], [unassigned]).positives).toEqual([]);
+    const assigned = assign("p", [unassigned.id], [], [unassigned], "t2");
+    expect(assigned).toEqual({ labels: [], flags: [{ ...unassigned, pattern: "p", ts: "t2" }] });
+    const current = latest([unassigned, ...assigned.flags], (f) => f.id);
+    expect(evidence("p", [], current).positives).toHaveLength(1);
+  });
+
+  test("rejects an id that is neither a label nor a flag", () => {
+    expect(() => assign("p", ["nope"], [], [], "t")).toThrow("Unknown ids: nope");
+  });
 });

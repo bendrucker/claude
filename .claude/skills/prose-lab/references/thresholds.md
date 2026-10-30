@@ -18,3 +18,5 @@ A hit is right when it overlaps a span labeled right or flagged, and wrong when 
 ## Customization Criteria
 
 The lab works when promoted rules hold their floor at the next sweep and right hits per 1,000 words rise on skill files. It fails when patterns stall below 8 positives over three sittings, or when promoted rules retire within a month. `status` and the rule headers in git history carry the evidence.
+
+Review works when flags from reviewed documents end up assigned to patterns that promote. It fails when they sit without a pattern across three sittings, which the count at the foot of `status` shows.

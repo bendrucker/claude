@@ -1,7 +1,10 @@
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 
 export const DATA = join(import.meta.dirname, "data");
+/** Snapshots of documents reviewed in Plannotator, which every corpus includes. */
+export const DOCS = join(DATA, "docs");
 
 export const Hit = z.object({
   plugin: z.string(),
@@ -23,6 +26,7 @@ export const Sweep = z.object({
   rev: z.string(),
   words: z.number(),
   hits: z.array(Hit),
+  plugins: z.array(z.string()).optional(),
 });
 export type Sweep = z.infer<typeof Sweep>;
 
@@ -42,7 +46,7 @@ export type Label = z.infer<typeof Label>;
 /** A span the user marked that no shipped rule caught. */
 export const Flag = z.object({
   id: z.string(),
-  pattern: z.string(),
+  pattern: z.string().optional(),
   file: z.string(),
   line: z.number(),
   span: z.tuple([z.number(), z.number()]),
@@ -51,6 +55,14 @@ export const Flag = z.object({
   ts: z.string(),
 });
 export type Flag = z.infer<typeof Flag>;
+
+/** A reviewed document's snapshot under `DOCS`, and the file it was copied from. */
+export const Doc = z.object({
+  doc: z.string(),
+  source: z.string(),
+  ts: z.string(),
+});
+export type Doc = z.infer<typeof Doc>;
 
 export const Pattern = z.object({
   slug: z.string().regex(/^[a-z0-9-]+$/),
@@ -85,6 +97,16 @@ export function hitId(hit: Pick<Hit, "check" | "file" | "line" | "span">): strin
   return `${hit.check}|${hit.file}|${hit.line}|${hit.span[0]}`;
 }
 
+/** A directory's entries, or none when it does not exist yet. */
+export async function entries(dir: string): Promise<string[]> {
+  try {
+    return await readdir(dir);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
 export async function readJsonl<T>(schema: z.ZodType<T>, path: string): Promise<T[]> {
   const file = Bun.file(path);
   if (!(await file.exists())) return [];
@@ -106,17 +128,39 @@ export function latest<T>(records: readonly T[], key: (record: T) => string): T[
   return [...new Map(records.map((record) => [key(record), record])).values()];
 }
 
+/** The records that move the labels and flags named by `ids` to pattern `slug`. */
+export function assign(
+  slug: string,
+  ids: readonly string[],
+  labels: readonly Label[],
+  flags: readonly Flag[],
+  ts: string,
+): { labels: Label[]; flags: Flag[] } {
+  const byId = new Map<string, Label | Flag>([
+    ...labels.map((label) => [label.id, label] as const),
+    ...flags.map((flag) => [flag.id, flag] as const),
+  ]);
+  const missing = ids.filter((id) => !byId.has(id));
+  if (missing.length > 0) throw new Error(`Unknown ids: ${missing.join(", ")}`);
+  const wanted = new Set(ids);
+  const pick = <T extends { id: string }>(records: readonly T[]): T[] =>
+    records.flatMap((record) => (wanted.has(record.id) ? [{ ...record, pattern: slug, ts }] : []));
+  return { labels: pick(labels), flags: pick(flags) };
+}
+
 export interface Store {
   dir: string;
   sweep(): Promise<Sweep | undefined>;
   writeSweep(sweep: Sweep): Promise<void>;
   labels(): Promise<Label[]>;
   flags(): Promise<Flag[]>;
+  docs(): Promise<Doc[]>;
   patterns(): Promise<Pattern[]>;
   scores(): Promise<Score[]>;
   queue(): Promise<Queued[]>;
   addLabels(records: readonly Label[]): Promise<void>;
   addFlags(records: readonly Flag[]): Promise<void>;
+  addDocs(records: readonly Doc[]): Promise<void>;
   addPatterns(records: readonly Pattern[]): Promise<void>;
   addScores(records: readonly Score[]): Promise<void>;
   enqueue(records: readonly Queued[]): Promise<void>;
@@ -135,12 +179,14 @@ export function store(dir = DATA): Store {
     },
     labels: async () => latest(await readJsonl(Label, path("labels.jsonl")), (l) => l.id),
     flags: async () => latest(await readJsonl(Flag, path("flags.jsonl")), (f) => f.id),
+    docs: () => readJsonl(Doc, path("docs.jsonl")),
     patterns: async () => latest(await readJsonl(Pattern, path("patterns.jsonl")), (p) => p.slug),
     scores: async () =>
       latest(await readJsonl(Score, path("scores.jsonl")), (s) => `${s.pattern}|${s.candidate}`),
     queue: async () => latest(await readJsonl(Queued, path("queue.jsonl")), hitId),
     addLabels: (records) => appendJsonl(path("labels.jsonl"), records),
     addFlags: (records) => appendJsonl(path("flags.jsonl"), records),
+    addDocs: (records) => appendJsonl(path("docs.jsonl"), records),
     addPatterns: (records) => appendJsonl(path("patterns.jsonl"), records),
     addScores: (records) => appendJsonl(path("scores.jsonl"), records),
     enqueue: (records) => appendJsonl(path("queue.jsonl"), records),

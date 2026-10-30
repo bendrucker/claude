@@ -1,7 +1,7 @@
 import { join, relative } from "node:path";
 import { $ } from "bun";
 import { lint } from "../../plugins/prompting/skills/scan/scripts/vale";
-import type { Corpus, Hit, Sweep } from "./data";
+import { type Corpus, DOCS, entries, type Hit, type Sweep } from "./data";
 
 export const ROOT = join(import.meta.dirname, "..", "..");
 
@@ -34,9 +34,13 @@ const SAMPLES = [
   ":(exclude,glob)**/evals/**",
 ];
 
-export async function corpusFiles(corpus: Corpus, root = ROOT): Promise<string[]> {
+export async function corpusFiles(corpus: Corpus, root = ROOT, docs = DOCS): Promise<string[]> {
   const out = await $`git -C ${root} ls-files -- ${[...CORPORA[corpus], ...SAMPLES]}`.text();
-  return out.split("\n").filter(Boolean);
+  // Snapshots are gitignored, so ls-files never lists them.
+  const reviewed = (await entries(docs))
+    .filter((name) => name.endsWith(".md"))
+    .map((name) => relative(root, join(docs, name)));
+  return [...out.split("\n").filter(Boolean), ...reviewed];
 }
 
 /** Words outside fenced code, the denominator for a per-1,000-word rate. */
@@ -87,5 +91,6 @@ export async function sweep(
     rev: rev.trim(),
     words: words.reduce((a, b) => a + b, 0),
     hits: hits.flat(),
+    plugins: [...plugins],
   };
 }

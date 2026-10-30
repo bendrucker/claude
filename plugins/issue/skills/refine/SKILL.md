@@ -68,7 +68,7 @@ What you learned exploring the codebase, so the implementing agent doesn't explo
 
 Write lists of paths, symbols, and commands for an agent. [Style](#style) does not apply: line numbers, ranges, and bare enumeration are fine when they save a search.
 
-Emit only what exploration produced. Drop subsections you can't fill, and the whole section when exploration came up empty or the issue goes to a repository your team doesn't maintain, whose maintainers know their own code.
+Emit only what exploration produced. Drop subsections you can't fill, and the whole section when exploration came up empty or you're filing in another project's tracker, whose maintainers know their own code. An issue in your own tracker about another project's bug keeps it.
 
 Open the block with one line, `Gathered at <commit> on <date>.` (`git rev-parse --short HEAD`), or `Gathered on <date>.` without a commit, and go straight to the first subsection. The implementer checks every pointer against their own checkout. That check already covers where a finding came from and what you couldn't confirm. State each finding as fact about the code. Pair every line number with its symbol, which survives drift.
 

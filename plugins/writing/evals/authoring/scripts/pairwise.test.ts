@@ -47,6 +47,10 @@ describe("extractOut", () => {
   ])("extractOut($reply)", ({ reply, expected }) => {
     expect(extractOut(reply)).toBe(expected);
   });
+
+  test("reads a named tag", () => {
+    expect(extractOut("<out>no</out>\n<issue>\nbody\n</issue>", "issue")).toBe("body");
+  });
 });
 
 describe("extractWrite", () => {
@@ -317,6 +321,10 @@ describe("surfaceFor", () => {
 
   test("an override wins over the tags", () => {
     expect(surfaceFor("pr-quiet", tags, new Map([["pr-quiet", "issue"]]))).toBe("issue");
+  });
+
+  test("a fallback names the surface for an untagged case", () => {
+    expect(surfaceFor("untagged", tags, new Map(), "issue")).toBe("issue");
   });
 
   test.each(["ambiguous", "untagged", "missing"])(

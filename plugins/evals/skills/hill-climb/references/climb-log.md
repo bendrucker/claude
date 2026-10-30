@@ -28,6 +28,7 @@ Keep one log per climb, beside the suite's results and outside version control w
 - Guard graders: `<case>/<grader>`, ...
 - Columns read: base against `<column>`
 - Spend: <amount>
+- Tokens: <before> → <after>, on a prune
 - Verdict: <accept, reject, or stall>, <the starred rows or the reason>
 - PR: <link>
 

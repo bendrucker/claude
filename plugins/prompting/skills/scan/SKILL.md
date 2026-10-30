@@ -62,8 +62,8 @@ Then drive the ledger through `audit.ts`:
 - `apply <ledger>` applies every proposal to the working tree and lists any quote it could not locate. An unlocated proposal drops out of the round.
 - Ben reviews the diff with `plannotator review`, which opens a browser and runs outside the sandbox. An annotation on a hunk rejects that proposal.
 - `revert <ledger> <id...> --reason <annotation>` restores each rejected span.
-- Commit the round with nothing else in the commit, so rule-precision can read it as labels.
-- `verdict <ledger> --commit <sha>` reconciles each proposal against the commit, so a hand edit Ben makes before committing counts too. It prints the per-class table and the `labels.json` entry to add under `agent` in `plugins/prompting/evals/rule-precision/labels.json` in `bendrucker/claude`.
+- Commit the round with nothing else in the commit, and open it as its own pull request, so rule-precision can read its squash commit as labels.
+- `verdict <ledger> --commit <sha>` reconciles each proposal against the commit, so a hand edit Ben makes before committing counts too. It prints the per-class table and the `labels.json` entry. Once the round's pull request merges, add its squash SHA under `agent` in `plugins/prompting/evals/rule-precision/labels.json` in `bendrucker/claude`.
 
 ## Gotchas
 

@@ -63,6 +63,43 @@ async function addCollector(evals: string, collect: string[]): Promise<void> {
   );
 }
 
+const Manifest = z.object({
+  userConfig: z.record(z.string(), z.object({ default: z.unknown().optional() })).optional(),
+});
+
+/**
+ * Writes each plugin's userConfig defaults over its `${user_config.KEY}` placeholders, as an
+ * install with default options does. The runner leaves them literal. A skill `!` command with
+ * one fails its Bash permission check, and the Skill call fails with it.
+ */
+export async function fillUserConfig(root: string, plugins: string[]): Promise<void> {
+  const files = await Promise.all(
+    plugins.map(async (p) => {
+      const dir = join(root, p);
+      const manifest = Manifest.parse(
+        JSON.parse(await Bun.file(join(dir, ".claude-plugin/plugin.json")).text()),
+      );
+      const defaults = Object.entries(manifest.userConfig ?? {}).filter(
+        ([, option]) => option.default !== undefined,
+      );
+      if (defaults.length === 0) return [];
+      const paths = await Array.fromAsync(
+        new Bun.Glob("{skills,agents,commands}/**/*.md").scan({ cwd: dir }),
+      );
+      return paths.map((path) => ({ path: join(dir, path), defaults }));
+    }),
+  );
+  await Promise.all(
+    files.flat().map(async ({ path, defaults }) => {
+      const text = await Bun.file(path).text();
+      let filled = text;
+      for (const [key, option] of defaults)
+        filled = filled.replaceAll(`\${user_config.${key}}`, String(option.default));
+      if (filled !== text) await Bun.write(path, filled);
+    }),
+  );
+}
+
 async function stagePlugins(
   repo: string,
   suite: string,
@@ -74,6 +111,7 @@ async function stagePlugins(
   if (owner === undefined)
     throw new Error(`${suite} does not sit inside any plugin its cases load`);
   await stage(repo, ref, plugins, root);
+  await fillUserConfig(root, plugins);
   // The suite always comes from the working tree, so every ref is graded by the same cases.
   await $`rm -rf ${join(root, suite)}`.quiet();
   await stage(repo, undefined, [suite], root);

@@ -32,6 +32,8 @@ export function validationRecord(event: Validation, at: Date): Record<string, un
       verb: event.verb,
       rules: event.rules,
       ...event.structure,
+      // Keeps the series from before prose and list words were split.
+      visibleWords: event.structure.proseWords + event.structure.listWords,
       "session.id": event.sessionId,
     },
     resource: { "service.name": "claude-code" },

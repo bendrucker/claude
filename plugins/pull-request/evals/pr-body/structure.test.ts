@@ -56,7 +56,8 @@ describe("overLimits", () => {
   const cases: [string, ReturnType<typeof overLimits>][] = [
     [long(20), []],
     [long(41), ["maxBlockWords"]],
-    [Array.from({ length: 5 }, () => long(30)).join("\n\n"), ["visibleWords"]],
+    [Array.from({ length: 5 }, () => long(30)).join("\n\n"), ["proseWords"]],
+    [Array.from({ length: 5 }, () => `- ${long(30)}`).join("\n"), []],
     [codeSpans(7), ["proseCodeSpans"]],
     [codeSpans(6), []],
     [`${long(41)} ${codeSpans(7)}`, ["maxBlockWords", "proseCodeSpans"]],

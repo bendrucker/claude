@@ -65,7 +65,7 @@ Name the primary change. A title that needs a serial comma names several: name t
 
 Lead with intent: why the change exists, the decisions a reviewer cannot reconstruct from the diff, and how you know it works. Leave out what the diff, the git log, and the status checks already show.
 
-- Review the session for content that never reached the code: rejected alternatives, scope changes, test observations. State each as a decision that stands on its own.
+- Review the session for content that never reached the code: rejected alternatives, scope changes, test observations, and a theory the evidence overturned that a reviewer could still hold. State each as a decision that stands on its own. Give an overturned theory one sentence: what it was and what ruled it out.
 - Use the `Entities` block in the context above to judge what the change did, and write the intent behind those entries in place of the list.
 - Open with a bare verb ("Adds", "Fixes", "Removes") when the change is self-evident, or with the problem when it needs justifying. Make the opening add to the title.
 - Reference the motivating issue at the end of the opening: `Closes #N`, `Fixes #N`, or a bare `#N` when the PR doesn't close it. On a repo you own, keep a link to the motivating task from another tracker (an `Original Task:` Things link) as the last line, even in a one-paragraph body. Leave the issue itself untouched: no comments, labels, milestones, or assignees.

@@ -70,7 +70,7 @@ Write lists of paths, symbols, and commands for an agent. [Style](#style) does n
 
 Emit only what exploration produced. Drop subsections you can't fill, and the whole section when you explored nothing.
 
-Open the block with one line, `Gathered at <commit> on <date>.` (`git rev-parse --short HEAD`), or `Gathered on <date>.` without a commit, and go straight to the first subsection. The implementer checks every pointer against their own checkout. A note on where a finding came from or what you couldn't confirm tells them nothing. State each finding as fact about the code. Pair every line number with its symbol, which survives drift.
+Open the block with one line, `Gathered at <commit> on <date>.` (`git rev-parse --short HEAD`), or `Gathered on <date>.` without a commit, and go straight to the first subsection. The implementer checks every pointer against their own checkout. That check already covers where a finding came from and what you couldn't confirm. State each finding as fact about the code. Pair every line number with its symbol, which survives drift.
 
 ```markdown
 ## 🤖 Agent Context

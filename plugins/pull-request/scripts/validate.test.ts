@@ -82,7 +82,7 @@ describe("processInput", () => {
         attributes: {
           verb: "gh pr create",
           rules: ["run-on-prose", "structure-limits"],
-          visibleWords: 130,
+          proseWords: 130,
           hiddenWords: 4,
           "session.id": "s-1",
         },

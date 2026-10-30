@@ -9,6 +9,8 @@ import { gfm } from "micromark-extension-gfm";
 
 export interface Structure {
   visibleWords: number;
+  proseWords: number;
+  listWords: number;
   collapsedWords: number;
   hiddenWords: number;
   leadWords: number;
@@ -235,6 +237,8 @@ export function measureStructure(body: string): Structure {
   const v = acc.visibleWords;
   return {
     visibleWords: v,
+    proseWords: v - acc.listWords,
+    listWords: acc.listWords,
     collapsedWords: acc.collapsedWords,
     hiddenWords: acc.collapsedWords + acc.tableWords + acc.fenceWords,
     leadWords: firstParagraph ? countWords(toString(firstParagraph)) : 0,
@@ -271,9 +275,10 @@ export function measureStructure(body: string): Structure {
 }
 
 // One-sided limits fitted against Ben's edits and hand-written PRs: a body
-// fails only by exceeding them, so terseness is never penalized.
+// fails only by exceeding them, so terseness is never penalized. Only prose
+// words are capped, since his edits cut prose and leave lists alone.
 export const LIMITS = {
-  visibleWords: 120,
+  proseWords: 120,
   maxBlockWords: 40,
   proseCodeSpans: 6,
   pathSpans: 1,
@@ -287,10 +292,11 @@ const isLimitKey = (k: string): k is LimitKey => k in LIMITS;
 export const limitKeys: LimitKey[] = Object.keys(LIMITS).filter(isLimitKey);
 
 // Trimming a body to fit the limits must not move its prose into <details>,
-// tables, or fences, or pile it into one long list. No baseline body comes near
-// the first, and lists past five items are rare in Ben's own PRs.
+// tables, fences, or lists. No baseline body comes near the first, lists past
+// five items are rare in Ben's own PRs, and 98% of them stay under 150 list words.
 export const GUARDS = {
   hiddenWords: 60,
+  listWords: 150,
   maxItemsPerList: 5,
 } as const satisfies Partial<Structure>;
 

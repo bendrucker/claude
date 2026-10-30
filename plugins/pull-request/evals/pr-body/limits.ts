@@ -6,12 +6,13 @@ export const CHECKS = { ...LIMITS, ...GUARDS };
 type CheckKey = keyof typeof CHECKS;
 
 export const ROWS = {
-  visibleWords: "visible-words",
+  proseWords: "prose-words",
   maxBlockWords: "max-block",
   proseCodeSpans: "prose-code-spans",
   pathSpans: "path-spans",
   contrastPhrases: "contrast-phrases",
   hiddenWords: "hidden-words",
+  listWords: "list-words",
   maxItemsPerList: "list-items",
 } as const satisfies Record<CheckKey, string>;
 

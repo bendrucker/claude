@@ -4,7 +4,7 @@ Goal: fewer tokens in the target, with every accepted cut shown to drop the scor
 
 ## Margin
 
-Before the first cut, write the margin in the climb log: the largest drop in with-arm pass rate a cut may cost. Read the noise columns from `Ready the Suite` and set the run count so a drop of the margin's size stars at `--alpha 0.2`, since at lower power a harmful cut also fails to star.
+Before the first cut, write the margin in the climb log: the largest drop in with-arm pass rate a cut may cost. Read the noise columns from `Ready the Suite` and set the run count so a drop of the margin's size stars at `--alpha 0.2`, per the table in [screen.md](screen.md), since at lower power a harmful cut also fails to star.
 
 ## Cuts
 
@@ -13,6 +13,10 @@ Cut a rule: the sentences under one heading that produce one behavior. Its targe
 Order cuts by tokens saved: the description first, since it costs every turn, then the body, then references.
 
 Batch cuts whose rules have disjoint targets into one candidate. When a batch fails, bisect it on the same base until one rule remains.
+
+## Blocks
+
+When the target contains a block of many rules, cut the whole block as the first candidate and verify it on the full suite. When it holds, accept it as one cut. When it fails, list the cases whose with-arm score dropped. Screen each rule's cut on those cases only, per [screen.md](screen.md), restore every rule whose screen drops, and verify the combined remaining cut on the full suite. That verify catches a rule that matters only beside another.
 
 ## Hold
 

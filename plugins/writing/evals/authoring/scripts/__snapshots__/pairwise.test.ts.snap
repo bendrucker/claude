@@ -13,20 +13,6 @@ exports[`scoreJudgments / formatScore formatScore snapshot 1`] = `
 left-slot pick share (position bias): 50%"
 `;
 
-exports[`compareLabels / agreementOf / calibrate / formatCalibration formatCalibration snapshot 1`] = `
-"agreement excludes pairs either side called a tie (reported as ties); pass requires >= 75%
-╔═════════╤═════════╤══════╤═══════════╤══════════════╤═════════╗
-║ surface │ decided │ ties │ agreement │ 95% interval │ verdict ║
-╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
-║ doc     │ 0       │ 1    │ -         │ 0% - 100%    │ fail    ║
-╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
-║ pr      │ 2       │ 0    │ 50%       │ 9% - 91%     │ fail    ║
-╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
-║ overall │ 2       │ 1    │ 50%       │ 9% - 91%     │ fail    ║
-╚═════════╧═════════╧══════╧═══════════╧══════════════╧═════════╝
-"
-`;
-
 exports[`pairwise CLI subcommands, flags, and defaults 1`] = `
 "Usage: pairwise [options] [command]
 
@@ -56,35 +42,39 @@ Pair a base column's drafts with a candidate column's drafts (or with Ben's
 originals), run-for-run, and write Pair JSON files
 
 Options:
-  --suite <dir>              Suite directory holding each case's prompt.md and
-                             case.yaml tags
-  --base <paths>             Comma-separated aggregate-result.json paths for the
-                             base column
-  --candidate <paths>        Comma-separated aggregate-result.json paths for the
-                             candidate column
-  --original <dir>           Directory of <case>.json files holding Ben's
-                             original text, paired against --candidate instead
-                             of --base
-  --field <name>             Field in <case>.json holding the original text
-                             (default: "body")
-  --out <dir>                Directory to write Pair JSON files
-  --file <case=path>         case=path override: extract the deliverable from
-                             the last Write/Edit to this file instead of the
-                             reply's <out> block (default: [])
-  --surface <case=surface>   case=surface override when the suite's case.yaml
-                             tags do not name one (default: [])
-  --before <dir>             Directory of <case>.md files holding a deliverable
-                             file's pre-change contents; Edit-only drafts replay
-                             against them and drafts are trimmed to the changed
-                             region
-  --base-arm <arm>           Arm the base drafts come from (default: "with")
-  --candidate-arm <arm>      Arm the candidate drafts come from (default:
-                             "with")
-  --base-label <label>       Source.column label for the base drafts (default:
-                             "base")
-  --candidate-label <label>  Source.column label for the candidate drafts
-                             (default: "candidate")
-  -h, --help                 display help for command
+  --suite <dir>                Suite directory holding each case's prompt.md and
+                               case.yaml tags
+  --base <paths>               Comma-separated aggregate-result.json paths for
+                               the base column
+  --candidate <paths>          Comma-separated aggregate-result.json paths for
+                               the candidate column
+  --original <dir>             Directory of <case>.json files holding Ben's
+                               original text, paired against --candidate instead
+                               of --base
+  --field <name>               Field in <case>.json holding the original text
+                               (default: "body")
+  --out <dir>                  Directory to write Pair JSON files
+  --file <case=path>           case=path override: extract the deliverable from
+                               the last Write/Edit to this file instead of the
+                               reply's <out> block (default: [])
+  --surface <case=surface>     case=surface override when the suite's case.yaml
+                               tags do not name one (default: [])
+  --before <dir>               Directory of <case>.md files holding a
+                               deliverable file's pre-change contents; Edit-only
+                               drafts replay against them and drafts are trimmed
+                               to the changed region
+  --tag <name>                 Reply tag holding the deliverable (default:
+                               "out")
+  --default-surface <surface>  Surface for every case without a --surface
+                               override, for suites whose tags name none
+  --base-arm <arm>             Arm the base drafts come from (default: "with")
+  --candidate-arm <arm>        Arm the candidate drafts come from (default:
+                               "with")
+  --base-label <label>         Source.column label for the base drafts (default:
+                               "base")
+  --candidate-label <label>    Source.column label for the candidate drafts
+                               (default: "candidate")
+  -h, --help                   display help for command
 
 Usage: pairwise judge [options]
 
@@ -126,5 +116,19 @@ Options:
                       breakdown
   --threshold <rate>  Minimum agreement rate to pass (default: 0.75)
   -h, --help          display help for command
+"
+`;
+
+exports[`compareLabels / agreementOf / calibrate / formatCalibration formatCalibration snapshot 1`] = `
+"agreement excludes pairs either side called a tie (reported as ties); pass requires >= 75%
+╔═════════╤═════════╤══════╤═══════════╤══════════════╤═════════╗
+║ surface │ decided │ ties │ agreement │ 95% interval │ verdict ║
+╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
+║ doc     │ 0       │ 1    │ -         │ 0% - 100%    │ fail    ║
+╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
+║ pr      │ 2       │ 0    │ 50%       │ 9% - 91%     │ fail    ║
+╟─────────┼─────────┼──────┼───────────┼──────────────┼─────────╢
+║ overall │ 2       │ 1    │ 50%       │ 9% - 91%     │ fail    ║
+╚═════════╧═════════╧══════╧═══════════╧══════════════╧═════════╝
 "
 `;

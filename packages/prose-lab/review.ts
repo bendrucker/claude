@@ -72,14 +72,19 @@ function rendered(raw: string): Rendered[] {
   return out;
 }
 
+/** Plannotator curls straight quotes when it renders, so compare with them straightened. */
+const straighten = (text: string): string => text.replaceAll(/[‘’]/g, "'").replaceAll(/[“”]/g, '"');
+
 /** Where a quote from the rendered document sits in the raw lines, one span per line it covers. */
 export function locate(lines: readonly string[], quote: string): Located[] {
   const raw = lines.join("\n");
   const collapsed = rendered(raw).filter(
     (entry, i, all) => !/\s/.test(entry.char) || i === 0 || !/\s/.test(all[i - 1]?.char ?? ""),
   );
-  const needle = quote.trim().replaceAll(/\s+/g, " ");
-  const text = collapsed.map((entry) => (/\s/.test(entry.char) ? " " : entry.char)).join("");
+  const needle = straighten(quote.trim().replaceAll(/\s+/g, " "));
+  const text = straighten(
+    collapsed.map((entry) => (/\s/.test(entry.char) ? " " : entry.char)).join(""),
+  );
   const found = needle === "" ? -1 : text.indexOf(needle);
   // A quote that appears twice could mark either copy. Leave it unlocated instead of guessing.
   if (found === -1 || text.includes(needle, found + 1)) return [];
@@ -133,6 +138,9 @@ export interface Reviewed {
   globals: string[];
 }
 
+/** Annotation types that mark a span in the document. */
+const MARKS = new Set(["COMMENT", "DELETION"]);
+
 /** Each inline comment as unassigned flags on `file`, keyed as the lab page keys them. */
 export function toFlags(
   found: readonly Annotation[],
@@ -146,7 +154,7 @@ export function toFlags(
       reviewed.globals.push(annotation.text);
       continue;
     }
-    const spans = annotation.type === "COMMENT" ? locate(lines, annotation.originalText ?? "") : [];
+    const spans = MARKS.has(annotation.type) ? locate(lines, annotation.originalText ?? "") : [];
     if (spans.length === 0) reviewed.unlocated.push(annotation);
     for (const { line, span } of spans) {
       reviewed.flags.push({
@@ -155,7 +163,7 @@ export function toFlags(
         line,
         span,
         match: lines[line - 1]?.slice(span[0] - 1, span[1]) ?? "",
-        note: annotation.text,
+        note: annotation.text === "" ? annotation.type.toLowerCase() : annotation.text,
         ts,
       });
     }

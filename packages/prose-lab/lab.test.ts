@@ -296,6 +296,7 @@ describe("locate", () => {
     "A second paragraph.",
     "Emoji 😀x y.",
     "Made &copy; here today.",
+    "It can't be read.",
   ];
   const slices = (quote: string): string[] =>
     locate(lines, quote).map(
@@ -320,6 +321,7 @@ describe("locate", () => {
     { name: "a quote that appears twice", quote: "for", want: [] },
     { name: "an astral character", quote: "😀x", want: ["😀x"] },
     { name: "text after a decoded entity", quote: "here today", want: ["here today"] },
+    { name: "a curled apostrophe", quote: "can’t be", want: ["can't be"] },
   ])("$name", ({ quote, want }) => {
     expect(slices(quote)).toEqual(want);
   });
@@ -358,6 +360,7 @@ describe("toFlags", () => {
         { type: "COMMENT", text: "jargon", originalText: "lab.ts sweep" },
         { type: "GLOBAL_COMMENT", text: "too terse" },
         { type: "COMMENT", text: "gone", originalText: "edited away" },
+        { type: "DELETION", text: "", originalText: "first" },
       ],
       "d.md",
       lines,
@@ -372,6 +375,15 @@ describe("toFlags", () => {
           span: [5, 18],
           match: "`lab.ts sweep`",
           note: "jargon",
+          ts: "t",
+        },
+        {
+          id: "d.md|1|20",
+          file: "d.md",
+          line: 1,
+          span: [20, 24],
+          match: "first",
+          note: "deletion",
           ts: "t",
         },
       ],

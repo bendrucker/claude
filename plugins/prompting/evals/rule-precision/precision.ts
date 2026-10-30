@@ -288,10 +288,11 @@ if (import.meta.main) {
     },
   });
 
-  const explicit = argv.flags.commit.length > 0 || argv.flags.agentCommit.length > 0;
-  const sources: LabelSources = explicit
-    ? { human: argv.flags.commit, agent: argv.flags.agentCommit }
-    : await loadLabelSources();
+  const tracked = await loadLabelSources();
+  const sources: LabelSources = {
+    human: argv.flags.commit.length > 0 ? argv.flags.commit : tracked.human,
+    agent: [...tracked.agent, ...argv.flags.agentCommit],
+  };
 
   const config =
     argv.flags.rule.length > 0

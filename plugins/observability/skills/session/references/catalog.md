@@ -25,6 +25,7 @@ The query lines are generated from those headers. Edit the header, then regenera
 - `permissions` [`denial_kind`, `limit`]: Denied tool calls, one row per denial, with the mechanism that stopped it and the signal that answered.
 - `plan-iterations` [`min_plans`]: One row per ExitPlanMode present, ordered within a session, measuring the append-only re-present signature.
 - `plan-sizes` [`threshold`]: Weekly trend of plan sizes, the steering metric for the plan plugin's ExitPlanMode size gate.
+- `prune-acceptance`: Per-class acceptance of prompting-audit proposals, per run and across the last two runs, for the retire-a-class rule.
 - `repeat-read-waste`: Repeat Reads split by cause, isolating the true context tax from pagination and fan-out.
 - `sandbox-bypass-effective-command` [`min_count`]: Bypassed commands by their real verb, ranked by frequency, with the split between bypasses that followed a failed sandboxed run (`justified`) and those that did not (`reflexive`): the `excludedCommands` candidates.
 - `sandbox-bypass-scaffold`: Weekly share of `dangerouslyDisableSandbox` calls whose commands already escape through `excludedCommands`, the `sandbox` plugin's retirement signal.

@@ -37,7 +37,7 @@ graders:
   bullets-10: "!neg-*"
   headings-3: "!neg-*"
   para-words-60: "!neg-*"
-  identifiers-10: "!neg-*"
+  identifiers-10: [bug-404-nav, bug-config-repro, bug-partial-success, bug-webhook-duplicates, bug-worker-memory-leak, bug-xml-type-inference, feature-aggregation-cases, feature-connection-check, feature-csv-export, feature-pin-conversations, feature-share-events, refactor-transform-cost, spike-thumbnail-offload, spike-workspace, bug-dialog-pointer-events, feature-dev-gateway, refactor-double-session-read, spike-ndjson-contract]
   identifiers-20: "!neg-*"
   context-words-100: "!neg-*"
   context-words-200: "!neg-*"

@@ -5,10 +5,12 @@
   "type": "module",
   "dependencies": {
     "@commander-js/extra-typings": "~15.0.0",
+    "@eslint-community/regexpp": "^4.12.2",
     "commander": "~15.0.0",
     "mdast-util-from-markdown": "^2.0.2",
     "table": "^6.9.0",
     "unist-util-visit": "^5.1.0",
+    "yaml": "^2.9.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

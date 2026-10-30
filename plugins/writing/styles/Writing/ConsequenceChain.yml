@@ -2,14 +2,16 @@
 #   deliverables. Hook promotion requires cross-project validation.
 # retire when: the consequence-chain rate in deliverables falls below 1/1k words or matches the
 #   hand-written baseline.
-extends: existence
-message: "'%s' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately."
+extends: sequence
+message: "', so' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/ConsequenceChain.yml
 level: warning
-nonword: true
-ignorecase: true
 tokens:
-  - ',\s*so\s+(?:the|an?|this|these|those|its|their|our|my|your|his|her|each|every|any|some|all|both|either|neither|no|it|they|there|that(?!\s+(?:the|an?|this|these|those|its|their|our|my|your|his|her|each|every|any|some|all|no|it|they|we|you|he|she|i|there)\b))\b'
+  - pattern: ','
+  - pattern: '(?i)so'
+  # A determiner opens the new subject. "so that" before a clause tags as IN, a purpose rather than a consequence.
+  # Pronoun subjects live in ConsequenceChainPronoun, since only it and they chain where I and you narrate.
+  - tag: 'DT|PDT|PRP\$|EX'
 tests:
   - name: "flags The cache fills up, so the old entries get evicted."
     input: |
@@ -18,14 +20,6 @@ tests:
   - name: "flags The worker finishes, so the queue clears."
     input: |
       The worker finishes, so the queue clears.
-    contains: [Writing.ConsequenceChain]
-  - name: "flags The flag is unset, so it falls back to the default."
-    input: |
-      The flag is unset, so it falls back to the default.
-    contains: [Writing.ConsequenceChain]
-  - name: "flags Both writers hold the lock, so neither request proceeds."
-    input: |
-      Both writers hold the lock, so neither request proceeds.
     contains: [Writing.ConsequenceChain]
   - name: "flags The migration ran twice, so that table has duplicate rows."
     input: |

@@ -52,7 +52,7 @@ When no candidate clears the floor, ship nothing. Record the trial (each candida
 
 After each `sweep`, the check table in `status` marks shipped checks whose labeled floor fell under the bar. Propose retiring each one to the user with its counts.
 
-`status` also names the plugins' rules over the complexity ceiling, and `rules` ranks them all. Rewrite one with candidates checked by `compare <rule> <candidates...> --dir <corpus>`, which lists the hits each keeps, drops, and adds. Accept a drop when the dropped hits are rare or marginal. Pass `--rate <Style.Rule> --verdict complex|fine` to `rules` when the user disagrees with a score, and refit `WEIGHTS` in `complexity.ts` when the ceiling's agreement falls.
+`rules` ranks the plugins' rules by complexity and marks those over the ceiling. Rewrite one with candidates checked by `compare <rule> <candidates...> --dir <corpus>`, which lists the hits each keeps, drops, and adds. Accept a drop when the dropped hits are rare or marginal. When the user disagrees with a score, adjust `WEIGHTS` in `complexity.ts`.
 
 ## Completion
 

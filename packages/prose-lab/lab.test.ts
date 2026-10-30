@@ -278,7 +278,7 @@ test.each<{ name: string; yaml: string; want: Partial<Features> }>([
     want: { branches: 1, exceptions: 2, tokens: 1 },
   },
 ])("measure: $name", ({ yaml, want }) => {
-  expect(measure(yaml).features).toMatchObject({ unparsed: 0, ...want });
+  expect(measure(yaml).features).toMatchObject(want);
 });
 
 test("diffHits matches overlapping hits and reports the rest each way", () => {

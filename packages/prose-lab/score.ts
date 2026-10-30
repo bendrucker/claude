@@ -170,12 +170,19 @@ export interface HitDiff {
   added: Hit[];
 }
 
+const lineKey = (hit: Hit) => `${hit.file}|${hit.line}`;
+
+function covers(byLine: Map<string, Hit[]>, hit: Hit): boolean {
+  return (byLine.get(lineKey(hit)) ?? []).some((other) => overlaps(other, hit));
+}
+
 /** How a candidate's hits differ from a baseline rule's, matching hits that overlap. */
 export function diffHits(baseline: readonly Hit[], candidate: readonly Hit[]): HitDiff {
-  const covers = (hits: readonly Hit[], hit: Hit) => hits.some((other) => overlaps(other, hit));
+  const byBaseline = Map.groupBy(baseline, lineKey);
+  const byCandidate = Map.groupBy(candidate, lineKey);
   return {
-    kept: baseline.filter((hit) => covers(candidate, hit)),
-    dropped: baseline.filter((hit) => !covers(candidate, hit)),
-    added: candidate.filter((hit) => !covers(baseline, hit)),
+    kept: baseline.filter((hit) => covers(byCandidate, hit)),
+    dropped: baseline.filter((hit) => !covers(byCandidate, hit)),
+    added: candidate.filter((hit) => !covers(byBaseline, hit)),
   };
 }

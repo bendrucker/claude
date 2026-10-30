@@ -6,7 +6,7 @@ import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typin
 import { $ } from "bun";
 import { table } from "table";
 import { z } from "zod";
-import { corpusFiles, lintFiles, PLUGINS, type Plugin, ROOT, sweep } from "./corpus";
+import { corpusFiles, lintFiles, markdownUnder, PLUGINS, type Plugin, ROOT, sweep } from "./corpus";
 import {
   assign,
   Corpus,
@@ -318,57 +318,14 @@ const scoreCommand = new Command("score")
   });
 
 const rulesCommand = new Command("rules")
-  .description(
-    "Rank each plugin's own rules by complexity, and record whether a rule is too complex to maintain.",
-  )
-  .option("--rate <rule>", "rule to rate, as Style.Rule")
-  .addOption(
-    new Option("--verdict <verdict>", "rating for --rate").choices(["complex", "fine"] as const),
-  )
-  .action(async (options) => {
-    if (options.rate !== undefined) {
-      if (options.verdict === undefined) throw new InvalidArgumentError("--rate needs --verdict.");
-      await data.addRatings([
-        { rule: options.rate, verdict: options.verdict, ts: new Date().toISOString() },
-      ]);
-    }
-    const ratings = new Map((await data.ratings()).map((rating) => [rating.rule, rating.verdict]));
+  .description("Rank each plugin's own rules by complexity.")
+  .action(async () => {
     const rules = (await ownRules()).toSorted((a, b) => b.score - a.score);
-    process.stdout.write(renderRules(rules, ratings));
+    process.stdout.write(renderRules(rules));
   });
 
-/** Files per Vale run, since one run over thousands of files fails. */
-const LINT_BATCH = 400;
-
 async function lintRule(plugin: Plugin, rule: string, files: readonly string[]) {
-  const config = await labConfig([resolve(rule)], PLUGINS[plugin]);
-  const batches = Array.from({ length: Math.ceil(files.length / LINT_BATCH) }, (_, i) =>
-    files.slice(i * LINT_BATCH, (i + 1) * LINT_BATCH),
-  );
-  const lintBatch = async (batch: readonly string[]) => {
-    try {
-      return await lintFiles(plugin, config, batch);
-    } catch {
-      // One unparseable file fails its whole batch, so isolate it.
-      const each = await Promise.all(
-        batch.map((file) =>
-          lintFiles(plugin, config, [file]).catch(() => {
-            console.error(`Skipped ${file}: vale could not lint it.`);
-            return [];
-          }),
-        ),
-      );
-      return each.flat();
-    }
-  };
-  return (await Promise.all(batches.map(lintBatch))).flat();
-}
-
-async function markdownUnder(dir: string): Promise<string[]> {
-  const names = await readdir(resolve(dir), { recursive: true });
-  return names
-    .filter((name) => name.endsWith(".md"))
-    .map((name) => relative(ROOT, join(resolve(dir), name)));
+  return lintFiles(plugin, await labConfig([resolve(rule)], PLUGINS[plugin]), files);
 }
 
 const compareCommand = new Command("compare")
@@ -386,7 +343,7 @@ const compareCommand = new Command("compare")
   .action(async (baseline, candidates, options) => {
     const files = [
       ...(await corpusFiles(options.corpus)),
-      ...(await Promise.all(options.dir.map(markdownUnder))).flat(),
+      ...(await Promise.all(options.dir.map((dir) => markdownUnder(resolve(dir))))).flat(),
     ];
     const base = await lintRule(options.plugin, baseline, files);
     const results = await Promise.all(
@@ -414,20 +371,18 @@ const compareCommand = new Command("compare")
 const statusCommand = new Command("status")
   .description("Report each pattern's stage and each labeled check's precision.")
   .action(async () => {
-    const [swept, labels, flags, patterns, scores, rules] = await Promise.all([
+    const [swept, labels, flags, patterns, scores] = await Promise.all([
       data.sweep(),
       data.labels(),
       data.flags(),
       data.patterns(),
       data.scores(),
-      ownRules(),
     ]);
     process.stdout.write(
       render(
         patternRows(patterns, labels, flags, scores),
         checkRows(swept?.hits ?? [], labels, flags),
         flags.filter((flag) => flag.pattern === undefined).length,
-        rules.filter((rule) => rule.score > CEILING).map((rule) => rule.rule),
       ),
     );
   });

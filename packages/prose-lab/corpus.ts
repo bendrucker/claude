@@ -1,3 +1,4 @@
+import { readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { $ } from "bun";
 import { lint } from "../../plugins/prompting/skills/scan/scripts/vale";
@@ -51,16 +52,41 @@ export function countWords(text: string): number {
     .filter(Boolean).length;
 }
 
+/** Every markdown file under a directory, relative to the repo root. */
+export async function markdownUnder(dir: string, root = ROOT): Promise<string[]> {
+  const names = await readdir(dir, { recursive: true });
+  return names
+    .filter((name) => name.endsWith(".md"))
+    .map((name) => relative(root, join(dir, name)));
+}
+
+/** Files per Vale run, since one run over thousands of files fails. */
+const LINT_BATCH = 400;
+
+/** Lints in batches, halving a failed batch until the file Vale can't read is skipped. */
 export async function lintFiles(
   plugin: string,
   config: string,
   files: readonly string[],
   root = ROOT,
 ): Promise<Hit[]> {
-  const alerts = await lint(
-    files.map((file) => join(root, file)),
-    { config },
-  );
+  if (files.length === 0) return [];
+  const split = async (at: number) => [
+    ...(await lintFiles(plugin, config, files.slice(0, at), root)),
+    ...(await lintFiles(plugin, config, files.slice(at), root)),
+  ];
+  if (files.length > LINT_BATCH) return split(LINT_BATCH);
+  let alerts: Awaited<ReturnType<typeof lint>>;
+  try {
+    alerts = await lint(
+      files.map((file) => join(root, file)),
+      { config },
+    );
+  } catch {
+    if (files.length > 1) return split(Math.ceil(files.length / 2));
+    console.error(`Skipped ${files[0]}: vale could not lint it.`);
+    return [];
+  }
   return [...alerts].flatMap(([path, found]) =>
     found.map((alert) => ({
       plugin,

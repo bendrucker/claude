@@ -78,7 +78,6 @@ export function render(
   patterns: readonly PatternRow[],
   checks: readonly CheckRow[],
   unassigned = 0,
-  overCeiling: readonly string[] = [],
 ): string {
   const patternTable = table([
     [
@@ -115,29 +114,20 @@ export function render(
       row.below ? "yes" : "",
     ]),
   ]);
-  return `${patterns.length === 0 ? "No patterns yet.\n" : patternTable}\n${checks.length === 0 ? "No labeled checks yet.\n" : checkTable}\n${unassigned} flags without a pattern.\n${overCeiling.length === 0 ? "" : `Rules over complexity ${CEILING}: ${overCeiling.join(", ")}.\n`}`;
+  return `${patterns.length === 0 ? "No patterns yet.\n" : patternTable}\n${checks.length === 0 ? "No labeled checks yet.\n" : checkTable}\n${unassigned} flags without a pattern.\n`;
 }
 
-/** Rules by complexity with the user's rating, and how often the ceiling agrees with the ratings. */
-export function renderRules(
-  rules: readonly RuleComplexity[],
-  ratings: ReadonlyMap<string, "complex" | "fine">,
-): string {
-  const rated = rules.filter((rule) => ratings.has(rule.rule));
-  const agree = rated.filter(
-    (rule) => rule.score > CEILING === (ratings.get(rule.rule) === "complex"),
-  ).length;
-  const rows = table([
-    ["rule", "complexity", "lookarounds", "gaps", "exception words", "branches", "rating"],
+/** Rules by complexity, marking those over the ceiling. */
+export function renderRules(rules: readonly RuleComplexity[]): string {
+  return table([
+    ["rule", "complexity", "lookarounds", "gaps", "exception words", "branches"],
     ...rules.map((rule) => [
       rule.rule,
-      rule.score > CEILING ? `${rule.score} (over)` : rule.score,
+      rule.score > CEILING ? `${rule.score} (over ${CEILING})` : rule.score,
       rule.features.lookarounds,
       rule.features.gaps,
       rule.features.exceptionWords,
       rule.features.branches,
-      ratings.get(rule.rule) ?? "",
     ]),
   ]);
-  return `${rows}\nThe ceiling of ${CEILING} agrees with ${agree} of ${rated.length} ratings.\n`;
 }

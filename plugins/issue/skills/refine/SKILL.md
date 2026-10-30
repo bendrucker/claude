@@ -70,7 +70,7 @@ Write lists of paths, symbols, and commands for an agent. [Style](#style) does n
 
 Emit only what exploration produced. Drop subsections you can't fill, and the whole section when you explored nothing.
 
-Open the block with the commit you read (`git rev-parse --short HEAD`) and today's date. Pair every line number with its symbol, which survives drift.
+Open the block with the commit you read (`git rev-parse --short HEAD`) and today's date, or the date alone when you had no checkout to read. List what you found as fact. Leave out where each finding came from and what you didn't check. Pair every line number with its symbol, which survives drift.
 
 ```markdown
 ## 🤖 Agent Context

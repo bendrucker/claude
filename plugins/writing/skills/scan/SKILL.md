@@ -15,11 +15,11 @@ allowed-tools:
 
 # Scan
 
-Detect AI writing tropes already present in prose. Every mode lints through Vale with the plugin's `.vale.ini`, the same checks the hook enforces on new edits. To transform a single input instead, use `writing:rewrite`.
+Detect AI writing tropes already present in prose. Every mode lints through Vale with the plugin's `.vale.ini`, the same checks the hook enforces on new edits. Scan reports only. Fix alerts with `writing:rewrite` or direct edits at the reported positions.
 
 ## Audit
 
-List the files or directories for Vale to lint. It walks directories itself and skips `node_modules` and `.git`:
+Pass files or directories. Vale walks directories and skips `node_modules` and `.git`.
 
 ```bash
 vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line docs README.md
@@ -28,11 +28,9 @@ vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line --glob='*.md' 
 
 Each alert prints as `path:line:col:check:message`, where `check` is the Vale rule name (`Writing.SpacedEmDash`, `ai-tells.EmDashUsage`). Vale exits 1 when any alert is at `error` level, so the command gates in CI or a pre-commit check.
 
-Audit is report-only. Fix flagged files with `writing:rewrite` or direct edits at the reported positions.
-
 ## Single Input
 
-`writing:rewrite` and other callers lint one input the same way:
+Lint one input the same way:
 
 ```bash
 vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line path/to/draft.md
@@ -51,4 +49,4 @@ bun ${CLAUDE_SKILL_DIR}/scripts/score.ts path/to/draft.md
 bun ${CLAUDE_SKILL_DIR}/scripts/score.ts --json path/to/draft.md
 ```
 
-Word count is Vale's own (`vale ls-metrics`), which leaves out code. Inline text and stdin score as a markdown file. Density is `alerts / (wordCount / 1000)`, and the table sorts by density.
+Word count is Vale's own (`vale ls-metrics`), which leaves out code. Inline text and stdin score as a markdown file. The table sorts by density.

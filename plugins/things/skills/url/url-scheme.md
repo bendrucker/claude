@@ -14,13 +14,11 @@ All commands follow the pattern: `things:///commandName?param1=value1&param2=val
 - `deadline` (date string) - Due date in `yyyy-mm-dd` format
 - `tags` (comma-separated) - Tag names
 - `checklist-items` (newline-separated, max 100) - Checklist items
-- `list` or `list-id` - Project/area destination (see note below)
+- `list` (project name) or `list-id` (project or area UUID) - Destination
 - `heading` or `heading-id` - Heading within a project
 - `completed` (boolean) - Mark as completed
 - `canceled` (boolean) - Mark as canceled
 - `reveal` (boolean) - Navigate to new item after creation
-
-**Note on `list` vs `list-id`:** `list` works with **project names** only. For **areas**, you must use `list-id` with the area's UUID (query area IDs via the `things:jxa` skill).
 
 ## add-project - Create Projects
 
@@ -61,7 +59,6 @@ All commands follow the pattern: `things:///commandName?param1=value1&param2=val
 - `reveal` (boolean) - Navigate to updated item
 
 #### Notes
-- Cannot update `when` or `deadline` on repeating to-dos
 - Projects require all child to-dos completed before marking complete
 
 ## update-project - Modify Projects
@@ -149,6 +146,5 @@ Each object takes an optional `"operation"`: `"create"` (default) or `"update"`.
 
 ## Limitations
 
-- **Rate limit**: maximum 250 items within 10 seconds. Exceeding it results in throttling.
 - **Auth token**: required for `update`, `update-project`, and `json` updates. From Things > Settings > General.
 - **JSON payload**: size limited by URL length. Prefer the `json` command over many individual `add` commands for complex structures.

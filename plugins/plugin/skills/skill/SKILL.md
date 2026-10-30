@@ -24,16 +24,14 @@ hooks:
 
 # Claude Code Skills Development
 
-Reference for developing effective skills.
-
 ## Arguments
 
 Run a check against a skill path in `$ARGUMENTS`, defaulting to the skill you just edited:
 
-- `--validate`: run `skill-lint` (see [Validation](#validation)) for frontmatter, naming, and reference-depth validation.
-- `--structure`: run the directory-structure check (`${CLAUDE_SKILL_DIR}/scripts/check-structure.ts`) for the SKILL.md, `scripts/`, `references/`, `assets/` layout.
+- `--validate`: run `skill-lint` (see [Validation](#validation)) for frontmatter, naming, and reference depth.
+- `--structure`: run `${CLAUDE_SKILL_DIR}/scripts/check-structure.ts` for the SKILL.md, `scripts/`, `references/`, `assets/` layout.
 
-With neither flag, use the skill as an authoring reference. See [Validation](#validation).
+With neither flag, use the skill as an authoring reference.
 
 ## Skill Structure
 
@@ -79,7 +77,7 @@ hooks:
 
 #### Naming
 
-Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab:ci`, `things:url`). The part after the colon should not repeat the plugin name. Skip the prefix when name equals plugin name. For standalone skills, use gerund form (verb + -ing): `processing-pdfs`, `analyzing-data`. Avoid vague names like `helper`, `utils`.
+Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab:ci`, `things:url`). The part after the colon should not repeat the plugin name. Skip the prefix when name equals plugin name. For standalone skills, use a specific gerund form (verb + -ing): `processing-pdfs`, `analyzing-data`.
 
 #### Storage
 
@@ -87,11 +85,11 @@ Plugin skills use `plugin-name:skill-name` with a colon namespace (e.g., `gitlab
 
 ## Skill Authoring Best Practices
 
-Load the `prompting` skill before writing a skill body or a reference file. It carries the rules for every document a model executes. The sections below cover what changes when that document is a Claude Code skill.
+Load the `prompting` skill before writing a skill body or a reference file. The sections below cover what is specific to Claude Code skills.
 
 #### Descriptions
 
-The `description` field is the pointer Claude scans to decide whether to activate the skill. Write it for the model and make it slightly pushy, since under-triggering is the common failure. The wording rules are in the `prompting` skill.
+The `description` field is the pointer Claude scans to decide whether to activate the skill. Write it for the model and make it slightly pushy, since under-triggering is the common failure.
 
 List triggers: the requests that call for the skill. End with the boundary to any sibling skill a request could land on. Tools, techniques, and capabilities go in the body.
 
@@ -101,31 +99,23 @@ description: Use when timing a program or command, asking whether a change or ve
 
 #### Gotchas
 
-The highest-signal content in any skill is a `## Gotchas` section documenting failure modes hit in practice. Grow it as edge cases surface.
+Record failure modes hit in practice in a `## Gotchas` section, and grow it as edge cases surface.
 
 #### Progressive Disclosure
 
-A skill is a folder. Keep `SKILL.md` a concise hub and push details into `references/`, `scripts/`, and `assets/`. Tell Claude what files exist and when to read them. Organize references by domain. A question about one domain then loads only that file.
+Keep `SKILL.md` a concise hub and push details into `references/`, `scripts/`, and `assets/`, organized by domain. Point to each file with when to read it.
 
 A model-invocable skill's `description` costs tokens in every session. Keep an invoked skill's body under roughly 4k tokens, since it is re-injected in full at every compaction. A `references/` file costs nothing until its pointer fires.
 
 Split one skill into two by invocation when the branches need different frontmatter: a different `model`, different `allowed-tools`, or one branch routed by the model while the other stays user-invoked.
 
-#### First-Run Setup
+#### State and Scripts
 
-Skills that depend on user-specific context should check for a `config.json` in `${CLAUDE_SKILL_DIR}` or `${CLAUDE_PLUGIN_DATA}`. If missing, prompt the user for setup and store answers for future runs.
-
-#### Store Persistent Data in `${CLAUDE_PLUGIN_DATA}`
-
-Skills can maintain state across runs: append-only logs, JSON records, SQLite databases. Use `${CLAUDE_PLUGIN_DATA}` for storage that survives plugin upgrades.
-
-#### Give Claude Code to Compose
-
-Include helper scripts and libraries that Claude can import and compose on the fly. Document scripts with `"Run script.py"` (execute) vs `"See script.py"` (reference).
+Store state that must survive plugin upgrades (logs, JSON records, SQLite, a first-run `config.json` of user answers) in `${CLAUDE_PLUGIN_DATA}`. Point to bundled scripts with "Run script.py" to execute and "See script.py" to read.
 
 #### On-Demand Hooks
 
-Skill-scoped hooks activate only when the skill is invoked and last for the session. Use these for guardrails that would be annoying globally but valuable in specific contexts (e.g., blocking destructive commands during prod operations).
+Skill-scoped hooks activate when the skill is invoked and last for the session. Use them for guardrails that belong only in the skill's context, such as blocking destructive commands during prod operations.
 
 ## Content Features
 
@@ -157,13 +147,11 @@ A skill that declares an `argument-hint` must parse `$ARGUMENTS` (or `$0`/`$1` f
 
 ### Dynamic Context Injection
 
-The bang-backtick syntax runs shell commands **before** the skill content is sent to Claude. The output replaces the placeholder — Claude sees only the result, not the command. This is preprocessing, not something Claude executes. Use it to inject live data (git state, CLI output, file contents) so the harness extracts and runs the commands without waiting on the model.
-
-See [references/patterns.md](references/patterns.md) for syntax, examples, and gotchas.
+Bang-backtick syntax runs a shell command before the skill content reaches Claude and replaces the placeholder with its stdout. Use it for live data every run needs. Syntax and gotchas are in [references/patterns.md](references/patterns.md#dynamic-context-injection).
 
 ## Directory Structure
 
-Skills follow the [Agent Skills](https://agentskills.io/specification#optional-directories) directory convention. Only `SKILL.md` is required; all directories are optional.
+Skills follow the [Agent Skills](https://agentskills.io/specification#optional-directories) directory convention. Only `SKILL.md` is required.
 
 ```
 skill-name/
@@ -177,18 +165,16 @@ A PostToolUse hook validates writes to skill directories against this structure.
 
 ### File Naming
 
-Reserve ALL CAPS for files with special meaning (`SKILL.md`, `README.md`). Use lowercase for all other files. Keep references one level deep.
+Use uppercase only for files with special meaning (`SKILL.md`, `README.md`) and lowercase for the rest. Keep references one level deep.
 
 ## Validation
 
-A skill-scoped PostToolUse hook runs `skill-lint` automatically when SKILL.md files are edited. For manual checks, run `bun run skill-lint path/to/skill/` from the project root.
+A skill-scoped PostToolUse hook runs `skill-lint` when SKILL.md files are edited. For manual checks, run `bun run skill-lint path/to/skill/` from the project root. A skill is done when `skill-lint` passes and its `SKILL.md` reports under roughly 4k tokens.
 
 ## References
 
-Load the guide that covers the question at hand:
-
-- **[references/patterns.md](references/patterns.md)** - Dynamic context injection, subagent integration, reasoning effort, skill-scoped hooks, anti-patterns
-- **[references/troubleshooting.md](references/troubleshooting.md)** - Activation issues, plugin cache
+- [references/patterns.md](references/patterns.md): dynamic context injection, subagents and `context: fork`, reasoning effort, skill-scoped hooks, tool and skill overlap
+- [references/troubleshooting.md](references/troubleshooting.md): activation issues, plugin cache
 
 ## Resources
 

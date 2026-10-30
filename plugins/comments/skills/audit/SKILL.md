@@ -19,7 +19,7 @@ allowed-tools:
 
 Find low-value comments and act on them. A comment earns its place when it adds information not readily available in the adjacent code. The judge returns one action per comment: `keep`, `trim` (delete or shorten), or `rewrite` (keep the fact, strip the AI voice). [`judge/prompt.md`](../../judge/prompt.md) holds the comment model and its carve-outs.
 
-The pipeline is three steps, run in order: `preflight` (extract, rank, build the job), one judge agent per shard, and `apply` (write the trims or report them).
+Run three steps in order: `preflight` (extract, rank, build the job), one judge agent per shard, and `apply` (write the trims or report them). The run is done when apply has printed its branch name or its report, and every comment it could not splice is listed for the user.
 
 ## Scope and Flags
 
@@ -35,7 +35,7 @@ The pipeline is three steps, run in order: `preflight` (extract, rank, build the
 
 ## Preflight
 
-Run from the repository you are auditing. The script resolves the git root itself, so stay in the target repo rather than `cd`-ing into the plugin:
+Run from the repository being audited. The script resolves the git root itself.
 
 ```bash
 bun <plugin-dir>/skills/audit/scripts/audit.ts preflight $ARGUMENTS
@@ -49,20 +49,9 @@ The script prints a human summary followed by a machine block:
 </preflight>
 ```
 
-Read the `<preflight>` block. At ten shards or fewer, state the comment count, file count, and token estimate in one line and fan out at once. Above ten shards, present those numbers and **wait for the user to confirm before fanning out**.
+At ten shards or fewer, state the comment count, file count, and token estimate in one line and start the judge. Above ten shards, present those numbers and wait for the user to confirm.
 
-`--all` preflight and every apply require a clean working tree. When preflight reports a dirty tree, commit first. When apply reports one, commit first or run it with `--report`. The default scope audits the working tree, so it can only report until those changes are committed.
-
-Every run leaves its comment features beside the verdicts in its job dir. The
-job root therefore accumulates (features, verdict) pairs across runs. Preflight reads
-them back into an action rate per comment shape (divider rule, ticket id, why
-marker, code aligned), which is the share of that shape's judged comments the
-judge trimmed or rewrote. It weights the ranking by that rate, capped so no
-shape outweighs the file's own comment density: two comments of the same length
-rank apart when the judge has been acting on one's shape and keeping the
-other's. A shape steers the ranking once thirty pairs carry it. The preflight
-summary prints the rate for every shape past that mark and the pair count for
-every shape under it, which keeps a shape's evidence visible while it builds.
+`--all` preflight and every apply require a clean working tree. When either reports a dirty tree, commit first, or run apply with `--report`. The default scope audits the working tree, so it can only report until those changes are committed.
 
 ## Judge
 
@@ -72,7 +61,7 @@ Make one `Agent` call per entry in `prompts`, all in a single message so they ru
 Agent({ subagent_type: "comments:judge", description: "Judge comment shard <n>", prompt: <prompts[n]> })
 ```
 
-Each agent judges one shard, writes its verdicts to disk for `apply` to read, and replies with one line of counts.
+Each agent writes its shard's verdicts to disk for `apply` and replies with one line of counts.
 
 ## Apply
 
@@ -80,19 +69,17 @@ Each agent judges one shard, writes its verdicts to disk for `apply` to read, an
 bun <plugin-dir>/skills/audit/scripts/audit.ts apply --job <jobDir> [--report] [--fix] [--format <template>] [--max-width <n>]
 ```
 
-Apply re-extracts the judged files, matches verdicts to comments by id, and commits the trims and rewrites to a fresh `comments/audit-<hash>` branch off HEAD. It uses git plumbing, so the working tree and current branch stay untouched. A comment that moved or changed since preflight matches no verdict and is skipped. Comments the applier cannot splice safely stay in place and are listed with the reason. Hand those to the user for manual handling.
+Apply commits the trims and rewrites to a fresh `comments/audit-<hash>` branch off HEAD through git plumbing, leaving the working tree and current branch untouched. A comment that moved or changed since preflight matches no verdict and is skipped. Apply lists each comment it cannot splice safely with the reason. Hand those to the user.
 
-`--report` prints the findings grouped by file and writes nothing. Use it to review before applying, or on a dirty tree.
+`--report` prints the findings grouped by file and writes nothing.
 
 ### Formatting
 
-The applier splices lines without running a formatter. `--format` takes a shell command template: `{}` is replaced with the repo-relative path, the file's new content is piped on stdin, stdout is taken as the formatted content, and the command runs from the repo root. A non-zero exit, output with under half the input's lines, or output that keeps none of the input's comments warns and keeps the unformatted content:
+`--format` takes a shell command template run from the repo root: `{}` becomes the repo-relative path, the new content arrives on stdin, and stdout is the formatted content. A non-zero exit, output with under half the input's lines, or output that keeps none of the input's comments warns and keeps the unformatted content:
 
 ```bash
 --format 'ruff format --stdin-filename {} -'
 --format 'prettier --stdin-filepath {}'
 ```
 
-Pass only a formatter the target repo configures. When the repo configures none, omit the flag.
-
-Without `--format`, the width limit is the only guard on wrapping. Set `--max-width` to the width the target repo already enforces (its formatter config, `.editorconfig`, or a linter rule). When the repo enforces none, omit the flag.
+Pass only a formatter the target repo configures. Set `--max-width` to the width the target repo already enforces (its formatter config, `.editorconfig`, or a linter rule). Omit either flag when the repo has no such config.

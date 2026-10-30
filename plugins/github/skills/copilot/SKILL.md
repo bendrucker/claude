@@ -15,22 +15,29 @@ allowed-tools:
 
 # Copilot Review
 
-A second model reads the diff. The point is a different reviewer rather than a better one: Claude re-reading its own work shares the blind spot that produced it. It has already caught an unchecked-failure defect that two Claude review passes both cleared.
+A second model, GPT through the Copilot CLI, reviews the diff to catch defects Claude's own review passes miss. The work is done when every finding is triaged and reported as accepted or rejected with a reason.
 
-## What It Costs
+## Cost
 
-The plan grants a fixed monthly entitlement of AI credits, which `--status` prints. It resets on the 1st and does not roll over. Four measured facts shape every choice:
+The plan grants a fixed monthly credit entitlement that resets on the 1st and does not roll over.
 
-- A terra call pays about 3.5 credits before it reads a line of your code, writing 14k tokens of system prompt and tool definitions to cache at 250 credits per million. That is half a median review. A second call is never a rounding error.
-- Output costs 6x input and 60x cache_read. Verbose answers run up a bill faster than large diffs.
-- Nothing caches between calls. Separate spawns are separate sessions, and each one re-pays its whole prompt at the cache_write rate. Three angles cost three full prompts.
-- `gpt-5.6-luna` prices every token class at exactly a tenth of terra.
+- A terra call pays about 3.5 credits of fixed prompt overhead before reading any code, about half a median review.
+- Output costs 6x input and 60x cache_read.
+- Calls don't share a cache. Each angle or spawn re-pays its whole prompt.
+- `gpt-5.6-luna` costs a tenth of terra for every token class.
+
+| model | input | cache_read | cache_write | output |
+| --- | --- | --- | --- | --- |
+| `gpt-5.6-terra` | 200 | 20 | 250 | 1200 |
+| `gpt-5.6-luna` | 20 | 2 | 25 | 120 |
+
+Rates are credits per million tokens, from the CLI's usage ledger.
 
 ## Sizing a Review
 
-`--status` prints the current tier and the bands, and spends nothing. Run it when you are unsure whether a change qualifies.
+`--status` prints the tier and bands for free. Run it when unsure whether a change qualifies.
 
-The tier comes from `pace`, credits remaining divided by days to reset. Under 25 is constrained, over 60 is abundant, and everything between is normal. The nominal allowance, the entitlement over 31 days, is the yardstick `--status` prints `pace` against, and it decides nothing on its own. The tier sets how strict the bar is, never how much to spend. Manufacturing reviews to use up an allotment is the failure mode this guards against, so credits left unspent in a month where every qualifying change got a full review are the right outcome.
+The tier comes from `pace`, credits remaining divided by days to reset: under 25 is constrained, over 60 is abundant, between is normal. The tier sets how strict the gate is. Spend only on changes the gate admits, and leave the rest of the allotment unspent.
 
 | tier | gate |
 | --- | --- |
@@ -38,7 +45,7 @@ The tier comes from `pace`, credits remaining divided by days to reset. Under 25
 | normal | terra one-shot on gate-worthy changes, skip the rest |
 | abundant | terra one-shot on any substantial human change, 3 angles on the risk class, agentic available |
 
-The bands reuse ship's Bot Review Gate criteria, so one set of rules decides both:
+The bands reuse the Bot Review Gate criteria from the `ship` skill:
 
 | band | criteria | shape | cost |
 | --- | --- | --- | --- |
@@ -47,20 +54,7 @@ The bands reuse ship's Bot Review Gate criteria, so one set of rules decides bot
 | deep+ | risk-surface hits, abundant tier only | terra, 3 angles | ~22.7 |
 | agentic | destructive, concurrent, or auth changes, abundant tier only | capped session | up to 60 |
 
-The script enforces the hard stops on its own. It refuses `--agentic` outside the abundant tier, degrades to luna below 150 credits remaining, and refuses any run whose session cap could carry the account into billed overage. A meter it cannot read stops the run, which is what keeps this inert on a machine with no personal Copilot entitlement.
-
-## Arguments
-
-Everything is optional and forwards to the script.
-
-- `--base <ref>`: what to diff against. Defaults to the upstream tracking ref, then `origin/main`.
-- `--angles <1-3>`: independent review calls. Defaults to 1. See [Angles](#angles).
-- `--model <name>`: see [Models](#models). Defaults to `gpt-5.6-terra`.
-- `--agentic`: review from a disposable checkout with tools instead of from inlined text. It is one capped session and refuses `--angles` above 1. See [Agentic Mode](#agentic-mode).
-- `--status`: print the tier and bands, spend nothing.
-- `--dry-run`: print the assembled prompts and their size, spend nothing.
-- `--max-bytes <n>`: raise or lower the 120 KB prompt cap.
-- `--force`: run even when a prompt exceeds the size cap.
+The script enforces the hard stops. It refuses `--agentic` outside the abundant tier, degrades to luna below 150 credits remaining, refuses a run whose session cap could reach billed overage, and stops when it cannot read the meter. It reads the meter once with no lock, so run one review at a time.
 
 ## Run It
 
@@ -68,11 +62,18 @@ Everything is optional and forwards to the script.
 bun ${CLAUDE_PLUGIN_ROOT}/skills/copilot/scripts/review.ts [--base <ref>] [--angles <n>] [--model <name>]
 ```
 
-The script resolves the diff, inlines the changed files, and prints each angle's findings with what it spent and what is left. It refuses a prompt over 120 KB rather than quietly spending on it. Prefer narrowing with `--base`, then `--max-bytes`, over passing `--force`.
+The script resolves the diff, inlines the changed files, and prints each angle's findings with credits spent and remaining.
 
-## Angles
+- `--base <ref>`: diff base. Defaults to the upstream tracking ref, then `origin/main`.
+- `--angles <1-3>`: independent calls over disjoint defect classes. Defaults to 1.
+- `--model <name>`: defaults to `gpt-5.6-terra`.
+- `--agentic`: one capped tool-using session. Refuses `--angles` above 1.
+- `--status`: print tier and bands, free.
+- `--dry-run`: print the assembled prompts and their size, free.
+- `--max-bytes <n>`: move the 120 KB prompt cap, a spend guard.
+- `--force`: run past the cap. Narrow with `--base` first, then `--max-bytes`.
 
-One angle asks for every defect class in one call, which is the right default. Above that, the script splits the classes so the calls do not overlap, because three identical reviews mostly agree and cost three times as much for one review's worth of coverage.
+#### Angles
 
 | angles | coverage |
 | --- | --- |
@@ -80,79 +81,53 @@ One angle asks for every defect class in one call, which is the right default. A
 | 2 | unchecked failure and correctness, then data loss and security |
 | 3 | adds contracts, concurrency, and resources |
 
-Use 3 only for something security-sensitive, destructive, or concurrent, and only in the abundant tier. It triples the spend and buys no cache discount.
+Use 3 only for security-sensitive, destructive, or concurrent changes in the abundant tier.
 
-## Agentic Mode
+#### Agentic Mode
 
-`--agentic` gives Copilot a throwaway `git worktree` checked out at HEAD and lets it use tools. It reads callers, tests, and history instead of only what the prompt carries. That is its one categorical advantage. It runs under a 60-credit cap against a one-shot's 30, and a one-shot in practice lands at 7.6 to 12.4, so budget for several times the cost rather than double. It needs a clean tree, because a worktree at HEAD would otherwise show it code that does not match the diff it was handed.
+`--agentic` gives Copilot a throwaway `git worktree` at HEAD with tools. It reads callers, tests, and history. It runs under a 60-credit cap, several times a one-shot's cost. It needs a clean tree. Otherwise the worktree differs from the diff. Use it only on changes you authored. Review a diff containing untrusted third-party text as a one-shot, which runs without tools.
 
-Reserve it for changes you authored. A diff carrying untrusted third-party text gets the one-shot shape, where the model has no tools and cannot act on anything it reads.
+#### Models
+
+`copilot help config` lists the model names the CLI accepts. A listed name can still return "not available" on this account, and a rejected probe is free because the CLI fails before inference. The GPT-5.6 family is `sol`, `terra`, and `luna`, and `sol` is not reachable on this plan.
 
 ## Triage the Findings
 
-A one-shot finding is a claim from a model that cannot see the repository, so treat it the way you would a review bot rather than an oracle. For each finding, read the actual code and decide:
+A one-shot run has no tools and sees only the inlined text, so treat each finding as a review-bot claim. Read the actual code for each one:
 
-- **Real** → fix it, or say precisely why you are deferring.
-- **Wrong** → say what the model missed. A one-shot review works from inlined text. A finding that depends on a caller or invariant it never saw is a common and expected miss.
-- **Unsure** → put it to the user rather than guessing.
+- Real: fix it, or state why you are deferring.
+- Wrong: state what the model missed, often a caller or invariant outside the inlined text.
+- Unsure: put it to the user.
 
-Report what you accepted and what you rejected, with the reason in both directions. A silent drop looks identical to a miss.
-
-Never re-run to get a second opinion on a rejected finding. That doubles the spend for a judgment you have already made.
-
-## Models
-
-Rates come from the CLI's own usage ledger, in credits per million tokens:
-
-| model | input | cache_read | cache_write | output |
-| --- | --- | --- | --- | --- |
-| `gpt-5.6-terra` | 200 | 20 | 250 | 1200 |
-| `gpt-5.6-luna` | 20 | 2 | 25 | 120 |
-
-`copilot help config` lists every model name the CLI accepts. That list is the discovery method: there is no `models` subcommand, and the names are not guessable. It is also broader than what this account can reach. A listed name can still come back "not available". Probing costs nothing when a model is rejected, because the CLI fails before inference.
-
-`gpt-5.6-codex` does not exist. The GPT-5.6 family is `sol`, `terra`, and `luna`, and `sol` is not reachable on this plan.
+Report accepted and rejected findings, each with its reason. Settle a rejected finding yourself rather than re-running for another opinion.
 
 ## Gotchas
 
-#### No Prefix Cache Across Calls
+#### Sandbox, `HOME`, and Auth
 
-Two terra spawns sharing an identical 20k-token prefix both wrote the full prompt and read nothing from cache. Caching works inside one session and not between them. Ordering the prompt to share a prefix across angles therefore buys nothing. Do not build for it without re-probing.
+The script points `HOME` at `~/.cache/claude/copilot-home`, because the sandbox blocks writes to `~/.copilot` (`I/O error: Operation not permitted (os error 1)`). Keep the sandbox on. That home persists. Read the spend ledger there afterward, and resume a session with `--resume`. `--no-custom-instructions` keeps repo instructions out of the review.
 
-#### The Sandbox, `HOME`, and Auth
+The redirect hides Copilot's own logins and `gh`'s. When none of `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` is set, the script runs `gh auth token` under the real `HOME` and passes it as `COPILOT_GITHUB_TOKEN`. When no token resolves, it refuses before spending. Fix that with `gh auth login` or by exporting one of the three variables.
 
-The sandbox blocks Copilot writing to `~/.copilot`, which kills the run with `I/O error: Operation not permitted (os error 1)`. The script points `HOME` at `~/.cache/claude/copilot-home`, which the sandbox allows. Do not solve this by disabling the sandbox. That home persists on purpose. This path's spend lands in a ledger you can read afterward, and `--resume` picks a session back up. `--no-custom-instructions` keeps the repo's own instructions out of the review.
-
-The redirect also hides every login Copilot knows how to find: its own under the real home and in the keychain, and `gh`'s in `~/.config/gh`. Without a token in the environment, every run fails before inference with `No authentication information found`, even right after `/login`. So when none of `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` is set, the script runs `gh auth token` under the real `HOME` and passes the result to Copilot as `COPILOT_GITHUB_TOKEN`. `gh` reads its keychain token from inside the sandbox, so this runs sandboxed like the rest of the script. Under the redirected `HOME` it finds no `hosts.yml` and reports no token. When no token resolves, the script refuses before spending anything. Fix that with `gh auth login` or by exporting one of the three variables.
-
-The sandbox allows `api.individual.githubcopilot.com` through `user/settings.json`, so a plain sandboxed call reaches it. If a run dies with `Failed to load models` and a `tunnel error`, the login reaches a different Copilot host, such as a Business plan's. Grant that host there instead of widening to `*.githubcopilot.com`.
-
-#### Prompt Size
-
-The prompt travels on stdin. Omitting `-p` is what selects that: Copilot reads stdin as the prompt and stays in the same non-interactive mode, so `ARG_MAX` does not bound it. The 120 KB cap is a spend guard rather than a size ceiling. `--max-bytes` moves it, and `--force` runs past it.
+`user/settings.json` allows `api.individual.githubcopilot.com`. A `Failed to load models` with a `tunnel error` means the login uses a different Copilot host, such as a Business plan's. Grant that exact host there.
 
 #### What Reaches GitHub
 
-The diff and the changed files go to GitHub. That is the whole mechanism, and there is no redaction. A changed file holding a token or a key sends it. Untracked files count. The script unions in `git ls-files --others --exclude-standard` so a pre-commit review does not miss new files, and it inlines their full contents like any other. A symlink out of the repository is the one exclusion, which is why a link to `~/.ssh` inlines nothing. Check what is in the diff before reviewing a change that touches secrets or fixtures.
+The diff and full changed files go to GitHub with no redaction, including untracked files from `git ls-files --others --exclude-standard`. The script skips symlinks that point out of the repository. Check the diff for secrets and fixtures before reviewing a change that touches them.
 
-#### One-Shot Has No Tools
+#### Agentic Containment
 
-A one-shot run sits outside the repo with no tools, so everything it sees is inlined in the prompt. A finding that assumes it read a file misjudges the mode.
+Agentic mode passes `--allow-all-tools` minus `--deny-tool write`, `--deny-tool url`, `shell(git push)`, `shell(gh:*)`, `shell(curl:*)`, and `shell(wget:*)`. It contains misbehavior. A deliberate attacker can get past it.
 
-#### Agentic Containment Has Known Gaps
+- Shell redirection can still write. The disposable worktree is the write barrier.
+- The worktree shares the parent's `.git`. `git update-ref` and `git config` reach the real repository. The reflog records ref moves.
+- Deny matching works on first-level subcommand grammar. An exotic invocation could reach `git push`.
+- Prompt injection in the diff gets past every flag. Running agentic mode only on your own changes covers it.
 
-Agentic mode passes `--allow-all-tools` and subtracts from it: `--deny-tool write` and `--deny-tool url`, plus `shell(git push)`, `shell(gh:*)`, `shell(curl:*)`, and `shell(wget:*)`. Deny beats allow, so those six are the boundary. The stack is built to contain misbehavior. It will not hold against a deliberate attacker.
+#### Overage
 
-- `--deny-tool write` covers file-writing tools and leaves shell redirection open. The disposable worktree is the actual write barrier.
-- That worktree shares the parent's `.git`. A shell write therefore reaches the real repository's refs and config. `git update-ref` moves a branch and `git config` changes repository settings, and neither is denied. The reflog records ref moves.
-- The four `shell` denies and `url` close the outbound paths the sandbox cannot, since `github.com` is allowlisted and `gh` credentials resolve.
-- Deny matching works on first-level subcommand grammar. An exotic invocation shape reaching `git push` may slip past it.
-- Prompt injection in the reviewed diff stays open. The mitigation is the usage rule above rather than a flag.
+A separate `$0` stop-usage budget on All AI Credit SKUs blocks billed overage, even though the plan reports `overage_permitted: true` with a 2000-credit overage entitlement.
 
-#### The Guard Holds No Lock
+#### Review Prompt
 
-Each invocation reads the meter once and reserves against that reading. Two reviews started at the same moment therefore both clear a reserve only one of them fits in. This script caps the common case. What makes the gap cost nothing is a separate `$0` stop-usage budget on All AI Credit SKUs, which blocks billed overage outright. The plan still reports `overage_permitted: true` with a 2000-credit overage entitlement, because that figure describes plan capability. The budget is what describes billing consent.
-
-#### Default Framing Is Thin
-
-A default framing gets a pass that ignores most of what you asked for. The script's prompt names the defect classes in priority order and forbids summarizing the change back. Keep that if you edit it.
+The script's prompt lists the defect classes in priority order and tells the model to skip summarizing the change. Keep both when editing it.

@@ -15,11 +15,9 @@ allowed-tools:
 
 # Update Pull Request
 
-The PR body documents what will happen when merged, not the journey. Don't echo review feedback. Only mention changes if the ultimate result is user-facing.
+Rewrite the PR/MR body so it describes what merging the current diff does. Describe the end result, and mention a change made during review only when that result is user-facing.
 
-## Arguments
-
-`$0` (optional): the PR/MR to update, given as a URL, number, or branch name. The Workflow passes it to `gh pr view`/`glab mr view`. Default: with no argument, the tools resolve the PR/MR from the current branch.
+`$0` (optional) is a PR/MR URL, number, or branch name. With none, `gh`/`glab` resolve the PR/MR from the current branch.
 
 ## Context
 
@@ -32,24 +30,24 @@ The PR body documents what will happen when merged, not the journey. Don't echo 
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/scripts/contributing.ts`
 
-## Workflow
+## Fetch
 
-1. **Fetch PR context**: Use `$0` (if provided) as a PR identifier (number or branch name). Fetch the current PR:
-   - **GitHub**: `gh pr view $0 --json title,body,updatedAt,commits`
-   - **GitLab**: `glab mr view $0`
-1. **Fetch PR diff**:
-   - **GitHub**: `gh pr diff $0`
-   - **GitLab**: `glab mr diff $0`
-1. Filter commits after `updatedAt` to identify new work since the body was last written.
+- GitHub: `gh pr view $0 --json title,body,updatedAt,commits` and `gh pr diff $0`
+- GitLab: `glab mr view $0` and `glab mr diff $0`
 
-## Writing
+Commits after `updatedAt` are the work the current body does not yet cover.
 
-1. Rewrite the PR body per [`sections.md`](../create/references/sections.md), the same rules the create skill follows. Load the `writing` skill for the full set of tropes to avoid. If a PR template is provided in context, preserve its structure. The `Entities` block in the context lists what changed at the function and class level, so use it to judge what the change did, but lead the body with intent and never reproduce the list.
-2. Write the updated body to a temp file (e.g., `tmp/pr-body-<branch>.md`) and apply:
-   - **GitHub**: `gh pr edit --body-file tmp/pr-body-<branch>.md`
-   - **GitLab**: `glab mr update --description-file tmp/pr-body-<branch>.md`
-   - A screenshot or recording the new body references by local path uploads with it: `--attach ./shot.png` per file on `gh pr edit` (load `github:attach`), or project uploads per `gitlab:api` pasted in before the update. Assets already in the body keep their uploaded URLs.
+## Write
 
-## GitLab Notes
+Rewrite the body per [`sections.md`](../create/references/sections.md), the rules the create skill follows, and load the `writing` skill. When a PR template is in context, keep its structure. Use the `Entities` block to judge what the change did, and lead the body with intent rather than that list.
 
-For advanced GitLab features (username lookup), load `gitlab:merge-request`.
+Write the body to `tmp/pr-body-<branch>.md` and apply it:
+
+- GitHub: `gh pr edit --body-file tmp/pr-body-<branch>.md`
+- GitLab: `glab mr update --description-file tmp/pr-body-<branch>.md`
+
+Upload any screenshot or recording the new body references by local path: `--attach ./shot.png` per file on `gh pr edit` (load `github:attach`), or project uploads per `gitlab:api` pasted in before the update. Assets already in the body keep their uploaded URLs.
+
+For GitLab username lookup, load `gitlab:merge-request`.
+
+Done when a fresh `gh pr view`/`glab mr view` shows the new body and it describes the work in the commits after `updatedAt`.

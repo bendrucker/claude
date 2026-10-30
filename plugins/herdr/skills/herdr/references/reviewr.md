@@ -2,7 +2,7 @@
 
 A herdr plugin that opens a review sidebar over the diff you just wrote and collects line comments on it.
 
-Never query or poll reviewr. When the user hits Send, it injects the comment batch into your input and stops. It does not submit. The comments arrive inside an ordinary user turn, usually with the user's own remarks attached.
+reviewr delivers on its own: when the user hits Send, it injects the comment batch into your input and stops. It does not submit. The comments arrive inside an ordinary user turn, usually with the user's own remarks attached.
 
 ## Reading a Batch
 

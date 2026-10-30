@@ -11,13 +11,7 @@ The bang-backtick syntax runs shell commands as preprocessing before Claude sees
 
 ### When to Use
 
-Prefer bang-backtick over asking Claude to run the same command with Bash when:
-
-- The data is **always needed** — every invocation requires it, so there's no decision for Claude to make
-- The data **shapes the task** — Claude needs the output to understand what to do, not just as supplementary info
-- **Latency matters** — preprocessing runs before the model prompt, avoiding a round-trip
-
-Keep using `allowed-tools` with Bash for commands Claude should decide whether/when to run.
+Use bang-backtick when every invocation needs the data, especially data that shapes the task. It saves a model round-trip. Use `allowed-tools` with Bash for commands Claude should decide whether or when to run.
 
 ### Combining with Other Features
 
@@ -27,10 +21,10 @@ Keep using `allowed-tools` with Bash for commands Claude should decide whether/w
 
 ### Gotchas
 
-- Commands run in the **project root**, not the skill directory. For plugin skills, use `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` to reference skill-local scripts. `${CLAUDE_SKILL_DIR}` also expands in `!` context (see the substitutions table in [SKILL.md](../SKILL.md) for where it does not).
-- **stderr is discarded** — only stdout replaces the placeholder.
+- Commands run in the project root, not the skill directory. For plugin skills, use `${CLAUDE_PLUGIN_ROOT}/skills/<skill-name>` to reference skill-local scripts. `${CLAUDE_SKILL_DIR}` also expands in `!` context (see the substitutions table in [SKILL.md](../SKILL.md) for where it does not).
+- Only stdout replaces the placeholder. stderr is discarded.
 - Failed commands produce empty output. Handle this in the command itself with a fallback (e.g., `some-cmd 2>/dev/null || echo "unavailable"`).
-- Commands run **synchronously and sequentially**. Avoid slow commands that would delay skill loading.
+- Commands run synchronously and sequentially, so a slow command delays skill loading.
 
 ## Skills and Subagents
 
@@ -51,7 +45,7 @@ Skills listed here are injected into the subagent's context at startup. Built-in
 
 ### Run a skill in a subagent context
 
-Use `context: fork` to run a skill in an isolated subagent. The sub-agent starts with a **clean context**. It does not inherit the parent conversation. It sees only the skill content (with `!`shell`` injections expanded) and `CLAUDE.md`. Results are summarized and returned to the main conversation.
+Use `context: fork` to run a skill in an isolated subagent. The subagent starts with a clean context, without the parent conversation. It sees only the skill content (with `!`shell`` injections expanded) and `CLAUDE.md`. Results are summarized and returned to the main conversation.
 
 Forks background by default. The result arrives as a later task notification rather than in the invoking turn, the fork runs with the narrower background-subagent tool set, and its edits fall outside session checkpoints so `/rewind` will not undo them. Set `background: false` when the caller needs the result in the turn that invoked the skill.
 
@@ -100,12 +94,6 @@ hooks:
             }'
 ```
 
-## Anti-Patterns
+## Tool and Skill Overlap
 
-### Tool and Skill Overlap
-
-Exposing several near-duplicate tools makes Claude pick the wrong one. Consolidate overlapping capabilities into a single parameterized tool where an argument selects behavior. The same overlap appears at the skill level: two skills whose `description` fields overlap compete to trigger. Prefer one skill with a `$ARGUMENTS`-selected mode over splitting it into rivals that race to activate.
-
-### Over-Prescription
-
-Prompts that micromanage the exact sequence of tool calls degrade output and become brittle. When a skill keeps accreting prescriptive steps to patch failures, the fix is usually a clearer goal or a helper script, not more steps.
+Consolidate overlapping capabilities into one parameterized tool, or one skill with a `$ARGUMENTS`-selected mode, since skills whose `description` fields overlap compete to trigger.

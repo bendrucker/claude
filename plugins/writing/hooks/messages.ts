@@ -57,12 +57,12 @@ function strings(value: unknown): string[] {
 const BODY_FILE_PATTERN = new RegExp(`(?:${BODY_FILE_FLAGS.join("|")})[=\\s](\\S+)`);
 const FIELD_FILE_PATTERN = /(?:^|\s)['"]?(?:-F|--field)[= ]([^\s=]+)=@(\S+)/g;
 const GIT_MESSAGE_FILE_PATTERN = /\bgit\s+(?:commit|tag)\b[^|;&]*?\s(?:-F|--file)[= ](\S+)/g;
-const INPUT_FILE_PATTERN = /(?:^|\s)--input[= ](\S+)/g;
+const INPUT_FILE_PATTERN = /(?:^|\s)--input[= ](?:'([^']*)'|"([^"]*)"|(\S+))/g;
 
 // Commands that post a peer-review comment: a GitLab draft note, discussion, or
 // note, or a GitHub pull request review or comment.
 const REVIEW_COMMAND =
-  /draft-note\.ts|\bglab\s+api\b[^|;&]*\/(?:draft_notes|discussions|notes)\b|\bglab\s+mr\s+note\b|\bgh\s+api\b[^|;&]*\/pulls\/\d+\/(?:reviews|comments)\b|\bgh\s+pr\s+(?:review|comment)\b/;
+  /draft-note\.ts|discussions\.ts\s+create\b|\bglab\s+api\b[^|;&]*\/(?:draft_notes|discussions|notes)\b|\bglab\s+mr\s+note\b|\bgh\s+api\b[^|;&]*\/pulls\/\d+\/(?:reviews|comments)\b|\bgh\s+pr\s+(?:review|comment)\b/;
 
 // Shell quoting survives into the raw command string, so a path captured from
 // `-F 'body=@tmp/x.md'` carries the closing quote.
@@ -121,7 +121,7 @@ function extractFieldFilePaths(command: string): string[] {
 
 function extractInputFilePaths(command: string): string[] {
   return [...command.matchAll(INPUT_FILE_PATTERN)]
-    .map((match) => stripQuotes(match[1] ?? ""))
+    .map((match) => match[1] ?? match[2] ?? match[3] ?? "")
     .filter((path) => path !== "" && path !== "-");
 }
 
@@ -168,10 +168,12 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
       files.map((path) => readNewest(pathCandidates(path, process.env, uid))),
     );
     texts.push(...bodies.filter((body) => body !== null));
+    const payloadPaths =
+      REVIEW_COMMAND.test(command) || /\b(?:gh|glab)\s+api\b/.test(command)
+        ? extractInputFilePaths(command)
+        : [];
     const payloads = await Promise.all(
-      extractInputFilePaths(command).map((path) =>
-        readNewest(pathCandidates(path, process.env, uid)),
-      ),
+      payloadPaths.map((path) => readNewest(pathCandidates(path, process.env, uid))),
     );
     for (const payload of payloads) {
       const prose = payload === null ? null : payloadProse(payload);
@@ -190,7 +192,11 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
 function messageKind(input: PreToolUseHookInput): "body" | "commit" | "review" {
   const command = toolInputOf(input).command ?? "";
   if (/\bgit\s+(commit|tag)\b/.test(command)) return "commit";
-  if (REVIEW_COMMAND.test(command) || /review|comment/i.test(input.tool_name)) return "review";
+  if (
+    REVIEW_COMMAND.test(command) ||
+    /review|merge_request_(?:note|discussion)/i.test(input.tool_name)
+  )
+    return "review";
   return "body";
 }
 

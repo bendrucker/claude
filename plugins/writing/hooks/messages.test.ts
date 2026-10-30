@@ -237,37 +237,64 @@ describe("review payloads", () => {
     await Bun.write(join(dir, "dense.json"), JSON.stringify(dense));
     await Bun.write(join(dir, "light.json"), JSON.stringify(light));
     await Bun.write(join(dir, "dense.md"), dense.comments[0]?.body ?? "");
+    await Bun.write(join(dir, "review draft.json"), JSON.stringify(dense));
   });
 
   afterAll(async () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  test.each<{ name: string; command: (dir: string) => string; denied: boolean }>([
+  const denseBody = dense.comments[0]?.body ?? "";
+
+  test.each<{ name: string; input: (dir: string) => PreToolUseHookInput; denied: boolean }>([
     {
       name: "a dense draft-note batch is denied",
-      command: (d) => `bun draft-note.ts review 1 --input ${d}/dense.json`,
+      input: (d) => mockBash(`bun draft-note.ts review 1 --input ${d}/dense.json`),
       denied: true,
     },
     {
       name: "a dense gh api review is denied",
-      command: (d) => `gh api repos/o/r/pulls/1/reviews --input ${d}/dense.json`,
+      input: (d) => mockBash(`gh api repos/o/r/pulls/1/reviews --input ${d}/dense.json`),
       denied: true,
     },
     {
       name: "a light draft-note batch passes",
-      command: (d) => `bun draft-note.ts review 1 --input ${d}/light.json`,
+      input: (d) => mockBash(`bun draft-note.ts review 1 --input ${d}/light.json`),
+      denied: false,
+    },
+    {
+      name: "a dense batch at a quoted path with a space is denied",
+      input: (d) => mockBash(`bun draft-note.ts review 1 --input "${d}/review draft.json"`),
+      denied: true,
+    },
+    {
+      name: "a dense discussions.ts comment is denied",
+      input: (d) => mockBash(`bun discussions.ts create 1 --body-file ${d}/dense.md`),
+      denied: true,
+    },
+    {
+      name: "a dense MCP review comment is denied",
+      input: () => mockMcp("mcp__github__add_pull_request_review_comment", { body: denseBody }),
+      denied: true,
+    },
+    {
+      name: "a dense issue comment is out of scope",
+      input: () => mockMcp("mcp__claude_ai_Linear__save_comment", { body: denseBody }),
       denied: false,
     },
     {
       name: "a dense PR body is out of scope",
-      command: (d) => `gh pr create --body-file ${d}/dense.md`,
+      input: (d) => mockBash(`gh pr create --body-file ${d}/dense.md`),
       denied: false,
     },
-  ])("$name", async ({ command, denied }) => {
-    const alerts = await lintMessages(mockBash(command(dir)));
+  ])("$name", async ({ input, denied }) => {
+    const alerts = await lintMessages(input(dir));
     const density = alerts.filter((alert) => alert.check === "Writing.CodeDensity");
     expect(density.map((alert) => alert.decision)).toEqual(denied ? ["deny"] : []);
+  });
+
+  it("never reads an --input payload for an unrelated command", async () => {
+    expect(await collectText(mockBash(`mytool convert --input ${dir}/dense.json`))).toEqual([]);
   });
 
   it("skips a payload that is not JSON", async () => {

@@ -41,7 +41,7 @@ Launch the watch script via the `Monitor` tool with `persistent: true`:
 - Pipeline-id mode: `bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --pipeline-id <id> [--project <group/project>]`
 - Optional flags: `--interval <seconds>`, `--max-minutes <N>`, `--queued-timeout <minutes>`, `--api-error-threshold <N>`.
 
-Exactly one of `--mr`, `--branch`, or `--pipeline-id` is required. In branch and pipeline-id modes, `--project` is inferred from the current git remote when omitted. Pipeline-id mode queries `glab api projects/:id/pipelines/:pid` directly; if the pipeline does not exist the watcher exits non-zero on the first call.
+Exactly one of `--mr`, `--branch`, or `--pipeline-id` is required. Pipeline-id mode queries `glab api projects/:id/pipelines/:pid` directly; if the pipeline does not exist the watcher exits non-zero on the first call.
 
 MR mode resolves the pipeline from `projects/:id/merge_requests/:iid/pipelines` and branch mode from `projects/:id/pipelines?ref=<branch>`. Both ignore `external` pipelines (commit statuses posted by other tools, which carry no CI jobs) and `parent_pipeline` pipelines (children the parent already aggregates), and each prefers its own kind: `merge_request_event` in MR mode, branch pipelines in branch mode.
 
@@ -61,13 +61,11 @@ Each line is one of:
 - `{"type":"merged"}`: MR merged. MR mode only. The script exits after emitting.
 - `{"type":"max-time-reached","minutes":60}`: wall-clock cap hit. The script exits after emitting.
 
-In branch and pipeline-id modes, `conflicts`, `mergeable-unknown`, `pr-closed`, and `merged` are never emitted (there is no MR metadata to derive them from). `merged` and `pr-closed` are distinct terminal events: `merged` means the MR landed, `pr-closed` means it closed without merging.
-
-The script exits on `status: success` in every mode, but only once that success survives the job-level confirmation above. A pipeline whose jobs cannot be read keeps the watcher polling rather than exiting green, surfacing as `api-error` if it persists. In pipeline-id mode it also exits on `status: failing` (the pipeline is terminal).
+The script exits on `status: success` in every mode, but only once that success survives the job-level confirmation above. A pipeline whose jobs cannot be read keeps the watcher polling rather than exiting green, surfacing as `api-error` if it persists.
 
 #### React to events
 
-On `status: failing`, invoke the `gitlab:logs` agent via the `Agent` tool with the pipeline ID from `run_id`. This applies to all three modes; the logs agent accepts a pipeline ID, so pipeline-id mode fits:
+On `status: failing`, invoke the `gitlab:logs` agent via the `Agent` tool with the pipeline ID from `run_id`.
 
 ```
 Agent(
@@ -88,21 +86,13 @@ On `merged`, `pr-closed`, or `max-time-reached`, the monitor has already exited.
 
 #### Stopping
 
-The monitor exits on its own for `status: success`, `merged`, `pr-closed`, and `max-time-reached`. In pipeline-id mode it also exits on `status: failing`. To stop earlier (e.g. after surfacing a failure summary to the user), call `TaskStop` on the monitor task.
+To stop earlier (e.g. after surfacing a failure summary to the user), call `TaskStop` on the monitor task.
 
 ## Config Authoring
 
 For editing `.gitlab-ci.yml` rather than watching a run:
 
-```bash
-glab ci lint               # Validate .gitlab-ci.yml before pushing
-glab ci status             # Pipeline status for current branch
-glab ci list               # List recent pipelines
-glab ci run                # Trigger a pipeline for the current branch
-glab ci view               # Interactive pipeline/job view
-glab ci trace <job-id>     # Stream job logs
-glab ci retry <job-id>     # Retry a failed job
-```
+Validate `.gitlab-ci.yml` with `glab ci lint` before pushing.
 
 Keyword syntax lives at `/ci/yaml/` in [GitLab docs](https://docs.gitlab.com/ci/yaml/). Predefined variables are at `/ci/variables/`.
 

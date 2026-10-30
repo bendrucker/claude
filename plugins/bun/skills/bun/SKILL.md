@@ -13,7 +13,7 @@ See [references/bunx.md](references/bunx.md)
 
 ## Lockfile
 
-`bun.lock` is a text-based lockfile. Resolve merge conflicts by deleting it and running `bun install` to regenerate — never merge it.
+`bun.lock` is a text-based lockfile. Resolve merge conflicts by regenerating it from `origin/main` with only the resolved manifests applied, never by hand.
 
 See [references/lockfile.md](references/lockfile.md)
 
@@ -43,6 +43,6 @@ See [references/file-io.md](references/file-io.md)
 
 ## Testing
 
-Bun runs tests in a single process. Use `describe`/`it`/`test` for structure, `expect` matchers for assertions, lifecycle hooks (`beforeEach`, `afterEach`) for setup/teardown, `mock()` for function mocking, and `.toMatchSnapshot()` for snapshot testing. Set `AGENT=1` to suppress passing test output.
+Bun runs tests in a single process, not worker-per-file like Vitest or Jest. Set `AGENT=1` to suppress passing test output.
 
 See [references/testing.md](references/testing.md)

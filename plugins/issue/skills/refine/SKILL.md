@@ -54,7 +54,7 @@ time out, so downstream jobs read a partial snapshot as if it were complete.
 
 Populate only the keys you can infer, and drop empty relation lists. The platform skill fills routing and workspace fields (team, assignee, state, estimate) at save time.
 
-A related issue you found belongs under `relations` as a tracker link, kept out of the body. Mention another issue in the body only when it tells the reader something the relation can't: what a prior attempt tried, why upstream work matters. The body has no Related Issues section. Put links the tracker has no field for (cross-tracker issues, upstream bug reports) under [Agent Context](#agent-context).
+A related issue you found belongs under `relations` as a tracker link, kept out of the body. Mention another issue in the body only when it tells the reader something the relation can't: what a prior attempt tried, why upstream work matters. The body has no Related Issues section. Link a source the body relies on (a spec, a dashboard, a status page) inline in the sentence that relies on it.
 
 ## Section Selection
 
@@ -68,7 +68,7 @@ What you learned exploring the codebase, so the implementing agent doesn't explo
 
 Write lists of paths, symbols, and commands for an agent. [Style](#style) does not apply: line numbers, ranges, and bare enumeration are fine when they save a search.
 
-Emit only what exploration produced. Drop subsections you can't fill, and the whole section when you explored nothing.
+Emit only what exploration produced. Drop subsections you can't fill, and the whole section when exploration came up empty or the issue goes to a repository your team doesn't maintain, whose maintainers know their own code.
 
 Open the block with one line, `Gathered at <commit> on <date>.` (`git rev-parse --short HEAD`), or `Gathered on <date>.` without a commit, and go straight to the first subsection. The implementer checks every pointer against their own checkout. That check already covers where a finding came from and what you couldn't confirm. State each finding as fact about the code. Pair every line number with its symbol, which survives drift.
 

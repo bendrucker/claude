@@ -7,7 +7,7 @@ import { $ } from "bun";
 import { type DuckDBConnection, DuckDBInstance } from "@duckdb/node-api";
 import { z } from "zod";
 import { ensureIndex, getDb, sessionDbPath } from "./db";
-import { type LakeOptions, publish, readerInit } from "./lake";
+import { LakeBudgetError, type LakeOptions, publish, queryLake, readerInit } from "./lake";
 
 const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 
@@ -104,6 +104,9 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+// What a promise rejected with, or undefined when it resolved.
+const failure = (p: Promise<unknown>) => p.then(() => undefined).catch((error: unknown) => error);
+
 describe("publish", () => {
   test("a first publish matches the local index for the published hosts", async () => {
     const db = await getDb(dir);
@@ -161,6 +164,20 @@ describe("publish", () => {
       SELECT (SELECT count(*) FROM scoped_sessions()) = (SELECT count(*) FROM sessions) AS same;`;
     const out = await $`duckdb -json -init ${init} -c ${sql}`.cwd(dir).text();
     expect(JSON.parse(out)).toEqual([{ same: true }]);
+  }, 60_000);
+
+  test("a lake query prices its reads and refuses one over budget", async () => {
+    const sql = "SELECT count(*) AS n FROM raw WHERE timestamp >= getvariable('after')";
+    const all = await queryLake(options.url, sql, 1e9, { after: "2000-01-01" });
+    expect(all.estimate).toBeGreaterThan(0);
+    const none = await queryLake(options.url, sql, 1e9, { after: "2999-01-01" });
+    expect(none).toMatchObject({ rows: [{ n: 0n }], estimate: 0 });
+    expect(await failure(queryLake(options.url, sql, 1, { after: "2000-01-01" }))).toBeInstanceOf(
+      LakeBudgetError,
+    );
+    expect(String(await failure(queryLake(options.url, "SELECT 1; SELECT 2", 1e9)))).toContain(
+      "one statement",
+    );
   }, 60_000);
 
   test("an unchanged index publishes nothing", async () => {

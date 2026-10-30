@@ -56,7 +56,7 @@ For self-improvement discovery (fanning out over the whole corpus to mine config
 
 ### Remote Index
 
-Where `CLAUDE_SESSION_LAKE_URL` is set and no local index exists, query the published lake in place: `duckdb -init "$(bun "${CLAUDE_SKILL_DIR}/scripts/lake.ts" init)" -c "<sql>"`. Table and view names match the local index. Every byte read is S3 egress, so bound each query by a date window and select only the columns it needs. A query that reads `data` or `attachment` across a wide window can pull hundreds of MB. The lake holds no local telemetry (`mod_events`, `debug_events`), so `index-health`, `classifier`, `sandbox-bypass-scaffold` and `mods` run only against a local index.
+Where `CLAUDE_SESSION_LAKE_URL` is set and no local index exists, query the published lake in place with `bun "${CLAUDE_SKILL_DIR}/scripts/lake.ts" query "<sql>"`, or `--name <query>`, with each variable as `--param name=value`. It prints rows as JSON and takes one statement. Table and view names match the local index. Every byte read is S3 egress, so bound each query by a date window and select only the columns it needs. Before running a query, `lake.ts query` estimates its data reads from the lake's catalog and refuses any query over `--max-mb` (default 256). Treat a refusal as a sign the query is too wide, not as a reason to raise the budget. Its stderr line reports what the query actually read. The lake holds no local telemetry (`mod_events`, `debug_events`), so `index-health`, `classifier`, `sandbox-bypass-scaffold` and `mods` run only against a local index.
 
 ## Named Queries
 

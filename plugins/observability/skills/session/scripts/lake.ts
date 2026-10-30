@@ -11,9 +11,12 @@ import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { Command } from "@commander-js/extra-typings";
+import { DuckDBInstance } from "@duckdb/node-api";
 import { $ } from "bun";
 import { z } from "zod";
 import { enumerateHosts, getDataDir, LOCAL_HOST, sessionDbPath } from "./db";
+import { emit, errorClass } from "./events";
+import { type QueryParams, renderSetVariables } from "./query";
 
 const RESOURCES_DIR = join(import.meta.dirname, "..", "resources");
 const LAKE_SQL = join(RESOURCES_DIR, "lake");
@@ -140,6 +143,141 @@ export async function readerInit(url: string): Promise<string> {
   ].join("\n");
 }
 
+const ScanPlan = z.object({
+  name: z.string(),
+  extra_info: z.record(z.string(), z.unknown()).optional(),
+  get children() {
+    return z.array(ScanPlan).default([]);
+  },
+});
+type ScanPlan = z.infer<typeof ScanPlan>;
+
+/** Every DuckLake scan in an EXPLAIN (FORMAT json) plan, with its columns and filter text. */
+export function lakeScans(
+  plan: unknown,
+): { id: number; tbl: string; projections: string[]; filters: string | null }[] {
+  const scans: ScanPlan[] = [];
+  const pending = z.array(ScanPlan).parse(plan);
+  for (let node = pending.pop(); node !== undefined; node = pending.pop()) {
+    if (node.name === "DUCKLAKE_SCAN") scans.push(node);
+    pending.push(...node.children);
+  }
+  return scans.map((s, id) => {
+    const info = z
+      .object({
+        Table: z.string(),
+        Projections: z.union([z.string(), z.array(z.string())]).optional(),
+        Filters: z.union([z.string(), z.array(z.string())]).optional(),
+      })
+      .parse(s.extra_info);
+    return {
+      id,
+      tbl: info.Table.split(".").at(-1) ?? info.Table,
+      projections: list(info.Projections),
+      filters: info.Filters === undefined ? null : list(info.Filters).join(" AND "),
+    };
+  });
+}
+
+const list = (v?: string | string[]) => (v === undefined ? [] : [v].flat());
+
+const Estimate = z.array(
+  z.object({ id: z.number(), tbl: z.string(), files: z.coerce.number(), bytes: z.coerce.number() }),
+);
+
+export interface LakeQueryResult {
+  rows: unknown[];
+  /** Data bytes the plan's scans could read, by the catalog's stats. */
+  estimate: number;
+  /** What the catalog fetches came to, for the attach and the query's planning. */
+  catalogBytes: number;
+  gets: number;
+  /** Every byte the process fetched, the catalog included. */
+  bytes: number;
+}
+
+const MB = 1024 * 1024;
+
+/**
+ * Runs `sql` against the lake in-process, refusing it when the catalog's stats put its
+ * data reads above `maxBytes`. The node client has no getenv, so a macro over the
+ * environment stands in for the variables the init reads.
+ */
+export async function queryLake(
+  url: string,
+  sql: string,
+  maxBytes: number,
+  params: QueryParams = {},
+): Promise<LakeQueryResult> {
+  const instance = await DuckDBInstance.create(":memory:");
+  const c = await instance.connect();
+  try {
+    const init = await readerInit(url);
+    const names = [...new Set([...init.matchAll(/getenv\('(\w+)'\)/g)].map((m) => m[1] ?? ""))];
+    const env = names.map((n) => `${quote(n)}: ${quote(process.env[n] ?? "")}`).join(", ");
+    await c.run(`CREATE TEMP MACRO getenv(name) AS coalesce(MAP {${env}}[name], '')`);
+    await c.run("CALL enable_logging('HTTP', storage = 'memory')");
+    await c.run(init);
+
+    // One statement, so the plan priced is the query that runs. Variables come as params.
+    if ((await c.extractStatements(sql)).count !== 1)
+      throw new Error("Pass one statement, with any variables as --param name=value.");
+    const vars = renderSetVariables(params);
+    if (vars !== "") await c.run(vars);
+    const explained = (await c.runAndReadAll(`EXPLAIN (FORMAT json) ${sql}`)).getRowObjectsJS();
+    const plan = explained.flatMap((r) =>
+      z.array(z.unknown()).parse(JSON.parse(z.string().parse(r.explain_value))),
+    );
+    await c.run(`SET VARIABLE scans = ${quote(JSON.stringify(lakeScans(plan)))}`);
+    const scans = Estimate.parse(
+      (await c.runAndReadAll(await read("lake/estimate.sql"))).getRowObjectsJS(),
+    );
+    const estimate = scans.reduce((n, s) => n + s.bytes, 0);
+    if (estimate > maxBytes) {
+      const top = scans
+        .slice(0, 3)
+        .map((s) => `${s.tbl} ${(s.bytes / MB).toFixed(1)} MB in ${s.files} files`)
+        .join(", ");
+      throw new LakeBudgetError(
+        `Estimated ${(estimate / MB).toFixed(1)} MB of lake reads, above the ${(maxBytes / MB).toFixed(0)} MB budget (${top}). Narrow the date window or the columns, or pass a larger --max-mb.`,
+        estimate,
+      );
+    }
+
+    const rows = (await c.runAndReadAll(sql)).getRowObjectsJS();
+    const fetched = z
+      .object({
+        gets: z.coerce.number(),
+        bytes: z.coerce.number(),
+        catalogBytes: z.coerce.number(),
+      })
+      .parse(
+        (
+          await c.runAndReadAll(
+            `SELECT count(*) AS gets, coalesce(sum(n), 0) AS bytes,
+                coalesce(sum(n) FILTER (WHERE request.url LIKE '%/catalog.ducklake'), 0) AS "catalogBytes"
+              FROM (SELECT *, TRY_CAST(response.headers['Content-Length'] AS BIGINT) AS n
+                FROM duckdb_logs_parsed('HTTP') WHERE request.type = 'GET')`,
+          )
+        ).getRowObjectsJS()[0],
+      );
+    return { rows, estimate, ...fetched };
+  } finally {
+    c.closeSync();
+    instance.closeSync();
+  }
+}
+
+export class LakeBudgetError extends Error {
+  constructor(
+    message: string,
+    readonly estimate: number,
+  ) {
+    super(message);
+    this.name = "LakeBudgetError";
+  }
+}
+
 /**
  * Writes the reader init for `url` and returns its path. duckdb -init runs the file, so it
  * lives in a directory only this user can write, named by its content so readers of
@@ -195,6 +333,62 @@ if (import.meta.main) {
     .command("checkpoint")
     .description("Run DuckLake's CHECKPOINT")
     .action(() => checkpoint(options()));
+  program
+    .command("query")
+    .description("Run SQL against the lake, refusing it when its estimated reads exceed a budget")
+    .argument("[sql]", "One SQL statement")
+    .option("--name <query>", "A named query from resources/queries, in place of SQL")
+    .option("--param <name=value...>", "Variables to set first, read with getvariable()", [])
+    .option("--max-mb <mb>", "Budget for the estimated data reads, in MiB", "256")
+    .action(async (text, o) => {
+      if ((text === undefined) === (o.name === undefined))
+        throw new Error("Pass SQL or --name, not both.");
+      const sql = text ?? (await read(join("queries", `${o.name}.sql`)));
+      const params = Object.fromEntries(
+        o.param.map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)]),
+      );
+      const started = performance.now();
+      const url = options().url;
+      try {
+        const r = await queryLake(url, sql, Number(o.maxMb) * MB, params);
+        console.log(
+          JSON.stringify(r.rows, (_, v: unknown) => (typeof v === "bigint" ? Number(v) : v)),
+        );
+        // The summary also lands in the transcript, which is how a cloud session's spend
+        // reaches the index.
+        console.error(
+          `lake: read ${(r.bytes / MB).toFixed(1)} MB in ${r.gets} GETs, ${(r.catalogBytes / MB).toFixed(1)} MB of it the catalog (data estimate ${(r.estimate / MB).toFixed(1)} MB)`,
+        );
+        await emit({
+          event: "query",
+          ok: true,
+          ms: performance.now() - started,
+          detail: {
+            name: o.name ?? "adhoc",
+            adapter: "lake",
+            caller: "session/lake.ts",
+            rows: r.rows.length,
+            estimate_bytes: r.estimate,
+            gets: r.gets,
+            http_bytes: r.bytes,
+            catalog_bytes: r.catalogBytes,
+          },
+        });
+      } catch (error) {
+        const detail: Record<string, unknown> = {
+          name: o.name ?? "adhoc",
+          adapter: "lake",
+          caller: "session/lake.ts",
+          error: errorClass(error),
+        };
+        if (error instanceof LakeBudgetError) {
+          detail.error = "over budget";
+          detail.estimate_bytes = error.estimate;
+        }
+        await emit({ event: "query", ok: false, ms: performance.now() - started, detail });
+        throw error;
+      }
+    });
   program
     .command("init")
     .description("Print the path of a reader init file, for duckdb -init")

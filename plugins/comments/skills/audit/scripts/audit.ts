@@ -4,7 +4,7 @@ import { $ } from "bun";
 import { cli, command } from "cleye";
 import { z } from "zod";
 import type { SortKey } from "../../../detection/rank";
-import { workflowJudge } from "../../../judge/adapter";
+import { agentJudge } from "../../../judge/adapter";
 import { apply } from "./apply";
 import { AuditError, consoleIo } from "./io";
 import { preflight } from "./preflight";
@@ -81,7 +81,7 @@ const preflightCmd = command(
         { base, mr, all, pathGlobs: path, sort: parseSort(sort), limit, shardSize, fix },
         {
           io: consoleIo,
-          judge: workflowJudge((line) => {
+          judge: agentJudge((line) => {
             consoleIo.log(line);
           }),
         },

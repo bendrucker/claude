@@ -77,8 +77,7 @@ function toShardComment(comment: ShardComment): ShardComment {
 
 /**
  * Partition ranked comments into shards, preserving rank order so the biggest
- * wins judge and stream first, and pin the prompt. The Bun side shards once. The
- * sandboxed Workflow cannot re-shard, so one shard maps 1:1 to one agent.
+ * wins judge and stream first, and pin the prompt. One shard maps to one agent.
  *
  * Reads only the shard fields off each comment, so a caller may pass a wider
  * type and the extra fields stay out of the shard files.
@@ -108,7 +107,7 @@ export interface ShardRef {
   path: string;
 }
 
-/** The Workflow `args`: how each agent finds its shard, the rubric, and where verdicts land. */
+/** Where the shards, the rubric, and the verdicts live. */
 export interface JobArgs {
   shards: ShardRef[];
   promptPath: string;
@@ -119,6 +118,7 @@ export interface JobArgs {
 export interface WrittenJob {
   jobDir: string;
   argsPath: string;
+  promptPath: string;
   verdictsDir: string;
   shards: ShardRef[];
   count: number;
@@ -140,11 +140,10 @@ function jobHash(descriptor: JobDescriptor): string {
 
 /**
  * Materialize the job under a content-keyed dir: one `shard-<n>.json` per shard,
- * the rubric as `prompt.md`, and a `job-args.json` the model hands to the Workflow
- * tool. The rubric is a file the judging agent reads rather than args text, so the
- * args the model passes stay small. The verdicts dir is created so agents can
- * `Bash`-write into it. Apply reads the shards back to know which files were
- * judged, then re-extracts to recover each comment's range.
+ * the rubric as `prompt.md`, and a `job-args.json` manifest. Each judge agent reads
+ * the rubric from disk and gets only paths in its prompt. Apply reads the
+ * shards back to know which files were judged, then re-extracts to recover each
+ * comment's range.
  */
 export async function writeJob(
   descriptor: JobDescriptor,
@@ -178,6 +177,7 @@ export async function writeJob(
   return {
     jobDir,
     argsPath,
+    promptPath,
     verdictsDir,
     shards,
     count,

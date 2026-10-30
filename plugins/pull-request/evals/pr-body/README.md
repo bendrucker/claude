@@ -85,6 +85,7 @@ Each scenario case grades:
 - `heading-sentence-case`, `heading-question`, `heading-clause`: regex approximations of `classifyPrHeading`
 - `generic-heading`: no heading that would fit any PR, such as `Summary` or `Test Plan`
 - `narration-leak`, `verbosity`, `self-contained`, `substance-retention`: `llm` graders ported from the retired promptfoo rubrics, scoped to the body after the `Title:` line. `verbosity` embeds the diff summary and `substance-retention` the session notes. The judge grades against the scenario
+- `coverage`: the body states all but at most one of the reviewer points listed in the grader, taken from the merged body in `shipped.md` where the prompt also states them, in any form. `verbosity` and the structure limits bound it from above. The `work-*` cases grade it too, except the two whose merged body is two sentences
 
 The judge sees only the final reply, one criterion at a time, and answers with one word. `narration-leak` judges sentences only, since `generic-heading` settles the heading half of the old rubric deterministically. The rubrics this suite replaced scored an isolated slip near the middle of a scale. A native verdict is binary, so `narration-leak` and `self-contained` pass a single slip in an otherwise clean body and fail on a pattern.
 

@@ -163,6 +163,70 @@ describe("edited files", () => {
     expect(log.target).toBe(targetOf(join(docs, "hashed.md")));
   });
 
+  describe("scoped to the edit", () => {
+    const BEFORE = ["# Notes", "", "We should dig into the cache.", "", "The config is fine."];
+
+    // Lines that differ at the same index become a one-line hunk, as Claude Code reports them.
+    async function edit(name: string, before: string[], after: string[]) {
+      const lines = after.flatMap((line, index) =>
+        line === before[index] ? [` ${line}`] : [`-${before[index]}`, `+${line}`],
+      );
+      return edited(name, `${after.join("\n")}\n`, {
+        tool_name: "Edit",
+        tool_response: {
+          originalFile: `${before.join("\n")}\n`,
+          structuredPatch: [{ newStart: 1, lines }],
+        },
+      });
+    }
+
+    test.each<{ name: string; before: string[]; after: string[]; emitted: string[] }>([
+      {
+        name: "an alert on a line the edit left alone",
+        before: BEFORE,
+        after: [...BEFORE.slice(0, 4), "The config reads one file."],
+        emitted: [],
+      },
+      {
+        name: "an alert the edit wrote",
+        before: BEFORE,
+        after: [...BEFORE.slice(0, 4), "Let's dig into it."],
+        emitted: ["ai-tells.UnpackExplore", "Writing.DigInto"],
+      },
+      {
+        name: "an alert the replaced line already carried",
+        before: ["We should dig into the cache."],
+        after: ["We should dig into the cache now."],
+        emitted: [],
+      },
+      {
+        name: "a paragraph alert the edit caused on another line",
+        before: ["We reviewed daily; it works well.", "The team reviews each change."],
+        after: ["We reviewed daily; it works well.", "The team reviews; it merges."],
+        emitted: ["Writing.SemicolonSplice", "ai-tells.SemicolonUsage"],
+      },
+    ])("handles $name", async ({ name, before, after, emitted }) => {
+      const { log } = await dispatch(await edit(`${name}.md`, before, after));
+      expect(log.emitted ?? []).toEqual(emitted);
+    });
+
+    it("logs the whole file's checks and counts the alerts it left out", async () => {
+      const after = [...BEFORE.slice(0, 4), "The config reads one file."];
+      const { log } = await dispatch(await edit("counted.md", BEFORE, after));
+      expect(log.checks).toContain("Writing.DigInto");
+      expect(log.unedited_alerts).toBe(1);
+    });
+
+    it("reports every alert in a file a Write created", async () => {
+      const input = await edited("created.md", `${BEFORE.join("\n")}\n`, {
+        tool_response: { type: "create", originalFile: null, structuredPatch: [] },
+      });
+      const { log } = await dispatch(input);
+      expect(log.emitted).toContain("Writing.DigInto");
+      expect(log.unedited_alerts).toBeUndefined();
+    });
+  });
+
   it("logs a failed lint as an error without a check list", async () => {
     const repo = mkdtempSync(join(import.meta.dirname, ".broken-repo-"));
     try {

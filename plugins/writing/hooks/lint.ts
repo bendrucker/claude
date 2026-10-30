@@ -4,7 +4,8 @@ import type { PostToolUseHookInput, PreToolUseHookInput } from "@anthropic-ai/cl
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detection/paths";
-import { lintFile } from "../detection/vale";
+import { lintFile, valeAlerts } from "../detection/vale";
+import { editScopeOf, newAlerts } from "./edit-scope";
 import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
 import { lintMessages } from "./messages";
 import { hookAlertOf, type HookAlert, report } from "./report";
@@ -23,9 +24,23 @@ export function targetOf(filePath: string): string {
   return createHash("sha256").update(filePath, "utf8").digest("hex").slice(0, 16);
 }
 
-// A file edit already happened, so every alert in the saved file is context.
-async function lintEdited(filePath: string): Promise<HookAlert[]> {
-  return (await lintFile(filePath)).map((alert) => hookAlertOf(alert, "context"));
+// Alerts the file already raised before the edit are counted but not reported,
+// since the model did not write them.
+async function lintEdited(
+  filePath: string,
+  toolResponse: unknown,
+): Promise<{ alerts: HookAlert[]; checks: string[]; unedited: number }> {
+  const all = await lintFile(filePath);
+  const scope = editScopeOf(toolResponse);
+  const edited =
+    scope === null || all.length === 0
+      ? all
+      : newAlerts(all, await valeAlerts(scope.original, { filePath }), scope.added);
+  return {
+    alerts: edited.map((alert) => hookAlertOf(alert, "context")),
+    checks: unique(all.map((alert) => alert.Check)),
+    unedited: all.length - edited.length,
+  };
 }
 
 // One run emits every alert in one output, so the model fixes them in a
@@ -64,16 +79,25 @@ export async function dispatch(
 
   // A failed lint is logged without `checks`, so it never reads as a clean run.
   let alerts: HookAlert[] = [];
+  // Every check in the saved file, including those an edit left alone, so a
+  // re-lint tells the health report whether an earlier alert was fixed.
+  let checks: string[] = [];
+  let unedited = 0;
   try {
-    if (input.hook_event_name === "PreToolUse") alerts = await lintMessages(input);
-    else if (hasPath) alerts = await lintEdited(filePath);
+    if (input.hook_event_name === "PreToolUse") {
+      alerts = await lintMessages(input);
+      checks = unique(alerts.map((alert) => alert.check));
+    } else if (hasPath) {
+      ({ alerts, checks, unedited } = await lintEdited(filePath, input.tool_response));
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[writing/lint] Vale failed: ${message}`);
     return finish(null, "error", { vale_error: message });
   }
-  const checks = unique(alerts.map((alert) => alert.check));
-  if (alerts.length === 0) return finish(null, "silent", { checks });
+  const scoped: Partial<RunLogEntry> =
+    unedited > 0 ? { checks, unedited_alerts: unedited } : { checks };
+  if (alerts.length === 0) return finish(null, "silent", scoped);
 
   // Repeats are muted per file, so an alert left in one file does not hide the same check in another.
   const key = (check: string): string =>
@@ -92,7 +116,7 @@ export async function dispatch(
     kept.push(alert);
   }
 
-  const extra: Partial<RunLogEntry> = { checks };
+  const extra = scoped;
   if (muted.size > 0) extra.suppressed_checks = [...muted];
   const result = report(kept, { event: input.hook_event_name, filePath });
   if (!result) {

@@ -35,6 +35,8 @@ const RunLogFields = z.object({
   // Older entries carry only `check` and `suppressed`.
   emitted: z.array(z.string()).optional(),
   vale_error: z.string().optional(),
+  // Alerts on lines the edit left unchanged, which the hook does not report.
+  unedited_alerts: z.number().optional(),
   suppressed_checks: z.array(z.string()).optional(),
 });
 // Entries written before the Vale port name checks under the `category` keys.

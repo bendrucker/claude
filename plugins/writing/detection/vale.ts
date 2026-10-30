@@ -81,19 +81,21 @@ async function isSynced(packages: string): Promise<boolean> {
   return (await stamp.exists()) && (await stamp.text()) === packages;
 }
 
+// A missing lock reads as infinitely old, which every caller treats as stale.
+async function lockAge(): Promise<number> {
+  const stat = await Bun.file(SYNC_LOCK)
+    .stat()
+    .catch(() => null);
+  return stat === null ? Infinity : Date.now() - stat.mtimeMs;
+}
+
 async function holdLock(): Promise<boolean> {
   try {
     await mkdir(SYNC_LOCK);
     return true;
-  } catch {
-    const age =
-      Date.now() -
-      (
-        await Bun.file(SYNC_LOCK)
-          .stat()
-          .catch(() => ({ mtimeMs: 0 }))
-      ).mtimeMs;
-    if (age < LOCK_STALE_MS) return false;
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
+    if ((await lockAge()) < LOCK_STALE_MS) return false;
     await rm(SYNC_LOCK, { recursive: true, force: true });
     return holdLock();
   }
@@ -102,6 +104,8 @@ async function holdLock(): Promise<boolean> {
 async function awaitSync(packages: string, deadline: number): Promise<boolean> {
   if (await isSynced(packages)) return true;
   if (Date.now() >= deadline) return false;
+  // The holder writes the stamp before it releases the lock. A released lock without a stamp means its sync failed.
+  if ((await lockAge()) === Infinity) return isSynced(packages);
   await Bun.sleep(250);
   return awaitSync(packages, deadline);
 }
@@ -127,6 +131,15 @@ export async function ensurePackages(binary: string): Promise<void> {
   }
 }
 
+const SYNC_WAIT_MS = 30_000;
+
+async function packagesReady(): Promise<boolean> {
+  const packages = await pinnedPackages();
+  if (await isSynced(packages)) return true;
+  if ((await lockAge()) >= LOCK_STALE_MS) return false;
+  return awaitSync(packages, Date.now() + SYNC_WAIT_MS);
+}
+
 const INSTALL_HINT = `bun "${join(import.meta.dirname, "..", "hooks", "sessionstart.ts")}"`;
 
 // A repo's own config replaces the plugin's, since Vale merges only the global
@@ -145,8 +158,8 @@ async function runVale(
 ): Promise<string | null> {
   const binary = valeBinary();
   if (binary === null) return null;
-  // The SessionStart hook installs the packages, so a lint only checks for them.
-  if (cwd === undefined && !(await isSynced(await pinnedPackages()))) {
+  // The SessionStart hook installs the packages, so a lint only waits out a sync already running.
+  if (cwd === undefined && !(await packagesReady())) {
     throw new Error(`Vale packages are not installed. Run ${INSTALL_HINT}`);
   }
   const proc = Bun.spawn([binary, "--output=JSON", ...args], {

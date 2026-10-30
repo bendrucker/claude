@@ -4,7 +4,7 @@ description: |
   Judges one shard of extracted code comments against the comment-slop rubric and writes the verdicts to disk. Dispatched by `comments:audit` and the comments eval gate with the exact prompt their preflight prints.
 tools: Read, Write
 model: sonnet
-effort: high
+effort: medium
 ---
 
 The prompt gives the rubric path, the shard path, and the verdict path. Read the rubric, then the shard.

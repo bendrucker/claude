@@ -166,56 +166,63 @@ describe("edited files", () => {
   describe("scoped to the edit", () => {
     const BEFORE = ["# Notes", "", "We should dig into the cache.", "", "The config is fine."];
 
-    async function edit(name: string, replacement: string): Promise<PostToolUseHookInput> {
-      const after = [...BEFORE.slice(0, 4), replacement];
+    // Lines that differ at the same index become a one-line hunk, as Claude Code reports them.
+    async function edit(name: string, before: string[], after: string[]) {
+      const lines = after.flatMap((line, index) =>
+        line === before[index] ? [` ${line}`] : [`-${before[index]}`, `+${line}`],
+      );
       return edited(name, `${after.join("\n")}\n`, {
         tool_name: "Edit",
         tool_response: {
-          structuredPatch: [
-            { newStart: 3, lines: [` ${BEFORE[2]}`, " ", `-${BEFORE[4]}`, `+${replacement}`] },
-          ],
+          originalFile: `${before.join("\n")}\n`,
+          structuredPatch: [{ newStart: 1, lines }],
         },
       });
     }
 
-    test.each<{ name: string; replacement: string; reported: boolean }>([
+    test.each<{ name: string; before: string[]; after: string[]; emitted: string[] }>([
       {
         name: "an alert on a line the edit left alone",
-        replacement: "The config reads one file.",
-        reported: false,
+        before: BEFORE,
+        after: [...BEFORE.slice(0, 4), "The config reads one file."],
+        emitted: [],
       },
-      { name: "an alert the edit wrote", replacement: "Let's dig into it.", reported: true },
-    ])("handles $name", async ({ name, replacement, reported }) => {
-      const { output, log } = await dispatch(await edit(`${name}.md`, replacement));
-      expect(log.checks).toContain("Writing.DigInto");
-      expect(log.emitted?.includes("Writing.DigInto") ?? false).toBe(reported);
-      expect(log.unedited_alerts).toBe(1);
-      expect(output !== null).toBe(reported);
+      {
+        name: "an alert the edit wrote",
+        before: BEFORE,
+        after: [...BEFORE.slice(0, 4), "Let's dig into it."],
+        emitted: ["ai-tells.UnpackExplore", "Writing.DigInto"],
+      },
+      {
+        name: "an alert the replaced line already carried",
+        before: ["We should dig into the cache."],
+        after: ["We should dig into the cache now."],
+        emitted: [],
+      },
+      {
+        name: "a paragraph alert the edit caused on another line",
+        before: ["We reviewed daily; it works well.", "The team reviews each change."],
+        after: ["We reviewed daily; it works well.", "The team reviews; it merges."],
+        emitted: ["Writing.SemicolonSplice", "ai-tells.SemicolonUsage"],
+      },
+    ])("handles $name", async ({ name, before, after, emitted }) => {
+      const { log } = await dispatch(await edit(`${name}.md`, before, after));
+      expect(log.emitted ?? []).toEqual(emitted);
     });
 
-    it("drops an alert the replaced line already carried", async () => {
-      const input = await edited("kept.md", "We should dig into the cache now.\n", {
-        tool_name: "Edit",
-        tool_response: {
-          structuredPatch: [
-            {
-              newStart: 1,
-              lines: ["-We should dig into the cache.", "+We should dig into the cache now."],
-            },
-          ],
-        },
-      });
-      const { output, log } = await dispatch(input);
-      expect(output).toBeNull();
+    it("logs the whole file's checks and counts the alerts it left out", async () => {
+      const after = [...BEFORE.slice(0, 4), "The config reads one file."];
+      const { log } = await dispatch(await edit("counted.md", BEFORE, after));
+      expect(log.checks).toContain("Writing.DigInto");
       expect(log.unedited_alerts).toBe(1);
     });
 
     it("reports every alert in a file a Write created", async () => {
       const input = await edited("created.md", `${BEFORE.join("\n")}\n`, {
-        tool_response: { type: "create", structuredPatch: [] },
+        tool_response: { type: "create", originalFile: null, structuredPatch: [] },
       });
       const { log } = await dispatch(input);
-      expect(log.checks).toContain("Writing.DigInto");
+      expect(log.emitted).toContain("Writing.DigInto");
       expect(log.unedited_alerts).toBeUndefined();
     });
   });

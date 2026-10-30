@@ -4,8 +4,8 @@ import type { PostToolUseHookInput, PreToolUseHookInput } from "@anthropic-ai/cl
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detection/paths";
-import { lintFile } from "../detection/vale";
-import { editedAlerts, editScopeOf } from "./edit-scope";
+import { lintFile, valeAlerts } from "../detection/vale";
+import { editScopeOf, newAlerts } from "./edit-scope";
 import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
 import { lintMessages } from "./messages";
 import { hookAlertOf, type HookAlert, report } from "./report";
@@ -24,15 +24,18 @@ export function targetOf(filePath: string): string {
   return createHash("sha256").update(filePath, "utf8").digest("hex").slice(0, 16);
 }
 
-// Alerts on lines the edit left alone are counted but not reported, since the
-// model did not write them.
+// Alerts the file already raised before the edit are counted but not reported,
+// since the model did not write them.
 async function lintEdited(
   filePath: string,
   toolResponse: unknown,
 ): Promise<{ alerts: HookAlert[]; checks: string[]; unedited: number }> {
   const all = await lintFile(filePath);
   const scope = editScopeOf(toolResponse);
-  const edited = scope === null ? all : editedAlerts(all, scope);
+  const edited =
+    scope === null || all.length === 0
+      ? all
+      : newAlerts(all, await valeAlerts(scope.original, { filePath }), scope.added);
   return {
     alerts: edited.map((alert) => hookAlertOf(alert, "context")),
     checks: unique(all.map((alert) => alert.Check)),
@@ -113,7 +116,7 @@ export async function dispatch(
     kept.push(alert);
   }
 
-  const extra: Partial<RunLogEntry> = { ...scoped };
+  const extra = scoped;
   if (muted.size > 0) extra.suppressed_checks = [...muted];
   const result = report(kept, { event: input.hook_event_name, filePath });
   if (!result) {

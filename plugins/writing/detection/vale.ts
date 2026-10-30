@@ -93,7 +93,8 @@ async function holdLock(): Promise<boolean> {
   try {
     await mkdir(SYNC_LOCK);
     return true;
-  } catch {
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error;
     if ((await lockAge()) < LOCK_STALE_MS) return false;
     await rm(SYNC_LOCK, { recursive: true, force: true });
     return holdLock();
@@ -103,6 +104,8 @@ async function holdLock(): Promise<boolean> {
 async function awaitSync(packages: string, deadline: number): Promise<boolean> {
   if (await isSynced(packages)) return true;
   if (Date.now() >= deadline) return false;
+  // The holder writes the stamp before it releases the lock. A released lock without a stamp means its sync failed.
+  if ((await lockAge()) === Infinity) return isSynced(packages);
   await Bun.sleep(250);
   return awaitSync(packages, deadline);
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it, test } from "bun:test";
+import * as hegel from "@hegeldev/hegel";
+import * as gs from "@hegeldev/hegel/generators";
 import type { ValeAlert } from "../detection/vale";
-import { type EditScope, editedAlerts, editScopeOf } from "./edit-scope";
+import { editScopeOf, newAlerts } from "./edit-scope";
 
 function makeAlert(overrides: Partial<ValeAlert> = {}): ValeAlert {
   return {
@@ -14,63 +16,77 @@ function makeAlert(overrides: Partial<ValeAlert> = {}): ValeAlert {
   };
 }
 
+const alerts = gs.arrays(
+  gs.composite((tc) =>
+    makeAlert({
+      Check: tc.draw(gs.sampledFrom(["Writing.DigInto", "Writing.SemicolonSplice"])),
+      Match: tc.draw(gs.sampledFrom(["dig into", "; it", ""])),
+      Line: tc.draw(gs.integers({ minValue: 1, maxValue: 5 })),
+    }),
+  ),
+  { maxSize: 8 },
+);
+
 describe("editScopeOf", () => {
   it("numbers added lines in the saved file past context and removed lines", () => {
     const scope = editScopeOf({
+      originalFile: "before\n",
       structuredPatch: [
         { newStart: 3, lines: [" keep", "-old one", "-old two", "+new", " keep"] },
         { newStart: 10, lines: ["+first", " keep", "+second"] },
       ],
     });
-    expect(scope).toEqual({
-      added: new Map([
-        [4, 0],
-        [10, 1],
-        [12, 1],
-      ]),
-      removed: ["old one\nold two", ""],
-    });
+    expect(scope).toEqual({ original: "before\n", added: new Set([4, 10, 12]) });
   });
 
-  test.each([
-    { name: "a created file", response: { type: "create", structuredPatch: [] } },
-    { name: "a response without a patch", response: {} },
+  test.each<{ name: string; response: unknown }>([
+    {
+      name: "a created file",
+      response: { type: "create", originalFile: null, structuredPatch: [] },
+    },
+    { name: "a response without the original", response: { structuredPatch: [] } },
     { name: "a malformed response", response: "edited" },
   ])("treats $name as wholly written", ({ response }) => {
     expect(editScopeOf(response)).toBeNull();
   });
-
-  it("scopes an overwrite that changed nothing to no lines", () => {
-    expect(editScopeOf({ type: "update", structuredPatch: [] })).toEqual({
-      added: new Map(),
-      removed: [],
-    });
-  });
 });
 
-describe("editedAlerts", () => {
-  const scope: EditScope = {
-    added: new Map([
-      [4, 0],
-      [5, 0],
-    ]),
-    removed: ["we should dig into it"],
-  };
-
-  test.each<{ name: string; alerts: ValeAlert[]; kept: number[] }>([
+describe("newAlerts", () => {
+  test.each<{ name: string; after: ValeAlert[]; before: ValeAlert[]; kept: number[] }>([
     {
-      name: "an alert the edit introduced",
-      alerts: [makeAlert({ Line: 4, Match: "deep dive" })],
+      name: "an alert the original never raised",
+      after: [makeAlert({ Line: 7 })],
+      before: [],
+      kept: [7],
+    },
+    {
+      name: "an alert the original raised on another line",
+      after: [makeAlert({ Line: 7 })],
+      before: [makeAlert({ Line: 2 })],
+      kept: [],
+    },
+    {
+      name: "a second occurrence, preferring the one on an added line",
+      after: [makeAlert({ Line: 2 }), makeAlert({ Line: 4 })],
+      before: [makeAlert({ Line: 2 })],
       kept: [4],
     },
-    { name: "an alert on a line the edit left alone", alerts: [makeAlert({ Line: 2 })], kept: [] },
-    { name: "a match the hunk already removed", alerts: [makeAlert({ Line: 4 })], kept: [] },
     {
-      name: "a match added beyond the ones removed",
-      alerts: [makeAlert({ Line: 4 }), makeAlert({ Line: 5 })],
-      kept: [5],
+      name: "the same text under another check",
+      after: [makeAlert({ Check: "Writing.Other" })],
+      before: [makeAlert()],
+      kept: [1],
     },
-  ])("handles $name", ({ alerts, kept }) => {
-    expect(editedAlerts(alerts, scope).map((alert) => alert.Line)).toEqual(kept);
+  ])("handles $name", ({ after, before, kept }) => {
+    expect(newAlerts(after, before, new Set([4])).map((alert) => alert.Line)).toEqual(kept);
+  });
+
+  test("keeps every alert against an empty original and none against itself", () => {
+    hegel.test((tc) => {
+      const after = tc.draw(alerts);
+      const added = new Set(tc.draw(gs.arrays(gs.integers({ minValue: 1, maxValue: 5 }))));
+      expect(newAlerts(after, [], added)).toEqual(after);
+      expect(newAlerts(after, after, added)).toEqual([]);
+    });
   });
 });

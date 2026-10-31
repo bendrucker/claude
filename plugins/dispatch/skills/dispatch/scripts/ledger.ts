@@ -19,6 +19,8 @@ export interface DispatchLedgerRow {
   host: string | null;
   name: string;
   session: string | null;
+  // The name the dispatched session reaches its dispatcher by.
+  sender: string | null;
   outcome: "dispatched" | "orphaned";
 }
 

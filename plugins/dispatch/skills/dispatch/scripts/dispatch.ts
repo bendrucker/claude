@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger in the plugin data dir under ~/.claude/plugins
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
@@ -272,6 +273,56 @@ export function taskSummary(prompt: string): string {
       .map((entry) => entry.replace(/^[\s>#*+-]+/, "").trim())
       .find((entry) => /\w/.test(entry)) ?? "";
   return line.slice(0, MAX_TASK_SUMMARY);
+}
+
+export interface Sender {
+  name: string;
+  // The Rex block or herdr pane running the dispatching session.
+  mux: { kind: "rex" | "herdr"; id: string } | null;
+}
+
+const SessionEntry = z.object({ name: z.string().min(1) });
+
+function claudeConfigDir(env: Readonly<Record<string, string | undefined>>): string {
+  const dir = env.CLAUDE_CONFIG_DIR;
+  return dir != null && dir !== "" ? dir : join(homedir(), ".claude");
+}
+
+// Claude Code registers each live session under its pid with the name that
+// ListAgents and SendMessage address it by.
+export async function readSender(
+  env: Readonly<Record<string, string | undefined>>,
+): Promise<Sender | null> {
+  const pid = env.CLAUDE_PID;
+  if (pid == null || !/^\d+$/.test(pid)) return null;
+  const file = Bun.file(join(claudeConfigDir(env), "sessions", `${pid}.json`));
+  let json: unknown;
+  try {
+    json = JSON.parse(await file.text());
+  } catch {
+    // A missing or unreadable entry leaves the prompt without a return address.
+    return null;
+  }
+  const parsed = SessionEntry.safeParse(json);
+  if (!parsed.success) return null;
+  return { name: parsed.data.name, mux: senderMux(env) };
+}
+
+function senderMux(env: Readonly<Record<string, string | undefined>>): Sender["mux"] {
+  const rex = env.REX_BLOCK;
+  if (rex != null && rex !== "") return { kind: "rex", id: rex };
+  const herdr = env.HERDR_PANE_ID;
+  if (herdr != null && herdr !== "") return { kind: "herdr", id: herdr };
+  return null;
+}
+
+export function withSender(prompt: string, sender: Sender | null): string {
+  if (sender == null) return prompt;
+  const where =
+    sender.mux == null
+      ? ""
+      : ` in ${sender.mux.kind === "rex" ? "Rex block" : "herdr pane"} \`${sender.mux.id}\``;
+  return `${prompt.trimEnd()}\n\n---\n\nThe Claude session \`${sender.name}\`${where} dispatched this task. Reach it with \`SendMessage\` to \`${sender.name}\`.\n`;
 }
 
 export function formatRecord(record: DispatchRecord): string {
@@ -1229,6 +1280,7 @@ if (import.meta.main) {
     process.stderr.write("the prompt is empty; pass --prompt <file> or pipe it on stdin\n");
     process.exit(2);
   }
+  const sender = await readSender(process.env);
 
   // The session is already running and the caller needs its identifiers, so a
   // ledger failure warns rather than failing the dispatch.
@@ -1250,6 +1302,7 @@ if (import.meta.main) {
           host: record.host,
           name: record.name,
           session: record.session,
+          sender: sender?.name ?? null,
           outcome,
         },
         resolveDataDir(argv.flags.dataDir),
@@ -1265,7 +1318,7 @@ if (import.meta.main) {
     const { record, root } = await dispatch({
       repo: argv.flags.repo,
       branch: argv.flags.branch,
-      prompt,
+      prompt: withSender(prompt, sender),
       name: argv.flags.name,
       base: argv.flags.base,
       timeout: argv.flags.timeout,

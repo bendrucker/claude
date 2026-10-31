@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger in the plugin data dir under ~/.claude/plugins
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { cli } from "cleye";
 import { z } from "zod";
@@ -275,13 +275,25 @@ export function taskSummary(prompt: string): string {
   return line.slice(0, MAX_TASK_SUMMARY);
 }
 
+export interface SenderMux {
+  kind: "rex" | "herdr";
+  // The Rex block or herdr pane running the dispatching session.
+  id: string;
+  // How another machine names this one: a Rex server address `rex -S` takes,
+  // or the hostname a herdr machine label stands for.
+  machine: string | null;
+}
+
 export interface Sender {
   name: string;
-  // The Rex block or herdr pane running the dispatching session.
-  mux: { kind: "rex" | "herdr"; id: string } | null;
+  mux: SenderMux | null;
 }
 
 const SessionEntry = z.object({ name: z.string().min(1) });
+
+const RexWhoami = z.object({
+  tailscale: z.object({ state: z.string(), dns_name: z.string().nullish() }).nullish(),
+});
 
 function claudeConfigDir(env: Readonly<Record<string, string | undefined>>): string {
   const dir = env.CLAUDE_CONFIG_DIR;
@@ -292,6 +304,8 @@ function claudeConfigDir(env: Readonly<Record<string, string | undefined>>): str
 // ListAgents and SendMessage address it by.
 export async function readSender(
   env: Readonly<Record<string, string | undefined>>,
+  run: Runner = spawnRunner,
+  host: string = hostname(),
 ): Promise<Sender | null> {
   const pid = env.CLAUDE_PID;
   if (pid == null || !/^\d+$/.test(pid)) return null;
@@ -305,24 +319,56 @@ export async function readSender(
   }
   const parsed = SessionEntry.safeParse(json);
   if (!parsed.success) return null;
-  return { name: parsed.data.name, mux: senderMux(env) };
+  return { name: parsed.data.name, mux: await senderMux(env, run, host) };
 }
 
-function senderMux(env: Readonly<Record<string, string | undefined>>): Sender["mux"] {
+async function senderMux(
+  env: Readonly<Record<string, string | undefined>>,
+  run: Runner,
+  host: string,
+): Promise<SenderMux | null> {
   const rex = env.REX_BLOCK;
-  if (rex != null && rex !== "") return { kind: "rex", id: rex };
+  if (rex != null && rex !== "") return { kind: "rex", id: rex, machine: await rexAddress(run) };
   const herdr = env.HERDR_PANE_ID;
-  if (herdr != null && herdr !== "") return { kind: "herdr", id: herdr };
+  if (herdr != null && herdr !== "")
+    return { kind: "herdr", id: herdr, machine: host === "" ? null : host };
   return null;
+}
+
+// The local endpoint is a unix socket, so only the server's tailnet name
+// reaches it from another machine.
+async function rexAddress(run: Runner): Promise<string | null> {
+  const result = await run(["rex", "whoami", "--json"]);
+  if (result.code !== 0) return null;
+  let json: unknown;
+  try {
+    json = JSON.parse(result.stdout);
+  } catch {
+    // An older Rex without `--json` leaves the footer machine-local.
+    return null;
+  }
+  const parsed = RexWhoami.safeParse(json);
+  const tailscale = parsed.success ? parsed.data.tailscale : null;
+  if (tailscale?.state !== "running") return null;
+  return tailscale.dns_name ?? null;
+}
+
+function remoteHint(mux: SenderMux): string {
+  if (mux.machine == null) return "";
+  if (mux.kind === "rex")
+    return ` From another machine, pass \`-S ${mux.machine}\` to \`rex\` to address that block.`;
+  return ` From another machine, pass \`--machine\` with the \`herdr machine list\` label for \`${mux.machine}\` to address that pane.`;
 }
 
 export function withSender(prompt: string, sender: Sender | null): string {
   if (sender == null) return prompt;
+  const { mux } = sender;
   const where =
-    sender.mux == null
+    mux == null
       ? ""
-      : ` in ${sender.mux.kind === "rex" ? "Rex block" : "herdr pane"} \`${sender.mux.id}\``;
-  return `${prompt.trimEnd()}\n\n---\n\nThe Claude session \`${sender.name}\`${where} dispatched this task. Reach it with \`SendMessage\` to \`${sender.name}\`.\n`;
+      : ` in ${mux.kind === "rex" ? "Rex block" : "herdr pane"} \`${mux.id}\`${mux.machine == null ? "" : ` on \`${mux.machine}\``}`;
+  const hint = mux == null ? "" : remoteHint(mux);
+  return `${prompt.trimEnd()}\n\n---\n\nThe Claude session \`${sender.name}\`${where} dispatched this task. Reach it with \`SendMessage\` to \`${sender.name}\`.${hint}\n`;
 }
 
 export function formatRecord(record: DispatchRecord): string {

@@ -275,16 +275,42 @@ describe("readSender", () => {
     await Bun.write(join(config, "sessions", "200.json"), "{}");
   });
 
-  test.each<{ name: string; env: Record<string, string>; expected: Sender | null }>([
+  const whoami = (tailscale: unknown) => ok(JSON.stringify({ tailscale }));
+  const running = whoami({ state: "running", dns_name: "rex-a.example.ts.net" });
+
+  test.each<{
+    name: string;
+    env: Record<string, string>;
+    whoami?: CommandResult;
+    host?: string;
+    expected: Sender | null;
+  }>([
     {
-      name: "a Rex session",
+      name: "a Rex session on the tailnet",
       env: { CLAUDE_PID: "100", REX_BLOCK: "block:1" },
-      expected: { name: "caller", mux: { kind: "rex", id: "block:1" } },
+      whoami: running,
+      expected: {
+        name: "caller",
+        mux: { kind: "rex", id: "block:1", machine: "rex-a.example.ts.net" },
+      },
+    },
+    {
+      name: "a Rex session with Tailscale stopped",
+      env: { CLAUDE_PID: "100", REX_BLOCK: "block:1" },
+      whoami: whoami({ state: "stopped" }),
+      expected: { name: "caller", mux: { kind: "rex", id: "block:1", machine: null } },
+    },
+    {
+      name: "a Rex session whose whoami fails",
+      env: { CLAUDE_PID: "100", REX_BLOCK: "block:1" },
+      whoami: fail("no server"),
+      expected: { name: "caller", mux: { kind: "rex", id: "block:1", machine: null } },
     },
     {
       name: "a herdr session",
       env: { CLAUDE_PID: "100", HERDR_PANE_ID: "w1-1" },
-      expected: { name: "caller", mux: { kind: "herdr", id: "w1-1" } },
+      host: "Studio",
+      expected: { name: "caller", mux: { kind: "herdr", id: "w1-1", machine: "Studio" } },
     },
     {
       name: "no multiplexer",
@@ -295,15 +321,29 @@ describe("readSender", () => {
     { name: "an unregistered pid", env: { CLAUDE_PID: "300" }, expected: null },
     { name: "an entry without a name", env: { CLAUDE_PID: "200" }, expected: null },
     { name: "a pid that is a path", env: { CLAUDE_PID: "../100" }, expected: null },
-  ])("$name", async ({ env, expected }) => {
-    expect(await readSender({ ...env, CLAUDE_CONFIG_DIR: config })).toEqual(expected);
+  ])("$name", async ({ env, whoami: result = running, host = "Studio", expected }) => {
+    const run: Runner = () => Promise.resolve(result);
+    expect(await readSender({ ...env, CLAUDE_CONFIG_DIR: config }, run, host)).toEqual(expected);
   });
 });
 
 describe("withSender", () => {
   test.each<{ name: string; sender: Sender | null }>([
-    { name: "a Rex block", sender: { name: "caller", mux: { kind: "rex", id: "block:1" } } },
-    { name: "a herdr pane", sender: { name: "caller", mux: { kind: "herdr", id: "w1-1" } } },
+    {
+      name: "a Rex block on the tailnet",
+      sender: {
+        name: "caller",
+        mux: { kind: "rex", id: "block:1", machine: "rex-a.example.ts.net" },
+      },
+    },
+    {
+      name: "a Rex block with no address",
+      sender: { name: "caller", mux: { kind: "rex", id: "block:1", machine: null } },
+    },
+    {
+      name: "a herdr pane",
+      sender: { name: "caller", mux: { kind: "herdr", id: "w1-1", machine: "Studio" } },
+    },
     { name: "no multiplexer", sender: { name: "caller", mux: null } },
     { name: "no sender", sender: null },
   ])("$name", ({ sender }) => {

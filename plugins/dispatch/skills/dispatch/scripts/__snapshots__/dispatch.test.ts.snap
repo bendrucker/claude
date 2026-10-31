@@ -1,6 +1,15 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`withSender a Rex block 1`] = `
+exports[`withSender a Rex block on the tailnet 1`] = `
+"do the thing
+
+---
+
+The Claude session \`caller\` in Rex block \`block:1\` on \`rex-a.example.ts.net\` dispatched this task. Reach it with \`SendMessage\` to \`caller\`. From another machine, pass \`-S rex-a.example.ts.net\` to \`rex\` to address that block.
+"
+`;
+
+exports[`withSender a Rex block with no address 1`] = `
 "do the thing
 
 ---
@@ -14,7 +23,7 @@ exports[`withSender a herdr pane 1`] = `
 
 ---
 
-The Claude session \`caller\` in herdr pane \`w1-1\` dispatched this task. Reach it with \`SendMessage\` to \`caller\`.
+The Claude session \`caller\` in herdr pane \`w1-1\` on \`Studio\` dispatched this task. Reach it with \`SendMessage\` to \`caller\`. From another machine, pass \`--machine\` with the \`herdr machine list\` label for \`Studio\` to address that pane.
 "
 `;
 

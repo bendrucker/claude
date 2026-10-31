@@ -1,0 +1,33 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`withSender a Rex block 1`] = `
+"do the thing
+
+---
+
+The Claude session \`caller\` in Rex block \`block:1\` dispatched this task. Reach it with \`SendMessage\` to \`caller\`.
+"
+`;
+
+exports[`withSender a herdr pane 1`] = `
+"do the thing
+
+---
+
+The Claude session \`caller\` in herdr pane \`w1-1\` dispatched this task. Reach it with \`SendMessage\` to \`caller\`.
+"
+`;
+
+exports[`withSender no multiplexer 1`] = `
+"do the thing
+
+---
+
+The Claude session \`caller\` dispatched this task. Reach it with \`SendMessage\` to \`caller\`.
+"
+`;
+
+exports[`withSender no sender 1`] = `
+"do the thing
+"
+`;

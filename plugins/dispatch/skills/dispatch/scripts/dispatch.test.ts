@@ -26,10 +26,12 @@ import {
   type Mux,
   type Pause,
   readProgramStatus,
+  readSender,
   remoteCommand,
   type ReportedStatus,
   type RunOptions,
   type Runner,
+  type Sender,
   type Settings,
   settingsKeys,
   settingsPatch,
@@ -37,6 +39,7 @@ import {
   type Start,
   type Status,
   taskSummary,
+  withSender,
 } from "./dispatch";
 import { appendDispatch, ledgerPath, resolveDataDir } from "./ledger";
 
@@ -261,6 +264,50 @@ describe("taskSummary", () => {
     ["", ""],
   ])("%p", (prompt, expected) => {
     expect(taskSummary(prompt)).toBe(expected);
+  });
+});
+
+describe("readSender", () => {
+  const config = mkdtempSync(join(tmpdir(), "dispatch-sender-"));
+
+  beforeAll(async () => {
+    await Bun.write(join(config, "sessions", "100.json"), JSON.stringify({ name: "caller" }));
+    await Bun.write(join(config, "sessions", "200.json"), "{}");
+  });
+
+  test.each<{ name: string; env: Record<string, string>; expected: Sender | null }>([
+    {
+      name: "a Rex session",
+      env: { CLAUDE_PID: "100", REX_BLOCK: "block:1" },
+      expected: { name: "caller", mux: { kind: "rex", id: "block:1" } },
+    },
+    {
+      name: "a herdr session",
+      env: { CLAUDE_PID: "100", HERDR_PANE_ID: "w1-1" },
+      expected: { name: "caller", mux: { kind: "herdr", id: "w1-1" } },
+    },
+    {
+      name: "no multiplexer",
+      env: { CLAUDE_PID: "100" },
+      expected: { name: "caller", mux: null },
+    },
+    { name: "no CLAUDE_PID", env: { REX_BLOCK: "block:1" }, expected: null },
+    { name: "an unregistered pid", env: { CLAUDE_PID: "300" }, expected: null },
+    { name: "an entry without a name", env: { CLAUDE_PID: "200" }, expected: null },
+    { name: "a pid that is a path", env: { CLAUDE_PID: "../100" }, expected: null },
+  ])("$name", async ({ env, expected }) => {
+    expect(await readSender({ ...env, CLAUDE_CONFIG_DIR: config })).toEqual(expected);
+  });
+});
+
+describe("withSender", () => {
+  test.each<{ name: string; sender: Sender | null }>([
+    { name: "a Rex block", sender: { name: "caller", mux: { kind: "rex", id: "block:1" } } },
+    { name: "a herdr pane", sender: { name: "caller", mux: { kind: "herdr", id: "w1-1" } } },
+    { name: "no multiplexer", sender: { name: "caller", mux: null } },
+    { name: "no sender", sender: null },
+  ])("$name", ({ sender }) => {
+    expect(withSender("do the thing\n", sender)).toMatchSnapshot();
   });
 });
 
@@ -1323,6 +1370,7 @@ const LedgerRow = z.object({
   host: z.string().nullable(),
   name: z.string(),
   session: z.string().nullable(),
+  sender: z.string().nullable(),
   outcome: z.enum(["dispatched", "orphaned"]),
 });
 
@@ -1509,6 +1557,7 @@ describe("ledger", () => {
       host: null,
       name: "fix-thing",
       session: null,
+      sender: "caller",
       outcome: "dispatched" as const,
     };
 

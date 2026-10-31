@@ -13,7 +13,7 @@ Start a separate Claude session on a new branch that takes a task through to its
 
 ## Write the Prompt
 
-Write the prompt to a file under `tmp/`. The dispatched session starts with no context from this one, so state the goal, the files to read, what is already ruled out, and the completion criterion. Keep it under 128KB. For larger material, point the session at a file.
+Write the prompt to a file under `tmp/`. The dispatched session starts with no context from this one, so state the goal, the files to read, what is already ruled out, and the completion criterion. Keep it under 128KB. For larger material, point the session at a file. The script appends this session's name and its Rex block or herdr pane to the prompt. The dispatched session sends its replies with `SendMessage` to that name.
 
 ## Grant Permissions
 

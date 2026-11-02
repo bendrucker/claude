@@ -2,14 +2,14 @@
 name: dispatch
 description: >-
   Hand new work bound for its own pull request to a fresh Claude session in a new worktree, opened in a Rex tab or a herdr workspace with its permissions written ahead of time. Use when a task should run beside this session rather than inside it, including a change this session found that belongs in another branch or repository. Not for re-rooting this session (`worktrunk:wt-switch-create`) or in-session subagents (`Agent`).
-argument-hint: "--branch <branch> --prompt <file>"
+argument-hint: "--branch <branch | pr:<n> | mr:<n>> --prompt <file>"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
 ---
 
 # Dispatch
 
-Start a separate Claude session on a new branch that takes a task through to its own PR while this session keeps working. The script creates the worktree with `wt`, writes the session's `.claude/settings.local.json`, and launches `claude --name <name> <prompt>` in the multiplexer hosting this session.
+Start a separate Claude session that takes a task through to its own PR while this session keeps working, or follows up on a branch or PR that already exists. The script checks the branch out in a worktree with `wt`, writes the session's `.claude/settings.local.json`, and launches `claude --name <name> <prompt>` in the multiplexer hosting this session.
 
 ## Write the Prompt
 
@@ -39,7 +39,8 @@ Dispatch into the multiplexer hosting this session, which `--mux` defaults to. O
 bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...
 ```
 
-- `--base` defaults to `origin/main`, fetched first.
+- `--branch` takes a branch name, `pr:<n>`, `mr:<n>`, or a PR or MR URL. A branch that exists locally or on a remote is reused, and a branch that already has a worktree opens there. Only a branch that exists nowhere is created. `wt` resolves a PR or MR to its head branch.
+- `--base` applies only to a branch being created. It defaults to `origin/main`, fetched first.
 - `--name` defaults to a slug of the branch.
 - Under Rex the session opens in a new tab labeled with the branch. `--split` opens it in a pane to the right of this one instead. From outside Rex, pass `--session <id or label>` from `rex ls`.
 - `--timeout` (ms, default 30000) bounds the wait for the session to start.
@@ -55,7 +56,8 @@ To run the session on another machine, pass `--host <label> --session <remote se
 On success the script prints one JSON line:
 
 - `name`: the session name to address it by.
-- `path`, `branch`: the worktree.
+- `path`, `branch`: the worktree. For a PR or MR, `branch` is its head branch.
+- `checkout`: `new-branch`, `existing-branch`, or `existing-worktree`. Absent for `--host`.
 - `mux`, `target`: the Rex block, herdr pane, or `claude --bg` id running the session.
 - `settings`: the settings keys written.
 - `status`:
@@ -65,7 +67,7 @@ On success the script prints one JSON line:
   - `unknown`: the session showed neither before the timeout. Read the screen before reporting the hand-off.
 - `submoduleError`, when present: submodules failed to initialize. The session can repair them.
 
-A failure exits 1 and prints the error. Once the worktree exists, it also prints the partial record, so report `path` to the user as an orphaned checkout to clean up.
+A failure exits 1 and prints the error. Once the worktree exists, it also prints the partial record. Unless `checkout` is `existing-worktree`, report `path` to the user as an orphaned checkout to clean up.
 
 ## Follow Up
 

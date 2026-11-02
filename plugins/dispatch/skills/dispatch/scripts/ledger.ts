@@ -21,7 +21,8 @@ export interface DispatchLedgerRow {
   session: string | null;
   // The name the dispatched session reaches its dispatcher by.
   sender: string | null;
-  outcome: "dispatched" | "orphaned";
+  // `failed` is a dispatch that reused a worktree it did not create.
+  outcome: "dispatched" | "orphaned" | "failed";
 }
 
 // A cached plugin resolves no import across a plugin boundary, so each plugin

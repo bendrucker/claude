@@ -51,18 +51,18 @@ const envelope = (code: string, message = "nope") =>
 
 const PATH = "/tmp/worktrees/demo/fix-thing";
 
-const worktreeList = (path: string) =>
-  ok(
-    JSON.stringify({
-      schema: 2,
-      items: [
-        { branch: "main", worktree: { path: "/repo", main: true } },
-        { branch: null, worktree: { path: "/repo/.worktrees/detached" } },
-        { branch: "other", worktree: null },
-        { branch: "fix-thing", worktree: { path } },
-      ],
-    }),
-  );
+// What wt switch --format=json prints for each way it can check a branch out.
+const SWITCH_ACTIONS = {
+  "new-branch": { action: "created", created_branch: true, base_branch: "origin/main" },
+  "existing-branch": { action: "created", created_branch: false, from_remote: "origin/fix-thing" },
+  "existing-worktree": { action: "existing" },
+} as const;
+
+const switched = (
+  path = PATH,
+  checkout: keyof typeof SWITCH_ACTIONS = "new-branch",
+  branch = "fix-thing",
+) => ok(JSON.stringify({ branch, path, ...SWITCH_ACTIONS[checkout] }));
 
 const AGENT_LIST = ok(
   JSON.stringify({ result: { agents: [{ name: "reviewer" }, { name: null }] } }),
@@ -71,8 +71,9 @@ const GIT_COMMON = ok("worktree /repo\nHEAD abc123\nbranch refs/heads/main\n\n")
 // A remote list, then the URL of the remote the base names.
 const REMOTES = [ok("origin\nupstream\n"), ok("git@github.com:owner/repo.git\n")];
 const BASE_OK = ok("abc123\n");
-const SWITCHED = ok("");
-const PREPARE = [GIT_COMMON, ...REMOTES, ok(""), BASE_OK];
+// for-each-ref finding no branch by that name, so dispatch creates it.
+const NO_BRANCH = ok("refs/heads/fix-thing/nested\n");
+const PREPARE = [GIT_COMMON, ...REMOTES, ok(""), NO_BRANCH, BASE_OK];
 
 const REX_CREATED = ok(JSON.stringify({ block_ids: ["block:new"], window_id: "window:new" }));
 const reported = (state: string, extra: Record<string, string> = {}) =>
@@ -192,7 +193,7 @@ function makeOptions(overrides: Partial<DispatchOptions> = {}): DispatchOptions 
 const herdrOptions = (overrides: Partial<DispatchOptions> = {}) =>
   makeOptions({ mux: "herdr", rexSession: undefined, rexBlock: undefined, ...overrides });
 
-const rexPath = (path = PATH) => [...PREPARE, SWITCHED, worktreeList(path)];
+const rexPath = (path = PATH) => [...PREPARE, switched(path)];
 const herdrPath = (path = PATH) => [AGENT_LIST, ...rexPath(path)];
 
 const WT_SWITCH = [
@@ -206,6 +207,7 @@ const WT_SWITCH = [
   "origin/main",
   "--no-cd",
   "--yes",
+  "--format=json",
 ];
 
 // What git prints when a sibling worktree holds .git/config.lock.
@@ -625,9 +627,17 @@ describe("dispatch under rex", () => {
         "https://github.com/owner/repo.git",
         "+refs/heads/*:refs/remotes/origin/*",
       ],
+      [
+        "git",
+        "-C",
+        "/repo",
+        "for-each-ref",
+        "--format=%(refname)",
+        "refs/heads/fix-thing",
+        "refs/remotes/*/fix-thing",
+      ],
       ["git", "-C", "/repo", "rev-parse", "--verify", "--quiet", "origin/main"],
       WT_SWITCH,
-      ["wt", "-C", "/repo", "list", "--format=json"],
       [
         "rex",
         "window",
@@ -655,7 +665,7 @@ describe("dispatch under rex", () => {
 
     expect(root).toBe("/repo");
     expect(formatRecord(record)).toMatchInlineSnapshot(
-      `"{"mux":"rex","target":"block:new","host":null,"name":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":[]}"`,
+      `"{"mux":"rex","target":"block:new","host":null,"name":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":[],"checkout":"new-branch"}"`,
     );
   });
 
@@ -775,7 +785,7 @@ describe("dispatch under bg", () => {
     ]);
     expect(options.at(-3)).toEqual({ cwd: PATH, env: detachedEnv(process.env) });
     expect(formatRecord(record)).toMatchInlineSnapshot(
-      `"{"mux":"bg","target":"a1b2c3","host":null,"name":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":[]}"`,
+      `"{"mux":"bg","target":"a1b2c3","host":null,"name":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":[],"checkout":"new-branch"}"`,
     );
   });
 
@@ -848,7 +858,7 @@ describe("dispatch under herdr", () => {
       ["herdr", "agent", "get", "fix-thing"],
     ]);
     expect(formatRecord(record)).toMatchInlineSnapshot(
-      `"{"mux":"herdr","target":"wZZ:p1","host":null,"name":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":"sess-1","status":"working","settings":[]}"`,
+      `"{"mux":"herdr","target":"wZZ:p1","host":null,"name":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":"sess-1","status":"working","settings":[],"checkout":"new-branch"}"`,
     );
   });
 
@@ -953,9 +963,9 @@ describe("dispatch worktree", () => {
     const { run, calls } = fakeRunner([
       GIT_COMMON,
       ok("origin\n"),
+      NO_BRANCH,
       BASE_OK,
-      SWITCHED,
-      worktreeList(PATH),
+      switched(),
       REX_CREATED,
       REPORTED_WORKING,
     ]);
@@ -969,9 +979,9 @@ describe("dispatch worktree", () => {
       ...REMOTES,
       fail("fatal: could not read Username"),
       ok(""),
+      NO_BRANCH,
       BASE_OK,
-      SWITCHED,
-      worktreeList(PATH),
+      switched(),
       REX_CREATED,
       REPORTED_WORKING,
     ]);
@@ -1008,8 +1018,7 @@ describe("dispatch worktree", () => {
       ...PREPARE,
       CONFIG_LOCKED,
       CONFIG_LOCKED,
-      SWITCHED,
-      worktreeList(PATH),
+      switched(),
       REX_CREATED,
       REPORTED_WORKING,
     ]);
@@ -1028,10 +1037,92 @@ describe("dispatch worktree", () => {
     expect(failure.partial).toBeNull();
   });
 
-  test("fails when wt list shows no worktree for the branch", async () => {
-    const { run } = fakeRunner([...PREPARE, SWITCHED, ok(JSON.stringify({ items: [] }))]);
+  test("fails when wt switch prints no worktree path", async () => {
+    const { run } = fakeRunner([...PREPARE, ok(JSON.stringify({ action: "created" }))]);
     const failure = await failureOf(dispatch(makeOptions(), run, instant));
-    expect(failure.message).toBe("wt list shows no worktree for fix-thing");
+    expect(failure.message).toMatch(/^wt -C \/repo/);
+    expect(failure.partial).toBeNull();
+  });
+
+  const existing = (ref: string) => ok(`refs/heads/fix-thing/nested\n${ref}\n`);
+
+  test.each<{
+    name: string;
+    branch: string;
+    responses: readonly CommandResult[];
+    switchArgs: string[];
+    checkout: string;
+    recorded: string;
+  }>([
+    {
+      name: "reuses a local branch",
+      branch: "fix-thing",
+      responses: [
+        ...PREPARE.slice(0, -2),
+        existing("refs/heads/fix-thing"),
+        switched(PATH, "existing-branch"),
+      ],
+      switchArgs: ["fix-thing"],
+      checkout: "existing-branch",
+      recorded: "fix-thing",
+    },
+    {
+      name: "reuses a branch only the remote has",
+      branch: "fix-thing",
+      responses: [
+        ...PREPARE.slice(0, -2),
+        existing("refs/remotes/origin/fix-thing"),
+        switched(PATH, "existing-branch"),
+      ],
+      switchArgs: ["fix-thing"],
+      checkout: "existing-branch",
+      recorded: "fix-thing",
+    },
+    {
+      name: "opens the worktree a branch already has",
+      branch: "fix-thing",
+      responses: [
+        ...PREPARE.slice(0, -2),
+        existing("refs/heads/fix-thing"),
+        switched(PATH, "existing-worktree"),
+      ],
+      switchArgs: ["fix-thing"],
+      checkout: "existing-worktree",
+      recorded: "fix-thing",
+    },
+    {
+      name: "hands a PR reference to wt without fetching or checking the base",
+      branch: "pr:42",
+      responses: [GIT_COMMON, REMOTES[0] ?? ok(""), switched(PATH, "existing-branch", "fix-pr")],
+      switchArgs: ["pr:42"],
+      checkout: "existing-branch",
+      recorded: "fix-pr",
+    },
+    {
+      name: "hands an MR URL to wt",
+      branch: "https://gitlab.com/group/project/-/merge_requests/7",
+      responses: [GIT_COMMON, REMOTES[0] ?? ok(""), switched(PATH, "existing-worktree", "fix-mr")],
+      switchArgs: ["https://gitlab.com/group/project/-/merge_requests/7"],
+      checkout: "existing-worktree",
+      recorded: "fix-mr",
+    },
+  ])("$name", async ({ branch, responses, switchArgs, checkout, recorded }) => {
+    const { run, calls } = fakeRunner([...responses, REX_CREATED, REPORTED_WORKING]);
+    const { record } = await dispatch(makeOptions({ branch }), run, instant);
+
+    expect(calls.filter((argv) => argv[0] === "wt")).toEqual([
+      ["wt", "-C", "/repo", "switch", ...switchArgs, "--no-cd", "--yes", "--format=json"],
+    ]);
+    expect(calls.some((argv) => argv.includes("--base") || argv.includes("rev-parse"))).toBe(false);
+    expect(record).toMatchObject({ path: PATH, branch: recorded, checkout });
+    expect(calls.find((argv) => argv[0] === "rex")?.slice(0, 6)).toEqual([
+      "rex",
+      "window",
+      "new",
+      "-s",
+      "session:s1",
+      recorded,
+    ]);
   });
 
   test.each([
@@ -1411,7 +1502,7 @@ const LedgerRow = z.object({
   name: z.string(),
   session: z.string().nullable(),
   sender: z.string().nullable(),
-  outcome: z.enum(["dispatched", "orphaned"]),
+  outcome: z.enum(["dispatched", "orphaned", "failed"]),
 });
 
 describe("cli", () => {

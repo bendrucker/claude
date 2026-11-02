@@ -7,6 +7,9 @@ import { z } from "zod";
 import { appendDispatch, resolveDataDir } from "./ledger";
 
 const BRANCH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
+// wt's pr:<n> and mr:<n> shortcuts, or a PR or MR URL.
+const CHANGE_PATTERN =
+  /^(?:(?:pr|mr):[1-9][0-9]*|https:\/\/[A-Za-z0-9.-]+(?:\/[A-Za-z0-9._~%-]+)+)$/;
 const AGENT_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const MAX_AGENT_NAME = 32;
 const MAX_TASK_SUMMARY = 120;
@@ -38,6 +41,7 @@ const ANSWERED = /^❯ \S.*\n(?:.*\n)*?⏺ /m;
 // `--exec` and its shell launcher print these, and `--keep-open` leaves them on screen.
 const EXEC_FAILED = /^dispatch failed: /m;
 const WORKTREE_LINE = /^dispatch worktree: (\S+)$/m;
+const BRANCH_LINE = /^dispatch branch: (\S+)$/m;
 // Linux caps one argv element at 128KB including its terminator.
 const MAX_ARG_BYTES = 128 * 1024 - 1;
 // rex passes words without a shell. This launcher's own shell expands $HOME.
@@ -114,6 +118,7 @@ export const spawnRunner: Runner = async (argv, options) => {
 export const MUXES = ["rex", "herdr", "bg"] as const;
 export type Mux = (typeof MUXES)[number];
 export type Status = "working" | "blocked" | "failed" | "unknown";
+export type Checkout = "new-branch" | "existing-branch" | "existing-worktree";
 
 export interface DispatchRecord {
   mux: Mux;
@@ -127,6 +132,8 @@ export interface DispatchRecord {
   session: string | null;
   status: Status;
   settings: string[];
+  // Unknown for another host, whose worktree is prepared there.
+  checkout?: Checkout;
   submoduleError?: string;
   // What a blocked Claude Code reported through Rex's program status.
   blockedKind?: string;
@@ -150,13 +157,11 @@ export class DispatchError extends Error {
   }
 }
 
-const WorktreeList = z.object({
-  items: z.array(
-    z.object({
-      branch: z.string().nullish(),
-      worktree: z.object({ path: z.string() }).nullish(),
-    }),
-  ),
+const WtSwitched = z.object({
+  action: z.string(),
+  branch: z.string().nullish(),
+  path: z.string(),
+  created_branch: z.boolean().optional(),
 });
 
 const RexCreated = z.object({ block_ids: z.array(z.string()).min(1) });
@@ -658,7 +663,7 @@ async function launchRex(ctx: Context): Promise<void> {
           "-c",
           ctx.path,
           "--label",
-          options.branch,
+          partial.branch,
           "--focus=false",
           ...command,
         ]
@@ -668,7 +673,7 @@ async function launchRex(ctx: Context): Promise<void> {
           "new",
           "-s",
           options.rexSession ?? "",
-          options.branch,
+          partial.branch,
           "-c",
           ctx.path,
           "--focus=false",
@@ -716,10 +721,10 @@ async function startNamed(
 }
 
 async function launchHerdr(ctx: Context): Promise<void> {
-  const { run, options, partial } = ctx;
+  const { run, partial } = ctx;
   const workspace = await requiredJson(
     run,
-    ["herdr", "workspace", "create", "--cwd", ctx.path, "--label", options.branch, "--no-focus"],
+    ["herdr", "workspace", "create", "--cwd", ctx.path, "--label", partial.branch, "--no-focus"],
     WorkspaceCreated,
     partial,
   );
@@ -751,6 +756,7 @@ async function pollScreen(
   const captured = await run(argv);
   if (captured.code !== 0) return "unknown";
   partial.path ??= WORKTREE_LINE.exec(captured.stdout)?.[1] ?? null;
+  partial.branch = BRANCH_LINE.exec(captured.stdout)?.[1] ?? partial.branch;
   return classifyScreen(captured.stdout);
 }
 
@@ -841,9 +847,9 @@ export interface DispatchOptions {
 function validateCommon(
   options: WorktreeOptions & { prompt: string; name?: string | undefined },
 ): void {
-  if (!BRANCH_PATTERN.test(options.branch))
+  if (!BRANCH_PATTERN.test(options.branch) && !CHANGE_PATTERN.test(options.branch))
     throw new DispatchError(
-      `branch ${JSON.stringify(options.branch)} must match ${BRANCH_PATTERN.source}`,
+      `branch ${JSON.stringify(options.branch)} must match ${BRANCH_PATTERN.source} or ${CHANGE_PATTERN.source}`,
       null,
     );
   if (options.name != null && !AGENT_NAME_PATTERN.test(options.name))
@@ -1032,6 +1038,82 @@ export async function dispatch(
   }
 }
 
+async function fetchBase(
+  run: Runner,
+  root: string,
+  remotes: ReadonlySet<string>,
+  base: string,
+): Promise<void> {
+  const remote = baseRemote(remotes, base);
+  if (remote == null) return;
+  const url = await required(run, ["git", "-C", root, "remote", "get-url", remote], null);
+  const fetchOptions: RunOptions = {
+    timeoutMs: FETCH_TIMEOUT_MS,
+    env: { GIT_TERMINAL_PROMPT: "0" },
+  };
+  const args = fetchArgs(remote, url.stdout);
+  // Without an HTTPS credential, a private repository is reachable only over the remote's own URL.
+  const https =
+    args.length > 1 ? await run(["git", "-C", root, "fetch", ...args], fetchOptions) : null;
+  if (https?.code !== 0)
+    await required(run, ["git", "-C", root, "fetch", remote], null, fetchOptions);
+}
+
+async function branchExists(
+  run: Runner,
+  root: string,
+  remotes: ReadonlySet<string>,
+  branch: string,
+): Promise<boolean> {
+  const listed = await required(
+    run,
+    [
+      "git",
+      "-C",
+      root,
+      "for-each-ref",
+      "--format=%(refname)",
+      `refs/heads/${branch}`,
+      `refs/remotes/*/${branch}`,
+    ],
+    null,
+  );
+  // A pattern also matches refs beneath it, so only an exact name counts.
+  const wanted = new Set([
+    `refs/heads/${branch}`,
+    ...[...remotes].map((remote) => `refs/remotes/${remote}/${branch}`),
+  ]);
+  return listed.stdout.split("\n").some((line) => wanted.has(line.trim()));
+}
+
+// The words naming what wt switch checks out. Only a branch that exists
+// nowhere is created, and only then does the base matter.
+async function switchTarget(
+  run: Runner,
+  root: string,
+  remotes: ReadonlySet<string>,
+  options: WorktreeOptions,
+): Promise<string[]> {
+  if (CHANGE_PATTERN.test(options.branch)) return [options.branch];
+  // A local branch needs nothing from the network.
+  if (await branchExists(run, root, new Set(), options.branch)) return [options.branch];
+  await fetchBase(run, root, remotes, options.base);
+  if (await branchExists(run, root, remotes, options.branch)) return [options.branch];
+
+  const verified = await run(["git", "-C", root, "rev-parse", "--verify", "--quiet", options.base]);
+  if (verified.code !== 0)
+    throw new DispatchError(
+      `base ${JSON.stringify(options.base)} names no commit in ${root}`,
+      null,
+    );
+  return ["--create", options.branch, "--base", options.base];
+}
+
+function checkoutOf(switched: z.infer<typeof WtSwitched>): Checkout {
+  if (switched.action === "existing") return "existing-worktree";
+  return switched.created_branch === true ? "new-branch" : "existing-branch";
+}
+
 async function prepareWorktree(
   options: WorktreeOptions,
   name: string,
@@ -1056,64 +1138,22 @@ async function prepareWorktree(
 
   try {
     const listedRemotes = await required(run, ["git", "-C", root, "remote"], null);
-    const remotes = new Set(listedRemotes.stdout.split("\n").map((line) => line.trim()));
-    const remote = baseRemote(remotes, options.base);
-    if (remote != null) {
-      const url = await required(run, ["git", "-C", root, "remote", "get-url", remote], null);
-      const fetchOptions: RunOptions = {
-        timeoutMs: FETCH_TIMEOUT_MS,
-        env: { GIT_TERMINAL_PROMPT: "0" },
-      };
-      const args = fetchArgs(remote, url.stdout);
-      // Without an HTTPS credential, a private repository is reachable only over the remote's own URL.
-      const https =
-        args.length > 1 ? await run(["git", "-C", root, "fetch", ...args], fetchOptions) : null;
-      if (https?.code !== 0)
-        await required(run, ["git", "-C", root, "fetch", remote], null, fetchOptions);
-    }
-
-    const verified = await run([
-      "git",
-      "-C",
-      root,
-      "rev-parse",
-      "--verify",
-      "--quiet",
-      options.base,
-    ]);
-    if (verified.code !== 0)
-      throw new DispatchError(
-        `base ${JSON.stringify(options.base)} names no commit in ${root}`,
-        null,
-      );
+    const remotes = new Set(
+      listedRemotes.stdout
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== ""),
+    );
+    const target = await switchTarget(run, root, remotes, options);
 
     const locked = retryConfigLock(run, options.timeout, pause);
-    await required(
+    const switched = await requiredJson(
       locked,
-      [
-        "wt",
-        "-C",
-        root,
-        "switch",
-        "--create",
-        options.branch,
-        "--base",
-        options.base,
-        "--no-cd",
-        "--yes",
-      ],
+      ["wt", "-C", root, "switch", ...target, "--no-cd", "--yes", "--format=json"],
+      WtSwitched,
       null,
     );
-
-    const worktrees = await requiredJson(
-      run,
-      ["wt", "-C", root, "list", "--format=json"],
-      WorktreeList,
-      null,
-    );
-    const path = worktrees.items.find((item) => item.branch === options.branch)?.worktree?.path;
-    if (path == null)
-      throw new DispatchError(`wt list shows no worktree for ${options.branch}`, null);
+    const path = switched.path;
 
     // Everything past here has a worktree behind it, so a failure carries the
     // record forward rather than leaving the checkout orphaned without a trace.
@@ -1123,10 +1163,11 @@ async function prepareWorktree(
       host: null,
       name,
       path,
-      branch: options.branch,
+      branch: switched.branch ?? options.branch,
       session: null,
       status: "unknown",
       settings: [],
+      checkout: checkoutOf(switched),
     };
 
     const submoduleError = await initSubmodules(run, path);
@@ -1159,7 +1200,7 @@ export async function execSession(
 ): Promise<number> {
   validateCommon(options);
   const { path, partial } = await prepareWorktree(options, options.name, "rex", run, pause);
-  process.stdout.write(`dispatch worktree: ${path}\n`);
+  process.stdout.write(`dispatch worktree: ${path}\ndispatch branch: ${partial.branch}\n`);
   if (partial.submoduleError != null)
     process.stderr.write(`warning: submodules were not initialized: ${partial.submoduleError}\n`);
   return start(
@@ -1192,14 +1233,22 @@ if (import.meta.main) {
     name: "dispatch",
     help: {
       description:
-        "Create a worktree with wt, write its local Claude settings, and start `claude --name <name> <prompt>` in a new Rex tab or herdr workspace. The repository's own checkout is never moved.",
+        "Check out a branch, PR, or MR in a worktree with wt, write its local Claude settings, and start `claude --name <name> <prompt>` in a new Rex tab or herdr workspace. The repository's own checkout is never moved.",
     },
     flags: {
       repo: { type: String, default: process.cwd(), description: "Repository to branch from" },
-      branch: { type: String, description: "Branch to create for the session (required)" },
+      branch: {
+        type: String,
+        description:
+          "Branch for the session, created when it exists nowhere, or a pr:<n>, mr:<n>, or PR/MR URL (required)",
+      },
       prompt: { type: String, description: "File holding the prompt; reads stdin when absent" },
       name: { type: String, description: "Session name; derived from the branch when absent" },
-      base: { type: String, default: "origin/main", description: "Ref the new branch starts from" },
+      base: {
+        type: String,
+        default: "origin/main",
+        description: "Ref a newly created branch starts from",
+      },
       mux: {
         type: String,
         description:
@@ -1333,7 +1382,7 @@ if (import.meta.main) {
   const writeLedger = (
     record: DispatchRecord,
     repo: string,
-    outcome: "dispatched" | "orphaned",
+    outcome: "dispatched" | "orphaned" | "failed",
   ) => {
     try {
       appendDispatch(
@@ -1396,7 +1445,9 @@ if (import.meta.main) {
     // failure cannot cost them the only copy of it.
     if (error.partial != null) {
       process.stderr.write(`${formatRecord(error.partial)}\n`);
-      writeLedger(error.partial, error.root ?? argv.flags.repo, "orphaned");
+      // A worktree that predates the dispatch still has an owner.
+      const outcome = error.partial.checkout === "existing-worktree" ? "failed" : "orphaned";
+      writeLedger(error.partial, error.root ?? argv.flags.repo, outcome);
     }
     process.exit(1);
   }

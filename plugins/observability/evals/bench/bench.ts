@@ -28,8 +28,17 @@ function arm(value: string, previous: Arm[] = []): Arm[] {
   const m = /^([\w.-]+)=([^,]+)(?:,(.+))?$/.exec(value);
   if (m?.[1] === undefined || m[2] === undefined)
     throw new InvalidArgumentError("Expected name=<db>[,<skill dir>].");
+  const lake = m[2].startsWith("ducklake:") ? m[2].slice("ducklake:".length) : undefined;
   // Absolute, since replays run duckdb from a scratch dir or the home dir.
-  return [...previous, { name: m[1], db: resolve(m[2]), skill: resolve(m[3] ?? SKILL) }];
+  return [
+    ...previous,
+    {
+      name: m[1],
+      db: lake === undefined ? resolve(m[2]) : ":memory:",
+      skill: resolve(m[3] ?? SKILL),
+      lake,
+    },
+  ];
 }
 
 function count(value: string): number {
@@ -78,7 +87,7 @@ async function replayable(queries: Query[], arms: Arm[]): Promise<Query[]> {
 }
 
 const ARM_HELP =
-  "name=<index>[,<skill dir>], once per arm; the first is the base. The skill dir defaults to this checkout's";
+  "name=<index>[,<skill dir>], once per arm; the first is the base. <index> may be ducklake:<url> to read a published lake in place. The skill dir defaults to this checkout's";
 
 const program = new Command("bench.ts").description(
   "Benchmark the session index: replay the queries agents run most, and time a refresh per changed transcript.",

@@ -50,8 +50,11 @@ WITH reads AS (
     tc.source_line
   FROM content_items tc
   JOIN messages m USING (host, source_file, source_line)
+  -- session_id keeps the planner from pairing every result with every scoped session,
+  -- which it does when host is the only key the two share.
   JOIN content_items tr
-    ON tr.tool_use_id = tc.id AND tr.host = tc.host AND tr.type = 'tool_result'
+    ON tr.tool_use_id = tc.id AND tr.host = tc.host AND tr.session_id = tc.session_id
+   AND tr.type = 'tool_result'
   JOIN scoped_sessions() s ON s.host = tc.host AND s.session_id = tc.session_id
   WHERE tc.type = 'tool_use'
     AND tc.name = 'Read'

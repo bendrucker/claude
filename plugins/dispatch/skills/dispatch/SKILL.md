@@ -49,7 +49,7 @@ Run `--help` for the rest.
 
 ## Other Machines
 
-To run the session on another machine, pass `--host <label> --session <remote session> --repo <remote path>`. The label must appear in `rex hosts list`, and that machine must have the dispatch plugin deployed at `~/.claude-repo`. The worktree, settings, and fetch happen there. The session starts with `--remote-control`, which puts it in `ListAgents` here. `path` stays `null` until the remote screen shows it.
+To run the session on another machine, pass `--host <label> --session <remote session> --repo <remote path>`. The label must appear in `rex hosts list`, and that machine must have the dispatch plugin deployed at `~/.claude-repo`. The worktree, settings, and fetch happen there. The session starts with `--remote-control`, which puts it in `ListAgents` here. `path` stays `null`, and `branch` stays a PR or MR reference, until the remote screen shows them.
 
 ## Read the Result
 

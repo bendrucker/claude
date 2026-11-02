@@ -41,6 +41,7 @@ const ANSWERED = /^❯ \S.*\n(?:.*\n)*?⏺ /m;
 // `--exec` and its shell launcher print these, and `--keep-open` leaves them on screen.
 const EXEC_FAILED = /^dispatch failed: /m;
 const WORKTREE_LINE = /^dispatch worktree: (\S+)$/m;
+const BRANCH_LINE = /^dispatch branch: (\S+)$/m;
 // Linux caps one argv element at 128KB including its terminator.
 const MAX_ARG_BYTES = 128 * 1024 - 1;
 // rex passes words without a shell. This launcher's own shell expands $HOME.
@@ -755,6 +756,7 @@ async function pollScreen(
   const captured = await run(argv);
   if (captured.code !== 0) return "unknown";
   partial.path ??= WORKTREE_LINE.exec(captured.stdout)?.[1] ?? null;
+  partial.branch = BRANCH_LINE.exec(captured.stdout)?.[1] ?? partial.branch;
   return classifyScreen(captured.stdout);
 }
 
@@ -1093,6 +1095,8 @@ async function switchTarget(
   options: WorktreeOptions,
 ): Promise<string[]> {
   if (CHANGE_PATTERN.test(options.branch)) return [options.branch];
+  // A local branch needs nothing from the network.
+  if (await branchExists(run, root, new Set(), options.branch)) return [options.branch];
   await fetchBase(run, root, remotes, options.base);
   if (await branchExists(run, root, remotes, options.branch)) return [options.branch];
 
@@ -1196,7 +1200,7 @@ export async function execSession(
 ): Promise<number> {
   validateCommon(options);
   const { path, partial } = await prepareWorktree(options, options.name, "rex", run, pause);
-  process.stdout.write(`dispatch worktree: ${path}\n`);
+  process.stdout.write(`dispatch worktree: ${path}\ndispatch branch: ${partial.branch}\n`);
   if (partial.submoduleError != null)
     process.stderr.write(`warning: submodules were not initialized: ${partial.submoduleError}\n`);
   return start(

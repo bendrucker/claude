@@ -68,12 +68,14 @@ const AGENT_LIST = ok(
   JSON.stringify({ result: { agents: [{ name: "reviewer" }, { name: null }] } }),
 );
 const GIT_COMMON = ok("worktree /repo\nHEAD abc123\nbranch refs/heads/main\n\n");
-// A remote list, then the URL of the remote the base names.
-const REMOTES = [ok("origin\nupstream\n"), ok("git@github.com:owner/repo.git\n")];
+const REMOTE_LIST = ok("origin\nupstream\n");
+const REMOTE_URL = ok("git@github.com:owner/repo.git\n");
 const BASE_OK = ok("abc123\n");
 // for-each-ref finding no branch by that name, so dispatch creates it.
 const NO_BRANCH = ok("refs/heads/fix-thing/nested\n");
-const PREPARE = [GIT_COMMON, ...REMOTES, ok(""), NO_BRANCH, BASE_OK];
+// The local check, then the URL of the remote the base names, its fetch, and
+// the check that includes the remotes.
+const PREPARE = [GIT_COMMON, REMOTE_LIST, NO_BRANCH, REMOTE_URL, ok(""), NO_BRANCH, BASE_OK];
 
 const REX_CREATED = ok(JSON.stringify({ block_ids: ["block:new"], window_id: "window:new" }));
 const reported = (state: string, extra: Record<string, string> = {}) =>
@@ -618,6 +620,15 @@ describe("dispatch under rex", () => {
     expect(calls).toEqual([
       ["git", "-C", "/repo", "worktree", "list", "--porcelain"],
       ["git", "-C", "/repo", "remote"],
+      [
+        "git",
+        "-C",
+        "/repo",
+        "for-each-ref",
+        "--format=%(refname)",
+        "refs/heads/fix-thing",
+        "refs/remotes/*/fix-thing",
+      ],
       ["git", "-C", "/repo", "remote", "get-url", "origin"],
       [
         "git",
@@ -964,6 +975,7 @@ describe("dispatch worktree", () => {
       GIT_COMMON,
       ok("origin\n"),
       NO_BRANCH,
+      NO_BRANCH,
       BASE_OK,
       switched(),
       REX_CREATED,
@@ -976,7 +988,9 @@ describe("dispatch worktree", () => {
   test("falls back to the remote when the HTTPS fetch fails", async () => {
     const { run, calls } = fakeRunner([
       GIT_COMMON,
-      ...REMOTES,
+      REMOTE_LIST,
+      NO_BRANCH,
+      REMOTE_URL,
       fail("fatal: could not read Username"),
       ok(""),
       NO_BRANCH,
@@ -1053,18 +1067,21 @@ describe("dispatch worktree", () => {
     switchArgs: string[];
     checkout: string;
     recorded: string;
+    fetched: boolean;
   }>([
     {
       name: "reuses a local branch",
       branch: "fix-thing",
       responses: [
-        ...PREPARE.slice(0, -2),
+        GIT_COMMON,
+        REMOTE_LIST,
         existing("refs/heads/fix-thing"),
         switched(PATH, "existing-branch"),
       ],
       switchArgs: ["fix-thing"],
       checkout: "existing-branch",
       recorded: "fix-thing",
+      fetched: false,
     },
     {
       name: "reuses a branch only the remote has",
@@ -1077,36 +1094,41 @@ describe("dispatch worktree", () => {
       switchArgs: ["fix-thing"],
       checkout: "existing-branch",
       recorded: "fix-thing",
+      fetched: true,
     },
     {
       name: "opens the worktree a branch already has",
       branch: "fix-thing",
       responses: [
-        ...PREPARE.slice(0, -2),
+        GIT_COMMON,
+        REMOTE_LIST,
         existing("refs/heads/fix-thing"),
         switched(PATH, "existing-worktree"),
       ],
       switchArgs: ["fix-thing"],
       checkout: "existing-worktree",
       recorded: "fix-thing",
+      fetched: false,
     },
     {
       name: "hands a PR reference to wt without fetching or checking the base",
       branch: "pr:42",
-      responses: [GIT_COMMON, REMOTES[0] ?? ok(""), switched(PATH, "existing-branch", "fix-pr")],
+      responses: [GIT_COMMON, REMOTE_LIST, switched(PATH, "existing-branch", "fix-pr")],
       switchArgs: ["pr:42"],
       checkout: "existing-branch",
       recorded: "fix-pr",
+      fetched: false,
     },
     {
       name: "hands an MR URL to wt",
       branch: "https://gitlab.com/group/project/-/merge_requests/7",
-      responses: [GIT_COMMON, REMOTES[0] ?? ok(""), switched(PATH, "existing-worktree", "fix-mr")],
+      responses: [GIT_COMMON, REMOTE_LIST, switched(PATH, "existing-worktree", "fix-mr")],
       switchArgs: ["https://gitlab.com/group/project/-/merge_requests/7"],
       checkout: "existing-worktree",
       recorded: "fix-mr",
+      fetched: false,
     },
-  ])("$name", async ({ branch, responses, switchArgs, checkout, recorded }) => {
+  ])("$name", async ({ branch, responses, switchArgs, checkout, recorded, fetched }) => {
     const { run, calls } = fakeRunner([...responses, REX_CREATED, REPORTED_WORKING]);
     const { record } = await dispatch(makeOptions({ branch }), run, instant);
 
@@ -1114,6 +1136,7 @@ describe("dispatch worktree", () => {
       ["wt", "-C", "/repo", "switch", ...switchArgs, "--no-cd", "--yes", "--format=json"],
     ]);
     expect(calls.some((argv) => argv.includes("--base") || argv.includes("rev-parse"))).toBe(false);
+    expect(calls.some((argv) => argv[3] === "fetch")).toBe(fetched);
     expect(record).toMatchObject({ path: PATH, branch: recorded, checkout });
     expect(calls.find((argv) => argv[0] === "rex")?.slice(0, 6)).toEqual([
       "rex",
@@ -1377,6 +1400,15 @@ describe("dispatch to another host", () => {
     const { run, calls } = fakeRunner([REX_CREATED, REPORTED_WORKING, NO_ROUTE]);
     await dispatch(remoteOptions({ settings: {} }), run, instant);
     expect(calls[0]).not.toContain("--settings-base64");
+  });
+
+  test("records the head branch the host resolved a PR reference to", async () => {
+    const shown = ok(
+      `dispatch worktree: ${REMOTE_PATH}\ndispatch branch: fix-pr\n${WORKING_SCREEN.stdout}`,
+    );
+    const { run } = fakeRunner([REX_CREATED, REPORTED_WORKING, shown]);
+    const { record } = await dispatch(remoteOptions({ branch: "pr:42" }), run, instant);
+    expect(record).toMatchObject({ path: REMOTE_PATH, branch: "fix-pr" });
   });
 
   test("leaves no record when the host refuses the tab", async () => {

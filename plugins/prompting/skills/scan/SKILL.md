@@ -55,6 +55,8 @@ List the units, defaulting to the current directory:
 bun ${CLAUDE_SKILL_DIR}/scripts/audit.ts units [<path>...]
 ```
 
+Where the `observability:session` index is available, rank the units by its `memory-loads` query, which multiplies each rule or nested `CLAUDE.md`'s load count by its injected size, and judge the costliest first.
+
 Judge one unit inline. Judge more than one through a Workflow with one judge per batch of units, kept within the session's workflow size, since this skill's instruction to run one is the opt-in. [references/judge.md](references/judge.md) holds the judge prompt and output schema, and [references/classes.md](references/classes.md) the classes it tags. Write the returned proposals to `tmp/prompting-audit/<run>/proposals.jsonl` in the audited repo, one per line with a unique `id`, where `<run>` names the round.
 
 Then drive the ledger through `audit.ts`:

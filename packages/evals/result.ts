@@ -21,6 +21,8 @@ export const Run = z.looseObject({
   graders: z.array(Grader).default([]),
   error: z.string().nullish(),
   tracePath: z.string().nullish(),
+  costUsd: z.number().nullish(),
+  turns: z.number().nullish(),
   /** Present when a mock stopped the run, which scores 0 whatever its graders say. */
   aborted: z.unknown().optional(),
 });

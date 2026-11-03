@@ -6,7 +6,17 @@ import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typin
 import { $ } from "bun";
 import { table } from "table";
 import { z } from "zod";
-import { corpusFiles, lintFiles, markdownUnder, PLUGINS, type Plugin, ROOT, sweep } from "./corpus";
+import {
+  checkouts,
+  corpusFiles,
+  corpusHits,
+  lintFiles,
+  markdownUnder,
+  PLUGINS,
+  type Plugin,
+  ROOT,
+  sweep,
+} from "./corpus";
 import {
   assign,
   Corpus,
@@ -69,11 +79,20 @@ const sweepCommand = new Command("sweep")
       .argParser(collect),
   )
   .option("--wide", "also fire every check the plugin configs turn off, at every level")
+  .option(
+    "--repo <path>",
+    "also lint the corpus in another checkout, its files prefixed with its directory name, repeatable",
+    collect,
+    [],
+  )
   .action(async (options) => {
     const plugins = (options.plugin ?? PLUGIN_NAMES).filter(
       (name): name is Plugin => name in PLUGINS,
     );
-    const result = await sweep(options.corpus, plugins, ROOT, options.wide);
+    const result = await sweep(options.corpus, plugins, {
+      wide: options.wide,
+      repos: await checkouts(options.repo.map((path) => resolve(path))),
+    });
     await data.writeSweep(result);
     const rate = (result.hits.length / result.words) * 1000;
     console.log(
@@ -81,20 +100,21 @@ const sweepCommand = new Command("sweep")
     );
   });
 
+const corpusFilter = () =>
+  new Option("--corpus <name>", "only the hits in this corpus's files").choices(Corpus.options);
+
 const serveCommand = new Command("serve")
   .description("Serve the labeling page over the last sweep.")
   .option("--port <n>", "port", int, 4317)
   .option("--per-check <n>", "hits sampled per check", int, 5)
+  .addOption(corpusFilter())
   .action(async (options) => {
-    const server = await serve(data, { port: options.port, perCheck: options.perCheck });
-    const swept = await data.sweep();
-    const count = sample(
-      swept?.hits ?? [],
-      await data.labels(),
-      await data.queue(),
-      options.perCheck,
-    ).length;
-    console.log(`${count} hits to label at ${server.url}`);
+    const { server, sampled } = await serve(data, {
+      port: options.port,
+      perCheck: options.perCheck,
+      corpus: options.corpus,
+    });
+    console.log(`${sampled} hits to label at ${server.url}`);
   });
 
 const patternCommand = new Command("pattern")
@@ -182,7 +202,9 @@ const reviewCommand = new Command("review")
 
     const last = await data.sweep();
     const plugins = PLUGIN_NAMES.filter((name) => last?.plugins?.includes(name) ?? true);
-    await data.writeSweep(await sweep(last?.corpus ?? "skills", plugins));
+    await data.writeSweep(
+      await sweep(last?.corpus ?? "skills", plugins, { repos: last?.repos ?? {} }),
+    );
     console.log(
       `${reviewed.flags.length} flags recorded on ${doc}, ${reviewed.unlocated.length} unlocated, ${reviewed.globals.length} global notes.`,
     );
@@ -252,14 +274,14 @@ const scoreCommand = new Command("score")
     const swept = await data.sweep();
     if (swept === undefined) throw new Error("No sweep yet. Run `lab.ts sweep` first.");
     const plugin = STYLE_PLUGIN[pattern.style];
-    const files = await corpusFiles(swept.corpus);
+    const files = await corpusFiles(swept.corpus, { repos: swept.repos });
     const [labels, flags, queued] = await Promise.all([data.labels(), data.flags(), data.queue()]);
     const ts = new Date().toISOString();
     const results = await Promise.all(
       candidates.map(async (candidate) => {
         const complexity = measure(await Bun.file(candidate).text()).score;
         const config = await labConfig([resolve(candidate)], PLUGINS[plugin]);
-        const hits = await lintFiles(plugin, config, files);
+        const hits = await lintFiles(plugin, config, files, ROOT, swept.repos);
         return {
           candidate: basename(candidate, ".yml"),
           ...score(
@@ -381,11 +403,12 @@ const proposeCommand = new Command("propose")
   .action(async (options) => {
     const swept = await data.sweep();
     if (swept === undefined) throw new Error("No sweep yet. Run `lab.ts sweep` first.");
-    const files = await corpusFiles(swept.corpus);
+    const files = await corpusFiles(swept.corpus, { repos: swept.repos });
     const results = await propose({
       files: spread(files, options.files ?? files.length),
       existing: await data.proposals(),
       root: ROOT,
+      repos: swept.repos,
       model: options.model,
       onResult: async (result) => {
         await data.addProposals([result]);
@@ -398,14 +421,20 @@ const proposeCommand = new Command("propose")
 
 const statusCommand = new Command("status")
   .description("Report each pattern's stage and each labeled check's precision.")
-  .action(async () => {
-    const [hits, labels, flags, patterns, scores] = await Promise.all([
+  .addOption(corpusFilter())
+  .action(async (options) => {
+    const [all, swept, labels, flags, patterns, scores] = await Promise.all([
       data.hits(),
+      data.sweep(),
       data.labels(),
       data.flags(),
       data.patterns(),
       data.scores(),
     ]);
+    const hits =
+      options.corpus === undefined
+        ? all
+        : await corpusHits(all, options.corpus, { repos: swept?.repos ?? {} });
     process.stdout.write(
       render(
         patternRows(patterns, labels, flags, scores),

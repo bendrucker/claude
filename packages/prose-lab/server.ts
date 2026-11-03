@@ -1,7 +1,16 @@
 import { join } from "node:path";
 import { z } from "zod";
-import { corpusFiles, ROOT } from "./corpus";
-import { type Flag, type Hit, hitId, type Label, type Store, Verdict } from "./data";
+import { corpusFiles, filePath, ROOT } from "./corpus";
+import {
+  type Corpus,
+  DOCS,
+  type Flag,
+  type Hit,
+  hitId,
+  type Label,
+  type Store,
+  Verdict,
+} from "./data";
 import { next, rate } from "./deck";
 import { sample } from "./sample";
 import { overlaps } from "./score";
@@ -81,30 +90,38 @@ export interface ServeOptions {
   port: number;
   perCheck: number;
   root?: string;
+  docs?: string;
+  /** Limits the deck, sample, and documents to this corpus's files. */
+  corpus?: Corpus | undefined;
 }
 
 export async function serve(
   data: Store,
-  { port, perCheck, root = ROOT }: ServeOptions,
-): Promise<Bun.Server<undefined>> {
+  { port, perCheck, root = ROOT, docs = DOCS, corpus: only }: ServeOptions,
+): Promise<{ server: Bun.Server<undefined>; sampled: number }> {
   const swept = await data.sweep();
   if (swept === undefined) throw new Error("No sweep yet. Run `lab.ts sweep` first.");
-  const corpus = new Set(await corpusFiles(swept.corpus, root));
+  const { repos } = swept;
+  const corpus = new Set(await corpusFiles(only ?? swept.corpus, { root, docs, repos }));
+  // Also drops saved proposals and queued hits on files outside the sweep's checkouts.
+  const within = <T extends Hit>(hits: readonly T[]): T[] =>
+    hits.filter((hit) => corpus.has(hit.file));
+  const sweptHits = within(swept.hits);
   const files = new Map<string, string[]>();
   const linesOf = async (file: string): Promise<string[]> => {
     let lines = files.get(file);
     if (lines === undefined) {
-      lines = (await Bun.file(join(root, file)).text()).split("\n");
+      lines = (await Bun.file(filePath(file, repos, root)).text()).split("\n");
       files.set(file, lines);
     }
     return lines;
   };
   const byId = new Map<string, Hit>([
-    ...swept.hits.map((hit) => [hitId(hit), hit] as const),
+    ...sweptHits.map((hit) => [hitId(hit), hit] as const),
     ...(await data.queue()).map((hit) => [hitId(hit), hit] as const),
   ]);
   const items = await Promise.all(
-    sample(swept.hits, await data.labels(), await data.queue(), perCheck).map(async (item) =>
+    sample(sweptHits, await data.labels(), within(await data.queue()), perCheck).map(async (item) =>
       Object.assign(item, context(item, await linesOf(item.file))),
     ),
   );
@@ -113,14 +130,14 @@ export async function serve(
   // Re-read on each card, since a background `propose` run appends to the deck.
   const deck = async () => {
     const [hits, labels, flags] = await Promise.all([data.hits(), data.labels(), data.flags()]);
-    return { hits, labels, flags };
+    return { hits: within(hits), labels, flags };
   };
   const currentBoard = async () => {
     const { hits, labels, flags } = await deck();
     return board(checkRows(hits, labels, flags));
   };
 
-  return Bun.serve({
+  const server = Bun.serve({
     port,
     async fetch(request) {
       const url = new URL(request.url);
@@ -148,8 +165,7 @@ export async function serve(
         case "/api/vote": {
           if (request.method !== "POST") break;
           const input = LabelInput.parse(await request.json());
-          const before = await data.hits();
-          const hit = before.find((entry) => hitId(entry) === input.id);
+          const hit = (await deck()).hits.find((entry) => hitId(entry) === input.id);
           if (hit === undefined) return new Response("unknown hit", { status: 404 });
           await data.addLabels([{ ...hit, ...input, by: "user", ts }]);
           const { hits, labels, flags } = await deck();
@@ -162,7 +178,7 @@ export async function serve(
         case "/api/patterns":
           return Response.json(await data.patterns());
         case "/api/files": {
-          const counts = Map.groupBy(swept.hits, (hit) => hit.file);
+          const counts = Map.groupBy(sweptHits, (hit) => hit.file);
           return Response.json(
             [...corpus].map((file) => ({ file, hits: counts.get(file)?.length ?? 0 })),
           );
@@ -172,7 +188,7 @@ export async function serve(
           if (!corpus.has(file)) return new Response("unknown file", { status: 404 });
           return Response.json({
             lines: await linesOf(file),
-            hits: swept.hits.filter((hit) => hit.file === file),
+            hits: sweptHits.filter((hit) => hit.file === file),
             flags: (await data.flags()).filter((flag) => flag.file === file),
           });
         }
@@ -204,4 +220,5 @@ export async function serve(
       return new Response("not found", { status: 404 });
     },
   });
+  return { server, sampled: items.length };
 }

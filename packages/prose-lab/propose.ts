@@ -1,4 +1,4 @@
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { z } from "zod";
 import {
   cacheKey,
@@ -7,6 +7,7 @@ import {
   type StructuredOptions,
   structured,
 } from "../eval-judge/index";
+import { filePath, type Repos } from "./corpus";
 import type { Hit, Proposed } from "./data";
 import { PROPOSED } from "./deck";
 
@@ -80,6 +81,7 @@ export interface ProposeOptions {
   files: readonly string[];
   existing: readonly Proposed[];
   root: string;
+  repos?: Repos;
   model?: string;
   query?: QueryFn;
   onResult?: (result: Proposed) => Promise<void>;
@@ -96,6 +98,7 @@ export async function propose({
   files,
   existing,
   root,
+  repos = {},
   model = MODEL,
   query,
   onResult,
@@ -104,7 +107,7 @@ export async function propose({
   const template = promptHash(PROMPT);
   const jobs = await Promise.all(
     files.map(async (file) => {
-      const text = await Bun.file(join(root, file)).text();
+      const text = await Bun.file(filePath(file, repos, root)).text();
       return { file, text, key: cacheKey(template, model, text) };
     }),
   );

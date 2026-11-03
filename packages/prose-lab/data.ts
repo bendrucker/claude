@@ -29,6 +29,8 @@ export const Sweep = z.object({
   words: z.number(),
   hits: z.array(Hit),
   plugins: z.array(z.string()).optional(),
+  /** Other checkouts' roots by the name their hits' files carry as a prefix. */
+  repos: z.record(z.string(), z.string()).default({}),
 });
 export type Sweep = z.infer<typeof Sweep>;
 

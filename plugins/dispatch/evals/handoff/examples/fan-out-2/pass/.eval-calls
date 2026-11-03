@@ -1,0 +1,8 @@
+wt -C /tmp/eval/cwd switch --create abort-signal --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval abort-signal -c /tmp/eval/cwd/.worktrees/abort-signal --json -- claude --name abort-signal -- <prompt>
+launch abort-signal /tmp/eval/cwd/.worktrees/abort-signal
+allow Bash(bun test:*)
+wt -C /tmp/eval/cwd switch --create add-contributing --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval add-contributing -c /tmp/eval/cwd/.worktrees/add-contributing --json -- claude --name add-contributing -- <prompt>
+launch add-contributing /tmp/eval/cwd/.worktrees/add-contributing
+allow Bash(bun test:*)

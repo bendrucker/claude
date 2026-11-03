@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs the gh and glab stand-ins into the run's home, each bundled into one file so it runs
+# Installs the gh, glab, rex, wt, and claude stand-ins into the run's home, each bundled into one file so it runs
 # after the staged tree is gone. Case sessions inherit PATH from the operator's shell, and the
 # Bash tool's zsh sources only .zshenv from the run's home and its bash .bashrc, so those files put
 # the stand-ins first for both eval arms. A fixture that writes $HOME/.eval-stubs/meta.json gets snapshot answers;
@@ -32,7 +32,7 @@ src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 dir="$HOME/.eval-stubs"
 bun=$(command -v bun)
 mkdir -p "$dir/bin"
-for cli in gh glab; do
+for cli in gh glab rex wt claude; do
   "$bun" build "$src/$cli.ts" --target bun --outfile "$dir/$cli.js" > /dev/null
   printf '#!/usr/bin/env bash\nexec "%s" "%s" "$@"\n' "$bun" "$dir/$cli.js" > "$dir/bin/$cli"
   chmod +x "$dir/bin/$cli"
@@ -42,6 +42,9 @@ if [[ -n "$check" ]]; then
   # An empty file fails the graders when no call counts; a missing one would error the run.
   : > .eval-verdicts
 fi
+# A file-target grader errors the run when its file is missing, and a quiet case makes no calls or briefs.
+: > .eval-calls
+: > .eval-briefs.md
 if $offline; then
   touch "$dir/offline"
 fi

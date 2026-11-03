@@ -1,0 +1,4 @@
+wt -C /tmp/eval/cwd switch --create fix-things --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval fix-things -c /tmp/eval/cwd/.worktrees/fix-things --json -- claude --name fix-things -- <prompt>
+launch fix-things /tmp/eval/cwd/.worktrees/fix-things
+allow Bash(bun test:*)

@@ -1,0 +1,2 @@
+wt -C /tmp/eval/cwd/repos/dotfiles switch --create add-editorconfig --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval add-editorconfig -c /tmp/eval/cwd/repos/dotfiles/.worktrees/add-editorconfig --json -- claude --name add-editorconfig -- <prompt>

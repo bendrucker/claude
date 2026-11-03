@@ -1,0 +1,4 @@
+wt -C /tmp/eval/cwd switch --create add-editorconfig --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval add-editorconfig -c /tmp/eval/cwd/.worktrees/add-editorconfig --json -- claude --name add-editorconfig -- <prompt>
+launch add-editorconfig /tmp/eval/cwd/.worktrees/add-editorconfig
+allow Bash(bun test:*)

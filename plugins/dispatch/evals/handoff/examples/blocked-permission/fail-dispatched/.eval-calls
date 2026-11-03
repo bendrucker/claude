@@ -1,0 +1,3 @@
+wt -C /tmp/eval/cwd switch --create add-deploy-target --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval add-deploy-target -c /tmp/eval/cwd/.worktrees/add-deploy-target --json -- claude --name add-deploy-target -- <prompt>
+allow Bash(bun test:*)

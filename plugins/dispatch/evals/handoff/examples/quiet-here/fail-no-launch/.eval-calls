@@ -1,0 +1,4 @@
+wt -C /tmp/eval/cwd switch --create fix-readme-typo --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval fix-readme-typo -c /tmp/eval/cwd/.worktrees/fix-readme-typo --json -- claude --name fix-readme-typo -- <prompt>
+launch fix-readme-typo /tmp/eval/cwd/.worktrees/fix-readme-typo
+allow Bash(bun test:*)

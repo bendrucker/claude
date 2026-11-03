@@ -1,0 +1,44 @@
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..9df4f48
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,5 @@
++# Notes tooling
++
++`scripts/backup.sh <dir> <dest>` writes a timestamped tarball of `<dir>` into `<dest>` and keeps the newest seven.
++
++`scripts/nightly.sh` runs it for `~/notes`.
+diff --git a/scripts/backup.sh b/scripts/backup.sh
+new file mode 100755
+index 0000000..e20c40d
+--- /dev/null
++++ b/scripts/backup.sh
+@@ -0,0 +1,16 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++src=${1:?usage: backup.sh <dir> <dest>}
++dest=${2:?usage: backup.sh <dir> <dest>}
++keep=7
++
++mkdir -p "$dest"
++name=$(basename "$src")
++stamp=${BACKUP_STAMP:-$(date +%Y%m%d%H%M%S)}
++tar -czf "$dest/$name-$stamp.tar.gz" -C "$(dirname "$src")" "$name"
++
++# Keep the newest archives. Names sort by timestamp.
++ls -1 "$dest/$name"-*.tar.gz | sort -r | tail -n +$((keep + 1)) | while read -r old; do
++  rm -f "$old"
++done
+diff --git a/scripts/nightly.sh b/scripts/nightly.sh
+new file mode 100755
+index 0000000..68093a8
+--- /dev/null
++++ b/scripts/nightly.sh
+@@ -0,0 +1,5 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++dir=$(cd "$(dirname "$0")" && pwd)
++"$dir/backup.sh" "$HOME/notes" "$HOME/backups"

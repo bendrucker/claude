@@ -2,6 +2,7 @@
 # Builds a case's repository from its history/ patches and stops the rebase on its conflict.
 # usage: scaffold.sh <case-dir>
 # history/ holds an optional operation (rebase or merge), base.patch, main.patch, main.msg, branch.name, and branch/NN.patch with NN.msg per branch commit.
+# operation may also be cherry-pick (with pick.patch, pick.msg, and pick.name) or none (nothing starts).
 # An optional upstream.patch and upstream.msg add a commit to origin's main that the working repository has not fetched.
 # An optional check.sh runs against each pushed result, and an optional expect lists `<blob> <path>` pairs it should match.
 # check.sh gets the path of the case's hidden/ copy and the branch's pre-operation tip as arguments.
@@ -37,16 +38,35 @@ base=$(git rev-parse HEAD)
 apply "$history/main.patch"
 commit "2026-10-03T09:00:00Z" "$(cat "$history/main.msg")" > /dev/null
 install
-git switch -q -c "$branch" "$base"
+start=$base
+if [ -f "$history/pick.patch" ]; then start=main; fi
+git switch -q -c "$branch" "$start"
 for patch in "$history"/branch/*.patch; do
   apply "$patch"
   commit "2026-10-02T09:00:00Z" "$(cat "${patch%.patch}.msg")" > /dev/null
 done
 install
 
+# A pick.patch case cuts the topic branch from main and starts the cherry-pick of pick.name, a commit cut from the base.
+if [ -f "$history/pick.patch" ]; then
+  git switch -q -c "$(cat "$history/pick.name")" "$base"
+  apply "$history/pick.patch"
+  commit "2026-10-02T12:00:00Z" "$(cat "$history/pick.msg")" > /dev/null
+  git switch -q "$branch"
+fi
+# A stacked.name case adds a branch on top of the topic branch, with its commits in stacked/NN.patch and NN.msg.
+if [ -f "$history/stacked.name" ]; then
+  git switch -q -c "$(cat "$history/stacked.name")" "$branch"
+  for patch in "$history"/stacked/*.patch; do
+    apply "$patch"
+    commit "2026-10-02T15:00:00Z" "$(cat "${patch%.patch}.msg")" > /dev/null
+  done
+  git switch -q "$branch"
+fi
+
 git init -q --bare .git/origin.git
 git remote set-url origin "$PWD/.git/origin.git"
-git push -q origin main "$branch"
+git push -q origin --all
 git branch -q --set-upstream-to "origin/$branch"
 git fetch -q origin
 git remote set-head origin main
@@ -70,6 +90,7 @@ fi
 hooks=.git/origin.git/hooks
 pwd > "$hooks/eval-work"
 cp "$(dirname "$0")/scripts/post-receive.sh" "$hooks/post-receive"
+if [ -f "$history/stacked.name" ]; then : > "$hooks/eval-branches"; fi
 if [ -f "$case_dir/check.sh" ]; then cp "$case_dir/check.sh" "$hooks/eval-check"; fi
 if [ -f "$case_dir/expect" ]; then cp "$case_dir/expect" "$hooks/eval-expect"; fi
 # Hidden checks sit outside the working tree, so the session never reads or edits them.
@@ -91,7 +112,15 @@ chmod +x "$hooks"/*
 : > .eval-pushed
 
 operation=$(cat "$history/operation" 2>/dev/null || echo rebase)
-if git "$operation" -q main > /dev/null 2>&1; then
-  echo "$operation of main applied cleanly: no conflict to resolve" >&2
-  exit 1
+# An optional before.sh runs before the operation starts and after.sh once it has stopped, both in the working repository.
+if [ -f "$history/before.sh" ]; then bash "$history/before.sh"; fi
+if [ "$operation" != none ]; then
+  target=main
+  quiet=-q
+  if [ "$operation" = cherry-pick ]; then target=$(cat "$history/pick.name"); quiet=; fi
+  if git "$operation" $quiet "$target" > /dev/null 2>&1; then
+    echo "$operation of $target applied cleanly: no conflict to resolve" >&2
+    exit 1
+  fi
 fi
+if [ -f "$history/after.sh" ]; then bash "$history/after.sh"; fi

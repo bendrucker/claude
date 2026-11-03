@@ -1,0 +1,10 @@
+package ledger
+
+import "testing"
+
+func TestParseCentsTrimsWhitespace(t *testing.T) {
+	got, err := ParseCents("\t3.05 ")
+	if err != nil || got != 305 {
+		t.Errorf("ParseCents with padding = %d, %v; want 305", got, err)
+	}
+}

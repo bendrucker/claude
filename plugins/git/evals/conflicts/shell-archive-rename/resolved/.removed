@@ -1,0 +1,4 @@
+bin/backup
+bin/archive.sh
+scripts/backup.sh
+scripts/archive.sh

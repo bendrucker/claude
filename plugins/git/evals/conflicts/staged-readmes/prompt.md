@@ -1,1 +1,1 @@
-Resolve these merge conflicts.
+/git:conflicts

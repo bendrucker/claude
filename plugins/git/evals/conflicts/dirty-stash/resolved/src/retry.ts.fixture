@@ -1,0 +1,21 @@
+export interface RetryOptions {
+  attempts: number;
+  delayMs: number;
+  shouldRetry?: (error: unknown) => boolean;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function retry<T>(fn: () => Promise<T>, options: RetryOptions): Promise<T> {
+  let last: unknown;
+  for (let i = 0; i < options.attempts; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      last = error;
+      if (options.shouldRetry && !options.shouldRetry(error)) throw error;
+      await sleep(options.delayMs * 2 ** i);
+    }
+  }
+  throw last;
+}

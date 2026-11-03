@@ -1,0 +1,32 @@
+diff --git a/bun.lock b/bun.lock
+index 59ff6ec..4cb9546 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -8,6 +8,7 @@
+     "packages/api": {
+       "name": "@union/api",
+       "dependencies": {
++        "yaml": "^2.8.0",
+         "zod": "^4.4.3",
+       },
+     },
+@@ -23,6 +24,8 @@
+ 
+     "@union/web": ["@union/web@workspace:packages/web"],
+ 
++    "yaml": ["yaml@2.8.0", "", { "bin": { "yaml": "bin.mjs" } }, "sha512-4lLa/EcQCB0cJkyts+FpIRx5G/llPxfP6VQU5KByHEhLxY3IJCH0f0Hy1MHI8sClTvsIb8qwRJ6R/ZdlDJ/leQ=="],
++
+     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
+   }
+ }
+diff --git a/packages/api/package.json b/packages/api/package.json
+index 0ad4f6b..5e23299 100644
+--- a/packages/api/package.json
++++ b/packages/api/package.json
+@@ -2,5 +2,5 @@
+   "name": "@union/api",
+   "private": true,
+   "type": "module",
+-  "dependencies": { "zod": "^4.4.3" }
++  "dependencies": { "yaml": "^2.8.0", "zod": "^4.4.3" }
+ }

@@ -1,0 +1,17 @@
+def _amount(line):
+    return line["qty"] * line["price"]
+
+
+def invoice_total(lines, tax_rate):
+    subtotal = sum(_amount(line) for line in lines)
+    return round(subtotal * (1 + tax_rate), 2)
+
+
+def summarize(invoices, tax_rate=0.08):
+    totals = {inv["id"]: invoice_total(inv["lines"], tax_rate) for inv in invoices}
+    return {
+        "count": len(totals),
+        "total": round(sum(totals.values()), 2),
+        "largest": max(totals, key=totals.get) if totals else None,
+        "refunded": sum(1 for inv in invoices for line in inv["lines"] if line.get("refunded")),
+    }

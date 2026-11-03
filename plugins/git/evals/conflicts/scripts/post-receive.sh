@@ -11,6 +11,11 @@ while read -r _ new ref; do
   rm -rf "$work/.eval-pushed-tree"
   mkdir -p "$work/.eval-pushed-tree"
   git archive "$new" | tar -x -C "$work/.eval-pushed-tree"
+  if [ -f "$hooks/eval-branches" ]; then
+    rm -rf "$work/.eval-pushed-trees/${ref#refs/heads/}"
+    mkdir -p "$work/.eval-pushed-trees/${ref#refs/heads/}"
+    git archive "$new" | tar -x -C "$work/.eval-pushed-trees/${ref#refs/heads/}"
+  fi
   {
     wgd="$work/.git"
     if [ -d "$wgd/rebase-merge" ] || [ -d "$wgd/rebase-apply" ] || [ -f "$wgd/MERGE_HEAD" ] || [ -f "$wgd/CHERRY_PICK_HEAD" ]; then

@@ -1,0 +1,21 @@
+package ledger
+
+import "testing"
+
+func TestParseCents(t *testing.T) {
+	cases := []struct {
+		in   string
+		want int
+	}{
+		{"12.50", 1250},
+		{"7", 700},
+		{"-0.50", -50},
+		{" 12.50\n", 1250},
+	}
+	for _, c := range cases {
+		got, err := ParseCents(c.in)
+		if err != nil || got != c.want {
+			t.Errorf("ParseCents(%q) = %d, %v; want %d", c.in, got, err, c.want)
+		}
+	}
+}

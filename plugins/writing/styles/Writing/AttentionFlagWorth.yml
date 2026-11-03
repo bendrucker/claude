@@ -8,27 +8,27 @@ ignorecase: true
 tokens:
   - '\bworth\s+(?:noting|knowing|flagging|mentioning|saying|stating|naming|recording|remembering|a\s+look|your\s+(?:attention|awareness|time|call))\b'
 tests:
-  - name: "flags Two things worth flagging before this merges."
+  - name: "flags worth plus a gerund of attention"
     input: |
       Two things worth flagging before this merges.
     contains: [Writing.AttentionFlagWorth]
-  - name: "flags Also worth noting for the rollout: the flag defaults off."
+  - name: "flags the wrapper before a colon"
     input: |
       Also worth noting for the rollout: the flag defaults off.
     contains: [Writing.AttentionFlagWorth]
-  - name: "flags One caveat worth your attention."
+  - name: "flags worth with a possessive object"
     input: |
       One caveat worth your attention.
     contains: [Writing.AttentionFlagWorth]
-  - name: "allows The refactor is worth doing before the freeze."
+  - name: "allows worth plus an action gerund"
     input: |
       The refactor is worth doing before the freeze.
     absent: Writing.AttentionFlagWorth
-  - name: "allows That tradeoff is not worth it."
+  - name: "allows worth as a value judgment"
     input: |
       That tradeoff is not worth it.
     absent: Writing.AttentionFlagWorth
-  - name: "allows The fix is worth confirming against staging."
+  - name: "allows worth plus a verification gerund"
     input: |
       The fix is worth confirming against staging.
     absent: Writing.AttentionFlagWorth

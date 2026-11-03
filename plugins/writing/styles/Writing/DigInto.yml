@@ -10,35 +10,35 @@ ignorecase: true
 tokens:
   - '(?:dig|digs|digging|dug|dive|dives|diving|dove|dived|wade|wades|wading|waded)\s+into'
 tests:
-  - name: "flags Let's dig into the codebase."
+  - name: "flags the base form dig"
     input: |
       Let's dig into the codebase.
     contains: [Writing.DigInto]
-  - name: "flags I dug into the parser internals."
+  - name: "flags the irregular past dug"
     input: |
       I dug into the parser internals.
     contains: [Writing.DigInto]
-  - name: "flags She dove into the schema migration."
+  - name: "flags the irregular past dove"
     input: |
       She dove into the schema migration.
     contains: [Writing.DigInto]
-  - name: "flags We're digging into the root cause."
+  - name: "flags the progressive digging"
     input: |
       We're digging into the root cause.
     contains: [Writing.DigInto]
-  - name: "flags We'll dive into the data later."
+  - name: "flags the base form dive"
     input: |
       We'll dive into the data later.
     contains: [Writing.DigInto]
-  - name: "flags The audit dives into each subsystem."
+  - name: "flags the third-person dives"
     input: |
       The audit dives into each subsystem.
     contains: [Writing.DigInto]
-  - name: "allows She dug a trench."
+  - name: "allows a literal dig without into"
     input: |
       She dug a trench.
     absent: Writing.DigInto
-  - name: "allows Water drains into the basin."
+  - name: "allows into after another verb"
     input: |
       Water drains into the basin.
     absent: Writing.DigInto

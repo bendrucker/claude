@@ -8,23 +8,23 @@ ignorecase: true
 tokens:
   - '\breach(?:ing|es|ed)?\s+for\b'
 tests:
-  - name: "flags Open a sibling pane rather than reaching for Bash."
+  - name: "flags the gerund reaching"
     input: |
       Open a sibling pane rather than reaching for Bash.
     contains: [Writing.ReachingFor]
-  - name: "flags Reach for the linter before the formatter."
+  - name: "flags the imperative reach"
     input: |
       Reach for the linter before the formatter.
     contains: [Writing.ReachingFor]
-  - name: "flags She reaches for the shell first."
+  - name: "flags the third-person reaches"
     input: |
       She reaches for the shell first.
     contains: [Writing.ReachingFor]
-  - name: "allows She reached the summit by noon."
+  - name: "allows reach with a direct object"
     input: |
       She reached the summit by noon.
     absent: Writing.ReachingFor
-  - name: "allows The fix is within reach."
+  - name: "allows reach as a noun"
     input: |
       The fix is within reach.
     absent: Writing.ReachingFor

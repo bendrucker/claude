@@ -10,19 +10,19 @@ ignorecase: true
 tokens:
   - 'would\s+you\s+like'
 tests:
-  - name: "flags Would you like me to retry?"
+  - name: "flags an offer to act"
     input: |
       Would you like me to retry?
     contains: [Writing.HedgingClose]
-  - name: "flags Would you like a summary?"
+  - name: "flags an offer of an artifact"
     input: |
       Would you like a summary?
     contains: [Writing.HedgingClose]
-  - name: "allows I would like to understand your goal."
+  - name: "allows a first-person wish"
     input: |
       I would like to understand your goal.
     absent: Writing.HedgingClose
-  - name: "allows They would like a design review."
+  - name: "allows a third-person wish"
     input: |
       They would like a design review.
     absent: Writing.HedgingClose

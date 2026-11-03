@@ -13,7 +13,7 @@ Start a separate Claude session that takes a task through to its own PR while th
 
 ## Write the Prompt
 
-Write the prompt to a file under `tmp/`. The dispatched session starts with no context from this one, so state the goal, the files to read, what is already ruled out, and the completion criterion. Keep it under 128KB. For larger material, point the session at a file. The script appends this session's name, its Rex block or herdr pane, and the address another machine uses for this one. The dispatched session sends its replies with `SendMessage` to that name.
+Write the prompt to a file under `tmp/` from what this conversation already knows. The dispatched session starts with no context from this one, so state the goal, what is already ruled out, and the completion criterion, and name any files this conversation has already found. It reads the repository itself, so go straight from the request to the prompt without exploring the code first. Keep it under 128KB. For larger material, point the session at a file. The script appends this session's name, its Rex block or herdr pane, and the address another machine uses for this one. The dispatched session sends its replies with `SendMessage` to that name.
 
 ## Flags
 

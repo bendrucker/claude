@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadColumn } from "./column";
-import { render } from "./compare";
+import { costRatios, render } from "./compare";
 import { erroredRuns, readResult } from "./result";
 import { loadTags } from "./suite";
 import { traceMeasures } from "./trace";
@@ -15,6 +15,8 @@ interface RunSpec {
   /** Fields of the trace's result line beside the reply. */
   stats?: Record<string, unknown>;
   error?: string | null | undefined;
+  costUsd?: number | undefined;
+  turns?: number | undefined;
 }
 
 /** Writes an aggregate-result.json with one case per entry, and a trace for each run with a reply. */
@@ -48,6 +50,8 @@ async function result(cases: Record<string, Record<string, RunSpec[]>>): Promise
               explanation,
             })),
             error: run.error,
+            costUsd: run.costUsd,
+            turns: run.turns,
           };
         }),
       ]),
@@ -90,6 +94,9 @@ describe("loadColumn", () => {
       tokens: [500, 900],
       cost: [0.1, 0.3],
       errored: 0,
+      runCost: [],
+      runTurns: [],
+      missingCost: 2,
       graders: new Map([
         ["fact", [true, false]],
         ["fired (indicator)", [true, false]],
@@ -244,4 +251,73 @@ test("marks a case whose errored runs left the pool", async () => {
   const next = await result({ c: { with: [{ ...pass(), error: "exit 1: session limit" }] } });
   const columns = await Promise.all([loadColumn([base]), loadColumn([next])]);
   expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain("c/with!");
+});
+
+describe("cost and turns", () => {
+  const costed = (costUsd: number | undefined, turns = 3): RunSpec => ({
+    score: 1,
+    graders: [["fact", true]],
+    costUsd,
+    turns,
+  });
+  const load = async (...paths: Record<string, Record<string, RunSpec[]>>[]) =>
+    Promise.all(paths.map(async (cases) => loadColumn([await result(cases)])));
+
+  test.each<{ name: string; candidate: number[]; ratio: number }>([
+    { name: "below the threshold", candidate: [0.15, 0.15, 0.15], ratio: 1.5 },
+    { name: "at the threshold", candidate: [0.2, 0.2, 0.2], ratio: 2 },
+    { name: "above the threshold", candidate: [0.3, 0.3, 0.3], ratio: 3 },
+  ])("ratios candidate to base median $name", async ({ candidate, ratio }) => {
+    const columns = await load(
+      { c: { with: [0.1, 0.1, 0.1].map((x) => costed(x)) } },
+      { c: { with: candidate.map((x) => costed(x)) } },
+    );
+    expect(costRatios(columns).ratios[0]).toBeCloseTo(ratio);
+    expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain(
+      `x${ratio.toFixed(2)})`,
+    );
+  });
+
+  test("skips a run missing costUsd and counts it", async () => {
+    const columns = await load(
+      { c: { with: [costed(0.1), costed(undefined)] } },
+      { c: { with: [costed(0.2), costed(0.2)] } },
+    );
+    const { ratios, missing } = costRatios(columns);
+    expect([ratios[0], missing]).toEqual([2, [1, 0]]);
+    expect(render({ columns, labels: ["base", "next"], alpha: 0.1 })).toContain(
+      "missing costUsd: base 1, next 0",
+    );
+  });
+
+  test.each<{ name: string; runs: [number, number][]; cost: string; turns: string }>([
+    {
+      name: "an odd run count",
+      runs: [
+        [0.3, 9],
+        [0.1, 1],
+        [0.2, 5],
+      ],
+      cost: "0.200",
+      turns: "5.0",
+    },
+    {
+      name: "an even run count",
+      runs: [
+        [0.4, 8],
+        [0.1, 2],
+        [0.2, 4],
+        [0.3, 6],
+      ],
+      cost: "0.250",
+      turns: "5.0",
+    },
+  ])("reports per-case medians over $name", async ({ runs, cost, turns }) => {
+    const [column = new Map()] = await load({
+      c: { with: runs.map(([c, t]) => costed(c, t)) },
+    });
+    const out = render({ columns: [column], labels: ["run"], alpha: 0.1 });
+    expect(out).toMatch(new RegExp(`c/with\\s*│\\s*${cost}`));
+    expect(out).toMatch(new RegExp(`c/with\\s*│\\s*${turns}`));
+  });
 });

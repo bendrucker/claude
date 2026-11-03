@@ -93,6 +93,7 @@ describe("scan following imports", () => {
         "See @docs/a.md for access control.",
         "@AGENTS.md",
         "@chain/1.md",
+        "@..notes.md",
         "@../sibling.md",
         "@docs/missing.md",
         "",
@@ -104,6 +105,7 @@ describe("scan following imports", () => {
         "",
       ].join("\n"),
       "AGENTS.md": `${flagged}@CLAUDE.md\n`,
+      "..notes.md": flagged,
       "docs/a.md": `${flagged}@b.md\n`,
       "docs/b.md": `${flagged}@a.md\n`,
       "docs/fenced.md": flagged,
@@ -133,6 +135,7 @@ describe("scan following imports", () => {
     const { alerts } = await scan([join(root, path)], all);
     expect([...alerts.keys()].toSorted()).toEqual(
       [
+        "..notes.md",
         "AGENTS.md",
         "chain/1.md",
         "chain/2.md",

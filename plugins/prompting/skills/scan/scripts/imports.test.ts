@@ -16,6 +16,9 @@ describe("importPaths", () => {
     ["a backtick fence", "```md\n@docs/a.md\n```\n@b.md", ["b.md"]],
     ["a tilde fence", "~~~\n@docs/a.md\n```\n@c.md\n~~~\n@b.md", ["b.md"]],
     ["an unclosed fence", "@a.md\n```\n@b.md", ["a.md"]],
+    ["a fence in a list item", "- Example:\n  ```\n  @a.md\n  ```\n- @b.md", ["b.md"]],
+    ["an indented code block", "Text.\n\n    @a.md\n\n@b.md", ["b.md"]],
+    ["an astral character before an import", "😀 `x` @b.md", ["b.md"]],
   ])("%s", (_label, text, expected) => {
     expect(importPaths(text)).toEqual(expected);
   });

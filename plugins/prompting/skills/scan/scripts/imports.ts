@@ -1,5 +1,7 @@
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fromMarkdown } from "mdast-util-from-markdown";
+import { visit } from "unist-util-visit";
 
 // https://code.claude.com/docs/en/memory#import-additional-files
 export const MAX_HOPS = 4;
@@ -8,9 +10,6 @@ export const MAX_HOPS = 4;
 export const IMPORTERS = new Set(["CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"]);
 
 const SKIPPED_DIRS = new Set(["node_modules", ".git", "fixtures", "__snapshots__", "evals"]);
-
-const FENCE = /^ {0,3}(`{3,}|~{3,})/;
-const CODE_SPAN = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g;
 const IMPORT = /(?:^|\s)@((?:[^\s\\]|\\ )+)/g;
 
 export interface Unscanned {
@@ -19,33 +18,25 @@ export interface Unscanned {
   reason: "outside the scanned paths" | "missing";
 }
 
-function* outsideFences(text: string): Generator<string> {
-  let fence: string | undefined;
-  let run: string[] = [];
-  for (const line of text.split("\n")) {
-    const marker = FENCE.exec(line)?.[1];
-    if (fence === undefined) {
-      if (marker === undefined) {
-        run.push(line);
-        continue;
-      }
-      yield run.join("\n");
-      run = [];
-      fence = marker;
-    } else if (marker?.startsWith(fence) && line.trim() === marker) {
-      fence = undefined;
-    }
-  }
-  yield run.join("\n");
+function blankCode(text: string): string {
+  let blanked = text;
+  visit(fromMarkdown(text), (node) => {
+    if (node.type !== "code" && node.type !== "inlineCode") return;
+    const { start, end } = node.position ?? {};
+    if (start?.offset === undefined || end?.offset === undefined) return;
+    blanked =
+      blanked.slice(0, start.offset) +
+      " ".repeat(end.offset - start.offset) +
+      blanked.slice(end.offset);
+  });
+  return blanked;
 }
 
 /** The `@path` imports in a markdown document, in order, with escaped spaces unescaped. */
 export function importPaths(text: string): string[] {
   const paths: string[] = [];
-  for (const prose of outsideFences(text)) {
-    for (const match of prose.replaceAll(CODE_SPAN, " ").matchAll(IMPORT)) {
-      paths.push((match[1] ?? "").replaceAll(String.raw`\ `, " "));
-    }
+  for (const match of blankCode(text).matchAll(IMPORT)) {
+    paths.push((match[1] ?? "").replaceAll(String.raw`\ `, " "));
   }
   return paths;
 }
@@ -57,7 +48,7 @@ export function resolveImport(path: string, from: string): string {
 
 function inside(path: string, root: string): boolean {
   const rel = relative(root, path);
-  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  return rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
 }
 
 /** The directory each scanned path covers, so a named file covers its siblings. */

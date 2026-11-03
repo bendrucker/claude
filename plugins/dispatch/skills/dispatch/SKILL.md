@@ -3,6 +3,7 @@ name: dispatch
 description: >-
   Hand new work bound for its own pull request to a fresh Claude session in a new worktree, opened in a Rex tab or a herdr workspace with its permissions written ahead of time. Use when a task should run beside this session rather than inside it, including a change this session found that belongs in another branch or repository. Not for re-rooting this session (`worktrunk:wt-switch-create`) or in-session subagents (`Agent`).
 argument-hint: "--branch <branch | pr:<n> | mr:<n>> --prompt <file>"
+effort: low
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
 ---

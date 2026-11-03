@@ -70,7 +70,9 @@ async function printScores(
     documents(paths, all ? `**/${DOCUMENTS}` : AGENT_FACING),
     scanRoots(paths),
   ]);
-  console.error(renderScores(await scoreFiles([...files, ...imports], alerts), roots));
+  const linted = new Bun.Glob(`**/${DOCUMENTS}`);
+  const scored = [...files, ...imports.filter((path) => linted.match(path))];
+  console.error(renderScores(await scoreFiles(scored, alerts), roots));
 }
 
 export const program = new Command("scan")

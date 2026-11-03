@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { AGENT_FACING, DOCUMENTS, scan } from "./scan";
-import { documents, renderScores, rootLabel, scoreFiles, wordCount } from "./score";
+import { commonRoot, documents, renderScores, scoreFiles, wordCount } from "./score";
 
 describe("wordCount", () => {
   test.each([
@@ -21,20 +21,16 @@ describe("wordCount", () => {
   });
 });
 
-describe("rootLabel", () => {
+describe("commonRoot", () => {
   test.each([
-    ["relative to a single root", "/org/a/CLAUDE.md", ["/org/a"], "CLAUDE.md"],
-    [
-      "under the root's name across roots",
-      "/org/b/x/SKILL.md",
-      ["/org/a", "/org/b"],
-      "b/x/SKILL.md",
-    ],
-    ["against the deepest root", "/org/a/x/SKILL.md", ["/org", "/org/a/x"], "x/SKILL.md"],
-    ["absolute outside every root", "/elsewhere/CLAUDE.md", ["/org/a"], "/elsewhere/CLAUDE.md"],
-    ["without matching a root's name prefix", "/org/ab/CLAUDE.md", ["/org/a"], "/org/ab/CLAUDE.md"],
-  ])("labels %s", (_label, path, roots, expected) => {
-    expect(rootLabel(path, roots)).toBe(expected);
+    ["a single root", ["/org/a"], "/org/a"],
+    ["sibling roots", ["/org/a", "/org/b"], "/org"],
+    ["same-named roots", ["/p/prompting/skills/scan", "/p/writing/skills/scan"], "/p"],
+    ["nested roots", ["/org", "/org/a/x"], "/org"],
+    ["a shared name prefix", ["/org/a", "/org/ab"], "/org"],
+    ["disjoint roots", ["/a", "/b"], "/"],
+  ])("finds the ancestor of %s", (_label, roots, expected) => {
+    expect(commonRoot(roots)).toBe(expected);
   });
 });
 

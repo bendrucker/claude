@@ -1,5 +1,5 @@
 import { readdir } from "node:fs/promises";
-import { basename, join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { table } from "table";
 import { visit } from "unist-util-visit";
@@ -71,19 +71,27 @@ function density(alerts: number, words: number): string {
   return ((alerts * 1000) / words).toFixed(2);
 }
 
-/** `path` relative to the deepest root holding it, under that root's name when there are several. */
-export function rootLabel(path: string, roots: readonly string[]): string {
-  const root = roots
-    .filter((dir) => path === dir || path.startsWith(dir.endsWith(sep) ? dir : dir + sep))
-    .toSorted((a, b) => b.length - a.length)[0];
-  if (root === undefined) return path;
-  const rel = relative(root, path);
-  return roots.length > 1 ? join(basename(root), rel) : rel;
+/** The deepest directory holding every one of `roots`, which are absolute. */
+export function commonRoot(roots: readonly string[]): string {
+  const [first = [], ...rest] = roots.map((root) => root.split(sep));
+  let depth = first.length;
+  for (const parts of rest) {
+    depth = Math.min(depth, parts.length);
+    while (depth > 0 && parts.slice(0, depth).some((part, i) => part !== first[i])) depth--;
+  }
+  const common = first.slice(0, depth).join(sep);
+  return common === "" ? sep : common;
+}
+
+function displayPath(path: string, base: string): string {
+  const rel = relative(base, path);
+  return rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel) ? path : rel;
 }
 
 export function renderScores(scores: readonly FileScore[], roots: readonly string[]): string {
+  const base = commonRoot(roots);
   const rows = scores
-    .map((score) => [rootLabel(score.path, roots), score.alerts, score.words] as const)
+    .map((score) => [displayPath(score.path, base), score.alerts, score.words] as const)
     .toSorted((a, b) => a[0].localeCompare(b[0]))
     .map(([label, alerts, words]) => [
       label,

@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
-import { relative } from "node:path";
+import { relative, resolve } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
+import { followImports, importers, scanRoots, type Unscanned } from "./imports";
 import { type Alert, lint } from "./vale";
 
 // Pass `--all` for a prompt that lives somewhere else, such as a string in a
@@ -13,8 +14,24 @@ export const AGENT_FACING =
 // prose check.
 export const DOCUMENTS = "*.{md,txt}";
 
-export function scan(paths: readonly string[], all: boolean): Promise<Map<string, Alert[]>> {
-  return lint(paths, { glob: all ? DOCUMENTS : AGENT_FACING });
+export interface ScanResult {
+  alerts: Map<string, Alert[]>;
+  unscanned: Unscanned[];
+}
+
+// A memory file loads its `@path` imports into context, so they are scanned
+// too, through `DOCUMENTS` because they rarely match `AGENT_FACING`.
+export async function scan(paths: readonly string[], all: boolean): Promise<ScanResult> {
+  const sources = await importers(paths, (name) => all || name !== "CLAUDE.local.md");
+  const [alerts, { targets, unscanned }] = await Promise.all([
+    lint(paths, { glob: all ? DOCUMENTS : AGENT_FACING }),
+    scanRoots(paths).then((roots) => followImports(sources, roots)),
+  ]);
+  const reported = new Set([...alerts.keys()].map((path) => resolve(path)));
+  for (const [path, found] of await lint(targets, { glob: DOCUMENTS })) {
+    if (!reported.has(resolve(path))) alerts.set(path, found);
+  }
+  return { alerts, unscanned };
 }
 
 export function fails(alerts: Map<string, Alert[]>): boolean {
@@ -65,7 +82,10 @@ if (import.meta.main) {
   });
 
   const paths = argv._.paths.length > 0 ? argv._.paths : ["."];
-  const alerts = await scan(paths, argv.flags.all);
+  const { alerts, unscanned } = await scan(paths, argv.flags.all);
+  for (const { from, path, reason } of unscanned) {
+    console.error(`${label(from)}: unscanned import @${path} (${reason})`);
+  }
   for (const [path, found] of alerts) {
     const name = label(path);
     for (const alert of found) {

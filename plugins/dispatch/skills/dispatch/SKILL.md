@@ -15,19 +15,19 @@ Start a separate Claude session that takes a task through to its own PR while th
 
 Write the prompt to a file under `tmp/`. The dispatched session starts with no context from this one, so state the goal, the files to read, what is already ruled out, and the completion criterion. Keep it under 128KB. For larger material, point the session at a file. The script appends this session's name, its Rex block or herdr pane, and the address another machine uses for this one. The dispatched session sends its replies with `SendMessage` to that name.
 
+## Flags
+
+`--help`, run for this session:
+
+!`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help`
+
 ## Grant Permissions
 
-Pass the permissions the task needs so the session runs without prompting for them:
-
-- `--allow <rule>`: a `permissions.allow` rule, such as `"Bash(bun test:*)"`. Repeatable.
-- `--sandbox-write <path>`: a `sandbox.filesystem.allowWrite` path outside the worktree, such as `~/.cache/<tool>`. Repeatable.
-- `--settings-json <file>`: any other settings, deep-merged.
-
-The script merges these into the worktree's `.claude/settings.local.json`, keeping existing keys and skipping array entries already present. It refuses to write when that file is not git-ignored.
+Pass the permissions the task needs with `--allow`, `--sandbox-write`, and `--settings-json` so the session runs without prompting for them. The script merges them into the worktree's `.claude/settings.local.json`, keeping existing keys and skipping array entries already present. It refuses to write when that file is not git-ignored.
 
 ## Pick the Multiplexer
 
-Dispatch into the multiplexer hosting this session, which `--mux` defaults to. Outside one, or when the script reports Rex and herdr nested, ask the user with `AskUserQuestion` and pass the answer as `--mux`. List the options in this order:
+`--help` above names the multiplexer `--mux` defaults to. When it says to pass `--mux` instead, ask the user with `AskUserQuestion` and pass the answer as `--mux`. List the options in this order:
 
 1. `rex`: a Rex tab.
 2. `herdr`: a herdr workspace.
@@ -36,16 +36,12 @@ Dispatch into the multiplexer hosting this session, which `--mux` defaults to. O
 ## Run It
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...
+bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...
 ```
 
-- `--branch` takes a branch name, `pr:<n>`, `mr:<n>`, or a PR or MR URL. A branch that exists locally or on a remote is reused, and a branch that already has a worktree opens there. Only a branch that exists nowhere is created. `wt` resolves a PR or MR to its head branch.
-- `--base` applies only to a branch being created. It defaults to `origin/main`, fetched first.
-- `--name` defaults to a slug of the branch.
-- Under Rex the session opens in a new tab labeled with the branch. `--split` opens it in a pane to the right of this one instead. From outside Rex, pass `--session <id or label>` from `rex ls`.
-- `--timeout` (ms, default 30000) bounds the wait for the session to start.
-
-Run `--help` for the rest.
+- `--repo` defaults to this session's repository, shown in `--help` above. Pass it only to dispatch into another repository.
+- A branch that exists locally or on a remote is reused, and a branch that already has a worktree opens there. `wt` resolves a PR or MR to its head branch. `--base` applies only to a branch being created, and is fetched first.
+- Under Rex the session opens in a new tab labeled with the branch. From outside Rex, pass `--session <id or label>` from `rex ls`.
 
 ## Other Machines
 

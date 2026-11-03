@@ -394,6 +394,14 @@ export function detectMux(env: Readonly<Record<string, string | undefined>>): Mu
   throw new Error("no multiplexer hosts this session; pass --mux rex, --mux herdr, or --mux bg");
 }
 
+export function describeMuxDefault(env: Readonly<Record<string, string | undefined>>): string {
+  try {
+    return `defaults to ${detectMux(env)}, the multiplexer hosting this session`;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
 // Variables the launching session set for itself would bind a background
 // session to this one. Settings re-apply their own env in the new session.
 export function detachedEnv(
@@ -1251,8 +1259,7 @@ if (import.meta.main) {
       },
       mux: {
         type: String,
-        description:
-          "rex, herdr, or bg (claude --bg); defaults to the multiplexer hosting this session",
+        description: `rex, herdr, or bg (claude --bg); ${describeMuxDefault(process.env)}`,
       },
       session: {
         type: String,

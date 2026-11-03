@@ -2,7 +2,7 @@
 name: prose-lab
 description: Turn the user's labels on repo prose, or their notes from reviewing a document in Plannotator, into calibrated Vale rules.
 disable-model-invocation: true
-argument-hint: "[review <file>] [--corpus skills|agent-facing|all]"
+argument-hint: "[review <file>] [--corpus skills|agent-facing|all] [--repo <path>...]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/../../../packages/prose-lab/lab.ts:*)
   - Read
@@ -20,15 +20,16 @@ Run every command as `bun ${CLAUDE_SKILL_DIR}/../../../packages/prose-lab/lab.ts
 
 ## Arguments
 
-- `--corpus <name>`: the documents `sweep` lints. Default: `skills`.
+- `--corpus <name>`: the documents `sweep` lints. Default: `skills`. On `status` and `serve`, it limits the ratings, calls, and deck to hits in that corpus's files, so `status --corpus agent-facing` rates a check on prompts apart from prose a person reads.
+- `--repo <path>`, repeatable: `sweep` also lints the corpus in that checkout. Its hits' files read `name:path`, where `name` is the checkout's directory. Keep another repo's paths and quotes in the lab data, out of commits and PR bodies.
 
 ## Flag
 
-Run `sweep --corpus all --wide`, which also reports the checks the plugin configs turn off. Start `propose` and `serve` in the background, and hand the user the URL. `propose` asks a model for spans the rules miss, one call per file, and its cards join the deck as `Model.Proposed` as they arrive.
+Run `sweep --corpus all --wide`, with a `--repo` for each checkout the user named. `--wide` also reports the checks the plugin configs turn off. Start `propose` and `serve` in the background, and hand the user the URL. `propose` asks a model for spans the rules miss, one call per file, and its cards join the deck as `Model.Proposed` as they arrive.
 
 The cards tab shows one hit at a time without its check, choosing the undecided check with the widest interval. A vote on a span judges every check with a hit on it. The sample tab lists hits per check, and the document tab flags spans that neither the rules nor the model marked. Stop until the user says the sitting is done.
 
-Then run `status`, which calls each check decided past ten judged hits. Propose each `enable` and `retire` call to the user with its counts. An accepted `enable` flips the check's line in the plugin's `.vale.ini` per `.claude/rules/vale-styles.md`. Retire through Retire. Take the `Model.Proposed` hits labeled right to Group, since they name patterns the rules miss.
+Then run `status`, which calls each check decided past ten judged hits. Run it again with `--corpus agent-facing` to rate checks on prompts alone. Propose each `enable` and `retire` call to the user with its counts. An accepted `enable` flips the check's line in the plugin's `.vale.ini` per `.claude/rules/vale-styles.md`. Retire through Retire. Take the `Model.Proposed` hits labeled right to Group, since they name patterns the rules miss.
 
 ## Review
 
@@ -49,6 +50,8 @@ Pre-judge the hits `score` queues with `label <id> --verdict ... --pattern <slug
 ## Promote
 
 Promote the candidate `status` reports as `ready`. Write it into `plugins/<plugin>/styles/<Style>/` with an `evidence:` header naming the labeled counts and a `retire when:` header. Add `vale test` cases from labeled examples, at least three right and three wrong. Run `vale --no-global --config=plugins/<plugin>/.vale.ini test plugins/<plugin>/styles/<Style>`. For a `Prompting` rule, also run the precision eval in `plugins/prompting/evals/rule-precision/`. Then record the check with `pattern <slug> --check <Style.Rule>`.
+
+A check `status --corpus agent-facing` calls `enable` or `keep` reaches `prompting:scan` here: turn an `ai-tells` check on in `plugins/prompting/.vale.ini`, or port a `Writing` rule into the `Prompting` style.
 
 When no candidate clears the floor, ship nothing. Record the trial (each candidate, its interval, and why it failed) in the commit that closes the round.
 

@@ -4,7 +4,18 @@ import * as gs from "@hegeldev/hegel/generators";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { countWords, lintFiles, markShipped, PLUGINS } from "./corpus";
+import { $ } from "bun";
+import { z } from "zod";
+import {
+  checkouts,
+  corpusHits,
+  countWords,
+  filePath,
+  lintFiles,
+  markShipped,
+  PLUGINS,
+  sweep,
+} from "./corpus";
 import {
   assign,
   type Flag,
@@ -35,7 +46,7 @@ import { locate, toFlags } from "./review";
 import type { Message, QueryFn } from "../eval-judge/index";
 import { type Call, next, PROPOSED } from "./deck";
 import { propose, type Reply, resolve, spread } from "./propose";
-import { context, reveal } from "./server";
+import { context, reveal, serve } from "./server";
 import { checkRows } from "./status";
 
 function hit(file: string, line: number, span: [number, number], check = "Writing.X"): Hit {
@@ -690,9 +701,109 @@ describe("propose", () => {
     const data = store(dir);
     const swept = hit("a", 1, [1, 2]);
     const proposed = { ...hit("a", 2, [1, 2], PROPOSED), shipped: false };
-    await data.writeSweep({ corpus: "all", rev: "r", words: 1, hits: [swept] });
+    await data.writeSweep({ corpus: "all", rev: "r", words: 1, hits: [swept], repos: {} });
     await data.addProposals([{ file: "a", key: "k", asked: 1, hits: [proposed], ts: "t" }]);
     expect((await data.hits()).map((h) => h.check)).toEqual(["Writing.X", PROPOSED]);
     await rm(dir, { recursive: true });
+  });
+});
+
+describe("repos", () => {
+  const text = "# Doc\n\nThe box carries books; the shelf holds them.\n";
+  let tmp: string;
+  let main: string;
+  let org: string;
+  let docs: string;
+
+  async function repo(path: string, files: readonly string[]): Promise<string> {
+    await Promise.all(files.map((file) => Bun.write(join(path, file), text)));
+    await $`git -C ${path} init -q && git -C ${path} add -A && git -C ${path} -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -qm init`;
+    return (await $`git -C ${path} rev-parse --show-toplevel`.text()).trim();
+  }
+
+  beforeAll(async () => {
+    tmp = await mkdtemp(join(tmpdir(), "prose-lab-repos-"));
+    const files = ["skills/a/SKILL.md", "README.md"];
+    main = await repo(join(tmp, "main"), files);
+    org = await repo(join(tmp, "org"), files);
+    docs = join(tmp, "docs");
+  });
+  afterAll(() => rm(tmp, { recursive: true }));
+
+  test("checkouts names a repo by its top-level directory and rejects this repo and a repeated name", async () => {
+    expect(await checkouts([join(org, "skills")], main)).toEqual({ org });
+    expect(checkouts([main], main)).rejects.toThrow("this repo");
+    const twin = await repo(join(tmp, "twin", "org"), ["README.md"]);
+    expect(checkouts([org, twin], main)).rejects.toThrow("Two checkouts");
+  });
+
+  test("filePath resolves a prefixed file in its checkout and any other file in the root", () => {
+    expect(filePath("org:README.md", { org }, main)).toBe(join(org, "README.md"));
+    expect(filePath("README.md", { org }, main)).toBe(join(main, "README.md"));
+    expect(filePath("other:README.md", { org }, main)).toBe(join(main, "other:README.md"));
+  });
+
+  test("a sweep across checkouts keeps the same path in each repo apart, and a corpus narrows it", async () => {
+    const swept = await sweep("all", ["writing"], { root: main, docs, repos: { org } });
+    expect(swept.repos).toEqual({ org });
+    const files = [...new Set(swept.hits.map((h) => h.file))].toSorted();
+    expect(files).toEqual([
+      "README.md",
+      "org:README.md",
+      "org:skills/a/SKILL.md",
+      "skills/a/SKILL.md",
+    ]);
+    expect(new Set(swept.hits.map(hitId)).size).toBe(swept.hits.length);
+    const prompts = await corpusHits(swept.hits, "agent-facing", {
+      root: main,
+      docs,
+      repos: { org },
+    });
+    expect([...new Set(prompts.map((h) => h.file))].toSorted()).toEqual([
+      "org:skills/a/SKILL.md",
+      "skills/a/SKILL.md",
+    ]);
+  });
+
+  test("serve with a corpus deals and reads documents only from that corpus's files", async () => {
+    const data = store(join(tmp, "data"));
+    await data.writeSweep(await sweep("all", ["writing"], { root: main, docs, repos: { org } }));
+    const { server } = await serve(data, {
+      port: 0,
+      perCheck: 5,
+      root: main,
+      docs,
+      corpus: "agent-facing",
+    });
+    try {
+      const get = (path: string) => fetch(new URL(path, server.url));
+      const doc = await get("/api/doc?file=org:skills/a/SKILL.md");
+      expect(z.object({ lines: z.array(z.string()) }).parse(await doc.json()).lines).toEqual(
+        text.split("\n"),
+      );
+      expect((await get("/api/doc?file=org:README.md")).status).toBe(404);
+      const Next = z.object({ card: z.object({ file: z.string() }).nullable() });
+      const deal = async (dealt: string[]): Promise<string[]> => {
+        const { card } = Next.parse(await (await get("/api/next")).json());
+        return card === null ? dealt : deal([...dealt, card.file]);
+      };
+      const dealt = new Set(await deal([]));
+      expect([...dealt].every((file) => file.endsWith("SKILL.md"))).toBe(true);
+      expect(dealt.size).toBeGreaterThan(0);
+    } finally {
+      await server.stop(true);
+    }
+  });
+
+  test("propose reads a prefixed file from its checkout", async () => {
+    const query = fakeQuery({ spans: [{ line: 3, quote: "shelf holds", reason: "r" }] }, []);
+    const [result] = await propose({
+      files: ["org:README.md"],
+      existing: [],
+      root: main,
+      repos: { org },
+      query,
+    });
+    expect(result?.hits).toMatchObject([{ file: "org:README.md", match: "shelf holds" }]);
   });
 });

@@ -22,7 +22,13 @@ Point `cwd` at the main repo, never a worktree.
 
 ## Worktrees
 
-Start any change meant to become its own PR in a worktree created with `worktrunk:wt-switch-create`, even where the harness suggests `EnterWorktree`. When already on a topic branch in a worktree, stay there. Work handed to a sibling agent gets its worktree through `dispatch:dispatch`.
+Use one worktree per task. Work in a worktree by entering it. Commit only the current worktree's task to its branch.
+
+- New PR-bound work for this session: enter a new worktree with `worktrunk:wt-switch-create` or `EnterWorktree({name})`. From a worktree session, call `ExitWorktree({action: "keep"})` first, then enter.
+- Side work while this session keeps its task: spawn one `Agent({isolation: "worktree"})` per workstream, each committing and pushing its own branch.
+- Side work that needs its own session, and work in another repository: `dispatch:dispatch`.
+
+When already on a topic branch in a worktree, stay there.
 
 ## Multiplexers
 

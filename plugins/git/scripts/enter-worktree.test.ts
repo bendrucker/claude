@@ -167,7 +167,7 @@ describe("processInput", () => {
       cwd: () => managed,
       path: () => sibling,
       transcript: "entered",
-      reason: () => unmanagedReason(sibling, join(repo, ".claude", "worktrees")),
+      reason: () => unmanagedReason(sibling),
     },
     {
       name: "unmanaged target from the main checkout before switching",
@@ -249,16 +249,22 @@ describe("processInput", () => {
   });
 });
 
+const reasons = {
+  same: sameDirectoryReason("/src/repo/.worktrees/topic"),
+  crossRepo: crossRepoReason("/src/other/.worktrees/topic"),
+  unmanaged: unmanagedReason("/src/repo/.worktrees/topic"),
+};
+
 test("reasons", () => {
-  expect({
-    same: sameDirectoryReason("/src/repo/.worktrees/topic"),
-    crossRepo: crossRepoReason("/src/other/.worktrees/topic"),
-    unmanaged: unmanagedReason("/src/repo/.worktrees/topic", "/src/repo/.claude/worktrees"),
-  }).toMatchInlineSnapshot(`
+  expect(reasons).toMatchInlineSnapshot(`
     {
-      "crossRepo": "\`/src/other/.worktrees/topic\` belongs to a different repository than this session, and EnterWorktree only enters worktrees of the session's own repository. For read-only work, spawn an \`Agent\` with \`cwd\` set to \`/src/other/.worktrees/topic\`.",
+      "crossRepo": "\`/src/other/.worktrees/topic\` belongs to a different repository than this session, and EnterWorktree only enters worktrees of the session's own repository. Hand edits there to \`dispatch:dispatch\`. For read-only inspection, spawn an \`Agent\` with \`cwd\` set to \`/src/other/.worktrees/topic\`.",
       "same": "\`/src/repo/.worktrees/topic\` is already the working directory. Keep working here.",
-      "unmanaged": "This session has already switched into a worktree, and from here EnterWorktree only enters worktrees under \`/src/repo/.claude/worktrees/\`. Work in \`/src/repo/.worktrees/topic\` from the current session with \`git -C /src/repo/.worktrees/topic\` and absolute paths.",
+      "unmanaged": "This session is already in a worktree session, which blocks a direct switch to \`/src/repo/.worktrees/topic\`. Commit or leave the current work in place, since it stays in the current worktree. Then call \`ExitWorktree({action: "keep"})\` to return to the launch directory, and call \`EnterWorktree({path: "/src/repo/.worktrees/topic"})\` again.",
     }
   `);
+});
+
+test.each(Object.entries(reasons))("%s reason never prescribes git -C", (_, reason) => {
+  expect(reason).not.toContain("git -C");
 });

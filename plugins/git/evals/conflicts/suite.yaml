@@ -10,3 +10,4 @@ graders:
   check-pass: [code-tests, code-tests-2, dir-rename, stacked-squash, lockfile-workspaces, lockfile-deps, lockfile-large, reformat-pass, codemod-rename, moved-edit, unit-change]
   left-for-user: "staged-*"
   not-pushed: "staged-*"
+collect: [.git/origin.git/hooks/eval-check.log]

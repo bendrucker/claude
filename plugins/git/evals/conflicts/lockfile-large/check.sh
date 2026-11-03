@@ -2,7 +2,7 @@
 set -euo pipefail
 hidden=$1
 branch=$2
-tmp=$(mktemp -d)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 lock=packages/app/package-lock.json
 git show "main:$lock" > "$tmp/main.json"

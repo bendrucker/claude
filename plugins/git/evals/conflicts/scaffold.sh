@@ -63,6 +63,10 @@ if [ -d "$case_dir/hidden" ]; then
     cp "$case_dir/hidden/$file" "$dest"
   done
 fi
+# A check's tools install here, outside the session's sandbox, since the sandbox's proxy refuses the registry.
+if [ -f "$case_dir/tools" ]; then
+  xargs npm install --prefix "$hooks/eval-tools" --ignore-scripts --no-audit --no-fund --loglevel=error < "$case_dir/tools" > /dev/null
+fi
 git rev-parse HEAD > "$hooks/eval-branch"
 chmod +x "$hooks"/*
 : > .eval-verdicts

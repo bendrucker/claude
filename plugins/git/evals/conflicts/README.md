@@ -50,7 +50,7 @@ Grading runs in the bare origin's [`post-receive`](scripts/post-receive.sh) hook
 - whether the pushed tree holds conflict markers
 - whether `main` is an ancestor of it
 - whether pushed files match the blobs in the case's `expect`, which `main` actually merged
-- the result of the case's `check.sh` (tests, a frozen lockfile install, or file locations), which runs only when the working tree is clean at the pushed commit. It receives the hooks directory's copy of the case's `hidden/`, tests and scripts the session never sees, and the branch's tip before the operation
+- the result of the case's `check.sh` (tests, a frozen lockfile install, or file locations), which runs only when the working tree is clean at the pushed commit. It receives the hooks directory's copy of the case's `hidden/`, tests and scripts the session never sees, and the branch's tip before the operation. Packages a case lists in `tools` install beside it at scaffold time, since the session's sandbox refuses the registry. It writes its output to the hooks directory's `eval-check.log`, which each run collects into `artifacts/`
 
 The hook writes only to those files. The session never sees a grade.
 

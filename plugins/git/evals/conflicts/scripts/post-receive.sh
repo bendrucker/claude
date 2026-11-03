@@ -25,8 +25,10 @@ while read -r _ new ref; do
     if [ -x "$hooks/eval-check" ]; then
       # The check runs in the working tree, so it counts only when that tree is exactly the pushed commit.
       if (unset GIT_DIR GIT_QUARANTINE_PATH GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+        # The eval sandbox denies writes to the system temp directory.
+        export TMPDIR="$hooks/tmp" && mkdir -p "$TMPDIR" &&
         cd "$work" && [ "$(git rev-parse HEAD)" = "$new" ] && [ -z "$(git status --porcelain)" ] &&
-          "$hooks/eval-check" "$hooks/eval-hidden" "$(cat "$hooks/eval-branch")") > /dev/null 2>&1; then
+          "$hooks/eval-check" "$hooks/eval-hidden" "$(cat "$hooks/eval-branch")") > "$hooks/eval-check.log" 2>&1; then
         echo "check: pass"
       else
         echo "check: fail"

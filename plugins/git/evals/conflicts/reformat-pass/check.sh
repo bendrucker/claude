@@ -3,10 +3,10 @@
 # usage: check.sh <hidden-dir>
 set -euo pipefail
 hidden=$1
-tree=$(mktemp -d)
+tree=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 trap 'rm -rf "$tree"' EXIT
 git archive HEAD | tar -x -C "$tree"
 cd "$tree"
-bunx prettier@3.9.10 --check .
+"$hidden/../eval-tools/node_modules/.bin/prettier" --check .
 cp -R "$hidden"/. "$tree"/
 bun test

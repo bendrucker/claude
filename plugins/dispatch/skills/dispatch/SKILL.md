@@ -15,11 +15,13 @@ Start a separate Claude session that takes a task through to its own PR while th
 
 Write the prompt to a file under `tmp/`. The dispatched session starts with no context from this one, so state the goal, the files to read, what is already ruled out, and the completion criterion. Keep it under 128KB. For larger material, point the session at a file. The script appends this session's name, its Rex block or herdr pane, and the address another machine uses for this one. The dispatched session sends its replies with `SendMessage` to that name.
 
-## Flags
+## This Session
 
-`--help`, run for this session:
+`--context`, run for this session:
 
-!`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help`
+!`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --context`
+
+Run `dispatch.ts --help` for a flag the usage line leaves out.
 
 ## Grant Permissions
 
@@ -27,7 +29,7 @@ Pass the permissions the task needs with `--allow`, `--sandbox-write`, and `--se
 
 ## Pick the Multiplexer
 
-`--help` above names the multiplexer `--mux` defaults to. When it says to pass `--mux` instead, ask the user with `AskUserQuestion` and pass the answer as `--mux`. List the options in this order:
+`mux` above names the multiplexer `--mux` defaults to. When it says to pass `--mux` instead, ask the user with `AskUserQuestion` and pass the answer as `--mux`. List the options in this order:
 
 1. `rex`: a Rex tab.
 2. `herdr`: a herdr workspace.
@@ -39,7 +41,7 @@ Pass the permissions the task needs with `--allow`, `--sandbox-write`, and `--se
 bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...
 ```
 
-- `--repo` defaults to this session's repository, shown in `--help` above. Pass it only to dispatch into another repository.
+- `--repo` defaults to this session's repository, shown as `repo` above. Pass it only to dispatch into another repository.
 - A branch that exists locally or on a remote is reused, and a branch that already has a worktree opens there. `wt` resolves a PR or MR to its head branch. `--base` applies only to a branch being created, and is fetched first.
 - Under Rex the session opens in a new tab labeled with the branch. From outside Rex, pass `--session <id or label>` from `rex ls`.
 

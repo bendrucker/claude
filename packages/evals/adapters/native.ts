@@ -21,12 +21,12 @@ const resultsDir = (path: string) => (path.endsWith(".json") ? dirname(path) : p
 export const native: Adapter = {
   name: "native",
 
-  async run(suiteArg, { ref, label, args: passed }) {
+  async run(suiteArg, { ref, label, remove, args: passed }) {
     const repo = (await $`git rev-parse --show-toplevel`.text()).trim();
     const suite = relative(repo, resolve(suiteArg));
     const config = await readSuite(join(repo, suite));
     const [globs, args] = splitCases(passed);
-    const { target, evalDir } = await prepare(repo, suite, ref);
+    const { target, evalDir } = await prepare(repo, suite, ref, remove);
     if (globs.length > 0) await keepCases(join(target, evalDir), globs);
     const stamp = new Date()
       .toISOString()

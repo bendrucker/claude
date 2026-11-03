@@ -4,6 +4,10 @@ import { resolveAdapter } from "../../packages/evals/adapter";
 import { generate } from "../../packages/evals/generate";
 import { strayArgs } from "../../packages/evals/run";
 
+function collect(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
+}
+
 export const program = new Command("run.ts")
   .description(
     "Run an eval suite against the artifacts it tests as they stand at a ref, and print the stored result's path. Arguments after -- pass through to the harness, claude plugin eval for native.",
@@ -12,12 +16,18 @@ export const program = new Command("run.ts")
   .argument("[args...]", "arguments for the harness, after --")
   .option("--ref <ref>", "git ref to read the skill or plugin at; the working tree when absent")
   .option("--label <label>", "suffix for the stored result's name")
+  .option(
+    "--remove <path>",
+    "repo path to delete from the staged plugins, repeatable; runs the suite without that skill or file",
+    collect,
+    [],
+  )
   .option("--adapter <name|path>", "adapter that runs the suite", "native")
   .action(async (suite, args, options) => {
     await generate(suite);
     const adapter = await resolveAdapter(options.adapter).catch(fail);
     const path = await adapter
-      .run(suite, { ref: options.ref, label: options.label, args })
+      .run(suite, { ref: options.ref, label: options.label, remove: options.remove, args })
       .catch(fail);
     console.log(path);
   });

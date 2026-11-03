@@ -13,8 +13,29 @@ import {
 } from "./data";
 import { next, rate } from "./deck";
 import { sample } from "./sample";
-import { overlaps } from "./score";
-import { board, type CheckRow, checkRows } from "./status";
+import { FLOOR, MIN_LABELED, overlaps } from "./score";
+import { type Board, board, type CheckRow, checkRows } from "./status";
+
+export interface Progress {
+  board: Board;
+  /** Cards with a saved vote of the user's. */
+  labeled: number;
+  floor: number;
+  minLabeled: number;
+}
+
+export function progress(
+  hits: readonly Hit[],
+  labels: readonly Label[],
+  flags: readonly Flag[],
+): Progress {
+  return {
+    board: board(checkRows(hits, labels, flags)),
+    labeled: labels.filter((label) => label.by === "user").length,
+    floor: FLOOR,
+    minLabeled: MIN_LABELED,
+  };
+}
 
 const LabelInput = z.object({
   id: z.string(),
@@ -132,9 +153,9 @@ export async function serve(
     const [hits, labels, flags] = await Promise.all([data.hits(), data.labels(), data.flags()]);
     return { hits: within(hits), labels, flags };
   };
-  const currentBoard = async () => {
+  const current = async () => {
     const { hits, labels, flags } = await deck();
-    return board(checkRows(hits, labels, flags));
+    return progress(hits, labels, flags);
   };
 
   const server = Bun.serve({
@@ -148,8 +169,8 @@ export async function serve(
         case "/api/next": {
           const { hits, labels, flags } = await deck();
           const hit = next(hits, labels, flags, seen);
-          const shown = board(checkRows(hits, labels, flags));
-          if (hit === undefined) return Response.json({ card: null, board: shown });
+          const shown = progress(hits, labels, flags);
+          if (hit === undefined) return Response.json({ card: null, ...shown });
           const id = hitId(hit);
           seen.add(id);
           const card = {
@@ -158,10 +179,10 @@ export async function serve(
             line: hit.line,
             ...context(hit, await linesOf(hit.file)),
           };
-          return Response.json({ card, board: shown });
+          return Response.json({ card, ...shown });
         }
         case "/api/board":
-          return Response.json(await currentBoard());
+          return Response.json(await current());
         case "/api/vote": {
           if (request.method !== "POST") break;
           const input = LabelInput.parse(await request.json());
@@ -172,7 +193,7 @@ export async function serve(
           const byCheck = Map.groupBy(hits, (entry) => entry.check);
           return Response.json({
             reveal: reveal(hit, hits, byCheck, labels, flags),
-            board: board(checkRows(hits, labels, flags)),
+            ...progress(hits, labels, flags),
           });
         }
         case "/api/patterns":

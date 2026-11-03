@@ -68,7 +68,7 @@ Then drive the ledger through `audit.ts`:
 ## Gotchas
 
 - Fenced blocks, inline code, quoted phrases, and blockquotes are exempt. A document that teaches a rule by showing the wording it rejects reports nothing.
-- A linked issue keeps its context, so `TicketRef` reads only a bare number. A modal makes a number a budget rather than a result, so `can yield 2-3 cards` is not a measurement.
+- A linked issue keeps its context, so `TicketRef` reads only a bare number. A number that ends a range or follows a comparator is a threshold, so `StaleMeasurement` passes `20-29 of 40` and `>= 36 of 40`.
 - Frontmatter is data, so a `description` field never raises an alert.
 - An explicit path that is not agent-facing scans nothing and exits 0, which reads the same as a clean pass. Pass `--all` when naming a file outside the recognized paths.
 - The checks cover what a lexical match can find with precision. Sprawl, duplication, and pointer wording need a reading pass, which `audit` runs.

@@ -1,0 +1,12 @@
+allow_tools: [Bash, Edit, Write]
+judge_model: claude-sonnet-5-5
+stage: [packages/eval-stubs]
+graders:
+  skill-fired: "*"
+  completed: "!staged-*"
+  committed-clean: "!staged-*"
+  on-main: "!staged-*"
+  pushed: "!staged-*"
+  check-pass: [code-tests, code-tests-2, dir-rename, stacked-squash, lockfile-workspaces, lockfile-deps]
+  left-for-user: "staged-*"
+  not-pushed: "staged-*"

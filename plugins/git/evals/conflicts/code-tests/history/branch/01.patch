@@ -1,0 +1,262 @@
+diff --git a/plugins/herdr/skills/herdr/scripts/dispatch.test.ts b/plugins/herdr/skills/herdr/scripts/dispatch.test.ts
+index 49e1ebbb..94b91222 100644
+--- a/plugins/herdr/skills/herdr/scripts/dispatch.test.ts
++++ b/plugins/herdr/skills/herdr/scripts/dispatch.test.ts
+@@ -11,6 +11,7 @@ import {
+   envelopeCode,
+   fetchArgs,
+   formatRecord,
++  type Pause,
+   type Runner,
+   spawnRunner,
+   taskSummary,
+@@ -80,17 +81,29 @@ const GIT_COMMON = ok("worktree /repo\nHEAD abc123\nbranch refs/heads/main\n\n")
+ // A remote list, then the URL of the remote the base names.
+ const REMOTES = [ok("origin\nupstream\n"), ok("git@github.com:owner/repo.git\n")];
+ 
+-const HAPPY_PATH = [
+-  AGENT_LIST,
+-  GIT_COMMON,
+-  ...REMOTES,
+-  ok(""),
+-  BASE_OK,
+-  ...CREATED,
+-  STARTED,
+-  ok(""),
+-  AGENT_GET,
+-];
++const BEFORE_CREATE = [AGENT_LIST, GIT_COMMON, ...REMOTES, ok(""), BASE_OK];
++const AFTER_CREATE = [STARTED, ok(""), AGENT_GET];
++const HAPPY_PATH = [...BEFORE_CREATE, ...CREATED, ...AFTER_CREATE];
++
++// What herdr and git print when a sibling worktree holds .git/config.lock.
++const LOCK_MESSAGE = "error: could not lock config file .git/config: File exists";
++const CREATE_LOCKED = fail(
++  envelope(
++    "worktree_create_failed",
++    `Preparing worktree (new branch 'fix-thing')\n${LOCK_MESSAGE}\nerror: unable to write upstream branch configuration`,
++  ),
++);
++const CONFIG_LOCKED: CommandResult = { code: 255, stdout: "", stderr: `${LOCK_MESSAGE}\n` };
++const DENIED = "error: could not lock config file .git/config: Operation not permitted";
++
++function recordedPause(): { pause: Pause; pauses: number[] } {
++  const pauses: number[] = [];
++  const pause: Pause = (ms) => {
++    pauses.push(ms);
++    return Promise.resolve();
++  };
++  return { pause, pauses };
++}
+ 
+ describe("fetchArgs", () => {
+   test.each([
+@@ -282,24 +295,52 @@ describe("dispatch", () => {
+     expect(calls.filter((argv) => argv[3] === "config")).toEqual([]);
+   });
+ 
+-  test("starts the agent when recording tracking fails", async () => {
+-    const { run, calls } = fakeRunner([
+-      AGENT_LIST,
+-      GIT_COMMON,
+-      ...REMOTES,
+-      ok(""),
+-      BASE_OK,
+-      WORKTREE,
+-      fail("error: could not lock config file"),
+-      STARTED,
+-      ok(""),
+-      AGENT_GET,
+-    ]);
+-    const { record } = await dispatch(options, run);
+-    expect(calls.filter((argv) => argv[3] === "config")).toHaveLength(1);
++  test.each<{ name: string; timeout: number; tracking: CommandResult[]; expected?: string }>([
++    { name: "waits out a held lock", timeout: 15_000, tracking: [CONFIG_LOCKED, ok(""), ok("")] },
++    {
++      name: "records a lock that outlasts the timeout",
++      timeout: 500,
++      tracking: [CONFIG_LOCKED, CONFIG_LOCKED, CONFIG_LOCKED],
++      expected: LOCK_MESSAGE,
++    },
++    {
++      name: "records a denied write without retrying it",
++      timeout: 15_000,
++      tracking: [ok(""), fail(`${DENIED}\n`)],
++      expected: DENIED,
++    },
++  ])("tracking $name and still starts the agent", async ({ timeout, tracking, expected }) => {
++    const { run, calls } = fakeRunner([...BEFORE_CREATE, WORKTREE, ...tracking, ...AFTER_CREATE]);
++    const { record } = await dispatch({ ...options, timeout }, run, recordedPause().pause);
++    expect(calls.filter((argv) => argv[3] === "config")).toHaveLength(tracking.length);
++    expect(record.trackingError).toBe(expected);
+     expect(record.status).toBe("working");
+   });
+ 
++  test("retries a create that lost the config lock", async () => {
++    const { pause, pauses } = recordedPause();
++    const { run, calls } = fakeRunner([
++      ...BEFORE_CREATE,
++      CREATE_LOCKED,
++      CREATE_LOCKED,
++      ...CREATED,
++      ...AFTER_CREATE,
++    ]);
++    const { record } = await dispatch(options, run, pause);
++    expect(calls.filter((argv) => argv[1] === "worktree" && argv[2] === "create")).toHaveLength(3);
++    expect(pauses).toEqual([250, 250]);
++    expect(record).toMatchObject({ path: "/tmp/worktrees/demo/fix-thing", status: "working" });
++  });
++
++  test("forwards the lock failure once it outlasts the timeout", async () => {
++    const { run } = fakeRunner([...BEFORE_CREATE, CREATE_LOCKED, CREATE_LOCKED, CREATE_LOCKED]);
++    const failure = await failureOf(
++      dispatch({ ...options, timeout: 500 }, run, recordedPause().pause),
++    );
++    expect(failure.message).toBe(CREATE_LOCKED.stderr);
++    expect(failure.partial).toBeNull();
++  });
++
+   test.each([
+     { name: "initializes", result: ok(""), expected: undefined },
+     {
+diff --git a/plugins/herdr/skills/herdr/scripts/dispatch.ts b/plugins/herdr/skills/herdr/scripts/dispatch.ts
+index b8cd3c9a..e894ee3a 100644
+--- a/plugins/herdr/skills/herdr/scripts/dispatch.ts
++++ b/plugins/herdr/skills/herdr/scripts/dispatch.ts
+@@ -14,6 +14,9 @@ const MAX_TASK_SUMMARY = 120;
+ const MAX_PROMPT_BYTES = 128 * 1024;
+ const FETCH_TIMEOUT_MS = 60_000;
+ const NAME_ATTEMPTS = 3;
++const LOCK_PAUSE_MS = 250;
++// A denied write shares the prefix, but only a lock someone holds exists already.
++const CONFIG_LOCK_HELD = /could not lock config file .*: File exists/;
+ 
+ export interface CommandResult {
+   code: number;
+@@ -30,6 +33,8 @@ export interface RunOptions {
+ 
+ export type Runner = (argv: readonly string[], options?: RunOptions) => Promise<CommandResult>;
+ 
++export type Pause = (ms: number) => Promise<void>;
++
+ // The sandbox marker covers the whole invocation, so every subprocess takes an argv array.
+ export const spawnRunner: Runner = async (argv, options) => {
+   let proc: Bun.Subprocess<"ignore", "pipe", "pipe">;
+@@ -85,6 +90,7 @@ export interface DispatchRecord {
+   // worktree and the name exist but the agent never received the work.
+   prompted: boolean;
+   submoduleError?: string;
++  trackingError?: string;
+ }
+ 
+ export interface DispatchResult {
+@@ -251,20 +257,50 @@ function baseRemote(remotes: ReadonlySet<string>, base: string): string | null {
+   return remotes.has(candidate) ? candidate : null;
+ }
+ 
++function failureText(result: CommandResult, label: string): string {
++  const stderr = result.stderr.trim();
++  return stderr === "" ? `${label} exited ${result.code}` : stderr;
++}
++
++// Every worktree of a repository writes the one .git/config, and git fails at
++// once rather than waiting when a sibling holds its lock.
++function retryConfigLock(run: Runner, budgetMs: number, pause: Pause): Runner {
++  const attempt = async (
++    argv: readonly string[],
++    options: RunOptions | undefined,
++    waited: number,
++  ): Promise<CommandResult> => {
++    const result = await run(argv, options);
++    if (result.code === 0 || !CONFIG_LOCK_HELD.test(result.stderr) || waited >= budgetMs)
++      return result;
++    await pause(LOCK_PAUSE_MS);
++    return attempt(argv, options, waited + LOCK_PAUSE_MS);
++  };
++  return (argv, options) => attempt(argv, options, 0);
++}
++
+ // The sandbox denies a session's writes to the shared .git/config, where `git
+ // push -u` records tracking, so record it here instead. herdr tracks the base,
+ // which would measure the session's branch against origin/main. Tracking is a
+-// convenience, so a failed write leaves herdr's and still starts the agent.
++// convenience, so a failed write is recorded and still starts the agent.
+ async function trackOrigin(
+   run: Runner,
+   remotes: ReadonlySet<string>,
+   path: string,
+   branch: string,
+-): Promise<void> {
+-  if (!remotes.has("origin")) return;
++): Promise<string | undefined> {
++  if (!remotes.has("origin")) return undefined;
+   const remote = await run(["git", "-C", path, "config", `branch.${branch}.remote`, "origin"]);
+-  if (remote.code !== 0) return;
+-  await run(["git", "-C", path, "config", `branch.${branch}.merge`, `refs/heads/${branch}`]);
++  if (remote.code !== 0) return failureText(remote, "git config");
++  const merge = await run([
++    "git",
++    "-C",
++    path,
++    "config",
++    `branch.${branch}.merge`,
++    `refs/heads/${branch}`,
++  ]);
++  return merge.code === 0 ? undefined : failureText(merge, "git config");
+ }
+ 
+ // GitHub over SSH signs with a key that may need a touch nobody is there to give, so
+@@ -284,10 +320,7 @@ async function initSubmodules(run: Runner, path: string): Promise<string | undef
+     timeoutMs: FETCH_TIMEOUT_MS,
+     env: { GIT_TERMINAL_PROMPT: "0" },
+   });
+-  if (result.code === 0) return undefined;
+-  return result.stderr.trim() === ""
+-    ? `git submodule update exited ${result.code}`
+-    : result.stderr.trim();
++  return result.code === 0 ? undefined : failureText(result, "git submodule update");
+ }
+ 
+ function agentNames(listed: z.infer<typeof AgentList>): ReadonlySet<string> {
+@@ -385,6 +418,7 @@ export interface DispatchOptions {
+ export async function dispatch(
+   options: DispatchOptions,
+   run: Runner = spawnRunner,
++  pause: Pause = Bun.sleep,
+ ): Promise<DispatchResult> {
+   if (!BRANCH_PATTERN.test(options.branch))
+     throw new DispatchError(
+@@ -464,8 +498,11 @@ export async function dispatch(
+         null,
+       );
+ 
++    // A create that loses the lock has already made the branch, and a retry
++    // checks that branch out rather than creating it again.
++    const locked = retryConfigLock(run, options.timeout, pause);
+     const created = await requiredJson(
+-      run,
++      locked,
+       [
+         "herdr",
+         "worktree",
+@@ -497,7 +534,8 @@ export async function dispatch(
+       prompted: false,
+     };
+ 
+-    await trackOrigin(run, remotes, partial.path, options.branch);
++    const trackingError = await trackOrigin(locked, remotes, partial.path, options.branch);
++    if (trackingError != null) partial.trackingError = trackingError;
+     const submoduleError = await initSubmodules(run, partial.path);
+     if (submoduleError != null) partial.submoduleError = submoduleError;
+ 
+@@ -626,6 +664,10 @@ if (import.meta.main) {
+       process.stderr.write(
+         `warning: submodules in ${record.path} were not initialized: ${record.submoduleError}\n`,
+       );
++    if (record.trackingError != null)
++      process.stderr.write(
++        `warning: ${record.branch} does not track origin/${record.branch}: ${record.trackingError}\n`,
++      );
+     if (!record.prompted)
+       process.stderr.write(
+         `warning: herdr could not confirm ${record.agent ?? "the agent"} received the prompt. Read the pane with \`herdr agent read ${record.pane}\`: answer any dialog with \`herdr agent send-keys\` and submit the prompt yourself, or confirm the agent is already working on it.\n`,

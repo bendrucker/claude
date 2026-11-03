@@ -1,0 +1,101 @@
+diff --git a/plugins/pull-request/evals/pr-body/scripts/limits.test.ts b/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
+index 758bd0f9..246141a4 100644
+--- a/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
++++ b/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
+@@ -66,6 +66,7 @@ test("scores the stub body when a tool result carries one and the reply otherwis
+     ["max-block", true],
+     ["prose-code-spans", false],
+     ["hidden-words", false],
++    ["list-items", true],
+   ]);
+   expect(rows("with", 1)).toEqual([
+     ["fact", true],
+@@ -73,18 +74,19 @@ test("scores the stub body when a tool result carries one and the reply otherwis
+     ["max-block", false],
+     ["prose-code-spans", true],
+     ["hidden-words", true],
++    ["list-items", true],
+   ]);
+   expect(written.cases[0]?.arms.with?.[0]?.graders.at(-1)?.explanation).toContain("from stub");
+   expect(written.cases[0]?.arms.with?.[1]?.graders.at(-1)?.explanation).toContain("from reply");
+-  expect(written.cases[0]?.arms.with?.map((r) => r.score)).toEqual([3 / 5, 3 / 5, 1]);
++  expect(written.cases[0]?.arms.with?.map((r) => r.score)).toEqual([4 / 6, 4 / 6, 1]);
+   expect(written.cases[0]?.arms.without?.[0]?.score).toBe(1);
+   expect(await Bun.file(join(out, "traces/one-with-1.jsonl")).exists()).toBe(true);
+   expect(render(counts)).toMatchInlineSnapshot(`
+-    "╔══════╤════════════════════╤════════════════╤═══════════════════════╤═══════════════════╤═══════════════════════╤═══════════════════╤══════════════════════════╤══════════════════════╗
+-    ║ case │ with visible-words │ with max-block │ with prose-code-spans │ with hidden-words │ without visible-words │ without max-block │ without prose-code-spans │ without hidden-words ║
+-    ╟──────┼────────────────────┼────────────────┼───────────────────────┼───────────────────┼───────────────────────┼───────────────────┼──────────────────────────┼──────────────────────╢
+-    ║ one  │ 1/2                │ 1/2            │ 1/2                   │ 1/2               │ 1/1                   │ 1/1               │ 1/1                      │ 1/1                  ║
+-    ╚══════╧════════════════════╧════════════════╧═══════════════════════╧═══════════════════╧═══════════════════════╧═══════════════════╧══════════════════════════╧══════════════════════╝
++    "╔══════╤════════════════════╤════════════════╤═══════════════════════╤═══════════════════╤═════════════════╤═══════════════════════╤═══════════════════╤══════════════════════════╤══════════════════════╤════════════════════╗
++    ║ case │ with visible-words │ with max-block │ with prose-code-spans │ with hidden-words │ with list-items │ without visible-words │ without max-block │ without prose-code-spans │ without hidden-words │ without list-items ║
++    ╟──────┼────────────────────┼────────────────┼───────────────────────┼───────────────────┼─────────────────┼───────────────────────┼───────────────────┼──────────────────────────┼──────────────────────┼────────────────────╢
++    ║ one  │ 1/2                │ 1/2            │ 1/2                   │ 1/2               │ 2/2             │ 1/1                   │ 1/1               │ 1/1                      │ 1/1                  │ 1/1                ║
++    ╚══════╧════════════════════╧════════════════╧═══════════════════════╧═══════════════════╧═════════════════╧═══════════════════════╧═══════════════════╧══════════════════════════╧══════════════════════╧════════════════════╝
+     "
+   `);
+ });
+diff --git a/plugins/pull-request/evals/pr-body/scripts/limits.ts b/plugins/pull-request/evals/pr-body/scripts/limits.ts
+index 01c1ca1a..cc8704e1 100644
+--- a/plugins/pull-request/evals/pr-body/scripts/limits.ts
++++ b/plugins/pull-request/evals/pr-body/scripts/limits.ts
+@@ -6,7 +6,7 @@ import { table } from "table";
+ import { z } from "zod";
+ import { traceReply } from "../../../../../evals/native/load";
+ import { type Run, Result, score } from "../../../../../evals/native/regrade";
+-import { GUARDS, LIMITS, limitKeys, measureStructure } from "../structure";
++import { GUARDS, LIMITS, guardKeys, limitKeys, measureStructure } from "../structure";
+ 
+ // Scores a results directory against the PR-body structure limits, so changing
+ // a limit doesn't require new sessions.
+@@ -24,13 +24,14 @@ const TraceLine = z.looseObject({
+ 
+ const CHECKS = { ...LIMITS, ...GUARDS };
+ type CheckKey = keyof typeof CHECKS;
+-const checkKeys: CheckKey[] = [...limitKeys, "hiddenWords"];
++const checkKeys: CheckKey[] = [...limitKeys, ...guardKeys];
+ 
+ const ROWS = {
+   visibleWords: "visible-words",
+   maxBlockWords: "max-block",
+   proseCodeSpans: "prose-code-spans",
+   hiddenWords: "hidden-words",
++  maxItemsPerList: "list-items",
+ } as const satisfies Record<CheckKey, string>;
+ 
+ const STUB_BLOCK = /^PR-BODY-BEGIN[^\S\n]*\n([\s\S]*?)\n?^PR-BODY-END[^\S\n]*$/gm;
+@@ -155,7 +156,7 @@ export function render(counts: Counts): string {
+ 
+ const program = new Command()
+   .description(
+-    "Add visible-words, max-block, prose-code-spans, and hidden-words rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
++    "Add visible-words, max-block, prose-code-spans, hidden-words, and list-items rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
+   )
+   .argument("<results-dir...>", "results directories holding aggregate-result.json and traces/")
+   .action(async (dirs) => {
+diff --git a/plugins/pull-request/evals/pr-body/structure.ts b/plugins/pull-request/evals/pr-body/structure.ts
+index 1b9e83dc..18135815 100644
+--- a/plugins/pull-request/evals/pr-body/structure.ts
++++ b/plugins/pull-request/evals/pr-body/structure.ts
+@@ -269,11 +269,19 @@ const isLimitKey = (k: string): k is LimitKey => k in LIMITS;
+ export const limitKeys: LimitKey[] = Object.keys(LIMITS).filter(isLimitKey);
+ 
+ // Trimming a body to fit the limits must not move its prose into <details>,
+-// tables, or fences. No baseline body comes near this.
++// tables, or fences, or pile it into one long list. No baseline body comes near
++// the first, and lists past five items are rare in Ben's own PRs.
+ export const GUARDS = {
+   hiddenWords: 60,
++  maxItemsPerList: 5,
+ } as const satisfies Partial<Structure>;
+ 
++export type GuardKey = keyof typeof GUARDS;
++
++const isGuardKey = (k: string): k is GuardKey => k in GUARDS;
++
++export const guardKeys: GuardKey[] = Object.keys(GUARDS).filter(isGuardKey);
++
+ export function overLimits(s: Structure): LimitKey[] {
+   return limitKeys.filter((k) => s[k] > LIMITS[k]);
+ }

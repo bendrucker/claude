@@ -29,6 +29,8 @@ function initRepo(dir: string): void {
     "user.name=t",
     "-c",
     "user.email=t@t",
+    "-c",
+    "commit.gpgsign=false",
     "commit",
     "-q",
     "--allow-empty",

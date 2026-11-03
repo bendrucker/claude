@@ -1,0 +1,67 @@
+diff --git a/plugins/performance/skills/hill-climb/SKILL.md b/plugins/performance/skills/hill-climb/SKILL.md
+index 9022e9bb..66af0e50 100644
+--- a/plugins/performance/skills/hill-climb/SKILL.md
++++ b/plugins/performance/skills/hill-climb/SKILL.md
+@@ -1,8 +1,9 @@
+ ---
+ name: performance:hill-climb
+ description: >-
+-  Use when asked to make software faster or leaner (runtime, startup,
+-  throughput, memory, bundle size) through repeated measured changes. For
++  Use when asked to hill-climb a program, or to make software faster or
++  leaner (runtime, startup, throughput, memory, bundle size) through repeated
++  measured changes, including resuming a climb from its notes file. For
+   prompts or skills scored by an eval suite, use prompting:hill-climb.
+ argument-hint: "<target> [<notes file>]"
+ ---
+@@ -16,7 +17,7 @@ This skill is the workflow. Load `performance:benchmark` to build the harness an
+ ## Arguments
+ 
+ - `<target>`: the program or command to climb. Required.
+-- `<notes file>`: where the climb log lives. Default: `CLIMB.md` beside the benchmark harness, or `tmp/climb.md` when the repo has no harness directory.
++- `<notes file>`: where the climb log lives. Default: `CLIMB.md` beside the benchmark harness, or `tmp/climb.md` when the repo has no harness directory. When it already exists, resume from it: skip the Frame items its Rules settle, and keep the line under its title that tells a later session to load this skill.
+ 
+ ## Frame
+ 
+@@ -39,8 +40,8 @@ Interview the user until each item below is settled and none rests on your assum
+   - When a candidate can change lookup order (`PATH`, module or library search paths), the guard compares what each name resolves to.
+   - Only the user relaxes a guard.
+ - **Side effects.** Everything a run touches outside itself: network, remote state, installed files, caches. Decide per item whether to stub it, hold it fixed, or reset it before each run.
+-- **Scope.** Which changes are allowed: code, config, dependencies, external tools, public API. Ask whether parallelism is in scope. When caching is in scope, ask where a cache may live and how it invalidates.
+-- **Inputs.** Which scenarios are `dev` (tuned against) and which are `holdout` (scored once at the end). Prefer real inputs over synthetic ones for `holdout`.
++- **Scope.** Which changes are allowed: code, config, dependencies, external tools, public API. Ask whether parallelism is in scope. When caching is in scope, ask where a cache may live and how it invalidates. Ask how much added code a gain must pay for.
++- **Inputs.** Which scenarios are `dev` (tuned against) and which are `holdout` (scored once at the end). Cover the workload's range of sizes and shapes. Prefer real inputs over synthetic ones for `holdout`, and look for larger real data when every `dev` input is small.
+ - **Budget.** How long the climb may run and how the user wants progress between checkpoints.
+ 
+ ## Workspace
+@@ -95,12 +96,13 @@ Record every lead you do not climb in the notes file's Set Aside table with its
+ 
+ Run the guard check first. A candidate that changes behavior is rejected without timing.
+ 
+-Screen with the fast signal or a microbenchmark of the changed path. Confirm a candidate that passes the screen with the full metric, interleaved against the current accepted arm at the baseline's run count.
++Screen with the fast signal or a microbenchmark of the changed path. Confirm a candidate that passes the screen with the full metric, interleaved against the current accepted arm at the baseline's run count. Confirm on every `dev` scenario, including ones the change cannot reach on paper, since a shared lock, allocator, or cache carries a change into code it never touches.
+ 
+ #### Decide
+ 
+-- **Accept** when the target moves in the predicted direction past the acceptance rule in the notes file (default: permutation p < 0.1 and a median gain of at least 3%) and no guard regresses. Commit the change alone, with the evidence in the commit body.
++- **Accept** when the target moves in the predicted direction past the acceptance rule in the notes file (default: permutation p < 0.1 and a median gain of at least 3%) and no guard regresses, and the gain pays for the code the change adds at the Scope's bar. Commit the change alone, with the evidence in the commit body.
+ - **Keep unconfirmed** when the target did not move but the user agrees to keep the change for a reason outside the metric. Label it "kept, unconfirmed" in the notes, commit body, and PR, and leave it out of the reported gain.
++- **Keep as a trade** when the target improves, another metric regresses, and the user approves the trade. Label it "kept, trade" and report both numbers wherever the gain appears.
+ - **Reject** otherwise. Record the hypothesis, pseudocode of the change, and the numbers in the notes file, and save the diff as a patch beside it, so the null result stays findable. A rejected hypothesis stays rejected until a new profile argues for it.
+ - **Re-run** an accept that rests on rounds `compare.ts report` flags for load, and decide on the re-run. An accept rests on them when the gain or its significance fails without those rounds.
+ - **Bound** an accepted gain by its target's time in the profile. Re-measure a gain past that bound before committing, or report the excess as unexplained.
+@@ -109,11 +111,13 @@ After each decision:
+ 
+ - Re-profile after an accept, since the ranking shifts.
+ - Report the first decision to the user in one line, and continue unless the user redirects.
+-- Commit a mid-climb harness change separately, re-run the baseline, and note it in the notes file.
++- Commit a mid-climb harness change separately, re-run the baseline and the A/A, and note it in the notes file. A new input family, inputs at a new scale, and a new runtime or dependency version are harness changes.
+ - After two rejections in a row, re-run the A/A and re-profile before the next candidate. A stall often means the noise floor rose or the profile ranks work the scenario does not wait on.
+ 
+ ## Stopping
+ 
++Before stopping on anything but the ceiling or the budget, profile every Frame metric at head on the largest inputs, and rank what that profile shows. A climb that has accepted most of its candidates still has headroom.
++
+ Stop when any of these holds, and say which:
+ 
+ - The metric reached the ceiling.

@@ -13,6 +13,7 @@ import {
   decodeArg,
   deriveName,
   detachedEnv,
+  describeMuxDefault,
   detectMux,
   dispatch,
   DispatchError,
@@ -389,6 +390,23 @@ describe("detectMux", () => {
   ])("$name", ({ env, expected }) => {
     if (typeof expected === "string") expect(detectMux(env)).toBe(expected);
     else expect(() => detectMux(env)).toThrow(expected);
+  });
+});
+
+describe("describeMuxDefault", () => {
+  test.each<{ name: string; env: Record<string, string>; expected: string }>([
+    {
+      name: "a Rex block",
+      env: { REX_BLOCK: "block:1" },
+      expected: "defaults to rex, the multiplexer hosting this session",
+    },
+    {
+      name: "neither",
+      env: {},
+      expected: "no multiplexer hosts this session; pass --mux rex, --mux herdr, or --mux bg",
+    },
+  ])("$name", ({ env, expected }) => {
+    expect(describeMuxDefault(env)).toBe(expected);
   });
 });
 

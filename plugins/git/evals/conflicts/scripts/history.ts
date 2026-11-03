@@ -4,21 +4,23 @@
 import { Command } from "@commander-js/extra-typings";
 import { createHash } from "node:crypto";
 import { readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { z } from "zod";
 
 export const REPO_ROOT = resolve(import.meta.dir, "../../../../..");
 
 // Public repo files are read at this commit, so later edits to them never change a generated history.
 export const SOURCE_REF = "e24090525c39a2b4d3d34d79e3b836519ca4332a";
-export const TARGET_TOKENS = 100_000;
-export const TOKEN_RANGE = { min: 95_000, max: 110_000 } as const;
+// Measured as chars/4 over message content. A real session counts about 1.45x that, which puts a history near 92k tokens and a first turn near 100k with the system prompt.
+export const TARGET_TOKENS = 63_000;
+export const TOKEN_RANGE = { min: 60_000, max: 66_000 } as const;
 
 const CWD = "/Users/ben/src/bendrucker/claude";
 const VERSION = "2.1.280";
 const MODEL = "claude-opus-5-5";
 const START = Date.UTC(2026, 8, 29, 14, 0, 0);
 const MAX_FILE_CHARS = 14_000;
+const LOCKFILE = /(^|\/)(package-lock\.json|bun\.lock)$/;
 const EXCLUDED = /ts\.net|tailnet|\.local\b|\.lan\b|\.internal\b/i;
 const PUBLIC_FILE =
   /^(README\.md|docs\/[^/]+\.md|plugins\/[^/]+\/README\.md|plugins\/[^/]+\/skills\/[^/]+\/(SKILL|references\/[^/]+)\.md|scripts\/[^/]+\.ts|user\/rules\/[^/]+\.md)$/;
@@ -46,6 +48,7 @@ interface Hunk {
 }
 
 interface Section {
+  isNew: boolean;
   path: string;
   lines: string[];
   hunks: Hunk[];
@@ -62,6 +65,8 @@ interface Opening {
   start: Transcript;
   fixed: Transcript;
   sources: Set<string>;
+  near: string[];
+  edited: string[];
 }
 
 function digest(seed: string): string {
@@ -111,10 +116,12 @@ function parsePatch(text: string): Section[] {
   for (const line of text.split("\n")) {
     if (line.startsWith("diff --git ")) {
       flush();
-      section = { path: pathOf(line), lines: [], hunks: [] };
+      section = { path: pathOf(line), isNew: false, lines: [], hunks: [] };
       sections.push(section);
     } else if (section === undefined) {
       continue;
+    } else if (line.startsWith("new file mode")) {
+      section.isNew = true;
     } else if (line.startsWith("@@")) {
       flush();
       hunk = { old: [], next: [], added: 0, removed: 0 };
@@ -145,14 +152,14 @@ function isPublicFile(path: string): boolean {
   return PUBLIC_FILE.test(path) && !path.endsWith(".test.ts");
 }
 
-function publicFiles(): string[] {
+function publicFiles(near: string[]): string[] {
   const files = git("ls-tree", "-r", "--name-only", SOURCE_REF)
     .split("\n")
     .filter(Boolean)
     .toSorted()
     .filter((path) => isPublicFile(path));
-  const herdr = files.filter((path) => path.startsWith("plugins/herdr/"));
-  return [...herdr, ...files.filter((path) => !path.startsWith("plugins/herdr/"))];
+  const close = (path: string) => near.some((prefix) => path.startsWith(prefix));
+  return [...files.filter((path) => close(path)), ...files.filter((path) => !close(path))];
 }
 
 const publicCache = new Map<string, string | undefined>();
@@ -255,9 +262,9 @@ class Transcript {
 }
 
 const READ_LEADS = [
-  "Checking how this plugin documents itself.",
+  "Checking how the repo documents this area.",
   "Reading the next doc for conventions.",
-  "One more file that may describe the record.",
+  "One more file that may describe this behavior.",
   "Looking at a neighboring plugin for the same pattern.",
   "Reading this for how scripts are laid out.",
   "Checking the rules that apply here.",
@@ -271,10 +278,10 @@ function addFiller(transcript: Transcript, files: string[]) {
   }
 }
 
-function fillerWithin(budgetChars: number, skip: Set<string>): string[] {
+function fillerWithin(budgetChars: number, skip: Set<string>, near: string[]): string[] {
   const chosen: string[] = [];
   let used = 0;
-  for (const path of publicFiles()) {
+  for (const path of publicFiles(near)) {
     if (skip.has(path)) continue;
     const body = readPublic(path);
     if (body === undefined) continue;
@@ -305,29 +312,38 @@ async function opening(caseDir: string): Promise<Opening> {
     .toSorted();
   const texts = await Promise.all(patches.map((patch) => Bun.file(join(branchDir, patch)).text()));
   const branch = texts.flatMap((text) => parsePatch(text));
-  const first = patches[0];
-  if (first === undefined) throw new Error(`no branch patches in ${branchDir}`);
-  const message = (await Bun.file(join(branchDir, first.replace(".patch", ".msg"))).text()).trim();
+  const messages = await Promise.all(
+    patches.map(async (patch) =>
+      (await Bun.file(join(branchDir, patch.replace(".patch", ".msg"))).text()).trim(),
+    ),
+  );
   const name = (await Bun.file(join(history, "branch.name")).text()).trim();
 
   const start = new Transcript(name);
   start.user(
-    `${message}. When another process holds the git config lock, the worktree write fails and the agent never starts. Retry the write a few times, and if it still fails, record it on the result and start the agent anyway. Read the plugin's docs first so the change matches how it describes the record.`,
+    `Make these changes on this branch:\n${messages.map((m) => `- ${m}`).join("\n")}\n\nRead the repo's docs first so the changes match how they describe things.`,
   );
 
-  const edited = new Set(branch.map((section) => section.path));
-  const sources = base.filter(
-    (section) => section.path.endsWith(".ts") || section.path.endsWith("package.json"),
-  );
+  const edited = new Set(branch.filter((section) => !section.isNew).map((section) => section.path));
+  const sources = base.filter((section) => !LOCKFILE.test(section.path));
   const ordered = sources.toSorted(
     (a, b) => Number(edited.has(b.path)) - Number(edited.has(a.path)),
   );
   const fixed = new Transcript(name);
-  fixed.say("I have the request. Reading the dispatch script, its tests, and what it records.");
+  fixed.say("I have the request. Reading the files it touches.");
   for (const section of ordered) {
     fixed.read(section.path, numbered(section.lines.join("\n")));
   }
   for (const section of branch) {
+    if (section.isNew) {
+      fixed.call(
+        "Write",
+        { file_path: `${CWD}/${section.path}`, content: `${section.lines.join("\n")}\n` },
+        `File created successfully at: ${CWD}/${section.path}`,
+        `Creating \`${section.path}\`.`,
+      );
+      continue;
+    }
     for (const [i, hunk] of section.hunks.entries()) {
       fixed.call(
         "Edit",
@@ -350,9 +366,14 @@ async function opening(caseDir: string): Promise<Opening> {
     `${stat}\n ${branch.length} files changed`,
   );
   fixed.say(
-    `The dispatch script now retries a worktree config write that loses the lock, and a lock that outlasts the retries is recorded on the result while the agent still starts. The tests cover both outcomes. I have not run them yet.`,
+    `The branch now has ${messages.length === 1 ? "the change" : "both changes"}. I have not run the tests yet.`,
   );
-  return { start, fixed, sources: new Set(base.map((s) => s.path)) };
+  const near = [
+    ...new Set(
+      branch.map((s) => /^plugins\/[^/]+\//.exec(s.path)?.[0]).filter((p) => p !== undefined),
+    ),
+  ];
+  return { start, fixed, sources: new Set(base.map((s) => s.path)), near, edited: [...edited] };
 }
 
 export async function build(caseDir: string): Promise<string> {
@@ -360,9 +381,9 @@ export async function build(caseDir: string): Promise<string> {
   const name = (await Bun.file(join(await historyDir(caseDir), "branch.name")).text()).trim();
   const fixedChars = contentChars(head.start.entries) + contentChars(head.fixed.entries);
   const followUp =
-    "Before I push this, skim the other plugins' docs for anything that describes dispatch retries or the result record, so I know whether any of them need a matching edit.";
+    "Before I push this, skim the other docs for anything that describes the behavior I changed, so I know whether any of them need a matching edit.";
   const budget = TARGET_TOKENS * 4 - fixedChars - followUp.length - 2_000;
-  const filler = fillerWithin(budget, head.sources);
+  const filler = fillerWithin(budget, head.sources, head.near);
   const split = Math.ceil(filler.length / 2);
 
   const transcript = new Transcript(name);
@@ -370,19 +391,19 @@ export async function build(caseDir: string): Promise<string> {
   addFiller(transcript, filler.slice(0, split));
   transcript.entries.push(...head.fixed.entries);
   transcript.user(followUp);
-  transcript.say("Reading the remaining docs and scripts for mentions of the record.");
+  transcript.say("Reading the remaining docs and scripts for mentions of it.");
   addFiller(transcript, filler.slice(split));
   transcript.call(
     "Grep",
     {
-      pattern: "trackingError|lock-retry|retry the write",
+      pattern: head.edited.map((path) => basename(path).replace(/\.[^.]+$/, "")).join("|"),
       path: CWD,
       output_mode: "files_with_matches",
     },
     "No files found",
   );
   transcript.say(
-    "None of the other docs describe dispatch retries or the result record, so nothing else needs a matching edit. The change is limited to the dispatch script and its tests.",
+    "None of the other docs describe this behavior, so nothing else needs a matching edit. The change stays in the files I edited.",
   );
   return serialize(transcript, name);
 }

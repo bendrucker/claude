@@ -25,7 +25,7 @@ describe.skipIf(!sourceAvailable())("history.jsonl", () => {
       expect((await committed) === (await build(dir))).toBe(true);
     });
 
-    test("is within the token range", async () => {
+    test("is 60k to 66k chars/4 tokens, which counts as about 92k real tokens", async () => {
       const tokens = estimateTokens(await committed);
       expect(tokens).toBeGreaterThanOrEqual(TOKEN_RANGE.min);
       expect(tokens).toBeLessThanOrEqual(TOKEN_RANGE.max);

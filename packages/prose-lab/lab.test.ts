@@ -4,7 +4,7 @@ import * as gs from "@hegeldev/hegel/generators";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { countWords, lintFiles, PLUGINS } from "./corpus";
+import { countWords, lintFiles, markShipped, PLUGINS } from "./corpus";
 import {
   assign,
   type Flag,
@@ -29,9 +29,13 @@ import {
   type Stage,
   score,
   stage,
+  wideConfig,
 } from "./score";
 import { locate, toFlags } from "./review";
-import { context } from "./server";
+import type { Message, QueryFn } from "../eval-judge/index";
+import { type Call, next, PROPOSED } from "./deck";
+import { propose, type Reply, resolve, spread } from "./propose";
+import { context, reveal } from "./server";
 import { checkRows } from "./status";
 
 function hit(file: string, line: number, span: [number, number], check = "Writing.X"): Hit {
@@ -330,6 +334,18 @@ describe("sample", () => {
   });
 });
 
+test("markShipped marks wide hits the shipped config also fires, and keeps any it alone fires", () => {
+  const both = hit("a", 1, [1, 2], "W.Both");
+  const wideOnly = hit("a", 2, [1, 2], "W.Off");
+  const ownOnly = hit("a", 3, [1, 2], "W.Own");
+  const marked = markShipped([{ ...both }, ownOnly], [{ ...both }, wideOnly]);
+  expect(marked.map((h) => `${h.check}:${h.shipped}`)).toEqual([
+    "W.Both:true",
+    "W.Off:false",
+    "W.Own:true",
+  ]);
+});
+
 test("countWords leaves fenced code out", () => {
   expect(countWords("One two.\n\n```ts\nconst three = 3;\n```\n\nFour.\n")).toBe(3);
 });
@@ -344,12 +360,82 @@ test("context splits the line around Vale's one-based inclusive span", () => {
   });
 });
 
-test("checkRows marks a check labeled past ten with a floor under the bar", () => {
-  const hits = Array.from({ length: 12 }, (_, i) => hit("a", i + 1, [1, 2], "ai-tells.Loud"));
-  const labels = hits.map((h, i) => label(h, i < 4 ? "right" : "wrong"));
-  expect(checkRows(hits, labels, [])).toMatchObject([
-    { check: "ai-tells.Loud", right: 4, wrong: 8, below: true },
-  ]);
+function checkHits(check: string, count: number, shipped?: boolean): Hit[] {
+  return Array.from({ length: count }, (_, i) => ({
+    ...hit(check, i + 1, [1, 2], check),
+    shipped,
+  }));
+}
+
+test.each<{ name: string; shipped?: boolean; right: number; wrong: number; want: Call }>([
+  { name: "a shipped check above the floor", shipped: true, right: 12, wrong: 0, want: "keep" },
+  { name: "a shipped check below the floor", shipped: true, right: 2, wrong: 10, want: "retire" },
+  { name: "a narrow sweep's check below the floor", right: 2, wrong: 10, want: "retire" },
+  { name: "an off check above the floor", shipped: false, right: 12, wrong: 0, want: "enable" },
+  { name: "an off check below the floor", shipped: false, right: 2, wrong: 10, want: "leave off" },
+  { name: "a check short of ten labels", shipped: false, right: 9, wrong: 0, want: "open" },
+  { name: "a check straddling the floor", shipped: false, right: 7, wrong: 5, want: "open" },
+])("checkRows calls $name $want", ({ shipped, right, wrong, want }) => {
+  const hits = checkHits("C", right + wrong, shipped);
+  const labels = hits.map((h, i) => label(h, i < right ? "right" : "wrong"));
+  expect(checkRows(hits, labels, [])).toMatchObject([{ check: "C", right, wrong, call: want }]);
+});
+
+describe("next", () => {
+  const settledCheck = checkHits("Settled", 20, false);
+  const openCheck = checkHits("Open", 20, false);
+  const hits = [...settledCheck, ...openCheck];
+  const labels = settledCheck.slice(0, 10).map((h) => label(h, "right"));
+
+  test("a decided check leaves the deck and an undecided one stays", () => {
+    const seen = new Set<string>();
+    const shown: string[] = [];
+    for (let i = 0; i < 50; i++) {
+      const card = next(hits, labels, [], seen);
+      if (card === undefined) break;
+      seen.add(hitId(card));
+      shown.push(card.check);
+    }
+    expect(shown).not.toContain("Settled");
+    expect(shown).toContain("Open");
+  });
+
+  test("returns undefined once every check is decided or exhausted", () => {
+    const seen = new Set(openCheck.map(hitId));
+    expect(next(hits, labels, [], seen)).toBeUndefined();
+  });
+
+  test("prefers the check with the widest interval", () => {
+    const some = openCheck.slice(0, 3).map((h) => label(h, "right"));
+    const fresh = checkHits("Fresh", 3, false);
+    expect(next([...openCheck, ...fresh], some, [], new Set())?.check).toBe("Fresh");
+  });
+
+  test("picks the hit from the file the check's labels least cover", () => {
+    const covered = [hit("a", 1, [1, 2], "X"), hit("a", 2, [1, 2], "X")];
+    const other = hit("b", 1, [1, 2], "X");
+    expect(next([...covered, other], [label(covered[0]!, "right")], [], new Set())?.file).toBe("b");
+  });
+
+  test.each<{ name: string; seen: number; want: string }>([
+    { name: "the fourth card", seen: 3, want: PROPOSED },
+    { name: "the first card", seen: 0, want: "Open" },
+  ])("draws a proposal on $name", ({ seen, want }) => {
+    const proposals = checkHits(PROPOSED, 5, false);
+    const ids = new Set(Array.from({ length: seen }, (_, i) => `elsewhere-${i}`));
+    expect(next([...openCheck, ...proposals], [], [], ids)?.check).toBe(want);
+  });
+});
+
+test("reveal lists every check on the voted span and rates each after one vote", () => {
+  const a = hit("doc.md", 3, [5, 12], "W.A");
+  const b = hit("doc.md", 3, [8, 20], "W.B");
+  const elsewhere = hit("doc.md", 4, [5, 12], "W.C");
+  const hits = [a, b, elsewhere];
+  const byCheck = Map.groupBy(hits, (h) => h.check);
+  const shown = reveal(a, hits, byCheck, [label(a, "right")], []);
+  expect(shown.others).toEqual(["W.B"]);
+  expect(shown.ratings.map((row) => `${row.check}:${row.right}`)).toEqual(["W.A:1", "W.B:1"]);
 });
 
 describe("store", () => {
@@ -402,6 +488,19 @@ describe("labConfig", () => {
     const config = await labConfig([join(root, "Carries.yml")], PLUGINS.writing);
     const hits = await lintFiles("writing", config, ["bad.md", "doc.md"], root);
     expect(hits.map((h) => h.file)).toEqual(["doc.md"]);
+  });
+
+  test("wideConfig fires a check the shipped config turns off, and the shipped config does not", async () => {
+    await Bun.write(
+      join(root, "hedge.md"),
+      "# Doc\n\nIt is important to note that the box holds books.\n",
+    );
+    const off = (hits: Hit[]) =>
+      hits.filter((h) => h.check === "ai-tells.HedgingPhrases").map((h) => h.match);
+    const own = await lintFiles("writing", PLUGINS.writing, ["hedge.md"], root);
+    const wide = await lintFiles("writing", await wideConfig(PLUGINS.writing), ["hedge.md"], root);
+    expect(off(own)).toEqual([]);
+    expect(off(wide).length).toBeGreaterThan(0);
   });
 
   test("throws when the config is broken", async () => {
@@ -529,5 +628,71 @@ describe("assign", () => {
 
   test("rejects an id that is neither a label nor a flag", () => {
     expect(() => assign("p", ["nope"], [], [], "t")).toThrow("Unknown ids: nope");
+  });
+});
+
+function fakeQuery(reply: Reply, prompts: string[]): QueryFn {
+  return ({ prompt }) => {
+    prompts.push(prompt);
+    const messages: Message[] = [{ type: "result", subtype: "success", structured_output: reply }];
+    const it = messages[Symbol.iterator]();
+    return { [Symbol.asyncIterator]: () => ({ next: () => Promise.resolve(it.next()) }) };
+  };
+}
+
+describe("propose", () => {
+  const lines = ["# Doc", "", "This rule carries real weight here.", "Plain line."];
+
+  test.each<{ name: string; line: number; quote: string; want: string[] }>([
+    { name: "a quote on its named line", line: 3, quote: "carries real weight", want: ["3:11-29"] },
+    { name: "a quote a line off", line: 4, quote: "carries real weight", want: ["3:11-29"] },
+    { name: "a paraphrase", line: 3, quote: "carries weight", want: [] },
+    { name: "a quote past the drift", line: 9, quote: "carries real weight", want: [] },
+    { name: "an empty quote", line: 3, quote: " ", want: [] },
+  ])("resolve keeps $name only when it matches verbatim", ({ line, quote, want }) => {
+    const hits = resolve("doc.md", lines, { spans: [{ line, quote, reason: "r" }] });
+    expect(hits.map((h) => `${h.line}:${h.span[0]}-${h.span[1]}`)).toEqual(want);
+    for (const h of hits) expect(lines[h.line - 1]?.slice(h.span[0] - 1, h.span[1])).toBe(h.match);
+  });
+
+  test("spread takes files round-robin across directories", () => {
+    const picked = spread(["a/1.md", "a/2.md", "a/3.md", "b/1.md", "c/1.md"], 4);
+    expect(
+      picked
+        .slice(0, 3)
+        .map((file) => file.split("/")[0])
+        .toSorted((a, b) => (a ?? "").localeCompare(b ?? "")),
+    ).toEqual(["a", "b", "c"]);
+    expect(picked[3]).toBe("a/2.md");
+  });
+
+  test("asks about a file once per text and records its spans as proposals", async () => {
+    const root = await mkdtemp(join(tmpdir(), "prose-lab-propose-"));
+    await Bun.write(join(root, "doc.md"), lines.join("\n"));
+    const prompts: string[] = [];
+    const query = fakeQuery(
+      { spans: [{ line: 3, quote: "real weight", reason: "figurative" }] },
+      prompts,
+    );
+    const first = await propose({ files: ["doc.md"], existing: [], root, query });
+    expect(first[0]?.hits).toMatchObject([
+      { check: PROPOSED, message: "figurative", match: "real weight", shipped: false },
+    ]);
+    expect(await propose({ files: ["doc.md"], existing: first, root, query })).toEqual([]);
+    await Bun.write(join(root, "doc.md"), `${lines.join("\n")}\nMore.\n`);
+    expect(await propose({ files: ["doc.md"], existing: first, root, query })).toHaveLength(1);
+    expect(prompts).toHaveLength(2);
+    await rm(root, { recursive: true });
+  });
+
+  test("the store merges proposals with the sweep's hits", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "prose-lab-proposals-"));
+    const data = store(dir);
+    const swept = hit("a", 1, [1, 2]);
+    const proposed = { ...hit("a", 2, [1, 2], PROPOSED), shipped: false };
+    await data.writeSweep({ corpus: "all", rev: "r", words: 1, hits: [swept] });
+    await data.addProposals([{ file: "a", key: "k", asked: 1, hits: [proposed], ts: "t" }]);
+    expect((await data.hits()).map((h) => h.check)).toEqual(["Writing.X", PROPOSED]);
+    await rm(dir, { recursive: true });
   });
 });

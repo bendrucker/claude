@@ -1,8 +1,8 @@
 import { table } from "table";
 import { CEILING, type RuleComplexity } from "./complexity";
 import type { Flag, Hit, Label, Pattern, Score } from "./data";
-import { best, clears, evidence, FLOOR, judge, MIN_LABELED, type Stage, stage } from "./score";
-import { wilson } from "../evals/stats";
+import { type Call, type Rating, rateAll } from "./deck";
+import { best, evidence, FLOOR, type Stage, stage } from "./score";
 
 export interface PatternRow {
   slug: string;
@@ -16,15 +16,7 @@ export interface PatternRow {
   stage: Stage;
 }
 
-export interface CheckRow {
-  check: string;
-  hits: number;
-  right: number;
-  wrong: number;
-  low: number;
-  /** Labeled past `MIN_LABELED` with an interval floor under `FLOOR`. */
-  below: boolean;
-}
+export type CheckRow = Omit<Rating, "unlabeled">;
 
 export function patternRows(
   patterns: readonly Pattern[],
@@ -49,26 +41,35 @@ export function patternRows(
   });
 }
 
+const CALL_ORDER: readonly Call[] = ["enable", "retire", "keep", "leave off", "open"];
+
+/** Every check's rating, settled calls first. */
 export function checkRows(
   hits: readonly Hit[],
   labels: readonly Label[],
   flags: readonly Flag[],
 ): CheckRow[] {
-  return [...Map.groupBy(hits, (hit) => hit.check)]
-    .map(([check, group]) => {
-      const { right, wrong } = judge(group, labels, flags);
-      const low = right + wrong === 0 ? 0 : wilson(right, right + wrong)[0];
-      return {
-        check,
-        hits: group.length,
-        right,
-        wrong,
-        low,
-        below: right + wrong >= MIN_LABELED && !clears({ right, wrong, low }),
-      };
-    })
-    .filter((row) => row.right + row.wrong > 0)
-    .toSorted((a, b) => a.low - b.low);
+  return rateAll(hits, labels, flags)
+    .map(({ unlabeled: _, ...row }) => row)
+    .toSorted((a, b) => {
+      const order = CALL_ORDER.indexOf(a.call) - CALL_ORDER.indexOf(b.call);
+      return order === 0 ? b.low - a.low : order;
+    });
+}
+
+export interface Board {
+  decided: number;
+  open: number;
+  calls: CheckRow[];
+}
+
+export function board(rows: readonly CheckRow[]): Board {
+  const open = rows.filter((row) => row.call === "open").length;
+  return {
+    decided: rows.length - open,
+    open,
+    calls: rows.filter((row) => row.call !== "open"),
+  };
 }
 
 const percent = (value: number | undefined): string =>
@@ -103,18 +104,20 @@ export function render(
       row.stage,
     ]),
   ]);
+  const labeled = checks.filter((row) => row.right + row.wrong > 0);
   const checkTable = table([
-    ["check", "hits", "right", "wrong", "floor", `under ${percent(FLOOR)}`],
-    ...checks.map((row) => [
+    ["check", "shipped", "hits", "right", "wrong", "interval", `call at ${percent(FLOOR)}`],
+    ...labeled.map((row) => [
       row.check,
+      row.shipped ? "yes" : "no",
       row.hits,
       row.right,
       row.wrong,
-      percent(row.low),
-      row.below ? "yes" : "",
+      `${percent(row.low)}-${percent(row.high)}`,
+      row.call,
     ]),
   ]);
-  return `${patterns.length === 0 ? "No patterns yet.\n" : patternTable}\n${checks.length === 0 ? "No labeled checks yet.\n" : checkTable}\n${unassigned} flags without a pattern.\n`;
+  return `${patterns.length === 0 ? "No patterns yet.\n" : patternTable}\n${labeled.length === 0 ? "No labeled checks yet.\n" : checkTable}\n${unassigned} flags without a pattern.\n`;
 }
 
 /** Rules by complexity, marking those over the ceiling. */

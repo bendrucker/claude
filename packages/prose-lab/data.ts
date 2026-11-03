@@ -15,6 +15,8 @@ export const Hit = z.object({
   line: z.number(),
   span: z.tuple([z.number(), z.number()]),
   match: z.string(),
+  /** False when the plugin's own config turns the check off and only a wide sweep fires it. */
+  shipped: z.boolean().optional(),
 });
 export type Hit = z.infer<typeof Hit>;
 
@@ -95,6 +97,17 @@ export type Score = z.infer<typeof Score>;
 export const Queued = Hit.extend({ pattern: z.string(), candidate: z.string() });
 export type Queued = z.infer<typeof Queued>;
 
+/** One proposer call on a file: the spans it resolved, keyed by the file text, prompt, and model asked. */
+export const Proposed = z.object({
+  file: z.string(),
+  key: z.string(),
+  /** Spans the model returned, before quotes that didn't match the file were dropped. */
+  asked: z.number(),
+  hits: z.array(Hit),
+  ts: z.string(),
+});
+export type Proposed = z.infer<typeof Proposed>;
+
 export function hitId(hit: Pick<Hit, "check" | "file" | "line" | "span">): string {
   return `${hit.check}|${hit.file}|${hit.line}|${hit.span[0]}`;
 }
@@ -160,6 +173,10 @@ export interface Store {
   patterns(): Promise<Pattern[]>;
   scores(): Promise<Score[]>;
   queue(): Promise<Queued[]>;
+  proposals(): Promise<Proposed[]>;
+  /** The last sweep's hits and the proposer's, which the deck and scores judge alike. */
+  hits(): Promise<Hit[]>;
+  addProposals(records: readonly Proposed[]): Promise<void>;
   addLabels(records: readonly Label[]): Promise<void>;
   addFlags(records: readonly Flag[]): Promise<void>;
   addDocs(records: readonly Doc[]): Promise<void>;
@@ -186,6 +203,13 @@ export function store(dir = DATA): Store {
     scores: async () =>
       latest(await readJsonl(Score, path("scores.jsonl")), (s) => `${s.pattern}|${s.candidate}`),
     queue: async () => latest(await readJsonl(Queued, path("queue.jsonl")), hitId),
+    proposals: async () =>
+      latest(await readJsonl(Proposed, path("proposals.jsonl")), (p) => p.file),
+    async hits() {
+      const [swept, proposed] = await Promise.all([this.sweep(), this.proposals()]);
+      return [...(swept?.hits ?? []), ...proposed.flatMap((entry) => entry.hits)];
+    },
+    addProposals: (records) => appendJsonl(path("proposals.jsonl"), records),
     addLabels: (records) => appendJsonl(path("labels.jsonl"), records),
     addFlags: (records) => appendJsonl(path("flags.jsonl"), records),
     addDocs: (records) => appendJsonl(path("docs.jsonl"), records),

@@ -20,6 +20,8 @@ import {
   Verdict,
 } from "./data";
 import { CEILING, measure, type RuleComplexity, styleRules } from "./complexity";
+import { PROPOSED } from "./deck";
+import { MODEL, propose, spread } from "./propose";
 import { annotations, toFlags } from "./review";
 import { sample } from "./sample";
 import { diffHits, labConfig, score } from "./score";
@@ -66,11 +68,12 @@ const sweepCommand = new Command("sweep")
       .choices(PLUGIN_NAMES)
       .argParser(collect),
   )
+  .option("--wide", "also fire every check the plugin configs turn off, at every level")
   .action(async (options) => {
     const plugins = (options.plugin ?? PLUGIN_NAMES).filter(
       (name): name is Plugin => name in PLUGINS,
     );
-    const result = await sweep(options.corpus, plugins);
+    const result = await sweep(options.corpus, plugins, ROOT, options.wide);
     await data.writeSweep(result);
     const rate = (result.hits.length / result.words) * 1000;
     console.log(
@@ -194,8 +197,7 @@ const labelCommand = new Command("label")
   .option("--note <text>", "why", "")
   .option("--pattern <slug>", "pattern the hit belongs to")
   .action(async (id, options) => {
-    const swept = await data.sweep();
-    const hit = [...(swept?.hits ?? []), ...(await data.queue())].find(
+    const hit = [...(await data.hits()), ...(await data.queue())].find(
       (entry) => hitId(entry) === id,
     );
     if (hit === undefined) throw new Error(`Unknown hit ${id}.`);
@@ -370,11 +372,35 @@ const compareCommand = new Command("compare")
     }
   });
 
+const proposeCommand = new Command("propose")
+  .description(
+    `Ask a model for spans that read as AI-written, as ${PROPOSED} cards in the deck. Skips files it already asked about at the same text.`,
+  )
+  .option("--files <n>", "files to ask about, spread across directories", int)
+  .option("--model <id>", "model", MODEL)
+  .action(async (options) => {
+    const swept = await data.sweep();
+    if (swept === undefined) throw new Error("No sweep yet. Run `lab.ts sweep` first.");
+    const files = await corpusFiles(swept.corpus);
+    const results = await propose({
+      files: spread(files, options.files ?? files.length),
+      existing: await data.proposals(),
+      root: ROOT,
+      model: options.model,
+      onResult: async (result) => {
+        await data.addProposals([result]);
+        console.log(`${result.file}: ${result.hits.length} of ${result.asked} spans resolved`);
+      },
+    });
+    const hits = results.flatMap((result) => result.hits).length;
+    console.log(`${hits} proposals over ${results.length} files.`);
+  });
+
 const statusCommand = new Command("status")
   .description("Report each pattern's stage and each labeled check's precision.")
   .action(async () => {
-    const [swept, labels, flags, patterns, scores] = await Promise.all([
-      data.sweep(),
+    const [hits, labels, flags, patterns, scores] = await Promise.all([
+      data.hits(),
       data.labels(),
       data.flags(),
       data.patterns(),
@@ -383,7 +409,7 @@ const statusCommand = new Command("status")
     process.stdout.write(
       render(
         patternRows(patterns, labels, flags, scores),
-        checkRows(swept?.hits ?? [], labels, flags),
+        checkRows(hits, labels, flags),
         flags.filter((flag) => flag.pattern === undefined).length,
       ),
     );
@@ -416,6 +442,7 @@ export const program = new Command("lab")
   .addCommand(importCommand)
   .addCommand(labelCommand)
   .addCommand(scoreCommand)
+  .addCommand(proposeCommand)
   .addCommand(statusCommand)
   .addCommand(rulesCommand)
   .addCommand(compareCommand)

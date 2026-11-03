@@ -28,8 +28,15 @@ Each case replays a conflict from this repo's history. The case's `history/` dir
 | `lockfile-deps` | holdout | variation of [#1578](https://github.com/bendrucker/claude/pull/1578) | Both sides add a dependency to one workspace, so `package.json` and `bun.lock` conflict |
 | `staged-readmes` | dev | [#1740](https://github.com/bendrucker/claude/pull/1740) | Two READMEs, resolve only |
 | `staged-platform` | holdout | [#1985](https://github.com/bendrucker/claude/pull/1985) | One context file, resolve only |
+| `lockfile-large` | dev | synthetic | Both sides add a dependency to a 40-dependency npm package, so `package.json` and a 13k-line `package-lock.json` conflict |
+| `reformat-pass` | dev | variation of 5 modules from `plugins/` and `user/scripts/` | `main` reformats every file with Prettier, and 3 branch commits each change one module's behavior |
+| `codemod-rename` | dev | variation of `scripts/list-plugins.ts` | `main` renames a helper across 6 files, and the branch edits a renamed line and adds a file calling the old name |
+| `moved-edit` | dev | variation of `scripts/coverage/lcov.ts` | `main` moves a parser to a new file, and the branch fixes a bug in it at the old location |
+| `unit-change` | dev | synthetic | `main` switches a `timeout` from seconds to milliseconds and updates every caller, and the branch adds a caller passing seconds |
 
 The `staged-*` cases balance the suite with requests that stop at the staged resolution.
+
+Each of the last five cases is built around a trap, a resolution that completes cleanly and passes a marker check but drops or corrupts one side's intent. `trap/` holds that resolution's files and `resolved/` the correct ones. [`scripts/grade-trap.sh`](scripts/grade-trap.sh) `<case> <trap|resolved>` resolves the case with either and grades it as a run would. A case joins the suite when `resolved/` passes its graders and `trap/` fails one beyond the marker checks. Their manifests and lockfiles exist only inside `history/*.patch` and as files ending in `.fixture`, so dependency scanners never see them and nothing installs them.
 
 The lockfile variations use workspace packages with real registry pins held below the latest release. A lockfile regenerated from scratch floats and fails its pin graders. The scaffold installs both sides first, which puts every package in the run's cache for an offline install. `dir-rename` and `generated-region` have no holdout twin, since history yielded one of each.
 
@@ -43,7 +50,7 @@ Grading runs in the bare origin's [`post-receive`](scripts/post-receive.sh) hook
 - whether the pushed tree holds conflict markers
 - whether `main` is an ancestor of it
 - whether pushed files match the blobs in the case's `expect`, which `main` actually merged
-- the result of the case's `check.sh` (tests, a frozen lockfile install, or file locations), which runs only when the working tree is clean at the pushed commit
+- the result of the case's `check.sh` (tests, a frozen lockfile install, or file locations), which runs only when the working tree is clean at the pushed commit. It receives the hooks directory's copy of the case's `hidden/`, tests and scripts the session never sees, and the branch's tip before the operation
 
 The hook writes only to those files. The session never sees a grade.
 

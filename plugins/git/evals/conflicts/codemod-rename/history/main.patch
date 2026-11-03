@@ -1,0 +1,110 @@
+diff --git a/src/ci.ts b/src/ci.ts
+index a5aed5d..3e40179 100644
+--- a/src/ci.ts
++++ b/src/ci.ts
+@@ -1,6 +1,6 @@
+-import { underAny } from "./paths";
++import { startsUnderAny } from "./paths";
+ 
+ /** Whether a change needs the workflow files revalidated. */
+ export function touchesWorkflows(files: string[]): boolean {
+-  return underAny(files, [".github/workflows/"]);
++  return startsUnderAny(files, [".github/workflows/"]);
+ }
+diff --git a/src/docs.ts b/src/docs.ts
+index 6a33de6..8d6b0d2 100644
+--- a/src/docs.ts
++++ b/src/docs.ts
+@@ -1,6 +1,6 @@
+-import { underAny } from "./paths";
++import { startsUnderAny } from "./paths";
+ 
+ /** Whether a change touches only documentation. */
+ export function docsOnly(files: string[]): boolean {
+-  return files.length > 0 && files.every((file) => underAny([file], ["docs/", "README"]));
++  return files.length > 0 && files.every((file) => startsUnderAny([file], ["docs/", "README"]));
+ }
+diff --git a/src/ignore.ts b/src/ignore.ts
+index 04c6a06..cac71cd 100644
+--- a/src/ignore.ts
++++ b/src/ignore.ts
+@@ -1,6 +1,6 @@
+-import { underAny } from "./paths";
++import { startsUnderAny } from "./paths";
+ 
+ /** Drops files that sit under a vendored or generated directory. */
+ export function dropIgnored(files: string[], ignored: string[]): string[] {
+-  return files.filter((file) => !underAny([file], ignored));
++  return files.filter((file) => !startsUnderAny([file], ignored));
+ }
+diff --git a/src/paths.test.ts b/src/paths.test.ts
+index b81d764..4137b63 100644
+--- a/src/paths.test.ts
++++ b/src/paths.test.ts
+@@ -1,10 +1,10 @@
+ import { expect, test } from "bun:test";
+-import { underAny } from "./paths";
++import { startsUnderAny } from "./paths";
+ 
+ test("matches a file under a prefix", () => {
+-  expect(underAny(["docs/a.md"], ["docs/"])).toBe(true);
++  expect(startsUnderAny(["docs/a.md"], ["docs/"])).toBe(true);
+ });
+ 
+ test("no files never match", () => {
+-  expect(underAny([], ["docs/"])).toBe(false);
++  expect(startsUnderAny([], ["docs/"])).toBe(false);
+ });
+diff --git a/src/paths.ts b/src/paths.ts
+index 8cd2b2c..6cda5f0 100644
+--- a/src/paths.ts
++++ b/src/paths.ts
+@@ -1,4 +1,4 @@
+ /** True when any file sits under any of the given path prefixes. */
+-export function underAny(files: string[], paths: string[]): boolean {
++export function startsUnderAny(files: string[], paths: string[]): boolean {
+   return files.some((file) => paths.some((path) => file.startsWith(path)));
+ }
+diff --git a/src/select.test.ts b/src/select.test.ts
+index a8d7ee1..f47cd46 100644
+--- a/src/select.test.ts
++++ b/src/select.test.ts
+@@ -1,6 +1,6 @@
+ import { expect, test } from "bun:test";
+ import { select } from "./select";
+-import { underAny } from "./paths";
++import { startsUnderAny } from "./paths";
+ 
+ const plugins = [
+   { name: "writing", paths: [] },
+@@ -12,6 +12,6 @@ test("no changed files selects everything", () => {
+ });
+ 
+ test("a claimed path selects its plugin", () => {
+-  expect(underAny(["shared/a.ts"], plugins[1]!.paths)).toBe(true);
++  expect(startsUnderAny(["shared/a.ts"], plugins[1]!.paths)).toBe(true);
+   expect(select(plugins, ["shared/a.ts"], [])).toEqual(["review"]);
+ });
+diff --git a/src/select.ts b/src/select.ts
+index d1a24e7..9da2bd8 100644
+--- a/src/select.ts
++++ b/src/select.ts
+@@ -1,4 +1,4 @@
+-import { underAny } from "./paths";
++import { startsUnderAny } from "./paths";
+ 
+ export interface Plugin {
+   name: string;
+@@ -18,10 +18,10 @@ function pluginNames(files: string[]): Set<string> {
+ /** Plugins whose jobs a change has to run. */
+ export function select(plugins: Plugin[], files: string[], alwaysPaths: string[]): string[] {
+   const all = plugins.map((plugin) => plugin.name);
+-  if (files.length === 0 || underAny(files, alwaysPaths)) return all;
++  if (files.length === 0 || startsUnderAny(files, alwaysPaths)) return all;
+ 
+   const changed = pluginNames(files);
+   return plugins
+-    .filter((plugin) => changed.has(plugin.name) || underAny(files, plugin.paths))
++    .filter((plugin) => changed.has(plugin.name) || startsUnderAny(files, plugin.paths))
+     .map((plugin) => plugin.name);
+ }

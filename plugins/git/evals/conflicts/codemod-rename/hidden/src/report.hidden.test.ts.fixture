@@ -1,0 +1,6 @@
+import { expect, test } from "bun:test";
+import { report } from "./report";
+
+test("report counts watched files through the renamed helper", () => {
+  expect(report(["docs/a.md", "docs/b.md", "src/c.ts"], ["docs/"])).toBe("2/3 under watched paths");
+});

@@ -103,8 +103,9 @@ export async function serve(
   if (swept === undefined) throw new Error("No sweep yet. Run `lab.ts sweep` first.");
   const { repos } = swept;
   const corpus = new Set(await corpusFiles(only ?? swept.corpus, { root, docs, repos }));
+  // Also drops saved proposals and queued hits on files outside the sweep's checkouts.
   const within = <T extends Hit>(hits: readonly T[]): T[] =>
-    only === undefined ? [...hits] : hits.filter((hit) => corpus.has(hit.file));
+    hits.filter((hit) => corpus.has(hit.file));
   const sweptHits = within(swept.hits);
   const files = new Map<string, string[]>();
   const linesOf = async (file: string): Promise<string[]> => {

@@ -730,6 +730,13 @@ describe("repos", () => {
   });
   afterAll(() => rm(tmp, { recursive: true }));
 
+  const Next = z.object({ card: z.object({ file: z.string() }).nullable() });
+  /** Every card's file until the deck runs out. */
+  async function deal(server: Bun.Server<undefined>, dealt: string[] = []): Promise<string[]> {
+    const { card } = Next.parse(await (await fetch(new URL("/api/next", server.url))).json());
+    return card === null ? dealt : deal(server, [...dealt, card.file]);
+  }
+
   test("checkouts names a repo by its top-level directory and rejects this repo and a repeated name", async () => {
     expect(await checkouts([join(org, "skills")], main)).toEqual({ org });
     expect(checkouts([main], main)).rejects.toThrow("this repo");
@@ -782,14 +789,25 @@ describe("repos", () => {
         text.split("\n"),
       );
       expect((await get("/api/doc?file=org:README.md")).status).toBe(404);
-      const Next = z.object({ card: z.object({ file: z.string() }).nullable() });
-      const deal = async (dealt: string[]): Promise<string[]> => {
-        const { card } = Next.parse(await (await get("/api/next")).json());
-        return card === null ? dealt : deal([...dealt, card.file]);
-      };
-      const dealt = new Set(await deal([]));
+      const dealt = new Set(await deal(server));
       expect([...dealt].every((file) => file.endsWith("SKILL.md"))).toBe(true);
       expect(dealt.size).toBeGreaterThan(0);
+    } finally {
+      await server.stop(true);
+    }
+  });
+
+  test("serve skips a saved proposal on a checkout a later sweep dropped", async () => {
+    const data = store(join(tmp, "dropped"));
+    await data.writeSweep(await sweep("all", ["writing"], { root: main, docs }));
+    const stale = { ...hit("gone:README.md", 3, [1, 3], PROPOSED), shipped: false };
+    await data.addProposals([
+      { file: "gone:README.md", key: "k", asked: 1, hits: [stale], ts: "t" },
+    ]);
+    await data.enqueue([{ ...stale, pattern: "p", candidate: "c" }]);
+    const { server } = await serve(data, { port: 0, perCheck: 5, root: main, docs });
+    try {
+      expect(await deal(server)).not.toContain("gone:README.md");
     } finally {
       await server.stop(true);
     }

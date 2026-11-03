@@ -55,7 +55,14 @@ cp "$(dirname "$0")/scripts/post-receive.sh" "$hooks/post-receive"
 if [ -f "$case_dir/check.sh" ]; then cp "$case_dir/check.sh" "$hooks/eval-check"; fi
 if [ -f "$case_dir/expect" ]; then cp "$case_dir/expect" "$hooks/eval-expect"; fi
 # Hidden checks sit outside the working tree, so the session never reads or edits them.
-if [ -d "$case_dir/hidden" ]; then cp -R "$case_dir/hidden" "$hooks/eval-hidden"; fi
+# A trailing .fixture keeps their tests and manifests out of this repo's test runs and dependency scanners.
+if [ -d "$case_dir/hidden" ]; then
+  (cd "$case_dir/hidden" && find . -type f) | while read -r file; do
+    dest="$hooks/eval-hidden/${file%.fixture}"
+    mkdir -p "$(dirname "$dest")"
+    cp "$case_dir/hidden/$file" "$dest"
+  done
+fi
 git rev-parse HEAD > "$hooks/eval-branch"
 chmod +x "$hooks"/*
 : > .eval-verdicts

@@ -43,6 +43,29 @@ export async function labConfig(rules: readonly string[], base: string): Promise
   return config;
 }
 
+/** The base config with every check of every style it names firing at every level. */
+export async function wideConfig(base: string): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "prose-lab-wide-"));
+  const ini = (await Bun.file(base).text())
+    .replace(/^StylesPath\s*=.*$/m, `StylesPath = ${join(dirname(base), "styles")}`)
+    .replaceAll(/^MinAlertLevel\s*=.*\n?/gm, "")
+    .replaceAll(/^[A-Za-z][\w-]*\.\w+\s*=.*\n?/gm, "");
+  const config = join(dir, ".vale.ini");
+  await Bun.write(config, `MinAlertLevel = suggestion\n${ini}`);
+  return config;
+}
+
+/** A Wilson interval over judged hits, or the whole range before any. */
+export function interval(right: number, wrong: number): [number, number] {
+  return right + wrong === 0 ? [0, 1] : wilson(right, right + wrong);
+}
+
+/** Labeled enough that the interval sits wholly on one side of the floor. */
+export function settled(right: number, wrong: number): boolean {
+  const [low, high] = interval(right, wrong);
+  return right + wrong >= MIN_LABELED && (low >= FLOOR || high < FLOOR);
+}
+
 export interface Evidence {
   positives: Located[];
   files: number;

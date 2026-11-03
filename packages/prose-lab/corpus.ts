@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { $ } from "bun";
 import { lint } from "../../plugins/prompting/skills/scan/scripts/vale";
-import { type Corpus, DOCS, entries, type Hit, type Sweep } from "./data";
+import { type Corpus, DOCS, entries, type Hit, hitId, type Sweep } from "./data";
+import { wideConfig } from "./score";
 
 export const ROOT = join(import.meta.dirname, "..", "..");
 
@@ -119,15 +120,40 @@ export async function lintFiles(
   );
 }
 
+/** The wide config's hits, each marked by whether the plugin's own config fires it too. */
+export function markShipped(own: Hit[], wide: Hit[]): Hit[] {
+  const ids = new Set(own.map(hitId));
+  const found = new Set(wide.map(hitId));
+  return [
+    ...wide.map((hit) => Object.assign(hit, { shipped: ids.has(hitId(hit)) })),
+    ...own
+      .filter((hit) => !found.has(hitId(hit)))
+      .map((hit) => Object.assign(hit, { shipped: true })),
+  ];
+}
+
+async function lintPlugin(
+  plugin: Plugin,
+  files: readonly string[],
+  wide: boolean,
+  root: string,
+): Promise<Hit[]> {
+  const own = lintFiles(plugin, PLUGINS[plugin], files, root);
+  if (!wide) return own;
+  const config = await wideConfig(PLUGINS[plugin]);
+  return markShipped(await own, await lintFiles(plugin, config, files, root));
+}
+
 export async function sweep(
   corpus: Corpus,
   plugins: readonly Plugin[],
   root = ROOT,
+  wide = false,
 ): Promise<Sweep> {
   const files = await corpusFiles(corpus, root);
   const [rev, hits, words] = await Promise.all([
     $`git -C ${root} rev-parse --short HEAD`.text(),
-    Promise.all(plugins.map((plugin) => lintFiles(plugin, PLUGINS[plugin], files, root))),
+    Promise.all(plugins.map((plugin) => lintPlugin(plugin, files, wide, root))),
     Promise.all(files.map(async (file) => countWords(await Bun.file(join(root, file)).text()))),
   ]);
   return {

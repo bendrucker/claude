@@ -24,14 +24,41 @@
   .note { width: 45%; }
   .pattern { width: 14rem; }
   #flagbar { position: sticky; top: 0; background: Canvas; padding: .5rem 0; border-bottom: 1px solid #8884; }
+  body:has(#cards:not([hidden])) { max-width: 78rem; }
+  #cards { display: grid; grid-template-columns: 1fr 20rem; gap: 2rem; align-items: start; }
+  #card { border: 1px solid #8884; border-radius: 10px; padding: 1.5rem 2rem; min-height: 16rem; }
+  #card .where { font-size: 13px; color: #777; margin-bottom: 1rem; }
+  #card .near { font-family: ui-monospace, monospace; font-size: 14px; color: #999; white-space: pre-wrap; min-height: 1.4em; }
+  #card .line { font-size: 22px; line-height: 1.5; margin: .75rem 0; white-space: pre-wrap; }
+  #card .inputs { margin-top: 1.25rem; display: flex; gap: .5rem; }
+  #card .inputs .note { flex: 1; }
+  #reveal { margin-top: 1rem; min-height: 6rem; font-size: 14px; }
+  #reveal .verdict { font-weight: 700; }
+  #reveal .right { color: #c33; }
+  #reveal .wrong { color: #393; }
+  #reveal table, #board table { border-collapse: collapse; margin-top: .4rem; font-size: 13px; }
+  #reveal td, #board td { padding: 1px .6rem 1px 0; }
+  .call-enable, .call-retire { font-weight: 700; }
+  .badge { font-size: 12px; border: 1px solid #8886; border-radius: 4px; padding: 0 .3rem; margin-left: .3rem; }
+  #board { font-size: 14px; position: sticky; top: 1rem; }
+  #board .counts { font-size: 18px; margin-bottom: .5rem; }
 </style>
 </head>
 <body>
 <h1>Prose lab</h1>
-<nav><button id="tab-sample" class="on" onclick="show('sample')">Sample</button><button id="tab-doc" onclick="show('doc')">Document</button></nav>
+<nav><button id="tab-cards" class="on" onclick="show('cards')">Cards</button><button id="tab-sample" onclick="show('sample')">Sample</button><button id="tab-doc" onclick="show('doc')">Document</button></nav>
 <datalist id="patterns"></datalist>
 
-<section id="sample">
+<section id="cards">
+  <div>
+    <p class="keys">→ slop · ← fine · ↓ unsure · z back · p pattern · n note · Esc leaves an input</p>
+    <div id="card"></div>
+    <div id="reveal"></div>
+  </div>
+  <aside id="board"></aside>
+</section>
+
+<section id="sample" hidden>
   <p class="keys">Right: the skill should cut or rewrite this prose. Wrong: it is fine as written. Unsure: you'd need more context. Name the pattern when you know it, and use the note for anything else. Keys: j/k move, r/w/u label the focused item.</p>
   <p id="progress"></p>
   <div id="items"></div>
@@ -54,7 +81,7 @@ const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">"
 let items = [], labels = new Map(), focus = 0, picked = null;
 
 function show(view) {
-  for (const name of ["sample", "doc"]) {
+  for (const name of ["cards", "sample", "doc"]) {
     document.getElementById(name).hidden = name !== view;
     document.getElementById(`tab-${name}`).classList.toggle("on", name === view);
   }
@@ -175,9 +202,95 @@ async function flag() {
   await openDoc(picked.file);
 }
 
+const pct = (x) => `${Math.round(x * 100)}%`;
+const VERDICT = { right: "slop", wrong: "fine", unsure: "unsure" };
+const REVEAL_MS = 1100;
+let deck = [], at = -1, revealing = null;
+
+function ratingRows(rows) {
+  return `<table>${rows.map((r) => `<tr><td>${esc(r.check)}${r.shipped ? "" : '<span class="badge">off</span>'}</td><td>${r.right}✓ ${r.wrong}✗</td><td>${pct(r.low)}–${pct(r.high)}</td><td class="call-${r.call.replace(" ", "-")}">${r.call}</td></tr>`).join("")}</table>`;
+}
+
+function renderBoard(board) {
+  document.getElementById("board").innerHTML = `<div class="counts"><b>${board.decided}</b> decided · <b>${board.open}</b> open</div>` +
+    (board.calls.length === 0 ? `<p class="meta">No calls yet. A check needs ten judged hits and an interval clear of the floor.</p>` : ratingRows(board.calls));
+}
+
+function renderCard() {
+  const card = deck[at]?.card;
+  const box = document.getElementById("card");
+  if (!card) return (box.innerHTML = `<p>Every check is decided or out of hits.</p>`);
+  box.innerHTML = `<div class="where">${esc(card.file)}:${card.line}${at < deck.length - 1 ? " · revisiting" : ""}</div>
+    <div class="near">${esc(card.before)}</div>
+    <div class="line">${esc(card.pre)}<mark>${esc(card.marked)}</mark>${esc(card.post)}</div>
+    <div class="near">${esc(card.after)}</div>
+    <div class="inputs"><input id="card-pattern" class="pattern" list="patterns" placeholder="pattern slug (p)" value="${esc(deck[at].pattern ?? "")}"><input id="card-note" class="note" placeholder="note (n)" value="${esc(deck[at].note ?? "")}"></div>`;
+}
+
+async function advance() {
+  clearTimeout(revealing);
+  revealing = null;
+  document.getElementById("reveal").innerHTML = "";
+  if (at < deck.length - 1) {
+    at++;
+    return renderCard();
+  }
+  const body = await (await fetch("/api/next")).json();
+  renderBoard(body.board);
+  if (body.card) {
+    deck.push({ card: body.card });
+    at = deck.length - 1;
+  } else at = deck.length;
+  renderCard();
+}
+
+async function vote(verdict) {
+  const entry = deck[at];
+  if (!entry) return;
+  entry.pattern = document.getElementById("card-pattern").value.trim() || undefined;
+  entry.note = document.getElementById("card-note").value;
+  const response = await fetch("/api/vote", { method: "POST", body: JSON.stringify({ id: entry.card.id, verdict, note: entry.note, pattern: entry.pattern }) });
+  if (!response.ok) return (document.getElementById("reveal").textContent = await response.text());
+  const { reveal, board } = await response.json();
+  renderBoard(board);
+  const others = reveal.others.length === 0 ? "" : ` · also ${reveal.others.map(esc).join(", ")}`;
+  document.getElementById("reveal").innerHTML = `<div><span class="verdict ${verdict}">${VERDICT[verdict]}</span> · <b>${esc(reveal.check)}</b>${reveal.shipped ? "" : '<span class="badge">off</span>'}${others}</div>
+    <div class="meta">${esc(reveal.message)}</div>${ratingRows(reveal.ratings)}`;
+  revealing = setTimeout(advance, REVEAL_MS);
+}
+
+function back() {
+  if (at <= 0) return;
+  clearTimeout(revealing);
+  revealing = null;
+  at--;
+  document.getElementById("reveal").innerHTML = "";
+  renderCard();
+}
+
+document.addEventListener("keydown", (event) => {
+  if (document.getElementById("cards").hidden) return;
+  if (event.target.tagName === "INPUT") {
+    if (event.key === "Escape" || event.key === "Enter") event.target.blur();
+    return;
+  }
+  if (revealing !== null) {
+    event.preventDefault();
+    if (event.key === "z") return back();
+    return advance();
+  }
+  const keys = { ArrowRight: () => vote("right"), ArrowLeft: () => vote("wrong"), ArrowDown: () => vote("unsure"), z: back,
+    p: () => document.getElementById("card-pattern")?.focus(), n: () => document.getElementById("card-note")?.focus() };
+  const action = keys[event.key];
+  if (!action) return;
+  event.preventDefault();
+  action();
+});
+
 loadPatterns();
 loadSample();
 loadFiles();
+advance();
 </script>
 </body>
 </html>

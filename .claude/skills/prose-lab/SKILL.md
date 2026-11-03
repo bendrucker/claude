@@ -24,7 +24,11 @@ Run every command as `bun ${CLAUDE_SKILL_DIR}/../../../packages/prose-lab/lab.ts
 
 ## Flag
 
-Run `sweep`, then `serve` in the background, and hand the user the URL. The sample tab takes right, wrong, or unsure per hit with an optional pattern slug. The document tab flags spans that the rules missed. Stop until the user says the sitting is done.
+Run `sweep --corpus all --wide`, which also reports the checks the plugin configs turn off. Start `propose` and `serve` in the background, and hand the user the URL. `propose` asks a model for spans the rules miss, one call per file, and its cards join the deck as `Model.Proposed` as they arrive.
+
+The cards tab shows one hit at a time without its check, choosing the undecided check with the widest interval. A vote on a span judges every check with a hit on it. The sample tab lists hits per check, and the document tab flags spans that neither the rules nor the model marked. Stop until the user says the sitting is done.
+
+Then run `status`, which calls each check decided past ten judged hits. Propose each `enable` and `retire` call to the user with its counts. An accepted `enable` flips the check's line in the plugin's `.vale.ini` per `.claude/rules/vale-styles.md`. Retire through Retire. Take the `Model.Proposed` hits labeled right to Group, since they name patterns the rules miss.
 
 ## Review
 
@@ -50,7 +54,7 @@ When no candidate clears the floor, ship nothing. Record the trial (each candida
 
 ## Retire
 
-After each `sweep`, the check table in `status` marks shipped checks whose labeled floor fell under the bar. Propose retiring each one to the user with its counts.
+The check table in `status` calls `retire` on a shipped check whose interval sits wholly under the floor. Propose retiring each one to the user with its counts.
 
 `rules` ranks the plugins' rules by complexity and marks those over the ceiling. Rewrite one with candidates checked by `compare <rule.yml> <candidates...> --dir <corpus>`, passing the rule's file path, which lists the hits each keeps, drops, and adds. Accept a drop when the dropped hits are rare or marginal. When the user disagrees with a score, adjust `WEIGHTS` in `complexity.ts`.
 

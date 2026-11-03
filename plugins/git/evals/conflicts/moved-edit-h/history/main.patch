@@ -1,0 +1,129 @@
+diff --git a/money.go b/money.go
+index aa49d80..002be6c 100644
+--- a/money.go
++++ b/money.go
+@@ -1,33 +1,6 @@
+ package ledger
+ 
+-import (
+-	"fmt"
+-	"strconv"
+-	"strings"
+-)
+-
+-// ParseCents converts a decimal string such as "12.50" to cents.
+-func ParseCents(s string) (int, error) {
+-	whole, frac, found := strings.Cut(s, ".")
+-	if !found {
+-		frac = "00"
+-	}
+-	if len(frac) != 2 {
+-		return 0, fmt.Errorf("want two decimal places in %q", s)
+-	}
+-	w, err := strconv.Atoi(whole)
+-	if err != nil {
+-		return 0, err
+-	}
+-	f, err := strconv.Atoi(frac)
+-	if err != nil {
+-		return 0, err
+-	}
+-	if strings.HasPrefix(whole, "-") {
+-		f = -f
+-	}
+-	return w*100 + f, nil
+-}
++import "fmt"
+ 
+ // FormatCents renders cents as a decimal string such as "12.50".
+ func FormatCents(c int) string {
+diff --git a/money_test.go b/money_test.go
+index 8bf27e4..d3e7354 100644
+--- a/money_test.go
++++ b/money_test.go
+@@ -2,23 +2,6 @@ package ledger
+ 
+ import "testing"
+ 
+-func TestParseCents(t *testing.T) {
+-	cases := []struct {
+-		in   string
+-		want int
+-	}{
+-		{"12.50", 1250},
+-		{"7", 700},
+-		{"-0.50", -50},
+-	}
+-	for _, c := range cases {
+-		got, err := ParseCents(c.in)
+-		if err != nil || got != c.want {
+-			t.Errorf("ParseCents(%q) = %d, %v; want %d", c.in, got, err, c.want)
+-		}
+-	}
+-}
+-
+ func TestFormatCents(t *testing.T) {
+ 	if got := FormatCents(-5); got != "-0.05" {
+ 		t.Errorf("FormatCents(-5) = %q", got)
+diff --git a/parse.go b/parse.go
+new file mode 100644
+index 0000000..eeae550
+--- /dev/null
++++ b/parse.go
+@@ -0,0 +1,30 @@
++package ledger
++
++import (
++	"fmt"
++	"strconv"
++	"strings"
++)
++
++// ParseCents converts a decimal string such as "12.50" to cents.
++func ParseCents(s string) (int, error) {
++	whole, frac, found := strings.Cut(s, ".")
++	if !found {
++		frac = "00"
++	}
++	if len(frac) != 2 {
++		return 0, fmt.Errorf("want two decimal places in %q", s)
++	}
++	w, err := strconv.Atoi(whole)
++	if err != nil {
++		return 0, err
++	}
++	f, err := strconv.Atoi(frac)
++	if err != nil {
++		return 0, err
++	}
++	if strings.HasPrefix(whole, "-") {
++		f = -f
++	}
++	return w*100 + f, nil
++}
+diff --git a/parse_test.go b/parse_test.go
+new file mode 100644
+index 0000000..c0e6d53
+--- /dev/null
++++ b/parse_test.go
+@@ -0,0 +1,20 @@
++package ledger
++
++import "testing"
++
++func TestParseCents(t *testing.T) {
++	cases := []struct {
++		in   string
++		want int
++	}{
++		{"12.50", 1250},
++		{"7", 700},
++		{"-0.50", -50},
++	}
++	for _, c := range cases {
++		got, err := ParseCents(c.in)
++		if err != nil || got != c.want {
++			t.Errorf("ParseCents(%q) = %d, %v; want %d", c.in, got, err, c.want)
++		}
++	}
++}

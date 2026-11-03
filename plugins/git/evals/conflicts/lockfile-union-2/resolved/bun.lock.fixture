@@ -1,0 +1,34 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "union",
+    },
+    "apps/cli": {
+      "name": "@union/cli",
+      "dependencies": {
+        "commander": "~14.0.0",
+        "semver": "~7.6.0",
+      },
+    },
+    "libs/core": {
+      "name": "@union/core",
+      "dependencies": {
+        "commander": "~14.0.0",
+        "semver": "^7.7.0",
+      },
+    },
+  },
+  "packages": {
+    "@union/cli": ["@union/cli@workspace:apps/cli"],
+
+    "@union/core": ["@union/core@workspace:libs/core"],
+
+    "commander": ["commander@14.0.2", "", {}, "sha512-TywoWNNRbhoD0BXs1P3ZEScW8W5iKrnbithIl0YH+uCmBd0QpPOA8yc82DS3BIE5Ma6FnBVUsJ7wVUDz4dvOWQ=="],
+
+    "semver": ["semver@7.6.3", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-oVekP1cKtI+CTDvHWYFUcMtsK/00wmAEfyqKfNdARm8u1wNVhSgaX7A8d4UuIlUI5e84iEwOhs7ZPYRmzU9U6A=="],
+
+    "@union/core/semver": ["semver@7.7.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA=="],
+  }
+}

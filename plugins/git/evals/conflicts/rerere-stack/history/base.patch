@@ -1,0 +1,23 @@
+diff --git a/src/client.ts b/src/client.ts
+new file mode 100644
+index 0000000..f591321
+--- /dev/null
++++ b/src/client.ts
+@@ -0,0 +1,6 @@
++import { open } from "./socket";
++import { limits } from "./limits";
++
++export function connect(host: string) {
++  return open(host, limits.timeoutMs);
++}
+diff --git a/src/limits.ts b/src/limits.ts
+new file mode 100644
+index 0000000..94c0f29
+--- /dev/null
++++ b/src/limits.ts
+@@ -0,0 +1,5 @@
++export const limits = {
++  retries: 3,
++  timeoutMs: 5000,
++  maxBodyBytes: 1_000_000,
++};

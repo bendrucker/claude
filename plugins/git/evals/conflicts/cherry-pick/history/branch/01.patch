@@ -1,0 +1,10 @@
+diff --git a/src/slug.ts b/src/slug.ts
+index b025dc9..9b4dcef 100644
+--- a/src/slug.ts
++++ b/src/slug.ts
+@@ -1,3 +1,3 @@
+-export function slugify(input: string): string {
+-  return input.toLowerCase().replace(/[^a-z0-9]+/g, "-");
++export function slugify(input: string, max = 64): string {
++  return input.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, max);
+ }

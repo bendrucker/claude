@@ -1,0 +1,13 @@
+diff --git a/src/retry.ts b/src/retry.ts
+index f4646ef..2530e93 100644
+--- a/src/retry.ts
++++ b/src/retry.ts
+@@ -12,7 +12,7 @@ export async function retry<T>(fn: () => Promise<T>, options: RetryOptions): Pro
+       return await fn();
+     } catch (error) {
+       last = error;
+-      await sleep(options.delayMs);
++      await sleep(options.delayMs * 2 ** i);
+     }
+   }
+   throw last;

@@ -1,0 +1,46 @@
+diff --git a/README.md b/README.md
+index 9df4f48..8b8c413 100644
+--- a/README.md
++++ b/README.md
+@@ -1,5 +1,5 @@
+ # Notes tooling
+ 
+-`scripts/backup.sh <dir> <dest>` writes a timestamped tarball of `<dir>` into `<dest>` and keeps the newest seven.
++`scripts/archive.sh <dir> <dest>` writes a timestamped tarball of `<dir>` into `<dest>` and keeps the newest seven.
+ 
+ `scripts/nightly.sh` runs it for `~/notes`.
+diff --git a/scripts/backup.sh b/scripts/archive.sh
+similarity index 67%
+rename from scripts/backup.sh
+rename to scripts/archive.sh
+index e20c40d..0e2849e 100755
+--- a/scripts/backup.sh
++++ b/scripts/archive.sh
+@@ -1,13 +1,13 @@
+ #!/usr/bin/env bash
+ set -euo pipefail
+ 
+-src=${1:?usage: backup.sh <dir> <dest>}
+-dest=${2:?usage: backup.sh <dir> <dest>}
+-keep=7
++src=${1:?usage: archive.sh <dir> <dest>}
++dest=${2:?usage: archive.sh <dir> <dest>}
++keep=${ARCHIVE_KEEP:-7}
+ 
+ mkdir -p "$dest"
+ name=$(basename "$src")
+-stamp=${BACKUP_STAMP:-$(date +%Y%m%d%H%M%S)}
++stamp=${ARCHIVE_STAMP:-$(date +%Y%m%d%H%M%S)}
+ tar -czf "$dest/$name-$stamp.tar.gz" -C "$(dirname "$src")" "$name"
+ 
+ # Keep the newest archives. Names sort by timestamp.
+diff --git a/scripts/nightly.sh b/scripts/nightly.sh
+index 68093a8..be006c1 100755
+--- a/scripts/nightly.sh
++++ b/scripts/nightly.sh
+@@ -2,4 +2,4 @@
+ set -euo pipefail
+ 
+ dir=$(cd "$(dirname "$0")" && pwd)
+-"$dir/backup.sh" "$HOME/notes" "$HOME/backups"
++"$dir/archive.sh" "$HOME/notes" "$HOME/backups"

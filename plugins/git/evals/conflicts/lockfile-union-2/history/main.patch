@@ -1,0 +1,31 @@
+diff --git a/bun.lock b/bun.lock
+index 32bf5f0..a2f4135 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -15,6 +15,7 @@
+       "name": "@union/core",
+       "dependencies": {
+         "commander": "~14.0.0",
++        "semver": "^7.7.0",
+       },
+     },
+   },
+@@ -24,5 +25,7 @@
+     "@union/core": ["@union/core@workspace:libs/core"],
+ 
+     "commander": ["commander@14.0.2", "", {}, "sha512-TywoWNNRbhoD0BXs1P3ZEScW8W5iKrnbithIl0YH+uCmBd0QpPOA8yc82DS3BIE5Ma6FnBVUsJ7wVUDz4dvOWQ=="],
++
++    "semver": ["semver@7.7.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA=="],
+   }
+ }
+diff --git a/libs/core/package.json b/libs/core/package.json
+index aeb2146..7ce4ce4 100644
+--- a/libs/core/package.json
++++ b/libs/core/package.json
+@@ -2,5 +2,5 @@
+   "name": "@union/core",
+   "private": true,
+   "type": "module",
+-  "dependencies": { "commander": "~14.0.0" }
++  "dependencies": { "semver": "^7.7.0", "commander": "~14.0.0" }
+ }

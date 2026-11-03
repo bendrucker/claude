@@ -1,0 +1,13 @@
+diff --git a/scripts/archive.sh b/scripts/archive.sh
+index 0e2849e..7cedeed 100755
+--- a/scripts/archive.sh
++++ b/scripts/archive.sh
+@@ -8,7 +8,7 @@ keep=${ARCHIVE_KEEP:-7}
+ mkdir -p "$dest"
+ name=$(basename "$src")
+ stamp=${ARCHIVE_STAMP:-$(date +%Y%m%d%H%M%S)}
+-tar -czf "$dest/$name-$stamp.tar.gz" -C "$(dirname "$src")" "$name"
++tar --exclude=.git -czf "$dest/$name-$stamp.tar.gz" -C "$(dirname "$src")" "$name"
+ 
+ # Keep the newest archives. Names sort by timestamp.
+ ls -1 "$dest/$name"-*.tar.gz | sort -r | tail -n +$((keep + 1)) | while read -r old; do

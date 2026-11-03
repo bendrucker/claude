@@ -1,1 +1,1 @@
-Rebase onto main hit conflicts. Resolve, continue, and push.
+Merge conflict and then push.

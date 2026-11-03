@@ -1,0 +1,9 @@
+from tally.seq import batched
+
+
+def csv_files(rows, per_file):
+    """Renders rows as CSV bodies of at most per_file rows each."""
+    return [
+        "\n".join(",".join(map(str, row)) for row in chunk)
+        for chunk in batched(rows, per_file)
+    ]

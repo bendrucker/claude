@@ -77,7 +77,7 @@ function isMarkerGrader(name: string): boolean {
 }
 
 const Args = z.object({
-  values: z.object({ expect: z.enum(["resolved", "trap"]) }),
+  values: z.object({ expect: z.string() }),
   positionals: z.tuple([z.string(), z.string()]),
 });
 

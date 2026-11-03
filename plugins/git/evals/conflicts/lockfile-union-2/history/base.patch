@@ -1,0 +1,90 @@
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..c2658d7
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1 @@
++node_modules/
+diff --git a/apps/cli/index.ts b/apps/cli/index.ts
+new file mode 100644
+index 0000000..cb0ff5c
+--- /dev/null
++++ b/apps/cli/index.ts
+@@ -0,0 +1 @@
++export {};
+diff --git a/apps/cli/package.json b/apps/cli/package.json
+new file mode 100644
+index 0000000..845ce0b
+--- /dev/null
++++ b/apps/cli/package.json
+@@ -0,0 +1,6 @@
++{
++  "name": "@union/cli",
++  "private": true,
++  "type": "module",
++  "dependencies": { "commander": "~14.0.0" }
++}
+diff --git a/bun.lock b/bun.lock
+new file mode 100644
+index 0000000..32bf5f0
+--- /dev/null
++++ b/bun.lock
+@@ -0,0 +1,28 @@
++{
++  "lockfileVersion": 2,
++  "configVersion": 1,
++  "workspaces": {
++    "": {
++      "name": "union",
++    },
++    "apps/cli": {
++      "name": "@union/cli",
++      "dependencies": {
++        "commander": "~14.0.0",
++      },
++    },
++    "libs/core": {
++      "name": "@union/core",
++      "dependencies": {
++        "commander": "~14.0.0",
++      },
++    },
++  },
++  "packages": {
++    "@union/cli": ["@union/cli@workspace:apps/cli"],
++
++    "@union/core": ["@union/core@workspace:libs/core"],
++
++    "commander": ["commander@14.0.2", "", {}, "sha512-TywoWNNRbhoD0BXs1P3ZEScW8W5iKrnbithIl0YH+uCmBd0QpPOA8yc82DS3BIE5Ma6FnBVUsJ7wVUDz4dvOWQ=="],
++  }
++}
+diff --git a/libs/core/index.ts b/libs/core/index.ts
+new file mode 100644
+index 0000000..cb0ff5c
+--- /dev/null
++++ b/libs/core/index.ts
+@@ -0,0 +1 @@
++export {};
+diff --git a/libs/core/package.json b/libs/core/package.json
+new file mode 100644
+index 0000000..aeb2146
+--- /dev/null
++++ b/libs/core/package.json
+@@ -0,0 +1,6 @@
++{
++  "name": "@union/core",
++  "private": true,
++  "type": "module",
++  "dependencies": { "commander": "~14.0.0" }
++}
+diff --git a/package.json b/package.json
+new file mode 100644
+index 0000000..794e3b5
+--- /dev/null
++++ b/package.json
+@@ -0,0 +1,5 @@
++{
++  "name": "union",
++  "private": true,
++  "workspaces": ["libs/*", "apps/*"]
++}

@@ -1,1 +1,1 @@
-The rebase onto main stopped on conflicts. Resolve them, finish the rebase, and push the branch.
+Rebase onto origin/main, resolve the conflicts, run the tests locally, and push. Do not merge.

@@ -1,1 +1,1 @@
-fix conflicts and push
+/git:conflicts push

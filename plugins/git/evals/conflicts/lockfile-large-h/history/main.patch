@@ -1,0 +1,43 @@
+diff --git a/packages/worker/package-lock.json b/packages/worker/package-lock.json
+index 7fb0078..1186227 100644
+--- a/packages/worker/package-lock.json
++++ b/packages/worker/package-lock.json
+@@ -44,7 +44,8 @@
+         "undici": "^7.0.0",
+         "vitest": "^2.1.0",
+         "ws": "^8.18.0",
+-        "yargs": "^17.7.0"
++        "yargs": "^17.7.0",
++        "zod": "^3.23.8"
+       }
+     },
+     "node_modules/@babel/runtime": {
+@@ -7190,6 +7191,15 @@
+       "funding": {
+         "url": "https://github.com/sponsors/sindresorhus"
+       }
++    },
++    "node_modules/zod": {
++      "version": "3.23.8",
++      "resolved": "https://registry.npmjs.org/zod/-/zod-3.23.8.tgz",
++      "integrity": "sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==",
++      "license": "MIT",
++      "funding": {
++        "url": "https://github.com/sponsors/colinhacks"
++      }
+     }
+   }
+ }
+diff --git a/packages/worker/package.json b/packages/worker/package.json
+index b46e2b2..2cd45b4 100644
+--- a/packages/worker/package.json
++++ b/packages/worker/package.json
+@@ -39,6 +39,7 @@
+     "undici": "^7.0.0",
+     "vitest": "^2.1.0",
+     "ws": "^8.18.0",
+-    "yargs": "^17.7.0"
++    "yargs": "^17.7.0",
++    "zod": "^3.23.8"
+   }
+ }

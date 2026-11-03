@@ -33,8 +33,6 @@ hooks:
 
 # Git Conflicts
 
-Every conflicted file ends as the result both sides intended: each side's change preserved, the file coherent, and nothing dropped that the merged result does not account for. Resolve a conflict these rules do not cover to that standard. When the three versions do not reveal what each side intended, keep both sides and ask the user.
-
 ## Status
 
 !`bun ${CLAUDE_PLUGIN_ROOT}/skills/conflicts/scripts/status.ts`
@@ -49,7 +47,7 @@ Every conflicted file ends as the result both sides intended: each side's change
 
 ## Resolving
 
-For each conflicted file, read base, ours, and theirs (`git show :1:path`, `:2:path`, `:3:path`), edit the file to the merged result, then `git add` it.
+Resolve each conflicted file, then `git add` it.
 
 - Regenerate a generated file, such as a lockfile or a build artifact, from its source. Follow the project's `CLAUDE.md` for lockfile guidance.
 - When repeated rebases hit the same conflict, [references/rerere.md](references/rerere.md) records a resolution and replays it.

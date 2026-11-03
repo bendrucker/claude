@@ -9,7 +9,7 @@ export const MAX_HOPS = 4;
 // The memory files whose `@path` imports Claude Code expands.
 export const IMPORTERS = new Set(["CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"]);
 
-const SKIPPED_DIRS = new Set(["node_modules", ".git", "fixtures", "__snapshots__", "evals"]);
+export const SKIPPED_DIRS = new Set(["node_modules", ".git", "fixtures", "__snapshots__", "evals"]);
 const IMPORT = /(?:^|\s)@((?:[^\s\\]|\\ )+)/g;
 
 export interface Unscanned {

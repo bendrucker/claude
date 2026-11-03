@@ -22,10 +22,12 @@ import {
   envelopeCode,
   execSession,
   fetchArgs,
+  formatContext,
   formatRecord,
   mergeSettings,
   type Mux,
   type Pause,
+  readContext,
   readProgramStatus,
   readSender,
   remoteCommand,
@@ -407,6 +409,69 @@ describe("describeMuxDefault", () => {
     },
   ])("$name", ({ env, expected }) => {
     expect(describeMuxDefault(env)).toBe(expected);
+  });
+});
+
+const CONTEXT_KEYS = ["repo", "branch", "mux", "sender", "base", "usage", "more"];
+
+describe("formatContext", () => {
+  const inputs = {
+    repo: "/src/app",
+    branch: "main",
+    mux: "defaults to rex, the multiplexer hosting this session",
+    sender: "lead",
+    base: "origin/main",
+  };
+
+  test("prints one line per key", () => {
+    const lines = formatContext(inputs).split("\n");
+    expect(lines.map((line) => line.split(":")[0])).toEqual(CONTEXT_KEYS);
+    expect(lines[1]).toBe("branch: main");
+    expect(lines[3]).toBe("sender: lead");
+  });
+
+  test("falls back for a missing branch and sender", () => {
+    const lines = formatContext({ ...inputs, branch: null, sender: null }).split("\n");
+    expect(lines[1]).toBe("branch: detached");
+    expect(lines[3]).toBe("sender: unknown");
+  });
+});
+
+describe("readContext", () => {
+  const defaults = { repo: "/src/app", base: "origin/main" };
+
+  test("reads the branch with one git call", async () => {
+    const { run, calls } = fakeRunner([{ code: 0, stdout: "topic\n", stderr: "" }]);
+    const context = await readContext(defaults, { REX_BLOCK: "b" }, run);
+    expect(context.branch).toBe("topic");
+    expect(context.mux).toBe(describeMuxDefault({ REX_BLOCK: "b" }));
+    expect(calls).toHaveLength(1);
+  });
+
+  test("falls back when git fails or the head is detached", async () => {
+    const detached = fakeRunner([{ code: 0, stdout: "\n", stderr: "" }]);
+    expect((await readContext(defaults, {}, detached.run)).branch).toBeNull();
+    const failed = fakeRunner([{ code: 128, stdout: "", stderr: "fatal" }]);
+    expect((await readContext(defaults, {}, failed.run)).branch).toBeNull();
+    const throws: Runner = () => Promise.reject(new Error("no git"));
+    expect((await readContext(defaults, {}, throws)).branch).toBeNull();
+  });
+});
+
+describe("--context", () => {
+  test("prints the line keys and exits 0 without a branch", async () => {
+    const proc = Bun.spawn(["bun", join(import.meta.dirname, "dispatch.ts"), "--context"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const out = await new Response(proc.stdout).text();
+    expect(await proc.exited).toBe(0);
+    expect(
+      out
+        .trimEnd()
+        .split("\n")
+        .map((line) => line.split(":")[0]),
+    ).toEqual(CONTEXT_KEYS);
   });
 });
 

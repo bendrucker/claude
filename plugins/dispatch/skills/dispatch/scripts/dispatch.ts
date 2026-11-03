@@ -402,6 +402,51 @@ export function describeMuxDefault(env: Readonly<Record<string, string | undefin
   }
 }
 
+export interface ContextInputs {
+  repo: string;
+  branch: string | null;
+  mux: string;
+  sender: string | null;
+  base: string;
+}
+
+const CONTEXT_USAGE =
+  "dispatch.ts --branch <name|pr:<n>|mr:<n>> --prompt <file> [--base <ref>] [--repo <path>] [--allow <rule>]... [--sandbox-write <path>]... [--mux rex|herdr|bg]";
+
+export function formatContext(inputs: ContextInputs): string {
+  return [
+    `repo: ${inputs.repo}`,
+    `branch: ${inputs.branch ?? "detached"}`,
+    `mux: ${inputs.mux}`,
+    `sender: ${inputs.sender ?? "unknown"}`,
+    `base: ${inputs.base}`,
+    `usage: ${CONTEXT_USAGE}`,
+    "more: dispatch.ts --help lists every flag",
+  ].join("\n");
+}
+
+// The skill injects this output at load, so no lookup may fail the command.
+export async function readContext(
+  defaults: { repo: string; base: string },
+  env: Readonly<Record<string, string | undefined>>,
+  run: Runner = spawnRunner,
+): Promise<ContextInputs> {
+  let branch: string | null = null;
+  try {
+    const result = await run(["git", "branch", "--show-current"], { cwd: defaults.repo });
+    if (result.code === 0 && result.stdout.trim() !== "") branch = result.stdout.trim();
+  } catch {
+    // Falls back to the detached label.
+  }
+  let sender: string | null = null;
+  try {
+    sender = (await readSender(env, run))?.name ?? null;
+  } catch {
+    // Falls back to "unknown".
+  }
+  return { ...defaults, branch, mux: describeMuxDefault(env), sender };
+}
+
 // Variables the launching session set for itself would bind a background
 // session to this one. Settings re-apply their own env in the new session.
 export function detachedEnv(
@@ -1245,6 +1290,11 @@ if (import.meta.main) {
     },
     flags: {
       repo: { type: String, default: process.cwd(), description: "Repository to branch from" },
+      context: {
+        type: Boolean,
+        default: false,
+        description: "Print this session's dispatch defaults and a usage synopsis, then exit",
+      },
       branch: {
         type: String,
         description:
@@ -1306,6 +1356,12 @@ if (import.meta.main) {
       },
     },
   });
+
+  if (argv.flags.context) {
+    const { repo, base } = argv.flags;
+    process.stdout.write(`${formatContext(await readContext({ repo, base }, process.env))}\n`);
+    process.exit(0);
+  }
 
   // The caller's poll reads this screen, so every failure prints its marker.
   if (argv.flags.exec) {

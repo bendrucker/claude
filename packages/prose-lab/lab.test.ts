@@ -797,6 +797,30 @@ describe("repos", () => {
     }
   });
 
+  test("a vote counts one labeled card per card, and a vote on an unknown card fails", async () => {
+    const data = store(join(tmp, "votes"));
+    await data.writeSweep(await sweep("all", ["writing"], { root: main, docs }));
+    const { server } = await serve(data, { port: 0, perCheck: 5, root: main, docs });
+    const Voted = z.object({ labeled: z.number(), reveal: z.object({ check: z.string() }) });
+    const vote = (id: string) =>
+      fetch(new URL("/api/vote", server.url), {
+        method: "POST",
+        body: JSON.stringify({ id, verdict: "right", note: "" }),
+      });
+    try {
+      const first = z
+        .object({ card: z.object({ id: z.string() }), labeled: z.number() })
+        .parse(await (await fetch(new URL("/api/next", server.url))).json());
+      expect(first.labeled).toBe(0);
+      expect(Voted.parse(await (await vote(first.card.id)).json()).labeled).toBe(1);
+      expect(Voted.parse(await (await vote(first.card.id)).json()).labeled).toBe(1);
+      const missing = await vote("Writing.X|gone.md|1|1");
+      expect([missing.status, await missing.text()]).toEqual([404, "unknown hit"]);
+    } finally {
+      await server.stop(true);
+    }
+  });
+
   test("serve skips a saved proposal on a checkout a later sweep dropped", async () => {
     const data = store(join(tmp, "dropped"));
     await data.writeSweep(await sweep("all", ["writing"], { root: main, docs }));

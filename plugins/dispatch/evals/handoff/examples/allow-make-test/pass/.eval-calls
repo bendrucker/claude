@@ -1,0 +1,4 @@
+wt -C /tmp/eval/cwd switch --create test-retry-delays --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval test-retry-delays -c /tmp/eval/cwd/.worktrees/test-retry-delays --json -- claude --name test-retry-delays -- <prompt>
+launch test-retry-delays /tmp/eval/cwd/.worktrees/test-retry-delays
+allow Bash(make test:*)

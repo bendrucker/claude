@@ -1,0 +1,4 @@
+wt -C /tmp/eval/cwd switch --create add-codeowners --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval add-codeowners -c /tmp/eval/cwd/.worktrees/add-codeowners --json -- claude --name add-codeowners -- <prompt>
+launch add-codeowners /tmp/eval/cwd/.worktrees/add-codeowners
+allow Bash(bun test:*)

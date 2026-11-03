@@ -1,0 +1,3 @@
+wt -C /tmp/eval/cwd switch --create add-request-ids --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval add-request-ids -c /tmp/eval/cwd/.worktrees/add-request-ids --json -- claude --name add-request-ids -- <prompt>
+allow Bash(bun test:*)

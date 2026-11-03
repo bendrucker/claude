@@ -1,0 +1,1 @@
+Two things to do in parallel, each as its own PR from its own session. First, make `connect` accept an `AbortSignal` so callers can cancel a retry loop. Second, add a `CONTRIBUTING.md` that explains how to run `bun test`.

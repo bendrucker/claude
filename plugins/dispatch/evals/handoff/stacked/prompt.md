@@ -1,0 +1,1 @@
+I'm on `feature-x`, which adds a retry counter to `src/client.ts`. Dispatch a session to build on top of this branch: log the attempt number on each retry, with a test. It should be its own PR stacked on this one.

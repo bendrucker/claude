@@ -3,6 +3,7 @@
 # usage: scaffold.sh <case-dir>
 # history/ holds an optional operation (rebase or merge), base.patch, main.patch, main.msg, branch.name, and branch/NN.patch with NN.msg per branch commit.
 # An optional check.sh runs against each pushed result, and an optional expect lists `<blob> <path>` pairs it should match.
+# check.sh gets the path of the case's hidden/ copy and the branch's pre-operation tip as arguments.
 set -euo pipefail
 case_dir=$1
 history="$case_dir/history"
@@ -53,6 +54,9 @@ pwd > "$hooks/eval-work"
 cp "$(dirname "$0")/scripts/post-receive.sh" "$hooks/post-receive"
 if [ -f "$case_dir/check.sh" ]; then cp "$case_dir/check.sh" "$hooks/eval-check"; fi
 if [ -f "$case_dir/expect" ]; then cp "$case_dir/expect" "$hooks/eval-expect"; fi
+# Hidden checks sit outside the working tree, so the session never reads or edits them.
+if [ -d "$case_dir/hidden" ]; then cp -R "$case_dir/hidden" "$hooks/eval-hidden"; fi
+git rev-parse HEAD > "$hooks/eval-branch"
 chmod +x "$hooks"/*
 : > .eval-verdicts
 : > .eval-pushed

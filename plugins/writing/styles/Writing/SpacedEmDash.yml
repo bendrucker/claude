@@ -10,23 +10,23 @@ nonword: true
 tokens:
   - ' — '
 tests:
-  - name: "flags The cache warms slowly — then it saturates."
+  - name: "flags a spaced dash before an adverb"
     input: |
       The cache warms slowly — then it saturates.
     contains: [Writing.SpacedEmDash]
-  - name: "flags The worker finishes — the queue clears."
+  - name: "flags a spaced dash joining two clauses"
     input: |
       The worker finishes — the queue clears.
     contains: [Writing.SpacedEmDash]
-  - name: "allows This is—fine without spaces."
+  - name: "allows an unspaced em dash"
     input: |
       This is—fine without spaces.
     absent: Writing.SpacedEmDash
-  - name: "allows The range spans 2024–2025."
+  - name: "allows an en dash in a range"
     input: |
       The range spans 2024–2025.
     absent: Writing.SpacedEmDash
-  - name: "allows | Rule | Level | | ---- | ----- | | Foo | — |"
+  - name: "allows a dash as an empty table cell"
     input: |
       | Rule | Level |
       | ---- | ----- |

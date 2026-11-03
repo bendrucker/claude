@@ -9,19 +9,19 @@ nonword: true
 tokens:
   - ',\s*so\s+(it|they|neither|either)\b'
 tests:
-  - name: "flags Both writers hold the lock, so neither request proceeds."
+  - name: "flags neither as the new subject"
     input: |
       Both writers hold the lock, so neither request proceeds.
     contains: [Writing.ConsequenceChainPronoun]
-  - name: "flags The flag is unset, so it falls back to the default."
+  - name: "flags it as the new subject"
     input: |
       The flag is unset, so it falls back to the default.
     contains: [Writing.ConsequenceChainPronoun]
-  - name: "allows The tests never passed in CI, so I rewrote them."
+  - name: "allows so before a first-person narrator"
     input: |
       The tests never passed in CI, so I rewrote them.
     absent: Writing.ConsequenceChainPronoun
-  - name: "allows It is so itemized that nobody reads it."
+  - name: "allows so as an intensifier"
     input: |
       It is so itemized that nobody reads it.
     absent: Writing.ConsequenceChainPronoun

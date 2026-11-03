@@ -15,19 +15,19 @@ tokens:
   - 'please'
   - 'carefully'
 tests:
-  - name: flags be thorough
+  - name: flags an exhortation to be thorough
     input: |
       Be thorough when reading the diff.
     contains: [Prompting.NoOp]
-  - name: flags please
+  - name: flags a courtesy word
     input: |
       Please read the file first.
     contains: [Prompting.NoOp]
-  - name: flags think step by step
+  - name: flags an instruction to reason stepwise
     input: |
       Think step by step.
     contains: [Prompting.NoOp]
-  - name: flags use your best judgment
+  - name: flags an appeal to judgment
     input: |
       Use your best judgment.
     contains: [Prompting.NoOp]

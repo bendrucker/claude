@@ -8,19 +8,19 @@ ignorecase: true
 tokens:
   - 'not\s+(?:just|only)\s+[^.!?\n]{1,50},\s+but\s+(?:also\s+)?'
 tests:
-  - name: "flags It is not just fast, but also reliable."
+  - name: "flags not just with but also"
     input: |
       It is not just fast, but also reliable.
     contains: [Writing.NotOnlyBut]
-  - name: "flags This not only improves speed, but reduces memory."
+  - name: "flags not only with a bare but"
     input: |
       This not only improves speed, but reduces memory.
     contains: [Writing.NotOnlyBut]
-  - name: "allows Not just yet."
+  - name: "allows not just without a but"
     input: |
       Not just yet.
     absent: Writing.NotOnlyBut
-  - name: "allows It is fast, reliable, and cheap."
+  - name: "allows a plain list"
     input: |
       It is fast, reliable, and cheap.
     absent: Writing.NotOnlyBut

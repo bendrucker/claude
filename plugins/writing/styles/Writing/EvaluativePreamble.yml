@@ -79,7 +79,7 @@ tests:
     input: |
       You merged #1453, so I closed out behind it.
     absent: Writing.EvaluativePreamble
-  - name: "allows you need"
+  - name: "allows a sentence-initial you plus need"
     input: |
       You need to run the apply before the tag exists.
     absent: Writing.EvaluativePreamble
@@ -91,7 +91,7 @@ tests:
     input: |
       The right fix is to move the guard into the loader.
     absent: Writing.EvaluativePreamble
-  - name: "allows it is clear that"
+  - name: "allows a clear-that clause without a colon"
     input: |
       It is clear that the cache misses on cold start.
     absent: Writing.EvaluativePreamble
@@ -99,7 +99,7 @@ tests:
     input: |
       The root cause is clear: the cache misses on cold start.
     absent: Writing.EvaluativePreamble
-  - name: "allows per your question"
+  - name: "allows a pointer to the reviewer's question"
     input: |
       Per your question in Linear, the threshold is a calibration.
     absent: Writing.EvaluativePreamble
@@ -107,7 +107,7 @@ tests:
     input: |
       This is right after the migration step.
     absent: Writing.EvaluativePreamble
-  - name: "allows we agreed"
+  - name: "allows first-person agreement as a verb"
     input: |
       We agreed to keep the materialized view.
     absent: Writing.EvaluativePreamble
@@ -115,7 +115,7 @@ tests:
     input: |
       Turn right at the second hook, then read the log.
     absent: Writing.EvaluativePreamble
-  - name: "allows good news"
+  - name: "allows good mid-sentence"
     input: |
       The good news is the fix is two lines.
     absent: Writing.EvaluativePreamble

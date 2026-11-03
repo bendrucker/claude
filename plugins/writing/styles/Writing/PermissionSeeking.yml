@@ -10,19 +10,19 @@ ignorecase: true
 tokens:
   - 'want\s+me\s+to\s+\w+'
 tests:
-  - name: "flags Want me to fix that for you?"
+  - name: "flags an offer to fix"
     input: |
       Want me to fix that for you?
     contains: [Writing.PermissionSeeking]
-  - name: "flags Want me to run the tests?"
+  - name: "flags an offer to run a command"
     input: |
       Want me to run the tests?
     contains: [Writing.PermissionSeeking]
-  - name: "allows They want me there by noon."
+  - name: "allows want me without to"
     input: |
       They want me there by noon.
     absent: Writing.PermissionSeeking
-  - name: "allows I want to understand the issue."
+  - name: "allows a first-person want"
     input: |
       I want to understand the issue.
     absent: Writing.PermissionSeeking

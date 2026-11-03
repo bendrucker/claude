@@ -14,11 +14,11 @@ tests:
     input: |
       The allowlist is a deliberate rail against ILIKE fan-out.
     contains: [Writing.FigurativeRail]
-  - name: "flags billing rails"
+  - name: "flags a plural modifier rail"
     input: |
       The tension here is billing rails, and it is worth separating from the front-end choice.
     contains: [Writing.FigurativeRail]
-  - name: "flags a safety rail"
+  - name: "flags a modifier rail"
     input: |
       The hook adds a safety rail for pushes to the default branch.
     contains: [Writing.FigurativeRail]
@@ -30,7 +30,7 @@ tests:
     input: |
       The Rails app reads the session from Redis.
     absent: Writing.FigurativeRail
-  - name: "allows Ruby on Rails"
+  - name: "allows the framework's full name"
     input: |
       Upgrade Ruby on Rails to 7.2 before the deploy.
     absent: Writing.FigurativeRail

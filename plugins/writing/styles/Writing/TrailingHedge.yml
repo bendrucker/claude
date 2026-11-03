@@ -9,19 +9,19 @@ nonword: true
 tokens:
   - '(?m)\b(?:regardless|nonetheless|anyway)\.[ \t]*$'
 tests:
-  - name: "flags The approach has tradeoffs regardless."
+  - name: "flags a sentence-final regardless"
     input: |
       The approach has tradeoffs regardless.
     contains: [Writing.TrailingHedge]
-  - name: "flags The fix works anyway."
+  - name: "flags a sentence-final anyway"
     input: |
       The fix works anyway.
     contains: [Writing.TrailingHedge]
-  - name: "allows Regardless of the input, the parser rejects it."
+  - name: "allows regardless as an opener"
     input: |
       Regardless of the input, the parser rejects it.
     absent: Writing.TrailingHedge
-  - name: "allows The fix works anyway you look at it."
+  - name: "allows anyway mid-sentence"
     input: |
       The fix works anyway you look at it.
     absent: Writing.TrailingHedge

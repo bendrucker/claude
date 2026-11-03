@@ -16,7 +16,7 @@ tests:
     input: |
       `ty` infers `Path` from the right-hand side, and we don't annotate module constants whose type the literal fixes. Dismissing.
     contains: [Writing.LabelFragment]
-  - name: "flags keeping as-is"
+  - name: "flags a gerund plus as-is closing a paragraph"
     input: |
       Routing through `logger.info` with the booleans as fields drops the report. Keeping as-is.
     contains: [Writing.LabelFragment]
@@ -44,7 +44,7 @@ tests:
     input: |
       The test asserts the peak equals the cap, and dropping the semaphore fails it. Resolving.
     contains: [Writing.LabelFragment]
-  - name: "flags keeping these as is"
+  - name: "flags an unhyphenated as-is opening a paragraph"
     input: |
       Keeping these as is. They're internal async methods, not part of the public surface.
     contains: [Writing.LabelFragment]

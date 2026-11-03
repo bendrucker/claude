@@ -13,15 +13,15 @@ tokens:
   - 'when (?:done|finished)'
   - 'until satisfied'
 tests:
-  - name: flags make sure
+  - name: flags make sure as a bound
     input: |
       Make sure the branch is clean.
     contains: [Prompting.VagueCriterion]
-  - name: flags appropriately
+  - name: flags a manner adverb as a bound
     input: |
       Handle the error appropriately.
     contains: [Prompting.VagueCriterion]
-  - name: flags until satisfied
+  - name: flags a satisfaction stopping point
     input: |
       Iterate until satisfied.
     contains: [Prompting.VagueCriterion]

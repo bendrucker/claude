@@ -11,27 +11,27 @@ exceptions:
 tokens:
   - '\b\w[\w\s]{2,40},\s+not\s+\w[\w\s]{2,30}(?:[.!?,;:]|$)'
 tests:
-  - name: "flags This is a tool, not a framework."
+  - name: "flags a noun contrast after a copula"
     input: |
       This is a tool, not a framework.
     contains: [Writing.ContrastNot]
-  - name: "flags The goal is clarity, not perfection."
+  - name: "flags an abstract noun contrast"
     input: |
       The goal is clarity, not perfection.
     contains: [Writing.ContrastNot]
-  - name: "allows It is not the case that X."
+  - name: "allows not without a comma"
     input: |
       It is not the case that X.
     absent: Writing.ContrastNot
-  - name: "allows Not a framework, but a tool."
+  - name: "allows the not-but order"
     input: |
       Not a framework, but a tool.
     absent: Writing.ContrastNot
-  - name: "allows The cache is fast, not necessarily correct."
+  - name: "allows the not-necessarily exception"
     input: |
       The cache is fast, not necessarily correct.
     absent: Writing.ContrastNot
-  - name: "allows Ship the build, not including the docs."
+  - name: "allows the not-including exception"
     input: |
       Ship the build, not including the docs.
     absent: Writing.ContrastNot

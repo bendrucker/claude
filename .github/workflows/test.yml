@@ -163,6 +163,9 @@ jobs:
       - name: Check permission rules
         run: bun scripts/check-permission-rules.ts
 
+      - name: Check Vale test names
+        run: bun scripts/check-vale-test-names.ts
+
       - name: Check for unenabled plugins
         if: github.event_name == 'pull_request'
         env:

@@ -18,7 +18,7 @@ source "$stubs/preamble.sh" https://github.com/acme/api-server.git
 `rex`, `wt`, and `claude` let the `dispatch:dispatch` script run without a multiplexer. `install.sh` starts two empty files in the workspace for graders:
 
 - `.eval-calls` gets one line per call, failures included: `<cli> <argv>`, with newlines in a word flattened to spaces. A launched command keeps everything through its last `--` and shows the prompt as `<prompt>`, as in `rex window new -s s relay-x -c /w --json -- claude --name relay-x -- <prompt>`. After a `rex window new` or `split` with `-c <path>`, a neutral `launch <branch> <path>` line follows the raw `rex` line, then each `permissions.allow` rule in that worktree's `.claude/settings.local.json` logs as `allow <rule>` and each `sandbox.filesystem.allowWrite` path as `sandbox-write <path>`.
-- `.eval-briefs.md` gets each elided prompt as `## <session name>`, a blank line, the prompt, and a blank line.
+- `.eval-briefs.md` gets each elided prompt after a `=== prompt for <session name> ===` line, which no markdown heading inside a prompt can be mistaken for.
 
 - `rex` answers `whoami --json`, `window new`, `split` (distinct `block:eval-<k>` ids), `block call … program_status`, `capture` (empty), `hosts list`, and `ls`. The status state comes from `$HOME/.eval-stubs/session-status`, a bare state or `{"state","kind","msg"}` JSON, defaulting to `working`.
 - `wt -C <root> switch` adds a git worktree under `<root>/.worktrees/<branch>` and prints the `--format=json` shape, `existing` when the branch already has one. `pr:<n>` and `mr:<n>` fail.

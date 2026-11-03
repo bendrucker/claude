@@ -28,7 +28,7 @@ export async function record(cli: string, argv: string[]): Promise<void> {
   if (dashes !== -1 && dashes < argv.length - 1) {
     const name = argv[argv.indexOf("--name") + 1] ?? "unknown";
     shown = [...flat.slice(0, dashes + 1), "<prompt>"];
-    await append(BRIEFS, `## ${name}\n\n${argv.slice(dashes + 1).join(" ")}\n\n`);
+    await append(BRIEFS, `=== prompt for ${name} ===\n${argv.slice(dashes + 1).join(" ")}\n\n`);
   }
   await appendLines([[cli, ...shown].join(" ")]);
 }

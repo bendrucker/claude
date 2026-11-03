@@ -611,7 +611,7 @@ describe("dispatch stand-ins", () => {
       "claude --bg --name bg -- <prompt>",
     ]);
     expect(await Bun.file(join(r.cwd, ".eval-briefs.md")).text()).toBe(
-      "## one\n\nFix it.\nThen test.\n\n## two\n\nOther\n\n## bg\n\nBack\nground\n\n",
+      "=== prompt for one ===\nFix it.\nThen test.\n\n=== prompt for two ===\nOther\n\n=== prompt for bg ===\nBack\nground\n\n",
     );
   });
 

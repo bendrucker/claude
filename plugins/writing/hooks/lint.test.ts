@@ -117,7 +117,7 @@ describe("edited files", () => {
     const { ts, session_id, duration_ms, target, ...stable } = log;
     expect(stable).toMatchInlineSnapshot(`
       {
-        "check": "Writing.StepHeading",
+        "check": "Writing.SpacedEmDash",
         "checks": [
           "Writing.StepHeading",
           "Writing.TitleCaseHeading",
@@ -125,9 +125,9 @@ describe("edited files", () => {
           "ai-tells.EmDashUsage",
         ],
         "emitted": [
+          "Writing.SpacedEmDash",
           "Writing.StepHeading",
           "Writing.TitleCaseHeading",
-          "Writing.SpacedEmDash",
           "ai-tells.EmDashUsage",
         ],
         "event": "PostToolUse",

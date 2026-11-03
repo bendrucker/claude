@@ -2,7 +2,7 @@ import type { PreToolUseHookInput } from "@anthropic-ai/claude-agent-sdk";
 import { stripCode } from "../detection/code-spans";
 import { valeAlerts } from "../detection/vale";
 import { toolInputOf } from "./io";
-import { hookAlertOf, type HookAlert } from "./report";
+import { decisionOf, hookAlertOf, type HookAlert } from "./report";
 
 // The full set of Bash prose surfaces this hook scans. The hooks.json Bash
 // guard is derived from these. hooks.test.ts enforces the sync.
@@ -205,5 +205,5 @@ export async function lintMessages(input: PreToolUseHookInput): Promise<HookAler
   const texts = await collectText(input);
   if (texts.length === 0) return [];
   const alerts = await valeAlerts(texts.join("\n"), { kind: messageKind(input) });
-  return alerts.map((alert) => hookAlertOf(alert, alert.Severity === "error" ? "deny" : "context"));
+  return alerts.map((alert) => hookAlertOf(alert, decisionOf(alert.Severity, "PreToolUse")));
 }

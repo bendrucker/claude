@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { lintProse, ValeError, valeAlerts, valeBinary } from "./vale";
+import { ensurePackages, lintProse, VALE_CONFIG, ValeError, valeAlerts, valeBinary } from "./vale";
 
 const root = join(import.meta.dirname, "..");
 
@@ -29,6 +29,22 @@ test.each<{ name: string; args: string[] }>([
     exitCode: 0,
     output: "",
   });
+});
+
+// The ai-tells package ships every check at error, which denies a message, so a package bump must not add one unlevelled.
+test("every ai-tells check has a level in the plugin config", async () => {
+  await ensurePackages(valeBinary() ?? "vale");
+  const checks = await Array.fromAsync(
+    new Bun.Glob("*.yml").scan({ cwd: join(root, "styles", "ai-tells") }),
+  );
+  const config = await Bun.file(VALE_CONFIG).text();
+  const levelled = new Set(config.match(/^ai-tells\.\w+(?= = )/gm));
+  const unlevelled = checks
+    .map((file) => `ai-tells.${file.replace(/\.yml$/, "")}`)
+    .filter((check) => !levelled.has(check))
+    .toSorted();
+  expect(checks.length).toBeGreaterThan(0);
+  expect(unlevelled).toEqual([]);
 });
 
 describe("lintProse", () => {

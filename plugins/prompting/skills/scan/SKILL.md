@@ -1,7 +1,7 @@
 ---
 name: prompting:scan
 description: "Report prompt defects a lexical scan finds in documents a model executes. Use to audit a repository's skills, CLAUDE.md, agent definitions, or a product's prompt files, or to gate them in CI or a pre-commit hook, or propose cuts a reading pass finds."
-argument-hint: "[audit] [<path>...] [--all] [--quiet]"
+argument-hint: "[audit] [<path>...] [--all] [--quiet] [--score]"
 effort: low
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts:*)
@@ -15,10 +15,10 @@ allowed-tools:
 Run the scanner over the paths in `$ARGUMENTS`, defaulting to the current directory:
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts [<path>...] [--all] [--quiet]
+bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts [<path>...] [--all] [--quiet] [--score]
 ```
 
-It reports each alert as `file:line:col: level: check: message` on stdout and a per-check count table on stderr, and exits non-zero on any alert. A check is an `error` once the precision eval confirms it and a `warning` until then. `--quiet` drops the table.
+It reports each alert as `file:line:col: level: check: message` on stdout and a per-check count table on stderr, and exits non-zero on any alert. A check is an `error` once the precision eval confirms it and a `warning` until then. `--quiet` drops the table. `--score` replaces it with one row per scanned file, clean files included, giving its alerts, its prose words outside frontmatter and code, and alerts per 1,000 words, plus a total. Run it before and after an edit round over the same paths to compare them.
 
 Without `--all` it reads the paths that hold documents a model executes: `SKILL.md`, `CLAUDE.md`, `AGENTS.md`, `.claude/agents`, `.claude/commands`, `.claude/rules`, a skill's `references/`, and a `prompt/` or `prompts/` directory holding `.md` or `.txt` files. Use `--all` for a prompt that lives somewhere else, such as one extracted from a string in a product repo. It reads `.md` and `.txt` under either setting, so `--all` widens which documents count without pulling in source files. Either way it also scans the files a scanned `CLAUDE.md` or `AGENTS.md` imports with `@path`, up to four hops deep, and lists on stderr each import outside the scanned paths or missing. It skips `node_modules`, `.git`, `fixtures`, `__snapshots__`, and `evals`.
 

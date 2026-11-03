@@ -10,7 +10,7 @@ allowed-tools:
 
 # Attachments
 
-Images and video in issues and pull requests are served from a user-attachments store. `gh` 2.99.0 added a repeatable `--attach` flag that uploads to it from `gh issue create`, `gh issue edit`, `gh issue comment`, `gh pr create`, `gh pr edit`, and `gh pr comment`. Everything else uploads through the endpoint the flag wraps: review comments and pending reviews, discussions, releases, gists, and any `gh` older than 2.99.0. Both paths exist on GitHub.com and Enterprise Cloud only. Enterprise Server has no attachment store.
+Images and video in issues and pull requests are served from a user-attachments store. `gh` 2.99.0 added a repeatable `--attach` flag that uploads to it from `gh issue create`, `gh issue edit`, `gh issue comment`, `gh pr create`, `gh pr edit`, and `gh pr comment`. Everything else uploads through the endpoint the flag wraps: review comments and pending reviews, discussions, releases, gists, and any `gh` older than 2.99.0. Content on a repository the token can't write to also takes the endpoint, the usual case being a pull request from a fork (`--repo upstream/repo --head you:branch`). Both paths exist on GitHub.com and Enterprise Cloud only. Enterprise Server has no attachment store.
 
 `--attach` on this build: !`gh issue comment --help 2>/dev/null | grep -q -- '--attach' && echo present || echo absent`
 
@@ -29,7 +29,7 @@ gh pr create --title "..." --body-file tmp/pr-body.md --attach ./picker.png --at
 - `gh pr edit` and `gh issue edit` without a body flag keep the existing body and append.
 - Up to 50 files per command.
 - When some uploads fail, the issue, pull request, or comment still lands with the ones that succeeded. Its URL prints, and the exit status is non-zero. Read the output before retrying. A blind retry duplicates the assets that already uploaded.
-- The token needs write access to the repository.
+- The token needs write access to the repository. Without it, the command fails before creating anything.
 
 ## The Endpoint
 
@@ -43,7 +43,7 @@ gh api --method POST \
   --input ./picker.png --jq .url
 ```
 
-The response is `{"url": "https://github.com/user-attachments/assets/<uuid>"}`. The token needs write access to that repository. Read-only access also answers 404. That makes a permission problem look like a missing repository.
+The response is `{"url": "https://github.com/user-attachments/assets/<uuid>"}`. The token needs write access to that repository. Read-only access also answers 404. That makes a permission problem look like a missing repository. For a pull request from a fork, upload against the fork. The asset renders in the upstream pull request.
 
 An image is ordinary markdown, with `\`, `[`, and `]` escaped in the alt text.
 

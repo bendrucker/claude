@@ -62,6 +62,10 @@ The former holdout twins (`claude-md-both`, `code-tests-2`, `lockfile-deps`, `re
 
 `<side>/.removed` lists paths `scripts/grade-trap.sh` deletes at every stop, for the cases whose correct result removes a file that the operation leaves in the tree.
 
+Cases tagged `long` (`code-tests-long`, `codemod-rename-long`, `staged-platform-long`) start with about 92k tokens of inherited conversation, `history.jsonl`, which puts the first turn near 100k. A run's cost then matches real invocations. Run them with `--tag long`, not `run.ts --case`, which prunes the staged suite to the matched cases and drops the sibling the fixture reads from. Each runs its sibling's scaffold, `history/`, and `check.sh`, and is excluded from `--tag dev`. [`scripts/history.ts`](scripts/history.ts) `<case-dir>` regenerates the file from the sibling's `history/` patches and public repo files pinned at a commit. `--check` exits 1 on drift, and `bun test plugins/git/evals/conflicts/scripts` runs it for every case with a `history.jsonl`.
+
+[`scripts/profile.sql`](scripts/profile.sql) measures field cost: the median cost and turns of each real `git:conflicts` invocation by model and week, subagent turns included. Run it against the session index with `duckdb -readonly -f plugins/git/evals/conflicts/scripts/profile.sql ~/.local/share/claude-sessions/session.duckdb`.
+
 ## Grading
 
 Grading runs in the bare origin's [`post-receive`](scripts/post-receive.sh) hook. Eval sessions disable git hooks in the working repository, and a local push starts this one without that config. Each push appends to `.eval-pushed`, and each pushed branch rewrites `.eval-verdicts` with:

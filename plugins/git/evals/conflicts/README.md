@@ -38,7 +38,7 @@ The `staged-*` cases balance the suite with requests that stop at the staged res
 
 Each of the last five cases is built around a trap, a resolution that completes cleanly and passes a marker check but drops or corrupts one side's intent. `trap/` holds that resolution's files and `resolved/` the correct ones. [`scripts/grade-trap.sh`](scripts/grade-trap.sh) `<case> <trap|resolved>` resolves the case with either and grades it as a run would. A case joins the suite when `resolved/` passes its graders and `trap/` fails one beyond the marker checks. Their manifests and lockfiles exist only inside `history/*.patch` and as files ending in `.fixture`, so dependency scanners never see them and nothing installs them.
 
-The lockfile variations use workspace packages with real registry pins held below the latest release. A lockfile regenerated from scratch floats and fails its pin graders. The scaffold installs both sides first, which puts every package in the run's cache for an offline install. `dir-rename` and `generated-region` have no holdout twin, since history yielded one of each.
+The lockfile variations use workspace packages with real registry pins held below the latest release. A lockfile regenerated from scratch floats and fails its pin graders. The scaffold installs both sides first, which warms the run's package cache the way a working checkout would. Sessions reach `registry.npmjs.org` through the suite's `WebFetch(domain:registry.npmjs.org)` grant, which `claude plugin eval` applies to the Bash sandbox too. A session can regenerate a lockfile as it would outside an eval. `dir-rename` and `generated-region` have no holdout twin, since history yielded one of each.
 
 Splits were assigned by a seeded coin flip within each pair of same-kind cases.
 
@@ -50,7 +50,7 @@ Grading runs in the bare origin's [`post-receive`](scripts/post-receive.sh) hook
 - whether the pushed tree holds conflict markers
 - whether `main` is an ancestor of it
 - whether pushed files match the blobs in the case's `expect`, which `main` actually merged
-- the result of the case's `check.sh` (tests, a frozen lockfile install, or file locations), which runs only when the working tree is clean at the pushed commit. It receives the hooks directory's copy of the case's `hidden/`, tests and scripts the session never sees, and the branch's tip before the operation. Packages a case lists in `tools` install beside it at scaffold time, since the session's sandbox refuses the registry. It writes its output to the hooks directory's `eval-check.log`, which each run collects into `artifacts/`
+- the result of the case's `check.sh` (tests, a frozen lockfile install, or file locations), which runs only when the working tree is clean at the pushed commit. It receives the hooks directory's copy of the case's `hidden/`, tests and scripts the session never sees, and the branch's tip before the operation. Packages a case lists in `tools` install beside it at scaffold time. A grade never depends on the network. It writes its output to the hooks directory's `eval-check.log`, which each run collects into `artifacts/`
 
 The hook writes only to those files. The session never sees a grade.
 

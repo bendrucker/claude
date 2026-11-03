@@ -3226,7 +3226,13 @@ describe("memory-loads query", () => {
         `${widget}/.claude/worktrees/b5/.claude/rules/style.md`,
         Array.from({ length: 40 }, () => "w").join(" "),
       ],
-      ["mem-main", widget, `${home}/.claude-repo/user/rules/shell.md`, "a b c", "User"],
+      ["mem-main", widget, `${home}/.claude/rules/shell.md`, "a b c", "User"],
+      [
+        "mem-dotted",
+        `${home}/src/other/widget.io`,
+        `${home}/src/other/widget.io/.claude/rules/testing.md`,
+        "one two three four five",
+      ],
     ];
     const lines = loads.map(([session, cwd, file, body, scope]) =>
       memoryLine(session, cwd, file, body, scope),
@@ -3247,6 +3253,7 @@ describe("memory-loads query", () => {
       db,
       "memory-loads",
       z.object({
+        host: z.string(),
         repo: z.string(),
         path: z.string(),
         loads: z.bigint(),
@@ -3259,6 +3266,7 @@ describe("memory-loads query", () => {
     );
     expect(
       rows.map((r) => ({
+        host: r.host,
         repo: r.repo,
         path: r.path,
         loads: Number(r.loads),
@@ -3268,6 +3276,7 @@ describe("memory-loads query", () => {
       })),
     ).toEqual([
       {
+        host: "local",
         repo: "widget",
         path: ".claude/rules/style.md",
         loads: 1,
@@ -3276,6 +3285,7 @@ describe("memory-loads query", () => {
         total_words: 40,
       },
       {
+        host: "local",
         repo: "widget",
         path: ".claude/rules/testing.md",
         loads: 5,
@@ -3284,6 +3294,16 @@ describe("memory-loads query", () => {
         total_words: 20,
       },
       {
+        host: "local",
+        repo: "widget.io",
+        path: ".claude/rules/testing.md",
+        loads: 1,
+        sessions: 1,
+        words_per_load: 5,
+        total_words: 5,
+      },
+      {
+        host: "local",
         repo: "widget",
         path: "src/agents/CLAUDE.md",
         loads: 2,
@@ -3292,8 +3312,9 @@ describe("memory-loads query", () => {
         total_words: 4,
       },
       {
+        host: "local",
         repo: "~",
-        path: "~/.claude-repo/user/rules/shell.md",
+        path: "~/.claude/rules/shell.md",
         loads: 1,
         sessions: 1,
         words_per_load: 3,

@@ -59,7 +59,7 @@ Judge one unit inline. Judge more than one through a Workflow with one judge per
 
 Then drive the ledger through `audit.ts`:
 
-- `apply <ledger>` applies every proposal to the working tree and lists any quote it could not locate. An unlocated proposal drops out of the round.
+- `apply <ledger>` runs each `enforced` proposal's planted-violation check, applies every proposal to the working tree, and lists any check that did not hold and any quote it could not locate. Either drops the proposal out of the round.
 - Ben reviews the diff with `plannotator review`, which opens a browser and runs outside the sandbox. An annotation on a hunk rejects that proposal.
 - `revert <ledger> <id...> --reason <annotation>` restores each rejected span.
 - Commit the round with nothing else in the commit, and open it as its own pull request, so rule-precision can read its squash commit as labels.

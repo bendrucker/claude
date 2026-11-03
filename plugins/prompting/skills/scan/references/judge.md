@@ -19,6 +19,7 @@ For each line that fails the test in `classes.md`, return one proposal:
 - `replacement`: the text to put in its place, or an empty string to delete it.
 - `class`: one class from `classes.md`.
 - `reason`: one sentence on why a current model behaves the same without the line.
+- `enforcer` and `check`: for an `enforced` proposal only, as `classes.md` defines them.
 
 Edit nothing. You are done when every file in every unit has been read and every proposal you would defend is returned. Return an empty list for a unit with nothing to cut.
 
@@ -39,9 +40,19 @@ Edit nothing. You are done when every file in every unit has been read and every
           "quote": { "type": "string" },
           "replacement": { "type": "string" },
           "class": {
-            "enum": ["no-op", "stale-guard", "emphasis", "duplication", "cache", "relevance", "choreography", "delegation"]
+            "enum": ["no-op", "stale-guard", "emphasis", "duplication", "cache", "relevance", "choreography", "delegation", "enforced"]
           },
-          "reason": { "type": "string" }
+          "reason": { "type": "string" },
+          "enforcer": { "type": "string" },
+          "check": {
+            "type": "object",
+            "required": ["file", "content", "command"],
+            "properties": {
+              "file": { "type": "string" },
+              "content": { "type": "string" },
+              "command": { "type": "string" }
+            }
+          }
         }
       }
     }

@@ -47,6 +47,10 @@ An exact sequence of tool calls or steps the goal already implies. Keep a step t
 
 An instruction to dispatch a subagent, fork, or parallel worker for work a current model does well inline. Anchor: Goal, the paragraph on pairing the goal with instructions.
 
+#### `enforced`
+
+An instruction a linter, type checker, or ast-grep rule in the repo already fails on. Locate the enforcer in the repo's lint configuration and rule files, since prose claiming a linter covers something is no proof. Set `enforcer` to the rule's name and give a `check` that proves it: `file`, a new path in a directory the enforcer covers; `content`, a minimal violation of the instruction; `command`, the lint command that reports it, run from the repo root. `apply` plants the file, runs the command, removes the file, and drops the proposal unless the command exits non-zero and names the file. Anchor: Pruning, Cache.
+
 ## Retiring a Class
 
 Retire a class when the `prune-acceptance` query shows it below 50% acceptance in each of two consecutive rounds where it drew at least five proposals. Retire it by deleting its entry from this file, so the judge stops proposing it.

@@ -17,21 +17,36 @@ export const CLASSES = [
   "relevance",
   "choreography",
   "delegation",
+  "enforced",
 ] as const;
 
-const Proposal = z.object({
-  id: z.string(),
-  file: z.string(),
-  quote: z.string(),
-  replacement: z.string(),
-  class: z.enum(CLASSES),
-  reason: z.string(),
-});
+const Check = z.object({ file: z.string(), content: z.string(), command: z.string() });
+
+const Proposal = z
+  .object({
+    id: z.string(),
+    file: z.string(),
+    quote: z.string(),
+    replacement: z.string(),
+    class: z.enum(CLASSES),
+    reason: z.string(),
+    enforcer: z.string().optional(),
+    check: Check.optional(),
+  })
+  .refine(
+    (proposal) =>
+      proposal.class !== "enforced" ||
+      (proposal.enforcer !== undefined && proposal.check !== undefined),
+    { message: "an enforced proposal names its enforcer and check" },
+  );
 
 // `removed` and `inserted` are the exact bytes taken out of and put into the file, including
 // any whitespace trimmed around a deletion. `before` and `after` are the text on either side
 // of the edit in the file once the whole round was applied.
-const Applied = Proposal.pick({ id: true, file: true, class: true }).extend({
+const Applied = z.object({
+  id: z.string(),
+  file: z.string(),
+  class: z.enum(CLASSES),
   removed: z.string(),
   inserted: z.string(),
   before: z.string(),
@@ -43,6 +58,7 @@ const Rejection = z.object({ id: z.string(), reason: z.string(), reverted: z.boo
 export type Proposal = z.infer<typeof Proposal>;
 export type Applied = z.infer<typeof Applied>;
 export type Rejection = z.infer<typeof Rejection>;
+export type Check = z.infer<typeof Check>;
 
 export interface Unit {
   unit: string;
@@ -53,6 +69,12 @@ export interface Unlocated {
   id: string;
   file: string;
   why: "missing" | "ambiguous" | "no such file";
+}
+
+export interface Unverified {
+  id: string;
+  file: string;
+  why: string;
 }
 
 type Env = Record<string, string | undefined>;
@@ -221,9 +243,46 @@ async function writeFiles(
   await Promise.all([...files].map((file) => Bun.write(join(root, file), texts.get(file) ?? "")));
 }
 
+const CHECK_TIMEOUT_MS = 120_000;
+
+/**
+ * Plants `check.content` at `check.file`, runs `check.command` from the root, and removes the
+ * file. Undefined when the command fails naming the file, otherwise why the check did not hold.
+ */
+export async function verifyCheck(root: string, check: Check): Promise<string | undefined> {
+  const path = resolve(root, check.file);
+  if (!path.startsWith(`${resolve(root)}/`)) return "check file is outside the repository";
+  if (await Bun.file(path).exists()) return "check file already exists";
+  if ((await Bun.$`test -d ${dirname(path)}`.nothrow().quiet()).exitCode !== 0) {
+    return "check file's directory does not exist";
+  }
+  await Bun.write(path, check.content);
+  try {
+    const proc = Bun.spawn(["sh", "-c", check.command], {
+      cwd: root,
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: CHECK_TIMEOUT_MS,
+    });
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+    if (code === 0) return "the command passed the planted violation";
+    if (!`${stdout}${stderr}`.includes(basename(path))) {
+      return `the command exited ${code} without naming the check file`;
+    }
+    return undefined;
+  } finally {
+    await Bun.file(path).delete();
+  }
+}
+
 export interface ApplyResult {
   applied: Applied[];
   unlocated: Unlocated[];
+  unverified: Unverified[];
 }
 
 interface Point {
@@ -231,20 +290,35 @@ interface Point {
   at: number;
 }
 
-/** Edits the working tree and returns what changed. Proposals apply in ledger order. */
+/**
+ * Edits the working tree and returns what changed. Proposals apply in ledger order, after
+ * every check runs, so no check lints a half-applied round.
+ */
 export async function applyProposals(
   root: string,
   proposals: readonly Proposal[],
 ): Promise<ApplyResult> {
+  const unverified: Unverified[] = [];
+  const verified: Proposal[] = [];
+  for (const proposal of proposals) {
+    const why =
+      proposal.check === undefined
+        ? undefined
+        : // oxlint-disable-next-line no-await-in-loop -- two checks may plant the same path.
+          await verifyCheck(root, proposal.check);
+    if (why === undefined) verified.push(proposal);
+    else unverified.push({ id: proposal.id, file: proposal.file, why });
+  }
+
   const texts = await readFiles(
     root,
-    proposals.map((proposal) => proposal.file),
+    verified.map((proposal) => proposal.file),
   );
   const edited = new Set<string>();
   const points = new Map<string, Point[]>();
   const unlocated: Unlocated[] = [];
 
-  for (const proposal of proposals) {
+  for (const proposal of verified) {
     const text = texts.get(proposal.file);
     if (text === undefined) {
       unlocated.push({ id: proposal.id, file: proposal.file, why: "no such file" });
@@ -291,7 +365,7 @@ export async function applyProposals(
   }
   await writeFiles(root, edited, texts);
   applied.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
-  return { applied, unlocated };
+  return { applied, unlocated, unverified };
 }
 
 export interface RevertResult {
@@ -485,7 +559,7 @@ const applyCommand = new Command("apply")
     }
     const root = await toplevel(process.cwd());
     const proposals = await readJsonl(ledger, Proposal);
-    const { applied, unlocated } = await applyProposals(root, proposals);
+    const { applied, unlocated, unverified } = await applyProposals(root, proposals);
     await writeJsonl(paths.applied, applied);
     const repo = await repoName(root);
     const run = runOf(ledger);
@@ -498,6 +572,9 @@ const applyCommand = new Command("apply")
     console.log(`applied ${applied.length} of ${proposals.length} proposals`);
     for (const miss of unlocated) {
       console.log(`unlocated: ${miss.id} (${miss.file}): ${miss.why}`);
+    }
+    for (const miss of unverified) {
+      console.log(`unverified: ${miss.id} (${miss.file}): ${miss.why}`);
     }
   });
 

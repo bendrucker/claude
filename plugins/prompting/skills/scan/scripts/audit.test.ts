@@ -13,6 +13,8 @@ import {
   program,
   revertEdits,
   units,
+  verifyCheck,
+  type Check,
   type Proposal,
 } from "./audit";
 
@@ -281,6 +283,99 @@ describe("round", () => {
     const unknown = await revertEdits(dir, applied, ["nope"]);
     expect(unknown.failed).toEqual([{ id: "nope", why: "not an applied proposal" }]);
     expect(await Bun.file(join(dir, "other.md")).text()).toBe("Alpha.\n\nGamma.\n");
+  });
+});
+
+describe("enforced", () => {
+  let base = "";
+
+  beforeAll(() => {
+    base = mkdtempSync(join(SCRATCH_PARENT, "audit-enforced-"));
+  });
+
+  afterAll(async () => {
+    await Bun.$`rm -rf ${base}`.quiet();
+  });
+
+  // Stands in for a linter: fails on `.sort(`, printing the offending file like oxlint does.
+  const LINT = "grep -Hn '[.]sort(' src/planted.ts && exit 1 || exit 0";
+
+  function makeCheck(overrides: Partial<Check> = {}): Check {
+    return { file: "src/planted.ts", content: "xs.sort();\n", command: LINT, ...overrides };
+  }
+
+  function enforced(id: string, quote: string, check: Check): Proposal {
+    return { ...proposal(id, quote), class: "enforced", enforcer: "fake/no-sort", check };
+  }
+
+  async function seed(name: string): Promise<string> {
+    const root = await scratchRepo(join(base, name));
+    mkdirSync(join(root, "src"));
+    await Bun.write(join(root, "src", "existing.ts"), "export {};\n");
+    await Bun.write(join(root, "doc.md"), "Use toSorted.\n\nAvoid mutation.\n");
+    await sh(root, "git", "add", ".");
+    await sh(root, "git", "commit", "-q", "-m", "seed");
+    return root;
+  }
+
+  test.each<{ name: string; check: Check; expected: string | undefined }>([
+    { name: "linter fails naming the file", check: makeCheck(), expected: undefined },
+    {
+      name: "linter passes the violation",
+      check: makeCheck({ content: "xs.toSorted();\n" }),
+      expected: "the command passed the planted violation",
+    },
+    {
+      name: "command fails for another reason",
+      check: makeCheck({ command: "exit 2" }),
+      expected: "the command exited 2 without naming the check file",
+    },
+    {
+      name: "file already exists",
+      check: makeCheck({ file: "src/existing.ts" }),
+      expected: "check file already exists",
+    },
+    {
+      name: "file outside the repository",
+      check: makeCheck({ file: "../escaped.ts" }),
+      expected: "check file is outside the repository",
+    },
+    {
+      name: "directory missing",
+      check: makeCheck({ file: "lib/planted.ts" }),
+      expected: "check file's directory does not exist",
+    },
+  ])("verifyCheck: $name", async ({ name, check, expected }) => {
+    const root = await seed(name.replaceAll(" ", "-"));
+    expect(await verifyCheck(root, check)).toBe(expected);
+    expect(await sh(root, "git", "status", "--porcelain", "--untracked-files=all")).toBe("");
+    expect(await Bun.file(join(root, "..", "escaped.ts")).exists()).toBe(false);
+  });
+
+  test("apply drops an enforced proposal whose check does not hold", async () => {
+    const root = await seed("apply");
+    const { applied, unlocated, unverified } = await applyProposals(root, [
+      enforced("held", "Use toSorted.", makeCheck()),
+      enforced("passed", "Avoid mutation.", makeCheck({ content: "xs.toSorted();\n" })),
+    ]);
+    expect(applied.map((row) => row.id)).toEqual(["held"]);
+    expect(unlocated).toEqual([]);
+    expect(unverified).toEqual([
+      { id: "passed", file: "doc.md", why: "the command passed the planted violation" },
+    ]);
+    expect(await Bun.file(join(root, "doc.md")).text()).toBe("Avoid mutation.\n");
+    expect(await Bun.file(join(root, "src", "planted.ts")).exists()).toBe(false);
+  });
+
+  test("apply rejects an enforced proposal without its check", async () => {
+    const root = await seed("schema");
+    const runDir = join(base, "runs", "schema");
+    mkdirSync(runDir, { recursive: true });
+    const ledger = join(runDir, "proposals.jsonl");
+    const row = { ...proposal("bare", "Use toSorted."), class: "enforced" };
+    await Bun.write(ledger, `${JSON.stringify(row)}\n`);
+    const failure = await run(root, "apply", ledger).catch((error: unknown) => error);
+    expect(String(failure)).toContain("an enforced proposal names its enforcer and check");
   });
 });
 

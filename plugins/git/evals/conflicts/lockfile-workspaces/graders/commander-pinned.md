@@ -1,7 +1,7 @@
 ---
 type: regex
-pattern: '"commander@15.0.0"'
+pattern: '"commander@14.0.2"'
 match: contains
-target: { source: file, path: bun.lock }
+target: { source: file, path: .eval-pushed-tree/bun.lock }
 ---
-main's locked commander 15.0.0 survives.
+main's locked commander 14.0.2 survives.

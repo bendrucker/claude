@@ -1,0 +1,10 @@
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+new file mode 100644
+--- /dev/null
++++ b/CONTRIBUTING.md
+@@ -0,0 +1,5 @@
++# Contributing
++
++Open a pull request against `main`. Keep a change to one concern, and say in the description what it fixes.
++
++Run `bun test` before pushing.

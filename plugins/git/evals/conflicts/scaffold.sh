@@ -2,6 +2,7 @@
 # Builds a case's repository from its history/ patches and stops the rebase on its conflict.
 # usage: scaffold.sh <case-dir>
 # history/ holds an optional operation (rebase or merge), base.patch, main.patch, main.msg, branch.name, and branch/NN.patch with NN.msg per branch commit.
+# An optional upstream.patch and upstream.msg add a commit to origin's main that the working repository has not fetched.
 # An optional check.sh runs against each pushed result, and an optional expect lists `<blob> <path>` pairs it should match.
 # check.sh gets the path of the case's hidden/ copy and the branch's pre-operation tip as arguments.
 set -euo pipefail
@@ -48,6 +49,23 @@ git remote set-url origin "$PWD/.git/origin.git"
 git push -q origin main "$branch"
 git branch -q --set-upstream-to "origin/$branch"
 git fetch -q origin
+git remote set-head origin main
+
+# Lands on origin only, so local main and origin/main stay behind it as in a clone that has not fetched.
+# It goes in before the hook is installed so the grade log never records it.
+if [ -f "$history/upstream.patch" ]; then
+  upstream=$(mktemp -d "${TMPDIR:-/tmp}/upstream.XXXXXX")
+  patch=$(cd "$history" && pwd)/upstream.patch
+  git clone -q --branch main "$PWD/.git/origin.git" "$upstream"
+  (
+    cd "$upstream"
+    git config commit.gpgsign false
+    git apply --index "$patch"
+    commit "2026-10-04T09:00:00Z" "$(cat "${patch%.patch}.msg")" > /dev/null
+    git push -q origin HEAD:main
+  )
+  rm -rf "$upstream"
+fi
 
 hooks=.git/origin.git/hooks
 pwd > "$hooks/eval-work"

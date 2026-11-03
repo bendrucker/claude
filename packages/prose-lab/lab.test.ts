@@ -44,7 +44,7 @@ import {
 } from "./score";
 import { locate, toFlags } from "./review";
 import type { Message, QueryFn } from "../eval-judge/index";
-import { type Call, next, PROPOSED } from "./deck";
+import { type Call, next, PROPOSED, toCall } from "./deck";
 import { propose, type Reply, resolve, spread } from "./propose";
 import { context, reveal, serve } from "./server";
 import { checkRows } from "./status";
@@ -416,10 +416,19 @@ describe("next", () => {
     expect(next(hits, labels, [], seen)).toBeUndefined();
   });
 
-  test("prefers the check with the widest interval", () => {
+  test("prefers the check fewest votes from a call", () => {
     const some = openCheck.slice(0, 3).map((h) => label(h, "right"));
     const fresh = checkHits("Fresh", 3, false);
-    expect(next([...openCheck, ...fresh], some, [], new Set())?.check).toBe("Fresh");
+    expect(next([...openCheck, ...fresh], some, [], new Set())?.check).toBe("Open");
+  });
+
+  test.each<{ name: string; right: number; wrong: number; want: number }>([
+    { name: "an unlabeled check needs the minimum", right: 0, wrong: 0, want: 10 },
+    { name: "a slop streak needs only the rest of the minimum", right: 5, wrong: 0, want: 5 },
+    { name: "a fine streak leans below the floor", right: 0, wrong: 4, want: 6 },
+    { name: "a decided check needs none", right: 10, wrong: 0, want: 0 },
+  ])("toCall: $name", ({ right, wrong, want }) => {
+    expect(toCall({ right, wrong })).toBe(want);
   });
 
   test("picks the hit from the file the check's labels least cover", () => {

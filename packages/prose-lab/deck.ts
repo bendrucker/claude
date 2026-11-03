@@ -79,16 +79,28 @@ function pick(group: readonly Hit[], rating: Rating, seen: ReadonlySet<string>):
 }
 
 /** Widest interval first, then fewest judged hits, then by name. */
+const MAX_TO_CALL = 200;
+
+/** Votes a check needs for a call if every one goes the way its labels lean, which for an unlabeled check is right. */
+export function toCall({ right, wrong }: Pick<Rating, "right" | "wrong">): number {
+  const above = right + wrong === 0 || right / (right + wrong) >= FLOOR;
+  const steps = Array.from({ length: MAX_TO_CALL }, (_, k) => k);
+  return (
+    steps.find((k) => (above ? settled(right + k, wrong) : settled(right, wrong + k))) ??
+    MAX_TO_CALL
+  );
+}
+
 function priority(a: Rating, b: Rating): number {
-  const width = b.high - b.low - (a.high - a.low);
-  if (width !== 0) return width;
-  const judged = a.right + a.wrong - (b.right + b.wrong);
+  const votes = toCall(a) - toCall(b);
+  if (votes !== 0) return votes;
+  const judged = b.right + b.wrong - (a.right + a.wrong);
   return judged === 0 ? a.check.localeCompare(b.check) : judged;
 }
 
 /**
  * Picks a proposer hit every `PROPOSAL_EVERY`th card, and otherwise a hit from
- * the undecided check with the widest interval and fewest labels.
+ * the undecided check fewest votes from a call.
  */
 export function next(
   hits: readonly Hit[],

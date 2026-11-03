@@ -1,4 +1,4 @@
-# A tally a past run produced goes stale as the work behind it moves, and the run prints it again anyway. Prose scopes a set with a spelled count, so only digits read as a tally.
+# A tally a past run produced goes stale as the work behind it moves, and the run prints it again anyway. Prose scopes a set with a spelled count, so only digits read as a tally. A count that ends a range or follows a comparator is a threshold.
 # evidence: a hand audit of every hit across the repo. The rule-precision labels barely exercise it.
 # retire when: a hand audit finds most hits are thresholds or fixed facts rather than numbers a run reports.
 extends: existence
@@ -7,7 +7,7 @@ level: warning
 nonword: true
 scope: ~text.frontmatter
 tokens:
-  - '\b\d[\d,]* of \d[\d,]*\b'
+  - '(?<![-–<>≥≤=]\s?)\b\d[\d,]* of \d[\d,]*\b'
 tests:
   - name: flags a survival count
     input: |
@@ -29,3 +29,22 @@ tests:
     input: |
       Merge on a 3-of-5 vote.
     absent: Prompting.StaleMeasurement
+  - name: allows a range band in a table cell
+    input: |
+      | Score | Severity |
+      | --- | --- |
+      | 50-74% (20-29 of 40) | Info |
+      | 75-89% (30–35 of 40) | Warning |
+    absent: Prompting.StaleMeasurement
+  - name: allows a count after a comparator
+    input: |
+      Escalate at >= 36 of 40, and block at ≥38 of 40.
+    absent: Prompting.StaleMeasurement
+  - name: allows a count after a less-than
+    input: |
+      Ignore scores < 20 of 40.
+    absent: Prompting.StaleMeasurement
+  - name: flags tallies beside a range elsewhere in the sentence
+    input: |
+      Of the 10-20 runs, 9 of 11 passed and 23 of 35 cleared.
+    contains: [Prompting.StaleMeasurement]

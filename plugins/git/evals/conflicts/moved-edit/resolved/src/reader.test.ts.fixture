@@ -1,0 +1,21 @@
+import { describe, expect, test } from "bun:test";
+import { parseLcov } from "./reader";
+
+describe("parseLcov", () => {
+  test("reads a record", () => {
+    const [fc] = parseLcov("SF:src/a.ts\nDA:1,1\nDA:2,0\nFNF:2\nFNH:1\nend_of_record\n");
+    expect(fc.file).toBe("src/a.ts");
+    expect(fc.lineHits.get(2)).toBe(0);
+    expect(fc.functionsFound).toBe(2);
+  });
+
+  test("strips carriage returns from CRLF input", () => {
+    const [fc] = parseLcov("SF:src/a.ts\r\nFNF:2\r\nFNH:1\r\nend_of_record\r\n");
+    expect(fc.file).toBe("src/a.ts");
+    expect(fc.functionsHit).toBe(1);
+  });
+
+  test("ignores lines outside a record", () => {
+    expect(parseLcov("DA:1,1\n")).toEqual([]);
+  });
+});

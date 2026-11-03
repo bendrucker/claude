@@ -1,0 +1,40 @@
+diff --git a/src/transcript.test.ts b/src/transcript.test.ts
+index 5a636ac..a9ab51e 100644
+--- a/src/transcript.test.ts
++++ b/src/transcript.test.ts
+@@ -36,6 +36,20 @@ test("skips malformed lines", async () => {
+   ]);
+ });
+ 
++test("skips lines that parse to a non-object value", async () => {
++  const path = await write([
++    '{"n":1}',
++    "42",
++    "null",
++    '"text"',
++    '{"n":2}'
++  ]);
++  expect(await readTranscriptTail(path, 1024)).toEqual([
++    { n: 1 },
++    { n: 2 }
++  ]);
++});
++
+ test("drops the partial line a mid-file slice splits", async () => {
+   const path = await write([
+     `{"pad":"${"x".repeat(200)}"}`,
+diff --git a/src/transcript.ts b/src/transcript.ts
+index 99ff72c..d1ee59d 100644
+--- a/src/transcript.ts
++++ b/src/transcript.ts
+@@ -22,7 +22,9 @@ export async function readTranscriptTail(
+     for (const line of lines) {
+       if (line.trim() === "") continue;
+       try {
+-        entries.push(JSON.parse(line));
++        const entry: unknown = JSON.parse(line);
++        if (typeof entry === "object" && entry !== null)
++          entries.push(entry);
+       } catch {
+         // Skip malformed lines.
+       }

@@ -1,0 +1,16 @@
+import { expect, test } from "bun:test";
+import { drainQueue } from "./drain";
+import { waitFor, type Clock, type Wait } from "./wait";
+
+test("drainQueue waits thirty seconds", async () => {
+  let t = 0;
+  const clock: Clock = {
+    now: () => t,
+    sleep: async (ms) => {
+      t += ms;
+    },
+  };
+  const wait: Wait = (check, options) => waitFor(check, { ...options, clock });
+  expect(await drainQueue(() => false, wait)).toBe(false);
+  expect(t).toBe(30_000);
+});

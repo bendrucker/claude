@@ -1,0 +1,25 @@
+import { expect, test } from "bun:test"
+import { join } from "node:path"
+import { scanImports } from "./imports"
+import { parseReviewers } from "./reviewers"
+import { readTranscriptTail } from "./transcript"
+
+test("parseReviewers drops a leading @", () => {
+  expect(parseReviewers("@Jacob, @coderabbitai")).toEqual(new Set(["jacob", "coderabbitai"]))
+})
+
+test("readTranscriptTail skips lines that are not objects", async () => {
+  const path = join(process.env.TMPDIR ?? "/tmp", `hidden-${crypto.randomUUID()}.jsonl`)
+  await Bun.write(path, ['{"a":1}', "7", "null", "[1]", "true", '{"b":2}'].join("\n") + "\n")
+  const entries = await readTranscriptTail(path, 4096)
+  expect(entries).toContainEqual({ a: 1 })
+  expect(entries).toContainEqual({ b: 2 })
+  expect(entries).not.toContain(7)
+  expect(entries).not.toContain(null)
+  expect(entries).not.toContain(true)
+})
+
+test("scanImports leaves out URL specifiers", () => {
+  const source = `import a from "http://example.com/a";\nimport b from "https://esm.sh/b";\nimport { z } from "zod";`
+  expect(scanImports(source)).toEqual(["zod"])
+})

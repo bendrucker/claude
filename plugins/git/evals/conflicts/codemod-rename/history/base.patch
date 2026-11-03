@@ -1,0 +1,118 @@
+diff --git a/src/ci.ts b/src/ci.ts
+new file mode 100644
+index 0000000..a5aed5d
+--- /dev/null
++++ b/src/ci.ts
+@@ -0,0 +1,6 @@
++import { underAny } from "./paths";
++
++/** Whether a change needs the workflow files revalidated. */
++export function touchesWorkflows(files: string[]): boolean {
++  return underAny(files, [".github/workflows/"]);
++}
+diff --git a/src/docs.ts b/src/docs.ts
+new file mode 100644
+index 0000000..6a33de6
+--- /dev/null
++++ b/src/docs.ts
+@@ -0,0 +1,6 @@
++import { underAny } from "./paths";
++
++/** Whether a change touches only documentation. */
++export function docsOnly(files: string[]): boolean {
++  return files.length > 0 && files.every((file) => underAny([file], ["docs/", "README"]));
++}
+diff --git a/src/ignore.ts b/src/ignore.ts
+new file mode 100644
+index 0000000..04c6a06
+--- /dev/null
++++ b/src/ignore.ts
+@@ -0,0 +1,6 @@
++import { underAny } from "./paths";
++
++/** Drops files that sit under a vendored or generated directory. */
++export function dropIgnored(files: string[], ignored: string[]): string[] {
++  return files.filter((file) => !underAny([file], ignored));
++}
+diff --git a/src/paths.test.ts b/src/paths.test.ts
+new file mode 100644
+index 0000000..b81d764
+--- /dev/null
++++ b/src/paths.test.ts
+@@ -0,0 +1,10 @@
++import { expect, test } from "bun:test";
++import { underAny } from "./paths";
++
++test("matches a file under a prefix", () => {
++  expect(underAny(["docs/a.md"], ["docs/"])).toBe(true);
++});
++
++test("no files never match", () => {
++  expect(underAny([], ["docs/"])).toBe(false);
++});
+diff --git a/src/paths.ts b/src/paths.ts
+new file mode 100644
+index 0000000..8cd2b2c
+--- /dev/null
++++ b/src/paths.ts
+@@ -0,0 +1,4 @@
++/** True when any file sits under any of the given path prefixes. */
++export function underAny(files: string[], paths: string[]): boolean {
++  return files.some((file) => paths.some((path) => file.startsWith(path)));
++}
+diff --git a/src/select.test.ts b/src/select.test.ts
+new file mode 100644
+index 0000000..a8d7ee1
+--- /dev/null
++++ b/src/select.test.ts
+@@ -0,0 +1,17 @@
++import { expect, test } from "bun:test";
++import { select } from "./select";
++import { underAny } from "./paths";
++
++const plugins = [
++  { name: "writing", paths: [] },
++  { name: "review", paths: ["shared/"] },
++];
++
++test("no changed files selects everything", () => {
++  expect(select(plugins, [], [])).toEqual(["writing", "review"]);
++});
++
++test("a claimed path selects its plugin", () => {
++  expect(underAny(["shared/a.ts"], plugins[1]!.paths)).toBe(true);
++  expect(select(plugins, ["shared/a.ts"], [])).toEqual(["review"]);
++});
+diff --git a/src/select.ts b/src/select.ts
+new file mode 100644
+index 0000000..d1a24e7
+--- /dev/null
++++ b/src/select.ts
+@@ -0,0 +1,27 @@
++import { underAny } from "./paths";
++
++export interface Plugin {
++  name: string;
++  /** Out-of-plugin paths that select it. */
++  paths: string[];
++}
++
++function pluginNames(files: string[]): Set<string> {
++  const plugins = new Set<string>();
++  for (const file of files) {
++    const match = file.match(/^plugins\/([^/]+)\//);
++    if (match?.[1] != null && match[1] !== "") plugins.add(match[1]);
++  }
++  return plugins;
++}
++
++/** Plugins whose jobs a change has to run. */
++export function select(plugins: Plugin[], files: string[], alwaysPaths: string[]): string[] {
++  const all = plugins.map((plugin) => plugin.name);
++  if (files.length === 0 || underAny(files, alwaysPaths)) return all;
++
++  const changed = pluginNames(files);
++  return plugins
++    .filter((plugin) => changed.has(plugin.name) || underAny(files, plugin.paths))
++    .map((plugin) => plugin.name);
++}

@@ -1,6 +1,6 @@
 ---
 type: regex
-pattern: 'Run a native `claude plugin eval` suite through `bun evals/native/run.ts'
+pattern: 'Run a native `claude plugin eval` suite[^\n]*through `bun evals/native/run\.ts'
 match: contains
 target: { source: file, path: CLAUDE.md }
 ---

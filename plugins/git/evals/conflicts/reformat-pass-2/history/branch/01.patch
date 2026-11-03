@@ -1,0 +1,32 @@
+diff --git a/src/reviewers.test.ts b/src/reviewers.test.ts
+index e1d1456..8067356 100644
+--- a/src/reviewers.test.ts
++++ b/src/reviewers.test.ts
+@@ -38,6 +38,12 @@ describe("parseReviewers", () => {
+       new Set(["coderabbitai", "jacob"])
+     );
+   });
++
++  test("drops a leading @ from each username", () => {
++    expect(parseReviewers("@CodeRabbitAI, @jacob")).toEqual(
++      new Set(["coderabbitai", "jacob"])
++    );
++  });
+ });
+ 
+ describe("isReviewTarget", () => {
+diff --git a/src/reviewers.ts b/src/reviewers.ts
+index 5af7627..5765663 100644
+--- a/src/reviewers.ts
++++ b/src/reviewers.ts
+@@ -20,7 +20,9 @@ export function parseReviewers(list = ""): Set<string> {
+   return new Set(
+     list
+       .split(",")
+-      .map((username) => username.trim().toLowerCase())
++      .map((username) =>
++        username.trim().replace(/^@/, "").toLowerCase()
++      )
+       .filter(Boolean)
+   );
+ }

@@ -1,0 +1,47 @@
+{
+  "path": "docs/deploy.rst",
+  "findings": [
+    {
+      "severity": "error",
+      "check": "Writing.SpacedEmDash",
+      "phrase": " — ",
+      "message": "Replace the spaced em dash with a period or a comma."
+    },
+    {
+      "severity": "warning",
+      "check": "ai-tells.PromotionalPuffery",
+      "phrase": "seamless",
+      "message": "'seamless' is promotional. Say what the deploy does."
+    },
+    {
+      "severity": "suggestion",
+      "check": "ai-tells.HedgingPhrases",
+      "phrase": "It might be worth noting that",
+      "message": "'It might be worth noting that' hedges. State the fact."
+    },
+    {
+      "severity": "suggestion",
+      "check": "ai-tells.FillerPhrases",
+      "phrase": "in order to",
+      "message": "'in order to' is filler. Use 'to'."
+    },
+    {
+      "severity": "suggestion",
+      "check": "ai-tells.PassiveVoice",
+      "phrase": "are tagged",
+      "message": "'are tagged' is passive. Name who tags the images."
+    },
+    {
+      "severity": "suggestion",
+      "check": "ai-tells.FormalTransitions",
+      "phrase": "However,",
+      "message": "'However' is a formal transition. Cut it or use 'But'."
+    },
+    {
+      "severity": "suggestion",
+      "check": "ai-tells.AbsoluteAssertions",
+      "phrase": "Never",
+      "message": "'Never' is an absolute. Qualify it if exceptions exist."
+    }
+  ]
+}

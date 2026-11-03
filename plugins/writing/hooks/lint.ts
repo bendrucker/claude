@@ -8,7 +8,7 @@ import { lintFile, valeAlerts } from "../detection/vale";
 import { editScopeOf, newAlerts } from "./edit-scope";
 import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
 import { lintMessages } from "./messages";
-import { hookAlertOf, type HookAlert, report } from "./report";
+import { decisionOf, hookAlertOf, type HookAlert, report } from "./report";
 import { appendRunLog, type RunLogEntry, type RunOutcome } from "./run-log";
 import { recentlyFired, recordFired } from "./session-state";
 
@@ -37,7 +37,7 @@ async function lintEdited(
       ? all
       : newAlerts(all, await valeAlerts(scope.original, { filePath }), scope.added);
   return {
-    alerts: edited.map((alert) => hookAlertOf(alert, "context")),
+    alerts: edited.map((alert) => hookAlertOf(alert, decisionOf(alert.Severity, "PostToolUse"))),
     checks: unique(all.map((alert) => alert.Check)),
     unedited: all.length - edited.length,
   };

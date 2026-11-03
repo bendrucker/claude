@@ -4,8 +4,9 @@ exports[`report caps the list and counts the rest 1`] = `
 {
   "hookSpecificOutput": {
     "additionalContext": 
-"Vale found 13 alerts in this text. Fix them in one pass.
+"Vale found 13 alerts in this text.
 
+Warnings are likely problems. Fix each one unless it is wrong for this text:
 - 1:1 Writing.Rule0: Cut the filler.
 - 1:1 Writing.Rule1: Cut the filler.
 - 1:1 Writing.Rule2: Cut the filler.
@@ -16,7 +17,8 @@ exports[`report caps the list and counts the rest 1`] = `
 - 1:1 Writing.Rule7: Cut the filler.
 - 1:1 Writing.Rule8: Cut the filler.
 - 1:1 Writing.Rule9: Cut the filler.
-- …and 3 more. Lint the text with Vale to see all."
+
+…and 3 more. Lint the text with Vale to see all."
 ,
     "hookEventName": "PreToolUse",
   },

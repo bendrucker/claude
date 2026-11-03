@@ -1,6 +1,6 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { $ } from "bun";
 import { parseDocument } from "yaml";
 import { z } from "zod";
@@ -100,11 +100,37 @@ export async function fillUserConfig(root: string, plugins: string[]): Promise<v
   );
 }
 
+function inside(parent: string, path: string): boolean {
+  const rel = relative(parent, path);
+  return !rel.startsWith("..") && !isAbsolute(rel);
+}
+
+/** Deletes repo paths from the staged plugins, rejecting one that is missing or outside them. */
+export async function removeStaged(
+  root: string,
+  plugins: string[],
+  suite: string,
+  remove: string[],
+): Promise<void> {
+  for (const path of remove) {
+    if (!plugins.some((p) => inside(p, path)) || inside(suite, path))
+      throw new Error(
+        `--remove ${path} is outside the staged plugins (${plugins.join(", ")}) or inside the suite`,
+      );
+  }
+  const present = await Promise.all(remove.map((path) => exists(join(root, path))));
+  const missing = remove.filter((_, i) => !present[i]);
+  if (missing.length > 0)
+    throw new Error(`--remove ${missing.join(", ")} does not exist in the staged tree`);
+  await Promise.all(remove.map(async (path) => $`rm -rf ${join(root, path)}`.quiet()));
+}
+
 async function stagePlugins(
   repo: string,
   suite: string,
   ref: string | undefined,
   root: string,
+  remove: string[],
 ): Promise<Staged> {
   const plugins = await casePlugins(repo, suite);
   const owner = plugins.find((p) => !relative(p, suite).startsWith(".."));
@@ -112,6 +138,7 @@ async function stagePlugins(
     throw new Error(`${suite} does not sit inside any plugin its cases load`);
   await stage(repo, ref, plugins, root);
   await fillUserConfig(root, plugins);
+  await removeStaged(root, plugins, suite, remove);
   // The suite always comes from the working tree, so every ref is graded by the same cases.
   await $`rm -rf ${join(root, suite)}`.quiet();
   await stage(repo, undefined, [suite], root);
@@ -146,12 +173,15 @@ export async function prepare(
   repo: string,
   suite: string,
   ref: string | undefined,
+  remove: string[] = [],
 ): Promise<Staged> {
-  const root = mkdtempSync(join(tmpdir(), "hill-climb-"));
   const config = await readSuite(join(repo, suite));
+  if (remove.length > 0 && config.wrap !== undefined)
+    throw new Error("--remove applies to suites that load plugins, not wrapped suites");
+  const root = mkdtempSync(join(tmpdir(), "hill-climb-"));
   const staged =
     config.wrap === undefined
-      ? await stagePlugins(repo, suite, ref, root)
+      ? await stagePlugins(repo, suite, ref, root, remove)
       : await stageWrapped(repo, suite, ref, root, config.wrap);
   await stage(repo, undefined, config.stage, root);
   await shareGraders(join(staged.target, staged.evalDir), config.graders);
@@ -232,8 +262,8 @@ export async function pluginErrors(output: string): Promise<string[]> {
 }
 
 /**
- * Command-line arguments given before `--` other than the suite, `--ref`, `--label`, `--adapter`,
- * and help.
+ * Command-line arguments given before `--` other than the suite, `--ref`, `--label`, `--remove`,
+ * `--adapter`, and help.
  * Runner arguments such as `--case` go after `--`, and one before it would be misread as a
  * `run.ts` option or a runner argument.
  */
@@ -244,8 +274,9 @@ export function strayArgs(args: string[]): string[] {
   let suite = false;
   for (let i = 0; i < before.length; i++) {
     const arg = before[i] ?? "";
-    if (["--ref", "--label", "--adapter"].includes(arg)) i++;
-    else if (/^--(ref|label|adapter)=/.test(arg) || arg === "-h" || arg === "--help") continue;
+    if (["--ref", "--label", "--remove", "--adapter"].includes(arg)) i++;
+    else if (/^--(ref|label|remove|adapter)=/.test(arg) || arg === "-h" || arg === "--help")
+      continue;
     else if (!suite && !arg.startsWith("-")) suite = true;
     else stray.push(arg);
   }

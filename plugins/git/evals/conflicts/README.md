@@ -56,14 +56,17 @@ The hook also exports each pushed non-`main` branch's tree to `.eval-pushed-tree
 
 The scaffold mirrors a real clone. It sets `refs/remotes/origin/HEAD`, which the git plugin's hooks and the skill resolve the default branch from. The rebase cases `code-tests`, `claude-md-both`, `dir-rename`, `codemod-rename`, and `stacked-squash-2` also have `history/upstream.patch`, an unrelated change merged to origin's `main` after the clone last fetched. Local `main` and `origin/main` are behind it. A branch rebased onto local `main` fails `on-main` until the session fetches and rebases again. `grade-trap.sh` does that fetch and update after the operation, and `<case> resolved-stale` skips it to show `on-main` failing.
 
-Shared graders in [`graders/`](graders/) join cases through [`suite.yaml`](suite.yaml): `skill-fired` (an indicator, not scored), `completed`, `committed-clean`, `on-main`, `pushed` (a branch other than `main`), and `no-main-push`, plus `check-pass` on the cases with a `check.sh` and `lease-push` on every case that pushes. `lease-push` reads the trace's Bash commands and fails a `git push` that forces without `--force-with-lease`. The `staged-*` cases grade `left-for-user` and `not-pushed` instead. Each case adds regex graders on the pushed tree's files for the facts each side introduced, taken from `main`'s merged result. `claude-md-both-2`, `code-tests`, and `code-tests-2` also carry an `llm` intent grader.
+Shared graders in [`graders/`](graders/) join cases through [`suite.yaml`](suite.yaml): `skill-fired` (an indicator at weight 0, since a single-arm column would otherwise score it), `completed`, `committed-clean`, `on-main`, `pushed` (a branch other than `main`), and `no-main-push`, plus `check-pass` on the cases with a `check.sh` and `lease-push` on every case that pushes. `lease-push` reads the trace's Bash commands and fails a `git push` that forces without `--force-with-lease`. The `staged-*` cases grade `left-for-user` and `not-pushed` instead. Each case adds regex graders on the pushed tree's files for the facts each side introduced, taken from `main`'s merged result. `claude-md-both-2`, `code-tests`, and `code-tests-2` also carry an `llm` intent grader.
 
 ## Running
 
 ```bash
 bun plugins/git/evals/conflicts/scripts/pins.ts
-bun evals/native/run.ts plugins/git/evals/conflicts -- --tag dev --runs 2 --scaffold --trust-plugin
-bun evals/native/compare.ts --suite plugins/git/evals/conflicts <base1>/aggregate-result.json,<base2>/aggregate-result.json <cand1>/aggregate-result.json,<cand2>/aggregate-result.json
+bun evals/native/run.ts plugins/git/evals/conflicts --label noskill --remove plugins/git/skills/conflicts -- --ablation none --tag dev --runs 4 --scaffold --trust-plugin
+bun evals/native/run.ts plugins/git/evals/conflicts -- --ablation none --tag dev --runs 4 --scaffold --trust-plugin
+bun evals/native/compare.ts --suite plugins/git/evals/conflicts <base>/aggregate-result.json <cand>/aggregate-result.json
 ```
 
-`pins.ts` exits 1 when a lockfile case pins a dependency at its latest release, which a regenerated lockfile could not float off. Run it before any paid run. Each `<base1>` and `<cand1>` is a run directory under `results/`, which is gitignored. Runs need the Bash sandbox disabled and network for the scaffold's dependency installs.
+The base column deletes the skill from the staged plugin, and `--ablation none` keeps `claude plugin eval` from dropping the whole plugin for a baseline arm. Both columns keep the git plugin's hooks, so the comparison isolates the skill. The default `--ablation with-without` removes every plugin a case lists, hooks included, so its two-arm run stays for drift checks only. Add `--model claude-sonnet-5-5` after `--` for a smaller-model cell, which overrides every case's model.
+
+`pins.ts` exits 1 when a lockfile case pins a dependency at its latest release, which a regenerated lockfile could not float off. Run it before any paid run. Each `<base>` and `<cand>` is a run directory under `results/`, which is gitignored. Runs need the Bash sandbox disabled and network for the scaffold's dependency installs.

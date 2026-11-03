@@ -92,6 +92,37 @@ describe("prepare", () => {
     expect(await read(join(target, "../packages/stubs/install.sh"))).toBe("working stub");
   });
 
+  test("removes a staged path and keeps the rest of the plugin", async () => {
+    const { target } = await prepare(repo, "plugins/p/evals/suite", undefined, [
+      "plugins/p/skills/s",
+      "plugins/q/.claude-plugin/plugin.json",
+    ]);
+    expect(await Bun.file(join(target, "p/skills/s/SKILL.md")).exists()).toBe(false);
+    expect(await Bun.file(join(target, "q/.claude-plugin/plugin.json")).exists()).toBe(false);
+    expect(await Bun.file(join(target, "q/skills/t/SKILL.md")).exists()).toBe(true);
+    expect(await Bun.file(join(target, "p/.claude-plugin/plugin.json")).exists()).toBe(true);
+  });
+
+  test.each<{ name: string; remove: string; message: string }>([
+    { name: "a missing path", remove: "plugins/p/skills/nope", message: "does not exist" },
+    { name: "a path inside the suite", remove: "plugins/p/evals/suite/one", message: "outside" },
+    { name: "a path in an unstaged plugin", remove: "plugins/bad", message: "outside" },
+    { name: "a path outside every plugin", remove: "packages/stubs", message: "outside" },
+    { name: "a path that climbs out", remove: "plugins/p/../x", message: "outside" },
+  ])("rejects $name", async ({ remove, message }) => {
+    const failure = await prepare(repo, "plugins/p/evals/suite", undefined, [remove]).catch(
+      (error: unknown) => error,
+    );
+    expect(String(failure)).toContain(message);
+  });
+
+  test("rejects --remove on a wrapped suite", async () => {
+    const failure = await prepare(repo, "evals/user/tdd", undefined, ["user/skills/tdd"]).catch(
+      (error: unknown) => error,
+    );
+    expect(String(failure)).toContain("wrapped");
+  });
+
   test("fills userConfig placeholders that have a default", async () => {
     const { target } = await prepare(repo, "plugins/p/evals/suite", undefined);
     expect(await read(join(target, "q/skills/t/SKILL.md"))).toBe(

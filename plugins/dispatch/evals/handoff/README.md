@@ -25,7 +25,7 @@ No case refers to a multiplexer. A multiplexer stand-in records each session it 
 
 ## Cases
 
-The floor is the fewest turns a run can take: the Skill load, the prompt `Write`, the run, and the reply for one dispatch, plus a `Write` and a run per extra fan-out task unless batched.
+The floor is the fewest turns a run can take: the Skill load, the prompt `Write`, the run, and the reply for one dispatch. A fan-out batches its `Write`s and its runs into one turn each, so it has the same floor.
 
 | Case | Split | Kind | Floor |
 | --- | --- | --- | --- |
@@ -35,8 +35,8 @@ The floor is the fewest turns a run can take: the Skill load, the prompt `Write`
 | `other-repo-ho` | holdout | another repository | 4 |
 | `stacked` | dev | stack on the current branch | 4 |
 | `stacked-ho` | holdout | stack on the current branch | 4 |
-| `fan-out-3` | dev | three tasks at once | 8 |
-| `fan-out-2` | holdout | two tasks at once | 6 |
+| `fan-out-3` | dev | three tasks at once | 4 |
+| `fan-out-2` | holdout | two tasks at once | 4 |
 | `allow-make-test` | dev | grant a permission | 4 |
 | `allow-ho` | holdout | grant a permission | 4 |
 | `blocked-permission` | dev | the session reports a permission prompt | 4 |

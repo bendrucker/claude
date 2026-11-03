@@ -11,7 +11,9 @@ const GraderConfig = z.object({
   pattern: z.string().optional(),
   flags: z.string().optional(),
   match: z.enum(["contains", "not_contains"]).optional(),
-  target: z.object({ source: z.string(), path: z.string() }).optional(),
+  target: z
+    .union([z.literal("trace"), z.object({ source: z.string(), path: z.string() })])
+    .optional(),
 });
 
 const Suite = z.object({
@@ -59,7 +61,7 @@ async function gradersFor(caseDir: string): Promise<Grader[]> {
 
 async function score(grader: Grader, work: string): Promise<Result> {
   const { type, pattern, flags, target } = grader;
-  if (type !== "regex" || pattern === undefined || target === undefined) {
+  if (type !== "regex" || pattern === undefined || target === undefined || target === "trace") {
     return { name: grader.name, verdict: "skip" };
   }
   const file = Bun.file(join(work, target.path));
@@ -69,9 +71,9 @@ async function score(grader: Grader, work: string): Promise<Result> {
   return { name: grader.name, verdict: pass ? "pass" : "fail" };
 }
 
-// Marker graders fail any unresolved file, so a trap must also fail a grader on intent.
+// The marker grader fails any unresolved file, so a trap must also fail a grader on intent.
 function isMarkerGrader(name: string): boolean {
-  return name === "committed-clean" || name.startsWith("no-markers");
+  return name === "committed-clean";
 }
 
 const Args = z.object({

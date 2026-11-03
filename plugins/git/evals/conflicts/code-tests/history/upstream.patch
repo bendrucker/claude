@@ -1,0 +1,11 @@
+diff --git a/plugins/herdr/skills/herdr/references/layouts.md b/plugins/herdr/skills/herdr/references/layouts.md
+new file mode 100644
+--- /dev/null
++++ b/plugins/herdr/skills/herdr/references/layouts.md
+@@ -0,0 +1,6 @@
++# Layouts
++
++A tab holds one or more panes. Split a pane to put a long-running process beside the session.
++
++- Split right for logs and dev servers.
++- Split down for a second agent.

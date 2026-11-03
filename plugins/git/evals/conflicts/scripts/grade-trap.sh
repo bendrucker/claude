@@ -3,10 +3,14 @@
 # usage: grade-trap.sh <case> <trap|resolved>
 # Files in <side>/ overwrite the working tree at every stop. A trailing .fixture is dropped from each name,
 # so fixture manifests and lockfiles stay invisible to dependency scanners.
+# After the operation it fetches and updates onto origin/main as a correct session does. A side of <side>-stale
+# uses <side>/ but skips that step, to show on-main failing a branch left behind origin.
 set -euo pipefail
 suite=$(cd "$(dirname "$0")/.." && pwd)
 case_dir="$suite/$1"
-side=$2
+side=${2%-stale}
+stale=false
+[ "$side" = "$2" ] || stale=true
 [ -d "$case_dir/$side" ] || { echo "no $side/ in $1" >&2; exit 2; }
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/grade-trap.XXXXXX")
@@ -22,7 +26,7 @@ overlay() {
 }
 
 in_progress() {
-  [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ] || [ -f .git/MERGE_HEAD ]
+  [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ] || [ -f .git/MERGE_HEAD ] || [ -f .git/CHERRY_PICK_HEAD ]
 }
 
 for _ in $(seq 20); do
@@ -38,7 +42,18 @@ for _ in $(seq 20); do
 done
 in_progress && { echo "operation still in progress in $work" >&2; exit 1; }
 
-git push -q --force origin HEAD
+if ! $stale; then
+  git fetch -q origin
+  if ! git merge-base --is-ancestor origin/main HEAD; then
+    if [ "$(cat "$case_dir/history/operation" 2>/dev/null)" = merge ]; then
+      git merge -q --no-edit origin/main
+    else
+      git rebase -q origin/main
+    fi
+  fi
+fi
+
+git push -q --force-with-lease origin HEAD
 
 hooks="$work/.git/origin.git/hooks"
 echo "== $1 $side ($work)"

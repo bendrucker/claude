@@ -8,6 +8,6 @@ execution:
   timeout_seconds: 1200
   allowed_tools: [Read, Glob, Grep, Skill, Bash, Edit, Write]
   append_system_prompt: >-
-    Nobody is available to answer questions during this task, so decide on your own and state any assumption in your final reply. `origin` is a local bare repository, so fetches and pushes work offline.
+    Nobody is available to answer questions during this task, so decide on your own and state any assumption in your final reply.
 context:
   scaffold_script: fixture.sh

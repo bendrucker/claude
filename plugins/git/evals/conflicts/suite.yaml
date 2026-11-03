@@ -7,6 +7,8 @@ graders:
   committed-clean: "!staged-*"
   on-main: "!staged-*"
   pushed: "!staged-*"
+  no-main-push: "!staged-*"
+  lease-push: [claude-md-both, claude-md-both-2, code-tests, code-tests-2, codemod-rename, dir-rename, generated-region, lockfile-deps, lockfile-large, lockfile-workspaces, moved-edit, reformat-pass, reformat-pass-2, stacked-squash, stacked-squash-2, unit-change]
   check-pass: [code-tests, code-tests-2, dir-rename, stacked-squash, lockfile-workspaces, lockfile-deps, lockfile-large, reformat-pass, reformat-pass-2, codemod-rename, moved-edit, unit-change]
   left-for-user: "staged-*"
   not-pushed: "staged-*"

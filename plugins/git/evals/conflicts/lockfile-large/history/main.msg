@@ -1,1 +1,1 @@
-app: add xml2js
+app: add yaml

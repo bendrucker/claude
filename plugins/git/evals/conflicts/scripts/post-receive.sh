@@ -8,6 +8,9 @@ while read -r _ new ref; do
   on=$(git merge-base --is-ancestor main "$new" && echo on-main || echo off-main)
   echo "pushed: $ref $on" >> "$work/.eval-pushed"
   [ "$ref" = refs/heads/main ] && continue
+  rm -rf "$work/.eval-pushed-tree"
+  mkdir -p "$work/.eval-pushed-tree"
+  git archive "$new" | tar -x -C "$work/.eval-pushed-tree"
   {
     wgd="$work/.git"
     if [ -d "$wgd/rebase-merge" ] || [ -d "$wgd/rebase-apply" ] || [ -f "$wgd/MERGE_HEAD" ] || [ -f "$wgd/CHERRY_PICK_HEAD" ]; then
@@ -25,7 +28,7 @@ while read -r _ new ref; do
     if [ -x "$hooks/eval-check" ]; then
       # The check runs in the working tree, so it counts only when that tree is exactly the pushed commit.
       if (unset GIT_DIR GIT_QUARANTINE_PATH GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
-        cd "$work" && [ "$(git rev-parse HEAD)" = "$new" ] && [ -z "$(git status --porcelain)" ] &&
+        cd "$work" && [ "$(git rev-parse HEAD)" = "$new" ] && [ -z "$(git status --porcelain --untracked-files=no)" ] &&
           "$hooks/eval-check" "$hooks/eval-hidden" "$(cat "$hooks/eval-branch")") > "$hooks/eval-check.log" 2>&1; then
         echo "check: pass"
       else

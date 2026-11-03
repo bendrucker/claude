@@ -3165,6 +3165,174 @@ describe("message_usage cost columns and usage queries", () => {
   });
 });
 
+describe("memory-loads query", () => {
+  const home = "/Users/test";
+  const widget = `${home}/src/acme/widget`;
+
+  function memoryLine(session: string, cwd: string, file: string, body: string, scope = "Project") {
+    return {
+      type: "attachment",
+      sessionId: session,
+      cwd,
+      uuid: `${session}:${file}`,
+      timestamp: "2026-03-01T10:00:00.000Z",
+      attachment: {
+        type: "nested_memory",
+        path: file,
+        displayPath: file,
+        content: {
+          path: file,
+          type: scope,
+          content: body,
+          rawContent: `---\npaths: ["**"]\n---\n${body}`,
+        },
+      },
+    };
+  }
+
+  beforeEach(async () => {
+    const testing = "one two three four";
+    const loads: [string, string, string, string, string?][] = [
+      ["mem-main", widget, `${widget}/.claude/rules/testing.md`, testing],
+      ["mem-main", widget, `${widget}/src/agents/CLAUDE.md`, "nested memory"],
+      [
+        "mem-local",
+        `${widget}/.worktrees/b1/sub`,
+        `${widget}/.worktrees/b1/.claude/rules/testing.md`,
+        testing,
+      ],
+      [
+        "mem-local",
+        `${widget}/.worktrees/b1/sub`,
+        `${widget}/.worktrees/b1/src/agents/CLAUDE.md`,
+        "nested memory",
+      ],
+      [
+        "mem-container",
+        `${home}/src/.worktrees/acme/widget/b2`,
+        `${home}/src/.worktrees/acme/widget/b2/.claude/rules/testing.md`,
+        testing,
+      ],
+      [
+        "mem-herdr",
+        `${home}/.herdr/worktrees/widget/b3`,
+        `${home}/.herdr/worktrees/widget/b3/.claude/rules/testing.md`,
+        testing,
+      ],
+      ["mem-sibling", `${widget}.b4`, `${widget}.b4/.claude/rules/testing.md`, testing],
+      [
+        "mem-harness",
+        `${widget}/.claude/worktrees/b5`,
+        `${widget}/.claude/worktrees/b5/.claude/rules/style.md`,
+        Array.from({ length: 40 }, () => "w").join(" "),
+      ],
+      ["mem-main", widget, `${home}/.claude/rules/shell.md`, "a b c", "User"],
+      [
+        "mem-dotted",
+        `${home}/src/other/widget.io`,
+        `${home}/src/other/widget.io/.claude/rules/testing.md`,
+        "one two three four five",
+      ],
+    ];
+    const lines = loads.map(([session, cwd, file, body, scope]) =>
+      memoryLine(session, cwd, file, body, scope),
+    );
+    await db.run(
+      `INSERT INTO raw
+       SELECT 'local', UNNEST(pinned_columns(value)),
+         '${home}/.claude/projects/memory/' || (value->>'$.sessionId') || '.jsonl',
+         key::BIGINT + 1, value
+       FROM json_each($lines::JSON)`,
+      { lines: JSON.stringify(lines) },
+    );
+    await rebuildViews(db);
+  });
+
+  it("folds every worktree layout onto one repo-relative row, ranked by total words", async () => {
+    const rows = await runQuery(
+      db,
+      "memory-loads",
+      z.object({
+        host: z.string(),
+        repo: z.string(),
+        path: z.string(),
+        loads: z.bigint(),
+        sessions: z.bigint(),
+        words_per_load: z.number(),
+        bytes_per_load: z.number(),
+        total_words: z.bigint(),
+      }),
+      { ...filterParams(), limit: null },
+    );
+    expect(
+      rows.map((r) => ({
+        host: r.host,
+        repo: r.repo,
+        path: r.path,
+        loads: Number(r.loads),
+        sessions: Number(r.sessions),
+        words_per_load: r.words_per_load,
+        total_words: Number(r.total_words),
+      })),
+    ).toEqual([
+      {
+        host: "local",
+        repo: "widget",
+        path: ".claude/rules/style.md",
+        loads: 1,
+        sessions: 1,
+        words_per_load: 40,
+        total_words: 40,
+      },
+      {
+        host: "local",
+        repo: "widget",
+        path: ".claude/rules/testing.md",
+        loads: 5,
+        sessions: 5,
+        words_per_load: 4,
+        total_words: 20,
+      },
+      {
+        host: "local",
+        repo: "widget.io",
+        path: ".claude/rules/testing.md",
+        loads: 1,
+        sessions: 1,
+        words_per_load: 5,
+        total_words: 5,
+      },
+      {
+        host: "local",
+        repo: "widget",
+        path: "src/agents/CLAUDE.md",
+        loads: 2,
+        sessions: 2,
+        words_per_load: 2,
+        total_words: 4,
+      },
+      {
+        host: "local",
+        repo: "~",
+        path: "~/.claude/rules/shell.md",
+        loads: 1,
+        sessions: 1,
+        words_per_load: 3,
+        total_words: 3,
+      },
+    ]);
+    expect(rows[1]?.bytes_per_load).toBe("one two three four".length);
+  });
+
+  it("filters to one repo by its folded name, keeping user-scope memory", async () => {
+    const rows = await runQuery(db, "memory-loads", z.object({ repo: z.string() }), {
+      ...filterParams({ project: "other" }),
+      limit: null,
+    });
+    expect(rows.map((r) => r.repo)).toEqual(["~"]);
+  });
+});
+
 describe("field registry", () => {
   let projects: string;
   const at = (day: number) => new Date(Date.UTC(2026, 0, day, 12)).toISOString();

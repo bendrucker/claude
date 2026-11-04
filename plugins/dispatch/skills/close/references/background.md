@@ -9,9 +9,9 @@ Your short id is the first eight characters of `sessionId` in `~/.claude/session
 The pane is already closed. Skip the close question and every step that runs `dispatch:close`, in this file and in any skill you run.
 
 1. Finish any skill the session had in progress, such as the remaining steps of `ship`.
-2. Run `pull-request:babysit --merge <pr>`. Watch until the PR merges, whether or not auto-merge is enabled, because conflicts and CI failures can stall a merge at any point.
+2. Run `pull-request:babysit --reviews <pr>`. Leave `--merge` off, because the user decides when to merge. Babysit runs as `--merge` on its own when the user already enabled auto-merge.
 3. When the watcher reports `max-time-reached`, start babysit again.
-4. Handle github and gitlab plugin messages the same way as babysit events.
+4. Once babysit stops at green, end your turn. Keep watching until the PR merges or closes, because conflicts and CI failures can stall a merge at any point. github and gitlab plugin messages wake you. On a conflict, a failing check, or new review comments, run babysit again.
 
 ## Escalate
 

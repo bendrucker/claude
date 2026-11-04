@@ -22,6 +22,8 @@ Write the prompt to a file under `tmp/` from what this conversation already know
 
 !`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help`
 
+Ask the close question from `dispatch:close` about the dispatched session, unless this session already has an answer. When the answer is yes, end the prompt with: "Once the PR is open, close your pane with `dispatch:close`."
+
 ## Grant Permissions
 
 Pass the permissions the task needs with `--allow`, `--sandbox-write`, and `--settings-json` so the session runs without prompting for them. The script merges them into the worktree's `.claude/settings.local.json`, keeping existing keys and skipping array entries already present. It refuses to write when that file is not git-ignored.

@@ -6,6 +6,7 @@ effort: low
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/scan.ts:*)
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/audit.ts:*)
+  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/edit.ts:*)
   - Read
   - Edit
 ---
@@ -59,11 +60,12 @@ Where the `observability:session` index is available, rank the units by its `mem
 
 Judge one unit inline. Judge more than one through a Workflow with one judge per batch of units, kept within the session's workflow size, since this skill's instruction to run one is the opt-in. [references/judge.md](references/judge.md) holds the judge prompt and output schema, and [references/classes.md](references/classes.md) the classes it tags. Write the returned proposals to `tmp/prompting-audit/<run>/proposals.jsonl` in the audited repo, one per line with a unique `id`, where `<run>` names the round.
 
-Then drive the ledger through `audit.ts`:
+Then drive the ledger through `audit.ts` and `edit.ts`:
 
-- `apply <ledger>` runs each `enforced` proposal's planted-violation check, applies every proposal to the working tree, and lists any check that did not hold and any quote it could not locate. Either drops the proposal out of the round.
+- `audit.ts check <ledger>` runs each `enforced` proposal's planted-violation check and lists any that did not hold.
+- `edit.ts apply <ledger>` applies every proposal whose check held to the working tree and lists any quote it could not locate. A failed check or a missing quote drops the proposal out of the round.
 - Ben reviews the diff with `plannotator review`, which opens a browser and runs outside the sandbox. An annotation on a hunk rejects that proposal.
-- `revert <ledger> <id...> --reason <annotation>` restores each rejected span.
+- `edit.ts revert <ledger> <id...> --reason <annotation>` restores each rejected span.
 - Commit the round with nothing else in the commit, and open it as its own pull request, so rule-precision can read its squash commit as labels.
 - `verdict <ledger> --commit <sha>` reconciles each proposal against the commit, so a hand edit Ben makes before committing counts too. It prints the per-class table and the `labels.json` entry. Once the round's pull request merges, add its squash SHA under `agent` in `plugins/prompting/evals/rule-precision/labels.json` in `bendrucker/claude`.
 
@@ -75,4 +77,5 @@ Then drive the ledger through `audit.ts`:
 - An explicit path that is not agent-facing scans nothing and exits 0, which reads the same as a clean pass. Pass `--all` when naming a file outside the recognized paths.
 - The checks cover what a lexical match can find with precision. Sprawl, duplication, and pointer wording need a reading pass, which `audit` runs.
 - The ledger copies source text, so it stays untracked under `tmp/`.
+- The sandbox denies writes under `.claude/skills`, so `edit.ts` carries the `mac` plugin's bypass marker and writes only agent-facing files inside the repository. Where no hook honors the marker, a sandboxed `edit.ts` run fails with nothing written, and this skill authorizes rerunning it with `dangerouslyDisableSandbox: true`.
 - Retire audit mode when two consecutive rounds fall below 50% overall acceptance in the `prune-acceptance` session query. [references/classes.md](references/classes.md) holds the per-class retirement rule.

@@ -18,6 +18,7 @@ import {
   isOpen,
   messageOf,
   noiseOf,
+  ownedOf,
   parseApprovals,
   parseDiscussions,
   parseJobs,
@@ -601,9 +602,13 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   watch.snapshot = next;
   watch.branch = read.branch;
   render($, watch);
+  const { sent, withheld } = ownedOf(next, due);
+  for (const { action, ...detail } of withheld) {
+    emit($, "withheld", { mr: next.mr, head: next.head, ...detail });
+  }
   // The send waits for an idle session, so the next poll is not held on it.
-  if (due.length > 0) {
-    void send($, watch, next, due, watch.held, attempt, isCurrent);
+  if (sent.length > 0) {
+    void send($, watch, next, sent, watch.held, attempt, isCurrent);
     watch.held = [];
   }
   return { isTracked: !isSameMr, isChanged };

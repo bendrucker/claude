@@ -9,7 +9,7 @@ allowed-tools:
 
 # Close
 
-Get a finished session out of the user's way without losing work. The pane closes. The worktree and branch stay on disk, where the nightly prune removes them once the PR merges. An open PR keeps a watcher: a background copy of this session, with its full context, that drives the PR to merged.
+Get a finished session out of the user's way without losing work. The pane closes. The worktree and branch stay on disk, where the nightly prune removes them once the PR merges. An open PR keeps a watcher: a background copy of this session, with its full context, that keeps CI green and conflicts resolved until the PR merges or closes.
 
 ## Context
 
@@ -21,7 +21,7 @@ Get a finished session out of the user's way without losing work. The pane close
 
 ## The Close Question
 
-Skills that reach a done-point point here: `dispatch:dispatch`, `ship`, and `pull-request:babysit`. When this session has no answer yet, ask once with `AskUserQuestion`: "Close this pane once the PR is open? A background copy watches it to merged." Recommend yes. Remember the answer for the rest of the session and never ask twice. When the answer is yes and the PR is open, close.
+Skills that reach a done-point point here: `dispatch:dispatch`, `ship`, and `pull-request:babysit`. When this session has no answer yet, ask once with `AskUserQuestion`: "Close this pane once the PR is open? A background copy watches it until it merges." Recommend yes. Remember the answer for the rest of the session and never ask twice. When the answer is yes and the PR is open, close.
 
 ## Close This Pane
 

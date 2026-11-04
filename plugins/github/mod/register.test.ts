@@ -563,6 +563,34 @@ describe("register", () => {
     expect(w.submits.length).toBe(1);
   });
 
+  test("another author's PR withholds its conflict, failures, and feedback but sends its merge", async ($, on) => {
+    const theirs = (over: Record<string, unknown> = {}) => ({
+      ...pr("SUCCESS"),
+      author: { login: "alice" },
+      mergeable: "CONFLICTING",
+      ...over,
+    });
+    const world: World = { branch: "topic", gh: GH_OK, view: theirs() };
+    const w = worldOf(on, world);
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = theirs({
+      statusCheckRollup: [check("FAILURE")],
+      reviews: [{ id: "r1", state: "CHANGES_REQUESTED", author: { login: "carol" } }],
+    });
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits).toEqual([]);
+    expect(w.named("withheld").map((e) => e.detail?.kind)).toEqual([
+      "conflict",
+      "ci.failed",
+      "feedback",
+    ]);
+
+    world.view = theirs({ state: "MERGED" });
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits).toEqual(["PR #7 merged: https://github.com/o/r/pull/7"]);
+  });
+
   test("a PR reopened with its conflict announces it again", async ($, on) => {
     const conflicting = { ...pr("SUCCESS"), mergeable: "CONFLICTING" };
     const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };

@@ -35,6 +35,7 @@ const read = (over: Partial<Read> = {}, pipelineStatus = "running"): Read => ({
     projectId: 1,
     title: "",
     url: "https://gitlab.com/g/r/-/merge_requests/7",
+    author: null,
     state: "opened",
     sha: "aaaaaaa1111",
     updatedAt: "",

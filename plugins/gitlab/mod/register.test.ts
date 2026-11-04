@@ -273,6 +273,30 @@ describe("register", () => {
     expect(w.named("promote")[0]?.detail).toMatchObject({ kind: "conflict", baseline: true });
   });
 
+  test("another author's MR withholds its conflict, failures, and feedback but sends its merge", async ($, on) => {
+    const theirs = { ...mr("success"), author: { username: "alice" }, has_conflicts: true };
+    const world: World = { branch: "topic", glab: GLAB_OK, view: theirs, jobs: job("success") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = { ...theirs, head_pipeline: { id: 50, project_id: 1, status: "failed" } };
+    world.jobs = job("failed");
+    world.notes = [note(1, "carol")];
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits).toEqual([]);
+    expect(w.named("withheld").map((e) => e.detail?.kind)).toEqual([
+      "conflict",
+      "ci.failed",
+      "feedback",
+    ]);
+
+    world.view = 'no open merge request available for "topic"';
+    world.byIid = { ...theirs, state: "merged" };
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits).toEqual(["MR !7 merged: https://gitlab.example.com/g/r/-/merge_requests/7"]);
+  });
+
   test("a dropped conflict is not retried against a new commit still being checked", async ($, on) => {
     const world: World = {
       branch: "topic",

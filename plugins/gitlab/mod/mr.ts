@@ -66,6 +66,7 @@ const readView = map(
     project_id: num,
     title: or(str, ""),
     web_url: str,
+    author: or(readUsername, null),
     state: str,
     sha: str,
     updated_at: or(str, ""),
@@ -79,6 +80,7 @@ const readView = map(
     projectId: v.project_id,
     title: v.title,
     url: v.web_url,
+    author: v.author,
     state: v.state,
     sha: v.sha,
     updatedAt: v.updated_at,
@@ -218,6 +220,8 @@ export interface Snapshot {
   title: string;
   url: string;
   state: string;
+  /** False when another user opened the MR. */
+  isAuthor: boolean;
   head: string;
   /** False when the head is a commit this checkout has never seen. */
   isHeadKnown: boolean;
@@ -474,6 +478,8 @@ export function snapshotOf(read: Read): Snapshot {
     title: view.title,
     url: view.url,
     state: view.state,
+    // An unread author keeps every promotion.
+    isAuthor: view.author === null || view.author.toLowerCase() === me.toLowerCase(),
     head: view.sha,
     isHeadKnown: read.isHeadKnown,
     target: view.target,
@@ -619,6 +625,22 @@ function approvalOf(carried: Approval, fresh: Approval): Approval {
   if (fresh === null) return carried;
   if (carried === null) return fresh;
   return carried === fresh ? fresh : null;
+}
+
+// Fixing a conflict, a failure, or feedback is the author's job, so another's MR
+// promotes only what changes the checkout itself.
+const UNOWNED: ReadonlySet<Promoted["kind"]> = new Set(["mr.merged", "mr.closed", "push.foreign"]);
+
+/** Splits promotions into those sent for this MR and those withheld because the session did not author it. */
+export function ownedOf(
+  snapshot: Snapshot,
+  promoted: Promoted[],
+): { sent: Promoted[]; withheld: Promoted[] } {
+  if (snapshot.isAuthor) return { sent: promoted, withheld: [] };
+  return {
+    sent: promoted.filter((d) => UNOWNED.has(d.kind)),
+    withheld: promoted.filter((d) => !UNOWNED.has(d.kind)),
+  };
 }
 
 /**

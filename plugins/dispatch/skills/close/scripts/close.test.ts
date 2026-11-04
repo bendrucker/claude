@@ -30,7 +30,6 @@ interface Call {
   options: RunOptions | undefined;
 }
 
-// Answers by the first argv words, so the order of git probes does not matter.
 function scripted(answers: Record<string, CommandResult>): { run: Runner; calls: Call[] } {
   const calls: Call[] = [];
   const run: Runner = (argv, options) => {

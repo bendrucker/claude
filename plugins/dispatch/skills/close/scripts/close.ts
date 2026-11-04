@@ -133,8 +133,6 @@ export interface ChildPane {
   path: string | null;
 }
 
-// A session may close only panes it dispatched, which the ledger and the
-// session's own registered name establish.
 export async function resolveChildPane(name: string, deps: Deps): Promise<ChildPane> {
   const sender = await deps.sender();
   const match = readLedger(deps.dataDir)

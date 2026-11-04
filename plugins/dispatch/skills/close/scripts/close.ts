@@ -273,17 +273,17 @@ export async function closePane(options: CloseOptions, deps: Deps): Promise<Clos
 
 // When the pane is still open, its session still runs, so a live fork would watch the PR twice.
 async function withdrawClose(row: ClosedRow, error: unknown, deps: Deps): Promise<void> {
-  if (row.fork != null) await deps.run(["claude", "stop", row.fork]);
+  const reason = `pane close failed: ${error instanceof Error ? error.message : String(error)}`;
+  const stopped = row.fork == null ? null : await deps.run(["claude", "stop", row.fork]);
+  const stopError = stopped != null && stopped.code !== 0 ? stopped.stderr.trim() : null;
+  const summary =
+    stopError == null ? reason : `${reason}. claude stop ${row.fork} failed: ${stopError}`;
   appendDispatch(
-    {
-      ...row,
-      event: "ended",
-      ts: deps.now().toISOString(),
-      outcome: "stopped",
-      summary: `pane close failed: ${error instanceof Error ? error.message : String(error)}`,
-    },
+    { ...row, event: "ended", ts: deps.now().toISOString(), outcome: "stopped", summary },
     deps.dataDir,
   );
+  if (stopError != null)
+    throw new CloseError(`${summary}. The fork may still be running, so stop it by hand.`);
 }
 
 async function closeTarget(pane: Pane, run: Runner): Promise<void> {

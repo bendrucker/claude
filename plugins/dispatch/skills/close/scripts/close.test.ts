@@ -274,6 +274,20 @@ describe("closePane --handoff", () => {
     ]);
   });
 
+  test("a failed stop after a refused close says the fork may still run", async () => {
+    const { deps, dataDir } = makeDeps(
+      {
+        "claude --bg": BG_OK,
+        "claude agents": AGENTS_OK,
+        "herdr pane close": fail("workspace_group_close_required"),
+        "claude stop": fail("no such session"),
+      },
+      HERDR_ENV,
+    );
+    expect((await failureOf(closePane(options, deps))).message).toContain("stop it by hand");
+    expect(readLedger(dataDir).at(-1)).toMatchObject({ event: "ended", outcome: "stopped" });
+  });
+
   test("aborts without a row or close when claude --bg prints no id", async () => {
     const { deps, calls, dataDir } = makeDeps(
       { "claude --bg": ok("started\nbut no id\n") },

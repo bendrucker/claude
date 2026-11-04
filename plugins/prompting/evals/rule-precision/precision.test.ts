@@ -33,6 +33,7 @@ Alpha keepword stays put.
 
 let repo = "";
 let head = "";
+let untouched = "";
 let rules = "";
 
 const candidate = (word: string): string => `extends: existence
@@ -52,12 +53,17 @@ beforeAll(async () => {
   await $`git config user.email test@example.com`.cwd(repo).quiet();
   await $`git config user.name Test`.cwd(repo).quiet();
   await $`git config core.hooksPath /dev/null`.cwd(repo).quiet();
+  await $`git config commit.gpgsign false`.cwd(repo).quiet();
   await Bun.write(join(repo, "doc.md"), BEFORE);
   await $`git add -A`.cwd(repo).quiet();
   await $`git commit -qm first`.cwd(repo).quiet();
   await Bun.write(join(repo, "doc.md"), AFTER);
   await $`git commit -qam prune`.cwd(repo).quiet();
   head = (await $`git rev-parse HEAD`.cwd(repo).quiet().text()).trim();
+  await Bun.write(join(repo, "notes.txt"), "no prose here\n");
+  await $`git add -A`.cwd(repo).quiet();
+  await $`git commit -qm notes`.cwd(repo).quiet();
+  untouched = (await $`git rev-parse HEAD`.cwd(repo).quiet().text()).trim();
   rules = mkdtempSync(join(tmpdir(), "rule-precision-rules-"));
   await Bun.write(join(rules, "Cut.yml"), candidate("cutword"));
   await Bun.write(join(rules, "Keep.yml"), candidate("keepword"));
@@ -92,8 +98,35 @@ describe("measure", () => {
     ]);
   });
 
-  test("measures nothing when the commit is unknown", async () => {
-    expect((await measure(repo, ["nosuchcommit"])).scores).toEqual([]);
+  test("reads a qualified label from its checkout", async () => {
+    const { labels } = await measure(".", [`test/scratch@${head}`], VALE_CONFIG, {
+      "test/scratch": repo,
+    });
+    expect(labels).toEqual({ deleted: 2, prose: 4, docs: 1 } satisfies Labels);
+  });
+
+  test.each<{ name: string; label: () => string; message: RegExp }>([
+    {
+      name: "unknown commit",
+      label: () => "nosuchcommit",
+      message: /does not resolve/,
+    },
+    {
+      name: "commit missing from its checkout",
+      label: () => "test/scratch@0000000000",
+      message: /does not resolve/,
+    },
+    {
+      name: "repo with no checkout",
+      label: () => `test/other@${head}`,
+      message: /no checkout/,
+    },
+  ])("rejects a label naming a $name", async ({ label, message }) => {
+    const failure = await measure(repo, [label()], VALE_CONFIG, { "test/scratch": repo }).catch(
+      (error: unknown) => error,
+    );
+    expect(failure).toBeInstanceOf(Error);
+    expect(String(failure)).toMatch(message);
   });
 });
 
@@ -171,7 +204,7 @@ describe("scoreSources", () => {
     const cutOnly = await candidateConfig([join(rules, "Cut.yml")], VALE_CONFIG);
     const result = await scoreSources(
       repo,
-      { human: [head], agent: ["nosuchcommit"] },
+      { human: [head], agent: [untouched] },
       cutOnly,
       lenient,
     );

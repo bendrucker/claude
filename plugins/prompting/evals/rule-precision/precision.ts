@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
@@ -101,9 +101,42 @@ interface PreImage {
   removed: Set<number>;
 }
 
-function documents(repo: string, commits: string[], labels: Labels): PreImage[] {
+/** Local clones that qualified labels (`owner/repo@sha`) read history from. */
+export const DEFAULT_CHECKOUTS: Readonly<Record<string, string>> = {
+  "bendrucker/dotfiles": join(homedir(), ".dotfiles"),
+};
+
+const QUALIFIED_LABEL = /^(?<name>[\w.-]+\/[\w.-]+)@(?<commit>\w+)$/;
+
+/** Maps a label to the repository and commit it names, bare labels reading from `repo`. */
+export function resolveLabel(
+  label: string,
+  repo: string,
+  checkouts: Readonly<Record<string, string>>,
+): { repo: string; commit: string } {
+  const groups = QUALIFIED_LABEL.exec(label)?.groups;
+  if (groups?.name === undefined || groups.commit === undefined) return { repo, commit: label };
+  const checkout = checkouts[groups.name];
+  if (checkout === undefined) {
+    throw new Error(
+      `label ${label}: no checkout for ${groups.name}, pass --checkout ${groups.name}=<path>`,
+    );
+  }
+  return { repo: checkout, commit: groups.commit };
+}
+
+function documents(
+  base: string,
+  entries: string[],
+  checkouts: Readonly<Record<string, string>>,
+  labels: Labels,
+): PreImage[] {
   const docs: PreImage[] = [];
-  for (const commit of commits) {
+  for (const label of entries) {
+    const { repo, commit } = resolveLabel(label, base, checkouts);
+    if (git(repo, ["rev-parse", "--verify", "--quiet", `${commit}^{commit}`]).trim() === "") {
+      throw new Error(`label ${label} does not resolve in ${repo}. Fetch it or pass --checkout.`);
+    }
     const parent = git(repo, ["rev-parse", `${commit}^`]).trim();
     if (parent.length === 0) continue;
     const touched = git(repo, ["diff", "--name-only", parent, commit])
@@ -131,11 +164,12 @@ export async function measure(
   repo: string,
   commits: string[],
   config: string = VALE_CONFIG,
+  checkouts: Readonly<Record<string, string>> = DEFAULT_CHECKOUTS,
 ): Promise<{ scores: CheckScore[]; labels: Labels }> {
   const flagged = new Map<string, number>();
   const confirmed = new Map<string, number>();
   const labels: Labels = { deleted: 0, prose: 0, docs: 0 };
-  const docs = documents(repo, commits, labels);
+  const docs = documents(repo, commits, checkouts, labels);
 
   // Vale lints files, so each pre-image is written out and the set linted in one run.
   const dir = await mkdtemp(join(tmpdir(), "rule-precision-docs-"));
@@ -221,13 +255,19 @@ export async function scoreSources(
   repo: string,
   sources: LabelSources,
   config: string,
-  options: { minFlagged: number; minPrecision?: number | undefined },
+  options: {
+    minFlagged: number;
+    minPrecision?: number | undefined;
+    checkouts?: Readonly<Record<string, string>>;
+  },
 ): Promise<{ output: string; failed: boolean; empty: boolean }> {
   const named = (["human", "agent"] as const).filter((name) => sources[name].length > 0);
   const sections: string[] = [];
   let failed = false;
   let empty = false;
-  const measured = await Promise.all(named.map((name) => measure(repo, sources[name], config)));
+  const measured = await Promise.all(
+    named.map((name) => measure(repo, sources[name], config, options.checkouts)),
+  );
   for (const [index, name] of named.entries()) {
     const { scores, labels } = measured[index] ?? {
       scores: [],
@@ -276,6 +316,11 @@ if (import.meta.main) {
         description: "Vale config to lint with, such as an overlay of the shipped one",
       },
       repo: { type: String, default: ".", description: "Repository to read history from" },
+      checkout: {
+        type: [String],
+        description:
+          "Local clone a qualified label (owner/repo@sha) reads from, as owner/repo=path (repeatable)",
+      },
       minPrecision: {
         type: Number,
         description: "Precision floor, overriding the measured base rate",
@@ -294,6 +339,13 @@ if (import.meta.main) {
     agent: [...tracked.agent, ...argv.flags.agentCommit],
   };
 
+  const checkouts: Record<string, string> = { ...DEFAULT_CHECKOUTS };
+  for (const entry of argv.flags.checkout) {
+    const split = entry.indexOf("=");
+    if (split <= 0) throw new Error(`--checkout ${entry}: expected owner/repo=path`);
+    checkouts[entry.slice(0, split)] = entry.slice(split + 1);
+  }
+
   const config =
     argv.flags.rule.length > 0
       ? await candidateConfig(argv.flags.rule, argv.flags.config)
@@ -301,6 +353,7 @@ if (import.meta.main) {
   const result = await scoreSources(argv.flags.repo, sources, config, {
     minFlagged: argv.flags.minFlagged,
     minPrecision: argv.flags.minPrecision,
+    checkouts,
   });
   if (config !== argv.flags.config) await rm(dirname(config), { recursive: true, force: true });
 

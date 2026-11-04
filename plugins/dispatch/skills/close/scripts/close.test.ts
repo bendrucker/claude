@@ -71,6 +71,7 @@ function makeDeps(
     cwd: "/work/tree",
     dataDir,
     now: () => new Date("2026-11-03T12:00:00.000Z"),
+    wait: () => Promise.resolve(),
     out: (line) => {
       out.push(line);
     },
@@ -316,7 +317,23 @@ describe("closePane --handoff", () => {
     const error = await failureOf(closePane(options, deps));
     expect(error.message).toContain(FORK);
     expect(readLedger(dataDir)).toEqual([]);
+    expect(argvs(calls).filter((line) => line.startsWith("claude agents"))).toHaveLength(5);
+    expect(argvs(calls).at(-1)).toBe(`claude stop ${FORK}`);
     expect(argvs(calls).some((line) => line.startsWith("rex block close"))).toBe(false);
+  });
+
+  test("waits for a fork the daemon lists late", async () => {
+    const { deps, calls } = makeDeps({ "claude --bg": BG_OK }, REX_ENV);
+    const answer = deps.run;
+    let listings = 0;
+    deps.run = (argv, runOptions) => {
+      if (argv[1] !== "agents") return answer(argv, runOptions);
+      listings++;
+      return Promise.resolve(listings < 3 ? ok("[]") : AGENTS_OK);
+    };
+    expect((await closePane(options, deps)).fork).toBe(FORK);
+    expect(listings).toBe(3);
+    expect(argvs(calls).at(-1)).toBe("rex block close -s main block:7");
   });
 
   test("aborts when the listed fork is not a background session", async () => {

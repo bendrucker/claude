@@ -41,6 +41,7 @@ export interface Deps {
   cwd: string;
   dataDir: string;
   now: () => Date;
+  wait: (ms: number) => Promise<void>;
   out: (line: string) => void;
   sender: () => Promise<Sender | null>;
 }
@@ -53,6 +54,7 @@ export function defaultDeps(): Deps {
     cwd: process.cwd(),
     dataDir: resolveDataDir(),
     now: () => new Date(),
+    wait: (ms) => Bun.sleep(ms),
     out: (line) => {
       console.log(line);
     },
@@ -82,6 +84,8 @@ const HerdrWorkspace = z.object({
   result: z.object({ root_pane: z.object({ pane_id: z.string() }) }),
 });
 
+const LIST_ATTEMPTS = 5;
+const LIST_INTERVAL_MS = 1000;
 const FORK_ID = /^[A-Za-z0-9._-]+$/;
 const GROUP_CONFLICT = /confirmation_required|workspace_group_close_required/;
 const BACKGROUND_REFERENCE = resolve(import.meta.dirname, "..", "references", "background.md");
@@ -199,20 +203,36 @@ export async function startFork(
   const fork = backgroundId(started.stdout);
   if (fork == null)
     throw new CloseError(`claude --bg printed no background session id: ${started.stdout.trim()}`);
+  const problem = await awaitListing(deps, fork, cwd, LIST_ATTEMPTS);
+  if (problem === "") return fork;
+  await deps.run(["claude", "stop", fork]);
+  throw new CloseError(`${problem}. Stopped ${fork} and left the pane open.`);
+}
+
+async function awaitListing(
+  deps: Deps,
+  fork: string,
+  cwd: string,
+  attempts: number,
+): Promise<string> {
+  const problem = await forkListingProblem(deps, fork, cwd);
+  if (problem === "" || attempts <= 1) return problem;
+  await deps.wait(LIST_INTERVAL_MS);
+  return awaitListing(deps, fork, cwd, attempts - 1);
+}
+
+async function forkListingProblem(deps: Deps, fork: string, cwd: string): Promise<string> {
   const listed = await deps.run(["claude", "agents", "--json"], { cwd });
-  if (listed.code !== 0)
-    throw new CloseError(`claude agents --json failed: ${listed.stderr.trim()}`);
+  if (listed.code !== 0) return `claude agents --json failed: ${listed.stderr.trim()}`;
   let agents: z.infer<typeof AgentList>;
   try {
     agents = AgentList.parse(JSON.parse(listed.stdout));
   } catch (error) {
-    throw new CloseError(
-      `claude agents --json returned an unexpected shape: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    return `claude agents --json returned an unexpected shape: ${error instanceof Error ? error.message : String(error)}`;
   }
-  if (!agents.some((agent) => agent.id === fork && agent.kind === "background"))
-    throw new CloseError(`background session ${fork} is not listed by claude agents`);
-  return fork;
+  return agents.some((agent) => agent.id === fork && agent.kind === "background")
+    ? ""
+    : `background session ${fork} is not listed by claude agents`;
 }
 
 export interface CloseOptions {

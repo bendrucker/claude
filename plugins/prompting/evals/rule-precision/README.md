@@ -27,6 +27,8 @@ Strip prose from agent-facing documents in a commit that does nothing else, then
 
 A human pass with no rule driving it goes under `human`. An audit round goes under `agent`, using the squash SHA its own pull request lands on `main` with. `audit.ts verdict` prints that entry. A round merged inside a larger pull request mixes in the other changes, so give each round its own.
 
+A bare SHA reads from `--repo`. A round in another repository goes in as `owner/repo@sha`, read from a local clone: `bendrucker/dotfiles` defaults to `~/.dotfiles`, and `--checkout owner/repo=path` names any other. A label that does not resolve in its clone fails the run, so fetch the clone before scoring a newly merged round.
+
 ## Removal
 
 This harness earns its place by changing what ships. Delete it when two consecutive candidate rules get the same verdict here that the reading pass already reached, because the measurement is then confirming a decision already made. Delete it too if the labels stop growing: with one defect class labeled, every new rule outside that class lands at `too few to judge` and the gate is inert.

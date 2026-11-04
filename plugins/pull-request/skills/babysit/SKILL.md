@@ -17,6 +17,7 @@ allowed-tools:
   - Skill(gitlab:ci-monitor)
   - Skill(gitlab:merge-request)
   - Skill(git:conflicts)
+  - Skill(dispatch:close)
   - mcp__github
 ---
 

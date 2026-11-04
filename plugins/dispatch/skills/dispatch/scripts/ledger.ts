@@ -26,28 +26,6 @@ export interface DispatchLedgerRow {
   outcome: "dispatched" | "orphaned" | "failed";
 }
 
-// One line per pane close or per finished background watch, so cleanup can
-// find the work a closed session left on disk.
-export interface ClosedRow {
-  event: "closed" | "ended";
-  ts: string;
-  session: string;
-  fork: string | null;
-  branch: string | null;
-  path: string | null;
-  head: string | null;
-  dirty: number | null;
-  ahead: number | null;
-  pr: string | null;
-  mux: "rex" | "herdr" | null;
-  target: string | null;
-  summary: string | null;
-  // Set on `ended` rows.
-  outcome?: "merged" | "closed" | "stopped" | undefined;
-}
-
-export type LedgerRow = DispatchLedgerRow | ClosedRow;
-
 const DispatchRowSchema = z.object({
   ts: z.string(),
   task: z.string(),
@@ -63,6 +41,8 @@ const DispatchRowSchema = z.object({
   outcome: z.enum(["dispatched", "orphaned", "failed"]),
 });
 
+// One line per pane close or per finished background watch, so cleanup can
+// find the work a closed session left on disk. `outcome` is set on `ended` rows.
 const ClosedRowSchema = z.object({
   event: z.enum(["closed", "ended"]),
   ts: z.string(),
@@ -79,6 +59,10 @@ const ClosedRowSchema = z.object({
   summary: z.string().nullable(),
   outcome: z.enum(["merged", "closed", "stopped"]).optional(),
 });
+
+export type ClosedRow = z.infer<typeof ClosedRowSchema>;
+
+export type LedgerRow = DispatchLedgerRow | ClosedRow;
 
 // A cached plugin resolves no import across a plugin boundary, so each plugin
 // resolves its own data dir.

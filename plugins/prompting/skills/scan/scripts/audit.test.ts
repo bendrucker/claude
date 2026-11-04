@@ -14,9 +14,11 @@ import {
   revertEdits,
   units,
   verifyCheck,
+  verifyProposals,
   type Check,
   type Proposal,
 } from "./audit";
+import { assertTargets, program as editProgram } from "./edit";
 
 const SCRATCH_PARENT = tmpdir();
 
@@ -27,8 +29,11 @@ function proposal(id: string, quote: string, replacement = "", file = "doc.md"):
 async function run(root: string, ...argv: string[]): Promise<void> {
   const original = process.cwd();
   process.chdir(root);
+  const [command] = argv;
   try {
-    await program.parseAsync(argv, { from: "user" });
+    await (command === "apply" || command === "revert" ? editProgram : program).parseAsync(argv, {
+      from: "user",
+    });
   } finally {
     process.chdir(original);
   }
@@ -352,12 +357,13 @@ describe("enforced", () => {
     expect(await Bun.file(join(root, "..", "escaped.ts")).exists()).toBe(false);
   });
 
-  test("apply drops an enforced proposal whose check does not hold", async () => {
+  test("a check that does not hold drops its proposal from the round", async () => {
     const root = await seed("apply");
-    const { applied, unlocated, unverified } = await applyProposals(root, [
+    const { verified, unverified } = await verifyProposals(root, [
       enforced("held", "Use toSorted.", makeCheck()),
       enforced("passed", "Avoid mutation.", makeCheck({ content: "xs.toSorted();\n" })),
     ]);
+    const { applied, unlocated } = await applyProposals(root, verified);
     expect(applied.map((row) => row.id)).toEqual(["held"]);
     expect(unlocated).toEqual([]);
     expect(unverified).toEqual([
@@ -367,14 +373,14 @@ describe("enforced", () => {
     expect(await Bun.file(join(root, "src", "planted.ts")).exists()).toBe(false);
   });
 
-  test("apply rejects an enforced proposal without its check", async () => {
+  test("check rejects an enforced proposal without its check", async () => {
     const root = await seed("schema");
     const runDir = join(base, "runs", "schema");
     mkdirSync(runDir, { recursive: true });
     const ledger = join(runDir, "proposals.jsonl");
     const row = { ...proposal("bare", "Use toSorted."), class: "enforced" };
     await Bun.write(ledger, `${JSON.stringify(row)}\n`);
-    const failure = await run(root, "apply", ledger).catch((error: unknown) => error);
+    const failure = await run(root, "check", ledger).catch((error: unknown) => error);
     expect(String(failure)).toContain("an enforced proposal names its enforcer and check");
   });
 });
@@ -427,37 +433,40 @@ describe("audit commands", () => {
       "Hand edited sentence one. Keep tail.",
       "",
     ].join("\n");
-    await Bun.write(join(root, "doc.md"), doc);
-    await sh(root, "git", "add", "doc.md");
+    await Bun.write(join(root, "CLAUDE.md"), doc);
+    await sh(root, "git", "add", "CLAUDE.md");
     await sh(root, "git", "commit", "-q", "-m", "seed");
 
     const runDir = join(base, "runs", "run-7");
     mkdirSync(runDir, { recursive: true });
     const ledger = join(runDir, "proposals.jsonl");
     const rows: Proposal[] = [
-      { ...proposal("accepted", "Accepted cut paragraph."), class: "no-op" },
-      { ...proposal("rejected", "Rejected cut paragraph."), class: "emphasis" },
-      { ...proposal("edited", "Hand edited sentence one.", "Shorter."), class: "emphasis" },
-      { ...proposal("lost", "Never written."), class: "cache" },
+      { ...proposal("accepted", "Accepted cut paragraph.", "", "CLAUDE.md"), class: "no-op" },
+      { ...proposal("rejected", "Rejected cut paragraph.", "", "CLAUDE.md"), class: "emphasis" },
+      {
+        ...proposal("edited", "Hand edited sentence one.", "Shorter.", "CLAUDE.md"),
+        class: "emphasis",
+      },
+      { ...proposal("lost", "Never written.", "", "CLAUDE.md"), class: "cache" },
     ];
     await Bun.write(ledger, rows.map((row) => `${JSON.stringify(row)}\n`).join(""));
 
     await run(root, "apply", ledger);
     const applied = (await Bun.file(join(runDir, "applied.jsonl")).text()).trim().split("\n");
     expect(applied).toHaveLength(3);
-    expect(await Bun.file(join(root, "doc.md")).text()).toBe(
+    expect(await Bun.file(join(root, "CLAUDE.md")).text()).toBe(
       "# Doc\n\nKeep this sentence.\n\nShorter. Keep tail.\n",
     );
     expect(await readEvents("prompting-audit.proposal")).toHaveLength(3);
 
     await run(root, "revert", ledger, "rejected", "--reason", "This guard still earns its keep.");
-    expect(await Bun.file(join(root, "doc.md")).text()).toBe(
+    expect(await Bun.file(join(root, "CLAUDE.md")).text()).toBe(
       "# Doc\n\nKeep this sentence.\n\nRejected cut paragraph.\n\nShorter. Keep tail.\n",
     );
 
     // The reviewer rewrote the span the judge replaced.
-    const text = await Bun.file(join(root, "doc.md")).text();
-    await Bun.write(join(root, "doc.md"), text.replace("Shorter.", "Reviewer's own words."));
+    const text = await Bun.file(join(root, "CLAUDE.md")).text();
+    await Bun.write(join(root, "CLAUDE.md"), text.replace("Shorter.", "Reviewer's own words."));
     await sh(root, "git", "commit", "-q", "-am", "prune");
     const sha = await sh(root, "git", "rev-parse", "HEAD");
 
@@ -465,9 +474,9 @@ describe("audit commands", () => {
 
     const proposed = await readEvents("prompting-audit.proposal");
     expect(proposed.map((record) => record.attributes)).toEqual([
-      { run: "run-7", id: "accepted", class: "no-op", file: "doc.md", repo: "claude" },
-      { run: "run-7", id: "rejected", class: "emphasis", file: "doc.md", repo: "claude" },
-      { run: "run-7", id: "edited", class: "emphasis", file: "doc.md", repo: "claude" },
+      { run: "run-7", id: "accepted", class: "no-op", file: "CLAUDE.md", repo: "claude" },
+      { run: "run-7", id: "rejected", class: "emphasis", file: "CLAUDE.md", repo: "claude" },
+      { run: "run-7", id: "edited", class: "emphasis", file: "CLAUDE.md", repo: "claude" },
     ]);
 
     const verdicts = await readEvents("prompting-audit.verdict");
@@ -496,6 +505,49 @@ describe("audit commands", () => {
     expect(String(failure)).toContain("already applied");
   });
 
+  test("apply refuses an enforced proposal until check records its outcome", async () => {
+    const root = await scratchRepo(join(base, "unchecked"));
+    await Bun.write(join(root, "CLAUDE.md"), "Use toSorted.\n");
+    const runDir = join(base, "runs", "unchecked");
+    mkdirSync(runDir, { recursive: true });
+    const ledger = join(runDir, "proposals.jsonl");
+    const row: Proposal = {
+      ...proposal("lint", "Use toSorted.", "", "CLAUDE.md"),
+      class: "enforced",
+      enforcer: "fake/no-sort",
+      check: { file: "planted.ts", content: "xs.sort();\n", command: "exit 0" },
+    };
+    await Bun.write(ledger, `${JSON.stringify(row)}\n`);
+    const failure = await run(root, "apply", ledger).catch((error: unknown) => error);
+    expect(String(failure)).toContain("run audit.ts check first");
+
+    await run(root, "check", ledger);
+    await run(root, "apply", ledger);
+    expect(await Bun.file(join(root, "CLAUDE.md")).text()).toBe("Use toSorted.\n");
+    expect(await Bun.file(join(runDir, "applied.jsonl")).text()).toBe("");
+  });
+
+  test("apply writes nothing when any target is unwritable", async () => {
+    const root = await scratchRepo(join(base, "locked"));
+    mkdirSync(join(root, "skills", "demo"), { recursive: true });
+    await Bun.write(join(root, "CLAUDE.md"), "Keep.\n\nCut one.\n");
+    await Bun.write(join(root, "skills", "demo", "SKILL.md"), "Keep.\n\nCut two.\n");
+    await Bun.$`chmod 444 ${join(root, "skills", "demo", "SKILL.md")}`;
+    const runDir = join(base, "runs", "locked");
+    mkdirSync(runDir, { recursive: true });
+    const ledger = join(runDir, "proposals.jsonl");
+    const rows = [
+      proposal("one", "Cut one.", "", "CLAUDE.md"),
+      proposal("two", "Cut two.", "", "skills/demo/SKILL.md"),
+    ];
+    await Bun.write(ledger, rows.map((row) => `${JSON.stringify(row)}\n`).join(""));
+    const failure = await run(root, "apply", ledger).catch((error: unknown) => error);
+    expect(String(failure)).toContain("nothing written");
+    expect(String(failure)).toContain("skills/demo/SKILL.md");
+    expect(await Bun.file(join(root, "CLAUDE.md")).text()).toBe("Keep.\n\nCut one.\n");
+    expect(await Bun.file(join(runDir, "applied.jsonl")).exists()).toBe(false);
+  });
+
   test("units groups skill directories and lists other files alone", async () => {
     const root = join(base, "units");
     mkdirSync(root, { recursive: true });
@@ -522,6 +574,38 @@ describe("audit commands", () => {
     expect(await units(["skills/b"], root)).toEqual([
       { unit: "skills/b", files: ["skills/b/SKILL.md"] },
     ]);
+  });
+});
+
+describe("assertTargets", () => {
+  let base = "";
+
+  beforeAll(async () => {
+    base = mkdtempSync(join(SCRATCH_PARENT, "audit-targets-"));
+    mkdirSync(join(base, "repo"));
+    mkdirSync(join(base, "outside"));
+    await Bun.write(join(base, "outside", "SKILL.md"), "x\n");
+    await Bun.$`ln -s ${join(base, "outside")} ${join(base, "repo", "linked")}`;
+  });
+
+  afterAll(async () => {
+    await Bun.$`rm -rf ${base}`.quiet();
+  });
+
+  test.each<{ name: string; file: string; refused: boolean }>([
+    { name: "root CLAUDE.md", file: "CLAUDE.md", refused: false },
+    { name: "project skill", file: ".claude/skills/demo/SKILL.md", refused: false },
+    { name: "skill reference", file: ".claude/skills/demo/references/notes.md", refused: false },
+    { name: "hook script", file: ".claude/hooks/gate.ts", refused: true },
+    { name: "plain markdown", file: "README.md", refused: true },
+    { name: "parent directory", file: "../CLAUDE.md", refused: true },
+    { name: "symlink out of the repository", file: "linked/SKILL.md", refused: true },
+  ])("$name", async ({ file, refused }) => {
+    const outcome = await assertTargets(join(base, "repo"), [file]).then(
+      () => false,
+      () => true,
+    );
+    expect(outcome).toBe(refused);
   });
 });
 

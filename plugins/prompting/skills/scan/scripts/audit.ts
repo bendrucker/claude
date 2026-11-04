@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // oxlint-disable-next-line no-restricted-imports -- Bun has no append, and a read-then-write could drop a concurrent run's line.
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, open } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { Command } from "@commander-js/extra-typings";
@@ -77,6 +77,13 @@ export interface Unverified {
   why: string;
 }
 
+/** One planted-violation check's outcome, `why` null when it held. */
+const Checked = z.object({ id: z.string(), file: z.string(), why: z.string().nullable() });
+
+export type Checked = z.infer<typeof Checked>;
+
+export { Applied, Checked, Proposal, Rejection };
+
 type Env = Record<string, string | undefined>;
 
 const CONTEXT = 60;
@@ -84,6 +91,7 @@ const ANCHORS = [60, 30, 15, 8];
 
 export const APPLIED_FILE = "applied.jsonl";
 export const REJECTIONS_FILE = "rejections.jsonl";
+export const CHECKS_FILE = "checks.jsonl";
 export const EVENTS_DIR_VAR = "PROMPTING_AUDIT_EVENTS_DIR";
 
 async function git(root: string, args: string[]): Promise<string> {
@@ -101,13 +109,13 @@ export async function toplevel(cwd: string): Promise<string> {
   return (await git(cwd, ["rev-parse", "--show-toplevel"])).trim();
 }
 
-async function repoName(root: string): Promise<string> {
+export async function repoName(root: string): Promise<string> {
   const url = await git(root, ["remote", "get-url", "origin"]).catch(() => "");
   const name = /([^/:]+?)(?:\.git)?\/?$/.exec(url.trim())?.[1];
   return name ?? basename(root);
 }
 
-async function readJsonl<T>(path: string, schema: z.ZodType<T>): Promise<T[]> {
+export async function readJsonl<T>(path: string, schema: z.ZodType<T>): Promise<T[]> {
   const text = await Bun.file(path).text();
   return text.split("\n").flatMap((line, index) => {
     if (line.trim() === "") return [];
@@ -119,11 +127,11 @@ async function readJsonl<T>(path: string, schema: z.ZodType<T>): Promise<T[]> {
   });
 }
 
-async function readOptionalJsonl<T>(path: string, schema: z.ZodType<T>): Promise<T[]> {
+export async function readOptionalJsonl<T>(path: string, schema: z.ZodType<T>): Promise<T[]> {
   return (await Bun.file(path).exists()) ? readJsonl(path, schema) : [];
 }
 
-async function writeJsonl(path: string, rows: readonly unknown[]): Promise<void> {
+export async function writeJsonl(path: string, rows: readonly unknown[]): Promise<void> {
   await Bun.write(path, rows.map((row) => `${JSON.stringify(row)}\n`).join(""));
 }
 
@@ -131,9 +139,17 @@ export function runOf(ledger: string): string {
   return basename(dirname(resolve(ledger)));
 }
 
-function siblings(ledger: string): { applied: string; rejections: string } {
+export function siblings(ledger: string): {
+  applied: string;
+  rejections: string;
+  checks: string;
+} {
   const dir = dirname(resolve(ledger));
-  return { applied: join(dir, APPLIED_FILE), rejections: join(dir, REJECTIONS_FILE) };
+  return {
+    applied: join(dir, APPLIED_FILE),
+    rejections: join(dir, REJECTIONS_FILE),
+    checks: join(dir, CHECKS_FILE),
+  };
 }
 
 const isBlank = (text: string): boolean => /^[ \t]*$/.test(text);
@@ -235,11 +251,25 @@ async function readFiles(root: string, files: Iterable<string>): Promise<Map<str
   return new Map(unique.flatMap((file, i) => (texts[i] === undefined ? [] : [[file, texts[i]]])));
 }
 
+/** Opens every target for writing before changing any, so a denied file fails the whole round. */
 async function writeFiles(
   root: string,
   files: ReadonlySet<string>,
   texts: ReadonlyMap<string, string>,
 ): Promise<void> {
+  const denied = await Promise.all(
+    [...files].map(async (file) => {
+      try {
+        await (await open(join(root, file), "r+")).close();
+        return [];
+      } catch (error) {
+        return [`${file}: ${error instanceof Error ? error.message : String(error)}`];
+      }
+    }),
+  );
+  if (denied.flat().length > 0) {
+    throw new Error(`nothing written, these files are not writable:\n${denied.flat().join("\n")}`);
+  }
   await Promise.all([...files].map((file) => Bun.write(join(root, file), texts.get(file) ?? "")));
 }
 
@@ -256,7 +286,11 @@ export async function verifyCheck(root: string, check: Check): Promise<string | 
   if ((await Bun.$`test -d ${dirname(path)}`.nothrow().quiet()).exitCode !== 0) {
     return "check file's directory does not exist";
   }
-  await Bun.write(path, check.content);
+  try {
+    await Bun.write(path, check.content);
+  } catch (error) {
+    return `could not plant the check file: ${error instanceof Error ? error.message : String(error)}`;
+  }
   try {
     const proc = Bun.spawn(["sh", "-c", check.command], {
       cwd: root,
@@ -279,10 +313,32 @@ export async function verifyCheck(root: string, check: Check): Promise<string | 
   }
 }
 
+export interface VerifyResult {
+  verified: Proposal[];
+  unverified: Unverified[];
+}
+
+/** Runs each proposal's planted-violation check, keeping the proposals whose check held. */
+export async function verifyProposals(
+  root: string,
+  proposals: readonly Proposal[],
+): Promise<VerifyResult> {
+  const result: VerifyResult = { verified: [], unverified: [] };
+  for (const proposal of proposals) {
+    const why =
+      proposal.check === undefined
+        ? undefined
+        : // oxlint-disable-next-line no-await-in-loop -- two checks may plant the same path.
+          await verifyCheck(root, proposal.check);
+    if (why === undefined) result.verified.push(proposal);
+    else result.unverified.push({ id: proposal.id, file: proposal.file, why });
+  }
+  return result;
+}
+
 export interface ApplyResult {
   applied: Applied[];
   unlocated: Unlocated[];
-  unverified: Unverified[];
 }
 
 interface Point {
@@ -290,26 +346,11 @@ interface Point {
   at: number;
 }
 
-/**
- * Edits the working tree and returns what changed. Proposals apply in ledger order, after
- * every check runs, so no check lints a half-applied round.
- */
+/** Edits the working tree and returns what changed, applying proposals in ledger order. */
 export async function applyProposals(
   root: string,
-  proposals: readonly Proposal[],
+  verified: readonly Proposal[],
 ): Promise<ApplyResult> {
-  const unverified: Unverified[] = [];
-  const verified: Proposal[] = [];
-  for (const proposal of proposals) {
-    const why =
-      proposal.check === undefined
-        ? undefined
-        : // oxlint-disable-next-line no-await-in-loop -- two checks may plant the same path.
-          await verifyCheck(root, proposal.check);
-    if (why === undefined) verified.push(proposal);
-    else unverified.push({ id: proposal.id, file: proposal.file, why });
-  }
-
   const texts = await readFiles(
     root,
     verified.map((proposal) => proposal.file),
@@ -352,7 +393,7 @@ export async function applyProposals(
   }
 
   const applied: Applied[] = [];
-  const order = new Map(proposals.map((proposal, index) => [proposal.id, index]));
+  const order = new Map(verified.map((proposal, index) => [proposal.id, index]));
   for (const file of edited) {
     const text = texts.get(file) ?? "";
     for (const { applied: row, at } of points.get(file) ?? []) {
@@ -365,7 +406,7 @@ export async function applyProposals(
   }
   await writeFiles(root, edited, texts);
   applied.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
-  return { applied, unlocated, unverified };
+  return { applied, unlocated };
 }
 
 export interface RevertResult {
@@ -549,65 +590,22 @@ const unitsCommand = new Command("units")
     for (const { unit, files } of found) console.log([unit, ...files].join("\t"));
   });
 
-const applyCommand = new Command("apply")
-  .description("Apply each proposal in the ledger to the working tree.")
+const checkCommand = new Command("check")
+  .description("Run each enforced proposal's planted-violation check.")
   .argument("<ledger>", "proposals.jsonl")
   .action(async (ledger) => {
-    const paths = siblings(ledger);
-    if (await Bun.file(paths.applied).exists()) {
-      throw new Error(`${paths.applied} exists: this ledger was already applied.`);
-    }
     const root = await toplevel(process.cwd());
     const proposals = await readJsonl(ledger, Proposal);
-    const { applied, unlocated, unverified } = await applyProposals(root, proposals);
-    await writeJsonl(paths.applied, applied);
-    const repo = await repoName(root);
-    const run = runOf(ledger);
-    await emit(
-      applied.map((row) => ({
-        event: "proposal",
-        detail: { run, id: row.id, class: row.class, file: row.file, repo },
-      })),
-    );
-    console.log(`applied ${applied.length} of ${proposals.length} proposals`);
-    for (const miss of unlocated) {
-      console.log(`unlocated: ${miss.id} (${miss.file}): ${miss.why}`);
-    }
+    const { verified, unverified } = await verifyProposals(root, proposals);
+    const failed = new Map(unverified.map((miss) => [miss.id, miss.why]));
+    const checked: Checked[] = proposals
+      .filter((proposal) => proposal.check !== undefined)
+      .map(({ id, file }) => ({ id, file, why: failed.get(id) ?? null }));
+    await writeJsonl(siblings(ledger).checks, checked);
+    console.log(`${verified.length} of ${proposals.length} proposals verified`);
     for (const miss of unverified) {
       console.log(`unverified: ${miss.id} (${miss.file}): ${miss.why}`);
     }
-  });
-
-const revertCommand = new Command("revert")
-  .description("Restore rejected proposals and record why.")
-  .argument("<ledger>", "proposals.jsonl")
-  .argument("<id...>", "proposals to restore")
-  .option("--reason <text>", "why the reviewer rejected them, applied to every id given", "")
-  .action(async (ledger, ids, options) => {
-    const paths = siblings(ledger);
-    const root = await toplevel(process.cwd());
-    const applied = await readJsonl(paths.applied, Applied);
-    const prior = await readOptionalJsonl(paths.rejections, Rejection);
-    const done = new Set(prior.filter((row) => row.reverted).map((row) => row.id));
-    for (const skipped of ids.filter((candidate) => done.has(candidate))) {
-      console.log(`already reverted: ${skipped}`);
-    }
-
-    const pending = ids.filter((candidate) => !done.has(candidate));
-    const result = await revertEdits(root, applied, pending);
-    const known = new Set(applied.map((row) => row.id));
-    const merged = new Map(prior.map((row) => [row.id, row]));
-    for (const rejected of pending.filter((candidate) => known.has(candidate))) {
-      merged.set(rejected, {
-        id: rejected,
-        reason: options.reason,
-        reverted: result.reverted.includes(rejected),
-      });
-    }
-    await writeJsonl(paths.rejections, [...merged.values()]);
-    for (const id of result.reverted) console.log(`reverted: ${id}`);
-    for (const miss of result.failed) console.log(`failed: ${miss.id}: ${miss.why}`);
-    if (result.failed.length > 0) process.exitCode = 1;
   });
 
 const verdictCommand = new Command("verdict")
@@ -645,10 +643,9 @@ const verdictCommand = new Command("verdict")
   });
 
 export const program = new Command("audit")
-  .description("One round of the prompt prune loop: apply proposals, revert rejections, reconcile.")
+  .description("One round of the prompt prune loop: list units, check proposals, reconcile.")
   .addCommand(unitsCommand)
-  .addCommand(applyCommand)
-  .addCommand(revertCommand)
+  .addCommand(checkCommand)
   .addCommand(verdictCommand);
 
 if (import.meta.main) {

@@ -218,7 +218,18 @@ describe("closePane", () => {
     expect(row).toMatchObject({ branch: null, path: null, head: null, dirty: null, ahead: null });
   });
 
-  test("no upstream leaves ahead null", async () => {
+  test("no upstream counts the commits missing from every remote", async () => {
+    const { deps } = makeDeps(
+      {
+        "git rev-list --count @{u}..HEAD": fail("no upstream", 128),
+        "git rev-list --count HEAD --not --remotes": ok("3\n"),
+      },
+      REX_ENV,
+    );
+    expect((await closePane({}, deps)).row.ahead).toBe(3);
+  });
+
+  test("ahead is null when neither count runs", async () => {
     const { deps } = makeDeps({ "git rev-list --count": fail("no upstream", 128) }, REX_ENV);
     expect((await closePane({}, deps)).row.ahead).toBeNull();
   });
@@ -322,6 +333,14 @@ describe("closePane --handoff", () => {
     expect(argvs(calls).some((line) => line.startsWith("rex block close"))).toBe(false);
   });
 
+  test("says the fork may still run when the stop after a missing listing fails", async () => {
+    const { deps } = makeDeps(
+      { "claude --bg": BG_OK, "claude agents": ok("[]"), "claude stop": fail("no such session") },
+      REX_ENV,
+    );
+    expect((await failureOf(closePane(options, deps))).message).toContain("stop it by hand");
+  });
+
   test("waits for a fork the daemon lists late", async () => {
     const { deps, calls } = makeDeps({ "claude --bg": BG_OK }, REX_ENV);
     const answer = deps.run;
@@ -393,6 +412,14 @@ describe("closePane --target", () => {
     expect(row.target).toBe("block:new");
   });
 
+  test("refuses a child whose pane was already closed", async () => {
+    const { deps, dataDir, calls } = makeDeps({}, REX_ENV, "parent");
+    appendDispatch(dispatchRow(), dataDir);
+    appendDispatch(closedRow({ mux: "rex", target: "block:child" }), dataDir);
+    expect((await failureOf(closePane({ target: "child" }, deps))).exitCode).toBe(2);
+    expect(calls).toEqual([]);
+  });
+
   test("closes a herdr child by its pane id", async () => {
     const { deps, dataDir, calls } = makeDeps({}, HERDR_ENV, "parent");
     appendDispatch(dispatchRow({ mux: "herdr", target: "pane-child" }), dataDir);
@@ -448,12 +475,12 @@ describe("recordEnded", () => {
 
 describe("report", () => {
   const rows = [
-    closedRow({ branch: "a", dirty: 3, ts: "1" }),
-    closedRow({ branch: "a", dirty: 0, ahead: 0, ts: "2" }),
-    closedRow({ branch: "b", dirty: 0, ahead: 4, ts: "3" }),
-    closedRow({ branch: "b", dirty: 1, ahead: 0, ts: "4" }),
-    closedRow({ branch: "c", dirty: 0, ahead: 0, ts: "5" }),
-    closedRow({ branch: "d", dirty: null, ahead: null, ts: "6" }),
+    closedRow({ branch: "a", path: "/a", dirty: 3, ts: "1" }),
+    closedRow({ branch: "a", path: "/a", dirty: 0, ahead: 0, ts: "2" }),
+    closedRow({ branch: "b", path: "/b", dirty: 0, ahead: 4, ts: "3" }),
+    closedRow({ branch: "b", path: "/b", dirty: 1, ahead: 0, ts: "4" }),
+    closedRow({ branch: "c", path: "/c", dirty: 0, ahead: 0, ts: "5" }),
+    closedRow({ branch: "d", path: "/d", dirty: null, ahead: null, ts: "6" }),
   ];
 
   test("--left-behind keeps the latest row per branch that has work left", () => {

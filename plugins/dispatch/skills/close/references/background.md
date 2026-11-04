@@ -6,6 +6,8 @@ Your short id is the first eight characters of `sessionId` in `~/.claude/session
 
 ## Watch
 
+The pane is already closed. Skip the close question and every step that runs `dispatch:close`, in this file and in any skill you run.
+
 1. Finish any skill the session had in progress, such as the remaining steps of `ship`.
 2. Run `pull-request:babysit --merge <pr>`. Watch until the PR merges, whether or not auto-merge is enabled, because conflicts and CI failures can stall a merge at any point.
 3. When the watcher reports `max-time-reached`, start babysit again.

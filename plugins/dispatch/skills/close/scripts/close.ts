@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger under ~/.claude/plugins and reaches the claude daemon and multiplexer sockets
 import { resolve } from "node:path";
-import { Command } from "@commander-js/extra-typings";
+import { Command, Option } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
 import {
@@ -16,7 +16,6 @@ import {
 import {
   appendDispatch,
   type ClosedRow,
-  type DispatchLedgerRow,
   isClosedRow,
   readLedger,
   resolveDataDir,
@@ -139,20 +138,35 @@ export interface ChildPane {
 
 export async function resolveChildPane(name: string, deps: Deps): Promise<ChildPane> {
   const sender = await deps.sender();
-  const match = readLedger(deps.dataDir)
-    .filter((row): row is DispatchLedgerRow => !isClosedRow(row))
-    .findLast(
-      (row) =>
-        row.outcome === "dispatched" &&
-        row.name === name &&
-        sender != null &&
-        row.sender === sender.name,
-    );
+  const ledger = readLedger(deps.dataDir);
+  const index = ledger.findLastIndex(
+    (row) =>
+      !isClosedRow(row) &&
+      row.outcome === "dispatched" &&
+      row.name === name &&
+      sender != null &&
+      row.sender === sender.name,
+  );
+  const found = ledger[index];
+  const match = found == null || isClosedRow(found) ? null : found;
   if (match?.target == null || match.mux === "bg")
     throw new CloseError(
       `no pane named ${name} was dispatched by this session, so it cannot be closed from here`,
       2,
     );
+  // A pane id freed by an earlier close can be reused by an unrelated pane.
+  if (
+    ledger
+      .slice(index + 1)
+      .some(
+        (row) =>
+          isClosedRow(row) &&
+          row.event === "closed" &&
+          row.mux === match.mux &&
+          row.target === match.target,
+      )
+  )
+    throw new CloseError(`the pane for ${name} was already closed`, 2);
   if (match.mux === "rex") {
     const session = deps.env.REX_SESSION;
     if (!present(session)) throw new CloseError("REX_SESSION is not set", 2);
@@ -171,13 +185,18 @@ export async function gitFacts(run: Runner, cwd: string): Promise<GitFacts> {
     run(["git", "status", "--porcelain"], { cwd }),
     run(["git", "rev-list", "--count", "@{u}..HEAD"], { cwd }),
   ]);
-  const count = Number(ahead.stdout.trim());
+  // A branch with no upstream counts the commits missing from every remote-tracking ref.
+  const unpushed =
+    ahead.code === 0
+      ? ahead
+      : await run(["git", "rev-list", "--count", "HEAD", "--not", "--remotes"], { cwd });
+  const count = Number(unpushed.stdout.trim());
   return {
     toplevel,
     branch: branch.code === 0 ? trimmed(branch.stdout) : null,
     head: head.code === 0 ? trimmed(head.stdout) : null,
     dirty: status.code === 0 ? lines(status.stdout).length : null,
-    ahead: ahead.code === 0 && Number.isInteger(count) ? count : null,
+    ahead: unpushed.code === 0 && Number.isInteger(count) ? count : null,
   };
 }
 
@@ -205,7 +224,11 @@ export async function startFork(
     throw new CloseError(`claude --bg printed no background session id: ${started.stdout.trim()}`);
   const problem = await awaitListing(deps, fork, cwd, LIST_ATTEMPTS);
   if (problem === "") return fork;
-  await deps.run(["claude", "stop", fork]);
+  const stopped = await deps.run(["claude", "stop", fork]);
+  if (stopped.code !== 0)
+    throw new CloseError(
+      `${problem}. claude stop ${fork} failed: ${stopped.stderr.trim()}. The fork may still be running, so stop it by hand.`,
+    );
   throw new CloseError(`${problem}. Stopped ${fork} and left the pane open.`);
 }
 
@@ -257,7 +280,8 @@ export async function closePane(options: CloseOptions, deps: Deps): Promise<Clos
 
   const child = options.target == null ? null : await resolveChildPane(options.target, deps);
   const pane = child?.pane ?? resolveOwnPane(deps.env);
-  const facts = await gitFacts(deps.run, child?.path ?? deps.cwd);
+  const checkout = child == null ? deps.cwd : child.path;
+  const facts = checkout == null ? NO_GIT : await gitFacts(deps.run, checkout);
 
   let fork: string | null = null;
   if (options.handoff === true && options.session != null && options.pr != null)
@@ -278,11 +302,11 @@ export async function closePane(options: CloseOptions, deps: Deps): Promise<Clos
     target: pane.target,
     summary: options.summary ?? null,
   };
-  appendDispatch(row, deps.dataDir);
   const report: CloseReport = { fork, pane, row };
-  // Closing the caller's own pane kills this process. Report before it.
-  deps.out(JSON.stringify(report));
   try {
+    appendDispatch(row, deps.dataDir);
+    // Closing the caller's own pane kills this process. Report before it.
+    deps.out(JSON.stringify(report));
     await closeTarget(pane, deps.run);
   } catch (error) {
     await withdrawClose(row, error, deps);
@@ -293,15 +317,19 @@ export async function closePane(options: CloseOptions, deps: Deps): Promise<Clos
 
 // When the pane is still open, its session still runs, so a live fork would watch the PR twice.
 async function withdrawClose(row: ClosedRow, error: unknown, deps: Deps): Promise<void> {
-  const reason = `pane close failed: ${error instanceof Error ? error.message : String(error)}`;
+  const reason = `close failed: ${error instanceof Error ? error.message : String(error)}`;
   const stopped = row.fork == null ? null : await deps.run(["claude", "stop", row.fork]);
   const stopError = stopped != null && stopped.code !== 0 ? stopped.stderr.trim() : null;
   const summary =
     stopError == null ? reason : `${reason}. claude stop ${row.fork} failed: ${stopError}`;
-  appendDispatch(
-    { ...row, event: "ended", ts: deps.now().toISOString(), outcome: "stopped", summary },
-    deps.dataDir,
-  );
+  try {
+    appendDispatch(
+      { ...row, event: "ended", ts: deps.now().toISOString(), outcome: "stopped", summary },
+      deps.dataDir,
+    );
+  } catch {
+    // The ledger itself may be what failed, and the stop result still has to reach the caller.
+  }
   if (stopError != null)
     throw new CloseError(`${summary}. The fork may still be running, so stop it by hand.`);
 }
@@ -414,7 +442,7 @@ export async function recordEnded(options: EndedOptions, deps: Deps): Promise<Cl
 export function leftBehind(rows: readonly ClosedRow[]): ClosedRow[] {
   const latest = new Map<string, ClosedRow>();
   for (const row of rows) {
-    const key = row.branch ?? row.path ?? row.ts;
+    const key = row.path ?? row.branch ?? row.ts;
     latest.delete(key);
     latest.set(key, row);
   }
@@ -476,13 +504,15 @@ export function createProgram(deps: Deps): Command {
     .description("Record that a background session finished watching its PR.")
     .requiredOption("--session <fork>", "background session id")
     .requiredOption("--pr <url>", "pull request URL")
-    .requiredOption("--outcome <outcome>", "merged, closed, or stopped")
+    .addOption(
+      new Option("--outcome <outcome>", "how the watch ended")
+        .choices(["merged", "closed", "stopped"] as const)
+        .makeOptionMandatory(),
+    )
     .action((options) =>
       guarded(async () => {
-        const { outcome } = options;
-        if (outcome !== "merged" && outcome !== "closed" && outcome !== "stopped")
-          throw new CloseError("--outcome must be merged, closed, or stopped", 2);
-        const row = await recordEnded({ session: options.session, pr: options.pr, outcome }, deps);
+        const { session, pr, outcome } = options;
+        const row = await recordEnded({ session, pr, outcome }, deps);
         deps.out(JSON.stringify(row));
       }),
     );

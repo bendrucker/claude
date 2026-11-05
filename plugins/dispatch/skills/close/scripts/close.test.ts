@@ -20,6 +20,8 @@ import {
   leftBehind,
   recordEnded,
   resolveOwnPane,
+  resumerLog,
+  resumeSession,
 } from "./close";
 
 const ok = (stdout = ""): CommandResult => ({ code: 0, stdout, stderr: "" });
@@ -51,8 +53,14 @@ const GIT = {
 };
 
 const FORK = "bg-1234";
-const BG_OK = ok(`backgrounded · ${FORK}\n  claude attach ${FORK}\n`);
-const AGENTS_OK = ok(JSON.stringify([{ pid: 1, id: FORK, kind: "background", extra: true }]));
+
+const RESUMER = 4242;
+
+interface Spawned {
+  argv: string[];
+  cwd: string;
+  logPath: string;
+}
 
 const REX_ENV = { REX_SESSION: "main", REX_BLOCK: "block:7" };
 const HERDR_ENV = { HERDR_ENV: "1", HERDR_PANE_ID: "pane-9" };
@@ -61,9 +69,18 @@ function makeDeps(
   answers: Record<string, CommandResult>,
   env: Record<string, string | undefined>,
   sender: string | null = null,
-): { deps: Deps; calls: Call[]; out: string[]; dataDir: string } {
+): {
+  deps: Deps;
+  calls: Call[];
+  out: string[];
+  dataDir: string;
+  spawned: Spawned[];
+  killed: number[];
+} {
   const { run, calls } = scripted({ ...GIT, ...answers });
   const out: string[] = [];
+  const spawned: Spawned[] = [];
+  const killed: number[] = [];
   const dataDir = mkdtempSync(join(tmpdir(), "close-test-"));
   const deps: Deps = {
     run,
@@ -76,8 +93,16 @@ function makeDeps(
       out.push(line);
     },
     sender: () => Promise.resolve(sender == null ? null : { name: sender, mux: null }),
+    spawnDetached: (argv, cwd, logPath) => {
+      spawned.push({ argv: [...argv], cwd, logPath });
+      return Promise.resolve(RESUMER);
+    },
+    alive: () => false,
+    kill: (pid) => {
+      killed.push(pid);
+    },
   };
-  return { deps, calls, out, dataDir };
+  return { deps, calls, out, dataDir, spawned, killed };
 }
 
 const argvs = (calls: Call[]): string[] => calls.map((call) => call.argv.join(" "));
@@ -250,129 +275,120 @@ describe("closePane", () => {
 
 describe("closePane --handoff", () => {
   const options = { handoff: true, session: "sess-1", pr: "https://github.com/o/r/pull/1" };
+  const env = { ...REX_ENV, CLAUDE_PID: "9" };
 
-  test("forks from the toplevel with a detached env, then records and closes", async () => {
-    const { deps, calls, dataDir } = makeDeps(
-      { "claude --bg": BG_OK, "claude agents": AGENTS_OK },
-      { ...REX_ENV, CLAUDE_CODE_SSE_PORT: "1", CLAUDE_PID: "9" },
-    );
+  test("starts a resumer that waits on this session's process, then records and closes", async () => {
+    const { deps, calls, dataDir, spawned } = makeDeps({}, env);
     const report = await closePane(options, deps);
+    expect(spawned).toHaveLength(1);
+    expect(spawned[0]?.argv.slice(2)).toEqual([
+      "resume",
+      "--session",
+      "sess-1",
+      "--pr",
+      options.pr,
+      "--pid",
+      "9",
+    ]);
+    expect(spawned[0]?.cwd).toBe("/work/tree");
+    expect(spawned[0]?.logPath).toBe(resumerLog(dataDir, "sess-1"));
+    expect(argvs(calls).some((line) => line.startsWith("claude"))).toBe(false);
+    expect(argvs(calls).at(-1)).toBe("rex block close -s main block:7");
+    expect(report).toMatchObject({ fork: "sess-1", resumer: RESUMER });
+    expect(readLedger(dataDir)).toMatchObject([{ fork: "sess-1", pr: options.pr }]);
+  });
+
+  test("refuses without CLAUDE_PID and starts nothing", async () => {
+    const { deps, calls, dataDir, spawned } = makeDeps({}, REX_ENV);
+    expect((await failureOf(closePane(options, deps))).exitCode).toBe(2);
+    expect(spawned).toEqual([]);
+    expect(readLedger(dataDir)).toEqual([]);
+    expect(argvs(calls).some((line) => line.startsWith("rex block close"))).toBe(false);
+  });
+
+  test("a refused close kills the resumer and records it ended", async () => {
+    const { deps, dataDir, killed } = makeDeps(
+      { "herdr pane close": fail("workspace_group_close_required") },
+      { ...HERDR_ENV, CLAUDE_PID: "9" },
+    );
+    await failureOf(closePane(options, deps));
+    expect(killed).toEqual([RESUMER]);
+    expect(readLedger(dataDir)).toMatchObject([
+      { event: "closed", fork: "sess-1" },
+      { event: "ended", fork: "sess-1", outcome: "stopped" },
+    ]);
+  });
+
+  test("a failed kill after a refused close says to kill the resumer by hand", async () => {
+    const { deps } = makeDeps(
+      { "herdr pane close": fail("workspace_group_close_required") },
+      { ...HERDR_ENV, CLAUDE_PID: "9" },
+    );
+    deps.kill = () => {
+      throw new Error("ESRCH");
+    };
+    expect((await failureOf(closePane(options, deps))).message).toContain(`${RESUMER} by hand`);
+  });
+});
+
+describe("resumeSession", () => {
+  const options = { session: "sess-1", pr: "https://github.com/o/r/pull/1", pid: 9 };
+  const SAME = ok("backgrounded · sess-1\n  claude attach sess-1\n");
+  const LISTED = ok(JSON.stringify([{ id: "sess-1", kind: "background" }]));
+
+  test("waits for the process to exit, then resumes under the same id with a detached env", async () => {
+    const { deps, calls, dataDir } = makeDeps(
+      { "claude --bg": SAME, "claude agents": LISTED },
+      { CLAUDE_PID: "9", CLAUDE_CODE_SSE_PORT: "1" },
+    );
+    let checks = 0;
+    deps.alive = (pid) => {
+      expect(pid).toBe(9);
+      return ++checks < 3;
+    };
+    expect(await resumeSession(options, deps)).toBe("sess-1");
+    expect(checks).toBe(3);
     const bg = calls.find((call) => call.argv[1] === "--bg");
     expect(bg?.argv.slice(0, 4)).toEqual(["claude", "--bg", "--resume", "sess-1"]);
     expect(bg?.argv[4]).toContain("background.md");
     expect(bg?.argv[4]).toContain(options.pr);
-    expect(bg?.options?.cwd).toBe("/work/tree");
-    expect(bg?.options?.env).toMatchObject({ CLAUDE_PID: undefined });
-    expect(bg?.options?.env).not.toHaveProperty("REX_BLOCK");
-    expect(argvs(calls).at(-1)).toBe("rex block close -s main block:7");
-    expect(report.fork).toBe(FORK);
-    expect(readLedger(dataDir)).toMatchObject([{ fork: FORK, pr: options.pr, session: "sess-1" }]);
+    expect(bg?.options?.env).toMatchObject({
+      CLAUDE_PID: undefined,
+      CLAUDE_CODE_SSE_PORT: undefined,
+    });
+    expect(readLedger(dataDir)).toEqual([]);
   });
 
-  test("a refused close stops the fork and records it ended", async () => {
-    const { deps, calls, dataDir } = makeDeps(
-      {
-        "claude --bg": BG_OK,
-        "claude agents": AGENTS_OK,
-        "herdr pane close": fail("workspace_group_close_required"),
-      },
-      HERDR_ENV,
-    );
-    await failureOf(closePane(options, deps));
-    expect(argvs(calls).at(-1)).toBe(`claude stop ${FORK}`);
+  test("gives up on a process that never exits and records it", async () => {
+    const { deps, calls, dataDir } = makeDeps({}, {});
+    deps.alive = () => true;
+    expect((await failureOf(resumeSession(options, deps))).message).toContain("still running");
+    expect(argvs(calls).some((line) => line.startsWith("claude"))).toBe(false);
     expect(readLedger(dataDir)).toMatchObject([
-      { event: "closed", fork: FORK },
-      { event: "ended", fork: FORK, outcome: "stopped" },
+      { event: "ended", fork: "sess-1", outcome: "stopped", branch: "feature" },
     ]);
   });
 
-  test("a failed stop after a refused close says the fork may still run", async () => {
-    const { deps, dataDir } = makeDeps(
-      {
-        "claude --bg": BG_OK,
-        "claude agents": AGENTS_OK,
-        "herdr pane close": fail("workspace_group_close_required"),
-        "claude stop": fail("no such session"),
-      },
-      HERDR_ENV,
-    );
-    expect((await failureOf(closePane(options, deps))).message).toContain("stop it by hand");
-    expect(readLedger(dataDir).at(-1)).toMatchObject({ event: "ended", outcome: "stopped" });
+  test("records a failed claude --bg", async () => {
+    const { deps, dataDir } = makeDeps({ "claude --bg": fail("daemon down") }, {});
+    await failureOf(resumeSession(options, deps));
+    expect(JSON.stringify(readLedger(dataDir).at(-1))).toContain("daemon down");
   });
 
-  test("aborts without a row or close when claude --bg prints no id", async () => {
+  test("records an id claude agents never lists", async () => {
     const { deps, calls, dataDir } = makeDeps(
-      { "claude --bg": ok("started\nbut no id\n") },
-      REX_ENV,
+      { "claude --bg": SAME, "claude agents": ok("[]") },
+      {},
     );
-    const error = await failureOf(closePane(options, deps));
-    expect(error.exitCode).toBe(1);
-    expect(readLedger(dataDir)).toEqual([]);
-    expect(argvs(calls).some((line) => line.startsWith("rex block close"))).toBe(false);
-  });
-
-  test("aborts when claude --bg exits non-zero", async () => {
-    const { deps, dataDir } = makeDeps({ "claude --bg": fail("daemon down") }, REX_ENV);
-    await failureOf(closePane(options, deps));
-    expect(readLedger(dataDir)).toEqual([]);
-  });
-
-  test("aborts when claude agents does not list the fork", async () => {
-    const { deps, calls, dataDir } = makeDeps(
-      {
-        "claude --bg": BG_OK,
-        "claude agents": ok(JSON.stringify([{ id: "other", kind: "background" }])),
-      },
-      REX_ENV,
-    );
-    const error = await failureOf(closePane(options, deps));
-    expect(error.message).toContain(FORK);
-    expect(readLedger(dataDir)).toEqual([]);
+    await failureOf(resumeSession(options, deps));
     expect(argvs(calls).filter((line) => line.startsWith("claude agents"))).toHaveLength(5);
-    expect(argvs(calls).at(-1)).toBe(`claude stop ${FORK}`);
-    expect(argvs(calls).some((line) => line.startsWith("rex block close"))).toBe(false);
+    expect(readLedger(dataDir).at(-1)).toMatchObject({ event: "ended", fork: "sess-1" });
   });
 
-  test("says the fork may still run when the stop after a missing listing fails", async () => {
-    const { deps } = makeDeps(
-      { "claude --bg": BG_OK, "claude agents": ok("[]"), "claude stop": fail("no such session") },
-      REX_ENV,
-    );
-    expect((await failureOf(closePane(options, deps))).message).toContain("stop it by hand");
-  });
-
-  test("waits for a fork the daemon lists late", async () => {
-    const { deps, calls } = makeDeps({ "claude --bg": BG_OK }, REX_ENV);
-    const answer = deps.run;
-    let listings = 0;
-    deps.run = (argv, runOptions) => {
-      if (argv[1] !== "agents") return answer(argv, runOptions);
-      listings++;
-      return Promise.resolve(listings < 3 ? ok("[]") : AGENTS_OK);
-    };
-    expect((await closePane(options, deps)).fork).toBe(FORK);
-    expect(listings).toBe(3);
-    expect(argvs(calls).at(-1)).toBe("rex block close -s main block:7");
-  });
-
-  test("aborts when the listed fork is not a background session", async () => {
-    const { deps } = makeDeps(
-      {
-        "claude --bg": BG_OK,
-        "claude agents": ok(JSON.stringify([{ id: FORK, kind: "interactive" }])),
-      },
-      REX_ENV,
-    );
-    await failureOf(closePane(options, deps));
-  });
-
-  test("aborts when claude agents prints something else", async () => {
-    const { deps, dataDir } = makeDeps(
-      { "claude --bg": BG_OK, "claude agents": ok("not json") },
-      REX_ENV,
-    );
-    await failureOf(closePane(options, deps));
-    expect(readLedger(dataDir)).toEqual([]);
+  test("records output with no background id", async () => {
+    const { deps, dataDir } = makeDeps({ "claude --bg": ok("started\nbut no id\n") }, {});
+    await failureOf(resumeSession(options, deps));
+    expect(JSON.stringify(readLedger(dataDir).at(-1))).toContain("no background session id");
   });
 });
 

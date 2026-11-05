@@ -298,13 +298,16 @@ describe("closePane --handoff", () => {
     expect(readLedger(dataDir)).toMatchObject([{ fork: "sess-1", pr: options.pr }]);
   });
 
-  test("refuses without CLAUDE_PID and starts nothing", async () => {
-    const { deps, calls, dataDir, spawned } = makeDeps({}, REX_ENV);
-    expect((await failureOf(closePane(options, deps))).exitCode).toBe(2);
-    expect(spawned).toEqual([]);
-    expect(readLedger(dataDir)).toEqual([]);
-    expect(argvs(calls).some((line) => line.startsWith("rex block close"))).toBe(false);
-  });
+  test.each([undefined, "", "abc", "0", "1.5"])(
+    "refuses CLAUDE_PID %p and starts nothing",
+    async (pid) => {
+      const { deps, calls, dataDir, spawned } = makeDeps({}, { ...REX_ENV, CLAUDE_PID: pid });
+      expect((await failureOf(closePane(options, deps))).exitCode).toBe(2);
+      expect(spawned).toEqual([]);
+      expect(readLedger(dataDir)).toEqual([]);
+      expect(argvs(calls).some((line) => line.startsWith("rex block close"))).toBe(false);
+    },
+  );
 
   test("a refused close kills the resumer and records it ended", async () => {
     const { deps, dataDir, killed } = makeDeps(
@@ -334,11 +337,10 @@ describe("closePane --handoff", () => {
 describe("resumeSession", () => {
   const options = { session: "sess-1", pr: "https://github.com/o/r/pull/1", pid: 9 };
   const SAME = ok("backgrounded · sess-1\n  claude attach sess-1\n");
-  const LISTED = ok(JSON.stringify([{ id: "sess-1", kind: "background" }]));
 
   test("waits for the process to exit, then resumes under the same id with a detached env", async () => {
     const { deps, calls, dataDir } = makeDeps(
-      { "claude --bg": SAME, "claude agents": LISTED },
+      { "claude --bg": SAME },
       { CLAUDE_PID: "9", CLAUDE_CODE_SSE_PORT: "1" },
     );
     let checks = 0;
@@ -373,16 +375,6 @@ describe("resumeSession", () => {
     const { deps, dataDir } = makeDeps({ "claude --bg": fail("daemon down") }, {});
     await failureOf(resumeSession(options, deps));
     expect(JSON.stringify(readLedger(dataDir).at(-1))).toContain("daemon down");
-  });
-
-  test("records an id claude agents never lists", async () => {
-    const { deps, calls, dataDir } = makeDeps(
-      { "claude --bg": SAME, "claude agents": ok("[]") },
-      {},
-    );
-    await failureOf(resumeSession(options, deps));
-    expect(argvs(calls).filter((line) => line.startsWith("claude agents"))).toHaveLength(5);
-    expect(readLedger(dataDir).at(-1)).toMatchObject({ event: "ended", fork: "sess-1" });
   });
 
   test("records output with no background id", async () => {

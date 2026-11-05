@@ -115,14 +115,11 @@ export interface GitFacts {
 
 const NO_GIT: GitFacts = { toplevel: null, branch: null, head: null, dirty: null, ahead: null };
 
-const AgentList = z.array(z.object({ id: z.string().nullish(), kind: z.string() }));
 const RexWindow = z.object({ block_ids: z.array(z.string()).min(1) });
 const HerdrWorkspace = z.object({
   result: z.object({ root_pane: z.object({ pane_id: z.string() }) }),
 });
 
-const LIST_ATTEMPTS = 5;
-const LIST_INTERVAL_MS = 1000;
 const EXIT_ATTEMPTS = 120;
 const EXIT_INTERVAL_MS = 500;
 const FORK_ID = /^[A-Za-z0-9._-]+$/;
@@ -255,17 +252,32 @@ export async function startResumer(
   pr: string,
   cwd: string,
 ): Promise<number> {
-  const pid = deps.env.CLAUDE_PID;
-  if (!present(pid))
+  const pid = processId(deps.env.CLAUDE_PID ?? "");
+  if (pid == null)
     throw new CloseError(
-      "CLAUDE_PID is not set, so the handoff cannot wait for this session to exit",
+      "CLAUDE_PID is not a process id, so the handoff cannot wait for this session to exit",
       2,
     );
   return deps.spawnDetached(
-    [process.execPath, import.meta.path, "resume", "--session", session, "--pr", pr, "--pid", pid],
+    [
+      process.execPath,
+      import.meta.path,
+      "resume",
+      "--session",
+      session,
+      "--pr",
+      pr,
+      "--pid",
+      String(pid),
+    ],
     cwd,
     resumerLog(deps.dataDir, session),
   );
+}
+
+function processId(value: string): number | null {
+  const pid = Number(value);
+  return value.trim() !== "" && Number.isInteger(pid) && pid > 0 ? pid : null;
 }
 
 export interface ResumeOptions {
@@ -276,14 +288,14 @@ export interface ResumeOptions {
 
 export async function resumeSession(options: ResumeOptions, deps: Deps): Promise<string> {
   const { session, pr, pid } = options;
-  const failed = async (fork: string, problem: string): Promise<never> => {
+  const failed = async (problem: string): Promise<never> => {
     const facts = await gitFacts(deps.run, deps.cwd);
     appendDispatch(
       {
         event: "ended",
         ts: deps.now().toISOString(),
         session,
-        fork,
+        fork: session,
         branch: facts.branch,
         path: facts.toplevel,
         head: facts.head,
@@ -301,7 +313,7 @@ export async function resumeSession(options: ResumeOptions, deps: Deps): Promise
   };
 
   if (!(await awaitExit(deps, pid, EXIT_ATTEMPTS)))
-    return failed(session, `session process ${pid} was still running, so it was not resumed`);
+    return failed(`session process ${pid} was still running, so it was not resumed`);
   const started = await deps.run(
     ["claude", "--bg", "--resume", session, handoffPrompt(session, pr)],
     {
@@ -310,18 +322,10 @@ export async function resumeSession(options: ResumeOptions, deps: Deps): Promise
     },
   );
   if (started.code !== 0)
-    return failed(
-      session,
-      `claude --bg failed: ${trimmed(started.stderr) ?? started.stdout.trim()}`,
-    );
+    return failed(`claude --bg failed: ${trimmed(started.stderr) ?? started.stdout.trim()}`);
   const fork = backgroundId(started.stdout);
   if (fork == null)
-    return failed(
-      session,
-      `claude --bg printed no background session id: ${started.stdout.trim()}`,
-    );
-  const problem = await awaitListing(deps, fork, deps.cwd, LIST_ATTEMPTS);
-  if (problem !== "") return failed(fork, problem);
+    return failed(`claude --bg printed no background session id: ${started.stdout.trim()}`);
   deps.out(started.stdout.trim());
   return fork;
 }
@@ -331,32 +335,6 @@ async function awaitExit(deps: Deps, pid: number, attempts: number): Promise<boo
   if (attempts <= 1) return false;
   await deps.wait(EXIT_INTERVAL_MS);
   return awaitExit(deps, pid, attempts - 1);
-}
-
-async function awaitListing(
-  deps: Deps,
-  fork: string,
-  cwd: string,
-  attempts: number,
-): Promise<string> {
-  const problem = await forkListingProblem(deps, fork, cwd);
-  if (problem === "" || attempts <= 1) return problem;
-  await deps.wait(LIST_INTERVAL_MS);
-  return awaitListing(deps, fork, cwd, attempts - 1);
-}
-
-async function forkListingProblem(deps: Deps, fork: string, cwd: string): Promise<string> {
-  const listed = await deps.run(["claude", "agents", "--json"], { cwd });
-  if (listed.code !== 0) return `claude agents --json failed: ${listed.stderr.trim()}`;
-  let agents: z.infer<typeof AgentList>;
-  try {
-    agents = AgentList.parse(JSON.parse(listed.stdout));
-  } catch (error) {
-    return `claude agents --json returned an unexpected shape: ${error instanceof Error ? error.message : String(error)}`;
-  }
-  return agents.some((agent) => agent.id === fork && agent.kind === "background")
-    ? ""
-    : `background session ${fork} is not listed by claude agents`;
 }
 
 export interface CloseOptions {
@@ -632,9 +610,8 @@ export function createProgram(deps: Deps): Command {
     .requiredOption("--session <id>", "session id to resume")
     .requiredOption("--pr <url>", "pull request the background session watches")
     .requiredOption("--pid <pid>", "process id of the session's foreground claude", (value) => {
-      const pid = Number(value);
-      if (!Number.isInteger(pid) || pid <= 0)
-        throw new InvalidArgumentError(`${value} is not a process id`);
+      const pid = processId(value);
+      if (pid == null) throw new InvalidArgumentError(`${value} is not a process id`);
       return pid;
     })
     .action((options) => guarded(async () => void (await resumeSession(options, deps))));

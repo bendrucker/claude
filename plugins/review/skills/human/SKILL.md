@@ -29,7 +29,7 @@ Put the change in front of Ben and act on what comes back until he approves. `at
 | `--browser`, diff | `plannotator review --git --json [--base <ref>]` | Blocks. The decision is the tool result |
 | `--browser`, `--doc <file>` | `plannotator annotate <file> --gate --json --require-approval` | Blocks. The decision is the tool result |
 
-Terminal surfaces open as a split beside this pane and deliver into it once it is idle, so the turn has to end before Send can land. They need the herdr pane above. When it reads `none` and the Rex block is set, a diff review runs the Rex gate below and a document review takes `--browser`. The Rex gate opens tuicr as a layer over this pane and ends the turn the same way. With neither, run the gate as if `--browser` were passed. In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
+Terminal surfaces open as a split beside this pane and deliver into it once it is idle, so the turn has to end before Send can land. They need the herdr pane above. When it reads `none` and the Rex block is set, a diff review runs the Rex gate below and a document review takes `--browser`. The Rex gate opens tuicr in a split beside this pane and ends the turn the same way. With neither, run the gate as if `--browser` were passed. In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
 
 ## Precondition
 

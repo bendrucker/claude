@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger under ~/.claude/plugins and reaches the claude daemon and multiplexer sockets
+import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typings";
 import { table } from "table";
@@ -69,12 +70,24 @@ async function spawnDetached(
   return pid;
 }
 
+function hasCode(error: unknown, code: string): boolean {
+  return error instanceof Error && "code" in error && error.code === code;
+}
+
 function alive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return error instanceof Error && "code" in error && error.code === "EPERM";
+    return hasCode(error, "EPERM");
+  }
+}
+
+function kill(pid: number): void {
+  try {
+    process.kill(pid);
+  } catch (error) {
+    if (!hasCode(error, "ESRCH")) throw error;
   }
 }
 
@@ -93,9 +106,7 @@ export function defaultDeps(): Deps {
     sender: () => readSender(env, spawnRunner),
     spawnDetached,
     alive,
-    kill: (pid) => {
-      process.kill(pid);
-    },
+    kill,
   };
 }
 
@@ -120,7 +131,7 @@ const HerdrWorkspace = z.object({
   result: z.object({ root_pane: z.object({ pane_id: z.string() }) }),
 });
 
-const EXIT_ATTEMPTS = 120;
+const EXIT_ATTEMPTS = 600;
 const EXIT_INTERVAL_MS = 500;
 const FORK_ID = /^[A-Za-z0-9._-]+$/;
 const GROUP_CONFLICT = /confirmation_required|workspace_group_close_required/;
@@ -258,6 +269,8 @@ export async function startResumer(
       "CLAUDE_PID is not a process id, so the handoff cannot wait for this session to exit",
       2,
     );
+  // sh opens the log after it reports the helper's pid, so a missing directory would fail unseen.
+  mkdirSync(deps.dataDir, { recursive: true });
   return deps.spawnDetached(
     [
       process.execPath,
@@ -277,7 +290,7 @@ export async function startResumer(
 
 function processId(value: string): number | null {
   const pid = Number(value);
-  return value.trim() !== "" && Number.isInteger(pid) && pid > 0 ? pid : null;
+  return /^\d+$/.test(value) && pid > 0 ? pid : null;
 }
 
 export interface ResumeOptions {
@@ -363,12 +376,15 @@ export async function closePane(options: CloseOptions, deps: Deps): Promise<Clos
   const checkout = child == null ? deps.cwd : child.path;
   const facts = checkout == null ? NO_GIT : await gitFacts(deps.run, checkout);
 
-  const handoff = options.handoff === true && options.session != null && options.pr != null;
-  const fork = handoff ? (options.session ?? null) : null;
-  const resumer =
-    handoff && options.session != null && options.pr != null
-      ? await startResumer(deps, options.session, options.pr, facts.toplevel ?? deps.cwd)
+  const handoff =
+    options.handoff === true && options.session != null && options.pr != null
+      ? { session: options.session, pr: options.pr }
       : null;
+  const fork = handoff?.session ?? null;
+  const resumer =
+    handoff == null
+      ? null
+      : await startResumer(deps, handoff.session, handoff.pr, facts.toplevel ?? deps.cwd);
 
   const row: ClosedRow = {
     event: "closed",

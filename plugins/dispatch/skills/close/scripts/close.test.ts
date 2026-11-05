@@ -17,6 +17,7 @@ import {
   CloseError,
   createProgram,
   type Deps,
+  defaultDeps,
   leftBehind,
   recordEnded,
   resolveOwnPane,
@@ -331,6 +332,23 @@ describe("closePane --handoff", () => {
       throw new Error("ESRCH");
     };
     expect((await failureOf(closePane(options, deps))).message).toContain(`${RESUMER} by hand`);
+  });
+});
+
+async function written(path: string, attempts = 100): Promise<string> {
+  const file = Bun.file(path);
+  const text = (await file.exists()) ? (await file.text()).trim() : "";
+  if (text !== "" || attempts <= 1) return text;
+  await Bun.sleep(20);
+  return written(path, attempts - 1);
+}
+
+describe("spawnDetached", () => {
+  test("returns the pid of the backgrounded command and appends its output to the log", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "close-spawn-"));
+    const log = join(dir, "resume.log");
+    const pid = await defaultDeps().spawnDetached(["sh", "-c", "echo $$"], dir, log);
+    expect(await written(log)).toBe(String(pid));
   });
 });
 

@@ -2,7 +2,7 @@
 
 You are a session resumed in the background after its pane closed. Get its pull request merged without the user, and reach the user only when a decision needs their judgment. `close.ts` sits at `../scripts/close.ts` relative to this file.
 
-Your short id is the first eight characters of `sessionId` in `~/.claude/sessions/$PPID.json`. `claude attach` takes it.
+Your session id is `sessionId` in `~/.claude/sessions/$PPID.json`, and your short id is its first eight characters. `claude attach` takes the short id.
 
 ## Watch
 
@@ -25,5 +25,5 @@ Escalate when a fix needs the user's judgment: a non-trivial CI failure, a confl
 
 When the PR merges or closes, or the user says to stop watching:
 
-1. Run `bun <close.ts> ended --session <short id> --pr <url> --outcome merged|closed|stopped`.
+1. Run `bun <close.ts> ended --session <session id> --pr <url> --outcome merged|closed|stopped`.
 2. End your turn. The nightly agent sweep removes this session.

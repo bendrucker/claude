@@ -135,7 +135,7 @@ export interface DispatchRecord {
   // Unknown for another host, whose worktree is prepared there.
   checkout?: Checkout;
   submoduleError?: string;
-  // What a blocked Claude Code reported through Rex's program status.
+  // What a blocked Claude Code reported through Rex or `claude agents`.
   blockedKind?: string;
   blockedMessage?: string;
 }
@@ -205,6 +205,56 @@ export function readProgramStatus(stdout: string): ReportedStatus | null {
   if (record.kind != null) blocked.kind = record.kind;
   if (record.msg != null) blocked.message = record.msg;
   return blocked;
+}
+
+const BackgroundAgents = z.array(
+  z.object({
+    id: z.string().nullish(),
+    name: z.string().nullish(),
+    kind: z.string().nullish(),
+    state: z.string().nullish(),
+    status: z.string().nullish(),
+    waitingFor: z.string().nullish(),
+  }),
+);
+
+const WAITING_KINDS: Readonly<Record<string, string>> = {
+  "permission prompt": "permission",
+  "sandbox request": "permission",
+  "input needed": "question",
+};
+
+// Reads one background session's entry from `claude agents --json`, by id
+// when `claude --bg` printed one and by name otherwise.
+export function readBackgroundStatus(
+  stdout: string,
+  target: string | null,
+  name: string,
+): ReportedStatus | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(stdout);
+  } catch {
+    // A failed listing prints prose, which leaves the poll to try again.
+    return null;
+  }
+  const parsed = BackgroundAgents.safeParse(json);
+  if (!parsed.success) return null;
+  const entry = parsed.data.find((agent) =>
+    target == null ? agent.name === name : agent.id === target,
+  );
+  if (entry == null) return null;
+  if (entry.state === "failed" || entry.state === "stopped") return { status: "failed" };
+  if (entry.state === "blocked" || entry.status === "waiting") {
+    const blocked: ReportedStatus = { status: "blocked" };
+    const kind = entry.waitingFor == null ? undefined : WAITING_KINDS[entry.waitingFor];
+    if (kind != null) blocked.kind = kind;
+    if (entry.waitingFor != null) blocked.message = entry.waitingFor;
+    return blocked;
+  }
+  if (entry.state === "working" || entry.state === "done" || entry.status === "busy")
+    return { status: "working" };
+  return { status: "unknown" };
 }
 
 const WorkspaceCreated = z.object({
@@ -745,15 +795,46 @@ async function launchHerdr(ctx: Context): Promise<void> {
   partial.name = name;
 }
 
+// The sandbox denies the jobs directory every background session writes.
+const JOBS_DENIED = /EPERM[\s\S]*\.claude\/jobs|\.claude\/jobs[\s\S]*EPERM/;
+
 async function launchBackground(ctx: Context): Promise<void> {
   const { partial } = ctx;
-  const started = await required(
-    ctx.run,
+  const started = await ctx.run(
     ["claude", "--bg", ...claudeArgs(partial.name, ctx.options.prompt)],
-    partial,
-    { cwd: ctx.path, env: detachedEnv(process.env) },
+    {
+      cwd: ctx.path,
+      env: detachedEnv(process.env),
+    },
   );
+  if (started.code !== 0) {
+    const message =
+      started.stderr.trim() === "" ? `claude --bg exited ${started.code}` : started.stderr;
+    throw new DispatchError(
+      JOBS_DENIED.test(message)
+        ? `claude --bg cannot write ~/.claude/jobs under the sandbox. Rerun dispatch outside the sandbox.\n${message}`
+        : message,
+      partial,
+    );
+  }
   partial.target = backgroundId(started.stdout);
+}
+
+// A background session has no screen until it prints, so its state comes from
+// `claude agents`. A sandboxed listing comes back empty, and the last attempt
+// falls back to the logs.
+async function pollBackground(ctx: Context, last: boolean): Promise<Status> {
+  const { run, partial } = ctx;
+  const listed = await run(["claude", "agents", "--json", "--all", "--cwd", ctx.path]);
+  const reported =
+    listed.code === 0 ? readBackgroundStatus(listed.stdout, partial.target, partial.name) : null;
+  if (reported != null && reported.status !== "unknown") {
+    if (reported.kind != null) partial.blockedKind = reported.kind;
+    if (reported.message != null) partial.blockedMessage = reported.message;
+    return reported.status;
+  }
+  if (!last) return "unknown";
+  return pollScreen(run, partial, ["claude", "logs", partial.target ?? partial.name]);
 }
 
 async function pollScreen(
@@ -831,8 +912,7 @@ async function awaitStatus(
 function localPoll(ctx: Context): (last: boolean) => Promise<Status> {
   const { run, partial } = ctx;
   if (partial.mux === "herdr") return () => pollHerdr(ctx, partial.name);
-  if (partial.mux === "bg")
-    return () => pollScreen(run, partial, ["claude", "logs", partial.target ?? partial.name]);
+  if (partial.mux === "bg") return (last) => pollBackground(ctx, last);
   return (last) => pollRex(run, partial, [], last);
 }
 

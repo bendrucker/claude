@@ -28,11 +28,14 @@ Pass the permissions the task needs with `--allow`, `--sandbox-write`, and `--se
 
 ## Pick the Multiplexer
 
-`--help` above names the multiplexer `--mux` defaults to. When it says to pass `--mux` instead, ask the user with `AskUserQuestion` and pass the answer as `--mux`. List the options in this order:
+Pick by how much the task needs the user along the way:
 
-1. `rex`: a Rex tab.
-2. `herdr`: a herdr workspace.
-3. `bg`: a `claude --bg` session with no terminal. Recommend it only for short, self-contained work, because a session with no tab is easy to lose track of. The ledger, `dispatches.jsonl` in the plugin data dir, records it so you can find it again.
+- `bg`, a `claude --bg` session with no terminal: a small, self-contained change with a clear completion criterion, few questions, and little for the user to read before the PR. Pass `--mux bg`.
+- A tab (`rex` or `herdr`): exploratory work, or work that needs decisions, reading, or review as it goes.
+
+`--help` above names the tab multiplexer `--mux` defaults to. When the task calls for a tab and `--help` says to pass `--mux` instead, ask the user with `AskUserQuestion` whether to use `rex` or `herdr`.
+
+The user finds a background session in `claude agents` and picks it up with `claude attach <target>`. This session follows it with `SendMessage` to `name`, and reads its output with `claude logs <target>`. The ledger, `dispatches.jsonl` in the plugin data dir, records every dispatch.
 
 ## Run It
 
@@ -59,9 +62,9 @@ On success the script prints one JSON line:
 - `settings`: the settings keys written.
 - `status`:
   - `working`: the session took the prompt.
-  - `blocked`: a dialog is showing, such as folder trust or a permission prompt. Under Rex, `blockedKind` (`permission`, `question`, or `auth`) and `blockedMessage` say what it asks when the session reported them. Otherwise read the screen (`rex capture -b <target> --trim`, `herdr agent read <name>`, or `claude logs <target>`). Tell the user what it asks. The user answers it.
-  - `failed`: under Rex, the session reported an error, or the remote launcher printed `dispatch failed:` and stopped. Read the screen (add `-S <host>` for a remote one) and report the error.
-  - `unknown`: the session showed neither before the timeout. Read the screen before reporting the hand-off.
+  - `blocked`: a dialog is showing, such as folder trust or a permission prompt. Under Rex and `bg`, `blockedKind` (`permission`, `question`, or `auth`) and `blockedMessage` say what it asks when the session reported them. Otherwise read the screen (`rex capture -b <target> --trim`, `herdr agent read <name>`, or `claude logs <target>`). Tell the user what it asks. The user answers it.
+  - `failed`: under Rex, the session reported an error, or the remote launcher printed `dispatch failed:` and stopped. Under `bg`, `claude agents` reports the session failed or stopped. Read the screen (add `-S <host>` for a remote one) and report the error.
+  - `unknown`: the session showed neither before the timeout. Read the screen before reporting the hand-off. Under `bg`, a sandboxed `claude agents --json` lists nothing, so the status comes from `claude logs` alone.
 - `submoduleError`, when present: submodules failed to initialize. The session can repair them.
 
 A failure exits 1 and prints the error. Once the worktree exists, it also prints the partial record. Unless `checkout` is `existing-worktree`, report `path` to the user as an orphaned checkout to clean up.

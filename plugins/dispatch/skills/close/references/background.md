@@ -1,6 +1,6 @@
 # Background Continuation
 
-You are a background copy of a session whose pane closed. Get its pull request merged without the user, and reach the user only when a decision needs their judgment. `close.ts` sits at `../scripts/close.ts` relative to this file.
+You are a session resumed in the background after its pane closed. Get its pull request merged without the user, and reach the user only when a decision needs their judgment. `close.ts` sits at `../scripts/close.ts` relative to this file.
 
 Your short id is the first eight characters of `sessionId` in `~/.claude/sessions/$PPID.json`. `claude attach` takes it.
 

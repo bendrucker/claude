@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // claude:dangerouslyDisableSandbox: appends the dispatch ledger under ~/.claude/plugins and reaches the claude daemon and multiplexer sockets
-import { resolve } from "node:path";
-import { Command, Option } from "@commander-js/extra-typings";
+import { join, resolve } from "node:path";
+import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
 import {
@@ -43,6 +43,39 @@ export interface Deps {
   wait: (ms: number) => Promise<void>;
   out: (line: string) => void;
   sender: () => Promise<Sender | null>;
+  spawnDetached: (argv: readonly string[], cwd: string, logPath: string) => Promise<number>;
+  alive: (pid: number) => boolean;
+  kill: (pid: number) => void;
+}
+
+// Claude Code kills its Bash tool's process tree on exit, so sh backgrounds the helper and exits, leaving it to launchd.
+async function spawnDetached(
+  argv: readonly string[],
+  cwd: string,
+  logPath: string,
+): Promise<number> {
+  const launcher = Bun.spawn(
+    ["sh", "-c", '"$@" >>"$0" 2>&1 </dev/null & echo $!', logPath, ...argv],
+    { cwd, detached: true, stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+  );
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(launcher.stdout).text(),
+    new Response(launcher.stderr).text(),
+    launcher.exited,
+  ]);
+  const pid = Number(stdout.trim());
+  if (code !== 0 || !Number.isInteger(pid) || pid <= 0)
+    throw new CloseError(`could not start the resume helper: ${trimmed(stderr) ?? stdout.trim()}`);
+  return pid;
+}
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error instanceof Error && "code" in error && error.code === "EPERM";
+  }
 }
 
 export function defaultDeps(): Deps {
@@ -58,6 +91,11 @@ export function defaultDeps(): Deps {
       console.log(line);
     },
     sender: () => readSender(env, spawnRunner),
+    spawnDetached,
+    alive,
+    kill: (pid) => {
+      process.kill(pid);
+    },
   };
 }
 
@@ -85,6 +123,8 @@ const HerdrWorkspace = z.object({
 
 const LIST_ATTEMPTS = 5;
 const LIST_INTERVAL_MS = 1000;
+const EXIT_ATTEMPTS = 120;
+const EXIT_INTERVAL_MS = 500;
 const FORK_ID = /^[A-Za-z0-9._-]+$/;
 const GROUP_CONFLICT = /confirmation_required|workspace_group_close_required/;
 const BACKGROUND_REFERENCE = resolve(import.meta.dirname, "..", "references", "background.md");
@@ -204,32 +244,93 @@ export function handoffPrompt(session: string, pr: string): string {
   return `You are the background continuation of session ${session}. Its pane has closed. Follow ${BACKGROUND_REFERENCE} for PR ${pr}.`;
 }
 
-export async function startFork(
+export function resumerLog(dataDir: string, session: string): string {
+  return join(dataDir, `close-resume-${session}.log`);
+}
+
+// Resuming after the foreground process exits keeps the session id. Resuming while it runs starts a copy.
+export async function startResumer(
   deps: Deps,
   session: string,
   pr: string,
   cwd: string,
-): Promise<string> {
+): Promise<number> {
+  const pid = deps.env.CLAUDE_PID;
+  if (!present(pid))
+    throw new CloseError(
+      "CLAUDE_PID is not set, so the handoff cannot wait for this session to exit",
+      2,
+    );
+  return deps.spawnDetached(
+    [process.execPath, import.meta.path, "resume", "--session", session, "--pr", pr, "--pid", pid],
+    cwd,
+    resumerLog(deps.dataDir, session),
+  );
+}
+
+export interface ResumeOptions {
+  session: string;
+  pr: string;
+  pid: number;
+}
+
+export async function resumeSession(options: ResumeOptions, deps: Deps): Promise<string> {
+  const { session, pr, pid } = options;
+  const failed = async (fork: string, problem: string): Promise<never> => {
+    const facts = await gitFacts(deps.run, deps.cwd);
+    appendDispatch(
+      {
+        event: "ended",
+        ts: deps.now().toISOString(),
+        session,
+        fork,
+        branch: facts.branch,
+        path: facts.toplevel,
+        head: facts.head,
+        dirty: facts.dirty,
+        ahead: facts.ahead,
+        pr,
+        mux: null,
+        target: null,
+        summary: `resume failed: ${problem}`,
+        outcome: "stopped",
+      },
+      deps.dataDir,
+    );
+    throw new CloseError(problem);
+  };
+
+  if (!(await awaitExit(deps, pid, EXIT_ATTEMPTS)))
+    return failed(session, `session process ${pid} was still running, so it was not resumed`);
   const started = await deps.run(
     ["claude", "--bg", "--resume", session, handoffPrompt(session, pr)],
     {
-      cwd,
+      cwd: deps.cwd,
       env: detachedEnv(deps.env),
     },
   );
   if (started.code !== 0)
-    throw new CloseError(`claude --bg failed: ${trimmed(started.stderr) ?? started.stdout.trim()}`);
+    return failed(
+      session,
+      `claude --bg failed: ${trimmed(started.stderr) ?? started.stdout.trim()}`,
+    );
   const fork = backgroundId(started.stdout);
   if (fork == null)
-    throw new CloseError(`claude --bg printed no background session id: ${started.stdout.trim()}`);
-  const problem = await awaitListing(deps, fork, cwd, LIST_ATTEMPTS);
-  if (problem === "") return fork;
-  const stopped = await deps.run(["claude", "stop", fork]);
-  if (stopped.code !== 0)
-    throw new CloseError(
-      `${problem}. claude stop ${fork} failed: ${stopped.stderr.trim()}. The fork may still be running, so stop it by hand.`,
+    return failed(
+      session,
+      `claude --bg printed no background session id: ${started.stdout.trim()}`,
     );
-  throw new CloseError(`${problem}. Stopped ${fork} and left the pane open.`);
+  const problem = await awaitListing(deps, fork, deps.cwd, LIST_ATTEMPTS);
+  if (problem !== "") return failed(fork, problem);
+  deps.out(started.stdout.trim());
+  return fork;
+}
+
+async function awaitExit(deps: Deps, pid: number, attempts: number): Promise<boolean> {
+  if (!deps.alive(pid)) return true;
+  if (attempts <= 1) return false;
+  await deps.wait(EXIT_INTERVAL_MS);
+  return awaitExit(deps, pid, attempts - 1);
 }
 
 async function awaitListing(
@@ -268,6 +369,7 @@ export interface CloseOptions {
 
 export interface CloseReport {
   fork: string | null;
+  resumer: number | null;
   pane: Pane;
   row: ClosedRow;
 }
@@ -283,9 +385,12 @@ export async function closePane(options: CloseOptions, deps: Deps): Promise<Clos
   const checkout = child == null ? deps.cwd : child.path;
   const facts = checkout == null ? NO_GIT : await gitFacts(deps.run, checkout);
 
-  let fork: string | null = null;
-  if (options.handoff === true && options.session != null && options.pr != null)
-    fork = await startFork(deps, options.session, options.pr, facts.toplevel ?? deps.cwd);
+  const handoff = options.handoff === true && options.session != null && options.pr != null;
+  const fork = handoff ? (options.session ?? null) : null;
+  const resumer =
+    handoff && options.session != null && options.pr != null
+      ? await startResumer(deps, options.session, options.pr, facts.toplevel ?? deps.cwd)
+      : null;
 
   const row: ClosedRow = {
     event: "closed",
@@ -302,26 +407,31 @@ export async function closePane(options: CloseOptions, deps: Deps): Promise<Clos
     target: pane.target,
     summary: options.summary ?? null,
   };
-  const report: CloseReport = { fork, pane, row };
+  const report: CloseReport = { fork, resumer, pane, row };
   try {
     appendDispatch(row, deps.dataDir);
     // Closing the caller's own pane kills this process. Report before it.
     deps.out(JSON.stringify(report));
     await closeTarget(pane, deps.run);
   } catch (error) {
-    await withdrawClose(row, error, deps);
+    withdrawClose(row, resumer, error, deps);
     throw error;
   }
   return report;
 }
 
-// When the pane is still open, its session still runs, so a live fork would watch the PR twice.
-async function withdrawClose(row: ClosedRow, error: unknown, deps: Deps): Promise<void> {
-  const reason = `close failed: ${error instanceof Error ? error.message : String(error)}`;
-  const stopped = row.fork == null ? null : await deps.run(["claude", "stop", row.fork]);
-  const stopError = stopped != null && stopped.code !== 0 ? stopped.stderr.trim() : null;
+// When the pane stays open, a waiting resumer would resume a copy once the user quits.
+function withdrawClose(row: ClosedRow, resumer: number | null, cause: unknown, deps: Deps): void {
+  const reason = `close failed: ${cause instanceof Error ? cause.message : String(cause)}`;
+  let killError: string | null = null;
+  if (resumer != null)
+    try {
+      deps.kill(resumer);
+    } catch (error) {
+      killError = error instanceof Error ? error.message : String(error);
+    }
   const summary =
-    stopError == null ? reason : `${reason}. claude stop ${row.fork} failed: ${stopError}`;
+    killError == null ? reason : `${reason}. Stopping resumer ${resumer} failed: ${killError}`;
   try {
     appendDispatch(
       { ...row, event: "ended", ts: deps.now().toISOString(), outcome: "stopped", summary },
@@ -330,8 +440,8 @@ async function withdrawClose(row: ClosedRow, error: unknown, deps: Deps): Promis
   } catch {
     // The ledger itself may be what failed, and the stop result still has to reach the caller.
   }
-  if (stopError != null)
-    throw new CloseError(`${summary}. The fork may still be running, so stop it by hand.`);
+  if (killError != null)
+    throw new CloseError(`${summary}. Kill process ${resumer} by hand before this session exits.`);
 }
 
 async function closeTarget(pane: Pane, run: Runner): Promise<void> {
@@ -517,6 +627,18 @@ export function createProgram(deps: Deps): Command {
       }),
     );
 
+  const resume = new Command("resume")
+    .description("Wait for a closed session's process to exit, then resume it in the background.")
+    .requiredOption("--session <id>", "session id to resume")
+    .requiredOption("--pr <url>", "pull request the background session watches")
+    .requiredOption("--pid <pid>", "process id of the session's foreground claude", (value) => {
+      const pid = Number(value);
+      if (!Number.isInteger(pid) || pid <= 0)
+        throw new InvalidArgumentError(`${value} is not a process id`);
+      return pid;
+    })
+    .action((options) => guarded(async () => void (await resumeSession(options, deps))));
+
   const report = new Command("report")
     .description("List the ledger's close rows.")
     .option("--left-behind", "only branches whose latest row has dirty or unpushed work")
@@ -533,6 +655,7 @@ export function createProgram(deps: Deps): Command {
     .addCommand(close)
     .addCommand(attach)
     .addCommand(ended)
+    .addCommand(resume)
     .addCommand(report);
 }
 

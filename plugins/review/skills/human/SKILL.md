@@ -5,8 +5,8 @@ description: >-
 argument-hint: "[--doc <file>] [--kind <kind>] [--browser] [--summary <text>]"
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/attention.ts:*)"
-  - Bash(rex run:*)
-  - Bash(tuicr review:*)
+  - Bash(rex do review_changes:*)
+  - Bash(rex do review_reply:*)
   - Bash(plannotator review:*)
   - Bash(plannotator annotate:*)
 ---
@@ -29,7 +29,7 @@ Put the change in front of Ben and act on what comes back until he approves. `at
 | `--browser`, diff | `plannotator review --git --json [--base <ref>]` | Blocks. The decision is the tool result |
 | `--browser`, `--doc <file>` | `plannotator annotate <file> --gate --json --require-approval` | Blocks. The decision is the tool result |
 
-Terminal surfaces open as a split beside this pane and deliver into it once it is idle, so the turn has to end before Send can land. They need the herdr pane above. When it reads `none` and the Rex block is set, a diff review runs the Rex gate below, and a document review takes `--browser`. With neither, run the gate as if `--browser` were passed. In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
+Terminal surfaces open as a split beside this pane and deliver into it once it is idle, so the turn has to end before Send can land. They need the herdr pane above. When it reads `none` and the Rex block is set, a diff review runs the Rex gate below and a document review takes `--browser`. The Rex gate opens tuicr as a layer over this pane and ends the turn the same way. With neither, run the gate as if `--browser` were passed. In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.
 
 ## Precondition
 
@@ -58,6 +58,7 @@ With `--browser`:
 
 ## Rex Gate
 
-1. Note the comment IDs from `tuicr review comments --session <path>` for each session `tuicr review list --repo "$PWD"` prints.
-2. With `run_in_background: true`, run `rex run --block "$REX_BLOCK" --split=right --focus=false --cwd "$PWD" --wait -- tuicr -w`, adding `-r <base>..HEAD` when the caller resolved a base. End the turn with one line saying quitting tuicr resumes the work.
-3. When it completes, read the comments again. Those with IDs absent from step 1 are the feedback: act on them and run the gate again. No new comments means approved.
+1. Run `rex do review_changes block="$REX_BLOCK"`, adding `revisions=<base>..HEAD` when the caller resolved a base.
+2. End the turn with one line saying the outcome arrives as the next turn.
+
+The outcome turn starts with its kind. On `[review: changes]`, follow the message's instructions and end the turn, and the review continues. `[review: approved]` and `[review: dismissed]` both end the review successfully.

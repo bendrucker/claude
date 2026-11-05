@@ -26,6 +26,7 @@ import {
   mergeSettings,
   type Mux,
   type Pause,
+  readBackgroundStatus,
   readProgramStatus,
   readSender,
   remoteCommand,
@@ -555,6 +556,63 @@ describe("readProgramStatus", () => {
   });
 });
 
+describe("readBackgroundStatus", () => {
+  const agents = (entry: Record<string, string>) =>
+    JSON.stringify([
+      { id: "other", name: "other", kind: "background", state: "working", status: "busy" },
+      { id: "a1b2c3", name: "fix-thing", kind: "background", ...entry },
+    ]);
+
+  test.each<{ name: string; stdout: string; expected: ReportedStatus | null }>([
+    {
+      name: "working",
+      stdout: agents({ state: "working", status: "busy" }),
+      expected: { status: "working" },
+    },
+    {
+      name: "done",
+      stdout: agents({ state: "done", status: "idle" }),
+      expected: { status: "working" },
+    },
+    { name: "failed", stdout: agents({ state: "failed" }), expected: { status: "failed" } },
+    { name: "stopped", stdout: agents({ state: "stopped" }), expected: { status: "failed" } },
+    {
+      name: "a permission prompt",
+      stdout: agents({ state: "blocked", status: "waiting", waitingFor: "permission prompt" }),
+      expected: { status: "blocked", kind: "permission", message: "permission prompt" },
+    },
+    {
+      name: "a sandbox request",
+      stdout: agents({ state: "blocked", status: "waiting", waitingFor: "sandbox request" }),
+      expected: { status: "blocked", kind: "permission", message: "sandbox request" },
+    },
+    {
+      name: "a question",
+      stdout: agents({ state: "blocked", status: "waiting", waitingFor: "input needed" }),
+      expected: { status: "blocked", kind: "question", message: "input needed" },
+    },
+    {
+      name: "an open dialog, which has no kind",
+      stdout: agents({ status: "waiting", waitingFor: "dialog open" }),
+      expected: { status: "blocked", message: "dialog open" },
+    },
+    {
+      name: "an idle entry with no state",
+      stdout: agents({ status: "idle" }),
+      expected: { status: "unknown" },
+    },
+    { name: "an empty listing, as under the sandbox", stdout: "[]", expected: null },
+    { name: "something that is not JSON", stdout: "error", expected: null },
+  ])("reads $name", ({ stdout, expected }) => {
+    expect(readBackgroundStatus(stdout, "a1b2c3", "fix-thing")).toEqual(expected);
+  });
+
+  test("matches by name when there is no id", () => {
+    const stdout = JSON.stringify([{ name: "fix-thing", state: "working" }]);
+    expect(readBackgroundStatus(stdout, null, "fix-thing")).toEqual({ status: "working" });
+  });
+});
+
 describe("mergeSettings", () => {
   test.each<{ name: string; base: Settings; patch: Settings; expected: Settings }>([
     {
@@ -797,20 +855,23 @@ describe("dispatch under rex", () => {
 describe("dispatch under bg", () => {
   const bgOptions = (overrides: Partial<DispatchOptions> = {}) =>
     makeOptions({ mux: "bg", rexSession: undefined, rexBlock: undefined, ...overrides });
+  const listing = (entry: Record<string, string>) =>
+    ok(JSON.stringify([{ id: "a1b2c3", name: "fix-thing", kind: "background", ...entry }]));
+  const AGENTS = ["claude", "agents", "--json", "--all", "--cwd", PATH];
 
   test("runs claude --bg in the worktree with this session's variables unset", async () => {
     const { run, calls, options } = fakeRunner([
       ...rexPath(),
       ok("a1b2c3\n"),
-      IDLE_SCREEN,
-      WORKING_SCREEN,
+      ok("[]"),
+      listing({ state: "working", status: "busy" }),
     ]);
     const { record } = await dispatch(bgOptions(), run, instant);
 
     expect(calls.slice(-3)).toEqual([
       ["claude", "--bg", "--name", "fix-thing", "--", "do the thing"],
-      ["claude", "logs", "a1b2c3"],
-      ["claude", "logs", "a1b2c3"],
+      AGENTS,
+      AGENTS,
     ]);
     expect(options.at(-3)).toEqual({ cwd: PATH, env: detachedEnv(process.env) });
     expect(formatRecord(record)).toMatchInlineSnapshot(
@@ -818,19 +879,39 @@ describe("dispatch under bg", () => {
     );
   });
 
+  test("records what a blocked session waits for", async () => {
+    const { run } = fakeRunner([
+      ...rexPath(),
+      ok("a1b2c3\n"),
+      listing({ state: "blocked", status: "waiting", waitingFor: "permission prompt" }),
+    ]);
+    const { record } = await dispatch(bgOptions(), run, instant);
+    expect(record).toMatchObject({
+      status: "blocked",
+      blockedKind: "permission",
+      blockedMessage: "permission prompt",
+    });
+  });
+
   test.each<{ name: string; logs: CommandResult; status: Status }>([
     { name: "a finished first turn", logs: FINISHED_SCREEN, status: "working" },
     { name: "a fresh session", logs: FRESH_SCREEN, status: "unknown" },
-  ])("reads $name from claude logs as $status", async ({ logs, status }) => {
-    const { run } = fakeRunner([...rexPath(), ok("a1b2c3\n"), logs, logs, logs]);
+  ])("falls back to $name in claude logs as $status", async ({ logs, status }) => {
+    const empty = ok("[]");
+    const { run, calls } = fakeRunner([...rexPath(), ok("a1b2c3\n"), empty, empty, empty, logs]);
     const { record } = await dispatch(bgOptions(), run, instant);
     expect(record.status).toBe(status);
+    expect(calls.at(-1)).toEqual(["claude", "logs", "a1b2c3"]);
   });
 
   test("reads logs by name when the id cannot be parsed", async () => {
+    const failed = fail("error");
     const { run, calls } = fakeRunner([
       ...rexPath(),
       ok("Started.\nMore prose.\n"),
+      failed,
+      failed,
+      failed,
       WORKING_SCREEN,
     ]);
     const { record } = await dispatch(bgOptions(), run, instant);
@@ -843,6 +924,15 @@ describe("dispatch under bg", () => {
     const failure = await failureOf(dispatch(bgOptions(), run, instant));
     expect(failure.message).toBe("claude: not logged in\n");
     expect(failure.partial).toMatchObject({ mux: "bg", path: PATH, target: null });
+  });
+
+  test("names the sandbox when it denies the jobs directory", async () => {
+    const denied = "Error: EPERM: operation not permitted, mkdir '/Users/me/.claude/jobs/a1b2c3'\n";
+    const { run } = fakeRunner([...rexPath(), fail(denied)]);
+    const failure = await failureOf(dispatch(bgOptions(), run, instant));
+    expect(failure.message).toBe(
+      `claude --bg cannot write ~/.claude/jobs under the sandbox. Rerun dispatch outside the sandbox.\n${denied}`,
+    );
   });
 });
 

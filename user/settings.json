@@ -301,6 +301,7 @@
         "~/Library/Application Support/rex/server.sock",
         "~/.local/state/vm",
         "~/.docker/run/docker.sock",
+        "~/.agent-browser",
         "/tmp/claude"
       ]
     },

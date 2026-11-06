@@ -24,6 +24,8 @@ agent-browser skills list              # everything on the installed version
 Each `--session` runs its own Chrome until it is closed or its idle timeout passes.
 
 - Use one session per agent, named for the agent rather than the item, and reuse it across items by navigating it.
+- Start each session with a bare `agent-browser --session <name> open <url>`, with nothing chained or piped. Later calls may chain and pipe.
+- When a launch fails with `bootstrap_check_in ... Permission denied`, run `agent-browser --session <name> close`, then the bare `open` again.
 - Run `agent-browser --session <name> close` once your last item is done.
 - A brief for browser-driving subagents names one session per subagent, and at most two such subagents run at a time.
 

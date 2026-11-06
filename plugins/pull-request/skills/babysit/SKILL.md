@@ -17,6 +17,7 @@ allowed-tools:
   - Skill(gitlab:ci-monitor)
   - Skill(gitlab:merge-request)
   - Skill(git:conflicts)
+  - Skill(dispatch:close)
   - mcp__github
 ---
 
@@ -33,6 +34,8 @@ Drive a PR to green CI, or to merged with `--merge`, by reacting to a provider w
 
 ## Workflow
 
+In a Rex or herdr pane, ask the close question from `dispatch:close` first, unless this session already has an answer. On yes, close with `dispatch:close` instead of watching here. The background copy it starts runs babysit.
+
 Start the watcher with `github:actions-monitor` for a `github.com` remote, or `gitlab:ci-monitor` for a `gitlab.com` remote. It runs under `Monitor` and emits JSON events, already deduped by `(sha, state)`. Read event fields from that JSON directly, without piping CLI output to an inline interpreter.
 
 Arguments (`$ARGUMENTS`), both flags off by default:
@@ -45,7 +48,7 @@ On GitHub, a PR with auto-merge already enabled (`gh pr view <pr> --json autoMer
 
 ## Bounds
 
-Every wait runs through a watcher, including the post-submit merge wait. The watcher enforces the poll interval and wall clock (`--max-minutes`, default 60). Pass through a user-supplied `--max-minutes`. After `max-time-reached`, report and stop without starting a new watcher. When babysit runs in `/loop`, the loop handles repetition.
+Every wait runs through a watcher, including the post-submit merge wait. The watcher enforces the poll interval and wall clock (`--max-minutes`, default 60). Pass through a user-supplied `--max-minutes`. After `max-time-reached`, report and stop without starting a new watcher. When babysit runs in `/loop`, the loop handles repetition. A background copy started by `dispatch:close` starts a new watcher after `max-time-reached`, until the PR merges or closes.
 
 The watcher ends with the session. Resume by invoking babysit from a new session.
 

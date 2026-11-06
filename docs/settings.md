@@ -192,6 +192,8 @@ Rex's `SessionStart` entry is absent from the tracked file. `rex skill setup` ad
 
 `prependPlugins` is empty in `managed/settings.json`. On a machine with managed settings, Claude Code seats its built-in `sec-default@builtin` outermost unless this list is set. Seated there, it skips user-tier plugin hooks like `plan` and `plannotator`, and these self-authored managed settings don't need its guard. An empty list counts as set, so it leaves sec-default unseated (verified against CLI 2.1.304). **List a plugin** here when a managed plugin should run outermost.
 
+`enabledPlugins` in `managed/settings.json` runs the mods sec-default would still skip mid-session (`plan`, `herdr`, `load`, and their `mod-events` dependency) in the managed tier, which the local `directory` marketplace makes possible. **Drop the list** if the debug log still shows `tier user` for them.
+
 `pluginConfigs` sets `load@bendrucker` for these Macs, where an agent's heavy work slows everything else on the machine. Cloud sessions never read this file, so there the mod stays inert and can saturate the VM. The caps are generous backstops: 4 builds and test runs, and 4 DuckDB processes, after 20 concurrent DuckDB processes forced a hard reset. Reminders start at 1.5x load per core (`remind`), turn firm at 3x (`warn`), and capped commands are refused above 4x (`refuse`). **Tighten a cap** when `cap.start` events show its pool full during a slowdown. **Raise `remind`** if `pace` events fire on a machine that still feels responsive.
 
 ## Sandbox Findings

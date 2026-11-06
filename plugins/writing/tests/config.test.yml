@@ -48,6 +48,25 @@
       --accent: #6c9cf0; --accent-fg: #0d1117; --chip: #232934; --good: #4cc27f; color-scheme: dark; }
     </style>
   absent: [Writing.CommentSplice, Writing.SemicolonSplice, ai-tells.SemicolonUsage]
+- name: an SVG style block and style attribute are not prose
+  format: .svg
+  input: |
+    <svg xmlns="http://www.w3.org/2000/svg">
+    <style>.cap { font-size: 12px; letter-spacing: 1.2px; font-weight: 600; }</style>
+    <text class="cap" style="fill: red; font-size: 9px;">Cold start; warm later.</text>
+    </svg>
+  absent: [ai-tells.SemicolonUsage]
+- name: CSS declarations are not prose
+  format: .css
+  input: |
+    .cap { font-size: 12px; letter-spacing: 1.2px; font-weight: 600; }
+  absent: [ai-tells.SemicolonUsage]
+- name: a CSS comment is prose
+  format: .css
+  input: |
+    /* The cache starts cold; the first request fills it. */
+    .cap { font-size: 12px; }
+  contains: [Writing.CommentSplice, ai-tells.SemicolonUsage]
 
 - name: a trope in a code comment fires
   format: .ts

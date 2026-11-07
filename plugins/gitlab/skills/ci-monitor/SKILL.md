@@ -38,9 +38,9 @@ Run the watcher with the `Monitor` tool and `persistent: true`:
 bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --mr <url> | --branch <name> | --pipeline-id <id> [--project <group/project>]
 ```
 
-Optional flags: `--interval <seconds>`, `--max-minutes <N>`, `--queued-timeout <minutes>`, `--api-error-threshold <N>`.
+Optional flags: `--max-minutes <N>`, `--queued-timeout <minutes>`, `--api-error-threshold <N>`.
 
-The watcher ignores `external` and `parent_pipeline` pipelines. A `success` is confirmed against the pipeline's jobs, so a pipeline reporting success with a failed required job reports `failing`. A pipeline whose jobs cannot be read keeps polling and surfaces as `api-error` if it persists.
+The watcher polls every 30 seconds through `glab ci get`. In MR mode, a pipeline built on an older commit than the MR head counts as `running`, so a push does not report the previous run's result. A `success` is confirmed against the pipeline's jobs, so a pipeline reporting success with a failed required job reports `failing`. A 401, 403, or 404 from `glab` ends the watch with a `fatal` event and exit code 1.
 
 ## Events
 
@@ -49,23 +49,24 @@ The script prints one JSON object per line. `run_id` is the GitLab pipeline ID.
 | Event | Meaning | Watcher exits | Action |
 | --- | --- | --- | --- |
 | `{"type":"status","state":"running"}` | Pipeline in progress | no | Keep watching |
-| `{"type":"status","state":"failing"}` | A job failed | pipeline-id mode only | Dispatch `gitlab:logs` (below) and report its summary |
+| `{"type":"status","state":"failing"}` | A job failed | no | Dispatch `gitlab:logs` (below) and report its summary. A retried job reports `running` next |
 | `{"type":"status","state":"success"}` | Green, job-confirmed | yes | Report green |
 | `{"type":"conflicts","sha":"..."}` | MR conflicts with target | no | Report the SHA and stop the monitor |
 | `{"type":"mergeable-unknown","sha":"..."}` | Merge status unsettled | no | Report the SHA |
 | `{"type":"queued-timeout","minutes":N}` | Queued past threshold | no | Report once |
-| `{"type":"api-error","consecutive":N}` | `glab` failures crossed threshold | no | Report once; stop the monitor if it repeats |
-| `{"type":"rate-limited","retry_after":"..."}` | `glab` rate limit | no | Report once; stop the monitor if it repeats |
+| `{"type":"api-error","consecutive":N}` | `glab` failures reached the threshold | no | Report once |
+| `{"type":"blocked","sha":"...","run_id":"..."}` | Pipeline waits on a manual job | no | Report once, naming the run |
+| `{"type":"fatal","message":"..."}` | `glab` returned 401, 403, or 404 | yes | Report the message |
 | `{"type":"merged"}` | MR merged | yes | Report |
 | `{"type":"pr-closed"}` | MR closed unmerged or source branch deleted | yes | Report |
 | `{"type":"max-time-reached","minutes":N}` | Wall-clock cap | yes | Report |
 
 `conflicts`, `mergeable-unknown`, `merged`, and `pr-closed` occur in MR mode only.
 
-On `failing`, pass `run_id` to the logs agent:
+On `failing`, pass `run_id` and the project path (from `--project` or the MR URL) to the logs agent:
 
 ```
-Agent(subagent_type="gitlab:logs", prompt="Fetch failing-job logs for pipeline <run_id>. Return the JSON summary described in the logs agent definition.")
+Agent(subagent_type="gitlab:logs", prompt="Fetch failing-job logs for pipeline <run_id> in project <group/project>. Return the JSON summary described in the logs agent definition.")
 ```
 
 Report the diagnosis and leave fixes, conflict resolution, and merge checks to the caller (`pull-request:babysit` owns fixes). Stop a running watcher with `TaskStop`.

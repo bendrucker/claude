@@ -1,18 +1,6 @@
 {
-  "description": "Transforms GitHub URLs into API requests for better content fetching, reports a dispatched run's place in line for a self-hosted runner, and watches the current branch's pull request, showing its CI and review state at the end of the prompt footer (function hooks)",
+  "description": "Reports a dispatched run's place in line for a self-hosted runner, and watches the current branch's pull request, showing its CI and review state at the end of the prompt footer (function hooks)",
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "WebFetch",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/fetch.ts\"",
-            "if": "WebFetch(domain:github.com)"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Bash",

@@ -287,6 +287,19 @@ describe("register", () => {
     expect(await w.shown($)).toBe("author  │ \u{f49e}");
   });
 
+  test("the same PR number in another repository is a new PR with its own baseline", async ($, on) => {
+    const world: World = { branch: "topic", gh: GH_OK, view: pr("") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    world.view = { ...pr("FAILURE"), url: "https://github.com/o/other/pull/7" };
+    await w.clock.advance(POLL_MS.pending);
+
+    expect(w.named("pr.tracked").length).toBe(2);
+    expect(w.submits).toEqual([]);
+  });
+
   test("every new review wakes the model with its state", async ($, on) => {
     const world: World = { branch: "topic", gh: GH_OK, view: pr("SUCCESS") };
     const w = worldOf(on, world);

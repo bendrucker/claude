@@ -2,6 +2,19 @@ import { describe, expect, it, test } from "bun:test";
 import { join } from "node:path";
 import { type HookInput, processInput } from "./auth";
 
+function mockFailure(command: string, error: string): HookInput {
+  return {
+    session_id: "test",
+    hook_event_name: "PostToolUseFailure",
+    tool_name: "Bash",
+    tool_input: { command },
+    error,
+    transcript_path: "/tmp/transcript.json",
+    cwd: process.cwd(),
+    tool_use_id: "test",
+  };
+}
+
 function mockInput(command: string, toolResponse: unknown = {}): HookInput {
   return {
     session_id: "test",
@@ -31,6 +44,48 @@ describe("glab auth hook", () => {
   it("ignores glab commands without auth errors", () => {
     const input = mockInput("glab mr list", { stdout: "No merge requests" });
     expect(processInput(input)).toBeNull();
+  });
+
+  test.each<{ name: string; stderr: string }>([
+    {
+      name: "no token",
+      stderr: "OAuth2 is configured for gitlab.com but no access or refresh token was found",
+    },
+    { name: "401", stderr: "GET https://gitlab.com/api/v4/user: 401 {message: 401 Unauthorized}" },
+  ])("recognizes $name wording", ({ stderr }) => {
+    const output = processInput(mockInput("glab api user", { stdout: "", stderr }));
+    expect(output?.hookSpecificOutput).toMatchObject({ hookEventName: "PostToolUse" });
+  });
+
+  it("reads the error of a failed call", () => {
+    const output = processInput(
+      mockFailure("glab mr view 1", "Exit code 1\n401 Unauthorized"),
+    )?.hookSpecificOutput;
+    if (output?.hookEventName !== "PostToolUseFailure") {
+      throw new Error(`expected PostToolUseFailure output, got ${JSON.stringify(output)}`);
+    }
+    expect(output.additionalContext).toContain("glab auth login");
+  });
+
+  it("leaves 403 alone", () => {
+    expect(processInput(mockFailure("glab mr view 1", "403 Forbidden"))).toBeNull();
+  });
+
+  it("prefers stderr over a stdout that only prints the wording", () => {
+    const input = mockInput("glab ci trace 5", {
+      stdout: "job log: 401 Unauthorized from the registry",
+      stderr: "warning: slow",
+    });
+    expect(processInput(input)).toBeNull();
+  });
+
+  test.each<{ name: string; command: string }>([
+    { name: "a command that only names glab", command: "grep invalid_grant glab-notes.txt" },
+    { name: "a heredoc that mentions glab", command: "cat <<'EOF'\nglab auth\nEOF" },
+    { name: "a query over glab output", command: "duckdb -c \"select 'glab invalid_grant'\"" },
+  ])("ignores $name", ({ command }) => {
+    expect(processInput(mockFailure(command, 'oauth2: "invalid_grant"'))).toBeNull();
+    expect(processInput(mockInput(command, { stderr: "invalid_grant" }))).toBeNull();
   });
 
   it("ignores non-glab commands", () => {

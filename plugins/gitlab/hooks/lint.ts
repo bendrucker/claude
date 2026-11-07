@@ -1,16 +1,19 @@
 #!/usr/bin/env bun
 
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
-import { BashHookInput, readHookInput } from "./hook-input";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import {
+  type Command,
+  commandsOf,
+  hasFlag,
+  isDescendant,
+  isProgram,
+  parseCommands,
+  positionals,
+} from "./command-segments";
+import { bashCommand, isPreToolUse, readHookInput } from "./hook-input";
 
-export const HookInput = BashHookInput.extend({
-  hook_event_name: z.literal("PreToolUse"),
-  session_id: z.string(),
-  cwd: z.string(),
-});
-export type HookInput = z.infer<typeof HookInput>;
+export type HookInput = PreToolUseHookInput;
 
 // The <session_id> "loaded" marker is written by the bang-execution line in
 // skills/merge-request/SKILL.md. Keep the path in sync with that command.
@@ -60,36 +63,41 @@ function context(text: string): SyncHookJSONOutput {
   };
 }
 
-// Blank out quoted spans so flag checks never match text inside argument
-// values (note bodies, field values), only real flags.
-export function stripQuoted(command: string): string {
-  return command.replaceAll(/'[^']*'/g, " ").replaceAll(/"[^"]*"/g, " ");
+function glabCommands(commands: Command[]): Command[] {
+  return commandsOf(commands, "glab");
 }
 
-// Segments approximate one process invocation each, so a `grep -q` elsewhere
-// in a pipeline never trips the glab flag checks.
-function segments(command: string): string[] {
-  return command.split(/\|\|?|&&|;|\n/);
+function heredocText(command: Command, commands: Command[]): string[] {
+  const holders = [command, ...commands.filter((other) => isDescendant(other, command))];
+  return holders.flatMap((holder) => holder.heredocs.map((heredoc) => heredoc.body));
 }
 
-export function lintGlab(command: string): string | null {
-  for (const segment of segments(stripQuoted(command))) {
-    if (!/\bglab\s/.test(segment)) continue;
-    if (/\bglab\s+api\b/.test(segment) && /\s(--jq\b|-q(\s|$))/.test(segment)) {
-      return "glab api has no --jq/-q output filter (that's gh api). Pipe to jq instead: glab api <endpoint> | jq '<filter>'";
+function usesEscapedDollar(command: Command, commands: Command[]): boolean {
+  const inlineQuery = command.args.some(
+    ({ text, quote }) =>
+      text.startsWith("query=") &&
+      text.includes(String.raw`\$`) &&
+      (quote === "single" || quote === "mixed"),
+  );
+  if (inlineQuery) return true;
+  const holders = [command, ...commands.filter((other) => isDescendant(other, command))];
+  return holders.some((holder) =>
+    holder.heredocs.some((heredoc) => heredoc.quoted && heredoc.body.includes(String.raw`\$`)),
+  );
+}
+
+export function lintGlab(commands: Command[]): string | null {
+  for (const command of glabCommands(commands)) {
+    const [area, sub] = positionals(command);
+    if (area === "api" && hasFlag(command, "--jq", "-q")) {
+      return "glab api has no --jq/-q (glab mr view, ci get, etc. accept --jq, api does not). Pipe instead: glab api <endpoint> | jq '<filter>'";
     }
-    if (/\s--json\b/.test(segment)) {
+    if (hasFlag(command, "--json")) {
       return "glab has no --json flag (that's gh). Use --output json.";
     }
-  }
 
-  // GraphQL checks scan raw text (queries live inside quotes), scoped to the
-  // segment invoking `glab api graphql` so text in sibling commands (note
-  // bodies) never matches. Newlines don't split here: heredoc queries span
-  // lines within one invocation.
-  for (const segment of command.split(/\|\|?|&&|;/)) {
-    if (!/\bglab\s+api\s+graphql\b/.test(segment)) continue;
-    if (/query=["']?[^;&|]*\\\$/.test(segment)) {
+    if (area !== "api" || sub !== "graphql") continue;
+    if (usesEscapedDollar(command, commands)) {
       return [
         String.raw`Escaped dollars (\$) corrupt GraphQL variable declarations. Pass the query via a quoted heredoc so $ needs no escaping:`,
         `glab api graphql -f query="$(cat <<'GQL'`,
@@ -98,41 +106,74 @@ export function lintGlab(command: string): string | null {
         ')" -f projectPath=<group/project> -f iid=<iid>',
       ].join("\n");
     }
-    if (segment.includes("mergeRequestSetAutoMerge")) {
+    const text = [...command.args.map((arg) => arg.text), ...heredocText(command, commands)].join(
+      "\n",
+    );
+    if (text.includes("mergeRequestSetAutoMerge")) {
       return "mergeRequestSetAutoMerge does not exist in GitLab's GraphQL schema. Auto-merge is REST-only: use the gitlab:merge-request skill's merge.ts (handles merge trains) or glab mr merge --auto-merge.";
     }
-    if (segment.includes("mergeRequestRequestReview")) {
+    if (text.includes("mergeRequestRequestReview")) {
       return "mergeRequestRequestReview does not exist in GitLab's GraphQL schema. To re-request a review use mergeRequestReviewerRereview; to request changes use mergeRequestRequestChanges. See the gitlab:merge-request skill.";
     }
   }
-
   return null;
 }
 
 // gh api, curl, and Claude Code's own @-mentions read `@<path>` as a file. glab
 // sends it literally, so a note posts as the bare path. Only `glab api -F`
 // reads the file.
-const FILE_PATH = String.raw`@((?:[~/.]|\$)[^\s"']*|[^\s"']+\.(?:md|markdown|txt))`;
-const FLAG_FILE = new RegExp(
-  String.raw`(?:^|\s)(?:-\w|--[a-z][\w-]*)(?:=|\s+)(["']?)${FILE_PATH}\1(?=\s|$)`,
-);
-const RAW_FIELD_FILE = new RegExp(
-  String.raw`(?:^|\s)(?:-f|--raw-field)(?:=|\s+)(["']?)([\w.[\]]+)=${FILE_PATH}\1(?=\s|$)`,
-);
+const FILE_PATH = String.raw`@((?:[~/.]|\$)\S*|\S+\.(?:md|markdown|txt))`;
+const FILE_VALUE = new RegExp(`^${FILE_PATH}$`);
+const RAW_FIELD_VALUE = new RegExp(String.raw`^([\w.[\]]+)=${FILE_PATH}$`);
+const FLAG_WITH_VALUE = /^(-\w|--[a-z][\w-]*)=([^]*)$/;
+const FLAG_ONLY = /^(?:-\w|--[a-z][\w-]*)$/;
 
-export function lintFileReference(command: string): string | null {
-  for (const segment of segments(command)) {
-    if (!/\bglab\s/.test(segment)) continue;
-    if (/\bglab\s+api\b/.test(segment)) {
-      const raw = segment.match(RAW_FIELD_FILE);
-      if (raw) {
-        return `glab api -f sends "@${raw[3]}" as the literal value of ${raw[2]}. Use -F ${raw[2]}=@${raw[3]}, which reads the file.`;
-      }
-      continue;
+interface FlagValue {
+  flag: string;
+  value: string;
+}
+
+function flagValues(command: Command): FlagValue[] {
+  const result: FlagValue[] = [];
+  const words = command.args.map((arg) => arg.text);
+  for (const [index, word] of words.entries()) {
+    const joined = word.match(FLAG_WITH_VALUE);
+    const next = words[index + 1];
+    if (joined?.[1] !== undefined && joined[2] !== undefined) {
+      result.push({ flag: joined[1], value: joined[2] });
+    } else if (FLAG_ONLY.test(word) && next !== undefined) {
+      result.push({ flag: word, value: next });
     }
-    const path = segment.match(FLAG_FILE)?.at(2);
-    if (path != null) {
-      return `glab does not read @<file> arguments: this would post the literal text "@${path}". Pass the contents instead, e.g. -m "$(cat ${path})".`;
+  }
+  return result;
+}
+
+function fileReferenceReason(command: Command, path: string): string {
+  const [area, sub] = positionals(command);
+  const literal = `glab does not read @<file> arguments: this would post the literal text "@${path}".`;
+  if ((area === "mr" || area === "issue") && sub === "note") {
+    const form = area === "mr" ? "glab mr note create <iid>" : "glab issue note <iid>";
+    return `${literal} Send the file on stdin: ${form} < ${path}`;
+  }
+  if ((area === "mr" || area === "issue") && (sub === "create" || sub === "update")) {
+    return `${literal} Use --description-file ${path} (or - for stdin).`;
+  }
+  return `${literal} Pass the contents instead, e.g. "$(cat ${path})".`;
+}
+
+export function lintFileReference(commands: Command[]): string | null {
+  for (const command of glabCommands(commands)) {
+    const [area] = positionals(command);
+    for (const { flag, value } of flagValues(command)) {
+      if (area === "api") {
+        const raw = flag === "-f" || flag === "--raw-field" ? value.match(RAW_FIELD_VALUE) : null;
+        if (raw) {
+          return `glab api -f sends "@${raw[2]}" as the literal value of ${raw[1]}. Use -F ${raw[1]}=@${raw[2]}, which reads the file.`;
+        }
+        continue;
+      }
+      const path = value.match(FILE_VALUE)?.at(1);
+      if (path != null) return fileReferenceReason(command, path);
     }
   }
   return null;
@@ -202,10 +243,29 @@ export async function originHost(cwd: string, env: LintEnv): Promise<string | nu
   return remoteHost(url.trim());
 }
 
-export async function lintGh(command: string, cwd: string, env: LintEnv): Promise<string | null> {
-  const targetsOrigin = segments(stripQuoted(command)).some(
-    (segment) => /(^|\s)gh\s+(pr|issue)\b/.test(segment) && !/\s(-R|--repo)\b/.test(segment),
-  );
+export async function lintGh(
+  commands: Command[],
+  cwd: string,
+  env: LintEnv,
+): Promise<string | null> {
+  const redirected = (index: number): boolean =>
+    commands
+      .slice(0, index)
+      .some(
+        (earlier) =>
+          earlier.program === "cd" ||
+          earlier.program === "pushd" ||
+          (isProgram(earlier, "git") && hasFlag(earlier, "-C")),
+      );
+  const targetsOrigin = commands.some((command, index) => {
+    if (!isProgram(command, "gh")) return false;
+    const [area] = positionals(command);
+    if (area !== "pr" && area !== "issue") return false;
+    if (hasFlag(command, "-R", "--repo")) return false;
+    if (command.assignments.some((assignment) => assignment.startsWith("GH_REPO="))) return false;
+    if (command.args.some(({ text }) => text.includes("github.com"))) return false;
+    return !redirected(index);
+  });
   if (!targetsOrigin) return null;
 
   const host = await originHost(cwd, env);
@@ -215,22 +275,94 @@ export async function lintGh(command: string, cwd: string, env: LintEnv): Promis
   return null;
 }
 
-const TRANSACTIONAL = [/\bglab\s+mr\s+(create|merge|update|note)\b/, /merge_trains/, /draft_notes/];
+const READ_ONLY_NOTE = new Set(["list"]);
+
+function isTransactional(command: Command): boolean {
+  if (!isProgram(command, "glab")) return false;
+  if (hasFlag(command, "--help", "-h")) return false;
+  const [area, sub, third] = positionals(command);
+  if (area === "mr") {
+    if (sub === "create" || sub === "merge" || sub === "update") return true;
+    if (sub === "note") return !READ_ONLY_NOTE.has(third ?? "");
+    return false;
+  }
+  if (area === "api") {
+    return command.args.some(
+      ({ text }) => text.includes("merge_trains") || text.includes("draft_notes"),
+    );
+  }
+  return false;
+}
+
+async function nudgeOnce(
+  marker: string,
+  sessionId: string,
+  text: string,
+  env: LintEnv,
+  skipWhenLoaded: boolean,
+): Promise<SyncHookJSONOutput | null> {
+  const loaded = join(MARKER_DIR, sessionId);
+  const nudged = join(MARKER_DIR, `${sessionId}.${marker}`);
+  if (skipWhenLoaded && (await env.fileExists(loaded))) return null;
+  if (await env.fileExists(nudged)) return null;
+  await env.touch(nudged);
+  return context(text);
+}
 
 export async function nudgeSkill(
-  command: string,
+  commands: Command[],
   sessionId: string,
   env: LintEnv,
 ): Promise<SyncHookJSONOutput | null> {
-  if (!TRANSACTIONAL.some((pattern) => pattern.test(command))) return null;
-
-  const loaded = join(MARKER_DIR, sessionId);
-  const nudged = join(MARKER_DIR, `${sessionId}.nudged`);
-  if ((await env.fileExists(loaded)) || (await env.fileExists(nudged))) return null;
-
-  await env.touch(nudged);
-  return context(
+  if (!commands.some(isTransactional)) return null;
+  return nudgeOnce(
+    "nudged",
+    sessionId,
     "This command transacts on a merge request but the gitlab:merge-request skill is not loaded. Load it first: it owns merge trains, auto-merge re-arming, draft notes, discussions, and reviewer/username resolution, and its scripts avoid known glab API pitfalls.",
+    env,
+    true,
+  );
+}
+
+function queriesPipelineState(command: Command): boolean {
+  if (!isProgram(command, "glab")) return false;
+  const [area, sub] = positionals(command);
+  if (area === "ci") return sub === "status" || sub === "get" || sub === "list";
+  if (area === "mr") return sub === "view";
+  if (area === "api") {
+    return command.args.some(
+      ({ text }) =>
+        /\/pipelines(?:\/|\?|$)/.test(text) || /\/merge_requests\/\d+(?:\?|$)/.test(text),
+    );
+  }
+  return false;
+}
+
+function pollsInLoop(commands: Command[]): boolean {
+  if (commands.some((command) => command.program === "sleep")) return true;
+  if (commands.some((command) => command.keywords.some((k) => k === "until" || k === "while"))) {
+    return true;
+  }
+  return commands.some(
+    (command) =>
+      command.program === "for" &&
+      (commands.some((other) => other.program === "seq" && isDescendant(other, command)) ||
+        command.args.some(({ text }) => /\{\d+\.\.\d+\}/.test(text))),
+  );
+}
+
+export async function nudgePolling(
+  commands: Command[],
+  sessionId: string,
+  env: LintEnv,
+): Promise<SyncHookJSONOutput | null> {
+  if (!commands.some(queriesPipelineState) || !pollsInLoop(commands)) return null;
+  return nudgeOnce(
+    "polling",
+    sessionId,
+    `Polling GitLab CI in a shell loop. Run the watcher under the Monitor tool with persistent: true instead: bun \${CLAUDE_PLUGIN_ROOT}/skills/ci-monitor/scripts/watch.ts with --mr <iid> (also reports merged, conflicts, mergeable-unknown), --branch <name>, or --pipeline-id <id>. It emits one event per state change, so the session is not blocked on sleep.`,
+    env,
+    false,
   );
 }
 
@@ -238,28 +370,34 @@ export async function processInput(
   input: HookInput,
   env: LintEnv = defaultEnv,
 ): Promise<SyncHookJSONOutput | null> {
-  const command = input.tool_input.command;
-  if (command == null || command === "") return null;
+  const command = bashCommand(input.tool_input);
+  if (command == null) return null;
+  if (!command.includes("glab") && !/(^|\s)gh\s/.test(command)) return null;
+
+  const commands = parseCommands(command);
 
   if (command.includes("glab")) {
-    const violation = lintGlab(command) ?? lintFileReference(command);
+    const violation = lintGlab(commands) ?? lintFileReference(commands);
     if (violation != null && violation !== "") return deny(violation);
   }
 
-  if (/(^|\s)gh\s/.test(command)) {
-    const violation = await lintGh(command, input.cwd, env);
+  if (commands.some((parsed) => isProgram(parsed, "gh"))) {
+    const violation = await lintGh(commands, input.cwd, env);
     if (violation != null && violation !== "") return deny(violation);
   }
 
   if (command.includes("glab")) {
-    return nudgeSkill(command, input.session_id, env);
+    return (
+      (await nudgeSkill(commands, input.session_id, env)) ??
+      (await nudgePolling(commands, input.session_id, env))
+    );
   }
 
   return null;
 }
 
 async function main(): Promise<void> {
-  const input = await readHookInput(HookInput, "lint");
+  const input = await readHookInput(isPreToolUse, "lint");
   if (input == null) return;
 
   const output = await processInput(input);

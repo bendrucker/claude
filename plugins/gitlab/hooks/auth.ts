@@ -1,33 +1,49 @@
 #!/usr/bin/env bun
 
-import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
-import { BashHookInput, readHookInput } from "./hook-input";
+import type {
+  PostToolUseFailureHookInput,
+  PostToolUseHookInput,
+  SyncHookJSONOutput,
+} from "@anthropic-ai/claude-agent-sdk";
+import { commandsOf, parseCommands } from "./command-segments";
+import { bashCommand, isPostToolUse, isRecord, readHookInput } from "./hook-input";
 
-export const HookInput = BashHookInput.extend({
-  hook_event_name: z.literal("PostToolUse"),
-  tool_response: z.unknown(),
-});
-export type HookInput = z.infer<typeof HookInput>;
+export type HookInput = PostToolUseHookInput | PostToolUseFailureHookInput;
+
+const AUTH_FAILURES = [/invalid_grant/, /no access or refresh token/i, /\b401 Unauthorized\b/];
+
+// A failed call carries its output in `error`. A successful one carries stderr
+// and stdout in `tool_response`, and stderr alone when it has any, so a log that
+// merely prints an auth error on stdout is not mistaken for glab's own failure.
+function outputText(input: HookInput): string {
+  if ("error" in input && typeof input.error === "string") return input.error;
+  if (!("tool_response" in input)) return "";
+  const response = input.tool_response;
+  if (isRecord(response) && typeof response.stderr === "string" && response.stderr !== "") {
+    return response.stderr;
+  }
+  return JSON.stringify(response ?? "");
+}
 
 export function processInput(input: HookInput): SyncHookJSONOutput | null {
-  const command = input.tool_input.command;
-  if (command == null || command === "" || !command.includes("glab")) return null;
+  const command = bashCommand(input.tool_input);
+  if (command == null || !command.includes("glab")) return null;
+  if (commandsOf(parseCommands(command), "glab").length === 0) return null;
 
-  const response = JSON.stringify(input.tool_response ?? "");
-  if (!response.includes("invalid_grant")) return null;
+  const output = outputText(input);
+  if (!AUTH_FAILURES.some((pattern) => pattern.test(output))) return null;
 
   return {
     hookSpecificOutput: {
-      hookEventName: "PostToolUse",
+      hookEventName: input.hook_event_name,
       additionalContext:
-        "glab OAuth token expired. Run: glab auth login --hostname <host> with the GitLab host the command targeted (requires dangerouslyDisableSandbox: true for browser OAuth flow)",
+        "glab auth failed (expired or missing token). Run: glab auth login --hostname <host> with the GitLab host the command targeted (requires dangerouslyDisableSandbox: true for browser OAuth flow)",
     },
   };
 }
 
 async function main(): Promise<void> {
-  const input = await readHookInput(HookInput, "auth");
+  const input = await readHookInput(isPostToolUse, "auth");
   if (input == null) return;
 
   const output = processInput(input);

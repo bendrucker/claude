@@ -1,115 +1,180 @@
 #!/usr/bin/env bun
 
-import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import UrlPattern from "url-pattern";
-import { z } from "zod";
-import { readHookInput } from "../hooks/hook-input";
+import { isPreToolUse, isRecord, readHookInput } from "../hooks/hook-input";
 
-const WebFetchInput = z.looseObject({ url: z.string() });
+export type HookInput = PreToolUseHookInput;
 
-export const HookInput = z.looseObject({ tool_input: z.unknown() });
-export type HookInput = z.infer<typeof HookInput>;
-
-// url-pattern's match() returns `any`.
-const Params = z.record(z.string(), z.string());
-
-interface RouteMatch {
-  type: string;
-  params: Record<string, string>;
+interface Project {
+  host: string;
+  path: string;
 }
 
 interface Route {
   pattern: UrlPattern;
   type: string;
-  suggestion: (params: Record<string, string>) => string;
+  suggestion: (params: Record<string, string>, project: Project) => string;
 }
 
-// GitLab uses /-/ prefix for resource paths
+interface RouteMatch {
+  route: Route;
+  params: Record<string, string>;
+}
+
+const GITLAB_COM = "gitlab.com";
+const RESERVED_FIRST_SEGMENTS = new Set([
+  "explore",
+  "users",
+  "dashboard",
+  "groups",
+  "help",
+  "admin",
+]);
+const DIGITS = /^\d+$/;
+
+function isParams(value: unknown): value is Record<string, string> {
+  return isRecord(value) && Object.values(value).every((entry) => typeof entry === "string");
+}
+
+// A self-managed instance is `gitlab.<domain>`. Subdomains such as docs.gitlab.com are not projects.
+function isGitLabHost(host: string): boolean {
+  return host === GITLAB_COM || host.startsWith("gitlab.");
+}
+
+function repoFlag({ host, path }: Project): string {
+  return host === GITLAB_COM ? `-R ${path}` : `-R https://${host}/${path}`;
+}
+
+function apiCall({ host, path }: Project, endpoint: string): string {
+  const hostFlag = host === GITLAB_COM ? "" : `--hostname ${host} `;
+  return `glab api ${hostFlag}"projects/${encodeURIComponent(path)}/${endpoint}"`;
+}
+
+const options = { segmentValueCharset: "a-zA-Z0-9-_.~%" };
+
+// Resource paths follow the `/-/` separator.
 const routes: Route[] = [
   {
-    pattern: new UrlPattern("-/issues/:number"),
+    pattern: new UrlPattern("-/issues/:number(/*)", options),
     type: "issue",
-    suggestion: ({ number }) => `Use: glab issue view ${number}.`,
+    suggestion: ({ number }, project) => `Use: glab issue view ${number} ${repoFlag(project)}.`,
   },
   {
-    pattern: new UrlPattern("-/merge_requests/:number"),
+    pattern: new UrlPattern("-/work_items/:number(/*)", options),
+    type: "issue",
+    suggestion: ({ number }, project) => `Use: glab issue view ${number} ${repoFlag(project)}.`,
+  },
+  {
+    pattern: new UrlPattern(/^-\/merge_requests\/(\d+)\.(?:diff|patch)$/, ["number"]),
     type: "mr",
-    suggestion: ({ number }) => `Use: glab mr view ${number}.`,
+    suggestion: ({ number }, project) => `Use: glab mr diff ${number} ${repoFlag(project)}.`,
   },
   {
-    pattern: new UrlPattern("-/pipelines/:id"),
+    pattern: new UrlPattern("-/merge_requests/:number/diffs(/*)", options),
+    type: "mr",
+    suggestion: ({ number }, project) => `Use: glab mr diff ${number} ${repoFlag(project)}.`,
+  },
+  {
+    pattern: new UrlPattern("-/merge_requests/:number/commits(/*)", options),
+    type: "mr",
+    suggestion: ({ number }, project) =>
+      `Use: ${apiCall(project, `merge_requests/${number}/commits`)}.`,
+  },
+  {
+    pattern: new UrlPattern("-/merge_requests/:number(/*)", options),
+    type: "mr",
+    suggestion: ({ number }, project) => `Use: glab mr view ${number} ${repoFlag(project)}.`,
+  },
+  {
+    pattern: new UrlPattern("-/pipelines/:id(/*)", options),
     type: "pipeline",
-    suggestion: ({ id }) => `Use: glab ci view ${id}.`,
+    suggestion: ({ id }, project) => `Use: glab ci get -p ${id} ${repoFlag(project)} -F json.`,
   },
   {
-    pattern: new UrlPattern("-/jobs/:id"),
+    pattern: new UrlPattern("-/jobs/:id(/*)", options),
     type: "job",
-    suggestion: ({ id }) => `Use: glab ci trace ${id}.`,
+    suggestion: ({ id }, project) => `Use: glab ci trace ${id} ${repoFlag(project)}.`,
   },
   {
-    pattern: new UrlPattern("-/blob/:ref/*"),
+    pattern: new UrlPattern("-/blob/:ref/*", options),
     type: "file",
-    suggestion: () => `Use: glab api to fetch file contents.`,
+    suggestion: ({ ref, _ }, project) => fileSuggestion(project, ref, _),
   },
   {
-    pattern: new UrlPattern("-/tree/:ref"),
-    type: "tree",
-    suggestion: () => `Use: glab api to fetch file contents.`,
+    pattern: new UrlPattern("-/raw/:ref/*", options),
+    type: "file",
+    suggestion: ({ ref, _ }, project) => fileSuggestion(project, ref, _),
   },
   {
-    pattern: new UrlPattern("-/tree/:ref/*"),
+    pattern: new UrlPattern("-/tree/:ref(/*)", options),
     type: "tree",
-    suggestion: () => `Use: glab api to fetch file contents.`,
+    suggestion: ({ ref, _ }, project) => {
+      const path = _ == null ? "" : `&path=${encodeURIComponent(decodeURIComponent(_))}`;
+      return `Use: ${apiCall(project, `repository/tree?ref=${ref}${path}`)}.`;
+    },
+  },
+  {
+    pattern: new UrlPattern("-/issues", options),
+    type: "issues",
+    suggestion: (_, project) => `Use: glab issue list ${repoFlag(project)}.`,
+  },
+  {
+    pattern: new UrlPattern("-/merge_requests", options),
+    type: "mrs",
+    suggestion: (_, project) => `Use: glab mr list ${repoFlag(project)}.`,
+  },
+  {
+    pattern: new UrlPattern("-/pipelines", options),
+    type: "pipelines",
+    suggestion: (_, project) => `Use: glab ci list ${repoFlag(project)}.`,
   },
 ];
 
+function fileSuggestion(
+  project: Project,
+  ref: string | undefined,
+  path: string | undefined,
+): string {
+  const file = encodeURIComponent(decodeURIComponent(path ?? ""));
+  return `Use: ${apiCall(project, `repository/files/${file}/raw?ref=${ref ?? ""}`)}.`;
+}
+
 export function matchRoute(path: string): RouteMatch | null {
   for (const route of routes) {
-    const params = Params.safeParse(route.pattern.match(path));
-    if (params.success) {
-      return { type: route.type, params: params.data };
-    }
+    const params: unknown = route.pattern.match(path);
+    if (!isParams(params)) continue;
+    const ids = [params.number, params.id].filter((id) => id !== undefined);
+    if (ids.every((id) => DIGITS.test(id))) return { route, params };
   }
   return null;
 }
 
 export function parseGitLabUrl(url: string): { type: string; suggestion: string } | null {
-  const path = new URL(url).pathname.slice(1);
-
-  // Check if this contains a /-/ path separator (resource path)
+  const { host, pathname } = new URL(url);
+  const path = decodeURIComponent(pathname).replaceAll(/^\/|\/$/g, "");
   const resourceIndex = path.indexOf("/-/");
-  if (resourceIndex !== -1) {
-    const resourcePath = path.slice(resourceIndex + 1); // Include the "-/"
-    const routeMatch = matchRoute(resourcePath);
-    if (routeMatch) {
-      const route = routes.find((r) => r.type === routeMatch.type);
-      if (route) {
-        return {
-          type: routeMatch.type,
-          suggestion: route.suggestion(routeMatch.params),
-        };
-      }
-    }
-    return null;
+  const projectPath = (resourceIndex === -1 ? path : path.slice(0, resourceIndex)).replace(
+    /\.git$/,
+    "",
+  );
+  const firstSegment = projectPath.split("/")[0] ?? "";
+  if (!projectPath.includes("/") || RESERVED_FIRST_SEGMENTS.has(firstSegment)) return null;
+
+  const project = { host, path: projectPath };
+  if (resourceIndex === -1) {
+    return { type: "repo", suggestion: `Use: glab repo view ${projectPath}.` };
   }
 
-  // No /-/ means this is a project root (possibly with nested groups)
-  // Match: group/project or group/subgroup/project etc.
-  const pathWithoutSlash = path.replace(/\/$/, "");
-  if (pathWithoutSlash.includes("/")) {
-    return {
-      type: "repo",
-      suggestion: `Use: glab repo view [<project>].`,
-    };
-  }
-
-  return null;
+  const matched = matchRoute(pathname.slice(pathname.indexOf("/-/") + 1));
+  if (!matched) return null;
+  return {
+    type: matched.route.type,
+    suggestion: matched.route.suggestion(matched.params, project),
+  };
 }
 
-export function formatOutput(
-  decision: "allow" | "deny" | "ask",
-  reason: string,
-): SyncHookJSONOutput {
+export function formatOutput(decision: "deny" | "ask", reason: string): SyncHookJSONOutput {
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
@@ -119,19 +184,23 @@ export function formatOutput(
   };
 }
 
-export function processInput(input: HookInput): SyncHookJSONOutput | null {
-  // hooks.json scopes this hook to GitLab domains.
-  const { url } = WebFetchInput.parse(input.tool_input);
-  const parsed = parseGitLabUrl(url);
-  if (parsed) {
-    return formatOutput("deny", parsed.suggestion);
-  }
+function fetchedUrl(input: HookInput): URL | null {
+  if (!isRecord(input.tool_input) || typeof input.tool_input.url !== "string") return null;
+  return URL.canParse(input.tool_input.url) ? new URL(input.tool_input.url) : null;
+}
 
-  return formatOutput("ask", `Unknown GitLab URL pattern.`);
+// hooks.json matches every WebFetch because the `domain:` form of `if` never fires, so the host is checked here.
+export function processInput(input: HookInput): SyncHookJSONOutput | null {
+  const url = fetchedUrl(input);
+  if (url == null || !isGitLabHost(url.hostname)) return null;
+
+  const parsed = parseGitLabUrl(url.href);
+  if (parsed) return formatOutput("deny", parsed.suggestion);
+  return formatOutput("ask", "Unknown GitLab URL pattern.");
 }
 
 async function main(): Promise<void> {
-  const input = await readHookInput(HookInput, "fetch");
+  const input = await readHookInput(isPreToolUse, "fetch");
   if (input == null) return;
 
   const output = processInput(input);

@@ -2,6 +2,7 @@
 
 import type { SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { invokesWorkflowRun } from "./gh-invocations";
 import { timeHook } from "./hook-metrics";
 
 // `gh workflow run` returns as soon as GitHub accepts the dispatch, so a job
@@ -63,10 +64,6 @@ export interface RunRef {
 
 /** Fetches one REST path and returns the response body. */
 export type Api = (path: string) => Promise<string>;
-
-export function invokesWorkflowRun(command: string): boolean {
-  return /(^|[\s;&|(])gh\s+(?:-\S+\s+\S+\s+)*workflow\s+run\b/.test(command);
-}
 
 export function parseRunUrl(output: string): RunRef | null {
   const match = RUN_URL.exec(output);
@@ -218,17 +215,30 @@ export function formatQueue(queue: Queue, now = Date.now()): string {
   return lines.join("\n");
 }
 
+export type Stage = "no-match" | "no-url" | "started" | "queued";
+
 export async function processInput(
   input: Input,
+  setStage: (stage: Stage) => void,
   api?: Api,
   now = Date.now(),
   retryMs?: number,
 ): Promise<SyncHookJSONOutput | null> {
-  if (!invokesWorkflowRun(input.tool_input.command)) return null;
+  if (!invokesWorkflowRun(input.tool_input.command)) {
+    setStage("no-match");
+    return null;
+  }
   const ref = parseRunUrl(`${input.tool_response.stdout}\n${input.tool_response.stderr}`);
-  if (!ref) return null;
+  if (!ref) {
+    setStage("no-url");
+    return null;
+  }
   const queue = await queueFor(api ?? ghApi(ref.host), ref, now, retryMs);
-  if (!queue) return null;
+  if (!queue) {
+    setStage("started");
+    return null;
+  }
+  setStage("queued");
   return {
     hookSpecificOutput: {
       hookEventName: "PostToolUse",
@@ -239,7 +249,7 @@ export async function processInput(
 
 async function main(): Promise<void> {
   const input = Input.parse(JSON.parse(await Bun.stdin.text()));
-  const output = await timeHook(HOOK, input, () => processInput(input));
+  const output = await timeHook(HOOK, input, async (setStage) => processInput(input, setStage));
   if (output) process.stdout.write(`${JSON.stringify(output)}\n`);
 }
 

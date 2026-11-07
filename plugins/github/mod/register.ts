@@ -466,7 +466,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   }
   watch.none = undefined;
   const prev = watch.snapshot;
-  const isSamePr = prev !== undefined && prev.pr === read.snapshot.pr;
+  const isSamePr = prev !== undefined && prev.url === read.snapshot.url;
   // An undecided poll keeps the last answer, so a recompute does not re-announce a block.
   const decided = read.snapshot.block;
   const next =

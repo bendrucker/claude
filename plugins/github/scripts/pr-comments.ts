@@ -102,6 +102,32 @@ export function parseUrl(url: string): {
   return { owner, repo, number };
 }
 
+/** Builds the `gh pr view` command resolving a PR number, branch, or the current branch to its URL. */
+export function prViewArgs(target: string | undefined): string[] {
+  return [
+    "gh",
+    "pr",
+    "view",
+    ...(target != null && target !== "" ? [target] : []),
+    "--json",
+    "url",
+    "--jq",
+    ".url",
+  ];
+}
+
+async function resolvePrUrl(target: string | undefined): Promise<string> {
+  if (target != null && URL.canParse(target)) return target;
+
+  const proc = Bun.spawn(prViewArgs(target), { stdout: "pipe", stderr: "pipe" });
+  const stdout = await new Response(proc.stdout).text();
+  if ((await proc.exited) !== 0) {
+    const stderr = await new Response(proc.stderr).text();
+    throw new Error(`gh pr view failed: ${stderr.trim()}`);
+  }
+  return stdout.trim();
+}
+
 export function detectRole(viewer: string, prAuthor: string): Role {
   return viewer === prAuthor ? "author" : "reviewer";
 }
@@ -286,7 +312,7 @@ async function fetchGraphQL(
 async function main(): Promise<void> {
   const argv = cli({
     name: "pr-comments",
-    parameters: ["<url>"],
+    parameters: ["[pr]"],
     flags: {
       role: {
         type: String,
@@ -313,7 +339,7 @@ async function main(): Promise<void> {
     },
   });
 
-  const { owner, repo, number } = parseUrl(argv._.url);
+  const { owner, repo, number } = parseUrl(await resolvePrUrl(argv._.pr));
 
   const allThreads: Thread[] = [];
   let cursor: string | undefined;

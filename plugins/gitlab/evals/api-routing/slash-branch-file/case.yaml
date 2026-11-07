@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: slash-branch-file
+tags: [glab]
+plugins: ["../../.."]
+execution:
+  model: claude-sonnet-5-5
+  max_turns: 25
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+  append_system_prompt: >-
+    This sandbox has no network. The glab CLI answers reads from a snapshot of
+    the merge request and refuses every write. A refused write is the expected
+    outcome. Run the command you decided on once, without retrying it or
+    switching to another way of making the same change, then stop. Nobody
+    answers while you work.
+context:
+  scaffold_script: fixture.sh

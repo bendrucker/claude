@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { cli } from "cleye";
+import { cli, command } from "cleye";
 import { z } from "zod";
 import { errorText, projectPath } from "../../../scripts/merge";
 
@@ -172,26 +172,26 @@ export async function runReview(
   return 0;
 }
 
-if (import.meta.main) {
-  try {
-    const argv = cli({
-      name: "draft-note",
-      parameters: ["<iid>"],
-      flags: {
-        input: { type: String, description: "JSON file with review entries" },
-        repo: { type: String, alias: "R", description: "Target group/project" },
-        submit: { type: Boolean, default: false, description: "Publish the drafts after creating" },
-        approve: { type: Boolean, default: false, description: "Approve after publishing" },
-        requestChanges: {
-          type: Boolean,
-          default: false,
-          description: "Set the reviewer state to requested_changes when publishing",
-        },
-        summary: { type: String, description: "Summary note posted with the publish" },
-        summaryFile: { type: String, description: "Read the summary from a file" },
-        sha: { type: String, description: "Approve only if the MR head matches this SHA" },
+const reviewCmd = command(
+  {
+    name: "review",
+    parameters: ["<iid>"],
+    flags: {
+      input: { type: String, description: "JSON file with review entries" },
+      repo: { type: String, alias: "R", description: "Target group/project" },
+      submit: { type: Boolean, default: false, description: "Publish the drafts after creating" },
+      approve: { type: Boolean, default: false, description: "Approve after publishing" },
+      requestChanges: {
+        type: Boolean,
+        default: false,
+        description: "Set the reviewer state to requested_changes when publishing",
       },
-    });
+      summary: { type: String, description: "Summary note posted with the publish" },
+      summaryFile: { type: String, description: "Read the summary from a file" },
+      sha: { type: String, description: "Approve only if the MR head matches this SHA" },
+    },
+  },
+  async (argv) => {
     const { flags } = argv;
     const invalid = validateOptions({ iid: argv._.iid, ...flags });
     if (invalid != null) throw new Error(invalid);
@@ -217,6 +217,15 @@ if (import.meta.main) {
         sha: flags.sha,
       }),
     );
+  },
+);
+
+if (import.meta.main) {
+  try {
+    await cli({ name: "draft-note", commands: [reviewCmd] }, (parsed) => {
+      parsed.showHelp();
+      process.exit(1);
+    });
   } catch (error) {
     console.error(errorText(error));
     process.exit(1);

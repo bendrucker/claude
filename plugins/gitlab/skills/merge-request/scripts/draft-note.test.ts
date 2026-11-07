@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import { join } from "node:path";
 import {
   type Entry,
   type ReviewOptions,
@@ -182,5 +183,13 @@ describe("runReview", () => {
     await runReview([{ body: "done", replyTo: "full", resolve: true }], options(), run);
 
     expect(run.mock.calls[0]?.[1]).toBeUndefined();
+  });
+});
+
+describe("cli", () => {
+  // review.md, the writing hook, and the eval graders all invoke `draft-note.ts review <iid>`.
+  test("accepts the documented review subcommand", () => {
+    const proc = Bun.spawnSync(["bun", join(import.meta.dir, "draft-note.ts"), "review", "7"]);
+    expect(proc.stderr.toString().trim()).toBe("--input is required");
   });
 });

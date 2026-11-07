@@ -6,6 +6,7 @@ import {
   errorText,
   merge,
   mergeArgs,
+  ProjectConfig,
   pickMrIid,
   projectPath,
   status,
@@ -419,5 +420,14 @@ describe("status", () => {
     });
 
     expect(status(["no-mr"], actions)).rejects.toThrow("No open MR found for branch: no-mr");
+  });
+});
+
+describe("ProjectConfig", () => {
+  test.each<{ name: string; input: object; expected: boolean }>([
+    { name: "absent on a plan without trains", input: {}, expected: false },
+    { name: "enabled", input: { merge_trains_enabled: true }, expected: true },
+  ])("$name", ({ input, expected }) => {
+    expect(ProjectConfig.parse(input).merge_trains_enabled).toBe(expected);
   });
 });

@@ -78,7 +78,8 @@ function repoArgs(repo?: string): string[] {
   return repo == null || repo === "" ? [] : ["-R", repo];
 }
 
-const ProjectConfig = z.looseObject({ merge_trains_enabled: z.boolean() });
+// GitLab omits merge_trains_enabled on plans without merge trains.
+export const ProjectConfig = z.looseObject({ merge_trains_enabled: z.boolean().default(false) });
 type ProjectConfig = z.infer<typeof ProjectConfig>;
 
 const MergeRequests = z.array(

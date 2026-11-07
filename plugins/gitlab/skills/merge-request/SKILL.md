@@ -83,7 +83,7 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --bots --reviewers=${u
 
 # Reply in a thread, then resolve it
 glab mr note create <iid> --reply <discussion-id> < tmp/reply.md
-glab mr note resolve <discussion-id> <iid>
+glab mr note resolve <iid> <discussion-id>
 ```
 
 See [discussions.md](discussions.md) for the other commands, the JSON schema, and API pitfalls.

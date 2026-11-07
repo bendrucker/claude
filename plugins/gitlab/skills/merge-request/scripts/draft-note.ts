@@ -1,282 +1,224 @@
 #!/usr/bin/env bun
 
-import { $ } from "bun";
-import { cli, command } from "cleye";
+import { cli } from "cleye";
 import { z } from "zod";
-import {
-  buildPosition,
-  exitOnRejection,
-  fetchMrDiffs,
-  getDiffRefs,
-  glabApiPost,
-  readBody,
-  validateLineInDiff,
-} from "./diff";
+import { errorText, projectPath } from "../../../scripts/merge";
 
-const RequestChangesResponse = z.looseObject({
-  data: z
-    .looseObject({
-      mergeRequestRequestChanges: z
-        .looseObject({ errors: z.array(z.string()).nullish() })
-        .nullish(),
-    })
-    .nullish(),
+const Line = z.union([z.number().int().positive(), z.string().regex(/^\d+(:\d+)?$/)]);
+
+export const Entry = z.looseObject({
+  body: z.string().min(1),
+  file: z.string().optional(),
+  line: Line.optional(),
+  oldLine: z.number().int().positive().optional(),
+  replyTo: z.string().optional(),
+  resolve: z.boolean().optional(),
 });
+export type Entry = z.infer<typeof Entry>;
 
-exitOnRejection();
+export interface RunResult {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+}
+export type Run = (args: string[], stdin?: string) => Promise<RunResult>;
 
-function apiPath(mr: number): string {
-  return `projects/:id/merge_requests/${mr}/draft_notes`;
+export interface ReviewOptions {
+  iid: string;
+  repo?: string | undefined;
+  submit: boolean;
+  approve: boolean;
+  requestChanges: boolean;
+  summary?: string | undefined;
+  sha?: string | undefined;
 }
 
-const createCmd = command(
-  {
-    name: "create",
-    parameters: ["<mr>"],
-    flags: {
-      file: { type: String, description: "File path for inline comment" },
-      line: { type: Number, description: "New line number" },
-      oldLine: {
-        type: Number,
-        description: "Old line number (deleted lines)",
-      },
-      replyTo: {
-        type: String,
-        description: "Discussion ID to reply to",
-      },
-      resolve: {
-        type: Boolean,
-        description: "Resolve the discussion",
-        default: false,
-      },
-      bodyFile: {
-        type: String,
-        description: "Read body from file (default: stdin)",
-      },
-    },
-  },
-  async (parsed) => {
-    const mr = Number(parsed._.mr);
-    const body = await readBody(parsed.flags.bodyFile);
+export const spawnGlab: Run = async (args, stdin) => {
+  const proc = Bun.spawn(["glab", ...args], {
+    stdin: stdin == null ? "ignore" : new Blob([stdin]),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ]);
+  return { ok: code === 0, stdout: stdout.trim(), stderr: stderr.trim() };
+};
 
-    const payload: Record<string, unknown> = { note: body };
+function repoArgs(repo?: string): string[] {
+  return repo == null || repo === "" ? [] : ["-R", repo];
+}
 
-    if (parsed.flags.replyTo != null && parsed.flags.replyTo !== "") {
-      payload.in_reply_to_discussion_id = parsed.flags.replyTo;
-      if (parsed.flags.resolve) {
-        payload.resolve_discussion = true;
-      }
-    } else if (parsed.flags.file != null && parsed.flags.file !== "") {
-      const [refs, diffs] = await Promise.all([getDiffRefs(mr), fetchMrDiffs(mr)]);
-      validateLineInDiff(diffs, parsed.flags.file, {
-        line: parsed.flags.line,
-        oldLine: parsed.flags.oldLine,
-      });
-      payload.position = buildPosition(refs, parsed.flags.file, {
-        line: parsed.flags.line,
-        oldLine: parsed.flags.oldLine,
-      });
+export function validateOptions(opts: {
+  iid: string;
+  submit: boolean;
+  approve: boolean;
+  requestChanges: boolean;
+  summary?: string | undefined;
+  summaryFile?: string | undefined;
+}): string | null {
+  if (!/^\d+$/.test(opts.iid)) return `Invalid MR iid: ${opts.iid}`;
+  if (opts.approve && opts.requestChanges) return "--approve and --request-changes conflict";
+  if (opts.summary != null && opts.summaryFile != null) {
+    return "--summary and --summary-file conflict";
+  }
+  const hasSummary = opts.summary != null || opts.summaryFile != null;
+  if (!opts.submit && (opts.approve || opts.requestChanges || hasSummary)) {
+    return "--approve, --request-changes, and the summary flags require --submit";
+  }
+  return null;
+}
+
+export function validateEntry(entry: Entry): string | null {
+  const hasFile = entry.file != null && entry.file !== "";
+  const hasReply = entry.replyTo != null && entry.replyTo !== "";
+  if (hasFile && hasReply) return "file and replyTo conflict";
+  if (entry.line != null && entry.oldLine != null) return "line and oldLine conflict";
+  if ((entry.line != null || entry.oldLine != null) && !hasFile)
+    return "line and oldLine need file";
+  if (entry.resolve && !hasReply) return "resolve needs replyTo";
+  return null;
+}
+
+// Native `draft create` reads the body from stdin and has no resolve flag, so a
+// reply that resolves its thread goes through the REST draft_notes endpoint.
+export function createArgs(iid: string, entry: Entry, repo?: string): string[] {
+  if (entry.resolve) {
+    return [
+      "api",
+      `${projectPath(repo)}/merge_requests/${iid}/draft_notes`,
+      "-X",
+      "POST",
+      "-f",
+      `note=${entry.body}`,
+      "-f",
+      `in_reply_to_discussion_id=${entry.replyTo ?? ""}`,
+      "-f",
+      "resolve_discussion=true",
+    ];
+  }
+  const args = ["mr", "note", "draft", "create", iid];
+  if (entry.file != null && entry.file !== "") args.push("--file", entry.file);
+  if (entry.line != null) args.push("--line", String(entry.line));
+  if (entry.oldLine != null) args.push("--old-line", String(entry.oldLine));
+  if (entry.replyTo != null && entry.replyTo !== "") args.push("--reply", entry.replyTo);
+  return [...args, ...repoArgs(repo)];
+}
+
+export function publishArgs(opts: ReviewOptions): string[] {
+  const args = ["mr", "note", "draft", "publish", opts.iid, "--yes"];
+  if (opts.summary != null && opts.summary !== "") args.push("-m", opts.summary);
+  if (opts.requestChanges) args.push("--reviewer-state", "requested_changes");
+  return [...args, ...repoArgs(opts.repo)];
+}
+
+export function approveArgs(opts: ReviewOptions): string[] {
+  const args = ["mr", "approve", opts.iid];
+  if (opts.sha != null && opts.sha !== "") args.push("--sha", opts.sha);
+  return [...args, ...repoArgs(opts.repo)];
+}
+
+function failureText(result: RunResult): string {
+  return result.stderr !== "" ? result.stderr : result.stdout;
+}
+
+function label(entry: Entry): string {
+  return entry.file ?? (entry.replyTo == null ? "general" : `reply ${entry.replyTo}`);
+}
+
+// Returns the process exit code. Nothing is published or approved after a failed entry.
+export async function runReview(
+  entries: Entry[],
+  opts: ReviewOptions,
+  run: Run = spawnGlab,
+): Promise<number> {
+  let failed = 0;
+  for (const entry of entries) {
+    // oxlint-disable-next-line no-await-in-loop -- one glab call per draft keeps the failure lines in entry order.
+    const result = await run(
+      createArgs(opts.iid, entry, opts.repo),
+      entry.resolve ? undefined : entry.body,
+    );
+    if (!result.ok) {
+      console.error(`Failed: ${label(entry)}: ${failureText(result)}`);
+      failed++;
     }
+  }
 
-    await glabApiPost(apiPath(mr), payload);
-  },
-);
+  console.error(`Created ${entries.length - failed} draft notes (${failed} failed)`);
+  if (failed > 0) {
+    if (opts.submit) console.error("Skipping publish and approve");
+    return 1;
+  }
+  if (!opts.submit) return 0;
 
-const publishCmd = command(
-  {
-    name: "publish",
-    parameters: ["<mr>"],
-  },
-  async (parsed) => {
-    const mr = Number(parsed._.mr);
-    const result = await $`glab api ${apiPath(mr)}/bulk_publish -X POST`.text();
-    console.log(result);
-  },
-);
+  const published = await run(publishArgs(opts));
+  if (!published.ok) {
+    console.error(`Publish failed: ${failureText(published)}`);
+    return 1;
+  }
+  console.error("Published draft notes");
 
-const submitCmd = command(
-  {
-    name: "submit",
-    parameters: ["<mr>"],
-    flags: {
-      approve: {
-        type: Boolean,
-        default: false,
-        description: "Approve the MR after publishing",
-      },
-      requestChanges: {
-        type: Boolean,
-        default: false,
-        description: "Request changes after publishing (Premium+, GraphQL)",
-      },
-      summary: {
-        type: String,
-        description: "Review summary comment text",
-      },
-      summaryFile: {
-        type: String,
-        description: "Read review summary from file",
-      },
-    },
-  },
-  async (parsed) => {
-    const mr = Number(parsed._.mr);
-
-    if (parsed.flags.approve && parsed.flags.requestChanges) {
-      console.error("Cannot both --approve and --request-changes");
-      process.exit(1);
+  if (opts.approve) {
+    const approved = await run(approveArgs(opts));
+    if (!approved.ok) {
+      console.error(`Approve failed: ${failureText(approved)}`);
+      return 1;
     }
+    console.error("Approved MR");
+  }
+  return 0;
+}
 
-    const summaryText =
-      parsed.flags.summaryFile != null && parsed.flags.summaryFile !== ""
-        ? await Bun.file(parsed.flags.summaryFile).text()
-        : parsed.flags.summary;
-
-    const result = await $`glab api ${apiPath(mr)}/bulk_publish -X POST`.text();
-    console.log(result);
-    console.error("Published draft notes");
-
-    if (summaryText != null && summaryText !== "") {
-      const notePath = `projects/:id/merge_requests/${mr}/notes`;
-      await glabApiPost(notePath, { body: summaryText });
-      console.error("Posted summary comment");
-    }
-
-    if (parsed.flags.approve) {
-      const refs = await getDiffRefs(mr);
-      await $`glab api projects/:id/merge_requests/${mr}/approve -X POST -f sha=${refs.head_sha}`.text();
-      console.error("Approved MR");
-    } else if (parsed.flags.requestChanges) {
-      const projectPath = (
-        await $`glab repo view --output json | jq -r '.path_with_namespace'`.text()
-      ).trim();
-      const query = `mutation($projectPath: ID!, $iid: String!) {
-        mergeRequestRequestChanges(input: { projectPath: $projectPath, iid: $iid }) {
-          mergeRequest { iid }
-          errors
-        }
-      }`;
-      const gqlResult = RequestChangesResponse.parse(
-        await $`glab api graphql -f query=${query} -f projectPath=${projectPath} -f iid=${String(mr)}`.json(),
-      );
-      const errors = gqlResult.data?.mergeRequestRequestChanges?.errors ?? [];
-      if (errors.length > 0) {
-        console.error(`Request changes failed: ${errors.join(", ")}`);
-        process.exit(1);
-      }
-      console.error("Requested changes");
-    }
-  },
-);
-
-const listCmd = command(
-  {
-    name: "list",
-    parameters: ["<mr>"],
-  },
-  async (parsed) => {
-    const mr = Number(parsed._.mr);
-    const result = await $`glab api ${apiPath(mr)}`.text();
-    console.log(result);
-  },
-);
-
-const ReviewEntries = z.array(
-  z.looseObject({
-    file: z.string().optional(),
-    line: z.number().optional(),
-    oldLine: z.number().optional(),
-    body: z.string(),
-  }),
-);
-
-const reviewCmd = command(
-  {
-    name: "review",
-    parameters: ["<mr>"],
-    flags: {
-      input: {
-        type: String,
-        description: "JSON file with review entries",
+if (import.meta.main) {
+  try {
+    const argv = cli({
+      name: "draft-note",
+      parameters: ["<iid>"],
+      flags: {
+        input: { type: String, description: "JSON file with review entries" },
+        repo: { type: String, alias: "R", description: "Target group/project" },
+        submit: { type: Boolean, default: false, description: "Publish the drafts after creating" },
+        approve: { type: Boolean, default: false, description: "Approve after publishing" },
+        requestChanges: {
+          type: Boolean,
+          default: false,
+          description: "Set the reviewer state to requested_changes when publishing",
+        },
+        summary: { type: String, description: "Summary note posted with the publish" },
+        summaryFile: { type: String, description: "Read the summary from a file" },
+        sha: { type: String, description: "Approve only if the MR head matches this SHA" },
       },
-      submit: {
-        type: Boolean,
-        default: false,
-        description: "Publish draft notes after creating",
-      },
-      approve: {
-        type: Boolean,
-        default: false,
-        description: "Approve MR after publishing",
-      },
-    },
-  },
-  async (parsed) => {
-    const mr = Number(parsed._.mr);
+    });
+    const { flags } = argv;
+    const invalid = validateOptions({ iid: argv._.iid, ...flags });
+    if (invalid != null) throw new Error(invalid);
+    if (flags.input == null || flags.input === "") throw new Error("--input is required");
 
-    if (parsed.flags.input == null || parsed.flags.input === "") {
-      console.error("--input is required");
-      process.exit(1);
-    }
+    const entries = z.array(Entry).parse(JSON.parse(await Bun.file(flags.input).text()));
+    const problems = entries
+      .map((entry, index) => [index, validateEntry(entry)] as const)
+      .filter(([, problem]) => problem != null)
+      .map(([index, problem]) => `entry ${index}: ${problem}`);
+    if (problems.length > 0) throw new Error(problems.join("\n"));
 
-    const entries = ReviewEntries.parse(JSON.parse(await Bun.file(parsed.flags.input).text()));
-    const hasPositioned = entries.some((e) => e.file != null && e.file !== "");
-
-    const positioned = hasPositioned
-      ? await Promise.all([getDiffRefs(mr), fetchMrDiffs(mr)])
-      : null;
-
-    let created = 0;
-    let failed = 0;
-
-    for (const entry of entries) {
-      try {
-        const payload: Record<string, unknown> = { note: entry.body };
-
-        if (entry.file != null && entry.file !== "" && positioned != null) {
-          const [refs, diffs] = positioned;
-          validateLineInDiff(diffs, entry.file, {
-            line: entry.line,
-            oldLine: entry.oldLine,
-          });
-          payload.position = buildPosition(refs, entry.file, {
-            line: entry.line,
-            oldLine: entry.oldLine,
-          });
-        }
-
-        // oxlint-disable-next-line no-await-in-loop -- one API POST per note; the created/failed tally and its error lines follow entry order.
-        await glabApiPost(apiPath(mr), payload);
-        created++;
-      } catch (error) {
-        console.error(
-          `Failed: ${entry.file ?? "general"}: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        failed++;
-      }
-    }
-
-    console.error(`Created ${created} draft notes (${failed} failed)`);
-
-    if (parsed.flags.submit) {
-      await $`glab api ${apiPath(mr)}/bulk_publish -X POST`.text();
-      console.error("Published draft notes");
-
-      if (parsed.flags.approve) {
-        const approveRefs = positioned?.[0] ?? (await getDiffRefs(mr));
-        await $`glab api projects/:id/merge_requests/${mr}/approve -X POST -f sha=${approveRefs.head_sha}`.text();
-        console.error("Approved MR");
-      }
-    }
-  },
-);
-
-await cli(
-  {
-    name: "draft-note",
-    commands: [createCmd, publishCmd, submitCmd, listCmd, reviewCmd],
-  },
-  (parsed) => {
-    parsed.showHelp();
-  },
-);
+    const summary =
+      flags.summaryFile == null ? flags.summary : await Bun.file(flags.summaryFile).text();
+    process.exit(
+      await runReview(entries, {
+        iid: argv._.iid,
+        repo: flags.repo,
+        submit: flags.submit,
+        approve: flags.approve,
+        requestChanges: flags.requestChanges,
+        summary,
+        sha: flags.sha,
+      }),
+    );
+  } catch (error) {
+    console.error(errorText(error));
+    process.exit(1);
+  }
+}

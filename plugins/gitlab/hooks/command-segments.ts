@@ -1,5 +1,6 @@
 // A hook matches a tool only where it is invoked, so quoted text, heredoc
-// bodies, and comments never produce a command.
+// bodies, and comments never produce a command. No runtime dependencies:
+// gating hooks import this module.
 
 export interface Word {
   /** The argument as the program receives it, quotes removed. */

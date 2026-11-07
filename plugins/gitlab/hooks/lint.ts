@@ -19,6 +19,9 @@ export type HookInput = PreToolUseHookInput;
 // skills/merge-request/SKILL.md. Keep the path in sync with that command.
 export const MARKER_DIR = "/tmp/claude/gitlab-skill";
 
+// The Bash tool's shell has no CLAUDE_PLUGIN_ROOT to expand.
+const WATCH_SCRIPT = join(import.meta.dirname, "..", "skills/ci-monitor/scripts/watch.ts");
+
 export interface LintEnv {
   fileExists(path: string): Promise<boolean>;
   readFile(path: string): Promise<string | null>;
@@ -113,7 +116,7 @@ export function lintGlab(commands: Command[]): string | null {
       return "mergeRequestSetAutoMerge does not exist in GitLab's GraphQL schema. Auto-merge is REST-only: use the gitlab:merge-request skill's merge.ts (handles merge trains) or glab mr merge --auto-merge.";
     }
     if (text.includes("mergeRequestRequestReview")) {
-      return "mergeRequestRequestReview does not exist in GitLab's GraphQL schema. To re-request a review use mergeRequestReviewerRereview; to request changes use mergeRequestRequestChanges. See the gitlab:merge-request skill.";
+      return "mergeRequestRequestReview does not exist in GitLab's GraphQL schema. To re-request a review, post a note holding the quick action: glab mr note create <iid> -m '/request_review @user'. To request changes use mergeRequestRequestChanges. See the gitlab:merge-request skill.";
     }
   }
   return null;
@@ -360,7 +363,7 @@ export async function nudgePolling(
   return nudgeOnce(
     "polling",
     sessionId,
-    `Polling GitLab CI in a shell loop. Run the watcher under the Monitor tool with persistent: true instead: bun \${CLAUDE_PLUGIN_ROOT}/skills/ci-monitor/scripts/watch.ts with --mr <iid> (also reports merged, conflicts, mergeable-unknown), --branch <name>, or --pipeline-id <id>. It emits one event per state change, so the session is not blocked on sleep.`,
+    `Polling GitLab CI in a shell loop. Run the watcher under the Monitor tool with persistent: true instead: bun "${WATCH_SCRIPT}" with --mr <url> (also reports conflicts and mergeable-unknown), --branch <name>, or --pipeline-id <id>. It emits one event per state change, so the session is not blocked on sleep.`,
     env,
     false,
   );

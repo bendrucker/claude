@@ -120,12 +120,16 @@ describe("validateEntry", () => {
     { name: "line without file", entry: { body: "x", line: 3 } },
     { name: "file with replyTo", entry: { body: "x", file: "a", replyTo: "r" } },
     { name: "line with oldLine", entry: { body: "x", file: "a", line: 1, oldLine: 2 } },
+    {
+      name: "a resolving reply to an id prefix",
+      entry: { body: "x", replyTo: "abc12345", resolve: true },
+    },
   ])("rejects $name", ({ entry }) => {
     expect(validateEntry(entry)).not.toBeNull();
   });
 
-  test("accepts a resolving reply", () => {
-    expect(validateEntry({ body: "x", replyTo: "r", resolve: true })).toBeNull();
+  test("accepts a resolving reply to a full id", () => {
+    expect(validateEntry({ body: "x", replyTo: "a".repeat(40), resolve: true })).toBeNull();
   });
 });
 

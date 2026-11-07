@@ -77,7 +77,7 @@ describe("glab gh-ism denials", () => {
     {
       name: "hallucinated mergeRequestRequestReview",
       command: "glab api graphql -f query='mutation { mergeRequestRequestReview }'",
-      reason: "mergeRequestReviewerRereview",
+      reason: "/request_review @user",
     },
   ])("denies $name", async ({ command, reason }) => {
     const output = decision(await processInput(mockInput(command), fakeEnv()));

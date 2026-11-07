@@ -133,9 +133,13 @@ describe("collectText", () => {
     });
 
     describe("review command bodies", () => {
-      it("reads a stdin redirect", async () => {
+      test.each<{ name: string; target: (path: string) => string }>([
+        { name: "a bare path", target: (path) => path },
+        { name: "a double-quoted path", target: (path) => `"${path}"` },
+        { name: "a single-quoted path", target: (path) => `'${path}'` },
+      ])("reads a stdin redirect from $name", async ({ target }) => {
         await Bun.write(tmpFile, "Redirected note");
-        const texts = await collectText(mockBash(`glab mr note create 7 < ${tmpFile}`));
+        const texts = await collectText(mockBash(`glab mr note create 7 < ${target(tmpFile)}`));
         expect(texts).toContain("Redirected note");
       });
 

@@ -71,10 +71,13 @@ describe("glab auth hook", () => {
     expect(processInput(mockFailure("glab mr view 1", "403 Forbidden"))).toBeNull();
   });
 
-  it("prefers stderr over a stdout that only prints the wording", () => {
+  test.each<{ name: string; stderr: string }>([
+    { name: "a warning on stderr", stderr: "warning: slow" },
+    { name: "an empty stderr", stderr: "" },
+  ])("ignores a stdout that only prints the wording, with $name", ({ stderr }) => {
     const input = mockInput("glab ci trace 5", {
       stdout: "job log: 401 Unauthorized from the registry",
-      stderr: "warning: slow",
+      stderr,
     });
     expect(processInput(input)).toBeNull();
   });

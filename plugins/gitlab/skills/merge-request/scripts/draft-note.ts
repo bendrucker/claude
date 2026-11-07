@@ -2,7 +2,9 @@
 
 import { cli, command } from "cleye";
 import { z } from "zod";
-import { errorText, projectPath } from "../../../scripts/merge";
+import { errorText, projectPath, repoArgs } from "../../../scripts/merge";
+
+const FULL_DISCUSSION_ID = /^[0-9a-f]{40}$/;
 
 const Line = z.union([z.number().int().positive(), z.string().regex(/^\d+(:\d+)?$/)]);
 
@@ -47,10 +49,6 @@ export const spawnGlab: Run = async (args, stdin) => {
   return { ok: code === 0, stdout: stdout.trim(), stderr: stderr.trim() };
 };
 
-function repoArgs(repo?: string): string[] {
-  return repo == null || repo === "" ? [] : ["-R", repo];
-}
-
 export function validateOptions(opts: {
   iid: string;
   submit: boolean;
@@ -79,6 +77,9 @@ export function validateEntry(entry: Entry): string | null {
   if ((entry.line != null || entry.oldLine != null) && !hasFile)
     return "line and oldLine need file";
   if (entry.resolve && !hasReply) return "resolve needs replyTo";
+  if (entry.resolve && !FULL_DISCUSSION_ID.test(entry.replyTo ?? "")) {
+    return "resolve needs the full 40-character discussion id, since REST takes no prefix";
+  }
   return null;
 }
 

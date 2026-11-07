@@ -70,14 +70,20 @@ const REVIEW_COMMAND =
   /draft-note\.ts|discussions\.ts\s+create\b|\bglab\s+api\b[^|;&]*\/(?:draft_notes|discussions|notes)\b|\bglab\s+mr\s+note\b|\bgh\s+api\b[^|;&]*\/pulls\/\d+\/(?:reviews|comments)\b|\bgh\s+pr\s+(?:review|comment)\b/;
 
 const HEREDOC_PATTERN = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2(?=\n|$)/g;
-const STDIN_REDIRECT_PATTERN = /(?<=^|[\s;&|])<\s*(?!<)([^\s<>|;&()]+)/g;
+const STDIN_REDIRECT_PATTERN =
+  /(?<=^|[\s;&|])<\s*(?!<)('[^']*'|"(?:[^"\\]|\\.)*"|[^\s<>|;&()'"]+)/g;
+const QUOTED_SPAN_PATTERN = /(<\s*)?('[^']*'|"(?:[^"\\]|\\.)*")/g;
 const SUBSTITUTION_FILE_PATTERN =
   /(?:^|\s)(?:-m|--message)[= ]["']?\$\(\s*(?:cat\s+|<\s*)(["']?)([^\s)"']+)\1\s*\)/g;
 
+// Quoted spans are blanked so a `<` inside an argument never reads as a redirect,
+// except the quoted path a redirect reads from.
 function extractStdinRedirectPaths(command: string): string[] {
   const bare = command
     .replaceAll(HEREDOC_PATTERN, "")
-    .replaceAll(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
+    .replaceAll(QUOTED_SPAN_PATTERN, (span, redirect: string | undefined) =>
+      redirect === undefined ? "''" : span,
+    );
   return [...bare.matchAll(STDIN_REDIRECT_PATTERN)]
     .map((match) => stripQuotes(match[1] ?? ""))
     .filter((path) => path !== "" && path !== "-" && !path.startsWith("&"));

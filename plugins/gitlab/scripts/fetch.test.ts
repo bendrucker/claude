@@ -31,6 +31,8 @@ describe("parseGitLabUrl", () => {
     },
     { name: "a group page", url: "https://gitlab.com/groups/g/-/issues/1" },
     { name: "a user page", url: "https://gitlab.com/users/someone" },
+    { name: "a REST API URL", url: "https://gitlab.com/api/v4/projects/1" },
+    { name: "an instance-level route", url: "https://gitlab.com/-/snippets/1" },
     { name: "a non-numeric id", url: "https://gitlab.com/g/p/-/merge_requests/new" },
     { name: "an unrouted resource", url: "https://gitlab.com/g/p/-/settings" },
   ])("returns null for $name", ({ url }) => {

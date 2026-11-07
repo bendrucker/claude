@@ -12,17 +12,14 @@ export type HookInput = PostToolUseHookInput | PostToolUseFailureHookInput;
 
 const AUTH_FAILURES = [/invalid_grant/, /no access or refresh token/i, /\b401 Unauthorized\b/];
 
-// A failed call carries its output in `error`. A successful one carries stderr
-// and stdout in `tool_response`, and stderr alone when it has any, so a log that
-// merely prints an auth error on stdout is not mistaken for glab's own failure.
+// A failed call carries its output in `error`. A successful one is read from
+// stderr only, so a log that prints an auth error on stdout is not mistaken for
+// glab's own failure.
 function outputText(input: HookInput): string {
   if ("error" in input && typeof input.error === "string") return input.error;
   if (!("tool_response" in input)) return "";
   const response = input.tool_response;
-  if (isRecord(response) && typeof response.stderr === "string" && response.stderr !== "") {
-    return response.stderr;
-  }
-  return JSON.stringify(response ?? "");
+  return isRecord(response) && typeof response.stderr === "string" ? response.stderr : "";
 }
 
 export function processInput(input: HookInput): SyncHookJSONOutput | null {

@@ -74,7 +74,7 @@ export function projectPath(repo?: string): string {
   return repo == null || repo === "" ? "projects/:id" : `projects/${encodeURIComponent(repo)}`;
 }
 
-function repoArgs(repo?: string): string[] {
+export function repoArgs(repo?: string): string[] {
   return repo == null || repo === "" ? [] : ["-R", repo];
 }
 

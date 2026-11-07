@@ -30,6 +30,8 @@ const RESERVED_FIRST_SEGMENTS = new Set([
   "groups",
   "help",
   "admin",
+  "api",
+  "-",
 ]);
 const DIGITS = /^\d+$/;
 

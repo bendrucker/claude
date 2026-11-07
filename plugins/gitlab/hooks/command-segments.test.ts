@@ -74,6 +74,15 @@ describe("parseCommands", () => {
     expect(commands.map((command) => command.parent?.program ?? null)).toEqual([null, "glab"]);
   });
 
+  test("closes a backtick substitution that opens on a subshell at the backtick", () => {
+    const commands = parseCommands("echo `(glab mr list)`; glab ci status");
+    expect(commands.map((command) => command.parent?.program ?? null)).toEqual([
+      null,
+      "echo",
+      null,
+    ]);
+  });
+
   test("keeps assignments and keywords", () => {
     const [command] = parseCommands("while GH_REPO=o/r gh pr view");
     expect(command?.program).toBe("gh");

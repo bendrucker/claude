@@ -103,7 +103,7 @@ class Scanner {
     };
     const substitution = (kind: Word["quote"]): void => {
       const start = this.index;
-      const closer = src[start + 1] === "(" ? ")" : "`";
+      const closer = src[start] === "$" ? ")" : "`";
       this.index += closer === ")" ? 2 : 1;
       this.scanCommands(closer, owner());
       append(src.slice(start, this.index), kind);

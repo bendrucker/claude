@@ -132,6 +132,62 @@ describe("collectText", () => {
       expect(texts).toContain("Tag annotation");
     });
 
+    describe("review command bodies", () => {
+      it("reads a stdin redirect", async () => {
+        await Bun.write(tmpFile, "Redirected note");
+        const texts = await collectText(mockBash(`glab mr note create 7 < ${tmpFile}`));
+        expect(texts).toContain("Redirected note");
+      });
+
+      it("reads a stdin redirect after --reply", async () => {
+        await Bun.write(tmpFile, "Threaded reply");
+        const texts = await collectText(
+          mockBash(`glab mr note create 7 --reply abc123 <${tmpFile}`),
+        );
+        expect(texts).toContain("Threaded reply");
+      });
+
+      it("reads -m with cat substitution", async () => {
+        await Bun.write(tmpFile, "Summary via cat");
+        const texts = await collectText(
+          mockBash(`glab mr note draft publish 7 --yes -m "$(cat ${tmpFile})"`),
+        );
+        expect(texts).toEqual(["Summary via cat"]);
+      });
+
+      it("reads -m with redirect substitution", async () => {
+        await Bun.write(tmpFile, "Summary via redirect");
+        const texts = await collectText(
+          mockBash(`glab mr note draft publish 7 -m "$(< ${tmpFile})"`),
+        );
+        expect(texts).toEqual(["Summary via redirect"]);
+      });
+
+      it("reads inline -m", async () => {
+        const texts = await collectText(mockBash('glab mr note draft publish 7 -m "Ready now"'));
+        expect(texts).toEqual(["Ready now"]);
+      });
+
+      it("ignores a redirect inside a heredoc body", async () => {
+        await Bun.write(tmpFile, "Should not be read");
+        const texts = await collectText(
+          mockBash(`glab mr note create 7 <<'EOF'\nuse a < ${tmpFile} here\nEOF`),
+        );
+        expect(texts).toHaveLength(0);
+      });
+
+      it("ignores a redirect inside quotes", async () => {
+        await Bun.write(tmpFile, "Should not be read");
+        const texts = await collectText(mockBash(`glab mr note create 7 -m 'a < ${tmpFile}'`));
+        expect(texts).not.toContain("Should not be read");
+      });
+
+      it("ignores a redirect on a non-review command", async () => {
+        await Bun.write(tmpFile, "Should not be read");
+        expect(await collectText(mockBash(`jq . < ${tmpFile}`))).toHaveLength(0);
+      });
+    });
+
     it("ignores bare -F outside git commands", async () => {
       const texts = await collectText(mockBash("curl -F upload=/tmp/data.bin https://x"));
       expect(texts).toHaveLength(0);

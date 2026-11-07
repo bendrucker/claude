@@ -25,6 +25,11 @@ export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 // file. Guard fragment shipped to hooks.json like the above.
 export const INPUT_FILE_GUARD = "--input[= ]";
 
+// `glab mr note ... < file` and `... -m "$(cat file)"` carry a review body that no
+// flag names. Guard fragment shipped to hooks.json like the above.
+export const REVIEW_STDIN_GUARD =
+  "(glab mr note|gh pr (review|comment)|draft-note|discussions)[^|;&]*( <|-m |--message)";
+
 // Any prose value in an MCP call puts three spaces, backticks, or JSON-escaped
 // tabs on the hook's stdin, since a stripped code span reads as spaces.
 // hooks.json ships this grep so other calls skip the bun spawn.
@@ -63,6 +68,25 @@ const INPUT_FILE_PATTERN = /(?:^|\s)--input[= ](?:'([^']*)'|"([^"]*)"|(\S+))/g;
 // note, or a GitHub pull request review or comment.
 const REVIEW_COMMAND =
   /draft-note\.ts|discussions\.ts\s+create\b|\bglab\s+api\b[^|;&]*\/(?:draft_notes|discussions|notes)\b|\bglab\s+mr\s+note\b|\bgh\s+api\b[^|;&]*\/pulls\/\d+\/(?:reviews|comments)\b|\bgh\s+pr\s+(?:review|comment)\b/;
+
+const HEREDOC_PATTERN = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2(?=\n|$)/g;
+const STDIN_REDIRECT_PATTERN = /(?<=^|[\s;&|])<\s*(?!<)([^\s<>|;&()]+)/g;
+const SUBSTITUTION_FILE_PATTERN =
+  /(?:^|\s)(?:-m|--message)[= ]["']?\$\(\s*(?:cat\s+|<\s*)(["']?)([^\s)"']+)\1\s*\)/g;
+
+// Stdin redirects in command position: heredoc bodies and quoted strings never count.
+function extractStdinRedirectPaths(command: string): string[] {
+  const bare = command
+    .replaceAll(HEREDOC_PATTERN, "")
+    .replaceAll(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
+  return [...bare.matchAll(STDIN_REDIRECT_PATTERN)]
+    .map((match) => stripQuotes(match[1] ?? ""))
+    .filter((path) => path !== "" && path !== "-" && !path.startsWith("&"));
+}
+
+function extractSubstitutionFilePaths(command: string): string[] {
+  return [...command.matchAll(SUBSTITUTION_FILE_PATTERN)].map((match) => match[2] ?? "");
+}
 
 // Shell quoting survives into the raw command string, so a path captured from
 // `-F 'body=@tmp/x.md'` carries the closing quote.
@@ -142,6 +166,8 @@ const INLINE_ARG_PATTERNS = new Map<string, RegExp>(
   PROSE_FLAGS.map((flag) => [flag, new RegExp(`${flag}[= ](?:"([^"]+)"|'([^']+)')`)]),
 );
 
+const INLINE_SHORT_MESSAGE_PATTERN = /(?:^|\s)-m[= ](?:"([^"]+)"|'([^']+)')/;
+
 function extractInlineArg(command: string, flag: string): string | null {
   const pattern = INLINE_ARG_PATTERNS.get(flag);
   if (!pattern) return null;
@@ -179,9 +205,22 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
       const prose = payload === null ? null : payloadProse(payload);
       if (prose !== null) texts.push(prose);
     }
+    if (REVIEW_COMMAND.test(command)) {
+      const bodyPaths = [
+        ...extractStdinRedirectPaths(command),
+        ...extractSubstitutionFilePaths(command),
+      ];
+      const reviewBodies = await Promise.all(
+        bodyPaths.map((path) => readNewest(pathCandidates(path, process.env, uid))),
+      );
+      texts.push(...reviewBodies.filter((body) => body !== null));
+      const inline = INLINE_SHORT_MESSAGE_PATTERN.exec(command);
+      const value = inline?.[1] ?? inline?.[2];
+      if (value != null && value !== "" && !value.startsWith("$(")) texts.push(value);
+    }
     for (const flag of PROSE_FLAGS) {
       const value = extractInlineArg(command, flag);
-      if (value != null && value !== "") texts.push(value);
+      if (value != null && value !== "" && !value.startsWith("$(")) texts.push(value);
     }
     return texts;
   }

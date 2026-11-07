@@ -29,10 +29,10 @@ Merge only through `merge.ts`. It handles merge trains, auto-merge, and squash. 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --auto-merge --squash
-bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --status
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --status 1298 1299 1300
 ```
 
-`--status` prints merge readiness as JSON without mutating the MR: target branch, draft state, `detailed_merge_status`, head pipeline, and `rebased_on_target`, an ancestry check computed from git. Trust `rebased_on_target` over the API's conflict fields, which lag.
+`--status` takes a branch or one or more MR IIDs and prints a compact readiness line per MR without mutating it: state, draft, branches, sha, `detailed_merge_status`, auto-merge, head pipeline, and `rebased_on_target`, an ancestry check computed from git. Use it to check state after a push or a rebase. Trust `rebased_on_target` over the API's conflict fields, which lag.
 
 #### Re-Arm After a Push
 
@@ -48,12 +48,12 @@ Merging one layer of a stack leaves the layer above it targeting the merged bran
 
 - Push the branch first: `git push -u origin feature-branch && glab mr create --fill`.
 - `--fill` populates title and description from commits and cannot combine with `--title`/`--description`.
-- Pass a body with `--description-file file.md` (gh's `--body-file` does not exist here) in place of `--description "$(cat file.md)"`, which passes the body through the shell and keeps it out of some hooks.
-- `glab mr` has no attach flag. Upload screenshots through project uploads per `gitlab:api` and paste the returned markdown into the description.
+- Pass a body with `--description-file file.md`, or `-` for stdin. gh's `--body-file` does not exist here.
+- Attach a screenshot or recording with `--attach <path>` (repeatable) on `glab mr create`, `glab mr update`, and `glab mr note create`.
 - `--reviewer` and `--assignee` silently drop unknown usernames. Resolve exact usernames first, then confirm they appear in `glab mr view`:
 
 ```bash
-glab api projects/:id/members/all --paginate | jq '.[] | select(.name | test("<name>"; "i")) | {name, username}'
+glab api "projects/:id/members/all?query=<name>" | jq '.[] | {name, username}'
 ```
 
 ## Reviews
@@ -70,7 +70,7 @@ For the underlying GraphQL, reading review state, and grouping every review-requ
 
 ## Re-Request Reviewers
 
-After a push resets approvals, the `mergeRequestReviewerRereview` mutation sets an assigned reviewer's `reviewState` back to `UNREVIEWED`. See [Re-Request Review](review-state.md#re-request-review) for the user-ID lookup and exact mutation.
+After a push resets approvals, a note holding only `/request_review @user` sets that reviewer's `reviewState` back to `UNREVIEWED`. See [Re-Request Review](review-state.md#re-request-review).
 
 ## Discussions
 
@@ -81,7 +81,15 @@ bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --resolvable --unresol
 # Only review-bot threads
 bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts list <iid> --bots --reviewers=${user_config.reviewers}
 
-bun ${CLAUDE_SKILL_DIR}/scripts/discussions.ts resolve <iid> <discussion-id>...
+# Reply in a thread, then resolve it
+glab mr note create <iid> --reply <discussion-id> < tmp/reply.md
+glab mr note resolve <discussion-id> <iid>
 ```
 
 See [discussions.md](discussions.md) for the other commands, the JSON schema, and API pitfalls.
+
+## Notes and Raw API
+
+The `glab mr note` commands (`create`, `draft`, `list`, `resolve`, `reopen`) need glab 1.128 or later. Check `glab --version` before relying on them. Every script here takes `-R group/project` to target an MR outside the current checkout.
+
+For any `glab api` call, read [api.md](api.md) first. It covers jq, error bodies, pagination, path encoding, field types, uploads, and GraphQL.

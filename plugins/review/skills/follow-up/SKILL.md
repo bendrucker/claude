@@ -39,7 +39,7 @@ If `$ARGUMENTS` carries a URL or identifier, use it. If it's empty, detect the c
 
 Both resolve the current branch with no positional argument. Ask me for a URL only if detection comes up empty. A closed or merged PR still resolves, so surface the `state` for me to confirm before proceeding.
 
-For GitLab, load the `gitlab:api` and `gitlab:merge-request` skills for API patterns and MR tooling.
+For GitLab, load the `gitlab:merge-request` skill for MR tooling and API patterns.
 
 ### Sync to the Latest Pushed State
 

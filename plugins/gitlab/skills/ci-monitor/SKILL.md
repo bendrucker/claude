@@ -75,13 +75,15 @@ Report the diagnosis and leave fixes, conflict resolution, and merge checks to t
 For editing `.gitlab-ci.yml` rather than watching a run:
 
 ```bash
-glab ci lint               # Validate .gitlab-ci.yml before pushing
-glab ci status             # Pipeline status for current branch
-glab ci list               # List recent pipelines
-glab ci run                # Trigger a pipeline for the current branch
-glab ci view               # Interactive pipeline/job view
-glab ci trace <job-id>     # Stream job logs
-glab ci retry <job-id>     # Retry a failed job
+glab ci lint                                       # Validate .gitlab-ci.yml before pushing
+glab ci lint --dry-run --include-jobs [--ref <b>]  # Simulate pipeline creation and list its jobs
+glab ci config compile                             # Merged config with includes resolved
+glab ci get [-p <pipeline-id> | --merge-request <iid>] [--status failed] -F json
+glab ci run                                        # Trigger a pipeline for the current branch
+glab ci trace <job-id>                             # Stream job logs
+glab ci retry <job-id>                             # Retry a failed job
 ```
+
+`glab ci view` needs a TTY and fails here. Use `glab ci get` for pipeline and job detail.
 
 Keyword syntax is at <https://docs.gitlab.com/ci/yaml/> and predefined variables at <https://docs.gitlab.com/ci/variables/>.

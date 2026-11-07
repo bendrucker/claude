@@ -386,7 +386,7 @@ export interface MergeStatus {
 }
 
 // Re-polling the MR nudges GitLab's background mergeability computation, so
-// repeated reads converge. Returns the last value seen.
+// repeated reads converge.
 export async function resolveMergeStatus(
   project: string,
   iid: number,
@@ -439,7 +439,6 @@ function selectorArgs(selector: PipelineSelector): string[] {
   return ["--pipeline-id", selector.id];
 }
 
-// Only a claimed success is checked against its jobs, which arrive in the same response.
 function confirmState(status: InternalState, jobs: unknown[], pipelineId: string): InternalState {
   if (status !== "success") return status;
   const records: JobRecord[] = [];

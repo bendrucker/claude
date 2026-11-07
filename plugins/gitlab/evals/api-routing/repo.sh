@@ -1,6 +1,3 @@
-# Sourced by each case's fixture: installs the snapshot glab stand-in, then starts a checkout on the
-# branch of open MR !41, where `priya-n` requested changes. A second branch,
-# `feature/rate-limit`, holds a `config.yaml`.
 here=$(dirname "${BASH_SOURCE[0]}")
 stubs="$here/../../../../packages/eval-stubs"
 bash "$stubs/install.sh"

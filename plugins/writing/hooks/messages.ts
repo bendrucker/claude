@@ -26,7 +26,7 @@ export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 export const INPUT_FILE_GUARD = "--input[= ]";
 
 // `glab mr note ... < file` and `... -m "$(cat file)"` carry a review body that no
-// flag names. Guard fragment shipped to hooks.json like the above.
+// flag names.
 export const REVIEW_STDIN_GUARD =
   "(glab mr note|gh pr (review|comment)|draft-note|discussions)[^|;&]*( <|-m |--message)";
 
@@ -74,7 +74,6 @@ const STDIN_REDIRECT_PATTERN = /(?<=^|[\s;&|])<\s*(?!<)([^\s<>|;&()]+)/g;
 const SUBSTITUTION_FILE_PATTERN =
   /(?:^|\s)(?:-m|--message)[= ]["']?\$\(\s*(?:cat\s+|<\s*)(["']?)([^\s)"']+)\1\s*\)/g;
 
-// Stdin redirects in command position: heredoc bodies and quoted strings never count.
 function extractStdinRedirectPaths(command: string): string[] {
   const bare = command
     .replaceAll(HEREDOC_PATTERN, "")

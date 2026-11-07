@@ -53,7 +53,6 @@ function apiCall({ host, path }: Project, endpoint: string): string {
 
 const options = { segmentValueCharset: "a-zA-Z0-9-_.~%" };
 
-// Resource paths follow the `/-/` separator.
 const routes: Route[] = [
   {
     pattern: new UrlPattern("-/issues/:number(/*)", options),

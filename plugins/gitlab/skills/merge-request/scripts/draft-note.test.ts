@@ -187,7 +187,6 @@ describe("runReview", () => {
 });
 
 describe("cli", () => {
-  // review.md, the writing hook, and the eval graders all invoke `draft-note.ts review <iid>`.
   test("accepts the documented review subcommand", () => {
     const proc = Bun.spawnSync(["bun", join(import.meta.dir, "draft-note.ts"), "review", "7"]);
     expect(proc.stderr.toString().trim()).toBe("--input is required");

@@ -122,7 +122,6 @@ interface Watch {
   /** This session's turns by id, any agent's, to tell its notes from the person's. */
   turns: Map<string, Span>;
   line: string | undefined;
-  /** Whether the pane's muted list is expanded. */
   isMutedOpen: boolean;
   generation: number;
   isStopped: boolean;

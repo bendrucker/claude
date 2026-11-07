@@ -128,7 +128,7 @@ function label(entry: Entry): string {
   return entry.file ?? (entry.replyTo == null ? "general" : `reply ${entry.replyTo}`);
 }
 
-// Returns the process exit code. Nothing is published or approved after a failed entry.
+// Nothing is published or approved after a failed entry.
 export async function runReview(
   entries: Entry[],
   opts: ReviewOptions,

@@ -1,7 +1,5 @@
-// Splits a Bash command into the simple commands it runs. A hook matches a
-// tool only where it is invoked, and quoted text, heredoc bodies, and comments
-// never produce a command. Gating hooks import this module, so it has no
-// runtime dependency.
+// A hook matches a tool only where it is invoked, so quoted text, heredoc
+// bodies, and comments never produce a command.
 
 export interface Word {
   /** The argument as the program receives it, quotes removed. */
@@ -18,7 +16,6 @@ export interface Heredoc {
 export interface Command {
   program: string;
   args: Word[];
-  /** `FOO=bar` assignments ahead of the program. */
   assignments: string[];
   /** Words such as `while`, `do`, or `!` that introduced the command. */
   keywords: string[];
@@ -271,7 +268,6 @@ class Scanner {
     }
   }
 
-  /** Turns a draft into a Command once it holds a program, in source order. */
   private register(draft: DraftCommand | null): void {
     if (draft == null || draft.finished != null) return;
     const assignments: string[] = [];

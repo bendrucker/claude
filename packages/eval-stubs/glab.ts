@@ -257,7 +257,6 @@ function graphql(q: string): Out {
   return fail("glab: GraphQL is unavailable in this snapshot. Use the REST endpoints.");
 }
 
-/** Replaces each `:key` named by a `--placeholder key=value` with the value encoded as one path segment. */
 function expandPlaceholders(endpoint: string, args: Args): string {
   let out = endpoint;
   for (const pair of args.flags.get("--placeholder") ?? []) {

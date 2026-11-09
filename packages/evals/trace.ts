@@ -1,12 +1,26 @@
 import { z } from "zod";
 
 const TraceLine = z.object({ type: z.string(), result: z.string().optional() });
+const Usage = z.object({
+  input_tokens: z.number().nullish(),
+  output_tokens: z.number().nullish(),
+  cache_creation_input_tokens: z.number().nullish(),
+  cache_read_input_tokens: z.number().nullish(),
+});
+const ModelUsage = z.object({
+  inputTokens: z.number().optional(),
+  outputTokens: z.number().optional(),
+  cacheReadInputTokens: z.number().optional(),
+  cacheCreationInputTokens: z.number().optional(),
+});
 const ResultLine = TraceLine.extend({
   num_turns: z.number().nullish(),
   duration_ms: z.number().nullish(),
   total_cost_usd: z.number().nullish(),
-  usage: z.object({ output_tokens: z.number().nullish() }).nullish(),
+  usage: Usage.nullish(),
+  modelUsage: z.record(z.string(), ModelUsage).nullish(),
 });
+type ResultLine = z.infer<typeof ResultLine>;
 const ToolUse = z.object({
   type: z.literal("tool_use"),
   name: z.string(),
@@ -30,19 +44,62 @@ export function traceReply(trace: string): string | undefined {
   return undefined;
 }
 
-/** A trace's measures from its last `result` line, each absent when that line lacks it. */
-export function traceMeasures(trace: string): Measured {
+function lastResult(trace: string): ResultLine | undefined {
   const line = trace
     .split("\n")
     .filter((l) => l.trim() !== "")
     .findLast((l) => TraceLine.parse(JSON.parse(l)).type === "result");
-  if (line === undefined) return {};
-  const last = ResultLine.parse(JSON.parse(line));
+  return line === undefined ? undefined : ResultLine.parse(JSON.parse(line));
+}
+
+export interface TokenUsage {
+  /** Input, output, and cache tokens. */
+  total: number;
+  output: number;
+}
+
+function usageOf(line: ResultLine): TokenUsage | undefined {
+  const models = Object.values(line.modelUsage ?? {});
+  if (models.length > 0) {
+    const sum = (pick: (m: z.infer<typeof ModelUsage>) => number | undefined) =>
+      models.reduce((n, m) => n + (pick(m) ?? 0), 0);
+    const output = sum((m) => m.outputTokens);
+    const total =
+      output +
+      sum((m) => m.inputTokens) +
+      sum((m) => m.cacheReadInputTokens) +
+      sum((m) => m.cacheCreationInputTokens);
+    return { total, output };
+  }
+  const usage = line.usage;
+  if (usage == null) return undefined;
+  const output = usage.output_tokens ?? 0;
+  const total =
+    output +
+    (usage.input_tokens ?? 0) +
+    (usage.cache_read_input_tokens ?? 0) +
+    (usage.cache_creation_input_tokens ?? 0);
+  return { total, output };
+}
+
+/**
+ * A trace's tokens from its last `result` line, undefined when unmeasured. `modelUsage` counts
+ * every model call including subagents, so it wins over `usage`, which counts the main loop only.
+ */
+export function traceUsage(trace: string): TokenUsage | undefined {
+  const last = lastResult(trace);
+  return last === undefined ? undefined : usageOf(last);
+}
+
+/** A trace's measures from its last `result` line, each absent when that line lacks it. */
+export function traceMeasures(trace: string): Measured {
+  const last = lastResult(trace);
+  if (last === undefined) return {};
   return {
     words: last.result?.split(/\s+/).filter(Boolean).length,
     turns: last.num_turns ?? undefined,
     seconds: last.duration_ms == null ? undefined : last.duration_ms / 1000,
-    tokens: last.usage?.output_tokens ?? undefined,
+    tokens: usageOf(last)?.output,
     cost: last.total_cost_usd ?? undefined,
   };
 }

@@ -31,25 +31,40 @@ describe("pFloor", () => {
 });
 
 describe("signFlipPValue", () => {
-  test("returns NaN when every pair tied", () => {
-    expect(signFlipPValue([0.5, 0.5, 0.5])).toBeNaN();
+  test("returns NaN when every difference is zero", () => {
+    expect(signFlipPValue([0, 0, 0])).toBeNaN();
   });
 
-  test("a unanimous win for b is extreme", () => {
+  test("a unanimous win is extreme", () => {
     const rng = seedrandom("test-a");
-    expect(signFlipPValue([1, 1, 1, 1, 1, 1, 1, 1], 2000, rng)).toBeLessThan(0.05);
+    expect(signFlipPValue([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 2000, rng)).toBeLessThan(0.05);
   });
 
   test("an even split is not extreme", () => {
     const rng = seedrandom("test-b");
-    expect(signFlipPValue([1, 0, 1, 0, 1, 0], 2000, rng)).toBeGreaterThan(0.5);
+    expect(signFlipPValue([0.5, -0.5, 0.5, -0.5, 0.5, -0.5], 2000, rng)).toBeGreaterThan(0.5);
   });
 
-  test("is deterministic under a seeded rng", () => {
-    const wins = [1, 1, 0, 1, 0.5, 1, 0];
-    const a = signFlipPValue(wins, 500, seedrandom("same-seed"));
-    const b = signFlipPValue(wins, 500, seedrandom("same-seed"));
-    expect(a).toBe(b);
+  test("a consistent paired gain is extreme", () => {
+    expect(signFlipPValue(Array.from({ length: 20 }, () => 0.2))).toBeLessThan(0.01);
+  });
+
+  test("zeros neither move the p-value nor draw from the rng", () => {
+    const diffs = [0.4, -0.2, 0.6, 0.2];
+    const padded = [0, ...diffs.flatMap((d) => [d, 0])];
+    const scale = padded.length / diffs.length;
+    expect(signFlipPValue(padded, 500, seedrandom("s"))).toBe(
+      signFlipPValue(
+        diffs.map((d) => d * scale),
+        500,
+        seedrandom("s"),
+      ),
+    );
+  });
+
+  test("reprints the same p-value by default", () => {
+    const diffs = [0.5, 0.5, -0.5, 0.5, 0, 0.5, -0.5];
+    expect(signFlipPValue(diffs, 500)).toBe(signFlipPValue(diffs, 500));
   });
 });
 

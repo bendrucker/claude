@@ -4,78 +4,11 @@ import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { mean } from "simple-statistics";
 import { table } from "table";
 import { z } from "zod";
+import { legend, mark } from "../../../../../packages/evals/compare";
 import { listTraces } from "../../../../../packages/evals/layout";
-import { pFloor, pValue } from "../../../../../packages/evals/stats";
+import { type TokenUsage, traceUsage } from "../../../../../packages/evals/trace";
 import { scoreText } from "../../../skills/scan/scripts/score";
 import { extractDeliverable, parseMap } from "./pairwise";
-
-const ModelUsageEntry = z.looseObject({
-  inputTokens: z.number().optional(),
-  outputTokens: z.number().optional(),
-  cacheReadInputTokens: z.number().optional(),
-  cacheCreationInputTokens: z.number().optional(),
-});
-
-const Usage = z.looseObject({
-  input_tokens: z.number().nullish(),
-  output_tokens: z.number().nullish(),
-  cache_creation_input_tokens: z.number().nullish(),
-  cache_read_input_tokens: z.number().nullish(),
-});
-
-const ResultLine = z.looseObject({
-  type: z.literal("result"),
-  usage: Usage.optional(),
-  modelUsage: z.record(z.string(), ModelUsageEntry).optional(),
-});
-
-export interface TokenUsage {
-  total: number;
-  output: number;
-}
-
-/**
- * Token usage read off a trace's final `result` line. `modelUsage` (per-model totals for
- * every call the query pipeline made: main loop, Task subagents, and internal calls) is
- * preferred over `usage` (main agent loop only), per the Agent SDK's own field docs
- * (`@anthropic-ai/claude-agent-sdk` `sdk.d.ts`, `SDKResultSuccess`/`SDKResultError`). Both
- * fields are cumulative across turns, so only the trace's last `result` line is read. Returns
- * undefined when neither field is present, which a caller must treat as "unmeasured," not zero.
- */
-export function tokenUsage(trace: string): TokenUsage | undefined {
-  for (const raw of trace.trim().split("\n").toReversed()) {
-    if (raw === "") continue;
-    const line = ResultLine.safeParse(JSON.parse(raw));
-    if (!line.success) continue;
-
-    const models = line.data.modelUsage;
-    if (models !== undefined && Object.keys(models).length > 0) {
-      let total = 0;
-      let output = 0;
-      for (const m of Object.values(models)) {
-        const out = m.outputTokens ?? 0;
-        total +=
-          (m.inputTokens ?? 0) +
-          out +
-          (m.cacheReadInputTokens ?? 0) +
-          (m.cacheCreationInputTokens ?? 0);
-        output += out;
-      }
-      return { total, output };
-    }
-
-    const usage = line.data.usage;
-    if (usage === undefined) return undefined;
-    const output = usage.output_tokens ?? 0;
-    const total =
-      (usage.input_tokens ?? 0) +
-      output +
-      (usage.cache_read_input_tokens ?? 0) +
-      (usage.cache_creation_input_tokens ?? 0);
-    return { total, output };
-  }
-  return undefined;
-}
 
 const User = z.object({
   type: z.literal("user"),
@@ -166,7 +99,7 @@ export async function loadRuns(
       if (ref.arm !== "with" && ref.arm !== "without") return undefined;
       const draft = extractDeliverable(text, files.get(ref.case));
       const metrics: RunMetrics = {
-        tokens: tokenUsage(text),
+        tokens: traceUsage(text),
         denies: hookDenies(text),
         density: draft === undefined ? undefined : await tropeDensity(draft),
       };
@@ -217,12 +150,6 @@ export interface JsonReport {
 
 const fmt = (xs: number[], digits: number): string =>
   xs.length > 0 ? mean(xs).toFixed(digits) : "-";
-
-function mark(base: number[], xs: number[], alpha: number): string {
-  if (base.length === 0 || xs.length === 0) return "";
-  if (pFloor(base.length, xs.length) >= alpha) return "†";
-  return pValue(base, xs) < alpha ? "*" : "";
-}
 
 function present(xs: (number | undefined)[]): number[] {
   return xs.filter((x): x is number => x !== undefined);
@@ -290,7 +217,7 @@ function renderJson(
           label: labels[i + 1] ?? `candidate${i}`,
           n: xs.length,
           mean: seriesMean(xs),
-          starred: mark(base, xs, alpha) === "*",
+          starred: mark(base, xs, alpha).endsWith("*"),
         })),
       ];
       return { key, values };
@@ -309,7 +236,7 @@ export function render(options: RenderOptions): string {
   }
 
   const out = [
-    `* marks p < ${alpha} against ${labels[0]} (permutation test, pooled runs). † marks a cell with too few runs on one side for any star.\n`,
+    `${legend(labels[0] ?? "base", alpha)} Runs pool across a column's results directories.\n`,
     ...renderTable(groups, labels, alpha),
     `Cost guard (tokens per deliverable, pooled): candidate mean must be at most base mean × ${guardMultiplier}`,
     table([

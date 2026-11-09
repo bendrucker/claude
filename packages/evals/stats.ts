@@ -19,29 +19,24 @@ export function pFloor(n1: number, n2: number): number {
 }
 
 /**
- * Two-sided sign-flip permutation p-value for a win rate against the no-preference null of 0.5.
- * Ties always flip to themselves, so they don't move the p-value. Deterministic under a
- * seeded `rng`.
+ * Two-sided sign-flip permutation p-value for paired differences against a null of zero, NaN
+ * when every difference is zero. A win rate tests as `wins - 0.5`.
  */
 export function signFlipPValue(
-  wins: readonly number[],
+  diffs: readonly number[],
   trials = 10_000,
-  rng: () => number = Math.random,
+  rng: () => number = seedrandom("compare"),
 ): number {
-  const decided = wins.filter((w) => w !== 0.5);
-  if (decided.length === 0) return Number.NaN;
-  const observed = Math.abs(mean([...wins]) - 0.5);
+  if (diffs.every((d) => d === 0)) return Number.NaN;
+  const observed = Math.abs(mean([...diffs]));
   let extreme = 0;
   for (let t = 0; t < trials; t++) {
     let sum = 0;
-    for (const w of wins) {
-      if (w === 0.5) {
-        sum += 0.5;
-      } else {
-        sum += rng() < 0.5 ? w : 1 - w;
-      }
+    for (const d of diffs) {
+      // A zero flips to itself and draws no random number.
+      if (d !== 0) sum += rng() < 0.5 ? d : -d;
     }
-    if (Math.abs(sum / wins.length - 0.5) >= observed - 1e-9) extreme++;
+    if (Math.abs(sum / diffs.length) >= observed - 1e-9) extreme++;
   }
   return extreme / trials;
 }

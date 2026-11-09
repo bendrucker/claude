@@ -1,0 +1,34 @@
+diff --git a/tools/ledgerroll/ledger.go b/tools/ledgerroll/ledger.go
+index c495852..0f2af3b 100644
+--- a/tools/ledgerroll/ledger.go
++++ b/tools/ledgerroll/ledger.go
+@@ -19,6 +19,9 @@ func aggregate(txns []Txn) []*Group {
+ 	index := map[string]*Group{}
+ 	var groups []*Group
+ 	for _, t := range txns {
++		if t.Void {
++			continue
++		}
+ 		key := groupKey(t)
+ 		g, ok := index[key]
+ 		if !ok {
+diff --git a/tools/ledgerroll/record.go b/tools/ledgerroll/record.go
+index 5a720e5..a85aa03 100644
+--- a/tools/ledgerroll/record.go
++++ b/tools/ledgerroll/record.go
+@@ -13,6 +13,7 @@ type Txn struct {
+ 	At       time.Time
+ 	Amount   float64
+ 	Memo     string
++	Void     bool
+ }
+ 
+ func decodeRecord(line []byte) (Txn, error) {
+@@ -40,6 +41,7 @@ func toRecord(raw map[string]any, at time.Time) (Txn, error) {
+ 	t.Account, _ = raw["account"].(string)
+ 	t.Currency, _ = raw["currency"].(string)
+ 	t.Memo, _ = raw["memo"].(string)
++	t.Void, _ = raw["void"].(bool)
+ 	switch a := raw["amount"].(type) {
+ 	case float64:
+ 		t.Amount = a

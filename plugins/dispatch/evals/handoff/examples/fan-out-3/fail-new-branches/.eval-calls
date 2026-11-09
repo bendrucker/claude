@@ -1,0 +1,11 @@
+rex window new -s session:eval cap-delay -c /tmp/eval/cwd/.worktrees/cap-delay --json -- claude --name cap-delay -- <prompt>
+launch cap-delay /tmp/eval/cwd/.worktrees/cap-delay
+allow Bash(bun test:*)
+wt -C /tmp/eval/cwd switch --create add-jitter --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval add-jitter -c /tmp/eval/cwd/.worktrees/add-jitter --json -- claude --name add-jitter -- <prompt>
+launch add-jitter /tmp/eval/cwd/.worktrees/add-jitter
+allow Bash(bun test:*)
+wt -C /tmp/eval/cwd switch --create limit-attempts --base origin/main --no-cd --yes --format=json
+rex window new -s session:eval limit-attempts -c /tmp/eval/cwd/.worktrees/limit-attempts --json -- claude --name limit-attempts -- <prompt>
+launch limit-attempts /tmp/eval/cwd/.worktrees/limit-attempts
+allow Bash(bun test:*)

@@ -1,0 +1,1 @@
+Dispatch a session to add a test for the retry delays in `connect` in `src/client.ts`. It will need to run `make test`, and it should be able to run that without asking for permission. Open a PR once it passes.

@@ -1,0 +1,7 @@
+import { startsUnderAny } from "./paths";
+
+/** Summarizes how many changed files sit under the watched prefixes. */
+export function report(files: string[], watched: string[]): string {
+  const hits = files.filter((file) => startsUnderAny([file], watched));
+  return `${hits.length}/${files.length} under watched paths`;
+}

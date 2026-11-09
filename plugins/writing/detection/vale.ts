@@ -144,12 +144,17 @@ async function packagesReady(): Promise<boolean> {
 
 const INSTALL_HINT = `bun "${join(import.meta.dirname, "..", "hooks", "sessionstart.ts")}"`;
 
-// A repo's own config replaces the plugin's, since Vale merges only the global
-// config with one other. Tests skip the global config so they see only the plugin's styles.
+// The plugin's config skips the global one, whose sections would lint files and
+// checks the plugin never calibrated. A repo's own config merges with the global
+// config as Vale does, except under tests.
+function skipsGlobal(root: string | null): boolean {
+  return root === null || process.env.NODE_ENV === "test";
+}
+
 async function configArgs(source: ValeSource): Promise<{ args: string[]; cwd?: string }> {
   const root = "filePath" in source ? await repoConfigRoot(source.filePath) : null;
   const args = root === null ? [`--config=${VALE_CONFIG}`] : [];
-  if (process.env.NODE_ENV === "test") args.push("--no-global");
+  if (skipsGlobal(root)) args.push("--no-global");
   args.push(sourceArg(source, root));
   return root === null ? { args } : { args, cwd: root };
 }
@@ -187,7 +192,7 @@ function alertsOf(stdout: string | null): ValeAlert[] {
 
 function fileArgs(filePath: string, root: string | null): string[] {
   const args = root === null ? [`--config=${VALE_CONFIG}`, filePath] : [relative(root, filePath)];
-  if (process.env.NODE_ENV === "test") args.unshift("--no-global");
+  if (skipsGlobal(root)) args.unshift("--no-global");
   return args;
 }
 

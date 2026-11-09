@@ -1,0 +1,10 @@
+import { expect, test } from "bun:test";
+import { parseLcov } from "./reader";
+
+test("CRLF records parse to clean paths and counts", () => {
+  const [fc] = parseLcov("SF:src/a.ts\r\nDA:1,1\r\nDA:2,0\r\nFNF:2\r\nFNH:1\r\nend_of_record\r\n");
+  expect(fc.file).toBe("src/a.ts");
+  expect(fc.lineHits.get(1)).toBe(1);
+  expect(fc.functionsFound).toBe(2);
+  expect(fc.functionsHit).toBe(1);
+});

@@ -3,7 +3,15 @@ import { mkdtempSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { lintProse, ValeError, valeAlerts, valeBinary } from "./vale";
+import {
+  ensurePackages,
+  lintFile,
+  lintProse,
+  VALE_CONFIG,
+  ValeError,
+  valeAlerts,
+  valeBinary,
+} from "./vale";
 
 const root = join(import.meta.dirname, "..");
 
@@ -31,6 +39,22 @@ test.each<{ name: string; args: string[] }>([
   });
 });
 
+// The ai-tells package ships every check at error, which denies a message, so a package bump must not add one unlevelled.
+test("every ai-tells check has a level in the plugin config", async () => {
+  await ensurePackages(valeBinary() ?? "vale");
+  const checks = await Array.fromAsync(
+    new Bun.Glob("*.yml").scan({ cwd: join(root, "styles", "ai-tells") }),
+  );
+  const config = await Bun.file(VALE_CONFIG).text();
+  const levelled = new Set(config.match(/^ai-tells\.\w+(?= = )/gm));
+  const unlevelled = checks
+    .map((file) => `ai-tells.${file.replace(/\.yml$/, "")}`)
+    .filter((check) => !levelled.has(check))
+    .toSorted();
+  expect(checks.length).toBeGreaterThan(0);
+  expect(unlevelled).toEqual([]);
+});
+
 describe("lintProse", () => {
   const dense =
     "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
@@ -52,6 +76,40 @@ describe("lintProse", () => {
       positions.toSorted(([al = 0, ac = 0], [bl = 0, bc = 0]) => (al === bl ? ac - bc : al - bl)),
     );
     expect(positions.length).toBeGreaterThan(1);
+  });
+});
+
+// A global config's `[*]` section once merged into the plugin's and linted CSS in an SVG `<style>` as prose.
+describe("a global config beside the plugin's", () => {
+  let home: string;
+  const keys = ["NODE_ENV", "XDG_CONFIG_HOME"] as const;
+  const saved = new Map(keys.map((key) => [key, process.env[key]]));
+
+  beforeAll(async () => {
+    home = mkdtempSync(join(tmpdir(), "vale-global-"));
+    await Bun.write(
+      join(home, "vale", ".vale.ini"),
+      `StylesPath = ${join(root, "styles")}\n[*]\nBasedOnStyles = ai-tells\n`,
+    );
+    process.env.NODE_ENV = "production";
+    process.env.XDG_CONFIG_HOME = home;
+  });
+
+  afterAll(async () => {
+    for (const [key, value] of saved) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await rm(home, { recursive: true, force: true });
+  });
+
+  test("leaves a file no plugin section matches unlinted", async () => {
+    const svg = join(home, "badge.svg");
+    await Bun.write(
+      svg,
+      '<svg><style>.cap { font-size: 12px; letter-spacing: 1.2px; }</style><text style="fill: red; font-size: 9px;">Hi</text></svg>\n',
+    );
+    expect(await lintFile(svg)).toEqual([]);
   });
 });
 

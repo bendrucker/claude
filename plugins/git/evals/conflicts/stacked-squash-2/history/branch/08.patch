@@ -1,0 +1,156 @@
+diff --git a/plugins/pull-request/evals/pr-body/scripts/limits.test.ts b/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
+index 246141a4..5c3782f6 100644
+--- a/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
++++ b/plugins/pull-request/evals/pr-body/scripts/limits.test.ts
+@@ -65,6 +65,8 @@ test("scores the stub body when a tool result carries one and the reply otherwis
+     ["visible-words", true],
+     ["max-block", true],
+     ["prose-code-spans", false],
++    ["path-spans", true],
++    ["contrast-phrases", true],
+     ["hidden-words", false],
+     ["list-items", true],
+   ]);
+@@ -73,20 +75,22 @@ test("scores the stub body when a tool result carries one and the reply otherwis
+     ["visible-words", false],
+     ["max-block", false],
+     ["prose-code-spans", true],
++    ["path-spans", true],
++    ["contrast-phrases", true],
+     ["hidden-words", true],
+     ["list-items", true],
+   ]);
+   expect(written.cases[0]?.arms.with?.[0]?.graders.at(-1)?.explanation).toContain("from stub");
+   expect(written.cases[0]?.arms.with?.[1]?.graders.at(-1)?.explanation).toContain("from reply");
+-  expect(written.cases[0]?.arms.with?.map((r) => r.score)).toEqual([4 / 6, 4 / 6, 1]);
++  expect(written.cases[0]?.arms.with?.map((r) => r.score)).toEqual([6 / 8, 6 / 8, 1]);
+   expect(written.cases[0]?.arms.without?.[0]?.score).toBe(1);
+   expect(await Bun.file(join(out, "traces/one-with-1.jsonl")).exists()).toBe(true);
+   expect(render(counts)).toMatchInlineSnapshot(`
+-    "╔══════╤════════════════════╤════════════════╤═══════════════════════╤═══════════════════╤═════════════════╤═══════════════════════╤═══════════════════╤══════════════════════════╤══════════════════════╤════════════════════╗
+-    ║ case │ with visible-words │ with max-block │ with prose-code-spans │ with hidden-words │ with list-items │ without visible-words │ without max-block │ without prose-code-spans │ without hidden-words │ without list-items ║
+-    ╟──────┼────────────────────┼────────────────┼───────────────────────┼───────────────────┼─────────────────┼───────────────────────┼───────────────────┼──────────────────────────┼──────────────────────┼────────────────────╢
+-    ║ one  │ 1/2                │ 1/2            │ 1/2                   │ 1/2               │ 2/2             │ 1/1                   │ 1/1               │ 1/1                      │ 1/1                  │ 1/1                ║
+-    ╚══════╧════════════════════╧════════════════╧═══════════════════════╧═══════════════════╧═════════════════╧═══════════════════════╧═══════════════════╧══════════════════════════╧══════════════════════╧════════════════════╝
++    "╔══════╤════════════════════╤════════════════╤═══════════════════════╤═════════════════╤═══════════════════════╤═══════════════════╤═════════════════╤═══════════════════════╤═══════════════════╤══════════════════════════╤════════════════════╤══════════════════════════╤══════════════════════╤════════════════════╗
++    ║ case │ with visible-words │ with max-block │ with prose-code-spans │ with path-spans │ with contrast-phrases │ with hidden-words │ with list-items │ without visible-words │ without max-block │ without prose-code-spans │ without path-spans │ without contrast-phrases │ without hidden-words │ without list-items ║
++    ╟──────┼────────────────────┼────────────────┼───────────────────────┼─────────────────┼───────────────────────┼───────────────────┼─────────────────┼───────────────────────┼───────────────────┼──────────────────────────┼────────────────────┼──────────────────────────┼──────────────────────┼────────────────────╢
++    ║ one  │ 1/2                │ 1/2            │ 1/2                   │ 2/2             │ 2/2                   │ 1/2               │ 2/2             │ 1/1                   │ 1/1               │ 1/1                      │ 1/1                │ 1/1                      │ 1/1                  │ 1/1                ║
++    ╚══════╧════════════════════╧════════════════╧═══════════════════════╧═════════════════╧═══════════════════════╧═══════════════════╧═════════════════╧═══════════════════════╧═══════════════════╧══════════════════════════╧════════════════════╧══════════════════════════╧══════════════════════╧════════════════════╝
+     "
+   `);
+ });
+diff --git a/plugins/pull-request/evals/pr-body/scripts/limits.ts b/plugins/pull-request/evals/pr-body/scripts/limits.ts
+index cc8704e1..2024f717 100644
+--- a/plugins/pull-request/evals/pr-body/scripts/limits.ts
++++ b/plugins/pull-request/evals/pr-body/scripts/limits.ts
+@@ -30,6 +30,8 @@ const ROWS = {
+   visibleWords: "visible-words",
+   maxBlockWords: "max-block",
+   proseCodeSpans: "prose-code-spans",
++  pathSpans: "path-spans",
++  contrastPhrases: "contrast-phrases",
+   hiddenWords: "hidden-words",
+   maxItemsPerList: "list-items",
+ } as const satisfies Record<CheckKey, string>;
+@@ -156,7 +158,7 @@ export function render(counts: Counts): string {
+ 
+ const program = new Command()
+   .description(
+-    "Add visible-words, max-block, prose-code-spans, hidden-words, and list-items rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
++    "Add visible-words, max-block, prose-code-spans, path-spans, contrast-phrases, hidden-words, and list-items rows to every run of a results directory, measured on the PR body the run produced. Writes <results-dir>-limits/ beside it for compare.ts.",
+   )
+   .argument("<results-dir...>", "results directories holding aggregate-result.json and traces/")
+   .action(async (dirs) => {
+diff --git a/plugins/pull-request/evals/pr-body/structure.ts b/plugins/pull-request/evals/pr-body/structure.ts
+index 18135815..37c8ba46 100644
+--- a/plugins/pull-request/evals/pr-body/structure.ts
++++ b/plugins/pull-request/evals/pr-body/structure.ts
+@@ -39,8 +39,19 @@ export interface Structure {
+   dashes: number;
+   inlineCodePer100: number;
+   proseCodeSpans: number;
++  pathSpans: number;
++  contrastPhrases: number;
+ }
+ 
++// A span reads as a file path when it has a directory separator or a source
++// file extension. A dotted identifier like `opts.cases` is not one.
++const PATH_SPAN =
++  /^(?!\w+:\/\/)[^\s()]*(?:\/[^\s()]*|\.(?:[cm]?[jt]sx?|json|ya?ml|toml|md|mdx|py|go|rs|rb|sh|zsh|sql|tf|lock|txt|css|html|java|kt|swift|env))$/;
++
++// Contrast connectives Claude stacks to justify a decision. Ben's own PRs
++// rarely use two.
++const CONTRAST = /\b(?:instead of|rather than|so that|without)\b/gi;
++
+ const wordSeg = new Intl.Segmenter("en", { granularity: "word" });
+ const sentenceSeg = new Intl.Segmenter("en", { granularity: "sentence" });
+ 
+@@ -88,6 +99,7 @@ interface Acc {
+   collapsedBlocks: number;
+   checkboxes: number;
+   inlineCode: number;
++  pathSpans: number;
+   proseText: string[];
+ }
+ 
+@@ -97,9 +109,9 @@ function countImages(node: Nodes): number {
+   return "children" in node ? node.children.reduce((n, c) => n + countImages(c), 0) : 0;
+ }
+ 
+-function countInlineCode(node: Nodes): number {
+-  if (node.type === "inlineCode") return 1;
+-  return "children" in node ? node.children.reduce((n, c) => n + countInlineCode(c), 0) : 0;
++function countInlineCode(node: Nodes, path = false): number {
++  if (node.type === "inlineCode") return !path || PATH_SPAN.test(node.value) ? 1 : 0;
++  return "children" in node ? node.children.reduce((n, c) => n + countInlineCode(c, path), 0) : 0;
+ }
+ 
+ function visitList(list: List, acc: Acc): void {
+@@ -112,9 +124,9 @@ function visitList(list: List, acc: Acc): void {
+     acc.bulletSentences.push(sentences(text).length);
+     acc.listWords += words;
+     acc.visibleWords += words;
+-    acc.inlineCode += item.children
+-      .filter((c) => c.type !== "list")
+-      .reduce((n, c) => n + countInlineCode(c), 0);
++    const own = item.children.filter((c) => c.type !== "list");
++    acc.inlineCode += own.reduce((n, c) => n + countInlineCode(c), 0);
++    acc.pathSpans += own.reduce((n, c) => n + countInlineCode(c, true), 0);
+     acc.visibleImages += countImages(item);
+     acc.proseText.push(text);
+     for (const child of item.children) if (child.type === "list") visitList(child, acc);
+@@ -162,6 +174,7 @@ function visitChildren(children: RootContent[], acc: Acc, collapsed: boolean): v
+         acc.visibleWords += words;
+         acc.visibleImages += countImages(node);
+         acc.inlineCode += countInlineCode(node);
++        acc.pathSpans += countInlineCode(node, true);
+         acc.proseText.push(text);
+         break;
+       }
+@@ -213,6 +226,7 @@ export function measureStructure(body: string): Structure {
+     collapsedBlocks: 0,
+     checkboxes: 0,
+     inlineCode: 0,
++    pathSpans: 0,
+     proseText: [],
+   };
+   visitChildren(root.children, acc, false);
+@@ -251,6 +265,8 @@ export function measureStructure(body: string): Structure {
+     dashes: per100((prose.match(/\s[—–]\s|—/g) ?? []).length, v),
+     inlineCodePer100: per100(acc.inlineCode, v),
+     proseCodeSpans: acc.inlineCode,
++    pathSpans: acc.pathSpans,
++    contrastPhrases: (prose.match(CONTRAST) ?? []).length,
+   };
+ }
+ 
+@@ -260,6 +276,8 @@ export const LIMITS = {
+   visibleWords: 120,
+   maxBlockWords: 40,
+   proseCodeSpans: 6,
++  pathSpans: 1,
++  contrastPhrases: 1,
+ } as const satisfies Partial<Structure>;
+ 
+ export type LimitKey = keyof typeof LIMITS;

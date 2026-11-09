@@ -1,0 +1,1 @@
+worker: add zod

@@ -1,0 +1,26 @@
+diff --git a/lib/archive.sh b/lib/archive.sh
+new file mode 100644
+index 0000000..f69fd9c
+--- /dev/null
++++ b/lib/archive.sh
+@@ -0,0 +1,7 @@
++#!/usr/bin/env bash
++. "$(dirname "${BASH_SOURCE[0]}")/size.sh"
++
++archive_size() {
++  local archive_kb=$1
++  printf 'archive: %s\n' "$(human_size "$archive_kb")"
++}
+diff --git a/lib/size.sh b/lib/size.sh
+index 8e4f97d..e945410 100644
+--- a/lib/size.sh
++++ b/lib/size.sh
+@@ -2,7 +2,7 @@
+ 
+ # human_size <kilobytes>: prints a size such as 1.5 MB.
+ human_size() {
+-  local kb=$1
++  local kb=${1:?size required}
+   if [ "$kb" -ge 1048576 ]; then
+     printf '%d.%d GB\n' $((kb / 1048576)) $((kb * 10 / 1048576 % 10))
+   elif [ "$kb" -ge 1024 ]; then

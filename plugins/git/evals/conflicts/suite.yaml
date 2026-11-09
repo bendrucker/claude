@@ -1,0 +1,16 @@
+allow_tools: [Bash, Edit, Write, "WebFetch(domain:registry.npmjs.org)"]
+judge_model: claude-sonnet-5-5
+stage: [packages/eval-stubs]
+graders:
+  skill-unused: "quiet-*"
+  squashed: [quiet-squash]
+  completed: "!{staged,quiet}-*"
+  committed-clean: "!{staged,quiet}-*"
+  on-main: "!{staged,quiet}-*"
+  pushed: "!{staged,quiet}-*"
+  no-main-push: "!{staged,quiet}-*"
+  lease-push: [claude-md-both, claude-md-both-2, code-tests, code-tests-long, code-tests-2, codemod-rename, codemod-rename-long, dir-rename, generated-region, lockfile-deps, lockfile-large, lockfile-workspaces, moved-edit, reformat-pass, reformat-pass-2, stacked-squash, stacked-squash-2, unit-change, codemod-rename-h, moved-edit-h, unit-change-h, lockfile-large-h, lockfile-union, lockfile-union-2, dirty-stash, diverged, cherry-pick, rerere-stack, shell-trace, go-ledger, py-legacy-totals, shell-archive-rename]
+  check-pass: [code-tests, code-tests-long, code-tests-2, dir-rename, stacked-squash, lockfile-workspaces, lockfile-deps, lockfile-large, reformat-pass, reformat-pass-2, codemod-rename, codemod-rename-long, moved-edit, unit-change, codemod-rename-h, moved-edit-h, unit-change-h, lockfile-large-h, lockfile-union, lockfile-union-2, shell-trace, go-ledger, py-legacy-totals, shell-archive-rename]
+  left-for-user: "staged-*"
+  not-pushed: "{staged,quiet}-*"
+collect: [.git/origin.git/hooks/eval-check.log]

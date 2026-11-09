@@ -1,0 +1,8 @@
+diff --git a/docs/ledger.md b/docs/ledger.md
+new file mode 100644
+--- /dev/null
++++ b/docs/ledger.md
+@@ -0,0 +1,3 @@
++# Ledger
++
++The daily roll writes one CSV row per transaction.

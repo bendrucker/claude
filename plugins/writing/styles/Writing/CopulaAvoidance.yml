@@ -8,19 +8,19 @@ ignorecase: true
 tokens:
   - '(?:serves|stands) as'
 tests:
-  - name: "flags The module serves as the entry point."
+  - name: "flags the serves-as copula"
     input: |
       The module serves as the entry point.
     contains: [Writing.CopulaAvoidance]
-  - name: "flags This stands as a reminder."
+  - name: "flags the stands-as copula"
     input: |
       This stands as a reminder.
     contains: [Writing.CopulaAvoidance]
-  - name: "allows The restaurant serves food."
+  - name: "allows serves with an object"
     input: |
       The restaurant serves food.
     absent: Writing.CopulaAvoidance
-  - name: "allows She stands at the podium."
+  - name: "allows stands as posture"
     input: |
       She stands at the podium.
     absent: Writing.CopulaAvoidance

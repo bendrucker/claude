@@ -94,6 +94,22 @@ test("timeHook records one line per invocation with the input's identifiers", as
   expect(Date.parse(entry.ts)).not.toBeNaN();
 });
 
+test("timeHook records the last stage the wrapped call names", async () => {
+  const path = metricsPath();
+  await timeHook(
+    "worktree",
+    { session_id: "abc" },
+    (setStage) => {
+      setStage("first");
+      setStage("second");
+      return null;
+    },
+    path,
+  );
+
+  expect(await readOne(path)).toMatchObject({ outcome: "silent", stage: "second" });
+});
+
 test("timeHook measures the wrapped call and returns its output", async () => {
   const path = metricsPath();
   const output: SyncHookJSONOutput = {

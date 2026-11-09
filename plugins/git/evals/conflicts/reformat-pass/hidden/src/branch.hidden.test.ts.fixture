@@ -1,0 +1,16 @@
+import { expect, test } from 'bun:test';
+import { effortMarker } from './effort';
+import { modelMarker } from './model';
+import { parseTags } from './tags';
+
+test('parseTags drops repeated tags within one value', () => {
+  expect(parseTags('a,b,a')).toEqual(['a', 'b']);
+});
+
+test('modelMarker recognizes the gemini family', () => {
+  expect(modelMarker('gemini-3-pro')).toEqual({ letter: 'g', isDefault: false });
+});
+
+test('effortMarker knows the minimal level', () => {
+  expect(effortMarker('minimal')).toEqual({ glyph: '·', isDefault: false });
+});

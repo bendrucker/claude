@@ -1,0 +1,12 @@
+from tally.seq import batched
+
+BATCH = 100
+
+
+def load(rows, sink):
+    """Sends non-empty rows to sink in batches and returns how many batches went out."""
+    sent = 0
+    for batch in batched([row for row in rows if row], BATCH):
+        sink(batch)
+        sent += 1
+    return sent

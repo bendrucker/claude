@@ -8,19 +8,19 @@ ignorecase: true
 tokens:
   - '\b(?:rollback|cleanup|migration|error|consumer|state|budget|ingest|deletion|upgrade|onboarding|testing|deploy(?:ment)?|win)\s+stor(?:y|ies)\b'
 tests:
-  - name: "flags The migration story gets messy across major versions."
+  - name: "flags a story headed by a process noun"
     input: |
       The migration story gets messy across major versions.
     contains: [Writing.AbstractStory]
-  - name: "flags This improves the rollback story."
+  - name: "flags a story ending the sentence"
     input: |
       This improves the rollback story.
     contains: [Writing.AbstractStory]
-  - name: "allows The Storybook story renders the grid."
+  - name: "allows a Storybook story"
     input: |
       The Storybook story renders the grid.
     absent: Writing.AbstractStory
-  - name: "allows The user story covers the checkout flow."
+  - name: "allows a user story"
     input: |
       The user story covers the checkout flow.
     absent: Writing.AbstractStory

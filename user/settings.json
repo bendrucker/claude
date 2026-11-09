@@ -267,6 +267,7 @@
         "github.com",
         "raw.githubusercontent.com",
         "api.github.com",
+        "uploads.github.com",
         "api.individual.githubcopilot.com",
         "gitlab.com",
         "api.linear.app",
@@ -301,6 +302,7 @@
         "~/Library/Application Support/rex/server.sock",
         "~/.local/state/vm",
         "~/.docker/run/docker.sock",
+        "~/.agent-browser",
         "/tmp/claude"
       ]
     },
@@ -371,7 +373,6 @@
   "env": {
     "TMPDIR": "/tmp",
     "TMPPREFIX": "/tmp/claude/zsh",
-    "WORKTRUNK_WORKTREE_PATH": ".worktrees/{{ branch | sanitize }}",
     "CLAUDE_CODE_NO_FLICKER": "1",
     "NODE_USE_ENV_PROXY": "1",
     "AGENT_BROWSER_IDLE_TIMEOUT_MS": "600000",

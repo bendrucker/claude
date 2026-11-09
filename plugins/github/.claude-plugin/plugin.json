@@ -1,6 +1,6 @@
 {
   "name": "github",
-  "description": "GitHub workflow, Actions monitoring, and rulesets management",
+  "description": "GitHub Actions monitoring and pull request tooling",
   "author": {
     "name": "Ben Drucker",
     "email": "bvdrucker@gmail.com"

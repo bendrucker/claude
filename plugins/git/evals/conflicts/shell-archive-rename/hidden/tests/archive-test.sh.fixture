@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/archive-test.XXXXXX")
+mkdir -p "$tmp/notes/.git" "$tmp/out"
+echo hello > "$tmp/notes/a.txt"
+echo object > "$tmp/notes/.git/HEAD"
+
+for day in 01 02 03 04; do
+  touch "$tmp/out/notes-202601${day}000000.tar.gz"
+done
+
+ARCHIVE_KEEP=3 ARCHIVE_STAMP=20260105000000 "$root/bin/archive" "$tmp/notes" "$tmp/out"
+
+[ "$(ls "$tmp/out" | wc -l | tr -d ' ')" = 3 ]
+[ -f "$tmp/out/notes-20260105000000.tar.gz" ]
+[ ! -e "$tmp/out/notes-20260101000000.tar.gz" ]
+tar -tzf "$tmp/out/notes-20260105000000.tar.gz" | grep -q 'notes/a.txt'
+if tar -tzf "$tmp/out/notes-20260105000000.tar.gz" | grep -q '\.git'; then
+  echo ".git was archived" >&2
+  exit 1
+fi
+
+mkdir -p "$tmp/home/notes"
+echo note > "$tmp/home/notes/b.txt"
+HOME="$tmp/home" "$root/bin/nightly"
+ls "$tmp/home/backups"/notes-*.tar.gz > /dev/null
+
+rm -rf "$tmp"

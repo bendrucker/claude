@@ -24,24 +24,52 @@
   .note { width: 45%; }
   .pattern { width: 14rem; }
   #flagbar { position: sticky; top: 0; background: Canvas; padding: .5rem 0; border-bottom: 1px solid #8884; }
+  :root { color-scheme: light dark; --slop: #d9480f; --fine: #2b8a3e; --unsure: #868e96; --accent: #5f3dc4; --tint: #5f3dc414; }
+  h1 { color: var(--accent); margin-bottom: .5rem; }
+  nav button.on { background: var(--accent); color: white; border: 1px solid var(--accent); border-radius: 4px; }
   body:has(#cards:not([hidden])) { max-width: 78rem; }
-  #cards { display: grid; grid-template-columns: 1fr 20rem; gap: 2rem; align-items: start; }
-  #card { border: 1px solid #8884; border-radius: 10px; padding: 1.5rem 2rem; min-height: 16rem; }
-  #card .where { font-size: 13px; color: #777; margin-bottom: 1rem; }
+  #cards { display: grid; grid-template-columns: 1fr 21rem; gap: 2rem; align-items: start; }
+  #card { border: 1px solid #8884; border-top: 6px solid var(--accent); border-radius: 10px; padding: 1.25rem 2rem 1.5rem; min-height: 16rem; background: var(--tint); }
+  #card .ask { font-size: 18px; font-weight: 700; }
+  #card .how { font-size: 13px; color: #777; margin: .2rem 0 1rem; }
+  #card .where { font-size: 13px; color: #777; margin-bottom: .5rem; }
   #card .near { font-family: ui-monospace, monospace; font-size: 14px; color: #999; white-space: pre-wrap; min-height: 1.4em; }
   #card .line { font-size: 22px; line-height: 1.5; margin: .75rem 0; white-space: pre-wrap; }
-  #card .inputs { margin-top: 1.25rem; display: flex; gap: .5rem; }
+  #card .line mark { background: #fab00566; border-bottom: 3px solid #f59f00; padding: 0 2px; }
+  #card .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-top: 1.25rem; }
+  #card .choices button { margin: 0; padding: .55rem .8rem; border-radius: 8px; border: 2px solid; background: Canvas; text-align: left; cursor: pointer; font-size: 15px; }
+  #card .choices small { display: block; font-size: 12px; color: #777; font-weight: 400; }
+  .choices .wrong { border-color: var(--fine); color: var(--fine); font-weight: 700; }
+  .choices .unsure { border-color: var(--unsure); color: var(--unsure); font-weight: 700; }
+  .choices .right { border-color: var(--slop); color: var(--slop); font-weight: 700; }
+  #card .inputs { margin-top: 1rem; display: flex; gap: .5rem; }
   #card .inputs .note { flex: 1; }
-  #reveal { margin-top: 1rem; min-height: 6rem; font-size: 14px; }
-  #reveal .verdict { font-weight: 700; }
-  #reveal .right { color: #c33; }
-  #reveal .wrong { color: #393; }
+  #status { min-height: 1.5em; margin-top: .6rem; font-size: 14px; }
+  #status.saving { color: #777; }
+  #status.error { color: white; background: #c92a2a; border-radius: 6px; padding: .4rem .7rem; font-weight: 600; }
+  #reveal { margin-top: 1.25rem; font-size: 14px; border-left: 4px solid var(--unsure); padding: .25rem 0 .25rem 1rem; }
+  #reveal:empty { display: none; }
+  #reveal.right { border-color: var(--slop); }
+  #reveal.wrong { border-color: var(--fine); }
+  #reveal h3 { margin: 0 0 .4rem; font-size: 15px; }
+  #reveal p { margin: .3rem 0; }
+  .verdict.right { color: var(--slop); }
+  .verdict.wrong { color: var(--fine); }
+  .verdict.unsure { color: var(--unsure); }
   #reveal table, #board table { border-collapse: collapse; margin-top: .4rem; font-size: 13px; }
-  #reveal td, #board td { padding: 1px .6rem 1px 0; }
-  .call-enable, .call-retire { font-weight: 700; }
+  #reveal th { text-align: left; font-weight: 600; color: #777; padding-right: .8rem; }
+  #reveal td, #board td { padding: 2px .8rem 2px 0; vertical-align: top; }
+  .call { border-radius: 4px; padding: 0 .35rem; font-weight: 600; white-space: nowrap; }
+  .call-enable { background: #2b8a3e; color: white; }
+  .call-keep { background: #2b8a3e33; }
+  .call-retire { background: #c92a2a; color: white; }
+  .call-leave-off { background: #86868b33; }
+  .call-open { background: #5f3dc41f; color: var(--accent); }
   .badge { font-size: 12px; border: 1px solid #8886; border-radius: 4px; padding: 0 .3rem; margin-left: .3rem; }
-  #board { font-size: 14px; position: sticky; top: 1rem; }
-  #board .counts { font-size: 18px; margin-bottom: .5rem; }
+  #board { font-size: 14px; position: sticky; top: 1rem; border: 1px solid #8884; border-radius: 10px; padding: 1rem 1.25rem; }
+  #board .tally { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-bottom: .75rem; }
+  #board .tally div { background: var(--tint); border-radius: 8px; padding: .4rem .6rem; }
+  #board .tally b { display: block; font-size: 22px; color: var(--accent); }
 </style>
 </head>
 <body>
@@ -51,8 +79,9 @@
 
 <section id="cards">
   <div>
-    <p class="keys">→ slop · ← fine · ↓ unsure · z back · p pattern · n note · Esc leaves an input</p>
+    <p class="keys">← fine · ↓ unsure · → slop · z back to the last card · p pattern · n note · Esc leaves an input</p>
     <div id="card"></div>
+    <div id="status"></div>
     <div id="reveal"></div>
   </div>
   <aside id="board"></aside>
@@ -204,67 +233,167 @@ async function flag() {
 
 const pct = (x) => `${Math.round(x * 100)}%`;
 const VERDICT = { right: "slop", wrong: "fine", unsure: "unsure" };
-const REVEAL_MS = 1100;
-let deck = [], at = -1, revealing = null;
+let deck = [], at = -1, busy = false, stalled = false, savedThisSitting = 0;
+let scale = { floor: 0.6, minLabeled: 10 };
 
-function ratingRows(rows) {
-  return `<table>${rows.map((r) => `<tr><td>${esc(r.check)}${r.shipped ? "" : '<span class="badge">off</span>'}</td><td>${r.right}✓ ${r.wrong}✗</td><td>${pct(r.low)}–${pct(r.high)}</td><td class="call-${r.call.replace(" ", "-")}">${r.call}</td></tr>`).join("")}</table>`;
+const callTag = (call) => `<span class="call call-${call.replace(" ", "-")}">${call}</span>`;
+
+function lean(r) {
+  const above = r.right / (r.right + r.wrong) >= scale.floor;
+  if (r.shipped) return above ? "keep" : "retire";
+  return above ? "enable" : "leave off";
 }
 
-function renderBoard(board) {
-  document.getElementById("board").innerHTML = `<div class="counts"><b>${board.decided}</b> decided · <b>${board.open}</b> open</div>` +
-    (board.calls.length === 0 ? `<p class="meta">No calls yet. A check needs ten judged hits and an interval clear of the floor.</p>` : ratingRows(board.calls));
+function standing(r) {
+  if (r.call !== "open") return `${callTag(r.call)} decided`;
+  const judged = r.right + r.wrong;
+  const leaning = judged === 0 ? "" : `, leaning ${lean(r)}`;
+  if (judged < scale.minLabeled) return `${callTag("open")} ${scale.minLabeled - judged} more judged hits${leaning}`;
+  return `${callTag("open")} range still crosses ${pct(scale.floor)}${leaning}`;
+}
+
+function ratingRows(rows) {
+  return `<table><tr><th>check</th><th>judged</th><th>precision range</th><th>standing</th></tr>${rows.map((r) => `<tr><td>${esc(r.check)}${r.shipped ? "" : '<span class="badge">off</span>'}</td><td>${r.right} slop · ${r.wrong} fine</td><td>${pct(r.low)}–${pct(r.high)}</td><td>${standing(r)}</td></tr>`).join("")}</table>`;
+}
+
+function renderBoard(body) {
+  scale = { floor: body.floor, minLabeled: body.minLabeled };
+  const { board } = body;
+  document.getElementById("board").innerHTML = `<div class="tally">
+      <div><b>${savedThisSitting}</b>votes saved this sitting</div>
+      <div><b>${body.labeled}</b>cards labeled in all</div>
+      <div><b>${board.decided}</b>checks decided</div>
+      <div><b>${board.open}</b>checks open</div>
+    </div>` +
+    (board.calls.length === 0
+      ? `<p class="meta">No calls yet. A check is decided once it has ${scale.minLabeled} judged hits and its precision range sits wholly above or below ${pct(scale.floor)}.</p>`
+      : ratingRows(board.calls));
+}
+
+function setStatus(text, kind = "") {
+  const status = document.getElementById("status");
+  status.textContent = text;
+  status.className = kind;
+}
+
+async function request(path, init) {
+  let response;
+  try {
+    response = await fetch(path, init);
+  } catch {
+    throw new Error("the lab server isn't responding. Restart it with `lab.ts serve`, then press the key again");
+  }
+  const text = await response.text();
+  if (response.status === 404 && text === "unknown hit") throw new Error("a new sweep replaced this card's hit. Reload the page for fresh cards");
+  if (!response.ok) throw new Error(`${response.status} ${text}`);
+  return JSON.parse(text);
+}
+
+let ignored = 0;
+
+async function guarded(action, failure = "Not saved") {
+  if (busy) {
+    ignored++;
+    return;
+  }
+  busy = true;
+  ignored = 0;
+  try {
+    await action();
+    if (ignored > 0) setStatus(`${ignored} key ${ignored === 1 ? "press" : "presses"} came while a vote was saving and didn't count. Vote on this card again.`, "error");
+  } catch (error) {
+    setStatus(`${failure}: ${error.message}.`, "error");
+  } finally {
+    busy = false;
+  }
+}
+
+function explain(verdict, card, reveal) {
+  const box = document.getElementById("reveal");
+  box.className = verdict;
+  const checks = [reveal.check, ...reveal.others].map((c) => `<b>${esc(c)}</b>`).join(", ");
+  const counted = verdict === "unsure"
+    ? `An unsure vote takes this span out of the deck but counts toward no check.`
+    : `It counts as ${verdict === "right" ? "a correct hit" : "a false hit"} for ${checks}${reveal.others.length === 0 ? "" : ", every check that flagged these words"}. That is the precision label tuning each check.`;
+  box.innerHTML = `<h3>Last vote: <span class="verdict ${verdict}">${VERDICT[verdict]}</span> on ${esc(card.file)}:${card.line}</h3>
+    <p>The rule that flagged it was <b>${esc(reveal.check)}</b>${reveal.shipped ? ", which ships on" : `<span class="badge">off</span>, which the shipped config turns off`}. The card hid its name so the name wouldn't sway your vote.</p>
+    <p class="meta">${esc(reveal.message)}</p>
+    <p>${counted}</p>
+    ${ratingRows(reveal.ratings)}
+    <p class="meta">The precision range is where each check's share of real slop likely sits. A check is decided at ${scale.minLabeled} judged hits once the range clears ${pct(scale.floor)}: above it, an off check is enabled and a shipped one kept. Below it, a shipped check is retired and an off one left off.</p>`;
 }
 
 function renderCard() {
   const card = deck[at]?.card;
   const box = document.getElementById("card");
-  if (!card) return (box.innerHTML = `<p>Every check is decided or out of hits.</p>`);
-  box.innerHTML = `<div class="where">${esc(card.file)}:${card.line}${at < deck.length - 1 ? " · revisiting" : ""}</div>
+  if (!card) return (box.innerHTML = stalled
+    ? `<p class="ask">No card loaded.</p><p class="how">Press space to try again.</p>`
+    : `<p class="ask">Every check is decided or out of hits.</p>`);
+  const prior = deck[at].verdict ? ` · revisiting, you said ${VERDICT[deck[at].verdict]}` : "";
+  box.innerHTML = `<div class="ask">Is the highlighted text slop?</div>
+    <div class="how">Judge only the highlighted words, read in their context. A rule flagged them, and its name stays hidden until you vote.</div>
+    <div class="where">${esc(card.file)}:${card.line}${prior}</div>
     <div class="near">${esc(card.before)}</div>
     <div class="line">${esc(card.pre)}<mark>${esc(card.marked)}</mark>${esc(card.post)}</div>
     <div class="near">${esc(card.after)}</div>
+    <div class="choices">
+      <button class="wrong" onclick="vote('wrong')">← Fine<small>Reads like a person wrote it. Leave it.</small></button>
+      <button class="unsure" onclick="vote('unsure')">↓ Unsure<small>You'd need more of the document to say.</small></button>
+      <button class="right" onclick="vote('right')">Slop →<small>A careful writer would cut or reword it.</small></button>
+    </div>
     <div class="inputs"><input id="card-pattern" class="pattern" list="patterns" placeholder="pattern slug (p)" value="${esc(deck[at].pattern ?? "")}"><input id="card-note" class="note" placeholder="note (n)" value="${esc(deck[at].note ?? "")}"></div>`;
 }
 
 async function advance() {
-  clearTimeout(revealing);
-  revealing = null;
-  document.getElementById("reveal").innerHTML = "";
   if (at < deck.length - 1) {
     at++;
     return renderCard();
   }
-  const body = await (await fetch("/api/next")).json();
-  renderBoard(body.board);
-  if (body.card) {
-    deck.push({ card: body.card });
-    at = deck.length - 1;
-  } else at = deck.length;
-  renderCard();
+  at = deck.length;
+  stalled = true;
+  try {
+    const body = await request("/api/next");
+    stalled = false;
+    renderBoard(body);
+    if (body.card) {
+      deck.push({ card: body.card });
+      at = deck.length - 1;
+    }
+  } finally {
+    renderCard();
+  }
 }
 
-async function vote(verdict) {
-  const entry = deck[at];
-  if (!entry) return;
-  entry.pattern = document.getElementById("card-pattern").value.trim() || undefined;
-  entry.note = document.getElementById("card-note").value;
-  const response = await fetch("/api/vote", { method: "POST", body: JSON.stringify({ id: entry.card.id, verdict, note: entry.note, pattern: entry.pattern }) });
-  if (!response.ok) return (document.getElementById("reveal").textContent = await response.text());
-  const { reveal, board } = await response.json();
-  renderBoard(board);
-  const others = reveal.others.length === 0 ? "" : ` · also ${reveal.others.map(esc).join(", ")}`;
-  document.getElementById("reveal").innerHTML = `<div><span class="verdict ${verdict}">${VERDICT[verdict]}</span> · <b>${esc(reveal.check)}</b>${reveal.shipped ? "" : '<span class="badge">off</span>'}${others}</div>
-    <div class="meta">${esc(reveal.message)}</div>${ratingRows(reveal.ratings)}`;
-  revealing = setTimeout(advance, REVEAL_MS);
+function vote(verdict) {
+  return guarded(async () => {
+    const entry = deck[at];
+    if (!entry) return;
+    entry.pattern = document.getElementById("card-pattern").value.trim() || undefined;
+    entry.note = document.getElementById("card-note").value;
+    setStatus("Saving…", "saving");
+    const body = await request("/api/vote", { method: "POST", body: JSON.stringify({ id: entry.card.id, verdict, note: entry.note, pattern: entry.pattern }) });
+    entry.verdict = verdict;
+    savedThisSitting++;
+    renderBoard(body);
+    explain(verdict, entry.card, body.reveal);
+    setStatus("");
+    try {
+      await advance();
+    } catch (error) {
+      setStatus(`Your vote saved, but the next card didn't load: ${error.message}. Press space to try again.`, "error");
+    }
+  });
 }
+
+const deal = () => guarded(async () => {
+  setStatus("");
+  await advance();
+}, "No card loaded");
 
 function back() {
-  if (at <= 0) return;
-  clearTimeout(revealing);
-  revealing = null;
+  if (busy || at <= 0) return;
   at--;
-  document.getElementById("reveal").innerHTML = "";
+  setStatus("");
   renderCard();
 }
 
@@ -274,12 +403,7 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" || event.key === "Enter") event.target.blur();
     return;
   }
-  if (revealing !== null) {
-    event.preventDefault();
-    if (event.key === "z") return back();
-    return advance();
-  }
-  const keys = { ArrowRight: () => vote("right"), ArrowLeft: () => vote("wrong"), ArrowDown: () => vote("unsure"), z: back,
+  const keys = { ArrowRight: () => vote("right"), ArrowLeft: () => vote("wrong"), ArrowDown: () => vote("unsure"), z: back, " ": () => (stalled ? deal() : undefined),
     p: () => document.getElementById("card-pattern")?.focus(), n: () => document.getElementById("card-note")?.focus() };
   const action = keys[event.key];
   if (!action) return;
@@ -290,7 +414,7 @@ document.addEventListener("keydown", (event) => {
 loadPatterns();
 loadSample();
 loadFiles();
-advance();
+deal();
 </script>
 </body>
 </html>

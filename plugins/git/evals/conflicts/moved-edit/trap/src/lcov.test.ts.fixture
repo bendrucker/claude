@@ -1,0 +1,19 @@
+import { describe, expect, test } from "bun:test";
+import { functionCoverage, lineCoverage, totalCoverage } from "./lcov";
+import { parseLcov } from "./reader";
+
+const sample = "SF:src/a.ts\nDA:1,1\nDA:2,0\nFNF:2\nFNH:1\nend_of_record\n";
+
+describe("coverage", () => {
+  test("lineCoverage", () => {
+    expect(lineCoverage(parseLcov(sample)[0]).pct).toBe(50);
+  });
+
+  test("functionCoverage", () => {
+    expect(functionCoverage(parseLcov(sample)[0])).toBe(50);
+  });
+
+  test("totalCoverage", () => {
+    expect(totalCoverage(parseLcov(sample))).toBe(50);
+  });
+});

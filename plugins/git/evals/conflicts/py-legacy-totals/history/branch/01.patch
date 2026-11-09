@@ -1,0 +1,11 @@
+diff --git a/billing/legacy_totals.py b/billing/legacy_totals.py
+index 699314a..91fedec 100644
+--- a/billing/legacy_totals.py
++++ b/billing/legacy_totals.py
+@@ -2,5 +2,5 @@
+ 
+ 
+ def invoice_total(lines, tax_rate):
+-    subtotal = sum(line["qty"] * line["price"] for line in lines)
++    subtotal = sum(line["qty"] * line["price"] for line in lines if not line.get("refunded"))
+     return round(subtotal * (1 + tax_rate), 2)

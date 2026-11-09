@@ -1,0 +1,451 @@
+diff --git a/.claude-plugin/marketplace.json b/.claude-plugin/marketplace.json
+index 75d7fd71..4b12c1bd 100644
+--- a/.claude-plugin/marketplace.json
++++ b/.claude-plugin/marketplace.json
+@@ -64,14 +64,24 @@
+       "source": "./plugins/github"
+     },
+     {
+-      "name": "classifier-telemetry",
+-      "description": "Records each tool call's permission verdict and wall time so auto-mode classifier cost is measurable from the session index",
+-      "source": "./plugins/classifier-telemetry"
++      "name": "auto-mode",
++      "description": "Enhancements for Claude Code auto mode",
++      "source": "./plugins/auto-mode"
+     },
+     {
+-      "name": "claude-code",
+-      "description": "Meta-tools for Claude Code configuration and customization",
+-      "source": "./plugins/claude-code"
++      "name": "observability",
++      "description": "Query Claude Code session history, tool calls, hooks, and token usage through a DuckDB index over local transcripts",
++      "source": "./plugins/observability"
++    },
++    {
++      "name": "plugin",
++      "description": "Author Claude Code skills and hooks, whether they live in a plugin, a project's .claude/, or ~/.claude",
++      "source": "./plugins/plugin"
++    },
++    {
++      "name": "agents",
++      "description": "Run work across multiple Claude Code sessions: agent teams and background handoffs",
++      "source": "./plugins/agents"
+     },
+     {
+       "name": "pull-request",
+@@ -113,6 +123,11 @@
+       "description": "Create, validate, and render Mermaid diagrams",
+       "source": "./plugins/mermaid"
+     },
++    {
++      "name": "mod-events",
++      "description": "Structured event log for mods: `$.modEvents.emit` writes per-session OTel log records as JSONL",
++      "source": "./plugins/mod-events"
++    },
+     {
+       "name": "tech-spec",
+       "description": "Create and review technical specifications",
+@@ -156,6 +171,16 @@
+       "description": "Pick a reply's `! <command>` suggestion by click or digit to fill it into the shell prompt",
+       "source": "./plugins/run-command"
+     },
++    {
++      "name": "session-limit",
++      "description": "Warn the model mid-turn as the 5-hour or 7-day limit nears",
++      "source": "./plugins/session-limit"
++    },
++    {
++      "name": "load",
++      "description": "Keep Claude-driven browsers and builds from saturating the machine",
++      "source": "./plugins/load"
++    },
+     {
+       "name": "herdr",
+       "description": "Drive the herdr terminal workspace manager: panes, tabs, workspaces, and sibling coding agents",
+diff --git a/plugins/mod-events/.claude-plugin/plugin.json b/plugins/mod-events/.claude-plugin/plugin.json
+new file mode 100644
+index 00000000..8aa7e631
+--- /dev/null
++++ b/plugins/mod-events/.claude-plugin/plugin.json
+@@ -0,0 +1,9 @@
++{
++  "name": "mod-events",
++  "description": "Structured event log for mods: `$.modEvents.emit` writes per-session OTel log records as JSONL",
++  "author": {
++    "name": "Ben Drucker",
++    "email": "bvdrucker@gmail.com"
++  },
++  "types": "./types/index.d.ts"
++}
+diff --git a/plugins/mod-events/README.md b/plugins/mod-events/README.md
+new file mode 100644
+index 00000000..1c0601fb
+--- /dev/null
++++ b/plugins/mod-events/README.md
+@@ -0,0 +1,81 @@
++# Mod Events
++
++Telemetry for mods. It adds `$.modEvents.emit`, which writes each mod's events to per-session JSONL. Each line is an OpenTelemetry log record, so a collector can tail the files, and the `observability:session` index ingests them as `mod_events`.
++
++- **Mod**: [`register.ts`](mod/register.ts) provides `emit` and records at session start whether the session is local or reached over mosh or ssh, with each attached herdr client's reach. Requires `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
++- **Types**: [`types/index.d.ts`](types/index.d.ts) declares `$.modEvents.emit`.
++
++## Emitting
++
++A mod lists `"dependencies": ["mod-events"]` in its `plugin.json`, adds `"../../mod-events/types"` to its `mod/tsconfig.json` `include`, and calls:
++
++```ts
++void $.modEvents.emit({ mod: "herdr", event: "herdr.call", ok: exitCode === 0, ms, detail: { command, exitCode, stderr } });
++```
++
++`emit` never rejects. Without this plugin enabled, the default `emit` drops events. Every mod emits `session.start` from its `session.start` hook, so a query can tell whether it was live.
++
++Records land in `<config>/mod-events/<session>/<mod>.<instance>.<n>.jsonl`, `<config>` being `CLAUDE_CONFIG_DIR` or `~/.claude`. `<instance>` is the first event's timestamp, so a reload starts new files, and `<n>` rolls at 64 KB.
++
++## Format
++
++Each line is one OTel log record with the data model's field names, flat rather than wrapped in an OTLP `resourceLogs` envelope:
++
++```json
++{"timestamp":"2026-10-06T17:00:00.012Z","severity_text":"WARN","severity_number":13,"event_name":"herdr.herdr.call","attributes":{"command":"pane.report-agent","exitCode":1,"stderr":"…","duration_ms":12,"session.id":"<session-id>"},"resource":{"service.name":"claude-code","service.version":"2.1.291","claude_code.surface":"mosh"},"scope":{"name":"herdr"}}
++```
++
++- `timestamp` is ISO 8601 in UTC, like Claude Code's own `event.timestamp`.
++- `severity_text` is `INFO` (9), or `WARN` (13) when `ok` is false. A failing mod degrades the session without ending it, so nothing logs `ERROR`.
++- `event_name` is `<mod>.<event>`.
++- `attributes` holds `detail`, plus `duration_ms` from `ms` and `session.id`. Both keys match Claude Code's native OTel events, so a backend can join a mod's records to the session's own telemetry.
++- `resource` carries `service.name` (`claude-code`, as the native exporter uses) and `service.version`. Once the session's heartbeat has judged it, it also carries `claude_code.surface` (`local`, `mosh`, or `ssh`).
++- `scope.name` is the mod. The engine doesn't expose a calling plugin's version, so `scope` has no `version`.
++
++`$.fs` can only replace a file whole, so each event rewrites its chunk. The new text always extends the old, and a rolled chunk is never written again, so a tailer's fingerprint and offset stay valid. `$.fs.write` truncates and then writes in place rather than renaming a temp file over the chunk, and `$.fs` has no rename. A tailer polling inside that window reads an empty file. The collector's `filelog` receiver skips a file whose fingerprint is empty, then resumes at its offset once the bytes are back.
++
++## Collector
++
++An `otelcol-contrib` `filelog` receiver maps each line into a log record. `event_name` lands as the `event.name` attribute, as Claude Code's own events carry it:
++
++```yaml
++receivers:
++  filelog/mod_events:
++    include: ["${env:HOME}/.claude/mod-events/**/*.jsonl"]
++    start_at: beginning
++    operators:
++      - type: json_parser
++        parse_to: body
++        timestamp:
++          parse_from: body.timestamp
++          layout_type: gotime
++          layout: "2006-01-02T15:04:05.000Z07:00"
++        severity:
++          parse_from: body.severity_text
++        scope_name:
++          parse_from: body.scope.name
++      - type: move
++        from: body.attributes
++        to: attributes
++      - type: move
++        from: body.event_name
++        to: attributes["event.name"]
++      - type: move
++        from: body.resource
++        to: resource
++      - type: remove
++        field: body
++```
++
++Retention deletes the oldest files once the directory passes 500 MB. The session index keeps rows it has already ingested.
++
++In a test, stub `$.modEvents` from your own `engine.create` hook and collect events at `modEvents.emit`:
++
++```ts
++on("engine.create", async ($, e, next) => ({ ...(await next(e)), modEvents: { emit: () => Promise.resolve() } }));
++on("modEvents.emit", ($, e) => (events.push(e), { value: undefined }));
++```
++
++## Tests
++
++`bun scripts/mod-test.ts mod-events` runs the mod's tests.
+diff --git a/plugins/mod-events/mod/register.ts b/plugins/mod-events/mod/register.ts
+new file mode 100644
+index 00000000..e4c5793c
+--- /dev/null
++++ b/plugins/mod-events/mod/register.ts
+@@ -0,0 +1,217 @@
++import type { EngineInterface, On } from "claude-code";
++import type { ModEventsInput, ModEventsRecord } from "../types";
++
++const MOD = "mod-events";
++const CHUNK_BYTES = 64 * 1024;
++
++interface Chunk {
++  path: string;
++  text: string;
++  version: number;
++  isWriting: boolean;
++}
++
++interface Log {
++  root: string | undefined;
++  instance: number | undefined;
++  resource: Record<string, string> | undefined;
++  chunks: Map<string, { chunk: Chunk; n: number }>;
++}
++
++export type Surface = "local" | "mosh" | "ssh";
++
++interface Process {
++  pid: number;
++  ppid: number;
++  name: string;
++}
++
++function parsePs(stdout: string): Map<number, Process> {
++  const table = new Map<number, Process>();
++  for (const line of stdout.split("\n")) {
++    const match = /^\s*(\d+)\s+(\d+)\s+(.+?)\s*$/.exec(line);
++    if (match === null) continue;
++    const [, pid, ppid, command] = match;
++    const name = command?.split("/").at(-1) ?? "";
++    table.set(Number(pid), { pid: Number(pid), ppid: Number(ppid), name });
++  }
++  return table;
++}
++
++function reachOf(table: Map<number, Process>, pid: number): Surface {
++  for (let p = table.get(pid); p !== undefined && p.pid > 1; p = table.get(p.ppid)) {
++    if (p.name === "mosh-server") return "mosh";
++    if (p.name === "sshd" || p.name.startsWith("sshd-")) return "ssh";
++  }
++  return "local";
++}
++
++function summarize(clients: Surface[], isSsh: boolean): Surface {
++  if (clients.includes("mosh")) return "mosh";
++  if (isSsh || clients.includes("ssh")) return "ssh";
++  return "local";
++}
++
++/**
++ * Classifies each attached herdr client by its ancestry. The server is the
++ * `herdr` process whose parent is launchd, and every other one is a client.
++ */
++export function surfaceOf(
++  ps: string | undefined,
++  sshConnection: string | undefined,
++): { surface: Surface; clients: Surface[] } {
++  const clients: Surface[] = [];
++  if (ps !== undefined) {
++    const table = parsePs(ps);
++    for (const p of table.values()) {
++      if (p.name === "herdr" && p.ppid > 1) clients.push(reachOf(table, p.pid));
++    }
++  }
++  // Panes inherit the herdr server's env, so `SSH_CONNECTION` speaks for the session only without clients.
++  const isSsh = clients.length === 0 && sshConnection !== undefined && sshConnection !== "";
++  return { surface: summarize(clients, isSsh), clients: clients.toSorted() };
++}
++
++async function flush($: EngineInterface, chunk: Chunk): Promise<void> {
++  if (chunk.isWriting) return;
++  chunk.isWriting = true;
++  try {
++    let written: number;
++    do {
++      written = chunk.version;
++      // oxlint-disable-next-line no-await-in-loop -- each rewrite must land before the next, or an older text could win.
++      await $.fs.write(chunk.path, chunk.text);
++    } while (written !== chunk.version);
++  } finally {
++    chunk.isWriting = false;
++  }
++}
++
++async function rootOf($: EngineInterface, log: Log): Promise<string | undefined> {
++  if (log.root !== undefined) return log.root;
++  const [config, home] = await Promise.all([$.env.get("CLAUDE_CONFIG_DIR"), $.env.get("HOME")]);
++  if (config !== undefined && config !== "") log.root = `${config}/mod-events`;
++  else if (home !== undefined) log.root = `${home}/.claude/mod-events`;
++  return log.root;
++}
++
++const fileSafe = (name: string) => name.replaceAll(/[^\w.-]/g, "_");
++
++async function resourceOf($: EngineInterface, log: Log): Promise<Record<string, string>> {
++  log.resource ??= {
++    "service.name": "claude-code",
++    "service.version": (await $.session.version()).version,
++  };
++  return log.resource;
++}
++
++function toRecord(
++  input: ModEventsInput,
++  ts: number,
++  session: string,
++  resource: Record<string, string>,
++): ModEventsRecord {
++  const isOk = input.ok ?? true;
++  return {
++    timestamp: new Date(ts).toISOString(),
++    severity_text: isOk ? "INFO" : "WARN",
++    severity_number: isOk ? 9 : 13,
++    event_name: `${input.mod}.${input.event}`,
++    attributes: {
++      ...input.detail,
++      ...(input.ms !== undefined && { duration_ms: input.ms }),
++      "session.id": session,
++    },
++    resource,
++    scope: { name: input.mod },
++  };
++}
++
++async function record($: EngineInterface, log: Log, input: ModEventsInput): Promise<void> {
++  const [root, ts, session, resource] = await Promise.all([
++    rootOf($, log),
++    $.clock.now(),
++    $.session.id(),
++    resourceOf($, log),
++  ]);
++  if (root === undefined) return;
++  log.instance ??= ts;
++  const line = toRecord(input, ts, session, resource);
++  const text = `${JSON.stringify(line)}\n`;
++  const key = `${session}/${fileSafe(input.mod)}`;
++  let slot = log.chunks.get(key);
++  if (
++    slot === undefined ||
++    (slot.chunk.text !== "" && slot.chunk.text.length + text.length > CHUNK_BYTES)
++  ) {
++    const n = slot === undefined ? 0 : slot.n + 1;
++    slot = {
++      n,
++      chunk: {
++        path: `${root}/${key}.${log.instance}.${n}.jsonl`,
++        text: "",
++        version: 0,
++        isWriting: false,
++      },
++    };
++    log.chunks.set(key, slot);
++  }
++  slot.chunk.text += text;
++  slot.chunk.version += 1;
++  await flush($, slot.chunk);
++}
++
++async function emit($: EngineInterface, log: Log, input: ModEventsInput): Promise<void> {
++  try {
++    await record($, log, input);
++  } catch (error) {
++    $.ui.log(`mod-events: ${input.mod} ${input.event} not recorded: ${String(error)}`, {
++      to: "debug",
++    });
++  }
++}
++
++async function readSurface($: EngineInterface): Promise<ReturnType<typeof surfaceOf>> {
++  const [ssh, ps] = await Promise.all([
++    $.env.get("SSH_CONNECTION"),
++    $.process
++      .run(["ps", "-axo", "pid=,ppid=,comm="], { timeoutMs: 5000 })
++      .then((r) => (r.exitCode === 0 ? r.stdout : undefined))
++      .catch(() => undefined),
++  ]);
++  return surfaceOf(ps, ssh);
++}
++
++/**
++ * Seats `$.modEvents` for every mod that depends on this plugin and writes
++ * what they emit as OTel log records to
++ * `<config>/mod-events/<session>/<mod>.<instance>.<n>.jsonl`. A chunk is
++ * rewritten whole on each event, since `$.fs` has no append, so chunks roll at
++ * 64 KB and a reload starts a new instance. Each rewrite only appends, and a
++ * rolled chunk is never written again, so a tailer's offset stays valid.
++ */
++export function register(on: On): void {
++  const log: Log = { root: undefined, instance: undefined, resource: undefined, chunks: new Map() };
++
++  on("engine.create", async ($, e, next) => {
++    const built = await next(e);
++    return { ...built, modEvents: { emit: () => Promise.resolve() } };
++  });
++
++  on("modEvents.emit", async ($, e, next) => {
++    await emit($, log, e);
++    return next(e);
++  }).catch(($, e, next) => (next.called ? next(e) : { value: undefined }));
++
++  on("session.start", async ($, e, next) => {
++    const started = await next(e);
++    const { surface, clients } = await readSurface($);
++    log.resource = { ...(await resourceOf($, log)), "claude_code.surface": surface };
++    await emit($, log, {
++      mod: MOD,
++      event: "session.start",
++      detail: { clients, surfaceKind: e.surface, isInteractive: e.isInteractive },
++    });
++    return started;
++  });
++}
+diff --git a/plugins/mod-events/mod/tsconfig.json b/plugins/mod-events/mod/tsconfig.json
+new file mode 100644
+index 00000000..1616b7ce
+--- /dev/null
++++ b/plugins/mod-events/mod/tsconfig.json
+@@ -0,0 +1,5 @@
++{
++  "extends": "../../../tsconfig.mod.json",
++  "compilerOptions": { "allowImportingTsExtensions": true },
++  "include": ["../.claude-plugin/types", "../types", "."]
++}
+diff --git a/plugins/mod-events/types/index.d.ts b/plugins/mod-events/types/index.d.ts
+new file mode 100644
+index 00000000..b529df97
+--- /dev/null
++++ b/plugins/mod-events/types/index.d.ts
+@@ -0,0 +1,45 @@
++/**
++ * What a mod passes to `$.modEvents.emit`.
++ */
++export interface ModEventsInput {
++  /** The emitting plugin's name. */
++  mod: string;
++  /** What happened, dotted: `session.start`, `herdr.call`, `pick`. */
++  event: string;
++  /** False when what the event records failed. Defaults to true. */
++  ok?: boolean;
++  /** How long it took, for an event with a duration. */
++  ms?: number;
++  /** Event-specific fields, as JSON data. */
++  detail?: Record<string, unknown>;
++}
++
++/**
++ * One line of `<config>/mod-events/<session>/<mod>.<instance>.<n>.jsonl`: an
++ * OTel log record with its fields flat, the shape the session index ingests as
++ * `mod_events`.
++ */
++export interface ModEventsRecord {
++  /** ISO 8601, as Claude Code's own `event.timestamp`. */
++  timestamp: string;
++  severity_text: "INFO" | "WARN";
++  severity_number: 9 | 13;
++  /** `<mod>.<event>`. */
++  event_name: string;
++  /** The event's detail, plus `duration_ms` and `session.id`. */
++  attributes: Record<string, unknown>;
++  /** `service.name`, `service.version`, and `claude_code.surface` once known. */
++  resource: Record<string, string>;
++  scope: { name: string };
++}
++
++export interface ModEvents {
++  /** Records one event. Never rejects, so a caller need not await it. */
++  emit: (event: ModEventsInput) => Promise<void>;
++}
++
++declare module "claude-code" {
++  interface EngineInterface {
++    modEvents: ModEvents;
++  }
++}

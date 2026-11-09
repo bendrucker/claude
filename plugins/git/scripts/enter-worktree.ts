@@ -72,14 +72,15 @@ export function sameDirectoryReason(target: string): string {
 export function crossRepoReason(target: string): string {
   return [
     `\`${target}\` belongs to a different repository than this session, and EnterWorktree only enters worktrees of the session's own repository.`,
-    `For read-only work, spawn an \`Agent\` with \`cwd\` set to \`${target}\`.`,
+    `Hand edits there to \`dispatch:dispatch\`. For read-only inspection, spawn an \`Agent\` with \`cwd\` set to \`${target}\`.`,
   ].join(" ");
 }
 
-export function unmanagedReason(target: string, managedDir: string): string {
+export function unmanagedReason(target: string): string {
   return [
-    `This session has already switched into a worktree, and from here EnterWorktree only enters worktrees under \`${managedDir}/\`.`,
-    `Work in \`${target}\` from the current session with \`git -C ${target}\` and absolute paths.`,
+    `This session is already in a worktree session, which blocks a direct switch to \`${target}\`.`,
+    `Commit or leave the current work in place, since it stays in the current worktree.`,
+    `Then call \`ExitWorktree({action: "keep"})\` to return to the launch directory, and call \`EnterWorktree({path: "${target}"})\` again.`,
   ].join(" ");
 }
 
@@ -108,7 +109,7 @@ export async function processInput(input: Envelope): Promise<SyncHookJSONOutput 
   if (isUnder(target, realpath(managedDir) ?? managedDir)) return null;
   if ((await worktreeSessionActive(input.transcript_path)) !== true) return null;
 
-  return deny(unmanagedReason(target, managedDir));
+  return deny(unmanagedReason(target));
 }
 
 async function main(): Promise<void> {

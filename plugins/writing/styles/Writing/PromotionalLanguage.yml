@@ -8,23 +8,23 @@ ignorecase: true
 tokens:
   - '\b(?:boasts|vibrant|showcasing|nestled|groundbreaking|renowned|diverse array)\b'
 tests:
-  - name: "flags The library boasts excellent performance."
+  - name: "flags boasts as a verb"
     input: |
       The library boasts excellent performance.
     contains: [Writing.PromotionalLanguage]
-  - name: "flags A groundbreaking approach to caching."
+  - name: "flags a hype adjective"
     input: |
       A groundbreaking approach to caching.
     contains: [Writing.PromotionalLanguage]
-  - name: "flags A vibrant community, nestled in the docs."
+  - name: "flags travel-brochure adjectives"
     input: |
       A vibrant community, nestled in the docs.
     contains: [Writing.PromotionalLanguage]
-  - name: "allows The server handles concurrent requests."
+  - name: "allows a plain technical claim"
     input: |
       The server handles concurrent requests.
     absent: Writing.PromotionalLanguage
-  - name: "allows A well-tested approach to retries."
+  - name: "allows a factual compound adjective"
     input: |
       A well-tested approach to retries.
     absent: Writing.PromotionalLanguage

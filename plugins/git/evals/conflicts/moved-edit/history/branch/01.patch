@@ -1,0 +1,30 @@
+diff --git a/src/lcov.test.ts b/src/lcov.test.ts
+index 4ebe5c3..5154e2b 100644
+--- a/src/lcov.test.ts
++++ b/src/lcov.test.ts
+@@ -11,6 +11,12 @@ describe("parseLcov", () => {
+     expect(fc.functionsFound).toBe(2);
+   });
+ 
++  test("strips carriage returns from CRLF input", () => {
++    const [fc] = parseLcov(sample.replaceAll("\n", "\r\n"));
++    expect(fc.file).toBe("src/a.ts");
++    expect(fc.functionsHit).toBe(1);
++  });
++
+   test("ignores lines outside a record", () => {
+     expect(parseLcov("DA:1,1\n")).toEqual([]);
+   });
+diff --git a/src/lcov.ts b/src/lcov.ts
+index c5b366f..76089c3 100644
+--- a/src/lcov.ts
++++ b/src/lcov.ts
+@@ -39,7 +39,7 @@ export function parseLcov(text: string): FileCoverage[] {
+   let current: FileCoverage | null = null;
+ 
+   for (const raw of text.split("\n")) {
+-    const line = raw;
++    const line = raw.replace(/\r$/, "");
+     if (line === "") continue;
+ 
+     if (line.startsWith("SF:")) {

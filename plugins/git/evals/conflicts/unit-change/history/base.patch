@@ -1,0 +1,138 @@
+diff --git a/src/cache.ts b/src/cache.ts
+new file mode 100644
+index 0000000..2e55fa8
+--- /dev/null
++++ b/src/cache.ts
+@@ -0,0 +1,5 @@
++import { waitFor, type Wait } from "./wait";
++
++export function warmCache(ready: () => boolean | Promise<boolean>, wait: Wait = waitFor): Promise<boolean> {
++  return wait(ready, { timeout: 30 });
++}
+diff --git a/src/callers.test.ts b/src/callers.test.ts
+new file mode 100644
+index 0000000..13fcc9e
+--- /dev/null
++++ b/src/callers.test.ts
+@@ -0,0 +1,20 @@
++import { expect, test } from "bun:test";
++import { warmCache } from "./cache";
++import { waitForDeploy } from "./deploy";
++import { waitForQueue } from "./queue";
++import { waitForServer } from "./server";
++import type { Wait, WaitOptions } from "./wait";
++
++const callers = { waitForServer, warmCache, waitForQueue, waitForDeploy };
++
++for (const [name, caller] of Object.entries(callers)) {
++  test(`${name} waits on the check it is given`, async () => {
++    let seen: WaitOptions | undefined;
++    const wait: Wait = async (check, options) => {
++      seen = options;
++      return check();
++    };
++    expect(await caller(() => true, wait)).toBe(true);
++    expect(seen?.timeout).toBeGreaterThan(0);
++  });
++}
+diff --git a/src/deploy.ts b/src/deploy.ts
+new file mode 100644
+index 0000000..e2f6d2f
+--- /dev/null
++++ b/src/deploy.ts
+@@ -0,0 +1,5 @@
++import { waitFor, type Wait } from "./wait";
++
++export function waitForDeploy(ready: () => boolean | Promise<boolean>, wait: Wait = waitFor): Promise<boolean> {
++  return wait(ready, { timeout: 30 });
++}
+diff --git a/src/queue.ts b/src/queue.ts
+new file mode 100644
+index 0000000..73b03a7
+--- /dev/null
++++ b/src/queue.ts
+@@ -0,0 +1,5 @@
++import { waitFor, type Wait } from "./wait";
++
++export function waitForQueue(ready: () => boolean | Promise<boolean>, wait: Wait = waitFor): Promise<boolean> {
++  return wait(ready, { timeout: 30 });
++}
+diff --git a/src/server.ts b/src/server.ts
+new file mode 100644
+index 0000000..61bfa4b
+--- /dev/null
++++ b/src/server.ts
+@@ -0,0 +1,5 @@
++import { waitFor, type Wait } from "./wait";
++
++export function waitForServer(ready: () => boolean | Promise<boolean>, wait: Wait = waitFor): Promise<boolean> {
++  return wait(ready, { timeout: 30 });
++}
+diff --git a/src/wait.test.ts b/src/wait.test.ts
+new file mode 100644
+index 0000000..35b3adc
+--- /dev/null
++++ b/src/wait.test.ts
+@@ -0,0 +1,25 @@
++import { expect, test } from "bun:test";
++import { waitFor, type Clock } from "./wait";
++
++function fakeClock(): Clock & { t: number } {
++  const clock = {
++    t: 0,
++    now: () => clock.t,
++    sleep: async (ms: number) => {
++      clock.t += ms;
++    },
++  };
++  return clock;
++}
++
++test("resolves true once the check passes", async () => {
++  const clock = fakeClock();
++  let calls = 0;
++  expect(await waitFor(() => ++calls === 3, { timeout: 10, clock })).toBe(true);
++});
++
++test("gives up after the timeout", async () => {
++  const clock = fakeClock();
++  expect(await waitFor(() => false, { timeout: 2, interval: 500, clock })).toBe(false);
++  expect(clock.t).toBe(2000);
++});
+diff --git a/src/wait.ts b/src/wait.ts
+new file mode 100644
+index 0000000..12e73c4
+--- /dev/null
++++ b/src/wait.ts
+@@ -0,0 +1,31 @@
++export interface Clock {
++  now(): number;
++  sleep(ms: number): Promise<void>;
++}
++
++export const systemClock: Clock = {
++  now: () => Date.now(),
++  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
++};
++
++export interface WaitOptions {
++  /** Seconds to keep checking before giving up. */
++  timeout: number;
++  /** Milliseconds between checks. */
++  interval?: number;
++  clock?: Clock;
++}
++
++export type Wait = (check: () => boolean | Promise<boolean>, options: WaitOptions) => Promise<boolean>;
++
++// Polls `check` until it returns true or the timeout elapses.
++export const waitFor: Wait = async (check, options) => {
++  const clock = options.clock ?? systemClock;
++  const interval = options.interval ?? 500;
++  const deadline = clock.now() + options.timeout * 1000;
++  while (true) {
++    if (await check()) return true;
++    if (clock.now() >= deadline) return false;
++    await clock.sleep(interval);
++  }
++};

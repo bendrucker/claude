@@ -9,6 +9,8 @@ export interface RunOptions {
   ref?: string | undefined;
   /** Suffix for the stored result's name. */
   label?: string | undefined;
+  /** Repo paths deleted from the staged plugins before the run. */
+  remove?: string[] | undefined;
   /** Arguments passed through to the harness. */
   args: string[];
 }

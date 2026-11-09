@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# human_size <bytes>: prints a size such as 1.5 MB.
+human_size() {
+  local bytes=${1:?size required}
+  if [ "$bytes" -ge 1073741824 ]; then
+    printf '%d.%d GB\n' $((bytes / 1073741824)) $((bytes * 10 / 1073741824 % 10))
+  elif [ "$bytes" -ge 1048576 ]; then
+    printf '%d.%d MB\n' $((bytes / 1048576)) $((bytes * 10 / 1048576 % 10))
+  elif [ "$bytes" -ge 1024 ]; then
+    printf '%d KB\n' $((bytes / 1024))
+  else
+    printf '%d B\n' "$bytes"
+  fi
+}

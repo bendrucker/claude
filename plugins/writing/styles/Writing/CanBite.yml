@@ -8,19 +8,19 @@ ignorecase: true
 tokens:
   - '\b(?:can|could|will|may|might)\s+bite\b'
 tests:
-  - name: "flags A stale cache entry can bite at runtime."
+  - name: "flags bite after a present modal"
     input: |
       A stale cache entry can bite at runtime.
     contains: [Writing.CanBite]
-  - name: "flags That assumption could bite once the schema changes."
+  - name: "flags bite after a past modal"
     input: |
       That assumption could bite once the schema changes.
     contains: [Writing.CanBite]
-  - name: "allows The dog will bark at strangers."
+  - name: "allows a modal with another verb"
     input: |
       The dog will bark at strangers.
     absent: Writing.CanBite
-  - name: "allows This could break under load."
+  - name: "allows a literal failure verb"
     input: |
       This could break under load.
     absent: Writing.CanBite

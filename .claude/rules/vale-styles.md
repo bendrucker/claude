@@ -13,3 +13,12 @@ Calibrate before adding, widening, or keeping a rule. Sample its hits from the s
 Match the abstraction, not the instances. Use the form that names the class: a `sequence` rule over part-of-speech tags, a Vale scope, a vocabulary, or a short structural pattern such as a digit tally. A hand-listed word alternation standing in for grammar (determiners, verbs, stopwords, a negative lookahead over exceptions) is the brittle kind. Prefer cutting such a rule down to the part that abstracts, or retiring it, over extending its list.
 
 When an abstraction overfires, keep the narrower rule and record the trial in the commit. A tagger supplies syntax but not meaning, so a rule whose signal lives in which verb was chosen stays a short phrase list or goes.
+
+## Tests
+
+A rule lists its cases under `tests`, and `vale test` runs them. A case pins one boundary of the rule, so give each variant and each excluded sense its own case.
+
+- `name` states the boundary in a few words, as `flags` or `allows` plus the class of input: "flags the opener mid-sentence", "allows catch as a latch". A failing case prints its name, which should say what broke.
+- An `allows` case names the sense or context it excludes.
+- `about` holds why the case exists, such as the labeled false positive it came from.
+- Use `contains` on the quoted match text when the case is about which span fires.

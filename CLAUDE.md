@@ -36,6 +36,7 @@ Path-specific guidance lives in [`.claude/rules/`](.claude/rules/). `bun run inv
 - `bun run schemas check`: fetches current upstream and verifies the upstream-backed schema overlays still apply, flagging overlay edits that upstream has absorbed and warning on edits that overwrite an upstream definition. Runs in CI.
 - `bun run skill-lint "plugins/<name>/skills/*"`: validates SKILL.md frontmatter and reference depth. `skill-lint` is a workspace package in `packages/skill-lint`, not an npm registry package.
 - `bun scripts/check-gating-catch.ts plugins/<name>`: fails on a mod's gating hook registered without `.catch`. Runs in CI and the `plugin-test` pre-commit hook.
+- `bun scripts/check-vale-test-names.ts`: fails on a Vale test case under `plugins/*/styles` whose `name` restates its `input` instead of naming the boundary it pins. Runs in CI.
 
 ## Inventory
 

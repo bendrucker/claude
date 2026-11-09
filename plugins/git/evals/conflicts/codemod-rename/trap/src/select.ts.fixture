@@ -1,0 +1,27 @@
+import { startsUnderAny } from "./paths";
+
+export interface Plugin {
+  name: string;
+  /** Out-of-plugin paths that select it. */
+  paths: string[];
+}
+
+function pluginNames(files: string[]): Set<string> {
+  const plugins = new Set<string>();
+  for (const file of files) {
+    const match = file.match(/^plugins\/([^/]+)\//);
+    if (match?.[1] != null && match[1] !== "") plugins.add(match[1]);
+  }
+  return plugins;
+}
+
+/** Plugins whose jobs a change has to run. */
+export function select(plugins: Plugin[], files: string[], alwaysPaths: string[]): string[] {
+  const all = plugins.map((plugin) => plugin.name);
+  if (files.length === 0 || files.length > 500 || startsUnderAny(files, alwaysPaths)) return all;
+
+  const changed = pluginNames(files);
+  return plugins
+    .filter((plugin) => changed.has(plugin.name) || startsUnderAny(files, plugin.paths))
+    .map((plugin) => plugin.name);
+}

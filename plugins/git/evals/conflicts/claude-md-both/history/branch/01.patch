@@ -1,0 +1,16 @@
+diff --git a/CLAUDE.md b/CLAUDE.md
+index b41aa671..a4fc03c5 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -58,9 +58,9 @@ To answer what customizations exist, run `bun run inventory [kind]` instead of r
+ 
+ ## Evals
+ 
+-Per-skill harnesses live inside the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, with a README per harness covering its loop: `pull-request/evals/pr-body`, `issue/evals/issue-refine`, `review/evals/review-voice`, `comments/evals/comment-density`, and `prompting/evals/rule-precision`. They share a shape: mine a sample, label it in a browser, then score or A/B. Hand-made ground truth stays tracked (`scenarios/`, `labels.json`, `briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, and some hold work-repo content that must not land here. The generic layer stays in [`evals/`](evals/): the native runner, the cost report, and their tests.
++Per-skill harnesses live inside the plugin they measure, at `plugins/<plugin>/evals/<suite>/`, with a README per harness covering its loop: `pull-request/evals/pr-body`, `issue/evals/issue-refine`, `review/evals/review-voice`, `comments/evals/comment-density`, and `prompting/evals/rule-precision`. They share a shape: mine a sample, label it in a browser, then score or A/B. Text mined from real PRs, sessions, or work repos lives in the private eval bucket (`s3://ben-drucker-agents-eval-corpus/<harness>/`), never in the repo. Hand-authored synthetic ground truth stays tracked (`briefs/`, `drafts/`). The bulky regenerables (`data/`, `feedback/`, `results/`, `raw/`, `labels/`, `ab/`) are gitignored, and some hold work-repo content that must not land here. The generic layer stays in [`evals/`](evals/): the native runner, the cost report, and their tests.
+ 
+-- `bun plugins/pull-request/evals/pr-body/scripts/mine.ts`, `label/server.ts`, and `calibrate.ts` for the heading screen, whose classifier `labels.json` calibrates. `scripts/judge.ts <run-dir>` is retained as the blinded audit reference for the rubric graders. The pr-body A/B lives as `scenario-*` cases in the `pull-request/evals/create` suite
++- `bun plugins/pull-request/evals/pr-body/scripts/mine.ts`, `label/server.ts`, and `calibrate.ts` for the heading screen, whose classifier `fixtures/labels.json` calibrates. `scripts/judge.ts <run-dir>` is retained as the blinded audit reference for the rubric graders. The pr-body A/B lives as `scenario-*` cases in the local-only `pull-request/evals/create-scenarios` suite. `scripts/sync.ts pull` fetches the labels, scenarios, and cases from the eval bucket
+ - `bun plugins/issue/evals/issue-refine/scripts/build-dataset.ts`, then `label/server.ts`, then `scripts/ab-report.ts` and `scripts/judge.ts`
+ - `bun plugins/review/evals/review-voice/scripts/mine.ts`, then `label/server.ts`, then `scripts/report.ts`
+ - `bun plugins/comments/evals/eval.ts build`, hand the printed `<preflight>` block to the Workflow tool, then `score --job <dir> --gate`. This is the comments judge's ship gate: it scores the labeled corpus through the workflow that ships, on subscription auth. `eval.ts --gate` scores the same corpus through the SDK oracle as a keyed cross-check

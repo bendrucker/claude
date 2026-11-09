@@ -1,0 +1,10 @@
+allow_tools: [Bash, Write, Read]
+judge_model: claude-sonnet-5-5
+stage: [packages/eval-stubs]
+graders:
+  skill-fired: "!quiet-*"
+  dispatched: "!quiet-*"
+  brief-complete: "!quiet-*"
+  reply-reports: "!quiet-*"
+  no-launch: "quiet-*"
+  no-dispatch-skill: "quiet-*"

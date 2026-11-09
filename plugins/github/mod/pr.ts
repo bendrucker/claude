@@ -1,5 +1,5 @@
 export const VIEW_FIELDS =
-  "number,title,url,state,headRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,reviewRequests,latestReviews,statusCheckRollup,reviews,comments";
+  "number,title,url,author,state,headRefOid,baseRefName,mergeable,mergeStateStatus,reviewDecision,reviewRequests,latestReviews,statusCheckRollup,reviews,comments";
 
 export interface CheckNode {
   __typename?: string;
@@ -33,6 +33,7 @@ export interface PrView {
   number: number;
   title?: string | null;
   url: string;
+  author?: { login?: string } | null;
   state: string;
   headRefOid: string;
   baseRefName?: string | null;
@@ -129,6 +130,7 @@ export function parseView(stdout: string): PrView | undefined {
     number: value.number,
     title: textOf(value.title),
     url: value.url,
+    author: loginOf(value.author),
     state: value.state,
     headRefOid: value.headRefOid,
     baseRefName: textOf(value.baseRefName),
@@ -215,6 +217,8 @@ export interface Snapshot {
   title: string;
   url: string;
   state: string;
+  /** False when another login opened the PR, and true when the session's login is unknown. */
+  isAuthor: boolean;
   head: string;
   /** False when the head is a commit this checkout has never seen. */
   isHeadKnown: boolean;
@@ -446,6 +450,10 @@ function askedOf(view: PrView): string[] {
     .toSorted();
 }
 
+// An unknown login on either side keeps every promotion, as before authorship was read.
+const isAuthorOf = (author: string | undefined, me: string | undefined) =>
+  author === undefined || me === undefined || author.toLowerCase() === me.toLowerCase();
+
 export function snapshotOf(view: PrView, local: Local): Snapshot {
   const { extras, turns = [] } = local;
   const base = local.noise ?? NO_NOISE;
@@ -500,6 +508,7 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     title: view.title ?? "",
     url: view.url,
     state: view.state,
+    isAuthor: isAuthorOf(view.author?.login, local.me),
     head: view.headRefOid,
     isHeadKnown: local.isHeadKnown,
     base: view.baseRefName ?? "",
@@ -626,6 +635,22 @@ export function decide(prev: Snapshot, next: Snapshot): Decision[] {
 
   decisions.push(...feedbackOf(prev, next));
   return decisions;
+}
+
+// Fixing a conflict, a failure, or feedback is the author's job, so another's PR
+// promotes only what changes the checkout itself.
+const UNOWNED: ReadonlySet<Promoted["kind"]> = new Set(["pr.merged", "pr.closed", "push.foreign"]);
+
+/** Splits promotions into those sent for this PR and those withheld because the session did not author it. */
+export function ownedOf(
+  snapshot: Snapshot,
+  promoted: Promoted[],
+): { sent: Promoted[]; withheld: Promoted[] } {
+  if (snapshot.isAuthor) return { sent: promoted, withheld: [] };
+  return {
+    sent: promoted.filter((d) => UNOWNED.has(d.kind)),
+    withheld: promoted.filter((d) => !UNOWNED.has(d.kind)),
+  };
 }
 
 /**

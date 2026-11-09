@@ -4,7 +4,18 @@ import * as gs from "@hegeldev/hegel/generators";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { countWords, lintFiles, markShipped, PLUGINS } from "./corpus";
+import { $ } from "bun";
+import { z } from "zod";
+import {
+  checkouts,
+  corpusHits,
+  countWords,
+  filePath,
+  lintFiles,
+  markShipped,
+  PLUGINS,
+  sweep,
+} from "./corpus";
 import {
   assign,
   type Flag,
@@ -33,9 +44,9 @@ import {
 } from "./score";
 import { locate, toFlags } from "./review";
 import type { Message, QueryFn } from "../eval-judge/index";
-import { type Call, next, PROPOSED } from "./deck";
+import { type Call, next, PROPOSED, toCall } from "./deck";
 import { propose, type Reply, resolve, spread } from "./propose";
-import { context, reveal } from "./server";
+import { context, reveal, serve } from "./server";
 import { checkRows } from "./status";
 
 function hit(file: string, line: number, span: [number, number], check = "Writing.X"): Hit {
@@ -405,10 +416,19 @@ describe("next", () => {
     expect(next(hits, labels, [], seen)).toBeUndefined();
   });
 
-  test("prefers the check with the widest interval", () => {
+  test("prefers the check fewest votes from a call", () => {
     const some = openCheck.slice(0, 3).map((h) => label(h, "right"));
     const fresh = checkHits("Fresh", 3, false);
-    expect(next([...openCheck, ...fresh], some, [], new Set())?.check).toBe("Fresh");
+    expect(next([...openCheck, ...fresh], some, [], new Set())?.check).toBe("Open");
+  });
+
+  test.each<{ name: string; right: number; wrong: number; want: number }>([
+    { name: "an unlabeled check needs the minimum", right: 0, wrong: 0, want: 10 },
+    { name: "a slop streak needs only the rest of the minimum", right: 5, wrong: 0, want: 5 },
+    { name: "a fine streak leans below the floor", right: 0, wrong: 4, want: 6 },
+    { name: "a decided check needs none", right: 10, wrong: 0, want: 0 },
+  ])("toCall: $name", ({ right, wrong, want }) => {
+    expect(toCall({ right, wrong })).toBe(want);
   });
 
   test("picks the hit from the file the check's labels least cover", () => {
@@ -690,9 +710,151 @@ describe("propose", () => {
     const data = store(dir);
     const swept = hit("a", 1, [1, 2]);
     const proposed = { ...hit("a", 2, [1, 2], PROPOSED), shipped: false };
-    await data.writeSweep({ corpus: "all", rev: "r", words: 1, hits: [swept] });
+    await data.writeSweep({ corpus: "all", rev: "r", words: 1, hits: [swept], repos: {} });
     await data.addProposals([{ file: "a", key: "k", asked: 1, hits: [proposed], ts: "t" }]);
     expect((await data.hits()).map((h) => h.check)).toEqual(["Writing.X", PROPOSED]);
     await rm(dir, { recursive: true });
+  });
+});
+
+describe("repos", () => {
+  const text = "# Doc\n\nThe box carries books; the shelf holds them.\n";
+  let tmp: string;
+  let main: string;
+  let org: string;
+  let docs: string;
+
+  async function repo(path: string, files: readonly string[]): Promise<string> {
+    await Promise.all(files.map((file) => Bun.write(join(path, file), text)));
+    await $`git -C ${path} init -q && git -C ${path} add -A && git -C ${path} -c user.name=t -c user.email=t@t -c commit.gpgsign=false commit -qm init`;
+    return (await $`git -C ${path} rev-parse --show-toplevel`.text()).trim();
+  }
+
+  beforeAll(async () => {
+    tmp = await mkdtemp(join(tmpdir(), "prose-lab-repos-"));
+    const files = ["skills/a/SKILL.md", "README.md"];
+    main = await repo(join(tmp, "main"), files);
+    org = await repo(join(tmp, "org"), files);
+    docs = join(tmp, "docs");
+  });
+  afterAll(() => rm(tmp, { recursive: true }));
+
+  const Next = z.object({ card: z.object({ file: z.string() }).nullable() });
+  /** Every card's file until the deck runs out. */
+  async function deal(server: Bun.Server<undefined>, dealt: string[] = []): Promise<string[]> {
+    const { card } = Next.parse(await (await fetch(new URL("/api/next", server.url))).json());
+    return card === null ? dealt : deal(server, [...dealt, card.file]);
+  }
+
+  test("checkouts names a repo by its top-level directory and rejects this repo and a repeated name", async () => {
+    expect(await checkouts([join(org, "skills")], main)).toEqual({ org });
+    expect(checkouts([main], main)).rejects.toThrow("this repo");
+    const twin = await repo(join(tmp, "twin", "org"), ["README.md"]);
+    expect(checkouts([org, twin], main)).rejects.toThrow("Two checkouts");
+  });
+
+  test("filePath resolves a prefixed file in its checkout and any other file in the root", () => {
+    expect(filePath("org:README.md", { org }, main)).toBe(join(org, "README.md"));
+    expect(filePath("README.md", { org }, main)).toBe(join(main, "README.md"));
+    expect(filePath("other:README.md", { org }, main)).toBe(join(main, "other:README.md"));
+  });
+
+  test("a sweep across checkouts keeps the same path in each repo apart, and a corpus narrows it", async () => {
+    const swept = await sweep("all", ["writing"], { root: main, docs, repos: { org } });
+    expect(swept.repos).toEqual({ org });
+    const files = [...new Set(swept.hits.map((h) => h.file))].toSorted();
+    expect(files).toEqual([
+      "README.md",
+      "org:README.md",
+      "org:skills/a/SKILL.md",
+      "skills/a/SKILL.md",
+    ]);
+    expect(new Set(swept.hits.map(hitId)).size).toBe(swept.hits.length);
+    const prompts = await corpusHits(swept.hits, "agent-facing", {
+      root: main,
+      docs,
+      repos: { org },
+    });
+    expect([...new Set(prompts.map((h) => h.file))].toSorted()).toEqual([
+      "org:skills/a/SKILL.md",
+      "skills/a/SKILL.md",
+    ]);
+  });
+
+  test("serve with a corpus deals and reads documents only from that corpus's files", async () => {
+    const data = store(join(tmp, "data"));
+    await data.writeSweep(await sweep("all", ["writing"], { root: main, docs, repos: { org } }));
+    const { server } = await serve(data, {
+      port: 0,
+      perCheck: 5,
+      root: main,
+      docs,
+      corpus: "agent-facing",
+    });
+    try {
+      const get = (path: string) => fetch(new URL(path, server.url));
+      const doc = await get("/api/doc?file=org:skills/a/SKILL.md");
+      expect(z.object({ lines: z.array(z.string()) }).parse(await doc.json()).lines).toEqual(
+        text.split("\n"),
+      );
+      expect((await get("/api/doc?file=org:README.md")).status).toBe(404);
+      const dealt = new Set(await deal(server));
+      expect([...dealt].every((file) => file.endsWith("SKILL.md"))).toBe(true);
+      expect(dealt.size).toBeGreaterThan(0);
+    } finally {
+      await server.stop(true);
+    }
+  });
+
+  test("a vote counts one labeled card per card, and a vote on an unknown card fails", async () => {
+    const data = store(join(tmp, "votes"));
+    await data.writeSweep(await sweep("all", ["writing"], { root: main, docs }));
+    const { server } = await serve(data, { port: 0, perCheck: 5, root: main, docs });
+    const Voted = z.object({ labeled: z.number(), reveal: z.object({ check: z.string() }) });
+    const vote = (id: string) =>
+      fetch(new URL("/api/vote", server.url), {
+        method: "POST",
+        body: JSON.stringify({ id, verdict: "right", note: "" }),
+      });
+    try {
+      const first = z
+        .object({ card: z.object({ id: z.string() }), labeled: z.number() })
+        .parse(await (await fetch(new URL("/api/next", server.url))).json());
+      expect(first.labeled).toBe(0);
+      expect(Voted.parse(await (await vote(first.card.id)).json()).labeled).toBe(1);
+      expect(Voted.parse(await (await vote(first.card.id)).json()).labeled).toBe(1);
+      const missing = await vote("Writing.X|gone.md|1|1");
+      expect([missing.status, await missing.text()]).toEqual([404, "unknown hit"]);
+    } finally {
+      await server.stop(true);
+    }
+  });
+
+  test("serve skips a saved proposal on a checkout a later sweep dropped", async () => {
+    const data = store(join(tmp, "dropped"));
+    await data.writeSweep(await sweep("all", ["writing"], { root: main, docs }));
+    const stale = { ...hit("gone:README.md", 3, [1, 3], PROPOSED), shipped: false };
+    await data.addProposals([
+      { file: "gone:README.md", key: "k", asked: 1, hits: [stale], ts: "t" },
+    ]);
+    await data.enqueue([{ ...stale, pattern: "p", candidate: "c" }]);
+    const { server } = await serve(data, { port: 0, perCheck: 5, root: main, docs });
+    try {
+      expect(await deal(server)).not.toContain("gone:README.md");
+    } finally {
+      await server.stop(true);
+    }
+  });
+
+  test("propose reads a prefixed file from its checkout", async () => {
+    const query = fakeQuery({ spans: [{ line: 3, quote: "shelf holds", reason: "r" }] }, []);
+    const [result] = await propose({
+      files: ["org:README.md"],
+      existing: [],
+      root: main,
+      repos: { org },
+      query,
+    });
+    expect(result?.hits).toMatchObject([{ file: "org:README.md", match: "shelf holds" }]);
   });
 });

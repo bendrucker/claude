@@ -14,6 +14,7 @@ import {
   messageOf,
   parseExtras,
   noiseOf,
+  ownedOf,
   parseView,
   snapshotOf,
   statusOf,
@@ -465,7 +466,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   }
   watch.none = undefined;
   const prev = watch.snapshot;
-  const isSamePr = prev !== undefined && prev.pr === read.snapshot.pr;
+  const isSamePr = prev !== undefined && prev.url === read.snapshot.url;
   // An undecided poll keeps the last answer, so a recompute does not re-announce a block.
   const decided = read.snapshot.block;
   const next =
@@ -504,9 +505,13 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
   }
   watch.snapshot = next;
   render($, watch);
+  const { sent, withheld } = ownedOf(next, due);
+  for (const { action, ...detail } of withheld) {
+    emit($, "withheld", { pr: next.pr, head: next.head, ...detail });
+  }
   // The send waits for an idle session, so the next poll is not held on it.
-  if (due.length > 0) {
-    void send($, watch, next, due, watch.held, attempt, isCurrent);
+  if (sent.length > 0) {
+    void send($, watch, next, sent, watch.held, attempt, isCurrent);
     watch.held = [];
   }
   return { isTracked: !isSamePr, isChanged };

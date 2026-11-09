@@ -1,4 +1,4 @@
-import { mean, min } from "simple-statistics";
+import { mean, median, min } from "simple-statistics";
 import { table } from "table";
 import type { Cell, Column } from "./column";
 import { pFloor, pValue } from "./stats";
@@ -39,6 +39,39 @@ function mark(base: number[], xs: number[], alpha: number): string {
 }
 
 const ARMS = ["with", "without"];
+
+const med = (xs: number[], digits: number) => (xs.length > 0 ? median(xs).toFixed(digits) : "-");
+
+/** Each column's median against the baseline's, as a candidate-to-base ratio. */
+function ratioCells(series: number[][], digits: number): string[] {
+  const [base = [], ...rest] = series;
+  const cells = rest.map((xs) => {
+    if (xs.length === 0 || base.length === 0 || median(base) === 0) return med(xs, digits);
+    return `${med(xs, digits)} (x${(median(xs) / median(base)).toFixed(2)})`;
+  });
+  return [med(base, digits), ...cells];
+}
+
+export interface CostRatios {
+  /** Per column after the baseline, its all-run median cost over the baseline's, if both have runs. */
+  ratios: (number | undefined)[];
+  /** Runs without a `costUsd` per column. */
+  missing: number[];
+}
+
+/** Median `costUsd` over every run in each column, as a ratio to the first column's. */
+export function costRatios(columns: Column[]): CostRatios {
+  const costs = columns.map((c) => [...c.values()].flatMap((cell) => cell.runCost));
+  const [base = [], ...rest] = costs;
+  return {
+    ratios: rest.map((xs) =>
+      xs.length === 0 || base.length === 0 || median(base) === 0
+        ? undefined
+        : median(xs) / median(base),
+    ),
+    missing: columns.map((c) => [...c.values()].reduce((n, cell) => n + cell.missingCost, 0)),
+  };
+}
 
 /** Every case's runs on one arm, pooled, so a suite-wide shift can star where no case can. */
 function poolArm(columns: Column[], keys: string[], arm: string, pick: (cell: Cell) => number[]) {
@@ -97,6 +130,38 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
       ),
     ];
   });
+  const hasRunCost = columns.some((c) => [...c.values()].some((cell) => cell.runCost.length > 0));
+  const runSections: Section[] = hasRunCost
+    ? (
+        [
+          ["Median cost per run (USD, x = candidate / base)", (c: Cell) => c.runCost, 3],
+          ["Median turns per run (x = candidate / base)", (c: Cell) => c.runTurns, 1],
+        ] as const
+      ).map(([title, pick, digits]): Section => {
+        const pooled = (arm: string | undefined) =>
+          ratioCells(
+            columns.map((c) =>
+              [...c]
+                .filter(([key]) => arm === undefined || key.endsWith(`/${arm}`))
+                .flatMap(([, cell]) => pick(cell)),
+            ),
+            digits,
+          );
+        const all: string[][] = [];
+        if (keys.length > 1) {
+          for (const arm of ARMS) {
+            if (keys.some((key) => key.endsWith(`/${arm}`)))
+              all.push([`all/${arm}`, ...pooled(arm)]);
+          }
+          all.push(["all", ...pooled(undefined)]);
+        }
+        return [
+          title,
+          ["case/arm"],
+          [...all, ...keys.map((key) => [key, ...ratioCells(series(key, pick), digits)])],
+        ];
+      })
+    : [];
   const graderRows = keys.flatMap((key) => {
     const names = new Set(columns.flatMap((c) => [...(c.get(key)?.graders.keys() ?? [])]));
     return [...names].toSorted().map((name) =>
@@ -127,6 +192,7 @@ function sections({ columns, alpha, tags }: RenderOptions): Section[] {
     ],
     ["Case minimum", ["case/arm"], minRows],
     ...measureSections,
+    ...runSections,
     ["Grader pass rate", ["case/arm", "grader"], [...graderPoolRows, ...graderRows]],
   ];
   if (tags !== undefined) {
@@ -204,6 +270,15 @@ export function render(options: RenderOptions): string {
     : [
         `Each cell shows its two-sided permutation p-value against ${labels[0]}, and * marks p < ${alpha}. all/<arm> pools every case's runs. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.\n`,
       ];
+  const { missing } = costRatios(options.columns);
+  const hasCost = options.columns.some((c) =>
+    [...c.values()].some((cell) => cell.runCost.length > 0),
+  );
+  const missingNote =
+    hasCost && missing.some((n) => n > 0)
+      ? `Runs skipped for cost, missing costUsd: ${labels.map((l, i) => `${l} ${missing[i] ?? 0}`).join(", ")}.\n`
+      : undefined;
+  if (missingNote !== undefined) out.push(missingNote);
   if (!options.markdown) {
     for (const [title, head, rows] of all) out.push(title, table([[...head, ...labels], ...rows]));
     return out.join("\n");

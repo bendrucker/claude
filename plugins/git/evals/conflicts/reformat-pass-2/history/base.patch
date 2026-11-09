@@ -1,0 +1,583 @@
+diff --git a/src/imports.test.ts b/src/imports.test.ts
+new file mode 100644
+index 0000000..68ee4b3
+--- /dev/null
++++ b/src/imports.test.ts
+@@ -0,0 +1,95 @@
++import { expect, test } from "bun:test";
++import {
++  isBuiltin,
++  packageName,
++  scanImports
++} from "./imports";
++
++test.each<{
++  name: string;
++  source: string;
++  expected: string[];
++}>([
++  {
++    name: "value import",
++    source: `import { z } from "zod";`,
++    expected: ["zod"]
++  },
++  {
++    name: "type-only import, which the transpiler would otherwise elide",
++    source: `import type { A } from "zod";`,
++    expected: ["zod"]
++  },
++  {
++    name: "type-only re-export",
++    source: `export type { A } from "zod";`,
++    expected: ["zod"]
++  },
++  {
++    name: "type-only star re-export",
++    source: `export type * from "zod";`,
++    expected: ["zod"]
++  },
++  {
++    name: "local type alias is not an import and must still parse",
++    source: `export type Source = "rss" | "blog";\nimport { z } from "zod";`,
++    expected: ["zod"]
++  },
++  {
++    name: "side-effect import",
++    source: `import "zod";`,
++    expected: ["zod"]
++  },
++  {
++    name: "dynamic import",
++    source: `const m = await import("zod");`,
++    expected: ["zod"]
++  },
++  {
++    name: "re-export",
++    source: `export { z } from "zod";`,
++    expected: ["zod"]
++  },
++  {
++    name: "relative specifier is returned too",
++    source: `import x from "./local";`,
++    expected: ["./local"]
++  },
++  {
++    name: "shebang does not break parsing",
++    source: `#!/usr/bin/env bun\nimport { z } from "zod";`,
++    expected: ["zod"]
++  }
++])("scanImports: $name", ({ source, expected }) => {
++  expect(scanImports(source).toSorted()).toEqual(
++    expected.toSorted()
++  );
++});
++
++test("scanImports: parses JSX under the tsx loader", () => {
++  const source = `import { a } from "./a.tsx";\nexport const b = <Box flexDirection="column" />;`;
++  expect(scanImports(source, "tsx")).toContain("./a.tsx");
++});
++
++test.each([
++  { specifier: "node:path", expected: true },
++  { specifier: "bun", expected: true },
++  { specifier: "bun:test", expected: true },
++  { specifier: "zod", expected: false },
++  { specifier: "bunyan", expected: false }
++])("isBuiltin: $specifier", ({ specifier, expected }) => {
++  expect(isBuiltin(specifier)).toBe(expected);
++});
++
++test.each([
++  { specifier: "zod", expected: "zod" },
++  { specifier: "zod/v4", expected: "zod" },
++  { specifier: "@types/bun", expected: "@types/bun" },
++  {
++    specifier: "@anthropic-ai/sdk/core",
++    expected: "@anthropic-ai/sdk"
++  },
++  { specifier: "@scope", expected: "@scope" }
++])("packageName: $specifier", ({ specifier, expected }) => {
++  expect(packageName(specifier)).toBe(expected);
++});
+diff --git a/src/imports.ts b/src/imports.ts
+new file mode 100644
+index 0000000..2204539
+--- /dev/null
++++ b/src/imports.ts
+@@ -0,0 +1,45 @@
++const transpilers = {
++  ts: new Bun.Transpiler({ loader: "ts" }),
++  // JSX makes this one also report the React runtime Bun injects.
++  tsx: new Bun.Transpiler({ loader: "tsx" })
++};
++
++/**
++ * Module specifiers imported by a TypeScript source, relative and bare alike.
++ *
++ * `Transpiler.scanImports` elides type-only imports, so the `type` keyword is
++ * stripped first: a type-only import of a package the workspace never declared
++ * still fails to resolve under `oxlint --type-aware`, and one that reaches
++ * outside a plugin still couples the two plugins. Only the two forms carrying a
++ * module specifier are rewritten, because a bare `export type Name =` declares
++ * a local alias and must survive intact for the source to still parse.
++ */
++export function scanImports(
++  source: string,
++  loader: keyof typeof transpilers = "ts"
++): string[] {
++  const body = source.startsWith("#!")
++    ? source.slice(source.indexOf("\n") + 1)
++    : source;
++  const values = body
++    .replaceAll(/\bimport\s+type\s+/g, "import ")
++    .replaceAll(/\bexport\s+type\s+(?=[{*])/g, "export ");
++
++  return transpilers[loader]
++    .scanImports(values)
++    .map(({ path }) => path);
++}
++
++export function isBuiltin(specifier: string): boolean {
++  return (
++    specifier.startsWith("node:") ||
++    specifier === "bun" ||
++    specifier.startsWith("bun:")
++  );
++}
++
++/** The installable package a specifier belongs to, dropping any subpath. */
++export function packageName(specifier: string): string {
++  const segments = specifier.startsWith("@") ? 2 : 1;
++  return specifier.split("/").slice(0, segments).join("/");
++}
+diff --git a/src/io.test.ts b/src/io.test.ts
+new file mode 100644
+index 0000000..a4cd901
+--- /dev/null
++++ b/src/io.test.ts
+@@ -0,0 +1,44 @@
++import {
++  afterAll,
++  beforeAll,
++  describe,
++  expect,
++  it
++} from "bun:test";
++import { mkdtempSync } from "node:fs";
++import { rm } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { join } from "node:path";
++import { readInput } from "./io";
++
++describe("readInput", () => {
++  let dir: string;
++
++  beforeAll(async () => {
++    dir = mkdtempSync(join(tmpdir(), "writing-input-"));
++    await Bun.write(
++      join(dir, "doc.md"),
++      "The function reads input.\n"
++    );
++  });
++
++  afterAll(async () => {
++    await rm(dir, { recursive: true, force: true });
++  });
++
++  it("reads an existing file and reports its path", async () => {
++    const path = join(dir, "doc.md");
++    expect(await readInput(path)).toEqual({
++      text: "The function reads input.\n",
++      filePath: path
++    });
++  });
++
++  it("treats a non-existent argument as inline text", async () => {
++    expect(
++      await readInput("The function reads input.")
++    ).toEqual({
++      text: "The function reads input."
++    });
++  });
++});
+diff --git a/src/io.ts b/src/io.ts
+new file mode 100644
+index 0000000..7ada574
+--- /dev/null
++++ b/src/io.ts
+@@ -0,0 +1,26 @@
++/**
++ * Shared I/O utilities for writing skill CLI scripts.
++ *
++ * readInput resolves in order: file path argument, inline text argument, stdin.
++ * It is used by both scan and score so the three-way resolution stays consistent.
++ */
++export async function readInput(
++  arg: string | undefined
++): Promise<{ text: string; filePath?: string }> {
++  if (
++    arg != null &&
++    arg !== "" &&
++    (await Bun.file(arg).exists())
++  ) {
++    return {
++      text: await Bun.file(arg).text(),
++      filePath: arg
++    };
++  }
++  if (arg != null && arg !== "") {
++    return { text: arg };
++  }
++  return {
++    text: await new Response(Bun.stdin.stream()).text()
++  };
++}
+diff --git a/src/page-text.test.ts b/src/page-text.test.ts
+new file mode 100644
+index 0000000..8935462
+--- /dev/null
++++ b/src/page-text.test.ts
+@@ -0,0 +1,62 @@
++import { describe, expect, test } from "bun:test";
++
++import { AMOUNT, amount } from "./page-text";
++
++// A page read mid-render hands the parsers a half-written number. The risk is
++// not a parse failure but a plausible one: `$1,` losing its separator and
++// arriving downstream as a real $1 fare.
++
++const ANYWHERE = new RegExp(String.raw`\$(${AMOUNT})`);
++
++function price(text: string): number | null {
++  return amount(ANYWHERE.exec(text)?.[1]);
++}
++
++describe("AMOUNT", () => {
++  const CASES: [string, number | null][] = [
++    ["$5", 5],
++    ["$234", 234],
++    ["$1,234", 1234],
++    ["$1,234,567", 1234567],
++    // United writes taxes with cents and miles with a fractional thousand.
++    ["$5.60", 5.6],
++    // Ungrouped four-digit amounts appear where the page omits the separator.
++    ["$22500", 22500],
++    // Truncated mid-format. Each of these parsed as a real fare before.
++    ["$1,", null],
++    ["$1,2", null],
++    ["$1,23", null],
++    ["$12,34", null],
++    ["$5.", null],
++    // A cents field caught one digit in would otherwise read as $249.90.
++    ["$249.9", null],
++    ["$", null],
++    ["$,", null]
++  ];
++
++  test.each(CASES)("%s parses as %p", (text, expected) => {
++    expect(price(text)).toBe(expected);
++  });
++
++  test("a comma opening a list item ends the amount rather than voiding it", () => {
++    // Grid cells carry their tier and dates in the same accessible name, so the
++    // separator that follows a legitimate price is a comma and a space.
++    expect(
++      price(
++        'button "$234, cheapest price, Nov 8 to Nov 13"'
++      )
++    ).toBe(234);
++    expect(price('button "$1,234, cheapest price"')).toBe(
++      1234
++    );
++  });
++});
++
++describe("amount", () => {
++  test("absent input stays absent rather than becoming zero", () => {
++    // `Number("")` is 0, which is what made an unparsed price read as a real one.
++    expect(amount(undefined)).toBeNull();
++    expect(amount(null)).toBeNull();
++    expect(amount("")).toBeNull();
++  });
++});
+diff --git a/src/page-text.ts b/src/page-text.ts
+new file mode 100644
+index 0000000..107238e
+--- /dev/null
++++ b/src/page-text.ts
+@@ -0,0 +1,48 @@
++// Primitives shared by the three parsers. Every value they read comes out of a
++// live page capture, so each one has to survive a page caught mid-render.
++
++// A field the page did not supply arrives as undefined when the capture group
++// went unmatched and as an empty string when it matched nothing. Both mean absent.
++export function present(
++  value: string | null | undefined
++): value is string {
++  return value != null && value !== "";
++}
++
++/** Whole part of a formatted number: thousands-grouped, or plain when ungrouped. */
++const DIGITS = String.raw`(?:\d{1,3}(?:,\d{3})+|\d+)`;
++
++/**
++ * Refuses to end a number on a half-written separator.
++ *
++ * This is what keeps a capture taken mid-render from parsing. A looser
++ * `\d[\d,]*` accepts the `$1,` or `$1,2` of a `$1,234` still being written, and
++ * `replaceAll(",", "")` turns either into a real $1 or $12. Requiring every
++ * group after a separator to be whole makes those fail instead.
++ *
++ * A comma that opens a list item rather than a thousands group is followed by a
++ * space, as in an accessible name like `$234, cheapest price`, so that one ends
++ * the number instead of rejecting it. The guard reaches partly written
++ * separators only. Nothing distinguishes a page that has rendered `$1` of
++ * `$1,234` from a genuine `$1`.
++ */
++const WHOLE = String.raw`(?![\d.])(?!,(?! ))`;
++
++/**
++ * A money amount: whole units, or exactly the two decimal places these pages
++ * use for cents. Allowing a shorter tail would read the `$249.9` of a
++ * half-written `$249.99` as $249.90.
++ */
++export const AMOUNT = `${DIGITS}(?:\\.\\d{2})?${WHOLE}`;
++
++/** United's abbreviated mileage, as in `22.5k`. The `k` itself sits outside this. */
++export const THOUSANDS = `${DIGITS}(?:\\.\\d{1,2})?${WHOLE}`;
++
++/** Converts digits captured by {@link AMOUNT}. */
++export function amount(
++  digits: string | null | undefined
++): number | null {
++  if (!present(digits)) return null;
++  const value = Number(digits.replaceAll(",", ""));
++  return Number.isFinite(value) ? value : null;
++}
+diff --git a/src/reviewers.test.ts b/src/reviewers.test.ts
+new file mode 100644
+index 0000000..e1d1456
+--- /dev/null
++++ b/src/reviewers.test.ts
+@@ -0,0 +1,65 @@
++import { describe, expect, test } from "bun:test";
++import {
++  isBotUsername,
++  isReviewTarget,
++  parseReviewers
++} from "./reviewers";
++
++describe("isBotUsername", () => {
++  test.each([
++    "group_1234_bot",
++    "group_108656794_bot_52b7e4c7a732080fa3b51efe36863e09",
++    "project_42_bot_abc123def456",
++    "my-reviewer-bot",
++    "greptile_bot",
++    "Project-Bot"
++  ])(
++    "matches the %s service-account convention",
++    (username) => {
++      expect(isBotUsername(username)).toBe(true);
++    }
++  );
++
++  test.each([
++    "bendrucker",
++    "jacob",
++    "coderabbitai",
++    "robotnik",
++    "group_bot_user",
++    "my_bot_friend"
++  ])("rejects %s (no bot suffix)", (username) => {
++    expect(isBotUsername(username)).toBe(false);
++  });
++});
++
++describe("parseReviewers", () => {
++  test("splits on commas, lowercased, ignoring blanks", () => {
++    expect(parseReviewers("CodeRabbitAI, jacob,")).toEqual(
++      new Set(["coderabbitai", "jacob"])
++    );
++  });
++});
++
++describe("isReviewTarget", () => {
++  test("includes structural bot accounts", () => {
++    expect(isReviewTarget("group_9_bot")).toBe(true);
++  });
++
++  test("includes listed usernames that break the convention", () => {
++    expect(
++      isReviewTarget(
++        "coderabbitai",
++        new Set(["coderabbitai"])
++      )
++    ).toBe(true);
++    expect(
++      isReviewTarget("jacob", new Set(["jacob"]))
++    ).toBe(true);
++  });
++
++  test("excludes unlisted humans", () => {
++    expect(
++      isReviewTarget("bendrucker", new Set(["jacob"]))
++    ).toBe(false);
++  });
++});
+diff --git a/src/reviewers.ts b/src/reviewers.ts
+new file mode 100644
+index 0000000..5af7627
+--- /dev/null
++++ b/src/reviewers.ts
+@@ -0,0 +1,36 @@
++// GitLab has no `__typename` to distinguish bots from users. Service accounts
++// follow a `*-bot` / `*_bot` convention, and token service accounts use
++// `group_<id>_bot_<hash>` / `project_<id>_bot_<hash>` (CodeRabbit posts under
++// a group token account). These are the structural signals. Named bots that
++// break the conventions, and any humans you want the autonomous loop to act
++// on, are listed additively in the plugin's comma-separated `reviewers`
++// option, which the skill passes as `--reviewers`.
++
++const SERVICE_ACCOUNT =
++  /^(?:group|project)_\d+_bot_[0-9a-f]+$/;
++
++export function isBotUsername(username: string): boolean {
++  const name = username.toLowerCase();
++  return (
++    /[_-]bot$/.test(name) || SERVICE_ACCOUNT.test(name)
++  );
++}
++
++export function parseReviewers(list = ""): Set<string> {
++  return new Set(
++    list
++      .split(",")
++      .map((username) => username.trim().toLowerCase())
++      .filter(Boolean)
++  );
++}
++
++export function isReviewTarget(
++  username: string,
++  extra = new Set<string>()
++): boolean {
++  return (
++    isBotUsername(username) ||
++    extra.has(username.toLowerCase())
++  );
++}
+diff --git a/src/transcript.test.ts b/src/transcript.test.ts
+new file mode 100644
+index 0000000..5a636ac
+--- /dev/null
++++ b/src/transcript.test.ts
+@@ -0,0 +1,62 @@
++import { expect, test } from "bun:test";
++import { join } from "node:path";
++import { readTranscriptTail } from "./transcript";
++
++const TMP_DIR = process.env.TMPDIR ?? "/tmp";
++
++async function write(lines: string[]): Promise<string> {
++  const path = join(
++    TMP_DIR,
++    `transcript-${crypto.randomUUID()}.jsonl`
++  );
++  await Bun.write(
++    path,
++    lines.map((line) => `${line}\n`).join("")
++  );
++  return path;
++}
++
++test("parses every well-formed line", async () => {
++  const path = await write(['{"n":1}', '{"n":2}']);
++  expect(await readTranscriptTail(path, 1024)).toEqual([
++    { n: 1 },
++    { n: 2 }
++  ]);
++});
++
++test("skips malformed lines", async () => {
++  const path = await write([
++    '{"n":1}',
++    "not json",
++    '{"n":2}'
++  ]);
++  expect(await readTranscriptTail(path, 1024)).toEqual([
++    { n: 1 },
++    { n: 2 }
++  ]);
++});
++
++test("drops the partial line a mid-file slice splits", async () => {
++  const path = await write([
++    `{"pad":"${"x".repeat(200)}"}`,
++    '{"n":2}'
++  ]);
++  expect(await readTranscriptTail(path, 64)).toEqual([
++    { n: 2 }
++  ]);
++});
++
++test("returns nothing for an empty file", async () => {
++  expect(
++    await readTranscriptTail(await write([]), 1024)
++  ).toEqual([]);
++});
++
++test("returns nothing for a missing file", async () => {
++  expect(
++    await readTranscriptTail(
++      join(TMP_DIR, "absent.jsonl"),
++      1024
++    )
++  ).toEqual([]);
++});
+diff --git a/src/transcript.ts b/src/transcript.ts
+new file mode 100644
+index 0000000..99ff72c
+--- /dev/null
++++ b/src/transcript.ts
+@@ -0,0 +1,40 @@
++// Transcripts grow to megabytes and only the tail holds the latest turns, so
++// read a bounded suffix rather than the file. A mid-file slice splits the first
++// line, which is dropped along with any other line that does not parse: a
++// reader scanning backwards for the newest record of some shape must tolerate
++// malformed lines rather than abort on the first one.
++export async function readTranscriptTail(
++  path: string,
++  tailBytes: number
++): Promise<unknown[]> {
++  try {
++    const file = Bun.file(path);
++    const size = file.size;
++    if (size === 0) return [];
++
++    const start = Math.max(0, size - tailBytes);
++    const lines = (await file.slice(start).text()).split(
++      "\n"
++    );
++    if (start > 0) lines.shift();
++
++    const entries: unknown[] = [];
++    for (const line of lines) {
++      if (line.trim() === "") continue;
++      try {
++        entries.push(JSON.parse(line));
++      } catch {
++        // Skip malformed lines.
++      }
++    }
++    return entries;
++  } catch (error) {
++    if (
++      !(error instanceof Error) ||
++      !("code" in error) ||
++      error.code !== "ENOENT"
++    )
++      throw error;
++    return [];
++  }
++}

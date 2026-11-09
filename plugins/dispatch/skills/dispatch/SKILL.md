@@ -3,6 +3,7 @@ name: dispatch
 description: >-
   Hand new work bound for its own pull request to a fresh Claude session in a new worktree, opened in a Rex tab or a herdr workspace with its permissions written ahead of time. Use when a task should run beside this session rather than inside it, including a change this session found that belongs in another branch or repository. Not for re-rooting this session (`worktrunk:wt-switch-create`) or in-session subagents (`Agent`).
 argument-hint: "--branch <branch | pr:<n> | mr:<n>> --prompt <file>"
+effort: low
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
 ---
@@ -13,41 +14,40 @@ Start a separate Claude session that takes a task through to its own PR while th
 
 ## Write the Prompt
 
-Write the prompt to a file under `tmp/`. The dispatched session starts with no context from this one, so state the goal, the files to read, what is already ruled out, and the completion criterion. Keep it under 128KB. For larger material, point the session at a file. The script appends this session's name, its Rex block or herdr pane, and the address another machine uses for this one. The dispatched session sends its replies with `SendMessage` to that name.
+Write the prompt to a file under `tmp/` from what this conversation already knows. The dispatched session starts with no context from this one, so state the goal, what is already ruled out, and the completion criterion, and name any files this conversation has already found. It reads the repository itself, so go straight from the request to the prompt without exploring the code first. Keep it under 128KB. For larger material, point the session at a file. The script appends this session's name, its Rex block or herdr pane, and the address another machine uses for this one. The dispatched session sends its replies with `SendMessage` to that name.
+
+## Flags
+
+`--help`, run for this session:
+
+!`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help`
 
 Ask once per session with `AskUserQuestion` whether dispatched sessions should close their panes once their PRs are open, recommending yes. On yes, end the prompt with: "Once the PR is open, close your pane with `dispatch:close`."
 
 ## Grant Permissions
 
-Pass the permissions the task needs so the session runs without prompting for them:
-
-- `--allow <rule>`: a `permissions.allow` rule, such as `"Bash(bun test:*)"`. Repeatable.
-- `--sandbox-write <path>`: a `sandbox.filesystem.allowWrite` path outside the worktree, such as `~/.cache/<tool>`. Repeatable.
-- `--settings-json <file>`: any other settings, deep-merged.
-
-The script merges these into the worktree's `.claude/settings.local.json`, keeping existing keys and skipping array entries already present. It refuses to write when that file is not git-ignored.
+Pass the permissions the task needs with `--allow`, `--sandbox-write`, and `--settings-json` so the session runs without prompting for them. The script merges them into the worktree's `.claude/settings.local.json`, keeping existing keys and skipping array entries already present. It refuses to write when that file is not git-ignored.
 
 ## Pick the Multiplexer
 
-Dispatch into the multiplexer hosting this session, which `--mux` defaults to. Outside one, or when the script reports Rex and herdr nested, ask the user with `AskUserQuestion` and pass the answer as `--mux`. List the options in this order:
+Pick by how much the task needs the user along the way:
 
-1. `rex`: a Rex tab.
-2. `herdr`: a herdr workspace.
-3. `bg`: a `claude --bg` session with no terminal. Recommend it only for short, self-contained work, because a session with no tab is easy to lose track of. The ledger, `dispatches.jsonl` in the plugin data dir, records it so you can find it again.
+- `bg`, a `claude --bg` session with no terminal: a small, self-contained change with a clear completion criterion, few questions, and little for the user to read before the PR. Pass `--mux bg`.
+- A tab (`rex` or `herdr`): exploratory work, or work that needs decisions, reading, or review as it goes.
+
+`--help` above names the tab multiplexer `--mux` defaults to. When the task calls for a tab and `--help` says to pass `--mux` instead, ask the user with `AskUserQuestion` whether to use `rex` or `herdr`.
+
+The user finds a background session in `claude agents` and picks it up with `claude attach <target>`. This session follows it with `SendMessage` to `name`, and reads its output with `claude logs <target>`. The ledger, `dispatches.jsonl` in the plugin data dir, records every dispatch.
 
 ## Run It
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --repo "$REPO" --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...
+bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...
 ```
 
-- `--branch` takes a branch name, `pr:<n>`, `mr:<n>`, or a PR or MR URL. A branch that exists locally or on a remote is reused, and a branch that already has a worktree opens there. Only a branch that exists nowhere is created. `wt` resolves a PR or MR to its head branch.
-- `--base` applies only to a branch being created. It defaults to `origin/main`, fetched first.
-- `--name` defaults to a slug of the branch.
-- Under Rex the session opens in a new tab labeled with the branch. `--split` opens it in a pane to the right of this one instead. From outside Rex, pass `--session <id or label>` from `rex ls`.
-- `--timeout` (ms, default 30000) bounds the wait for the session to start.
-
-Run `--help` for the rest.
+- `--repo` defaults to this session's repository, shown in `--help` above. Pass it only to dispatch into another repository.
+- A branch that exists locally or on a remote is reused, and a branch that already has a worktree opens there. `wt` resolves a PR or MR to its head branch. `--base` applies only to a branch being created, and is fetched first.
+- Under Rex the session opens in a new tab labeled with the branch. From outside Rex, pass `--session <id or label>` from `rex ls`.
 
 ## Other Machines
 
@@ -64,9 +64,9 @@ On success the script prints one JSON line:
 - `settings`: the settings keys written.
 - `status`:
   - `working`: the session took the prompt.
-  - `blocked`: a dialog is showing, such as folder trust or a permission prompt. Under Rex, `blockedKind` (`permission`, `question`, or `auth`) and `blockedMessage` say what it asks when the session reported them. Otherwise read the screen (`rex capture -b <target> --trim`, `herdr agent read <name>`, or `claude logs <target>`). Tell the user what it asks. The user answers it.
-  - `failed`: under Rex, the session reported an error, or the remote launcher printed `dispatch failed:` and stopped. Read the screen (add `-S <host>` for a remote one) and report the error.
-  - `unknown`: the session showed neither before the timeout. Read the screen before reporting the hand-off.
+  - `blocked`: a dialog is showing, such as folder trust or a permission prompt. Under Rex and `bg`, `blockedKind` (`permission`, `question`, or `auth`) and `blockedMessage` say what it asks when the session reported them. Otherwise read the screen (`rex capture -b <target> --trim`, `herdr agent read <name>`, or `claude logs <target>`). Tell the user what it asks. The user answers it.
+  - `failed`: under Rex, the session reported an error, or the remote launcher printed `dispatch failed:` and stopped. Under `bg`, `claude agents` reports the session failed or stopped. Read the screen (add `-S <host>` for a remote one) and report the error.
+  - `unknown`: the session showed neither before the timeout. Read the screen before reporting the hand-off. Under `bg`, a sandboxed `claude agents --json` lists nothing, so the status comes from `claude logs` alone.
 - `submoduleError`, when present: submodules failed to initialize. The session can repair them.
 
 A failure exits 1 and prints the error. Once the worktree exists, it also prints the partial record. Unless `checkout` is `existing-worktree`, report `path` to the user as an orphaned checkout to clean up.

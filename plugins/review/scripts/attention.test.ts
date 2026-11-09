@@ -7,6 +7,8 @@ import {
   docOpenArgs,
   docPanePath,
   type DocPanes,
+  docResult,
+  docResultPath,
   existingReviewr,
   isKind,
   kinds,
@@ -23,6 +25,10 @@ import {
   recordedDocPanes,
   reviewGlyph,
   reviewrOpenArgs,
+  rexDiffArgs,
+  rexDocArgs,
+  sessionHost,
+  type Host,
   surfaceState,
   type ReviewrLookup,
   type SurfaceState,
@@ -221,6 +227,85 @@ describe("currentPane", () => {
     ["herdr env with an empty pane", { HERDR_ENV: "1", HERDR_PANE_ID: "" }, null],
   ])("%s", (_name, env, expected) => {
     expect(currentPane(env)).toBe(expected);
+  });
+});
+
+describe("sessionHost", () => {
+  test.each<[string, Record<string, string | undefined>, Host]>([
+    ["herdr", { HERDR_ENV: "1", HERDR_PANE_ID: "wE5:p1" }, { kind: "herdr", pane: "wE5:p1" }],
+    ["Rex", { REX_BLOCK: "block:01a1" }, { kind: "rex", block: "block:01a1" }],
+    [
+      "herdr inside Rex",
+      { HERDR_ENV: "1", HERDR_PANE_ID: "wE5:p1", REX_BLOCK: "block:01a1" },
+      { kind: "herdr", pane: "wE5:p1" },
+    ],
+    [
+      "a stale herdr pane id inside Rex",
+      { HERDR_PANE_ID: "wE5:p1", REX_BLOCK: "block:01a1" },
+      { kind: "rex", block: "block:01a1" },
+    ],
+    ["an empty Rex block", { REX_BLOCK: "" }, { kind: "none" }],
+    ["a bare terminal", {}, { kind: "none" }],
+  ])("%s", (_name, env, expected) => {
+    expect(sessionHost(env)).toEqual(expected);
+  });
+});
+
+describe("Rex targets", () => {
+  test.each<[string, string | undefined, string[]]>([
+    ["working diff", undefined, ["do", "review_changes", "block=block:01a1"]],
+    ["empty base", "", ["do", "review_changes", "block=block:01a1"]],
+    [
+      "against a base",
+      "origin/main",
+      ["do", "review_changes", "block=block:01a1", "revisions=origin/main..HEAD"],
+    ],
+  ])("diff: %s", (_name, base, expected) => {
+    expect(rexDiffArgs("block:01a1", base)).toEqual(expected);
+  });
+
+  test("a document gates plannotator-tui in a split left of the block", () => {
+    expect(rexDocArgs("block:01a1", "/repo/tmp/pr-body.md", "/home/r.json")).toMatchInlineSnapshot(`
+      [
+        "split",
+        "-b",
+        "block:01a1",
+        "--split=left",
+        "--cwd",
+        "/repo/tmp",
+        "--wait",
+        "--",
+        "plannotator-tui",
+        "/repo/tmp/pr-body.md",
+        "--gate",
+        "--json",
+        "--require-approval",
+        "--result-file",
+        "/home/r.json",
+      ]
+    `);
+  });
+
+  test("the result file sits beside the block's marker", () => {
+    expect(docResultPath("block:01a1", "/home")).toBe(
+      "/home/.cache/claude/review-human/block-01a1.result.json",
+    );
+  });
+});
+
+describe("docResult", () => {
+  test.each<[string, string, ReturnType<typeof docResult>]>([
+    ["approved", '{"decision":"approved","feedback":""}', { decision: "approved", feedback: "" }],
+    [
+      "annotated",
+      String.raw`{"decision":"annotated","feedback":"> quote\n\ncut this"}`,
+      { decision: "annotated", feedback: "> quote\n\ncut this" },
+    ],
+    ["no feedback field", '{"decision":"dismissed"}', { decision: "dismissed" }],
+    ["no decision", '{"feedback":"x"}', null],
+    ["truncated", '{"decision":', null],
+  ])("%s", (_name, text, expected) => {
+    expect(docResult(text)).toEqual(expected);
   });
 });
 

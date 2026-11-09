@@ -332,6 +332,66 @@ export function currentPane(env: Record<string, string | undefined> = process.en
   return paneId;
 }
 
+export type Host =
+  | { kind: "herdr"; pane: string }
+  | { kind: "rex"; block: string }
+  | { kind: "none" };
+
+// herdr wins when both are set: a herdr pane inside a Rex block is the nearer host.
+export function sessionHost(env: Record<string, string | undefined> = process.env): Host {
+  const pane = currentPane(env);
+  if (pane != null) return { kind: "herdr", pane };
+  const block = env.REX_BLOCK;
+  if (block != null && block !== "") return { kind: "rex", block };
+  return { kind: "none" };
+}
+
+export function rexDiffArgs(block: string, base?: string): string[] {
+  const args = ["do", "review_changes", `block=${block}`];
+  if (base != null && base !== "") args.push(`revisions=${base}..HEAD`);
+  return args;
+}
+
+export function docResultPath(block: string, home = homedir()): string {
+  return `${markerPath(block, home)}.result.json`;
+}
+
+export function rexDocArgs(block: string, file: string, resultFile: string): string[] {
+  const path = resolve(file);
+  return [
+    "split",
+    "-b",
+    block,
+    "--split=left",
+    "--cwd",
+    dirname(path),
+    "--wait",
+    "--",
+    "plannotator-tui",
+    path,
+    "--gate",
+    "--json",
+    "--require-approval",
+    "--result-file",
+    resultFile,
+  ];
+}
+
+const DocResult = z.object({ decision: z.string(), feedback: z.string().nullish() });
+export type DocResult = z.infer<typeof DocResult>;
+
+export function docResult(text: string): DocResult | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    return null;
+  }
+  const parsed = DocResult.safeParse(json);
+  return parsed.success ? parsed.data : null;
+}
+
 // Attention is best effort: a herdr that is down or slow must not fail the
 // skill that asked for it.
 function herdr(args: string[]): boolean {
@@ -485,6 +545,31 @@ async function closeDoc(paneId: string, file: string): Promise<void> {
   await writeDocPanes(recordPath, panes);
 }
 
+function rexOpenDiff(block: string, base: string | undefined): void {
+  const result = Bun.spawnSync(["rex", ...rexDiffArgs(block, base)], {
+    stdio: ["ignore", "inherit", "inherit"],
+  });
+  if (result.exitCode !== 0) process.exit(1);
+  console.log(`opened tuicr beside ${block}`);
+}
+
+// Blocks until Ben quits plannotator-tui, so the skill runs it in the background.
+async function rexGateDoc(block: string, file: string): Promise<void> {
+  const resultPath = docResultPath(block);
+  mkdirSync(dirname(resultPath), { recursive: true });
+  const result = Bun.file(resultPath);
+  if (await result.exists()) await result.delete();
+  const split = Bun.spawnSync(["rex", ...rexDocArgs(block, file, resultPath)], {
+    stdio: ["ignore", "ignore", "inherit"],
+  });
+  const outcome = (await result.exists()) ? docResult(await result.text()) : null;
+  if (outcome == null) {
+    console.error(`plannotator-tui left no decision (rex split exited ${split.exitCode})`);
+    process.exit(2);
+  }
+  console.log(JSON.stringify(outcome));
+}
+
 function fail(message: string): never {
   console.error(message);
   process.exit(1);
@@ -558,10 +643,14 @@ const promptCmd = command(
 const openCmd = command(
   {
     name: "open",
-    help: { description: "Open a review surface beside this pane, delivering into it" },
+    help: { description: "Open a review surface beside this pane" },
     flags: {
-      diff: { type: Boolean, description: "Open reviewr over the working diff" },
-      doc: { type: String, description: "Open plannotator-tui over this file" },
+      diff: { type: Boolean, description: "Review the working diff" },
+      doc: { type: String, description: "Review this file" },
+      base: {
+        type: String,
+        description: "Under Rex, review <base>..HEAD instead of the working diff",
+      },
     },
   },
   async (parsed) => {
@@ -569,11 +658,17 @@ const openCmd = command(
       parsed.showHelp();
       process.exit(1);
     }
-    const paneId =
-      currentPane() ?? fail("not inside a herdr pane (HERDR_PANE_ID unset): use --browser");
-    if (parsed.flags.doc != null) {
-      if (!(await Bun.file(parsed.flags.doc).exists())) fail(`no such file: ${parsed.flags.doc}`);
-      await openDoc(paneId, parsed.flags.doc);
+    const host = sessionHost();
+    if (host.kind === "none") fail("no herdr pane or Rex block: run the browser gate");
+    const doc = parsed.flags.doc;
+    if (doc != null && !(await Bun.file(doc).exists())) fail(`no such file: ${doc}`);
+    if (host.kind === "rex") {
+      if (doc != null) await rexGateDoc(host.block, doc);
+      else rexOpenDiff(host.block, parsed.flags.base);
+      process.exit(0);
+    }
+    if (doc != null) {
+      await openDoc(host.pane, doc);
       process.exit(0);
     }
     const workspace = process.env.HERDR_WORKSPACE_ID;
@@ -586,7 +681,7 @@ const openCmd = command(
       process.exit(0);
     }
     openPane(
-      reviewrOpenArgs(paneId),
+      reviewrOpenArgs(host.pane),
       `reviewr not found: install the \`${REVIEWR_PLUGIN}\` herdr plugin`,
     );
     process.exit(0);

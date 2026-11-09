@@ -1,0 +1,24 @@
+diff --git a/src/drain.ts b/src/drain.ts
+new file mode 100644
+index 0000000..f25cb53
+--- /dev/null
++++ b/src/drain.ts
+@@ -0,0 +1,5 @@
++import { waitFor, type Wait } from "./wait";
++
++export function drainQueue(empty: () => boolean | Promise<boolean>, wait: Wait = waitFor): Promise<boolean> {
++  return wait(empty, { timeout: 30 });
++}
+diff --git a/src/wait.ts b/src/wait.ts
+index 12e73c4..a6781db 100644
+--- a/src/wait.ts
++++ b/src/wait.ts
+@@ -22,7 +22,7 @@ export type Wait = (check: () => boolean | Promise<boolean>, options: WaitOption
+ export const waitFor: Wait = async (check, options) => {
+   const clock = options.clock ?? systemClock;
+   const interval = options.interval ?? 500;
+-  const deadline = clock.now() + options.timeout * 1000;
++  const deadline = clock.now() + Math.max(options.timeout, 0) * 1000;
+   while (true) {
+     if (await check()) return true;
+     if (clock.now() >= deadline) return false;

@@ -65,13 +65,13 @@ Pinning `effort` in frontmatter switches reasoning effort for the skill's durati
 - `xhigh`: hard problems short of a fully autonomous run.
 - `max`: long autonomous runs on hard problems.
 
-The pin applies only when the user types the skill as a slash command. A skill invoked through the Skill tool runs at the conversation's effort.
+The pin applies whenever the skill runs, from a typed slash command or a model-invoked Skill call. Turns before the skill loads run at the conversation's effort, so a pinned skill gains a little less than the same level set for the whole session.
 
 On Claude Fable 5.1, Claude Mythos 5.1, Claude Opus 5.5, and Claude Opus 5, Claude Code sends the switch as a per-message effort change, which keeps the conversation's cached prefix. Pin freely on these models. This is confirmed on the Claude API. Bedrock, Vertex, and Foundry are unconfirmed.
 
 Other models take effort as a top-level request parameter, so switching to the pinned level rewrites the whole cached prefix at cache-creation rates. Reverting is cheap while the pre-switch cache entry is still live, which holds only if the skill finishes within the cache TTL. On those models one rewrite outweighs what a low-effort run saves once the prefix passes a few thousand tokens. A skill re-invoked on every polling cycle pays the rewrite each time.
 
-A skill running under `context: fork` starts a subagent with no inherited prefix, so when its pin applies it costs nothing on any model.
+A skill running under `context: fork` starts a subagent with no inherited prefix, so its pin costs nothing on any model.
 
 ## Skill-Scoped Hooks
 

@@ -57,6 +57,9 @@ export function column(b: Block, which: "base" | "cand"): Column {
         seconds: s.seconds,
         tokens: s.tokens,
         cost: s.cost,
+        runCost: [],
+        runTurns: [],
+        missingCost: 0,
       };
       col.set(`${c.id}/${arm}`, cell);
     }

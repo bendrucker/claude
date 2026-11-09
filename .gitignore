@@ -45,6 +45,10 @@ node_modules/
 # `install.sh` replaces them on every upgrade.
 /user/skills/plannotator*
 
+# The Moshi app writes its inline-visuals skill into ~/.claude/skills, which is
+# this repo's user/skills.
+/user/skills/moshi-visuals/
+
 # Claude Code syncs account-level skills into ~/.claude/skills, which is this
 # repo's user/skills. They belong to that install, not here.
 /user/skills/synced/

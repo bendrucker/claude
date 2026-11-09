@@ -6,16 +6,16 @@ import { join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import {
-  ensureIndex,
   getDataDir,
-  getDb,
   getImportsDir,
   importRoot,
+  isHostLabel,
   LOCAL_HOST,
   listImportedHosts,
   type Manifest,
 } from "./db";
 import { dirExists } from "./file-catalog";
+import { refreshIndex } from "./index-writer";
 
 const argv = cli({
   name: "import",
@@ -51,7 +51,7 @@ if (label === LOCAL_HOST) {
   process.exit(1);
 }
 
-if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(label)) {
+if (!isHostLabel(label)) {
   console.error(`Invalid host label "${label}". Use letters, digits, "-" and "_".`);
   process.exit(1);
 }
@@ -85,15 +85,7 @@ if (!existing) {
   await $`chmod 600 ${manifestPath}`.quiet();
 }
 
-const dataDir = getDataDir();
-await mkdir(dataDir, { recursive: true });
-
-const db = await getDb(dataDir);
-try {
-  await ensureIndex(db);
-} finally {
-  db.close();
-}
+await refreshIndex(getDataDir(), { trigger: "import" });
 
 const blockEgress = existing ? (existing.policy.block_egress ?? true) : !argv.flags.egress;
 console.log(`${existing ? "Re-indexed" : "Imported"} host "${label}" from ${projectsDir}`);

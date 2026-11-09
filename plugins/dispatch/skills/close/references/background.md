@@ -6,7 +6,7 @@ Your session id is `sessionId` in `~/.claude/sessions/$PPID.json`, and your shor
 
 ## Watch
 
-The pane is already closed. Skip the close question and every step that runs `dispatch:close`, in this file and in any skill you run.
+The pane is already closed, so skip any instruction to run `dispatch:close`.
 
 1. Finish any skill the session had in progress, such as the remaining steps of `ship`.
 2. Run `pull-request:babysit --reviews <pr>`. Leave `--merge` off, because the user decides when to merge. Babysit runs as `--merge` on its own when the user already enabled auto-merge.

@@ -23,7 +23,6 @@ allowed-tools:
   - Skill(pull-request:create)
   - Skill(pull-request:babysit)
   - Skill(pull-request:follow-up)
-  - Skill(dispatch:close)
 ---
 
 # Ship
@@ -51,8 +50,6 @@ Gate each pass on the file set, its size, and the content behind any judgment ca
 - `writing:review`: the diff touches prose people read (READMEs, docs, `.mdx`, `.rst`) outside those prompt files. A diff with both kinds runs both passes, each over its own files.
 - `run`: the diff has a runtime surface. Skip on docs-only and tests-only diffs.
 - `review:human`: the diff clears the [Human Review Gate](references/passes.md#human-review-gate), which skips trivial diffs.
-
-In a Rex or herdr pane, ask the close question from `dispatch:close` with the plan, unless this session already has an answer.
 
 State the plan in one line and proceed. Use `AskUserQuestion` only for a real toss-up: refactor versus behavior change, or `medium` versus `high` effort.
 
@@ -97,8 +94,6 @@ Run `pull-request:create`, which commits the working-tree fixes, pushes, and ope
 - `--no-review-body` whenever `review:human` did not run.
 - `--base <parent>` when `/ship --base` named a stack parent, so the PR targets the parent and links into the stack.
 - `--label review` only when the [Bot Review Gate](references/passes.md#bot-review-gate) routed to the hosted channel. After a local pass, the label pays a second credit for the same review.
-
-When the close answer is yes, close with `dispatch:close` once the PR is open. The background copy it starts runs Babysit and Refresh the Body.
 
 ## Babysit
 

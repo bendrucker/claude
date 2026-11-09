@@ -521,15 +521,11 @@ describe("report", () => {
     expect(closedRows(dataDir, true).map((row) => row.ts)).toEqual(["4"]);
   });
 
-  test("the command prints JSON rows or a table", async () => {
+  test("the command prints JSON rows", async () => {
     const { deps, out, dataDir } = makeDeps({}, REX_ENV);
     for (const row of rows) appendDispatch(row, dataDir);
-    const program = createProgram(deps);
-    await program.parseAsync(["report", "--left-behind", "--json"], { from: "user" });
+    await createProgram(deps).parseAsync(["report", "--left-behind"], { from: "user" });
     expect(out).toEqual([JSON.stringify(rows.find((row) => row.ts === "4"))]);
-    out.length = 0;
-    await program.parseAsync(["report", "--left-behind"], { from: "user" });
-    expect(out[0]).toContain("branch");
   });
 });
 

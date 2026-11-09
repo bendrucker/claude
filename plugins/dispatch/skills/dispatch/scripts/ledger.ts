@@ -9,23 +9,6 @@ import { z } from "zod";
 // session can see what was handed out and to which session. A dispatch that
 // failed after that point leaves a checkout nobody owns, which is the case
 // cleanup most needs, so `orphaned` rows carry the path with a null target.
-export interface DispatchLedgerRow {
-  ts: string;
-  task: string;
-  repo: string;
-  branch: string;
-  path: string | null;
-  mux: "rex" | "herdr" | "bg";
-  target: string | null;
-  host: string | null;
-  name: string;
-  session: string | null;
-  // The name the dispatched session reaches its dispatcher by.
-  sender: string | null;
-  // `failed` is a dispatch that reused a worktree it did not create.
-  outcome: "dispatched" | "orphaned" | "failed";
-}
-
 const DispatchRowSchema = z.object({
   ts: z.string(),
   task: z.string(),
@@ -37,9 +20,13 @@ const DispatchRowSchema = z.object({
   host: z.string().nullable(),
   name: z.string(),
   session: z.string().nullable(),
+  // The name the dispatched session reaches its dispatcher by.
   sender: z.string().nullable(),
+  // `failed` is a dispatch that reused a worktree it did not create.
   outcome: z.enum(["dispatched", "orphaned", "failed"]),
 });
+
+export type DispatchLedgerRow = z.infer<typeof DispatchRowSchema>;
 
 // One line per pane close or per finished background watch, so cleanup can
 // find the work a closed session left on disk. `outcome` is set on `ended` rows.

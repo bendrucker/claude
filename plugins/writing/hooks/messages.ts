@@ -3,17 +3,18 @@ import { stripCode } from "../detection/code-spans";
 import { valeAlerts } from "../detection/vale";
 import { toolInputOf } from "./io";
 import { decisionOf, hookAlertOf, type HookAlert } from "./report";
+import { parseShell, type ShellArg, type ShellCommand } from "./shell";
 
 // The full set of Bash prose surfaces this hook scans. The hooks.json Bash
 // guard is derived from these. hooks.test.ts enforces the sync.
 export const PROSE_FLAGS = ["--body", "--message", "--description", "--title"] as const;
-// gh reads a body from `--body-file`, glab from `--description-file`. Both name
-// a path the hook can read, so both are scanned.
-export const BODY_FILE_FLAGS = ["--body-file", "--description-file"] as const;
+// `--body-file path` names the file a CLI reads the `--body` value from.
+export const BODY_FILE_FLAGS = PROSE_FLAGS.map((flag) => `${flag}-file`);
+// Short forms are read only on a review command, where they cannot mean something else.
+const REVIEW_SHORT_FLAGS = ["-m", "-b"] as const;
 
-// gh api / glab api carry prose in `-F key=@file` / `--field key=@file` forms
-// that the prose-flag alternation misses. The guard fragment ships to
-// hooks.json verbatim, and hooks.test.ts enforces the sync.
+// An API CLI reads a field's value from a file in the `-F key=@file` form. The
+// guard fragment ships to hooks.json verbatim, and hooks.test.ts enforces the sync.
 export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 
 // git commit / git tag read their message from a file via -F / --file, with no
@@ -21,14 +22,13 @@ export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 // not trigger file reads. Guard fragment shipped to hooks.json like the above.
 export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 
-// `draft-note.ts review` and `gh api ... --input` read a JSON payload from a
-// file. Guard fragment shipped to hooks.json like the above.
+// A review command reads a JSON payload of comments from `--input <file>`.
+// Guard fragment shipped to hooks.json like the above.
 export const INPUT_FILE_GUARD = "--input[= ]";
 
-// `glab mr note ... < file` and `... -m "$(cat file)"` carry a review body that no
-// flag names.
-export const REVIEW_STDIN_GUARD =
-  "(glab mr note|gh pr (review|comment)|draft-note|discussions)[^|;&]*( <|-m |--message)";
+// A review command can read its body from stdin or a short flag. hooks.json
+// greps for this fragment too.
+export const REVIEW_STDIN_GUARD = "(review|note|discussion)[^|;&]*( <|-m |-b )";
 
 // Any prose value in an MCP call puts three spaces, backticks, or JSON-escaped
 // tabs on the hook's stdin, since a stripped code span reads as spaces.
@@ -59,44 +59,128 @@ function strings(value: unknown): string[] {
   return [];
 }
 
-const BODY_FILE_PATTERN = new RegExp(`(?:${BODY_FILE_FLAGS.join("|")})[=\\s](\\S+)`);
-const FIELD_FILE_PATTERN = /(?:^|\s)['"]?(?:-F|--field)[= ]([^\s=]+)=@(\S+)/g;
-const GIT_MESSAGE_FILE_PATTERN = /\bgit\s+(?:commit|tag)\b[^|;&]*?\s(?:-F|--file)[= ](\S+)/g;
-const INPUT_FILE_PATTERN = /(?:^|\s)--input[= ](?:'([^']*)'|"([^"]*)"|(\S+))/g;
+// `review`, `note`, or `discussion`, alone or plural, as a whole word or a
+// segment of a path, script name, or API endpoint.
+const REVIEW_WORD = /(?:^|[/_.-])(?:review|note|discussion)s?(?:$|[/_.-])/;
+// A review word past the subcommand is an argument, such as a file name.
+const REVIEW_WORD_POSITIONS = 4;
 
-// Commands that post a peer-review comment: a GitLab draft note, discussion, or
-// note, or a GitHub pull request review or comment.
-const REVIEW_COMMAND =
-  /draft-note\.ts|discussions\.ts\s+create\b|\bglab\s+api\b[^|;&]*\/(?:draft_notes|discussions|notes)\b|\bglab\s+mr\s+note\b|\bgh\s+api\b[^|;&]*\/pulls\/\d+\/(?:reviews|comments)\b|\bgh\s+pr\s+(?:review|comment)\b/;
+// A command that posts a peer-review comment states the act in the words before
+// its first flag. Only a path's last segment counts, so a directory name never does.
+function isReviewCommand(command: ShellCommand): boolean {
+  const words = [command.name, ...command.args.map((arg) => arg.text)];
+  const firstFlag = words.findIndex((word) => word.startsWith("-"));
+  return words
+    .slice(0, Math.min(firstFlag === -1 ? words.length : firstFlag, REVIEW_WORD_POSITIONS))
+    .some((word) => REVIEW_WORD.test(word.slice(word.lastIndexOf("/") + 1)));
+}
 
-const HEREDOC_PATTERN = /<<-?\s*(['"]?)(\w+)\1[^\n]*\n[\s\S]*?\n\s*\2(?=\n|$)/g;
-const STDIN_REDIRECT_PATTERN =
-  /(?<=^|[\s;&|])<\s*(?!<)('[^']*'|"(?:[^"\\]|\\.)*"|[^\s<>|;&()'"]+)/g;
-const QUOTED_SPAN_PATTERN = /(<\s*)?('[^']*'|"(?:[^"\\]|\\.)*")/g;
-const SUBSTITUTION_FILE_PATTERN =
-  /(?:^|\s)(?:-m|--message)[= ]["']?\$\(\s*(?:cat\s+|<\s*)(["']?)([^\s)"']+)\1\s*\)/g;
+function isGitMessageCommand(command: ShellCommand): boolean {
+  const sub = command.args[0]?.text;
+  return command.name === "git" && (sub === "commit" || sub === "tag");
+}
 
-// Quoted spans are blanked so a `<` inside an argument never reads as a redirect,
-// except the quoted path a redirect reads from.
-function extractStdinRedirectPaths(command: string): string[] {
-  const bare = command
-    .replaceAll(HEREDOC_PATTERN, "")
-    .replaceAll(QUOTED_SPAN_PATTERN, (span, redirect: string | undefined) =>
-      redirect === undefined ? "''" : span,
+/** Values of `--flag value` and `--flag=value` for any of `flags`. */
+function flagValues(command: ShellCommand, flags: readonly string[]): ShellArg[] {
+  const values: ShellArg[] = [];
+  for (const [index, arg] of command.args.entries()) {
+    const next = command.args[index + 1];
+    const flag = flags.find((name) => arg.text.startsWith(`${name}=`));
+    if (flags.includes(arg.text) && next !== undefined) values.push(next);
+    else if (flag !== undefined) values.push({ ...arg, text: arg.text.slice(flag.length + 1) });
+  }
+  return values;
+}
+
+function literalPaths(values: ShellArg[]): string[] {
+  return values
+    .filter((value) => value.literal && value.text !== "" && value.text !== "-")
+    .map((value) => value.text);
+}
+
+// `-F body=@path` reads the field's value from `path`.
+function fieldFilePaths(command: ShellCommand): string[] {
+  return literalPaths(flagValues(command, ["-F", "--field"])).flatMap((value) => {
+    const at = value.indexOf("=@");
+    const path = at === -1 ? "" : value.slice(at + 2);
+    return path === "" || path === "-" ? [] : [path];
+  });
+}
+
+// `"$(cat path)"` and `"$(< path)"` read the file into the value.
+function substitutionPaths(value: ShellArg): string[] {
+  return value.substitutions.flatMap((inner) =>
+    inner.name === "cat" ? [...inner.stdin, ...literalPaths(inner.args)] : [],
+  );
+}
+
+interface BashSources {
+  files: string[];
+  payloads: string[];
+  inline: string[];
+}
+
+function bashSources(source: string): BashSources {
+  const sources: BashSources = { files: [], payloads: [], inline: [] };
+  for (const command of parseShell(source)) {
+    const review = isReviewCommand(command);
+    sources.files.push(...literalPaths(flagValues(command, BODY_FILE_FLAGS)));
+    if (isGitMessageCommand(command)) {
+      sources.files.push(...literalPaths(flagValues(command, ["-F", "--file"])));
+    } else {
+      sources.files.push(...fieldFilePaths(command));
+    }
+    if (review) {
+      sources.payloads.push(...literalPaths(flagValues(command, ["--input"])));
+      sources.files.push(...command.stdin);
+    }
+    const messages = flagValues(
+      command,
+      review ? [...PROSE_FLAGS, ...REVIEW_SHORT_FLAGS] : PROSE_FLAGS,
     );
-  return [...bare.matchAll(STDIN_REDIRECT_PATTERN)]
-    .map((match) => stripQuotes(match[1] ?? ""))
-    .filter((path) => path !== "" && path !== "-" && !path.startsWith("&"));
+    for (const value of messages) {
+      if (value.literal) {
+        if (value.text !== "") sources.inline.push(value.text);
+      } else {
+        sources.files.push(...substitutionPaths(value));
+      }
+    }
+  }
+  return sources;
 }
 
-function extractSubstitutionFilePaths(command: string): string[] {
-  return [...command.matchAll(SUBSTITUTION_FILE_PATTERN)].map((match) => match[2] ?? "");
+async function readAll(paths: string[]): Promise<string[]> {
+  const uid = process.getuid?.() ?? 0;
+  const bodies = await Promise.all(
+    paths.map((path) => readNewest(pathCandidates(path, process.env, uid))),
+  );
+  return bodies.filter((body) => body !== null);
 }
 
-// Shell quoting survives into the raw command string, so a path captured from
-// `-F 'body=@tmp/x.md'` carries the closing quote.
-function stripQuotes(token: string): string {
-  return token.replaceAll(/^['"]+|['"]+$/g, "");
+export async function collectText(input: PreToolUseHookInput): Promise<string[]> {
+  const toolInput = toolInputOf(input);
+  const toolName = input.tool_name;
+
+  if (toolName.startsWith("mcp__")) return strings(input.tool_input).filter(isProse);
+
+  if (toolName === "Bash" && toolInput.command !== undefined) {
+    const { files, payloads, inline } = bashSources(toolInput.command);
+    const prose = (await readAll(payloads)).map(payloadProse).filter((text) => text !== null);
+    return [...(await readAll(files)), ...prose, ...inline];
+  }
+
+  return [];
+}
+
+function messageKind(input: PreToolUseHookInput): "body" | "commit" | "review" {
+  const commands = parseShell(toolInputOf(input).command ?? "");
+  if (commands.some(isGitMessageCommand)) return "commit";
+  if (
+    commands.some(isReviewCommand) ||
+    input.tool_name.split("__").some((part) => REVIEW_WORD.test(part))
+  )
+    return "review";
+  return "body";
 }
 
 const SHELL_VAR_PATTERN = /\$\{?(\w+)\}?/g;
@@ -129,31 +213,6 @@ async function readNewest(paths: string[]): Promise<string | null> {
   return newest == null ? null : newest.file.text();
 }
 
-function extractBodyFilePath(command: string): string | null {
-  const match = command.match(BODY_FILE_PATTERN);
-  const captured = match?.at(1);
-  return captured != null && captured !== "" ? stripQuotes(captured) : null;
-}
-
-function extractFieldFilePaths(command: string): string[] {
-  const paths: string[] = [];
-  for (const match of command.matchAll(FIELD_FILE_PATTERN)) {
-    const path = stripQuotes(match[2] ?? "");
-    if (path !== "" && path !== "-") paths.push(path);
-  }
-  for (const match of command.matchAll(GIT_MESSAGE_FILE_PATTERN)) {
-    const path = stripQuotes(match[1] ?? "");
-    if (path !== "" && path !== "-") paths.push(path);
-  }
-  return paths;
-}
-
-function extractInputFilePaths(command: string): string[] {
-  return [...command.matchAll(INPUT_FILE_PATTERN)]
-    .map((match) => match[1] ?? match[2] ?? match[3] ?? "")
-    .filter((path) => path !== "" && path !== "-");
-}
-
 // Each prose string becomes its own paragraph, so two comments never read as one.
 function payloadProse(body: string): string | null {
   let payload: unknown;
@@ -165,83 +224,6 @@ function payloadProse(body: string): string | null {
   }
   const prose = strings(payload).filter(isProse);
   return prose.length === 0 ? null : prose.join("\n\n");
-}
-
-const INLINE_ARG_PATTERNS = new Map<string, RegExp>(
-  PROSE_FLAGS.map((flag) => [flag, new RegExp(`${flag}[= ](?:"([^"]+)"|'([^']+)')`)]),
-);
-
-const INLINE_SHORT_MESSAGE_PATTERN = /(?:^|\s)-m[= ](?:"([^"]+)"|'([^']+)')/;
-
-function extractInlineArg(command: string, flag: string): string | null {
-  const pattern = INLINE_ARG_PATTERNS.get(flag);
-  if (!pattern) return null;
-  const match = pattern.exec(command);
-  return match?.[1] ?? match?.[2] ?? null;
-}
-
-export async function collectText(input: PreToolUseHookInput): Promise<string[]> {
-  const toolInput = toolInputOf(input);
-  const toolName = input.tool_name;
-
-  if (toolName.startsWith("mcp__")) return strings(input.tool_input).filter(isProse);
-
-  if (toolName === "Bash" && toolInput.command !== undefined) {
-    const command = toolInput.command;
-    const texts: string[] = [];
-    const bodyFile = extractBodyFilePath(command);
-    const files =
-      bodyFile != null && bodyFile !== ""
-        ? [bodyFile, ...extractFieldFilePaths(command)]
-        : extractFieldFilePaths(command);
-    const uid = process.getuid?.() ?? 0;
-    const bodies = await Promise.all(
-      files.map((path) => readNewest(pathCandidates(path, process.env, uid))),
-    );
-    texts.push(...bodies.filter((body) => body !== null));
-    const payloadPaths =
-      REVIEW_COMMAND.test(command) || /\b(?:gh|glab)\s+api\b/.test(command)
-        ? extractInputFilePaths(command)
-        : [];
-    const payloads = await Promise.all(
-      payloadPaths.map((path) => readNewest(pathCandidates(path, process.env, uid))),
-    );
-    for (const payload of payloads) {
-      const prose = payload === null ? null : payloadProse(payload);
-      if (prose !== null) texts.push(prose);
-    }
-    if (REVIEW_COMMAND.test(command)) {
-      const bodyPaths = [
-        ...extractStdinRedirectPaths(command),
-        ...extractSubstitutionFilePaths(command),
-      ];
-      const reviewBodies = await Promise.all(
-        bodyPaths.map((path) => readNewest(pathCandidates(path, process.env, uid))),
-      );
-      texts.push(...reviewBodies.filter((body) => body !== null));
-      const inline = INLINE_SHORT_MESSAGE_PATTERN.exec(command);
-      const value = inline?.[1] ?? inline?.[2];
-      if (value != null && value !== "" && !value.startsWith("$(")) texts.push(value);
-    }
-    for (const flag of PROSE_FLAGS) {
-      const value = extractInlineArg(command, flag);
-      if (value != null && value !== "" && !value.startsWith("$(")) texts.push(value);
-    }
-    return texts;
-  }
-
-  return [];
-}
-
-function messageKind(input: PreToolUseHookInput): "body" | "commit" | "review" {
-  const command = toolInputOf(input).command ?? "";
-  if (/\bgit\s+(commit|tag)\b/.test(command)) return "commit";
-  if (
-    REVIEW_COMMAND.test(command) ||
-    /review|merge_request_(?:note|discussion)/i.test(input.tool_name)
-  )
-    return "review";
-  return "body";
 }
 
 /** Alerts for the message prose a Bash or MCP call sends. An error-level alert denies the call. */

@@ -55,6 +55,7 @@ function strings(value: unknown): string[] {
   return [];
 }
 
+// review, note, or discussion, optionally plural, as a word or a `/_.-` segment.
 const REVIEW_WORD = /(?:^|[/_.-])(?:review|note|discussion)s?(?:$|[/_.-])/;
 // A review word past the subcommand is an argument, such as a file name.
 const REVIEW_WORD_POSITIONS = 4;

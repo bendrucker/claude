@@ -22,7 +22,7 @@ Write the prompt to a file under `tmp/` from what this conversation already know
 
 !`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help`
 
-Ask the close question from `dispatch:close` about the dispatched session, unless this session already has an answer. When the answer is yes, end the prompt with: "Once the PR is open, close your pane with `dispatch:close`."
+Ask once per session with `AskUserQuestion` whether dispatched sessions should close their panes once their PRs are open, recommending yes. On yes, end the prompt with: "Once the PR is open, close your pane with `dispatch:close`."
 
 ## Grant Permissions
 

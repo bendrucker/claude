@@ -198,7 +198,7 @@
     },
     {
       "name": "dispatch",
-      "description": "Hand new work to a fresh Claude session in its own worktree, and close finished sessions' panes while a background copy watches the PR",
+      "description": "Hand new work to a fresh Claude session in its own worktree, and close its pane once the PR is open",
       "source": "./plugins/dispatch"
     },
     {

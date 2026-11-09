@@ -3,12 +3,12 @@
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typings";
-import { table } from "table";
 import { z } from "zod";
 import {
   backgroundId,
   detachedEnv,
   detectMux,
+  type Mux,
   type Runner,
   readSender,
   type Sender,
@@ -150,24 +150,28 @@ function lines(text: string): string[] {
   return text.split("\n").filter((line) => line.trim() !== "");
 }
 
-function hostMux(env: Env): PaneMux {
-  const mux = detectMux(env);
-  if (mux === "bg") throw new Error("no multiplexer hosts this session");
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function paneMux(env: Env): PaneMux {
+  if (present(env.HC_TERMINAL_ID) && !present(env.REX_BLOCK) && env.HERDR_ENV !== "1")
+    throw new CloseError(
+      "this session runs in the herdr App, which close does not support yet. Close the pane by hand.",
+      2,
+    );
+  let mux: Mux;
+  try {
+    mux = detectMux(env);
+  } catch (error) {
+    throw new CloseError(errorText(error), 2);
+  }
+  if (mux === "bg") throw new CloseError("no multiplexer hosts this session", 2);
   return mux;
 }
 
 export function resolveOwnPane(env: Env): Pane {
-  let mux: PaneMux;
-  try {
-    mux = hostMux(env);
-  } catch (error) {
-    if (present(env.HC_TERMINAL_ID) && !present(env.REX_BLOCK) && env.HERDR_ENV !== "1")
-      throw new CloseError(
-        "this session runs in the herdr App, which close does not support yet. Close the pane by hand.",
-        2,
-      );
-    throw new CloseError(error instanceof Error ? error.message : String(error), 2);
-  }
+  const mux = paneMux(env);
   if (mux === "rex") {
     const { REX_SESSION: session, REX_BLOCK: block } = env;
     if (!present(session) || !present(block))
@@ -187,40 +191,36 @@ export interface ChildPane {
 export async function resolveChildPane(name: string, deps: Deps): Promise<ChildPane> {
   const sender = await deps.sender();
   const ledger = readLedger(deps.dataDir);
-  const index = ledger.findLastIndex(
-    (row) =>
-      !isClosedRow(row) &&
-      row.outcome === "dispatched" &&
-      row.name === name &&
-      sender != null &&
-      row.sender === sender.name,
-  );
-  const found = ledger[index];
-  const match = found == null || isClosedRow(found) ? null : found;
-  if (match?.target == null || match.mux === "bg")
+  const index =
+    sender == null
+      ? -1
+      : ledger.findLastIndex(
+          (row) =>
+            !isClosedRow(row) &&
+            row.outcome === "dispatched" &&
+            row.name === name &&
+            row.sender === sender.name,
+        );
+  const match = ledger[index];
+  if (match == null || isClosedRow(match) || match.target == null || match.mux === "bg")
     throw new CloseError(
       `no pane named ${name} was dispatched by this session, so it cannot be closed from here`,
       2,
     );
+  const mux = match.mux;
+  const target = match.target;
   // A pane id freed by an earlier close can be reused by an unrelated pane.
-  if (
-    ledger
-      .slice(index + 1)
-      .some(
-        (row) =>
-          isClosedRow(row) &&
-          row.event === "closed" &&
-          row.mux === match.mux &&
-          row.target === match.target,
-      )
-  )
-    throw new CloseError(`the pane for ${name} was already closed`, 2);
-  if (match.mux === "rex") {
-    const session = deps.env.REX_SESSION;
-    if (!present(session)) throw new CloseError("REX_SESSION is not set", 2);
-    return { pane: { mux: "rex", target: match.target, rexSession: session }, path: match.path };
-  }
-  return { pane: { mux: "herdr", target: match.target, rexSession: null }, path: match.path };
+  const closed = ledger
+    .slice(index + 1)
+    .some(
+      (row) =>
+        isClosedRow(row) && row.event === "closed" && row.mux === mux && row.target === target,
+    );
+  if (closed) throw new CloseError(`the pane for ${name} was already closed`, 2);
+  if (mux === "herdr") return { pane: { mux, target, rexSession: null }, path: match.path };
+  const session = deps.env.REX_SESSION;
+  if (!present(session)) throw new CloseError("REX_SESSION is not set", 2);
+  return { pane: { mux, target, rexSession: session }, path: match.path };
 }
 
 export async function gitFacts(run: Runner, cwd: string): Promise<GitFacts> {
@@ -299,33 +299,40 @@ export interface ResumeOptions {
   pid: number;
 }
 
+async function appendEnded(
+  options: EndedOptions,
+  summary: string | null,
+  deps: Deps,
+): Promise<ClosedRow> {
+  const facts = await gitFacts(deps.run, deps.cwd);
+  const row: ClosedRow = {
+    event: "ended",
+    ts: deps.now().toISOString(),
+    session: options.session,
+    fork: options.session,
+    branch: facts.branch,
+    path: facts.toplevel,
+    head: facts.head,
+    dirty: facts.dirty,
+    ahead: facts.ahead,
+    pr: options.pr,
+    mux: null,
+    target: null,
+    summary,
+    outcome: options.outcome,
+  };
+  appendDispatch(row, deps.dataDir);
+  return row;
+}
+
 export async function resumeSession(options: ResumeOptions, deps: Deps): Promise<string> {
   const { session, pr, pid } = options;
   const failed = async (problem: string): Promise<never> => {
-    const facts = await gitFacts(deps.run, deps.cwd);
-    appendDispatch(
-      {
-        event: "ended",
-        ts: deps.now().toISOString(),
-        session,
-        fork: session,
-        branch: facts.branch,
-        path: facts.toplevel,
-        head: facts.head,
-        dirty: facts.dirty,
-        ahead: facts.ahead,
-        pr,
-        mux: null,
-        target: null,
-        summary: `resume failed: ${problem}`,
-        outcome: "stopped",
-      },
-      deps.dataDir,
-    );
+    await appendEnded({ session, pr, outcome: "stopped" }, `resume failed: ${problem}`, deps);
     throw new CloseError(problem);
   };
 
-  if (!(await awaitExit(deps, pid, EXIT_ATTEMPTS)))
+  if (!(await awaitExit(deps, pid)))
     return failed(`session process ${pid} was still running, so it was not resumed`);
   const started = await deps.run(
     ["claude", "--bg", "--resume", session, handoffPrompt(session, pr)],
@@ -343,7 +350,7 @@ export async function resumeSession(options: ResumeOptions, deps: Deps): Promise
   return fork;
 }
 
-async function awaitExit(deps: Deps, pid: number, attempts: number): Promise<boolean> {
+async function awaitExit(deps: Deps, pid: number, attempts = EXIT_ATTEMPTS): Promise<boolean> {
   if (!deps.alive(pid)) return true;
   if (attempts <= 1) return false;
   await deps.wait(EXIT_INTERVAL_MS);
@@ -366,20 +373,20 @@ export interface CloseReport {
 }
 
 export async function closePane(options: CloseOptions, deps: Deps): Promise<CloseReport> {
-  if (options.handoff === true && options.target != null)
-    throw new CloseError("--handoff cannot be combined with --target", 2);
-  if (options.handoff === true && (options.session == null || options.pr == null))
-    throw new CloseError("--handoff requires --session and --pr", 2);
+  let handoff: { session: string; pr: string } | null = null;
+  if (options.handoff === true) {
+    const { target, session, pr } = options;
+    if (target != null) throw new CloseError("--handoff cannot be combined with --target", 2);
+    if (session == null || pr == null)
+      throw new CloseError("--handoff requires --session and --pr", 2);
+    handoff = { session, pr };
+  }
 
   const child = options.target == null ? null : await resolveChildPane(options.target, deps);
   const pane = child?.pane ?? resolveOwnPane(deps.env);
   const checkout = child == null ? deps.cwd : child.path;
   const facts = checkout == null ? NO_GIT : await gitFacts(deps.run, checkout);
 
-  const handoff =
-    options.handoff === true && options.session != null && options.pr != null
-      ? { session: options.session, pr: options.pr }
-      : null;
   const fork = handoff?.session ?? null;
   const resumer =
     handoff == null
@@ -416,13 +423,13 @@ export async function closePane(options: CloseOptions, deps: Deps): Promise<Clos
 
 // When the pane stays open, a waiting resumer would resume a copy once the user quits.
 function withdrawClose(row: ClosedRow, resumer: number | null, cause: unknown, deps: Deps): void {
-  const reason = `close failed: ${cause instanceof Error ? cause.message : String(cause)}`;
+  const reason = `close failed: ${errorText(cause)}`;
   let killError: string | null = null;
   if (resumer != null)
     try {
       deps.kill(resumer);
     } catch (error) {
-      killError = error instanceof Error ? error.message : String(error);
+      killError = errorText(error);
     }
   const summary =
     killError == null ? reason : `${reason}. Stopping resumer ${resumer} failed: ${killError}`;
@@ -456,9 +463,7 @@ function parseJson<T>(schema: z.ZodType<T>, text: string, label: string): T {
   try {
     return schema.parse(JSON.parse(text));
   } catch (error) {
-    throw new CloseError(
-      `${label} returned an unexpected shape: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new CloseError(`${label} returned an unexpected shape: ${errorText(error)}`);
   }
 }
 
@@ -467,12 +472,7 @@ export async function attachFork(
   deps: Deps,
 ): Promise<{ mux: PaneMux; pane: string }> {
   if (!FORK_ID.test(fork)) throw new CloseError(`${fork} is not a background session id`, 2);
-  let mux: PaneMux;
-  try {
-    mux = hostMux(deps.env);
-  } catch (error) {
-    throw new CloseError(error instanceof Error ? error.message : String(error), 2);
-  }
+  const mux = paneMux(deps.env);
   const label = `attach-${fork}`;
   if (mux === "rex") {
     // The fork inherited the closed pane's REX_BLOCK, so only the session is usable.
@@ -521,26 +521,8 @@ export interface EndedOptions {
   outcome: "merged" | "closed" | "stopped";
 }
 
-export async function recordEnded(options: EndedOptions, deps: Deps): Promise<ClosedRow> {
-  const facts = await gitFacts(deps.run, deps.cwd);
-  const row: ClosedRow = {
-    event: "ended",
-    ts: deps.now().toISOString(),
-    session: options.session,
-    fork: options.session,
-    branch: facts.branch,
-    path: facts.toplevel,
-    head: facts.head,
-    dirty: facts.dirty,
-    ahead: facts.ahead,
-    pr: options.pr,
-    mux: null,
-    target: null,
-    summary: null,
-    outcome: options.outcome,
-  };
-  appendDispatch(row, deps.dataDir);
-  return row;
+export function recordEnded(options: EndedOptions, deps: Deps): Promise<ClosedRow> {
+  return appendEnded(options, null, deps);
 }
 
 export function leftBehind(rows: readonly ClosedRow[]): ClosedRow[] {
@@ -556,23 +538,6 @@ export function leftBehind(rows: readonly ClosedRow[]): ClosedRow[] {
 export function closedRows(dataDir: string, onlyLeftBehind: boolean): ClosedRow[] {
   const rows = readLedger(dataDir).filter(isClosedRow);
   return onlyLeftBehind ? leftBehind(rows) : rows;
-}
-
-function cell(value: string | number | null): string {
-  return value == null ? "" : String(value);
-}
-
-export function formatReport(rows: readonly ClosedRow[]): string {
-  if (rows.length === 0) return "no close rows\n";
-  const header = ["ts", "event", "branch", "dirty", "ahead", "pr", "fork", "summary"];
-  return table([
-    header,
-    ...rows.map((row) =>
-      [row.ts, row.event, row.branch, row.dirty, row.ahead, row.pr, row.fork, row.summary].map(
-        cell,
-      ),
-    ),
-  ]);
 }
 
 async function guarded(action: () => Promise<void>): Promise<void> {
@@ -633,13 +598,11 @@ export function createProgram(deps: Deps): Command {
     .action((options) => guarded(async () => void (await resumeSession(options, deps))));
 
   const report = new Command("report")
-    .description("List the ledger's close rows.")
+    .description("Print the ledger's close rows as JSON lines.")
     .option("--left-behind", "only branches whose latest row has dirty or unpushed work")
-    .option("--json", "print rows as JSON lines")
     .action((options) => {
-      const rows = closedRows(deps.dataDir, options.leftBehind === true);
-      if (options.json === true) for (const row of rows) deps.out(JSON.stringify(row));
-      else deps.out(formatReport(rows));
+      for (const row of closedRows(deps.dataDir, options.leftBehind === true))
+        deps.out(JSON.stringify(row));
     });
 
   return new Command("close")

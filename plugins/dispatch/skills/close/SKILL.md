@@ -1,7 +1,7 @@
 ---
 name: close
 description: >-
-  Use when the user says to close yourself, close your pane or tab, or that you're done, and when this session's agreed close point arrives. Closes this session's Rex or herdr pane and resumes the session in the background to watch an open pull request. Also closes a child pane this session dispatched.
+  Use when the user says to close yourself, close your pane or tab, or that you're done, and when your dispatch prompt says to close once the PR is open. Closes this session's Rex or herdr pane and resumes the session in the background to watch an open pull request. Also closes a child pane this session dispatched.
 argument-hint: "[--target <name>]"
 allowed-tools:
   - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/close.ts:*)
@@ -18,10 +18,6 @@ Get a finished session out of the user's way without losing work. The pane close
 ## Arguments
 
 - `--target <name>`: close the pane of a session this one dispatched, by its dispatch `name`. Default: this session's own pane.
-
-## The Close Question
-
-Skills that reach a done-point point here: `dispatch:dispatch`, `ship`, and `pull-request:babysit`. When this session has no answer yet, ask once with `AskUserQuestion`: "Close this pane once the PR is open? This session keeps watching it in the background until it merges." Recommend yes. Remember the answer for the rest of the session and never ask twice. When the answer is yes and the PR is open, close.
 
 ## Close This Pane
 
@@ -46,6 +42,4 @@ Run `bun ${CLAUDE_SKILL_DIR}/scripts/close.ts close --target <name>`. It refuses
 
 ## Ledger
 
-Every close appends a row to the dispatch ledger. `bun ${CLAUDE_SKILL_DIR}/scripts/close.ts report --left-behind` lists closed sessions that left uncommitted or unpushed work.
-
-A handoff resumes the session from a detached `close.ts resume` process that waits for this session's `claude` to exit. It logs to `close-resume-<session>.log` in the dispatch data directory, and a resume that fails appends an `ended` row whose summary starts with `resume failed:`.
+Every close appends a row to the dispatch ledger. `bun ${CLAUDE_SKILL_DIR}/scripts/close.ts report --left-behind` lists closed sessions that left uncommitted or unpushed work. A failed handoff resume logs to `close-resume-<session>.log` in the dispatch data directory and appends an `ended` row whose summary starts with `resume failed:`.

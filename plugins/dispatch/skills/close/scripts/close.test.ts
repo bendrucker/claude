@@ -10,20 +10,11 @@ import {
   ledgerPath,
   readLedger,
 } from "../../dispatch/scripts/ledger";
-import {
-  attachFork,
-  closedRows,
-  closePane,
-  CloseError,
-  createProgram,
-  type Deps,
-  defaultDeps,
-  leftBehind,
-  recordEnded,
-  resolveOwnPane,
-  resumerLog,
-  resumeSession,
-} from "./close";
+import { attachSession, closeSession, createProgram, type Deps, defaultDeps } from "./close";
+import { CloseError } from "./errors";
+import { hostMuxer } from "./muxers";
+import { recordEnded, resumerLog, resumeSession } from "./resume";
+import { closedRows, leftBehind } from "./rows";
 
 const ok = (stdout = ""): CommandResult => ({ code: 0, stdout, stderr: "" });
 const fail = (stderr: string, code = 1): CommandResult => ({ code, stdout: "", stderr });
@@ -155,18 +146,23 @@ function closedRow(overrides: Partial<ClosedRow> = {}): ClosedRow {
   };
 }
 
-describe("resolveOwnPane", () => {
+describe("hostMuxer", () => {
+  const ownPane = (env: Record<string, string>) => {
+    const host = hostMuxer({ env, cwd: "/", run: scripted({}).run });
+    return { mux: host.kind, target: host.ownPane() };
+  };
+
   test("rex uses the session and block", () => {
-    expect(resolveOwnPane(REX_ENV)).toEqual({ mux: "rex", target: "block:7", rexSession: "main" });
+    expect(ownPane(REX_ENV)).toEqual({ mux: "rex", target: "block:7" });
   });
 
   test("herdr uses the pane id", () => {
-    expect(resolveOwnPane(HERDR_ENV)).toEqual({ mux: "herdr", target: "pane-9", rexSession: null });
+    expect(ownPane(HERDR_ENV)).toEqual({ mux: "herdr", target: "pane-9" });
   });
 
   test("the herdr App is refused with exit 2", () => {
     try {
-      resolveOwnPane({ HC_TERMINAL_ID: "t1" });
+      ownPane({ HC_TERMINAL_ID: "t1" });
       throw new Error("expected refusal");
     } catch (error) {
       expect(error).toBeInstanceOf(CloseError);
@@ -176,14 +172,14 @@ describe("resolveOwnPane", () => {
   });
 
   test("no multiplexer is refused", () => {
-    expect(() => resolveOwnPane({})).toThrow(CloseError);
+    expect(() => ownPane({})).toThrow(CloseError);
   });
 });
 
-describe("closePane", () => {
+describe("closeSession", () => {
   test("rex closes its own block after writing the row and the report", async () => {
     const { deps, calls, out, dataDir } = makeDeps({}, REX_ENV);
-    const report = await closePane({ summary: "done" }, deps);
+    const report = await closeSession({ summary: "done" }, deps);
     expect(argvs(calls).at(-1)).toBe("rex block close -s main block:7");
     expect(report.row).toMatchObject({
       event: "closed",
@@ -209,13 +205,13 @@ describe("closePane", () => {
       if (argv[0] === "herdr") seen.push({ rows: readLedger(dataDir).length, out: out.length });
       return inner(argv, options);
     };
-    await closePane({}, deps);
+    await closeSession({}, deps);
     expect(seen).toEqual([{ rows: 1, out: 1 }]);
   });
 
   test("herdr closes the pane and never passes --group", async () => {
     const { deps, calls } = makeDeps({}, HERDR_ENV);
-    await closePane({}, deps);
+    await closeSession({}, deps);
     expect(argvs(calls).at(-1)).toBe("herdr pane close pane-9");
     expect(argvs(calls).join(" ")).not.toContain("--group");
   });
@@ -225,14 +221,14 @@ describe("closePane", () => {
       { "herdr pane close": fail('{"error":{"code":"workspace_group_close_required"}}') },
       HERDR_ENV,
     );
-    const error = await failureOf(closePane({}, deps));
+    const error = await failureOf(closeSession({}, deps));
     expect(error.exitCode).toBe(1);
     expect(error.message).toContain("linked worktree group");
   });
 
   test("confirmation_required is a group conflict too", async () => {
     const { deps } = makeDeps({ "herdr pane close": ok("confirmation_required") }, HERDR_ENV);
-    expect((await failureOf(closePane({}, deps))).message).toContain("linked worktree group");
+    expect((await failureOf(closeSession({}, deps))).message).toContain("linked worktree group");
   });
 
   test("outside git the facts are null", async () => {
@@ -240,7 +236,7 @@ describe("closePane", () => {
       { "git rev-parse --show-toplevel": fail("not a repo", 128) },
       REX_ENV,
     );
-    const { row } = await closePane({}, deps);
+    const { row } = await closeSession({}, deps);
     expect(row).toMatchObject({ branch: null, path: null, head: null, dirty: null, ahead: null });
   });
 
@@ -252,35 +248,35 @@ describe("closePane", () => {
       },
       REX_ENV,
     );
-    expect((await closePane({}, deps)).row.ahead).toBe(3);
+    expect((await closeSession({}, deps)).row.ahead).toBe(3);
   });
 
   test("ahead is null when neither count runs", async () => {
     const { deps } = makeDeps({ "git rev-list --count": fail("no upstream", 128) }, REX_ENV);
-    expect((await closePane({}, deps)).row.ahead).toBeNull();
+    expect((await closeSession({}, deps)).row.ahead).toBeNull();
   });
 
   test("--handoff with --target is invalid", async () => {
     const { deps } = makeDeps({}, REX_ENV, "parent");
     const error = await failureOf(
-      closePane({ handoff: true, target: "child", session: "s", pr: "u" }, deps),
+      closeSession({ handoff: true, target: "child", session: "s", pr: "u" }, deps),
     );
     expect(error.exitCode).toBe(2);
   });
 
   test("--handoff requires a session and a PR", async () => {
     const { deps } = makeDeps({}, REX_ENV);
-    expect((await failureOf(closePane({ handoff: true }, deps))).exitCode).toBe(2);
+    expect((await failureOf(closeSession({ handoff: true }, deps))).exitCode).toBe(2);
   });
 });
 
-describe("closePane --handoff", () => {
+describe("closeSession --handoff", () => {
   const options = { handoff: true, session: "sess-1", pr: "https://github.com/o/r/pull/1" };
   const env = { ...REX_ENV, CLAUDE_PID: "9" };
 
   test("starts a resumer that waits on this session's process, then records and closes", async () => {
     const { deps, calls, dataDir, spawned } = makeDeps({}, env);
-    const report = await closePane(options, deps);
+    const report = await closeSession(options, deps);
     expect(spawned).toHaveLength(1);
     expect(spawned[0]?.argv.slice(2)).toEqual([
       "resume",
@@ -303,7 +299,7 @@ describe("closePane --handoff", () => {
     "refuses CLAUDE_PID %p and starts nothing",
     async (pid) => {
       const { deps, calls, dataDir, spawned } = makeDeps({}, { ...REX_ENV, CLAUDE_PID: pid });
-      expect((await failureOf(closePane(options, deps))).exitCode).toBe(2);
+      expect((await failureOf(closeSession(options, deps))).exitCode).toBe(2);
       expect(spawned).toEqual([]);
       expect(readLedger(dataDir)).toEqual([]);
       expect(argvs(calls).some((line) => line.startsWith("rex block close"))).toBe(false);
@@ -315,7 +311,7 @@ describe("closePane --handoff", () => {
       { "herdr pane close": fail("workspace_group_close_required") },
       { ...HERDR_ENV, CLAUDE_PID: "9" },
     );
-    await failureOf(closePane(options, deps));
+    await failureOf(closeSession(options, deps));
     expect(killed).toEqual([RESUMER]);
     expect(readLedger(dataDir)).toMatchObject([
       { event: "closed", fork: "sess-1" },
@@ -331,7 +327,7 @@ describe("closePane --handoff", () => {
     deps.kill = () => {
       throw new Error("ESRCH");
     };
-    expect((await failureOf(closePane(options, deps))).message).toContain(`${RESUMER} by hand`);
+    expect((await failureOf(closeSession(options, deps))).message).toContain(`${RESUMER} by hand`);
   });
 });
 
@@ -402,37 +398,37 @@ describe("resumeSession", () => {
   });
 });
 
-describe("closePane --target", () => {
+describe("closeSession --target", () => {
   test("refuses a pane the caller did not dispatch", async () => {
     const { deps, dataDir, calls } = makeDeps({}, REX_ENV, "someone-else");
     appendDispatch(dispatchRow(), dataDir);
-    const error = await failureOf(closePane({ target: "child" }, deps));
+    const error = await failureOf(closeSession({ target: "child" }, deps));
     expect(error.exitCode).toBe(2);
     expect(calls).toEqual([]);
   });
 
   test("refuses an unknown name", async () => {
     const { deps } = makeDeps({}, REX_ENV, "parent");
-    expect((await failureOf(closePane({ target: "ghost" }, deps))).exitCode).toBe(2);
+    expect((await failureOf(closeSession({ target: "ghost" }, deps))).exitCode).toBe(2);
   });
 
   test("refuses when the session has no registered name", async () => {
     const { deps, dataDir } = makeDeps({}, REX_ENV, null);
     appendDispatch(dispatchRow({ sender: null }), dataDir);
-    await failureOf(closePane({ target: "child" }, deps));
+    await failureOf(closeSession({ target: "child" }, deps));
   });
 
   test("refuses a dispatch that failed", async () => {
     const { deps, dataDir } = makeDeps({}, REX_ENV, "parent");
     appendDispatch(dispatchRow({ outcome: "failed" }), dataDir);
-    await failureOf(closePane({ target: "child" }, deps));
+    await failureOf(closeSession({ target: "child" }, deps));
   });
 
   test("closes the latest matching rex child with facts from its worktree", async () => {
     const { deps, dataDir, calls } = makeDeps({}, REX_ENV, "parent");
     appendDispatch(dispatchRow({ target: "block:old" }), dataDir);
     appendDispatch(dispatchRow({ target: "block:new" }), dataDir);
-    const { row } = await closePane({ target: "child" }, deps);
+    const { row } = await closeSession({ target: "child" }, deps);
     expect(argvs(calls).at(-1)).toBe("rex block close -s main block:new");
     expect(calls[0]?.options?.cwd).toBe("/work/child");
     expect(row.target).toBe("block:new");
@@ -442,25 +438,25 @@ describe("closePane --target", () => {
     const { deps, dataDir, calls } = makeDeps({}, REX_ENV, "parent");
     appendDispatch(dispatchRow(), dataDir);
     appendDispatch(closedRow({ mux: "rex", target: "block:child" }), dataDir);
-    expect((await failureOf(closePane({ target: "child" }, deps))).exitCode).toBe(2);
+    expect((await failureOf(closeSession({ target: "child" }, deps))).exitCode).toBe(2);
     expect(calls).toEqual([]);
   });
 
   test("closes a herdr child by its pane id", async () => {
     const { deps, dataDir, calls } = makeDeps({}, HERDR_ENV, "parent");
     appendDispatch(dispatchRow({ mux: "herdr", target: "pane-child" }), dataDir);
-    await closePane({ target: "child" }, deps);
+    await closeSession({ target: "child" }, deps);
     expect(argvs(calls).at(-1)).toBe("herdr pane close pane-child");
   });
 });
 
-describe("attachFork", () => {
+describe("attachSession", () => {
   test("rex names only the session and never the stale block", async () => {
     const { deps, calls } = makeDeps(
       { "rex window new": ok(JSON.stringify({ block_ids: ["block:a"], window_id: "w" })) },
       REX_ENV,
     );
-    expect(await attachFork(FORK, deps)).toEqual({ mux: "rex", pane: "block:a" });
+    expect(await attachSession(FORK, deps)).toEqual({ mux: "rex", pane: "block:a" });
     const line = argvs(calls).join("\n");
     expect(line).toBe(
       `rex window new -s main attach-${FORK} --focus=false --json -- claude attach ${FORK}`,
@@ -477,7 +473,7 @@ describe("attachFork", () => {
       },
       HERDR_ENV,
     );
-    expect(await attachFork(FORK, deps)).toEqual({ mux: "herdr", pane: "pane-new" });
+    expect(await attachSession(FORK, deps)).toEqual({ mux: "herdr", pane: "pane-new" });
     expect(argvs(calls)).toEqual([
       `herdr workspace create --cwd /work/tree --label attach-${FORK} --no-focus`,
       `herdr pane run pane-new claude attach ${FORK}`,
@@ -486,7 +482,7 @@ describe("attachFork", () => {
 
   test("rejects an id that is not shell-safe", async () => {
     const { deps } = makeDeps({}, HERDR_ENV);
-    expect((await failureOf(attachFork("x; rm -rf /", deps))).exitCode).toBe(2);
+    expect((await failureOf(attachSession("x; rm -rf /", deps))).exitCode).toBe(2);
   });
 });
 

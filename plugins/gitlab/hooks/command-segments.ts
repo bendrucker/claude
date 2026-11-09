@@ -26,7 +26,6 @@ export interface Command {
 }
 
 const KEYWORDS = new Set(["if", "then", "else", "elif", "do", "while", "until", "!", "{"]);
-// Words that stand ahead of the command they run.
 const WRAPPERS = new Set(["command", "builtin", "exec", "time", "nohup", "env"]);
 const ASSIGNMENT = /^[A-Za-z_]\w*=/;
 const DOUBLE_QUOTED_ESCAPES = new Set(["$", "`", '"', "\\"]);

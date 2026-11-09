@@ -16,7 +16,6 @@ export interface ShellCommand {
   stdin: string[];
 }
 
-// Words that run the command after them.
 const WRAPPERS = new Set(["command", "builtin", "exec", "nohup", "time", "env"]);
 
 const parser = new Parser();

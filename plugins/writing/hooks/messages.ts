@@ -8,13 +8,11 @@ import { parseShell, type ShellArg, type ShellCommand } from "./shell";
 // The full set of Bash prose surfaces this hook scans. The hooks.json Bash
 // guard is derived from these. hooks.test.ts enforces the sync.
 export const PROSE_FLAGS = ["--body", "--message", "--description", "--title"] as const;
-// `--body-file path` names the file a CLI reads the `--body` value from.
 export const BODY_FILE_FLAGS = PROSE_FLAGS.map((flag) => `${flag}-file`);
 // Short forms are read only on a review command, where they cannot mean something else.
 const REVIEW_SHORT_FLAGS = ["-m", "-b"] as const;
 
-// An API CLI reads a field's value from a file in the `-F key=@file` form. The
-// guard fragment ships to hooks.json verbatim, and hooks.test.ts enforces the sync.
+// An API CLI reads a field's value from a file in the `-F key=@file` form.
 export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 
 // git commit / git tag read their message from a file via -F / --file, with no
@@ -23,11 +21,9 @@ export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 
 // A review command reads a JSON payload of comments from `--input <file>`.
-// Guard fragment shipped to hooks.json like the above.
 export const INPUT_FILE_GUARD = "--input[= ]";
 
-// A review command can read its body from stdin or a short flag. hooks.json
-// greps for this fragment too.
+// A review command can read its body from stdin or a short flag.
 export const REVIEW_STDIN_GUARD = "(review|note|discussion)[^|;&]*( <|-m |-b )";
 
 // Any prose value in an MCP call puts three spaces, backticks, or JSON-escaped
@@ -59,8 +55,6 @@ function strings(value: unknown): string[] {
   return [];
 }
 
-// `review`, `note`, or `discussion`, alone or plural, as a whole word or a
-// segment of a path, script name, or API endpoint.
 const REVIEW_WORD = /(?:^|[/_.-])(?:review|note|discussion)s?(?:$|[/_.-])/;
 // A review word past the subcommand is an argument, such as a file name.
 const REVIEW_WORD_POSITIONS = 4;
@@ -80,7 +74,6 @@ function isGitMessageCommand(command: ShellCommand): boolean {
   return command.name === "git" && (sub === "commit" || sub === "tag");
 }
 
-/** Values of `--flag value` and `--flag=value` for any of `flags`. */
 function flagValues(command: ShellCommand, flags: readonly string[]): ShellArg[] {
   const values: ShellArg[] = [];
   for (const [index, arg] of command.args.entries()) {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { z } from "zod";
 import { type Database, getDb, sessionDbPath } from "./db";
 import type { IndexEvent } from "./events";
@@ -220,4 +220,11 @@ describe("withReader", () => {
     held = await holdLock(dataDir, "READ_WRITE");
     expect(await withReader(dataDir, rawCount)).toBeUndefined();
   });
+});
+
+it("matches the stamp the session eval plants", async () => {
+  const setup = await Bun.file(
+    join(import.meta.dirname, "..", "..", "..", "evals", "session", "index.sh"),
+  ).text();
+  expect(setup).toContain(`"$dir/${basename(stampPath("data"))}"`);
 });

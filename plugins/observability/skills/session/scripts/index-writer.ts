@@ -17,6 +17,8 @@ export interface WriterDeps {
   retryDelayMs?: number;
 }
 
+const DEFAULT_LOCK_WAIT_MS = 750;
+
 export type RefreshOutcome = "indexed" | "compacted" | "lock-yield";
 
 export interface RefreshOptions {
@@ -24,19 +26,20 @@ export interface RefreshOptions {
   compact?: boolean;
   /** Return "lock-yield" instead of throwing when another writer holds an existing index. */
   yieldToLock?: boolean;
+  /** How long to wait out another writer before yielding or failing. */
+  lockWaitMs?: number;
   /** Recorded on the refresh event when something other than refresh.ts asked. */
   trigger?: string;
   index?: Parameters<typeof ensureIndex>[1];
 }
 
-const LOCK_RETRIES = 3;
 const COMPACT_FLOOR_BYTES = 64 * 1024 * 1024;
 
 export function stampPath(dataDir: string): string {
   return join(dataDir, "last-refresh");
 }
 
-function isLockError(error: unknown): boolean {
+export function isLockError(error: unknown): boolean {
   return /lock/i.test(String(error));
 }
 
@@ -71,15 +74,20 @@ export function recordKilled(signal: string, deps: WriterDeps = {}): Promise<voi
 }
 
 // A brief retry rides out short holders, such as a reader finishing a query.
-async function openWriter(dataDir: string, deps: WriterDeps): Promise<Database> {
+async function openWriter(
+  dataDir: string,
+  deps: WriterDeps,
+  lockWaitMs = DEFAULT_LOCK_WAIT_MS,
+): Promise<Database> {
   const { open = getDb, retryDelayMs = 250 } = deps;
+  const deadline = performance.now() + lockWaitMs;
   await mkdir(dataDir, { recursive: true });
-  for (let attempt = 0; ; attempt++) {
+  for (;;) {
     try {
       // oxlint-disable-next-line no-await-in-loop -- retry loop: an attempt runs only because the previous one hit the write lock.
       return await open(dataDir);
     } catch (error) {
-      if (!isLockError(error) || attempt >= LOCK_RETRIES) throw error;
+      if (!isLockError(error) || performance.now() >= deadline) throw error;
     }
     // oxlint-disable-next-line no-await-in-loop -- backoff between lock retries.
     await Bun.sleep(retryDelayMs);
@@ -96,7 +104,7 @@ export async function refreshIndex(
   try {
     let db: Database;
     try {
-      db = await openWriter(dataDir, deps);
+      db = await openWriter(dataDir, deps, options.lockWaitMs);
     } catch (error) {
       // A concurrent refresher is doing the same work, so the existing index is the answer.
       if (options.yieldToLock === true && isLockError(error) && (await Bun.file(dbPath).exists())) {

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { $ } from "bun";
 import { z } from "zod";
 import { ensureIndex, getDb } from "./db";
-import { holdLock } from "./lock-holder";
+import { type HeldLock, holdLock } from "./lock-holder";
 
 const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 
@@ -14,6 +14,7 @@ let tmpDir: string;
 let dataDir: string;
 let importsDir: string;
 let configDir: string;
+let held: HeldLock | undefined;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(join(tmpdir(), "writer-scripts-"));
@@ -24,6 +25,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  await held?.release();
+  held = undefined;
   await rm(tmpDir, { recursive: true, force: true });
 });
 
@@ -75,6 +78,21 @@ async function refreshEvents(): Promise<z.infer<typeof EventRecord>[]> {
 }
 
 describe("import.ts", () => {
+  it("waits out a writer instead of yielding to it", async () => {
+    await buildIndex();
+    await $`mkdir -p ${join(importsDir, "box", "projects")}`.quiet();
+    await $`cp -R ${fixturesDir}/. ${join(importsDir, "box", "projects")}`.quiet();
+    held = await holdLock(dataDir, "READ_WRITE");
+
+    const importing = run("import.ts", "--host", "box");
+    await Bun.sleep(1500);
+    await held.release();
+    held = undefined;
+
+    expect((await importing).exitCode).toBe(0);
+    expect((await refreshEvents()).map((e) => e.attributes.outcome)).toEqual(["indexed"]);
+  });
+
   it("stamps the index and records a refresh event", async () => {
     await $`mkdir -p ${join(importsDir, "box", "projects")}`.quiet();
     await $`cp -R ${fixturesDir}/. ${join(importsDir, "box", "projects")}`.quiet();
@@ -90,19 +108,26 @@ describe("import.ts", () => {
 });
 
 describe("forget.ts", () => {
-  it.each(["..", "../home", "a/b"])(
-    "rejects the label %p without deleting anything",
-    async (label) => {
-      await buildIndex();
-      mkdirSync(importsDir, { recursive: true });
-      await Bun.write(join(tmpDir, "home", "keep"), "keep\n");
+  it.each<{ name: string; label: () => string }>([
+    { name: "parent", label: () => ".." },
+    { name: "current", label: () => "." },
+    { name: "empty", label: () => "" },
+    { name: "relative traversal", label: () => "../home" },
+    { name: "absolute path", label: () => join(tmpDir, "home") },
+    { name: "nested", label: () => "a/b" },
+  ])("rejects a $name label before touching the index or disk", async ({ label }) => {
+    await buildIndex();
+    mkdirSync(join(importsDir, "box"), { recursive: true });
+    await Bun.write(join(tmpDir, "home", "keep"), "keep\n");
+    held = await holdLock(dataDir, "READ_WRITE");
 
-      const { exitCode } = await run("forget.ts", "--host", label);
+    const { exitCode, stderr } = await run("forget.ts", "--host", label());
 
-      expect(exitCode).toBe(1);
-      expect(await Bun.file(join(tmpDir, "home", "keep")).exists()).toBe(true);
-    },
-  );
+    expect(exitCode).toBe(1);
+    expect(stderr).toMatch(/^(Invalid host label|--host is required)/);
+    expect(await Bun.file(join(tmpDir, "home", "keep")).exists()).toBe(true);
+    expect(readdirSync(importsDir)).toEqual(["box"]);
+  });
 });
 
 describe("hosts.ts", () => {

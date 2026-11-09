@@ -15,7 +15,7 @@ import {
   type Manifest,
 } from "./db";
 import { dirExists } from "./file-catalog";
-import { refreshIndex } from "./index-writer";
+import { isLockError, refreshIndex } from "./index-writer";
 
 const argv = cli({
   name: "import",
@@ -85,7 +85,17 @@ if (!existing) {
   await $`chmod 600 ${manifestPath}`.quiet();
 }
 
-await refreshIndex(getDataDir(), { trigger: "import" });
+// Yielding would report success while a refresh that listed hosts before this
+// manifest existed leaves the host unindexed, so import waits out the lock instead.
+try {
+  await refreshIndex(getDataDir(), { trigger: "import", lockWaitMs: 60_000 });
+} catch (error) {
+  if (!isLockError(error)) throw error;
+  console.error(
+    "A refresh held the index lock for over a minute. Rerun import.ts once it finishes.",
+  );
+  process.exit(1);
+}
 
 const blockEgress = existing ? (existing.policy.block_egress ?? true) : !argv.flags.egress;
 console.log(`${existing ? "Re-indexed" : "Imported"} host "${label}" from ${projectsDir}`);

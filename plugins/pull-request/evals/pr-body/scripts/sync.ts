@@ -3,7 +3,7 @@
 import { globSync } from "node:fs";
 import { join } from "node:path";
 import { $ } from "bun";
-import type { Corpus } from "../../../../../packages/eval-corpus/bucket";
+import { type Corpus, DOTFILES } from "../../../../../packages/eval-corpus/bucket";
 import { syncCommand } from "../../../../../packages/eval-corpus/sync";
 
 /** The pr-body corpus as laid out under an `evals` directory. */
@@ -14,7 +14,11 @@ export function corpusAt(evals: string): Corpus {
     description: "the pr-body fixtures and create-scenarios cases",
     mirrors: [
       { local: join(evals, "pr-body", "fixtures"), remote: "fixtures" },
-      { local: join(evals, "pr-body", "data", "revisions"), remote: "data/revisions" },
+      {
+        local: join(evals, "pr-body", "data", "revisions"),
+        remote: "data/revisions",
+        filters: [DOTFILES],
+      },
       {
         local: scenarios,
         remote: "create-scenarios",

@@ -28,14 +28,15 @@ export interface Corpus {
   afterPull?: () => Promise<void>;
 }
 
-const HIDDEN: Filter = { exclude: ".*" };
-
 export function key(corpus: Corpus, mirror: Mirror): string {
   return mirror.remote === undefined ? corpus.prefix : `${corpus.prefix}/${mirror.remote}`;
 }
 
+/** Skips top-level dot entries and everything under a top-level dot directory. */
+export const DOTFILES: Filter = { exclude: ".*" };
+
 export function filters(mirror: Mirror): Filter[] {
-  return [HIDDEN, ...(mirror.filters ?? [])];
+  return mirror.filters ?? [];
 }
 
 export function url(path: string): string {

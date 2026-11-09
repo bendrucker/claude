@@ -15,10 +15,11 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true });
 });
 
-test("a pull restores the mined files, skips tracked cases, and makes fixture scripts executable", async () => {
+test("a pull restores the mined files and fixture dotfiles, skips tracked cases and revision dotfiles, and makes fixture scripts executable", async () => {
   const source = join(root, "source");
   const files = [
     "pr-body/fixtures/labels.json",
+    "pr-body/fixtures/.claude/settings.json",
     "pr-body/data/revisions/r1.json",
     "pr-body/data/revisions/.DS_Store",
     "create-scenarios/scenario-1/case.yaml",
@@ -47,6 +48,7 @@ test("a pull restores the mined files, skips tracked cases, and makes fixture sc
       "create-scenarios/scenario-1/fixture.sh",
       "create-scenarios/work-2/case.yaml",
       "pr-body/data/revisions/r1.json",
+      "pr-body/fixtures/.claude/settings.json",
       "pr-body/fixtures/labels.json",
     ]
   `);

@@ -36,6 +36,7 @@ import { annotations, toFlags } from "./review";
 import { sample } from "./sample";
 import { diffHits, labConfig, score } from "./score";
 import { serve } from "./server";
+import { DOTFILES } from "../eval-corpus/bucket";
 import { syncCommand } from "../eval-corpus/sync";
 import { checkRows, patternRows, render, renderRules } from "./status";
 
@@ -464,7 +465,7 @@ export const program = new Command("lab")
     syncCommand({
       prefix: "prose-lab",
       description: "the lab data",
-      mirrors: [{ local: data.dir, remote: "data" }],
+      mirrors: [{ local: data.dir, remote: "data", filters: [DOTFILES] }],
     }),
   );
 

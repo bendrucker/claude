@@ -1,4 +1,12 @@
-export { BUCKET, type Corpus, type Direction, type Filter, type Mirror, PROFILES } from "./bucket";
+export {
+  BUCKET,
+  type Corpus,
+  DOTFILES,
+  type Direction,
+  type Filter,
+  type Mirror,
+  PROFILES,
+} from "./bucket";
 export {
   Feedback,
   type FeedbackEndpoint,

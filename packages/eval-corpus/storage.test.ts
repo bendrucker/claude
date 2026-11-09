@@ -43,6 +43,8 @@ test.each<{ path: string; filters: Filter[]; expected: boolean }>([
   { path: "a.json", filters: [], expected: true },
   { path: ".DS_Store", filters: [{ exclude: ".*" }], expected: false },
   { path: "sub/.hidden", filters: [{ exclude: ".*" }], expected: true },
+  { path: ".claude/settings.json", filters: [{ exclude: ".*" }], expected: false },
+  { path: ".claude/settings.json", filters: [], expected: true },
   { path: "snap/x/y.json", filters: [{ exclude: "*" }, { include: "snap/*" }], expected: true },
   {
     path: "index.duckdb",

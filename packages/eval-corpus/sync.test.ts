@@ -68,12 +68,12 @@ test.each<{ argv: string[]; profile: string | undefined }>([
   for (const args of calls) expect(profileOf(args)).toBe(profile);
 });
 
-test("every mirror syncs with dotfiles excluded ahead of its own filters", async () => {
+test("each mirror syncs with exactly its own filters", async () => {
   const { calls, run } = harness(corpus);
   await run(["pull"]);
   expect(calls.map((args) => args.slice(2, -2))).toEqual([
-    ["s3://ben-drucker-agents-eval-corpus/suite/a", "/a", "--exclude", ".*"],
-    ["s3://ben-drucker-agents-eval-corpus/suite", "/b", "--exclude", ".*", "--include", "x"],
+    ["s3://ben-drucker-agents-eval-corpus/suite/a", "/a"],
+    ["s3://ben-drucker-agents-eval-corpus/suite", "/b", "--include", "x"],
   ]);
 });
 

@@ -14,6 +14,16 @@ describe("pValue", () => {
     expect(pValue([1, 1, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0])).toBeLessThan(0.1);
   });
 
+  test("never reaches 0, since the observed split counts as one permutation", () => {
+    const n = Array.from({ length: 20 }, (_, i) => i);
+    expect(
+      pValue(
+        n,
+        n.map((x) => x + 100),
+      ),
+    ).toBe(1 / 10_001);
+  });
+
   test("does not separate one flip in three", () => {
     expect(pValue([1, 1, 1], [1, 1, 0])).toBeGreaterThan(0.1);
   });
@@ -47,6 +57,10 @@ describe("signFlipPValue", () => {
 
   test("a consistent paired gain is extreme", () => {
     expect(signFlipPValue(Array.from({ length: 20 }, () => 0.2))).toBeLessThan(0.01);
+  });
+
+  test("never reaches 0, since the observed signs count as one permutation", () => {
+    expect(signFlipPValue(Array.from({ length: 40 }, () => 1))).toBe(1 / 10_001);
   });
 
   test("zeros neither move the p-value nor draw from the rng", () => {

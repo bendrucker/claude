@@ -1,11 +1,17 @@
 import seedrandom from "seedrandom";
 import { mean, permutationTest } from "simple-statistics";
 
+const TRIALS = 10_000;
+
+/** A Monte Carlo p-value counting the observed statistic as one permutation, so it never reaches 0. */
+const corrected = (extreme: number, trials: number) => (extreme + 1) / (trials + 1);
+
 /** Two-sided permutation p-value between two samples, seeded so a report reprints the same. */
 export function pValue(base: number[], other: number[]): number {
   if (base.length === 0 || other.length === 0) return NaN;
   if (new Set([...base, ...other]).size === 1) return 1;
-  return permutationTest(base, other, "two_side", 10_000, seedrandom("compare"));
+  const share = permutationTest(base, other, "two_side", TRIALS, seedrandom("compare"));
+  return corrected(Math.round(share * TRIALS), TRIALS);
 }
 
 /**
@@ -24,7 +30,7 @@ export function pFloor(n1: number, n2: number): number {
  */
 export function signFlipPValue(
   diffs: readonly number[],
-  trials = 10_000,
+  trials = TRIALS,
   rng: () => number = seedrandom("compare"),
 ): number {
   if (diffs.every((d) => d === 0)) return Number.NaN;
@@ -38,7 +44,7 @@ export function signFlipPValue(
     }
     if (Math.abs(sum / diffs.length) >= observed - 1e-9) extreme++;
   }
-  return extreme / trials;
+  return corrected(extreme, trials);
 }
 
 /**

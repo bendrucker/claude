@@ -65,8 +65,13 @@ const WRITER_CONFIG = {
   storage_compatibility_version: STORAGE_VERSION,
 };
 
-async function createDatabase(dbPath: string): Promise<Database> {
-  const instance = await DuckDBInstance.create(dbPath, WRITER_CONFIG);
+const READER_CONFIG = { access_mode: "READ_ONLY", memory_limit: "1GiB", threads: "2" };
+
+async function createDatabase(
+  dbPath: string,
+  config: Record<string, string> = WRITER_CONFIG,
+): Promise<Database> {
+  const instance = await DuckDBInstance.create(dbPath, config);
   const connection = await instance.connect();
 
   return {
@@ -124,7 +129,12 @@ export function getImportsDir(importsDir?: string): string {
   return join(process.env.HOME, ".claude", "session-imports");
 }
 
+export function isHostLabel(label: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(label);
+}
+
 export function importRoot(label: string, importsDir?: string): string {
+  if (!isHostLabel(label)) throw new Error(`Invalid host label "${label}"`);
   return join(getImportsDir(importsDir), label);
 }
 
@@ -457,6 +467,10 @@ async function rawMatchesProjection(db: Database): Promise<boolean> {
 export async function getDb(dataDir: string): Promise<Database> {
   if (dataDir === defaultDataDir()) await migrateLegacyIndex(dataDir);
   return createDatabase(sessionDbPath(dataDir));
+}
+
+export function getReadOnlyDb(dataDir: string): Promise<Database> {
+  return createDatabase(sessionDbPath(dataDir), READER_CONFIG);
 }
 
 // Returns whether raw's projected columns were re-derived, which invalidates the tables

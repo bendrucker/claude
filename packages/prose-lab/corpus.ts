@@ -1,8 +1,7 @@
-import { mkdtemp, readdir } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readdir } from "node:fs/promises";
 import { basename, join, relative } from "node:path";
 import { $ } from "bun";
-import { lint } from "../../plugins/prompting/skills/scan/scripts/vale";
+import { lint } from "../vale-runner/index";
 import { type Corpus, DOCS, entries, type Hit, hitId, type Sweep } from "./data";
 import { wideConfig } from "./score";
 
@@ -105,27 +104,6 @@ export async function markdownUnder(dir: string, root = ROOT): Promise<string[]>
     .map((name) => relative(root, join(dir, name)));
 }
 
-/** Files per Vale run, since one run over thousands of files fails. */
-const LINT_BATCH = 400;
-
-const probes = new Map<string, Promise<void>>();
-
-async function lintProbe(config: string): Promise<void> {
-  const file = join(await mkdtemp(join(tmpdir(), "prose-lab-probe-")), "probe.md");
-  await Bun.write(file, "Probe.\n");
-  await lint([file], { config });
-}
-
-/** Rejects when the config or binary is broken. */
-function probe(config: string): Promise<void> {
-  let probed = probes.get(config);
-  if (probed === undefined) {
-    probed = lintProbe(config);
-    probes.set(config, probed);
-  }
-  return probed;
-}
-
 export async function lintFiles(
   plugin: string,
   config: string,
@@ -133,22 +111,13 @@ export async function lintFiles(
   root = ROOT,
   repos: Repos = {},
 ): Promise<Hit[]> {
-  if (files.length === 0) return [];
-  const split = async (at: number) => [
-    ...(await lintFiles(plugin, config, files.slice(0, at), root, repos)),
-    ...(await lintFiles(plugin, config, files.slice(at), root, repos)),
-  ];
   const paths = new Map(files.map((file) => [filePath(file, repos, root), file]));
-  if (files.length > LINT_BATCH) return split(LINT_BATCH);
-  let alerts: Awaited<ReturnType<typeof lint>>;
-  try {
-    alerts = await lint([...paths.keys()], { config });
-  } catch {
-    await probe(config);
-    if (files.length > 1) return split(Math.ceil(files.length / 2));
-    console.error(`Skipped ${files[0]}: vale could not lint it.`);
-    return [];
-  }
+  const alerts = await lint([...paths.keys()], {
+    config,
+    onSkip: (path) => {
+      console.error(`Skipped ${paths.get(path) ?? path}: vale could not lint it.`);
+    },
+  });
   return [...alerts].flatMap(([path, found]) =>
     found.map((alert) => ({
       plugin,

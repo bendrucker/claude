@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const VALE_CONFIG = join(import.meta.dirname, "..", "..", "..", ".vale.ini");
 
-const Alert = z.object({
+export const Alert = z.object({
   Check: z.string(),
   Message: z.string(),
   Severity: z.enum(["error", "warning", "suggestion"]),

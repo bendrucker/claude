@@ -55,6 +55,14 @@
         "@hegeldev/hegel": "^0.4.7",
       },
     },
+    "packages/eval-corpus": {
+      "name": "@bendrucker/claude-eval-corpus",
+      "dependencies": {
+        "@commander-js/extra-typings": "~15.0.0",
+        "commander": "~15.0.0",
+        "zod": "^4.4.3",
+      },
+    },
     "packages/eval-judge": {
       "name": "@bendrucker/claude-eval-judge",
       "dependencies": {
@@ -621,6 +629,8 @@
     "@bendrucker/claude-comments": ["@bendrucker/claude-comments@workspace:plugins/comments"],
 
     "@bendrucker/claude-decode": ["@bendrucker/claude-decode@workspace:packages/decode"],
+
+    "@bendrucker/claude-eval-corpus": ["@bendrucker/claude-eval-corpus@workspace:packages/eval-corpus"],
 
     "@bendrucker/claude-eval-judge": ["@bendrucker/claude-eval-judge@workspace:packages/eval-judge"],
 

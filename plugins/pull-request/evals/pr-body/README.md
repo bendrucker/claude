@@ -65,7 +65,7 @@ bun plugins/pull-request/evals/pr-body/label/server.ts                      # ht
 
 Open the URL and review each body. Select any span in the rendered body to attach an inline comment with a severity (critical, minor, praise), and set a verdict, quality tags, and freeform notes per PR. Highlights persist across reloads. Everything autosaves to `feedback/<id>.json`. The header links to the PR on GitHub so the diff is one click away while judging the body.
 
-Each harness carries its own copy of this UI. Extracting a shared labeler package is a known deferred refactor.
+Each harness carries its own UI. The samples and feedback endpoints come from [`packages/eval-corpus/label.ts`](../../../../packages/eval-corpus/label.ts).
 
 ## Scenario Cases
 

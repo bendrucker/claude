@@ -2,10 +2,12 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
-import { z } from "zod";
+import {
+  Feedback,
+  feedbackEndpoint,
+  fileResponse,
+} from "../../../../../packages/eval-corpus/label";
 import { Label, Pair } from "../scripts/pairs";
-
-const Feedback = z.looseObject({ id: z.string().regex(/^[\w-]+$/), feedback: z.unknown() });
 
 // Local labeling server. Serves the review UI and persists reviewer feedback
 // to disk so a later analysis pass can read it back. Two modes share one
@@ -15,28 +17,6 @@ const Feedback = z.looseObject({ id: z.string().regex(/^[\w-]+$/), feedback: z.u
 
 const html = join(import.meta.dir, "index.html");
 const align = join(import.meta.dir, "align.ts");
-
-async function readAllJson(dir: string): Promise<Record<string, unknown>> {
-  const out: Record<string, unknown> = {};
-  let names: string[];
-  try {
-    names = await readdir(dir);
-  } catch {
-    return out;
-  }
-  await Promise.all(
-    names
-      .filter((n) => n.endsWith(".json"))
-      .map(async (n) => {
-        try {
-          out[n.replace(/\.json$/, "")] = await Bun.file(join(dir, n)).json();
-        } catch {
-          // best-effort: skip a file that fails to parse rather than blocking the rest
-        }
-      }),
-  );
-  return out;
-}
 
 /** Deterministic left/right screen assignment from the pair id, stable across reloads. */
 export function computeLeft(id: string): "a" | "b" {
@@ -94,13 +74,13 @@ export interface ServerOptions {
 }
 
 export function createHandler(opts: ServerOptions) {
+  const feedback = feedbackEndpoint(opts.feedbackDir, Feedback, (body) => body.feedback);
+  const labels = feedbackEndpoint(opts.feedbackDir, Label);
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
 
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      return new Response(Bun.file(html), {
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return fileResponse(html, "text/html; charset=utf-8");
     }
 
     if (url.pathname === "/align.js") {
@@ -124,35 +104,12 @@ export function createHandler(opts: ServerOptions) {
         return Response.json(await loadPairs(pairsDir));
       }
 
-      if (url.pathname === "/api/labels" && req.method === "GET") {
-        return Response.json(await readAllJson(opts.feedbackDir));
-      }
-
-      if (url.pathname === "/api/labels" && req.method === "POST") {
-        const body = Label.safeParse(await req.json());
-        if (!body.success) return new Response(z.prettifyError(body.error), { status: 400 });
-        const path = join(opts.feedbackDir, `${body.data.id}.json`);
-        await Bun.write(path, JSON.stringify(body.data, null, 2));
-        return Response.json({ ok: true });
-      }
+      if (url.pathname === "/api/labels" && req.method === "GET") return labels.get();
+      if (url.pathname === "/api/labels" && req.method === "POST") return labels.post(req);
     } else {
-      if (url.pathname === "/api/samples") {
-        return new Response(Bun.file(opts.dataPath), {
-          headers: { "content-type": "application/json" },
-        });
-      }
-
-      if (url.pathname === "/api/feedback" && req.method === "GET") {
-        return Response.json(await readAllJson(opts.feedbackDir));
-      }
-
-      if (url.pathname === "/api/feedback" && req.method === "POST") {
-        const body = Feedback.safeParse(await req.json());
-        if (!body.success) return new Response(z.prettifyError(body.error), { status: 400 });
-        const path = join(opts.feedbackDir, `${body.data.id}.json`);
-        await Bun.write(path, JSON.stringify(body.data.feedback, null, 2));
-        return Response.json({ ok: true });
-      }
+      if (url.pathname === "/api/samples") return fileResponse(opts.dataPath, "application/json");
+      if (url.pathname === "/api/feedback" && req.method === "GET") return feedback.get();
+      if (url.pathname === "/api/feedback" && req.method === "POST") return feedback.post(req);
     }
 
     return new Response("not found", { status: 404 });

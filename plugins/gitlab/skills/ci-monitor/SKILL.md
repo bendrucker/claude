@@ -40,28 +40,15 @@ bun ${CLAUDE_SKILL_DIR}/scripts/watch.ts --mr <url> | --branch <name> | --pipeli
 
 Optional flags: `--max-minutes <N>`, `--queued-timeout <minutes>`, `--api-error-threshold <N>`.
 
-The watcher polls every 30 seconds through `glab ci get`. In MR mode, a pipeline built on an older commit than the MR head counts as `running`, so a push does not report the previous run's result. A `success` is confirmed against the pipeline's jobs, so a pipeline reporting success with a failed required job reports `failing`. A 401, 403, or 404 from `glab` ends the watch with a `fatal` event and exit code 1.
-
 ## Events
 
-The script prints one JSON object per line. `run_id` is the GitLab pipeline ID.
+The script prints one JSON object per line. `run_id` is the GitLab pipeline ID. It exits on `success`, `fatal` (a 401, 403, or 404 from `glab`), `merged`, `pr-closed`, and `max-time-reached`. Report each event once.
 
-| Event | Meaning | Watcher exits | Action |
-| --- | --- | --- | --- |
-| `{"type":"status","state":"running"}` | Pipeline in progress | no | Keep watching |
-| `{"type":"status","state":"failing"}` | A job failed | no | Dispatch `gitlab:logs` (below) and report its summary. A retried job reports `running` next |
-| `{"type":"status","state":"success"}` | Green, job-confirmed | yes | Report green |
-| `{"type":"conflicts","sha":"..."}` | MR conflicts with target | no | Report the SHA and stop the monitor |
-| `{"type":"mergeable-unknown","sha":"..."}` | Merge status unsettled | no | Report the SHA |
-| `{"type":"queued-timeout","minutes":N}` | Queued past threshold | no | Report once |
-| `{"type":"api-error","consecutive":N}` | `glab` failures reached the threshold | no | Report once |
-| `{"type":"blocked","sha":"...","run_id":"..."}` | Pipeline waits on a manual job | no | Report once, naming the run |
-| `{"type":"fatal","message":"..."}` | `glab` returned 401, 403, or 404 | yes | Report the message |
-| `{"type":"merged"}` | MR merged | yes | Report |
-| `{"type":"pr-closed"}` | MR closed unmerged or source branch deleted | yes | Report |
-| `{"type":"max-time-reached","minutes":N}` | Wall-clock cap | yes | Report |
-
-`conflicts`, `mergeable-unknown`, `merged`, and `pr-closed` occur in MR mode only.
+- `status` `running`: keep watching.
+- `status` `failing`: dispatch `gitlab:logs` (below) and report its summary. A retried job reports `running` next.
+- `status` `success`: report green.
+- `conflicts`: report the SHA and stop the monitor.
+- `mergeable-unknown`, `queued-timeout`, `api-error`, `blocked` (waiting on a manual job), `fatal`, `merged`, `pr-closed`, `max-time-reached`: report it.
 
 On `failing`, pass `run_id` and the project path (from `--project` or the MR URL) to the logs agent:
 

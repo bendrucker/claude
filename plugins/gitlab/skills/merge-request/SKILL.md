@@ -24,7 +24,7 @@ Scripts directory (absolute, for invocations from other skills where `${CLAUDE_S
 
 ## Merging
 
-Merge only through `merge.ts`. It handles merge trains, auto-merge, and squash. A bare `glab mr merge` turns on auto-merge whenever a pipeline is running. The MR then merges later instead of now. `merge.ts` always sends `--auto-merge=<choice>`.
+Merge only through `merge.ts`, which handles merge trains, auto-merge, and squash. A bare `glab mr merge` silently enables auto-merge while a pipeline runs.
 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts
@@ -32,7 +32,7 @@ bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts feature-branch --auto-merge --squash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts --status 1298 1299 1300
 ```
 
-`--status` takes a branch or one or more MR IIDs and prints a compact readiness line per MR without mutating it: state, draft, branches, sha, `detailed_merge_status`, auto-merge, head pipeline, and `rebased_on_target`, an ancestry check computed from git. Use it to check state after a push or a rebase. Trust `rebased_on_target` over the API's conflict fields, which lag.
+`--status` prints a read-only readiness line per MR. Use it after a push or rebase, and trust its git-computed `rebased_on_target` over the API's conflict fields, which lag.
 
 #### Re-Arm After a Push
 

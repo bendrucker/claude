@@ -8,6 +8,6 @@ allowed-tools:
 
 # Hunk Review
 
-Ben launches the Hunk window. Drive it with `hunk session` commands and never start the interactive TUI. The instructions below come from the installed Hunk binary and match its version.
+Ben launches the Hunk window. Drive it with `hunk session` commands and never start the interactive TUI. The instructions below come from the installed Hunk binary and match its version. Pass `--repo` the root of the repository the Hunk window opened, since a subdirectory or other worktree doesn't match its session.
 
 !`hunk skill show hunk-review 2>&1 || echo "hunk is not installed. Tell Ben it comes from the dotfiles hunk topic."`

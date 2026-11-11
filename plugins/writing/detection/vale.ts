@@ -7,7 +7,7 @@ export const VALE_CONFIG = join(import.meta.dirname, "..", ".vale.ini");
 /** Where text came from, which picks the `.vale.ini` section that lints it. */
 export type ValeSource = { filePath: string } | { kind: "body" | "commit" | "review" };
 
-const Alert = z.object({
+export const Alert = z.object({
   Check: z.string(),
   Message: z.string(),
   Severity: z.enum(["error", "warning", "suggestion"]),
@@ -219,11 +219,6 @@ export async function valeWords(filePath: string): Promise<number | null> {
   args.splice(-1, 0, "ls-metrics");
   const stdout = await runVale(args, { cwd: root ?? undefined });
   return stdout === null ? null : Metrics.parse(JSON.parse(stdout)).words;
-}
-
-/** Alerts for every file under `dir`, linted with `config` alone. */
-export async function lintDirectory(dir: string, config: string): Promise<ValeAlert[]> {
-  return alertsOf(await runVale(["--no-global", `--config=${config}`, dir]));
 }
 
 /** Alerts in `text`, in position order. No path lints it as a message. */

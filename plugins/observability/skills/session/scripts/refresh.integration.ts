@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { $ } from "bun";
 import { z } from "zod";
 import { getDb } from "./db";
+import { stampPath } from "./index-writer";
 
 const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
 const refreshScript = join(import.meta.dirname, "refresh.ts");
@@ -70,7 +71,7 @@ describe("refresh.ts", () => {
     const { stdout, exitCode } = await run();
     expect(exitCode).toBe(0);
     expect(stdout.trim()).toBe(join(dataDir, "session.duckdb"));
-    expect(await Bun.file(join(dataDir, "last-refresh")).exists()).toBe(true);
+    expect(await Bun.file(stampPath(dataDir)).exists()).toBe(true);
   });
 
   it("is idempotent across repeated runs", async () => {
@@ -129,7 +130,7 @@ describe("refresh.ts", () => {
   });
 
   it("finishes the refresh after its caller's process group is killed", async () => {
-    const stamp = join(dataDir, "last-refresh");
+    const stamp = stampPath(dataDir);
     const caller = spawn("bun", [refreshScript], { detached: true, env: env(), stdio: "ignore" });
     // The database file appears once the worker has opened it.
     // oxlint-disable-next-line no-await-in-loop -- waits for the worker to start.

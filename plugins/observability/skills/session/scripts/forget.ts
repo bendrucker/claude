@@ -3,8 +3,9 @@
 // ~/.claude/session-imports, which the sandbox denies.
 import { rm } from "node:fs/promises";
 import { cli } from "cleye";
-import { ensureSchema, forgetHost, getDataDir, getDb, importRoot, LOCAL_HOST } from "./db";
+import { forgetHost, getDataDir, importRoot, isHostLabel, LOCAL_HOST } from "./db";
 import { dirExists } from "./file-catalog";
+import { withWriter } from "./index-writer";
 
 const argv = cli({
   name: "forget",
@@ -29,14 +30,12 @@ if (label === LOCAL_HOST) {
   process.exit(1);
 }
 
-const db = await getDb(getDataDir());
-let deleted = 0;
-try {
-  await ensureSchema(db);
-  deleted = await forgetHost(db, label);
-} finally {
-  db.close();
+if (!isHostLabel(label)) {
+  console.error(`Invalid host label "${label}". Use letters, digits, "-" and "_".`);
+  process.exit(1);
 }
+
+const deleted = await withWriter(getDataDir(), (db) => forgetHost(db, label));
 
 const root = importRoot(label);
 const removedFiles = dirExists(root);

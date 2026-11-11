@@ -120,6 +120,12 @@
         "skill-lint": "./cli.ts",
       },
     },
+    "packages/vale-runner": {
+      "name": "@bendrucker/claude-vale-runner",
+      "dependencies": {
+        "zod": "^4.4.3",
+      },
+    },
     "packages/validate": {
       "name": "@bendrucker/claude-validate",
       "dependencies": {
@@ -636,6 +642,8 @@
     "@bendrucker/claude-review": ["@bendrucker/claude-review@workspace:plugins/review"],
 
     "@bendrucker/claude-vale": ["@bendrucker/claude-vale@workspace:plugins/vale"],
+
+    "@bendrucker/claude-vale-runner": ["@bendrucker/claude-vale-runner@workspace:packages/vale-runner"],
 
     "@bendrucker/claude-validate": ["@bendrucker/claude-validate@workspace:packages/validate"],
 

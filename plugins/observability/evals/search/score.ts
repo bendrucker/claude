@@ -4,10 +4,12 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
+import { mean, median } from "simple-statistics";
 import { table } from "table";
 import { z } from "zod";
+import { signFlipPValue } from "../../../../packages/evals/stats";
 import { renderSetVariables } from "../../skills/session/scripts/query";
-import { type Labeled, mean, median, pairedP, type Scored, score } from "./metrics";
+import { type Labeled, type Scored, score } from "./metrics";
 
 const SKILL = join(import.meta.dirname, "..", "..", "skills", "session");
 const INDEX = join(import.meta.dirname, "..", "session", "data", "session.duckdb");
@@ -94,6 +96,12 @@ function count(value: string): number {
 
 const f = (n: number) => n.toFixed(3);
 
+/** Blank for the base arm, and `-` when no query's P@5 moved. */
+function pCell(p: number | undefined): string {
+  if (p === undefined) return "";
+  return Number.isNaN(p) ? "-" : f(p);
+}
+
 function summarize(runs: Run[], arms: Arm[]) {
   const byArm = Map.groupBy(runs, (r) => r.arm);
   const base = byArm.get(arms[0]?.name ?? "") ?? [];
@@ -117,10 +125,7 @@ function summarize(runs: Run[], arms: Arm[]) {
       p5P:
         name === arms[0]?.name
           ? undefined
-          : pairedP(
-              rs.map((r) => r.p5),
-              base.map((r) => r.p5),
-            ),
+          : signFlipPValue(rs.map((r, i) => r.p5 - (base[i]?.p5 ?? 0))),
     };
   });
 }
@@ -144,6 +149,8 @@ const program = new Command()
       ({ name, skill, index }) => ({ name, skill, index: index ?? o.index }),
     );
     const labels = await loadLabels(o.labels, o.tag);
+    if (labels.length === 0)
+      throw new Error(`No labels in ${o.labels}${o.tag === undefined ? "" : ` tagged ${o.tag}`}`);
     const runs: Run[] = [];
     for (const l of labels) {
       for (const a of arms) {
@@ -195,7 +202,7 @@ const program = new Command()
           s.errors,
           s.wallMedian.toFixed(2),
           s.wallP90.toFixed(2),
-          s.p5P === undefined ? "" : f(s.p5P),
+          pCell(s.p5P),
         ]),
       ]),
     );

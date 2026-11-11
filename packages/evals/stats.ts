@@ -1,11 +1,17 @@
 import seedrandom from "seedrandom";
 import { mean, permutationTest } from "simple-statistics";
 
+const TRIALS = 10_000;
+
+/** A Monte Carlo p-value counting the observed statistic as one permutation, so it never reaches 0. */
+const corrected = (extreme: number) => (extreme + 1) / (TRIALS + 1);
+
 /** Two-sided permutation p-value between two samples, seeded so a report reprints the same. */
 export function pValue(base: number[], other: number[]): number {
   if (base.length === 0 || other.length === 0) return NaN;
   if (new Set([...base, ...other]).size === 1) return 1;
-  return permutationTest(base, other, "two_side", 10_000, seedrandom("compare"));
+  const share = permutationTest(base, other, "two_side", TRIALS, seedrandom("compare"));
+  return corrected(share * TRIALS);
 }
 
 /**
@@ -19,31 +25,23 @@ export function pFloor(n1: number, n2: number): number {
 }
 
 /**
- * Two-sided sign-flip permutation p-value for a win rate against the no-preference null of 0.5.
- * Ties always flip to themselves, so they don't move the p-value. Deterministic under a
- * seeded `rng`.
+ * Two-sided sign-flip permutation p-value for paired differences against a null of zero, NaN
+ * when every difference is zero. A win rate tests as `wins - 0.5`.
  */
 export function signFlipPValue(
-  wins: readonly number[],
-  trials = 10_000,
-  rng: () => number = Math.random,
+  diffs: readonly number[],
+  rng: () => number = seedrandom("compare"),
 ): number {
-  const decided = wins.filter((w) => w !== 0.5);
-  if (decided.length === 0) return Number.NaN;
-  const observed = Math.abs(mean([...wins]) - 0.5);
+  const live = diffs.filter((d) => d !== 0);
+  if (live.length === 0) return Number.NaN;
+  const observed = Math.abs(mean(live));
   let extreme = 0;
-  for (let t = 0; t < trials; t++) {
+  for (let t = 0; t < TRIALS; t++) {
     let sum = 0;
-    for (const w of wins) {
-      if (w === 0.5) {
-        sum += 0.5;
-      } else {
-        sum += rng() < 0.5 ? w : 1 - w;
-      }
-    }
-    if (Math.abs(sum / wins.length - 0.5) >= observed - 1e-9) extreme++;
+    for (const d of live) sum += rng() < 0.5 ? d : -d;
+    if (Math.abs(sum / live.length) >= observed - 1e-9) extreme++;
   }
-  return extreme / trials;
+  return corrected(extreme);
 }
 
 /**

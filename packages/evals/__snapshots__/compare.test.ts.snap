@@ -1,7 +1,7 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`render stars rows that moved and leads the markdown with them 1`] = `
-"Each cell shows its two-sided permutation p-value against base, and * marks p < 0.1. all/<arm> pools every case's runs. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.
+"Each cell shows its two-sided permutation p-value against base, and * marks p < 0.1. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. all/<arm> pools every case's runs. ! marks a case whose errored runs, such as a session limit, were left out of the pool.
 
 #### Starred
 

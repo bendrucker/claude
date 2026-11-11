@@ -31,11 +31,16 @@ const fmt = (xs: number[], digits: number) => (xs.length > 0 ? mean(xs).toFixed(
  * A cell's p-value against the baseline and its mark: `*` when it moved, `†` when too few runs
  * could ever star it.
  */
-function mark(base: number[], xs: number[], alpha: number): string {
+export function mark(base: number[], xs: number[], alpha: number): string {
   if (base.length === 0 || xs.length === 0) return "";
   const p = pValue(base, xs);
   if (pFloor(base.length, xs.length) >= alpha) return ` (p=${p.toFixed(2)})†`;
   return ` (p=${p.toFixed(3)})${p < alpha ? "*" : ""}`;
+}
+
+/** The key to `mark`'s output, for a report whose baseline column is `base`. */
+export function legend(base: string, alpha: number): string {
+  return `Each cell shows its two-sided permutation p-value against ${base}, and * marks p < ${alpha}. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1.`;
 }
 
 const ARMS = ["with", "without"];
@@ -268,7 +273,7 @@ export function render(options: RenderOptions): string {
   const out = single
     ? []
     : [
-        `Each cell shows its two-sided permutation p-value against ${labels[0]}, and * marks p < ${alpha}. all/<arm> pools every case's runs. † marks a cell with too few runs on one side for any star, which takes at least 4 against 4 at 0.1. ! marks a case whose errored runs, such as a session limit, were left out of the pool.\n`,
+        `${legend(labels[0] ?? "base", alpha)} all/<arm> pools every case's runs. ! marks a case whose errored runs, such as a session limit, were left out of the pool.\n`,
       ];
   const { missing } = costRatios(options.columns);
   const hasCost = options.columns.some((c) =>

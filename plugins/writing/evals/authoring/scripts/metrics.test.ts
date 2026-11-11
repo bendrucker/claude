@@ -8,7 +8,6 @@ import {
   loadRuns,
   render,
   type Runs,
-  tokenUsage,
   tropeDensity,
   WRITING_DENY_MARKERS,
 } from "./metrics";
@@ -30,63 +29,6 @@ const resultLine = (extra: Record<string, unknown> = {}) => ({
 });
 
 const trace = (...lines: object[]): string => lines.map(line).join("\n");
-
-describe("tokenUsage", () => {
-  test("prefers modelUsage, summed across models", () => {
-    const usage = tokenUsage(
-      trace(
-        resultLine({
-          usage: {
-            input_tokens: 1,
-            output_tokens: 1,
-            cache_creation_input_tokens: 0,
-            cache_read_input_tokens: 0,
-          },
-          modelUsage: {
-            "claude-opus-5-5": {
-              inputTokens: 10,
-              outputTokens: 20,
-              cacheReadInputTokens: 5,
-              cacheCreationInputTokens: 3,
-            },
-            "claude-haiku-5": { inputTokens: 1, outputTokens: 2 },
-          },
-        }),
-      ),
-    );
-    expect(usage).toEqual({ total: 10 + 20 + 5 + 3 + 1 + 2, output: 22 });
-  });
-
-  test("falls back to usage when modelUsage is absent", () => {
-    const usage = tokenUsage(
-      trace(
-        resultLine({
-          usage: {
-            input_tokens: 100,
-            output_tokens: 50,
-            cache_creation_input_tokens: 10,
-            cache_read_input_tokens: 5,
-          },
-        }),
-      ),
-    );
-    expect(usage).toEqual({ total: 165, output: 50 });
-  });
-
-  test("reads the last result line, since usage is cumulative", () => {
-    const usage = tokenUsage(
-      trace(
-        resultLine({ usage: { input_tokens: 1, output_tokens: 1 } }),
-        resultLine({ usage: { input_tokens: 9, output_tokens: 9 } }),
-      ),
-    );
-    expect(usage).toEqual({ total: 18, output: 9 });
-  });
-
-  test("is undefined when neither field is present", () => {
-    expect(tokenUsage(trace(resultLine()))).toBeUndefined();
-  });
-});
 
 describe("hookDenies", () => {
   test.each([

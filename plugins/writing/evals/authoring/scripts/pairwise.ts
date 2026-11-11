@@ -557,7 +557,10 @@ export function scoreJudgments(
       case: name,
       n: js.length,
       winRate: wins.length > 0 ? mean(wins) : Number.NaN,
-      p: signFlipPValue(wins, 10_000, rng),
+      p: signFlipPValue(
+        wins.map((w) => w - 0.5),
+        rng,
+      ),
     };
   };
 

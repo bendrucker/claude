@@ -36,9 +36,10 @@ import { annotations, toFlags } from "./review";
 import { sample } from "./sample";
 import { diffHits, labConfig, score } from "./score";
 import { serve } from "./server";
+import { DOTFILES } from "../eval-corpus/bucket";
+import { syncCommand } from "../eval-corpus/sync";
 import { checkRows, patternRows, render, renderRules } from "./status";
 
-const BUCKET = "s3://ben-drucker-agents-eval-corpus/prose-lab/data";
 const STYLE_PLUGIN = { Prompting: "prompting", Writing: "writing" } as const satisfies Record<
   Pattern["style"],
   Plugin
@@ -444,21 +445,6 @@ const statusCommand = new Command("status")
     );
   });
 
-function syncCommand(direction: "pull" | "push", profile: string) {
-  return new Command(direction)
-    .description(
-      direction === "pull"
-        ? "Copy the lab data from the eval bucket."
-        : "Upload the lab data to the eval bucket.",
-    )
-    .option("--profile <name>", "AWS profile", profile)
-    .option("--dry-run", "print what would change")
-    .action(async (options) => {
-      const [from, to] = direction === "pull" ? [BUCKET, data.dir] : [data.dir, BUCKET];
-      await $`aws s3 sync ${from} ${to} --exclude ${".*"} --profile ${options.profile} ${options.dryRun ? ["--dryrun"] : []}`;
-    });
-}
-
 export const program = new Command("lab")
   .description(
     "Flag prose anti-patterns, generalize them into Vale rules, and score the rules against the labels.",
@@ -476,10 +462,11 @@ export const program = new Command("lab")
   .addCommand(rulesCommand)
   .addCommand(compareCommand)
   .addCommand(
-    new Command("sync")
-      .description("Mirror the lab data with the eval bucket.")
-      .addCommand(syncCommand("pull", "agents"))
-      .addCommand(syncCommand("push", "agents-admin")),
+    syncCommand({
+      prefix: "prose-lab",
+      description: "the lab data",
+      mirrors: [{ local: data.dir, remote: "data", filters: [DOTFILES] }],
+    }),
   );
 
 if (import.meta.main) {

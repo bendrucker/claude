@@ -26,14 +26,12 @@ Jobs with `allow_failure: true` are excluded because they do not fail the pipeli
 Create the target directory and write the combined raw logs:
 
 ```bash
-mkdir -p "$TMPDIR/$CLAUDE_SESSION_ID/gitlab"
+mkdir -p "$TMPDIR/$CLAUDE_CODE_SESSION_ID/gitlab"
 ```
 
-For each failing job, fetch the trace with `glab api [-R <project>] projects/:id/jobs/<job-id>/trace`. Concatenate all failing-job traces into `$TMPDIR/$CLAUDE_SESSION_ID/gitlab/<pipeline-id>.log`. Prefix each trace with a job header so the file is self-describing (e.g., `===== job: <name> (<id>) =====`).
+For each failing job, fetch the trace with `glab api [-R <project>] projects/:id/jobs/<job-id>/trace`. Concatenate all failing-job traces into `$TMPDIR/$CLAUDE_CODE_SESSION_ID/gitlab/<pipeline-id>.log`. Prefix each trace with a job header so the file is self-describing (e.g., `===== job: <name> (<id>) =====`).
 
 ## Identify the failing section
-
-Follow the strategy in [`../skills/ci-monitor/references/log-parsing.md`](../skills/ci-monitor/references/log-parsing.md):
 
 - GitLab job traces use ANSI `section_start:<timestamp>:<name>` / `section_end:<timestamp>:<name>` delimiters. The failing section sits between the last `section_start` and its matching `section_end` before the non-zero exit.
 - If a job log exceeds the section-based extraction or sections are absent, take the last 100-200 lines.
@@ -45,7 +43,7 @@ Emit one JSON object on stdout:
 
 ```json
 {
-  "log_file": "/tmp/<session>/gitlab/<pipeline-id>.log",
+  "log_file": "<tmpdir>/<session>/gitlab/<pipeline-id>.log",
   "failing_jobs": [
     { "name": "test", "step": "rspec", "lines": "..." }
   ],

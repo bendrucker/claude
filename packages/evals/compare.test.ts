@@ -6,7 +6,7 @@ import { loadColumn } from "./column";
 import { costRatios, render } from "./compare";
 import { erroredRuns, readResult } from "./result";
 import { loadTags } from "./suite";
-import { traceMeasures } from "./trace";
+import { traceMeasures, traceUsage } from "./trace";
 
 interface RunSpec {
   score: number;
@@ -168,10 +168,77 @@ describe("traceMeasures", () => {
       trace: jsonl({ type: "result", result: "one", total_cost_usd: null, usage: null }),
       expected: { words: 1 },
     },
+    {
+      name: "output tokens from modelUsage over usage",
+      trace: jsonl({
+        type: "result",
+        usage: { output_tokens: 1 },
+        modelUsage: { a: { outputTokens: 20 }, b: { outputTokens: 2 } },
+      }),
+      expected: { tokens: 22 },
+    },
     { name: "no result line", trace: jsonl({ type: "assistant" }), expected: {} },
     { name: "an empty trace", trace: "", expected: {} },
   ])("reads $name", ({ trace, expected }) => {
     expect(traceMeasures(trace)).toEqual(expected);
+  });
+});
+
+describe("traceUsage", () => {
+  const jsonl = (...lines: object[]) => lines.map((l) => JSON.stringify(l)).join("\n");
+
+  test.each<{ name: string; trace: string; expected: ReturnType<typeof traceUsage> }>([
+    {
+      name: "modelUsage summed across models, over usage",
+      trace: jsonl({
+        type: "result",
+        usage: { input_tokens: 1, output_tokens: 1 },
+        modelUsage: {
+          "claude-opus-5-5": {
+            inputTokens: 10,
+            outputTokens: 20,
+            cacheReadInputTokens: 5,
+            cacheCreationInputTokens: 3,
+          },
+          "claude-haiku-5-5": { inputTokens: 1, outputTokens: 2 },
+        },
+      }),
+      expected: { total: 41, output: 22 },
+    },
+    {
+      name: "usage without modelUsage",
+      trace: jsonl({
+        type: "result",
+        usage: {
+          input_tokens: 100,
+          output_tokens: 50,
+          cache_creation_input_tokens: 10,
+          cache_read_input_tokens: 5,
+        },
+      }),
+      expected: { total: 165, output: 50 },
+    },
+    {
+      name: "the last result line, since usage is cumulative",
+      trace: jsonl(
+        { type: "result", usage: { input_tokens: 1, output_tokens: 1 } },
+        { type: "result", usage: { input_tokens: 9, output_tokens: 9 } },
+      ),
+      expected: { total: 18, output: 9 },
+    },
+    {
+      name: "usage when modelUsage is empty",
+      trace: jsonl({ type: "result", usage: { output_tokens: 4 }, modelUsage: {} }),
+      expected: { total: 4, output: 4 },
+    },
+    {
+      name: "nothing from a result line without either",
+      trace: jsonl({ type: "result" }),
+      expected: undefined,
+    },
+    { name: "nothing from an empty trace", trace: "", expected: undefined },
+  ])("reads $name", ({ trace, expected }) => {
+    expect(traceUsage(trace)).toEqual(expected);
   });
 });
 

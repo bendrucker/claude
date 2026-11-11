@@ -7,7 +7,7 @@ export const VALE_CONFIG = join(import.meta.dirname, "..", ".vale.ini");
 /** Where text came from, which picks the `.vale.ini` section that lints it. */
 export type ValeSource = { filePath: string } | { kind: "body" | "commit" | "review" };
 
-const Alert = z.object({
+export const Alert = z.object({
   Check: z.string(),
   Message: z.string(),
   Severity: z.enum(["error", "warning", "suggestion"]),
@@ -144,12 +144,17 @@ async function packagesReady(): Promise<boolean> {
 
 const INSTALL_HINT = `bun "${join(import.meta.dirname, "..", "hooks", "sessionstart.ts")}"`;
 
-// A repo's own config replaces the plugin's, since Vale merges only the global
-// config with one other. Tests skip the global config so they see only the plugin's styles.
+// The plugin's config skips the global one, whose sections would lint files and
+// checks the plugin never calibrated. A repo's own config merges with the global
+// config as Vale does, except under tests.
+function skipsGlobal(root: string | null): boolean {
+  return root === null || process.env.NODE_ENV === "test";
+}
+
 async function configArgs(source: ValeSource): Promise<{ args: string[]; cwd?: string }> {
   const root = "filePath" in source ? await repoConfigRoot(source.filePath) : null;
   const args = root === null ? [`--config=${VALE_CONFIG}`] : [];
-  if (process.env.NODE_ENV === "test") args.push("--no-global");
+  if (skipsGlobal(root)) args.push("--no-global");
   args.push(sourceArg(source, root));
   return root === null ? { args } : { args, cwd: root };
 }
@@ -187,7 +192,7 @@ function alertsOf(stdout: string | null): ValeAlert[] {
 
 function fileArgs(filePath: string, root: string | null): string[] {
   const args = root === null ? [`--config=${VALE_CONFIG}`, filePath] : [relative(root, filePath)];
-  if (process.env.NODE_ENV === "test") args.unshift("--no-global");
+  if (skipsGlobal(root)) args.unshift("--no-global");
   return args;
 }
 
@@ -214,11 +219,6 @@ export async function valeWords(filePath: string): Promise<number | null> {
   args.splice(-1, 0, "ls-metrics");
   const stdout = await runVale(args, { cwd: root ?? undefined });
   return stdout === null ? null : Metrics.parse(JSON.parse(stdout)).words;
-}
-
-/** Alerts for every file under `dir`, linted with `config` alone. */
-export async function lintDirectory(dir: string, config: string): Promise<ValeAlert[]> {
-  return alertsOf(await runVale(["--no-global", `--config=${config}`, dir]));
 }
 
 /** Alerts in `text`, in position order. No path lints it as a message. */

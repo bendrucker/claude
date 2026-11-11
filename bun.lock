@@ -55,6 +55,14 @@
         "@hegeldev/hegel": "^0.4.7",
       },
     },
+    "packages/eval-corpus": {
+      "name": "@bendrucker/claude-eval-corpus",
+      "dependencies": {
+        "@commander-js/extra-typings": "~15.0.0",
+        "commander": "~15.0.0",
+        "zod": "^4.4.3",
+      },
+    },
     "packages/eval-judge": {
       "name": "@bendrucker/claude-eval-judge",
       "dependencies": {
@@ -118,6 +126,12 @@
       "version": "0.0.1",
       "bin": {
         "skill-lint": "./cli.ts",
+      },
+    },
+    "packages/vale-runner": {
+      "name": "@bendrucker/claude-vale-runner",
+      "dependencies": {
+        "zod": "^4.4.3",
       },
     },
     "packages/validate": {
@@ -324,6 +338,7 @@
       "dependencies": {
         "@commander-js/extra-typings": "^15.0.0",
         "commander": "^15.0.0",
+        "simple-statistics": "^7.12.0",
         "table": "^6.9.0",
         "zod": "^4.4.3",
       },
@@ -618,6 +633,8 @@
 
     "@bendrucker/claude-decode": ["@bendrucker/claude-decode@workspace:packages/decode"],
 
+    "@bendrucker/claude-eval-corpus": ["@bendrucker/claude-eval-corpus@workspace:packages/eval-corpus"],
+
     "@bendrucker/claude-eval-judge": ["@bendrucker/claude-eval-judge@workspace:packages/eval-judge"],
 
     "@bendrucker/claude-eval-stubs": ["@bendrucker/claude-eval-stubs@workspace:packages/eval-stubs"],
@@ -637,6 +654,8 @@
     "@bendrucker/claude-review": ["@bendrucker/claude-review@workspace:plugins/review"],
 
     "@bendrucker/claude-vale": ["@bendrucker/claude-vale@workspace:plugins/vale"],
+
+    "@bendrucker/claude-vale-runner": ["@bendrucker/claude-vale-runner@workspace:packages/vale-runner"],
 
     "@bendrucker/claude-validate": ["@bendrucker/claude-validate@workspace:packages/validate"],
 

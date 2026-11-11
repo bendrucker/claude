@@ -60,7 +60,7 @@
     },
     {
       "name": "github",
-      "description": "GitHub workflow, Actions monitoring, and rulesets management",
+      "description": "GitHub Actions monitoring and pull request tooling",
       "source": "./plugins/github"
     },
     {

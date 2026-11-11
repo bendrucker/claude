@@ -26,7 +26,7 @@ Watch a PR, branch, or workflow run until it reaches a terminal event, and diagn
 - A PR URL selects PR mode. It reads owner and repo from the URL and works from any directory.
 - A branch name selects branch mode.
 - A run ID selects run-id mode, which covers `workflow_dispatch`, manual triggers, and re-runs.
-- With no argument, use the current PR from `gh pr view --json url --jq '.url'`. When the branch has no PR, use branch mode on the current branch.
+- With no argument, watch the current branch's PR, or the branch itself when it has none.
 
 Branch and run-id mode read the repo from `git remote get-url origin`. Pass `--repo <owner/repo>` to override it.
 
@@ -63,7 +63,4 @@ The script exits on `status:success`, `pr-closed`, `merged`, and `max-time-reach
 - `failing` with a `run_id`: dispatch the `github:logs` agent with the `run_id` and the PR URL or branch. It returns a JSON summary of the failing jobs and saves the raw logs to a temp path you can read for more detail.
 - `failing` with `"run_id": null`: the red check is an external status such as a hosted reviewer or deployment. Name the failing checks from `gh pr checks`.
 - `conflicts` and `mergeable-unknown`: report the SHA and leave the response to the caller, such as `pull-request:babysit`. `mergeable-unknown` means GitHub had not settled mergeability after bounded re-polling.
-- `queued-timeout` and `api-error`: report them to the user.
 - `rate-limited`: wait until `retry_after`, then retry.
-
-For log parsing, see [references/log-parsing.md](references/log-parsing.md).

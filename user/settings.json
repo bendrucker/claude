@@ -267,6 +267,7 @@
         "github.com",
         "raw.githubusercontent.com",
         "api.github.com",
+        "uploads.github.com",
         "api.individual.githubcopilot.com",
         "gitlab.com",
         "api.linear.app",
@@ -301,6 +302,7 @@
         "~/Library/Application Support/rex/server.sock",
         "~/.local/state/vm",
         "~/.docker/run/docker.sock",
+        "~/.agent-browser",
         "/tmp/claude"
       ]
     },

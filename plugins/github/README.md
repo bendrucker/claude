@@ -1,22 +1,20 @@
 # GitHub Plugin
 
-GitHub workflow, Actions monitoring, and rulesets management for Claude Code.
+GitHub Actions monitoring and pull request tooling for Claude Code.
 
 ## Contents
 
 - **Skills**:
-  - `actions-monitor`: Watch a PR's CI and stream state events; invokes the logs agent on failures
+  - `actions-monitor`: Watch a PR's CI and stream state events. Invokes the logs agent on failures
   - `attach`: Attach an image or video to an issue, PR, comment, or review, through `gh --attach` or the user-attachments endpoint it wraps
-  - `copilot`: Cross-model review of the current diff through the Copilot CLI. Slash-invocable only, one call by default and three at most, because the Copilot plan is a fixed budget
-  - `notifications`: Inbox management (list, filter, mark read/done, unsubscribe)
-  - `pr-comments`: Fetch unresolved review comments from a pull request
-  - `stack`: Build, publish, and merge native stacked PRs with the `gh stack` extension
+  - `copilot`: Cross-model review of the current diff through the Copilot CLI, sized to the monthly credit budget
+  - `pr-comments`: Fetch, reply to, and resolve review threads on a pull request
+  - `stack`: Publish and merge native stacked PRs with the `gh stack` extension
 - **Agents**:
-  - `github-rulesets-manager`: Configure repository rulesets and branch protection
   - `logs`: Extracts relevant lines from failing-job logs (invoked by `actions-monitor`)
 - **Hooks**:
-  - Intercepts WebFetch for efficient GitHub data access
-  - [`runner-queue.ts`](scripts/runner-queue.ts) follows `gh workflow run` with the new run's place in line when it waits on a self-hosted runner. The model then knows why the run has not started and how long to wait before checking. Silent when the job starts at once or runs on a GitHub-hosted runner. Self-timed to `~/.claude/hook-metrics/github-runner-queue.jsonl`
+  - [`dispatch-then-list.ts`](scripts/dispatch-then-list.ts) denies a command that runs both `gh workflow run` and `gh run list`. The dispatch prints the new run's URL, and listing by workflow picks the wrong run when dispatches overlap. A command that only quotes them, such as a commit message, passes. Every invocation is recorded to `~/.claude/hook-metrics/github-dispatch-then-list.jsonl`. Remove it after 30 days with no `deny` there
+  - [`runner-queue.ts`](scripts/runner-queue.ts) follows `gh workflow run` with the new run's place in line when it waits on a self-hosted runner. The model then knows why the run has not started and how long to wait before checking. Silent when the job starts at once or runs on a GitHub-hosted runner. The `if` passes every compound command to the script, which screens them itself. Self-timed to `~/.claude/hook-metrics/github-runner-queue.jsonl`, where `stage` records where each invocation stopped: `no-match`, `no-url`, `started`, or `queued`. Remove it if no `queued` stage appears within 30 days of the first self-hosted dispatch
 
     ```text
     [github/runner-queue] Run 39817210542 is queued for a self-hosted runner labeled actions-sandbox: 0 job(s) ahead, 1 matching job(s) running.

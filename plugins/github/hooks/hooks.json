@@ -1,13 +1,14 @@
 {
-  "description": "Transforms GitHub URLs into API requests for better content fetching, reports a dispatched run's place in line for a self-hosted runner, and watches the current branch's pull request, showing its CI and review state at the end of the prompt footer (function hooks)",
+  "description": "Denies a workflow dispatch chained to a run listing. Reports a dispatched run's place in line for a self-hosted runner, and watches the current branch's pull request, showing its CI and review state at the end of the prompt footer (function hooks)",
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "WebFetch",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/fetch.ts\""
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/dispatch-then-list.ts\"",
+            "if": "Bash(gh workflow run *)"
           }
         ]
       }

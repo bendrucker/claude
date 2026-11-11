@@ -9,19 +9,21 @@ allowed-tools:
 
 # Stacked Pull Requests
 
-`gh stack` (the `github/gh-stack` extension) drives GitHub's native stacked PRs. The stack object on GitHub and the merge are the same under either layout below. The layout decides how the stack gets built and published.
+`gh stack` (the `github/gh-stack` extension) drives GitHub's native stacked PRs. The stack object on GitHub and the merge are the same under either layout below. The layouts differ in which tool rebases the branches.
 
 ## Layouts
 
-**Native tracking** keeps every layer checked out in one working tree. `gh stack` owns the branches, the rebases, and the publish, with the interactive PR editor, cascading rebase, and one-command sync.
+#### Native Tracking
 
-**External tracking** keeps each layer somewhere else, typically its own worktree. Another tool owns the rebases and `gh stack link` publishes the result without writing local state.
+`gh stack` creates the branches, runs the cascading rebase, and publishes, across worktrees. Its commands are in [`references/native-tracking.md`](references/native-tracking.md).
 
-Pick per stack. Native tracking fits a stack you are actively reshaping, where reordering and folding layers matters more than working two layers at once. External tracking fits a stack whose layers are worked on in parallel or over a long stretch, where each layer wants its own checkout, editor, and running services.
+#### External Tracking
+
+Another tool rebases the branches, and `gh stack link` publishes the result without writing local state.
+
+Keep each stack under one layout, so two tools never rebase the same branches.
 
 Read the current state with `gh stack view --short` (add `--json` to parse it). It answers from local tracking. Output means native tracking, and an error means the stack is not tracked in this clone. A stack published by `link` exists on GitHub and is still absent from `view`.
-
-Keep each stack under one layout. The local-tracking commands silently under-perform against branches they can't check out. `gh stack rebase` prints `✓ Rebased <branch>` and changes nothing when that branch is checked out in a different worktree ([gh-stack#35](https://github.com/github/gh-stack/issues/35)).
 
 Exit code 9 means the repository doesn't have stacked PRs enabled. Code 6 means a branch belongs to more than one stack, or more than one remote is configured with no `remote.pushDefault` set. `link`, `submit`, `push`, and `sync` take `--remote` for that second case.
 
@@ -29,7 +31,7 @@ Stack numbers and PR numbers share one sequence per repository, so a bare number
 
 ## Detection
 
-Stack membership lives on the API. Given a PR number, this query answers under either layout with nothing checked out.
+Stack membership is stored on the API. Given a PR number, this query answers under either layout with nothing checked out.
 
 ```bash
 gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){stack{number size}}}}' \
@@ -47,29 +49,7 @@ gh api graphql -f query='query($owner:String!,$repo:String!,$number:Int!){reposi
 
 There is no CI field here. `mergeStateStatus` is the proxy. `CLEAN` is mergeable with checks passing. `BLOCKED` is blocked by a rule or a missing review, `UNSTABLE` is a non-passing commit status, `DIRTY` is a conflict, and `BEHIND` is a stale head ref.
 
-## Native Tracking
-
-Build the stack with `init` and `add`. `init` adopts branches that exist and creates the ones that don't, bottom to top.
-
-```bash
-gh stack init auth-layer api-routes ui-components  # adopt or create a whole stack
-gh stack init --base develop my-feature            # non-default trunk
-gh stack add -Am "Add rate limiting" rate-limits   # new layer on top, committing staged work
-```
-
-`gh stack submit` pushes every branch, opens the missing PRs, fixes the bases, and creates or updates the stack object. Interactively it opens a single-screen editor to write each new PR's title, description, and draft state before submitting them together. Use it whenever the bodies matter.
-
-Non-interactively, and with `--auto`, it skips the editor and auto-generates titles. It also creates new PRs as **drafts**. Pass `--open` to get PRs that are ready for review.
-
-`gh stack sync` is the maintenance command: fetch, reconcile against the stack on GitHub, fast-forward the trunk, cascade-rebase each branch onto its parent, push atomically with `--force-with-lease`, and link the open PRs into a stack once two exist. It never opens PRs. `--prune` deletes local branches for merged PRs, which is the cleanup after a stack lands.
-
-Use the narrower commands when sync is too much: `gh stack rebase` for the cascading rebase alone (`--downstack`, `--upstack`, `--no-trunk`, and `--continue` / `--abort` around conflicts), and `gh stack push` to push without rebasing. `push` is per-branch and not atomic. A rejected branch leaves the ones before it already updated.
-
-`gh stack modify` restructures the stack interactively: drop, fold, insert, reorder, rename. Run `submit` afterward, since it changes local branches and leaves GitHub behind.
-
-Move around with `gh stack checkout` (bare, for a picker over local and remote stacks), plus `up`, `down`, `top`, `bottom`, `trunk`, and `switch`.
-
-## External Tracking
+## Linking
 
 Let the other tool rebase and push the whole stack first. `link` pushes without force. It rejects a branch whose remote copy has diverged, which is every branch immediately after a rebase.
 
@@ -100,10 +80,4 @@ The merge is all-or-nothing across every PR at or below the target. One layer th
 
 Only open-and-not-draft state is checked before submitting. GitHub evaluates branch protection and repository rules when the merge runs, and those requirements can't be bypassed for a stack.
 
-When the base branch uses a merge queue, the stack goes on the queue instead of merging directly. The queue picks the method and ignores any method flag with a warning, and the PRs enter together but land as the queue processes them, possibly in separate groups.
-
-## Switching Layouts
-
-`gh stack checkout <stack-number>` adopts a stack that exists only on GitHub: it queries the API, fetches the branches, and sets up local tracking. This is how a stack published by `link` becomes natively tracked, and it wants a working tree the branches can all be checked out in.
-
-`gh stack unstack --local` drops local tracking and leaves the stack on GitHub, which is the reverse. Without `--local`, `unstack` also unstacks on GitHub, and takes a stack number to do that from anywhere. GitHub keeps PRs stacked when they are queued or have auto-merge enabled.
+When the base branch uses a merge queue, the stack goes on the queue instead of merging directly. The queue picks the method and ignores any method flag with a warning, and the PRs enter together but merge as the queue processes them, possibly in separate groups.

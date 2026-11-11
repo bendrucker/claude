@@ -362,7 +362,8 @@ export function rexDocArgs(block: string, file: string, resultFile: string): str
     "split",
     "-b",
     block,
-    "--split=left",
+    "--split=right",
+    "--ratio=75",
     "--cwd",
     dirname(path),
     "--wait",
@@ -550,7 +551,7 @@ function rexOpenDiff(block: string, base: string | undefined): void {
     stdio: ["ignore", "inherit", "inherit"],
   });
   if (result.exitCode !== 0) process.exit(1);
-  console.log(`opened tuicr beside ${block}`);
+  console.log(`opened Hunk beside ${block}`);
 }
 
 // Blocks until Ben quits plannotator-tui, so the skill runs it in the background.

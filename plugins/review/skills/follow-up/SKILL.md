@@ -137,7 +137,7 @@ After I decide on next steps, use platform-appropriate commands:
 
 - Approve: `gh pr review --approve`
 - Comment: `gh pr comment`, with `--attach ./shot.png` for a screenshot the comment references (load `github:attach`)
-- Resolve thread: `gh api graphql` with `resolveReviewThread` mutation
+- Resolve thread: `review-threads.ts resolve <thread-id>` from `github:pr-comments`, or `reply --resolve` to resolve with a reply
 
 ##### Draft a Pending Review
 

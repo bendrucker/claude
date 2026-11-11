@@ -10,7 +10,7 @@ Code review workflows for Claude Code.
 - The `follow-up` skill follows up on a PR/MR you reviewed: it checks if your comments were addressed, finds silent resolves, and decides whether to re-approve.
 - The `meat-proxy` skill drafts a short reply that hands an AI-relayed PR, MR, or doc back to its author with motivation and scope questions, holding line-level findings in private notes. It posts only when told to, as an unpublished draft.
 - The `inbox` skill dispatches inbound PR/MR reviews as background sessions that collect in `claude agents` (GitHub and GitLab).
-- The `human` skill requests Ben's own review of the working diff or a document, in the terminal (reviewr, plannotator-tui) or the browser (plannotator). It raises a herdr pane label and toast that the plugin's `UserPromptSubmit` hook clears when he replies.
+- The `human` skill requests Ben's own review of the working diff or a document, in the terminal (reviewr under herdr, Hunk under Rex, plannotator-tui) or the browser (plannotator). It raises a herdr pane label and toast that the plugin's `UserPromptSubmit` hook clears when he replies.
 
 ### Hooks
 

@@ -26,7 +26,7 @@ The host is herdr when the herdr pane is set, else Rex when the Rex block is set
 | Host | Diff | `--doc <file>` |
 |---|---|---|
 | herdr | reviewr split. Follow Request | plannotator-tui split. Follow Request |
-| Rex | tuicr split. Follow Request | plannotator-tui split, gated. Follow Rex Document Gate |
+| Rex | Hunk split. Follow Request | plannotator-tui split, gated. Follow Rex Document Gate |
 | none, or `--browser` | Follow Browser Gate | Follow Browser Gate |
 
 In a cloud session, where Plannotator's browser can't reach Ben, name what to review and end the turn instead.

@@ -17,9 +17,7 @@ export interface WriterDeps {
   retryDelayMs?: number;
 }
 
-const DEFAULT_LOCK_WAIT_MS = 750;
-
-export type RefreshOutcome = "indexed" | "compacted" | "lock-yield";
+type RefreshOutcome = "indexed" | "compacted" | "lock-yield";
 
 export interface RefreshOptions {
   /** Compact into a fresh file even when the size guard would not. */
@@ -32,8 +30,6 @@ export interface RefreshOptions {
   trigger?: string;
   index?: Parameters<typeof ensureIndex>[1];
 }
-
-const COMPACT_FLOOR_BYTES = 64 * 1024 * 1024;
 
 export function stampPath(dataDir: string): string {
   return join(dataDir, "last-refresh");
@@ -74,11 +70,7 @@ export function recordKilled(signal: string, deps: WriterDeps = {}): Promise<voi
 }
 
 // A brief retry rides out short holders, such as a reader finishing a query.
-async function openWriter(
-  dataDir: string,
-  deps: WriterDeps,
-  lockWaitMs = DEFAULT_LOCK_WAIT_MS,
-): Promise<Database> {
+async function openWriter(dataDir: string, deps: WriterDeps, lockWaitMs = 750): Promise<Database> {
   const { open = getDb, retryDelayMs = 250 } = deps;
   const deadline = performance.now() + lockWaitMs;
   await mkdir(dataDir, { recursive: true });
@@ -126,7 +118,7 @@ export async function refreshIndex(
     const dbSize = Bun.file(dbPath).size;
     const compact =
       options.compact === true ||
-      (corpusBytes > 0 && dbSize > Math.max(4 * corpusBytes, COMPACT_FLOOR_BYTES));
+      (corpusBytes > 0 && dbSize > Math.max(4 * corpusBytes, 64 * 1024 * 1024));
     if (compact) {
       console.error(
         `refresh: compacting ${(dbSize / 1e9).toFixed(1)}GB index against ${(corpusBytes / 1e9).toFixed(1)}GB corpus`,
@@ -172,13 +164,11 @@ export async function withWriter<T>(
 export async function withReader<T>(
   dataDir: string,
   work: (db: Database) => Promise<T>,
-  deps: Pick<WriterDeps, "open"> = {},
 ): Promise<T | undefined> {
-  const { open = getReadOnlyDb } = deps;
   if (!(await Bun.file(sessionDbPath(dataDir)).exists())) return undefined;
   let db: Database;
   try {
-    db = await open(dataDir);
+    db = await getReadOnlyDb(dataDir);
   } catch (error) {
     if (!isLockError(error)) throw error;
     console.error("session index: a refresh holds the index, skipping it");

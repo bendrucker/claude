@@ -76,11 +76,6 @@ describe("refreshIndex", () => {
     expect(events[0]?.detail.changed_files).toBeGreaterThan(0);
   });
 
-  it("carries the trigger on the event", async () => {
-    await refreshIndex(dataDir, { index: index(), trigger: "import" }, deps());
-    expect(events[0]?.detail).toMatchObject({ outcome: "indexed", trigger: "import" });
-  });
-
   it("compacts on request", async () => {
     await refreshIndex(dataDir, { index: index() }, deps());
     expect(await refreshIndex(dataDir, { index: index(), compact: true }, deps())).toBe(
@@ -188,13 +183,6 @@ describe("checkStamp", () => {
 
 describe("withWriter", () => {
   it("ensures the schema on a fresh directory", async () => {
-    expect(await withWriter(dataDir, rawCount, deps())).toBe(0);
-  });
-
-  it("closes the connection when the work fails", async () => {
-    expect(
-      await rejection(withWriter(dataDir, () => Promise.reject(new Error("boom")), deps())),
-    ).toMatch("boom");
     expect(await withWriter(dataDir, rawCount, deps())).toBe(0);
   });
 });

@@ -1,17 +1,16 @@
 #!/usr/bin/env bun
-
 import { join } from "node:path";
-import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
+import { Command } from "@commander-js/extra-typings";
 import {
   Feedback,
   feedbackEndpoint,
   fileResponse,
 } from "../../../../../packages/eval-corpus/label";
 
-// Serves the review UI, hands the browser the mined samples, and persists reviewer
-// feedback to feedback/<id>.json for a later analysis pass.
+// Local labeling server. Serves the review UI, hands the browser the mined samples, and persists
+// reviewer feedback to feedback/<id>.json so a later analysis pass can read it back off disk.
 
-export interface ServerOptions {
+interface ServerOptions {
   dataPath: string;
   feedbackDir: string;
 }
@@ -29,15 +28,9 @@ export function createHandler(opts: ServerOptions): (req: Request) => Promise<Re
   };
 }
 
-function port(value: string): number {
-  const n = Number(value);
-  if (!Number.isInteger(n)) throw new InvalidArgumentError("Not an integer.");
-  return n;
-}
-
 export const program = new Command("label-server")
   .description("Label mined PR bodies in a browser.")
-  .option("--port <n>", "Port to listen on", port, 4319)
+  .option("--port <n>", "Port to listen on", "4319")
   .option(
     "--data <path>",
     "Mined samples to review",
@@ -50,7 +43,7 @@ export const program = new Command("label-server")
   )
   .action((options) => {
     const server = Bun.serve({
-      port: options.port,
+      port: Number(options.port),
       fetch: createHandler({ dataPath: options.data, feedbackDir: options.feedback }),
     });
     console.log(`Labeling UI: http://localhost:${server.port}`);

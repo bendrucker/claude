@@ -1,11 +1,11 @@
 import { Command } from "@commander-js/extra-typings";
-import { type Corpus, type Direction, filters, key, PROFILES } from "./bucket";
+import { type Corpus, type Direction, key, PROFILES } from "./bucket";
 import { s3, type S3Options, type Storage } from "./storage";
 
 export async function sync(corpus: Corpus, direction: Direction, storage: Storage): Promise<void> {
   await Promise.all(
     corpus.mirrors.map((mirror) =>
-      storage.copy(direction, mirror.local, key(corpus, mirror), filters(mirror)),
+      storage.copy(direction, mirror.local, key(corpus, mirror), mirror.filters ?? []),
     ),
   );
 }

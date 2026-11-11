@@ -6,7 +6,7 @@ import { syncCommand } from "../../../../../packages/eval-corpus/sync";
 
 // results/ is gitignored, so the bucket is the permanent home of every run.
 
-export const corpus: Corpus = {
+const corpus: Corpus = {
   prefix: "issue-refine",
   description: "the issue-refine run results",
   mirrors: [

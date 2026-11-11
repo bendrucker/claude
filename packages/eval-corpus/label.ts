@@ -2,7 +2,7 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 
-export const Id = z.string().regex(/^[\w-]+$/);
+const Id = z.string().regex(/^[\w-]+$/);
 
 /** A draft-review POST body: the sample id and whatever the UI recorded for it. */
 export const Feedback = z.looseObject({ id: Id, feedback: z.looseObject({}) });
@@ -37,17 +37,12 @@ export async function writeJson(dir: string, id: string, value: unknown): Promis
   await Bun.write(join(dir, `${Id.parse(id)}.json`), `${JSON.stringify(value, null, 2)}\n`);
 }
 
-export interface FeedbackEndpoint {
-  get(): Promise<Response>;
-  post(req: Request): Promise<Response>;
-}
-
 /** GET returns every saved record in `dir`. POST validates the body and saves `toFile(body)` as `<id>.json`. */
 export function feedbackEndpoint<T extends { id: string }>(
   dir: string,
   schema: z.ZodType<T>,
   toFile: (body: T) => object = (body) => body,
-): FeedbackEndpoint {
+): { get(): Promise<Response>; post(req: Request): Promise<Response> } {
   return {
     async get(): Promise<Response> {
       return Response.json(await readJsonDir(dir));

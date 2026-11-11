@@ -2,7 +2,6 @@
   "name": "@bendrucker/claude-eval-corpus",
   "private": true,
   "type": "module",
-  "main": "./index.ts",
   "dependencies": {
     "@commander-js/extra-typings": "~15.0.0",
     "commander": "~15.0.0",

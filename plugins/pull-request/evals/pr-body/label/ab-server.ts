@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
-
 import { join } from "node:path";
-import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
+import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 import { fileResponse, readJsonDir, writeJson } from "../../../../../packages/eval-corpus/label";
 
@@ -25,7 +24,7 @@ const Label = z.object({
 });
 const Saved = Label.extend({ id: z.string() });
 
-export interface AbOptions {
+interface AbOptions {
   pairs: Pair[];
   labelsDir: string;
   now?: () => Date;
@@ -81,15 +80,9 @@ export function createHandler({
   };
 }
 
-function port(value: string): number {
-  const n = Number(value);
-  if (!Number.isInteger(n)) throw new InvalidArgumentError("Not an integer.");
-  return n;
-}
-
 export const program = new Command("ab-server")
   .description("Label blinded pr-body A/B pairs from a phone.")
-  .option("--port <n>", "port to listen on", port, 4321)
+  .option("--port <n>", "port to listen on", "4321")
   .option("--pairs <file>", "pairs file", join(import.meta.dirname, "..", "data", "ab-pairs.json"))
   .option(
     "--labels <dir>",
@@ -99,7 +92,7 @@ export const program = new Command("ab-server")
   .action(async (options) => {
     const pairs = z.array(Pair).parse(await Bun.file(options.pairs).json());
     const server = Bun.serve({
-      port: options.port,
+      port: Number(options.port),
       hostname: "0.0.0.0",
       fetch: createHandler({ pairs, labelsDir: options.labels }),
     });

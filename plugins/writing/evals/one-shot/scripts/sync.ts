@@ -7,7 +7,7 @@ import { syncCommand } from "../../../../../packages/eval-corpus/sync";
 // data/ is gitignored because it holds text mined from sessions, so the
 // bucket is its only shared home.
 
-export const corpus: Corpus = {
+const corpus: Corpus = {
   prefix: "one-shot",
   description: "the one-shot drafts",
   mirrors: [

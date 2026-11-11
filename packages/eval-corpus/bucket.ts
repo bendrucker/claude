@@ -34,11 +34,3 @@ export function key(corpus: Corpus, mirror: Mirror): string {
 
 /** Skips top-level dot entries and everything under a top-level dot directory. */
 export const DOTFILES: Filter = { exclude: ".*" };
-
-export function filters(mirror: Mirror): Filter[] {
-  return mirror.filters ?? [];
-}
-
-export function url(path: string): string {
-  return `s3://${BUCKET}/${path}`;
-}

@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { $ } from "bun";
-import { type Direction, type Filter, url } from "./bucket";
+import { BUCKET, type Direction, type Filter } from "./bucket";
 
 /** Copies files between a local directory and a bucket key, adding and overwriting but never deleting. */
 export interface Storage {
@@ -22,7 +22,7 @@ export function s3Args(
   filters: Filter[],
   options: Pick<S3Options, "profile" | "dryRun">,
 ): string[] {
-  const remote = url(key);
+  const remote = `s3://${BUCKET}/${key}`;
   const [from, to] = direction === "pull" ? [remote, local] : [local, remote];
   return [
     "s3",
@@ -37,12 +37,12 @@ export function s3Args(
   ];
 }
 
-async function aws(args: string[]): Promise<void> {
-  await $`aws ${args}`;
-}
-
 export function s3(options: S3Options): Storage {
-  const run = options.run ?? aws;
+  const run =
+    options.run ??
+    (async (args) => {
+      await $`aws ${args}`;
+    });
   return {
     async copy(direction, local, key, filters) {
       await run(s3Args(direction, local, key, filters, options));
@@ -52,10 +52,7 @@ export function s3(options: S3Options): Storage {
 
 /** Translates an `aws s3` filter glob, where `*` also crosses `/`, into an anchored regex. */
 function pattern(glob: string): RegExp {
-  const source = RegExp.escape(glob)
-    .replaceAll(String.raw`\*`, ".*")
-    .replaceAll(String.raw`\?`, ".");
-  return new RegExp(`^${source}$`);
+  return new RegExp(`^${RegExp.escape(glob).replaceAll(String.raw`\*`, ".*")}$`);
 }
 
 export function included(path: string, filters: Filter[]): boolean {

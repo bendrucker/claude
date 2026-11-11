@@ -9,9 +9,11 @@ import {
 } from "../../../../../packages/eval-corpus/label";
 import { Label, Pair } from "../scripts/pairs";
 
-// Two modes share one server and one index.html: draft mode (--data) reviews
-// single (input, output) drafts, and pairs mode (--pairs) runs blind A/B/tie
-// review over Pair records.
+// Local labeling server. Serves the review UI and persists reviewer feedback
+// to disk so a later analysis pass can read it back. Two modes share one
+// server and one index.html:
+//   - draft mode (--data): the original single-draft (input, output) review.
+//   - pairs mode (--pairs): blind pairwise A/B/tie review over Pair records.
 
 const html = join(import.meta.dir, "index.html");
 const align = join(import.meta.dir, "align.ts");
@@ -71,7 +73,7 @@ export interface ServerOptions {
   feedbackDir: string;
 }
 
-export function createHandler(opts: ServerOptions): (req: Request) => Promise<Response> {
+export function createHandler(opts: ServerOptions) {
   const feedback = feedbackEndpoint(opts.feedbackDir, Feedback, (body) => body.feedback);
   const labels = feedbackEndpoint(opts.feedbackDir, Label);
   return async (req: Request): Promise<Response> => {

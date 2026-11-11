@@ -264,13 +264,14 @@ describe("Rex targets", () => {
     expect(rexDiffArgs("block:01a1", base)).toEqual(expected);
   });
 
-  test("a document gates plannotator-tui in a split left of the block", () => {
+  test("a document gates plannotator-tui in a wide split right of the block", () => {
     expect(rexDocArgs("block:01a1", "/repo/tmp/pr-body.md", "/home/r.json")).toMatchInlineSnapshot(`
       [
         "split",
         "-b",
         "block:01a1",
-        "--split=left",
+        "--split=right",
+        "--ratio=75",
         "--cwd",
         "/repo/tmp",
         "--wait",

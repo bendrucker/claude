@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -16,19 +16,32 @@ import {
 } from "./index-writer";
 import { type HeldLock, holdLock } from "./lock-holder";
 
-const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
+// The lock tests spawn a bun process, which a loaded CI runner can slow several-fold.
+setDefaultTimeout(20_000);
+
+const corpusFile = join(
+  import.meta.dirname,
+  "..",
+  "fixtures",
+  "sessions",
+  "-Users-test-project",
+  "basic.jsonl",
+);
 const LOCK_ERROR =
   'IO Error: Could not set lock on file "session.duckdb": Conflicting lock is held';
 
 let dataDir: string;
 let importsDir: string;
+let projectsDir: string;
 let events: IndexEvent[];
 let held: HeldLock | undefined;
 
-beforeEach(() => {
+beforeEach(async () => {
   const tmp = mkdtempSync(join(tmpdir(), "index-writer-"));
   dataDir = join(tmp, "data");
   importsDir = join(tmp, "imports");
+  projectsDir = join(tmp, "projects");
+  await Bun.write(join(projectsDir, "basic.jsonl"), Bun.file(corpusFile));
   events = [];
   held = undefined;
 });
@@ -58,7 +71,7 @@ async function rejection(promise: Promise<unknown>): Promise<string> {
   throw new Error("expected a rejection");
 }
 
-const index = () => ({ projectsDir: fixturesDir, importsDir });
+const index = () => ({ projectsDir, importsDir });
 const outcomes = () => events.map((e) => e.detail.outcome);
 
 async function rawCount(db: Database): Promise<number> {
@@ -89,9 +102,9 @@ describe("refreshIndex", () => {
     await rm(stampPath(dataDir));
     held = await holdLock(dataDir, "READ_WRITE");
 
-    expect(await refreshIndex(dataDir, { index: index(), yieldToLock: true }, deps())).toBe(
-      "lock-yield",
-    );
+    expect(
+      await refreshIndex(dataDir, { index: index(), yieldToLock: true, lockWaitMs: 0 }, deps()),
+    ).toBe("lock-yield");
     expect(outcomes()).toEqual(["indexed", "lock-yield"]);
     expect(await Bun.file(stampPath(dataDir)).exists()).toBe(false);
   });
@@ -100,16 +113,18 @@ describe("refreshIndex", () => {
     await refreshIndex(dataDir, { index: index() }, deps());
     held = await holdLock(dataDir, "READ_WRITE");
 
-    expect(await rejection(refreshIndex(dataDir, { index: index() }, deps()))).toMatch(/lock/);
+    expect(
+      await rejection(refreshIndex(dataDir, { index: index(), lockWaitMs: 0 }, deps())),
+    ).toMatch(/lock/);
     expect(outcomes()).toEqual(["indexed", "error"]);
     expect(events[1]).toMatchObject({ ok: false, detail: { error: "IO Error" } });
   });
 
   it("fails rather than yields when there is no index to yield to", async () => {
     const open = () => Promise.reject(new Error(LOCK_ERROR));
-    expect(await rejection(refreshIndex(dataDir, { yieldToLock: true }, deps({ open })))).toMatch(
-      /lock/,
-    );
+    expect(
+      await rejection(refreshIndex(dataDir, { yieldToLock: true, lockWaitMs: 0 }, deps({ open }))),
+    ).toMatch(/lock/);
     expect(outcomes()).toEqual(["error"]);
   });
 

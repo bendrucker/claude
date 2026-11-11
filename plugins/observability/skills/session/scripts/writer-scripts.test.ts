@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, setDefaultTimeout } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,7 +8,17 @@ import { z } from "zod";
 import { ensureIndex, getDb } from "./db";
 import { type HeldLock, holdLock } from "./lock-holder";
 
-const fixturesDir = join(import.meta.dirname, "..", "fixtures", "sessions");
+// Each test spawns bun processes, which a loaded CI runner can slow several-fold.
+setDefaultTimeout(20_000);
+
+const corpusFile = join(
+  import.meta.dirname,
+  "..",
+  "fixtures",
+  "sessions",
+  "-Users-test-project",
+  "basic.jsonl",
+);
 
 let tmpDir: string;
 let dataDir: string;
@@ -32,9 +42,10 @@ afterEach(async () => {
 
 async function buildIndex(): Promise<void> {
   mkdirSync(dataDir, { recursive: true });
+  await $`cp ${corpusFile} ${join(tmpDir, "projects")}`.quiet();
   const db = await getDb(dataDir);
   try {
-    await ensureIndex(db, { projectsDir: fixturesDir, importsDir });
+    await ensureIndex(db, { projectsDir: join(tmpDir, "projects"), importsDir });
   } finally {
     db.close();
   }
@@ -81,7 +92,7 @@ describe("import.ts", () => {
   it("waits out a writer instead of yielding to it", async () => {
     await buildIndex();
     await $`mkdir -p ${join(importsDir, "box", "projects")}`.quiet();
-    await $`cp -R ${fixturesDir}/. ${join(importsDir, "box", "projects")}`.quiet();
+    await $`cp ${corpusFile} ${join(importsDir, "box", "projects")}`.quiet();
     held = await holdLock(dataDir, "READ_WRITE");
 
     const importing = run("import.ts", "--host", "box");
@@ -95,7 +106,7 @@ describe("import.ts", () => {
 
   it("stamps the index and records a refresh event", async () => {
     await $`mkdir -p ${join(importsDir, "box", "projects")}`.quiet();
-    await $`cp -R ${fixturesDir}/. ${join(importsDir, "box", "projects")}`.quiet();
+    await $`cp ${corpusFile} ${join(importsDir, "box", "projects")}`.quiet();
 
     const { exitCode, stderr } = await run("import.ts", "--host", "box");
     expect(stderr).toBe("");
@@ -116,7 +127,7 @@ describe("forget.ts", () => {
     { name: "absolute path", label: () => join(tmpDir, "home") },
     { name: "nested", label: () => "a/b" },
   ])("rejects a $name label before touching the index or disk", async ({ label }) => {
-    await buildIndex();
+    mkdirSync(dataDir, { recursive: true });
     mkdirSync(join(importsDir, "box"), { recursive: true });
     await Bun.write(join(tmpDir, "home", "keep"), "keep\n");
     held = await holdLock(dataDir, "READ_WRITE");

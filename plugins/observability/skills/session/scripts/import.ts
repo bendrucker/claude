@@ -6,16 +6,16 @@ import { join } from "node:path";
 import { $ } from "bun";
 import { cli } from "cleye";
 import {
-  ensureIndex,
   getDataDir,
-  getDb,
   getImportsDir,
   importRoot,
+  isHostLabel,
   LOCAL_HOST,
   listImportedHosts,
   type Manifest,
 } from "./db";
 import { dirExists } from "./file-catalog";
+import { isLockError, refreshIndex } from "./index-writer";
 
 const argv = cli({
   name: "import",
@@ -51,7 +51,7 @@ if (label === LOCAL_HOST) {
   process.exit(1);
 }
 
-if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(label)) {
+if (!isHostLabel(label)) {
   console.error(`Invalid host label "${label}". Use letters, digits, "-" and "_".`);
   process.exit(1);
 }
@@ -85,14 +85,16 @@ if (!existing) {
   await $`chmod 600 ${manifestPath}`.quiet();
 }
 
-const dataDir = getDataDir();
-await mkdir(dataDir, { recursive: true });
-
-const db = await getDb(dataDir);
+// Yielding would report success while a refresh that listed hosts before this
+// manifest existed leaves the host unindexed, so import waits out the lock instead.
 try {
-  await ensureIndex(db);
-} finally {
-  db.close();
+  await refreshIndex(getDataDir(), { trigger: "import", lockWaitMs: 60_000 });
+} catch (error) {
+  if (!isLockError(error)) throw error;
+  console.error(
+    "A refresh held the index lock for over a minute. Rerun import.ts once it finishes.",
+  );
+  process.exit(1);
 }
 
 const blockEgress = existing ? (existing.policy.block_egress ?? true) : !argv.flags.egress;

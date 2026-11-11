@@ -1,32 +1,31 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: opens the index read-write, outside the sandbox's
-// writable paths.
 import { join } from "node:path";
 import { cli } from "cleye";
 import { table } from "table";
 import { z } from "zod";
-import { getDataDir, getDb, LOCAL_HOST, listImportedHosts, sessionDbPath } from "./db";
+import { getDataDir, LOCAL_HOST, listImportedHosts } from "./db";
+import { errorClass } from "./events";
+import { withReader } from "./index-writer";
 
 cli({ name: "hosts", flags: {} });
 
 const dataDir = getDataDir();
 
 async function lastImports(): Promise<Record<string, string>> {
-  if (!(await Bun.file(sessionDbPath(dataDir)).exists())) return {};
-  const db = await getDb(dataDir);
-  try {
-    const rows = await db.query(
-      "SELECT host, strftime(last_import, '%Y-%m-%d %H:%M') AS last_import FROM meta",
-      z.object({ host: z.string(), last_import: z.string().nullable() }),
-    );
-    return Object.fromEntries(rows.map((r) => [r.host, r.last_import ?? "-"]));
-  } catch {
-    // An older or newer session DB may lack the `meta` table or column this
-    // query expects. Showing dashes beats failing the whole `hosts` listing.
-    return {};
-  } finally {
-    db.close();
-  }
+  const watermarks = await withReader(dataDir, async (db) => {
+    try {
+      const rows = await db.query(
+        "SELECT host, strftime(last_import, '%Y-%m-%d %H:%M') AS last_import FROM meta",
+        z.object({ host: z.string(), last_import: z.string().nullable() }),
+      );
+      return Object.fromEntries(rows.map((r) => [r.host, r.last_import ?? "-"]));
+    } catch (error) {
+      // An index from another version may lack the `meta` table or a column of it.
+      if (!/^(Catalog|Binder) Error$/.test(errorClass(error))) throw error;
+      return {};
+    }
+  });
+  return watermarks ?? {};
 }
 
 const imported = await listImportedHosts();

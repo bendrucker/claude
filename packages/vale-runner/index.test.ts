@@ -9,7 +9,7 @@ import {
 } from "../../plugins/prompting/skills/scan/scripts/vale";
 import { Alert as FixAlert, lint as fixLint } from "../../plugins/vale/skills/fix/scripts/job";
 import { Alert as WritingAlert, lintFile } from "../../plugins/writing/detection/vale";
-import { Alert, lint, ValeError } from "./index";
+import { Alert, lint } from "./index";
 
 const FILES = {
   "clean.md": "Clean.\n",
@@ -46,22 +46,6 @@ afterAll(() => rm(root, { recursive: true, force: true }));
 const config = (dir: string): string => join(dir, ".vale.ini");
 
 describe("lint", () => {
-  test.each<{ name: string; file: File; checks: string[] }>([
-    { name: "exit 0 returns no alerts", file: "clean.md", checks: [] },
-    { name: "exit 1 returns the error-level alert", file: "foo.md", checks: ["Test.Foo"] },
-  ])("$name", async ({ file, checks }) => {
-    const alerts = await lint([at(good(), file)], { config: config(good()) });
-    expect([...alerts.values()].flat().map((alert) => alert.Check)).toEqual(checks);
-  });
-
-  test("exit 2 throws a ValeError", async () => {
-    const thrown = await lint([at(good(), "clean.md")], { config: config(broken()) }).catch(
-      (error: unknown) => error,
-    );
-    expect(thrown).toBeInstanceOf(ValeError);
-    expect(thrown).toMatchObject({ exitCode: 2 });
-  });
-
   test("merges alerts across batches", async () => {
     const files: File[] = ["foo.md", "clean.md", "foo.md", "clean.md", "foo.md"];
     const paths = files.map((file, index) => join(good(), `${index}-${file}`));

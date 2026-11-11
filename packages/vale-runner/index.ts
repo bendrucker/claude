@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { z } from "zod";
+import { decodeJson } from "../decode/index";
 
 export const Alert = z.object({
   Check: z.string(),
@@ -11,26 +12,13 @@ export const Alert = z.object({
   Span: z.tuple([z.number(), z.number()]),
   Match: z.string(),
 });
-export type Alert = z.infer<typeof Alert>;
+type Alert = z.infer<typeof Alert>;
 
 const Output = z.record(z.string(), z.array(Alert));
 
-export class ValeError extends Error {
-  readonly exitCode: number;
-  constructor(exitCode: number, output: string) {
-    super(`vale exited ${exitCode}: ${output}`);
-    this.name = "ValeError";
-    this.exitCode = exitCode;
-  }
-}
-
-export function valeBinary(): string | null {
-  return Bun.which("vale");
-}
-
 /** Vale's stdout for `args`. Throws when the binary is missing or Vale reports a runtime failure. */
 export async function vale(args: readonly string[]): Promise<string> {
-  const binary = valeBinary();
+  const binary = Bun.which("vale");
   if (binary === null)
     throw new Error("vale is not on PATH. Install it: https://vale.sh/docs/install");
   const proc = Bun.spawn([binary, ...args], { stdout: "pipe", stderr: "pipe" });
@@ -40,60 +28,45 @@ export async function vale(args: readonly string[]): Promise<string> {
     proc.exited,
   ]);
   // vale exits 1 when it reports an error-level alert, 2 on a runtime failure.
-  if (exitCode > 1) throw new ValeError(exitCode, `${stdout.trim()}${stderr.trim()}`);
+  if (exitCode > 1) throw new Error(`vale exited ${exitCode}: ${stdout.trim()}${stderr.trim()}`);
   return stdout;
 }
 
 export interface LintOptions {
   config: string;
-  /** Vale's `--glob`, which filters the files it reads under each path. */
-  glob?: string;
   /** Paths per Vale run, since one run over thousands of files fails. */
   batch?: number;
   /** Called for a file Vale fails on alone. Without it, that failure throws. */
   onSkip?: (path: string, error: unknown) => void;
 }
 
-async function lintOnce(
-  paths: readonly string[],
-  { config, glob }: LintOptions,
-): Promise<Map<string, Alert[]>> {
+async function lintOnce(paths: readonly string[], config: string): Promise<Map<string, Alert[]>> {
   // The global config would merge its styles into the caller's.
-  const args = ["--no-global", `--config=${config}`, "--output=JSON"];
-  if (glob !== undefined) args.push(`--glob=${glob}`);
-  const stdout = await vale([...args, ...paths]);
+  const stdout = await vale(["--no-global", `--config=${config}`, "--output=JSON", ...paths]);
   if (stdout.trim() === "") return new Map();
-  return new Map(Object.entries(Output.parse(JSON.parse(stdout))));
+  return new Map(Object.entries(decodeJson(Output, stdout, "vale output")));
 }
 
-const probes = new Map<string, Promise<void>>();
-
 /** Rejects when the config or binary is broken, so a failed batch is not blamed on its files. */
-function probe(config: string): Promise<void> {
-  let probed = probes.get(config);
-  if (probed === undefined) {
-    probed = (async () => {
-      const dir = await mkdtemp(join(tmpdir(), "vale-probe-"));
-      try {
-        await Bun.write(join(dir, "probe.md"), "Probe.\n");
-        await lintOnce([join(dir, "probe.md")], { config });
-      } finally {
-        await rm(dir, { recursive: true, force: true });
-      }
-    })();
-    probes.set(config, probed);
+async function probe(config: string): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), "vale-probe-"));
+  try {
+    await Bun.write(join(dir, "probe.md"), "Probe.\n");
+    await lintOnce([join(dir, "probe.md")], config);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
-  return probed;
 }
 
 async function lintSplitting(
   paths: readonly string[],
   options: LintOptions,
+  probed = false,
 ): Promise<Map<string, Alert[]>> {
   try {
-    return await lintOnce(paths, options);
+    return await lintOnce(paths, options.config);
   } catch (error) {
-    await probe(options.config);
+    if (!probed) await probe(options.config);
     const [path] = paths;
     if (paths.length === 1 && path !== undefined) {
       if (options.onSkip === undefined) throw error;
@@ -102,8 +75,8 @@ async function lintSplitting(
     }
     const at = Math.ceil(paths.length / 2);
     return new Map([
-      ...(await lintSplitting(paths.slice(0, at), options)),
-      ...(await lintSplitting(paths.slice(at), options)),
+      ...(await lintSplitting(paths.slice(0, at), options, true)),
+      ...(await lintSplitting(paths.slice(at), options, true)),
     ]);
   }
 }

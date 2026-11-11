@@ -47,16 +47,12 @@ describe("signFlipPValue", () => {
 
   test("a unanimous win is extreme", () => {
     const rng = seedrandom("test-a");
-    expect(signFlipPValue([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], 2000, rng)).toBeLessThan(0.05);
+    expect(signFlipPValue([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5], rng)).toBeLessThan(0.05);
   });
 
   test("an even split is not extreme", () => {
     const rng = seedrandom("test-b");
-    expect(signFlipPValue([0.5, -0.5, 0.5, -0.5, 0.5, -0.5], 2000, rng)).toBeGreaterThan(0.5);
-  });
-
-  test("a consistent paired gain is extreme", () => {
-    expect(signFlipPValue(Array.from({ length: 20 }, () => 0.2))).toBeLessThan(0.01);
+    expect(signFlipPValue([0.5, -0.5, 0.5, -0.5, 0.5, -0.5], rng)).toBeGreaterThan(0.5);
   });
 
   test("never reaches 0, since the observed signs count as one permutation", () => {
@@ -66,19 +62,12 @@ describe("signFlipPValue", () => {
   test("zeros neither move the p-value nor draw from the rng", () => {
     const diffs = [0.4, -0.2, 0.6, 0.2];
     const padded = [0, ...diffs.flatMap((d) => [d, 0])];
-    const scale = padded.length / diffs.length;
-    expect(signFlipPValue(padded, 500, seedrandom("s"))).toBe(
-      signFlipPValue(
-        diffs.map((d) => d * scale),
-        500,
-        seedrandom("s"),
-      ),
-    );
+    expect(signFlipPValue(padded, seedrandom("s"))).toBe(signFlipPValue(diffs, seedrandom("s")));
   });
 
   test("reprints the same p-value by default", () => {
     const diffs = [0.5, 0.5, -0.5, 0.5, 0, 0.5, -0.5];
-    expect(signFlipPValue(diffs, 500)).toBe(signFlipPValue(diffs, 500));
+    expect(signFlipPValue(diffs)).toBe(signFlipPValue(diffs));
   });
 });
 

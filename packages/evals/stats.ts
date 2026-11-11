@@ -4,14 +4,14 @@ import { mean, permutationTest } from "simple-statistics";
 const TRIALS = 10_000;
 
 /** A Monte Carlo p-value counting the observed statistic as one permutation, so it never reaches 0. */
-const corrected = (extreme: number, trials: number) => (extreme + 1) / (trials + 1);
+const corrected = (extreme: number) => (extreme + 1) / (TRIALS + 1);
 
 /** Two-sided permutation p-value between two samples, seeded so a report reprints the same. */
 export function pValue(base: number[], other: number[]): number {
   if (base.length === 0 || other.length === 0) return NaN;
   if (new Set([...base, ...other]).size === 1) return 1;
   const share = permutationTest(base, other, "two_side", TRIALS, seedrandom("compare"));
-  return corrected(Math.round(share * TRIALS), TRIALS);
+  return corrected(share * TRIALS);
 }
 
 /**
@@ -30,21 +30,18 @@ export function pFloor(n1: number, n2: number): number {
  */
 export function signFlipPValue(
   diffs: readonly number[],
-  trials = TRIALS,
   rng: () => number = seedrandom("compare"),
 ): number {
-  if (diffs.every((d) => d === 0)) return Number.NaN;
-  const observed = Math.abs(mean([...diffs]));
+  const live = diffs.filter((d) => d !== 0);
+  if (live.length === 0) return Number.NaN;
+  const observed = Math.abs(mean(live));
   let extreme = 0;
-  for (let t = 0; t < trials; t++) {
+  for (let t = 0; t < TRIALS; t++) {
     let sum = 0;
-    for (const d of diffs) {
-      // A zero flips to itself and draws no random number.
-      if (d !== 0) sum += rng() < 0.5 ? d : -d;
-    }
-    if (Math.abs(sum / diffs.length) >= observed - 1e-9) extreme++;
+    for (const d of live) sum += rng() < 0.5 ? d : -d;
+    if (Math.abs(sum / live.length) >= observed - 1e-9) extreme++;
   }
-  return corrected(extreme, trials);
+  return corrected(extreme);
 }
 
 /**

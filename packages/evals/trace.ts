@@ -1,18 +1,26 @@
 import { z } from "zod";
 
 const TraceLine = z.object({ type: z.string(), result: z.string().optional() });
-const Usage = z.object({
-  input_tokens: z.number().nullish(),
-  output_tokens: z.number().nullish(),
-  cache_creation_input_tokens: z.number().nullish(),
-  cache_read_input_tokens: z.number().nullish(),
-});
 const ModelUsage = z.object({
   inputTokens: z.number().optional(),
   outputTokens: z.number().optional(),
   cacheReadInputTokens: z.number().optional(),
   cacheCreationInputTokens: z.number().optional(),
 });
+type ModelUsage = z.infer<typeof ModelUsage>;
+const Usage = z
+  .object({
+    input_tokens: z.number().nullish(),
+    output_tokens: z.number().nullish(),
+    cache_creation_input_tokens: z.number().nullish(),
+    cache_read_input_tokens: z.number().nullish(),
+  })
+  .transform((u): ModelUsage => ({
+    inputTokens: u.input_tokens ?? undefined,
+    outputTokens: u.output_tokens ?? undefined,
+    cacheReadInputTokens: u.cache_read_input_tokens ?? undefined,
+    cacheCreationInputTokens: u.cache_creation_input_tokens ?? undefined,
+  }));
 const ResultLine = TraceLine.extend({
   num_turns: z.number().nullish(),
   duration_ms: z.number().nullish(),
@@ -58,27 +66,18 @@ export interface TokenUsage {
   output: number;
 }
 
-function usageOf(line: ResultLine): TokenUsage | undefined {
-  const models = Object.values(line.modelUsage ?? {});
-  if (models.length > 0) {
-    const sum = (pick: (m: z.infer<typeof ModelUsage>) => number | undefined) =>
-      models.reduce((n, m) => n + (pick(m) ?? 0), 0);
-    const output = sum((m) => m.outputTokens);
-    const total =
-      output +
-      sum((m) => m.inputTokens) +
-      sum((m) => m.cacheReadInputTokens) +
-      sum((m) => m.cacheCreationInputTokens);
-    return { total, output };
-  }
-  const usage = line.usage;
-  if (usage == null) return undefined;
-  const output = usage.output_tokens ?? 0;
+function usageOf({ modelUsage, usage }: ResultLine): TokenUsage | undefined {
+  const models = Object.values(modelUsage ?? {});
+  if (models.length === 0 && usage != null) models.push(usage);
+  if (models.length === 0) return undefined;
+  const sum = (pick: (m: ModelUsage) => number | undefined) =>
+    models.reduce((n, m) => n + (pick(m) ?? 0), 0);
+  const output = sum((m) => m.outputTokens);
   const total =
     output +
-    (usage.input_tokens ?? 0) +
-    (usage.cache_read_input_tokens ?? 0) +
-    (usage.cache_creation_input_tokens ?? 0);
+    sum((m) => m.inputTokens) +
+    sum((m) => m.cacheReadInputTokens) +
+    sum((m) => m.cacheCreationInputTokens);
   return { total, output };
 }
 

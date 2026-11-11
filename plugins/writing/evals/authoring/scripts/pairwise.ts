@@ -559,7 +559,6 @@ export function scoreJudgments(
       winRate: wins.length > 0 ? mean(wins) : Number.NaN,
       p: signFlipPValue(
         wins.map((w) => w - 0.5),
-        10_000,
         rng,
       ),
     };

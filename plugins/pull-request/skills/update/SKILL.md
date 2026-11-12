@@ -46,7 +46,7 @@ Write the body to `tmp/pr-body-<branch>.md` and apply it:
 - GitHub: `gh pr edit --body-file tmp/pr-body-<branch>.md`
 - GitLab: `glab mr update --description-file tmp/pr-body-<branch>.md`
 
-Upload any screenshot or recording the new body references by local path: `--attach ./shot.png` per file on `gh pr edit` (load `github:attach`), or project uploads per `gitlab:api` pasted in before the update. Assets already in the body keep their uploaded URLs.
+Upload any screenshot or recording the new body references by local path: `--attach ./shot.png` per file on `gh pr edit` (load `github:attach`), or `--attach ./shot.png` per file on `glab mr update`. Assets already in the body keep their uploaded URLs.
 
 For GitLab username lookup, load `gitlab:merge-request`.
 

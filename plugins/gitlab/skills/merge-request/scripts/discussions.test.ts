@@ -4,9 +4,12 @@ import {
   type DiscussionSummary,
   type FilterOptions,
   deduplicateDiscussions,
+  discussionsArgs,
   filterDiscussions,
   formatDigest,
   formatLocation,
+  parseIid,
+  parseNdjson,
   truncateBody,
 } from "./discussions";
 
@@ -114,6 +117,20 @@ describe("deduplicateDiscussions", () => {
       ids: ["1", "2"],
     },
     {
+      name: "keeps deleted files apart by falling back to old_path",
+      discussions: [
+        makeDiscussion("1", {
+          body: "Why drop this",
+          position: { new_path: null, old_path: "a.ts" },
+        }),
+        makeDiscussion("2", {
+          body: "Why drop this",
+          position: { new_path: null, old_path: "b.ts" },
+        }),
+      ],
+      ids: ["1", "2"],
+    },
+    {
       name: "skips discussions with empty notes",
       discussions: [{ id: "1", notes: [] }],
       ids: [],
@@ -189,14 +206,14 @@ describe("formatDigest", () => {
     );
     expect(out.split("\n")).toHaveLength(2);
     expect(out).toMatchInlineSnapshot(`
-      "111111111111  src/app.ts:42  [open]      Extract this
-      222222222222  -              [resolved]  Nit: typo"
+      "11111111  src/app.ts:42  [open]      Extract this
+      22222222  -              [resolved]  Nit: typo"
     `);
   });
 
   it("truncates bodies to the given width", () => {
     expect(formatDigest([makeSummary({ body: "x".repeat(200) })], 20)).toMatchInlineSnapshot(
-      `"abcdef012345  -  [open]  xxxxxxxxxxxxxxxxxxx…"`,
+      `"abcdef01  -  [open]  xxxxxxxxxxxxxxxxxxx…"`,
     );
   });
 
@@ -259,5 +276,52 @@ describe("null position fields", () => {
       ],
     });
     expect(parsed.notes?.[0]?.position?.line_range?.start.new_line).toBe(10);
+  });
+});
+
+describe("parseNdjson", () => {
+  test("reads one discussion per line and skips blank lines", () => {
+    const raw = `${JSON.stringify({ id: "a", notes: [] })}\n\n${JSON.stringify({ id: "b" })}\n`;
+    expect(parseNdjson(raw).map((d) => d.id)).toEqual(["a", "b"]);
+  });
+
+  test("leaves a `][` inside a body untouched", () => {
+    const body = "see a[0][1] and ][ here";
+    const raw = JSON.stringify({ id: "a", notes: [makeNote({ body })] });
+    expect(parseNdjson(raw)[0]?.notes?.[0]?.body).toBe(body);
+  });
+});
+
+describe("parseIid", () => {
+  test("accepts digits", () => {
+    expect(parseIid("1298")).toBe("1298");
+  });
+
+  test.each(["", "12a", "../1", "1 2"])("rejects %p", (value) => {
+    expect(() => parseIid(value)).toThrow("Invalid MR iid");
+  });
+});
+
+describe("discussionsArgs", () => {
+  test("paginates as ndjson against the checkout project", () => {
+    expect(discussionsArgs("7")).toEqual([
+      "api",
+      "--paginate",
+      "--output",
+      "ndjson",
+      "projects/:id/merge_requests/7/discussions?per_page=100",
+    ]);
+  });
+
+  test("encodes -R into the project path", () => {
+    expect(discussionsArgs("7", "group/sub/proj").at(-1)).toBe(
+      "projects/group%2Fsub%2Fproj/merge_requests/7/discussions?per_page=100",
+    );
+  });
+});
+
+describe("module import", () => {
+  test("installs no process-wide rejection handler", () => {
+    expect(process.listenerCount("unhandledRejection")).toBe(0);
   });
 });

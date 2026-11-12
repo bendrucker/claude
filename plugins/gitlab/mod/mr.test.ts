@@ -34,6 +34,7 @@ const read = (over: Partial<Read> = {}, pipelineStatus = "running"): Read => ({
     iid: 7,
     projectId: 1,
     title: "",
+    projectPath: "g/r",
     url: "https://gitlab.com/g/r/-/merge_requests/7",
     author: null,
     state: "opened",
@@ -541,7 +542,7 @@ describe("messageOf", () => {
     [
       "approval",
       [fb("alice", "approved")],
-      "@alice approved MR !7\nhttps://gitlab.com/g/r/-/merge_requests/7\nRead the discussion with `glab mr view 7 --comments`.",
+      "@alice approved MR !7\nhttps://gitlab.com/g/r/-/merge_requests/7\nRead the discussion with `glab mr note list 7`.",
     ],
     [
       "unapproval",
@@ -551,7 +552,7 @@ describe("messageOf", () => {
     [
       "changes requested",
       [{ action: "promote", kind: "changes_requested" }],
-      "Changes were requested on MR !7\nhttps://gitlab.com/g/r/-/merge_requests/7",
+      "Changes were requested on MR !7\nhttps://gitlab.com/g/r/-/merge_requests/7\nRead the discussion with `glab mr note list 7 --state unresolved`.",
     ],
     [
       "conflict",
@@ -575,12 +576,12 @@ describe("messageOf", () => {
         fb("alice", "approved", 2),
         fb("bot", null, 1),
       ],
-      "Changes were requested on MR !7\n@alice approved MR !7 (2 new comments)\n@bot commented on MR !7 (1 new comment)\nhttps://gitlab.com/g/r/-/merge_requests/7\nRead the discussion with `glab mr view 7 --comments`.",
+      "Changes were requested on MR !7\n@alice approved MR !7 (2 new comments)\n@bot commented on MR !7 (1 new comment)\nhttps://gitlab.com/g/r/-/merge_requests/7\nRead the discussion with `glab mr note list 7`.",
     ],
     [
       "comments",
       [fb("bot", null, 3)],
-      "@bot commented on MR !7 (3 new comments)\nhttps://gitlab.com/g/r/-/merge_requests/7",
+      "@bot commented on MR !7 (3 new comments)\nhttps://gitlab.com/g/r/-/merge_requests/7\nRead the discussion with `glab mr note list 7`.",
     ],
   ];
   test("leads with each event and closes with the watch note", () => {

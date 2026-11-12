@@ -56,6 +56,8 @@ const LATE_MS = 3 * TICK_MS;
 const STUCK_MS = 5 * 60_000;
 // A resolved thread may leave updated_at alone, so a full read runs this often.
 const FULL_EVERY_MS = 30 * 60_000;
+// A failed GraphQL read is not retried for the same key until this has passed.
+export const GRAPH_RETRY_MS = 5 * 60_000;
 
 // A dropped injection is retried on later polls, up to this many attempts.
 export const MAX_ATTEMPTS = 3;
@@ -83,6 +85,9 @@ interface Feedback {
 interface Held<T> {
   key?: string;
   value?: T;
+  /** The key whose read failed, and when, so the next polls skip refetching it. */
+  failedKey?: string | undefined;
+  failedAt?: number;
 }
 
 interface Watch {
@@ -117,7 +122,6 @@ interface Watch {
   /** This session's turns by id, any agent's, to tell its notes from the person's. */
   turns: Map<string, Span>;
   line: string | undefined;
-  /** How the last successful poll read the MR. */
   isMutedOpen: boolean;
   generation: number;
   isStopped: boolean;
@@ -126,7 +130,7 @@ interface Watch {
 /** A gate that matched the last read, one that missed and read in full, or no gate. */
 type Via = "hit" | "miss" | "full";
 
-type Read =
+type Polled =
   | { kind: "none"; reason: string; branch: string }
   | {
       kind: "mr";
@@ -155,8 +159,15 @@ function render($: EngineInterface, watch: Watch) {
   show($, watch, statusOf(watch.snapshot, isBusy(watch), watch.error !== undefined));
 }
 
-function emit($: EngineInterface, event: string, detail: Record<string, unknown>, ok = true) {
-  void $.modEvents.emit({ mod: MOD, event, ok, detail });
+function emit(
+  $: EngineInterface,
+  event: string,
+  detail: Record<string, unknown>,
+  ok = true,
+  ms?: number,
+) {
+  const entry = { mod: MOD, event, ok, detail };
+  void $.modEvents.emit(ms === undefined ? entry : { ...entry, ms });
 }
 
 async function isDefaultBranch($: EngineInterface, cwd: string, branch: string): Promise<boolean> {
@@ -191,19 +202,22 @@ function parsed<T>(value: T | undefined, source: string): T {
 
 // glab mr view finds only an open MR by branch, so a tracked MR is re-read by IID
 // to see it merge or close.
+type Viewed = { kind: "view"; stdout: string } | { kind: "foreign" } | { kind: "none" };
+
 async function viewMr(
   $: EngineInterface,
   watch: Watch,
   cwd: string,
   branch: string,
-): Promise<string | undefined> {
+): Promise<Viewed> {
   try {
-    return await glab($, cwd, ["mr", "view", "-F", "json"]);
+    return { kind: "view", stdout: await glab($, cwd, ["mr", "view", "-F", "json"]) };
   } catch (error) {
-    if (error instanceof Error && FOREIGN.test(error.message)) return "not gitlab";
+    if (error instanceof Error && FOREIGN.test(error.message)) return { kind: "foreign" };
     if (!(error instanceof Error && NO_MR.test(error.message))) throw error;
-    if (watch.snapshot === undefined || watch.branch !== branch) return undefined;
-    return glab($, cwd, ["mr", "view", String(watch.snapshot.mr), "-F", "json"]);
+    if (watch.snapshot === undefined || watch.branch !== branch) return { kind: "none" };
+    const stdout = await glab($, cwd, ["mr", "view", String(watch.snapshot.mr), "-F", "json"]);
+    return { kind: "view", stdout };
   }
 }
 
@@ -288,24 +302,26 @@ async function graphOf<T>(
 ): Promise<T> {
   const key = `${view.projectId}/${view.iid} ${view.sha} ${Math.max(0, ...notes.map((n) => n.id))}`;
   if (held.key === key && held.value !== undefined) return held.value;
-  const path = new URL(view.url).pathname.split("/-/")[0]?.slice(1) ?? "";
-  const argv = ["api", "graphql", "-f", `query=${graph.query}`, "-f", `path=${path}`];
   const started = await $.clock.now();
+  const isSameMr = held.key?.startsWith(`${view.projectId}/${view.iid} `) === true;
+  const kept = () => (isSameMr && held.value !== undefined ? held.value : graph.fallback);
+  if (held.failedKey === key && started - (held.failedAt ?? 0) < GRAPH_RETRY_MS) return kept();
   try {
+    if (view.projectPath === "") throw new Error("the MR view names no project path");
+    const argv = ["api", "graphql", "-f", `query=${graph.query}`, "-f", `path=${view.projectPath}`];
     const stdout = await glab($, cwd, [...argv, "-f", `iid=${view.iid}`]);
     const value = parsed(graph.parse(stdout), graph.event);
-    const ms = (await $.clock.now()) - started;
-    void $.modEvents.emit({ mod: MOD, event: graph.event, ok: true, ms, detail: { mr: view.iid } });
+    emit($, graph.event, { mr: view.iid }, true, (await $.clock.now()) - started);
     held.key = key;
     held.value = value;
+    held.failedKey = undefined;
     return value;
   } catch (error) {
-    const ms = (await $.clock.now()) - started;
     const message = error instanceof Error ? error.message : String(error);
-    const detail = { mr: view.iid, error: message };
-    void $.modEvents.emit({ mod: MOD, event: graph.event, ok: false, ms, detail });
-    const isSameMr = held.key?.startsWith(`${view.projectId}/${view.iid} `) === true;
-    return isSameMr && held.value !== undefined ? held.value : graph.fallback;
+    emit($, graph.event, { mr: view.iid, error: message }, false, (await $.clock.now()) - started);
+    held.failedKey = key;
+    held.failedAt = started;
+    return kept();
   }
 }
 
@@ -341,7 +357,7 @@ async function readMr(
   watch: Watch,
   now: number,
   isRetry = false,
-): Promise<Read> {
+): Promise<Polled> {
   const cwd = await $.session.cwd();
   const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
   const branch = head.stdout.trim();
@@ -350,13 +366,18 @@ async function readMr(
   if (await isDefaultBranch($, cwd, branch)) {
     return { kind: "none", reason: "default branch", branch };
   }
-  const stdout = await viewMr($, watch, cwd, branch);
-  if (stdout === undefined) return { kind: "none", reason: "no mr", branch };
-  if (stdout === "not gitlab") return { kind: "none", reason: stdout, branch };
-  const view = parsed(parseView(stdout), "glab mr view");
+  const viewed = await viewMr($, watch, cwd, branch);
+  if (viewed.kind === "none") return { kind: "none", reason: "no mr", branch };
+  if (viewed.kind === "foreign") return { kind: "none", reason: "not gitlab", branch };
+  const view = parsed(parseView(viewed.stdout), "glab mr view");
   const prev = watch.snapshot;
   // A merged or closed MR changes nothing else the watch shows.
-  if (prev?.mr === view.iid && !isOpen(prev) && view.state === prev.state) {
+  if (
+    prev?.mr === view.iid &&
+    prev.projectId === view.projectId &&
+    !isOpen(prev) &&
+    view.state === prev.state
+  ) {
     return { kind: "mr", snapshot: prev, branch, read: "hit" };
   }
   // A note, an approval, or a push moves updated_at, so while it and the pipeline
@@ -393,7 +414,7 @@ async function readMr(
   });
   // A deleted note can lower the newest id seen, which would re-admit older notes.
   const snapshot =
-    prev?.mr === read.mr
+    prev?.mr === read.mr && prev.projectId === read.projectId
       ? { ...read, noteCursor: Math.max(prev.noteCursor, read.noteCursor) }
       : read;
   // The reads are not atomic, so approvals a push reset can look withdrawn on the
@@ -543,7 +564,7 @@ interface Applied {
   isChanged: boolean;
 }
 
-function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => boolean): Applied {
+function apply($: EngineInterface, watch: Watch, read: Polled, isCurrent: () => boolean): Applied {
   if (read.kind === "none") {
     const prev = watch.snapshot;
     const none = `${read.reason} ${read.branch}`;
@@ -553,7 +574,7 @@ function apply($: EngineInterface, watch: Watch, read: Read, isCurrent: () => bo
     watch.none = none;
     watch.snapshot = undefined;
     watch.held = [];
-    watch.branch = undefined;
+    watch.branch = read.branch;
     watch.undelivered = undefined;
     return { isTracked: false, isChanged };
   }
@@ -620,9 +641,8 @@ async function poll($: EngineInterface, watch: Watch, generation: number, now: n
   try {
     const read = await readMr($, watch, now);
     if (read.kind === "mr") {
-      const ms = (await $.clock.now()) - now;
       const detail = { mr: read.snapshot.mr, read: read.read };
-      void $.modEvents.emit({ mod: MOD, event: "poll", ms, detail });
+      emit($, "poll", detail, true, (await $.clock.now()) - now);
     }
     // A session.end that landed while glab ran has already cleared the status.
     if (!isCurrent() || seq !== watch.polls) return;
@@ -662,6 +682,14 @@ async function pollNow($: EngineInterface, watch: Watch, generation: number, now
   if (watch.pollingSince === now) watch.pollingSince = undefined;
 }
 
+// A checkout switching branches would otherwise show the old MR until the next poll is due.
+async function isBranchMoved($: EngineInterface, watch: Watch): Promise<boolean> {
+  if (watch.branch === undefined || watch.error !== undefined) return false;
+  const cwd = await $.session.cwd();
+  const head = await $.process.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], { cwd });
+  return head.exitCode === 0 && head.stdout.trim() !== watch.branch;
+}
+
 async function tick($: EngineInterface, watch: Watch, generation: number): Promise<void> {
   const now = await $.clock.now();
   if (watch.isStopped || watch.generation !== generation) return;
@@ -675,7 +703,7 @@ async function tick($: EngineInterface, watch: Watch, generation: number): Promi
     if (now - watch.pollingSince < STUCK_MS) return;
     emit($, "poll.stuck", { ms: now - watch.pollingSince }, false);
   }
-  if (now < watch.due - TICK_MS / 2) return;
+  if (now < watch.due - TICK_MS / 2 && !(await isBranchMoved($, watch))) return;
   await pollNow($, watch, generation, now);
 }
 

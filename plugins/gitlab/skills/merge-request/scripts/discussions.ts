@@ -4,21 +4,8 @@ import { $ } from "bun";
 import { cli, command } from "cleye";
 import { table } from "table";
 import { z } from "zod";
-import {
-  buildPosition,
-  exitOnRejection,
-  fetchMrDiffs,
-  getDiffRefs,
-  glabApiPost,
-  parseGlabPaginated,
-  readBody,
-  validateLineInDiff,
-} from "./diff";
+import { errorText, projectPath } from "../../../scripts/merge";
 import { isReviewTarget, parseReviewers } from "./reviewers";
-
-export { parseGlabPaginated } from "./diff";
-
-exitOnRejection();
 
 const LineEnd = z.looseObject({
   type: z.enum(["new", "old"]),
@@ -52,8 +39,6 @@ export const Discussion = z.looseObject({
 });
 export type Discussion = z.infer<typeof Discussion>;
 type Note = z.infer<typeof Note>;
-
-const Discussions = z.array(Discussion);
 
 function firstNote(d: Discussion): Note | null {
   return d.notes?.[0] ?? null;
@@ -109,12 +94,13 @@ export function formatLocation(s: DiscussionSummary): string {
 }
 
 const LOCATION_MAX_WIDTH = 40;
+const ID_WIDTH = 8;
 
 export function formatDigest(summaries: DiscussionSummary[], truncate: number): string {
   const rows = summaries.map((s) => {
     const location = formatLocation(s);
     return {
-      id: s.id.slice(0, 12),
+      id: s.id.slice(0, ID_WIDTH),
       location: location !== "" ? location : "-",
       state: s.resolved ? "[resolved]" : "[open]",
       body: truncateBody(s.body, truncate),
@@ -129,7 +115,7 @@ export function formatDigest(summaries: DiscussionSummary[], truncate: number): 
 
 export function formatTable(summaries: DiscussionSummary[], truncate: number): string {
   const rows = summaries.map((s) => [
-    s.id.slice(0, 12),
+    s.id.slice(0, ID_WIDTH),
     s.author,
     s.resolved ? "yes" : "no",
     formatLocation(s),
@@ -164,7 +150,7 @@ export function deduplicateDiscussions(discussions: Discussion[]): Discussion[] 
   for (const d of discussions) {
     const note = firstNote(d);
     if (!note) continue;
-    const path = note.position?.new_path ?? "";
+    const path = note.position?.new_path ?? note.position?.old_path ?? "";
     const prefix = note.body.slice(0, 80);
     const key = `${path}:${prefix}`;
     if (!seen.has(key)) {
@@ -192,50 +178,48 @@ function buildFilterOptions(flags: {
   return opts;
 }
 
-const createCmd = command(
-  {
-    name: "create",
-    parameters: ["<iid>"],
-    flags: {
-      file: { type: String, description: "File path for inline comment" },
-      line: { type: Number, description: "New line number" },
-      oldLine: {
-        type: Number,
-        description: "Old line number (deleted lines)",
-      },
-      bodyFile: {
-        type: String,
-        description: "Read body from file (default: stdin)",
-      },
-    },
-  },
-  async (parsed) => {
-    const iid = parsed._.iid;
-    const body = await readBody(parsed.flags.bodyFile);
+const IID = /^\d+$/;
 
-    const payload: Record<string, unknown> = { body };
+export function parseIid(value: string): string {
+  if (!IID.test(value)) {
+    throw new Error(`Invalid MR iid: ${value}`);
+  }
+  return value;
+}
 
-    if (parsed.flags.file != null && parsed.flags.file !== "") {
-      const [refs, diffs] = await Promise.all([getDiffRefs(iid), fetchMrDiffs(iid)]);
-      validateLineInDiff(diffs, parsed.flags.file, {
-        line: parsed.flags.line,
-        oldLine: parsed.flags.oldLine,
-      });
-      payload.position = buildPosition(refs, parsed.flags.file, {
-        line: parsed.flags.line,
-        oldLine: parsed.flags.oldLine,
-      });
-    }
+export function parseNdjson(raw: string): Discussion[] {
+  return raw
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => Discussion.parse(JSON.parse(line)));
+}
 
-    await glabApiPost(`projects/:id/merge_requests/${iid}/discussions`, payload);
-  },
-);
+export function discussionsArgs(iid: string, repo?: string): string[] {
+  return [
+    "api",
+    "--paginate",
+    "--output",
+    "ndjson",
+    `${projectPath(repo)}/merge_requests/${iid}/discussions?per_page=100`,
+  ];
+}
+
+async function fetchDiscussions(iid: string, repo?: string): Promise<Discussion[]> {
+  return parseNdjson(await $`glab ${discussionsArgs(parseIid(iid), repo)}`.text());
+}
+
+const repoFlag = {
+  type: String,
+  alias: "R",
+  description: "Target group/project instead of the checkout",
+} as const;
 
 const listCmd = command(
   {
     name: "list",
     parameters: ["<iid>"],
     flags: {
+      repo: repoFlag,
       author: { type: String, description: "Filter by author username" },
       bots: {
         type: Boolean,
@@ -267,9 +251,7 @@ const listCmd = command(
     },
   },
   async (parsed) => {
-    const iid = parsed._.iid;
-    const raw = await $`glab api projects/:id/merge_requests/${iid}/discussions --paginate`.text();
-    let discussions = Discussions.parse(parseGlabPaginated(raw));
+    let discussions = await fetchDiscussions(parsed._.iid, parsed.flags.repo);
 
     discussions = filterDiscussions(discussions, buildFilterOptions(parsed.flags));
 
@@ -294,31 +276,14 @@ const listCmd = command(
   },
 );
 
-const resolveCmd = command(
-  {
-    name: "resolve",
-    parameters: ["<iid>", "[ids...]"],
-  },
-  async (parsed) => {
-    const iid = parsed._.iid;
-
-    for (const id of parsed._.ids) {
-      // oxlint-disable-next-line no-await-in-loop -- one API mutation per discussion, each confirmed on stderr as it resolves.
-      await $`glab api projects/:id/merge_requests/${iid}/discussions/${id} -X PUT -f resolved=true`.text();
-      console.error(`Resolved: ${id}`);
-    }
-  },
-);
-
 const summaryCmd = command(
   {
     name: "summary",
     parameters: ["<iid>"],
+    flags: { repo: repoFlag },
   },
   async (parsed) => {
-    const iid = parsed._.iid;
-    const raw = await $`glab api projects/:id/merge_requests/${iid}/discussions --paginate`.text();
-    const discussions = Discussions.parse(parseGlabPaginated(raw));
+    const discussions = await fetchDiscussions(parsed._.iid, parsed.flags.repo);
 
     const resolvable = discussions.filter((d) => firstNote(d)?.resolvable);
     const resolved = resolvable.filter((d) => firstNote(d)?.resolved);
@@ -354,12 +319,19 @@ const summaryCmd = command(
   },
 );
 
-await cli(
-  {
-    name: "discussions",
-    commands: [createCmd, listCmd, resolveCmd, summaryCmd],
-  },
-  (parsed) => {
-    parsed.showHelp();
-  },
-);
+if (import.meta.main) {
+  try {
+    await cli(
+      {
+        name: "discussions",
+        commands: [listCmd, summaryCmd],
+      },
+      (parsed) => {
+        parsed.showHelp();
+      },
+    );
+  } catch (error) {
+    console.error(errorText(error));
+    process.exit(1);
+  }
+}

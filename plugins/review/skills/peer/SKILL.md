@@ -79,6 +79,6 @@ See [tone.md](tone.md) for comment style.
 
 ## Service Support
 
-For GitLab, load `gitlab:merge-request` for submission and publish draft notes with `draft-note.ts submit`, which takes an optional summary and review decision.
+For GitLab, load `gitlab:merge-request` for submission and publish draft notes with `glab mr note draft publish <iid> --yes`, which takes an optional `-m` summary and `--reviewer-state requested_changes`.
 
 Post comments through `mcp__github`, `gh`, or `glab`. On follow-up, resolve addressed threads natively: `review-threads.ts` on GitHub, the resolve flow in `gitlab:merge-request` on GitLab.

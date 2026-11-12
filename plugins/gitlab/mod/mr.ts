@@ -66,6 +66,10 @@ const readView = map(
     project_id: num,
     title: or(str, ""),
     web_url: str,
+    references: or(
+      map(obj({ full: str }), (r) => r.full),
+      "",
+    ),
     author: or(readUsername, null),
     state: str,
     sha: str,
@@ -80,6 +84,7 @@ const readView = map(
     projectId: v.project_id,
     title: v.title,
     url: v.web_url,
+    projectPath: v.references.replace(/!\d+$/, ""),
     author: v.author,
     state: v.state,
     sha: v.sha,
@@ -744,11 +749,16 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
     else paragraphs.push(paragraphOf(snapshot, decision));
   }
   if (feedback.length > 0) {
+    // Only a bare change request narrows to open threads, since a comment can be unresolvable.
+    const isThreadsOnly =
+      promoted.some((d) => d.kind === "changes_requested") &&
+      !promoted.some((d) => d.kind === "feedback" && d.notes > 0);
+    const state = isThreadsOnly ? " --state unresolved" : "";
     paragraphs.push(
       [
         ...feedback,
         snapshot.url,
-        `Read the discussion with \`glab mr view ${snapshot.mr} --comments\`.`,
+        `Read the discussion with \`glab mr note list ${snapshot.mr}${state}\`.`,
       ].join("\n"),
     );
   }

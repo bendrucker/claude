@@ -10,7 +10,6 @@ import {
   pickMrIid,
   projectPath,
   status,
-  trainArgs,
 } from "./merge";
 
 function shellError(streams: { stdout?: string; stderr?: string }): Error {
@@ -42,7 +41,6 @@ function createActions(overrides: Partial<MergeActions> = {}): MergeActions {
     getMrIid: mock(() => Promise.resolve(10)),
     getMergeRequest: mock(() => Promise.resolve(createMergeRequest())),
     isRebasedOnTarget: mock(() => Promise.resolve(true)),
-    addToMergeTrain: mock(() => Promise.resolve()),
     mergeViaGlab: mock(() => Promise.resolve()),
     ...overrides,
   };
@@ -80,76 +78,14 @@ describe("errorText", () => {
 });
 
 describe("merge", () => {
-  test("uses merge train API when merge trains enabled and auto-merge requested", async () => {
+  test("hands a train project's auto-merge to glab mr merge", async () => {
     const actions = createActions(trains());
+    const opts = { autoMerge: true, squash: true, sha: "abc" };
 
-    await merge("feature", { autoMerge: true }, actions);
+    await merge("feature", opts, actions);
 
-    expect(actions.getMrIid).toHaveBeenCalledWith("feature");
-    expect(actions.addToMergeTrain).toHaveBeenCalledWith(10, { autoMerge: true });
-    expect(actions.mergeViaGlab).not.toHaveBeenCalled();
-  });
-
-  test("uses glab mr merge when merge trains disabled", async () => {
-    const actions = createActions();
-
-    await merge("feature", { autoMerge: true }, actions);
-
-    expect(actions.mergeViaGlab).toHaveBeenCalledWith("feature", { autoMerge: true });
-    expect(actions.addToMergeTrain).not.toHaveBeenCalled();
-  });
-
-  test("skips the project read when auto-merge is not requested", async () => {
-    const actions = createActions(trains());
-
-    await merge("feature", { autoMerge: false }, actions);
-
-    expect(actions.mergeViaGlab).toHaveBeenCalledWith("feature", { autoMerge: false });
+    expect(actions.mergeViaGlab).toHaveBeenCalledWith("feature", opts);
     expect(actions.getProjectConfig).not.toHaveBeenCalled();
-    expect(actions.addToMergeTrain).not.toHaveBeenCalled();
-  });
-
-  test("takes an iid without resolving a branch", async () => {
-    const actions = createActions(trains());
-
-    await merge("1298", { autoMerge: true }, actions);
-
-    expect(actions.getMrIid).not.toHaveBeenCalled();
-    expect(actions.addToMergeTrain).toHaveBeenCalledWith(1298, { autoMerge: true });
-  });
-
-  test("throws when no open MR found for branch", () => {
-    const actions = createActions({
-      ...trains(),
-      getMrIid: mock(() => Promise.reject(new Error("No open MR found for branch: no-mr"))),
-    });
-
-    expect(merge("no-mr", { autoMerge: true }, actions)).rejects.toThrow(
-      "No open MR found for branch: no-mr",
-    );
-  });
-
-  test("passes squash and sha to the merge train API", async () => {
-    const actions = createActions(trains());
-
-    await merge("feature", { autoMerge: true, squash: true, sha: "abc" }, actions);
-
-    expect(actions.addToMergeTrain).toHaveBeenCalledWith(10, {
-      autoMerge: true,
-      squash: true,
-      sha: "abc",
-    });
-  });
-
-  test("passes squash to glab mr merge when trains are off", async () => {
-    const actions = createActions();
-
-    await merge("feature", { autoMerge: false, squash: true }, actions);
-
-    expect(actions.mergeViaGlab).toHaveBeenCalledWith("feature", {
-      autoMerge: false,
-      squash: true,
-    });
   });
 });
 
@@ -180,23 +116,6 @@ describe("projectPath", () => {
     ["group/sub/project", "projects/group%2Fsub%2Fproject"],
   ])("maps %p to %s", (repo, expected) => {
     expect(projectPath(repo)).toBe(expected);
-  });
-});
-
-describe("trainArgs", () => {
-  test("sends fields as strings and targets the repo", () => {
-    expect(trainArgs(4, { squash: true, sha: "abc" }, "g/p")).toEqual([
-      "api",
-      "projects/g%2Fp/merge_trains/merge_requests/4",
-      "-X",
-      "POST",
-      "-f",
-      "auto_merge=true",
-      "-f",
-      "squash=true",
-      "-f",
-      `sha=abc`,
-    ]);
   });
 });
 
@@ -358,7 +277,6 @@ describe("status", () => {
     });
     expect(actions.isRebasedOnTarget).toHaveBeenCalledWith("main", "feature");
     expect(actions.mergeViaGlab).not.toHaveBeenCalled();
-    expect(actions.addToMergeTrain).not.toHaveBeenCalled();
   });
 
   test("reads several iids with one project read", async () => {

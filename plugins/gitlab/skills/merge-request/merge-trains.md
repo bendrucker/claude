@@ -8,5 +8,5 @@ glab api "projects/:id/merge_trains?scope=active" | jq '.[] | {iid: .merge_reque
 
 # Clear a stuck entry, then re-arm
 glab api --method DELETE "projects/:id/merge_trains/merge_requests/<iid>"
-glab api --method POST  "projects/:id/merge_trains/merge_requests/<iid>" --raw-field auto_merge=true
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/merge.ts <branch> --auto-merge
 ```

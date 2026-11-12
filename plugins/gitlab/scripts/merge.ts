@@ -4,11 +4,6 @@ import { $ } from "bun";
 import { cli } from "cleye";
 import { z } from "zod";
 
-// glab has no merge-train command: `glab mr merge --auto-merge` hits the accept
-// endpoint (PUT .../merge). GitLab 19.1+ resolves that to the train server-side,
-// but we POST .../merge_trains/merge_requests/:iid directly so squash applies to
-// the train add and the outcome doesn't depend on the instance version.
-
 // Re-arming is idempotent: GitLab returns 409 "already set to Auto-Merge" when the
 // MR is already armed, which counts as success for auto-merge only. A push clears the
 // arm and briefly reports approvals_syncing before the arm can land, so retry through
@@ -146,26 +141,9 @@ export interface MergeOptions {
   sha?: string | undefined;
 }
 
-export function trainArgs(
-  iid: number,
-  opts: Pick<MergeOptions, "squash" | "sha">,
-  repo?: string,
-): string[] {
-  const args = [
-    "api",
-    `${projectPath(repo)}/merge_trains/merge_requests/${iid}`,
-    "-X",
-    "POST",
-    "-f",
-    "auto_merge=true",
-  ];
-  if (opts.squash) args.push("-f", "squash=true");
-  if (opts.sha != null && opts.sha !== "") args.push("-f", `sha=${opts.sha}`);
-  return args;
-}
-
 // `glab mr merge` turns auto-merge on by default whenever a pipeline is running, so
 // omitting the flag arms the MR instead of merging it. Always send the caller's choice.
+// On a merge-train project, GitLab routes an auto-merge to the train server-side.
 export function mergeArgs(ref: string, opts: MergeOptions, repo?: string): string[] {
   const args = ["mr", "merge", ref, `--auto-merge=${opts.autoMerge}`, "-y"];
   if (opts.squash) args.push("--squash");
@@ -178,7 +156,6 @@ export interface MergeActions {
   getMrIid: (branch: string) => Promise<number>;
   getMergeRequest: (iid: number) => Promise<MergeRequestDetail>;
   isRebasedOnTarget: (target: string, source: string) => Promise<boolean | null>;
-  addToMergeTrain: (iid: number, opts: MergeOptions) => Promise<void>;
   mergeViaGlab: (ref: string, opts: MergeOptions) => Promise<void>;
 }
 
@@ -198,7 +175,6 @@ export function glabActions(repo?: string): MergeActions {
     // Ancestry needs the checkout's origin, which -R may not name.
     isRebasedOnTarget: (target, source) =>
       repo == null || repo === "" ? isRebasedOnTarget(target, source) : Promise.resolve(null),
-    addToMergeTrain: (iid, opts) => arm(() => $`glab ${trainArgs(iid, opts, repo)}`),
     mergeViaGlab: (ref, opts) =>
       arm(() => $`glab ${mergeArgs(ref, opts, repo)}`, Bun.sleep, opts.autoMerge),
   };
@@ -259,13 +235,7 @@ export async function status(refs: string[], actions: MergeActions): Promise<Mer
 }
 
 export async function merge(ref: string, opts: MergeOptions, actions: MergeActions): Promise<void> {
-  if (opts.autoMerge && (await actions.getProjectConfig()).merge_trains_enabled) {
-    const iid = await resolveIid(ref, actions);
-    console.log(`Merge trains enabled: adding !${iid} (${ref}) to merge train`);
-    await actions.addToMergeTrain(iid, opts);
-  } else {
-    await actions.mergeViaGlab(ref, opts);
-  }
+  await actions.mergeViaGlab(ref, opts);
 }
 
 export async function currentBranch(): Promise<string> {

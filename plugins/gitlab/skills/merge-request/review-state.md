@@ -24,7 +24,15 @@ To withdraw it, run the same call with `mergeRequestDestroyRequestedChanges`.
 
 ## Re-Request Review
 
-The web UI's "re-request review" mutation. `userId` takes `gid://gitlab/User/<id>`, so look up the numeric ID first:
+Post a note holding only the quick action. It resets each named reviewer to `UNREVIEWED` and posts no visible comment:
+
+```bash
+glab mr note create <iid> -m '/request_review @alice @bob'
+```
+
+Done when [Read Review State](#read-review-state) shows each reviewer as `UNREVIEWED`.
+
+If the quick action is unavailable, fall back to the `mergeRequestReviewerRereview` mutation. `userId` takes `gid://gitlab/User/<id>`:
 
 ```bash
 user_id=$(glab api "users?username=<username>" | jq -r '.[0].id')
@@ -35,8 +43,6 @@ glab api graphql \
   -f iid=<iid> \
   -f userId="gid://gitlab/User/$user_id"
 ```
-
-Done when `errors` is empty and the reviewer's `reviewState` reads `UNREVIEWED`.
 
 ## Read Review State
 

@@ -13,63 +13,62 @@ git diff origin/<target-branch>...HEAD
 
 Read `<target-branch>` from `glab mr view <iid>`. `glab mr diff <iid>` prints GitLab's exact diff.
 
-## Draft Notes Script
+## Draft Notes
 
-Create and anchor draft notes through `${CLAUDE_SKILL_DIR}/scripts/draft-note.ts`. It builds the JSON payload, sets `Content-Type`, and fetches diff refs so inline notes anchor to the right SHAs. A hand-rolled `glab api .../draft_notes` call drops the `position` object and posts a summary comment instead.
-
-### Create
-
-Pass bodies with `--body-file`, which keeps backtick-heavy markdown away from shell expansion.
+Create draft notes with `glab mr note draft create`, which reads the body from stdin and anchors inline notes to the MR's latest diff version. It prints the draft id. Add `-R group/project` to target another repository.
 
 ```bash
 # General comment
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --body-file tmp/note.md
+glab mr note draft create <iid> < tmp/note.md
 
-# Inline comment on a new line
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --file src/app.go --line 42 --body-file tmp/note.md
+# Inline comment on a new line, or a range
+glab mr note draft create <iid> --file src/app.go --line 42 < tmp/note.md
+glab mr note draft create <iid> --file src/app.go --line 10:15 < tmp/note.md
 
 # Comment on a deleted line
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --file src/app.go --old-line 10 --body-file tmp/note.md
+glab mr note draft create <iid> --file src/app.go --old-line 10 < tmp/note.md
 
-# Reply to a discussion, optionally resolving it
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts create <iid> --reply-to <discussion-id> [--resolve] --body-file tmp/note.md
+# Reply to a discussion (full id or an 8-character prefix)
+glab mr note draft create <iid> --reply <discussion-id> < tmp/note.md
 ```
 
-A positioned comment on a line outside the diff hunks exits with an error listing the valid line ranges.
+`glab mr note draft list`, `update`, and `delete` manage your pending drafts. A reply that also resolves its thread is the one case native `draft create` cannot express. Use a batch entry for it.
 
 ### Batch Review
+
+`${CLAUDE_SKILL_DIR}/scripts/draft-note.ts` posts many drafts from one JSON file, then optionally publishes and decides:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts review <iid> --input tmp/review.json
 
-# Create, publish, and approve
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts review <iid> --input tmp/review.json --submit --approve
+# Create, publish with a summary, and approve
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts review <iid> --input tmp/review.json --submit --summary-file tmp/summary.md --approve
+
+# Create, publish, and request changes
+bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts review <iid> --input tmp/review.json --submit --request-changes
 ```
 
 ```json
 [
   { "file": "src/app.ts", "line": 42, "body": "Consider extracting this." },
+  { "file": "src/app.ts", "line": "10:15", "body": "This block repeats." },
   { "file": "src/db.ts", "oldLine": 10, "body": "This was handling errors." },
+  { "replyTo": "<full-discussion-id>", "resolve": true, "body": "Fixed." },
   { "body": "Overall the approach looks good." }
 ]
 ```
 
-Failures are reported per entry and the rest of the batch still posts.
+Every entry is attempted and failures print per entry. After any failure the script skips publish and approve and exits 1. `--approve`, `--request-changes`, and the summary flags require `--submit`, and `--approve` conflicts with `--request-changes`. `--sha` pins the approval to the reviewed head commit. A `resolve` entry needs the full discussion id, since it goes through REST.
 
-### List and Submit
+### Publish
 
-`submit` publishes all drafts, then optionally posts a summary and a decision, as up to three calls because REST has no atomic submit. `publish` publishes without a decision.
+`glab mr note draft publish <iid> --yes` publishes every pending draft. `-m <summary>` posts a summary note, and `--reviewer-state requested_changes` sets your review state. GitLab ignores the state when you are the MR author and not a listed reviewer. Neither state is an approval.
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts list <iid>
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts submit <iid>
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts submit <iid> --summary "LGTM, minor nits"
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts submit <iid> --approve --summary-file tmp/review-summary.md
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts submit <iid> --request-changes   # Premium+, GraphQL
-bun ${CLAUDE_SKILL_DIR}/scripts/draft-note.ts publish <iid>
+glab mr note draft publish <iid> --yes -m "A few blockers, see the comments." --reviewer-state requested_changes
 ```
 
-The review is done when `list` shows no remaining drafts.
+The review is done when `glab mr note draft list <iid>` shows no remaining drafts.
 
 ## Code Suggestions
 
@@ -83,21 +82,12 @@ third line
 ```
 ````
 
-## API Pitfalls
-
-For raw `glab api` calls outside the script:
-
-- `glab api --input <file>` needs `-H "Content-Type: application/json"`, or GitLab returns HTTP 415.
-- Send nested objects such as `position` as JSON via `--input`. Nested `-f "position[base_sha]=..."` fields silently fail.
-- Reply with `in_reply_to_discussion_id`.
-- Delete and recreate a positioned draft note to change it. A PUT strips the position.
-- A range comment needs `new_line` set to the range end alongside `line_range`, or GitLab rejects it as "position is incomplete".
-- Review state is GraphQL-only, see [review-state.md](review-state.md).
-
 ## Approvals
 
 ```bash
-# Approve with SHA safety check (409 if the MR has moved)
-glab api projects/:id/merge_requests/<iid>/approve -X POST -f sha="<head_sha>"
-glab api projects/:id/merge_requests/<iid>/unapprove -X POST
+# Approve, failing if the MR has moved past the reviewed commit
+glab mr approve <iid> --sha <head_sha>
+glab mr revoke <iid>
 ```
+
+Review state beyond requesting changes is GraphQL-only, see [review-state.md](review-state.md). For any raw `glab api` call, read [api.md](api.md).

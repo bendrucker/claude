@@ -4,10 +4,12 @@ import {
   type MergeRequestDetail,
   arm,
   errorText,
-  type MergeOptions,
+  merge,
   mergeArgs,
+  ProjectConfig,
+  pickMrIid,
+  projectPath,
   status,
-  streamText,
 } from "./merge";
 
 function shellError(streams: { stdout?: string; stderr?: string }): Error {
@@ -20,17 +22,15 @@ function shellError(streams: { stdout?: string; stderr?: string }): Error {
 function createMergeRequest(overrides: Partial<MergeRequestDetail> = {}): MergeRequestDetail {
   return {
     iid: 10,
-    title: "Add tenants config",
     state: "opened",
     draft: false,
-    web_url: "https://gitlab.com/acme/tenants-config/-/merge_requests/10",
+    sha: "abc123",
     source_branch: "feature",
     target_branch: "main",
     detailed_merge_status: "mergeable",
-    has_conflicts: false,
     blocking_discussions_resolved: true,
     auto_merge_enabled: false,
-    head_pipeline: { id: 7, status: "success" },
+    head_pipeline: { id: 7, status: "success", sha: "abc123" },
     ...overrides,
   };
 }
@@ -38,20 +38,16 @@ function createMergeRequest(overrides: Partial<MergeRequestDetail> = {}): MergeR
 function createActions(overrides: Partial<MergeActions> = {}): MergeActions {
   return {
     getProjectConfig: mock(() => Promise.resolve({ merge_trains_enabled: false })),
+    getMrIid: mock(() => Promise.resolve(10)),
     getMergeRequest: mock(() => Promise.resolve(createMergeRequest())),
     isRebasedOnTarget: mock(() => Promise.resolve(true)),
+    mergeViaGlab: mock(() => Promise.resolve()),
     ...overrides,
   };
 }
 
-describe("streamText", () => {
-  test.each<[string, unknown, string]>([
-    ["passes a string through untrimmed", "  body\n", "  body\n"],
-    ["decodes a Uint8Array", new TextEncoder().encode("body"), "body"],
-    ["drops a value that is not text", { code: 1 }, ""],
-  ])("%s", (_name, stream, expected) => {
-    expect(streamText(stream)).toBe(expected);
-  });
+const trains = () => ({
+  getProjectConfig: mock(() => Promise.resolve({ merge_trains_enabled: true })),
 });
 
 describe("errorText", () => {
@@ -68,8 +64,7 @@ describe("errorText", () => {
       { stdout: encode("body"), stderr: encode("glab: boom (HTTP 500)") },
       "body\nglab: boom (HTTP 500)",
     ],
-    ["accepts string streams", { stdout: "body", stderr: "" }, "body"],
-    ["trims surrounding whitespace", { stdout: encode("  body\n"), stderr: "" }, "body"],
+    ["trims surrounding whitespace", { stdout: encode("  body\n"), stderr: encode("") }, "body"],
     [
       "skips streams that are not text",
       { stdout: { code: 1 }, stderr: encode("glab: boom") },
@@ -79,6 +74,48 @@ describe("errorText", () => {
     ["falls back to the raw value", "plain failure", "plain failure"],
   ])("%s", (_name, err, expected) => {
     expect(errorText(err)).toBe(expected);
+  });
+});
+
+describe("merge", () => {
+  test("hands a train project's auto-merge to glab mr merge", async () => {
+    const actions = createActions(trains());
+    const opts = { autoMerge: true, squash: true, sha: "abc" };
+
+    await merge("feature", opts, actions);
+
+    expect(actions.mergeViaGlab).toHaveBeenCalledWith("feature", opts);
+    expect(actions.getProjectConfig).not.toHaveBeenCalled();
+  });
+});
+
+describe("pickMrIid", () => {
+  const mr = (iid: number, source: number, target: number) => ({
+    iid,
+    source_project_id: source,
+    target_project_id: target,
+  });
+
+  test("ignores a fork MR with the same source branch name", () => {
+    expect(pickMrIid("feature", [mr(5, 99, 1), mr(6, 1, 1)])).toBe(6);
+  });
+
+  test("throws when only a fork MR matches", () => {
+    expect(() => pickMrIid("feature", [mr(5, 99, 1)])).toThrow("No open MR found");
+  });
+
+  test("throws when more than one MR matches", () => {
+    expect(() => pickMrIid("feature", [mr(5, 1, 1), mr(6, 1, 1)])).toThrow("!5, !6");
+  });
+});
+
+describe("projectPath", () => {
+  test.each<[string | undefined, string]>([
+    [undefined, "projects/:id"],
+    ["", "projects/:id"],
+    ["group/sub/project", "projects/group%2Fsub%2Fproject"],
+  ])("maps %p to %s", (repo, expected) => {
+    expect(projectPath(repo)).toBe(expected);
   });
 });
 
@@ -103,6 +140,20 @@ describe("arm", () => {
 
     expect(run).toHaveBeenCalledTimes(1);
     expect(sleep).not.toHaveBeenCalled();
+  });
+
+  test("rethrows already-armed when the merge is immediate", () => {
+    const run = mock(() =>
+      Promise.reject(new Error('{"message":"Merge request is already set to Auto-Merge"}')),
+    );
+
+    expect(
+      arm(
+        run,
+        mock(() => Promise.resolve()),
+        false,
+      ),
+    ).rejects.toThrow("already set");
   });
 
   test("retries through approvals_syncing then succeeds", async () => {
@@ -180,43 +231,83 @@ describe("arm", () => {
 describe("mergeArgs", () => {
   // glab enables auto-merge by default when a pipeline is running, so omitting the
   // flag silently queues the MR. Both branches must send it explicitly.
-  test.each<{ name: string; opts: MergeOptions; expected: string[] }>([
-    {
-      name: "auto-merge",
-      opts: { autoMerge: true },
-      expected: ["feature", "--auto-merge=true", "-y"],
-    },
-    {
-      name: "immediate merge",
-      opts: { autoMerge: false },
-      expected: ["feature", "--auto-merge=false", "-y"],
-    },
-    {
-      name: "squashed auto-merge",
-      opts: { autoMerge: true, squash: true },
-      expected: ["feature", "--auto-merge=true", "--squash", "-y"],
-    },
-  ])("$name", ({ opts, expected }) => {
-    expect(mergeArgs("feature", opts)).toEqual(expected);
+  test.each([
+    [true, "--auto-merge=true"],
+    [false, "--auto-merge=false"],
+  ])("passes the auto-merge choice explicitly when autoMerge is %p", (autoMerge, flag) => {
+    expect(mergeArgs("feature", { autoMerge })).toEqual(["mr", "merge", "feature", flag, "-y"]);
+  });
+
+  test("appends squash, sha, and repo", () => {
+    expect(mergeArgs("feature", { autoMerge: false, squash: true, sha: "abc" }, "g/p")).toEqual([
+      "mr",
+      "merge",
+      "feature",
+      "--auto-merge=false",
+      "-y",
+      "--squash",
+      "--sha",
+      "abc",
+      "-R",
+      "g/p",
+    ]);
   });
 });
 
 describe("status", () => {
-  test("reports merge readiness without merging", async () => {
-    const actions = createActions({
-      getProjectConfig: mock(() => Promise.resolve({ merge_trains_enabled: true })),
-    });
+  test("reports a compact projection without merging", async () => {
+    const actions = createActions(trains());
 
-    const result = await status("feature", actions);
+    const [result] = await status(["feature"], actions);
 
-    expect(result).toMatchObject({
+    expect(result).toEqual({
       iid: 10,
+      state: "opened",
+      draft: false,
+      source_branch: "feature",
+      target_branch: "main",
+      sha: "abc123",
       detailed_merge_status: "mergeable",
+      blocking_discussions_resolved: true,
+      auto_merge: false,
+      merge_user: null,
+      head_pipeline: { id: 7, status: "success", sha: "abc123" },
       merge_trains_enabled: true,
       rebased_on_target: true,
     });
-    expect(actions.getMergeRequest).toHaveBeenCalledWith("feature");
     expect(actions.isRebasedOnTarget).toHaveBeenCalledWith("main", "feature");
+    expect(actions.mergeViaGlab).not.toHaveBeenCalled();
+  });
+
+  test("reads several iids with one project read", async () => {
+    const actions = createActions({
+      getMergeRequest: mock((iid: number) => Promise.resolve(createMergeRequest({ iid }))),
+    });
+
+    const results = await status(["1298", "1299", "feature"], actions);
+
+    expect(results.map((r) => r.iid)).toEqual([1298, 1299, 10]);
+    expect(actions.getProjectConfig).toHaveBeenCalledTimes(1);
+    expect(actions.getMrIid).toHaveBeenCalledTimes(1);
+  });
+
+  test("falls back to merge_when_pipeline_succeeds for auto-merge", async () => {
+    const actions = createActions({
+      getMergeRequest: mock(() =>
+        Promise.resolve(
+          createMergeRequest({
+            auto_merge_enabled: undefined,
+            merge_when_pipeline_succeeds: true,
+            merge_user: { username: "ben" },
+          }),
+        ),
+      ),
+    });
+
+    const [result] = await status(["10"], actions);
+
+    expect(result?.auto_merge).toBe(true);
+    expect(result?.merge_user).toBe("ben");
   });
 
   test("surfaces a child MR still targeting a merged parent branch", async () => {
@@ -227,10 +318,10 @@ describe("status", () => {
       isRebasedOnTarget: mock(() => Promise.resolve(false)),
     });
 
-    const result = await status("feature", actions);
+    const [result] = await status(["feature"], actions);
 
-    expect(result.target_branch).toBe("parent-layer");
-    expect(result.rebased_on_target).toBe(false);
+    expect(result?.target_branch).toBe("parent-layer");
+    expect(result?.rebased_on_target).toBe(false);
   });
 
   test("reports null when the ancestry check cannot run", async () => {
@@ -238,14 +329,23 @@ describe("status", () => {
       isRebasedOnTarget: mock(() => Promise.resolve(null)),
     });
 
-    expect((await status("feature", actions)).rebased_on_target).toBeNull();
+    expect((await status(["feature"], actions))[0]?.rebased_on_target).toBeNull();
   });
 
-  test("throws when no MR is found for the branch", () => {
+  test("throws when no open MR found for branch", () => {
     const actions = createActions({
-      getMergeRequest: mock(() => Promise.reject(new Error("no merge request found"))),
+      getMrIid: mock(() => Promise.reject(new Error("No open MR found for branch: no-mr"))),
     });
 
-    expect(status("no-mr", actions)).rejects.toThrow("no merge request found");
+    expect(status(["no-mr"], actions)).rejects.toThrow("No open MR found for branch: no-mr");
+  });
+});
+
+describe("ProjectConfig", () => {
+  test.each<{ name: string; input: object; expected: boolean }>([
+    { name: "absent on a plan without trains", input: {}, expected: false },
+    { name: "enabled", input: { merge_trains_enabled: true }, expected: true },
+  ])("$name", ({ input, expected }) => {
+    expect(ProjectConfig.parse(input).merge_trains_enabled).toBe(expected);
   });
 });

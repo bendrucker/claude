@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { type CurrentUser, filterReviewQueue, type ReviewState } from "./review-queue";
+import {
+  assertComplete,
+  type CurrentUser,
+  filterReviewQueue,
+  QUERY,
+  type ReviewState,
+} from "./review-queue";
 
 function mrNode(
   reference: string,
@@ -113,5 +119,46 @@ describe("filterReviewQueue", () => {
     };
 
     expect(filterReviewQueue(user)).toEqual([]);
+  });
+});
+
+describe("QUERY", () => {
+  test("asks for the project-qualified reference, which !iid alone is not", () => {
+    expect(QUERY).toContain("reference(full: true)");
+  });
+});
+
+describe("assertComplete", () => {
+  const withPage = (hasNextPage: boolean | undefined): CurrentUser => ({
+    username: "me",
+    reviewRequestedMergeRequests: {
+      nodes: [],
+      pageInfo: hasNextPage === undefined ? null : { hasNextPage },
+    },
+  });
+
+  test("throws when another page exists", () => {
+    expect(() => {
+      assertComplete(withPage(true));
+    }).toThrow("truncated");
+  });
+
+  test.each([false, undefined])("passes when hasNextPage is %p", (hasNextPage) => {
+    expect(() => {
+      assertComplete(withPage(hasNextPage));
+    }).not.toThrow();
+  });
+});
+
+describe("filterReviewQueue across projects", () => {
+  test("keeps same-iid MRs from different projects apart", () => {
+    const result = filterReviewQueue(
+      currentUser([
+        mrNode("org/a!1", [{ username: "me", reviewState: "UNREVIEWED" }]),
+        mrNode("org/b!1", [{ username: "me", reviewState: "UNREVIEWED" }]),
+      ]),
+    );
+
+    expect(result.map((r) => r.reference)).toEqual(["org/a!1", "org/b!1"]);
   });
 });

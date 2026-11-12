@@ -171,6 +171,15 @@ describe("echo mode", () => {
     );
   });
 
+  test("glab accepts --attach on mr update and mr note create, echoing the body", () => {
+    expect(
+      stub(run, "glab", ["mr", "update", "1", "--attach", "tmp/s.png", "-d", "Edited"]).out,
+    ).toBe(block("", "Edited", gitlab));
+    expect(
+      stub(run, "glab", ["mr", "note", "create", "1", "--attach", "tmp/s.png", "-m", "Edited"]).out,
+    ).toBe(block("", "Edited", gitlab));
+  });
+
   test.each([
     ["glab", ["mr", "update", "1", "--description", "Edited"], gitlab],
     ["gh", ["pr", "edit", "1", "--body", "Edited"], "https://github.com/team/service/pull/1"],
@@ -492,6 +501,18 @@ describe("glab snapshot", () => {
     expect(list.indexOf("added 1 commit")).toBeLessThan(list.indexOf("Why b?"));
   });
 
+  test("prints one item per line for --paginate --output ndjson", () => {
+    const r = stub(run, "glab", [
+      "api",
+      "--paginate",
+      "--output",
+      "ndjson",
+      "projects/:id/merge_requests/89/discussions?per_page=100",
+    ]);
+    const lines = r.out.trimEnd().split("\n");
+    expect(lines.map((l) => /"id":"([^"]+)"/.exec(l)?.[1])).toEqual(["d1", "d2"]);
+  });
+
   test("lists participants once each", () => {
     const path = "projects/team%2Fservice/merge_requests/89/participants";
     const r = stub(run, "glab", ["api", path, "--jq", ".[].username"]);
@@ -506,8 +527,51 @@ describe("glab snapshot", () => {
     });
   });
 
+  test("expands --placeholder into one encoded path segment before matching", async () => {
+    await $`git branch release/rate-limit`.cwd(run.cwd);
+    const get = (...args: string[]) => stub(run, "glab", ["api", ...args]);
+    const encoded = get(
+      "projects/:id/repository/branches/:b",
+      "--placeholder",
+      "b=release/rate-limit",
+    );
+    expect(JSON.parse(encoded.out)).toMatchObject({
+      name: "release/rate-limit",
+      commit: { id: shas.head },
+    });
+    expect(get("projects/:id/repository/branches/release%2Frate-limit").code).toBe(0);
+    const raw = get("projects/:id/repository/branches/release/rate-limit");
+    expect(raw.code).toBe(1);
+    expect(raw.err).toContain("404");
+    expect(get("projects/:id/repository/branches/:b", "--placeholder", "b=nope").err).toContain(
+      "404",
+    );
+  });
+
+  test("keeps :b distinct from a longer placeholder name", () => {
+    const r = stub(run, "glab", [
+      "api",
+      "projects/:id/repository/branches/:branch",
+      "--placeholder",
+      "b=x",
+      "--placeholder",
+      "branch=release/rate-limit",
+    ]);
+    expect(JSON.parse(r.out)).toMatchObject({ name: "release/rate-limit" });
+  });
+
   test.each([
     [["mr", "note", "89", "-m", "hi"], "glab mr note"],
+    [["mr", "note", "create", "89", "--reply", "d1"], "glab mr note create"],
+    [["mr", "note", "create", "89", "-m", "/request_review @jlee"], "glab mr note create"],
+    [
+      ["mr", "note", "create", "89", "--attach", "tmp/shot.png", "-m", "see"],
+      "glab mr note create",
+    ],
+    [["mr", "note", "resolve", "89", "d1"], "glab mr note resolve"],
+    [["mr", "note", "reopen", "89", "d1"], "glab mr note reopen"],
+    [["mr", "update", "89", "--attach", "tmp/shot.png"], "glab mr update"],
+    [["mr", "update", "--attach", "tmp/a.png", "--attach", "tmp/b.png", "89"], "glab mr update"],
     [["mr", "approve", "89"], "glab mr approve"],
     [
       ["api", "-X", "PUT", "projects/:id/merge_requests/89/discussions/d1", "-f", "resolved=true"],

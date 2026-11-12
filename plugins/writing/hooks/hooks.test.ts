@@ -7,6 +7,7 @@ import {
   FIELD_FILE_GUARD,
   GIT_MESSAGE_FILE_GUARD,
   INPUT_FILE_GUARD,
+  REVIEW_STDIN_GUARD,
   MCP_PROSE_GUARD,
   PROSE_FLAGS,
 } from "./messages";
@@ -75,6 +76,7 @@ describe("PreToolUse gating", () => {
     expect(command).toContain(FIELD_FILE_GUARD);
     expect(command).toContain(GIT_MESSAGE_FILE_GUARD);
     expect(command).toContain(INPUT_FILE_GUARD);
+    expect(command).toContain(REVIEW_STDIN_GUARD);
     for (const flag of BODY_FILE_FLAGS) expect(`${flag} `).toMatch(new RegExp(alternation));
   });
 });
@@ -146,6 +148,17 @@ describe("inline guard behavior", () => {
       command: "bun draft-note.ts review 1 --input tmp/review.json",
       runs: true,
     },
+    {
+      name: "glab note stdin redirect",
+      command: "glab mr note create 7 < tmp/reply.md",
+      runs: true,
+    },
+    {
+      name: "glab note substitution body",
+      command: 'glab mr note draft publish 7 --yes -m "$(cat tmp/s.md)"',
+      runs: true,
+    },
+    { name: "unrelated stdin redirect", command: "jq . < tmp/x.json", runs: false },
     { name: "field with inline value", command: "gh api repos/x -F state=closed", runs: false },
     { name: "git commit inline message", command: "git commit -m 'fix: parser'", runs: false },
     { name: "flag-free long command", command: "ls -la && bun test plugins/writing", runs: false },

@@ -132,6 +132,102 @@ describe("collectText", () => {
       expect(texts).toContain("Tag annotation");
     });
 
+    describe("review command bodies", () => {
+      test.each<{ name: string; target: (path: string) => string }>([
+        { name: "a bare path", target: (path) => path },
+        { name: "a double-quoted path", target: (path) => `"${path}"` },
+        { name: "a single-quoted path", target: (path) => `'${path}'` },
+      ])("reads a stdin redirect from $name", async ({ target }) => {
+        await Bun.write(tmpFile, "Redirected note");
+        const texts = await collectText(mockBash(`glab mr note create 7 < ${target(tmpFile)}`));
+        expect(texts).toContain("Redirected note");
+      });
+
+      it("reads a stdin redirect after --reply", async () => {
+        await Bun.write(tmpFile, "Threaded reply");
+        const texts = await collectText(
+          mockBash(`glab mr note create 7 --reply abc123 <${tmpFile}`),
+        );
+        expect(texts).toContain("Threaded reply");
+      });
+
+      it("reads -m with cat substitution", async () => {
+        await Bun.write(tmpFile, "Summary via cat");
+        const texts = await collectText(
+          mockBash(`glab mr note draft publish 7 --yes -m "$(cat ${tmpFile})"`),
+        );
+        expect(texts).toEqual(["Summary via cat"]);
+      });
+
+      it("reads -m with redirect substitution", async () => {
+        await Bun.write(tmpFile, "Summary via redirect");
+        const texts = await collectText(
+          mockBash(`glab mr note draft publish 7 -m "$(< ${tmpFile})"`),
+        );
+        expect(texts).toEqual(["Summary via redirect"]);
+      });
+
+      it("reads inline -m", async () => {
+        const texts = await collectText(mockBash('glab mr note draft publish 7 -m "Ready now"'));
+        expect(texts).toEqual(["Ready now"]);
+      });
+
+      it("ignores a redirect inside a heredoc body", async () => {
+        await Bun.write(tmpFile, "Should not be read");
+        const texts = await collectText(
+          mockBash(`glab mr note create 7 <<'EOF'\nuse a < ${tmpFile} here\nEOF`),
+        );
+        expect(texts).toHaveLength(0);
+      });
+
+      it("ignores a redirect inside quotes", async () => {
+        await Bun.write(tmpFile, "Should not be read");
+        const texts = await collectText(mockBash(`glab mr note create 7 -m 'a < ${tmpFile}'`));
+        expect(texts).not.toContain("Should not be read");
+      });
+
+      it("ignores a redirect on a non-review command", async () => {
+        await Bun.write(tmpFile, "Should not be read");
+        expect(await collectText(mockBash(`jq . < ${tmpFile}`))).toHaveLength(0);
+      });
+
+      it("reads only the review command's redirect in a compound command", async () => {
+        const other = join(dir, "data.md");
+        await Bun.write(other, "Should not be read");
+        await Bun.write(tmpFile, "Redirected note");
+        const texts = await collectText(
+          mockBash(`jq . < ${other} && glab mr note create 7 < ${tmpFile}`),
+        );
+        expect(texts).toEqual(["Redirected note"]);
+      });
+    });
+
+    test.each<{ name: string; command: string; expected: string[] }>([
+      {
+        name: "escaped quotes inside a flag value",
+        command: String.raw`gh issue create --body "say \"hi\" now"`,
+        expected: ['say "hi" now'],
+      },
+      {
+        name: "a flag inside another command's quoted argument",
+        command: `echo "--body 'Not a body'" && git status`,
+        expected: [],
+      },
+      {
+        name: "a flag on a command chained after the body",
+        command: `gh issue create --title "Real title" && other --title`,
+        expected: ["Real title"],
+      },
+    ])("inline values: $name", async ({ command, expected }) => {
+      expect(await collectText(mockBash(command))).toEqual(expected);
+    });
+
+    it("reads a --body cat substitution", async () => {
+      await Bun.write(tmpFile, "Body via cat");
+      const texts = await collectText(mockBash(`gh pr create --body "$(cat ${tmpFile})"`));
+      expect(texts).toEqual(["Body via cat"]);
+    });
+
     it("ignores bare -F outside git commands", async () => {
       const texts = await collectText(mockBash("curl -F upload=/tmp/data.bin https://x"));
       expect(texts).toHaveLength(0);

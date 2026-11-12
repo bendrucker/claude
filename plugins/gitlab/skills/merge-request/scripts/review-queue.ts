@@ -26,7 +26,10 @@ const MergeRequestNode = z.looseObject({
 
 export const CurrentUser = z.looseObject({
   username: z.string(),
-  reviewRequestedMergeRequests: z.looseObject({ nodes: z.array(MergeRequestNode) }),
+  reviewRequestedMergeRequests: z.looseObject({
+    nodes: z.array(MergeRequestNode),
+    pageInfo: z.looseObject({ hasNextPage: z.boolean() }).nullish(),
+  }),
 });
 export type CurrentUser = z.infer<typeof CurrentUser>;
 
@@ -41,12 +44,15 @@ export interface ReviewQueueEntry {
   title: string;
 }
 
-const QUERY = `{
+export const QUERY = `{
   currentUser {
     username
-    reviewRequestedMergeRequests(state: opened) {
+    reviewRequestedMergeRequests(state: opened, first: 100) {
+      pageInfo {
+        hasNextPage
+      }
       nodes {
-        reference
+        reference(full: true)
         webUrl
         title
         reviewers {
@@ -78,6 +84,12 @@ export function filterReviewQueue(currentUser: CurrentUser): ReviewQueueEntry[] 
     .map((node) => ({ url: node.webUrl, reference: node.reference, title: node.title }));
 }
 
+export function assertComplete(currentUser: CurrentUser): void {
+  if (currentUser.reviewRequestedMergeRequests.pageInfo?.hasNextPage) {
+    throw new Error("More than 100 review-requested MRs: the queue would be truncated");
+  }
+}
+
 if (import.meta.main) {
   await cli(
     {
@@ -96,6 +108,7 @@ if (import.meta.main) {
         console.error("No currentUser in GraphQL response (is glab authenticated?)");
         process.exit(1);
       }
+      assertComplete(currentUser);
       console.log(JSON.stringify(filterReviewQueue(currentUser), null, 2));
     },
   );

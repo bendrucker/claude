@@ -1,6 +1,13 @@
 import type { On } from "claude-code";
 import { describe, expect, mock, test, type Engine } from "claude-code/testing";
-import { IDLE_CAP_MS, MAX_ATTEMPTS, POLL_MS, QUIET_MS, TICK_MS } from "./register.ts";
+import {
+  GRAPH_RETRY_MS,
+  IDLE_CAP_MS,
+  MAX_ATTEMPTS,
+  POLL_MS,
+  QUIET_MS,
+  TICK_MS,
+} from "./register.ts";
 
 interface Recorded {
   event: string;
@@ -22,6 +29,7 @@ const mr = (pipeline: string | null = "running", state = "opened") => ({
   iid: 7,
   project_id: 1,
   web_url: "https://gitlab.example.com/g/r/-/merge_requests/7",
+  references: { full: "g/r!7" },
   state,
   sha: "aaaaaaa1111",
   detailed_merge_status: "mergeable",
@@ -634,7 +642,7 @@ describe("register", () => {
     expect(w.views).toEqual([]);
 
     world.branch = "master";
-    await w.clock.advance(POLL_MS.idle);
+    await w.clock.advance(TICK_MS);
     expect(w.views.length).toBe(1);
     expect(w.named("mr.tracked").length).toBe(1);
   });
@@ -820,6 +828,108 @@ describe("register", () => {
     world.jobs = job("success");
     await w.clock.advance(POLL_MS.settled * 2);
     expect(w.submits.length).toBe(1);
+  });
+
+  test("the GraphQL path comes from the MR's project reference, not a subpath install's URL", async ($, on) => {
+    const subpath = {
+      ...mr("success"),
+      web_url: "https://gitlab.example.com/gitlab/g/r/-/merge_requests/7",
+    };
+    const world: World = { branch: "topic", glab: GLAB_OK, view: subpath, jobs: job("success") };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.graphql.length).toBe(1);
+    expect(w.graphql[0]).toContain("-f path=g/r ");
+  });
+
+  test("a view with an unparseable URL still polls", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: { ...mr("success"), web_url: "not a url" },
+      jobs: job("success"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.named("poll.error")).toEqual([]);
+    expect(w.named("mr.tracked").length).toBe(1);
+  });
+
+  test("a failed GraphQL read is not retried for the same key until the retry wait passes", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+      reviewers: "HTTP 500",
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.graphql.length).toBe(1);
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.graphql.length).toBe(1);
+    await w.clock.advance(GRAPH_RETRY_MS);
+    expect(w.graphql.length).toBe(2);
+  });
+
+  test("an MR with the same IID in another project is tracked anew once merged", async ($, on) => {
+    const merged = (projectId: number) => ({ ...mr(null, "merged"), project_id: projectId });
+    const world: World = { branch: "topic", glab: GLAB_OK, view: merged(1) };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.named("mr.tracked").length).toBe(1);
+
+    world.view = merged(2);
+    await w.clock.advance(POLL_MS.closed);
+    expect(w.named("mr.tracked").length).toBe(2);
+  });
+
+  test("a note cursor from another project's MR with the same IID is not carried over", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+      notes: [note(50, "alice")],
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+
+    world.view = { ...mr("success"), project_id: 2 };
+    world.notes = [note(5, "bob")];
+    await w.clock.advance(POLL_MS.settled);
+    world.notes = [note(6, "alice"), note(5, "bob")];
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits.some((text) => text.includes("@alice commented on MR !7"))).toBe(true);
+  });
+
+  test("a branch switch polls on the next tick instead of waiting out the backoff", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.named("mr.tracked").length).toBe(1);
+
+    world.branch = "other";
+    world.view = { ...mr("success"), iid: 8 };
+    await w.clock.advance(TICK_MS);
+    expect(w.named("mr.tracked").length).toBe(2);
   });
 
   test("a second /mr closes the pane", async ($, on) => {

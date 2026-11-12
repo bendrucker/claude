@@ -11,7 +11,6 @@ allowed-tools:
   - Skill(pull-request:follow-up)
   - Skill(github:stack)
   - Skill(gitlab:merge-request)
-  - Skill(gitlab:api)
   - Skill(github:attach)
   - "Bash(git add:*)"
   - "Bash(git commit:*)"
@@ -92,7 +91,7 @@ When the context above shows a detected PR template, load [`references/template.
 1. Create the PR/MR, appending `--draft` when set, `--base <parent>` when the branch is a stack layer, and `--label <name>` for each label that resolved:
    - **GitHub**: `gh pr create --title "..." --body-file tmp/pr-body-<branch>.md`
    - **GitLab**: `glab mr create --title "..." --description-file tmp/pr-body-<branch>.md`
-   - Upload a screenshot or recording the body references by local path. GitHub: load `github:attach`, then pass `--attach ./shot.png` per file on `gh pr create`, which rewrites the reference to the uploaded asset. GitLab: upload each file per the uploads section of `gitlab:api` and paste the returned markdown into the body before creating.
+   - Upload a screenshot or recording the body references by local path. GitHub: load `github:attach`, then pass `--attach ./shot.png` per file on `gh pr create`, which rewrites the reference to the uploaded asset. GitLab: pass `--attach ./shot.png` per file on `glab mr create`.
    - Keep the branch name in the body filename so concurrent agents use separate files. Writing the file with a quoted heredoc (`cat > tmp/pr-body-<branch>.md <<'EOF'`) in the same call as the create command works, because the validation hook reads the heredoc directly.
 1. Chain a GitHub stack layer into its stack once the PR exists. Load `github:stack` for the `gh stack link` forms, the detection query that picks between them, and what an exit code 9 means.
 1. When `--[no-]auto` resolves on, enable auto-merge per [`references/merge.md`](references/merge.md).

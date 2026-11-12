@@ -4,7 +4,7 @@ import {
   type MergeRequestDetail,
   arm,
   errorText,
-  merge,
+  type MergeOptions,
   mergeArgs,
   status,
   streamText,
@@ -37,12 +37,9 @@ function createMergeRequest(overrides: Partial<MergeRequestDetail> = {}): MergeR
 
 function createActions(overrides: Partial<MergeActions> = {}): MergeActions {
   return {
-    getProjectConfig: mock(() => Promise.resolve({ id: 42, merge_trains_enabled: false })),
-    getMrIid: mock(() => Promise.resolve(10)),
+    getProjectConfig: mock(() => Promise.resolve({ merge_trains_enabled: false })),
     getMergeRequest: mock(() => Promise.resolve(createMergeRequest())),
     isRebasedOnTarget: mock(() => Promise.resolve(true)),
-    addToMergeTrain: mock(() => Promise.resolve()),
-    mergeViaGlab: mock(() => Promise.resolve()),
     ...overrides,
   };
 }
@@ -82,69 +79,6 @@ describe("errorText", () => {
     ["falls back to the raw value", "plain failure", "plain failure"],
   ])("%s", (_name, err, expected) => {
     expect(errorText(err)).toBe(expected);
-  });
-});
-
-describe("merge", () => {
-  test("uses merge train API when merge trains enabled and auto-merge requested", async () => {
-    const actions = createActions({
-      getProjectConfig: mock(() => Promise.resolve({ id: 42, merge_trains_enabled: true })),
-    });
-
-    await merge("feature", { autoMerge: true }, actions);
-
-    expect(actions.getMrIid).toHaveBeenCalledWith("feature");
-    expect(actions.addToMergeTrain).toHaveBeenCalledWith({
-      projectId: 42,
-      iid: 10,
-      squash: undefined,
-    });
-    expect(actions.mergeViaGlab).not.toHaveBeenCalled();
-  });
-
-  test("uses glab mr merge when merge trains disabled", async () => {
-    const actions = createActions();
-
-    await merge("feature", { autoMerge: true }, actions);
-
-    expect(actions.mergeViaGlab).toHaveBeenCalledWith("feature", true);
-    expect(actions.addToMergeTrain).not.toHaveBeenCalled();
-  });
-
-  test("uses glab mr merge when auto-merge not requested", async () => {
-    const actions = createActions({
-      getProjectConfig: mock(() => Promise.resolve({ id: 42, merge_trains_enabled: true })),
-    });
-
-    await merge("feature", { autoMerge: false }, actions);
-
-    expect(actions.mergeViaGlab).toHaveBeenCalledWith("feature", false);
-    expect(actions.addToMergeTrain).not.toHaveBeenCalled();
-  });
-
-  test("throws when no open MR found for branch", () => {
-    const actions = createActions({
-      getProjectConfig: mock(() => Promise.resolve({ id: 42, merge_trains_enabled: true })),
-      getMrIid: mock(() => Promise.reject(new Error("No open MR found for branch: no-mr"))),
-    });
-
-    expect(merge("no-mr", { autoMerge: true }, actions)).rejects.toThrow(
-      "No open MR found for branch: no-mr",
-    );
-  });
-
-  test("passes squash flag to merge train API", async () => {
-    const actions = createActions({
-      getProjectConfig: mock(() => Promise.resolve({ id: 42, merge_trains_enabled: true })),
-    });
-
-    await merge("feature", { autoMerge: true, squash: true }, actions);
-
-    expect(actions.addToMergeTrain).toHaveBeenCalledWith({
-      projectId: 42,
-      iid: 10,
-      squash: true,
-    });
   });
 });
 
@@ -246,18 +180,31 @@ describe("arm", () => {
 describe("mergeArgs", () => {
   // glab enables auto-merge by default when a pipeline is running, so omitting the
   // flag silently queues the MR. Both branches must send it explicitly.
-  test.each([
-    [true, "--auto-merge=true"],
-    [false, "--auto-merge=false"],
-  ])("passes the auto-merge choice explicitly when autoMerge is %p", (autoMerge, flag) => {
-    expect(mergeArgs("feature", autoMerge)).toEqual(["feature", flag, "-y"]);
+  test.each<{ name: string; opts: MergeOptions; expected: string[] }>([
+    {
+      name: "auto-merge",
+      opts: { autoMerge: true },
+      expected: ["feature", "--auto-merge=true", "-y"],
+    },
+    {
+      name: "immediate merge",
+      opts: { autoMerge: false },
+      expected: ["feature", "--auto-merge=false", "-y"],
+    },
+    {
+      name: "squashed auto-merge",
+      opts: { autoMerge: true, squash: true },
+      expected: ["feature", "--auto-merge=true", "--squash", "-y"],
+    },
+  ])("$name", ({ opts, expected }) => {
+    expect(mergeArgs("feature", opts)).toEqual(expected);
   });
 });
 
 describe("status", () => {
   test("reports merge readiness without merging", async () => {
     const actions = createActions({
-      getProjectConfig: mock(() => Promise.resolve({ id: 42, merge_trains_enabled: true })),
+      getProjectConfig: mock(() => Promise.resolve({ merge_trains_enabled: true })),
     });
 
     const result = await status("feature", actions);
@@ -268,9 +215,8 @@ describe("status", () => {
       merge_trains_enabled: true,
       rebased_on_target: true,
     });
+    expect(actions.getMergeRequest).toHaveBeenCalledWith("feature");
     expect(actions.isRebasedOnTarget).toHaveBeenCalledWith("main", "feature");
-    expect(actions.mergeViaGlab).not.toHaveBeenCalled();
-    expect(actions.addToMergeTrain).not.toHaveBeenCalled();
   });
 
   test("surfaces a child MR still targeting a merged parent branch", async () => {
@@ -295,11 +241,11 @@ describe("status", () => {
     expect((await status("feature", actions)).rebased_on_target).toBeNull();
   });
 
-  test("throws when no open MR found for branch", () => {
+  test("throws when no MR is found for the branch", () => {
     const actions = createActions({
-      getMrIid: mock(() => Promise.reject(new Error("No open MR found for branch: no-mr"))),
+      getMergeRequest: mock(() => Promise.reject(new Error("no merge request found"))),
     });
 
-    expect(status("no-mr", actions)).rejects.toThrow("No open MR found for branch: no-mr");
+    expect(status("no-mr", actions)).rejects.toThrow("no merge request found");
   });
 });

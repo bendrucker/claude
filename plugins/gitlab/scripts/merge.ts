@@ -4,11 +4,6 @@ import { $ } from "bun";
 import { cli } from "cleye";
 import { z } from "zod";
 
-// glab has no merge-train command: `glab mr merge --auto-merge` hits the accept
-// endpoint (PUT .../merge). GitLab 19.1+ resolves that to the train server-side,
-// but we POST .../merge_trains/merge_requests/:iid directly so squash applies to
-// the train add and the outcome doesn't depend on the instance version.
-
 // Re-arming is idempotent: GitLab returns 409 "already set to Auto-Merge" when the
 // MR is already armed, which we treat as success. A push clears the arm and briefly
 // reports approvals_syncing before the arm can land, so retry through that window.
@@ -69,25 +64,11 @@ export async function arm(
   }
 }
 
-const ProjectConfig = z.looseObject({ id: z.number(), merge_trains_enabled: z.boolean() });
+const ProjectConfig = z.looseObject({ merge_trains_enabled: z.boolean() });
 type ProjectConfig = z.infer<typeof ProjectConfig>;
 
 export async function getProjectConfig(): Promise<ProjectConfig> {
-  return ProjectConfig.parse(await $`glab api projects/:id`.json());
-}
-
-const MergeRequests = z.array(z.looseObject({ iid: z.number() }));
-
-export async function getMrIid(branch: string): Promise<number> {
-  const [mr] = MergeRequests.parse(
-    await $`glab api projects/:id/merge_requests -X GET --field source_branch=${branch} --field state=opened`.json(),
-  );
-
-  if (!mr) {
-    throw new Error(`No open MR found for branch: ${branch}`);
-  }
-
-  return mr.iid;
+  return ProjectConfig.parse(await $`glab api projects/:id`.quiet().json());
 }
 
 export const MergeRequestDetail = z.looseObject({
@@ -101,13 +82,13 @@ export const MergeRequestDetail = z.looseObject({
   detailed_merge_status: z.string(),
   has_conflicts: z.boolean(),
   blocking_discussions_resolved: z.boolean(),
-  auto_merge_enabled: z.boolean().optional(),
+  auto_merge_enabled: z.boolean().nullish(),
   head_pipeline: z.looseObject({ id: z.number(), status: z.string() }).nullish(),
 });
 export type MergeRequestDetail = z.infer<typeof MergeRequestDetail>;
 
-export async function getMergeRequest(iid: number): Promise<MergeRequestDetail> {
-  return MergeRequestDetail.parse(await $`glab api projects/:id/merge_requests/${iid}`.json());
+export async function getMergeRequest(branch: string): Promise<MergeRequestDetail> {
+  return MergeRequestDetail.parse(await $`glab mr view ${branch} -F json`.quiet().json());
 }
 
 // The API's has_conflicts/detailed_merge_status stay stale for minutes after a
@@ -131,50 +112,32 @@ export async function isRebasedOnTarget(target: string, source: string): Promise
   return ancestor.exitCode === 0;
 }
 
-interface MergeTrainOptions {
-  projectId: number;
-  iid: number;
+export interface MergeOptions {
+  autoMerge: boolean;
   squash?: boolean | undefined;
-}
-
-export async function addToMergeTrain(opts: MergeTrainOptions): Promise<void> {
-  const fields = ["--raw-field auto_merge=true"];
-  if (opts.squash) {
-    fields.push("--raw-field squash=true");
-  }
-
-  await arm(
-    () =>
-      $`glab api projects/${opts.projectId}/merge_trains/merge_requests/${opts.iid} -X POST ${{ raw: fields.join(" ") }}`,
-  );
 }
 
 // `glab mr merge` turns auto-merge on by default whenever a pipeline is running, so
 // omitting the flag arms the MR instead of merging it. Always send the caller's choice.
-export function mergeArgs(branch: string, autoMerge: boolean): string[] {
-  return [branch, `--auto-merge=${autoMerge}`, "-y"];
+// On a merge-train project, GitLab routes an auto-merge to the train server-side.
+export function mergeArgs(branch: string, opts: MergeOptions): string[] {
+  return [branch, `--auto-merge=${opts.autoMerge}`, ...(opts.squash ? ["--squash"] : []), "-y"];
 }
 
-export async function mergeViaGlab(branch: string, autoMerge: boolean): Promise<void> {
-  await arm(() => $`glab mr merge ${mergeArgs(branch, autoMerge)}`);
+export async function mergeViaGlab(branch: string, opts: MergeOptions): Promise<void> {
+  await arm(() => $`glab mr merge ${mergeArgs(branch, opts)}`);
 }
 
 export interface MergeActions {
   getProjectConfig: () => Promise<ProjectConfig>;
-  getMrIid: (branch: string) => Promise<number>;
-  getMergeRequest: (iid: number) => Promise<MergeRequestDetail>;
+  getMergeRequest: (branch: string) => Promise<MergeRequestDetail>;
   isRebasedOnTarget: (target: string, source: string) => Promise<boolean | null>;
-  addToMergeTrain: (opts: MergeTrainOptions) => Promise<void>;
-  mergeViaGlab: (branch: string, autoMerge: boolean) => Promise<void>;
 }
 
 const defaultActions: MergeActions = {
   getProjectConfig,
-  getMrIid,
   getMergeRequest,
   isRebasedOnTarget,
-  addToMergeTrain,
-  mergeViaGlab,
 };
 
 export type MergeRequestStatus = MergeRequestDetail & {
@@ -186,35 +149,16 @@ export async function status(
   branch: string,
   actions: MergeActions = defaultActions,
 ): Promise<MergeRequestStatus> {
-  const project = await actions.getProjectConfig();
-  const iid = await actions.getMrIid(branch);
-  const mr = await actions.getMergeRequest(iid);
+  const [project, mr] = await Promise.all([
+    actions.getProjectConfig(),
+    actions.getMergeRequest(branch),
+  ]);
 
   return {
     ...mr,
     merge_trains_enabled: project.merge_trains_enabled,
     rebased_on_target: await actions.isRebasedOnTarget(mr.target_branch, mr.source_branch),
   };
-}
-
-export async function merge(
-  branch: string,
-  opts: { autoMerge: boolean; squash?: boolean },
-  actions: MergeActions = defaultActions,
-): Promise<void> {
-  const project = await actions.getProjectConfig();
-
-  if (project.merge_trains_enabled && opts.autoMerge) {
-    const iid = await actions.getMrIid(branch);
-    console.log(`Merge trains enabled: adding !${iid} (${branch}) to merge train`);
-    await actions.addToMergeTrain({
-      projectId: project.id,
-      iid,
-      squash: opts.squash,
-    });
-  } else {
-    await actions.mergeViaGlab(branch, opts.autoMerge);
-  }
 }
 
 if (import.meta.main) {
@@ -248,7 +192,7 @@ if (import.meta.main) {
   if (argv.flags.status) {
     console.log(JSON.stringify(await status(branch), null, 2));
   } else {
-    await merge(branch, {
+    await mergeViaGlab(branch, {
       autoMerge: argv.flags.autoMerge,
       squash: argv.flags.squash,
     });

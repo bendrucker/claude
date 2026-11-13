@@ -151,7 +151,7 @@ async function orient(): Promise<void> {
 
   if (inspectText === null) {
     console.log(
-      'rex session inspect failed. Run it directly to see why: rex session inspect "$REX_SESSION" --json',
+      "rex session inspect failed. Run it directly to see why: rex session inspect --json",
     );
     return;
   }
@@ -159,7 +159,7 @@ async function orient(): Promise<void> {
   const inspect = decode(Inspect, inspectText);
   if (inspect === null) {
     console.log(
-      'Session did not match the expected shape. Read it directly with: rex session inspect "$REX_SESSION" --json',
+      "Session did not match the expected shape. Read it directly with: rex session inspect --json",
     );
     return;
   }

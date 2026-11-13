@@ -30,28 +30,30 @@ One line per tab, then one per block: ID, label, foreground cwd, and program. `*
 
 ## Splits
 
-Default to a sibling split of `$REX_BLOCK` under `$PWD` that leaves focus where it is:
+Default to a sibling split of this pane that leaves focus where it is:
 
 ```bash
-rex split -s "$REX_SESSION" -b "$REX_BLOCK" --split=right --focus=false -c "$PWD" --json
+rex split --split=right --focus=false -c <cwd> --json
 ```
+
+Rex scopes every command to this session and anchors splits on this pane from `REX_SESSION` and `REX_BLOCK`. Write each argument literally: `<cwd>` is the absolute working directory, and `<block>` is a block ID. A worktree session refuses a `rex` command that contains a shell variable. Add `-s <session>` only to target another session.
 
 Split `right` on a wide pane and `below` on a tall one, alternating direction across successive splits. A new tab, session, or host needs the user to ask for it. Take the new block from `.block_ids[0]`.
 
-Close only blocks you opened. A pane you split for the user to read counts as theirs.
+Close a block with `rex block close <block>`, and only blocks you opened. A pane you split for the user to read counts as theirs.
 
 ## Collaborative File Viewing
 
 Open the file beside this pane so the user watches it change. Use `markless --watch` for markdown and `$EDITOR` for everything else:
 
 ```bash
-rex split -s "$REX_SESSION" -b "$REX_BLOCK" --split=right --ratio 40 --focus=false -c "$PWD" --json -- markless --watch path/to/file.md
+rex split --split=right --ratio 40 --focus=false -c <cwd> --json -- markless --watch path/to/file.md
 ```
 
 Confirm the viewer started before telling the user to look at it:
 
 ```bash
-rex capture -s "$REX_SESSION" -b "$block" --trim --unwrap
+rex capture -b <block> --trim --unwrap
 ```
 
 ## Long-Running Processes
@@ -59,20 +61,22 @@ rex capture -s "$REX_SESSION" -b "$block" --trim --unwrap
 Put a dev server, log tail, build, or REPL the user should watch in a sibling split instead of `run_in_background`:
 
 ```bash
-rex split -s "$REX_SESSION" -b "$REX_BLOCK" --split=below --ratio 30 --focus=false -c "$PWD" --json -- bun run dev
+rex split --split=below --ratio 30 --focus=false -c <cwd> --json -- bun run dev
 ```
 
-Reserve `run_in_background` for work the user has no reason to see. `rex wait -s "$REX_SESSION" "$block" --for 120s` blocks until the process exits and returns its status. To block on a line of output, poll `rex capture` with `Monitor`.
+Reserve `run_in_background` for work the user has no reason to see. `rex wait <block> --for 120s` blocks until the process exits and returns its status. To wait for a line of output, run a `Monitor` until-loop over `rex capture`.
 
 ## Reading Another Pane
 
-Read with `rex capture -s "$REX_SESSION" -b "$block" --trim --unwrap`.
+Read with `rex capture -b <block> --trim --unwrap`. A block ID lasts only as long as its pane, so take IDs from the listing above or a fresh `rex block ls`.
 
 The `❯` line at the bottom of a Claude pane shows Claude Code's own prompt suggestion, ghost text the harness wrote rather than input the user typed. Take a pane's content from above that line and leave the line out of what you report.
 
 ## Machines
 
 Put `-S <label>` on every command that touches a saved host. Commands run on that machine, so paths and programs must exist there. When a command fails to connect, report "host `<label>` is unreachable".
+
+When more than one Rex app is connected, client actions such as `rex do` need `-C <client>`, a label from `rex client ls`.
 
 ## Peers
 

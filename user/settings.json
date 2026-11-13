@@ -315,6 +315,7 @@
         "~/.terraform.d/plugin-cache",
         "~/.cache",
         "~/.local/state/friction",
+        "~/.local/state/rex-try",
         "~/Library/Caches/go-build",
         "~/Library/Caches/ms-playwright",
         "~/Library/Caches/golangci-lint",

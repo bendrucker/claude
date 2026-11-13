@@ -77,7 +77,7 @@ jobs:
           echo "$HOME/.duckdb/cli/$DUCKDB_VERSION" >> "$GITHUB_PATH"
 
       # The adapter suite's tests hand rescore calls to the real uv.
-      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: astral-sh/setup-uv@v10.3.3
 
       - name: Run tests
         run: bun test ./evals/
@@ -246,7 +246,7 @@ jobs:
 
       # The evals adapter suite's tests hand rescore calls to the real uv.
       - if: matrix.plugin.name == 'evals'
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@v10.3.3
 
       - name: Validate plugin
         run: claude plugin validate "plugins/${{ matrix.plugin.name }}"

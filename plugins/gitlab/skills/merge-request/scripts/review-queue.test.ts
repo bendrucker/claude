@@ -46,7 +46,7 @@ describe("filterReviewQueue", () => {
     ]);
   });
 
-  test.each<ReviewState>(["APPROVED", "REQUESTED_CHANGES", "REVIEW_STARTED"])(
+  test.each<ReviewState>(["APPROVED", "REQUESTED_CHANGES", "REVIEWED", "REVIEW_STARTED"])(
     "drops MRs where my reviewer entry is %s",
     (reviewState) => {
       const result = filterReviewQueue(

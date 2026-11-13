@@ -1,6 +1,6 @@
 # Review State
 
-MR review state (`UNREVIEWED`, `REVIEW_STARTED`, `REQUESTED_CHANGES`, `APPROVED`) is GraphQL-only. REST reports every reviewer as `"active"`.
+MR review state (`UNREVIEWED`, `REVIEW_STARTED`, `REQUESTED_CHANGES`, `REVIEWED`, `APPROVED`) is GraphQL-only. REST reports every reviewer as `"active"`.
 
 These rules apply to every mutation below:
 
@@ -85,6 +85,7 @@ To triage every MR you review, run the queue query without the `UNREVIEWED` filt
 | `UNREVIEWED` | You, first review |
 | `REVIEW_STARTED` | You, review not yet submitted |
 | `REQUESTED_CHANGES` | Author, until they re-request |
+| `REVIEWED` | Author, to answer comments left without a verdict |
 | `APPROVED` | Nobody |
 
-The web UI's "Reviewed" label maps to `REVIEW_STARTED` or `REQUESTED_CHANGES`. Triage from `reviewState` rather than the GitLab todos inbox, because re-requests do not reliably create a todo.
+The web UI's "Reviewed" label maps to `REVIEW_STARTED`, `REQUESTED_CHANGES`, or `REVIEWED`. Triage from `reviewState` rather than the GitLab todos inbox, because re-requests do not reliably create a todo.

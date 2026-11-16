@@ -13,13 +13,13 @@ async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOut
   return report(await lintMessages(input), { event: "PreToolUse" })?.output ?? null;
 }
 
-function denialOf(output: SyncHookJSONOutput | null): {
+function decisionOf(output: SyncHookJSONOutput | null): {
   decision: string | undefined;
-  reason: string | undefined;
+  context: string | undefined;
 } {
   const specific = output?.hookSpecificOutput;
-  if (specific?.hookEventName !== "PreToolUse") return { decision: undefined, reason: undefined };
-  return { decision: specific.permissionDecision, reason: specific.permissionDecisionReason };
+  if (specific?.hookEventName !== "PreToolUse") return { decision: undefined, context: undefined };
+  return { decision: specific.permissionDecision, context: specific.additionalContext };
 }
 
 function mockBash(command: string): PreToolUseHookInput {
@@ -295,17 +295,6 @@ describe("Bash processInput", () => {
     expect(result?.hookSpecificOutput).toHaveProperty("additionalContext");
   });
 
-  it("denies an MR body that negates the noun", async () => {
-    const result = await processInput(
-      mockBash(
-        `glab mr create --description "The handler reads the cache, so the event costs no extra query."`,
-      ),
-    );
-    const denial = denialOf(result);
-    expect(denial.decision).toBe("deny");
-    expect(denial.reason).toContain("Writing.NoNegation");
-  });
-
   it("returns null for non-text Bash commands", async () => {
     expect(await processInput(mockBash("git push origin main"))).toBeNull();
   });
@@ -402,27 +391,6 @@ describe("review payloads", () => {
 });
 
 describe("MCP calls", () => {
-  it("denies a GitHub PR body that negates the noun", async () => {
-    const result = await processInput(
-      mockMcp("mcp__github__create_pull_request", {
-        owner: "o",
-        repo: "r",
-        title: "Cache the lookup",
-        body: "The handler reads the cache, so the event costs no extra query.",
-      }),
-    );
-    const denial = denialOf(result);
-    expect(denial.decision).toBe("deny");
-    expect(denial.reason).toContain("Writing.NoNegation");
-  });
-
-  it("denies a thread reply that negates the noun", async () => {
-    const result = await processInput(
-      mockMcp("mcp__hearthbot__post_message", { text: "The sweep ran, and I filed nothing." }),
-    );
-    expect(denialOf(result).decision).toBe("deny");
-  });
-
   it("reads prose at any depth and under any field name", async () => {
     const texts = await collectText(
       mockMcp("mcp__any__tool", {
@@ -576,5 +544,35 @@ describe("isProse properties", () => {
       },
       { testCases: 1000 },
     );
+  });
+});
+
+describe("negated nouns", () => {
+  test.each<{ name: string; input: PreToolUseHookInput }>([
+    {
+      name: "an MR body",
+      input: mockBash(
+        `glab mr create --description "The handler reads the cache, so the event costs no extra query."`,
+      ),
+    },
+    {
+      name: "a GitHub PR body",
+      input: mockMcp("mcp__github__create_pull_request", {
+        owner: "o",
+        repo: "r",
+        title: "Cache the lookup",
+        body: "The handler reads the cache, so the event costs no extra query.",
+      }),
+    },
+    {
+      name: "a thread reply",
+      input: mockMcp("mcp__hearthbot__post_message", {
+        text: "The sweep ran, and I filed nothing.",
+      }),
+    },
+  ])("warns on $name without denying it", async ({ input }) => {
+    const { decision, context } = decisionOf(await processInput(input));
+    expect(decision).toBeUndefined();
+    expect(context).toContain("Writing.NoNegation");
   });
 });

@@ -1,9 +1,10 @@
 # evidence: 2026-09 session-corpus measurement. On shared verbs assistant chat picks the no-form 4.4:1 against the human's 2.7:1, and PR bodies reach 10:1. The governing verbs are an open set and the tagger often reads them as nouns, so the rule excludes closed classes and have/be predication (Tottie 1991) rather than requiring a verb tag. A tagger that reads the next verb as a noun lets an indefinite subject through ("work nobody performs").
-# retire when: the no-form share sits at the human voice baseline for 30 days, or the run log shows blocked side effects that are false positives.
+# retire when: a judged sample of its hits mostly reads no better rewritten.
+# A warning, since a denied message's rewrite tripped on the next phrase. It also flags a bold label with no colon and a complement-clause subject the tagger reads as a noun ("make sure no file changes").
 extends: sequence
 message: "This puts the negation on the noun. Negate the verb with a contraction ('doesn't cost an extra query', 'doesn't add anything'), or use a positive term that names the state exactly ('a no-op', 'unchanged')."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/NoNegation.yml
-level: error
+level: warning
 scope: ~table
 # The indefinite is case-sensitive: capitalized, it opens the sentence as a subject.
 tokens:

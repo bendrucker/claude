@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: appends the dispatch ledger in the plugin data dir under ~/.claude/plugins
 import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { cli } from "cleye";

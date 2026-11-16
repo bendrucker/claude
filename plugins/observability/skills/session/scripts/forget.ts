@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: deletes the host's copy under
-// ~/.claude/session-imports, which the sandbox denies.
 import { rm } from "node:fs/promises";
 import { cli } from "cleye";
 import { forgetHost, getDataDir, importRoot, isHostLabel, LOCAL_HOST } from "./db";

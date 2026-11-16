@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: appends the dispatch ledger under ~/.claude/plugins and reaches the claude daemon and multiplexer sockets
 import { Command, InvalidArgumentError, Option } from "@commander-js/extra-typings";
 import { readSender, type Sender, spawnRunner } from "../../dispatch/scripts/dispatch";
 import {

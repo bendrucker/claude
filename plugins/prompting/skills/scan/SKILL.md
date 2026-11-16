@@ -77,5 +77,5 @@ Then drive the ledger through `audit.ts` and `edit.ts`:
 - An explicit path that is not agent-facing scans nothing and exits 0, which reads the same as a clean pass. Pass `--all` when naming a file outside the recognized paths.
 - The checks cover what a lexical match can find with precision. Sprawl, duplication, and pointer wording need a reading pass, which `audit` runs.
 - The ledger copies source text, so it stays untracked under `tmp/`.
-- The sandbox denies writes under `.claude/skills`, so `edit.ts` carries the `mac` plugin's bypass marker and writes only agent-facing files inside the repository. Where no hook honors the marker, a sandboxed `edit.ts` run fails with nothing written, and this skill authorizes rerunning it with `dangerouslyDisableSandbox: true`.
+- The sandbox denies writes under `.claude/skills`, so `edit.ts` escapes through a `sandbox.excludedCommands` entry naming its deployed path, and writes only agent-facing files inside the repository. Run it as the whole Bash command. Where no entry matches, a sandboxed `edit.ts` run fails with nothing written, and this skill authorizes rerunning it with `dangerouslyDisableSandbox: true`.
 - Retire audit mode when two consecutive rounds fall below 50% overall acceptance in the `prune-acceptance` session query. [references/classes.md](references/classes.md) holds the per-class retirement rule.

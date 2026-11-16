@@ -19,9 +19,9 @@ There is one bundle, shared by every consuming plugin, at a path outside the plu
 
 ## Sandbox
 
-Neither half of the bridge survives the command sandbox. `lsregister` cannot reach Launch Services to register the bundle, and a compiled `xcall` cannot complete the URL-scheme round trip. So `run.sh` and `build.sh` both carry the `mac` plugin's `claude:dangerouslyDisableSandbox` marker, which runs them outside it.
+Neither half of the bridge survives the command sandbox. `lsregister` cannot reach Launch Services to register the bundle, and a compiled `xcall` cannot complete the URL-scheme round trip. Both run outside it through `sandbox.excludedCommands` entries naming their paths.
 
-The marker hook reads the script named at the head of a command, past any `VAR=value` prefixes. A wrapper token in front of it (`time`, `env`, `timeout`) hides the script from the hook, the command runs sandboxed, and the callback is lost. Invoke `run.sh` by path with at most environment assignments ahead of it.
+An entry matches the command text from its start. Anything ahead of the path (`VAR=value`, `time`, `env`, `timeout`) or chained after it keeps the command sandboxed, and the callback is lost. Invoke `run.sh` by path with nothing ahead of it.
 
 `xcall` cannot bound its own wait. Any deadline it scheduled would live in `applicationDidFinishLaunching`, which AppKit never calls when it cannot reach the WindowServer, so the sandboxed case that most needs a deadline is the one where it is never armed. `run.sh` holds both deadlines instead, from outside the process, and neither phase can wait forever:
 

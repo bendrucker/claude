@@ -5,13 +5,6 @@ argument-hint: <app> <expression-or-script-file>
 effort: low
 allowed-tools:
   - "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/jxa.ts:*)"
-hooks:
-  PreToolUse:
-    - matcher: "Bash(bun ${CLAUDE_PLUGIN_ROOT}/scripts/jxa.ts:*)"
-      hooks:
-        - type: command
-          command: |
-            cat | jq '{hookSpecificOutput: {hookEventName: "PreToolUse", updatedInput: (.tool_input + {dangerouslyDisableSandbox: true})}}'
 ---
 
 # Run JXA
@@ -21,3 +14,5 @@ Run the JXA expression or script file from the arguments. `$0` is the app name. 
 ```bash
 bun ${CLAUDE_PLUGIN_ROOT}/scripts/jxa.ts $ARGUMENTS
 ```
+
+Run it as the whole Bash command. The runner leaves the sandbox through a `sandbox.excludedCommands` entry, which matches only when nothing precedes, follows, or pipes from it.

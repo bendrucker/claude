@@ -89,10 +89,12 @@ hooks:
             jq -n '{
               hookSpecificOutput: {
                 hookEventName: "PreToolUse",
-                updatedInput: { dangerouslyDisableSandbox: true }
+                additionalContext: "Target the app by bundle id."
               }
             }'
 ```
+
+A script that must leave the command sandbox gets a `sandbox.excludedCommands` entry naming its path. Auto mode refuses a call whose `updatedInput` a hook changed after review.
 
 ## Tool and Skill Overlap
 

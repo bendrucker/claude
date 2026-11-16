@@ -90,8 +90,8 @@ function tokenize(command: string): string[] | null {
 // The `Bash(open:*)` rule only narrows which calls spawn this hook. It fails
 // open on shell metacharacters, so `open notes.txt && echo done.shortcut`
 // reaches here, and the extension of the last word would describe the `echo`
-// rather than what `open` receives. Since this hook can hand back a sandbox
-// bypass, it decides on its own parse: a compound yields no target, and the call
+// rather than what `open` receives. Since this hook can hand back an allow,
+// it decides on its own parse: a compound yields no target, and the call
 // falls through to normal permissions.
 function extractTarget(command: string): string | null {
   const tokens = tokenize(command) ?? [];
@@ -115,7 +115,6 @@ export function processInput(input: HookInput): SyncHookJSONOutput | null {
         hookEventName: "PreToolUse",
         permissionDecision: "allow",
         permissionDecisionReason: "Opening a .shortcut file for import",
-        updatedInput: { dangerouslyDisableSandbox: true },
       },
     };
   }

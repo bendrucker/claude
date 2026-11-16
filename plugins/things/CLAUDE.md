@@ -10,7 +10,7 @@ JXA scripts run via `osascript`, which requires Apple Events mach-lookup service
 - Formatter (`scripts/format-output.ts`): reads JSON from stdin, outputs tables or passes through `--json`
 - JXA execution: invoke the `mac:jxa-run` skill, which validates `Application("Things3")` scope via AST
 
-Scripts that hand off to Launch Services (`inbox.ts`, `url.ts`, `reorder.ts`, `src/mcp/stdio.ts`) carry the `claude:dangerouslyDisableSandbox` marker so the `mac` plugin's sandbox hook runs them fully outside the command sandbox. `sandbox.allowAppleEvents` alone does not survive the handoff. See [`plugins/mac/README.md`](../mac/README.md).
+The scripts that hand off to Launch Services (`inbox.ts`, `url.ts`, `reorder.ts`) run fully outside the command sandbox through `sandbox.excludedCommands` entries naming their deployed paths. `sandbox.allowAppleEvents` alone does not survive the handoff. `src/mcp/stdio.ts` needs no entry, since tailgate launches it outside Claude Code.
 
 ## JXA Script Conventions
 
@@ -33,7 +33,7 @@ Linting is disabled for the `.js` files in `scripts/jxa/` via `ignorePatterns` i
 
 It takes the plugin root as an argument and is exported so tests can point it at a fixture tree. Injecting it through `DispatchActions` covers what `dispatch` does with a runner, never how one gets found, so the resolver needs its own fixtures across both layouts.
 
-`reorder.ts` and `inbox.ts` are bun TypeScript scripts (not `osascript`). Their Launch Services handoff runs outside the command sandbox via the `claude:dangerouslyDisableSandbox` marker.
+`reorder.ts` and `inbox.ts` are bun TypeScript scripts (not `osascript`). Their Launch Services handoff runs outside the command sandbox through their `sandbox.excludedCommands` entries.
 
 A degraded dispatch is no longer silent. `dispatch` returns a `fallbackReason` naming why no id came back (runner missing, bridge build failed, callback timed out, app error) plus the runner's `fallbackDetail` stderr, and `warnFallback` prints both. Every caller of `dispatch` should pass its result through `warnFallback`, because the alternative is a write that lands with no id and no explanation.
 

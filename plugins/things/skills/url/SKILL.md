@@ -72,7 +72,7 @@ With the `x-callback-url` plugin installed, the scripts read Things' response th
 
 On the fallback path `url.ts` exits 0 with empty stdout after a successful write. Judge failure by a non-zero exit and stderr. Confirm a silent write with `things:jxa` before retrying, since a repeated `add` creates duplicates. `inbox.ts` (`captured: <title>`) and `reorder.ts` always print on success, so silence from them is a failure.
 
-When stderr mentions `procNotFound`, `-10810`, or `LSOpenURLsWithRole`, the sandbox blocked the handoff to Things. `url.ts` and `inbox.ts` carry the `claude:dangerouslyDisableSandbox` marker that the `mac` plugin's sandbox hook acts on, so check that the `mac` plugin is installed.
+When stderr mentions `procNotFound`, `-10810`, or `LSOpenURLsWithRole`, the sandbox blocked the handoff to Things. `url.ts`, `inbox.ts`, and `reorder.ts` escape it only through `sandbox.excludedCommands` entries naming their paths, so invoke them by path with nothing ahead of or chained after the command.
 
 ## Things Behavior
 

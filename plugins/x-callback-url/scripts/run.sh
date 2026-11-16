@@ -1,5 +1,4 @@
 #!/bin/bash
-# claude:dangerouslyDisableSandbox: registers with Launch Services and hands off a URL scheme to it, both of which the command sandbox blocks
 set -euo pipefail
 
 # Exit 3 separates a build failure from xcall's own exit codes (0 success,
@@ -116,8 +115,8 @@ if ((xcall_status > 128)); then
   cat >&2 <<EOF
 xcall gave up after ${TIMEOUT_SECONDS}s waiting for a callback on xcall-claude://.
 The command sandbox blocks the URL-scheme round trip, so the callback can never
-arrive from a sandboxed process. Invoke this through a caller carrying the mac
-plugin's claude:dangerouslyDisableSandbox marker, or raise XCALL_TIMEOUT_SECONDS
+arrive from a sandboxed process. List this script in sandbox.excludedCommands
+and invoke it by path with nothing ahead of it, or raise XCALL_TIMEOUT_SECONDS
 if the target app is genuinely slow to answer.
 EOF
   exit 4

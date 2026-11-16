@@ -486,11 +486,10 @@ describe("rule messages", () => {
       body: `${VISIBLE_PROSE}\n\n${BLOCK_PARAGRAPH}\n\nRenames \`a\`, \`b\`, \`c\`, \`d\`, \`e\`, \`f\`, and \`g\`.`,
       id: "structure-limits",
       fragments: [
-        "prose words 235 > 120",
-        "longest paragraph or bullet words 52 > 40",
-        "inline code spans 7 > 6",
+        "prose words 235 > 120, cut 115",
+        "longest paragraph or bullet words 52 > 40, cut 12",
+        "inline code spans 7 > 6, cut 1",
         "`<details>` don't count",
-        "doesn't run again",
       ],
     },
     {

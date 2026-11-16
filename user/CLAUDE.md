@@ -12,6 +12,7 @@
 
 ## Organization
 
+- Keep the diff to what the task needs. Leave unrelated code and existing comments as they are, most of all in repos I don't own. Add dependencies through the package manager rather than copying their source in.
 - Don't create or extend catch-all modules like `utils`. Name modules for what they hold.
 - Split code into files before splitting it across directories.
 - Don't number steps or phases in code ("Phase 1:", "Step 2:"). Use descriptive function names called in sequence.

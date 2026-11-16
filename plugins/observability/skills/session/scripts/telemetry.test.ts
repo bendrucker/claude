@@ -240,7 +240,6 @@ describe("telemetry ingest", () => {
         decision: "ask",
         hook: "PreToolUse",
         setting: "permissions.blockReadsOutsideWorkingDirectories",
-        decider: "host",
         ceiling: "ask",
         read_only: true,
         outcome: "deny",
@@ -253,12 +252,11 @@ describe("telemetry ingest", () => {
     await reindex();
 
     const verdicts = await db.query(
-      "SELECT tool_use_id, hook, setting, decider, ceiling, read_only, duration_ms, outcome FROM classifier_verdicts",
+      "SELECT tool_use_id, hook, setting, ceiling, read_only, duration_ms, outcome FROM classifier_verdicts",
       z.object({
         tool_use_id: z.string(),
         hook: z.string().nullable(),
         setting: z.string().nullable(),
-        decider: z.string().nullable(),
         ceiling: z.string().nullable(),
         read_only: z.boolean().nullable(),
         duration_ms: z.bigint().nullable(),
@@ -270,7 +268,6 @@ describe("telemetry ingest", () => {
         tool_use_id: "t1",
         hook: "PreToolUse",
         setting: "permissions.blockReadsOutsideWorkingDirectories",
-        decider: "host",
         ceiling: "ask",
         read_only: true,
         duration_ms: 40n,

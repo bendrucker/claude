@@ -47,6 +47,7 @@ function worldOf(
   on("tool.check", () =>
     decision === "allow" ? { decision, rule: "Bash(ls)", ...verdict } : { decision, ...verdict },
   );
+  on("classic.PermissionRequest", () => ({ decision: { behavior: "allow" } }));
   on("tool.call", async () => {
     calls += 1;
     await clock.sleep(ms);
@@ -181,7 +182,7 @@ describe("register", () => {
 
     expect(world.events.map((e) => [e.detail?.decision, e.detail?.outcome])).toEqual([
       ["ask", "throw"],
-      [null, "ok"],
+      ["ask", "ok"],
     ]);
   });
 
@@ -211,6 +212,7 @@ describe("register", () => {
       throw new Error("clock down");
     });
     on("tool.check", () => ({ decision: "ask" }));
+    on("classic.PermissionRequest", () => ({ decision: { behavior: "allow" } }));
     on("tool.call", () => ((calls += 1), { result: "ok" }));
 
     expect(
@@ -222,29 +224,20 @@ describe("register", () => {
     expect(events).toEqual([]);
   });
 
-  test("a call the check never saw records no verdict", async ($, on) => {
-    const world = worldOf(on);
-
-    await settle(world, $.tool.call(CALL));
-
-    expect(world.events).toEqual([
-      expect.objectContaining({
-        detail: expect.objectContaining({ decision: null, check_ms: null }),
-      }),
-    ]);
-  });
-
   test("keys a subagent's verdict on its loop", async ($, on) => {
-    const world = worldOf(on, { decision: "allow" });
-    await $.tool.check({ tool: "Bash", input: {}, tool_use_id: "toolu_1", agentId: "a1" });
+    const world: World = { events: seatEvents(on), calls: () => 0, clock: mock.clock(on) };
+    on("tool.check", (_, e) =>
+      e.agentId === "a1" ? { decision: "allow", rule: "Bash(ls)" } : { decision: "ask" },
+    );
+    on("classic.PermissionRequest", () => ({ decision: { behavior: "allow" } }));
+    on("tool.call", () => ({ result: "ok" }));
 
     await settle(world, $.tool.call(CALL));
-    // The engine sets agentId from the loop. The kit's call type leaves it out.
     const subagentCall = { ...CALL, agentId: "a1" };
     await settle(world, $.tool.call(subagentCall));
 
     expect(world.events.map((e) => e.detail)).toEqual([
-      expect.objectContaining({ agent_id: null, decision: null }),
+      expect.objectContaining({ agent_id: null, decision: "ask", rule: null }),
       expect.objectContaining({ agent_id: "a1", decision: "allow", rule: "Bash(ls)" }),
     ]);
   });

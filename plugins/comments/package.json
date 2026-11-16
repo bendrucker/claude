@@ -10,6 +10,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@hegeldev/hegel": "^0.4.7"
+    "@hegeldev/hegel": "^0.5.0"
   }
 }

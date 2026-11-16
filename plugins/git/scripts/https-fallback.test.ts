@@ -26,6 +26,9 @@ const SECRETIVE_FAILURE = [
   "fatal: Could not read from remote repository.",
 ].join("\n");
 
+const HOSTLESS_FAILURE =
+  'sign_and_send_pubkey: signing failed for RSA "SHA256:abc" from agent: agent refused operation';
+
 function mockInput(
   command: string,
   error: string,
@@ -234,6 +237,70 @@ describe("processInput", () => {
     expect(await processInput(mockInput(command, error), noRemotes)).toBeNull();
   });
 
+  test.each<{ name: string; command: string; error: string }>([
+    {
+      name: "cd into another repo",
+      command: "cd /repo && git fetch -q origin",
+      error: SECRETIVE_FAILURE,
+    },
+    {
+      name: "-C into a worktree",
+      command: "git -C /repo/wt push -u origin HEAD",
+      error: SECRETIVE_FAILURE,
+    },
+    {
+      name: "fetch chained before a switch",
+      command: "git fetch origin main && git switch -c topic origin/main",
+      error: SECRETIVE_FAILURE,
+    },
+    {
+      name: "fetch after a local command",
+      command: "ls; git fetch -q origin main",
+      error: SECRETIVE_FAILURE,
+    },
+    {
+      name: "agent unreachable",
+      command: "git fetch -q origin main",
+      error:
+        'sign_and_send_pubkey: signing failed for ECDSA "x" from agent: communication with agent failed\ngit@github.com: Permission denied (publickey).',
+    },
+  ])(
+    "resolves the host from the error when the cwd has no SSH remote: $name",
+    async ({ command, error }) => {
+      const result = await processInput(mockInput(command, error), noRemotes);
+      const specific = result?.hookSpecificOutput;
+      expect(
+        specific?.hookEventName === "PostToolUseFailure" && specific.additionalContext,
+      ).toContain("url.https://github.com/.insteadOf=git@github.com:");
+    },
+  );
+
+  test("falls back to the manifest default when Claude Code exports no https_hosts option", async () => {
+    const configured = process.env.CLAUDE_PLUGIN_OPTION_HTTPS_HOSTS;
+    delete process.env.CLAUDE_PLUGIN_OPTION_HTTPS_HOSTS;
+    try {
+      const result = await processInput(
+        mockInput("git fetch -q origin main", SECRETIVE_FAILURE),
+        githubSshRemote,
+      );
+      expect(result).not.toBeNull();
+    } finally {
+      process.env.CLAUDE_PLUGIN_OPTION_HTTPS_HOSTS = configured;
+    }
+  });
+
+  test.each<{ command: string; error: string; stage: string }>([
+    { command: "git status", error: SECRETIVE_FAILURE, stage: "not-network" },
+    { command: "git fetch", error: "fatal: couldn't find remote ref main", stage: "not-ssh-auth" },
+    { command: "git fetch", error: HOSTLESS_FAILURE, stage: "no-provider" },
+  ])("names the $stage stage when it stays silent", async ({ command, error, stage }) => {
+    const stages: string[] = [];
+    await processInput(mockInput(command, error), noRemotes, (s) => {
+      stages.push(s);
+    });
+    expect(stages).toEqual([stage]);
+  });
+
   test("stays silent when the command carries no command field", async () => {
     const input = { ...mockInput("git fetch", SECRETIVE_FAILURE), tool_input: {} };
     expect(await processInput(input, githubSshRemote)).toBeNull();
@@ -242,7 +309,7 @@ describe("processInput", () => {
   test("stays silent when a bare pull fails against an unrecognized remote", async () => {
     const unknownRemote = () =>
       Promise.resolve("remote.origin.url git@git.example.com:owner/repo.git\n");
-    expect(await processInput(mockInput("git pull", SECRETIVE_FAILURE), unknownRemote)).toBeNull();
+    expect(await processInput(mockInput("git pull", HOSTLESS_FAILURE), unknownRemote)).toBeNull();
   });
 
   test.each<{ name: string; remotes: () => Promise<string>; expected: string }>([
@@ -259,7 +326,7 @@ describe("processInput", () => {
   ])(
     "resolves the remote from the repo when the command names none: $name",
     async ({ remotes, expected }) => {
-      const result = await processInput(mockInput("git pull", SECRETIVE_FAILURE), remotes);
+      const result = await processInput(mockInput("git pull", HOSTLESS_FAILURE), remotes);
       expect(result).not.toBeNull();
       const specific = result?.hookSpecificOutput;
       expect(

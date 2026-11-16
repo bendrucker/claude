@@ -5,7 +5,9 @@ import type {
   SyncHookJSONOutput,
 } from "@anthropic-ai/claude-agent-sdk";
 import { $ } from "bun";
+import manifest from "../.claude-plugin/plugin.json";
 import { BashInput, PostToolUseFailure } from "./hook-input";
+import { timeHook } from "./hook-metrics";
 import { hasSigningRefusal } from "./signing-refusal";
 
 /**
@@ -70,7 +72,9 @@ export function parseHosts(spec: string): Provider[] {
 }
 
 function configuredProviders(): Provider[] {
-  return parseHosts(process.env.CLAUDE_PLUGIN_OPTION_HTTPS_HOSTS ?? "");
+  return parseHosts(
+    process.env.CLAUDE_PLUGIN_OPTION_HTTPS_HOSTS ?? manifest.userConfig.https_hosts.default,
+  );
 }
 
 function httpsConfig({ host, cli }: Provider): string {
@@ -171,19 +175,31 @@ export async function readRemoteUrls(cwd: string): Promise<string> {
 export async function processInput(
   input: PostToolUseFailureHookInput,
   readRemotes: (cwd: string) => Promise<string> = readRemoteUrls,
+  setStage?: (stage: string) => void,
 ): Promise<SyncHookJSONOutput | null> {
   const command = BashInput.safeParse(input.tool_input).data?.command;
   if (command == null || command === "") return null;
 
-  if (gitNetworkSubcommand(command) == null || gitNetworkSubcommand(command) === "") return null;
+  if (gitNetworkSubcommand(command) == null || gitNetworkSubcommand(command) === "") {
+    setStage?.("not-network");
+    return null;
+  }
   // A refused commit signature also reads `agent refused operation`, and HTTPS cannot fix it.
-  if (!hasSshAuthFailure(input.error) || hasSigningRefusal(input.error)) return null;
+  if (!hasSshAuthFailure(input.error) || hasSigningRefusal(input.error)) {
+    setStage?.("not-ssh-auth");
+    return null;
+  }
 
   const cwd = input.cwd;
   const providers = configuredProviders();
   const target =
-    sshProviderOf(command, providers) ?? sshProviderOf(await readRemotes(cwd), providers);
-  if (!target) return null;
+    sshProviderOf(command, providers) ??
+    sshProviderOf(input.error, providers) ??
+    sshProviderOf(await readRemotes(cwd), providers);
+  if (!target) {
+    setStage?.("no-provider");
+    return null;
+  }
 
   const retryCommand = rewriteCommand(command, target);
   if (retryCommand == null || retryCommand === "") return null;
@@ -205,7 +221,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  const output = await processInput(input);
+  const output = await timeHook("https-fallback", input, (setStage) =>
+    processInput(input, readRemoteUrls, setStage),
+  );
   if (output) {
     process.stdout.write(`${JSON.stringify(output)}\n`);
   }

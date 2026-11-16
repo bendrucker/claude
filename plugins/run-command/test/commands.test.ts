@@ -18,7 +18,7 @@ const commandText = gs
   })
   .map(({ head, rest }) => [head, ...rest].join(" "));
 
-const commandSegment: gs.Generator<Segment> = gs
+const commandSegment: gs.PrintableGenerator<Segment> = gs
   .record({
     command: commandText,
     indent: gs.sampledFrom(["", " ", "  ", "\t"]),
@@ -36,7 +36,7 @@ const commandSegment: gs.Generator<Segment> = gs
     };
   });
 
-const segment: gs.Generator<Segment> = gs.oneOf(
+const segment: gs.PrintableGenerator<Segment> = gs.oneOf(
   commandSegment,
   gs.sampledFrom(["", " ", "\t"]).map((line) => ({ kind: "blank", line })),
   gs.sampledFrom(["```", "```sh", "  ```bash"]).map((line) => ({ kind: "fence", line })),

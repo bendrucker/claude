@@ -13,7 +13,7 @@ import {
 } from "./lcov";
 
 // A trailing `\r` is indistinguishable from a CRLF line ending.
-const fileCoverage: gs.Generator<FileCoverage> = gs.record({
+const fileCoverage: gs.PrintableGenerator<FileCoverage> = gs.record({
   file: gs.text({ minSize: 1, excludeCharacters: "\n" }).filter((f) => !f.endsWith("\r")),
   lineHits: gs.maps(gs.integers({ minValue: 1 }), gs.integers({ minValue: 0 })),
   functionsFound: gs.integers({ minValue: 0 }),

@@ -4,7 +4,7 @@ import { type Engine, describe, expect, mock, test } from "claude-code/testing";
 type ModEventsInput = Parameters<EngineInterface["modEvents"]["emit"]>[0];
 
 const START = { surface: "terminal", isInteractive: true, cwd: "/work" } as const;
-const ZSH = "5.9.2\non\noff\noff\non\n";
+const ZSH = "5.9.2\n";
 
 function ran(stdout: string, exitCode = 0): ProcessRunResult {
   return { exitCode, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false };
@@ -30,8 +30,6 @@ function worldOf(on: On, env: Record<string, string>, probe: ProcessRunResult | 
     if (probe instanceof Error) throw probe;
     return { value: probe };
   });
-  on("classic.UserPromptSubmit", () => ({}));
-  on("classic.PostToolUse", () => ({}));
   on("tool.call", ($, e) => {
     if (e.tool === "Bash") world.ran.push(e.command);
     return { result: world.output, text: world.output };
@@ -42,76 +40,24 @@ function worldOf(on: On, env: Record<string, string>, probe: ProcessRunResult | 
 const bash = ($: Engine, command: string) =>
   $.tool.call({ tool: "Bash", command, tool_use_id: "toolu_1" });
 
-const prompt = ($: Engine, mode: string) =>
-  $.classic.UserPromptSubmit({ permission_mode: mode, prompt: "go" });
-
 const named = (world: World, event: string) =>
   world.events.filter((e) => e.event === event).map((e) => e.detail);
 
 describe("register", () => {
-  test("reports the shell and its options at session start", async ($, on) => {
+  test("reports the shell at session start", async ($, on) => {
     const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
     await $.session.start(START);
     expect(named(world, "session.start")).toEqual([
-      {
-        shell: "/bin/zsh",
-        version: "5.9.2",
-        active: true,
-        nomatch: "on",
-        nullglob: "off",
-        cshnullglob: "off",
-        equals: "on",
-      },
+      { shell: "/bin/zsh", version: "5.9.2", active: true },
     ]);
   });
 
-  test("quotes what zsh would expand and records the rules", async ($, on) => {
+  test("runs a command with unquoted patterns as written", async ($, on) => {
     const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
     await $.session.start(START);
-    await bash($, "grep -rn register --include=*.ts plugins | head -2; echo ===");
-    expect(world.ran).toEqual(["grep -rn register --include='*.ts' plugins | head -2; echo '==='"]);
-    expect(named(world, "rewrite")).toEqual([{ rules: ["flag-glob", "equals"], denied: false }]);
-  });
-
-  test("in auto mode, refuses with the quoted command instead of rewriting", async ($, on) => {
-    const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
-    await $.session.start(START);
-    await prompt($, "auto");
-    const result = await bash($, "grep -rn register --include=*.ts plugins");
-    expect(world.ran).toEqual([]);
-    expect(result.deny).toContain("grep -rn register --include='*.ts' plugins");
-    expect(named(world, "rewrite")).toEqual([{ rules: ["flag-glob"], denied: true }]);
-  });
-
-  test("in auto mode, runs a command with nothing to quote", async ($, on) => {
-    const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
-    await $.session.start(START);
-    await prompt($, "auto");
-    await bash($, "ls -la 'src/*.ts'");
-    expect(world.ran).toEqual(["ls -la 'src/*.ts'"]);
-  });
-
-  test("rewrites again once a later event leaves auto mode", async ($, on) => {
-    const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
-    await $.session.start(START);
-    await prompt($, "auto");
-    await $.classic.PostToolUse({
-      permission_mode: "default",
-      tool_name: "Bash",
-      tool_input: {},
-      tool_response: "",
-      tool_use_id: "toolu_0",
-    });
-    await bash($, "echo ===");
-    expect(world.ran).toEqual(["echo '==='"]);
-  });
-
-  test("passes a command with nothing to quote through unchanged", async ($, on) => {
-    const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
-    await $.session.start(START);
-    await bash($, "ls -la 'src/*.ts'");
-    expect(world.ran).toEqual(["ls -la 'src/*.ts'"]);
-    expect(named(world, "rewrite")).toEqual([]);
+    const result = await bash($, "grep -rn register --include=*.ts plugins | head -2; echo ===");
+    expect(world.ran).toEqual(["grep -rn register --include=*.ts plugins | head -2; echo ==="]);
+    expect(result.deny).toBeUndefined();
   });
 
   test("notes a zsh error after the result, in full once and briefly after", async ($, on) => {
@@ -139,28 +85,21 @@ describe("register", () => {
   });
 
   test("stays inert under bash", async ($, on) => {
-    const world = worldOf(on, { SHELL: "/bin/bash" }, ran("\n\n\n\n\n"));
+    const world = worldOf(on, { SHELL: "/bin/bash" }, ran("\n"));
     await $.session.start(START);
     world.output = "(eval):1: no matches found: *.nope";
-    const result = await bash($, "grep --include=*.ts x .; echo ===");
+    const result = await bash($, "ls *.nope");
     expect(named(world, "session.start")[0]).toMatchObject({ shell: "/bin/bash", active: false });
-    expect(world.ran).toEqual(["grep --include=*.ts x .; echo ==="]);
     expect(result.context).toBeUndefined();
-    expect(named(world, "rewrite")).toEqual([]);
+    expect(named(world, "explain")).toEqual([]);
   });
 
-  test("follows the user's options", async ($, on) => {
-    const world = worldOf(on, { SHELL: "/bin/zsh" }, ran("5.9.2\non\non\noff\non\n"));
-    await $.session.start(START);
-    await bash($, "grep --include=*.ts x .; echo ===");
-    expect(world.ran).toEqual(["grep --include=*.ts x .; echo '==='"]);
-  });
-
-  test("falls back to zsh defaults when the probe fails", async ($, on) => {
+  test("still notes zsh errors when the probe fails", async ($, on) => {
     const world = worldOf(on, { SHELL: "/bin/zsh" }, new Error("timed out"));
     await $.session.start(START);
-    await bash($, "echo ===");
-    expect(world.ran).toEqual(["echo '==='"]);
+    world.output = "(eval):1: no matches found: *.nope";
+    const result = await bash($, "ls *.nope");
+    expect(result.context).toHaveLength(1);
     expect(named(world, "error")).toMatchObject([{ hook: "session.start", kind: "probe" }]);
   });
 

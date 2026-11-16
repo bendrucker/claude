@@ -26,7 +26,7 @@ import {
   type WrappedParagraph,
 } from "./prose";
 import { classifyPrHeading } from "./sentence-heading";
-import { exceededLimits, measureStructure } from "./structure";
+import { exceededLimits, limitsReason, measureStructure } from "./structure";
 
 /** Facts about the repository the rules consult only when a body warrants it. */
 export interface RepoContext {
@@ -301,12 +301,7 @@ const RULES = [
     id: "structure-limits",
     tier: "deny",
     detect: (body) => nonEmpty(exceededLimits(measureStructure(body))),
-    message: (exceeded) => {
-      const detail = exceeded
-        .map(({ label, measured, limit }) => `${label} ${measured} > ${limit}`)
-        .join(", ");
-      return `The body is over its structure limits (${detail}). List words count apart from prose words. Tables, fenced output, and \`<details>\` don't count. Rewrite it under them, then retry the create. This check doesn't run again, so make the cut in one rewrite.`;
-    },
+    message: limitsReason,
   }),
   rule({
     id: "title-length",

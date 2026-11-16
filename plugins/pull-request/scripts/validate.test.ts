@@ -90,7 +90,7 @@ describe("processInput", () => {
       });
     });
 
-    it("denies over-limit creates once per session and never on edits", async () => {
+    it("denies an over-limit body on every create and edit", async () => {
       const events = join(tempDir, "mod-events");
       const body = join(tempDir, "body.md");
       await Bun.write(body, "Adds words. ".repeat(65));
@@ -99,9 +99,11 @@ describe("processInput", () => {
           { ...createInput(`gh pr ${verb} --body-file ${body}`), session_id: "s-2" },
           events,
         );
-      expect(getDenyReason(await run("edit 1"))).toBeUndefined();
-      expect(getDenyReason(await run("create --title 'x: y'"))).toContain("doesn't run again");
-      expect(getDenyReason(await run("create --title 'x: y'"))).toBeUndefined();
+      const verbs = ["edit 1", "create --title 'x: y'", "create --title 'x: y'", "edit 1"];
+      const results = await Promise.all(verbs.map(run));
+      for (const result of results) {
+        expect(getDenyReason(result)).toContain("prose words 130 > 120, cut 10");
+      }
     });
 
     it("records nothing without a session", async () => {

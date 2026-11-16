@@ -1,5 +1,5 @@
 {
-  "description": "Validates PR body content before creation",
+  "description": "Validates PR body content on drafts, creates, and edits",
   "hooks": {
     "PreToolUse": [
       {
@@ -24,6 +24,23 @@
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/validate.ts\"",
             "if": "Bash(glab mr update:*)"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/check-draft.ts\"",
+            "if": "Write(**/pr-body*.md)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/scripts/check-draft.ts\"",
+            "if": "Edit(**/pr-body*.md)"
           }
         ]
       }

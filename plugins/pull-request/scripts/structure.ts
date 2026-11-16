@@ -187,3 +187,10 @@ export function exceededLimits(structure: Pick<Structure, LimitKey>): ExceededLi
       : [],
   );
 }
+
+export function limitsReason(exceeded: ExceededLimit[]): string {
+  const detail = exceeded
+    .map(({ label, measured, limit }) => `${label} ${measured} > ${limit}, cut ${measured - limit}`)
+    .join("; ");
+  return `The body is over its structure limits (${detail}). List words count apart from prose words. Tables, fenced output, and \`<details>\` don't count. Make every cut in one rewrite.`;
+}

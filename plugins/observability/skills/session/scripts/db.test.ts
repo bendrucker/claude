@@ -3599,6 +3599,11 @@ describe("native harness fields", () => {
     result("n3", "PreToolUse:Bash hook error: Cannot commit directly to main", {
       toolDenialKind: "permission-rule",
     }),
+    use("n8", "Bash", { command: "gh pr create --body x" }),
+    result("n8", "PreToolUse:Bash hook error: Vale found 1 alert in this text.", {
+      toolDenialKind: "permission-rule",
+      permissionDecision: rejectHook,
+    }),
     use("n4", "Bash", { command: "make" }),
     result("n4", "ok", {
       is_error: false,
@@ -3654,6 +3659,7 @@ describe("native harness fields", () => {
       { tool_use_id: "n1", hook_name: "(unmapped)", deny_source: "field" },
       { tool_use_id: "n3", hook_name: "git:block-default-branch-commit", deny_source: "prefix" },
       { tool_use_id: "n5", hook_name: "(unmapped)", deny_source: "field" },
+      { tool_use_id: "n8", hook_name: "writing:lint", deny_source: "field" },
     ]);
   });
 

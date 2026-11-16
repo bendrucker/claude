@@ -901,6 +901,7 @@ WITH patterns(hook_name, pattern) AS (
     ('git:block-default-branch-commit', 'Cannot commit directly to %'),
     ('user:worktree',                   'Use the worktrunk skill%'),
     ('writing:check-tropes',            'Spaced em dashes%'),
+    ('writing:lint',                    'Vale found %'),
     ('gitlab:lint',                     'This repository''s origin remote is GitLab%'),
     ('pull-request:validate-body',      'Fix the PR body before retrying%'),
     ('linear:cli-create',               '`linear issue create` without%')

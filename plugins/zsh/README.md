@@ -13,6 +13,7 @@ Quotes the bash habits that misfire under zsh before the Bash tool runs them, an
   - `flag-glob` quotes `--name=*.ts` values and `find -name` patterns.
   - `equals` quotes words starting with `=`.
   - `url` quotes URLs with `?`, `*` or `[`.
+- **Auto mode**: auto mode refuses a call whose input a hook changed after its classifier reviewed it, so there the mod refuses the call and names the quoted command to run instead of rewriting it. `tool.call` carries no permission mode, so the mod reads it from the latest `UserPromptSubmit`, `PostToolUse`, or `PostToolUseFailure` input. The `rewrite` event's `denied` attribute marks these.
 - **Null glob**: a `SessionStart` hook writes `setopt cshnullglob` to `CLAUDE_ENV_FILE`, so a glob with no match drops out of a command when another glob in it matched, as an unmatched glob fails quietly behind `2>/dev/null` in bash. zsh still skips a command whose globs all missed, reporting `no match`.
 - **Notes**: `glob`, `equals`, `reserved`, `split`, and `bash-syntax`. A repeat within a session gets the short form.
 - **Shell detection**: the mod picks the shell from `CLAUDE_CODE_SHELL`, then `$SHELL`, then `zsh` on `PATH`, and probes `nomatch`, `nullglob`, `cshnullglob`, and `equals` with a non-interactive `zsh -c`. The glob options gate `flag-glob` and `url`, and `equals` gates the `equals` rule. Under any other shell the mod is a no-op.

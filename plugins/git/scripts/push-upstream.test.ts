@@ -73,11 +73,12 @@ describe("processInput", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  function input(command: string): PreToolUseHookInput {
+  function input(command: string, permissionMode = "default"): PreToolUseHookInput {
     return {
       session_id: "test",
       transcript_path: "",
       cwd: worktree,
+      permission_mode: permissionMode,
       hook_event_name: "PreToolUse",
       tool_name: "Bash",
       tool_input: { command, description: "push" },
@@ -95,6 +96,18 @@ describe("processInput", () => {
       hookEventName: "PreToolUse",
       updatedInput: { command: "git push origin HEAD 2>&1 | tail -3", description: "push" },
     });
+    expect(await tracking()).toBe("branch.feat.remote origin\nbranch.feat.merge refs/heads/feat\n");
+  });
+
+  test("in auto mode, records tracking and denies with the command minus -u", async () => {
+    await $`git -C ${worktree} branch -q --set-upstream-to=base`.quiet();
+    const output = await processInput(input("git push -u origin HEAD", "auto"));
+    const hook = output?.hookSpecificOutput;
+    expect(hook).not.toHaveProperty("updatedInput");
+    expect(hook).toHaveProperty("permissionDecision", "deny");
+    expect(hook && "permissionDecisionReason" in hook && hook.permissionDecisionReason).toEndWith(
+      ": git push origin HEAD",
+    );
     expect(await tracking()).toBe("branch.feat.remote origin\nbranch.feat.merge refs/heads/feat\n");
   });
 

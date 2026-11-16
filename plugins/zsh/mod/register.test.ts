@@ -30,6 +30,8 @@ function worldOf(on: On, env: Record<string, string>, probe: ProcessRunResult | 
     if (probe instanceof Error) throw probe;
     return { value: probe };
   });
+  on("classic.UserPromptSubmit", () => ({}));
+  on("classic.PostToolUse", () => ({}));
   on("tool.call", ($, e) => {
     if (e.tool === "Bash") world.ran.push(e.command);
     return { result: world.output, text: world.output };
@@ -39,6 +41,9 @@ function worldOf(on: On, env: Record<string, string>, probe: ProcessRunResult | 
 
 const bash = ($: Engine, command: string) =>
   $.tool.call({ tool: "Bash", command, tool_use_id: "toolu_1" });
+
+const prompt = ($: Engine, mode: string) =>
+  $.classic.UserPromptSubmit({ permission_mode: mode, prompt: "go" });
 
 const named = (world: World, event: string) =>
   world.events.filter((e) => e.event === event).map((e) => e.detail);
@@ -65,7 +70,40 @@ describe("register", () => {
     await $.session.start(START);
     await bash($, "grep -rn register --include=*.ts plugins | head -2; echo ===");
     expect(world.ran).toEqual(["grep -rn register --include='*.ts' plugins | head -2; echo '==='"]);
-    expect(named(world, "rewrite")).toEqual([{ rules: ["flag-glob", "equals"] }]);
+    expect(named(world, "rewrite")).toEqual([{ rules: ["flag-glob", "equals"], denied: false }]);
+  });
+
+  test("in auto mode, refuses with the quoted command instead of rewriting", async ($, on) => {
+    const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
+    await $.session.start(START);
+    await prompt($, "auto");
+    const result = await bash($, "grep -rn register --include=*.ts plugins");
+    expect(world.ran).toEqual([]);
+    expect(result.deny).toContain("grep -rn register --include='*.ts' plugins");
+    expect(named(world, "rewrite")).toEqual([{ rules: ["flag-glob"], denied: true }]);
+  });
+
+  test("in auto mode, runs a command with nothing to quote", async ($, on) => {
+    const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
+    await $.session.start(START);
+    await prompt($, "auto");
+    await bash($, "ls -la 'src/*.ts'");
+    expect(world.ran).toEqual(["ls -la 'src/*.ts'"]);
+  });
+
+  test("rewrites again once a later event leaves auto mode", async ($, on) => {
+    const world = worldOf(on, { SHELL: "/bin/zsh" }, ran(ZSH));
+    await $.session.start(START);
+    await prompt($, "auto");
+    await $.classic.PostToolUse({
+      permission_mode: "default",
+      tool_name: "Bash",
+      tool_input: {},
+      tool_response: "",
+      tool_use_id: "toolu_0",
+    });
+    await bash($, "echo ===");
+    expect(world.ran).toEqual(["echo '==='"]);
   });
 
   test("passes a command with nothing to quote through unchanged", async ($, on) => {

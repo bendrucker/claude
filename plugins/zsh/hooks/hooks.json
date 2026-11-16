@@ -1,5 +1,5 @@
 {
-  "description": "Quotes flag globs, =words, and URLs that zsh would expand in Bash commands, sets cshnullglob so a glob with no match drops out when another in the command matched, and explains zsh errors in the result",
+  "description": "Quotes flag globs, =words, and URLs that zsh would expand in Bash commands (in auto mode, refuses with the quoted command instead), sets cshnullglob so a glob with no match drops out when another in the command matched, and explains zsh errors in the result",
   "modules": ["../mod/register.ts"],
   "hooks": {
     "SessionStart": [

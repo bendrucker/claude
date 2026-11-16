@@ -170,11 +170,24 @@ export async function processInput(
   if (currentRemote !== push.remote && !(await git.set(remoteKey, push.remote))) return null;
   if (currentMerge !== merge && !(await git.set(mergeKey, merge))) return null;
 
+  const recorded = `The git plugin recorded ${branch}'s upstream as ${push.remote}/${destination}`;
+  const reason = "because the sandbox denies the .git/config write -u makes";
+  const rewritten = dropFlag(command, push.flag);
+  // Auto mode refuses a call whose input a hook changed after its classifier reviewed it.
+  if (input.permission_mode === "auto") {
+    return {
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: `${recorded}, so -u is not needed, ${reason}. Run the push without it: ${rewritten}`,
+      },
+    };
+  }
   return {
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
-      updatedInput: { ...toolInput, command: dropFlag(command, push.flag) },
-      additionalContext: `The git plugin recorded ${branch}'s upstream as ${push.remote}/${destination} and removed -u from the push, because the sandbox denies the .git/config write -u makes.`,
+      updatedInput: { ...toolInput, command: rewritten },
+      additionalContext: `${recorded} and removed -u from the push, ${reason}.`,
     },
   };
 }

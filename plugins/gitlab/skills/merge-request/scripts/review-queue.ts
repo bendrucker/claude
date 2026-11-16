@@ -8,6 +8,7 @@ export const ReviewState = z.enum([
   "UNREVIEWED",
   "REVIEW_STARTED",
   "REQUESTED_CHANGES",
+  "REVIEWED",
   "APPROVED",
 ]);
 export type ReviewState = z.infer<typeof ReviewState>;

@@ -8,7 +8,6 @@ import { errorText, projectPath } from "../../../scripts/merge";
 import { isReviewTarget, parseReviewers } from "./reviewers";
 
 const LineEnd = z.looseObject({
-  type: z.enum(["new", "old"]),
   new_line: z.number().nullish(),
   old_line: z.number().nullish(),
 });

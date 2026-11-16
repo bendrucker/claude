@@ -277,6 +277,24 @@ describe("null position fields", () => {
     });
     expect(parsed.notes?.[0]?.position?.line_range?.start.new_line).toBe(10);
   });
+
+  it("parses a line_range on unchanged context lines, whose ends have a null type", () => {
+    const parsed = Discussion.parse({
+      id: "1",
+      notes: [
+        makeNote({
+          position: {
+            new_path: "src/a.ts",
+            line_range: {
+              start: { type: null, new_line: 10, old_line: 8 },
+              end: { type: null, new_line: 12, old_line: 10 },
+            },
+          },
+        }),
+      ],
+    });
+    expect(parsed.notes?.[0]?.position?.line_range?.end.new_line).toBe(12);
+  });
 });
 
 describe("parseNdjson", () => {

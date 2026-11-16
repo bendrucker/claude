@@ -1118,7 +1118,6 @@ SELECT
   attributes->>'rule'                                     AS rule,
   attributes->>'hook'                                     AS hook,
   attributes->>'setting'                                  AS setting,
-  attributes->>'decider'                                  AS decider,
   attributes->>'ceiling'                                  AS ceiling,
   attributes->>'reason'                                   AS reason,
   TRY_CAST(attributes->>'read_only' AS BOOLEAN)           AS read_only,

@@ -37,7 +37,7 @@ function worldOf(
     ms?: number;
     result?: ToolCallResult;
     failCalls?: number;
-    verdict?: { setting?: string; decider?: "host" };
+    verdict?: { setting?: string };
   } = {},
 ): World {
   const events = seatEvents(on);
@@ -121,7 +121,6 @@ describe("register", () => {
           rule: null,
           hook: null,
           setting: null,
-          decider: null,
           ceiling: null,
           reason: null,
           read_only: false,
@@ -186,10 +185,10 @@ describe("register", () => {
     ]);
   });
 
-  test("records the check's setting and decider, and a read-only run", async ($, on) => {
+  test("records the check's setting and a read-only run", async ($, on) => {
     const world = worldOf(on, {
       result: { result: "ok", isReadOnly: true },
-      verdict: { setting: "permissions.blockReadsOutsideWorkingDirectories", decider: "host" },
+      verdict: { setting: "permissions.blockReadsOutsideWorkingDirectories" },
     });
 
     await run($, world, 0);
@@ -198,7 +197,6 @@ describe("register", () => {
       expect.objectContaining({
         detail: expect.objectContaining({
           setting: "permissions.blockReadsOutsideWorkingDirectories",
-          decider: "host",
           ceiling: null,
           read_only: true,
         }),

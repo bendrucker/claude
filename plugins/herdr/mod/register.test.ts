@@ -18,9 +18,35 @@ const IDLE = { teammate_name: "reviewer", team_name: "team" };
 const report = (seq: number, args: string) =>
   `herdr pane report-metadata w1:p1 --source bendrucker:herdr --seq ${seq} ${args}`;
 
-const CLEAR_ALL = ["subagents", "teammates", "agents_waiting", "agents_idle", "branch"]
+const BRAND = `--display-agent ${String.fromCodePoint(0xec82)}`;
+
+const glyph = (index: number) => String.fromCodePoint(0xf0a9e + index);
+
+const CLEAR_ALL = [
+  "subagents",
+  "teammates",
+  "agents_waiting",
+  "agents_idle",
+  "branch",
+  "ctx_low",
+  "ctx_mid",
+  "ctx_high",
+  "ctx_crit",
+  "title",
+]
   .map((name) => `--clear-token ${name}`)
   .join(" ");
+
+const TAIL = "tail -c 262144 /t.jsonl";
+
+const titleRecord = (type: string, field: string, title: string) =>
+  JSON.stringify({ type, [field]: title });
+
+const measure = (percent: number | undefined, tokens = 0) => ({
+  context: { window: 1_000_000, tokens, ...(percent !== undefined && { percent }) },
+  rateLimits: [],
+  changed: ["context" as const],
+});
 
 function agent(status: AgentInfo["status"], teammateId?: string): AgentInfo {
   return {
@@ -28,6 +54,14 @@ function agent(status: AgentInfo["status"], teammateId?: string): AgentInfo {
     description: "",
     type: "Explore",
     status,
+    kind: teammateId === undefined ? "local_agent" : "in_process_teammate",
+    taskStatus: "running",
+    label: "",
+    startTime: 0,
+    cwd: "/work",
+    tokenCount: 0,
+    tokenSamples: [],
+    hasRow: false,
     ...(teammateId !== undefined && { teammateId }),
   };
 }
@@ -41,11 +75,24 @@ interface World {
   branch: string;
   herdrExit: number | Error;
   emitMs: number;
+  transcriptPath: string;
+  tail: string;
+  tailExit: number;
 }
 
 function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}) {
-  const state: World = { agents: [], branch: "main", herdrExit: 0, emitMs: 0, ...world };
+  const state: World = {
+    agents: [],
+    branch: "main",
+    herdrExit: 0,
+    emitMs: 0,
+    transcriptPath: "",
+    tail: "",
+    tailExit: 0,
+    ...world,
+  };
   const calls: string[] = [];
+  const tails: string[] = [];
   const timeouts: (number | undefined)[] = [];
   const order: string[] = [];
   const events: {
@@ -66,6 +113,8 @@ function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}
   on("classic.SubagentStop", () => ({}));
   on("classic.TeammateIdle", () => ({}));
   on("agent.list", () => ({ value: state.agents }));
+  on("session.info", () => ({ value: { transcriptPath: state.transcriptPath } }));
+  on("session.measure", ($, e) => ({ changed: e.changed }));
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
@@ -80,6 +129,10 @@ function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}
     if (e.argv[0] === "git") {
       return { value: ran(0, `${state.branch}\n`, "") };
     }
+    if (e.argv[0] === "tail") {
+      tails.push(e.argv.join(" "));
+      return { value: ran(state.tailExit, state.tail, "") };
+    }
     calls.push(e.argv.join(" "));
     timeouts.push(e.init?.timeoutMs);
     const exit = state.herdrExit;
@@ -87,7 +140,7 @@ function herdrOf(on: On, env: Record<string, string>, world: Partial<World> = {}
     return { value: ran(exit, "", exit === 0 ? "" : "pane_not_found\n") };
   });
   const failures = () => events.filter((event) => event.ok === false);
-  return { calls, events, failures, clock, state, timeouts, order };
+  return { calls, tails, events, failures, clock, state, timeouts, order };
 }
 
 const end = ($: Engine) =>
@@ -102,7 +155,7 @@ describe("register", () => {
     await end($);
     await herdr.clock.settle();
 
-    expect(herdr.calls).toEqual([report(1, "--token branch=main"), report(2, CLEAR_ALL)]);
+    expect(herdr.calls).toEqual([report(1, `${BRAND} --token branch=main`), report(2, CLEAR_ALL)]);
     expect(herdr.events.map(({ event, ok }) => [event, ok])).toEqual([
       ["session.start", undefined],
       ["herdr.call", true],
@@ -145,7 +198,7 @@ describe("register", () => {
     await herdr.clock.settle();
 
     expect(herdr.calls).toEqual([
-      report(1, "--token subagents=↳1 --token branch=main"),
+      report(1, `${BRAND} --token subagents=↳1 --token branch=main`),
       report(2, "--clear-token subagents --token branch=topic"),
     ]);
   });
@@ -160,7 +213,7 @@ describe("register", () => {
     await herdr.clock.advance(30_000);
 
     expect(herdr.calls).toEqual([
-      report(1, "--token subagents=↳1 --token branch=main"),
+      report(1, `${BRAND} --token subagents=↳1 --token branch=main`),
       report(2, "--clear-token subagents"),
     ]);
   });
@@ -210,6 +263,139 @@ describe("register", () => {
     expect(herdr.order.slice(-2)).toEqual(["herdr.call", "session.end"]);
   });
 
+  test("the dial follows the context fill and clears the other three tokens", async ($, on) => {
+    const herdr = herdrOf(on, HERDR);
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    await $.session.measure(measure(30));
+    await herdr.clock.settle();
+    await $.session.measure(measure(85));
+    await herdr.clock.settle();
+
+    expect(herdr.calls.slice(1)).toEqual([
+      report(2, `--token ctx_low=${glyph(2)}`),
+      report(3, `--clear-token ctx_low --token ctx_crit=${glyph(5)}`),
+    ]);
+    expect(herdr.events.filter(({ event }) => event === "dial")).toEqual([
+      { event: "dial", ok: undefined, detail: { token: "ctx_low", percent: 30 } },
+      { event: "dial", ok: undefined, detail: { token: "ctx_crit", percent: 85 } },
+    ]);
+  });
+
+  test("a context past 200k turns the dial a step hotter", async ($, on) => {
+    const herdr = herdrOf(on, HERDR);
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    await $.session.measure(measure(30, 250_000));
+    await herdr.clock.settle();
+
+    expect(herdr.calls.at(-1)).toBe(report(2, `--token ctx_mid=${glyph(2)}`));
+  });
+
+  test("a compacted context with no percent clears the dial", async ($, on) => {
+    const herdr = herdrOf(on, HERDR);
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    await $.session.measure(measure(30));
+    await herdr.clock.settle();
+    await $.session.measure(measure(undefined));
+    await herdr.clock.settle();
+
+    expect(herdr.calls.at(-1)).toBe(report(3, "--clear-token ctx_low"));
+  });
+
+  test("a measurement where the context did not move leaves the dial", async ($, on) => {
+    const herdr = herdrOf(on, HERDR);
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    await $.session.measure({ ...measure(85), changed: ["cost"] });
+    await herdr.clock.settle();
+
+    expect(herdr.calls).toHaveLength(1);
+  });
+
+  test("the last title record in the transcript tail names the session", async ($, on) => {
+    const herdr = herdrOf(on, HERDR, {
+      transcriptPath: "/t.jsonl",
+      tail: [
+        '{"type":"assistant","message":{"content":"cut mid-line and ai-title',
+        titleRecord("ai-title", "aiTitle", "First name"),
+        JSON.stringify({ type: "user", message: { content: "an ai-title quoted in a prompt" } }),
+        titleRecord("custom-title", "customTitle", "Final\nname"),
+        '{"type":"ai-title","aiTitle":"half written',
+      ].join("\n"),
+    });
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+
+    expect(herdr.tails).toEqual([TAIL]);
+    expect(herdr.calls.at(-1)).toContain("--token title=Final name");
+    expect(herdr.events).toContainEqual({
+      event: "title",
+      ok: undefined,
+      detail: { title: "Final name" },
+    });
+  });
+
+  test("a title that appears later is reported once and kept across a tail with none", async ($, on) => {
+    const herdr = herdrOf(on, HERDR, { transcriptPath: "/t.jsonl" });
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    herdr.state.tail = titleRecord("ai-title", "aiTitle", "Named");
+    await $.turn.complete(COMPLETE);
+    await herdr.clock.settle();
+    herdr.state.tail = "";
+    await $.turn.complete(COMPLETE);
+    await herdr.clock.settle();
+
+    expect(herdr.calls.slice(1)).toEqual([report(2, "--token title=Named")]);
+  });
+
+  test("a failed tail leaves the title alone", async ($, on) => {
+    const herdr = herdrOf(on, HERDR, { transcriptPath: "/t.jsonl", tailExit: 1 });
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+
+    expect(herdr.calls).toEqual([report(1, `${BRAND} --token branch=main`)]);
+  });
+
+  test("the full token set and the brand are re-sent hourly", async ($, on) => {
+    const herdr = herdrOf(on, HERDR);
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    await $.session.measure(measure(30));
+    await herdr.clock.settle();
+    await herdr.clock.advance(3_599_000);
+    const before = herdr.calls.length;
+    await herdr.clock.advance(1000);
+    await herdr.clock.settle();
+
+    expect([before, herdr.calls.length]).toEqual([2, 3]);
+    expect(herdr.calls.at(-1)).toBe(
+      report(3, `${BRAND} --token branch=main --token ctx_low=${glyph(2)}`),
+    );
+  });
+
+  test("the hourly re-send stops at the end", async ($, on) => {
+    const herdr = herdrOf(on, HERDR);
+
+    await $.session.start(START);
+    await herdr.clock.settle();
+    await end($);
+    await herdr.clock.settle();
+    await herdr.clock.advance(7_200_000);
+
+    expect(herdr.calls).toHaveLength(2);
+  });
+
   test("a /clear keeps the tokens", async ($, on) => {
     const herdr = herdrOf(on, HERDR);
 
@@ -218,7 +404,7 @@ describe("register", () => {
     await $.session.end({ reason: "clear", sessionId: "s1", resume: { id: "s1" } });
     await herdr.clock.settle();
 
-    expect(herdr.calls).toEqual([report(1, "--token branch=main")]);
+    expect(herdr.calls).toEqual([report(1, `${BRAND} --token branch=main`)]);
   });
 
   test("a failed report emits an event and is retried on the next event", async ($, on) => {
@@ -238,8 +424,8 @@ describe("register", () => {
       },
     ]);
     expect(herdr.calls).toEqual([
-      report(1, "--token branch=main"),
-      report(2, "--token branch=main"),
+      report(1, `${BRAND} --token branch=main`),
+      report(2, `${BRAND} --token branch=main`),
     ]);
   });
 

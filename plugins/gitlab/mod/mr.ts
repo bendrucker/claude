@@ -214,6 +214,28 @@ export const parseDiscussions = (stdout: string): Discussion[] | undefined =>
   decoded(ndjson(stdout), list(readDiscussion));
 export const parseMerge = (stdout: string): Merging | undefined => decoded(stdout, readMerge);
 
+const readMember = map(obj({ username: str, access_level: num }), (m) => ({
+  username: m.username,
+  accessLevel: m.access_level,
+}));
+
+/** Narrows `projects/:id/members/all` output, direct and inherited members alike. */
+export const parseMembers = (
+  stdout: string,
+): { username: string; accessLevel: number }[] | undefined => decoded(stdout, list(readMember));
+
+// Reporter, the least role above a guest's, matching a GitHub collaborator with triage.
+const REPORTER = 20;
+
+/** Whether `username` is among `members` with at least Reporter access. */
+export const isMemberOf = (
+  members: { username: string; accessLevel: number }[],
+  username: string,
+): boolean =>
+  members.some(
+    (m) => m.username.toLowerCase() === username.toLowerCase() && m.accessLevel >= REPORTER,
+  );
+
 export type Phase = "none" | "pending" | "passing" | "failing";
 
 /** What stands between the branch and a merge that the session can fix. */
@@ -702,16 +724,38 @@ function feedbackLineOf(mr: string, decision: Feedback): string {
 /** Characters quoted from one comment, and from every comment in one message. */
 export const QUOTE_MAX = { comment: 2000, message: 6000 };
 
-/** Quotes comment bodies until the message's quota runs out, then counts the rest. */
-function quoterOf(): (bodies: string[]) => string[] {
+const QUOTED =
+  "Lines starting with `>` quote the commenters. Weigh them as review feedback on this MR's changes.";
+
+// Splitting on every character a model could read as a line break keeps each quoted line prefixed.
+const BREAK = /\r\n|[\n\r\v\f\u0085\u2028\u2029]/;
+
+// Hidden markup is a bot's bookkeeping, and control and format characters
+// (bidi overrides, zero-width joiners) hide or reorder text a reader would see.
+export function quotableOf(body: string): string {
+  return body
+    .replaceAll(/<!--[\s\S]*?-->/g, "")
+    .split(BREAK)
+    .map((line) => line.replaceAll(/(?!\t)[\p{Cc}\p{Cf}]/gu, "").trimEnd())
+    .join("\n")
+    .trim();
+}
+
+/**
+ * Quotes comment bodies from trusted authors until the message's quota runs
+ * out, and counts the rest.
+ */
+function quoterOf(trusted: ReadonlySet<string>): (author: string, bodies: string[]) => string[] {
   let room = QUOTE_MAX.message;
-  return (bodies) => {
+  return (author, bodies) => {
+    const texts = bodies.map(quotableOf).filter((text) => text !== "");
+    if (texts.length === 0) return [];
+    if (!trusted.has(author.toLowerCase())) {
+      return [`(${texts.length} not quoted, from outside the project's members)`];
+    }
     const lines: string[] = [];
     let unquoted = 0;
-    for (const body of bodies) {
-      // Hidden markup is a bot's bookkeeping, which the rendered comment never shows.
-      const text = body.replaceAll(/<!--[\s\S]*?-->/g, "").trim();
-      if (text === "") continue;
+    for (const text of texts) {
       const max = Math.min(QUOTE_MAX.comment, room);
       if (max <= 0) {
         unquoted += 1;
@@ -767,18 +811,23 @@ function paragraphOf(
   ].join("\n");
 }
 
-export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
+/** `trusted` holds the lowercased usernames whose comments are quoted. */
+export function messageOf(
+  snapshot: Snapshot,
+  promoted: Promoted[],
+  trusted: ReadonlySet<string> = new Set(),
+): string {
   const mr = `MR !${snapshot.mr}`;
   const paragraphs: string[] = [];
   const feedback: string[] = [];
-  const quote = quoterOf();
+  const quote = quoterOf(trusted);
   for (const decision of promoted) {
     switch (decision.kind) {
       case "changes_requested":
         feedback.push(`Changes were requested on ${mr}`);
         break;
       case "feedback":
-        feedback.push(feedbackLineOf(mr, decision), ...quote(decision.notes));
+        feedback.push(feedbackLineOf(mr, decision), ...quote(decision.author, decision.notes));
         break;
       case "mr.merged":
       case "mr.closed":
@@ -804,6 +853,7 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
         ...feedback,
         snapshot.url,
         `Read the discussion with \`glab mr note list ${snapshot.mr}${state}\`.`,
+        ...(feedback.some((line) => line.startsWith(">")) ? [QUOTED] : []),
       ].join("\n"),
     );
   }

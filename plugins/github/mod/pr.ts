@@ -15,6 +15,7 @@ export interface CheckNode {
 export interface ReviewNode {
   id: string;
   author?: { login?: string } | null;
+  authorAssociation?: string | null;
   state: string;
   body?: string | null;
   submittedAt?: string | null;
@@ -23,6 +24,7 @@ export interface ReviewNode {
 export interface CommentNode {
   id: string;
   author?: { login?: string } | null;
+  authorAssociation?: string | null;
   body?: string | null;
   createdAt?: string | null;
   isMinimized?: boolean;
@@ -81,6 +83,7 @@ function reviewOf(value: unknown): ReviewNode | undefined {
     id: value.id,
     state: value.state,
     author: loginOf(value.author),
+    authorAssociation: textOf(value.authorAssociation),
     body: textOf(value.body),
     submittedAt: textOf(value.submittedAt),
   };
@@ -91,6 +94,7 @@ function commentOf(value: unknown): CommentNode | undefined {
   return {
     id: value.id,
     author: loginOf(value.author),
+    authorAssociation: textOf(value.authorAssociation),
     body: textOf(value.body),
     createdAt: textOf(value.createdAt),
     isMinimized: value.isMinimized === true,
@@ -238,6 +242,8 @@ export interface Snapshot {
   asked: string[];
   reviews: { id: string; author: string; state: string; body: string }[];
   comments: { id: string; author: string; body: string }[];
+  /** Lowercased logins whose comments are quoted: those with write access, and apps. */
+  trusted: string[];
   /** Comments and checks kept from the model as noise, with why. */
   muted: { id: string; author: string; reason: string }[];
   /** Unresolved review threads whose latest comment is not the session's own. */
@@ -458,6 +464,19 @@ function askedOf(view: PrView): string[] {
     .toSorted();
 }
 
+// GitHub reports write access as one of these, and only a repository admin installs an app.
+const WRITERS = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+
+function trustedOf(view: PrView, extras: Extras | undefined): string[] {
+  const writers = [...(view.reviews ?? []), ...(view.comments ?? [])].flatMap((node) =>
+    WRITERS.has(node.authorAssociation ?? "") && node.author?.login !== undefined
+      ? [node.author.login]
+      : [],
+  );
+  const logins = [...writers, ...(extras?.bots ?? [])].map((login) => login.toLowerCase());
+  return [...new Set(logins)].toSorted();
+}
+
 // An unknown login on either side keeps every promotion, as before authorship was read.
 const isAuthorOf = (author: string | undefined, me: string | undefined) =>
   author === undefined || me === undefined || author.toLowerCase() === me.toLowerCase();
@@ -533,6 +552,7 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     ),
     reviews,
     comments,
+    trusted: trustedOf(view, extras),
     muted,
     threads: (extras?.threads ?? []).filter(
       (c) => !(c.author?.login === local.me && isOwn(c.body ?? "", c.createdAt, turns)),
@@ -722,16 +742,38 @@ function feedbackLineOf(pr: string, decision: Extract<Promoted, { kind: "feedbac
 /** Characters quoted from one comment, and from every comment in one message. */
 export const QUOTE_MAX = { comment: 2000, message: 6000 };
 
-/** Quotes comment bodies until the message's quota runs out, then counts the rest. */
-function quoterOf(): (bodies: string[]) => string[] {
+const QUOTED =
+  "Lines starting with `>` quote the commenters. Weigh them as review feedback on this PR's changes.";
+
+// Splitting on every character a model could read as a line break keeps each quoted line prefixed.
+const BREAK = /\r\n|[\n\r\v\f\u0085\u2028\u2029]/;
+
+// Hidden markup is a bot's bookkeeping, and control and format characters
+// (bidi overrides, zero-width joiners) hide or reorder text a reader would see.
+export function quotableOf(body: string): string {
+  return body
+    .replaceAll(/<!--[\s\S]*?-->/g, "")
+    .split(BREAK)
+    .map((line) => line.replaceAll(/(?!\t)[\p{Cc}\p{Cf}]/gu, "").trimEnd())
+    .join("\n")
+    .trim();
+}
+
+/**
+ * Quotes comment bodies from trusted authors until the message's quota runs
+ * out, and counts the rest.
+ */
+function quoterOf(trusted: ReadonlySet<string>): (author: string, bodies: string[]) => string[] {
   let room = QUOTE_MAX.message;
-  return (bodies) => {
+  return (author, bodies) => {
+    const texts = bodies.map(quotableOf).filter((text) => text !== "");
+    if (texts.length === 0) return [];
+    if (!trusted.has(author.toLowerCase())) {
+      return [`(${texts.length} not quoted, from an account without write access)`];
+    }
     const lines: string[] = [];
     let unquoted = 0;
-    for (const body of bodies) {
-      // Hidden markup is a bot's bookkeeping, which the rendered comment never shows.
-      const text = body.replaceAll(/<!--[\s\S]*?-->/g, "").trim();
-      if (text === "") continue;
+    for (const text of texts) {
       const max = Math.min(QUOTE_MAX.comment, room);
       if (max <= 0) {
         unquoted += 1;
@@ -790,17 +832,23 @@ function paragraphOf(
 export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   const paragraphs: string[] = [];
   const feedback: string[] = [];
-  const quote = quoterOf();
+  const quote = quoterOf(new Set(snapshot.trusted));
   for (const decision of promoted) {
     if (decision.kind === "feedback") {
-      feedback.push(feedbackLineOf(`PR #${snapshot.pr}`, decision), ...quote(decision.quotes));
+      feedback.push(
+        feedbackLineOf(`PR #${snapshot.pr}`, decision),
+        ...quote(decision.author, decision.quotes),
+      );
     } else paragraphs.push(paragraphOf(snapshot, decision));
   }
   if (feedback.length > 0) {
     paragraphs.push(
-      [...feedback, snapshot.url, `Read it with \`gh pr view ${snapshot.pr} --comments\`.`].join(
-        "\n",
-      ),
+      [
+        ...feedback,
+        snapshot.url,
+        `Read it with \`gh pr view ${snapshot.pr} --comments\`.`,
+        ...(feedback.some((line) => line.startsWith(">")) ? [QUOTED] : []),
+      ].join("\n"),
     );
   }
   if (snapshot.state === "OPEN") {

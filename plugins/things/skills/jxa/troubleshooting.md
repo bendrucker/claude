@@ -4,7 +4,7 @@
 
 `Operation not permitted`, `Sandbox: deny`, file path access errors, and `A privilege violation occurred. (-10004)` come from the sandbox, while `Application can't be found` means Things is closed.
 
-Sandboxed `osascript` Apple Events to Things3 fail with `-10004` even with `sandbox.allowAppleEvents` set, because that key covers Launch Services `open`/URL handoff only. The JXA runner escapes the sandbox through a `sandbox.excludedCommands` entry naming its path. On `-10004`, check that the command starts with that path and has nothing chained after it.
+Sandboxed `osascript` Apple Events to Things3 fail with `-10004` even with `sandbox.allowAppleEvents` set, because that key covers Launch Services `open`/URL handoff only. The JXA runner escapes the sandbox through the `jxa-run:*` entry in `sandbox.excludedCommands`. On `-10004`, check that the command starts with `jxa-run` and has nothing chained after it.
 
 ## Updates Not Working
 
@@ -51,7 +51,7 @@ JSON.stringify(result, null, 2)
 
 ## Reorder Script Issues
 
-`scripts/reorder.ts` reads the keychain auth token. It runs outside the sandbox through a `sandbox.excludedCommands` entry. On permission errors, check that the command matches `bun ${CLAUDE_PLUGIN_ROOT}/scripts/reorder.ts` with nothing ahead of it.
+`scripts/reorder.ts` reads the keychain auth token. It runs outside the sandbox through a `sandbox.excludedCommands` entry. On permission errors, check that the command starts with `things-reorder` with nothing ahead of it.
 
 ## Error Messages
 

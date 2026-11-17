@@ -49,7 +49,7 @@ Cloud sessions (claude.ai/code, project threads) run in containers the Mac never
 ```bash
 mkdir -p ~/.claude/session-imports/cloud/projects
 bun <skill-dir>/scripts/import.ts --host cloud --source 's3://<bucket>/<prefix>/' --egress
-bun <skill-dir>/scripts/pull.ts --host cloud
+session-index-pull --host cloud
 ```
 
 `--egress` fits because these rows came from the cloud in the first place. The bucket keeps every session. `pull.ts` keeps the local copy to the sessions uploaded within `--days` (default 90, matching `cleanupPeriodDays`), fetching any whose objects grew and deleting the rest, so the next refresh imports the new ones and reaps the rows of the old, the way `cleanupPeriodDays` works for `local`. It shells out to the `aws` CLI with whatever credentials the environment provides.

@@ -94,7 +94,7 @@ hooks:
             }'
 ```
 
-A script that must leave the command sandbox gets a `sandbox.excludedCommands` entry naming its path. Auto mode refuses a call whose `updatedInput` a hook changed after review.
+A script that must leave the command sandbox ships a shim in the plugin's `bin/`, which Claude Code puts on the Bash `PATH`, and the user lists the shim's name in `sandbox.excludedCommands`. Auto mode refuses a call whose `updatedInput` a hook changed after review.
 
 ## Tool and Skill Overlap
 

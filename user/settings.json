@@ -359,16 +359,15 @@
       "agent-browser:*",
       "open:*",
       "osascript:*",
-      "bun /Users/ben/.claude-repo/plugins/dispatch/skills/dispatch/scripts/dispatch.ts:*",
-      "bun /Users/ben/.claude-repo/plugins/dispatch/skills/close/scripts/close.ts:*",
-      "bun /Users/ben/.claude-repo/plugins/observability/skills/session/scripts/pull.ts:*",
-      "bun /Users/ben/.claude-repo/plugins/prompting/skills/scan/scripts/edit.ts:*",
-      "bun /Users/ben/.claude-repo/plugins/mac/scripts/jxa.ts:*",
-      "bun /Users/ben/.claude-repo/plugins/things/scripts/url.ts:*",
-      "bun /Users/ben/.claude-repo/plugins/things/scripts/inbox.ts:*",
-      "bun /Users/ben/.claude-repo/plugins/things/scripts/reorder.ts:*",
-      "/Users/ben/.claude-repo/plugins/x-callback-url/scripts/run.sh:*",
-      "/Users/ben/.claude-repo/plugins/x-callback-url/scripts/build.sh:*"
+      "claude-dispatch:*",
+      "claude-dispatch-close:*",
+      "session-index-pull:*",
+      "prompt-scan-edit:*",
+      "jxa-run:*",
+      "things-url:*",
+      "things-inbox:*",
+      "things-reorder:*",
+      "xcall-run:*"
     ]
   },
   "statusLine": {

@@ -47,7 +47,7 @@ Use ONLY the provided render scripts. Do not improvise alternative methods (Chro
 | SVG | `bun {SKILL_DIR}/scripts/render.ts [--scale N] <file.svg> [output.png]` |
 | HTML | `bun {SKILL_DIR}/scripts/render-html.ts [--scale N] <file.html> [output.png]` |
 
-`render-html.ts` launches Chromium, which exits at startup under the command sandbox. Run it through a `sandbox.excludedCommands` entry naming its path, as the whole Bash command.
+`render-html.ts` launches Chromium, which exits at startup under the command sandbox. It needs a `bin/` shim listed in `sandbox.excludedCommands`, run as the whole Bash command.
 
 ## Common Sizes
 

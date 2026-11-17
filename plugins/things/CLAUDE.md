@@ -10,7 +10,7 @@ JXA scripts run via `osascript`, which requires Apple Events mach-lookup service
 - Formatter (`scripts/format-output.ts`): reads JSON from stdin, outputs tables or passes through `--json`
 - JXA execution: invoke the `mac:jxa-run` skill, which validates `Application("Things3")` scope via AST
 
-The scripts that hand off to Launch Services (`inbox.ts`, `url.ts`, `reorder.ts`) run fully outside the command sandbox through `sandbox.excludedCommands` entries naming their deployed paths. `sandbox.allowAppleEvents` alone does not survive the handoff. `src/mcp/stdio.ts` needs no entry, since tailgate launches it outside Claude Code.
+The scripts that hand off to Launch Services (`inbox.ts`, `url.ts`, `reorder.ts`) run fully outside the command sandbox through `sandbox.excludedCommands` entries naming their `bin/` shims, `things-inbox`, `things-url`, and `things-reorder`. `sandbox.allowAppleEvents` alone does not survive the handoff. `src/mcp/stdio.ts` needs no entry, since tailgate launches it outside Claude Code.
 
 ## JXA Script Conventions
 

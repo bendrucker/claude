@@ -18,12 +18,12 @@ The pane is already closed, so skip any instruction to run `dispatch:close`.
 Escalate when a fix needs the user's judgment: a non-trivial CI failure, a conflict you cannot resolve with confidence, requested changes, or a reviewer's question.
 
 1. Send one `PushNotification` naming the PR and what you need.
-2. Run `bun <close.ts> attach --session <short id>` once for that issue. It opens a pane, without focus, attached to this session.
+2. Run `claude-dispatch-close attach --session <short id>` once for that issue. It opens a pane, without focus, attached to this session.
 3. Wait for the user.
 
 ## End
 
 When the PR merges or closes, or the user says to stop watching:
 
-1. Run `bun <close.ts> ended --session <session id> --pr <url> --outcome merged|closed|stopped`.
+1. Run `claude-dispatch-close ended --session <session id> --pr <url> --outcome merged|closed|stopped`.
 2. End your turn. The nightly agent sweep removes this session.

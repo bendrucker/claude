@@ -115,8 +115,8 @@ if ((xcall_status > 128)); then
   cat >&2 <<EOF
 xcall gave up after ${TIMEOUT_SECONDS}s waiting for a callback on xcall-claude://.
 The command sandbox blocks the URL-scheme round trip, so the callback can never
-arrive from a sandboxed process. List this script in sandbox.excludedCommands
-and invoke it by path with nothing ahead of it, or raise XCALL_TIMEOUT_SECONDS
+arrive from a sandboxed process. List xcall-run:* in sandbox.excludedCommands
+and run xcall-run as the whole command, or raise XCALL_TIMEOUT_SECONDS
 if the target app is genuinely slow to answer.
 EOF
   exit 4

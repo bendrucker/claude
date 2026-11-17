@@ -22,7 +22,7 @@ macOS-specific automation and system integration.
 
 Go-based CLIs run fine sandboxed: `sandbox.network.allowMachLookup: ["com.apple.trustd.agent"]` in `user/settings.json` lets Go's `crypto/x509` reach the system `trustd` daemon for TLS verification (`gh`, `glab`, `terraform`, `kubectl`, `go`) profile-wide.
 
-Apple Events and Launch Services handoff is different. Scripts that shell out to `osascript` (JXA) or `open` (URL schemes) do not survive the sandbox even with `sandbox.allowAppleEvents`. They need a full skip, which a `sandbox.excludedCommands` entry naming the script's deployed path gives: `bun /Users/<user>/.claude-repo/plugins/mac/scripts/jxa.ts:*`. The entry matches command text, so the script escapes only when it is the whole command.
+Apple Events and Launch Services handoff is different. Scripts that shell out to `osascript` (JXA) or `open` (URL schemes) do not survive the sandbox even with `sandbox.allowAppleEvents`. They need a full skip, which a `sandbox.excludedCommands` entry naming the `bin/jxa-run` shim gives: `jxa-run:*`. The entry matches command text, so the script escapes only when it is the whole command.
 
 ## Testing
 

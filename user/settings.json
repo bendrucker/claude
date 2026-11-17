@@ -222,7 +222,8 @@
     "load@bendrucker": true,
     "performance@bendrucker": true,
     "zsh@bendrucker": true,
-    "sandbox@bendrucker": true
+    "sandbox@bendrucker": true,
+    "mddog@mddog": true
   },
   "extraKnownMarketplaces": {
     "bendrucker": {
@@ -249,6 +250,13 @@
         "source": "github",
         "repo": "schpet/linear-cli",
         "ref": "v3.0.0"
+      }
+    },
+    "mddog": {
+      "source": {
+        "source": "github",
+        "repo": "qu8n/mddog",
+        "ref": "v1.0.3"
       }
     }
   },

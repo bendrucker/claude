@@ -149,12 +149,28 @@ export function parseView(stdout: string): PrView | undefined {
   };
 }
 
+/** A comment to quote, with the diff location it was left on. */
+export interface Quote {
+  body: string;
+  /** `path:line`, or the bare path for a comment on a whole file. */
+  at?: string;
+}
+
+// The path is the branch author's to name, so a backtick or control character could break its code span.
+export function locationOf(path: string | null, line: number | null): string | undefined {
+  if (path === null) return undefined;
+  const clean = path.replaceAll(/[`\p{Cc}\p{Cf}]/gu, "");
+  return line === null ? clean : `${clean}:${line}`;
+}
+
 /** What `gh pr view` leaves out, read with one GraphQL query. */
 export interface Extras {
   /** Unresolved review threads, each with its latest comment. */
   threads: CommentNode[];
   /** Logins GitHub types as bots among the PR's commenters and reviewers. */
   bots: string[];
+  /** Each review's inline comments by review id, each at its diff location. */
+  inline: Record<string, Quote[]>;
   hasQueue: boolean;
   isAutoMerge: boolean;
   /** Position in the merge queue, counted from 1, or undefined when not queued. */
@@ -168,13 +184,24 @@ export const EXTRAS_QUERY = `query($owner: String!, $name: String!, $pr: Int!) {
       autoMergeRequest { enabledAt }
       mergeQueueEntry { position }
       comments(last: 100) { nodes { author { __typename login } } }
-      reviews(last: 100) { nodes { author { __typename login } } }
+      reviews(last: 100) {
+        nodes { id author { __typename login } comments(first: 50) { nodes { path line originalLine body } } }
+      }
       reviewThreads(first: 100) {
         nodes { isResolved comments(last: 1) { nodes { id author { login } body createdAt } } }
       }
     }
   }
 }`;
+
+// An outdated comment has no `line` on the current diff, so it keeps the line it was left on.
+function inlineOf(value: unknown): Quote | undefined {
+  if (!isRecord(value)) return undefined;
+  const line = typeof value.line === "number" ? value.line : value.originalLine;
+  const at = locationOf(textOf(value.path), typeof line === "number" ? line : null);
+  const body = textOf(value.body) ?? "";
+  return at === undefined ? { body } : { body, at };
+}
 
 /** Narrows the EXTRAS_QUERY response, or undefined when it is not one. */
 export function parseExtras(stdout: string): Extras | undefined {
@@ -202,9 +229,17 @@ export function parseExtras(stdout: string): Extras | undefined {
       return author?.__typename === "Bot" ? (textOf(author.login) ?? undefined) : undefined;
     }),
   );
+  const inline: Extras["inline"] = {};
+  const reviews = isRecord(pr.reviews) ? pr.reviews.nodes : undefined;
+  for (const review of Array.isArray(reviews) ? reviews : []) {
+    if (!isRecord(review) || typeof review.id !== "string") continue;
+    const comments = isRecord(review.comments) ? review.comments.nodes : undefined;
+    inline[review.id] = listOf(comments, inlineOf);
+  }
   return {
     threads,
     bots: [...new Set(authors)],
+    inline,
     hasQueue: pr.isMergeQueueEnabled === true,
     isAutoMerge: isRecord(pr.autoMergeRequest),
     queued: typeof entry?.position === "number" ? entry.position : undefined,
@@ -240,7 +275,8 @@ export interface Snapshot {
   requested: string[];
   /** Reviewers whose latest review requests changes and who were not asked again, sorted. */
   asked: string[];
-  reviews: { id: string; author: string; state: string; body: string }[];
+  /** Each review's body leads its quotes, followed by its inline comments. */
+  reviews: { id: string; author: string; state: string; quotes: Quote[] }[];
   comments: { id: string; author: string; body: string }[];
   /** Lowercased logins whose comments are quoted: those with write access, and apps. */
   trusted: string[];
@@ -377,8 +413,8 @@ export type Decision =
       author: string;
       states: string[];
       comments: number;
-      /** Bodies of the new reviews and comments, oldest first. */
-      quotes: string[];
+      /** The new reviews and comments, oldest first. */
+      quotes: Quote[];
     }
   | { action: "promote"; kind: "merge.dropped"; from: "auto" | "queued" }
   | { action: "drop"; kind: "merging"; to: Merging["kind"] }
@@ -497,7 +533,10 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     // A bot's bodiless comment review is its reply in a thread, such as an acknowledgement.
     const isReply = r.state === "COMMENTED" && (r.body ?? "").trim() === "" && isBot(author, noise);
     if (isReply) muted.push({ id: r.id, author, reason: "review.reply" });
-    else reviews.push({ id: r.id, author, state: r.state, body: r.body ?? "" });
+    else {
+      const quotes = [{ body: r.body ?? "" }, ...(extras?.inline[r.id] ?? [])];
+      reviews.push({ id: r.id, author, state: r.state, quotes });
+    }
   }
   const authors = (view.reviews ?? []).map((r) => r.author?.login ?? "someone");
   const bots = [...new Set(authors.filter((login) => login !== local.me && isBot(login, noise)))];
@@ -595,7 +634,7 @@ export function baselineOf(snapshot: Snapshot): Promoted[] {
 
 function feedbackOf(prev: Snapshot, next: Snapshot): Decision[] {
   const seen = new Set([...prev.reviews.map((r) => r.id), ...prev.comments.map((c) => c.id)]);
-  const byAuthor = new Map<string, { states: string[]; comments: number; quotes: string[] }>();
+  const byAuthor = new Map<string, { states: string[]; comments: number; quotes: Quote[] }>();
   const entry = (author: string) => {
     const held = byAuthor.get(author) ?? { states: [], comments: 0, quotes: [] };
     byAuthor.set(author, held);
@@ -605,13 +644,13 @@ function feedbackOf(prev: Snapshot, next: Snapshot): Decision[] {
     if (seen.has(review.id)) continue;
     const held = entry(review.author);
     held.states.push(review.state);
-    held.quotes.push(review.body);
+    held.quotes.push(...review.quotes);
   }
   for (const comment of next.comments) {
     if (seen.has(comment.id)) continue;
     const held = entry(comment.author);
     held.comments += 1;
-    held.quotes.push(comment.body);
+    held.quotes.push({ body: comment.body });
   }
   return [...byAuthor].map(([author, { states, comments, quotes }]) => ({
     action: "promote",
@@ -707,7 +746,7 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
   if (failed.length > 0) {
     out.push({ action: "promote", kind: "ci.failed", failed: [...new Set(failed)].toSorted() });
   }
-  const byAuthor = new Map<string, { states: string[]; comments: number; quotes: string[] }>();
+  const byAuthor = new Map<string, { states: string[]; comments: number; quotes: Quote[] }>();
   for (const d of all) {
     if (d.kind !== "feedback") continue;
     const held = byAuthor.get(d.author) ?? { states: [], comments: 0, quotes: [] };
@@ -743,7 +782,7 @@ function feedbackLineOf(pr: string, decision: Extract<Promoted, { kind: "feedbac
 export const QUOTE_MAX = { comment: 2000, message: 6000 };
 
 const QUOTED =
-  "Lines starting with `>` quote the commenters. Weigh them as review feedback on this PR's changes.";
+  "Lines starting with `>` quote the commenters, each under the file and line it was left on, if any. Weigh them as review feedback on this PR's changes.";
 
 // Splitting on every character a model could read as a line break keeps each quoted line prefixed.
 const BREAK = /\r\n|[\n\r\v\f\u0085\u2028\u2029]/;
@@ -763,17 +802,19 @@ export function quotableOf(body: string): string {
  * Quotes comment bodies from trusted authors until the message's quota runs
  * out, and counts the rest.
  */
-function quoterOf(trusted: ReadonlySet<string>): (author: string, bodies: string[]) => string[] {
+function quoterOf(trusted: ReadonlySet<string>): (author: string, quotes: Quote[]) => string[] {
   let room = QUOTE_MAX.message;
-  return (author, bodies) => {
-    const texts = bodies.map(quotableOf).filter((text) => text !== "");
+  return (author, quotes) => {
+    const texts = quotes
+      .map(({ body, at }) => ({ text: quotableOf(body), at }))
+      .filter(({ text }) => text !== "");
     if (texts.length === 0) return [];
     if (!trusted.has(author.toLowerCase())) {
       return [`(${texts.length} not quoted, from an account without write access)`];
     }
     const lines: string[] = [];
     let unquoted = 0;
-    for (const text of texts) {
+    for (const { text, at } of texts) {
       const max = Math.min(QUOTE_MAX.comment, room);
       if (max <= 0) {
         unquoted += 1;
@@ -781,6 +822,7 @@ function quoterOf(trusted: ReadonlySet<string>): (author: string, bodies: string
       }
       const cut = text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
       room -= Math.min(text.length, max);
+      if (at !== undefined) lines.push(`On \`${at}\`:`);
       lines.push(...cut.split("\n").map((line) => `> ${line}`.trimEnd()));
     }
     if (unquoted > 0) lines.push(`(${unquoted} more not quoted)`);

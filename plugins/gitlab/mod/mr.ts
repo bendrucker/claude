@@ -109,6 +109,34 @@ const readApprovals = map(
   }),
 );
 
+/** A comment to quote, with the diff location it was left on. */
+export interface Quote {
+  body: string;
+  /** `path:line`, or the bare path for a comment on a whole file. */
+  at?: string;
+}
+
+// The path is the branch author's to name, so a backtick or control character could break its code span.
+export function locationOf(path: string | null, line: number | null): string | undefined {
+  if (path === null) return undefined;
+  const clean = path.replaceAll(/[`\p{Cc}\p{Cf}]/gu, "");
+  return line === null ? clean : `${clean}:${line}`;
+}
+
+const quoteOf = (body: string, at: string | undefined): Quote =>
+  at === undefined ? { body } : { body, at };
+
+// A note on a removed line has only the old side.
+const readPosition = map(
+  obj({
+    new_path: or(str, null),
+    old_path: or(str, null),
+    new_line: or(num, null),
+    old_line: or(num, null),
+  }),
+  (p) => locationOf(p.new_path ?? p.old_path, p.new_line ?? p.old_line) ?? null,
+);
+
 const readNote = map(
   obj({
     id: num,
@@ -117,15 +145,20 @@ const readNote = map(
     system: or(bool, false),
     type: or(str, ""),
     created_at: or(str, ""),
+    position: or(readPosition, null),
   }),
-  (n) => ({
-    id: n.id,
-    author: n.author,
-    body: n.body,
-    isSystem: n.system,
-    type: n.type,
-    createdAt: n.created_at,
-  }),
+  (n) => {
+    const note: Note = {
+      id: n.id,
+      author: n.author,
+      body: n.body,
+      isSystem: n.system,
+      type: n.type,
+      createdAt: n.created_at,
+    };
+    if (n.position !== null) note.at = n.position;
+    return note;
+  },
 );
 
 const readJob = map(
@@ -193,7 +226,16 @@ const readMerge = map(
 
 export type MrView = Out<typeof readView>;
 export type Approvals = Out<typeof readApprovals>;
-export type Note = Out<typeof readNote>;
+export interface Note {
+  id: number;
+  author: string;
+  body: string;
+  isSystem: boolean;
+  type: string;
+  createdAt: string;
+  /** Where a diff note sits, as `path:line`. */
+  at?: string;
+}
 export type Job = Out<typeof readJob>;
 export type Reviewer = Out<typeof readReviewer>;
 export type Discussion = Out<typeof readDiscussion>;
@@ -271,7 +313,7 @@ export interface Snapshot {
   /** Reviewers other than the session's own user who requested changes, sorted. */
   asked: string[];
   noteCursor: number;
-  notes: { id: number; author: string; body: string }[];
+  notes: ({ id: number; author: string } & Quote)[];
   /** Notes kept from the model as noise, with why. */
   muted: { id: string; author: string; reason: string }[];
   /** Unresolved threads whose latest note is not the session's own. */
@@ -366,7 +408,7 @@ export type Decision =
   | { action: "promote"; kind: "push.foreign"; from: string }
   | { action: "promote"; kind: "ci.failed"; failed: string[] }
   | { action: "promote"; kind: "changes_requested" }
-  | { action: "promote"; kind: "feedback"; author: string; approval: Approval; notes: string[] }
+  | { action: "promote"; kind: "feedback"; author: string; approval: Approval; notes: Quote[] }
   | { action: "promote"; kind: "merge.dropped"; from: "auto" | "queued" }
   | { action: "drop"; kind: "merging"; to: Merging["kind"] }
   | { action: "drop"; kind: "unblocked" }
@@ -496,7 +538,7 @@ export function snapshotOf(read: Read): Snapshot {
       continue;
     }
     const reason = chatterOf(note, noise);
-    if (reason === undefined) kept.push({ id, author, body: note.body });
+    if (reason === undefined) kept.push({ id, author, ...quoteOf(note.body, note.at) });
     else muted.push({ id: String(id), author, reason });
   }
   return {
@@ -587,7 +629,7 @@ function feedbackOf(prev: Snapshot, next: Snapshot, isSameHead: boolean): Decisi
     for (const author of removed) entry(author).approval = "unapproved";
   }
   for (const note of next.notes.toSorted((a, b) => a.id - b.id)) {
-    if (note.id > prev.noteCursor) entry(note.author).notes.push(note.body);
+    if (note.id > prev.noteCursor) entry(note.author).notes.push(quoteOf(note.body, note.at));
   }
 
   // GitLab names no reviewer for a request for changes.
@@ -725,7 +767,7 @@ function feedbackLineOf(mr: string, decision: Feedback): string {
 export const QUOTE_MAX = { comment: 2000, message: 6000 };
 
 const QUOTED =
-  "Lines starting with `>` quote the commenters. Weigh them as review feedback on this MR's changes.";
+  "Lines starting with `>` quote the commenters, each under the file and line it was left on, if any. Weigh them as review feedback on this MR's changes.";
 
 // Splitting on every character a model could read as a line break keeps each quoted line prefixed.
 const BREAK = /\r\n|[\n\r\v\f\u0085\u2028\u2029]/;
@@ -745,17 +787,19 @@ export function quotableOf(body: string): string {
  * Quotes comment bodies from trusted authors until the message's quota runs
  * out, and counts the rest.
  */
-function quoterOf(trusted: ReadonlySet<string>): (author: string, bodies: string[]) => string[] {
+function quoterOf(trusted: ReadonlySet<string>): (author: string, quotes: Quote[]) => string[] {
   let room = QUOTE_MAX.message;
-  return (author, bodies) => {
-    const texts = bodies.map(quotableOf).filter((text) => text !== "");
+  return (author, quotes) => {
+    const texts = quotes
+      .map(({ body, at }) => ({ text: quotableOf(body), at }))
+      .filter(({ text }) => text !== "");
     if (texts.length === 0) return [];
     if (!trusted.has(author.toLowerCase())) {
       return [`(${texts.length} not quoted, from outside the project's members)`];
     }
     const lines: string[] = [];
     let unquoted = 0;
-    for (const text of texts) {
+    for (const { text, at } of texts) {
       const max = Math.min(QUOTE_MAX.comment, room);
       if (max <= 0) {
         unquoted += 1;
@@ -763,6 +807,7 @@ function quoterOf(trusted: ReadonlySet<string>): (author: string, bodies: string
       }
       const cut = text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
       room -= Math.min(text.length, max);
+      if (at !== undefined) lines.push(`On \`${at}\`:`);
       lines.push(...cut.split("\n").map((line) => `> ${line}`.trimEnd()));
     }
     if (unquoted > 0) lines.push(`(${unquoted} more not quoted)`);

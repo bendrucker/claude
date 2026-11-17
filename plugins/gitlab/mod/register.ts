@@ -472,7 +472,7 @@ async function trustedOf(
   promoted: Promoted[],
 ): Promise<Set<string>> {
   const authors = promoted.flatMap((d) =>
-    d.kind === "feedback" && d.notes.some((body) => body.trim() !== "") ? [d.author] : [],
+    d.kind === "feedback" && d.notes.some(({ body }) => body.trim() !== "") ? [d.author] : [],
   );
   const members = await Promise.all(
     authors.map((author) => isMember($, watch, snapshot.projectId, author)),

@@ -162,8 +162,8 @@ async function meOf(
   return login;
 }
 
-// Only the footer and the pane read the extras, so a failed read keeps the
-// last answer for the same PR rather than failing the poll.
+// The extras only place quotes and fill the footer and pane, so a failed read
+// keeps the last answer for the same PR rather than failing the poll.
 async function extrasOf(
   $: EngineInterface,
   watch: Watch,

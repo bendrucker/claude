@@ -794,39 +794,42 @@ function paragraphOf(
 ): string {
   const pr = `PR #${snapshot.pr}`;
   const base = snapshot.base === "" ? "its base branch" : `\`${snapshot.base}\``;
-  if (decision.kind === "pr.merged") return `${pr} merged: ${snapshot.url}`;
-  if (decision.kind === "pr.closed") return `${pr} closed without merging: ${snapshot.url}`;
-  if (decision.kind === "conflict") {
-    return [
-      `${pr} has merge conflicts with ${base} at ${short(snapshot.head)}.`,
-      `Update the branch from ${base}, resolve the conflicts with the \`git:conflicts\` skill, and push.`,
-    ].join("\n");
+  switch (decision.kind) {
+    case "pr.merged":
+      return `${pr} merged: ${snapshot.url}`;
+    case "pr.closed":
+      return `${pr} closed without merging: ${snapshot.url}`;
+    case "conflict":
+      return [
+        `${pr} has merge conflicts with ${base} at ${short(snapshot.head)}.`,
+        `Update the branch from ${base}, resolve the conflicts with the \`git:conflicts\` skill, and push.`,
+      ].join("\n");
+    case "behind":
+      return [
+        `${pr} is behind ${base} at ${short(snapshot.head)}, and merging requires an up-to-date branch.`,
+        `Update the branch from ${base}, resolve any conflicts with the \`git:conflicts\` skill, and push.`,
+      ].join("\n");
+    case "merge.dropped":
+      if (decision.from === "queued") {
+        return [
+          `${pr} left the merge queue without merging: ${snapshot.url}`,
+          "The queue tests a merge group, whose checks the PR does not show. Read them with `gh run list --event merge_group`.",
+        ].join("\n");
+      }
+      return `${pr}'s auto-merge was turned off before it merged: ${snapshot.url}`;
+    case "push.foreign":
+      return [
+        `${pr}'s branch moved from ${short(decision.from)} to ${short(snapshot.head)}, a commit this checkout does not have.`,
+        "Pull it before committing or pushing again.",
+      ].join("\n");
+    case "ci.failed":
+      return [
+        `CI failed on ${pr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
+        `Read the failure with \`gh pr checks ${snapshot.pr}\` and \`gh run view <run> --log-failed\`.`,
+      ].join("\n");
+    default:
+      return decision satisfies never;
   }
-  if (decision.kind === "behind") {
-    return [
-      `${pr} is behind ${base} at ${short(snapshot.head)}, and merging requires an up-to-date branch.`,
-      `Update the branch from ${base}, resolve any conflicts with the \`git:conflicts\` skill, and push.`,
-    ].join("\n");
-  }
-  if (decision.kind === "merge.dropped" && decision.from === "queued") {
-    return [
-      `${pr} left the merge queue without merging: ${snapshot.url}`,
-      "The queue tests a merge group, whose checks the PR does not show. Read them with `gh run list --event merge_group`.",
-    ].join("\n");
-  }
-  if (decision.kind === "merge.dropped") {
-    return `${pr}'s auto-merge was turned off before it merged: ${snapshot.url}`;
-  }
-  if (decision.kind === "push.foreign") {
-    return [
-      `${pr}'s branch moved from ${short(decision.from)} to ${short(snapshot.head)}, a commit this checkout does not have.`,
-      "Pull it before committing or pushing again.",
-    ].join("\n");
-  }
-  return [
-    `CI failed on ${pr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
-    `Read the failure with \`gh pr checks ${snapshot.pr}\` and \`gh run view <run> --log-failed\`.`,
-  ].join("\n");
 }
 
 export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {

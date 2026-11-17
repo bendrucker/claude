@@ -776,39 +776,42 @@ function paragraphOf(
 ): string {
   const mr = `MR !${snapshot.mr}`;
   const target = snapshot.target === "" ? "its target branch" : `\`${snapshot.target}\``;
-  if (decision.kind === "mr.merged") return `${mr} merged: ${snapshot.url}`;
-  if (decision.kind === "mr.closed") return `${mr} closed without merging: ${snapshot.url}`;
-  if (decision.kind === "merge.dropped" && decision.from === "queued") {
-    return [
-      `${mr} left the merge train without merging: ${snapshot.url}`,
-      `Read why in its system notes with \`glab mr view ${snapshot.mr} --comments --system-logs\`.`,
-    ].join("\n");
+  switch (decision.kind) {
+    case "mr.merged":
+      return `${mr} merged: ${snapshot.url}`;
+    case "mr.closed":
+      return `${mr} closed without merging: ${snapshot.url}`;
+    case "merge.dropped":
+      if (decision.from === "queued") {
+        return [
+          `${mr} left the merge train without merging: ${snapshot.url}`,
+          `Read why in its system notes with \`glab mr view ${snapshot.mr} --comments --system-logs\`.`,
+        ].join("\n");
+      }
+      return `${mr}'s auto-merge was turned off before it merged: ${snapshot.url}`;
+    case "conflict":
+      return [
+        `${mr} has merge conflicts with ${target} at ${short(snapshot.head)}.`,
+        `Update the branch from ${target}, resolve the conflicts with the \`git:conflicts\` skill, and push.`,
+      ].join("\n");
+    case "behind":
+      return [
+        `${mr} is behind ${target} at ${short(snapshot.head)}, and merging requires a rebase.`,
+        `Rebase onto ${target}, resolve any conflicts with the \`git:conflicts\` skill, and push.`,
+      ].join("\n");
+    case "push.foreign":
+      return [
+        `${mr}'s branch moved from ${short(decision.from)} to ${short(snapshot.head)}, a commit this checkout does not have.`,
+        "Pull it before committing or pushing again.",
+      ].join("\n");
+    case "ci.failed":
+      return [
+        `Pipeline failed on ${mr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
+        `Read the failure with \`glab ci get --merge-request=${snapshot.mr} --status=failed\` and \`glab ci trace <job> --pipeline-id ${snapshot.pipeline}\`.`,
+      ].join("\n");
+    default:
+      return decision satisfies never;
   }
-  if (decision.kind === "merge.dropped") {
-    return `${mr}'s auto-merge was turned off before it merged: ${snapshot.url}`;
-  }
-  if (decision.kind === "conflict") {
-    return [
-      `${mr} has merge conflicts with ${target} at ${short(snapshot.head)}.`,
-      `Update the branch from ${target}, resolve the conflicts with the \`git:conflicts\` skill, and push.`,
-    ].join("\n");
-  }
-  if (decision.kind === "behind") {
-    return [
-      `${mr} is behind ${target} at ${short(snapshot.head)}, and merging requires a rebase.`,
-      `Rebase onto ${target}, resolve any conflicts with the \`git:conflicts\` skill, and push.`,
-    ].join("\n");
-  }
-  if (decision.kind === "push.foreign") {
-    return [
-      `${mr}'s branch moved from ${short(decision.from)} to ${short(snapshot.head)}, a commit this checkout does not have.`,
-      "Pull it before committing or pushing again.",
-    ].join("\n");
-  }
-  return [
-    `Pipeline failed on ${mr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
-    `Read the failure with \`glab ci get --merge-request=${snapshot.mr} --status=failed\` and \`glab ci trace <job> --pipeline-id ${snapshot.pipeline}\`.`,
-  ].join("\n");
 }
 
 /** `trusted` holds the lowercased usernames whose comments are quoted. */

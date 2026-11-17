@@ -45,6 +45,7 @@ The user finds a background session in `claude agents` and picks it up with `cla
 claude-dispatch --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...
 ```
 
+- Make `claude-dispatch` the entire Bash command, with no `cd`, env prefix, pipe, `&&`, or loop, because only that form matches its sandbox exclusion. For several dispatches, write one prompt file each and issue the Bash calls in parallel in one message.
 - `--repo` defaults to this session's repository, shown in `--help` above. Pass it only to dispatch into another repository.
 - A branch that exists locally or on a remote is reused, and a branch that already has a worktree opens there. `wt` resolves a PR or MR to its head branch. `--base` applies only to a branch being created, and is fetched first.
 - Under Rex the session opens in a new tab labeled with the branch. From outside Rex, pass `--session <id or label>` from `rex ls`.
@@ -69,7 +70,7 @@ On success the script prints one JSON line:
   - `unknown`: the session showed neither before the timeout. Read the screen before reporting the hand-off. Under `bg`, a sandboxed `claude agents --json` lists nothing, so the status comes from `claude logs` alone.
 - `submoduleError`, when present: submodules failed to initialize. The session can repair them.
 
-A failure exits 1 and prints the error. Once the worktree exists, it also prints the partial record. Unless `checkout` is `existing-worktree`, report `path` to the user as an orphaned checkout to clean up.
+A failure exits 1 and prints the error. Once the worktree exists, it also prints the partial record. Unless `checkout` is `existing-worktree`, report `path` to the user as an orphaned checkout to clean up. A failure after `wt` created the branch leaves the branch, and a rerun with the same `--branch` reuses it (`existing-branch`).
 
 ## Follow Up
 

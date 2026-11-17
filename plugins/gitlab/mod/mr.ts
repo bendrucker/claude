@@ -249,7 +249,7 @@ export interface Snapshot {
   /** Reviewers other than the session's own user who requested changes, sorted. */
   asked: string[];
   noteCursor: number;
-  notes: { id: number; author: string }[];
+  notes: { id: number; author: string; body: string }[];
   /** Notes kept from the model as noise, with why. */
   muted: { id: string; author: string; reason: string }[];
   /** Unresolved threads whose latest note is not the session's own. */
@@ -344,7 +344,7 @@ export type Decision =
   | { action: "promote"; kind: "push.foreign"; from: string }
   | { action: "promote"; kind: "ci.failed"; failed: string[] }
   | { action: "promote"; kind: "changes_requested" }
-  | { action: "promote"; kind: "feedback"; author: string; approval: Approval; notes: number }
+  | { action: "promote"; kind: "feedback"; author: string; approval: Approval; notes: string[] }
   | { action: "promote"; kind: "merge.dropped"; from: "auto" | "queued" }
   | { action: "drop"; kind: "merging"; to: Merging["kind"] }
   | { action: "drop"; kind: "unblocked" }
@@ -474,7 +474,7 @@ export function snapshotOf(read: Read): Snapshot {
       continue;
     }
     const reason = chatterOf(note, noise);
-    if (reason === undefined) kept.push({ id, author });
+    if (reason === undefined) kept.push({ id, author, body: note.body });
     else muted.push({ id: String(id), author, reason });
   }
   return {
@@ -547,7 +547,7 @@ function feedbackOf(prev: Snapshot, next: Snapshot, isSameHead: boolean): Decisi
       kind: "feedback",
       author,
       approval: null,
-      notes: 0,
+      notes: [],
     };
     byAuthor.set(author, held);
     return held;
@@ -565,7 +565,7 @@ function feedbackOf(prev: Snapshot, next: Snapshot, isSameHead: boolean): Decisi
     for (const author of removed) entry(author).approval = "unapproved";
   }
   for (const note of next.notes.toSorted((a, b) => a.id - b.id)) {
-    if (note.id > prev.noteCursor) entry(note.author).notes += 1;
+    if (note.id > prev.noteCursor) entry(note.author).notes.push(note.body);
   }
 
   // GitLab names no reviewer for a request for changes.
@@ -678,7 +678,7 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
     byAuthor.set(d.author, {
       ...d,
       approval: approvalOf(held?.approval ?? null, d.approval),
-      notes: (held?.notes ?? 0) + d.notes,
+      notes: [...(held?.notes ?? []), ...d.notes],
     });
   }
   out.push(...byAuthor.values());
@@ -689,13 +689,41 @@ const short = (sha: string) => sha.slice(0, 7);
 
 function feedbackLineOf(mr: string, decision: Feedback): string {
   const { author, approval, notes } = decision;
-  const comments = notes === 1 ? "1 new comment" : `${notes} new comments`;
+  const count = notes.length;
+  const comments = count === 1 ? "1 new comment" : `${count} new comments`;
   if (approval === null) return `@${author} commented on ${mr} (${comments})`;
   const line =
     approval === "approved"
       ? `@${author} approved ${mr}`
       : `@${author} revoked their approval of ${mr}`;
-  return notes > 0 ? `${line} (${comments})` : line;
+  return count > 0 ? `${line} (${comments})` : line;
+}
+
+/** Characters quoted from one comment, and from every comment in one message. */
+export const QUOTE_MAX = { comment: 2000, message: 6000 };
+
+/** Quotes comment bodies until the message's quota runs out, then counts the rest. */
+function quoterOf(): (bodies: string[]) => string[] {
+  let room = QUOTE_MAX.message;
+  return (bodies) => {
+    const lines: string[] = [];
+    let unquoted = 0;
+    for (const body of bodies) {
+      // Hidden markup is a bot's bookkeeping, which the rendered comment never shows.
+      const text = body.replaceAll(/<!--[\s\S]*?-->/g, "").trim();
+      if (text === "") continue;
+      const max = Math.min(QUOTE_MAX.comment, room);
+      if (max <= 0) {
+        unquoted += 1;
+        continue;
+      }
+      const cut = text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
+      room -= Math.min(text.length, max);
+      lines.push(...cut.split("\n").map((line) => `> ${line}`.trimEnd()));
+    }
+    if (unquoted > 0) lines.push(`(${unquoted} more not quoted)`);
+    return lines;
+  };
 }
 
 function paragraphOf(
@@ -743,16 +771,33 @@ export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   const mr = `MR !${snapshot.mr}`;
   const paragraphs: string[] = [];
   const feedback: string[] = [];
+  const quote = quoterOf();
   for (const decision of promoted) {
-    if (decision.kind === "changes_requested") feedback.push(`Changes were requested on ${mr}`);
-    else if (decision.kind === "feedback") feedback.push(feedbackLineOf(mr, decision));
-    else paragraphs.push(paragraphOf(snapshot, decision));
+    switch (decision.kind) {
+      case "changes_requested":
+        feedback.push(`Changes were requested on ${mr}`);
+        break;
+      case "feedback":
+        feedback.push(feedbackLineOf(mr, decision), ...quote(decision.notes));
+        break;
+      case "mr.merged":
+      case "mr.closed":
+      case "merge.dropped":
+      case "conflict":
+      case "behind":
+      case "push.foreign":
+      case "ci.failed":
+        paragraphs.push(paragraphOf(snapshot, decision));
+        break;
+      default:
+        decision satisfies never;
+    }
   }
   if (feedback.length > 0) {
     // Only a bare change request narrows to open threads, since a comment can be unresolvable.
     const isThreadsOnly =
       promoted.some((d) => d.kind === "changes_requested") &&
-      !promoted.some((d) => d.kind === "feedback" && d.notes > 0);
+      !promoted.some((d) => d.kind === "feedback" && d.notes.length > 0);
     const state = isThreadsOnly ? " --state unresolved" : "";
     paragraphs.push(
       [

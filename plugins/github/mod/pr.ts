@@ -236,8 +236,8 @@ export interface Snapshot {
   requested: string[];
   /** Reviewers whose latest review requests changes and who were not asked again, sorted. */
   asked: string[];
-  reviews: { id: string; author: string; state: string }[];
-  comments: { id: string; author: string }[];
+  reviews: { id: string; author: string; state: string; body: string }[];
+  comments: { id: string; author: string; body: string }[];
   /** Comments and checks kept from the model as noise, with why. */
   muted: { id: string; author: string; reason: string }[];
   /** Unresolved review threads whose latest comment is not the session's own. */
@@ -365,7 +365,15 @@ export type Decision =
   | { action: "promote"; kind: "behind" }
   | { action: "promote"; kind: "push.foreign"; from: string }
   | { action: "promote"; kind: "ci.failed"; failed: string[] }
-  | { action: "promote"; kind: "feedback"; author: string; states: string[]; comments: number }
+  | {
+      action: "promote";
+      kind: "feedback";
+      author: string;
+      states: string[];
+      comments: number;
+      /** Bodies of the new reviews and comments, oldest first. */
+      quotes: string[];
+    }
   | { action: "promote"; kind: "merge.dropped"; from: "auto" | "queued" }
   | { action: "drop"; kind: "merging"; to: Merging["kind"] }
   | { action: "drop"; kind: "unblocked" }
@@ -470,7 +478,7 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     // A bot's bodiless comment review is its reply in a thread, such as an acknowledgement.
     const isReply = r.state === "COMMENTED" && (r.body ?? "").trim() === "" && isBot(author, noise);
     if (isReply) muted.push({ id: r.id, author, reason: "review.reply" });
-    else reviews.push({ id: r.id, author, state: r.state });
+    else reviews.push({ id: r.id, author, state: r.state, body: r.body ?? "" });
   }
   const authors = (view.reviews ?? []).map((r) => r.author?.login ?? "someone");
   const bots = [...new Set(authors.filter((login) => login !== local.me && isBot(login, noise)))];
@@ -500,7 +508,7 @@ export function snapshotOf(view: PrView, local: Local): Snapshot {
     if (c.isMinimized || (isMine && isOwn(c.body ?? "", c.createdAt, turns))) continue;
     const author = c.author?.login ?? "someone";
     const reason = chatterOf(author, c.body ?? "", noise);
-    if (reason === undefined) comments.push({ id: c.id, author });
+    if (reason === undefined) comments.push({ id: c.id, author, body: c.body ?? "" });
     else muted.push({ id: c.id, author, reason });
   }
   return {
@@ -567,24 +575,31 @@ export function baselineOf(snapshot: Snapshot): Promoted[] {
 
 function feedbackOf(prev: Snapshot, next: Snapshot): Decision[] {
   const seen = new Set([...prev.reviews.map((r) => r.id), ...prev.comments.map((c) => c.id)]);
-  const byAuthor = new Map<string, { states: string[]; comments: number }>();
+  const byAuthor = new Map<string, { states: string[]; comments: number; quotes: string[] }>();
   const entry = (author: string) => {
-    const held = byAuthor.get(author) ?? { states: [], comments: 0 };
+    const held = byAuthor.get(author) ?? { states: [], comments: 0, quotes: [] };
     byAuthor.set(author, held);
     return held;
   };
   for (const review of next.reviews) {
-    if (!seen.has(review.id)) entry(review.author).states.push(review.state);
+    if (seen.has(review.id)) continue;
+    const held = entry(review.author);
+    held.states.push(review.state);
+    held.quotes.push(review.body);
   }
   for (const comment of next.comments) {
-    if (!seen.has(comment.id)) entry(comment.author).comments += 1;
+    if (seen.has(comment.id)) continue;
+    const held = entry(comment.author);
+    held.comments += 1;
+    held.quotes.push(comment.body);
   }
-  return [...byAuthor].map(([author, { states, comments }]) => ({
+  return [...byAuthor].map(([author, { states, comments, quotes }]) => ({
     action: "promote",
     kind: "feedback",
     author,
     states,
     comments,
+    quotes,
   }));
 }
 
@@ -672,17 +687,18 @@ export function combine(carried: Promoted[], fresh: Promoted[]): Promoted[] {
   if (failed.length > 0) {
     out.push({ action: "promote", kind: "ci.failed", failed: [...new Set(failed)].toSorted() });
   }
-  const byAuthor = new Map<string, { states: string[]; comments: number }>();
+  const byAuthor = new Map<string, { states: string[]; comments: number; quotes: string[] }>();
   for (const d of all) {
     if (d.kind !== "feedback") continue;
-    const held = byAuthor.get(d.author) ?? { states: [], comments: 0 };
+    const held = byAuthor.get(d.author) ?? { states: [], comments: 0, quotes: [] };
     byAuthor.set(d.author, {
       states: [...held.states, ...d.states],
       comments: held.comments + d.comments,
+      quotes: [...held.quotes, ...d.quotes],
     });
   }
-  for (const [author, { states, comments }] of byAuthor) {
-    out.push({ action: "promote", kind: "feedback", author, states, comments });
+  for (const [author, { states, comments, quotes }] of byAuthor) {
+    out.push({ action: "promote", kind: "feedback", author, states, comments, quotes });
   }
   return out;
 }
@@ -701,6 +717,33 @@ function feedbackLineOf(pr: string, decision: Extract<Promoted, { kind: "feedbac
   if (comments > 0) details.push(comments === 1 ? "1 new comment" : `${comments} new comments`);
   const verb = states.length > 0 ? "reviewed" : "commented on";
   return `@${author} ${verb} ${pr} (${details.join(", ")})`;
+}
+
+/** Characters quoted from one comment, and from every comment in one message. */
+export const QUOTE_MAX = { comment: 2000, message: 6000 };
+
+/** Quotes comment bodies until the message's quota runs out, then counts the rest. */
+function quoterOf(): (bodies: string[]) => string[] {
+  let room = QUOTE_MAX.message;
+  return (bodies) => {
+    const lines: string[] = [];
+    let unquoted = 0;
+    for (const body of bodies) {
+      // Hidden markup is a bot's bookkeeping, which the rendered comment never shows.
+      const text = body.replaceAll(/<!--[\s\S]*?-->/g, "").trim();
+      if (text === "") continue;
+      const max = Math.min(QUOTE_MAX.comment, room);
+      if (max <= 0) {
+        unquoted += 1;
+        continue;
+      }
+      const cut = text.length > max ? `${text.slice(0, max).trimEnd()}…` : text;
+      room -= Math.min(text.length, max);
+      lines.push(...cut.split("\n").map((line) => `> ${line}`.trimEnd()));
+    }
+    if (unquoted > 0) lines.push(`(${unquoted} more not quoted)`);
+    return lines;
+  };
 }
 
 function paragraphOf(
@@ -747,9 +790,11 @@ function paragraphOf(
 export function messageOf(snapshot: Snapshot, promoted: Promoted[]): string {
   const paragraphs: string[] = [];
   const feedback: string[] = [];
+  const quote = quoterOf();
   for (const decision of promoted) {
-    if (decision.kind === "feedback") feedback.push(feedbackLineOf(`PR #${snapshot.pr}`, decision));
-    else paragraphs.push(paragraphOf(snapshot, decision));
+    if (decision.kind === "feedback") {
+      feedback.push(feedbackLineOf(`PR #${snapshot.pr}`, decision), ...quote(decision.quotes));
+    } else paragraphs.push(paragraphOf(snapshot, decision));
   }
   if (feedback.length > 0) {
     paragraphs.push(

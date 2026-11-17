@@ -12,6 +12,7 @@ import {
   combine,
   decide,
   messageOf,
+  QUOTE_MAX,
   noiseOf,
   parseView,
   snapshotOf,
@@ -344,8 +345,8 @@ describe("decide", () => {
     comments: [string, string][] = [],
   ): Snapshot => ({
     ...passing,
-    reviews: reviews.map(([id, author, state]) => ({ id, author, state })),
-    comments: comments.map(([id, author]) => ({ id, author })),
+    reviews: reviews.map(([id, author, state]) => ({ id, author, state, body: "" })),
+    comments: comments.map(([id, author]) => ({ id, author, body: "" })),
   });
 
   const cases: [string, Snapshot, Snapshot, Decision[]][] = [
@@ -430,6 +431,7 @@ describe("decide", () => {
           author: "alice",
           states: ["CHANGES_REQUESTED"],
           comments: 0,
+          quotes: [""],
         },
         {
           action: "promote",
@@ -437,8 +439,16 @@ describe("decide", () => {
           author: "review-app",
           states: ["COMMENTED"],
           comments: 1,
+          quotes: ["", ""],
         },
-        { action: "promote", kind: "feedback", author: "bob", states: [], comments: 1 },
+        {
+          action: "promote",
+          kind: "feedback",
+          author: "bob",
+          states: [],
+          comments: 1,
+          quotes: [""],
+        },
       ],
     ],
   ];
@@ -491,6 +501,7 @@ describe("combine", () => {
     author,
     states,
     comments,
+    quotes: [],
   });
 
   test("folds a retry into fresh decisions without repeating anything", () => {
@@ -548,8 +559,9 @@ describe("messageOf", () => {
           author: "alice",
           states: ["COMMENTED", "COMMENTED", "APPROVED"],
           comments: 0,
+          quotes: [],
         },
-        { action: "promote", kind: "feedback", author: "bot", states: [], comments: 2 },
+        { action: "promote", kind: "feedback", author: "bot", states: [], comments: 2, quotes: [] },
       ],
       "@alice reviewed PR #7 (COMMENTED ×2, APPROVED)\n@bot commented on PR #7 (2 new comments)\nhttps://github.com/o/r/pull/7\nRead it with `gh pr view 7 --comments`.",
     ],
@@ -572,6 +584,60 @@ describe("messageOf", () => {
     expect(
       messageOf({ ...snapshot, state: "MERGED" }, [{ action: "promote", kind: "pr.merged" }]),
     ).toBe("PR #7 merged: https://github.com/o/r/pull/7");
+  });
+
+  test("quotes each new review and comment under its author", () => {
+    const message = messageOf(snapshot, [
+      {
+        action: "promote",
+        kind: "feedback",
+        author: "alice",
+        states: ["APPROVED"],
+        comments: 1,
+        quotes: ["", "Looks good.\n\nOne nit: rename `x`."],
+      },
+      {
+        action: "promote",
+        kind: "feedback",
+        author: "bot",
+        states: [],
+        comments: 2,
+        quotes: ["<!-- marker -->\nNull check missing.", "<!-- only markup -->"],
+      },
+    ]);
+    expect(message.split("\n\n")[0]).toBe(
+      [
+        "@alice reviewed PR #7 (APPROVED, 1 new comment)",
+        "> Looks good.",
+        ">",
+        "> One nit: rename `x`.",
+        "@bot commented on PR #7 (2 new comments)",
+        "> Null check missing.",
+        "https://github.com/o/r/pull/7",
+        "Read it with `gh pr view 7 --comments`.",
+      ].join("\n"),
+    );
+  });
+
+  test("cuts a long comment and stops quoting at the message's quota", () => {
+    const long = "y".repeat(QUOTE_MAX.comment + 50);
+    const count = Math.ceil(QUOTE_MAX.message / QUOTE_MAX.comment);
+    const lines = messageOf(snapshot, [
+      {
+        action: "promote",
+        kind: "feedback",
+        author: "bot",
+        states: [],
+        comments: count + 1,
+        quotes: [...Array(count).fill(long), "late"],
+      },
+    ])
+      .split("\n\n")[0]!
+      .split("\n");
+    expect(lines.filter((line) => line.startsWith("> "))).toEqual(
+      Array(count).fill(`> ${"y".repeat(QUOTE_MAX.comment)}…`),
+    );
+    expect(lines).toContain("(1 more not quoted)");
   });
 });
 

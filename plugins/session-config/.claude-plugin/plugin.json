@@ -1,0 +1,9 @@
+{
+  "name": "session-config",
+  "description": "Shows the session model, and off-default effort, in the prompt footer",
+  "dependencies": ["mod-events"],
+  "author": {
+    "name": "Ben Drucker",
+    "email": "bvdrucker@gmail.com"
+  }
+}

@@ -218,6 +218,7 @@
     "rex@bendrucker": true,
     "run-command@bendrucker": true,
     "session-limit@bendrucker": true,
+    "session-config@bendrucker": true,
     "load@bendrucker": true,
     "performance@bendrucker": true,
     "zsh@bendrucker": true,
@@ -351,14 +352,6 @@
       ]
     },
     "excludedCommands": ["git:*", "wt:*", "claude:*", "agent-browser:*", "open:*", "osascript:*"]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/scripts/statusline.ts"
-  },
-  "subagentStatusLine": {
-    "type": "command",
-    "command": "~/.claude/scripts/subagent-statusline.ts"
   },
   "skipAutoPermissionPrompt": true,
   "skipWorkflowUsageWarning": true,

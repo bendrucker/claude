@@ -41,7 +41,7 @@ A plugin `README.md` is an index, not documentation: a title with one-line descr
 
 ## Plugin Metadata
 
-Plugin `settings.json` supports only `agent` and `subagentStatusLine`. Don't create schema-only placeholder files. `plugin.json` supports an optional `"$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json"` for editor autocomplete, and `displayName` for the UI.
+Plugin `settings.json` supports only `agent` and `subagentStatusLine`, and `subagentStatusLine` is deprecated in favor of an `AgentRow` mod. Don't create schema-only placeholder files. `plugin.json` supports an optional `"$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json"` for editor autocomplete, and `displayName` for the UI.
 
 Deleting a plugin's `commands/`, `agents/`, or `hooks/` directory requires removing the matching path key from `plugin.json` in the same change, or `claude plugin validate` fails CI on the dangling path.
 

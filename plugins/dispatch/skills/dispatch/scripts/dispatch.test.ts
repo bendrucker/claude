@@ -1,10 +1,10 @@
 import { mkdtempSync } from "node:fs";
-import { realpath } from "node:fs/promises";
+import { readdir, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
-import { beforeAll, describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { z } from "zod";
 import {
   backgroundId,
@@ -15,17 +15,19 @@ import {
   detachedEnv,
   describeMuxDefault,
   detectMux,
-  dispatch,
+  dispatch as dispatchWith,
   DispatchError,
   type DispatchOptions,
   encodeArg,
   envelopeCode,
-  execSession,
+  execSession as execSessionWith,
   fetchArgs,
   formatRecord,
   mergeSettings,
   type Mux,
   type Pause,
+  type Probe,
+  probeWorktreeAdmin,
   readBackgroundStatus,
   readProgramStatus,
   readSender,
@@ -160,6 +162,18 @@ function fakeRunner(responses: readonly CommandResult[]): {
 }
 
 const instant: Pause = () => Promise.resolve();
+
+const writable: Probe = () => Promise.resolve(null);
+
+const dispatch = (options: DispatchOptions, run?: Runner, pause?: Pause) =>
+  dispatchWith(options, run, pause, writable);
+
+const execSession = (
+  options: Parameters<typeof execSessionWith>[0],
+  run?: Runner,
+  pause?: Pause,
+  start?: Start,
+) => execSessionWith(options, run, pause, start, writable);
 
 function recordedPause(): { pause: Pause; pauses: number[] } {
   const pauses: number[] = [];
@@ -930,9 +944,10 @@ describe("dispatch under bg", () => {
     const denied = "Error: EPERM: operation not permitted, mkdir '/Users/me/.claude/jobs/a1b2c3'\n";
     const { run } = fakeRunner([...rexPath(), fail(denied)]);
     const failure = await failureOf(dispatch(bgOptions(), run, instant));
-    expect(failure.message).toBe(
-      `claude --bg cannot write ~/.claude/jobs under the sandbox. Rerun dispatch outside the sandbox.\n${denied}`,
+    expect(failure.message).toMatch(
+      /^claude --bg cannot write ~\/\.claude\/jobs under the sandbox\. Run claude-dispatch as the whole Bash command/,
     );
+    expect(failure.message).toEndWith(`\n${denied}`);
   });
 });
 
@@ -1078,6 +1093,15 @@ describe("dispatch under herdr", () => {
 });
 
 describe("dispatch worktree", () => {
+  test("refuses a read-only worktree admin directory before touching git", async () => {
+    const { run, calls } = fakeRunner([GIT_COMMON]);
+    const denied: Probe = () => Promise.resolve("/repo/.git/worktrees is not writable");
+    const failure = await failureOf(dispatchWith(makeOptions(), run, instant, denied));
+    expect(failure.message).toBe("/repo/.git/worktrees is not writable");
+    expect(failure.partial).toBeNull();
+    expect(calls.map((argv) => argv.slice(3, 5))).toEqual([["worktree", "list"]]);
+  });
+
   test("fetches nothing when the base names no remote", async () => {
     const { run, calls } = fakeRunner([
       GIT_COMMON,
@@ -1811,6 +1835,37 @@ describe("spawnRunner", () => {
     } finally {
       delete process.env.DISPATCH_DROP;
     }
+  });
+});
+
+describe("probeWorktreeAdmin", () => {
+  let locked: string | null = null;
+  afterEach(async () => {
+    if (locked != null) await spawnRunner(["chmod", "755", locked]);
+    locked = null;
+  });
+
+  const initRepo = async (): Promise<string> => {
+    const repo = await realpath(mkdtempSync(join(tmpdir(), "dispatch-probe-")));
+    expect((await spawnRunner(["git", "init", "--quiet", repo])).code).toBe(0);
+    return repo;
+  };
+
+  test("accepts a writable repository and leaves nothing behind", async () => {
+    const repo = await initRepo();
+    expect(await probeWorktreeAdmin(repo)).toBeNull();
+    expect(await readdir(join(repo, ".git", "worktrees"))).toEqual([]);
+  });
+
+  test("names the bare-command fix when the admin directory is read-only", async () => {
+    const repo = await initRepo();
+    locked = join(repo, ".git", "worktrees");
+    await Bun.write(join(locked, ".keep"), "");
+    expect((await spawnRunner(["chmod", "555", locked])).code).toBe(0);
+    const message = await probeWorktreeAdmin(repo);
+    expect(message?.replace(repo, "<repo>")).toMatchInlineSnapshot(
+      `"<repo>/.git/worktrees is not writable, so this ran inside the Claude Code sandbox. Run claude-dispatch as the whole Bash command, with no cd, env prefix, pipe, chain, or loop, so its sandbox.excludedCommands entry applies. Issue one Bash call per dispatch. If it already was the whole command, the deployed settings lack claude-dispatch:* in excludedCommands."`,
+    );
   });
 });
 

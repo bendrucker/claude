@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { cli } from "cleye";
@@ -70,7 +71,8 @@ export type Runner = (argv: readonly string[], options?: RunOptions) => Promise<
 
 export type Pause = (ms: number) => Promise<void>;
 
-// The sandbox marker covers the whole invocation, so every subprocess takes an argv array.
+// The claude-dispatch sandbox.excludedCommands entry covers the whole invocation,
+// so every subprocess takes an argv array.
 export const spawnRunner: Runner = async (argv, options) => {
   let proc: Bun.Subprocess<"ignore", "pipe", "pipe">;
   try {
@@ -794,6 +796,9 @@ async function launchHerdr(ctx: Context): Promise<void> {
   partial.name = name;
 }
 
+const BARE_COMMAND =
+  "Run claude-dispatch as the whole Bash command, with no cd, env prefix, pipe, chain, or loop, so its sandbox.excludedCommands entry applies. Issue one Bash call per dispatch. If it already was the whole command, the deployed settings lack claude-dispatch:* in excludedCommands.";
+
 // The sandbox denies the jobs directory every background session writes.
 const JOBS_DENIED = /EPERM[\s\S]*\.claude\/jobs|\.claude\/jobs[\s\S]*EPERM/;
 
@@ -811,7 +816,7 @@ async function launchBackground(ctx: Context): Promise<void> {
       started.stderr.trim() === "" ? `claude --bg exited ${started.code}` : started.stderr;
     throw new DispatchError(
       JOBS_DENIED.test(message)
-        ? `claude --bg cannot write ~/.claude/jobs under the sandbox. Rerun dispatch outside the sandbox.\n${message}`
+        ? `claude --bg cannot write ~/.claude/jobs under the sandbox. ${BARE_COMMAND}\n${message}`
         : message,
       partial,
     );
@@ -1095,6 +1100,7 @@ export async function dispatch(
   options: DispatchOptions,
   run: Runner = spawnRunner,
   pause: Pause = Bun.sleep,
+  probe: Probe = probeWorktreeAdmin,
 ): Promise<DispatchResult> {
   validate(options);
   if (options.host != null) return dispatchRemote(options, options.host, run, pause);
@@ -1112,7 +1118,14 @@ export async function dispatch(
       null,
     );
 
-  const { root, path, partial } = await prepareWorktree(options, wanted, options.mux, run, pause);
+  const { root, path, partial } = await prepareWorktree(
+    options,
+    wanted,
+    options.mux,
+    run,
+    pause,
+    probe,
+  );
   try {
     const ctx: Context = { run, pause, options, partial, path };
     const launch = { rex: launchRex, herdr: launchHerdr, bg: launchBackground }[options.mux];
@@ -1201,12 +1214,43 @@ function checkoutOf(switched: z.infer<typeof WtSwitched>): Checkout {
   return switched.created_branch === true ? "new-branch" : "existing-branch";
 }
 
+// Resolves to why the repository's worktree admin directory refuses writes,
+// or null when it accepts them.
+export type Probe = (root: string) => Promise<string | null>;
+
+const DENIED = new Set(["EPERM", "EACCES", "EROFS"]);
+
+// The sandbox makes .git/worktrees read-only, so git worktree add fails only
+// after wt has created the branch. Any other error is left for wt to report.
+export const probeWorktreeAdmin: Probe = async (root) => {
+  const common = await spawnRunner([
+    "git",
+    "-C",
+    root,
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-common-dir",
+  ]);
+  if (common.code !== 0) return null;
+  const admin = join(common.stdout.trim(), "worktrees");
+  try {
+    await mkdir(admin, { recursive: true });
+    await rm(await mkdtemp(join(admin, ".dispatch-probe-")), { recursive: true });
+    return null;
+  } catch (error) {
+    const code = error instanceof Error && "code" in error ? error.code : null;
+    if (typeof code !== "string" || !DENIED.has(code)) return null;
+    return `${admin} is not writable, so this ran inside the Claude Code sandbox. ${BARE_COMMAND}`;
+  }
+};
+
 async function prepareWorktree(
   options: WorktreeOptions,
   name: string,
   mux: Mux,
   run: Runner,
   pause: Pause,
+  probe: Probe,
 ): Promise<Prepared> {
   // The porcelain listing puts the main worktree first whatever the
   // repository's git layout, and wt runs from there.
@@ -1224,6 +1268,8 @@ async function prepareWorktree(
     throw new DispatchError(`git named no worktree for ${options.repo}`, null);
 
   try {
+    const denied = await probe(root);
+    if (denied != null) throw new DispatchError(denied, null);
     const listedRemotes = await required(run, ["git", "-C", root, "remote"], null);
     const remotes = new Set(
       listedRemotes.stdout
@@ -1284,9 +1330,10 @@ export async function execSession(
   run: Runner = spawnRunner,
   pause: Pause = Bun.sleep,
   start: Start = inheritStart,
+  probe: Probe = probeWorktreeAdmin,
 ): Promise<number> {
   validateCommon(options);
-  const { path, partial } = await prepareWorktree(options, options.name, "rex", run, pause);
+  const { path, partial } = await prepareWorktree(options, options.name, "rex", run, pause, probe);
   process.stdout.write(`dispatch worktree: ${path}\ndispatch branch: ${partial.branch}\n`);
   if (partial.submoduleError != null)
     process.stderr.write(`warning: submodules were not initialized: ${partial.submoduleError}\n`);

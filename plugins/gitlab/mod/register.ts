@@ -22,6 +22,8 @@ import {
   parseApprovals,
   parseDiscussions,
   parseJobs,
+  isMemberOf,
+  parseMembers,
   parseMerge,
   parseNotes,
   parseReviewers,
@@ -101,6 +103,8 @@ interface Watch {
   /** The last review state read, refetched only when `key` changes. */
   graphs: { reviewers: Held<Reviewer[]>; merging: Held<Merging> };
   me: string | undefined;
+  /** Whether each `projectId/username` has at least Reporter access, kept for the session. */
+  members: Map<string, boolean>;
   noise: Noise;
   undelivered: Undelivered | undefined;
   /** What was muted since the last send, which the next send logs beside it. */
@@ -435,14 +439,56 @@ async function readMr(
   return { kind: "mr", snapshot, branch, read: isCheap ? "hit" : via, feedback };
 }
 
+// A failed read leaves the author unquoted and uncached. The next send asks again.
+async function isMember(
+  $: EngineInterface,
+  watch: Watch,
+  projectId: number,
+  username: string,
+): Promise<boolean> {
+  const key = `${projectId}/${username.toLowerCase()}`;
+  const known = watch.members.get(key);
+  if (known !== undefined) return known;
+  const started = await $.clock.now();
+  const path = `projects/${projectId}/members/all?query=${encodeURIComponent(username)}&per_page=100`;
+  try {
+    const stdout = await glab($, await $.session.cwd(), ["api", path]);
+    const is = isMemberOf(parsed(parseMembers(stdout), "project members"), username);
+    watch.members.set(key, is);
+    emit($, "members.read", { member: is }, true, (await $.clock.now()) - started);
+    return is;
+  } catch (error) {
+    const detail = { error: error instanceof Error ? error.message : String(error) };
+    emit($, "members.read", detail, false, (await $.clock.now()) - started);
+    return false;
+  }
+}
+
+/** The lowercased usernames, among those with comments to quote, that are project members. */
+async function trustedOf(
+  $: EngineInterface,
+  watch: Watch,
+  snapshot: Snapshot,
+  promoted: Promoted[],
+): Promise<Set<string>> {
+  const authors = promoted.flatMap((d) =>
+    d.kind === "feedback" && d.notes.some((body) => body.trim() !== "") ? [d.author] : [],
+  );
+  const members = await Promise.all(
+    authors.map((author) => isMember($, watch, snapshot.projectId, author)),
+  );
+  return new Set(authors.filter((_, i) => members[i]).map((author) => author.toLowerCase()));
+}
+
 async function inject(
   $: EngineInterface,
+  watch: Watch,
   snapshot: Snapshot,
   promoted: Promoted[],
   muted: string[],
   attempt: number,
 ): Promise<boolean> {
-  const text = messageOf(snapshot, promoted);
+  const text = messageOf(snapshot, promoted, await trustedOf($, watch, snapshot, promoted));
   const kinds = promoted.map((d) => d.kind);
   const detail = {
     mr: snapshot.mr,
@@ -508,7 +554,7 @@ async function send(
   attempt: number,
   isCurrent: () => boolean,
 ): Promise<void> {
-  const isSent = await inject($, next, due, muted, attempt);
+  const isSent = await inject($, watch, next, due, muted, attempt);
   if (!isCurrent() || isSent || attempt >= MAX_ATTEMPTS) return;
   const pending = watch.undelivered;
   watch.undelivered = {
@@ -772,6 +818,7 @@ export function register(on: On, options: PluginOptions): void {
     isFullDue: false,
     graphs: { reviewers: {}, merging: {} },
     me: undefined,
+    members: new Map(),
     noise,
     undelivered: undefined,
     held: [],

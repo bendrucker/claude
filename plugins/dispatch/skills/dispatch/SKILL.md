@@ -5,7 +5,7 @@ description: >-
 argument-hint: "--branch <branch | pr:<n> | mr:<n>> --prompt <file>"
 effort: low
 allowed-tools:
-  - Bash(bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts:*)
+  - Bash(claude-dispatch:*)
 ---
 
 # Dispatch
@@ -42,7 +42,7 @@ The user finds a background session in `claude agents` and picks it up with `cla
 ## Run It
 
 ```bash
-bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...
+claude-dispatch --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...
 ```
 
 - `--repo` defaults to this session's repository, shown in `--help` above. Pass it only to dispatch into another repository.

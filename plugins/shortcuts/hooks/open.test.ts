@@ -108,12 +108,13 @@ describe("processInput", () => {
     }
   });
 
-  it("disables the sandbox when allowing a .shortcut file", () => {
+  it("allows a .shortcut file without rewriting the call", () => {
     const output = getOutput(mockInput('open "out/My Shortcut.shortcut"'));
-    expect(output?.updatedInput).toEqual({ dangerouslyDisableSandbox: true });
+    expect(output?.permissionDecision).toBe("allow");
+    expect(output?.updatedInput).toBeUndefined();
   });
 
-  it("does not extend the sandbox bypass to a compound command", () => {
+  it("does not allow a compound command", () => {
     expect(getOutput(mockInput("open notes.txt && echo done.shortcut"))).toBeNull();
   });
 });

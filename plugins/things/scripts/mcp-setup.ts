@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: claude mcp login opens a browser through Launch Services, which the command sandbox blocks
-
 import { cli } from "cleye";
 
 export const SERVER_NAME = "things";

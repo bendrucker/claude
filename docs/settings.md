@@ -89,6 +89,8 @@ The rest are tool caches and state directories holding no credential material:
 - `~/Library/Caches/com.apple.python`: where Apple's `/usr/bin/python3` writes bytecode, through a `pycache_prefix` it sets itself. Without it each import of a script under the session tree fails its `.pyc` write. Setting `PYTHONPYCACHEPREFIX` in `env` cannot replace this, because `env` values are not expanded and the path needs the home directory. **Drop it** when no script runs under the system Python.
 - `~/.claude/plans`: saved plan files, which copying one in fails without. No injected deny shadows it, unlike the `~/.claude` paths below. Permanent unless plan files move out of `~/.claude`.
 - `~/.claude/mod-events`: `session-index.query` events from the session skill's sandboxed readers (`usage.ts`, `schema.ts`, eval miners). **Drop it** when no sandboxed script emits them.
+- `~/.local/share/claude-sessions`: the session index, which `refresh.ts`, `import.ts`, and `forget.ts` open read-write. Without it a sandboxed refresh fails `Cannot open file ... session.duckdb: Operation not permitted`. The index holds transcript text from every session, so the added risk is a sandboxed command rewriting or deleting it. **Drop it** if the index moves or its writers stop running from Bash.
+- `~/.claude/session-imports`: other hosts' transcript copies, which `import.ts` writes and `forget.ts` deletes. It sits outside the injected `~/.claude` denies. **Drop it** alongside the index grant, or when no host is imported.
 
 ## Sockets and Local Binding
 
@@ -116,6 +118,15 @@ An entry earns its place globally only when sandboxed runs of the command fail a
 - `wt`, `claude`: worktree and session control. `wt` creates worktrees outside the session directory.
 - `agent-browser`: the escape lets the daemon launch Chrome off the egress proxy, which an arbitrary page needs.
 - `open`, `osascript`: Apple Events and Launch Services handoff, which the sandbox cannot model even with `allowAppleEvents`.
+
+Plugin scripts that cannot run sandboxed each get a shim in the plugin's `bin/` and an entry naming it, such as `things-url:*`, in place of a hook that rewrote the call with `dangerouslyDisableSandbox`. Auto mode refuses a call a hook changed after review, and the classifier blocks many of the re-issued calls ([evidence](https://github.com/bendrucker/claude/pull/2083#evidence)). The entry matches command text from its start, so it escapes the script only as the whole command. Claude Code appends each enabled plugin's `bin/` to the Bash `PATH`. No `PATH` directory is writable from the sandbox, so no sandboxed command can plant a file the name resolves to. A writable directory added to `PATH` would break that, so re-check before adding one. A `VAR=value` prefix, a pipe, or a chained command keeps the script sandboxed.
+
+- `claude-dispatch`, `claude-dispatch-close`: create worktrees through `wt`, write the new worktree's `.claude/settings.local.json`, append the ledger under `~/.claude/plugins`, and start or resume sessions through the `claude` daemon.
+- `session-index-pull`: syncs imported transcripts from S3 through the `aws` CLI. A sandboxed run would need an upload-capable S3 host.
+- `prompt-scan-edit`: the `prompting:scan` audit writes skills under `.claude/skills`, which the harness denies.
+- `jxa-run`, `things-url`, `things-inbox`, `things-reorder`, `xcall-run`: Apple Events and Launch Services handoff, the same reach as `osascript` and `open`.
+
+**Drop an entry** when its shim is deleted or renamed, or when a sandboxed run of it succeeds. **Retire the approach** if auto mode stops refusing hook-changed input, since a marker hook would then cover new scripts without a settings edit.
 
 A command one or two projects use goes in that project's `.claude/settings.json`, and scopes combine. This repo's settings carry `ssh`, `scp`, `rsync`, `vm`, and `aws`, which its VM and eval-bucket work needs. `aws` escapes only without `--profile` (see the AWS hosts above). `vm`, the EC2 launcher in dotfiles, shells out to `aws --profile` against `ec2`, `ssm`, and `ssmmessages`, and to `ssh` through Session Manager. Escaping it keeps those hosts out of the allowlist. Piped, `vm list | cat` runs sandboxed and reports each kind as skipped at `ec2`. A work repo's entries live in its own checkout, never here.
 
@@ -223,7 +234,7 @@ The sandbox denies writes to every `.git/config` and `.git/hooks` path, and `all
 
 The `git` plugin's `push-upstream` hook records the tracking instead, since hooks run outside the sandbox. On a `git push -u <remote> <refspec>` from the current branch to an existing remote, it sets `branch.<name>.remote` and `branch.<name>.merge` and removes `-u` from the command. `-u` rewrites the config under its lock even when the values already match, so recording tracking ahead of time never spared the push. The hook writes only those two keys, which keeps the `core.*` risk out of reach.
 
-Tracking is also recorded at creation for a bare `git push` and for herdr, which measures a branch against its upstream. The `herdr` plugin's dispatch, which its sandbox marker runs outside the sandbox, sets the same two keys when the repository has an `origin`, best-effort. Worktrunk's `wt switch --create` gets the same from a dotfiles `pre-start` hook. **Drop all three** when a sandboxed `git push -u origin HEAD 2>&1 | tail` from a linked worktree records its upstream.
+Tracking is also recorded at creation for a bare `git push` and for herdr, which measures a branch against its upstream. The `dispatch` plugin's dispatch, which its `excludedCommands` entry runs outside the sandbox, sets the same two keys when the repository has an `origin`, best-effort. Worktrunk's `wt switch --create` gets the same from a dotfiles `pre-start` hook. **Drop all three** when a sandboxed `git push -u origin HEAD 2>&1 | tail` from a linked worktree records its upstream.
 
 #### Path Globs
 

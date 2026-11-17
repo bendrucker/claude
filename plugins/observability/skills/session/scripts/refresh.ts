@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: prunes debug logs and mod events under ~/.claude
-// and moves a legacy index out of ~/.claude/plugins, both denied to the sandbox.
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { cli } from "cleye";

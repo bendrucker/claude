@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: an audit edits project skills, and the sandbox denies writes under .claude/skills
 import { realpath } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import { Command } from "@commander-js/extra-typings";

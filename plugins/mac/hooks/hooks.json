@@ -1,5 +1,5 @@
 {
-  "description": "Disables the command sandbox for plugin scripts that hand off to macOS automation (Apple Events, Launch Services), and lets git reach ssh remotes through the macOS sandbox proxy",
+  "description": "Lets git reach ssh remotes through the macOS sandbox proxy",
   "hooks": {
     "SessionStart": [
       {
@@ -8,17 +8,6 @@
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/sandbox-ssh-proxy.ts\"",
             "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash|Monitor",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/sandbox.ts\""
           }
         ]
       }

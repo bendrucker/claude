@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: writes the copied corpus under
-// ~/.claude/session-imports, which the sandbox denies.
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { $ } from "bun";

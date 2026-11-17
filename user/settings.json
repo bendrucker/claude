@@ -346,11 +346,29 @@
         "~/.agent-browser",
         "~/.claude/plans",
         "~/.claude/mod-events",
+        "~/.claude/session-imports",
+        "~/.local/share/claude-sessions",
         "/dev/fd",
         "/var/folders/*/*/T/**/*"
       ]
     },
-    "excludedCommands": ["git:*", "wt:*", "claude:*", "agent-browser:*", "open:*", "osascript:*"]
+    "excludedCommands": [
+      "git:*",
+      "wt:*",
+      "claude:*",
+      "agent-browser:*",
+      "open:*",
+      "osascript:*",
+      "claude-dispatch:*",
+      "claude-dispatch-close:*",
+      "session-index-pull:*",
+      "prompt-scan-edit:*",
+      "jxa-run:*",
+      "things-url:*",
+      "things-inbox:*",
+      "things-reorder:*",
+      "xcall-run:*"
+    ]
   },
   "statusLine": {
     "type": "command",

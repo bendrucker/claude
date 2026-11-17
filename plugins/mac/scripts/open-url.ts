@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: hands off to open for Launch Services, which the command sandbox blocks
-
 interface ValidationResult {
   valid: boolean;
   error?: string;

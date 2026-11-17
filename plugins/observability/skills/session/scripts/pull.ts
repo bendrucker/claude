@@ -1,7 +1,4 @@
 #!/usr/bin/env bun
-// claude:dangerouslyDisableSandbox: writes the host's copy under
-// ~/.claude/session-imports, which the sandbox denies.
-//
 // Refreshes an S3-backed host's local copy to a trailing window of sessions.
 // The bucket keeps every session, and the Mac keeps only the ones uploaded to
 // within `--days`, the way `cleanupPeriodDays` bounds `local`. The next

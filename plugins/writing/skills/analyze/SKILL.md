@@ -14,7 +14,7 @@ allowed-tools:
 
 # Writing Analyze
 
-The hook dispatcher (`hooks/lint.ts`) appends one JSONL line per run to `~/.claude/writing-hooks/log.jsonl` (controlled by `WRITING_HOOKS_LOG`, see the plugin README). `hook-health.ts` reads it:
+The hook dispatcher (`hooks/lint.ts`) appends one JSONL line per run to `~/.claude/writing-hooks/log.jsonl` (controlled by `WRITING_HOOKS_LOG`, see `resolveLogPath` in `hooks/run-log.ts`). `hook-health.ts` reads it:
 
 ```bash
 bun ${CLAUDE_SKILL_DIR}/scripts/hook-health.ts

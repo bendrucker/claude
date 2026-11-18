@@ -8,7 +8,7 @@ description: >-
 
 # Writing
 
-Write prose a person reads in a direct, conversational voice. The writing hooks lint saved files and outgoing messages against the Vale styles in [`styles/Writing/`](../../styles/Writing/). The text is done when every alert the hook reports on it is fixed.
+Write prose a person reads in a direct, conversational voice. The writing hooks lint saved files and outgoing messages against the Vale styles in [`styles/Writing/`](../../styles/Writing/). The text is done when every error and warning the hook reports is fixed or is wrong for this text, and each suggestion is applied only where it makes the text better.
 
 ## Voice
 

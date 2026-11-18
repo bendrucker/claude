@@ -2,6 +2,10 @@
 
 A screen runs a candidate on its target and guard cases only, with many repeats in one invocation, to decide whether the candidate earns a full-suite verify. Power on a case comes from that case's run count. A full replicate spends most of its cost on cases the candidate never touches. A screen reaches the same per-case power in a fraction of the time.
 
+## Reading
+
+Run the base and the candidate concurrently on the target and guard cases only, with enough repeats in one invocation to star the smallest drop that would reject it. Compare the two sides as in `Compare`. Drop or revise a candidate whose targets do not move in the predicted direction or whose guards fall, and re-screen the revision. Send the rest to verify.
+
 ## Repeats
 
 At a base that passed all its runs on a case, the cell stars at p<0.1 only once the candidate fails about 5 runs, at any run count. Run about 5 ÷ the drop rate repeats a side:

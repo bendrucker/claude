@@ -34,6 +34,8 @@ When already on a topic branch in a worktree, stay there.
 
 herdr, the Herdr app, and Rex host sessions here. Open panes, tabs, and splits with the multiplexer hosting this session: `rex:rex` when the session-start context names a Rex terminal, `herdr:herdr` otherwise. `herdr:herdr` covers both herdr TUI and the Herdr app. Sibling-agent dispatch goes through `dispatch:dispatch` from Rex or herdr TUI, and through the herdr skill's Herdr App steps from the app. Claude sessions talk to each other over `SendMessage`.
 
+In a Rex tab still labeled `Window <id>`, once the task is clear, rename the tab with `rex window rename` to two to four Title Case words naming the task, and leave the Rex session label as it is.
+
 ## Configuration Repos
 
 Edit `bendrucker/claude` at `~/src/bendrucker/claude`. `claude-sync` updates `~/.claude-repo` from `main`, so a merged change goes live only after that sync runs. Dotfiles are deployed at `~/.dotfiles`.

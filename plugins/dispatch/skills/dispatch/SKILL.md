@@ -22,20 +22,21 @@ Write the prompt to a file under `tmp/` from what this conversation already know
 
 !`bun ${CLAUDE_SKILL_DIR}/scripts/dispatch.ts --help`
 
-Ask once per session with `AskUserQuestion` whether dispatched sessions should close their panes once their PRs are open, recommending yes. On yes, end the prompt with: "Once the PR is open, close your pane with `dispatch:close`."
+Pass `--title` with two to four Title Case words naming the task. The script ends a pane or tab session's prompt with an instruction to run `dispatch:close` once its PR is open. Pass `--keep-open` to leave that instruction out when the user wants to keep the session open.
 
 ## Grant Permissions
 
 Pass the permissions the task needs with `--allow`, `--sandbox-write`, and `--settings-json` so the session runs without prompting for them. The script merges them into the worktree's `.claude/settings.local.json`, keeping existing keys and skipping array entries already present. It refuses to write when that file is not git-ignored.
 
-## Pick the Multiplexer
+## Pick the Place
 
-Pick by how much the task needs the user along the way:
+A tab is a workstream with this session as its lead, and a pane is one task within it. Take the first place that fits:
 
 - `bg`, a `claude --bg` session with no terminal: a small, self-contained change with a clear completion criterion, few questions, and little for the user to read before the PR. Pass `--mux bg`.
-- A tab (`rex` or `herdr`): exploratory work, or work that needs decisions, reading, or review as it goes.
+- A pane in this tab: a side issue inside this tab's current workstream that the user will want to watch or steer. Under Rex, pass `--split`. Under herdr, open a tab.
+- A new tab (`rex` or `herdr`): an unrelated theme, or exploratory work that needs decisions, reading, or review as it goes.
 
-`--help` above names the tab multiplexer `--mux` defaults to. When the task calls for a tab and `--help` says to pass `--mux` instead, ask the user with `AskUserQuestion` whether to use `rex` or `herdr`.
+`--help` above names the tab multiplexer `--mux` defaults to. When the task calls for a pane or tab and `--help` says to pass `--mux` instead, ask the user with `AskUserQuestion` whether to use `rex` or `herdr`.
 
 The user finds a background session in `claude agents` and picks it up with `claude attach <target>`. This session follows it with `SendMessage` to `name`, and reads its output with `claude logs <target>`. The ledger, `dispatches.jsonl` in the plugin data dir, records every dispatch.
 
@@ -48,7 +49,7 @@ claude-dispatch --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [
 - Make `claude-dispatch` the entire Bash command, with no `cd`, env prefix, pipe, `&&`, or loop, because only that form matches its sandbox exclusion. For several dispatches, write one prompt file each and issue the Bash calls in parallel in one message.
 - `--repo` defaults to this session's repository, shown in `--help` above. Pass it only to dispatch into another repository.
 - A branch that exists locally or on a remote is reused, and a branch that already has a worktree opens there. `wt` resolves a PR or MR to its head branch. `--base` applies only to a branch being created, and is fetched first.
-- Under Rex the session opens in a new tab labeled with the branch. From outside Rex, pass `--session <id or label>` from `rex ls`.
+- Under Rex the session opens in a new tab, or a pane with `--split`, labeled with the title. From outside Rex, pass `--session <id or label>` from `rex ls`.
 
 ## Other Machines
 
@@ -59,6 +60,8 @@ To run the session on another machine, pass `--host <label> --session <remote se
 On success the script prints one JSON line:
 
 - `name`: the session name to address it by.
+- `title`: the tab or pane label.
+- `place`: `pane`, `tab`, or `bg`.
 - `path`, `branch`: the worktree. For a PR or MR, `branch` is its head branch.
 - `checkout`: `new-branch`, `existing-branch`, or `existing-worktree`. Absent for `--host`.
 - `mux`, `target`: the Rex block, herdr pane, or `claude --bg` id running the session.

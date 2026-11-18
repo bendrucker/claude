@@ -1,0 +1,2 @@
+rex split -b block:sender --split=below -c /tmp/eval/cwd/.worktrees/reset-retries --label Reset Retry Counter --focus=false --json -- claude --name reset-retries -- <prompt>
+launch reset-retries /tmp/eval/cwd/.worktrees/reset-retries place=pane title=Reset Retry Counter

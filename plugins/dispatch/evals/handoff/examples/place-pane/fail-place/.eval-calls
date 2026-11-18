@@ -1,0 +1,2 @@
+rex window new -s session:eval Retry On Throw -c /tmp/eval/cwd/.worktrees/retry-on-throw --focus=false --json -- claude --name retry-on-throw -- <prompt>
+launch retry-on-throw /tmp/eval/cwd/.worktrees/retry-on-throw place=tab title=Retry On Throw

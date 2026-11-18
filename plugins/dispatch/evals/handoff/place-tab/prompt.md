@@ -1,0 +1,1 @@
+Unrelated to the retry work in this tab: dispatch a session to add metrics to this service. I haven't decided between Prometheus and OpenTelemetry. It should lay out the options, settle the choice with me, then build it and open a PR.

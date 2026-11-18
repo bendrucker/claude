@@ -94,20 +94,23 @@ test.each<{ name: string; file: string; expected: Mismatch[] }>([
   expect((await check(dir)).mismatches).toEqual(expected);
 });
 
-test("an example directory supplies a dotfile to a file grader", async () => {
-  const dir = await suite({
-    ...graders,
-    "one/graders/dot.md":
-      "---\ntype: regex\npattern: 'ok'\ntarget:\n  source: file\n  path: .verdicts\n---\n",
-    "examples/one/good.md": "p99 230ms",
-    "examples/one/good/.verdicts": "not yet",
-  });
-  const { mismatches, unchecked } = await check(dir);
-  expect(mismatches).toEqual([
-    { example: "examples/one/good.md", grader: "dot", expected: "pass" },
-  ]);
-  expect(unchecked).not.toContain("one/dot");
-});
+test.each(["dotfile", "file under a dot directory"])(
+  "an example directory supplies a %s to a file grader",
+  async (kind) => {
+    const path = kind === "dotfile" ? ".verdicts" : ".data/verdicts.jsonl";
+    const dir = await suite({
+      ...graders,
+      "one/graders/dot.md": `---\ntype: regex\npattern: 'ok'\ntarget:\n  source: file\n  path: ${path}\n---\n`,
+      "examples/one/good.md": "p99 230ms",
+      [`examples/one/good/${path}`]: "not yet",
+    });
+    const { mismatches, unchecked } = await check(dir);
+    expect(mismatches).toEqual([
+      { example: "examples/one/good.md", grader: "dot", expected: "pass" },
+    ]);
+    expect(unchecked).not.toContain("one/dot");
+  },
+);
 
 test("names the regex graders no example reaches", async () => {
   const dir = await suite({

@@ -594,6 +594,7 @@ describe("dispatch stand-ins", () => {
     [["whoami", "--json"], '{"tailscale":null}\n'],
     [["window", "new", "-s", "session:eval", "eval-x"], '{"block_ids":["block:eval-1"]}\n'],
     [["split", "-b", "block:sender", "--split=right"], '{"block_ids":["block:eval-2"]}\n'],
+    [["block", "call", "-b", "block:sender", "size"], '{"columns":200,"rows":50}\n'],
     [
       ["block", "call", "-b", "block:eval-1", "program_status", "{}"],
       '{"records":[{"state":"working","effective_app":"claude-code"}]}\n',
@@ -637,6 +638,7 @@ describe("dispatch stand-ins", () => {
     const r = await install();
     const worktree = join(r.home, "wt1");
     mkdirSync(join(worktree, ".claude"), { recursive: true });
+    await $`git init -q -b fix-one`.cwd(worktree);
     await Bun.write(
       join(worktree, ".claude/settings.local.json"),
       JSON.stringify({
@@ -650,7 +652,7 @@ describe("dispatch stand-ins", () => {
         "new",
         "-s",
         "s",
-        name,
+        "Fix One",
         "-c",
         path,
         "--json",
@@ -662,20 +664,28 @@ describe("dispatch stand-ins", () => {
         prompt,
       ]);
     launch(worktree, "one", "Fix it.\nThen test.");
-    launch(join(r.home, "none"), "two", "Other");
-    stub(r, "claude", ["--bg", "--name", "bg", "--", "Back\nground"]);
+    stub(r, "rex", ["split", "-b", "b", "-c", join(r.home, "none"), "--label", "Two Words"]);
+    const bg = Bun.spawnSync(
+      [join(r.home, ".eval-stubs/bin", "claude"), "--bg", "--name", "bg", "--", "Back\nground"],
+      { cwd: worktree, env: { ...process.env, HOME: r.home } },
+    );
+    expect(bg.stdout.toString()).toBe("bg-eval-1\n");
     expect(await calls(r)).toEqual([
-      `rex window new -s s one -c ${worktree} --json -- claude --name one -- <prompt>`,
-      `launch one ${worktree}`,
+      `rex window new -s s Fix One -c ${worktree} --json -- claude --name one -- <prompt>`,
+      `launch fix-one ${worktree} place=tab title=Fix One`,
       "allow Bash(bun test:*)",
       "allow Read",
       "sandbox-write /x/repo",
-      `rex window new -s s two -c ${join(r.home, "none")} --json -- claude --name two -- <prompt>`,
-      `launch two ${join(r.home, "none")}`,
+      `rex split -b b -c ${join(r.home, "none")} --label Two Words`,
+      `launch unknown ${join(r.home, "none")} place=pane title=Two Words`,
       "claude --bg --name bg -- <prompt>",
+      `launch fix-one ${worktree} place=bg`,
+      "allow Bash(bun test:*)",
+      "allow Read",
+      "sandbox-write /x/repo",
     ]);
     expect(await Bun.file(join(r.cwd, ".eval-briefs.md")).text()).toBe(
-      "=== prompt for one ===\nFix it.\nThen test.\n\n=== prompt for two ===\nOther\n\n=== prompt for bg ===\nBack\nground\n\n",
+      "=== prompt for one ===\nFix it.\nThen test.\n\n=== prompt for bg ===\nBack\nground\n\n",
     );
   });
 
@@ -694,13 +704,33 @@ describe("dispatch stand-ins", () => {
     expect(await calls(r)).toEqual([line("rex", ["kill", "-b", "x"])]);
   });
 
-  test("claude records the call and fails offline", async () => {
+  test("claude lists each background launch as working", async () => {
     const r = await install();
-    const res = stub(r, "claude", ["--bg", "--name", "n", "go"]);
+    stub(r, "claude", ["--bg", "--name", "a", "--", "one"]);
+    stub(r, "claude", ["--bg", "--name", "b", "--", "two"]);
+    const listed = stub(r, "claude", ["agents", "--json", "--all"]);
+    expect(JSON.parse(listed.out)).toEqual([
+      { id: "bg-eval-1", state: "working" },
+      { id: "bg-eval-2", state: "working" },
+    ]);
+    await Bun.write(
+      join(r.home, ".eval-stubs/session-status"),
+      '{"state":"blocked","kind":"permission","msg":"Bash"}',
+    );
+    const blocked: unknown = JSON.parse(stub(r, "claude", ["agents", "--json"]).out);
+    expect(blocked).toEqual([
+      { id: "bg-eval-1", state: "blocked", status: "waiting", waitingFor: "permission prompt" },
+      { id: "bg-eval-2", state: "blocked", status: "waiting", waitingFor: "permission prompt" },
+    ]);
+  });
+
+  test("claude records anything else and fails offline", async () => {
+    const r = await install();
+    const res = stub(r, "claude", ["logs", "x"]);
     expect(res.code).toBe(1);
     expect(res.out).toBe("");
-    expect(res.err).toBe("claude stand-in: --bg --name n go is unavailable offline\n");
-    expect(await calls(r)).toEqual([line("claude", ["--bg", "--name", "n", "go"])]);
+    expect(res.err).toBe("claude stand-in: logs x is unavailable offline\n");
+    expect(await calls(r)).toEqual([line("claude", ["logs", "x"])]);
   });
 
   describe("wt", () => {
@@ -806,7 +836,9 @@ describe("dispatch stand-ins", () => {
     expect(JSON.parse(printed)).toMatchObject({ status: "working", branch: "eval-x" });
     expect(Bun.spawnSync(["test", "-d", join(repo, ".worktrees/eval-x")]).exitCode).toBe(0);
     expect(await Bun.file(join(r.cwd, ".eval-briefs.md")).text()).toContain("Do the thing.");
-    expect(await calls(r)).toContain(`launch eval-x ${join(repo, ".worktrees/eval-x")}`);
+    expect(await calls(r)).toContain(
+      `launch eval-x ${join(repo, ".worktrees/eval-x")} place=tab title=Eval X`,
+    );
     expect((await calls(r)).some((l) => l.startsWith("wt "))).toBe(true);
   });
 });

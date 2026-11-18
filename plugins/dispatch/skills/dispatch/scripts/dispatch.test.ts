@@ -12,6 +12,7 @@ import {
   type CommandResult,
   decodeArg,
   deriveName,
+  deriveTitle,
   detachedEnv,
   describeMuxDefault,
   detectMux,
@@ -271,6 +272,22 @@ describe("deriveName", () => {
   });
 });
 
+describe("deriveTitle", () => {
+  test.each([
+    ["fix-thing", "Fix Thing"],
+    ["cap_reconnect-backoff", "Cap Reconnect Backoff"],
+    ["ben/fix-thing", "Fix Thing"],
+    ["feat/api/rate-limit", "Api Rate Limit"],
+    ["pr:42", "PR 42"],
+    ["mr:7", "MR 7"],
+    ["https://github.com/owner/repo/pull/12", "PR 12"],
+    ["https://gitlab.com/group/project/-/merge_requests/7", "MR 7"],
+    ["---", "---"],
+  ])("%s -> %s", (branch, expected) => {
+    expect(deriveTitle(branch)).toBe(expected);
+  });
+});
+
 describe("taskSummary", () => {
   test.each([
     ["one line", "one line"],
@@ -367,7 +384,17 @@ describe("withSender", () => {
     { name: "no multiplexer", sender: { name: "caller", mux: null } },
     { name: "no sender", sender: null },
   ])("$name", ({ sender }) => {
-    expect(withSender("do the thing\n", sender)).toMatchSnapshot();
+    expect(withSender("do the thing\n", sender, false)).toMatchSnapshot();
+  });
+
+  test("asks the session to close once its PR is open", () => {
+    const sender: Sender = { name: "caller", mux: null };
+    expect(withSender("do the thing\n", sender, true)).toEndWith(
+      "to `caller`.\n\nOnce the PR is open, run `dispatch:close`.\n",
+    );
+    expect(withSender("do the thing\n", null, true)).toBe(
+      "do the thing\n\n---\n\nOnce the PR is open, run `dispatch:close`.\n",
+    );
   });
 });
 
@@ -680,6 +707,9 @@ describe("validation", () => {
     { name: "an oversized prompt", bad: makeOptions({ prompt: "x".repeat(200_000) }) },
     { name: "a base that is a flag", bad: makeOptions({ base: "-unstable" }) },
     { name: "a blank base", bad: makeOptions({ base: "  " }) },
+    { name: "a blank title", bad: makeOptions({ title: " " }) },
+    { name: "a two-line title", bad: makeOptions({ title: "Fix\nThing" }) },
+    { name: "an overlong title", bad: makeOptions({ title: "x".repeat(61) }) },
     { name: "a split under herdr", bad: herdrOptions({ split: true }) },
     { name: "a split without REX_BLOCK", bad: makeOptions({ split: true, rexBlock: "" }) },
     { name: "a Rex tab without a session", bad: makeOptions({ rexSession: undefined }) },
@@ -745,7 +775,7 @@ describe("dispatch under rex", () => {
         "new",
         "-s",
         "session:s1",
-        "fix-thing",
+        "Fix Thing",
         "-c",
         PATH,
         "--focus=false",
@@ -766,23 +796,37 @@ describe("dispatch under rex", () => {
 
     expect(root).toBe("/repo");
     expect(formatRecord(record)).toMatchInlineSnapshot(
-      `"{"mux":"rex","target":"block:new","host":null,"name":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":[],"checkout":"new-branch"}"`,
+      `"{"mux":"rex","target":"block:new","host":null,"name":"fix-thing","title":"Fix Thing","place":"tab","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":[],"checkout":"new-branch"}"`,
     );
   });
 
-  test("splits the current block when asked", async () => {
+  test("labels the tab with the title passed in", async () => {
     const { run, calls } = fakeRunner([...rexPath(), REX_CREATED, REPORTED_WORKING]);
-    await dispatch(makeOptions({ split: true, name: "custom" }), run, instant);
-    expect(calls.find((argv) => argv[0] === "rex")).toEqual([
+    const { record } = await dispatch(makeOptions({ title: "Cap Backoff" }), run, instant);
+    expect(calls.find((argv) => argv[0] === "rex")?.[5]).toBe("Cap Backoff");
+    expect(record).toMatchObject({ name: "fix-thing", title: "Cap Backoff", place: "tab" });
+  });
+
+  const sized = (columns: number) => ok(JSON.stringify({ columns, rows: 50 }));
+  test.each<{ name: string; size: CommandResult; direction: string }>([
+    { name: "a wide block", size: sized(160), direction: "right" },
+    { name: "a narrow block", size: sized(159), direction: "below" },
+    { name: "a block whose size fails", size: fail("unknown method"), direction: "right" },
+  ])("splits $name to the $direction", async ({ size, direction }) => {
+    const { run, calls } = fakeRunner([...rexPath(), size, REX_CREATED, REPORTED_WORKING]);
+    const { record } = await dispatch(makeOptions({ split: true, name: "custom" }), run, instant);
+    const rex = calls.filter((argv) => argv[0] === "rex");
+    expect(rex[0]).toEqual(["rex", "block", "call", "-b", "block:here", "size"]);
+    expect(rex[1]).toEqual([
       "rex",
       "split",
       "-b",
       "block:here",
-      "--split=right",
+      `--split=${direction}`,
       "-c",
       PATH,
       "--label",
-      "fix-thing",
+      "Fix Thing",
       "--focus=false",
       "--json",
       "--",
@@ -792,6 +836,7 @@ describe("dispatch under rex", () => {
       "--",
       "do the thing",
     ]);
+    expect(record.place).toBe("pane");
   });
 
   const unreported = (shown: CommandResult) => [NO_REPORT, shown];
@@ -889,7 +934,7 @@ describe("dispatch under bg", () => {
     ]);
     expect(options.at(-3)).toEqual({ cwd: PATH, env: detachedEnv(process.env) });
     expect(formatRecord(record)).toMatchInlineSnapshot(
-      `"{"mux":"bg","target":"a1b2c3","host":null,"name":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":[],"checkout":"new-branch"}"`,
+      `"{"mux":"bg","target":"a1b2c3","host":null,"name":"fix-thing","title":"Fix Thing","place":"bg","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":[],"checkout":"new-branch"}"`,
     );
   });
 
@@ -961,7 +1006,7 @@ describe("dispatch under rex from outside", () => {
       "new",
       "-s",
       "Claude",
-      "fix-thing",
+      "Fix Thing",
     ]);
   });
 });
@@ -992,7 +1037,7 @@ describe("dispatch under herdr", () => {
       ["herdr", "agent", "get", "fix-thing"],
     ]);
     expect(formatRecord(record)).toMatchInlineSnapshot(
-      `"{"mux":"herdr","target":"wZZ:p1","host":null,"name":"fix-thing","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":"sess-1","status":"working","settings":[],"checkout":"new-branch"}"`,
+      `"{"mux":"herdr","target":"wZZ:p1","host":null,"name":"fix-thing","title":"Fix Thing","place":"tab","path":"/tmp/worktrees/demo/fix-thing","branch":"fix-thing","session":"sess-1","status":"working","settings":[],"checkout":"new-branch"}"`,
     );
   });
 
@@ -1199,6 +1244,7 @@ describe("dispatch worktree", () => {
     switchArgs: string[];
     checkout: string;
     recorded: string;
+    title: string;
     fetched: boolean;
   }>([
     {
@@ -1213,6 +1259,7 @@ describe("dispatch worktree", () => {
       switchArgs: ["fix-thing"],
       checkout: "existing-branch",
       recorded: "fix-thing",
+      title: "Fix Thing",
       fetched: false,
     },
     {
@@ -1226,6 +1273,7 @@ describe("dispatch worktree", () => {
       switchArgs: ["fix-thing"],
       checkout: "existing-branch",
       recorded: "fix-thing",
+      title: "Fix Thing",
       fetched: true,
     },
     {
@@ -1240,6 +1288,7 @@ describe("dispatch worktree", () => {
       switchArgs: ["fix-thing"],
       checkout: "existing-worktree",
       recorded: "fix-thing",
+      title: "Fix Thing",
       fetched: false,
     },
     {
@@ -1249,6 +1298,7 @@ describe("dispatch worktree", () => {
       switchArgs: ["pr:42"],
       checkout: "existing-branch",
       recorded: "fix-pr",
+      title: "PR 42",
       fetched: false,
     },
     {
@@ -1258,9 +1308,10 @@ describe("dispatch worktree", () => {
       switchArgs: ["https://gitlab.com/group/project/-/merge_requests/7"],
       checkout: "existing-worktree",
       recorded: "fix-mr",
+      title: "MR 7",
       fetched: false,
     },
-  ])("$name", async ({ branch, responses, switchArgs, checkout, recorded, fetched }) => {
+  ])("$name", async ({ branch, responses, switchArgs, checkout, recorded, title, fetched }) => {
     const { run, calls } = fakeRunner([...responses, REX_CREATED, REPORTED_WORKING]);
     const { record } = await dispatch(makeOptions({ branch }), run, instant);
 
@@ -1276,7 +1327,7 @@ describe("dispatch worktree", () => {
       "new",
       "-s",
       "session:s1",
-      recorded,
+      title,
     ]);
   });
 
@@ -1462,7 +1513,7 @@ describe("dispatch to another host", () => {
       "new",
       "-s",
       "work",
-      "fix-thing",
+      "Fix Thing",
       "-c",
       "/home/ben/src/demo",
       "--keep-open",
@@ -1496,7 +1547,7 @@ describe("dispatch to another host", () => {
     expect(calls.slice(1)).toEqual([status, capture]);
     expect(root).toBe("/home/ben/src/demo");
     expect(formatRecord(record)).toMatchInlineSnapshot(
-      `"{"mux":"rex","target":"block:new","host":"studio","name":"fix-thing","path":"/home/ben/src/demo/.worktrees/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":["permissions.allow"]}"`,
+      `"{"mux":"rex","target":"block:new","host":"studio","name":"fix-thing","title":"Fix Thing","place":"tab","path":"/home/ben/src/demo/.worktrees/fix-thing","branch":"fix-thing","session":null,"status":"working","settings":["permissions.allow"]}"`,
     );
   });
 

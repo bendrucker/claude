@@ -1,0 +1,2 @@
+rex split -b block:sender --split=right -c /tmp/eval/cwd/.worktrees/add-metrics --label Service Metrics --focus=false --json -- claude --name add-metrics -- <prompt>
+launch add-metrics /tmp/eval/cwd/.worktrees/add-metrics place=pane title=Service Metrics

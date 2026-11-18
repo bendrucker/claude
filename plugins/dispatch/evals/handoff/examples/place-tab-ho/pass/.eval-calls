@@ -1,0 +1,2 @@
+rex window new -s session:eval Config File Design -c /tmp/eval/cwd/.worktrees/config-file --focus=false --json -- claude --name config-file -- <prompt>
+launch config-file /tmp/eval/cwd/.worktrees/config-file place=tab title=Config File Design

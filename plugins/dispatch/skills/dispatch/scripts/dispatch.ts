@@ -12,6 +12,8 @@ const CHANGE_PATTERN =
   /^(?:(?:pr|mr):[1-9][0-9]*|https:\/\/[A-Za-z0-9.-]+(?:\/[A-Za-z0-9._~%-]+)+)$/;
 const AGENT_NAME_PATTERN = /^[a-z][a-z0-9_-]{0,31}$/;
 const MAX_AGENT_NAME = 32;
+const MAX_TITLE = 60;
+const SPLIT_RIGHT_COLUMNS = 160;
 const MAX_TASK_SUMMARY = 120;
 // The prompt travels as one argv element, and the whole argv shares an
 // operating-system limit that a large paste can exhaust.
@@ -120,6 +122,7 @@ export const MUXES = ["rex", "herdr", "bg"] as const;
 export type Mux = (typeof MUXES)[number];
 export type Status = "working" | "blocked" | "failed" | "unknown";
 export type Checkout = "new-branch" | "existing-branch" | "existing-worktree";
+export type Place = "pane" | "tab" | "bg";
 
 export interface DispatchRecord {
   mux: Mux;
@@ -127,6 +130,8 @@ export interface DispatchRecord {
   target: string | null;
   host: string | null;
   name: string;
+  title: string;
+  place: Place;
   // A remote worktree's path is known only once its screen shows it.
   path: string | null;
   branch: string;
@@ -320,6 +325,20 @@ export function deriveName(branch: string, taken: ReadonlySet<string>): string {
   return candidate;
 }
 
+export function deriveTitle(branch: string): string {
+  const change = /^(pr|mr):(\d+)$/.exec(branch);
+  if (change?.[1] != null) return `${change[1].toUpperCase()} ${change[2]}`;
+  const url = /\/(pull|merge_requests)\/(\d+)\/?$/.exec(branch);
+  if (url?.[1] != null) return `${url[1] === "pull" ? "PR" : "MR"} ${url[2]}`;
+  const segments = branch.split("/");
+  const words = (segments.length > 1 ? segments.slice(1) : segments)
+    .join("/")
+    .split(/[-_/]+/)
+    .filter((word) => word !== "")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1));
+  return words.length === 0 ? branch : words.join(" ");
+}
+
 export function taskSummary(prompt: string): string {
   // A prompt file often opens with a heading or a rule, so the summary is the
   // first line that still carries words once the markup is off the front.
@@ -416,15 +435,24 @@ function remoteHint(mux: SenderMux): string {
   return ` From another machine, pass \`--machine\` with the \`herdr machine list\` label for \`${mux.machine}\` to address that pane.`;
 }
 
-export function withSender(prompt: string, sender: Sender | null): string {
-  if (sender == null) return prompt;
-  const { mux } = sender;
-  const where =
-    mux == null
-      ? ""
-      : ` in ${mux.kind === "rex" ? "Rex block" : "herdr pane"} \`${mux.id}\`${mux.machine == null ? "" : ` on \`${mux.machine}\``}`;
-  const hint = mux == null ? "" : remoteHint(mux);
-  return `${prompt.trimEnd()}\n\n---\n\nThe Claude session \`${sender.name}\`${where} dispatched this task. Reach it with \`SendMessage\` to \`${sender.name}\`.${hint}\n`;
+const CLOSE_WHEN_OPEN = "Once the PR is open, run `dispatch:close`.";
+
+export function withSender(prompt: string, sender: Sender | null, close: boolean): string {
+  const lines: string[] = [];
+  if (sender != null) {
+    const { mux } = sender;
+    const where =
+      mux == null
+        ? ""
+        : ` in ${mux.kind === "rex" ? "Rex block" : "herdr pane"} \`${mux.id}\`${mux.machine == null ? "" : ` on \`${mux.machine}\``}`;
+    const hint = mux == null ? "" : remoteHint(mux);
+    lines.push(
+      `The Claude session \`${sender.name}\`${where} dispatched this task. Reach it with \`SendMessage\` to \`${sender.name}\`.${hint}`,
+    );
+  }
+  if (close) lines.push(CLOSE_WHEN_OPEN);
+  if (lines.length === 0) return prompt;
+  return `${prompt.trimEnd()}\n\n---\n\n${lines.join("\n\n")}\n`;
 }
 
 export function formatRecord(record: DispatchRecord): string {
@@ -708,6 +736,24 @@ interface Context {
   path: string;
 }
 
+const BlockSize = z.object({ columns: z.number() });
+
+// A block whose size cannot be read splits to the right, as Rex does by default.
+async function splitDirection(run: Runner, block: string): Promise<"right" | "below"> {
+  const result = await run(["rex", "block", "call", "-b", block, "size"]);
+  if (result.code !== 0) return "right";
+  let json: unknown;
+  try {
+    json = JSON.parse(result.stdout);
+  } catch {
+    // An older Rex without the size method prints prose.
+    return "right";
+  }
+  const parsed = BlockSize.safeParse(json);
+  if (!parsed.success) return "right";
+  return parsed.data.columns >= SPLIT_RIGHT_COLUMNS ? "right" : "below";
+}
+
 async function launchRex(ctx: Context): Promise<void> {
   const { options, partial } = ctx;
   const command = ["--json", "--", "claude", ...claudeArgs(partial.name, options.prompt)];
@@ -718,11 +764,11 @@ async function launchRex(ctx: Context): Promise<void> {
           "split",
           "-b",
           options.rexBlock,
-          "--split=right",
+          `--split=${await splitDirection(ctx.run, options.rexBlock)}`,
           "-c",
           ctx.path,
           "--label",
-          partial.branch,
+          partial.title,
           "--focus=false",
           ...command,
         ]
@@ -732,7 +778,7 @@ async function launchRex(ctx: Context): Promise<void> {
           "new",
           "-s",
           options.rexSession ?? "",
-          partial.branch,
+          partial.title,
           "-c",
           ctx.path,
           "--focus=false",
@@ -925,6 +971,7 @@ export interface DispatchOptions {
   branch: string;
   prompt: string;
   name?: string | undefined;
+  title?: string | undefined;
   base: string;
   timeout: number;
   mux: Mux;
@@ -961,8 +1008,21 @@ function validateCommon(
     );
 }
 
+export function titleOf(options: Pick<DispatchOptions, "title" | "branch">): string {
+  return options.title ?? deriveTitle(options.branch);
+}
+
+export function placeOf(options: Pick<DispatchOptions, "mux" | "split">): Place {
+  if (options.mux === "bg") return "bg";
+  return options.split === true ? "pane" : "tab";
+}
+
 function validate(options: DispatchOptions): void {
   validateCommon(options);
+  if (options.title != null && (options.title.trim() === "" || /[\n\r]/.test(options.title)))
+    throw new DispatchError("--title must be one non-empty line", null);
+  if (options.title != null && options.title.length > MAX_TITLE)
+    throw new DispatchError(`--title must be at most ${MAX_TITLE} characters`, null);
   if (options.host != null) {
     validateRemote(options, options.host);
     return;
@@ -1033,6 +1093,7 @@ async function dispatchRemote(
   pause: Pause,
 ): Promise<DispatchResult> {
   const name = options.name ?? deriveName(options.branch, new Set());
+  const title = titleOf(options);
   const created = await requiredJson(
     run,
     [
@@ -1043,7 +1104,7 @@ async function dispatchRemote(
       "new",
       "-s",
       options.rexSession ?? "",
-      options.branch,
+      title,
       "-c",
       options.repo,
       "--keep-open",
@@ -1060,6 +1121,8 @@ async function dispatchRemote(
     target: created.block_ids[0] ?? null,
     host,
     name,
+    title,
+    place: "tab",
     path: null,
     branch: options.branch,
     session: null,
@@ -1120,8 +1183,7 @@ export async function dispatch(
 
   const { root, path, partial } = await prepareWorktree(
     options,
-    wanted,
-    options.mux,
+    { name: wanted, mux: options.mux, title: titleOf(options), place: placeOf(options) },
     run,
     pause,
     probe,
@@ -1244,10 +1306,11 @@ export const probeWorktreeAdmin: Probe = async (root) => {
   }
 };
 
+type Launch = Pick<DispatchRecord, "name" | "mux" | "title" | "place">;
+
 async function prepareWorktree(
   options: WorktreeOptions,
-  name: string,
-  mux: Mux,
+  launch: Launch,
   run: Runner,
   pause: Pause,
   probe: Probe,
@@ -1291,10 +1354,12 @@ async function prepareWorktree(
     // Everything past here has a worktree behind it, so a failure carries the
     // record forward rather than leaving the checkout orphaned without a trace.
     const partial: DispatchRecord = {
-      mux,
+      mux: launch.mux,
       target: null,
       host: null,
-      name,
+      name: launch.name,
+      title: launch.title,
+      place: launch.place,
       path,
       branch: switched.branch ?? options.branch,
       session: null,
@@ -1333,7 +1398,13 @@ export async function execSession(
   probe: Probe = probeWorktreeAdmin,
 ): Promise<number> {
   validateCommon(options);
-  const { path, partial } = await prepareWorktree(options, options.name, "rex", run, pause, probe);
+  const { path, partial } = await prepareWorktree(
+    options,
+    { name: options.name, mux: "rex", title: deriveTitle(options.branch), place: "tab" },
+    run,
+    pause,
+    probe,
+  );
   process.stdout.write(`dispatch worktree: ${path}\ndispatch branch: ${partial.branch}\n`);
   if (partial.submoduleError != null)
     process.stderr.write(`warning: submodules were not initialized: ${partial.submoduleError}\n`);
@@ -1378,6 +1449,16 @@ if (import.meta.main) {
       },
       prompt: { type: String, description: "File holding the prompt; reads stdin when absent" },
       name: { type: String, description: "Session name; derived from the branch when absent" },
+      title: {
+        type: String,
+        description:
+          "Rex tab or pane label, two to four Title Case words naming the task; derived from the branch when absent",
+      },
+      keepOpen: {
+        type: Boolean,
+        default: false,
+        description: "Leave out the prompt's instruction to run dispatch:close once the PR is open",
+      },
       base: {
         type: String,
         default: "origin/main",
@@ -1394,7 +1475,8 @@ if (import.meta.main) {
       split: {
         type: Boolean,
         default: false,
-        description: "Rex only: split the current block to the right instead of opening a tab",
+        description:
+          "Rex only: open a pane in this tab, beside the current block at 160 columns or more and below it otherwise, instead of a new tab",
       },
       allow: {
         type: [String],
@@ -1529,6 +1611,8 @@ if (import.meta.main) {
           target: record.target,
           host: record.host,
           name: record.name,
+          title: record.title,
+          place: record.place,
           session: record.session,
           sender: sender?.name ?? null,
           outcome,
@@ -1546,8 +1630,9 @@ if (import.meta.main) {
     const { record, root } = await dispatch({
       repo: argv.flags.repo,
       branch: argv.flags.branch,
-      prompt: withSender(prompt, sender),
+      prompt: withSender(prompt, sender, !argv.flags.keepOpen && mux !== "bg"),
       name: argv.flags.name,
+      title: argv.flags.title,
       base: argv.flags.base,
       timeout: argv.flags.timeout,
       mux,

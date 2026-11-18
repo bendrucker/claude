@@ -19,6 +19,9 @@ const DispatchRowSchema = z.object({
   target: z.string().nullable(),
   host: z.string().nullable(),
   name: z.string(),
+  // Absent from rows written before dispatch recorded them.
+  title: z.string().optional(),
+  place: z.enum(["pane", "tab", "bg"]).optional(),
   session: z.string().nullable(),
   // The name the dispatched session reaches its dispatcher by.
   sender: z.string().nullable(),

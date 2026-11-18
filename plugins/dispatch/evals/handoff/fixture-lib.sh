@@ -39,10 +39,23 @@ session_status() {
   printf '%s\n' "$1" > "$HOME/.eval-stubs/session-status"
 }
 
-# The sandbox denies the ledger's default home under ~/.claude/plugins.
+# The sandbox denies the ledger's default home under ~/.claude/plugins. The
+# `titled` grader reads the ledger, so it starts empty rather than missing.
 for rc in .zshenv .bashrc; do
   printf 'export CLAUDE_PLUGIN_DATA=%q\n' "$HOME/cwd/.dispatch-data" >> "$HOME/$rc"
 done
+mkdir -p .dispatch-data
+: > .dispatch-data/dispatches.jsonl
+echo "/.dispatch-data/" >> .git/info/exclude
+
+# workstream: commits a retry counter on feature-x and leaves it checked out, as
+# the work this session's tab is leading.
+workstream() {
+  git switch -q -c feature-x
+  printf '\nexport let retries = 0;\n' >> src/client.ts
+  commit 2026-10-02T12:00:00Z 'feature-x: count retries' > /dev/null
+  git push -q -u origin feature-x
+}
 
 mux="${EVAL_MUX:-rex}"
 # shellcheck source=/dev/null

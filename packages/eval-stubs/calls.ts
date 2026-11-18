@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 // Concurrent stand-ins need O_APPEND atomicity, which Bun.write lacks.
 // oxlint-disable-next-line no-restricted-imports
 import { appendFile } from "node:fs/promises";
@@ -64,9 +65,21 @@ function isSettings(value: unknown): value is Settings {
   return true;
 }
 
-/** Records a session opened in a worktree, then the permissions it was given, one line per rule. */
-export async function recordLaunch(branch: string, worktree: string): Promise<void> {
-  await appendLines([`launch ${branch} ${worktree}`]);
+export type Place = "pane" | "tab" | "bg";
+
+function checkedOutBranch(worktree: string): string {
+  const run = spawnSync("git", ["-C", worktree, "branch", "--show-current"], { encoding: "utf8" });
+  const branch = run.status === 0 ? run.stdout.trim() : "";
+  return branch === "" ? "unknown" : branch;
+}
+
+/**
+ * Records a session opened in a worktree as `launch <branch> <path> place=<place>`, with
+ * `title=<label>` when the multiplexer shows one, then the permissions it was given, one per line.
+ */
+export async function recordLaunch(worktree: string, place: Place, title?: string): Promise<void> {
+  const fields = [`place=${place}`, ...(title === undefined ? [] : [`title=${title}`])];
+  await appendLines([`launch ${checkedOutBranch(worktree)} ${worktree} ${fields.join(" ")}`]);
   const file = Bun.file(join(worktree, ".claude/settings.local.json"));
   if (!(await file.exists())) return;
   let parsed: unknown;
@@ -81,6 +94,35 @@ export async function recordLaunch(branch: string, worktree: string): Promise<vo
     ...(parsed.permissions?.allow ?? []).map((rule) => `allow ${rule}`),
     ...(parsed.sandbox?.filesystem?.allowWrite ?? []).map((path) => `sandbox-write ${path}`),
   ]);
+}
+
+export interface Status {
+  state: string;
+  kind?: string;
+  msg?: string;
+}
+
+function isStatus(value: unknown): value is Status {
+  return (
+    isObject(value) &&
+    typeof value.state === "string" &&
+    (value.kind === undefined || typeof value.kind === "string") &&
+    (value.msg === undefined || typeof value.msg === "string")
+  );
+}
+
+/** `session-status` holds a bare state or a JSON object with `kind` and `msg`. */
+export async function status(): Promise<Status> {
+  const file = Bun.file(join(stubDir, "session-status"));
+  if (!(await file.exists())) return { state: "working" };
+  const text = (await file.text()).trim();
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (isStatus(parsed)) return parsed;
+  } catch {
+    // A bare state is not JSON.
+  }
+  return { state: text === "" ? "working" : text };
 }
 
 export function unavailable(cli: string, argv: string[]): never {

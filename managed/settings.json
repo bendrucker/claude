@@ -6,6 +6,11 @@
   },
   "fallbackModel": ["sonnet"],
   "prependPlugins": [],
+  "enabledPlugins": {
+    "herdr@bendrucker": true,
+    "load@bendrucker": true,
+    "plan@bendrucker": true
+  },
   "cleanupPeriodDays": 90,
   "autoMode": {
     "hard_deny": [

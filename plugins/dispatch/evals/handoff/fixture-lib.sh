@@ -25,13 +25,13 @@ TS
   printf '{\n  "name": "%s",\n  "private": true,\n  "scripts": {\n    "test": "bun test"\n  }\n}\n' "$1" > package.json
   commit 2026-10-01T12:00:00Z "$1: initial tree" > /dev/null
   git push -q -u origin main
-  # The session's sandbox keeps a repository's .git/worktrees read-only, and the
-  # `wt` stand-in adds real worktrees, so the git dir lives outside the tree.
-  mv .git "$HOME/.$1.git"
-  printf 'gitdir: %s\n' "$HOME/.$1.git" > .git
 }
 
 seed_repo relay
+# The session's sandbox keeps its repository's .git/worktrees read-only, and the
+# `wt` stand-in adds real worktrees, so the git dir lives outside the tree.
+mv .git "$HOME/.relay.git"
+printf 'gitdir: %s\n' "$HOME/.relay.git" > .git
 
 second_repo() {
   mkdir -p "repos/$1"

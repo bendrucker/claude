@@ -815,11 +815,19 @@ function quoterOf(trusted: ReadonlySet<string>): (author: string, quotes: Quote[
   };
 }
 
+/** How a message names an MR the checkout's branch does not resolve, and the `-R` its commands take. */
+export interface Named {
+  name: string;
+  repo: string;
+}
+
 function paragraphOf(
   snapshot: Snapshot,
   decision: Exclude<Promoted, { kind: "feedback" | "changes_requested" }>,
+  named: Named | undefined,
 ): string {
-  const mr = `MR !${snapshot.mr}`;
+  const mr = named?.name ?? `MR !${snapshot.mr}`;
+  const repo = named === undefined ? "" : ` -R ${named.repo}`;
   const target = snapshot.target === "" ? "its target branch" : `\`${snapshot.target}\``;
   switch (decision.kind) {
     case "mr.merged":
@@ -830,7 +838,7 @@ function paragraphOf(
       if (decision.from === "queued") {
         return [
           `${mr} left the merge train without merging: ${snapshot.url}`,
-          `Read why in its system notes with \`glab mr view ${snapshot.mr} --comments --system-logs\`.`,
+          `Read why in its system notes with \`glab mr view ${snapshot.mr}${repo} --comments --system-logs\`.`,
         ].join("\n");
       }
       return `${mr}'s auto-merge was turned off before it merged: ${snapshot.url}`;
@@ -852,7 +860,7 @@ function paragraphOf(
     case "ci.failed":
       return [
         `Pipeline failed on ${mr} at ${short(snapshot.head)}: ${decision.failed.map(shown).join(", ")}.`,
-        `Read the failure with \`glab ci get --merge-request=${snapshot.mr} --status=failed\` and \`glab ci trace <job> --pipeline-id ${snapshot.pipeline}\`.`,
+        `Read the failure with \`glab ci get --merge-request=${snapshot.mr} --status=failed${repo}\` and \`glab ci trace <job> --pipeline-id ${snapshot.pipeline}${repo}\`.`,
       ].join("\n");
     default:
       return decision satisfies never;
@@ -864,8 +872,10 @@ export function messageOf(
   snapshot: Snapshot,
   promoted: Promoted[],
   trusted: ReadonlySet<string> = new Set(),
+  named?: Named,
 ): string {
-  const mr = `MR !${snapshot.mr}`;
+  const mr = named?.name ?? `MR !${snapshot.mr}`;
+  const repo = named === undefined ? "" : ` -R ${named.repo}`;
   const paragraphs: string[] = [];
   const feedback: string[] = [];
   const quote = quoterOf(trusted);
@@ -884,7 +894,7 @@ export function messageOf(
       case "behind":
       case "push.foreign":
       case "ci.failed":
-        paragraphs.push(paragraphOf(snapshot, decision));
+        paragraphs.push(paragraphOf(snapshot, decision, named));
         break;
       default:
         decision satisfies never;
@@ -900,7 +910,7 @@ export function messageOf(
       [
         ...feedback,
         snapshot.url,
-        `Read the discussion with \`glab mr note list ${snapshot.mr}${state}\`.`,
+        `Read the discussion with \`glab mr note list ${snapshot.mr}${repo}${state}\`.`,
         ...(feedback.some((line) => line.startsWith(">")) ? [QUOTED] : []),
       ].join("\n"),
     );
@@ -910,7 +920,8 @@ export function messageOf(
       "The gitlab plugin watches this MR's pipeline, reviews, comments, and mergeability, so polling them is unnecessary.",
     );
   }
-  return paragraphs.join("\n\n");
+  const text = paragraphs.join("\n\n");
+  return named === undefined || text.includes(snapshot.url) ? text : `${text}\n\n${snapshot.url}`;
 }
 
 /** Whom the MR waits on, which leads the footer. */
@@ -1028,7 +1039,7 @@ export function statusPartsOf(snapshot: Snapshot, isBusy = false, isStale = fals
   return { lead: LEADS[ballOf(snapshot)](isBusy), parts };
 }
 
-// The footer already links the MR, so the state rides after it on that line.
+/** The footer status as plain text, for a surface that draws only the dim tail. */
 export function statusOf(snapshot: Snapshot, isBusy = false, isStale = false): string {
   const { lead, parts } = statusPartsOf(snapshot, isBusy, isStale);
   const details = parts.map((part) => part.text).join(SEP);

@@ -5,16 +5,33 @@ export const PANE = "mr";
 export const MUTED = "muted";
 export const REFRESH = "refresh";
 
-/** What the watch holds that the pane shows. */
+/** What the watch holds for one MR that the pane shows. */
 export interface Seen {
   snapshot: Snapshot | undefined;
   none: string | undefined;
   polledAt: number;
   due: number;
   error: string | undefined;
+  isPolling: boolean;
+  isBranch: boolean;
+}
+
+/** Every tracked MR, in the watch's order, and those that ended this session. */
+export interface View {
+  mrs: Seen[];
+  ended: Snapshot[];
   isMutedOpen: boolean;
   isBusy: boolean;
-  isPolling: boolean;
+}
+
+/** The MR drawn in full: the first that needs its author, else the branch MR, else the first. */
+export function focusOf(mrs: readonly Seen[], isBusy: boolean): Seen | undefined {
+  const shown = mrs.filter((seen) => seen.snapshot !== undefined);
+  const needsAuthor = (seen: Seen) => {
+    const lead = seen.snapshot && statusPartsOf(seen.snapshot, isBusy).lead?.text;
+    return lead === "author" || lead === "agent";
+  };
+  return shown.find(needsAuthor) ?? shown.find((seen) => seen.isBranch) ?? shown[0];
 }
 
 // Section labels sit in a column this wide, so their contents line up.
@@ -109,11 +126,11 @@ function mergeParts(s: Snapshot): Part[] {
   return parts.length > 0 ? parts : [{ text: "manual", tone: "subtle" }];
 }
 
-/** Draws what the watcher last read, and how it is polling. */
+/** Draws what the watcher last read for each MR, and how it is polling. */
 export function drawPane(
   $: EngineInterface,
   e: RenderInput,
-  seen: Seen,
+  view: View,
   now: number,
 ): RenderElement {
   const { Box, Text, Button, Link } = $.ui.resolve(e);
@@ -139,36 +156,57 @@ export function drawPane(
       </Box>
     </Box>
   );
-  const s = seen.snapshot;
-  const next = seen.due - now;
-  const timing = seen.isPolling
+  const polling = view.mrs.some((seen) => seen.isPolling);
+  const polledAt = Math.min(...view.mrs.map((seen) => seen.polledAt));
+  const next = Math.min(...view.mrs.map((seen) => seen.due)) - now;
+  const timing = polling
     ? "refreshing…"
-    : `polled ${since(now - seen.polledAt)} · next ${next >= 60_000 ? `in ${ago(next)}` : "soon"}`;
+    : `polled ${since(now - polledAt)} · next ${next >= 60_000 ? `in ${ago(next)}` : "soon"}`;
   const footer = (
     <Box flexDirection="row" justifyContent="space-between" marginTop={1}>
       <Text dimColor>{timing}</Text>
       <Button key={REFRESH} plain dimColor hotkey="r" label="refresh" onPress={() => undefined} />
     </Box>
   );
-  if (s === undefined) {
+  const ended = view.ended.length > 0 && (
+    <Box marginTop={1}>
+      {section(
+        "Ended",
+        [],
+        [
+          <Text>
+            {view.ended.map((s, index) => (
+              <Text dimColor>
+                {index === 0 ? "" : SEP}
+                <Link href={s.url}>!{s.mr}</Link> {s.state}
+              </Text>
+            ))}
+          </Text>,
+        ],
+      )}
+    </Box>
+  );
+  const focus = focusOf(view.mrs, view.isBusy);
+  if (focus?.snapshot === undefined) {
+    const none = view.mrs.find((seen) => seen.isBranch)?.none;
     return (
       <Box flexDirection="column">
         <Text>No merge request for this branch</Text>
-        {seen.none === undefined ? undefined : <Text dimColor>{seen.none}</Text>}
+        {none === undefined ? undefined : <Text dimColor>{none}</Text>}
+        {ended}
         {footer}
       </Box>
     );
   }
-  const status = statusPartsOf(s, seen.isBusy, seen.error !== undefined);
-  const failing = s.checks.filter((check) => check.outcome !== "passed");
-  return (
-    <Box flexDirection="column">
+  const heading = (seen: Seen, s: Snapshot) => {
+    const status = statusPartsOf(s, view.isBusy, seen.error !== undefined);
+    return [
       <Text weight="semibold">
         <Link href={s.url}>
           !{s.mr}
           {s.title === "" ? "" : ` ${s.title}`}
         </Link>
-      </Text>
+      </Text>,
       <Text>
         {status.lead === undefined ? undefined : (
           <Text weight="semibold" color={status.lead.tone}>
@@ -177,7 +215,22 @@ export function drawPane(
           </Text>
         )}
         {inline(status.parts)}
+      </Text>,
+    ];
+  };
+  // oxlint-disable-next-line unicorn/consistent-function-scoping
+  const failure = (seen: Seen) =>
+    seen.error === undefined ? undefined : (
+      <Text color="warning">
+        {OCT.alert} last poll failed: {seen.error}
       </Text>
+    );
+  const s = focus.snapshot;
+  const failing = s.checks.filter((check) => check.outcome !== "passed");
+  const rest = view.mrs.filter((seen) => seen !== focus && seen.snapshot !== undefined);
+  return (
+    <Box flexDirection="column">
+      {heading(focus, s)}
       {isOpen(s) && (
         <Box flexDirection="column" marginTop={1}>
           {section(
@@ -204,10 +257,10 @@ export function drawPane(
                   plain
                   dimColor
                   hotkey="m"
-                  label={`${seen.isMutedOpen ? "▾" : "▸"} ${s.muted.length} bot ${s.muted.length === 1 ? "comment" : "comments"}`}
+                  label={`${view.isMutedOpen ? "▾" : "▸"} ${s.muted.length} bot ${s.muted.length === 1 ? "comment" : "comments"}`}
                   onPress={() => undefined}
                 />,
-                ...(seen.isMutedOpen
+                ...(view.isMutedOpen
                   ? s.muted.map((m) => (
                       <Text dimColor>
                         {"  "}
@@ -219,11 +272,16 @@ export function drawPane(
             )}
         </Box>
       )}
-      {seen.error !== undefined && (
-        <Text color="warning">
-          {OCT.alert} last poll failed: {seen.error}
-        </Text>
+      {failure(focus)}
+      {rest.map((seen) =>
+        seen.snapshot === undefined ? undefined : (
+          <Box flexDirection="column" marginTop={1}>
+            {heading(seen, seen.snapshot)}
+            {failure(seen)}
+          </Box>
+        ),
       )}
+      {ended}
       {footer}
     </Box>
   );

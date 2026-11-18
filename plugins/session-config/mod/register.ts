@@ -28,20 +28,28 @@ function cells(text: string): number {
   return [...graphemes.segment(text)].length;
 }
 
-export function hintOf(hint: string, label: string[], columns?: number): string {
+/** The hint without key help, carrying the label only when nothing else is left. */
+export function hintOf(
+  hint: string,
+  label: string[],
+  columns?: number,
+): { hint: string; hasLabel: boolean } {
   const parts = hint.split(SEPARATOR).filter((part) => part !== "" && !KEY_HELP.has(part.trim()));
+  if (parts.length > 0) return { hint: parts.join(SEPARATOR), hasLabel: false };
   const room = columns === undefined ? Infinity : columns - ROW_RESERVE;
   for (const part of label) {
     if (cells([...parts, part].join(SEPARATOR)) > room) break;
     parts.push(part);
   }
-  return parts.join(SEPARATOR);
+  return { hint: parts.join(SEPARATOR), hasLabel: parts.length > 0 };
 }
 
 interface Config {
   family?: string | undefined;
   effort?: string | number | undefined;
   label: string[];
+  /** Whether the last prompt hint carried the label, so the mode labels leave it out. */
+  isInHint: boolean;
 }
 
 function labelOf({ family, effort }: Config): string[] {
@@ -64,7 +72,7 @@ function refresh($: EngineInterface, config: Config) {
 }
 
 export function register(on: On): void {
-  const config: Config = { label: [] };
+  const config: Config = { label: [], isInHint: false };
 
   on("session.start", async ($, e, next) => {
     config.family = modelFamily(await $.session.model());
@@ -89,10 +97,20 @@ export function register(on: On): void {
     return yield* next(e);
   });
 
-  // The engine draws a separator after the mode pill even for an empty hint.
-  // The label goes in the hint to give that separator something to separate.
+  // The engine draws a separator after the mode pill even for an empty hint,
+  // so an otherwise empty hint carries the label.
   on("ui.render", { component: "PromptHint" }, ($, e, next) => {
-    const hint = hintOf(e.props.hint, config.label, e.viewport?.columns);
+    const { hint, hasLabel } = hintOf(e.props.hint, config.label, e.viewport?.columns);
+    if (hasLabel !== config.isInHint) {
+      config.isInHint = hasLabel;
+      $.ui.invalidate("ui.render");
+    }
     return hint === e.props.hint ? next(e) : next({ ...e, props: { ...e.props, hint } });
+  });
+
+  on("ui.render", { component: "SessionMode" }, ($, e, next) => {
+    if (config.isInHint || config.label.length === 0) return next(e);
+    const modes = [...e.props.modes, config.label.join(SEPARATOR)];
+    return next({ ...e, props: { ...e.props, modes } });
   });
 }

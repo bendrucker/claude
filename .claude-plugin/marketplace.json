@@ -69,11 +69,6 @@
       "source": "./plugins/session-config"
     },
     {
-      "name": "auto-mode",
-      "description": "Enhancements for Claude Code auto mode",
-      "source": "./plugins/auto-mode"
-    },
-    {
       "name": "observability",
       "description": "Query Claude Code session history, tool calls, hooks, and token usage through a DuckDB index over local transcripts",
       "source": "./plugins/observability"

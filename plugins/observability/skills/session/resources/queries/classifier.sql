@@ -2,7 +2,7 @@
 -- name: classifier
 -- summary: >-
 --   Auto-mode classifier volume and latency, the permission stall on every dispatched call,
---   the allow rules auto mode dropped, and which calls the engine routed to the classifier.
+--   and the allow rules auto mode dropped.
 -- description: >-
 --   One row per (`section`, `week`, `dim1`, `dim2`).
 --
@@ -12,15 +12,10 @@
 --   between a call and its dispatch on allowed and classified calls alike. `dim1` is the tool.
 --   `dropped-allow-rule` lists each allow rule auto mode ignored because it bypasses the
 --   classifier. `dim1` is the rule, `dim2` is the settings file, and `calls` counts the
---   sessions that loaded it. `verdict` reads the auto-mode mod's records. `dim1` is
---   the engine's verdict. An `ask` goes to the mode's decider, which is the classifier only in
---   auto mode, and the records carry no mode. `dim2` is the `tool_errors` denial kind, or else
---   the call's outcome. Its latencies are the call's wall time, the decider and the tool
---   together, so the classifier's own latency comes from `classifier-request`.
+--   sessions that loaded it.
 --
---   Every section but `verdict` exists only for sessions run with debug logging on, and
---   `verdict` only where the mod was enabled. Both sources are this machine's, so every row
---   is `local`.
+--   Every section exists only for sessions run with debug logging on. The debug log is this
+--   machine's, so every row is `local`.
 -- params:
 --   - after_date
 --   - before_date
@@ -31,15 +26,6 @@ WITH debug AS (
   FROM debug_events
   WHERE date_filter(ts, getvariable('after_date'), getvariable('before_date'))
     AND host_filter(host, getvariable('host'))
-),
-verdicts AS (
-  SELECT
-    v.*,
-    COALESCE(e.denial_kind, v.outcome) AS result
-  FROM classifier_verdicts v
-  LEFT JOIN tool_errors e ON e.host = v.host AND e.tool_id = v.tool_use_id
-  WHERE date_filter(v.started_at, getvariable('after_date'), getvariable('before_date'))
-    AND host_filter(v.host, getvariable('host'))
 ),
 timed AS (
   SELECT
@@ -59,9 +45,6 @@ timed AS (
     TRY_CAST(fields->>'permissionDecisionMs' AS DOUBLE)
   FROM debug
   WHERE event = 'tool_dispatch_start'
-  UNION ALL
-  SELECT 'verdict', started_at, decision, result, duration_ms::DOUBLE
-  FROM verdicts
 )
 SELECT
   section,

@@ -1,17 +1,27 @@
 import type { EngineInterface, RenderElement, RenderInput } from "claude-code";
-import { OCT, type Part, SEP, type Snapshot, statusPartsOf, turnOf } from "./pr.ts";
+import { nameOf, OCT, type Part, SEP, type Snapshot, statusPartsOf, turnOf } from "./pr.ts";
 
 export const PANE = "pr";
 export const MUTED = "muted";
 export const REFRESH = "refresh";
 
+/** One tracked PR as the pane shows it. */
+export interface SeenPr {
+  snapshot: Snapshot;
+  error: string | undefined;
+  isBranch: boolean;
+}
+
 /** What the watch holds that the pane shows. */
 export interface Seen {
-  snapshot: Snapshot | undefined;
+  /** Tracked PRs, the one that most needs the author first. */
+  prs: SeenPr[];
+  /** Why the branch has no PR, when it has none. */
   none: string | undefined;
+  /** PRs retired after they ended. */
+  ended: { url: string; name: string; state: string }[];
   polledAt: number;
   due: number;
-  error: string | undefined;
   isMutedOpen: boolean;
   isBusy: boolean;
   isPolling: boolean;
@@ -128,7 +138,6 @@ export function drawPane(
       </Box>
     </Box>
   );
-  const s = seen.snapshot;
   const next = seen.due - now;
   const timing = seen.isPolling
     ? "refreshing…"
@@ -139,26 +148,18 @@ export function drawPane(
       <Button key={REFRESH} plain dimColor hotkey="r" label="refresh" onPress={() => undefined} />
     </Box>
   );
-  if (s === undefined) {
+  const isNamed = seen.prs.length > 1 || seen.prs.some((pr) => !pr.isBranch);
+  const heading = (s: Snapshot) => (
+    <Text weight="semibold">
+      <Link href={s.url}>
+        {isNamed ? nameOf(s.url) : `#${s.pr}`}
+        {s.title === "" ? "" : ` ${s.title}`}
+      </Link>
+    </Text>
+  );
+  const statusLine = (pr: SeenPr) => {
+    const status = statusPartsOf(pr.snapshot, seen.isBusy, pr.error !== undefined);
     return (
-      <Box flexDirection="column">
-        <Text>No pull request for this branch</Text>
-        {seen.none === undefined ? undefined : <Text dimColor>{seen.none}</Text>}
-        {footer}
-      </Box>
-    );
-  }
-  const status = statusPartsOf(s, seen.isBusy, seen.error !== undefined);
-  const isOpen = s.state === "OPEN";
-  const failing = s.checks.filter((check) => check.outcome !== "passed");
-  return (
-    <Box flexDirection="column">
-      <Text weight="semibold">
-        <Link href={s.url}>
-          #{s.pr}
-          {s.title === "" ? "" : ` ${s.title}`}
-        </Link>
-      </Text>
       <Text>
         {status.lead === undefined ? undefined : (
           <Text weight="semibold" color={status.lead.tone}>
@@ -168,52 +169,96 @@ export function drawPane(
         )}
         {inline(status.parts)}
       </Text>
-      {isOpen && (
-        <Box flexDirection="column" marginTop={1}>
-          {section(
-            "Checks",
-            checkParts(s),
-            failing
-              .toSorted((a, b) => ORDER[a.outcome] - ORDER[b.outcome])
-              .map((check) => (
-                <Text>
-                  {tinted(MARK[check.outcome])} {check.label}
-                </Text>
-              )),
-            true,
-          )}
-          {section("Review", reviewParts(s))}
-          {section("Merge", mergeParts(s))}
-          {s.muted.length > 0 &&
-            section(
-              "Muted",
-              [],
-              [
-                <Button
-                  key={MUTED}
-                  plain
-                  dimColor
-                  hotkey="m"
-                  label={`${seen.isMutedOpen ? "▾" : "▸"} ${s.muted.length} bot ${s.muted.length === 1 ? "comment" : "comments"}`}
-                  onPress={() => undefined}
-                />,
-                ...(seen.isMutedOpen
-                  ? s.muted.map((m) => (
-                      <Text dimColor>
-                        {"  "}
-                        {m.author} · {m.reason}
-                      </Text>
-                    ))
-                  : []),
-              ],
+    );
+  };
+  const detail = (pr: SeenPr) => {
+    const s = pr.snapshot;
+    const failing = s.checks.filter((check) => check.outcome !== "passed");
+    return (
+      <Box flexDirection="column">
+        {heading(s)}
+        {statusLine(pr)}
+        {s.state === "OPEN" && (
+          <Box flexDirection="column" marginTop={1}>
+            {section(
+              "Checks",
+              checkParts(s),
+              failing
+                .toSorted((a, b) => ORDER[a.outcome] - ORDER[b.outcome])
+                .map((check) => (
+                  <Text>
+                    {tinted(MARK[check.outcome])} {check.label}
+                  </Text>
+                )),
+              true,
             )}
+            {section("Review", reviewParts(s))}
+            {section("Merge", mergeParts(s))}
+            {s.muted.length > 0 &&
+              section(
+                "Muted",
+                [],
+                [
+                  <Button
+                    key={MUTED}
+                    plain
+                    dimColor
+                    hotkey="m"
+                    label={`${seen.isMutedOpen ? "▾" : "▸"} ${s.muted.length} bot ${s.muted.length === 1 ? "comment" : "comments"}`}
+                    onPress={() => undefined}
+                  />,
+                  ...(seen.isMutedOpen
+                    ? s.muted.map((m) => (
+                        <Text dimColor>
+                          {"  "}
+                          {m.author} · {m.reason}
+                        </Text>
+                      ))
+                    : []),
+                ],
+              )}
+          </Box>
+        )}
+        {pr.error !== undefined && (
+          <Text color="warning">
+            {OCT.alert} last poll failed: {pr.error}
+          </Text>
+        )}
+      </Box>
+    );
+  };
+  const [first, ...rest] = seen.prs;
+  const ended =
+    seen.ended.length === 0 ? undefined : (
+      <Box flexDirection="column" marginTop={1}>
+        <Text dimColor>Ended</Text>
+        {seen.ended.map((pr) => (
+          <Text dimColor>
+            <Link href={pr.url}>{pr.name}</Link> {pr.state.toLowerCase()}
+          </Text>
+        ))}
+      </Box>
+    );
+  if (first === undefined) {
+    return (
+      <Box flexDirection="column">
+        <Text>No pull request for this branch</Text>
+        {seen.none === undefined ? undefined : <Text dimColor>{seen.none}</Text>}
+        {ended}
+        {footer}
+      </Box>
+    );
+  }
+  return (
+    <Box flexDirection="column">
+      {detail(first)}
+      {rest.map((pr) => (
+        <Box flexDirection="column" marginTop={1}>
+          {heading(pr.snapshot)}
+          {statusLine(pr)}
         </Box>
-      )}
-      {seen.error !== undefined && (
-        <Text color="warning">
-          {OCT.alert} last poll failed: {seen.error}
-        </Text>
-      )}
+      ))}
+      {ended}
       {footer}
     </Box>
   );

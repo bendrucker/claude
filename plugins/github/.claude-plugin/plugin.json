@@ -28,7 +28,7 @@
     "watch": {
       "type": "boolean",
       "title": "Watch the pull request",
-      "description": "Watch the current branch's pull request in interactive sessions and show its state in the prompt footer.",
+      "description": "Watch the current branch's pull request, and those the session opens or tracks with /pr track, in interactive sessions and show their state in the prompt footer.",
       "default": true
     }
   }

@@ -59,7 +59,7 @@ classified AS (
       WHEN b.end_time >= (SELECT t FROM horizon)
         - to_hours(COALESCE(TRY_CAST(getvariable('ongoing_hours') AS INTEGER), 48))
         THEN 'ongoing'
-      WHEN lp.last_outcome = 'handoff' THEN 'handed-off'
+      WHEN lp.last_outcome = 'accepted-handoff' THEN 'handed-off'
       WHEN COALESCE(e.n, 0) > 0 THEN 'abandoned-with-edits'
       ELSE 'no-artifact'
     END AS state

@@ -2150,7 +2150,7 @@ describe("plan_calls view and plans query", () => {
     expect(Number(row?.plan_count)).toBe(2);
   });
 
-  it("classifies a terminal rejection with no edits after as outcome=handoff", async () => {
+  it("classifies a terminal rejection with no edits after as outcome=accepted-handoff", async () => {
     // handoff-session ends on a rejected plan followed only by a Read, the
     // reject-and-handoff workflow (implement from the plan file in a fresh session).
     const rows = await db.query(
@@ -2158,7 +2158,7 @@ describe("plan_calls view and plans query", () => {
       z.object({ outcome: z.string() }),
     );
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.outcome).toBe("handoff");
+    expect(rows[0]?.outcome).toBe("accepted-handoff");
   });
 
   it("classifies the 'approved exiting plan mode' wording as outcome=approved", async () => {
@@ -2184,21 +2184,25 @@ describe("plan_calls view and plans query", () => {
 
   it("counts handoffs separately from redirects in plan_sessions", async () => {
     const [row] = await db.query(
-      "SELECT redirect_count, handoff_count FROM plan_sessions WHERE session_id = 'handoff-session'",
-      z.object({ redirect_count: z.bigint(), handoff_count: z.bigint() }),
+      "SELECT redirect_count, accepted_handoff_count FROM plan_sessions WHERE session_id = 'handoff-session'",
+      z.object({ redirect_count: z.bigint(), accepted_handoff_count: z.bigint() }),
     );
     expect(Number(row?.redirect_count)).toBe(0);
-    expect(Number(row?.handoff_count)).toBe(1);
+    expect(Number(row?.accepted_handoff_count)).toBe(1);
   });
 
   it("tiers a handoff-only session as single, keyed on mid-session redirects", async () => {
     const rows = await db.query(
-      "SELECT session_id, replan_tier, handoff_count FROM plan_sessions",
-      z.object({ session_id: z.string(), replan_tier: z.string(), handoff_count: z.bigint() }),
+      "SELECT session_id, replan_tier, accepted_handoff_count FROM plan_sessions",
+      z.object({
+        session_id: z.string(),
+        replan_tier: z.string(),
+        accepted_handoff_count: z.bigint(),
+      }),
     );
     const handoff = rows.find((r) => r.session_id === "handoff-session");
     expect(handoff?.replan_tier).toBe("single");
-    expect(Number(handoff?.handoff_count)).toBe(1);
+    expect(Number(handoff?.accepted_handoff_count)).toBe(1);
   });
 });
 
@@ -3614,6 +3618,11 @@ describe("native harness fields", () => {
       toolDenialKind: "permission-rule",
       permissionDecision: rejectHook,
     }),
+    use("n9", "ExitPlanMode", { plan: "do it" }),
+    result("n9", "PreToolUse:ExitPlanMode hook error: Still not approved. Open in Plannotator.", {
+      toolDenialKind: "permission-rule",
+      permissionDecision: rejectHook,
+    }),
     text("n-peer", "Another Claude session sent a message: status?"),
     text("n-int", "[Request interrupted by user]"),
     use("n6", "Bash", { command: "cat log" }),
@@ -3660,6 +3669,7 @@ describe("native harness fields", () => {
       { tool_use_id: "n3", hook_name: "git:block-default-branch-commit", deny_source: "prefix" },
       { tool_use_id: "n5", hook_name: "(unmapped)", deny_source: "field" },
       { tool_use_id: "n8", hook_name: "writing:lint", deny_source: "field" },
+      { tool_use_id: "n9", hook_name: "(unmapped)", deny_source: "field" },
     ]);
   });
 
@@ -3682,12 +3692,15 @@ describe("native harness fields", () => {
     expect(rows.find((r) => r.tool_id === "n2")?.decision_source).toBe("config");
   });
 
-  it("marks a plan the gate refused as denied", async () => {
-    const [row] = await db.query(
-      "SELECT outcome FROM plan_calls WHERE host = 'native'",
-      z.object({ outcome: z.string() }),
+  it("splits a gate refusal from a plan held for review", async () => {
+    const rows = await db.query(
+      "SELECT tool_use_id, outcome FROM plan_calls WHERE host = 'native' ORDER BY tool_use_id",
+      z.object({ tool_use_id: z.string(), outcome: z.string() }),
     );
-    expect(row?.outcome).toBe("denied");
+    expect(rows).toEqual([
+      { tool_use_id: "n5", outcome: "gate" },
+      { tool_use_id: "n9", outcome: "review-pending" },
+    ]);
   });
 
   it("marks a peer session's message as system text", async () => {

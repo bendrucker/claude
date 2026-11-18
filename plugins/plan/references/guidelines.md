@@ -26,8 +26,7 @@ Define each term, type, or field the plan relies on at first use: name its sourc
 ## Plan Shape
 
 - Open with the non-negotiable conventions and a stop condition (implement, ship, end).
-- Move supporting detail to `<plan>-<topic>.md` sidecars the plan links (`decisions` is the common topic). Deferred design goes in a linked file the implementer is told not to open.
-- Plans over 10k characters are denied at presentation.
+- Deferred design goes in a linked file the implementer is told not to open.
 - Honor standing `CLAUDE.md` rules (numbered `Step`/`Phase` headings are banned, plan files included) and match the sibling layout when naming files and symbols.
 - Reference skills inline where they run. No time estimates. List out-of-scope observations separately.
 

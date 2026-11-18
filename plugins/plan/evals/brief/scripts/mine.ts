@@ -5,7 +5,6 @@ import { Command } from "@commander-js/extra-typings";
 import { z } from "zod";
 import { getDataDir, sessionDbPath } from "../../../../observability/skills/session/scripts/db";
 import { cliAdapter, runQuery } from "../../../../observability/skills/session/scripts/query";
-import { classifyResponse, type Present } from "../../../hooks/decisions";
 
 // Mine every ExitPlanMode presentation since the gate switched to deny (#1216,
 // 2026-08-15): the plan text, the response the call received, and the model that
@@ -70,6 +69,20 @@ ORDER BY p.host, p.session_id, p.timestamp
 `;
 }
 
+export interface Present {
+  host: string;
+  session_id: string;
+  session: string;
+  project_path: string | null;
+  timestamp: string;
+  seq: number;
+  chars: number;
+  plan: string;
+  plan_file: string | null;
+  model: string | null;
+  response: string | null;
+}
+
 export function toPresent(row: z.infer<typeof MinedRow>): Present {
   const plan = row.plan ?? "";
   return {
@@ -84,7 +97,6 @@ export function toPresent(row: z.infer<typeof MinedRow>): Present {
     plan_file: row.plan_file,
     model: row.model,
     response: row.response,
-    actual: classifyResponse(row.response),
   };
 }
 

@@ -8,8 +8,8 @@ import { syncCommand } from "../../../../../packages/eval-corpus/sync";
 // checkout keeps only a gitignored copy.
 
 const corpus: Corpus = {
-  prefix: "plan-gate",
-  description: "the plan gate's mined presentations and replay baseline",
+  prefix: "plan-brief",
+  description: "the plan brief eval's mined redirect cases",
   mirrors: [
     { local: join(import.meta.dirname, "..", "data"), remote: "data", filters: [DOTFILES] },
   ],

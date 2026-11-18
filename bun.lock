@@ -386,8 +386,8 @@
         "@anthropic-ai/claude-agent-sdk": "^0.3.0",
       },
     },
-    "plugins/plan/evals/gate": {
-      "name": "plan-gate-eval",
+    "plugins/plan/evals/brief": {
+      "name": "plan-brief-eval",
       "dependencies": {
         "@commander-js/extra-typings": "~15.0.0",
         "commander": "~15.0.0",
@@ -1729,7 +1729,7 @@
 
     "pkce-challenge": ["pkce-challenge@5.0.1", "", {}, "sha512-wQ0b/W4Fr01qtpHlqSqspcj3EhBvimsdh0KlHhH8HRZnMsEa0ea2fTULOXOS9ccQr3om+GcGRk4e+isrZWV8qQ=="],
 
-    "plan-gate-eval": ["plan-gate-eval@workspace:plugins/plan/evals/gate"],
+    "plan-brief-eval": ["plan-brief-eval@workspace:plugins/plan/evals/brief"],
 
     "playwright": ["playwright@1.65.1", "", { "dependencies": { "playwright-core": "1.65.1" }, "bin": { "playwright": "cli.js" } }, "sha512-vJ1FuoOrNwOKHUIVEvSt3jT1L+wjjDpwhwIstKtfvTh8XIG4FG4bIFuvNdMxi81LGfAhUgUZleVFaOLY4RIUUw=="],
 

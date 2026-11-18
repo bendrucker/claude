@@ -1008,9 +1008,11 @@ GROUP BY host, session_id, pr_number, repository, url;
 -- Outcome classification: 'approved' when the result contains "approved your plan" or
 -- "approved exiting plan mode" (the harness has shipped both wordings, and matching only
 -- the first drops the second into 'unknown', reading as an unapproved plan);
--- 'handoff' when the session's last plan was rejected and no file edits follow it in
--- that session (the user deliberately ends the session on the plan and implements
--- from the plan file in a fresh one); 'redirected' for any other rejection (the user
+-- 'review-pending' when a review hook held the plan for the user (Plannotator's "not
+-- approved, wait" stubs); 'gate' when a PreToolUse hook refused it before anyone saw it;
+-- 'accepted-handoff' when the session's last plan ended in a silent rejection with no
+-- file edits after it (the "clear context and implement" approval, which hands the plan
+-- to a fresh session); 'redirected' for any other rejection (the user
 -- typed feedback instead of clicking approve, mid-session churn); 'unknown' for
 -- anything else (cancelled, null, etc.). Full plan text is in `data->'$.input.plan'`;
 -- not materialized here because plans can be several KB each.
@@ -1024,14 +1026,12 @@ WITH calls AS (
     ci.id AS tool_use_id,
     (ci.data->>'$.input.planFilePath') AS plan_file,
     length(json_extract_string(ci.data, '$.input.plan')) AS plan_chars,
-    r.content AS result_content,
-    te.denial_kind
+    r.content AS result_content
   FROM content_items ci
   LEFT JOIN content_items r
     ON r.tool_use_id = ci.id
    AND r.host = ci.host
    AND r.type = 'tool_result'
-  LEFT JOIN tool_errors te ON te.host = ci.host AND te.tool_id = ci.id
   WHERE ci.type = 'tool_use'
     AND ci.name = 'ExitPlanMode'
 ),
@@ -1059,8 +1059,9 @@ SELECT
   CASE
     WHEN (result_content) LIKE '%approved your plan%'
       OR (result_content) LIKE '%approved exiting plan mode%'      THEN 'approved'
-    -- A PreToolUse hook (the plan gate) refused the call before anyone saw the plan.
-    WHEN denial_kind = 'permission-rule'                           THEN 'denied'
+    WHEN (result_content) LIKE '%open in Plannotator%'
+      OR (result_content) LIKE '%Still not approved%'              THEN 'review-pending'
+    WHEN starts_with(result_content, 'PreToolUse:ExitPlanMode hook error') THEN 'gate'
     WHEN (result_content) LIKE '%want to proceed%'
       OR (result_content) LIKE '%was rejected%'                    THEN
       CASE
@@ -1072,7 +1073,7 @@ SELECT
             AND tc.tool_name IN ('Write', 'Edit', 'MultiEdit', 'NotebookEdit')
             AND tc.file_path IS NOT NULL
             AND tc.timestamp > seq.timestamp
-        ) THEN 'handoff'
+        ) THEN 'accepted-handoff'
         ELSE 'redirected'
       END
     ELSE 'unknown'
@@ -1082,7 +1083,7 @@ FROM seq;
 
 -- Session-level plan aggregates: one row per session that used plan mode, with counts
 -- broken down by outcome. `redirect_count` is mid-session churn only; a terminal
--- rejection with no edits afterward lands in `handoff_count` (see plan_calls).
+-- rejection with no edits afterward lands in `accepted_handoff_count` (see plan_calls).
 CREATE OR REPLACE VIEW plan_sessions AS
 SELECT
   host,
@@ -1091,8 +1092,9 @@ SELECT
   COUNT(*)                                               AS plan_count,
   COUNT(*) FILTER (WHERE outcome = 'redirected')         AS redirect_count,
   COUNT(*) FILTER (WHERE outcome = 'approved')           AS approved_count,
-  COUNT(*) FILTER (WHERE outcome = 'handoff')            AS handoff_count,
-  COUNT(*) FILTER (WHERE outcome = 'denied')             AS denied_count,
+  COUNT(*) FILTER (WHERE outcome = 'accepted-handoff')   AS accepted_handoff_count,
+  COUNT(*) FILTER (WHERE outcome = 'gate')               AS gate_count,
+  COUNT(*) FILTER (WHERE outcome = 'review-pending')     AS review_pending_count,
   COUNT(*) FILTER (WHERE outcome = 'unknown')            AS unknown_count,
   CASE
     WHEN COUNT(*) FILTER (WHERE outcome = 'redirected') >= 2 THEN 'off-rails'

@@ -1,14 +1,50 @@
 {
-  "description": "Inject planning guidelines when a session reaches plan mode, attach delegation guidance once a plan grows large and a warning once it passes the gate's limit, gate plan re-presents, and show a plan's size against that limit",
+  "description": "Inject planning guidelines when a session reaches plan mode, attach delegation guidance once a plan grows large, and log each plan presentation",
   "modules": ["../mod/register.ts"],
   "hooks": {
-    "PreToolUse": [
+    "UserPromptSubmit": [
       {
-        "matcher": "ExitPlanMode",
         "hooks": [
           {
             "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/gate.ts\""
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/inject.ts\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/inject.ts\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "EnterPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/inject.ts\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/delegation.ts\"",
+            "if": "Write(~/.claude/plans/**)"
+          },
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/delegation.ts\"",
+            "if": "Edit(~/.claude/plans/**)"
           }
         ]
       }

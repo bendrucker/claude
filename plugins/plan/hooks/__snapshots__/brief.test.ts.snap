@@ -1,0 +1,55 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`checkBrief flags no Brief heading 1`] = `
+[
+  "The plan's first \`##\` heading must be \`## Brief\`.",
+]
+`;
+
+exports[`checkBrief flags Brief not first H2 1`] = `
+[
+  "The plan's first \`##\` heading must be \`## Brief\`.",
+]
+`;
+
+exports[`checkBrief flags two paragraphs before Decisions 1`] = `
+[
+  "The Brief has 2 paragraphs before \`Decisions:\`. Keep one.",
+]
+`;
+
+exports[`checkBrief flags no Decisions line 1`] = `
+[
+  "The Brief needs a \`Decisions:\` line followed by a list.",
+]
+`;
+
+exports[`checkBrief flags six decisions 1`] = `
+[
+  "The Brief lists 6 decisions. Keep at most 5.",
+]
+`;
+
+exports[`checkBrief flags uncited rejection 1`] = `
+[
+  "Decision 1 needs \`Rejected:\` followed by a code span or link citing why.",
+]
+`;
+
+exports[`checkBrief flags citation before the label 1`] = `
+[
+  "Decision 1 needs \`Rejected:\` followed by a code span or link citing why.",
+]
+`;
+
+exports[`checkBrief flags no Measure line 1`] = `
+[
+  "The Brief needs a \`Measure:\` line.",
+]
+`;
+
+exports[`checkBrief flags revision without Revised 1`] = `
+[
+  "This plan revises one the user rejected. Add a \`Revised:\` list to the Brief naming what changed.",
+]
+`;

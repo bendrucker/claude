@@ -1,5 +1,5 @@
 {
-  "description": "Inject planning guidelines when a session reaches plan mode, attach delegation guidance once a plan grows large, and log each plan presentation",
+  "description": "Inject planning guidelines when a session reaches plan mode, attach delegation guidance once a plan grows large, gate each presented plan on its Brief, strip the Brief's revision list on approval, and log each presentation",
   "modules": ["../mod/register.ts"],
   "hooks": {
     "UserPromptSubmit": [
@@ -45,6 +45,26 @@
             "type": "command",
             "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/delegation.ts\"",
             "if": "Edit(~/.claude/plans/**)"
+          }
+        ]
+      },
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/strip.ts\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/gate.ts\""
           }
         ]
       }

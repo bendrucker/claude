@@ -25,6 +25,9 @@ export interface Muxer {
   closePane(target: string): Promise<void>;
   // Opens an unfocused pane running `claude attach <fork>` and returns its id.
   openAttachPane(fork: string): Promise<string>;
+  // Hides the pane with its process running, and shows it again.
+  parkPane?: (target: string) => Promise<void>;
+  restorePane?: (target: string) => Promise<void>;
 }
 
 export function required(env: Env, name: string): string {

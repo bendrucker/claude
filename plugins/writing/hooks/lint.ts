@@ -30,12 +30,13 @@ async function lintEdited(
   filePath: string,
   toolResponse: unknown,
 ): Promise<{ alerts: HookAlert[]; checks: string[]; unedited: number }> {
-  const all = await lintFile(filePath);
   const scope = editScopeOf(toolResponse);
-  const edited =
-    scope === null || all.length === 0
-      ? all
-      : newAlerts(all, await valeAlerts(scope.original, { filePath }), scope.added);
+  // The pre-edit lint runs beside the saved one, since most edited files already raise an alert.
+  const [all, before] = await Promise.all([
+    lintFile(filePath),
+    scope === null ? [] : valeAlerts(scope.original, { filePath }),
+  ]);
+  const edited = scope === null || all.length === 0 ? all : newAlerts(all, before, scope.added);
   return {
     alerts: edited.map((alert) => hookAlertOf(alert, decisionOf(alert.Severity, "PostToolUse"))),
     checks: unique(all.map((alert) => alert.Check)),

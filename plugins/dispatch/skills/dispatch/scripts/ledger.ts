@@ -34,7 +34,7 @@ export type DispatchLedgerRow = z.infer<typeof DispatchRowSchema>;
 // One line per pane close or per finished background watch, so cleanup can
 // find the work a closed session left on disk. `outcome` is set on `ended` rows.
 const ClosedRowSchema = z.object({
-  event: z.enum(["closed", "ended"]),
+  event: z.enum(["closed", "parked", "ended"]),
   ts: z.string(),
   session: z.string(),
   fork: z.string().nullable(),

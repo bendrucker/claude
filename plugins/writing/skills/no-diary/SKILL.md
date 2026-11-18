@@ -1,11 +1,13 @@
 ---
 name: writing:no-diary
 description: >-
-  Cut slop, jargon, process narration, past states, session leakage, and
-  provenance from a deliverable (PR or MR body, code comment, doc, skill, review
-  comment, issue, plan) so it states the result rather than how the work
-  happened. Use when asked to de-slop, de-jargon, trim, shorten, or cut down one
-  of those, or when told that one reads as slop or runs too long.
+  Cut slop, AI voice, jargon, process narration, past states, session leakage,
+  and provenance from a deliverable (PR or MR body, commit message, code
+  comment, doc, skill, review comment, issue, plan, chat message) so it states
+  the result rather than how the work happened. Use when asked to de-slop,
+  de-jargon, polish, tighten, trim, shorten, or cut down one of those, to strip
+  AI voice from a draft before sending it, or when told that one reads as slop
+  or runs too long.
 argument-hint: "[<file> | <pr> | <section> | <text>]"
 user-invocable: true
 allowed-tools:
@@ -50,6 +52,20 @@ Judge the text as a reader who was not in the session. For a whole artifact rath
 
 The rewrite is done when every sentence passes the test and every fact a reader needs from the original survives.
 
+## Lint
+
+Lint the text with Vale before and after the rewrite. It prints one alert per line (`path:line:col:check:message`):
+
+```bash
+vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line path/to/file.md
+```
+
+Pipe a message body (PR, issue, comment) on stdin with `--ext=.prbody`, or `--ext=.commitmsg` for a commit message. Re-run until every error and warning is fixed or is wrong for this text, and apply each suggestion only where it makes the text better.
+
+## Check
+
+Once Vale is clean, answer the questions in [`references/check.md`](references/check.md) with the rewrite beside the original. Fix what fails and re-check until every answer passes.
+
 ## Removals
 
 - **Change evolution.** The shapes the work passed through. Any sentence needing an earlier draft to parse, and sequencing words such as "originally", "initially", "then", "turned out", "along the way", "ended up".
@@ -74,7 +90,7 @@ Most diary sentences sit where a useful sentence belongs. Put one of these there
 - A prompt asking for what is non-obvious to a reviewer produces the literal heading "Things that wouldn't be obvious to a reviewer". Write what the instruction asked for, never the instruction.
 - Verification results resemble narration. Keep the result and cut the framing: a row count proving a join assumption is a finding, and "I ran it and found" is not. A passing-test tally is not a result: cut "all tests pass" and test counts.
 - Cutting a rationale can strand the rule it supported. Keep one clause when the reason is what lets a reader handle an unlisted case.
-- Rewriting a user's own prose is out of scope. When the invocation frames the text as theirs ("my review comment", "my draft") or the artifact attributes it to them, cut the diary and leave the voice.
+- When the invocation frames the text as the user's own ("my review comment", "my draft") or the artifact attributes it to them, first note its core point and its voice: vocabulary, cadence, bluntness, humor, admitted uncertainty, digressions. Then make the smallest edit that clears the tells. Strip the voice entirely only when it is a model's.
 - A review comment names the code by function or behavior. Drop `file:line` paths and finding counts ("three nits") from it, the user's own comment included.
 
 ## Surfaces

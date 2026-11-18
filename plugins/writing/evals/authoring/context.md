@@ -1,0 +1,1 @@
+- Load the `writing:writing` skill before the first long-form prose you write for others (PR comments, reviews, documents, issues, Slack). One load covers the session.

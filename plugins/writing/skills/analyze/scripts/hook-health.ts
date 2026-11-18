@@ -98,7 +98,6 @@ export function summarize(entries: RunLogEntry[]): HookHealth {
   const byOutcome: Record<RunOutcome, number> = {
     silent: 0,
     context: 0,
-    ask: 0,
     deny: 0,
     "skipped-scratch": 0,
     error: 0,

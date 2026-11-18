@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 
-export const RunOutcome = z.enum(["silent", "context", "ask", "deny", "skipped-scratch", "error"]);
+export const RunOutcome = z.enum(["silent", "context", "deny", "skipped-scratch", "error"]);
 export type RunOutcome = z.infer<typeof RunOutcome>;
 
 const LEGACY_KEYS: Record<string, string> = {
@@ -48,7 +48,7 @@ export const RunLogEntry = z
   .pipe(RunLogFields);
 export type RunLogEntry = z.infer<typeof RunLogFields>;
 
-const INJECTION_OUTCOMES = new Set<RunOutcome>(["context", "ask", "deny"]);
+const INJECTION_OUTCOMES = new Set<RunOutcome>(["context", "deny"]);
 
 export function emittedOf(entry: RunLogEntry): string[] {
   if (entry.emitted) return entry.emitted;

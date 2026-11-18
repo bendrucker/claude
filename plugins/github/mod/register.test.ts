@@ -5,6 +5,7 @@ import { IDLE_CAP_MS, MAX_ATTEMPTS, POLL_MS, QUIET_MS, TICK_MS } from "./registe
 interface Recorded {
   event: string;
   ok?: boolean;
+  ms?: number;
   detail?: Readonly<Record<string, unknown>>;
 }
 
@@ -1487,6 +1488,7 @@ describe("register", () => {
 
       await $.session.start(START);
       await w.clock.settle();
+      await w.clock.advance(3_600_000);
       await $.classic.PostToolUse({
         tool_name: "Bash",
         tool_input: { command: "gh pr create --fill --head other" },
@@ -1496,6 +1498,8 @@ describe("register", () => {
       await w.clock.settle();
       expect(w.named("discover").map((e) => e.detail)).toEqual([{ origin: "created", count: 1 }]);
       expect(w.named("pr.tracked").map((e) => e.detail?.origin)).toEqual(["branch", "created"]);
+      const first = w.named("poll").find((e) => e.detail?.pr === 9);
+      expect(first?.ms).toBeLessThan(60_000);
 
       expect((await $.command.run(runOf("untrack #9"))).text).toBe("Stopped tracking #9");
       expect(w.named("pr.untracked").map((e) => e.detail?.reason)).toEqual(["command"]);

@@ -902,8 +902,15 @@ function track(
   const t = trackedOf(origin, false, ref);
   watch.others.set(ref.key, t);
   emit($, "pr.tracking", { key: ref.key, origin });
-  if (!watch.isStopped) void pollNow($, watch, t, watch.generation, 0);
+  if (!watch.isStopped) void pollFirst($, watch, t);
   return `Tracking ${name}`;
+}
+
+async function pollFirst($: EngineInterface, watch: Watch, t: Tracked): Promise<void> {
+  const generation = watch.generation;
+  const now = await $.clock.now();
+  if (watch.isStopped || watch.generation !== generation) return;
+  await pollNow($, watch, t, generation, now);
 }
 
 function untrack(

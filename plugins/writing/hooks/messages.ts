@@ -20,6 +20,11 @@ export const FIELD_FILE_GUARD = "(-F|--field)[= ][^ ]*=@";
 // not trigger file reads. Guard fragment shipped to hooks.json like the above.
 export const GIT_MESSAGE_FILE_GUARD = "git (commit|tag).* (-F|--file)[= ]";
 
+// git commit / git tag take a message from -m, alone or ending a short-flag
+// cluster such as -am. Scoped to git like the file guard.
+export const GIT_MESSAGE_GUARD = "git (commit|tag).* -[a-zA-Z]*m ";
+const GIT_MESSAGE_FLAG = /^-[a-zA-Z]*m$/;
+
 // A review command reads a JSON payload of comments from `--input <file>`.
 export const INPUT_FILE_GUARD = "--input[= ]";
 
@@ -101,11 +106,26 @@ function fieldFilePaths(command: ShellCommand): string[] {
   });
 }
 
-// `"$(cat path)"` and `"$(< path)"` read the file into the value.
-function substitutionPaths(value: ShellArg): string[] {
-  return value.substitutions.flatMap((inner) =>
-    inner.name === "cat" ? [...inner.stdin, ...literalPaths(inner.args)] : [],
-  );
+// `"$(cat path)"` and `"$(< path)"` read the file into the value, and
+// `"$(cat <<EOF ...)"` the heredoc.
+function substitutionSources(value: ShellArg): { files: string[]; inline: string[] } {
+  const cats = value.substitutions.filter((inner) => inner.name === "cat");
+  return {
+    files: cats.flatMap((inner) => [...inner.stdin, ...literalPaths(inner.args)]),
+    inline: cats.flatMap((inner) => inner.heredocs),
+  };
+}
+
+function gitMessageFlags(command: ShellCommand): string[] {
+  const clusters = command.args
+    .map((arg) => arg.text)
+    .filter((text) => GIT_MESSAGE_FLAG.test(text));
+  return [...PROSE_FLAGS, ...new Set(clusters)];
+}
+
+function messageFlags(command: ShellCommand, review: boolean): readonly string[] {
+  if (isGitMessageCommand(command)) return gitMessageFlags(command);
+  return review ? [...PROSE_FLAGS, ...REVIEW_SHORT_FLAGS] : PROSE_FLAGS;
 }
 
 interface BashSources {
@@ -119,26 +139,35 @@ function bashSources(source: string): BashSources {
   for (const command of parseShell(source)) {
     const review = isReviewCommand(command);
     sources.files.push(...literalPaths(flagValues(command, BODY_FILE_FLAGS)));
-    if (isGitMessageCommand(command)) {
-      sources.files.push(...literalPaths(flagValues(command, ["-F", "--file"])));
+    const git = isGitMessageCommand(command);
+    if (git) {
+      const messageFiles = flagValues(command, ["-F", "--file"]);
+      sources.files.push(...literalPaths(messageFiles));
+      if (messageFiles.some((value) => value.literal && value.text === "-")) {
+        sources.files.push(...command.stdin);
+        sources.inline.push(...command.heredocs);
+      }
     } else {
       sources.files.push(...fieldFilePaths(command));
     }
     if (review) {
       sources.payloads.push(...literalPaths(flagValues(command, ["--input"])));
       sources.files.push(...command.stdin);
+      sources.inline.push(...command.heredocs);
     }
-    const messages = flagValues(
-      command,
-      review ? [...PROSE_FLAGS, ...REVIEW_SHORT_FLAGS] : PROSE_FLAGS,
-    );
-    for (const value of messages) {
+    const paragraphs: string[] = [];
+    for (const value of flagValues(command, messageFlags(command, review))) {
       if (value.literal) {
-        if (value.text !== "") sources.inline.push(value.text);
+        if (value.text !== "") paragraphs.push(value.text);
       } else {
-        sources.files.push(...substitutionPaths(value));
+        const substituted = substitutionSources(value);
+        sources.files.push(...substituted.files);
+        paragraphs.push(...substituted.inline);
       }
     }
+    // git joins repeated -m values as paragraphs of one message.
+    if (git && paragraphs.length > 0) sources.inline.push(paragraphs.join("\n\n"));
+    else sources.inline.push(...paragraphs);
   }
   return sources;
 }
@@ -166,7 +195,7 @@ export async function collectText(input: PreToolUseHookInput): Promise<string[]>
   return [];
 }
 
-function messageKind(input: PreToolUseHookInput): "body" | "commit" | "review" {
+export function messageKind(input: PreToolUseHookInput): "body" | "commit" | "review" {
   const commands = parseShell(toolInputOf(input).command ?? "");
   if (commands.some(isGitMessageCommand)) return "commit";
   if (

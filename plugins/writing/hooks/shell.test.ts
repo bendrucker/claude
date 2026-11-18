@@ -50,6 +50,17 @@ describe("parseShell", () => {
       expected: [{ name: "gh", args: ["--body", 'say "hi" to $USER'], stdin: [] }],
     },
     {
+      name: "a line break inside double quotes survives",
+      source: `git commit -m "first line reached\nthrough the end"`,
+      expected: [
+        {
+          name: "git",
+          args: ["commit", "-m", "first line reached\nthrough the end"],
+          stdin: [],
+        },
+      ],
+    },
+    {
       name: "a flag inside another command's quoted argument stays an argument",
       source: `echo "--body 'x'"`,
       expected: [{ name: "echo", args: ["--body 'x'"], stdin: [] }],
@@ -66,6 +77,25 @@ describe("parseShell", () => {
     },
   ])("$name", ({ source, expected }) => {
     expect(parseShell(source).map(summarize)).toEqual(expected);
+  });
+
+  test.each<{ name: string; source: string; args: string[]; heredocs: string[] }>([
+    {
+      name: "a heredoc feeds its command's stdin",
+      source: "note post <<'EOF'\nBody $X.\nEOF",
+      args: ["post"],
+      heredocs: ["Body $X.\n"],
+    },
+    {
+      name: "a heredoc after a list feeds its last command",
+      source: "cd x && git commit -F - <<EOF\nfix: y\nEOF",
+      args: ["commit", "-F", "-"],
+      heredocs: ["fix: y\n"],
+    },
+  ])("$name", ({ source, args, heredocs }) => {
+    const command = parseShell(source).at(-1);
+    expect(command?.args.map((arg) => arg.text)).toEqual(args);
+    expect(command?.heredocs).toEqual(heredocs);
   });
 
   test.each<{ name: string; source: string; inner: Summary }>([

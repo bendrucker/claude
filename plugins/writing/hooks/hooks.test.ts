@@ -6,6 +6,7 @@ import {
   BODY_FILE_FLAGS,
   FIELD_FILE_GUARD,
   GIT_MESSAGE_FILE_GUARD,
+  GIT_MESSAGE_GUARD,
   INPUT_FILE_GUARD,
   REVIEW_STDIN_GUARD,
   MCP_PROSE_GUARD,
@@ -75,6 +76,7 @@ describe("PreToolUse gating", () => {
     expect(command).toContain(alternation);
     expect(command).toContain(FIELD_FILE_GUARD);
     expect(command).toContain(GIT_MESSAGE_FILE_GUARD);
+    expect(command).toContain(GIT_MESSAGE_GUARD);
     expect(command).toContain(INPUT_FILE_GUARD);
     expect(command).toContain(REVIEW_STDIN_GUARD);
     for (const flag of BODY_FILE_FLAGS) expect(`${flag} `).toMatch(new RegExp(alternation));
@@ -160,7 +162,21 @@ describe("inline guard behavior", () => {
     },
     { name: "unrelated stdin redirect", command: "jq . < tmp/x.json", runs: false },
     { name: "field with inline value", command: "gh api repos/x -F state=closed", runs: false },
-    { name: "git commit inline message", command: "git commit -m 'fix: parser'", runs: false },
+    { name: "git commit inline message", command: "git commit -m 'fix: parser'", runs: true },
+    { name: "git commit -m cluster", command: "git commit -am 'fix: parser'", runs: true },
+    { name: "git tag message", command: "git tag -a v1 -m 'Release.'", runs: true },
+    {
+      name: "git commit heredoc stdin",
+      command: "git commit -F - <<'EOF'\nfix: parser\nEOF",
+      runs: true,
+    },
+    {
+      name: "heredoc body substitution",
+      command: `gh pr create --body "$(cat <<'EOF'\nBody.\nEOF\n)"`,
+      runs: true,
+    },
+    { name: "-m on another CLI", command: "python -m pytest -q", runs: false },
+    { name: "git log with -m", command: "git log -m --oneline", runs: false },
     { name: "flag-free long command", command: "ls -la && bun test plugins/writing", runs: false },
   ])("dispatcher bash: $name", async ({ command, runs }) => {
     const hookCommand = findCommand("Bash", "lint");

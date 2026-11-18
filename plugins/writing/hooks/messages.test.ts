@@ -6,7 +6,14 @@ import { join } from "node:path";
 import type { PreToolUseHookInput, SyncHookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 import * as hegel from "@hegeldev/hegel";
 import * as gs from "@hegeldev/hegel/generators";
-import { collectText, isProse, lintMessages, MCP_PROSE_GUARD, pathCandidates } from "./messages";
+import {
+  collectText,
+  isProse,
+  lintMessages,
+  MCP_PROSE_GUARD,
+  messageKind,
+  pathCandidates,
+} from "./messages";
 import { report } from "./report";
 
 async function processInput(input: PreToolUseHookInput): Promise<SyncHookJSONOutput | null> {
@@ -177,7 +184,7 @@ describe("collectText", () => {
         const texts = await collectText(
           mockBash(`glab mr note create 7 <<'EOF'\nuse a < ${tmpFile} here\nEOF`),
         );
-        expect(texts).toHaveLength(0);
+        expect(texts).toEqual([`use a < ${tmpFile} here\n`]);
       });
 
       it("ignores a redirect inside quotes", async () => {
@@ -247,6 +254,108 @@ describe("collectText", () => {
       const texts = await collectText(mockBash("git status"));
       expect(texts).toHaveLength(0);
     });
+  });
+});
+
+const DASHED = "The parser \u2014 which ran last week \u2014 drops the newline.";
+
+describe("git and heredoc messages", () => {
+  test.each<{
+    name: string;
+    command: string;
+    texts: string[];
+    kind: ReturnType<typeof messageKind>;
+  }>([
+    {
+      name: "git commit -m",
+      command: "git commit -m 'fix: parser'",
+      texts: ["fix: parser"],
+      kind: "commit",
+    },
+    {
+      name: "repeated -m joined as paragraphs",
+      command: `git commit -m "fix: parser" -m "Keeps the line break." -m "Second paragraph."`,
+      texts: ["fix: parser\n\nKeeps the line break.\n\nSecond paragraph."],
+      kind: "commit",
+    },
+    {
+      name: "-m ending a short-flag cluster",
+      command: `git commit --amend -am "fix: parser"`,
+      texts: ["fix: parser"],
+      kind: "commit",
+    },
+    {
+      name: "a multi-line -m",
+      command: `git commit -m "fix: parser\n\nThe break\nsurvives."`,
+      texts: ["fix: parser\n\nThe break\nsurvives."],
+      kind: "commit",
+    },
+    {
+      name: "git tag -m",
+      command: `git tag -a v1.2.0 -m "Release notes."`,
+      texts: ["Release notes."],
+      kind: "commit",
+    },
+    {
+      name: "heredoc --body",
+      command: `gh pr create --title "Fix parser" --body "$(cat <<'EOF'\nBody text.\n\nMore.\nEOF\n)"`,
+      texts: ["Fix parser", "Body text.\n\nMore.\n"],
+      kind: "body",
+    },
+    {
+      name: "heredoc -m",
+      command: `git commit -m "$(cat <<'EOF'\nfix: parser\n\nBody.\nEOF\n)"`,
+      texts: ["fix: parser\n\nBody.\n"],
+      kind: "commit",
+    },
+    {
+      name: "git commit -F - with a heredoc",
+      command: `cd repo && git commit -F - <<EOF\nfix: parser\n\nBody for $USER.\nEOF`,
+      texts: ["fix: parser\n\nBody for $USER.\n"],
+      kind: "commit",
+    },
+    {
+      name: "review command heredoc stdin",
+      command: `glab mr note create 7 <<'EOF'\nThe retry swallows the error.\nEOF`,
+      texts: ["The retry swallows the error.\n"],
+      kind: "review",
+    },
+    { name: "-m on another CLI", command: "python -m pytest -q", texts: [], kind: "body" },
+    {
+      name: "a heredoc into a file",
+      command: `cat <<'EOF' > notes.md\nNot a message.\nEOF`,
+      texts: [],
+      kind: "body",
+    },
+    {
+      name: "a heredoc without -F -",
+      command: `git commit -m "fix: parser" <<'EOF'\nNot read.\nEOF`,
+      texts: ["fix: parser"],
+      kind: "commit",
+    },
+  ])("$name", async ({ command, texts, kind }) => {
+    expect(await collectText(mockBash(command))).toEqual(texts);
+    expect(messageKind(mockBash(command))).toBe(kind);
+  });
+
+  test.each<{ name: string; command: string }>([
+    { name: "git commit -m", command: `git commit -m "fix: parser" -m "${DASHED}"` },
+    { name: "git tag -m", command: `git tag -a v1 -m "${DASHED}"` },
+    { name: "heredoc --body", command: `gh pr create --body "$(cat <<'EOF'\n${DASHED}\nEOF\n)"` },
+    { name: "heredoc -m", command: `git commit -m "$(cat <<'EOF'\nfix: x\n\n${DASHED}\nEOF\n)"` },
+    { name: "git commit -F -", command: `git commit -F - <<'EOF'\nfix: x\n\n${DASHED}\nEOF` },
+  ])("denies an error-level phrase in $name", async ({ command }) => {
+    expect(decisionOf(await processInput(mockBash(command))).decision).toBe("deny");
+  });
+
+  test.each<string>([
+    "fix: parser",
+    "feat(writing): lint git commit -m messages",
+    "chore: bump vale to 3.9",
+    "docs: fix typo in README",
+    "refactor!: drop the legacy flag",
+  ])("a short subject stays silent: %s", async (subject) => {
+    expect(await processInput(mockBash(`git commit -m "${subject}"`))).toBeNull();
   });
 });
 

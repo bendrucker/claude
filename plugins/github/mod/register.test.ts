@@ -1351,6 +1351,41 @@ describe("register", () => {
       expect(await w.shown($)).toBe("#7 ci      │ \u{f444} 0/1 · #9 author  │ \u{f49e}");
     });
 
+    test("the open branch PR leaves its number to the native badge", async ($, on) => {
+      const world: World = {
+        branch: "topic",
+        gh: GH_OK,
+        view: pr("SUCCESS"),
+        byNumber: { [VIEW_9]: other("SUCCESS") },
+      };
+      const w = worldOf(on, world);
+      const drawn = async () => {
+        const hint = await $.ui.mount({
+          plugin: "github",
+          surface: "terminal",
+          component: "PromptHint",
+          props: HINT,
+          viewport: { columns: 200, rows: 40 },
+        });
+        const texts = (await hint.findAll({ type: "Text" })).map((t) => t.text);
+        await hint.unmount();
+        return texts.join(" ");
+      };
+
+      await $.session.start(START);
+      await w.clock.settle();
+      await $.command.run(runOf(`track ${URL_9}`));
+      await w.clock.settle();
+      const open = await drawn();
+      expect(open).toContain("#9");
+      expect(open).not.toContain("#7");
+      expect(open).toContain("\u{f49e}");
+
+      world.view = { ...pr("SUCCESS"), state: "MERGED" };
+      await w.clock.advance(POLL_MS.settled);
+      expect(await drawn()).toContain("#7");
+    });
+
     test("a failure on a PR away from the branch names it", async ($, on) => {
       const world: World = {
         branch: "topic",

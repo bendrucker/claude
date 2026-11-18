@@ -10,7 +10,7 @@ import { artifactsPath, casePath, listCases, resultPath, tracePath } from "./lay
 import { eachRun, readResult } from "./result";
 import { stage } from "./stage";
 import { casePlugins, listedPlugins, readSuite, type SuiteFile, withDependencies } from "./suite";
-import { wrap } from "./wrap";
+import { contextHooks, wrap } from "./wrap";
 
 export interface Staged {
   target: string;
@@ -58,6 +58,28 @@ async function addCollector(evals: string, collect: string[]): Promise<void> {
       const path = casePath(evals, name);
       const doc = parseDocument(await Bun.file(path).text());
       doc.addIn(["plugins"], "./collect");
+      await Bun.write(path, doc.toString());
+    }),
+  );
+}
+
+/** Adds a plugin to each staged case whose SessionStart hook injects the suite's context files. */
+async function addContext(repo: string, evals: string, context: string[]): Promise<void> {
+  if (context.length === 0) return;
+  const names = await listCases(evals);
+  await Promise.all(
+    names.map(async (name) => {
+      const plugin = join(evals, name, "context");
+      await Bun.write(join(plugin, ".claude-plugin/plugin.json"), '{"name":"context"}');
+      await Bun.write(join(plugin, "hooks/hooks.json"), JSON.stringify(contextHooks));
+      await Promise.all(
+        context.map((p) =>
+          Bun.write(join(plugin, "context", basename(p)), Bun.file(join(repo, p))),
+        ),
+      );
+      const path = casePath(evals, name);
+      const doc = parseDocument(await Bun.file(path).text());
+      doc.addIn(["plugins"], "./context");
       await Bun.write(path, doc.toString());
     }),
   );
@@ -178,6 +200,8 @@ export async function prepare(
   const config = await readSuite(join(repo, suite));
   if (remove.length > 0 && config.wrap !== undefined)
     throw new Error("--remove applies to suites that load plugins, not wrapped suites");
+  if (config.context.length > 0 && config.wrap !== undefined)
+    throw new Error("a wrapped suite lists its context under wrap.context");
   const root = mkdtempSync(join(tmpdir(), "hill-climb-"));
   const staged =
     config.wrap === undefined
@@ -186,6 +210,7 @@ export async function prepare(
   await stage(repo, undefined, config.stage, root);
   await shareGraders(join(staged.target, staged.evalDir), config.graders);
   await addCollector(join(staged.target, staged.evalDir), config.collect);
+  await addContext(repo, join(staged.target, staged.evalDir), config.context);
   return staged;
 }
 

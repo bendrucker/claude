@@ -26,6 +26,7 @@ This directory is the generic layer: the native suite runner and the report that
 allow_tools: ["Bash(git:*)"]    # gated tools passed to --allow-tools
 judge_model: claude-sonnet-5-5
 stage: [packages/eval-stubs]    # repo paths a scaffold reads, staged from the working tree
+context: [user/CLAUDE.md]       # context injected beside the plugins the cases load, from the working tree
 wrap:                           # omit when the cases load a plugin
   skills: [user/skills/tdd]
   context: [user/rules/typescript.md]
@@ -40,7 +41,7 @@ A suite that generates its cases can keep them out of git by naming its generato
 
 A grader two or more cases repeat byte for byte lives once in `<suite>/graders/`, joined by globs (`!quiet-*` for every case but the quiet ones) or an explicit case list. `run.ts` copies it into each matching case as it stages the suite, skipping a case that holds a grader by that name, and `check.ts` and `regrade.ts` read the same merged set. A bare `claude plugin eval` run never sees these graders. `check.ts` names any case grader that shadows one `suite.yaml` shares in.
 
-The runner ignores a `CLAUDE.md` or `.claude/rules` in the scaffolded working directory, so wrapped context reaches the session through a `SessionStart` hook instead. It injects every context file whatever its `paths:` frontmatter says. A wrapped skill keeps the files it links to beside it, such as a sibling skill's reference, and loses `disable-model-invocation`. A user-invoked skill can load from a natural-language prompt on the with arm.
+The runner ignores a `CLAUDE.md` or `.claude/rules` in the scaffolded working directory, so wrapped context reaches the session through a `SessionStart` hook instead. A suite whose cases load plugins lists its context at the top level instead, and each case gets a plugin carrying the same hook. The without arm drops it along with the plugins. It injects every context file whatever its `paths:` frontmatter says. A wrapped skill keeps the files it links to beside it, such as a sibling skill's reference, and loses `disable-model-invocation`. A user-invoked skill can load from a natural-language prompt on the with arm.
 
 ### Workarounds
 

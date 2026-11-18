@@ -20,6 +20,8 @@ export const SuiteFile = z.object({
   stage: z.array(z.string()).default([]),
   /** Paths in each run's working directory copied to `<output>/artifacts/<run>/`, for a `score` script. */
   collect: z.array(z.string()).default([]),
+  /** Repo paths injected at session start beside the plugins the cases load, read from the working tree. */
+  context: z.array(z.string()).default([]),
   /** Artifacts that are not a plugin, wrapped into one by `wrap.ts`. */
   wrap: z
     .object({
@@ -146,7 +148,7 @@ async function skillSiblings(repo: string, skill: string): Promise<string[]> {
 
 /** Repo paths a suite's scores depend on: the suite, the plugins its cases load, and what it wraps. */
 export async function suiteInputs(repo: string, suite: string): Promise<string[]> {
-  const { wrap } = await readSuite(join(repo, suite));
+  const { wrap, context } = await readSuite(join(repo, suite));
   const wrapped =
     wrap === undefined
       ? []
@@ -156,7 +158,7 @@ export async function suiteInputs(repo: string, suite: string): Promise<string[]
           ...wrap.agents,
           ...wrap.context,
         ];
-  return [...new Set([suite, ...(await casePlugins(repo, suite)), ...wrapped])];
+  return [...new Set([suite, ...(await casePlugins(repo, suite)), ...wrapped, ...context])];
 }
 
 const within = (path: string, input: string) => path === input || path.startsWith(`${input}/`);

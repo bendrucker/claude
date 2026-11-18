@@ -25,7 +25,7 @@ export interface WrapOptions {
 
 // The runner ignores a CLAUDE.md or .claude/rules in the scaffolded working directory,
 // so context reaches the session the way a plugin can deliver it: a SessionStart hook.
-const hooks = {
+export const contextHooks = {
   hooks: {
     SessionStart: [
       {
@@ -135,7 +135,7 @@ export async function wrap(options: WrapOptions): Promise<string> {
   await copy(options.agents, "agents");
   await copy(options.context, "context");
   if (options.context.length > 0) {
-    await Bun.write(join(out, "hooks/hooks.json"), JSON.stringify(hooks, null, 2));
+    await Bun.write(join(out, "hooks/hooks.json"), JSON.stringify(contextHooks, null, 2));
   }
   if (options.evals !== undefined)
     await $`cp -R ${join(staged, options.evals)} ${join(out, "evals")}`;

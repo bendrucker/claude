@@ -40,6 +40,8 @@ const files: Record<string, string> = {
   "evals/user/tdd/suite.yaml":
     'wrap:\n  skills: [user/skills/tdd]\n  context: [user/rules/ts.md]\ncollect: [out.ts, "it\'s/nested", never.ts]\n',
   "evals/user/tdd/one/case.yaml": "plugins: [../..]\n",
+  "plugins/p/evals/ctx/suite.yaml": "context: [user/rules/ts.md]\n",
+  "plugins/p/evals/ctx/one/case.yaml": "plugins: [../../..]\n",
 };
 
 beforeAll(async () => {
@@ -55,6 +57,7 @@ beforeAll(async () => {
     Bun.write(join(repo, "plugins/p/evals/suite/one/prompt.md"), "working prompt"),
     Bun.write(join(repo, "user/skills/tdd/SKILL.md"), "working user skill"),
     Bun.write(join(repo, "packages/stubs/install.sh"), "working stub"),
+    Bun.write(join(repo, "user/rules/ts.md"), "working rule"),
   ]);
 });
 
@@ -141,6 +144,37 @@ describe("prepare", () => {
     expect(await read(join(target, "context/ts.md"))).toBe("committed rule");
     expect(await read(join(target, "hooks/hooks.json"))).toContain("SessionStart");
     expect(await Bun.file(join(target, "evals/one/case.yaml")).exists()).toBe(true);
+  });
+
+  test("adds a context plugin whose hook injects the working-tree context files", async () => {
+    const { target, evalDir } = await prepare(repo, "plugins/p/evals/ctx", "HEAD");
+    const caseDir = join(target, evalDir, "one");
+    expect(await read(join(caseDir, "case.yaml"))).toBe("plugins: [ ../../.., ./context ]\n");
+    const Hooks = z.object({
+      hooks: z.object({
+        SessionStart: z.tuple([z.object({ hooks: z.tuple([z.object({ command: z.string() })]) })]),
+      }),
+    });
+    const hooks = Hooks.parse(await Bun.file(join(caseDir, "context/hooks/hooks.json")).json());
+    const command = hooks.hooks.SessionStart[0].hooks[0].command;
+    const stdout = await $`bash -c ${command}`
+      .env({ ...process.env, CLAUDE_PLUGIN_ROOT: join(caseDir, "context") })
+      .text();
+    expect(z.unknown().parse(JSON.parse(stdout))).toEqual({
+      hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "working rule" },
+    });
+  });
+
+  test("rejects top-level context on a wrapped suite", async () => {
+    await Bun.write(
+      join(repo, "evals/user/both/suite.yaml"),
+      "wrap: {}\ncontext: [user/rules/ts.md]\n",
+    );
+    await Bun.write(join(repo, "evals/user/both/one/case.yaml"), "plugins: [../..]\n");
+    const failure = await prepare(repo, "evals/user/both", undefined).catch(
+      (error: unknown) => error,
+    );
+    expect(String(failure)).toContain("wrap.context");
   });
 
   test("adds a collector whose hook copies the collect paths into the config dir", async () => {

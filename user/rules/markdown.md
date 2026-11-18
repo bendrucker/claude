@@ -6,5 +6,5 @@ paths:
 
 # Markdown
 
-- Use a `####` (or deeper) heading for a labeled subsection instead of a `**Label**:` line.
+- Use a heading one level below its parent for a labeled subsection instead of a `**Label**:` line.
 - Delete any section that exists only to fill a template.

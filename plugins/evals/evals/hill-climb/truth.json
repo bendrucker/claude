@@ -395,6 +395,20 @@
           "(flat|held|hold|unchanged|no regress|stable)[^\\n]{0,100}guards?"
         ]
       ]
+    },
+    {
+      "id": "holdout-unstarred-fall",
+      "expected": "reject",
+      "note": "The dev target starred up, and the final holdout score fell below the base's by more than the spread between the base's two holdout replicates. The fall did not star, but a fall past that spread fails the climb.",
+      "reason": [
+        [
+          "(fell|fall|drop|below|lower|down|worse|declin)[^\\n]{0,120}(spread|replicates?)",
+          "(spread|replicates?)[^\\n]{0,160}(fell|fall|drop|below|lower|down|worse|declin|past|beyond|exceed)",
+          "(fall|fell|drop)[^\\n]{0,120}(not|n't|un|without)\\s?(a\\s)?star",
+          "(not|n't|no|without)\\s(a\\s)?star[^\\n]{0,120}(fall|fell|drop|fail)",
+          "unstarred"
+        ]
+      ]
     }
   ]
 }

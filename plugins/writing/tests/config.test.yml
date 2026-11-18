@@ -1,26 +1,39 @@
-- name: the splice rule fires in markdown
+- name: flags a single splice in markdown
   format: .md
   input: &spliced |
-    The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.
-  contains: [Writing.SemicolonSplice]
-- name: the splice rule is off in code comments
-  format: .ts
-  input: |
-    // The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed.
-    const x = 1;
-  contains: [Writing.CommentSplice]
-  absent: Writing.SemicolonSplice
-- name: the splice rule is off in a message
-  format: .prbody
-  input: *spliced
-  absent: Writing.SemicolonSplice
-
-- name: a single semicolon in prose is left to the per-semicolon rule
-  format: .md
-  input: |
     The cache starts cold; the first request fills it.
   contains: [ai-tells.SemicolonUsage]
-  absent: Writing.SemicolonSplice
+- name: flags a splice in a message
+  format: .prbody
+  input: *spliced
+  contains: [ai-tells.SemicolonUsage]
+- name: leaves code-comment splices to CommentSplice
+  about: SemicolonUsage also fired on semicolons inside quoted attributes in comments.
+  format: .ts
+  input: |
+    // The cache starts cold; the first request fills it.
+    const x = 1;
+  contains: [Writing.CommentSplice]
+  absent: ai-tells.SemicolonUsage
+
+- name: allows a double hyphen in an argument hint
+  about: DoubleHyphen fired on CLI flags in frontmatter, which the model cannot rewrite.
+  format: .md
+  input: |
+    ---
+    argument-hint: "[--base <ref>] [--force]"
+    ---
+
+    Pass --force to skip the check.
+  absent: ai-tells.DoubleHyphen
+
+- name: flags a consequence clause once
+  about: ConsequenceClause owns the determiner-subject ", so" that ConsequenceChain also reported.
+  format: .md
+  input: |
+    The worker drains the queue, so the scheduler skips the next tick.
+  want: |
+    1:28:ai-tells.ConsequenceClause:AI consequence clause: ', so the scheduler skips'. End the sentence before the comma and state the effect as its own claim.
 
 - name: a spliced code comment fires
   format: .ts
@@ -47,7 +60,7 @@
     :root { --bg: #12151b; --surface: #1a1e26; --fg: #e4e8ef; --muted: #98a1b0; --line: #2c323d;
       --accent: #6c9cf0; --accent-fg: #0d1117; --chip: #232934; --good: #4cc27f; color-scheme: dark; }
     </style>
-  absent: [Writing.CommentSplice, Writing.SemicolonSplice, ai-tells.SemicolonUsage]
+  absent: [Writing.CommentSplice, ai-tells.SemicolonUsage]
 - name: an SVG style block and style attribute are not prose
   format: .svg
   input: |
@@ -66,7 +79,7 @@
   input: |
     /* The cache starts cold; the first request fills it. */
     .cap { font-size: 12px; }
-  contains: [Writing.CommentSplice, ai-tells.SemicolonUsage]
+  contains: [Writing.CommentSplice]
 
 - name: a trope in a code comment fires
   format: .ts
@@ -102,11 +115,11 @@
   input: |
     Otherwise, this looks right.
   absent: Writing.Salutation
-- name: a negated noun fires in a commit message
+- name: a consequence clause fires in a commit message
   format: .commitmsg
   input: |
     The handler reads the cache, so the event costs no extra query.
-  contains: [Writing.NoNegation]
+  contains: [ai-tells.ConsequenceClause]
 
 - name: the section template on a short PR body fires
   format: .prbody

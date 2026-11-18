@@ -676,12 +676,12 @@ describe("negated nouns", () => {
     {
       name: "a thread reply",
       input: mockMcp("mcp__hearthbot__post_message", {
-        text: "The sweep ran, and I filed nothing.",
+        text: "The sweep ran, so the queue clears on its own.",
       }),
     },
   ])("warns on $name without denying it", async ({ input }) => {
     const { decision, context } = decisionOf(await processInput(input));
     expect(decision).toBeUndefined();
-    expect(context).toContain("Writing.NoNegation");
+    expect(context).toContain("ai-tells.ConsequenceClause");
   });
 });

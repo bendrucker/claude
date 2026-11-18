@@ -512,13 +512,13 @@ describe("labConfig", () => {
 
   test("wideConfig fires a check the shipped config turns off, and the shipped config does not", async () => {
     await Bun.write(
-      join(root, "hedge.md"),
-      "# Doc\n\nIt is important to note that the box holds books.\n",
+      join(root, "dash.md"),
+      "# Doc\n\nThe box holds books -- and the shelf holds the box.\n",
     );
     const off = (hits: Hit[]) =>
-      hits.filter((h) => h.check === "ai-tells.HedgingPhrases").map((h) => h.match);
-    const own = await lintFiles("writing", PLUGINS.writing, ["hedge.md"], root);
-    const wide = await lintFiles("writing", await wideConfig(PLUGINS.writing), ["hedge.md"], root);
+      hits.filter((h) => h.check === "ai-tells.DoubleHyphen").map((h) => h.match);
+    const own = await lintFiles("writing", PLUGINS.writing, ["dash.md"], root);
+    const wide = await lintFiles("writing", await wideConfig(PLUGINS.writing), ["dash.md"], root);
     expect(off(own)).toEqual([]);
     expect(off(wide).length).toBeGreaterThan(0);
   });

@@ -123,7 +123,7 @@ Plugin scripts that cannot run sandboxed each get a shim in the plugin's `bin/` 
 
 - `claude-dispatch`, `claude-dispatch-close`: create worktrees through `wt`, write the new worktree's `.claude/settings.local.json`, append the ledger under `~/.claude/plugins`, and start or resume sessions through the `claude` daemon.
 - `session-index-pull`: syncs imported transcripts from S3 through the `aws` CLI. A sandboxed run would need an upload-capable S3 host.
-- `prompt-scan-edit`: the `prompting:scan` audit writes skills under `.claude/skills`, which the harness denies.
+- `prompt-scan-edit`: `prompting:audit` writes skills under `.claude/skills`, which the harness denies.
 - `jxa-run`, `things-url`, `things-inbox`, `things-reorder`, `xcall-run`: Apple Events and Launch Services handoff, the same reach as `osascript` and `open`.
 
 **Drop an entry** when its shim is deleted or renamed, or when a sandboxed run of it succeeds. **Retire the approach** if auto mode stops refusing hook-changed input, since a marker hook would then cover new scripts without a settings edit.

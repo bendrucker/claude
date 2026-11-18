@@ -1,2 +1,2 @@
 #!/bin/sh
-exec bun "$(dirname "$0")/../skills/scan/scripts/edit.ts" "$@"
+exec bun "$(dirname "$0")/../skills/audit/scripts/edit.ts" "$@"

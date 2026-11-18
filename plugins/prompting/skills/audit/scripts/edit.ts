@@ -19,7 +19,7 @@ import {
   type Unverified,
   writeJsonl,
 } from "./audit";
-import { AGENT_FACING } from "./scan";
+import { AGENT_FACING } from "../../scan/scripts/scan";
 
 /**
  * Throws unless every file is an agent-facing document inside the repository, since this

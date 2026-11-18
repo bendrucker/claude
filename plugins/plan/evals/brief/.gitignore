@@ -1,2 +1,5 @@
-# Mined presentations and the replay baseline carry work-host plan text and never land in this repo.
+# Mined cases and the replay baseline carry work-host plan text and never land in this repo.
 data/
+case-*/
+# claude plugin eval run output, whose traces carry session text.
+results/

@@ -1,0 +1,4 @@
+allow_tools: [Write]
+judge_model: claude-fable-5-2
+wrap:
+  context: [plugins/plan/references/guidelines.md]

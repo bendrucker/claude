@@ -1,0 +1,1 @@
+.local-only marks this suite as never running in CI: its cases carry work-host session text.

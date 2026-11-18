@@ -232,6 +232,11 @@ function seenOf(watch: Watch): Seen {
   };
 }
 
+// Claude Code's own footer badge links the branch's open github.com PR.
+function isBadged(t: Tracked, s: Snapshot): boolean {
+  return t.isBranch && s.state === "OPEN" && new URL(s.url).host === "github.com";
+}
+
 function render($: EngineInterface, watch: Watch) {
   const busy = isBusy(watch);
   const shown = shownOf(watch);
@@ -249,7 +254,7 @@ function render($: EngineInterface, watch: Watch) {
         parts,
         needsAuthor,
         isBranch: t.isBranch,
-        isLabelled: true,
+        isLabelled: !isBadged(t, s),
       },
     ];
   });

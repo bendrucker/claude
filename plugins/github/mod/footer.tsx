@@ -177,10 +177,6 @@ export function budgetOf(columns: number, isWorking: boolean): number {
   return columns - ENGINE_COLUMNS[isWorking ? "working" : "idle"] - 3;
 }
 
-// The native badge already links the branch PR as `#n` in the hint.
-const isBadged = (hint: string, chip: Chip) =>
-  chip.isBranch && new RegExp(`#${chip.pr}(?!\\d)`).test(hint);
-
 /** The engine's line, then the PRs fitted to what is left of the row. */
 export function drawFooter(
   $: EngineInterface,
@@ -193,10 +189,8 @@ export function drawFooter(
   // oxlint-disable-next-line unicorn/consistent-function-scoping
   const spaced = (parts: RenderElement[], gap: string) =>
     parts.flatMap((part, index) => (index === 0 ? [part] : [<Text>{gap}</Text>, part]));
-  const { hint } = e.props;
-  const labelled = chips.map((chip) => ({ ...chip, isLabelled: !isBadged(hint, chip) }));
   const budget = budgetOf(e.viewport?.columns ?? 0, e.props.isWorking);
-  const fitted = fit(labelled, budget);
+  const fitted = fit(chips, budget);
   // oxlint-disable-next-line unicorn/consistent-function-scoping
   const tinted = (part: Part) => <Text color={part.tone}>{part.text}</Text>;
   const groups =

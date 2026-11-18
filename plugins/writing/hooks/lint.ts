@@ -7,7 +7,6 @@ import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detect
 import { lintFile, valeAlerts } from "../detection/vale";
 import { editScopeOf, newAlerts } from "./edit-scope";
 import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
-import { lintMessages } from "./messages";
 import { decisionOf, hookAlertOf, type HookAlert, report } from "./report";
 import { appendRunLog, type RunLogEntry, type RunOutcome } from "./run-log";
 import { recentlyFired, recordFired } from "./session-state";
@@ -86,6 +85,8 @@ export async function dispatch(
   let unedited = 0;
   try {
     if (input.hook_event_name === "PreToolUse") {
+      // The message linter loads tree-sitter, which a file edit never needs.
+      const { lintMessages } = await import("./messages");
       alerts = await lintMessages(input);
       checks = unique(alerts.map((alert) => alert.check));
     } else if (hasPath) {

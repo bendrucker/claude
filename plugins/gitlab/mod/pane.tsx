@@ -5,7 +5,6 @@ export const PANE = "mr";
 export const MUTED = "muted";
 export const REFRESH = "refresh";
 
-/** What the watch holds for one MR that the pane shows. */
 export interface Seen {
   snapshot: Snapshot | undefined;
   none: string | undefined;
@@ -16,7 +15,6 @@ export interface Seen {
   isBranch: boolean;
 }
 
-/** Every tracked MR, in the watch's order, and those that ended this session. */
 export interface View {
   mrs: Seen[];
   ended: Snapshot[];
@@ -24,7 +22,6 @@ export interface View {
   isBusy: boolean;
 }
 
-/** The MR drawn in full: the first that needs its author, else the branch MR, else the first. */
 export function focusOf(mrs: readonly Seen[], isBusy: boolean): Seen | undefined {
   const shown = mrs.filter((seen) => seen.snapshot !== undefined);
   const needsAuthor = (seen: Seen) => {
@@ -126,7 +123,6 @@ function mergeParts(s: Snapshot): Part[] {
   return parts.length > 0 ? parts : [{ text: "manual", tone: "subtle" }];
 }
 
-/** Draws what the watcher last read for each MR, and how it is polling. */
 export function drawPane(
   $: EngineInterface,
   e: RenderInput,

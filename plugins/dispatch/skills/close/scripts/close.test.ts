@@ -10,7 +10,15 @@ import {
   ledgerPath,
   readLedger,
 } from "../../dispatch/scripts/ledger";
-import { attachSession, closeSession, createProgram, type Deps, defaultDeps } from "./close";
+import {
+  attachSession,
+  closeSession,
+  createProgram,
+  type Deps,
+  defaultDeps,
+  parkSession,
+  restoreSession,
+} from "./close";
 import { CloseError } from "./errors";
 import { hostMuxer } from "./muxers";
 import { recordEnded, resumerLog, resumeSession } from "./resume";
@@ -450,6 +458,150 @@ describe("closeSession --target", () => {
   });
 });
 
+function windowWith(...layers: { id: string; kind: string; state?: string; blocks: string[] }[]) {
+  return ok(
+    JSON.stringify({
+      window_id: "window:1",
+      layers: layers.map((layer) => ({
+        layer_id: layer.id,
+        kind: layer.kind,
+        state: layer.state ?? null,
+        blocks: layer.blocks.map((block_id) => ({ block_id })),
+      })),
+    }),
+  );
+}
+
+const REX_LAYERS = (window: CommandResult) => ({
+  "rex block inspect": ok(JSON.stringify({ block: { window_id: "window:1" } })),
+  "rex window inspect": window,
+  "rex api call -s main session.float_block": ok('{"layer_id":"layer:float","revision":3}'),
+  "rex api call -s main session.set_layer_state": ok('{"revision":4}'),
+});
+
+const PARK = { session: "sess-1", pr: "https://github.com/o/r/pull/1", summary: "done" };
+
+describe("parkSession", () => {
+  test("rex floats a tiled block, minimizes its layer, and records a parked row", async () => {
+    const { deps, calls, dataDir } = makeDeps(
+      REX_LAYERS(windowWith({ id: "layer:tiled", kind: "tiled", blocks: ["block:7", "block:8"] })),
+      REX_ENV,
+    );
+    const report = await parkSession(PARK, deps);
+    expect(argvs(calls).filter((line) => line.startsWith("rex"))).toEqual([
+      "rex block inspect -s main block:7 --json",
+      "rex window inspect -s main window:1 --json",
+      'rex api call -s main session.float_block {"block_id":"block:7","bounds":[0.2,0.15,0.6,0.7]}',
+      'rex api call -s main session.set_layer_state {"layer_id":"layer:float","state":"minimized"}',
+    ]);
+    expect(report.row).toMatchObject({
+      event: "parked",
+      session: "sess-1",
+      pr: PARK.pr,
+      mux: "rex",
+      target: "block:7",
+      fork: null,
+    });
+    expect(readLedger(dataDir)).toEqual([report.row]);
+  });
+
+  test("a block already floating minimizes its own layer without floating again", async () => {
+    const { deps, calls } = makeDeps(
+      REX_LAYERS(
+        windowWith(
+          { id: "layer:tiled", kind: "tiled", blocks: ["block:8"] },
+          { id: "layer:mine", kind: "floating", blocks: ["block:7"] },
+        ),
+      ),
+      REX_ENV,
+    );
+    await parkSession(PARK, deps);
+    const lines = argvs(calls).filter((line) => line.startsWith("rex api call"));
+    expect(lines).toEqual([
+      'rex api call -s main session.set_layer_state {"layer_id":"layer:mine","state":"minimized"}',
+    ]);
+  });
+
+  test("the only visible pane in its tab is refused before anything moves", async () => {
+    const { deps, calls, dataDir } = makeDeps(
+      REX_LAYERS(
+        windowWith(
+          { id: "layer:tiled", kind: "tiled", blocks: ["block:7"] },
+          { id: "layer:hidden", kind: "floating", state: "minimized", blocks: ["block:9"] },
+        ),
+      ),
+      REX_ENV,
+    );
+    const error = await failureOf(parkSession(PARK, deps));
+    expect(error.exitCode).toBe(2);
+    expect(error.message).toContain("close --handoff");
+    expect(argvs(calls).some((line) => line.startsWith("rex api call"))).toBe(false);
+    expect(readLedger(dataDir)).toEqual([]);
+  });
+
+  test("a failed minimize surfaces Rex's error and records nothing", async () => {
+    const { deps, dataDir } = makeDeps(
+      {
+        ...REX_LAYERS(
+          windowWith({ id: "layer:tiled", kind: "tiled", blocks: ["block:7", "block:8"] }),
+        ),
+        "rex api call -s main session.set_layer_state": fail("bad_request: last visible pane"),
+      },
+      REX_ENV,
+    );
+    expect((await failureOf(parkSession(PARK, deps))).message).toContain("last visible pane");
+    expect(readLedger(dataDir)).toEqual([]);
+  });
+
+  test("herdr is refused with a pointer to close --handoff", async () => {
+    const { deps, calls, dataDir } = makeDeps({}, HERDR_ENV);
+    const error = await failureOf(parkSession(PARK, deps));
+    expect(error.exitCode).toBe(2);
+    expect(error.message).toContain("close --handoff");
+    expect(calls).toEqual([]);
+    expect(readLedger(dataDir)).toEqual([]);
+  });
+
+  test("the command prints the report and the session keeps running", async () => {
+    const { deps, out, calls } = makeDeps(
+      REX_LAYERS(windowWith({ id: "layer:tiled", kind: "tiled", blocks: ["block:7", "block:8"] })),
+      REX_ENV,
+    );
+    await createProgram(deps).parseAsync(
+      ["park", "--session", PARK.session, "--pr", PARK.pr, "--summary", PARK.summary],
+      { from: "user" },
+    );
+    expect(JSON.parse(out[0] ?? "")).toMatchObject({ row: { event: "parked" } });
+    expect(argvs(calls).some((line) => line.startsWith("rex block close"))).toBe(false);
+  });
+});
+
+describe("restoreSession", () => {
+  test("sets the block's floating layer normal without focus", async () => {
+    const { deps, calls } = makeDeps(
+      REX_LAYERS(
+        windowWith(
+          { id: "layer:tiled", kind: "tiled", blocks: ["block:8"] },
+          { id: "layer:mine", kind: "floating", state: "minimized", blocks: ["block:7"] },
+        ),
+      ),
+      REX_ENV,
+    );
+    expect(await restoreSession(deps)).toEqual({ mux: "rex", target: "block:7" });
+    expect(argvs(calls).at(-1)).toBe(
+      'rex api call -s main session.set_layer_state {"layer_id":"layer:mine","state":"normal","focus":false}',
+    );
+  });
+
+  test("a tiled block is not parked", async () => {
+    const { deps } = makeDeps(
+      REX_LAYERS(windowWith({ id: "layer:tiled", kind: "tiled", blocks: ["block:7"] })),
+      REX_ENV,
+    );
+    expect((await failureOf(restoreSession(deps))).exitCode).toBe(2);
+  });
+});
+
 describe("attachSession", () => {
   test("rex names only the session and never the stale block", async () => {
     const { deps, calls } = makeDeps(
@@ -515,6 +667,21 @@ describe("report", () => {
     for (const row of rows) appendDispatch(row, dataDir);
     expect(closedRows(dataDir, false)).toHaveLength(rows.length);
     expect(closedRows(dataDir, true).map((row) => row.ts)).toEqual(["4"]);
+  });
+
+  test("--left-behind skips a parked row, whose session is still running", () => {
+    const parked = closedRow({ event: "parked", branch: "e", path: "/e", dirty: 2, ts: "7" });
+    expect(leftBehind([...rows, parked]).map((row) => row.ts)).toEqual(["4"]);
+  });
+
+  test("--count counts parked beside closed and ended", async () => {
+    const { deps, out, dataDir } = makeDeps({}, REX_ENV);
+    appendDispatch(dispatchRow(), dataDir);
+    for (const row of rows) appendDispatch(row, dataDir);
+    appendDispatch(closedRow({ event: "parked" }), dataDir);
+    appendDispatch(closedRow({ event: "ended", outcome: "merged" }), dataDir);
+    await createProgram(deps).parseAsync(["report", "--count"], { from: "user" });
+    expect(out).toEqual([JSON.stringify({ closed: rows.length, parked: 1, ended: 1 })]);
   });
 
   test("the command prints JSON rows", async () => {

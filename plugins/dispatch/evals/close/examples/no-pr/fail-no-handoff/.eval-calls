@@ -1,0 +1,1 @@
+claude-dispatch-close close --handoff --session 3f1c2a9e-5b7d-4e21-9a0c-1d2e3f4a5b6c --pr none --summary Spiked a 30s backoff cap.

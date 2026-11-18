@@ -28,10 +28,14 @@ TS
 }
 
 seed_repo relay
+# The session's sandbox keeps its repository's .git/worktrees read-only, and the
+# `wt` stand-in adds real worktrees, so the git dir lives outside the tree.
+mv .git "$HOME/.relay.git"
+printf 'gitdir: %s\n' "$HOME/.relay.git" > .git
 
 second_repo() {
   mkdir -p "repos/$1"
-  echo "/repos/" >> .git/info/exclude
+  echo "/repos/" >> "$HOME/.relay.git/info/exclude"
   (cd "repos/$1" && seed_repo "$1")
 }
 
@@ -39,10 +43,27 @@ session_status() {
   printf '%s\n' "$1" > "$HOME/.eval-stubs/session-status"
 }
 
-# The sandbox denies the ledger's default home under ~/.claude/plugins.
+# The sandbox denies the ledger's default home under ~/.claude/plugins. The
+# `titled` grader reads the ledger, so it starts empty rather than missing.
+# The eval session has no excludedCommands entry, and its sandbox refuses to
+# exec the plugin's bin/ shim, so a function runs the staged script in its place.
+script=$(cd "$here/../../skills/dispatch/scripts" && pwd)/dispatch.ts
 for rc in .zshenv .bashrc; do
   printf 'export CLAUDE_PLUGIN_DATA=%q\n' "$HOME/cwd/.dispatch-data" >> "$HOME/$rc"
+  printf 'claude-dispatch() { bun %q "$@"; }\n' "$script" >> "$HOME/$rc"
 done
+mkdir -p .dispatch-data
+: > .dispatch-data/dispatches.jsonl
+echo "/.dispatch-data/" >> "$HOME/.relay.git/info/exclude"
+
+# workstream: commits a retry counter on feature-x and leaves it checked out, as
+# the work this session's tab is leading.
+workstream() {
+  git switch -q -c feature-x
+  printf '\nexport let retries = 0;\n' >> src/client.ts
+  commit 2026-10-02T12:00:00Z 'feature-x: count retries' > /dev/null
+  git push -q -u origin feature-x
+}
 
 mux="${EVAL_MUX:-rex}"
 # shellcheck source=/dev/null

@@ -21,7 +21,7 @@ Every case sources [`fixture-lib.sh`](fixture-lib.sh). It builds a repository wi
 
 #### Multiplexers
 
-No case refers to a multiplexer. A multiplexer stand-in records each session it opens as a neutral `launch <branch> <path>` line, and the graders read only that line, `wt`, and `allow`. [`mux/`](mux/) contains one file per multiplexer with its environment markers, and `EVAL_MUX` (default `rex`) picks one. Supporting another multiplexer takes a stand-in that writes the same `launch` line and a `mux/<name>.sh`.
+No case refers to a multiplexer. A multiplexer stand-in records each session it opens as a neutral `launch <branch> <path> place=<tab|pane|bg>` line, with `title=<label>` after it for a tab or pane, and the graders read only that line, `wt`, and `allow`. The `claude` stand-in records a `--bg` session the same way. [`mux/`](mux/) contains one file per multiplexer with its environment markers, and `EVAL_MUX` (default `rex`) picks one. Supporting another multiplexer takes a stand-in that writes the same `launch` line and a `mux/<name>.sh`.
 
 ## Cases
 
@@ -40,6 +40,12 @@ The floor is the fewest turns a run can take: the Skill load, the prompt `Write`
 | `allow-make-test` | dev | grant a permission | 4 |
 | `allow-ho` | holdout | grant a permission | 4 |
 | `blocked-permission` | dev | the session reports a permission prompt | 4 |
+| `place-pane` | dev | side issue in this tab's workstream, opens a pane | 4 |
+| `place-pane-ho` | holdout | side issue in this tab's workstream, opens a pane | 4 |
+| `place-bg` | dev | small self-contained fix, runs in the background | 4 |
+| `place-bg-ho` | holdout | small self-contained fix, runs in the background | 4 |
+| `place-tab` | dev | unrelated theme, opens a new tab | 4 |
+| `place-tab-ho` | holdout | unrelated theme, opens a new tab | 4 |
 | `quiet-here` | dev | do it here, no dispatch | 3 |
 | `quiet-subagent` | holdout | in-session question, no dispatch | 2 |
 
@@ -49,6 +55,7 @@ Shared graders live in [`graders/`](graders/), joined by [`suite.yaml`](suite.ya
 
 - `skill-fired`: indicator that the skill loaded.
 - `no-launch` and `no-dispatch-skill`: the quiet cases launch nothing and never load the skill.
-- `dispatched`, `brief-complete`, `reply-reports`, and each case's argument graders: guards. Argument graders match one line of `.eval-calls`, such as `^wt -C \S*/repos/dotfiles ` or `^allow Bash\(make test`.
+- `dispatched`, `brief-complete`, `reply-reports`, and each case's argument graders: guards. Argument graders match one line of `.eval-calls`, such as `^wt -C \S*/repos/dotfiles ` or `^allow Bash\(make test`. Each `place-*` case's `place` grader matches the `place=` on its `launch` line.
+- `titled`: every dispatching case. Reads the dispatch ledger at `.dispatch-data/dispatches.jsonl` and requires each recorded title to be two to four Title Case words.
 
 To see which waste a change removed, count the runs that read the source with `bun evals/native/calls.ts <results> --match 'dispatch\.ts|SKILL\.md'`.

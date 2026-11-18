@@ -6,5 +6,6 @@ graders:
   dispatched: "!quiet-*"
   brief-complete: "!quiet-*"
   reply-reports: "!quiet-*"
+  titled: "!quiet-*"
   no-launch: "quiet-*"
   no-dispatch-skill: "quiet-*"

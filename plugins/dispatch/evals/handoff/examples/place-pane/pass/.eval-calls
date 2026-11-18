@@ -1,0 +1,3 @@
+rex block call -b block:sender size
+rex split -b block:sender --split=right -c /tmp/eval/cwd/.worktrees/retry-on-throw --label Retry On Throw --focus=false --json -- claude --name retry-on-throw -- <prompt>
+launch retry-on-throw /tmp/eval/cwd/.worktrees/retry-on-throw place=pane title=Retry On Throw

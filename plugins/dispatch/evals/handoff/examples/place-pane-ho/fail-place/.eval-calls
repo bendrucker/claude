@@ -1,0 +1,2 @@
+claude --bg --name reset-retries -- <prompt>
+launch reset-retries /tmp/eval/cwd/.worktrees/reset-retries place=bg

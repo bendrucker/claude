@@ -1,1 +1,1 @@
-Dispatch a session to add a `deploy` target to the `Makefile` that builds and ships the service, and open a PR.
+Dispatch a session to work out how this service should deploy. I haven't picked where it ships (a container registry, a VM, or something else). It should lay out the options, settle the choice with me, then add a `deploy` target to the `Makefile` that builds and deploys the service, and open a PR.

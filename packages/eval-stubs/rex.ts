@@ -1,38 +1,5 @@
 import { join } from "node:path";
-import { record, recordLaunch, stubDir, unavailable } from "./calls";
-
-interface Status {
-  state: string;
-  kind?: string;
-  msg?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isStatus(value: unknown): value is Status {
-  return (
-    isRecord(value) &&
-    typeof value.state === "string" &&
-    (value.kind === undefined || typeof value.kind === "string") &&
-    (value.msg === undefined || typeof value.msg === "string")
-  );
-}
-
-/** `session-status` holds a bare state or a JSON object with `kind` and `msg`. */
-async function status(): Promise<Status> {
-  const file = Bun.file(join(stubDir, "session-status"));
-  if (!(await file.exists())) return { state: "working" };
-  const text = (await file.text()).trim();
-  try {
-    const parsed: unknown = JSON.parse(text);
-    if (isStatus(parsed)) return parsed;
-  } catch {
-    // A bare state is not JSON.
-  }
-  return { state: text === "" ? "working" : text };
-}
+import { record, recordLaunch, type Status, status, stubDir, unavailable } from "./calls";
 
 async function nextBlock(): Promise<string> {
   const file = Bun.file(join(stubDir, "rex-count"));
@@ -63,9 +30,11 @@ if (first === "whoami" && words.includes("--json")) print({ tailscale: null });
 if ((first === "window" && second === "new") || first === "split") {
   const cwd = after("-c");
   const label = first === "split" ? after("--label") : after("-s", 2);
-  if (cwd !== undefined) await recordLaunch(label ?? "", cwd);
+  if (cwd !== undefined) await recordLaunch(cwd, first === "split" ? "pane" : "tab", label ?? "");
   print({ block_ids: [await nextBlock()] });
 }
+if (first === "block" && second === "call" && words.includes("size"))
+  print({ columns: 200, rows: 50 });
 if (first === "block" && second === "call" && words.includes("program_status")) {
   const { state, kind, msg } = await status();
   const reported: Status = { state };

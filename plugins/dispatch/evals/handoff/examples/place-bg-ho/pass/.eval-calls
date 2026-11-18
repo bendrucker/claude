@@ -1,0 +1,2 @@
+claude --bg --name rename-delay -- <prompt>
+launch rename-delay /tmp/eval/cwd/.worktrees/rename-delay place=bg

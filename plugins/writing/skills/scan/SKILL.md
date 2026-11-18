@@ -26,7 +26,7 @@ vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line docs README.md
 vale --config="${CLAUDE_SKILL_DIR}/../../.vale.ini" --output=line --glob='*.md' .
 ```
 
-Each alert prints as `path:line:col:check:message`, where `check` is the Vale rule name (`Writing.SpacedEmDash`, `ai-tells.EmDashUsage`). Vale exits 1 when any alert is at `error` level, so the command gates in CI or a pre-commit check.
+Each alert prints as `path:line:col:check:message`, where `check` is the Vale rule name (`Writing.PathBullet`, `ai-tells.EmDashUsage`). Vale exits 1 when any alert is at `error` level, so the command gates in CI or a pre-commit check.
 
 ## Single Input
 

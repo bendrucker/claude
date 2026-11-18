@@ -11,7 +11,7 @@ describe("scoreText", () => {
     // One em dash in a 1000-word body lands at density 1.0.
     const score = await scoreText(`${"word ".repeat(998)}a — b`);
     expect(score.wordCount).toBe(1000);
-    const emDash = score.checks.find((c) => c.check === "Writing.SpacedEmDash");
+    const emDash = score.checks.find((c) => c.check === "ai-tells.EmDashUsage");
     expect(emDash?.hits).toBe(1);
     expect(emDash?.density).toBeCloseTo(1.0, 5);
   });
@@ -30,8 +30,6 @@ describe("renderTable", () => {
       ║ Check                │ Hits │ Density /1k ║
       ╟──────────────────────┼──────┼─────────────╢
       ║ ai-tells.EmDashUsage │ 1    │ 500.0       ║
-      ╟──────────────────────┼──────┼─────────────╢
-      ║ Writing.SpacedEmDash │ 1    │ 500.0       ║
       ╚══════════════════════╧══════╧═════════════╝"
     `);
   });

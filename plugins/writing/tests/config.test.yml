@@ -99,7 +99,7 @@
      * The cache — cold at first — warms up.
      */
     const x = 1;
-  contains: [Writing.SpacedEmDash]
+  contains: [ai-tells.EmDashUsage]
 
 - name: a salutation fires in a PR body
   format: .prbody
@@ -148,3 +148,66 @@
 
     Text.
   absent: Writing.TitleCaseHeading
+
+- name: flags commit self-narration in a commit message
+  format: .commitmsg
+  input: &self-narration |
+    Retry the upload on a timeout
+
+    This commit adds a retry around the upload call.
+  contains: [ai-tells-commits.CommitSelfReference]
+- name: flags commit self-narration in a PR body
+  format: .prbody
+  input: *self-narration
+  contains: [ai-tells-commits.CommitSelfReference]
+- name: flags commit self-narration in a review body
+  format: .reviewbody
+  input: |
+    This commit adds a retry, but the timeout still applies to the first attempt.
+  contains: [ai-tells-commits.CommitSelfReference]
+- name: allows commit self-narration in a markdown file
+  format: .md
+  input: *self-narration
+  absent: ai-tells-commits.CommitSelfReference
+
+- name: flags a past-tense subject in a commit message
+  format: .commitmsg
+  input: &past-subject |
+    Added a retry around the upload call
+  contains: [ai-tells-commits.CommitPastTense]
+- name: allows a past-tense opening line in a PR body
+  about: CommitPastTense anchors on the first line as a commit subject, which a PR body does not have.
+  format: .prbody
+  input: *past-subject
+  absent: ai-tells-commits.CommitPastTense
+
+- name: allows the harness attribution trailer
+  format: .commitmsg
+  input: |
+    Retry the upload on a timeout
+
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+  absent: ai-tells-commits.CommitAttribution
+- name: allows the index as the session index
+  format: .commitmsg
+  input: |
+    Count denied calls in the index
+
+    The index now records each denied call with its reason.
+  absent: ai-tells-commits.CommitGitJargon
+
+- name: allows literal hand-work in a message
+  about: CommitFigurativeVerbs reads "by hand" and "hand-written" as figures, and they were literal in every sampled commit.
+  format: .commitmsg
+  input: |
+    Rebuild the fixtures by hand
+
+    The hand-written cases stay beside the generated ones.
+  absent: ai-tells-commits.CommitFigurativeVerbs
+- name: flags an inanimate subject that arrives
+  format: .commitmsg
+  input: |
+    Report the gate outcome
+
+    The outcome arrives after the turn ends.
+  contains: [ai-tells-commits.CommitFigurativeVerbs]

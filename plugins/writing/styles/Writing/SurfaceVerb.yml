@@ -1,5 +1,5 @@
-# evidence: user-flagged 2026-06 as the highest-frequency tell. "Surface" is also a domain noun here ("chat surface", "surface area"), so the determiner after the verb picks out the verb-with-object sense.
-# retire when: a sense-aware corpus pass shows the verb usage isn't distinctive against the user baseline.
+# evidence: user-flagged 2026-06 as the highest-frequency tell. "Surface" is also a domain noun here ("chat surface", "surface area"), so the determiner after the verb picks out the verb-with-object sense. It catches "surface the X" as report or show, which ai-tells.FigurativeSurfaces misses.
+# retire when: a judged sample of spans no ai-tells check overlaps falls below half real.
 extends: existence
 message: "'%s' uses 'surface' as a verb meaning reveal or report. Say 'show', 'report', or 'expose'."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/SurfaceVerb.yml

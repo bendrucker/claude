@@ -56,7 +56,6 @@ describe("summarize", () => {
     expect(health).toMatchInlineSnapshot(`
       {
         "byOutcome": {
-          "ask": 0,
           "context": 2,
           "deny": 1,
           "error": 0,

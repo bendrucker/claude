@@ -4,8 +4,8 @@ description: >-
   Detect AI writing tropes in repository prose. Use `audit` to scan a directory
   or glob (READMEs, docs, skill files, proposals) for slop already committed and
   gate on it, reporting every match with file, line, and column. Use `score` to
-  measure trope density of one input on a per-1000-word basis, compare two
-  drafts, or score code comments separately. Not for rewriting a single input.
+  measure trope density of one input on a per-1000-word basis or compare two
+  drafts. Not for rewriting a single input.
 argument-hint: "audit <path...> | score <input>"
 user-invocable: true
 allowed-tools:
@@ -15,7 +15,7 @@ allowed-tools:
 
 # Scan
 
-Detect AI writing tropes already present in prose. Every mode lints through Vale with the plugin's `.vale.ini`, the same checks the hook enforces on new edits. Scan reports only. Fix alerts with `writing:rewrite` or direct edits at the reported positions.
+Detect AI writing tropes already present in prose. Every mode lints through Vale with the plugin's `.vale.ini`, the same checks the hook enforces on new edits. Scan reports only. Fix alerts with `writing:no-diary` or direct edits at the reported positions.
 
 ## Audit
 

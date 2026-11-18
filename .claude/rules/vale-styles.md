@@ -16,7 +16,7 @@ When an abstraction overfires, keep the narrower rule and record the trial in th
 
 ## Tests
 
-A rule lists its cases under `tests`, and `vale test` runs them. A case pins one boundary of the rule, so give each variant and each excluded sense its own case.
+A rule lists its cases under `tests`, and `vale test styles/<Style>` runs them. Project cases in the plugin's `tests/` check what `.vale.ini` decides per file type and message, run with `vale --no-global --config=.vale.ini test tests/`. A case pins one boundary of the rule, so give each variant and each excluded sense its own case.
 
 - `name` states the boundary in a few words, as `flags` or `allows` plus the class of input: "flags the opener mid-sentence", "allows catch as a latch". A failing case prints its name, which should say what broke.
 - An `allows` case names the sense or context it excludes.

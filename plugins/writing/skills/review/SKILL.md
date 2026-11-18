@@ -10,7 +10,7 @@ allowed-tools:
   - Read
   - Grep
   - Glob
-  - Task
+  - Agent
   - WebFetch
   - Bash(bun:*)
 ---

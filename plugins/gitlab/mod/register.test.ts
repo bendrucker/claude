@@ -52,6 +52,9 @@ const note = (id: number, username: string, system = false, body = "") => ({
 });
 
 interface World {
+  /** The plugin store, shared by worlds that stand for one session across restarts. */
+  store?: Map<string, unknown>;
+  sessionId?: string;
   branch: string;
   originHead?: string;
   glab: { exitCode: number; stdout: string; stderr: string } | Error;
@@ -80,6 +83,10 @@ interface World {
   sleptMs?: number;
   /** Refuses the ticker's periods, which ends it. */
   isTickRefused?: boolean;
+  /** MRs off the branch by IID, read with `-R`. */
+  others?: Record<number, unknown>;
+  /** Jobs of pipeline 51, the pipeline of an MR off the branch. */
+  otherJobs?: unknown[];
 }
 
 const result = (stdout: string, stderr = "", exitCode = stderr === "" ? 0 : 1) => ({
@@ -104,8 +111,17 @@ function worldOf(on: On, world: World) {
   });
   const apis: string[] = [];
   const graphql: string[] = [];
+  const hosted: string[] = [];
   const clock = mock.clock(on);
   on("turn.complete", () => ({ text: "" }));
+  on("classic.PostToolUse", () => ({}));
+  const store = world.store ?? new Map<string, unknown>();
+  on("session.id", () => ({ value: world.sessionId ?? "s1" }));
+  on("store.get", ($, e) => ({ value: store.get(e.key) }));
+  on("store.set", ($, e) => {
+    store.set(e.key, e.value);
+    return { value: undefined };
+  });
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
     modEvents: { emit: () => Promise.resolve() },
@@ -146,7 +162,17 @@ function worldOf(on: On, world: World) {
     return world.drop === undefined ? { text: e.text } : { drop: world.drop };
   });
   on("process.run", async ($, e) => {
-    const argv = e.argv.join(" ");
+    const joined = e.argv.join(" ");
+    const argv = joined.replace(" --hostname gitlab.example.com", "");
+    if (argv !== joined) hosted.push(argv);
+    const other = /^glab mr view (\d+) -R gitlab\.example\.com\/g\/r -F json$/.exec(argv);
+    if (other !== null) {
+      views.push(argv);
+      return reply(world.others?.[Number(other[1])] ?? "404 Not Found");
+    }
+    if (argv.startsWith("glab api --paginate --output ndjson projects/1/pipelines/51/jobs?")) {
+      return result((world.otherJobs ?? []).map((row) => JSON.stringify(row)).join("\n"));
+    }
     if (argv.startsWith("git symbolic-ref")) {
       return world.originHead === undefined ? result("", "", 1) : result(`${world.originHead}\n`);
     }
@@ -214,10 +240,26 @@ function worldOf(on: On, world: World) {
     });
     return tails.at(-1);
   };
-  return { events, named, shown, submits, views, apis, graphql, clock };
+  return { events, named, shown, submits, views, apis, graphql, hosted, clock };
 }
 
 const HINT = { isDraft: false, isWorking: false, hint: "? for shortcuts" };
+
+const mountPane = ($: Engine) =>
+  $.ui.mount({
+    plugin: "gitlab",
+    surface: "terminal",
+    component: "Pane",
+    requestId: "mr",
+    props: {
+      title: "MR",
+      isFocused: false,
+      bodyColumns: 60,
+      placement: "dock",
+      scroll: { offset: 0, bodyRows: 30 },
+      view: {},
+    },
+  });
 
 const GLAB_OK = { exitCode: 0, stdout: "glab 1.122.0\n", stderr: "" };
 
@@ -236,6 +278,7 @@ describe("register", () => {
       head: "aaaaaaa1111",
       phase: "pending",
       state: "opened",
+      origin: "branch",
     });
     expect(await w.shown($)).toBe("author  │ \u{f444} 0/1  \u{f441} 1");
 
@@ -1154,5 +1197,238 @@ describe("register", () => {
     expect(w.views.length).toBe(2);
     expect(w.named("watch.revived")[0]?.detail).toEqual({ silentMs: TICK_MS * 10, mr: 7 });
     expect(w.named("poll.late")).toEqual([]);
+  });
+});
+
+const URL9 = "https://gitlab.example.com/g/r/-/merge_requests/9";
+
+const mr9 = (pipeline = "success", state = "opened") => ({
+  ...mr(null, state),
+  iid: 9,
+  web_url: URL9,
+  references: { full: "g/r!9" },
+  sha: "ccccccc3333",
+  head_pipeline: { id: 51, project_id: 1, status: pipeline },
+});
+
+const command = (args: string) => ({
+  command: "mr",
+  args,
+  origin: { kind: "composer" as const },
+  presentation: { isFullscreen: false, columns: 120 },
+});
+
+describe("several MRs", () => {
+  test("an MR named with /mr track polls on its own schedule, by IID on its host", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr(),
+      others: { 9: mr9() },
+      otherJobs: job("success"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(await $.command.run(command(`track ${URL9}`))).toEqual({
+      text: `/mr: tracking ${URL9}`,
+    });
+    await w.clock.settle();
+    const nine = () => w.views.filter((argv) => argv.startsWith("glab mr view 9")).length;
+    const seven = () => w.views.filter((argv) => argv === "glab mr view -F json").length;
+    expect([seven(), nine()]).toEqual([1, 1]);
+    expect(w.hosted).toContain("glab api projects/1/merge_requests/9/approvals");
+    expect(w.named("mr.tracked").map((e) => [e.detail?.mr, e.detail?.origin])).toEqual([
+      [7, "branch"],
+      [9, "manual"],
+    ]);
+
+    await w.clock.advance(POLL_MS.pending * 3);
+    expect([seven(), nine()]).toEqual([4, 2]);
+    expect(await w.shown($)).toBe(
+      "!7 author  │ \u{f444} 0/1  \u{f441} 1 · !9 author  │ \u{f49e}  \u{f441} 1",
+    );
+  });
+
+  test("a failure on an MR off the branch names that MR and its repository", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+      others: { 9: mr9("running") },
+      otherJobs: job("running"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.command.run(command(`track ${URL9}`));
+    await w.clock.settle();
+    world.others = { 9: mr9("failed") };
+    world.otherJobs = job("failed");
+    await w.clock.advance(POLL_MS.pending);
+
+    expect(w.submits.length).toBe(1);
+    expect(w.submits[0]).toContain("Pipeline failed on g/r!9 at ccccccc: test.");
+    expect(w.submits[0]).toContain("--status=failed -R gitlab.example.com/g/r");
+    expect(w.submits[0]).toContain(URL9);
+  });
+
+  test("a branch MR already tracked takes over that entry instead of a second one", async ($, on) => {
+    const world: World = {
+      branch: "main",
+      glab: GLAB_OK,
+      view: mr9(),
+      jobs: job("success"),
+      others: { 9: mr9() },
+      otherJobs: job("success"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.command.run(command(`track ${URL9}`));
+    await w.clock.settle();
+    world.branch = "topic";
+    await w.clock.advance(TICK_MS);
+
+    expect(w.named("mr.tracked").map((e) => e.detail?.mr)).toEqual([9]);
+    expect(await w.shown($)).toBe("author  │ \u{f49e}  \u{f441} 1");
+    expect(await $.command.run(command(`track ${URL9}`))).toEqual({
+      text: `/mr: already tracking ${URL9}`,
+    });
+  });
+
+  test("a merged MR off the branch is announced once, then retired", async ($, on) => {
+    const world: World = {
+      branch: "main",
+      glab: GLAB_OK,
+      view: mr(),
+      others: { 9: mr9() },
+      otherJobs: job("success"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.command.run(command(`track ${URL9}`));
+    await w.clock.settle();
+    world.others = { 9: mr9("success", "merged") };
+    await w.clock.advance(POLL_MS.settled);
+    expect(w.submits).toEqual([`g/r!9 merged: ${URL9}`]);
+    expect(w.named("mr.untracked")).toEqual([]);
+
+    await w.clock.advance(POLL_MS.closed);
+    expect(w.submits.length).toBe(1);
+    expect(w.named("mr.untracked").map((e) => e.detail?.reason)).toEqual(["ended"]);
+    expect(await w.shown($)).toBeUndefined();
+    const pane = await mountPane($);
+    expect((await pane.find({ type: "Text", text: /!9 merged/ }))?.text).toContain("!9 merged");
+    await pane.unmount();
+  });
+
+  test("the pane draws one MR in full and the rest by their status", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr("success"),
+      jobs: job("success"),
+      others: { 9: mr9("failed") },
+      otherJobs: job("failed"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.command.run(command(`track ${URL9}`));
+    await w.clock.settle();
+    const pane = await mountPane($);
+    const jobs = await pane.findAll({ type: "Text", text: /^Jobs$/ });
+    expect(jobs).toHaveLength(1);
+    expect(await pane.find({ type: "Text", text: /merge_requests\/9!9$/ })).toBeDefined();
+    expect(await pane.find({ type: "Text", text: /\u{f52f} test/u })).toBeUndefined();
+    await pane.unmount();
+  });
+
+  test("an MR the session pushed stays tracked across /clear and after the branch moves off it", async ($, on) => {
+    const world: World = {
+      branch: "topic",
+      glab: GLAB_OK,
+      view: mr9(),
+      jobs: job("success"),
+      others: { 9: mr9() },
+      otherJobs: job("success"),
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.classic.PostToolUse({
+      tool_name: "Bash",
+      tool_use_id: "u1",
+      tool_input: { command: "git push -u origin topic" },
+      tool_response: {
+        stdout: "",
+        stderr: `remote:\nremote: View merge request for topic:\nremote:   ${URL9}\nremote:\n`,
+      },
+    });
+    expect(w.named("discover")[0]?.detail).toMatchObject({ origin: "pushed", count: 0 });
+
+    await $.session.end({ reason: "clear", sessionId: "s1", resume: { id: "s1" } });
+    await $.session.start(START);
+    world.branch = "main";
+    await w.clock.advance(TICK_MS);
+    await w.clock.settle();
+
+    expect(w.named("mr.untracked")).toEqual([]);
+    expect(await w.shown($)).toBe("!9 author  │ \u{f49e}  \u{f441} 1");
+  });
+
+  test("a resumed session restores its MRs from the store and prunes stale sessions", async ($, on) => {
+    const store = new Map<string, unknown>([
+      [
+        "tracked",
+        {
+          s1: { at: 0, mrs: [{ url: URL9, origin: "manual" }] },
+          old: { at: -1e15, mrs: [{ url: URL9, origin: "created" }] },
+        },
+      ],
+    ]);
+    const world: World = {
+      branch: "main",
+      glab: GLAB_OK,
+      view: mr(),
+      others: { 9: mr9() },
+      otherJobs: job("success"),
+      store,
+    };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    expect(w.named("mr.tracked").map((e) => [e.detail?.mr, e.detail?.origin])).toEqual([
+      [9, "manual"],
+    ]);
+
+    await $.command.run(command("untrack !9"));
+    expect(store.get("tracked")).toEqual({});
+  });
+
+  test("/mr untrack stops watching an MR, and an unknown one is refused", async ($, on) => {
+    const world: World = { branch: "main", glab: GLAB_OK, view: mr(), others: { 9: mr9() } };
+    const w = worldOf(on, world);
+
+    await $.session.start(START);
+    await w.clock.settle();
+    await $.command.run(command(`track ${URL9}`));
+    await w.clock.settle();
+    expect(await $.command.run(command("untrack !9"))).toEqual({
+      text: `/mr: stopped tracking ${URL9}`,
+    });
+    expect(await $.command.run(command("untrack !9"))).toEqual({ text: "/mr: not tracking !9" });
+    expect(w.named("mr.untracked").map((e) => e.detail?.reason)).toEqual(["command"]);
+    expect(await w.shown($)).toBeUndefined();
   });
 });

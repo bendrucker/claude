@@ -1,5 +1,4 @@
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, rm } from "node:fs/promises";
 import { basename, dirname, extname, join, relative } from "node:path";
 import { z } from "zod";
 
@@ -259,24 +258,6 @@ export async function lintFile(filePath: string): Promise<ValeAlert[]> {
   const root = await repoConfigRoot(filePath);
   if (await pluginSkips(filePath, root)) return [];
   return alertsOf(await runVale(fileArgs(filePath, root), { cwd: root ?? undefined }));
-}
-
-/** The saved file's alerts, then the pre-edit text's, from one Vale run when the plugin's config applies. */
-export async function lintEdit(filePath: string, original: string): Promise<ValeAlert[][]> {
-  const root = await repoConfigRoot(filePath);
-  // A repo config's directory sections match the path relative to its root, which a temp copy lacks.
-  if (root !== null || (await pluginSkips(filePath, root)))
-    return Promise.all([lintFile(filePath), valeAlerts(original, { filePath })]);
-  const dir = await mkdtemp(join(tmpdir(), "writing-lint-"));
-  const copy = join(dir, basename(filePath));
-  try {
-    await Bun.write(copy, original);
-    const stdout = await runVale([...fileArgs(filePath, null), copy]);
-    const output = stdout === null || stdout.trim() === "" ? {} : Output.parse(JSON.parse(stdout));
-    return [output[filePath] ?? [], output[copy] ?? []];
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
 }
 
 /** Vale's word count for the file at `filePath`, which leaves out code. Null when vale is unavailable. */

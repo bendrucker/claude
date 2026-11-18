@@ -4,7 +4,7 @@ import type { PostToolUseHookInput, PreToolUseHookInput } from "@anthropic-ai/cl
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getExtension, isMemoryPath, isPlanPath, isScratchPath } from "../detection/paths";
-import { lintEdit, lintFile } from "../detection/vale";
+import { lintFile, valeAlerts } from "../detection/vale";
 import { editScopeOf, newAlerts } from "./edit-scope";
 import { isPlanMode, type SyncHookJSONOutput, toolInputOf } from "./io";
 import { decisionOf, hookAlertOf, type HookAlert, report } from "./report";
@@ -30,8 +30,11 @@ async function lintEdited(
   toolResponse: unknown,
 ): Promise<{ alerts: HookAlert[]; checks: string[]; unedited: number }> {
   const scope = editScopeOf(toolResponse);
-  const [all = [], before = []] =
-    scope === null ? [await lintFile(filePath)] : await lintEdit(filePath, scope.original);
+  // The pre-edit lint runs beside the saved one, since most edited files already raise an alert.
+  const [all, before] = await Promise.all([
+    lintFile(filePath),
+    scope === null ? [] : valeAlerts(scope.original, { filePath }),
+  ]);
   const edited = scope === null || all.length === 0 ? all : newAlerts(all, before, scope.added);
   return {
     alerts: edited.map((alert) => hookAlertOf(alert, decisionOf(alert.Severity, "PostToolUse"))),

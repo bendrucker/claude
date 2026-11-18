@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   ensurePackages,
-  lintEdit,
   lintFile,
   lintProse,
   repoConfigRoot,
@@ -233,44 +232,6 @@ describe("a file inside a copy of this plugin", () => {
     await Bun.write(path, "The cache starts cold; the first request fills it.\n");
     const checks = (await lintFile(path)).map((alert) => alert.Check);
     expect(checks).toContain("ai-tells.SemicolonUsage");
-  });
-});
-
-describe("lintEdit", () => {
-  let dir: string;
-  beforeAll(() => {
-    dir = mkdtempSync(join(tmpdir(), "vale-edit-"));
-  });
-  afterAll(async () => {
-    await rm(dir, { recursive: true, force: true });
-  });
-
-  test.each<{ name: string; file: string; saved: string; original: string }>([
-    {
-      name: "markdown",
-      file: "notes.md",
-      saved: "The cache starts cold; it fills.\n\nWe reach for it — here.\n",
-      original: "The cache starts cold; it fills.\n",
-    },
-    {
-      name: "TypeScript comments",
-      file: "cache.ts",
-      saved:
-        "// The cache starts cold; it fills.\n// We reach for it — here.\nexport const a = 1;\n",
-      original: "// The cache starts cold; it fills.\nexport const a = 1;\n",
-    },
-  ])("matches separate lints of $name from one spawn", async ({ file, saved, original }) => {
-    const path = join(dir, file);
-    await Bun.write(path, saved);
-    const separate = [await lintFile(path), await valeAlerts(original, { filePath: path })];
-    const spawn = spyOn(Bun, "spawn");
-    try {
-      expect(await lintEdit(path, original)).toEqual(separate);
-      expect(spawn).toHaveBeenCalledTimes(1);
-    } finally {
-      spawn.mockRestore();
-    }
-    expect(separate[1]?.length).toBeGreaterThan(0);
   });
 });
 

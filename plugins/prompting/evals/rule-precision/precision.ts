@@ -2,7 +2,7 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
-import { cli } from "cleye";
+import { Command, InvalidArgumentError } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
 import { lint, VALE_CONFIG } from "../../skills/scan/scripts/vale";
@@ -289,78 +289,88 @@ export async function scoreSources(
   return { output: sections.join("\n\n"), failed, empty };
 }
 
+function number(value: string): number {
+  const n = Number(value);
+  if (Number.isNaN(n)) throw new InvalidArgumentError("Not a number.");
+  return n;
+}
+
+function collect(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
+}
+
+export const program = new Command("rule-precision")
+  .description(
+    "Score Vale checks by per-line precision against commits where a human deleted prose. A check clears when its interval beats the rate at which those commits deleted prose at all. Exits non-zero when a check with enough hits fails to clear.",
+  )
+  .option(
+    "--commit <sha>",
+    "Commit where a human deleted prose, gating the exit code (repeatable)",
+    collect,
+    [],
+  )
+  .option(
+    "--agent-commit <sha>",
+    "Commit whose cuts an LLM judge proposed and a human accepted, reported without gating (repeatable)",
+    collect,
+    [],
+  )
+  .option(
+    "--rule <file>",
+    "Vale rule file to score instead of the shipped style (repeatable)",
+    collect,
+    [],
+  )
+  .option(
+    "--config <file>",
+    "Vale config to lint with, such as an overlay of the shipped one",
+    VALE_CONFIG,
+  )
+  .option("--repo <path>", "Repository to read history from", ".")
+  .option(
+    "--checkout <entry>",
+    "Local clone a qualified label (owner/repo@sha) reads from, as owner/repo=path (repeatable)",
+    collect,
+    [],
+  )
+  .option("--min-precision <n>", "Precision floor, overriding the measured base rate", number)
+  .option(
+    "--min-flagged <n>",
+    "Hits a check needs before the labeled history can judge it",
+    number,
+    10,
+  )
+  .action(async (flags) => {
+    const tracked = await loadLabelSources();
+    const sources: LabelSources = {
+      human: flags.commit.length > 0 ? flags.commit : tracked.human,
+      agent: [...tracked.agent, ...flags.agentCommit],
+    };
+
+    const checkouts: Record<string, string> = { ...DEFAULT_CHECKOUTS };
+    for (const entry of flags.checkout) {
+      const split = entry.indexOf("=");
+      if (split <= 0) throw new Error(`--checkout ${entry}: expected owner/repo=path`);
+      checkouts[entry.slice(0, split)] = entry.slice(split + 1);
+    }
+
+    const config =
+      flags.rule.length > 0 ? await candidateConfig(flags.rule, flags.config) : flags.config;
+    const result = await scoreSources(flags.repo, sources, config, {
+      minFlagged: flags.minFlagged,
+      minPrecision: flags.minPrecision,
+      checkouts,
+    });
+    if (config !== flags.config) await rm(dirname(config), { recursive: true, force: true });
+
+    if (result.empty) {
+      console.error("No check matched anything in the labeled history. Nothing was measured.");
+      process.exit(1);
+    }
+    console.log(result.output);
+    process.exit(result.failed ? 1 : 0);
+  });
+
 if (import.meta.main) {
-  const argv = cli({
-    name: "rule-precision",
-    help: {
-      description:
-        "Score Vale checks by per-line precision against commits where a human deleted prose. A check clears when its interval beats the rate at which those commits deleted prose at all. Exits non-zero when a check with enough hits fails to clear.",
-    },
-    flags: {
-      commit: {
-        type: [String],
-        description: "Commit where a human deleted prose, gating the exit code (repeatable)",
-      },
-      agentCommit: {
-        type: [String],
-        description:
-          "Commit whose cuts an LLM judge proposed and a human accepted, reported without gating (repeatable)",
-      },
-      rule: {
-        type: [String],
-        description: "Vale rule file to score instead of the shipped style (repeatable)",
-      },
-      config: {
-        type: String,
-        default: VALE_CONFIG,
-        description: "Vale config to lint with, such as an overlay of the shipped one",
-      },
-      repo: { type: String, default: ".", description: "Repository to read history from" },
-      checkout: {
-        type: [String],
-        description:
-          "Local clone a qualified label (owner/repo@sha) reads from, as owner/repo=path (repeatable)",
-      },
-      minPrecision: {
-        type: Number,
-        description: "Precision floor, overriding the measured base rate",
-      },
-      minFlagged: {
-        type: Number,
-        default: 10,
-        description: "Hits a check needs before the labeled history can judge it",
-      },
-    },
-  });
-
-  const tracked = await loadLabelSources();
-  const sources: LabelSources = {
-    human: argv.flags.commit.length > 0 ? argv.flags.commit : tracked.human,
-    agent: [...tracked.agent, ...argv.flags.agentCommit],
-  };
-
-  const checkouts: Record<string, string> = { ...DEFAULT_CHECKOUTS };
-  for (const entry of argv.flags.checkout) {
-    const split = entry.indexOf("=");
-    if (split <= 0) throw new Error(`--checkout ${entry}: expected owner/repo=path`);
-    checkouts[entry.slice(0, split)] = entry.slice(split + 1);
-  }
-
-  const config =
-    argv.flags.rule.length > 0
-      ? await candidateConfig(argv.flags.rule, argv.flags.config)
-      : argv.flags.config;
-  const result = await scoreSources(argv.flags.repo, sources, config, {
-    minFlagged: argv.flags.minFlagged,
-    minPrecision: argv.flags.minPrecision,
-    checkouts,
-  });
-  if (config !== argv.flags.config) await rm(dirname(config), { recursive: true, force: true });
-
-  if (result.empty) {
-    console.error("No check matched anything in the labeled history. Nothing was measured.");
-    process.exit(1);
-  }
-  console.log(result.output);
-  process.exit(result.failed ? 1 : 0);
+  await program.parseAsync();
 }

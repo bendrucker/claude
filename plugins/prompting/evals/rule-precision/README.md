@@ -7,8 +7,8 @@ bun plugins/prompting/evals/rule-precision/precision.ts
 ```
 
 - **Labels**: each commit contributes its own deletions as ground truth. [`labels.json`](labels.json) lists them under two sources, `human` and `agent`. `--commit` replaces the human list and `--agent-commit` adds to the agent list. Two human commits carry the current labels: [#814](https://github.com/bendrucker/claude/pull/814) `1ec44ee80` stripped filler from every skill in the repo, and [#139](https://github.com/bendrucker/claude/pull/139) `196bbf000` cut skill bodies down to what each run needs. A human read each document and chose the cuts with no rule driving them, which is what makes the deletions usable as labels.
-- **Floor**: a check clears when the lower bound of its 95% interval beats the rate at which the labeled commits deleted prose at all. Flagging lines at random lands at that rate, so clearing it is the minimum for carrying information. `--minPrecision` overrides the measured rate.
-- **Counts**: the interval is Wilson, so a check measured on a dozen hits reports a wide range instead of a number that reads as settled. Below `--minFlagged` hits (default 10) the harness reports `too few to judge` and the check does not gate the exit code.
+- **Floor**: a check clears when the lower bound of its 95% interval beats the rate at which the labeled commits deleted prose at all. Flagging lines at random lands at that rate, so clearing it is the minimum for carrying information. `--min-precision` overrides the measured rate.
+- **Counts**: the interval is Wilson, so a check measured on a dozen hits reports a wide range instead of a number that reads as settled. Below `--min-flagged` hits (default 10) the harness reports `too few to judge` and the check does not gate the exit code.
 - **Candidates**: `--rule Candidate.yml` scores a Vale rule file without adding it to `styles/Prompting`, under the shipped config's scopes and ignores. Repeat the flag to score several. Given any `--rule`, the shipped style is not scored. `--config` lints with another `.vale.ini`, such as an overlay that changes an ignore.
 
 ## Reading the Numbers
@@ -17,7 +17,7 @@ The labels are scoped to what each commit's author was looking for. Both labelin
 
 Precision here is a floor rather than an estimate. The human deleted what they were after in one pass, so a check can flag a real defect on a line that survived. A check reading well below its true precision is expected. A check reading well is hard to fake.
 
-Each source gets its own floor and table, and only the human table gates the exit code. Agent labels come from `prompting:scan audit` rounds, where a judge proposed the cuts and a human accepted them. The judge and the rules share the `prompting` doctrine's vocabulary, so an agent table that agrees with a rule partly measures that shared vocabulary. Read it as a lead for a candidate rule, and confirm against human labels before a rule ships.
+Each source gets its own floor and table, and only the human table gates the exit code. Agent labels come from `prompting:audit` rounds, where a judge proposed the cuts and a human accepted them. The judge and the rules share the `prompting` doctrine's vocabulary, so an agent table that agrees with a rule partly measures that shared vocabulary. Read it as a lead for a candidate rule, and confirm against human labels before a rule ships.
 
 Recall is not measured. Getting it would mean labeling every defect in the pre-image, and the labeling commits only mark the ones their author chose to cut.
 

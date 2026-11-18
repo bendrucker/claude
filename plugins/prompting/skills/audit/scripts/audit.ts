@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { Command } from "@commander-js/extra-typings";
 import { table } from "table";
 import { z } from "zod";
-import { AGENT_FACING } from "./scan";
+import { AGENT_FACING } from "../../scan/scripts/scan";
 
 export const CLASSES = [
   "no-op",

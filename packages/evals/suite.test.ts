@@ -28,6 +28,7 @@ describe("selectSuites", () => {
 
   const files: Record<string, string> = {
     "plugins/p/evals/a/one/case.yaml": "plugins: [../../..]\n",
+    "plugins/p/evals/a/suite.yaml": "context: [user/CLAUDE.md]\n",
     "plugins/p/evals/b/one/case.yaml": "plugins: [../../.., ../../../../q]\n",
     "plugins/p/evals/local/one/case.yaml": "plugins: [../../..]\n",
     "plugins/p/evals/local/.local-only": "",
@@ -65,6 +66,7 @@ describe("selectSuites", () => {
       changed: ["user/skills/tdd/SKILL.md"],
       expected: ["evals/user/tdd"],
     },
+    { name: "a context file", changed: ["user/CLAUDE.md"], expected: ["plugins/p/evals/a"] },
     { name: "a wrapped rule", changed: ["user/rules/ts.md"], expected: ["evals/user/tdd"] },
     {
       name: "the suite itself",

@@ -27,6 +27,55 @@ test("shim names are unique across plugins", () => {
   expect(new Set(names).size).toBe(names.length);
 });
 
+const binPlugins = [...new Set(shims.map((path) => basename(join(path, "..", ".."))))];
+const CHECK_SCRIPT = "scripts/bin-path-check.sh";
+
+test.each(binPlugins)("%s carries the bin-path-check copy", async (plugin) => {
+  const [canonical, copy] = await Promise.all([
+    Bun.file(join(root, "plugins/dispatch", CHECK_SCRIPT)).text(),
+    Bun.file(join(root, "plugins", plugin, CHECK_SCRIPT)).text(),
+  ]);
+  expect(copy).toBe(canonical);
+});
+
+// A session that predates a shim's deploy lacks it on PATH, so each skill that references one checks first.
+const skillDirs = binPlugins.flatMap((plugin) =>
+  globSync(`plugins/${plugin}/skills/*/SKILL.md`, { cwd: root }).map((path) => ({
+    plugin,
+    dir: join(root, path, ".."),
+  })),
+);
+
+describe.each(skillDirs.map(({ plugin, dir }) => [`${plugin}:${basename(dir)}`, plugin, dir]))(
+  "%s",
+  (_name, plugin, dir) => {
+    test("checks PATH for every shim it names", async () => {
+      const skill = await Bun.file(join(dir, "SKILL.md")).text();
+      const references = await Promise.all(
+        globSync("references/**/*.md", { cwd: dir }).map((path) =>
+          Bun.file(join(dir, path)).text(),
+        ),
+      );
+      const text = [skill, ...references].join("\n");
+      const named = shims
+        .filter((path) => path.startsWith(join(root, "plugins", plugin, "bin")))
+        .map((path) => basename(path))
+        .filter((shim) => new RegExp(`(^|[\\s\`(])${shim}([\\s\`:)]|$)`, "m").test(text));
+      const preflights = [
+        ...skill.matchAll(
+          /^!`(sh \$\{CLAUDE_PLUGIN_ROOT\}\/scripts\/bin-path-check\.sh) ([^`]+)`$/gm,
+        ),
+      ];
+      const checked = new Set(preflights.flatMap((match) => match[2]?.split(" ") ?? []));
+      expect(named.filter((shim) => !checked.has(shim))).toEqual([]);
+      for (const [, command] of preflights) {
+        const granted = skill.includes(`Bash(${command}:*)`) || /^ {2}- "?Bash"?$/m.test(skill);
+        expect(granted).toBe(true);
+      }
+    });
+  },
+);
+
 const SYSTEM_COMMANDS = new Set(["git", "wt", "claude", "agent-browser", "open", "osascript"]);
 
 const Settings = z.looseObject({

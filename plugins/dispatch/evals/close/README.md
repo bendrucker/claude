@@ -18,7 +18,7 @@ bun evals/native/compare.ts --suite plugins/dispatch/evals/close --markdown <bas
 
 Every case sources [`fixture-lib.sh`](fixture-lib.sh). It installs the offline stand-ins from [`packages/eval-stubs`](../../../../packages/eval-stubs/), then bundles [`stand-in.ts`](stand-in.ts) as `claude-dispatch-close`, first on `PATH`. The stand-in records each call as a `claude-dispatch-close <argv>` line in `.eval-calls` and answers `close`, `park`, and `restore` with a pane report. Every pane stays where it is. The fixture pushes a feature branch to a bare local origin. `open_pr` writes the `gh` snapshot with the PR and its `gh pr checks` rows, and `no_pr` replaces `gh` with one that finds no PR for any branch.
 
-The cases load no `pull-request` plugin. A parked run ends after its `pull-request:babysit` `Skill` call fails.
+The two parked cases also load a `pull-request` stand-in from their `plugin/` directory, whose `babysit` skill tells the session a watcher has CI and ends the turn. A parked run ends there instead of polling checks that never settle.
 
 ## Cases
 

@@ -24,4 +24,4 @@ Dispatch a background Agent: `analyst` when your agent types list it, otherwise 
 
 ## Report
 
-Relay the agent's report verbatim: divergences with their classification, requirements drift, ranked follow-ups split fix-before-merge from later, and the verdict.
+Relay the agent's report verbatim: divergences with their classification, requirements drift, ranked follow-ups split fix-before-merge from later, measurement evidence, the verdict, and the closing `plan-review:` line.

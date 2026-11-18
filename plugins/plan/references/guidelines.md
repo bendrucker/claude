@@ -1,6 +1,6 @@
 # Planning Guidelines
 
-The deliverable is one plan file. A new session implements it with no access to this conversation, so put everything the implementer needs in the file and nothing written for the user here.
+The deliverable is one plan file with two readers. The user approves or redirects it from the file alone, since plan mode shows them nothing else. A new session then executes it with no access to this conversation. The Brief serves the user. The rest of the plan holds everything the implementer needs.
 
 ## Grounding
 
@@ -19,28 +19,60 @@ Most rejected plans miss something the code already contains or the request alre
 - Write the plan yourself. Subagents return findings, not plans.
 - For a vague ask ("a skill", "a few rules"), plan the smallest change that satisfies it and offer heavier work as named tiers. Ask before adding a guard, rule, or test that catches zero existing cases.
 
+## Brief
+
+Make `## Brief` the plan's first `##` heading. A hook checks its structure at `ExitPlanMode` and denies a plan that misses it:
+
+- One paragraph stating the approach.
+- A `Decisions:` line, then a list of at most five decisions the user would otherwise discover in the diff. Each names the choice, then `Rejected:` with the strongest alternative and its evidence as a code span or link: a `file:line`, a query, a doc.
+- A `Measure:` line naming the change type and the loop from Measurement.
+- On every presentation after a rejection, a `Revised:` list naming what changed in answer to the feedback.
+
+```markdown
+## Brief
+
+Approach: move guideline delivery to a command hook so it reaches every host.
+
+Decisions:
+- Inject on UserPromptSubmit in plan mode. Rejected: the mod's reminder rewrite (`mod/register.ts:73`), which a security plugin bypasses.
+
+Measure: infra/config → the `plan-delivery` query per host after a re-sync.
+```
+
 ## New Terms
 
 Define each term, type, or field the plan relies on at first use: name its source when it exists upstream, or say in one line what it abstracts when coined here. For one that crosses a process or repo boundary (wire field, env var, manifest key), also name its consumers. If no one-line definition works for a new reader, use plain language instead.
 
 ## Plan Shape
 
-- Open with the non-negotiable conventions and a stop condition (implement, ship, end).
+- After the Brief, state the non-negotiable conventions and a stop condition (implement, ship, end).
 - Deferred design goes in a linked file the implementer is told not to open.
 - Honor standing `CLAUDE.md` rules (numbered `Step`/`Phase` headings are banned, plan files included) and match the sibling layout when naming files and symbols.
 - Reference skills inline where they run. No time estimates. List out-of-scope observations separately.
 
-## Verification
+## Measurement
 
-Include at least one criterion that fails when the change is wrong while the suite still passes:
+Pick the loop by change type:
+
+- Deterministic code: write a failing test first, then make it pass.
+- Model behavior (prompts, skills, rules, guidelines): run the eval suite, and climb with `evals:hill-climb`.
+- Performance: benchmark before and after, and profile before choosing what to change.
+- UI: capture screenshots before and after, and iterate against a rubric.
+- Infra or config: observe the live system after the change deploys.
+
+For each loop, state whether each metric is informational or a target, and name the artifact the loop leaves: a test file, an eval result path, benchmark output, a screenshot, a query result. Include at least one signal that fails when the change is wrong while the suite still passes:
 
 ```
 - Signal: <query result, rendered string, exit code, row count>
   Observe via: <command or query>
-  Pre-fix: <current value>   Pass: <expected value>
+  Pre-fix: <current value>   Pass: <expected value>   Artifact: <path or output>
 ```
 
-List mechanical checks (test, lint, build) once, and confirm each named target exists. Asserting that the diff landed is not a criterion.
+List mechanical checks (test, lint, build) once, and confirm each named target exists. Asserting that the diff landed is not a signal.
+
+## Critique
+
+Before the first `ExitPlanMode`, run `plan:critique` when the plan adds a type, module, API, or dependency, or chooses between approaches. Merge its findings into the plan. The Brief states that the critique ran and lists what it changed or what you overruled.
 
 ## Checkpoints
 
@@ -55,6 +87,6 @@ Mark a checkpoint line with its emoji, and state the instruction in plain words 
 Feedback lives in this conversation, which the implementer never sees, so it has to change the file:
 
 - Revise the sections the feedback names and leave the rest. A rejection with no feedback calls for a question, not a guess.
-- Delete text the feedback superseded. A finished plan reads as if written once: no "changed since last plan" or "previously considered". Keep a ruled-out approach only as one line under `## Alternatives` when the implementer would re-propose it.
+- Rewrite the body as if written once, and put what changed in the Brief's `Revised:` list. When implementing an approved plan, ignore its `Revised:` list.
 - Treat every `AskUserQuestion` answer as a constraint and check the plan against each before `ExitPlanMode`.
 - A pause or bare interrupt is a stop signal. Present and wait rather than editing and resubmitting.

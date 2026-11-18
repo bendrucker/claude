@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { join } from "node:path";
 import { checkBrief, stripRevised } from "./brief";
 
 interface Plan {
@@ -37,6 +38,15 @@ const first = { revisionRequired: false };
 describe("checkBrief", () => {
   it("passes a plan in the guidelines' shape", () => {
     expect(checkBrief(makePlan(), first)).toEqual([]);
+  });
+
+  it("passes the sample Brief in the guidelines", async () => {
+    const guidelines = await Bun.file(
+      join(import.meta.dirname, "..", "references", "guidelines.md"),
+    ).text();
+    const [, sample] = /```markdown\n([\s\S]*?)```/.exec(guidelines) ?? [];
+    expect(sample).toBeDefined();
+    expect(checkBrief(`# Plan\n\n${sample}`, first)).toEqual([]);
   });
 
   it.each<{ name: string; plan: string; revisionRequired?: boolean }>([

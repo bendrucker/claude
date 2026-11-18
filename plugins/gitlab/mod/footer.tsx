@@ -160,7 +160,6 @@ export function fit(chips: readonly Chip[], budget: number): Fitted {
   return fitted.kind === "chips" && fitted.placed.length === 0 ? count() : fitted;
 }
 
-/** One tracked MR as the footer draws it. */
 export interface Entry {
   snapshot: Snapshot;
   isBranch: boolean;
@@ -197,7 +196,6 @@ export function chipsOf(entries: readonly Entry[], isBusy: boolean, hint: string
   });
 }
 
-// The separator the footer draws between the engine's hint and the MRs.
 const JOIN = " · ";
 
 // The indent, the widest common permission pill (`⏵⏵ accept edits on`), and its separator.
@@ -206,11 +204,9 @@ const ROW_RESERVE = 25;
 // The right-hand mode labels, which a hook here can't read, such as `opus · medium`.
 const MODES_RESERVE = 16;
 
-/** The columns left for the MRs after the engine's line and the separator. */
 export const budgetOf = (columns: number, hint: string): number =>
   columns - ROW_RESERVE - MODES_RESERVE - cellsOf(hint) - cellsOf(JOIN);
 
-/** Draws the engine's hint, then each MR as a linked, colored group sized to the room left. */
 export function drawFooter(
   $: EngineInterface,
   e: RenderInput,

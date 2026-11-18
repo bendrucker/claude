@@ -100,7 +100,6 @@ interface Held<T> {
   failedAt?: number;
 }
 
-/** One merge request the session watches, with its own caches, backoff, and delivery. */
 interface Tracked {
   /** Where an MR off the branch is read from, undefined for the branch slot. */
   ref: MrRef | undefined;
@@ -127,7 +126,6 @@ interface Tracked {
   polls: number;
   /** Unchanged polls in a row. */
   streak: number;
-  /** The branch the slot last read. */
   branch: string | undefined;
   /** Why the slot's last poll found no MR, and on which branch. */
   none: string | undefined;
@@ -157,7 +155,6 @@ interface Watch {
   isStopped: boolean;
 }
 
-/** Where a tracked MR's glab calls run, and the host flag its `glab api` calls take. */
 interface Where {
   cwd: string;
   host: string[];

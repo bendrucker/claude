@@ -113,22 +113,20 @@ describe("edited files", () => {
     const { output, log } = await dispatch(await edited("draft.md", MULTI_VIOLATION));
     expect(output?.hookSpecificOutput?.hookEventName).toBe("PostToolUse");
     expect(contextOf(output)).toContain("numbers a step");
-    expect(contextOf(output)).toContain("em dash");
+    expect(contextOf(output)).toContain("em-dash");
     const { ts, session_id, duration_ms, target, ...stable } = log;
     expect(stable).toMatchInlineSnapshot(`
       {
-        "check": "Writing.SpacedEmDash",
+        "check": "ai-tells.EmDashUsage",
         "checks": [
           "Writing.StepHeading",
           "Writing.TitleCaseHeading",
-          "Writing.SpacedEmDash",
           "ai-tells.EmDashUsage",
         ],
         "emitted": [
-          "Writing.SpacedEmDash",
+          "ai-tells.EmDashUsage",
           "Writing.StepHeading",
           "Writing.TitleCaseHeading",
-          "ai-tells.EmDashUsage",
         ],
         "event": "PostToolUse",
         "ext": "md",
@@ -149,7 +147,7 @@ describe("edited files", () => {
     },
   ])("lints $name by Vale's own scoping", async ({ file, content, flagged }) => {
     const { log } = await dispatch(await edited(file, content));
-    expect((log.checks ?? []).includes("Writing.SpacedEmDash")).toBe(flagged);
+    expect((log.checks ?? []).includes("ai-tells.EmDashUsage")).toBe(flagged);
   });
 
   it("stays silent on a clean file and records an empty check list", async () => {

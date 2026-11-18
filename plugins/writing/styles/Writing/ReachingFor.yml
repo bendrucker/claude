@@ -1,5 +1,5 @@
-# evidence: pre-dates the curation principle with no corpus evidence recorded. Kept because the figurative construction is distinctive to AI output.
-# retire when: corpus analysis shows the phrase at low lift, or corrective-feedback moments stop citing it.
+# evidence: catches the figurative "reach for" that ai-tells.FigurativeReaches misses. Its misses are the noun "reach" and quotations of the pattern.
+# retire when: a judged sample of spans no ai-tells check overlaps falls below half real.
 extends: existence
 message: "'%s' is an AI-flavored figurative construction. Prefer 'use' or 'prefer X over Y'."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/ReachingFor.yml

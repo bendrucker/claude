@@ -30,8 +30,8 @@ describe("rewriteDraft", () => {
       judgeModel: "j",
       query: fakeQuery("The cache starts cold and warms up after the first request.\n", prompts),
     });
-    expect(prompts[0]).toContain("line 1, Writing.SpacedEmDash:");
-    expect(result.before.map((f) => f.Check)).toContain("Writing.SpacedEmDash");
+    expect(prompts[0]).toContain("line 1, ai-tells.EmDashUsage:");
+    expect(result.before.map((f) => f.Check)).toContain("ai-tells.EmDashUsage");
     expect(result.after).toEqual([]);
     expect(result.meaning).toEqual({ preserved: true, lost: [] });
     expect(result.words.after).toBe(11);

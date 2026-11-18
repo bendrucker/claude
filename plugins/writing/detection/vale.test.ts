@@ -41,21 +41,24 @@ test.each<{ name: string; args: string[] }>([
   });
 });
 
-// The ai-tells package ships every check at error, which denies a message, so a package bump must not add one unlevelled.
-test("every ai-tells check has a level in the plugin config", async () => {
-  await ensurePackages(valeBinary() ?? "vale");
-  const checks = await Array.fromAsync(
-    new Bun.Glob("*.yml").scan({ cwd: join(root, "styles", "ai-tells") }),
-  );
-  const config = await Bun.file(VALE_CONFIG).text();
-  const levelled = new Set(config.match(/^ai-tells\.\w+(?= = )/gm));
-  const unlevelled = checks
-    .map((file) => `ai-tells.${file.replace(/\.yml$/, "")}`)
-    .filter((check) => !levelled.has(check))
-    .toSorted();
-  expect(checks.length).toBeGreaterThan(0);
-  expect(unlevelled).toEqual([]);
-});
+// The ai-tells packages ship every check at error, which denies a message, so a package bump must not add one unlevelled.
+test.each(["ai-tells", "ai-tells-commits"])(
+  "every %s check has a level in the plugin config",
+  async (style) => {
+    await ensurePackages(valeBinary() ?? "vale");
+    const checks = await Array.fromAsync(
+      new Bun.Glob("*.yml").scan({ cwd: join(root, "styles", style) }),
+    );
+    const config = await Bun.file(VALE_CONFIG).text();
+    const levelled = new Set(config.match(new RegExp(`^${style}\\.\\w+(?= = )`, "gm")));
+    const unlevelled = checks
+      .map((file) => `${style}.${file.replace(/\.yml$/, "")}`)
+      .filter((check) => !levelled.has(check))
+      .toSorted();
+    expect(checks.length).toBeGreaterThan(0);
+    expect(unlevelled).toEqual([]);
+  },
+);
 
 // Vale 3.27 reads code comments through grammars `vale sync` installs, which an older sync of the same packages lacks.
 test("a Vale upgrade re-syncs packages already installed", async () => {

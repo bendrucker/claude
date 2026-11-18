@@ -1,5 +1,5 @@
-# evidence: split from ConsequenceChain, whose corpus hits are about a tenth ", so it" and ", so they". Which pronoun opens the clause is a word choice no tag carries. It stays a short list, with "neither" and "either", which the tagger reads as conjunctions.
-# retire when: ConsequenceChain retires, or a labeling pass shows most hits read fine.
+# evidence: split from the retired ConsequenceChain, whose corpus hits were about a tenth ", so it" and ", so they". ai-tells.ConsequenceClause reads determiner subjects only, so this keeps the pronoun ones. A 2026-11 re-sample judged 11 of 15 hook hits better split. Which pronoun opens the clause is a word choice no tag carries. It stays a short list, with "neither" and "either", which the tagger reads as conjunctions.
+# retire when: a judged sample of its hits mostly reads fine as written.
 extends: existence
 message: "'%s' chains a consequence onto the clause. Split into two sentences. State the cause and effect separately."
 link: https://github.com/bendrucker/claude/blob/main/plugins/writing/styles/Writing/ConsequenceChainPronoun.yml

@@ -56,17 +56,53 @@ test("every ai-tells check has a level in the plugin config", async () => {
 });
 
 describe("lintProse", () => {
-  const dense =
-    "The cache starts cold; the first request fills it. The retry logic backs off; later attempts succeed. The parser rejects malformed input; it returns an error. The server validates each field. The client sends a token. The job runs nightly.";
+  const text = "Hi Dana, the cache starts cold; the first request fills it.";
 
-  test.each<{ name: string; path: string | undefined; message: boolean; fires: boolean }>([
-    { name: "a prose file gets the file rules", path: "notes.md", message: false, fires: true },
-    { name: "a code file gets the code rules", path: "script.ts", message: false, fires: false },
-    { name: "no path lints as a message", path: undefined, message: false, fires: false },
-    { name: "a message flag overrides the path", path: "notes.md", message: true, fires: false },
-  ])("$name", async ({ path, message, fires }) => {
-    const checks = (await lintProse(dense, path, { message })).map((alert) => alert.Check);
-    expect(checks.includes("Writing.SemicolonSplice")).toBe(fires);
+  test.each<{
+    name: string;
+    path: string | undefined;
+    message: boolean;
+    check: string;
+    fires: boolean;
+  }>([
+    {
+      name: "a prose file gets the file rules",
+      path: "notes.md",
+      message: false,
+      check: "ai-tells.SemicolonUsage",
+      fires: true,
+    },
+    {
+      name: "a prose file skips the message rules",
+      path: "notes.md",
+      message: false,
+      check: "Writing.Salutation",
+      fires: false,
+    },
+    {
+      name: "a code file gets the code rules",
+      path: "script.ts",
+      message: false,
+      check: "ai-tells.SemicolonUsage",
+      fires: false,
+    },
+    {
+      name: "no path lints as a message",
+      path: undefined,
+      message: false,
+      check: "Writing.Salutation",
+      fires: true,
+    },
+    {
+      name: "a message flag overrides the path",
+      path: "notes.md",
+      message: true,
+      check: "Writing.Salutation",
+      fires: true,
+    },
+  ])("$name", async ({ path, message, check, fires }) => {
+    const checks = (await lintProse(text, path, { message })).map((alert) => alert.Check);
+    expect(checks.includes(check)).toBe(fires);
   });
 
   test("sorts by line, then column", async () => {

@@ -73,10 +73,10 @@ function contextOf(output: SyncHookJSONOutput | null): string | undefined {
 describe("messages", () => {
   it("denies on an error-level alert and lists the rest beside it", async () => {
     const opener = ["Hi", "team,"].join(" ");
-    const command = `gh pr create --body "${opener} this matches nothing. We must reach for it."`;
+    const command = `gh pr create --body "${opener} the handler reads the cache, so the event skips a query. We must reach for it."`;
     const { output, log } = await dispatch(message(command));
     expect(log.outcome).toBe("deny");
-    expect(log.emitted).toContain("Writing.NoNegation");
+    expect(log.emitted).toContain("ai-tells.ConsequenceClause");
     expect(log.emitted).toContain("Writing.Salutation");
     const specific = output?.hookSpecificOutput;
     const reason =
@@ -201,9 +201,9 @@ describe("edited files", () => {
       },
       {
         name: "a paragraph alert the edit caused on another line",
-        before: ["We reviewed daily; it works well.", "The team reviews each change."],
-        after: ["We reviewed daily; it works well.", "The team reviews; it merges."],
-        emitted: ["Writing.SemicolonSplice", "ai-tells.SemicolonUsage"],
+        before: ["The migration runs cleanly.", "The team reviews each change."],
+        after: ["The migration runs cleanly.", "The fixtures strip cleanly."],
+        emitted: ["Writing.SoftPhrasing"],
       },
     ])("handles $name", async ({ name, before, after, emitted }) => {
       const { log } = await dispatch(await edit(`${name}.md`, before, after));

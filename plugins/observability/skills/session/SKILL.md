@@ -105,6 +105,8 @@ duckdb -readonly -json -init ${CLAUDE_SKILL_DIR}/resources/limits.sql \
 
 ## Cross-Machine History
 
+!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh session-index-pull`
+
 Each machine is a `host`: this one is `local`, and each imported machine has a chosen label. `${CLAUDE_SKILL_DIR}/scripts/hosts.ts` lists them. To list, import, re-sync, or remove a machine, follow [`references/cross-machine.md`](references/cross-machine.md).
 
 ### Privacy

@@ -6,6 +6,7 @@ argument-hint: "--branch <branch | pr:<n> | mr:<n>> --prompt <file>"
 effort: low
 allowed-tools:
   - Bash(claude-dispatch:*)
+  - Bash(sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh:*)
 ---
 
 # Dispatch
@@ -41,6 +42,8 @@ A tab is a workstream with this session as its lead, and a pane is one task with
 The user finds a background session in `claude agents` and picks it up with `claude attach <target>`. This session follows it with `SendMessage` to `name`, and reads its output with `claude logs <target>`. The ledger, `dispatches.jsonl` in the plugin data dir, records every dispatch.
 
 ## Run It
+
+!`sh ${CLAUDE_PLUGIN_ROOT}/scripts/bin-path-check.sh claude-dispatch`
 
 ```bash
 claude-dispatch --branch "$BRANCH" --prompt "$PROMPT_FILE" [--allow <rule>]... [--sandbox-write <path>]...

@@ -12,6 +12,7 @@ const IDLE_AUTO = "(shift+tab to cycle) · ← for agents";
 function worldOf(on: On, model: string) {
   const events: { event: string; detail?: Readonly<Record<string, unknown>> | undefined }[] = [];
   const hints: string[] = [];
+  const modes: (readonly string[])[] = [];
   const invalidations: unknown[] = [];
   on("engine.create", async ($, e, next) => ({
     ...(await next(e)),
@@ -30,6 +31,10 @@ function worldOf(on: On, model: string) {
   on("ui.render", { component: "PromptHint" }, ($, e) => {
     hints.push(e.props.hint);
     return $.ui.resolve(e).Text({ children: e.props.hint });
+  });
+  on("ui.render", { component: "SessionMode" }, ($, e) => {
+    modes.push(e.props.modes);
+    return $.ui.resolve(e).Text({ children: e.props.modes.join(" & ") });
   });
   on("turn.step", async function* () {
     yield* await Promise.resolve([]);
@@ -52,7 +57,16 @@ function worldOf(on: On, model: string) {
     });
     return hints.at(-1);
   };
-  return { events, invalidations, shown };
+  const right = async ($: Engine, current: readonly string[] = []) => {
+    await $.ui.mount({
+      plugin: "session-config",
+      surface: "terminal",
+      component: "SessionMode",
+      props: { modes: current },
+    });
+    return modes.at(-1);
+  };
+  return { events, invalidations, shown, right };
 }
 
 async function step($: Engine, model: string, effort?: TurnStepInput["effort"]) {
@@ -101,12 +115,21 @@ describe("register", () => {
     ]);
   });
 
-  test("live hint parts stay ahead of the label", async ($, on) => {
+  test("live hint parts keep the row, and the label moves to the mode labels", async ($, on) => {
     const w = worldOf(on, SONNET);
     await $.session.start(START);
+    await step($, SONNET, "low");
     expect(await w.shown($, "esc to interrupt · ↓ to manage")).toBe(
-      "esc to interrupt · ↓ to manage · sonnet",
+      "esc to interrupt · ↓ to manage",
     );
+    expect(await w.right($, ["focus"])).toEqual(["focus", "sonnet · low"]);
+  });
+
+  test("a label carried by the hint stays out of the mode labels", async ($, on) => {
+    const w = worldOf(on, OPUS);
+    await $.session.start(START);
+    expect(await w.shown($)).toBe("opus");
+    expect(await w.right($)).toEqual([]);
   });
 
   test("a numeric effort adds no level", async ($, on) => {
@@ -132,7 +155,7 @@ describe("register", () => {
     expect(w.invalidations).toHaveLength(2);
   });
 
-  test("hintOf drops key help and fits the label to the row", () => {
+  test("hintOf drops key help and fits a lone label to the row", () => {
     const cases = [
       { name: "idle auto, no label", hint: IDLE_AUTO, label: [], columns: 45, want: "" },
       { name: "idle auto", hint: IDLE_AUTO, label: ["opus"], columns: 45, want: "opus" },
@@ -144,11 +167,11 @@ describe("register", () => {
         want: "sonnet · low",
       },
       {
-        name: "working at phone width drops the level first",
+        name: "a live part leaves the label out",
         hint: "↓ to manage",
         label: ["haiku", "medium"],
         columns: 45,
-        want: "↓ to manage · haiku",
+        want: "↓ to manage",
       },
       {
         name: "live parts stay when no label fits",
@@ -159,13 +182,13 @@ describe("register", () => {
       },
       {
         name: "no viewport, no limit",
-        hint: "? for shortcuts",
+        hint: IDLE_AUTO,
         label: ["sonnet", "low"],
         columns: undefined,
-        want: "? for shortcuts · sonnet · low",
+        want: "sonnet · low",
       },
     ];
     for (const { name, hint, label, columns, want } of cases)
-      expect([name, hintOf(hint, label, columns)]).toEqual([name, want]);
+      expect([name, hintOf(hint, label, columns).hint]).toEqual([name, want]);
   });
 });

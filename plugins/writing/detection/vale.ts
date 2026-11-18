@@ -1,5 +1,5 @@
 import { mkdir, rm } from "node:fs/promises";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, extname, join, relative } from "node:path";
 import { z } from "zod";
 
 export const VALE_CONFIG = join(import.meta.dirname, "..", ".vale.ini");
@@ -48,6 +48,15 @@ function sourceArg(source: ValeSource, root: string | null): string {
   return `--path=${path}`;
 }
 
+const PluginManifest = z.object({ name: z.string() });
+
+// A checkout or worktree of this plugin has its own `.vale.ini` but lacks the packages it syncs.
+async function isPluginCopy(dir: string): Promise<boolean> {
+  const manifest = Bun.file(join(dir, ".claude-plugin", "plugin.json"));
+  if (!(await manifest.exists())) return false;
+  return PluginManifest.safeParse(await manifest.json().catch(() => null)).data?.name === "writing";
+}
+
 /** The directory of the nearest `.vale.ini` or `_vale.ini` above `filePath`, if a repo adopted Vale. */
 export async function repoConfigRoot(filePath: string): Promise<string | null> {
   const ancestors: string[] = [];
@@ -56,19 +65,43 @@ export async function repoConfigRoot(filePath: string): Promise<string | null> {
     if (dirname(dir) === dir) break;
   }
   const adopted = await Promise.all(
-    ancestors.map(async (dir) =>
-      (
-        await Promise.all(
-          [".vale.ini", "_vale.ini"].map((name) => Bun.file(join(dir, name)).exists()),
-        )
-      ).some(Boolean),
-    ),
+    ancestors.map(async (dir) => {
+      const exists = await Promise.all(
+        [".vale.ini", "_vale.ini"].map((name) => Bun.file(join(dir, name)).exists()),
+      );
+      return exists.some(Boolean) && !(await isPluginCopy(dir));
+    }),
   );
   return ancestors[adopted.indexOf(true)] ?? null;
 }
 
+/** The extensions the config's `[*.ext]` and `[*.{a,b}]` sections match, or null when a section is any other glob. */
+export function sectionExtensions(ini: string): Set<string> | null {
+  const extensions = new Set<string>();
+  for (const [, header = ""] of ini.matchAll(/^\[([^\]]+)\]\s*$/gm)) {
+    if (header === "formats") continue;
+    // `*.md` or `*.{md,ts}`: the extension, or the braced list.
+    const glob = /^\*\.(?:\{([\w,]+)\}|(\w+))$/.exec(header);
+    if (glob === null) return null;
+    for (const ext of (glob[1] ?? glob[2] ?? "").split(",")) extensions.add(ext);
+  }
+  return extensions;
+}
+
+let pluginExtensions: Promise<Set<string> | null> | undefined;
+
+// Vale returns nothing for an extension outside every section, so skip the spawn. A repo's own config
+// merges with the global one, so only Vale knows what it lints.
+async function pluginSkips(filePath: string, root: string | null): Promise<boolean> {
+  if (root !== null) return false;
+  pluginExtensions ??= Bun.file(VALE_CONFIG).text().then(sectionExtensions);
+  const extensions = await pluginExtensions;
+  return extensions !== null && !extensions.has(extname(filePath).slice(1));
+}
+
 const STYLES = join(import.meta.dirname, "..", "styles");
 const SYNC_STAMP = join(STYLES, ".synced");
+const SYNC_VERSION = join(STYLES, ".synced-vale");
 const SYNC_LOCK = join(STYLES, ".sync.lock");
 const LOCK_STALE_MS = 120_000;
 
@@ -112,10 +145,22 @@ async function awaitSync(packages: string, deadline: number): Promise<boolean> {
   return awaitSync(packages, deadline);
 }
 
-/** Install the plugin's pinned Vale packages into `styles/`, unless that package list is already installed. */
+async function valeVersion(binary: string): Promise<string> {
+  const proc = Bun.spawn([binary, "--version"], { stdout: "pipe", stderr: "ignore" });
+  return (await new Response(proc.stdout).text()).trim();
+}
+
+// A Vale upgrade can need assets the last sync predates, such as the tree-sitter grammars 3.27 reads code comments with.
+async function syncedBy(version: string): Promise<boolean> {
+  const stamp = Bun.file(SYNC_VERSION);
+  return (await stamp.exists()) && (await stamp.text()) === version;
+}
+
+/** Install the plugin's pinned Vale packages into `styles/`, unless this Vale already installed that package list. */
 export async function ensurePackages(binary: string): Promise<void> {
   const packages = await pinnedPackages();
-  if (await isSynced(packages)) return;
+  const version = await valeVersion(binary);
+  if ((await isSynced(packages)) && (await syncedBy(version))) return;
   if (!(await holdLock())) {
     if (await awaitSync(packages, Date.now() + LOCK_STALE_MS)) return;
     throw new Error("timed out waiting for another process to sync Vale packages");
@@ -127,6 +172,7 @@ export async function ensurePackages(binary: string): Promise<void> {
     });
     const [stderr, exitCode] = await Promise.all([new Response(proc.stderr).text(), proc.exited]);
     if (exitCode !== 0) throw new Error(`vale sync exited ${exitCode}: ${stderr.trim()}`);
+    await Bun.write(SYNC_VERSION, version);
     await Bun.write(SYNC_STAMP, packages);
   } finally {
     await rm(SYNC_LOCK, { recursive: true, force: true });
@@ -151,8 +197,7 @@ function skipsGlobal(root: string | null): boolean {
   return root === null || process.env.NODE_ENV === "test";
 }
 
-async function configArgs(source: ValeSource): Promise<{ args: string[]; cwd?: string }> {
-  const root = "filePath" in source ? await repoConfigRoot(source.filePath) : null;
+function configArgs(source: ValeSource, root: string | null): { args: string[]; cwd?: string } {
   const args = root === null ? [`--config=${VALE_CONFIG}`] : [];
   if (skipsGlobal(root)) args.push("--no-global");
   args.push(sourceArg(source, root));
@@ -202,13 +247,16 @@ const Metrics = z.object({ words: z.number().default(0) });
 /** Lint `text` with the plugin's Vale config. Returns [] when vale is unavailable, and throws on a runtime failure. */
 export async function valeAlerts(text: string, source: ValeSource): Promise<ValeAlert[]> {
   if (text.trim() === "") return [];
-  const { args, cwd } = await configArgs(source);
+  const root = "filePath" in source ? await repoConfigRoot(source.filePath) : null;
+  if ("filePath" in source && (await pluginSkips(source.filePath, root))) return [];
+  const { args, cwd } = configArgs(source, root);
   return alertsOf(await runVale(args, { cwd, stdin: text }));
 }
 
 /** Lint the file at `filePath` as saved, under the repo's Vale config if it has one and the plugin's otherwise. */
 export async function lintFile(filePath: string): Promise<ValeAlert[]> {
   const root = await repoConfigRoot(filePath);
+  if (await pluginSkips(filePath, root)) return [];
   return alertsOf(await runVale(fileArgs(filePath, root), { cwd: root ?? undefined }));
 }
 

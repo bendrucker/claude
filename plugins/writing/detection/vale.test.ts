@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { mkdtempSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,6 +7,8 @@ import {
   ensurePackages,
   lintFile,
   lintProse,
+  repoConfigRoot,
+  sectionExtensions,
   VALE_CONFIG,
   ValeError,
   valeAlerts,
@@ -53,6 +55,16 @@ test("every ai-tells check has a level in the plugin config", async () => {
     .toSorted();
   expect(checks.length).toBeGreaterThan(0);
   expect(unlevelled).toEqual([]);
+});
+
+// Vale 3.27 reads code comments through grammars `vale sync` installs, which an older sync of the same packages lacks.
+test("a Vale upgrade re-syncs packages already installed", async () => {
+  const binary = valeBinary() ?? "vale";
+  const stamp = join(root, "styles", ".synced-vale");
+  await Bun.write(stamp, "vale version 0.0.0");
+  await ensurePackages(binary);
+  const version = (await new Response(Bun.spawn([binary, "--version"]).stdout).text()).trim();
+  expect(await Bun.file(stamp).text()).toBe(version);
 });
 
 describe("lintProse", () => {
@@ -149,6 +161,80 @@ describe("a global config beside the plugin's", () => {
   });
 });
 
+describe("sectionExtensions", () => {
+  test.each<{ name: string; ini: string; extensions: string[] | null }>([
+    {
+      name: "reads single and braced globs, ignoring [formats]",
+      ini: "[formats]\nprbody = md\n[*.md]\nA = YES\n[*.{ts,py}]\nB = NO\n",
+      extensions: ["md", "py", "ts"],
+    },
+    { name: "gives up on a directory glob", ini: "[*.md]\n[docs/*.txt]\n", extensions: null },
+    { name: "gives up on a catch-all", ini: "[*]\n", extensions: null },
+  ])("$name", ({ ini, extensions }) => {
+    const found = sectionExtensions(ini);
+    expect(found === null ? null : [...found].toSorted()).toEqual(extensions);
+  });
+
+  test("the plugin config lints markdown and TypeScript but not reStructuredText", async () => {
+    const found = sectionExtensions(await Bun.file(VALE_CONFIG).text());
+    expect([found?.has("md"), found?.has("ts"), found?.has("rst")]).toEqual([true, true, false]);
+  });
+});
+
+describe("a file no plugin section matches", () => {
+  let dir: string;
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), "vale-skip-"));
+  });
+  afterAll(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test.each(["data.json", "notes.rst", "Makefile", "run.sh"])(
+    "%s lints without spawning Vale",
+    async (name) => {
+      const path = join(dir, name);
+      await Bun.write(path, "The cache starts cold; the first request fills it.\n");
+      const spawn = spyOn(Bun, "spawn");
+      try {
+        expect(await lintFile(path)).toEqual([]);
+        expect(await valeAlerts("The cache starts cold; it fills.", { filePath: path })).toEqual(
+          [],
+        );
+        expect(spawn).not.toHaveBeenCalled();
+      } finally {
+        spawn.mockRestore();
+      }
+    },
+  );
+});
+
+// Each worktree holds its own copy of the plugin, whose `styles/` never had the packages synced.
+describe("a file inside a copy of this plugin", () => {
+  let copy: string;
+  beforeAll(async () => {
+    await ensurePackages(valeBinary() ?? "vale");
+    copy = join(mkdtempSync(join(tmpdir(), "vale-worktree-")), "plugins", "writing");
+    await mkdir(join(copy, "styles"), { recursive: true });
+    await Bun.write(join(copy, ".claude-plugin", "plugin.json"), '{ "name": "writing" }\n');
+    await Bun.write(join(copy, ".vale.ini"), Bun.file(VALE_CONFIG));
+  });
+  afterAll(async () => {
+    await rm(join(copy, "..", ".."), { recursive: true, force: true });
+  });
+
+  test("is not an adopted repo config", async () => {
+    expect(await repoConfigRoot(join(copy, "README.md"))).toBeNull();
+  });
+
+  test("lints under the running plugin's config without E201", async () => {
+    const path = join(copy, "README.md");
+    await Bun.write(path, "The cache starts cold; the first request fills it.\n");
+    const checks = (await lintFile(path)).map((alert) => alert.Check);
+    expect(checks).toContain("ai-tells.SemicolonUsage");
+  });
+});
+
 describe("a repo's own config", () => {
   let repo: string;
 
@@ -173,6 +259,20 @@ describe("a repo's own config", () => {
       (alert) => alert.Check,
     );
     expect(checks.includes("Vale.Repetition")).toBe(fires);
+  });
+
+  // Vale merges the global config with a repo's, so only Vale knows what a repo config lints.
+  test("lints an extension the plugin config does not", async () => {
+    const notes = join(repo, "notes");
+    await mkdir(join(notes, "styles"), { recursive: true });
+    await Bun.write(
+      join(notes, ".vale.ini"),
+      "StylesPath = styles\n[formats]\nnotes = md\n[*.notes]\nBasedOnStyles = Vale\n",
+    );
+    const checks = (await valeAlerts("The the cache.", { filePath: join(notes, "a.notes") })).map(
+      (alert) => alert.Check,
+    );
+    expect(checks).toContain("Vale.Repetition");
   });
 
   test("throws a runtime failure with Vale's error code", async () => {
